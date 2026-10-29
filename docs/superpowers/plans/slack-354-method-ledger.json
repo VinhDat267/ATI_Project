@@ -1,6 +1,7 @@
 {
-  "version": "2.0.0",
-  "snapshotSha": "811f5dc9 (PR 185 staged in 81a27b78)",
+  "version": "2.2.0",
+  "sourceCommit": "811f5dc9121d372f232efb63d9880d9574648e3a",
+  "inventoryFileSha256": "e55bc180eb43c71c1131dbded5968c1e240d3424fe1314bf604139055c074f09",
   "totalMethods": 354,
   "excludedCount": 101,
   "probeRequiredCount": 253,
@@ -272,6 +273,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.analytics:read"
       ],
@@ -287,7 +289,8 @@
       "method": "admin.analytics.messages.activity",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.analytics:read"
       ],
@@ -303,7 +306,8 @@
       "method": "admin.analytics.messages.metadata",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.analytics:read"
       ],
@@ -320,6 +324,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.app_activities:read"
       ],
@@ -335,7 +340,8 @@
       "method": "admin.apps.approve",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.apps:write"
       ],
@@ -351,7 +357,8 @@
       "method": "admin.apps.approved.list",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.apps:read"
       ],
@@ -367,7 +374,8 @@
       "method": "admin.apps.clearResolution",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.apps:write"
       ],
@@ -384,6 +392,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.apps:read"
       ],
@@ -400,6 +409,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.apps:write"
       ],
@@ -415,7 +425,8 @@
       "method": "admin.apps.mcp.servers.list",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.apps:read"
       ],
@@ -431,7 +442,8 @@
       "method": "admin.apps.mcp.servers.permissions.list",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.apps:read"
       ],
@@ -447,7 +459,8 @@
       "method": "admin.apps.mcp.servers.permissions.set",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.apps:write"
       ],
@@ -463,7 +476,8 @@
       "method": "admin.apps.permissions.add",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.apps:write"
       ],
@@ -479,7 +493,8 @@
       "method": "admin.apps.permissions.list",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.apps:read"
       ],
@@ -495,7 +510,8 @@
       "method": "admin.apps.permissions.remove",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.apps:write"
       ],
@@ -511,7 +527,8 @@
       "method": "admin.apps.permissions.set",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.apps:write"
       ],
@@ -527,7 +544,8 @@
       "method": "admin.apps.requests.cancel",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.apps:write"
       ],
@@ -543,7 +561,8 @@
       "method": "admin.apps.requests.list",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.apps:read"
       ],
@@ -559,7 +578,8 @@
       "method": "admin.apps.restrict",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.apps:write"
       ],
@@ -575,7 +595,8 @@
       "method": "admin.apps.restricted.list",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.apps:read"
       ],
@@ -591,7 +612,8 @@
       "method": "admin.apps.uninstall",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.apps:write"
       ],
@@ -608,6 +630,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin"
       ],
@@ -624,6 +647,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin"
       ],
@@ -639,7 +663,8 @@
       "method": "admin.auth.policy.assignEntities",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.users:write"
       ],
@@ -655,7 +680,8 @@
       "method": "admin.auth.policy.getEntities",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.users:read"
       ],
@@ -671,7 +697,8 @@
       "method": "admin.auth.policy.removeEntities",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.users:write"
       ],
@@ -687,7 +714,8 @@
       "method": "admin.barriers.create",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.barriers:write"
       ],
@@ -703,7 +731,8 @@
       "method": "admin.barriers.delete",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.barriers:write"
       ],
@@ -719,7 +748,8 @@
       "method": "admin.barriers.list",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.barriers:read"
       ],
@@ -735,7 +765,8 @@
       "method": "admin.barriers.update",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.barriers:write"
       ],
@@ -751,7 +782,8 @@
       "method": "admin.conversations.archive",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.conversations:write"
       ],
@@ -768,6 +800,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.conversations:write"
       ],
@@ -784,6 +817,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.conversations:write"
       ],
@@ -800,6 +834,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.conversations:write"
       ],
@@ -816,6 +851,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.conversations:write"
       ],
@@ -832,6 +868,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.conversations:write"
       ],
@@ -847,7 +884,8 @@
       "method": "admin.conversations.convertToPrivate",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.conversations:write"
       ],
@@ -863,7 +901,8 @@
       "method": "admin.conversations.convertToPublic",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.conversations:write"
       ],
@@ -879,7 +918,8 @@
       "method": "admin.conversations.create",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.conversations:write"
       ],
@@ -896,6 +936,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.conversations:manage_objects"
       ],
@@ -911,7 +952,8 @@
       "method": "admin.conversations.delete",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.conversations:write"
       ],
@@ -927,7 +969,8 @@
       "method": "admin.conversations.disconnectShared",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.conversations:write"
       ],
@@ -943,7 +986,8 @@
       "method": "admin.conversations.ekm.listOriginalConnectedChannelInfo",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.conversations:read"
       ],
@@ -959,7 +1003,8 @@
       "method": "admin.conversations.getConversationPrefs",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.conversations:read"
       ],
@@ -975,7 +1020,8 @@
       "method": "admin.conversations.getCustomRetention",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.conversations:read"
       ],
@@ -991,7 +1037,8 @@
       "method": "admin.conversations.getTeams",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.conversations:read"
       ],
@@ -1007,7 +1054,8 @@
       "method": "admin.conversations.invite",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.conversations:write"
       ],
@@ -1024,6 +1072,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.conversations:manage_objects"
       ],
@@ -1040,6 +1089,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.conversations:read"
       ],
@@ -1055,7 +1105,8 @@
       "method": "admin.conversations.removeCustomRetention",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.conversations:write"
       ],
@@ -1071,7 +1122,8 @@
       "method": "admin.conversations.rename",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.conversations:write"
       ],
@@ -1087,7 +1139,8 @@
       "method": "admin.conversations.restrictAccess.addGroup",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.conversations:write"
       ],
@@ -1103,7 +1156,8 @@
       "method": "admin.conversations.restrictAccess.listGroups",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.conversations:read"
       ],
@@ -1119,7 +1173,8 @@
       "method": "admin.conversations.restrictAccess.removeGroup",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.conversations:write"
       ],
@@ -1135,7 +1190,8 @@
       "method": "admin.conversations.search",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.conversations:read"
       ],
@@ -1151,7 +1207,8 @@
       "method": "admin.conversations.setConversationPrefs",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.conversations:write"
       ],
@@ -1167,7 +1224,8 @@
       "method": "admin.conversations.setCustomRetention",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.conversations:write"
       ],
@@ -1183,7 +1241,8 @@
       "method": "admin.conversations.setTeams",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.conversations:write"
       ],
@@ -1200,6 +1259,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.conversations:write"
       ],
@@ -1216,6 +1276,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.conversations:manage_objects"
       ],
@@ -1231,7 +1292,8 @@
       "method": "admin.emoji.add",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.teams:write"
       ],
@@ -1247,7 +1309,8 @@
       "method": "admin.emoji.addAlias",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.teams:write"
       ],
@@ -1263,7 +1326,8 @@
       "method": "admin.emoji.list",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.teams:read"
       ],
@@ -1279,7 +1343,8 @@
       "method": "admin.emoji.remove",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.teams:write"
       ],
@@ -1295,7 +1360,8 @@
       "method": "admin.emoji.rename",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.teams:write"
       ],
@@ -1312,6 +1378,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.workflows:read"
       ],
@@ -1328,6 +1395,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.workflows:read"
       ],
@@ -1344,6 +1412,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.workflows:read"
       ],
@@ -1360,6 +1429,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.invites:write"
       ],
@@ -1376,6 +1446,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.invites:read"
       ],
@@ -1392,6 +1463,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.invites:read"
       ],
@@ -1408,6 +1480,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.invites:write"
       ],
@@ -1424,6 +1497,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.invites:read"
       ],
@@ -1439,7 +1513,8 @@
       "method": "admin.roles.addAssignments",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.roles:write"
       ],
@@ -1456,6 +1531,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.roles:read"
       ],
@@ -1472,6 +1548,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.roles:write"
       ],
@@ -1487,7 +1564,8 @@
       "method": "admin.slackbot.skills.list",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.skills:read"
       ],
@@ -1503,7 +1581,8 @@
       "method": "admin.slackbot.skills.publish",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.skills:write"
       ],
@@ -1519,7 +1598,8 @@
       "method": "admin.slackbot.skills.setAutoEnabled",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.skills:write"
       ],
@@ -1535,7 +1615,8 @@
       "method": "admin.slackbot.skills.unpublish",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.skills:write"
       ],
@@ -1551,7 +1632,8 @@
       "method": "admin.teams.admins.list",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.teams:read"
       ],
@@ -1567,7 +1649,8 @@
       "method": "admin.teams.create",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.teams:write"
       ],
@@ -1583,7 +1666,8 @@
       "method": "admin.teams.list",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.teams:read"
       ],
@@ -1599,7 +1683,8 @@
       "method": "admin.teams.owners.list",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.teams:read"
       ],
@@ -1615,7 +1700,8 @@
       "method": "admin.teams.settings.info",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.teams:read"
       ],
@@ -1631,7 +1717,8 @@
       "method": "admin.teams.settings.setDefaultChannels",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.teams:write"
       ],
@@ -1647,7 +1734,8 @@
       "method": "admin.teams.settings.setDescription",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.teams:write"
       ],
@@ -1663,7 +1751,8 @@
       "method": "admin.teams.settings.setDiscoverability",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.teams:write"
       ],
@@ -1679,7 +1768,8 @@
       "method": "admin.teams.settings.setIcon",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.teams:write"
       ],
@@ -1695,7 +1785,8 @@
       "method": "admin.teams.settings.setName",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.teams:write"
       ],
@@ -1711,7 +1802,8 @@
       "method": "admin.usergroups.addChannels",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.usergroups:write"
       ],
@@ -1728,6 +1820,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.teams:write"
       ],
@@ -1743,7 +1836,8 @@
       "method": "admin.usergroups.addUsers",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.usergroups:write"
       ],
@@ -1759,7 +1853,8 @@
       "method": "admin.usergroups.create",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.usergroups:write"
       ],
@@ -1775,7 +1870,8 @@
       "method": "admin.usergroups.fetch",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.usergroups:read"
       ],
@@ -1791,7 +1887,8 @@
       "method": "admin.usergroups.listChannels",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.usergroups:read"
       ],
@@ -1807,7 +1904,8 @@
       "method": "admin.usergroups.removeChannels",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.usergroups:write"
       ],
@@ -1824,6 +1922,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.teams:write"
       ],
@@ -1839,7 +1938,8 @@
       "method": "admin.usergroups.removeUsers",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.usergroups:write"
       ],
@@ -1855,7 +1955,8 @@
       "method": "admin.usergroups.update",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.usergroups:write"
       ],
@@ -1871,7 +1972,8 @@
       "method": "admin.usergroups.uploadUsers",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.usergroups:write"
       ],
@@ -1887,7 +1989,8 @@
       "method": "admin.users.access.pause",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.users:write"
       ],
@@ -1903,7 +2006,8 @@
       "method": "admin.users.access.resume",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.users:write"
       ],
@@ -1919,7 +2023,8 @@
       "method": "admin.users.assign",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.users:write"
       ],
@@ -1935,7 +2040,8 @@
       "method": "admin.users.deactivate",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.users:write"
       ],
@@ -1951,7 +2057,8 @@
       "method": "admin.users.getExpiration",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.users:read"
       ],
@@ -1967,7 +2074,8 @@
       "method": "admin.users.invite",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.users:write"
       ],
@@ -1983,7 +2091,8 @@
       "method": "admin.users.list",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.users:read"
       ],
@@ -1999,7 +2108,8 @@
       "method": "admin.users.remove",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.users:write"
       ],
@@ -2015,7 +2125,8 @@
       "method": "admin.users.session.clearSettings",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.users:write"
       ],
@@ -2031,7 +2142,8 @@
       "method": "admin.users.session.getSettings",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.users:read"
       ],
@@ -2047,7 +2159,8 @@
       "method": "admin.users.session.invalidate",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.users:write"
       ],
@@ -2063,7 +2176,8 @@
       "method": "admin.users.session.list",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.users:read"
       ],
@@ -2079,7 +2193,8 @@
       "method": "admin.users.session.reset",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.users:write"
       ],
@@ -2095,7 +2210,8 @@
       "method": "admin.users.session.resetBulk",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.users:write"
       ],
@@ -2111,7 +2227,8 @@
       "method": "admin.users.session.setSettings",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.users:write"
       ],
@@ -2127,7 +2244,8 @@
       "method": "admin.users.setAdmin",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.users:write"
       ],
@@ -2143,7 +2261,8 @@
       "method": "admin.users.setExpiration",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.users:write"
       ],
@@ -2159,7 +2278,8 @@
       "method": "admin.users.setOwner",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.users:write"
       ],
@@ -2175,7 +2295,8 @@
       "method": "admin.users.setRegular",
       "family": "admin",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": [
         "admin.users:write"
       ],
@@ -2192,6 +2313,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.users:read"
       ],
@@ -2208,6 +2330,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.workflows:write"
       ],
@@ -2224,6 +2347,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.workflows:write"
       ],
@@ -2240,6 +2364,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.workflows:read"
       ],
@@ -2256,6 +2381,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.workflows:read"
       ],
@@ -2272,6 +2398,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "client"
       ],
@@ -2288,6 +2415,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "client"
       ],
@@ -2304,6 +2432,7 @@
       "family": "admin",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin.workflows:write"
       ],
@@ -2320,6 +2449,7 @@
       "family": "agents",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2334,6 +2464,7 @@
       "family": "agents",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2348,6 +2479,7 @@
       "family": "agents",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2362,6 +2494,7 @@
       "family": "agents",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2376,6 +2509,7 @@
       "family": "agents",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2390,6 +2524,7 @@
       "family": "agents",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2404,6 +2539,7 @@
       "family": "agents",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2418,6 +2554,7 @@
       "family": "agents",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2432,6 +2569,7 @@
       "family": "agents",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2446,6 +2584,7 @@
       "family": "agents",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2460,6 +2599,7 @@
       "family": "agents",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2474,6 +2614,7 @@
       "family": "api",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2488,6 +2629,7 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "hosting:read"
       ],
@@ -2504,6 +2646,7 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2518,6 +2661,7 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2531,7 +2675,8 @@
       "method": "apps.connections.open",
       "family": "apps",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Method usage requires an app-level token; excluded from user-token business tools. Event authorization lookup remains separate infrastructure.",
+      "reason": "Method usage requires an app-level token; excluded from user-token business tools. Event authorization lookup remains separate infrastructure.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "excluded",
@@ -2546,6 +2691,7 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2560,6 +2706,7 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2574,6 +2721,7 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2588,6 +2736,7 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2602,6 +2751,7 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2616,6 +2766,7 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2630,6 +2781,7 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2644,6 +2796,7 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2658,6 +2811,7 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2671,7 +2825,8 @@
       "method": "apps.event.authorizations.list",
       "family": "apps",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Method usage requires an app-level token; excluded from user-token business tools. Event authorization lookup remains separate infrastructure.",
+      "reason": "Method usage requires an app-level token; excluded from user-token business tools. Event authorization lookup remains separate infrastructure.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "excluded",
@@ -2686,6 +2841,7 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "app_configurations:write"
       ],
@@ -2702,6 +2858,7 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2716,6 +2873,7 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2730,6 +2888,7 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2744,6 +2903,7 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2758,6 +2918,7 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2772,6 +2933,7 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2786,6 +2948,7 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2800,6 +2963,7 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "users:write"
       ],
@@ -2816,6 +2980,7 @@
       "family": "assistant",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "search:read.public",
         "search:read.private",
@@ -2837,6 +3002,7 @@
       "family": "assistant",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "search:read.public"
       ],
@@ -2853,6 +3019,7 @@
       "family": "assistant",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2867,6 +3034,7 @@
       "family": "assistant",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2881,6 +3049,7 @@
       "family": "assistant",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2895,6 +3064,7 @@
       "family": "auth",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2909,6 +3079,7 @@
       "family": "auth",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2923,6 +3094,7 @@
       "family": "auth",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2937,6 +3109,7 @@
       "family": "blocks",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -2951,6 +3124,7 @@
       "family": "bookmarks",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "bookmarks:write"
       ],
@@ -2967,6 +3141,7 @@
       "family": "bookmarks",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "bookmarks:write"
       ],
@@ -2983,6 +3158,7 @@
       "family": "bookmarks",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "bookmarks:read"
       ],
@@ -2999,6 +3175,7 @@
       "family": "bookmarks",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "bookmarks:write"
       ],
@@ -3015,6 +3192,7 @@
       "family": "bots",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "users:read"
       ],
@@ -3031,6 +3209,7 @@
       "family": "calls",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "calls:write"
       ],
@@ -3047,6 +3226,7 @@
       "family": "calls",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "calls:write"
       ],
@@ -3063,6 +3243,7 @@
       "family": "calls",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "calls:read"
       ],
@@ -3079,6 +3260,7 @@
       "family": "calls",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "calls:write"
       ],
@@ -3095,6 +3277,7 @@
       "family": "calls",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "calls:write"
       ],
@@ -3111,6 +3294,7 @@
       "family": "calls",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "calls:write"
       ],
@@ -3127,6 +3311,7 @@
       "family": "canvases",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "canvases:write"
       ],
@@ -3143,6 +3328,7 @@
       "family": "canvases",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "canvases:write"
       ],
@@ -3159,6 +3345,7 @@
       "family": "canvases",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "canvases:write"
       ],
@@ -3175,6 +3362,7 @@
       "family": "canvases",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "canvases:write"
       ],
@@ -3191,6 +3379,7 @@
       "family": "canvases",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "canvases:write"
       ],
@@ -3207,6 +3396,7 @@
       "family": "canvases",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "canvases:read"
       ],
@@ -3223,6 +3413,7 @@
       "family": "canvases",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "canvases:read"
       ],
@@ -3239,6 +3430,7 @@
       "family": "chat",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "core",
@@ -3253,6 +3445,7 @@
       "family": "chat",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "chat:write"
       ],
@@ -3269,6 +3462,7 @@
       "family": "chat",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "chat:write"
       ],
@@ -3285,6 +3479,7 @@
       "family": "chat",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "core",
@@ -3299,6 +3494,7 @@
       "family": "chat",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "chat:write"
       ],
@@ -3315,6 +3511,7 @@
       "family": "chat",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "chat:write"
       ],
@@ -3331,6 +3528,7 @@
       "family": "chat",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "chat:write"
       ],
@@ -3347,6 +3545,7 @@
       "family": "chat",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "chat:write"
       ],
@@ -3363,6 +3562,7 @@
       "family": "chat",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "core",
@@ -3377,6 +3577,7 @@
       "family": "chat",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "core",
@@ -3391,6 +3592,7 @@
       "family": "chat",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "core",
@@ -3405,6 +3607,7 @@
       "family": "chat",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "links:write"
       ],
@@ -3421,6 +3624,7 @@
       "family": "chat",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "chat:write"
       ],
@@ -3437,6 +3641,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "core",
@@ -3451,6 +3656,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "core",
@@ -3465,6 +3671,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "groups:write",
         "im:write",
@@ -3484,6 +3691,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "canvases:write"
       ],
@@ -3500,6 +3708,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "groups:write",
         "im:write",
@@ -3519,6 +3728,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "groups:write",
         "im:write",
@@ -3538,6 +3748,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "core",
@@ -3551,7 +3762,8 @@
       "method": "conversations.externalInvitePermissions.set",
       "family": "conversations",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "excluded",
@@ -3566,6 +3778,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "groups:history",
         "im:history",
@@ -3585,6 +3798,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "groups:read",
         "im:read",
@@ -3604,6 +3818,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "channels:write.invites",
         "groups:write.invites",
@@ -3625,6 +3840,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "core",
@@ -3639,6 +3855,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "channels:write"
       ],
@@ -3655,6 +3872,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "groups:write",
         "channels:write"
@@ -3672,6 +3890,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "groups:write",
         "im:write",
@@ -3691,6 +3910,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "groups:read",
         "im:read",
@@ -3710,6 +3930,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "core",
@@ -3724,6 +3945,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "groups:write",
         "im:write",
@@ -3743,6 +3965,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "groups:read",
         "im:read",
@@ -3762,6 +3985,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "channels:write",
         "groups:write",
@@ -3781,6 +4005,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "groups:write",
         "im:write",
@@ -3800,6 +4025,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "groups:history",
         "im:history",
@@ -3819,6 +4045,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "core",
@@ -3833,6 +4060,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "core",
@@ -3847,6 +4075,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "core",
@@ -3861,6 +4090,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "channels:write.topic",
         "groups:write.topic",
@@ -3884,6 +4114,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "channels:write.topic",
         "groups:write.topic",
@@ -3907,6 +4138,7 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "groups:write",
         "im:write",
@@ -3926,6 +4158,7 @@
       "family": "dialog",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -3940,6 +4173,7 @@
       "family": "dnd",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "dnd:write"
       ],
@@ -3956,6 +4190,7 @@
       "family": "dnd",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "dnd:write"
       ],
@@ -3972,6 +4207,7 @@
       "family": "dnd",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "dnd:read"
       ],
@@ -3988,6 +4224,7 @@
       "family": "dnd",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "dnd:write"
       ],
@@ -4004,6 +4241,7 @@
       "family": "dnd",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "dnd:read"
       ],
@@ -4020,6 +4258,7 @@
       "family": "emoji",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "emoji:read"
       ],
@@ -4036,6 +4275,7 @@
       "family": "entity",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -4050,6 +4290,7 @@
       "family": "entity",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -4064,6 +4305,7 @@
       "family": "entity",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -4078,6 +4320,7 @@
       "family": "files",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "files:write"
       ],
@@ -4094,6 +4337,7 @@
       "family": "files",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "files:write"
       ],
@@ -4110,6 +4354,7 @@
       "family": "files",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "files:write"
       ],
@@ -4126,6 +4371,7 @@
       "family": "files",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "files:write"
       ],
@@ -4142,6 +4388,7 @@
       "family": "files",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "files:read"
       ],
@@ -4158,6 +4405,7 @@
       "family": "files",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "files:read"
       ],
@@ -4174,6 +4422,7 @@
       "family": "files",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "content_and_interaction",
@@ -4188,6 +4437,7 @@
       "family": "files",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "remote_files:read"
       ],
@@ -4204,6 +4454,7 @@
       "family": "files",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "remote_files:read"
       ],
@@ -4220,6 +4471,7 @@
       "family": "files",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "content_and_interaction",
@@ -4234,6 +4486,7 @@
       "family": "files",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "remote_files:share"
       ],
@@ -4250,6 +4503,7 @@
       "family": "files",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "content_and_interaction",
@@ -4264,6 +4518,7 @@
       "family": "files",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "files:write"
       ],
@@ -4280,6 +4535,7 @@
       "family": "files",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "files:write"
       ],
@@ -4295,7 +4551,8 @@
       "method": "files.upload",
       "family": "files",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Method page explicitly documents deprecation, retirement or non-functional behavior; outside the non-deprecated API target.",
+      "reason": "Method page explicitly documents deprecation, retirement or non-functional behavior; outside the non-deprecated API target.",
       "userScopes": [
         "files:write"
       ],
@@ -4312,6 +4569,7 @@
       "family": "functions",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -4326,6 +4584,7 @@
       "family": "functions",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -4340,6 +4599,7 @@
       "family": "functions",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -4354,6 +4614,7 @@
       "family": "functions",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -4368,6 +4629,7 @@
       "family": "functions",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -4382,6 +4644,7 @@
       "family": "functions",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -4396,6 +4659,7 @@
       "family": "functions",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -4410,6 +4674,7 @@
       "family": "functions",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -4424,6 +4689,7 @@
       "family": "migration",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "tokens.basic"
       ],
@@ -4440,6 +4706,7 @@
       "family": "oauth",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -4454,6 +4721,7 @@
       "family": "oauth",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -4468,6 +4736,7 @@
       "family": "oauth",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -4482,6 +4751,7 @@
       "family": "oauth",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -4496,6 +4766,7 @@
       "family": "oauth",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -4510,6 +4781,7 @@
       "family": "oauth",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -4524,6 +4796,7 @@
       "family": "openid",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -4538,6 +4811,7 @@
       "family": "openid",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "openid"
       ],
@@ -4554,6 +4828,7 @@
       "family": "pins",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "pins:write"
       ],
@@ -4570,6 +4845,7 @@
       "family": "pins",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "pins:read"
       ],
@@ -4586,6 +4862,7 @@
       "family": "pins",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "pins:write"
       ],
@@ -4602,6 +4879,7 @@
       "family": "reactions",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "reactions:write"
       ],
@@ -4618,6 +4896,7 @@
       "family": "reactions",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "reactions:read"
       ],
@@ -4634,6 +4913,7 @@
       "family": "reactions",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "reactions:read"
       ],
@@ -4650,6 +4930,7 @@
       "family": "reactions",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "reactions:write"
       ],
@@ -4666,6 +4947,7 @@
       "family": "reminders",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "reminders:write"
       ],
@@ -4682,6 +4964,7 @@
       "family": "reminders",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "reminders:write"
       ],
@@ -4698,6 +4981,7 @@
       "family": "reminders",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "reminders:write"
       ],
@@ -4714,6 +4998,7 @@
       "family": "reminders",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "reminders:read"
       ],
@@ -4730,6 +5015,7 @@
       "family": "reminders",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "reminders:read"
       ],
@@ -4746,6 +5032,7 @@
       "family": "rtm",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -4759,7 +5046,8 @@
       "method": "rtm.start",
       "family": "rtm",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Method page explicitly documents deprecation, retirement or non-functional behavior; outside the non-deprecated API target.",
+      "reason": "Method page explicitly documents deprecation, retirement or non-functional behavior; outside the non-deprecated API target.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "excluded",
@@ -4774,6 +5062,7 @@
       "family": "search",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "search:read"
       ],
@@ -4790,6 +5079,7 @@
       "family": "search",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "search:read"
       ],
@@ -4806,6 +5096,7 @@
       "family": "search",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "search:read"
       ],
@@ -4822,6 +5113,7 @@
       "family": "slackLists",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "lists:write"
       ],
@@ -4838,6 +5130,7 @@
       "family": "slackLists",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "lists:write"
       ],
@@ -4854,6 +5147,7 @@
       "family": "slackLists",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "lists:write"
       ],
@@ -4870,6 +5164,7 @@
       "family": "slackLists",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "lists:read"
       ],
@@ -4886,6 +5181,7 @@
       "family": "slackLists",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "lists:read"
       ],
@@ -4902,6 +5198,7 @@
       "family": "slackLists",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "lists:write"
       ],
@@ -4918,6 +5215,7 @@
       "family": "slackLists",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "lists:write"
       ],
@@ -4934,6 +5232,7 @@
       "family": "slackLists",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "lists:write"
       ],
@@ -4950,6 +5249,7 @@
       "family": "slackLists",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "lists:read"
       ],
@@ -4966,6 +5266,7 @@
       "family": "slackLists",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "lists:read"
       ],
@@ -4982,6 +5283,7 @@
       "family": "slackLists",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "lists:write"
       ],
@@ -4998,6 +5300,7 @@
       "family": "slackLists",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "lists:write"
       ],
@@ -5014,6 +5317,7 @@
       "family": "slackbot",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, organization feature enablement, caller role and native behavior remain unverified.",
       "userScopes": [
         "skills:write"
       ],
@@ -5030,6 +5334,7 @@
       "family": "slackbot",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, organization feature enablement, caller role and native behavior remain unverified.",
       "userScopes": [
         "skills:write"
       ],
@@ -5046,6 +5351,7 @@
       "family": "slackbot",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, organization feature enablement, caller role and native behavior remain unverified.",
       "userScopes": [
         "skills:read"
       ],
@@ -5062,6 +5368,7 @@
       "family": "slackbot",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, organization feature enablement, caller role and native behavior remain unverified.",
       "userScopes": [
         "skills:write"
       ],
@@ -5078,6 +5385,7 @@
       "family": "slackbot",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, organization feature enablement, caller role and native behavior remain unverified.",
       "userScopes": [
         "skills:write"
       ],
@@ -5094,6 +5402,7 @@
       "family": "slackbot",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, organization feature enablement, caller role and native behavior remain unverified.",
       "userScopes": [
         "skills:read"
       ],
@@ -5110,6 +5419,7 @@
       "family": "slackbot",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, organization feature enablement, caller role and native behavior remain unverified.",
       "userScopes": [
         "skills:write"
       ],
@@ -5126,6 +5436,7 @@
       "family": "stars",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed legacy Stars documentation: these methods do not represent the current Later saved-items UI; native behavior remains unverified.",
       "userScopes": [
         "stars:write"
       ],
@@ -5142,6 +5453,7 @@
       "family": "stars",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed legacy Stars documentation: these methods do not represent the current Later saved-items UI; native behavior remains unverified.",
       "userScopes": [
         "stars:read"
       ],
@@ -5158,6 +5470,7 @@
       "family": "stars",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed legacy Stars documentation: these methods do not represent the current Later saved-items UI; native behavior remains unverified.",
       "userScopes": [
         "stars:write"
       ],
@@ -5174,6 +5487,7 @@
       "family": "team",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin"
       ],
@@ -5190,6 +5504,7 @@
       "family": "team",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin"
       ],
@@ -5206,6 +5521,7 @@
       "family": "team",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "team.billing:read"
       ],
@@ -5221,7 +5537,8 @@
       "method": "team.externalTeams.disconnect",
       "family": "team",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "excluded",
@@ -5235,7 +5552,8 @@
       "method": "team.externalTeams.list",
       "family": "team",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "excluded",
@@ -5250,6 +5568,7 @@
       "family": "team",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "team:read"
       ],
@@ -5266,6 +5585,7 @@
       "family": "team",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "admin"
       ],
@@ -5282,6 +5602,7 @@
       "family": "team",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "team.preferences:read"
       ],
@@ -5298,6 +5619,7 @@
       "family": "team",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "users.profile:read"
       ],
@@ -5314,6 +5636,7 @@
       "family": "tooling",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -5328,6 +5651,7 @@
       "family": "usergroups",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "usergroups:write"
       ],
@@ -5344,6 +5668,7 @@
       "family": "usergroups",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "usergroups:write"
       ],
@@ -5360,6 +5685,7 @@
       "family": "usergroups",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "usergroups:write"
       ],
@@ -5376,6 +5702,7 @@
       "family": "usergroups",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "usergroups:read"
       ],
@@ -5392,6 +5719,7 @@
       "family": "usergroups",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "usergroups:write"
       ],
@@ -5408,6 +5736,7 @@
       "family": "usergroups",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "usergroups:read"
       ],
@@ -5424,6 +5753,7 @@
       "family": "usergroups",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "usergroups:write"
       ],
@@ -5440,6 +5770,7 @@
       "family": "users",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "groups:read",
         "im:read",
@@ -5459,6 +5790,7 @@
       "family": "users",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "users.profile:write"
       ],
@@ -5474,7 +5806,8 @@
       "method": "users.discoverableContacts.lookup",
       "family": "users",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "excluded",
@@ -5489,6 +5822,7 @@
       "family": "users",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "users:read"
       ],
@@ -5505,6 +5839,7 @@
       "family": "users",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "identity:read"
       ],
@@ -5521,6 +5856,7 @@
       "family": "users",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "users:read"
       ],
@@ -5537,6 +5873,7 @@
       "family": "users",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "users:read"
       ],
@@ -5553,6 +5890,7 @@
       "family": "users",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "users:read.email"
       ],
@@ -5569,6 +5907,7 @@
       "family": "users",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "users.profile:read"
       ],
@@ -5585,6 +5924,7 @@
       "family": "users",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "users.profile:write"
       ],
@@ -5600,7 +5940,8 @@
       "method": "users.setActive",
       "family": "users",
       "disposition": "excluded",
-      "exclusionReason": null,
+      "exclusionReason": "Method page explicitly documents deprecation, retirement or non-functional behavior; outside the non-deprecated API target.",
+      "reason": "Method page explicitly documents deprecation, retirement or non-functional behavior; outside the non-deprecated API target.",
       "userScopes": [
         "users:write"
       ],
@@ -5617,6 +5958,7 @@
       "family": "users",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "users.profile:write"
       ],
@@ -5633,6 +5975,7 @@
       "family": "users",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "users:write"
       ],
@@ -5649,6 +5992,7 @@
       "family": "views",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -5663,6 +6007,7 @@
       "family": "views",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -5677,6 +6022,7 @@
       "family": "views",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -5691,6 +6037,7 @@
       "family": "views",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -5705,6 +6052,7 @@
       "family": "workflows",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "bookmarks:write"
       ],
@@ -5721,6 +6069,7 @@
       "family": "workflows",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "bookmarks:read"
       ],
@@ -5737,6 +6086,7 @@
       "family": "workflows",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "bookmarks:write"
       ],
@@ -5753,6 +6103,7 @@
       "family": "workflows",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, caller role and native behavior remain unverified.",
       "userScopes": [
         "bookmarks:write"
       ],
@@ -5769,6 +6120,7 @@
       "family": "workflows",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -5783,6 +6135,7 @@
       "family": "workflows",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -5797,6 +6150,7 @@
       "family": "workflows",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
@@ -5811,6 +6165,7 @@
       "family": "workflows",
       "disposition": "probe_required",
       "exclusionReason": null,
+      "reason": "Reviewed metadata has no user-scope declaration; token eligibility requires explicit verification, not an unsupported inference.",
       "userScopes": null,
       "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
