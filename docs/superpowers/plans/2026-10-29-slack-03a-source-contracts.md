@@ -292,11 +292,11 @@ git commit -m "feat(slack): extend policy contracts with storage decision and po
     `{ ownerSourceKey: string; origin: SlackSourceRef; policyRef: SlackPolicyReference; derivedCopies: SlackDerivedCopyRef[]; }`
   - `validateSlackSourceLineage(input: unknown): SlackSourceLineage`.
   - `SlackTombstoneReason`:
-    `'source_deleted' | 'source_edited' | 'channel_membership_lost' | 'connection_disconnected' | 'app_reinstalled' | 'consent_revoked' | 'retention_expired'`.
+    `'source_deleted' | 'source_edited' | 'channel_membership_lost' | 'connection_disconnected' | 'app_reinstalled' | 'consent_revoked' | 'retention_expired' | 'policy_changed'`.
   - `SlackTombstoneRecord`:
     `{ sourceRef: SlackSourceRef; reason: SlackTombstoneReason; tombstonedAt: string; purgedAt: string | null; }`
   - `validateSlackTombstoneRecord(input: unknown): SlackTombstoneRecord`.
-  - `SlackPurgeTarget`: Discriminated union với 5 tagged scopes tường minh, loại bỏ hoàn toàn thẩm quyền mơ hồ:
+  - `SlackPurgeTarget`: Discriminated union với 6 tagged scopes tường minh, loại bỏ hoàn toàn thẩm quyền mơ hồ:
     ```ts
     export type SlackPurgeTarget =
       | {
@@ -339,6 +339,12 @@ git commit -m "feat(slack): extend policy contracts with storage decision and po
           consentRevision: string; // chuỗi số thập phân dương: chống xoá nhầm bản sao cấp lại
           cascadeTargetKinds: SlackDerivedTargetKind[];
           tombstoneReason: 'consent_revoked';
+        }
+      | {
+          scope: 'policy_epoch_invalidated';
+          epoch: SlackPolicyEpoch; // danh tính ủy quyền bất biến chuẩn tắc
+          cascadeTargetKinds: SlackDerivedTargetKind[];
+          tombstoneReason: 'policy_changed';
         };
     ```
   - `validateSlackPurgeTarget(input: unknown): SlackPurgeTarget`.

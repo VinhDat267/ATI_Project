@@ -10,6 +10,7 @@ import {
   type SlackBinding,
   type SlackSourceRef,
   type SlackPolicyReference,
+  type SlackPolicyEpoch,
   type SlackSourceEntity,
   type SlackPurgeTarget,
 } from '../src/index.js';
@@ -285,6 +286,12 @@ describe('Slack Source Lifecycle, Lineage & Purge Contracts (F1, F2, F3)', () =>
         purgedAt: null,
       };
       expect(validateSlackTombstoneRecord(tombstone)).toEqual(tombstone);
+
+      const policyChangedTombstone = {
+        ...tombstone,
+        reason: 'policy_changed' as const,
+      };
+      expect(validateSlackTombstoneRecord(policyChangedTombstone)).toEqual(policyChangedTombstone);
     });
 
     it('rejects tombstone record with invalid reason', () => {
@@ -299,7 +306,7 @@ describe('Slack Source Lifecycle, Lineage & Purge Contracts (F1, F2, F3)', () =>
     });
   });
 
-  describe('SlackPurgeTarget (5 Tagged Scopes)', () => {
+  describe('SlackPurgeTarget (6 Tagged Scopes)', () => {
     it('validates scope: owner_retention with full binding, policyRef, and retention_expired reason', () => {
       const target: SlackPurgeTarget = {
         scope: 'owner_retention',
@@ -430,6 +437,48 @@ describe('Slack Source Lifecycle, Lineage & Purge Contracts (F1, F2, F3)', () =>
         validateSlackPurgeTarget({
           ...target,
           consentRevision: 1 as any,
+        })
+      ).toThrow(TypeError);
+    });
+
+    it('validates scope: policy_epoch_invalidated requiring exact epoch and policy_changed reason', () => {
+      const epoch: SlackPolicyEpoch = {
+        binding,
+        providerProfileId: 'verified-provider',
+        configFingerprint: 'a'.repeat(64),
+        policyVersion: 'policy-v1',
+        consentRevision: '1',
+        providerRevision: '1',
+      };
+
+      const target: SlackPurgeTarget = {
+        scope: 'policy_epoch_invalidated',
+        epoch,
+        cascadeTargetKinds: ['chat_history_message', 'working_memory_entity'],
+        tombstoneReason: 'policy_changed',
+      };
+      expect(validateSlackPurgeTarget(target)).toEqual(target);
+
+      // Rejects if tombstoneReason is not 'policy_changed'
+      expect(() =>
+        validateSlackPurgeTarget({
+          ...target,
+          tombstoneReason: 'consent_revoked' as any,
+        })
+      ).toThrow(TypeError);
+
+      // Rejects if epoch is missing or has invalid revision
+      expect(() =>
+        validateSlackPurgeTarget({
+          ...target,
+          epoch: { ...epoch, providerRevision: '0' },
+        })
+      ).toThrow(TypeError);
+
+      expect(() =>
+        validateSlackPurgeTarget({
+          ...target,
+          epoch: undefined as any,
         })
       ).toThrow(TypeError);
     });

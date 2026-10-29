@@ -3,9 +3,13 @@ import {
   decideSlackModelUse,
   decideSlackSourceStorage,
   validateSlackPolicyReference,
+  validateSlackPolicyEpoch,
+  sameSlackPolicyEpoch,
+  slackPolicyRefToEpoch,
   type SlackModelPolicy,
   type SlackModelRequest,
   type SlackPolicyReference,
+  type SlackPolicyEpoch,
   type SlackSourceStorageRequest,
 } from '../src/index.js';
 
@@ -226,6 +230,58 @@ describe('Slack source model authorization', () => {
       const clean = validateSlackPolicyReference(dirty);
       expect(clean).toEqual(request.policyRef);
       expect((clean as any).extraSecret).toBeUndefined();
+    });
+
+    it('validates canonical SlackPolicyEpoch and strips operational context', () => {
+      const { request } = storageInputs();
+      const epoch: SlackPolicyEpoch = {
+        binding: request.policyRef.binding,
+        providerProfileId: request.policyRef.providerProfileId,
+        configFingerprint: request.policyRef.configFingerprint,
+        policyVersion: request.policyRef.policyVersion,
+        consentRevision: request.policyRef.consentRevision,
+        providerRevision: request.policyRef.providerRevision,
+      };
+
+      const clean = validateSlackPolicyEpoch(epoch);
+      expect(clean).toEqual(epoch);
+
+      // Conversions from SlackPolicyReference drop purpose & requestedRetentionDays
+      expect(slackPolicyRefToEpoch(request.policyRef)).toEqual(epoch);
+
+      // Rejects non-canonical revisions: "0", "01", "-1", "v1", number
+      for (const badRev of ['0', '01', '-1', 'v1', '1.0', '', '  ', null, undefined, 1 as any]) {
+        expect(() => validateSlackPolicyEpoch({ ...epoch, consentRevision: badRev })).toThrow(TypeError);
+        expect(() => validateSlackPolicyEpoch({ ...epoch, providerRevision: badRev })).toThrow(TypeError);
+      }
+
+      // Rejects missing/empty string fields
+      expect(() => validateSlackPolicyEpoch({ ...epoch, providerProfileId: '' })).toThrow(TypeError);
+      expect(() => validateSlackPolicyEpoch({ ...epoch, configFingerprint: '   ' })).toThrow(TypeError);
+      expect(() => validateSlackPolicyEpoch({ ...epoch, policyVersion: '' })).toThrow(TypeError);
+
+      // Strips extra fields
+      const dirty = { ...epoch, purpose: 'storage', extraField: 'remove-me' };
+      const cleaned = validateSlackPolicyEpoch(dirty);
+      expect(cleaned).toEqual(epoch);
+      expect((cleaned as any).purpose).toBeUndefined();
+      expect((cleaned as any).extraField).toBeUndefined();
+    });
+
+    it('sameSlackPolicyEpoch checks exact immutable authorization identity', () => {
+      const { request } = storageInputs();
+      const epochA = slackPolicyRefToEpoch(request.policyRef);
+      const epochB = slackPolicyRefToEpoch(request.policyRef);
+      expect(sameSlackPolicyEpoch(epochA, epochB)).toBe(true);
+
+      // Differentiates provider revision bump
+      expect(sameSlackPolicyEpoch(epochA, { ...epochB, providerRevision: '2' })).toBe(false);
+
+      // Differentiates consent revision bump
+      expect(sameSlackPolicyEpoch(epochA, { ...epochB, consentRevision: '2' })).toBe(false);
+
+      // Differentiates binding change
+      expect(sameSlackPolicyEpoch(epochA, { ...epochB, binding: { ...epochB.binding, connectionId: 'other-conn' } })).toBe(false);
     });
   });
 });

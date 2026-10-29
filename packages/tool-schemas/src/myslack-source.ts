@@ -10,7 +10,9 @@ import {
 } from './myslack-context.js';
 import {
   validateSlackPolicyReference,
+  validateSlackPolicyEpoch,
   type SlackPolicyReference,
+  type SlackPolicyEpoch,
 } from './myslack-policy.js';
 
 export interface SlackSourceMetadata {
@@ -383,7 +385,8 @@ export type SlackTombstoneReason =
   | 'connection_disconnected'
   | 'app_reinstalled'
   | 'consent_revoked'
-  | 'retention_expired';
+  | 'retention_expired'
+  | 'policy_changed';
 
 export const SLACK_TOMBSTONE_REASONS: readonly SlackTombstoneReason[] = [
   'source_deleted',
@@ -393,6 +396,7 @@ export const SLACK_TOMBSTONE_REASONS: readonly SlackTombstoneReason[] = [
   'app_reinstalled',
   'consent_revoked',
   'retention_expired',
+  'policy_changed',
 ] as const;
 
 export interface SlackTombstoneRecord {
@@ -482,6 +486,12 @@ export type SlackPurgeTarget =
       consentRevision: string;
       cascadeTargetKinds: SlackDerivedTargetKind[];
       tombstoneReason: 'consent_revoked';
+    }
+  | {
+      scope: 'policy_epoch_invalidated';
+      epoch: SlackPolicyEpoch;
+      cascadeTargetKinds: SlackDerivedTargetKind[];
+      tombstoneReason: 'policy_changed';
     };
 
 const CANONICAL_CONSENT_REVISION = /^[1-9][0-9]*$/;
@@ -667,6 +677,22 @@ export function validateSlackPurgeTarget(input: unknown): SlackPurgeTarget {
         consentRevision: record.consentRevision,
         cascadeTargetKinds,
         tombstoneReason: 'consent_revoked',
+      };
+    }
+
+    case 'policy_epoch_invalidated': {
+      if (!Object.hasOwn(record, 'epoch')) throw new TypeError('policy_epoch_invalidated requires epoch');
+      const cleanEpoch = validateSlackPolicyEpoch(record.epoch);
+
+      if (record.tombstoneReason !== 'policy_changed') {
+        throw new TypeError('policy_epoch_invalidated requires tombstoneReason "policy_changed"');
+      }
+
+      return {
+        scope: 'policy_epoch_invalidated',
+        epoch: cleanEpoch,
+        cascadeTargetKinds,
+        tombstoneReason: 'policy_changed',
       };
     }
 

@@ -32,6 +32,12 @@ Sau phiên review độc lập tại commits `6e02ca56` và `871c5393`, nhóm đ
 - **Kiểm thực đệ quy cấu trúc tham số:** Xây dựng hàm kiểm thực đệ quy hỗ trợ kiểm tra kiểu dữ liệu, giới hạn biên (minimum/maximum), mảng enum, và thực thi nghiêm ngặt cờ `additionalProperties: false` cho cả các đối tượng lồng nhau (loại bỏ hoàn toàn rủi ro lọt token bí mật như `access_token` trong object con).
 - **Fail-closed với thuộc tính ngoài vỏ envelope:** Khi nhận tham số dạng envelope `{ binding, params: { ... } }`, từ chối ngay lập tức nếu xuất hiện bất kỳ thuộc tính lạ nào ở cấp ngoài cùng (outer fields).
 
+### 1.4. Hợp Đồng Vô Hiệu Hóa Kỷ Nguyên Chính Sách Phục Vụ Consumer 03B1 (`policy_epoch_invalidated`)
+- **Định nghĩa `SlackPolicyEpoch`:** Đại diện cho danh tính ủy quyền bất biến chuẩn tắc (`binding`, `providerProfileId`, `configFingerprint`, `policyVersion`, `consentRevision`, `providerRevision`), tách biệt hoàn toàn khỏi ngữ cảnh vận hành (`purpose`, `requestedRetentionDays`).
+- **Thêm tagged scope thứ 6 `policy_epoch_invalidated`:** Cho phép Backend 03B1 vô hiệu hóa chính xác các bản ghi thuộc về provider revision cũ mà vẫn bảo toàn các bản sao được bắt mới dưới cùng một consent revision.
+- **Thêm lý do `tombstoneReason: 'policy_changed'`:** Phản ánh chính xác nguồn bị tombstone do chính sách hoặc cấu hình nhà cung cấp thay đổi.
+- **Các hàm tiện ích chuẩn tắc:** `validateSlackPolicyEpoch`, `sameSlackPolicyEpoch`, và `slackPolicyRefToEpoch`.
+
 ---
 
 ## 2. Bằng Chứng Kiểm Thử Thực Tế (Real Evidence)
@@ -41,8 +47,8 @@ Tất cả các kiểm thử đều được chạy thực tế trong môi trư�
 | Lệnh Kiểm Thử | Mục Đích | Kết Quả Thực Tế | Exit Code |
 |---|---|---|---|
 | `npx tsx .superpowers/review194/review.mts` | Bộ tái hiện đánh giá độc lập | **13/13 tests PASS** (1 valid fixture + 10 boundary cases + 2 registry/schema protection cases) | **0** |
-| `npm test -w @wap/tool-schemas` | Chạy toàn bộ test suites của package | **15 test files PASS, 263 tests PASS** (tăng từ 183 ban đầu) | **0** |
-| `npx vitest run packages/tool-schemas/tests/myslack-*.test.ts` | Kiểm thử tập trung 5 suites Slack | **5 test files PASS, 195 tests PASS** (context 47, connection 67, policy 32, source 27, tools 22) | **0** |
+| `npm test -w @wap/tool-schemas` | Chạy toàn bộ test suites của package | **15 test files PASS, 266 tests PASS** (tăng từ 183 ban đầu) | **0** |
+| `npx vitest run packages/tool-schemas/tests/myslack-*.test.ts` | Kiểm thử tập trung 5 suites Slack | **5 test files PASS, 198 tests PASS** (context 47, connection 67, policy 34, source 28, tools 22) | **0** |
 | `npm run typecheck:v3` | Kiểm tra static types toàn bộ workspace v3 | **PASS** (`apps/chat-api` và `apps/chat-web` typecheck sạch sẽ) | **0** |
 | `git diff --check b757ae0..HEAD` | Kiểm tra cú pháp Whitespace từ base tới HEAD | Sạch sẽ, không có trailing whitespace | **0** |
 | Mechanical Assertion Script | Kiểm tra đối soát 354 methods với inventory hash `e55bc180eb43c71c1131dbded5968c1e240d3424fe1314bf604139055c074f09` | **100% 354 methods PASS**, 101 excluded khớp chính xác lý do | **0** |

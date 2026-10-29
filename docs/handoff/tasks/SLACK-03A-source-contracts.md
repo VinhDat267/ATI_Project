@@ -67,6 +67,17 @@ Tái sử dụng và mở rộng trực tiếp policy engine hiện hữu thay v
    - Hợp lệ -> `{ allowed: true, maxRetentionDays: number }`.
    - Lưu ý: Backend runtime bắt buộc revalidate persisted consent/provider revisions và current connection/ACL tại mỗi lần sử dụng; schemas thuần không tự chứng minh được DB freshness.
 
+6. `interface SlackPolicyEpoch`: Danh tính ủy quyền bất biến chuẩn tắc (Immutable Authorization Identity):
+   - `binding: SlackBinding;`
+   - `providerProfileId: string;`
+   - `configFingerprint: string;`
+   - `policyVersion: string;`
+   - `consentRevision: string;`
+   - `providerRevision: string;`
+   Loại bỏ ngữ cảnh vận hành (`purpose` và `requestedRetentionDays`) để phục vụ chuẩn xác cho đối soát và vô hiệu hóa kỷ nguyên chính sách.
+7. `validateSlackPolicyEpoch(input: unknown): SlackPolicyEpoch`: Kiểm thực toàn bộ trường bắt buộc và định dạng canonical decimal string cho các revision.
+8. `sameSlackPolicyEpoch(a: SlackPolicyEpoch, b: SlackPolicyEpoch): boolean` & `slackPolicyRefToEpoch(ref: SlackPolicyReference): SlackPolicyEpoch`.
+
 ### 2.3. File Tạo Mới: `packages/tool-schemas/src/myslack-source.ts`
 Chứa các định nghĩa và hàm xác thực vòng đời dữ liệu nguồn (F1, F2, F3):
 1. `interface SlackSourceMetadata`: Bounded whitelisted metadata:
@@ -107,19 +118,20 @@ Chứa các định nghĩa và hàm xác thực vòng đời dữ liệu nguồn
    - `policyRef: SlackPolicyReference;`
    - `derivedCopies: SlackDerivedCopyRef[];`
 9. `validateSlackSourceLineage(input: unknown): SlackSourceLineage`
-10. `type SlackTombstoneReason = 'source_deleted' | 'source_edited' | 'channel_membership_lost' | 'connection_disconnected' | 'app_reinstalled' | 'consent_revoked' | 'retention_expired';`
+10. `type SlackTombstoneReason = 'source_deleted' | 'source_edited' | 'channel_membership_lost' | 'connection_disconnected' | 'app_reinstalled' | 'consent_revoked' | 'retention_expired' | 'policy_changed';`
 11. `interface SlackTombstoneRecord`:
     - `sourceRef: SlackSourceRef;`
     - `reason: SlackTombstoneReason;`
     - `tombstonedAt: string;`
     - `purgedAt: string | null;`
 12. `validateSlackTombstoneRecord(input: unknown): SlackTombstoneRecord`
-13. `type SlackPurgeTarget`: Discriminated union với 5 tagged scopes phân định rành mạch thẩm quyền, triệt tiêu nguy cơ phá dữ liệu chéo người dùng:
+13. `type SlackPurgeTarget`: Discriminated union với 6 tagged scopes phân định rành mạch thẩm quyền, triệt tiêu nguy cơ phá dữ liệu chéo người dùng:
     - `{ scope: 'owner_retention'; binding: SlackBinding; resourceType: SlackResourceType; resourceId: string; revision?: string; policyRef: SlackPolicyReference; cascadeTargetKinds: SlackDerivedTargetKind[]; tombstoneReason: 'retention_expired' }` (Hết hạn retention theo đúng chủ sở hữu và chính sách đã cấp, không ảnh hưởng người khác).
     - `{ scope: 'channel_membership_lost'; binding: SlackBinding; channelId: string; cascadeTargetKinds: SlackDerivedTargetKind[]; tombstoneReason: 'channel_membership_lost' }` (Chỉ xoá bản sao của kênh bị mất quyền, giữ nguyên các kênh khác).
     - `{ scope: 'authorization_disconnect'; binding: SlackBinding; cascadeTargetKinds: SlackDerivedTargetKind[]; tombstoneReason: 'connection_disconnected' | 'app_reinstalled' }` (Chỉ xoá bản sao của riêng người ngắt kết nối; bảo toàn người dùng B trong cùng workspace).
     - `{ scope: 'resource_lifecycle'; workspaceId: string; resourceType: SlackResourceType; resourceId: string; revision?: string; cascadeTargetKinds: SlackDerivedTargetKind[]; tombstoneReason: 'source_deleted' | 'source_edited' }` (Xoá bản ghi khi tin/file bị sửa hoặc xoá ở Slack).
     - `{ scope: 'workspace_consent_revocation'; workspaceId: string; policyVersion: string; providerProfileId: string; consentRevision: string; cascadeTargetKinds: SlackDerivedTargetKind[]; tombstoneReason: 'consent_revoked' }` (Xoá toàn bộ nội dung của workspace thuộc đúng policyVersion, providerProfileId và consentRevision; bảo vệ các bản sao được cấp lại dưới revision mới).
+    - `{ scope: 'policy_epoch_invalidated'; epoch: SlackPolicyEpoch; cascadeTargetKinds: SlackDerivedTargetKind[]; tombstoneReason: 'policy_changed' }` (Xoá bản sao thuộc đúng kỷ nguyên chính sách/nhà cung cấp cụ thể đã bị thay đổi; cho phép Backend 03B1 vô hiệu hóa provider revision cũ mà bảo toàn các lượt bắt mới dưới cùng consent).
 14. `validateSlackPurgeTarget(input: unknown): SlackPurgeTarget`
 
 ### 2.4. File Tạo Mới: `packages/tool-schemas/src/myslack-tools.ts`
@@ -234,7 +246,7 @@ Trước khi Backend (03B) và Adapter (03C) thi công mã nguồn, các module 
 - [x] `formatSlackOwnerSourceKey` mã hoá cấu trúc tuple JSON đầy đủ binding + tài nguyên; 2 người dùng ATI khác nhau cùng workspace có khoá nguồn riêng biệt.
 - [x] `validateSlackPolicyReference` kiểm tra định dạng positive canonical decimal string (`/^[1-9][0-9]*$/`) cho cả `consentRevision` và `providerRevision`; từ chối số 0 hoặc số có số 0 ở đầu; kiểm tra `purpose` thuộc 5 giá trị chuẩn tắc.
 - [x] `decideSlackSourceStorage` mở rộng trực tiếp `myslack-policy.ts` và ủy quyền `decideSlackModelUse`, chặn đứng việc lưu trữ bền vững khi `retentionDays === 0`.
-- [x] Hợp đồng xoá nguồn `SlackPurgeTarget` phân biệt rõ 5 tagged scopes: `owner_retention`, `channel_membership_lost`, `authorization_disconnect`, `resource_lifecycle`, `workspace_consent_revocation`.
+- [x] Hợp đồng xoá nguồn `SlackPurgeTarget` phân biệt rõ 6 tagged scopes: `owner_retention`, `channel_membership_lost`, `authorization_disconnect`, `resource_lifecycle`, `workspace_consent_revocation`, `policy_epoch_invalidated`.
 - [x] `validateSlackToolExecutionArgs` kiểm tra fail-closed theo schema tham số cố định, từ chối tham số lạ.
 - [x] `SlackMethodFamily` chứa đúng 36 tên snapshot family từ inventory; `userScopes` phân biệt rõ `null` (unknown) với `[]` (empty).
 - [x] `ALL_TOOLS` và `SERVICE_REGISTRY` tuyệt đối không chứa `myslack`.
@@ -246,8 +258,8 @@ Trước khi Backend (03B) và Adapter (03C) thi công mã nguồn, các module 
 
 | Tiêu chuẩn kiểm tra | Lệnh thực hiện | Kết quả thực tế |
 |---|---|---|
-| Kiểm tra toàn bộ test suite package `@wap/tool-schemas` | `npm test -w @wap/tool-schemas` | **15 test files PASS, 263 tests PASS**, exit code 0 |
-| Kiểm tra bộ test Slack đầy đủ | `npx vitest run packages/tool-schemas/tests/myslack-*.test.ts` | **5 test files PASS, 195 tests PASS** (context 47, connection 67, policy 32, source 27, tools 22), exit code 0 |
+| Kiểm tra toàn bộ test suite package `@wap/tool-schemas` | `npm test -w @wap/tool-schemas` | **15 test files PASS, 266 tests PASS**, exit code 0 |
+| Kiểm tra bộ test Slack đầy đủ | `npx vitest run packages/tool-schemas/tests/myslack-*.test.ts` | **5 test files PASS, 198 tests PASS** (context 47, connection 67, policy 34, source 28, tools 22), exit code 0 |
 | Kiểm tra bộ tái hiện đánh giá độc lập | `npx tsx .superpowers/review194/review.mts` | **13/13 boundary tests PASS** (1 valid fixture + 10 source/lineage/schema cases + 2 registry/tampering protection cases), exit code 0 |
 | Kiểm tra static types toàn workspace v3 | `npm run typecheck:v3` | **PASS**, exit code 0 (`apps/chat-api` và `apps/chat-web` typecheck sạch sẽ) |
 | Kiểm tra đối soát cơ học 354 entries | Node.js assertion script | **100% 354 methods PASS**, 101 excluded khớp chính xác lý do từ `method.reason`, 253 probe_required, hash khớp `e55bc180eb43c71c1131dbded5968c1e240d3424fe1314bf604139055c074f09` |

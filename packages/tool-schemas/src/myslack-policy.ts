@@ -110,6 +110,70 @@ export function validateSlackPolicyReference(value: unknown): SlackPolicyReferen
   };
 }
 
+export interface SlackPolicyEpoch {
+  binding: SlackBinding;
+  providerProfileId: string;
+  configFingerprint: string;
+  policyVersion: string;
+  consentRevision: string;
+  providerRevision: string;
+}
+
+export function validateSlackPolicyEpoch(value: unknown): SlackPolicyEpoch {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError('Invalid Slack policy epoch: must be an object');
+  }
+  const record = value as Record<string, unknown>;
+
+  if (!Object.hasOwn(record, 'binding')) {
+    throw new TypeError('Slack policy epoch missing binding');
+  }
+  const cleanBinding = validateSlackBinding(record.binding);
+
+  for (const strField of ['providerProfileId', 'configFingerprint', 'policyVersion'] as const) {
+    if (!Object.hasOwn(record, strField) || typeof record[strField] !== 'string' || !(record[strField] as string).trim()) {
+      throw new TypeError(`Invalid Slack policy epoch ${strField}`);
+    }
+  }
+
+  for (const revField of ['consentRevision', 'providerRevision'] as const) {
+    if (!Object.hasOwn(record, revField) || typeof record[revField] !== 'string' || !CANONICAL_REVISION_REGEX.test(record[revField] as string)) {
+      throw new TypeError(`Invalid Slack policy epoch ${revField}`);
+    }
+  }
+
+  return {
+    binding: cleanBinding,
+    providerProfileId: (record.providerProfileId as string).trim(),
+    configFingerprint: (record.configFingerprint as string).trim(),
+    policyVersion: (record.policyVersion as string).trim(),
+    consentRevision: (record.consentRevision as string).trim(),
+    providerRevision: (record.providerRevision as string).trim(),
+  };
+}
+
+export function sameSlackPolicyEpoch(a: SlackPolicyEpoch, b: SlackPolicyEpoch): boolean {
+  return (
+    sameSlackBinding(a.binding, b.binding) &&
+    a.providerProfileId === b.providerProfileId &&
+    a.configFingerprint === b.configFingerprint &&
+    a.policyVersion === b.policyVersion &&
+    a.consentRevision === b.consentRevision &&
+    a.providerRevision === b.providerRevision
+  );
+}
+
+export function slackPolicyRefToEpoch(ref: SlackPolicyReference): SlackPolicyEpoch {
+  return {
+    binding: structuredClone(ref.binding),
+    providerProfileId: ref.providerProfileId,
+    configFingerprint: ref.configFingerprint,
+    policyVersion: ref.policyVersion,
+    consentRevision: ref.consentRevision,
+    providerRevision: ref.providerRevision,
+  };
+}
+
 export interface SlackSourceStorageRequest {
   binding: SlackBinding;
   policyRef: SlackPolicyReference;
