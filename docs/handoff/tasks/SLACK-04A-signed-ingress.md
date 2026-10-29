@@ -85,8 +85,8 @@ Card này bóc tách và định nghĩa trọn vẹn ranh giới kỹ thuật c�
         - *Xác nhận invalid/revoked:* Ngắt kết nối dứt khoát (`status = 'disconnected'`, `config = NULL`, tăng `identity_version`, reset `refresh_in_flight`), thực thi purge thế hệ cũ chính xác qua 03B1;
         - *Xác nhận valid (cùng actor & workspace):* Thu hồi thuộc về grant cũ; grant mới vẫn hợp lệ! Gỡ bỏ DUY NHẤT rào cản tạm thời này, không purge snapshot mới, giữ nguyên trạng thái active (trừ khi đã có disconnect thủ công hoặc barrier khác can thiệp);
         - *Lỗi mạng/timeout/rate-limit (unknown):* Giữ nguyên fail-closed ở trạng thái `reconnect_required`.
-   - **Đồng bộ Khóa Advisory Lock với TokenManager:**
-     `SlackTokenManager` giữ `withOwner(userId)` (`pg_advisory_lock`) qua lượt refresh mạng và lưu `UPDATE slack_connections SET config... WHERE id` không có CAS. Mọi mutation vòng đời BẮT BUỘC phối hợp cùng owner advisory lock (`withOwner(userId)`) và khóa dòng, đồng thời lập kế hoạch tích hợp CAS có giới hạn (`WHERE id = $1 AND identity_version = $2`) để tuần tự hóa với khoảng thời gian refresh token mạng.
+   - **Đồng bộ Khóa Advisory Lock với TokenManager & Giới hạn Chờ Bounded Lock:**
+     `SlackTokenManager` giữ `withOwner(userId)` (`pg_advisory_lock`) qua lượt refresh mạng và lưu `UPDATE slack_connections SET config... WHERE id` không có CAS. Mọi mutation vòng đời BẮT BUỘC phối hợp cùng owner advisory lock (`withOwner(userId)`) và khóa dòng, đồng thời lập kế hoạch tích hợp CAS có giới hạn (`WHERE id = $1 AND identity_version = $2`) để tuần tự hóa với khoảng thời gian refresh token mạng. Vì `TokenManager` có thể giữ khóa tới 10s khi refresh mạng, ingress bắt buộc dùng bounded lock acquisition (`pg_try_advisory_xact_lock` hoặc lock_timeout <= 2.000 ms); khi lock bận, ingress trả về HTTP 503 ngay lập tức để Slack retry (tuyệt đối không trả về 200 trước khi commit).
    - **Rào cản Đọc F3 Thống nhất Qua Giao diện 03B1 (Loại bỏ Bảng Tombstone Riêng Biệt):**
      Loại bỏ hoàn toàn đề xuất bảng `slack_source_tombstones` riêng của 04A vì thiếu provenance nguồn và gây xung đột cạnh tranh với 03B1. Ingress phối hợp trực tiếp với 03B1 thông qua giao diện transaction-bound `stageInTransaction(client, input)` thuộc `SlackTransactionBoundInvalidationService`:
      - `tokens_revoked`: Bắt generation, commit provisional barrier qua `stageInTransaction` nhắm vào generation CŨ.
@@ -212,7 +212,8 @@ export interface SlackLifecycleIntentRow {
   id: string;
   receipt_id: string;
   team_id: string;
-  intent_type: 'tokens_revoked' | 'app_uninstalled' | 'message_deleted' | 'message_changed';
+  effect_key: string;
+  intent_type: 'token_revocation_validation' | 'app_uninstall_validation' | 'message_deleted' | 'message_changed';
   payload: SlackLifecycleIntentPayload;
   status: 'pending' | 'applied' | 'failed';
   created_at: Date;
@@ -305,12 +306,13 @@ CREATE TABLE IF NOT EXISTS slack_lifecycle_intents (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   receipt_id uuid NOT NULL REFERENCES slack_event_receipts(id) ON DELETE CASCADE,
   team_id text NOT NULL,
-  intent_type text NOT NULL CHECK (intent_type IN ('tokens_revoked', 'app_uninstalled', 'message_deleted', 'message_changed')),
+  effect_key text NOT NULL,
+  intent_type text NOT NULL CHECK (intent_type IN ('token_revocation_validation', 'app_uninstall_validation', 'message_deleted', 'message_changed')),
   payload_json jsonb NOT NULL,
   status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'applied', 'failed')),
   created_at timestamptz NOT NULL DEFAULT now(),
   applied_at timestamptz,
-  UNIQUE(receipt_id, intent_type)
+  UNIQUE(receipt_id, effect_key)
 );
 
 CREATE INDEX IF NOT EXISTS idx_slack_lifecycle_intents_pending
@@ -328,7 +330,7 @@ CREATE INDEX IF NOT EXISTS idx_slack_lifecycle_intents_pending
 - [ ] **AC1 (Mounting Order, Stream Handling & Raw Buffer Integrity):** Route `/api/slack/events` kích hoạt trước `express.json()`. Body stream thu thập thành raw buffer nguyên vẹn byte-for-byte; request quá 1 MB bị từ chối bằng HTTP 413 `Payload Too Large` mà không phá vỡ kết nối socket trước khi gửi phản hồi.
 - [ ] **AC2 (Xác thực Chữ ký HMAC Không Roundtrip & Bounded Timestamp):** Chữ ký sai hoặc thiếu header -> 401; timestamp lệch > 300s, chứa khoảng trắng hoặc không phải số nguyên -> 400 regex `/^\d{1,10}$/`; băm trực tiếp buffer byte thô không qua UTF-8 stringification (hỗ trợ an toàn non-ASCII và byte lạ); so sánh bằng `timingSafeEqual` sau khi kiểm tra độ dài 67 bytes không gây crash.
 - [ ] **AC3 (Xác thực Thử thách URL & Ràng buộc Sự kiện Thường):** Thử thách `url_verification` chuẩn Slack không chứa `api_app_id` được chấp nhận và phản hồi HTTP 200 `{ challenge }` tức thì không ghi DB; nếu có truyền `api_app_id` sai thì từ chối HTTP 400; sự kiện `event_callback` bắt buộc có `api_app_id` khớp cấu hình và `team_id` hợp lệ (không fallback sang authorizations[0]).
-- [ ] **AC4 (Cam kết Bền vững Nguyên tử & Bounded Wakeup):** Sự kiện cần xử lý chỉ trả lời HTTP 200 SAU KHI receipt, intent và rào cản F3 đã commit thành công trong cùng transaction PostgreSQL. Hook in-memory chỉ là wakeup bounded, không await sau commit làm chậm/fail HTTP 200. Lỗi DB trả về HTTP 500/503 để Slack retry; tuyệt đối không fake 200.
+- [ ] **AC4 (Cam kết Bền vững Nguyên tử & Bounded Wakeup):** Sự kiện cần xử lý chỉ trả lời HTTP 200 SAU KHI receipt, intent và rào cản F3 đã commit thành công trong cùng transaction PostgreSQL. Hook in-memory chỉ là wakeup bounded, không await sau commit làm chậm/fail HTTP 200. Khi lock bận (advisory lock contention) hoặc lỗi DB, trả về HTTP 500/503 để Slack retry; tuyệt đối không fake 200.
 - [ ] **AC5 (Idempotency & Chống Trùng lặp Thực tế):** Xử lý đồng thời trên PostgreSQL thật an toàn qua `UNIQUE (slack_app_id, event_id)`: request đầu commit receipt, retry trả về 200 ngay mà không nhân bản queue intent.
 - [ ] **AC6 (Bảo toàn Body-Free Receipt & Hợp đồng Watermark 6 Chiều F1):** Bảng `slack_event_receipts` không chứa trường lưu body tin nhắn. Lưu `source_event_time` bất biến parse nghiêm ngặt bằng `/^\d{1,10}(\.\d{1,6})?$/` (không dùng `parseFloat` nhận suffix junk). Worker 04B áp dụng watermark 6 chiều chặn hoàn toàn việc backfill sự kiện quá khứ.
 - [ ] **AC7 (Vòng đời F4, Provisional Barrier & Lock Concurrency với TokenManager):** Khi `MYSLACK_AUTOMATION_ENABLED=off`:
@@ -336,7 +338,7 @@ CREATE INDEX IF NOT EXISTS idx_slack_lifecycle_intents_pending
   - Cả 4 loại sự kiện vòng đời (`tokens_revoked`, `app_uninstalled`, `message_deleted`, `message_changed`) được commit nguyên tử vào database trước khi trả về HTTP 200.
   - `tokens_revoked`: Dưới `withOwner(userId)` bắt generation, commit provisional barrier qua 03B1 `stageInTransaction`, giữ private `config` dưới `reconnect_required`, sau ACK probe `auth.test` có CAS guard; xác nhận revoked -> disconnect dứt khoát + purge; xác nhận valid (kịch bản old token revoke after newer grant) -> gỡ provisional barrier mà không ngắt kết nối grant mới.
   - Phối hợp rào cản F3 trực tiếp qua 03B1 `stageInTransaction`: `app_uninstalled` và `tokens_revoked` nhắm đúng binding/epoch cũ (không dùng `app:*` toàn workspace chặn reinstall); `message_deleted` tombstone vĩnh viễn; `message_changed` vô hiệu hóa đơn điệu revision cũ, bảo toàn revision mới; ngăn chặn resurrection khi delete/edit out-of-order.
-  - Lock synchronization với `SlackTokenManager`: Mọi mutation trạng thái kết nối serialize dưới cùng owner advisory lock (`withOwner(userId)`) và CAS guard.
+  - Lock synchronization với `SlackTokenManager`: Mọi mutation trạng thái kết nối serialize dưới cùng owner advisory lock (`withOwner(userId)`) và CAS guard; ingress sử dụng bounded try-lock (`pg_try_advisory_xact_lock` hoặc lock_timeout <= 2.000 ms), trả về HTTP 503 nhanh chóng khi lock bận mà không làm treo request quá deadline ACK. Hỗ trợ sự kiện ảnh hưởng >= 2 bindings/generations khác nhau qua `effect_key` với `UNIQUE(receipt_id, effect_key)` dưới cùng một receipt.
 - [ ] **AC8 (Bảo vệ Log & Bí mật):** Không có access token, signing secret, hay nội dung tin nhắn nào xuất hiện trong log console, exception message hay API response.
 
 ---
@@ -349,10 +351,10 @@ CREATE INDEX IF NOT EXISTS idx_slack_lifecycle_intents_pending
 # 1. Chạy unit test kiểm tra mật mã chữ ký HMAC-SHA256, timingSafeEqual, bounded timestamp regex (NOT_RUN - Docs Only)
 npm test -w @wap/chat-api -- tests/services/slack-signature.test.ts
 
-# 2. Chạy database test kiểm tra repository receipt nguyên tử, rào cản F3 qua 03B1 stageInTransaction, idempotency (NOT_RUN - Docs Only)
+# 2. Chạy database test kiểm tra repository receipt nguyên tử, rào cản F3 qua 03B1 stageInTransaction, idempotency, multi-binding intent UNIQUE(receipt_id, effect_key) (NOT_RUN - Docs Only)
 npm test -w @wap/chat-api -- tests/db/slack-event-receipt-repo.test.ts
 
-# 3. Chạy integration HTTP route test kiểm tra mounting, challenge chuẩn, missing app/team ID, 413 stream, 500 on DB error (NOT_RUN - Docs Only)
+# 3. Chạy integration HTTP route test kiểm tra mounting, challenge chuẩn, missing app/team ID, 413 stream, 500 on DB error, 503 khi owner lock bận (NOT_RUN - Docs Only)
 npm test -w @wap/chat-api -- tests/routes/slack-events-ingress.test.ts
 
 # 4. Chạy integration test kiểm tra F4 lifecycle: provisional barrier, old revoke after newer grant, TokenManager lock race, 03B1 barrier (NOT_RUN - Docs Only)
@@ -369,8 +371,9 @@ git diff --check b757ae08 HEAD
 
 - **Phiên hiệu chỉnh tài liệu (Docs Correction):** Hoàn thành rà soát và khắc phục triệt để các mâu thuẫn kỹ thuật theo hướng dẫn thẩm định của coordinator:
   1. Áp dụng thiết kế thận trọng (conservative final design): official `tokens_revoked` chỉ cung cấp user IDs (không có grant generation ID); không đoán định thế hệ grant từ timestamp/userID. Dưới `withOwner(userId)`, bắt generation hiện tại, commit provisional read block qua 03B1 `stageInTransaction` trước ACK và giữ private `config` dưới `reconnect_required`; sau ACK probe `auth.test` có CAS guard; xác thực chính xác kịch bản old token revoke after newer grant.
-  2. Đồng bộ khóa owner advisory lock (`withOwner(userId)`) của `SlackTokenManager` với các mutation trạng thái vòng đời, loại bỏ race condition trong khoảng thời gian refresh token mạng.
-  3. Loại bỏ bảng `slack_source_tombstones` cạnh tranh và tombstone toàn cục `app:*`; thống nhất cơ chế rào cản đọc F3 qua giao diện 03B1 `stageInTransaction` với target semantics chính xác theo binding/epoch cũ.
-  4. Mở rộng hợp đồng watermark 6 chiều cho F1, parse timestamp nghiêm ngặt bằng `/^\d{1,10}(\.\d{1,6})?$/` loại bỏ suffix junk.
-  5. Quy định hook in-process là bounded best-effort wakeup không block HTTP 200 response sau commit, fail-closed khi payload vòng đời malformed.
+  2. Đồng bộ khóa owner advisory lock (`withOwner(userId)`) của `SlackTokenManager` với các mutation trạng thái vòng đời: ingress sử dụng bounded try-lock acquisition (`pg_try_advisory_xact_lock` hoặc lock_timeout <= 2.000 ms) trả về HTTP 503 nhanh chóng khi lock bận, không chờ vô hạn quá deadline ACK 3s của Slack, tuyệt đối không fake 200 trước khi commit.
+  3. Chuẩn hóa DDL `slack_lifecycle_intents`: thêm `effect_key text NOT NULL`, đổi sang `UNIQUE(receipt_id, effect_key)` để 1 sự kiện `tokens_revoked` ảnh hưởng >= 2 bindings khác nhau lưu đủ các validation intents độc lập; đồng bộ enum `intent_type` khớp đúng với typed intent names (`token_revocation_validation`, `app_uninstall_validation`, `message_deleted`, `message_changed`).
+  4. Loại bỏ bảng `slack_source_tombstones` cạnh tranh và tombstone toàn cục `app:*`; thống nhất cơ chế rào cản đọc F3 qua giao diện 03B1 `stageInTransaction` với target semantics chính xác theo binding/epoch cũ.
+  5. Mở rộng hợp đồng watermark 6 chiều cho F1, parse timestamp nghiêm ngặt bằng `/^\d{1,10}(\.\d{1,6})?$/` loại bỏ suffix junk.
+  6. Quy định hook in-process là bounded best-effort wakeup không block HTTP 200 response sau commit, fail-closed khi payload vòng đời malformed.
 - **Trạng thái Mã nguồn & Kiểm thử:** Không có mã nguồn runtime nào được tạo hoặc sửa đổi. Toàn bộ kiểm thử runtime được giữ nguyên trạng thái `NOT_RUN` tuân thủ kỷ luật ranh giới phase.

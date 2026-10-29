@@ -45,7 +45,7 @@
 5. **Thử thách URL vs Sự kiện Thường:** `url_verification` không bắt buộc `api_app_id` (nếu có phải khớp); `event_callback` bắt buộc có `api_app_id` khớp cấu hình và `team_id` hợp lệ (cấm fallback `authorizations[0]`).
 6. **Body-Free Receipt & Watermark 6 Chiều:** Receipt không lưu body text. Worker 04B bắt buộc đối soát `source_event_time >= MAX(processing_start, consent_grant, identity_epoch, provider_attestation, config_revision, resume)`.
 7. **Bảo toàn Credential & Rào cản Tạm thời Per-Binding:** Không đoán định thế hệ grant từ timestamp/userID. Dưới `withOwner(userId)`, commit provisional barrier per-binding và giữ private `config` dưới `reconnect_required`; chỉ xóa `config = NULL` khi probe `auth.test` xác nhận credential đã bị revoke.
-8. **Tuần tự hóa Lock với TokenManager:** Mọi mutation trạng thái kết nối phối hợp cùng owner advisory lock (`withOwner(userId)`) của TokenManager và CAS guard (`identity_version`) nhằm tránh race condition trong khoảng refresh mạng.
+8. **Tuần tự hóa Lock với TokenManager & Giới hạn Chờ Bounded Lock:** Mọi mutation trạng thái kết nối phối hợp cùng owner advisory lock (`withOwner(userId)`) của TokenManager và CAS guard (`identity_version`). Vì TokenManager có thể giữ khóa tới 10s trong lúc refresh mạng, ingress bắt buộc dùng bounded lock acquisition (`pg_try_advisory_xact_lock` hoặc lock_timeout <= 2.000 ms). Khi lock bận, ingress trả về HTTP 503 ngay lập tức để Slack retry (tuyệt đối không trả về 200 trước khi commit).
 9. **Rào cản Đọc Thống nhất 03B1 `stageInTransaction`:** Sử dụng API duy nhất `stageInTransaction` với `sourceEventKey` có namespace, `effectKey` duy nhất, hỗ trợ barrier-only auth validation trước ACK; cấm bảng tombstone cạnh tranh.
 10. **F4 Lifecycle & Bounded Wakeup:** Vòng đời hoạt động cả khi `MYSLACK_AUTOMATION_ENABLED=off`. In-process hook chỉ là wakeup bounded, không await sau commit làm lỗi HTTP 200.
 11. **Bảo vệ Bí mật & Cổng Mã nguồn:** Không log raw body, token, secret. Không thi công code runtime trước khi 03C read, 03A, 02B được nghiệm thu tích hợp.
@@ -207,12 +207,13 @@ CREATE TABLE IF NOT EXISTS slack_lifecycle_intents (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   receipt_id uuid NOT NULL REFERENCES slack_event_receipts(id) ON DELETE CASCADE,
   team_id text NOT NULL,
-  intent_type text NOT NULL CHECK (intent_type IN ('tokens_revoked', 'app_uninstalled', 'message_deleted', 'message_changed')),
+  effect_key text NOT NULL,
+  intent_type text NOT NULL CHECK (intent_type IN ('token_revocation_validation', 'app_uninstall_validation', 'message_deleted', 'message_changed')),
   payload_json jsonb NOT NULL,
   status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'applied', 'failed')),
   created_at timestamptz NOT NULL DEFAULT now(),
   applied_at timestamptz,
-  UNIQUE(receipt_id, intent_type)
+  UNIQUE(receipt_id, effect_key)
 );
 CREATE INDEX IF NOT EXISTS idx_slack_lifecycle_intents_pending ON slack_lifecycle_intents (status, created_at) WHERE status = 'pending';
 ```
@@ -227,8 +228,9 @@ CREATE INDEX IF NOT EXISTS idx_slack_lifecycle_intents_pending ON slack_lifecycl
   - T1.2: Ràng buộc UNIQUE `(slack_app_id, event_id)`: insert trùng trả về `{ inserted: false, receipt }` idempotent.
   - T1.3: Concurrency 10 insert đồng thời: đúng 1 insert thành công, 9 trả về existing.
   - T1.4: Transaction nguyên tử receipt + lifecycle intent + 03B1 barrier: fail barrier -> rollback toàn bộ.
-  - T1.5: Phối hợp rào cản tạm thời (provisional barrier) cho `tokens_revoked`: bắt generation per-binding, commit provisional barrier qua `stageInTransaction`, giữ `config`.
-  - T1.6: Rào cản 03B1 cho `message_deleted` (tombstone vĩnh viễn) và `message_changed` (`min_valid_revision = edit_ts`), ngăn chặn resurrection.
+  - T1.5: Phối hợp rào cản tạm thời (provisional barrier) cho `tokens_revoked`: bắt generation per-binding, 1 sự kiện ảnh hưởng >= 2 bindings/generations khác nhau lưu >= 2 intent với `UNIQUE(receipt_id, effect_key)`, commit qua `stageInTransaction`, giữ `config`.
+  - T1.6: Idempotency duplicate delivery: sự kiện gửi lại với receipt đã tồn tại không tạo thêm intent trùng lặp.
+  - T1.7: Rào cản 03B1 cho `message_deleted` (tombstone vĩnh viễn) và `message_changed` (`min_valid_revision = edit_ts`), ngăn chặn resurrection.
 - [ ] **Step 2:** Chạy test; mong đợi FAIL (chưa có DDL/repo).
 - [ ] **Step 3 (GREEN Implementation):** Tạo migration `NNNN_slack_event_receipts.sql` và triển khai `SlackEventReceiptRepo.recordReceiptAtomic` phối hợp với `SlackTransactionBoundInvalidationService.stageInTransaction`.
 - [ ] **Step 4:** Chạy lại test; mong đợi PASS trên PG 16 thật.
@@ -250,7 +252,7 @@ CREATE INDEX IF NOT EXISTS idx_slack_lifecycle_intents_pending ON slack_lifecycl
   - T3.3: Sự kiện `event_callback` thiếu `api_app_id` hoặc thiếu `team_id` -> 400 (không fallback sang authorizations[0]).
   - T3.4: Parse timestamp nghiêm ngặt bằng `/^\d{1,10}(\.\d{1,6})?$/`: từ chối suffix junk như `'1730214000abc'`.
   - T3.5: Cờ automation tắt: discard tin thường trong memory; 4 sự kiện vòng đời F4 vẫn commit nguyên tử trước ACK 200.
-  - T3.6: Provisional barrier under owner lock per-binding: `withOwner(userId)` bắt generation, commit read block per-binding, giữ `config` an toàn.
+  - T3.6: Provisional barrier under bounded owner lock: dùng `pg_try_advisory_xact_lock` hoặc timeout 2s; khi TokenManager đang giữ lock refresh mạng, ingress trả về HTTP 503 nhanh chóng (không fake 200, không timeout vô hạn); retry khi lock mở trả về HTTP 200.
   - T3.7: In-process hook là non-blocking wakeup: hook lỗi/chậm không làm chậm hoặc fail phản hồi 200 sau khi DB commit.
   - T3.8: Malformed lifecycle event fields: fail-closed, không fall through sang automation message processing.
 - [ ] **Step 2:** Chạy test; mong đợi FAIL.
@@ -280,7 +282,9 @@ CREATE INDEX IF NOT EXISTS idx_slack_lifecycle_intents_pending ON slack_lifecycl
     2. Revoke confirmed by probe: `auth.test` trả về invalid -> disconnect dứt khoát + tăng `identity_version` + purge exact old generation.
     3. Fractional same-second (`connected_at = t + 0.354s`, `event_time = t`): provisional barrier + metadata probe có CAS guard.
     4. Concurrency race với `SlackTokenManager`: Refresh in-flight dưới `withOwner(userId)` tuần tự hóa với webhook revocation, CAS guard ngăn chặn overwrite.
-    5. Out-of-order edit/delete: `message_deleted` trước `message_changed` -> tin nhắn đã xóa không bị hồi sinh.
-    6. Mọi cờ tính năng tắt (`MYSLACK_ENABLED=off`, `MYSLACK_AUTOMATION_ENABLED=off`) -> F4 lifecycle vẫn commit nguyên tử trước ACK.
+    5. Owner lock concurrency & busy timeout: TokenManager giữ `withOwner` qua mạng, webhook nhận revocation -> ingress trả về 503 nhanh chóng; sau khi lock giải phóng, retry trả về 200.
+    6. Multi-binding lifecycle event: 1 `tokens_revoked` chứa >= 2 user/binding khác nhau -> tạo >= 2 intent độc lập với `UNIQUE(receipt_id, effect_key)` dưới cùng receipt; duplicate receipt idempotency.
+    7. Out-of-order edit/delete: `message_deleted` trước `message_changed` -> tin nhắn đã xóa không bị hồi sinh.
+    8. Mọi cờ tính năng tắt (`MYSLACK_ENABLED=off`, `MYSLACK_AUTOMATION_ENABLED=off`) -> F4 lifecycle vẫn commit nguyên tử trước ACK.
 - [ ] **Step 2:** Trạng thái tài liệu: Toàn bộ kiểm thử trên được đánh dấu `NOT_RUN` trong phiên lập kế hoạch tài liệu (chờ nghiệm thu 03C/03A/02B).
 - [ ] **Step 3:** Kiểm tra chất lượng tài liệu: `git diff --check b757ae08 HEAD`, kiểm tra toàn bộ liên kết markdown nội bộ.
