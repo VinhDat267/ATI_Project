@@ -4,6 +4,7 @@ import { encryptCredentials, decryptCredentials } from '@wap/tool-adapters';
 import { createAuthMiddleware, type AuthUser } from '../../auth/jwt.js';
 import type { SessionRepo } from '../../db/repositories/session-repo.js';
 import type { SlackConnectionRepo, SlackConnectionRow } from '../../db/repositories/slack-connection-repo.js';
+import { SlackPolicyService } from '../../services/slack/policy-service.js';
 import { SlackOAuthClient, SlackProviderError, SLACK_USER_SCOPES, type SlackOAuthConfig } from '../../services/slack/oauth-client.js';
 import { SlackTokenManager } from '../../services/slack/token-manager.js';
 const cookieName = 'ati_slack_browser', cookiePath = '/api/connections/myslack';
@@ -13,17 +14,42 @@ const valid = (s: unknown): s is string => typeof s === 'string' && /^[A-Za-z0-9
 export interface SlackConnectionsOptions {
   oauth: SlackOAuthConfig; repo: SlackConnectionRepo; jwtSecret: string; encryptionKey: string;
   sessionRepo: SessionRepo; fetchFn?: typeof fetch; clock?: () => number; timeoutMs?: number;
+  policyService?: SlackPolicyService;
 }
-export const slackConnectionView = (row: SlackConnectionRow) => ({
-  id: row.id, workspaceId: row.workspace_id, workspaceName: row.workspace_name, actorId: row.actor_id,
-  identityVersion: row.identity_version, status: row.status, connectedAt: row.connected_at,
-  scopes: row.scopes, missingScopes: SLACK_USER_SCOPES.filter(s => !row.scopes.includes(s)),
-  processingStatus: 'pending' as const,
-});
+export const slackConnectionView = (
+  row: SlackConnectionRow,
+  readiness: { processingReady?: boolean; consentStatus?: 'pending' | 'granted' | 'revoked' } = {}
+) => {
+  const status = row.status === 'disconnected' ? 'revoked' : row.status;
+  const consentStatus = readiness.consentStatus ?? 'pending';
+  const processingReady = status === 'active' && consentStatus === 'granted' && (readiness.processingReady === true);
+  const connectedAt = row.connected_at instanceof Date
+    ? row.connected_at.toISOString()
+    : new Date(row.connected_at).toISOString();
+
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    workspaceName: row.workspace_name,
+    slackUserId: row.actor_id,
+    slackUserLabel: row.actor_id,
+    status,
+    identityVersion: row.identity_version,
+    scopes: row.scopes,
+    connectedAt,
+    consentStatus,
+    processingReady,
+    actorId: row.actor_id,
+    missingScopes: SLACK_USER_SCOPES.filter(s => !row.scopes.includes(s)),
+    processingStatus: (processingReady ? 'ready' : 'pending') as 'ready' | 'pending',
+    ...(row.status === 'disconnected' ? { legacyStatus: 'disconnected' } : {}),
+  };
+};
 /** Setup metadata only. No content read, model call, tool or processing-consent endpoint. */
 export function createSlackConnectionRoutes(options: SlackConnectionsOptions): Router {
   const router = Router(), oauth = new SlackOAuthClient(options.oauth, options.fetchFn), clock = options.clock ?? Date.now;
   const tokens = new SlackTokenManager(options.repo, oauth, options.encryptionKey, clock, options.timeoutMs);
+  const policyService = options.policyService ?? new SlackPolicyService((options.repo as any).pool);
   router.use((_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
   router.use(createAuthMiddleware(options.jwtSecret, { sessionRepo: options.sessionRepo, clock }));
   router.use((req, res, next) => { if (!(req as any).user?.sid) { res.status(401).json({ code: 'INVALID_SESSION', error: 'Phiên đăng nhập đã hết hạn.' }); return; } next(); });
@@ -33,7 +59,19 @@ export function createSlackConnectionRoutes(options: SlackConnectionsOptions): R
     ? 'Tài khoản Slack này đang liên kết với một tài khoản ATI khác. Hãy ngắt liên kết cũ trước.'
     : code === 'SLACK_DENIED' ? 'Bạn đã hủy kết nối Slack.' : 'Không hoàn tất được kết nối Slack. Hãy bắt đầu lại từ Kết nối dịch vụ.' });
   router.get('/', async (req, res) => {
-    try { res.json({ connections: (await options.repo.list(user(req).id)).map(slackConnectionView) }); }
+    try {
+      const list = await options.repo.list(user(req).id);
+      const connections = await Promise.all(list.map(async row => {
+        let readiness: { processingReady?: boolean; consentStatus?: 'pending' | 'granted' | 'revoked' } = {};
+        try {
+          readiness = await policyService.checkProcessingReady(row.workspace_id);
+        } catch {
+          readiness = { processingReady: false, consentStatus: 'pending' };
+        }
+        return slackConnectionView(row, readiness);
+      }));
+      res.json({ connections });
+    }
     catch { res.status(503).json({ error: 'Chưa tải được kết nối Slack. Hãy thử lại.' }); }
   });
   router.post('/start', async (req, res) => {
@@ -55,7 +93,9 @@ export function createSlackConnectionRoutes(options: SlackConnectionsOptions): R
       const config = encryptCredentials({ accessToken: grant.accessToken, ...(grant.refreshToken ? { refreshToken: grant.refreshToken, expiresAt: clock() + grant.expiresIn! * 1000 } : {}) }, options.encryptionKey);
       const row = await options.repo.save(who.id, consumed.id, { ...grant, config }, clock);
       if (!row) { fail(res, 'SLACK_STATE_INVALID'); return; }
-      res.json(slackConnectionView(row));
+      let readiness: { processingReady?: boolean; consentStatus?: 'pending' | 'granted' | 'revoked' } = {};
+      try { readiness = await policyService.checkProcessingReady(row.workspace_id); } catch { readiness = { processingReady: false, consentStatus: 'pending' }; }
+      res.json(slackConnectionView(row, readiness));
     } catch (e) { fail(res, e instanceof Error && e.message === 'SLACK_IDENTITY_CONFLICT' ? e.message : 'SLACK_CONNECT_FAILED'); }
   });
   router.post('/:id/check', async (req, res) => {
@@ -74,7 +114,9 @@ export function createSlackConnectionRoutes(options: SlackConnectionsOptions): R
     }
     const current = (await options.repo.list(who.id)).find(r => r.id === id);
     if (!current) { res.status(404).json({ error: 'Kết nối đã được ngắt.' }); return; }
-    res.json(slackConnectionView(current));
+    let readiness: { processingReady?: boolean; consentStatus?: 'pending' | 'granted' | 'revoked' } = {};
+    try { readiness = await policyService.checkProcessingReady(current.workspace_id); } catch { readiness = { processingReady: false, consentStatus: 'pending' }; }
+    res.json(slackConnectionView(current, readiness));
   });
   router.delete('/:id', async (req, res) => {
     if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) { res.status(400).json({ error: 'Kết nối không hợp lệ.' }); return; }

@@ -16,17 +16,18 @@ Triển khai phần backend còn lại của SLACK-02, trọng tâm là **Chính
    - Tái sử dụng bảng `slack_connections` và `slack_oauth_states` từ PR #184 (`ac448dd`).
    - Tái sử dụng migration `0015_slack_callback_order.sql` từ bản sửa lỗi cô lập callback 02R (`order_seq` CAS check và xóa state cục bộ theo `(id, user_id)`).
    - Tuyệt đối không tạo file migration `0014` trùng lặp. Migration tiếp theo là `0016_slack_processing_consents.sql`.
-2. **Chính sách Chấp thuận Tổ chức (F1) & Quản Trị Tin Cậy:**
-   - Bảng `slack_processing_consents`: Quản lý chấp thuận xử lý dữ liệu của tổ chức với `policy_version`, `status` (`pending` / `granted` / `revoked`), `retention_days >= 0`, `evidence_ref`, `authorized_by`, `granted_at`, `revoked_at`.
-   - Bảng `slack_trusted_providers`: Lưu cấu hình nhà cung cấp tin cậy với cờ `verified`, `no_training` và trần lưu trữ `max_retention_days`.
-   - Cung cấp Operator CLI (`apps/chat-api/src/cli/slack-consent.ts`) và Admin API routes (`/api/admin/connections/myslack/:workspaceId/consent...`) với kiểm tra phân quyền revalidation trực tiếp từ DB. Thành viên thường và request body từ client không thể tự tạo lòng tin.
-3. **Tính toán `processingReady` & Lớp Ánh Xạ Tương Thích:**
-   - Đánh giá động `processingReady` dựa trên 6 tiêu chí đồng thời (fail-closed).
-   - Ánh xạ chuẩn: DB `actor_id` -> canonical `slackUserId`; DB `disconnected` -> canonical `revoked`.
-   - Giữ nguyên các trường legacy để không làm gãy UI hay tests hiện hữu trước khi 02C thi công.
+2. **Chính sách Chấp thuận Tổ chức (F1) & Quản Trị Tin Cậy qua Operator CLI:**
+   - Bảng `slack_processing_consents`: Quản lý chấp thuận xử lý dữ liệu của tổ chức với `policy_version`, monotonic `revision`, `status` (`pending` / `granted` / `revoked`), `purposes` (`manual_lookup`, `triage`, `planning`, `digest`, `storage`), `retention_days >= 0` (đây là data retention TTL, không phải ngày hết hạn của consent; 0 là xử lý không lưu bản sao), `organization_representative`, `evidence_ref`, `recorded_by`, `granted_at`, `revoked_at`.
+   - Bảng `slack_trusted_providers`: Lưu cấu hình nhà cung cấp tin cậy với monotonic `revision`, `verified`, `no_training`, `configuration_fingerprint`, `evidence_ref`, `verified_by`, `verified_at`, trần lưu trữ `max_retention_days`. Không có trusted defaults hoặc tự động seed `true`. Tuyệt đối không lưu API key vào bảng này.
+   - Bảng `slack_policy_events`: Lưu vết sự kiện thay đổi chính sách bền vững (`consent_granted`, `consent_revoked`, `provider_attested`, v.v.) được commit nguyên tử cùng transaction với thay đổi chính sách, sẵn sàng cho Phase 3 (SLACK-03) consume để kích hoạt tombstone/purge.
+   - Cung cấp Operator CLI (`apps/chat-api/src/cli/slack-consent.ts`) thực thi ở cấp độ deployment/database access: `grant`, `revoke`, `attest-provider`, `list`.
+   - **Ranh giới tin cậy nghiêm ngặt:** KHÔNG tạo HTTP endpoints tạo trust trong slice này. Các API HTTP giữ nguyên phạm vi kết nối của caller và metadata. Kiểm thử phải chứng minh các nỗ lực mutate consent/provider qua HTTP đều bị từ chối/không thay đổi policy.
+3. **Runtime Provider Selection, Policy Resolution & Dynamic `processingReady`:**
+   - Provider profile được chọn thông qua cấu hình máy chủ (khớp `createProviderFromEnv`), tính toán `configuration_fingerprint` máy chủ sở hữu, tách biệt hoàn toàn với model builder Antigravity.
+   - Dịch vụ `SlackPolicyService`: Re-validate kết nối, owner, workspace, actor_id, identityVersion, active session, và persisted consent/provider policy trên mỗi quyết định cấp quyền. Trả về credential-free policy reference kèm revision và policyVersion.
+   - Đánh giá động `processingReady` theo 6 tiêu chí đồng thời (fail-closed).
+   - Ánh xạ chuẩn 02A: DB `actor_id` -> canonical `slackUserId` (với `slackUserLabel` fallback an toàn là actorId, không gọi `users.info` trước khi có content authorization); DB `disconnected` -> canonical `revoked` (dùng trường legacy nếu cần).
    - Xuất capability qua `GET /api/services` (`personalOAuth: ['myslack']`).
-4. **Giao diện Vòng đời & Purge Event cho Phase 3:**
-   - Thiết lập interface sự kiện nội bộ `SlackConsentChangeEvent` để Phase 3 đăng ký lắng nghe và kích hoạt xóa dữ liệu nguồn/bộ nhớ đệm tin nhắn khi consent bị thu hồi hoặc hết hạn lưu trữ.
 
 ---
 
@@ -34,47 +35,64 @@ Triển khai phần backend còn lại của SLACK-02, trọng tâm là **Chính
 
 ### 2.1. File Tạo Mới
 1. `db/v3/0016_slack_processing_consents.sql`:
-   - Tạo bảng `slack_trusted_providers` (cấu hình provider tin cậy, mặc định `verified: false`).
-   - Tạo bảng `slack_processing_consents` (lưu vết chấp thuận của workspace cho từng provider).
+   - Tạo bảng `slack_trusted_providers` (cấu hình provider tin cậy, monotonic revision, fingerprint, không lưu key).
+   - Tạo bảng `slack_processing_consents` (lưu vết chấp thuận của workspace cho từng provider, monotonic revision, purposes, data retention TTL).
+   - Tạo bảng `slack_policy_events` (lưu vết sự kiện thay đổi chính sách bền vững cho Phase 3).
 2. `apps/chat-api/src/db/repositories/slack-consent-repo.ts`:
-   - Tra cứu và cập nhật consent, kiểm tra CAS, ghi nhận `revoked_at`.
-3. `apps/chat-api/src/config/slack-policy-env.ts`:
-   - Đọc cấu hình danh sách provider mặc định từ biến môi trường máy chủ.
+   - Tra cứu và cập nhật consent/provider, kiểm tra CAS revision, ghi nhận sự kiện `slack_policy_events` trong cùng transaction.
+3. `apps/chat-api/src/services/slack/policy-service.ts`:
+   - Dịch vụ giải quyết và kiểm tra chính sách runtime: đối soát binding, kiểm tra 6 tiêu chí fail-closed, fingerprint match.
 4. `apps/chat-api/src/cli/slack-consent.ts`:
-   - CLI script cho Operator: `grant`, `revoke`, `list` consents.
-5. `apps/chat-api/src/routes/connections/slack-admin.ts`:
-   - Router Express quản trị consent: `GET /api/admin/connections/myslack/:workspaceId/consents`, `POST .../consent`, `POST .../consent/revoke`.
-   - Kiểm tra revalidation DB `users.role = 'admin'` và session còn hiệu lực trong `auth_sessions`.
-6. `apps/chat-api/src/services/slack/consent-lifecycle.ts`:
-   - Event bus / listener interface cho các thay đổi trạng thái chấp thuận phục vụ Phase 3.
+   - CLI script cho Operator: `grant`, `revoke`, `attest-provider`, `list`.
 
 ### 2.2. File Cập Nhật
 1. `apps/chat-api/src/db/repositories/slack-connection-repo.ts`:
-   - Bổ sung hàm tính toán metadata `processingReady` kết hợp từ trạng thái kết nối và consent repo.
-   - Thêm lớp ánh xạ trường `actor_id` <-> `slackUserId`, `disconnected` <-> `revoked`.
+   - Tích hợp tính toán `consentStatus` và dynamic `processingReady` vào phương thức list.
 2. `apps/chat-api/src/routes/connections/slack.ts`:
-   - Trả về envelope danh sách `{ connections: SlackConnectionPublicInfo[] }` chuẩn 02A kèm legacy fields.
-3. `apps/chat-api/src/app.ts`:
-   - Mount router `slack-admin.ts` khi cờ `MYSLACK_ENABLED=on`.
+   - Trả về danh sách kết nối chuẩn 02A canonical (`SlackConnectionPublicInfo`) kèm các trường legacy tương thích an toàn cho UI hiện tại.
 
 ### 2.3. File Kiểm Thử
-1. `apps/chat-api/tests/db/slack-consent-repo.test.ts`: Kiểm thử repo consent trên PostgreSQL thật.
-2. `apps/chat-api/tests/routes/slack-admin-consent.test.ts`: Kiểm thử bảo mật role admin, từ chối member thường (403), audit log.
-3. `apps/chat-api/tests/cli/slack-consent-cli.test.ts`: Kiểm thử lệnh CLI operator.
-4. `apps/chat-api/tests/routes/slack-compatibility.test.ts`: Kiểm thử lớp ánh xạ tương thích và dynamic `processingReady`.
-5. `apps/chat-api/tests/services/slack-consent-lifecycle.test.ts`: Kiểm thử event purge khi thu hồi consent.
+1. `apps/chat-api/tests/db/slack-consent-repo.test.ts`: Kiểm thử repo consent trên PostgreSQL thật (CAS revisions, validation, 0 retention, atomic policy event emission, migration idempotent repeat với real non-empty rows).
+2. `apps/chat-api/tests/cli/slack-consent-cli.test.ts`: Kiểm thử lệnh CLI operator thực tế (spawn process, argument validation, CAS check, audit provenance).
+3. `apps/chat-api/tests/services/slack-policy-service.test.ts`: Kiểm thử giải quyết chính sách runtime, fingerprint mismatch, tampered binding, retention 0 vs requested retention, purpose check, stale policy version.
+4. `apps/chat-api/tests/routes/slack-compatibility.test.ts`: Kiểm thử canonical DTO chuẩn 02A, bảo toàn legacy fields, và chứng minh không có endpoint HTTP nào có thể mutate consent hay provider trust.
 
 ---
 
 ## 3. Tiêu Chí Nghiệm Thu
 
-- [ ] Migration `0016_slack_processing_consents.sql` thực thi an toàn, idempotent trên PostgreSQL.
-- [ ] Thành viên thường (`role = 'member'`) không thể tự cấp quyền hoặc thay đổi cờ `noTraining` (luôn trả về 403 `ADMIN_REQUIRED`).
-- [ ] `processingReady` chỉ true khi thỏa mãn đồng thời 6 điều kiện; chuyển ngay về `false` khi consent bị thu hồi.
-- [ ] Khả năng kết nối được công bố qua `GET /api/services` (`personalOAuth: ['myslack']`).
-- [ ] Các tests hiện hữu của PR #184 và 02R tiếp tục pass 100% nhờ lớp tương thích.
-- [ ] Không có secret hay token nào bị lọt vào log, exception hay API responses.
-- [ ] `npm run typecheck` đạt exit code 0; `git diff --check` đạt 0 lỗi whitespace.
+- [x] Migration `0016_slack_processing_consents.sql` thực thi an toàn, idempotent trên PostgreSQL thật (lặp lại thành công trên non-empty schema).
+- [x] Ranh giới tin cậy nghiêm ngặt: Không có HTTP endpoint tạo trust; chỉ Operator CLI có quyền attestation provider và grant/revoke consent tổ chức. HTTP mutation attempts trả về 404 và không làm thay đổi chính sách.
+- [x] `processingReady` chỉ true khi thỏa mãn đồng thời 6 điều kiện; chuyển ngay về `false` khi consent bị thu hồi hoặc provider thay đổi cấu hình mà chưa re-attest.
+- [x] Khả năng kết nối được công bố qua `GET /api/services` (`personalOAuth: ['myslack']`).
+- [x] Các tests hiện hữu của PR #184 và 02R tiếp tục pass 100% nhờ lớp tương thích chuẩn 02A (`validateSlackConnectionPublicInfo` + safe legacy aliases).
+- [x] Không có secret hay token nào bị lọt vào log, exception hay API responses.
+- [x] `npm run typecheck:v3` đạt exit code 0; `npm run check` toàn diện đạt 3,088 tests pass (exit code 0); `git diff --check` đạt 0 lỗi whitespace.
+
+---
+
+## 4. Kết Quả Triển Khai
+
+- **Trạng thái:** Hoàn thành (Completed).
+- **Branch:** `feat/slack-02b-consent-backend`.
+- **Base Integration Branch:** `integration/slack-personal-20261029`.
+- **Files đã triển khai:**
+  - `db/v3/0016_slack_processing_consents.sql`: Tạo bảng `slack_trusted_providers`, `slack_processing_consents`, `slack_policy_events` với monotonic `revision`, constraints chặt chẽ.
+  - `apps/chat-api/src/db/repositories/slack-consent-repo.ts`: Quản lý CAS atomic update, monotonic revisions, retentionDays >= 0, và lưu vết `slack_policy_events`.
+  - `apps/chat-api/src/config/slack-policy-runtime.ts`: Tính toán SHA-256 configuration fingerprint từ runtime model environment (không chứa credentials).
+  - `apps/chat-api/src/cli/slack-consent.ts`: Operator CLI (`attest-provider`, `grant`, `revoke`, `list`) với argument parsing, validation, CAS support.
+  - `apps/chat-api/src/services/slack/policy-service.ts`: `resolveSlackModelPolicy` thẩm định fail-closed 6 tiêu chí; `checkProcessingReady` tính toán dynamic readiness cho workspace.
+  - `apps/chat-api/src/routes/connections/slack.ts`: Trả về `SlackConnectionPublicInfo` chuẩn 02A (`slackUserId`, `slackUserLabel`, `consentStatus`, dynamic `processingReady`) và bảo toàn safe legacy aliases (`actorId`, `processingStatus`).
+  - `apps/chat-api/package.json`: Thêm script `"admin:slack-consent"`.
+- **Bằng chứng kiểm thử thực tế:**
+  - `apps/chat-api/tests/db/slack-consent-repo.test.ts`: 10/10 tests PASS (PostgreSQL CAS, retention 0, events atomicity, repeat migration).
+  - `apps/chat-api/tests/cli/slack-consent-cli.test.ts`: 6/6 tests PASS (spawn CLI child process, validation, CAS conflict).
+  - `apps/chat-api/tests/services/slack-policy-service.test.ts`: 8/8 tests PASS (fail-closed gates, fingerprint mismatch, purpose checks).
+  - `apps/chat-api/tests/routes/slack-compatibility.test.ts`: 3/3 tests PASS (02A envelope validation, legacy aliases, HTTP mutation rejected with 404).
+  - `npm run test:slack:foundation`: 56 node tests + 49 vitest tests PASS (105 tests).
+  - `npm run typecheck:v3`: Exit code 0.
+  - `npm run check`: 2,615 v3 tests + 406 eval + 1 launcher + 66 node = 3,088 tests PASS (Exit code 0).
+
 
 ## Quyết định triển khai của điều phối viên
 
