@@ -246,15 +246,16 @@ Trước khi Backend (03B) và Adapter (03C) thi công mã nguồn, các module 
 
 | Tiêu chuẩn kiểm tra | Lệnh thực hiện | Kết quả thực tế |
 |---|---|---|
-| Kiểm tra toàn bộ test suite package `@wap/tool-schemas` | `npm test -w @wap/tool-schemas` | **15 test files PASS, 251 tests PASS**, exit code 0 |
-| Kiểm tra bộ test Slack đầy đủ | `npx vitest run packages/tool-schemas/tests/myslack-*.test.ts` | **5 test files PASS, 183 tests PASS** (context 47, connection 67, policy 32, source 21, tools 16), exit code 0 |
+| Kiểm tra toàn bộ test suite package `@wap/tool-schemas` | `npm test -w @wap/tool-schemas` | **15 test files PASS, 261 tests PASS**, exit code 0 |
+| Kiểm tra bộ test Slack đầy đủ | `npx vitest run packages/tool-schemas/tests/myslack-*.test.ts` | **5 test files PASS, 193 tests PASS** (context 47, connection 67, policy 32, source 27, tools 20), exit code 0 |
+| Kiểm tra bộ tái hiện đánh giá độc lập | `npx tsx .superpowers/review194/review.mts` | **11/11 boundary tests PASS**, exit code 0 |
 | Kiểm tra static types toàn workspace v3 | `npm run typecheck:v3` | **PASS**, exit code 0 (`apps/chat-api` và `apps/chat-web` typecheck sạch sẽ) |
 | Kiểm tra đối soát cơ học 354 entries | Node.js assertion script | **100% 354 methods PASS**, 101 excluded khớp chính xác lý do từ `method.reason`, 253 probe_required, hash khớp `e55bc180eb43c71c1131dbded5968c1e240d3424fe1314bf604139055c074f09` |
-| Kiểm tra cú pháp Whitespace | `git diff --check b757ae0` | Sạch sẽ, exit code 0, không có trailing whitespace |
+| Kiểm tra cú pháp Whitespace từ base tới HEAD | `git diff --check b757ae0..HEAD` | Sạch sẽ, exit code 0, không có trailing whitespace |
 | Ranh giới Module Ownership | Kiểm tra git status | Chỉ sửa đổi `packages/tool-schemas/` và tài liệu kế hoạch/handoff của SLACK-03A |
 
 ### Ranh giới rõ ràng (Explicit Boundaries):
 - **NOT_RUN:** Không thực hiện bất kỳ lệnh gọi API Slack thực tế nào (`offline contracts only`).
 - **NOT_RUN:** Không thực hiện gọi mô hình LLM trên dữ liệu Slack.
-- **NOT_RUN:** Không chỉnh sửa mã nguồn của Backend (03B) hay Tool Adapters (03C); các module này sẽ được triển khai ở các dispatch tiếp theo sau khi 02B được nghiệm thu.
+- **NOT_RUN:** Không thi công mã nguồn của Backend (03B) hay Tool Adapters (03C); các module này sẽ được triển khai ở các dispatch tiếp theo sau khi 02B được nghiệm thu.
 - **Bảo toàn:** Toàn bộ công việc của các agent khác được giữ nguyên; không chỉnh sửa `CURRENT-STATE.md`, `ROADMAP.md` hay 02 cards.

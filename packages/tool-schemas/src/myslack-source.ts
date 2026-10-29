@@ -83,11 +83,22 @@ export function validateSlackSourceMetadata(input: unknown): SlackSourceMetadata
   return clean;
 }
 
-function isValidIsoDateString(value: unknown): boolean {
-  if (typeof value !== 'string' || !value.trim()) return false;
-  const timestamp = Date.parse(value);
-  if (Number.isNaN(timestamp)) return false;
-  // Ensure ISO string round-trip or standard date parse
+export const RAW_SOURCE_MAX_RETENTION_DAYS = 7;
+
+const ISO_UTC_REGEX = /^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])T([01]\d|2[0-3]):([0-5]\d):([0-5]\d)(?:\.\d+)?Z$/;
+
+export function isValidIsoUtcTimestamp(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const match = ISO_UTC_REGEX.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return false;
+  if (d.getUTCFullYear() !== year || d.getUTCMonth() !== month - 1 || d.getUTCDate() !== day) {
+    return false;
+  }
   return true;
 }
 
@@ -125,6 +136,14 @@ export function validateSlackSourceEntity(input: unknown): SlackSourceEntity {
   }
   const cleanPolicyRef = validateSlackPolicyReference(record.policyRef);
 
+  if (cleanPolicyRef.purpose !== 'storage') {
+    throw new TypeError('Slack source entity policyRef purpose must be "storage"');
+  }
+
+  if (cleanPolicyRef.requestedRetentionDays <= 0) {
+    throw new TypeError('Slack source entity requires policyRef requestedRetentionDays > 0');
+  }
+
   if (!sameSlackBinding(cleanSourceRef.binding, cleanPolicyRef.binding)) {
     throw new TypeError('SourceRef binding must match policyRef binding');
   }
@@ -151,32 +170,45 @@ export function validateSlackSourceEntity(input: unknown): SlackSourceEntity {
     throw new TypeError('Slack source entity requires positive safe integer retentionDays');
   }
 
-  if (!Object.hasOwn(record, 'capturedAt') || !isValidIsoDateString(record.capturedAt)) {
-    throw new TypeError('Invalid Slack source entity capturedAt');
+  if ((record.retentionDays as number) > cleanPolicyRef.requestedRetentionDays) {
+    throw new TypeError('Slack source entity retentionDays cannot exceed policyRef.requestedRetentionDays');
   }
 
-  if (!Object.hasOwn(record, 'expiresAt') || !isValidIsoDateString(record.expiresAt)) {
-    throw new TypeError('Invalid Slack source entity expiresAt');
+  if ((record.retentionDays as number) > RAW_SOURCE_MAX_RETENTION_DAYS) {
+    throw new TypeError('Raw source entity retentionDays cannot exceed ceiling of 7 days');
+  }
+
+  if (!Object.hasOwn(record, 'capturedAt') || !isValidIsoUtcTimestamp(record.capturedAt)) {
+    throw new TypeError('Invalid Slack source entity capturedAt: must be valid ISO UTC timestamp');
+  }
+
+  if (!Object.hasOwn(record, 'expiresAt') || !isValidIsoUtcTimestamp(record.expiresAt)) {
+    throw new TypeError('Invalid Slack source entity expiresAt: must be valid ISO UTC timestamp');
   }
 
   const capturedTime = Date.parse(record.capturedAt as string);
   const expiresTime = Date.parse(record.expiresAt as string);
-  if (expiresTime < capturedTime) {
-    throw new TypeError('expiresAt must not precede capturedAt');
+  const intervalMs = expiresTime - capturedTime;
+  if (intervalMs <= 0) {
+    throw new TypeError('expiresAt must be after capturedAt');
+  }
+  const maxIntervalMs = (record.retentionDays as number) * 86_400_000;
+  if (intervalMs > maxIntervalMs) {
+    throw new TypeError('expiresAt cannot exceed the declared retentionDays TTL');
   }
 
   let tombstonedAt: string | null = null;
   if (Object.hasOwn(record, 'tombstonedAt') && record.tombstonedAt !== null) {
-    if (!isValidIsoDateString(record.tombstonedAt)) {
-      throw new TypeError('Invalid Slack source entity tombstonedAt');
+    if (!isValidIsoUtcTimestamp(record.tombstonedAt)) {
+      throw new TypeError('Invalid Slack source entity tombstonedAt: must be valid ISO UTC timestamp');
     }
     tombstonedAt = record.tombstonedAt as string;
   }
 
   let purgedAt: string | null = null;
   if (Object.hasOwn(record, 'purgedAt') && record.purgedAt !== null) {
-    if (!isValidIsoDateString(record.purgedAt)) {
-      throw new TypeError('Invalid Slack source entity purgedAt');
+    if (!isValidIsoUtcTimestamp(record.purgedAt)) {
+      throw new TypeError('Invalid Slack source entity purgedAt: must be valid ISO UTC timestamp');
     }
     purgedAt = record.purgedAt as string;
   }
@@ -258,7 +290,7 @@ export function validateSlackDerivedCopyRef(input: unknown): SlackDerivedCopyRef
     return cleanRef;
   });
 
-  if (!Object.hasOwn(record, 'createdAt') || !isValidIsoDateString(record.createdAt)) {
+  if (!Object.hasOwn(record, 'createdAt') || !isValidIsoUtcTimestamp(record.createdAt)) {
     throw new TypeError('Invalid Slack derived copy createdAt');
   }
 
@@ -309,9 +341,30 @@ export function validateSlackSourceLineage(input: unknown): SlackSourceLineage {
 
   const cleanDerivedCopies = record.derivedCopies.map(copy => {
     const cleanCopy = validateSlackDerivedCopyRef(copy);
-    if (!sameSlackBinding(cleanCopy.policyRef.binding, cleanOrigin.binding)) {
-      throw new TypeError('Derived copy binding must match lineage origin binding');
+
+    // Each attached copy must include exact origin key/resource/revision in its sourceRefs
+    const hasExactOrigin = cleanCopy.sourceRefs.some(ref =>
+      ref.resourceType === cleanOrigin.resourceType &&
+      ref.resourceId === cleanOrigin.resourceId &&
+      ref.revision === cleanOrigin.revision &&
+      sameSlackBinding(ref.binding, cleanOrigin.binding)
+    );
+    if (!hasExactOrigin) {
+      throw new TypeError('Derived copy sourceRefs must include lineage origin');
     }
+
+    // Match immutable authorization identity between lineage origin policyRef and copy policyRef
+    if (
+      !sameSlackBinding(cleanCopy.policyRef.binding, cleanPolicyRef.binding) ||
+      cleanCopy.policyRef.providerProfileId !== cleanPolicyRef.providerProfileId ||
+      cleanCopy.policyRef.configFingerprint !== cleanPolicyRef.configFingerprint ||
+      cleanCopy.policyRef.policyVersion !== cleanPolicyRef.policyVersion ||
+      cleanCopy.policyRef.consentRevision !== cleanPolicyRef.consentRevision ||
+      cleanCopy.policyRef.providerRevision !== cleanPolicyRef.providerRevision
+    ) {
+      throw new TypeError('Derived copy authorization identity must match lineage origin policyRef');
+    }
+
     return cleanCopy;
   });
 
@@ -368,13 +421,13 @@ export function validateSlackTombstoneRecord(input: unknown): SlackTombstoneReco
     throw new TypeError('Invalid Slack tombstone record reason');
   }
 
-  if (!Object.hasOwn(record, 'tombstonedAt') || !isValidIsoDateString(record.tombstonedAt)) {
+  if (!Object.hasOwn(record, 'tombstonedAt') || !isValidIsoUtcTimestamp(record.tombstonedAt)) {
     throw new TypeError('Invalid Slack tombstone record tombstonedAt');
   }
 
   let purgedAt: string | null = null;
   if (Object.hasOwn(record, 'purgedAt') && record.purgedAt !== null) {
-    if (!isValidIsoDateString(record.purgedAt)) {
+    if (!isValidIsoUtcTimestamp(record.purgedAt)) {
       throw new TypeError('Invalid Slack tombstone record purgedAt');
     }
     purgedAt = record.purgedAt as string;

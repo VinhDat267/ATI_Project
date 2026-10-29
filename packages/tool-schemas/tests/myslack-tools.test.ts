@@ -134,6 +134,13 @@ describe('Slack Tool Catalog Metadata & Fail-Closed Execution Contracts', () => 
       };
       expect(() => validateSlackToolDefinition(invalidService)).toThrow(TypeError);
     });
+
+    it('detaches input/output schema so mutating validated output does not mutate caller', () => {
+      const definition = structuredClone(MYSLACK_CONVERSATIONS_HISTORY_TOOL);
+      const clean = validateSlackToolDefinition(definition);
+      (clean.inputSchema.properties as any).channel.type = 'object';
+      expect((definition.inputSchema.properties as any).channel.type).toBe('string');
+    });
   });
 
   describe('validateSlackToolExecutionArgs (Fail-Closed Parameter Validation)', () => {
@@ -222,6 +229,58 @@ describe('Slack Tool Catalog Metadata & Fail-Closed Execution Contracts', () => 
     it('fails closed when binding is missing or malformed', () => {
       expect(() =>
         validateSlackToolExecutionArgs(MYSLACK_CONVERSATIONS_HISTORY_TOOL, { channel: 'C123' })
+      ).toThrow(TypeError);
+    });
+
+    it('unknown method cannot reuse a known sample tool argument schema', () => {
+      expect(() =>
+        validateSlackToolExecutionArgs(
+          { ...MYSLACK_CHAT_POST_MESSAGE_TOOL, method: 'fictional.write' },
+          { binding, channel: 'C1', text: 'fixture' }
+        )
+      ).toThrow(TypeError);
+    });
+
+    it('nested params are validated recursively or rejected as unsupported', () => {
+      const tool: SlackToolDefinition = {
+        ...MYSLACK_CHAT_POST_MESSAGE_TOOL,
+        name: 'myslack.views_open',
+        method: 'views.open',
+        family: 'views',
+        userScopes: null,
+        hasUnknownScopes: true,
+        inputSchema: {
+          type: 'object',
+          properties: {
+            binding: { type: 'object' },
+            view: {
+              type: 'object',
+              properties: {
+                type: { type: 'string', enum: ['modal'] },
+              },
+              required: ['type'],
+              additionalProperties: false,
+            },
+          },
+          required: ['binding', 'view'],
+          additionalProperties: false,
+        },
+      };
+      expect(() =>
+        validateSlackToolExecutionArgs(tool, {
+          binding,
+          view: { type: 'modal', access_token: 'FIXTURE_SECRET_SHOULD_NOT_PASS' },
+        })
+      ).toThrow(TypeError);
+    });
+
+    it('nested params envelope rejects unknown outer arguments', () => {
+      expect(() =>
+        validateSlackToolExecutionArgs(MYSLACK_CHAT_POST_MESSAGE_TOOL, {
+          binding,
+          params: { channel: 'C1', text: 'fixture' },
+          unexpected: 'ignored',
+        })
       ).toThrow(TypeError);
     });
   });

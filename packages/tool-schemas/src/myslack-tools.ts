@@ -195,8 +195,8 @@ export function validateSlackToolDefinition(input: unknown): SlackToolDefinition
     planTier: record.planTier,
     isProbeRequired: record.isProbeRequired,
     requiresBinding: true,
-    inputSchema: record.inputSchema as JSONSchema,
-    outputSchema: record.outputSchema as JSONSchema,
+    inputSchema: structuredClone(record.inputSchema) as JSONSchema,
+    outputSchema: structuredClone(record.outputSchema) as JSONSchema,
     ...(typeof record.discovers === 'string' ? { discovers: record.discovers } : {}),
     ...(typeof record.listable === 'boolean' ? { listable: record.listable } : {}),
   };
@@ -350,11 +350,144 @@ export const MYSLACK_SAMPLE_TOOLS: readonly SlackToolDefinition[] = [
   MYSLACK_USERS_INFO_TOOL,
 ] as const;
 
+function validateSchemaValue(
+  schema: Record<string, any>,
+  val: unknown,
+  path: string,
+  toolName: string
+): unknown {
+  if (val === undefined || val === null) {
+    return val;
+  }
+
+  if (Array.isArray(schema.enum)) {
+    if (!schema.enum.includes(val)) {
+      throw new TypeError(`Value at "${path}" for tool ${toolName} must be one of [${schema.enum.join(', ')}]`);
+    }
+  }
+
+  const expectedType = schema.type;
+  if (!expectedType) {
+    if (schema.properties) {
+      return validateObjectSchema(schema, val, path, toolName);
+    }
+    return structuredClone(val);
+  }
+
+  switch (expectedType) {
+    case 'string': {
+      if (typeof val !== 'string') {
+        throw new TypeError(`Property "${path}" for tool ${toolName} must be a string`);
+      }
+      return val;
+    }
+    case 'integer': {
+      if (!Number.isSafeInteger(val)) {
+        throw new TypeError(`Property "${path}" for tool ${toolName} must be an integer`);
+      }
+      if (schema.minimum !== undefined && (val as number) < schema.minimum) {
+        throw new TypeError(`Property "${path}" for tool ${toolName} must be >= ${schema.minimum}`);
+      }
+      if (schema.maximum !== undefined && (val as number) > schema.maximum) {
+        throw new TypeError(`Property "${path}" for tool ${toolName} must be <= ${schema.maximum}`);
+      }
+      return val;
+    }
+    case 'number': {
+      if (typeof val !== 'number' || !Number.isFinite(val)) {
+        throw new TypeError(`Property "${path}" for tool ${toolName} must be a number`);
+      }
+      if (schema.minimum !== undefined && (val as number) < schema.minimum) {
+        throw new TypeError(`Property "${path}" for tool ${toolName} must be >= ${schema.minimum}`);
+      }
+      if (schema.maximum !== undefined && (val as number) > schema.maximum) {
+        throw new TypeError(`Property "${path}" for tool ${toolName} must be <= ${schema.maximum}`);
+      }
+      return val;
+    }
+    case 'boolean': {
+      if (typeof val !== 'boolean') {
+        throw new TypeError(`Property "${path}" for tool ${toolName} must be a boolean`);
+      }
+      return val;
+    }
+    case 'object': {
+      return validateObjectSchema(schema, val, path, toolName);
+    }
+    case 'array': {
+      if (!Array.isArray(val)) {
+        throw new TypeError(`Property "${path}" for tool ${toolName} must be an array`);
+      }
+      if (schema.items && typeof schema.items === 'object') {
+        return val.map((item, idx) => validateSchemaValue(schema.items, item, `${path}[${idx}]`, toolName));
+      }
+      return val.map(item => structuredClone(item));
+    }
+    default:
+      throw new TypeError(`Unsupported schema type "${expectedType}" at "${path}" for tool ${toolName}`);
+  }
+}
+
+function validateObjectSchema(
+  schema: Record<string, any>,
+  val: unknown,
+  path: string,
+  toolName: string
+): Record<string, unknown> {
+  if (typeof val !== 'object' || val === null || Array.isArray(val)) {
+    throw new TypeError(`Property "${path}" for tool ${toolName} must be an object`);
+  }
+  const obj = val as Record<string, unknown>;
+  const allowedProps = (schema.properties ?? {}) as Record<string, any>;
+  const cleanObj: Record<string, unknown> = {};
+
+  if (schema.additionalProperties === false) {
+    for (const key of Object.keys(obj)) {
+      if (!Object.hasOwn(allowedProps, key)) {
+        throw new TypeError(`Unknown property "${path ? `${path}.${key}` : key}" for tool ${toolName} (fail-closed)`);
+      }
+    }
+  }
+
+  for (const key of Object.keys(obj)) {
+    if (Object.hasOwn(allowedProps, key)) {
+      const propSchema = allowedProps[key];
+      const propVal = obj[key];
+      if (propVal !== undefined && propVal !== null) {
+        cleanObj[key] = validateSchemaValue(propSchema, propVal, path ? `${path}.${key}` : key, toolName);
+      }
+    } else if (schema.additionalProperties !== false) {
+      cleanObj[key] = structuredClone(obj[key]);
+    }
+  }
+
+  if (Array.isArray(schema.required)) {
+    for (const req of schema.required) {
+      if (path === '' && req === 'binding') continue;
+      if (!Object.hasOwn(obj, req) || obj[req] === undefined || obj[req] === null) {
+        throw new TypeError(`Missing required property "${path ? `${path}.${req}` : req}" for tool ${toolName}`);
+      }
+    }
+  }
+
+  return cleanObj;
+}
+
 export function validateSlackToolExecutionArgs<TParams = Record<string, unknown>>(
   tool: SlackToolDefinition,
   args: unknown
 ): { binding: SlackBinding; params: TParams } {
   const validTool = validateSlackToolDefinition(tool);
+
+  // Validate method name and family consistency
+  const expectedName = 'myslack.' + validTool.method.replace(/\./g, '_');
+  if (validTool.name !== expectedName) {
+    throw new TypeError(`Tool method "${validTool.method}" does not match tool name "${validTool.name}"`);
+  }
+  const methodFamily = validTool.method.split('.')[0];
+  if (validTool.family !== methodFamily || !SLACK_METHOD_FAMILIES.includes(methodFamily as SlackMethodFamily)) {
+    throw new TypeError(`Tool method "${validTool.method}" family "${methodFamily}" is invalid or does not match declared family "${validTool.family}"`);
+  }
 
   if (!args || typeof args !== 'object' || Array.isArray(args)) {
     throw new TypeError(`Invalid execution arguments for tool ${validTool.name}: must be an object`);
@@ -367,9 +500,28 @@ export function validateSlackToolExecutionArgs<TParams = Record<string, unknown>
   const cleanBinding = validateSlackBinding(record.binding);
 
   let rawParams: Record<string, unknown> = {};
-  if (Object.hasOwn(record, 'params') && record.params !== null && typeof record.params === 'object' && !Array.isArray(record.params)) {
+
+  if (Object.hasOwn(record, 'params')) {
+    // Nested envelope: fail closed if any unexpected outer properties are present
+    for (const key of Object.keys(record)) {
+      if (key !== 'binding' && key !== 'params') {
+        throw new TypeError(`Unknown outer argument "${key}" for tool ${validTool.name} (fail-closed)`);
+      }
+    }
+    if (typeof record.params !== 'object' || record.params === null || Array.isArray(record.params)) {
+      throw new TypeError(`Execution arguments params for tool ${validTool.name} must be an object`);
+    }
     rawParams = { ...(record.params as Record<string, unknown>) };
   } else {
+    // Flat args: outer properties must match inputSchema
+    const allowedOuter = (validTool.inputSchema.properties ?? {}) as Record<string, any>;
+    if (validTool.inputSchema.additionalProperties === false) {
+      for (const key of Object.keys(record)) {
+        if (key !== 'binding' && !Object.hasOwn(allowedOuter, key)) {
+          throw new TypeError(`Unknown property "${key}" for tool ${validTool.name} (fail-closed)`);
+        }
+      }
+    }
     for (const key of Object.keys(record)) {
       if (key !== 'binding') {
         rawParams[key] = record[key];
@@ -377,63 +529,18 @@ export function validateSlackToolExecutionArgs<TParams = Record<string, unknown>
     }
   }
 
-  const allowedProperties = (validTool.inputSchema.properties ?? {}) as Record<string, any>;
-  const cleanParams: Record<string, unknown> = {};
+  // Construct parameter schema without binding
+  const paramsSchema: Record<string, any> = {
+    type: 'object',
+    properties: { ...validTool.inputSchema.properties },
+    additionalProperties: validTool.inputSchema.additionalProperties,
+    required: Array.isArray(validTool.inputSchema.required)
+      ? validTool.inputSchema.required.filter(r => r !== 'binding')
+      : [],
+  };
+  delete paramsSchema.properties.binding;
 
-  // Fail-closed verification: reject any property not present in allowedProperties
-  for (const key of Object.keys(rawParams)) {
-    if (key === 'binding' || !Object.hasOwn(allowedProperties, key)) {
-      throw new TypeError(`Unknown property "${key}" for tool ${validTool.name} (fail-closed)`);
-    }
-
-    const val = rawParams[key];
-    if (val !== undefined && val !== null) {
-      const propSchema = allowedProperties[key];
-      if (propSchema) {
-        if (propSchema.type === 'string') {
-          if (typeof val !== 'string') {
-            throw new TypeError(`Property "${key}" for tool ${validTool.name} must be a string`);
-          }
-          cleanParams[key] = val;
-        } else if (propSchema.type === 'integer') {
-          if (!Number.isSafeInteger(val)) {
-            throw new TypeError(`Property "${key}" for tool ${validTool.name} must be an integer`);
-          }
-          if (propSchema.minimum !== undefined && (val as number) < propSchema.minimum) {
-            throw new TypeError(`Property "${key}" for tool ${validTool.name} must be >= ${propSchema.minimum}`);
-          }
-          if (propSchema.maximum !== undefined && (val as number) > propSchema.maximum) {
-            throw new TypeError(`Property "${key}" for tool ${validTool.name} must be <= ${propSchema.maximum}`);
-          }
-          cleanParams[key] = val;
-        } else if (propSchema.type === 'boolean') {
-          if (typeof val !== 'boolean') {
-            throw new TypeError(`Property "${key}" for tool ${validTool.name} must be a boolean`);
-          }
-          cleanParams[key] = val;
-        } else if (propSchema.type === 'number') {
-          if (typeof val !== 'number' || !Number.isFinite(val)) {
-            throw new TypeError(`Property "${key}" for tool ${validTool.name} must be a number`);
-          }
-          cleanParams[key] = val;
-        } else {
-          cleanParams[key] = val;
-        }
-      } else {
-        cleanParams[key] = val;
-      }
-    }
-  }
-
-  // Check required parameters
-  if (Array.isArray(validTool.inputSchema.required)) {
-    for (const req of validTool.inputSchema.required) {
-      if (req === 'binding') continue;
-      if (!Object.hasOwn(cleanParams, req) || cleanParams[req] === undefined || cleanParams[req] === null) {
-        throw new TypeError(`Missing required parameter "${req}" for tool ${validTool.name}`);
-      }
-    }
-  }
+  const cleanParams = validateObjectSchema(paramsSchema, rawParams, '', validTool.name);
 
   return {
     binding: cleanBinding,

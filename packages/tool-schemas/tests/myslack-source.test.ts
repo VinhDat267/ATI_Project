@@ -133,6 +133,46 @@ describe('Slack Source Lifecycle, Lineage & Purge Contracts (F1, F2, F3)', () =>
       expect(() => validateSlackSourceEntity({ ...validEntity, capturedAt: 'invalid-date' })).toThrow(TypeError);
       expect(() => validateSlackSourceEntity({ ...validEntity, expiresAt: '2026-10-01T00:00:00.000Z' })).toThrow(TypeError);
     });
+
+    it('stored source rejects a zero-retention policy reference', () => {
+      expect(() =>
+        validateSlackSourceEntity({
+          ...validEntity,
+          policyRef: { ...policyRef, requestedRetentionDays: 0 },
+        })
+      ).toThrow(TypeError);
+    });
+
+    it('raw source ceiling remains seven days even when provider consent allows more', () => {
+      expect(() =>
+        validateSlackSourceEntity({
+          ...validEntity,
+          retentionDays: 14,
+          policyRef: { ...policyRef, requestedRetentionDays: 14 },
+          expiresAt: '2026-11-12T00:00:00.000Z',
+        })
+      ).toThrow(TypeError);
+    });
+
+    it('expiry cannot exceed the declared source TTL', () => {
+      expect(() =>
+        validateSlackSourceEntity({
+          ...validEntity,
+          retentionDays: 1,
+          expiresAt: '2027-10-29T00:00:00.000Z',
+        })
+      ).toThrow(TypeError);
+    });
+
+    it('source timestamps must be ISO UTC timestamps, not Date.parse coercions', () => {
+      expect(() =>
+        validateSlackSourceEntity({
+          ...validEntity,
+          capturedAt: '0',
+          expiresAt: '2000-01-02T00:00:00.000Z',
+        })
+      ).toThrow(TypeError);
+    });
   });
 
   describe('SlackDerivedCopyRef & Lineage', () => {
@@ -191,6 +231,46 @@ describe('Slack Source Lifecycle, Lineage & Purge Contracts (F1, F2, F3)', () =>
           origin: sourceRef,
           policyRef,
           derivedCopies: [],
+        })
+      ).toThrow(TypeError);
+    });
+
+    it('lineage cannot attach an unrelated resource copy with the same binding', () => {
+      const ownerKey = formatSlackOwnerSourceKey(sourceRef);
+      expect(() =>
+        validateSlackSourceLineage({
+          ownerSourceKey: ownerKey,
+          origin: sourceRef,
+          policyRef,
+          derivedCopies: [
+            {
+              targetKind: 'plan_step_arg' as const,
+              targetId: 'plan-1:step-1',
+              sourceRefs: [{ ...sourceRef, resourceId: 'OTHER_MESSAGE' }],
+              policyRef,
+              createdAt: '2026-10-29T20:05:00.000Z',
+            },
+          ],
+        })
+      ).toThrow(TypeError);
+    });
+
+    it('lineage cannot silently adopt a derived copy from another consent epoch', () => {
+      const ownerKey = formatSlackOwnerSourceKey(sourceRef);
+      expect(() =>
+        validateSlackSourceLineage({
+          ownerSourceKey: ownerKey,
+          origin: sourceRef,
+          policyRef,
+          derivedCopies: [
+            {
+              targetKind: 'plan_step_arg' as const,
+              targetId: 'plan-1:step-1',
+              sourceRefs: [sourceRef],
+              policyRef: { ...policyRef, consentRevision: '2' },
+              createdAt: '2026-10-29T20:05:00.000Z',
+            },
+          ],
         })
       ).toThrow(TypeError);
     });
