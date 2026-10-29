@@ -10,29 +10,35 @@ export interface SlackConnectionPublicInfo {
   status: SlackConnectionStatus;
   identityVersion: number;
   scopes: string[];
+  connectedAt: string;
   consentStatus: SlackConsentStatus;
   processingReady: boolean;
-  connectedAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export interface SlackProcessingConsentInfo {
-  id: string;
   workspaceId: string;
   providerId: string;
+  policyVersion: string;
   status: SlackConsentStatus;
+  retentionDays: number;
   evidenceRef?: string;
   authorizedBy?: string;
   grantedAt?: string;
-  retentionDays: number;
-  updatedAt: string;
+  revokedAt?: string;
+  id?: string;
+  updatedAt?: string;
+}
+
+export interface SlackStartConnectionResponse {
+  url: string;
 }
 
 export interface SlackCallbackResult {
-  ok: boolean;
-  connection?: SlackConnectionPublicInfo;
-  error?: string;
-  errorCode?: string;
+  connectionId: string;
+  workspaceId: string;
+  workspaceName: string;
+  slackUserId: string;
   returnTo?: string;
 }
 
@@ -42,6 +48,20 @@ export interface SlackListConnectionsResponse {
 
 function isRecord(val: unknown): val is Record<string, unknown> {
   return typeof val === 'object' && val !== null && !Array.isArray(val);
+}
+
+function requireOwnProperty(obj: Record<string, unknown>, prop: string): unknown {
+  if (!Object.hasOwn(obj, prop)) {
+    throw new TypeError(`Field '${prop}' is required as an own property`);
+  }
+  return obj[prop];
+}
+
+function requireNonBlankString(val: unknown, fieldName: string): string {
+  if (typeof val !== 'string' || val.trim().length === 0) {
+    throw new TypeError(`Field '${fieldName}' must be a non-blank string`);
+  }
+  return val;
 }
 
 function isValidIsoUtcDate(dateStr: unknown): dateStr is string {
@@ -55,9 +75,9 @@ function isValidIsoUtcDate(dateStr: unknown): dateStr is string {
   return date.toISOString().startsWith(dateStr.slice(0, 10));
 }
 
-function requireNonEmptyString(val: unknown, fieldName: string): string {
-  if (typeof val !== 'string' || val.trim().length === 0) {
-    throw new TypeError(`Field '${fieldName}' must be a non-empty string`);
+function validateIsoUtcDate(val: unknown, fieldName: string): string {
+  if (!isValidIsoUtcDate(val)) {
+    throw new TypeError(`Field '${fieldName}' must be a valid ISO 8601 UTC date string, got: ${String(val)}`);
   }
   return val;
 }
@@ -79,56 +99,54 @@ export function validateSlackConnectionPublicInfo(input: unknown): SlackConnecti
     throw new TypeError('Expected an object for SlackConnectionPublicInfo');
   }
 
-  const id = requireNonEmptyString(input.id, 'id');
-  const workspaceId = requireNonEmptyString(input.workspaceId, 'workspaceId');
-  const workspaceName = requireNonEmptyString(input.workspaceName, 'workspaceName');
-  const slackUserId = requireNonEmptyString(input.slackUserId, 'slackUserId');
-  const slackUserLabel = requireNonEmptyString(input.slackUserLabel, 'slackUserLabel');
+  const id = requireNonBlankString(requireOwnProperty(input, 'id'), 'id');
+  const workspaceId = requireNonBlankString(requireOwnProperty(input, 'workspaceId'), 'workspaceId');
+  const workspaceName = requireNonBlankString(requireOwnProperty(input, 'workspaceName'), 'workspaceName');
+  const slackUserId = requireNonBlankString(requireOwnProperty(input, 'slackUserId'), 'slackUserId');
+  const slackUserLabel = requireNonBlankString(requireOwnProperty(input, 'slackUserLabel'), 'slackUserLabel');
 
-  if (typeof input.status !== 'string' || !VALID_CONNECTION_STATUSES.has(input.status as SlackConnectionStatus)) {
-    throw new TypeError(`Invalid connection status: ${String(input.status)}`);
+  const rawStatus = requireOwnProperty(input, 'status');
+  if (typeof rawStatus !== 'string' || !VALID_CONNECTION_STATUSES.has(rawStatus as SlackConnectionStatus)) {
+    throw new TypeError(`Invalid connection status: ${String(rawStatus)}`);
   }
-  const status = input.status as SlackConnectionStatus;
+  const status = rawStatus as SlackConnectionStatus;
 
-  if (typeof input.consentStatus !== 'string' || !VALID_CONSENT_STATUSES.has(input.consentStatus as SlackConsentStatus)) {
-    throw new TypeError(`Invalid consentStatus: ${String(input.consentStatus)}`);
+  const rawConsentStatus = requireOwnProperty(input, 'consentStatus');
+  if (typeof rawConsentStatus !== 'string' || !VALID_CONSENT_STATUSES.has(rawConsentStatus as SlackConsentStatus)) {
+    throw new TypeError(`Invalid consentStatus: ${String(rawConsentStatus)}`);
   }
-  const consentStatus = input.consentStatus as SlackConsentStatus;
+  const consentStatus = rawConsentStatus as SlackConsentStatus;
 
+  const rawIdentityVersion = requireOwnProperty(input, 'identityVersion');
   if (
-    typeof input.identityVersion !== 'number' ||
-    !Number.isSafeInteger(input.identityVersion) ||
-    input.identityVersion <= 0
+    typeof rawIdentityVersion !== 'number' ||
+    !Number.isSafeInteger(rawIdentityVersion) ||
+    rawIdentityVersion <= 0
   ) {
     throw new TypeError(
-      `Field 'identityVersion' must be a positive safe integer, got: ${String(input.identityVersion)}`
+      `Field 'identityVersion' must be a positive safe integer, got: ${String(rawIdentityVersion)}`
     );
   }
-  const identityVersion = input.identityVersion;
+  const identityVersion = rawIdentityVersion;
 
-  if (!Array.isArray(input.scopes) || !input.scopes.every((s) => typeof s === 'string')) {
-    throw new TypeError("Field 'scopes' must be an array of strings");
+  const rawScopes = requireOwnProperty(input, 'scopes');
+  if (!Array.isArray(rawScopes)) {
+    throw new TypeError("Field 'scopes' must be an array of non-blank strings");
   }
-  const scopes = [...input.scopes];
-
-  if (!isValidIsoUtcDate(input.connectedAt)) {
-    throw new TypeError(
-      `Field 'connectedAt' must be a valid ISO 8601 UTC date string, got: ${String(input.connectedAt)}`
-    );
+  for (const s of rawScopes) {
+    if (typeof s !== 'string' || s.trim().length === 0) {
+      throw new TypeError("Field 'scopes' must contain only non-blank strings");
+    }
   }
-  const connectedAt = input.connectedAt;
+  const scopes = [...rawScopes];
 
-  if (!isValidIsoUtcDate(input.updatedAt)) {
-    throw new TypeError(
-      `Field 'updatedAt' must be a valid ISO 8601 UTC date string, got: ${String(input.updatedAt)}`
-    );
-  }
-  const updatedAt = input.updatedAt;
+  const connectedAt = validateIsoUtcDate(requireOwnProperty(input, 'connectedAt'), 'connectedAt');
 
-  if (typeof input.processingReady !== 'boolean') {
+  const rawProcessingReady = requireOwnProperty(input, 'processingReady');
+  if (typeof rawProcessingReady !== 'boolean') {
     throw new TypeError("Field 'processingReady' must be a boolean");
   }
-  const processingReady = input.processingReady;
+  const processingReady = rawProcessingReady;
 
   if (processingReady === true) {
     if (status !== 'active') {
@@ -139,7 +157,12 @@ export function validateSlackConnectionPublicInfo(input: unknown): SlackConnecti
     }
   }
 
-  return {
+  let updatedAt: string | undefined;
+  if (Object.hasOwn(input, 'updatedAt') && input.updatedAt !== undefined) {
+    updatedAt = validateIsoUtcDate(input.updatedAt, 'updatedAt');
+  }
+
+  const result: SlackConnectionPublicInfo = {
     id,
     workspaceId,
     workspaceName,
@@ -148,11 +171,14 @@ export function validateSlackConnectionPublicInfo(input: unknown): SlackConnecti
     status,
     identityVersion,
     scopes,
+    connectedAt,
     consentStatus,
     processingReady,
-    connectedAt,
-    updatedAt,
   };
+  if (updatedAt !== undefined) {
+    result.updatedAt = updatedAt;
+  }
+  return result;
 }
 
 export function validateSlackProcessingConsentInfo(input: unknown): SlackProcessingConsentInfo {
@@ -160,73 +186,86 @@ export function validateSlackProcessingConsentInfo(input: unknown): SlackProcess
     throw new TypeError('Expected an object for SlackProcessingConsentInfo');
   }
 
-  const id = requireNonEmptyString(input.id, 'id');
-  const workspaceId = requireNonEmptyString(input.workspaceId, 'workspaceId');
-  const providerId = requireNonEmptyString(input.providerId, 'providerId');
+  const workspaceId = requireNonBlankString(requireOwnProperty(input, 'workspaceId'), 'workspaceId');
+  const providerId = requireNonBlankString(requireOwnProperty(input, 'providerId'), 'providerId');
+  const policyVersion = requireNonBlankString(requireOwnProperty(input, 'policyVersion'), 'policyVersion');
 
-  if (typeof input.status !== 'string' || !VALID_CONSENT_STATUSES.has(input.status as SlackConsentStatus)) {
-    throw new TypeError(`Invalid consent status: ${String(input.status)}`);
+  const rawStatus = requireOwnProperty(input, 'status');
+  if (typeof rawStatus !== 'string' || !VALID_CONSENT_STATUSES.has(rawStatus as SlackConsentStatus)) {
+    throw new TypeError(`Invalid consent status: ${String(rawStatus)}`);
   }
-  const status = input.status as SlackConsentStatus;
+  const status = rawStatus as SlackConsentStatus;
 
+  const rawRetentionDays = requireOwnProperty(input, 'retentionDays');
   if (
-    typeof input.retentionDays !== 'number' ||
-    !Number.isSafeInteger(input.retentionDays) ||
-    input.retentionDays <= 0
+    typeof rawRetentionDays !== 'number' ||
+    !Number.isSafeInteger(rawRetentionDays) ||
+    rawRetentionDays < 0
   ) {
     throw new TypeError(
-      `Field 'retentionDays' must be a positive safe integer, got: ${String(input.retentionDays)}`
+      `Field 'retentionDays' must be a non-negative safe integer (>= 0), got: ${String(rawRetentionDays)}`
     );
   }
-  const retentionDays = input.retentionDays;
-
-  if (!isValidIsoUtcDate(input.updatedAt)) {
-    throw new TypeError(
-      `Field 'updatedAt' must be a valid ISO 8601 UTC date string, got: ${String(input.updatedAt)}`
-    );
-  }
-  const updatedAt = input.updatedAt;
+  const retentionDays = rawRetentionDays;
 
   let evidenceRef: string | undefined;
   let authorizedBy: string | undefined;
   let grantedAt: string | undefined;
+  let revokedAt: string | undefined;
+  let id: string | undefined;
+  let updatedAt: string | undefined;
 
   if (status === 'granted') {
-    evidenceRef = requireNonEmptyString(input.evidenceRef, 'evidenceRef');
-    authorizedBy = requireNonEmptyString(input.authorizedBy, 'authorizedBy');
-    if (!isValidIsoUtcDate(input.grantedAt)) {
-      throw new TypeError(
-        `Field 'grantedAt' must be a valid ISO 8601 UTC date string when status is 'granted', got: ${String(
-          input.grantedAt
-        )}`
-      );
-    }
-    grantedAt = input.grantedAt;
+    evidenceRef = requireNonBlankString(requireOwnProperty(input, 'evidenceRef'), 'evidenceRef');
+    authorizedBy = requireNonBlankString(requireOwnProperty(input, 'authorizedBy'), 'authorizedBy');
+    grantedAt = validateIsoUtcDate(requireOwnProperty(input, 'grantedAt'), 'grantedAt');
   } else {
-    if (typeof input.evidenceRef === 'string' && input.evidenceRef.trim().length > 0) {
-      evidenceRef = input.evidenceRef;
+    if (Object.hasOwn(input, 'evidenceRef') && input.evidenceRef !== undefined) {
+      evidenceRef = requireNonBlankString(input.evidenceRef, 'evidenceRef');
     }
-    if (typeof input.authorizedBy === 'string' && input.authorizedBy.trim().length > 0) {
-      authorizedBy = input.authorizedBy;
+    if (Object.hasOwn(input, 'authorizedBy') && input.authorizedBy !== undefined) {
+      authorizedBy = requireNonBlankString(input.authorizedBy, 'authorizedBy');
     }
-    if (isValidIsoUtcDate(input.grantedAt)) {
-      grantedAt = input.grantedAt;
+    if (Object.hasOwn(input, 'grantedAt') && input.grantedAt !== undefined) {
+      grantedAt = validateIsoUtcDate(input.grantedAt, 'grantedAt');
     }
   }
 
+  if (Object.hasOwn(input, 'revokedAt') && input.revokedAt !== undefined) {
+    revokedAt = validateIsoUtcDate(input.revokedAt, 'revokedAt');
+  }
+
+  if (Object.hasOwn(input, 'id') && input.id !== undefined) {
+    id = requireNonBlankString(input.id, 'id');
+  }
+
+  if (Object.hasOwn(input, 'updatedAt') && input.updatedAt !== undefined) {
+    updatedAt = validateIsoUtcDate(input.updatedAt, 'updatedAt');
+  }
+
   const result: SlackProcessingConsentInfo = {
-    id,
     workspaceId,
     providerId,
+    policyVersion,
     status,
     retentionDays,
-    updatedAt,
   };
+  if (id !== undefined) result.id = id;
   if (evidenceRef !== undefined) result.evidenceRef = evidenceRef;
   if (authorizedBy !== undefined) result.authorizedBy = authorizedBy;
   if (grantedAt !== undefined) result.grantedAt = grantedAt;
+  if (revokedAt !== undefined) result.revokedAt = revokedAt;
+  if (updatedAt !== undefined) result.updatedAt = updatedAt;
 
   return result;
+}
+
+export function validateSlackStartConnectionResponse(input: unknown): SlackStartConnectionResponse {
+  if (!isRecord(input)) {
+    throw new TypeError('Expected an object for SlackStartConnectionResponse');
+  }
+  const url = requireNonBlankString(requireOwnProperty(input, 'url'), 'url');
+  return { url };
 }
 
 export function validateSlackCallbackResult(input: unknown): SlackCallbackResult {
@@ -234,26 +273,25 @@ export function validateSlackCallbackResult(input: unknown): SlackCallbackResult
     throw new TypeError('Expected an object for SlackCallbackResult');
   }
 
-  if (typeof input.ok !== 'boolean') {
-    throw new TypeError("Field 'ok' must be a boolean");
+  const connectionId = requireNonBlankString(requireOwnProperty(input, 'connectionId'), 'connectionId');
+  const workspaceId = requireNonBlankString(requireOwnProperty(input, 'workspaceId'), 'workspaceId');
+  const workspaceName = requireNonBlankString(requireOwnProperty(input, 'workspaceName'), 'workspaceName');
+  const slackUserId = requireNonBlankString(requireOwnProperty(input, 'slackUserId'), 'slackUserId');
+
+  let returnTo: string | undefined;
+  if (Object.hasOwn(input, 'returnTo') && input.returnTo !== undefined) {
+    returnTo = requireNonBlankString(input.returnTo, 'returnTo');
   }
 
-  const result: SlackCallbackResult = { ok: input.ok };
-
-  if (input.connection !== undefined && input.connection !== null) {
-    result.connection = validateSlackConnectionPublicInfo(input.connection);
+  const result: SlackCallbackResult = {
+    connectionId,
+    workspaceId,
+    workspaceName,
+    slackUserId,
+  };
+  if (returnTo !== undefined) {
+    result.returnTo = returnTo;
   }
-
-  if (typeof input.error === 'string') {
-    result.error = input.error;
-  }
-  if (typeof input.errorCode === 'string') {
-    result.errorCode = input.errorCode;
-  }
-  if (typeof input.returnTo === 'string') {
-    result.returnTo = input.returnTo;
-  }
-
   return result;
 }
 
@@ -262,11 +300,12 @@ export function validateSlackListConnectionsResponse(input: unknown): SlackListC
     throw new TypeError('Expected an object for SlackListConnectionsResponse');
   }
 
-  if (!Array.isArray(input.connections)) {
+  const rawConnections = requireOwnProperty(input, 'connections');
+  if (!Array.isArray(rawConnections)) {
     throw new TypeError("Field 'connections' must be an array");
   }
 
   return {
-    connections: input.connections.map(validateSlackConnectionPublicInfo),
+    connections: rawConnections.map(validateSlackConnectionPublicInfo),
   };
 }

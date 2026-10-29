@@ -1,6 +1,6 @@
 # SLACK-02A · Hợp đồng Interface Kết nối Slack Cá nhân (@wap/tool-schemas)
 
-**Trạng thái:** hoàn thành (chờ review)
+**Trạng thái:** đã hoàn thành các điểm hiệu chỉnh blocking review (chờ leader re-review)
 **Nhánh gợi ý:** `feat/slack-02a-connection-contracts` · **Nền:** `fc12e3fb`
 **Vai trò sở hữu:** Integration / AI Engineer (chỉ sở hữu thư mục `packages/tool-schemas/`)
 **Phụ thuộc:** SLACK-01 (đã hoàn thành `myslack-context.ts` và `myslack-policy.ts`)
@@ -104,17 +104,25 @@ Chứa các định nghĩa và hàm xác thực:
 
 ---
 
-## 5. Kết Quả Thực Hiện
+## 5. Kết Quả Thực Hiện & Giải Quyết Blocking Review
 
 - **Nhánh:** `feat/slack-02a-connection-contracts` (phân nhánh từ `docs/slack-02-plan`).
 - **Files tạo mới & cập nhật:**
-  - `packages/tool-schemas/src/myslack-connection.ts`: Định nghĩa types, DTO interfaces và các hàm validator an toàn (`validateSlackConnectionPublicInfo`, `validateSlackProcessingConsentInfo`, `validateSlackCallbackResult`, `validateSlackListConnectionsResponse`).
+  - `packages/tool-schemas/src/myslack-connection.ts`: Định nghĩa types, DTO interfaces và các hàm validator an toàn (`validateSlackConnectionPublicInfo`, `validateSlackProcessingConsentInfo`, `validateSlackStartConnectionResponse`, `validateSlackCallbackResult`, `validateSlackListConnectionsResponse`).
   - `packages/tool-schemas/src/index.ts`: Re-export các types và validator từ `myslack-connection.js`.
-  - `packages/tool-schemas/tests/myslack-connection.test.ts`: Bộ 46 unit tests kiểm thử toàn diện validation, clone detached copy, date format và catalog invariants.
+  - `packages/tool-schemas/tests/myslack-connection.test.ts`: Bộ 67 unit tests kiểm thử toàn diện validation, clone detached copy, date format, rejection of prototype inheritance, non-blank scopes, zero retentionDays và catalog invariants.
+- **Tiếp thu & Xử lý 5 điểm Blocking Review từ Coordinator:**
+  1. *Flat `SlackCallbackResult`:* Chuẩn hóa về dạng phẳng `{ connectionId, workspaceId, workspaceName, slackUserId, returnTo? }`; xuất bản thêm `SlackStartConnectionResponse` `{ url }`.
+  2. *Bắt buộc `policyVersion`:* Bắt buộc có `policyVersion` non-blank để phục vụ F1 policy change detection; hỗ trợ `revokedAt` tùy chọn và kiểm tra ISO UTC date; từ chối mọi trường optional bị sai kiểu dữ liệu thay vì bỏ qua âm thầm.
+  3. *Cho phép `retentionDays >= 0`:* Chấp nhận `retentionDays = 0` (chính sách không lưu trữ dữ liệu), chỉ từ chối số âm, số thập phân, NaN, Infinity.
+  4. *Kiểm tra Own Properties (`Object.hasOwn`):* Từ chối các thuộc tính kế thừa qua prototype (`Object.create(valid)` ném `TypeError`); bắt buộc từng phần tử trong `scopes` là chuỗi non-blank.
+  5. *Bỏ các trường bắt buộc không có trong spec:* Bỏ yêu cầu bắt buộc `id` và `updatedAt` trên consent, bỏ yêu cầu bắt buộc `updatedAt` trên public connection; chỉ coi là optional metadata nếu có và validate khi xuất hiện.
 - **Bằng chứng kiểm thử:**
-  - Pha RED: 41 failed tests khi chưa có mã nguồn (lưu tại `.superpowers/slack02a/red-failure.txt`).
-  - Pha GREEN: 46/46 unit tests PASS trong `tests/myslack-connection.test.ts`.
-  - Toàn bộ package `@wap/tool-schemas`: 162/162 tests PASS (13 test files).
-  - Foundation tests: `npm run test:slack:foundation` PASS (105 tests, exit code 0).
-  - TypeScript typecheck: `npm run typecheck` PASS (exit code 0).
-  - Format/Whitespace: `git diff --check` PASS (exit code 0, 0 trailing whitespace).
+  - **Executable Review Harness (`.superpowers/slack02a/leader-contract-review.mts`):**
+    - Trước khi sửa (commit cũ SHA256 `63517bdd3bdd6db61c4b0f9926bb56cb276bd2ff4ee2f72e5311f79825159fa5`): 0/5 passed (5/5 failed).
+    - Sau khi sửa (SHA256 `95841edbc53d7fedc60b048cc511fa81e330868c7d971f85455f1687210e712f`): **5/5 passed (exit code 0)**.
+  - **Unit tests:** 67/67 tests PASS trong `tests/myslack-connection.test.ts`.
+  - **Toàn bộ package `@wap/tool-schemas`:** 183/183 tests PASS (13 test files).
+  - **Foundation tests:** `npm run test:slack:foundation` PASS (105 tests gồm 56 node tests + 49 tool-schemas tests, exit code 0).
+  - **TypeScript typecheck:** `npm run typecheck` PASS (exit code 0).
+  - **Format/Whitespace:** `git diff --check docs/slack-02-plan` PASS (exit code 0).

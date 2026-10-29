@@ -5,10 +5,12 @@ import {
   validateSlackConnectionPublicInfo,
   validateSlackProcessingConsentInfo,
   validateSlackCallbackResult,
+  validateSlackStartConnectionResponse,
   validateSlackListConnectionsResponse,
   type SlackConnectionPublicInfo,
   type SlackProcessingConsentInfo,
   type SlackCallbackResult,
+  type SlackStartConnectionResponse,
   type SlackListConnectionsResponse,
 } from '../src/index.js';
 
@@ -22,24 +24,22 @@ function validConnectionInput(): SlackConnectionPublicInfo {
     status: 'active',
     identityVersion: 1,
     scopes: ['chat:write', 'channels:read'],
+    connectedAt: '2026-10-29T07:00:00.000Z',
     consentStatus: 'granted',
     processingReady: true,
-    connectedAt: '2026-10-29T07:00:00.000Z',
-    updatedAt: '2026-10-29T07:00:00.000Z',
   };
 }
 
 function validConsentInput(): SlackProcessingConsentInfo {
   return {
-    id: 'consent-123',
     workspaceId: 'T12345678',
     providerId: 'provider-gemini',
+    policyVersion: 'policy-v1',
     status: 'granted',
+    retentionDays: 30,
     evidenceRef: 'doc-ref-999',
     authorizedBy: 'admin-ati-1',
     grantedAt: '2026-10-29T06:00:00.000Z',
-    retentionDays: 30,
-    updatedAt: '2026-10-29T06:00:00.000Z',
   };
 }
 
@@ -62,6 +62,11 @@ describe('Slack Connection Contracts & Validation', () => {
       // Ensure scopes array is cloned (not same reference)
       expect(validated.scopes).not.toBe(input.scopes);
       expect(validated.scopes).toEqual(input.scopes);
+    });
+
+    it('rejects inherited fields via Object.create (requires own properties)', () => {
+      const inherited = Object.create(validConnectionInput());
+      expect(() => validateSlackConnectionPublicInfo(inherited)).toThrow(TypeError);
     });
 
     it('allows processingReady = false when active and consent granted (e.g. unverified provider config)', () => {
@@ -148,6 +153,18 @@ describe('Slack Connection Contracts & Validation', () => {
       ).toThrow(/scopes/i);
     });
 
+    it.each(['', '   ', '\t', '\n'])(
+      'rejects blank scope entry %j',
+      (blankScope) => {
+        expect(() =>
+          validateSlackConnectionPublicInfo({
+            ...validConnectionInput(),
+            scopes: ['chat:write', blankScope],
+          })
+        ).toThrow(TypeError);
+      }
+    );
+
     it.each([
       'not-a-date',
       '2026-10-29', // missing time/UTC
@@ -159,9 +176,24 @@ describe('Slack Connection Contracts & Validation', () => {
       expect(() => validateSlackConnectionPublicInfo(input)).toThrow(/connectedAt/i);
     });
 
-    it('rejects invalid updatedAt date', () => {
-      const input = { ...validConnectionInput(), updatedAt: 'invalid-date' };
-      expect(() => validateSlackConnectionPublicInfo(input)).toThrow(/updatedAt/i);
+    it('does NOT require updatedAt on public connection, but validates when provided', () => {
+      const withoutUpdatedAt = validConnectionInput();
+      expect(withoutUpdatedAt.updatedAt).toBeUndefined();
+      const validatedWithout = validateSlackConnectionPublicInfo(withoutUpdatedAt);
+      expect(validatedWithout.updatedAt).toBeUndefined();
+
+      const withValidUpdatedAt = {
+        ...validConnectionInput(),
+        updatedAt: '2026-10-29T08:00:00.000Z',
+      };
+      const validatedWith = validateSlackConnectionPublicInfo(withValidUpdatedAt);
+      expect(validatedWith.updatedAt).toBe('2026-10-29T08:00:00.000Z');
+
+      const withInvalidUpdatedAt = {
+        ...validConnectionInput(),
+        updatedAt: 'not-a-date',
+      };
+      expect(() => validateSlackConnectionPublicInfo(withInvalidUpdatedAt)).toThrow(/updatedAt/i);
     });
   });
 
@@ -176,14 +208,41 @@ describe('Slack Connection Contracts & Validation', () => {
       expect((validated as any).secretField).toBeUndefined();
     });
 
+    it('accepts retentionDays = 0 (zero retention permitted)', () => {
+      const input = { ...validConsentInput(), retentionDays: 0 };
+      const validated = validateSlackProcessingConsentInfo(input);
+      expect(validated.retentionDays).toBe(0);
+    });
+
+    it.each([-1, -5, 1.2, NaN, Infinity, -Infinity, '0', '30'])(
+      'rejects invalid retentionDays %s',
+      (val) => {
+        const input = { ...validConsentInput(), retentionDays: val };
+        expect(() => validateSlackProcessingConsentInfo(input)).toThrow(/retentionDays/i);
+      }
+    );
+
+    it('requires policyVersion and rejects missing or blank policyVersion', () => {
+      const missing = { ...validConsentInput() };
+      delete (missing as any).policyVersion;
+      expect(() => validateSlackProcessingConsentInfo(missing)).toThrow(TypeError);
+
+      const blank = { ...validConsentInput(), policyVersion: '   ' };
+      expect(() => validateSlackProcessingConsentInfo(blank)).toThrow(TypeError);
+    });
+
+    it('rejects inherited fields via Object.create for consent', () => {
+      const inherited = Object.create(validConsentInput());
+      expect(() => validateSlackProcessingConsentInfo(inherited)).toThrow(TypeError);
+    });
+
     it('allows pending consent without grantedAt, evidenceRef or authorizedBy', () => {
       const pending: SlackProcessingConsentInfo = {
-        id: 'consent-pending-1',
         workspaceId: 'T12345678',
         providerId: 'provider-gemini',
+        policyVersion: 'policy-v1',
         status: 'pending',
         retentionDays: 14,
-        updatedAt: '2026-10-29T06:00:00.000Z',
       };
       const validated = validateSlackProcessingConsentInfo(pending);
       expect(validated).toEqual(pending);
@@ -196,22 +255,68 @@ describe('Slack Connection Contracts & Validation', () => {
       const missingEvidence = { ...validConsentInput(), evidenceRef: '' };
       expect(() => validateSlackProcessingConsentInfo(missingEvidence)).toThrow(/evidenceRef/i);
 
-      const missingAuthorizer = { ...validConsentInput(), authorizedBy: undefined };
+      const missingAuthorizer = { ...validConsentInput() };
+      delete (missingAuthorizer as any).authorizedBy;
       expect(() => validateSlackProcessingConsentInfo(missingAuthorizer)).toThrow(/authorizedBy/i);
 
-      const missingGrantedAt = { ...validConsentInput(), grantedAt: undefined };
+      const missingGrantedAt = { ...validConsentInput() };
+      delete (missingGrantedAt as any).grantedAt;
       expect(() => validateSlackProcessingConsentInfo(missingGrantedAt)).toThrow(/grantedAt/i);
     });
 
-    it.each([0, -5, 1.2, NaN, '30'])(
-      'rejects invalid retentionDays %s',
-      (val) => {
-        const input = { ...validConsentInput(), retentionDays: val };
-        expect(() => validateSlackProcessingConsentInfo(input)).toThrow(/retentionDays/i);
-      }
-    );
+    it('rejects malformed optional fields instead of silently dropping them', () => {
+      // Invalid date in grantedAt for pending status
+      const invalidDatePending = {
+        ...validConsentInput(),
+        status: 'pending',
+        grantedAt: 'invalid-date',
+      };
+      expect(() => validateSlackProcessingConsentInfo(invalidDatePending)).toThrow(TypeError);
 
-    it.each(['id', 'workspaceId', 'providerId'] as const)(
+      // Blank string in evidenceRef
+      const blankEvidence = {
+        ...validConsentInput(),
+        evidenceRef: '   ',
+      };
+      expect(() => validateSlackProcessingConsentInfo(blankEvidence)).toThrow(TypeError);
+
+      // Invalid revokedAt date
+      const invalidRevoked = {
+        ...validConsentInput(),
+        status: 'revoked',
+        revokedAt: 'not-a-date',
+      };
+      expect(() => validateSlackProcessingConsentInfo(invalidRevoked)).toThrow(TypeError);
+
+      // Valid revokedAt date accepted
+      const validRevoked = {
+        ...validConsentInput(),
+        status: 'revoked',
+        revokedAt: '2026-10-29T10:00:00.000Z',
+      };
+      const res = validateSlackProcessingConsentInfo(validRevoked);
+      expect(res.revokedAt).toBe('2026-10-29T10:00:00.000Z');
+    });
+
+    it('does NOT require id or updatedAt on consent, but validates when provided', () => {
+      const input = validConsentInput();
+      expect(input.id).toBeUndefined();
+      expect(input.updatedAt).toBeUndefined();
+      const validated = validateSlackProcessingConsentInfo(input);
+      expect(validated.id).toBeUndefined();
+      expect(validated.updatedAt).toBeUndefined();
+
+      const withMeta = {
+        ...input,
+        id: 'consent-id-1',
+        updatedAt: '2026-10-29T08:00:00.000Z',
+      };
+      const validatedMeta = validateSlackProcessingConsentInfo(withMeta);
+      expect(validatedMeta.id).toBe('consent-id-1');
+      expect(validatedMeta.updatedAt).toBe('2026-10-29T08:00:00.000Z');
+    });
+
+    it.each(['workspaceId', 'providerId', 'policyVersion'] as const)(
       'rejects missing or empty string field %s',
       (field) => {
         const input = { ...validConsentInput(), [field]: '' };
@@ -223,32 +328,87 @@ describe('Slack Connection Contracts & Validation', () => {
   });
 
   describe('validateSlackCallbackResult', () => {
-    it('validates successful callback result with connection and returnTo', () => {
+    it('validates flat approved callback result', () => {
       const result: SlackCallbackResult = {
-        ok: true,
-        connection: validConnectionInput(),
+        connectionId: 'conn-123',
+        workspaceId: 'T12345678',
+        workspaceName: 'Acme Corp',
+        slackUserId: 'U12345678',
         returnTo: '/c/123e4567-e89b-12d3-a456-426614174000',
       };
       const validated = validateSlackCallbackResult(result);
-      expect(validated.ok).toBe(true);
-      expect(validated.connection).toEqual(validConnectionInput());
-      expect(validated.returnTo).toBe('/c/123e4567-e89b-12d3-a456-426614174000');
+      expect(validated).toEqual(result);
     });
 
-    it('validates failure callback result with error and errorCode', () => {
+    it('validates flat approved callback result without optional returnTo', () => {
       const result: SlackCallbackResult = {
-        ok: false,
-        error: 'State mismatch',
-        errorCode: 'SLACK_STATE_INVALID',
+        connectionId: 'conn-123',
+        workspaceId: 'T12345678',
+        workspaceName: 'Acme Corp',
+        slackUserId: 'U12345678',
       };
       const validated = validateSlackCallbackResult(result);
-      expect(validated.ok).toBe(false);
-      expect(validated.error).toBe('State mismatch');
-      expect(validated.errorCode).toBe('SLACK_STATE_INVALID');
+      expect(validated).toEqual(result);
+      expect(validated.returnTo).toBeUndefined();
     });
 
-    it('throws if ok is not boolean', () => {
-      expect(() => validateSlackCallbackResult({ ok: 'true' })).toThrow(/ok/i);
+    it.each([
+      'connectionId',
+      'workspaceId',
+      'workspaceName',
+      'slackUserId',
+    ] as const)('rejects missing or blank %s', (field) => {
+      const result = {
+        connectionId: 'conn-123',
+        workspaceId: 'T12345678',
+        workspaceName: 'Acme Corp',
+        slackUserId: 'U12345678',
+        [field]: '   ',
+      };
+      expect(() => validateSlackCallbackResult(result)).toThrow(TypeError);
+    });
+
+    it('rejects inherited fields for callback result', () => {
+      const result = {
+        connectionId: 'conn-123',
+        workspaceId: 'T12345678',
+        workspaceName: 'Acme Corp',
+        slackUserId: 'U12345678',
+      };
+      expect(() => validateSlackCallbackResult(Object.create(result))).toThrow(TypeError);
+    });
+
+    it('rejects non-string returnTo', () => {
+      const result = {
+        connectionId: 'conn-123',
+        workspaceId: 'T12345678',
+        workspaceName: 'Acme Corp',
+        slackUserId: 'U12345678',
+        returnTo: 123,
+      };
+      expect(() => validateSlackCallbackResult(result)).toThrow(TypeError);
+    });
+  });
+
+  describe('validateSlackStartConnectionResponse', () => {
+    it('validates start connection response with url', () => {
+      const response: SlackStartConnectionResponse = {
+        url: 'https://slack.com/oauth/v2/authorize?client_id=123',
+      };
+      const validated = validateSlackStartConnectionResponse(response);
+      expect(validated.url).toBe(response.url);
+    });
+
+    it('rejects missing or blank url', () => {
+      expect(() => validateSlackStartConnectionResponse({})).toThrow(TypeError);
+      expect(() => validateSlackStartConnectionResponse({ url: '' })).toThrow(TypeError);
+      expect(() => validateSlackStartConnectionResponse({ url: '   ' })).toThrow(TypeError);
+      expect(() => validateSlackStartConnectionResponse({ url: 123 })).toThrow(TypeError);
+    });
+
+    it('rejects inherited fields for start connection response', () => {
+      const res = { url: 'https://slack.com/oauth/v2/authorize' };
+      expect(() => validateSlackStartConnectionResponse(Object.create(res))).toThrow(TypeError);
     });
   });
 
