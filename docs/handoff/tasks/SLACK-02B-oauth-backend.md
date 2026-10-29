@@ -16,7 +16,7 @@ Thi công toàn bộ tầng backend phục vụ kết nối Slack cá nhân đa 
 - Mở rộng HTTP provider fixture giả lập OAuth v2, code exchange, one-use rotating refresh token và revoke.
 - `SlackOAuthClient` bảo mật (confidential web client, không PKCE, `user_scope`, gọi `auth.test`).
 - `SlackConnectionRepo` & `SlackTokenManager` với PostgreSQL session advisory lock (`pg_advisory_lock` trên dedicated `PoolClient`) và **durable refresh-attempt marker** đảm bảo an toàn tuyệt đối trước sự cố crash khi dùng refresh token một lần.
-- API endpoints `/api/connections/myslack/...` sau cờ `MYSLACK_ENABLED` (mặc định `off`).
+- API endpoints Express 5.2.1 `/api/connections/myslack/...` sau cờ `MYSLACK_ENABLED` (mặc định `off`).
 
 ---
 
@@ -93,30 +93,38 @@ Thi công toàn bộ tầng backend phục vụ kết nối Slack cá nhân đa 
   - Consume state theo đúng stateId của request (cho phép 2 workspace kết nối song song trong 1 session ATI qua 2 state độc lập).
   - Exchange code lấy user token từ `authed_user`.
   - Gọi `auth.test` xác minh danh tính.
-  - Lưu vào database. Trả về thông tin workspace và `returnTo` (nếu có).
-- `GET /`: Trả về danh sách workspace của user kèm trạng thái `consentStatus` và `processingReady` (tính toán đầy đủ dựa trên connection active + consent granted + bằng chứng evidenceRef/authorizedBy hợp lệ + provider verified & noTraining).
+  - Lưu vào database. Trả về `{ connectionId, workspaceId, workspaceName, slackUserId, ...(consumed.return_to ? { returnTo: consumed.return_to } : {}) }`.
+- `GET /`: Trả về `{ connections: SlackConnectionPublicInfo[] }` với `consentStatus` và `processingReady` (tính toán đầy đủ dựa trên connection active + consent granted + bằng chứng evidenceRef/authorizedBy hợp lệ + provider verified & noTraining).
 - `DELETE /:id`:
   - Ngắt kết nối cục bộ trước: đặt `status = 'revoked'`, tăng `identity_version`, xóa token trong config.
   - Gọi `auth.revoke` trong background; không bao giờ gọi `apps.uninstall`.
 - `POST /api/admin/connections/myslack/:workspaceId/consent`:
-  - Route tin cậy dành cho Quản trị viên / Operator cấp phép xử lý dữ liệu và cấu hình provider theo Mục 4.4 (F1).
+  - Route tin cậy dành cho Quản trị viên / Operator cấp phép xử lý dữ liệu (yêu cầu session admin `role === 'admin'`).
 
 ---
 
 ## 3. Các Bài Kiểm Thử Concurrency & Race Cases Bắt Buộc
 
-1. **Child-Process Crash Simulation (One-Use Refresh Safety):**
+1. **Browser Cookie CSRF & Session Tamper:**
+   - Thiếu hoặc sai cookie `ati_slack_browser` -> từ chối `SLACK_STATE_INVALID`.
+   - State thuộc session hoặc user khác -> từ chối, không consume.
+2. **Child-Process Crash Simulation (One-Use Refresh Safety):**
    - Tạo kết nối xoay token có thời hạn.
    - Spawn child-process thực hiện refresh; HTTP provider nhận request và ghi nhận token cũ đã dùng; child process bị terminate (`process.kill('SIGKILL')`) TRƯỚC khi commit kết quả vào DB.
    - Tiến trình chính khởi tạo lại manager: kiểm tra thấy `refresh_attempt_id` treo, đánh dấu `reconnect_required`, và **chứng minh không có cuộc gọi HTTP thứ hai** nào được gửi tới provider.
-2. **Concurrent Callback (Two Workspaces vs Duplicate State):**
+3. **Concurrent Callback (Two Workspaces vs Duplicate State):**
    - Hai request callback với 2 state khác nhau cho 2 workspace khác nhau trong cùng 1 session ATI -> cả hai đều thành công.
    - Hai request callback trùng 1 state -> đúng 1 request thành công, request thứ hai trả `SLACK_STATE_INVALID`.
-3. **Identity Exclusivity Conflict:**
+4. **Stale Callback Same-Workspace Race:**
+   - Callback cũ mang generation cũ không được đè lên connection đã được cập nhật bởi callback mới hơn.
+5. **Identity Exclusivity Conflict:**
    - User A đã kết nối workspace T, Slack user U.
    - User B thử kết nối cùng workspace T, Slack user U -> User B bị từ chối `SLACK_IDENTITY_CONFLICT`, token của User A vẫn an toàn và không bị revoke.
-4. **Disconnect Race:**
+6. **Disconnect Race & Shared Installation:**
    - Tiến trình gọi disconnect trong lúc refresh đang chạy -> Disconnect thành công, kết nối trở thành `revoked`, refresh bị bỏ qua và không làm hồi sinh kết nối.
+   - User A ngắt kết nối không làm gián đoạn User B trong cùng workspace.
+7. **Secret Redaction:**
+   - Mọi log hệ thống, response lỗi và body trả về không chứa access token, refresh token hay client secret.
 
 ---
 
@@ -126,3 +134,4 @@ Thi công toàn bộ tầng backend phục vụ kết nối Slack cá nhân đa 
 - [ ] Test crash-safety chứng minh không bao giờ gửi lại refresh token đã bị tiêu thụ sau crash.
 - [ ] Không rò rỉ token, client secret hay body trong log/error.
 - [ ] Khi `MYSLACK_ENABLED=off`, `/api/health` không có `myslackEnabled`, mọi route `/api/connections/myslack` trả 503.
+- [ ] `npm run typecheck` đạt exit code 0.

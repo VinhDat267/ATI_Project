@@ -38,15 +38,17 @@ Chứa các định nghĩa và hàm xác thực:
    - `connectedAt: string;` (Chuỗi ISO-8601)
    - `consentStatus: SlackConsentStatus;`
    - `processingReady: boolean;` (Chỉ true khi `status === 'active'` VÀ toàn bộ điều kiện provider/evidence/retention trong policy đều thỏa mãn)
-4. `interface SlackStartConnectionResponse`:
+4. `interface SlackListConnectionsResponse`:
+   - `connections: SlackConnectionPublicInfo[];`
+5. `interface SlackStartConnectionResponse`:
    - `url: string;` (URL chuyển hướng OAuth tới Slack)
-5. `interface SlackCallbackResult`:
+6. `interface SlackCallbackResult`:
    - `connectionId: string;`
    - `workspaceId: string;`
    - `workspaceName: string;`
    - `slackUserId: string;`
    - `returnTo?: string;`
-6. `interface SlackProcessingConsentInfo`:
+7. `interface SlackProcessingConsentInfo`:
    - `workspaceId: string;`
    - `status: SlackConsentStatus;`
    - `policyVersion: string;`
@@ -56,7 +58,7 @@ Chứa các định nghĩa và hàm xác thực:
    - `evidenceRef: string;`
    - `grantedAt?: string;`
    - `revokedAt?: string;`
-7. Các hàm xác thực runtime (ném `TypeError` khi dữ liệu rỗng, sai kiểu hoặc version ≤ 0):
+8. Các hàm xác thực runtime (ném `TypeError` khi dữ liệu rỗng, sai kiểu hoặc version ≤ 0):
    - `validateSlackConnectionPublicInfo(value: unknown): SlackConnectionPublicInfo`
    - `validateSlackProcessingConsentInfo(value: unknown): SlackProcessingConsentInfo`
 
@@ -83,11 +85,14 @@ Chứa các định nghĩa và hàm xác thực:
 3. **VERIFY:** Chạy lại test:
    ```sh
    npm test -w @wap/tool-schemas -- tests/myslack-connection.test.ts
-   npm run check:types
+   npm run typecheck
    ```
    *Kỳ vọng:* 100% tests PASS, typecheck đạt exit 0.
-4. **COMMIT:** Chỉ commit các file trong `packages/tool-schemas/`:
-   `feat(slack): add personal connection and consent schema contracts`
+4. **COMMIT:** Chỉ commit các file cụ thể trong `packages/tool-schemas/`:
+   ```sh
+   git add packages/tool-schemas/src/myslack-connection.ts packages/tool-schemas/src/index.ts packages/tool-schemas/tests/myslack-connection.test.ts
+   git commit -m "feat(slack): add personal connection schema contracts"
+   ```
 
 ---
 
@@ -95,4 +100,4 @@ Chứa các định nghĩa và hàm xác thực:
 - [ ] Mọi interface DTO và type alias xuất phát từ `packages/tool-schemas`.
 - [ ] Validation ném `TypeError` rõ ràng đối với payload không hợp lệ.
 - [ ] Catalog `ALL_TOOLS` và `SERVICE_REGISTRY` giữ nguyên 100% không đổi.
-- [ ] Không có circular dependencies, build sạch exit code 0.
+- [ ] `npm run typecheck` đạt exit code 0.

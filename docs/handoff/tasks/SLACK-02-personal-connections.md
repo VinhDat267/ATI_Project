@@ -1,6 +1,6 @@
 # SLACK-02 · Kết nối Slack cá nhân đa workspace, token rotation và CAS
 
-**Trạng thái:** sẵn sàng triển khai (kế hoạch và task cards đã được duyệt)  
+**Trạng thái:** chờ điều phối viên review và phê duyệt (awaiting coordinator review)  
 **Nhánh điều phối:** `docs/slack-02-plan` (tài liệu) · **Nhánh mã triển khai:** chia theo ba card con 02A, 02B, 02C  
 **Nền:** `fc12e3fbd683f9ffee53322b4f5fc132d50fc2ac` (origin/main sau PR #183 `3d0edfa0`)  
 **Phụ thuộc:** SLACK-01 (contracts nền, inventory và HTTP fixture đã merge)  
@@ -56,19 +56,20 @@ Thực hiện toàn bộ hạ tầng kết nối OAuth cá nhân cho Slack nhi�
    - Bắt buộc gọi `auth.test` xác minh danh tính chủ sở hữu và team ID.
 5. **Ngắt kết nối An toàn (Disconnect Semantics):**
    - Vô hiệu hóa cục bộ trước (`status = 'revoked'`, tăng `identity_version`), sau đó gọi `auth.revoke` thu hồi riêng token đó trong background; không bao giờ gọi `apps.uninstall`.
-   - Ngắt kết nối của tài khoản A không phá vỡ kết nối của tài khoản B trong cùng workspace.
+   - Ngắt kết nối của tài khoản A không phá vỡ kết nối của tài khoản B trong cùng workspace. Xung đột danh tính không thu hồi token của tài khoản đang kết nối.
 6. **Ranh giới Chấp thuận Xử lý Dữ liệu (F1 Policy Gate) & `processingReady`:**
    - Chấp thuận tổ chức được cấp qua đường quản trị tin cậy (`slack_processing_consents`), không cho phép người dùng thường tự cấp qua checkbox.
    - `processingReady` chỉ true khi đồng thời thỏa mãn: connection active, consent granted, evidenceRef/authorizedBy đầy đủ, provider id khớp, verified && noTraining true, và retention cap không vượt quá.
    - Mất chấp thuận lập tức chặn đưa dữ liệu vào model thông qua `decideSlackModelUse`, kể cả khi token đang `active`.
-7. **Cờ Tính Năng Mặc Định Tắt:** Khi `MYSLACK_ENABLED=off`, toàn bộ hệ thống giữ nguyên 100% baseline, không lộ route hay trạng thái trong health check.
+7. **Cờ Tính Năng Mặc Định Tắt:** Khi `MYSLACK_ENABLED=off`, toàn bộ hệ thống giữ nguyên 100% baseline, không lộ route hay trạng thái trong health check. Danh sách kết nối trả về định dạng `{ connections: SlackConnectionPublicInfo[] }`.
 8. **Kiểm Thử Thực Tế:** Tất cả test concurrency chạy trên PostgreSQL thật và HTTP loopback fixture thật; toàn bộ test suite `npm run check` đạt exit 0.
 
 ---
 
-## 4. Bàn Giao & Thứ Tự Tích Hợp
+## 4. Bàn Giao & Chiến Lược Nhánh Stacked
 
-- **Bước 1:** Hoàn thành và merge SLACK-02A (contracts) vào develop/main.
-- **Bước 2:** Triển khai SLACK-02B (backend, DB migration 0014, fixture). Chạy test PostgreSQL concurrency và crash simulation. Merge SLACK-02B.
-- **Bước 3:** Triển khai SLACK-02C (frontend UI). Chạy test vitest và browser spec. Merge SLACK-02C.
-- **Bước 4:** Điều phối viên kiểm tra tích hợp toàn diện và đóng card SLACK-02.
+- Các nhánh triển khai được tổ chức theo mô hình **stacked branches**:
+  - Nhánh 1: `feat/slack-02a-connection-contracts` (từ `main`) -> Review độc lập.
+  - Nhánh 2: `feat/slack-02b-oauth-backend` (từ `feat/slack-02a-connection-contracts`) -> Review độc lập.
+  - Nhánh 3: `feat/slack-02c-connection-ui` (từ `feat/slack-02b-oauth-backend`) -> Review độc lập.
+- **Không tự ý merge vào `main` hay `develop`** khi chưa có quyết định và hướng dẫn rõ ràng từ Điều phối viên Trưởng hoặc chủ dự án.

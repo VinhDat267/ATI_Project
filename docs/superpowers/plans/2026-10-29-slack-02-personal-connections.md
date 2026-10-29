@@ -8,10 +8,10 @@
 - Giữ nguyên Confidential Web Client với `user_scope`, không PKCE; xác thực danh tính sau callback bắt buộc qua `auth.test`.
 - Quản lý xoay token dùng một lần qua PostgreSQL Session Advisory Lock (`pg_advisory_lock` trên dedicated `PoolClient`) kết hợp **durable refresh-attempt marker** commit vào database TRƯỚC KHI phát request ra ngoài, duy trì lock trong suốt lượt gọi HTTP và publish CAS nguyên tử, đảm bảo không bao giờ phát lại refresh token cũ sau crash.
 - Giao diện Settings hiển thị danh mục nhiều workspace độc lập trong mục "Của riêng bạn".  
-**Tech Stack:** Node.js `^22.12.0 || >=24.0.0`, TypeScript 5.8, Express 4, PostgreSQL 16 (với `pg.Pool`), Vitest 3, React 19, Tailwind CSS.  
+**Tech Stack:** Node.js `^22.12.0 || >=24.0.0`, TypeScript 5.8, Express 5.2.1, PostgreSQL 16 (với `pg.Pool`), Vitest 3, React 19, Tailwind CSS.  
 **Spec:** [Slack cá nhân và trợ lý công việc trong ATI](../specs/2026-10-28-slack-personal-oauth-design.md) (mục 4, 8, 9, 10).  
 **Task Cards:** [SLACK-02 Parent Card](../../handoff/tasks/SLACK-02-personal-connections.md), [SLACK-02A (Contracts)](../../handoff/tasks/SLACK-02A-connection-contracts.md), [SLACK-02B (Backend)](../../handoff/tasks/SLACK-02B-oauth-backend.md), [SLACK-02C (Frontend)](../../handoff/tasks/SLACK-02C-connection-ui.md).  
-**Status:** Kế hoạch sẵn sàng thực thi theo quy chuẩn TDD Red-Green-Refactor.
+**Status:** Kế hoạch sẵn sàng thực thi; chờ điều phối viên review trước khi triển khai các nhánh stacked.
 
 ---
 
@@ -43,7 +43,7 @@
    - Ngắt kết nối của người này không ảnh hưởng đến người khác trong cùng workspace. Xung đột danh tính không được thu hồi token của người đang sở hữu hợp lệ.
 6. **Ranh Giới Chấp Thuận Dữ Liệu (F1 Policy Boundary) & `processingReady`:**
    - Quản lý qua bảng `slack_processing_consents (workspace_id UNIQUE, status, policy_version, provider_id, retention_days, authorized_by, evidence_ref)`.
-   - Cấp phép qua đường quản trị tin cậy (`POST /api/admin/connections/myslack/:workspaceId/consent`), không để người dùng thường tự cấp qua checkbox.
+   - Cấp phép qua đường quản trị tin cậy (`POST /api/admin/connections/myslack/:workspaceId/consent` yêu cầu session admin `role === 'admin'`), không để người dùng thường tự cấp qua checkbox.
    - `processingReady` chỉ trả về `true` khi hội đủ toàn bộ điều kiện:
      1. `connection.status === 'active'`
      2. `consent.status === 'granted'`
@@ -55,6 +55,8 @@
 7. **Bảo Tồn Baseline Hiện Hữu:**
    - Chỉ thêm cờ `MYSLACK_ENABLED` (mặc định `off`).
    - `ALL_TOOLS` và `SERVICE_REGISTRY` tuyệt đối không thêm `myslack` trong SLACK-02 (dành cho SLACK-03).
+   - Route `/api/health` chỉ bổ sung `myslackEnabled` khi cờ bật và đủ cấu hình (`isMySlackAvailable`).
+   - Envelope cho danh sách kết nối trả về định dạng chuẩn: `{ connections: SlackConnectionPublicInfo[] }`.
 
 ---
 
@@ -65,7 +67,7 @@
 | `packages/tool-schemas/src/myslack-connection.ts` | Integration / AI | Interface DTOs cho connection, consent và public metadata |
 | `packages/tool-schemas/src/index.ts` | Integration / AI | Export public contracts, bảo toàn catalog không có myslack |
 | `packages/tool-schemas/tests/myslack-connection.test.ts` | Integration / AI | Test kiểm tra contract bất biến và validation |
-| `db/v3/0014_slack_personal_connections.sql` | Backend | Migration idempotent: mở rộng `oauth_states`, tạo 2 bảng mới và unique index |
+| `db/v3/0014_slack_personal_connections.sql` | Backend | Migration idempotent: mở rộng `oauth_states`, tạo 2 bảng mới và stable unique index |
 | `scripts/fake-slack-personal.mjs` | Backend / Integration | Provider HTTP fixture: hỗ trợ `oauth.v2.access` (code & refresh) và `auth.revoke` |
 | `scripts/fake-slack-personal.test.mjs` | Backend / Integration | Test kiểm chứng hành vi provider giả lập |
 | `apps/chat-api/src/db/repositories/slack-connection-repo.ts` | Backend | Quản lý kết nối đa workspace, stable row, CAS, atomic update và exclusive identity |
@@ -116,6 +118,10 @@ export interface SlackConnectionPublicInfo {
   processingReady: boolean;
 }
 
+export interface SlackListConnectionsResponse {
+  connections: SlackConnectionPublicInfo[];
+}
+
 export interface SlackStartConnectionResponse { url: string; }
 export interface SlackCallbackResult {
   connectionId: string;
@@ -137,11 +143,11 @@ export function validateSlackConnectionPublicInfo(value: unknown): SlackConnecti
 - [ ] **Step 4:** Chạy lại test xác nhận xanh:
   ```sh
   npm test -w @wap/tool-schemas -- tests/myslack-connection.test.ts
-  npm run check:types
+  npm run typecheck
   ```
 - [ ] **Step 5 (Commit):**
   ```sh
-  git add packages/tool-schemas/
+  git add packages/tool-schemas/src/myslack-connection.ts packages/tool-schemas/src/index.ts packages/tool-schemas/tests/myslack-connection.test.ts
   git commit -m "feat(slack): add personal connection schema contracts"
   ```
 
@@ -179,7 +185,7 @@ export function validateSlackConnectionPublicInfo(value: unknown): SlackConnecti
   ```
 - [ ] **Step 5 (Commit):**
   ```sh
-  git add db/v3/0014_slack_personal_connections.sql apps/chat-api/src/db/repositories/ apps/chat-api/tests/db/
+  git add db/v3/0014_slack_personal_connections.sql apps/chat-api/src/db/repositories/slack-connection-repo.ts apps/chat-api/src/db/repositories/slack-consent-repo.ts apps/chat-api/tests/db/slack-migration.test.ts apps/chat-api/tests/db/slack-connection-repo.test.ts
   git commit -m "feat(slack): add personal connection database migration and repository"
   ```
 
@@ -252,7 +258,7 @@ export function validateSlackConnectionPublicInfo(value: unknown): SlackConnecti
   ```
 - [ ] **Step 5 (Commit):**
   ```sh
-  git add apps/chat-api/src/services/slack/ apps/chat-api/tests/services/
+  git add apps/chat-api/src/services/slack/oauth-client.ts apps/chat-api/src/services/slack/token-manager.ts apps/chat-api/tests/services/slack-oauth-client.test.ts apps/chat-api/tests/services/slack-token-manager.test.ts
   git commit -m "feat(slack): implement confidential oauth client and serial token manager"
   ```
 
@@ -269,17 +275,19 @@ export function validateSlackConnectionPublicInfo(value: unknown): SlackConnecti
 
 **Routes:**
 - `POST /api/connections/myslack/start`: Tạo state, gắn cookie `ati_slack_browser`, trả `{ url }`.
-- `POST /api/connections/myslack/callback`: Consume state, exchange token, gọi `auth.test`, lưu connection, trả `{ connectionId, workspaceId, workspaceName, returnTo }`.
+- `POST /api/connections/myslack/callback`: Consume state, exchange token, gọi `auth.test`, lưu connection, trả `{ connectionId, workspaceId, workspaceName, slackUserId, ...(consumed.return_to ? { returnTo: consumed.return_to } : {}) }`.
   - CAS per state: Hai state khác nhau cho 2 workspace khác nhau trong cùng session ATI đều kết nối thành công.
-- `GET /api/connections/myslack`: Danh sách kết nối của user kèm `consentStatus` và `processingReady` (tính toán dựa trên đầy đủ điều kiện provider và retention).
+- `GET /api/connections/myslack`: Trả về `{ connections: SlackConnectionPublicInfo[] }` với `consentStatus` và `processingReady` (tính toán dựa trên đầy đủ điều kiện provider và retention).
 - `DELETE /api/connections/myslack/:id`: Ngắt kết nối cục bộ (`status = 'revoked'`, tăng `identity_version`), sau đó gọi `auth.revoke` background. Không gọi `apps.uninstall`.
-- `POST /api/admin/connections/myslack/:workspaceId/consent`: Đặt quyền chấp thuận tổ chức (yêu cầu quyền admin).
+- `POST /api/admin/connections/myslack/:workspaceId/consent`: Đặt quyền chấp thuận tổ chức (yêu cầu quyền admin `user.role === 'admin'`).
 - Cờ: `MYSLACK_ENABLED` (mặc định `'off'`). Khi tắt, routes trả 503, `/api/health` không có `myslackEnabled`.
 
 - [ ] **Step 1 (Test RED):** Viết test routes:
   - Start, callback 2 workspace đồng thời, callback duplicate state trả 400.
   - Ngắt kết nối A không ảnh hưởng B trong cùng workspace.
+  - Xung đột danh tính không thu hồi token của tài khoản đang kết nối.
   - Cờ tắt trả 503.
+  - Log / response không chứa body hay token.
 - [ ] **Step 2:** Chạy test xác nhận đỏ:
   ```sh
   npm test -w apps/chat-api -- tests/routes/myslack-routes.test.ts
@@ -291,7 +299,7 @@ export function validateSlackConnectionPublicInfo(value: unknown): SlackConnecti
   ```
 - [ ] **Step 5 (Commit):**
   ```sh
-  git add apps/chat-api/src/routes/connections/myslack.ts apps/chat-api/src/config/env.ts apps/chat-api/src/app.ts apps/chat-api/src/routes/services-routes.ts apps/chat-api/tests/routes/
+  git add apps/chat-api/src/routes/connections/myslack.ts apps/chat-api/src/config/env.ts apps/chat-api/src/app.ts apps/chat-api/src/routes/services-routes.ts apps/chat-api/tests/routes/myslack-routes.test.ts
   git commit -m "feat(slack): add personal connection routes and configuration flags"
   ```
 
@@ -314,7 +322,7 @@ export function validateSlackConnectionPublicInfo(value: unknown): SlackConnecti
 - Modify: `scripts/test-v3-browser.mjs` (bổ sung test group cho Slack callback & Settings, bảo toàn các group cũ)
 
 **UI Flow:**
-- Settings mục "Của riêng bạn" hiển thị danh sách các workspace đã kết nối.
+- Settings mục "Của riêng bạn" hiển thị danh sách các workspace đã kết nối từ `{ connections: SlackConnectionPublicInfo[] }`.
 - Mỗi workspace có tên, logo, tài khoản Slack, badge trạng thái (Đã kết nối, Chờ cho phép xử lý, Cần kết nối lại) và nút Ngắt kết nối (kèm modal CockpitDialog).
 - Nút "Kết nối Workspace Slack" để thêm workspace mới.
 - Trang Callback hiển thị trạng thái đang kết nối, chuyển hướng về `returnTo` hoặc `/settings#myslack`.
@@ -331,7 +339,7 @@ export function validateSlackConnectionPublicInfo(value: unknown): SlackConnecti
   ```
 - [ ] **Step 5 (Commit):**
   ```sh
-  git add apps/chat-web/ scripts/test-v3-browser.mjs
+  git add apps/chat-web/src/pages/Settings/PersonalMySlack.tsx apps/chat-web/src/views/MySlackCallbackView.tsx apps/chat-web/src/services/myslack-connection.ts apps/chat-web/src/hooks/use-myslack-enabled.ts apps/chat-web/tests/myslack-ui.test.tsx apps/chat-web/tests/myslack-callback.test.tsx apps/chat-web/src/pages/Settings/SettingsPage.tsx apps/chat-web/src/routes.ts apps/chat-web/src/types.ts apps/chat-web/src/services/api-client.ts apps/chat-web/src/App.tsx scripts/test-v3-browser.mjs
   git commit -m "feat(slack): add multi-workspace settings and callback view"
   ```
 
@@ -351,4 +359,4 @@ Trước khi tuyên bố hoàn tất SLACK-02:
    ```
    *Yêu cầu:* Toàn bộ các kịch bản trình duyệt trên 1440px và 375px đều đạt.
 3. Không bật cờ `MYSLACK_ENABLED=on` trong production hoặc file cấu hình commit.
-4. Mọi task con được review độc lập trước khi merge.
+4. Mọi task con được review độc lập trước khi merge; không tự ý merge vào develop/main khi chưa có hướng dẫn rõ ràng từ điều phối viên/người dùng.

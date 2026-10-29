@@ -31,7 +31,7 @@
    - Ngắt kết nối của User A không làm hỏng kết nối của User B trong cùng workspace. Xung đột danh tính từ chối kết nối mới nhưng không thu hồi token của tài khoản đang kết nối hợp lệ.
 6. **Ranh Giới Chấp Thuận Xử Lý Dữ Liệu (F1 Policy Boundary) & `processingReady` (Correction 6 & Preflight):**
    - Bảng `slack_processing_consents` lưu vết bằng chứng cấp phép của tổ chức, provider được phép và thời hạn retention.
-   - Cấp phép qua đường quản trị tin cậy (`POST /api/admin/connections/myslack/:workspaceId/consent`), không để người dùng thường tự cấp qua checkbox.
+   - Cấp phép qua đường quản trị tin cậy (`POST /api/admin/connections/myslack/:workspaceId/consent` yêu cầu admin session), không để người dùng thường tự cấp qua checkbox.
    - `processingReady` chỉ true khi toàn bộ các điều kiện sau được thỏa mãn đồng thời:
      1. `connection.status === 'active'`
      2. `consent.status === 'granted'`
@@ -40,16 +40,20 @@
      5. Cấu hình provider có `verified === true` và `noTraining === true`
      6. `consent.retentionDays <= provider.maxRetentionDays`
    - Bất kỳ điều kiện nào không thỏa -> fail-closed (`false`). Mất chấp thuận lập tức chặn đưa dữ liệu vào model thông qua `decideSlackModelUse`.
-7. **Cờ Tính Năng & Bảo Tồn Hệ Thống (Correction 7):**
+7. **Cờ Tính Năng & Bảo Tồn Hệ Thống (Correction 7 & Preflight):**
    - Chỉ thêm cờ `MYSLACK_ENABLED` (mặc định `off`).
    - `ALL_TOOLS` và `SERVICE_REGISTRY` tuyệt đối không đăng ký `myslack` trong SLACK-02 (dành cho SLACK-03).
+   - API list envelope chuẩn: `{ connections: SlackConnectionPublicInfo[] }`.
+   - Lệnh kiểm tra type chuẩn: `npm run typecheck` (hoặc `typecheck:v3`).
+   - Phiên bản Express chuẩn: `express@5.2.1`.
 8. **An Toàn Bảo Mật & CSRF (Correction 8):**
    - Bắt buộc cookie trình duyệt `ati_slack_browser`, xác thực phiên `auth_sessions`, finite timeout `AbortSignal`, và che giấu toàn bộ secret trong log/lỗi.
-9. **Phân Rã Task Cards theo Quyền Sở Hữu Module (Correction 9):**
+9. **Phân Rã Task Cards theo Quyền Sở Hữu Module & Quy Trình Bàn Giao (Correction 9 & Preflight):**
    - Bóc tách thành 3 cards con độc lập:
      - `SLACK-02A` (Integration: `packages/tool-schemas`)
      - `SLACK-02B` (Backend: `apps/chat-api`, `db/v3`, `scripts/fake-slack-personal.*`)
      - `SLACK-02C` (Frontend: `apps/chat-web`, browser runner)
+   - Trạng thái card cha là **chờ điều phối viên review và phê duyệt**. Quy trình bàn giao là các nhánh stacked branches, không tự ý merge vào `main` hay `develop` khi chưa có hướng dẫn rõ ràng.
 
 ---
 
@@ -68,4 +72,4 @@
 
 - **Mã nguồn:** Không có product code nào bị sửa đổi.
 - **Git:** Nhánh `docs/slack-02-plan` sạch, chỉ chứa các file tài liệu và task cards mới. Không có lệnh push hoặc merge nào được thực hiện.
-- **Sẵn sàng:** Bàn giao cho Điều phối viên Trưởng (Coordinator) để thẩm định và phân công thực hiện theo thứ tự SLACK-02A → SLACK-02B → SLACK-02C.
+- **Sẵn sàng:** Bàn giao cho Điều phối viên Trưởng (Coordinator) để thẩm định và phê duyệt trước khi bắt đầu triển khai các nhánh stacked.
