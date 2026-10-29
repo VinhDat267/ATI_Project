@@ -14,7 +14,7 @@
   2. *Bất định cùng giây (`connected_at >= to_timestamp(t) AND connected_at < to_timestamp(t + 1)`):* Không xóa token! Chuyển `status = 'reconnect_required'`, giữ encrypted token riêng tư trong `config` (chặn toàn bộ content query), tăng `identity_version`, reset `refresh_in_flight = false`, ghi intent ambiguity để worker giải quyết bằng metadata-only `auth.test` có CAS guard chống race reconnect/refresh.
   3. *Mới hơn rõ ràng (`connected_at >= to_timestamp(t + 1)`):* Bỏ qua (stale delayed event).
   Token IDs tuyệt đối không xuất hiện trong receipts, intents hay DTOs.
-- **Rào cản Đọc F3 Thống nhất Qua 03B1 (Loại bỏ Tombstone Cạnh tranh):** Không tạo bảng tombstone riêng thiếu provenance. Ingress phối hợp trực tiếp với giao diện 03B1 `commitLifecycleInvalidation(client, target, barrier)` trong cùng transaction DB trước ACK 200:
+- **Rào cản Đọc F3 Thống nhất Qua 03B1 (Loại bỏ Tombstone Cạnh tranh):** Không tạo bảng tombstone riêng thiếu provenance. Ingress phối hợp trực tiếp với giao diện 03B1 `stageInTransaction(client, input)` (`SlackTransactionBoundInvalidationService`) trong cùng transaction DB trước ACK 200:
   - `tokens_revoked` / `app_uninstalled`: Mục tiêu `authorization_disconnect` theo binding/epoch cũ, không dùng `app:*` toàn workspace gây chặn cài đặt lại.
   - `message_deleted`: Mục tiêu `resource_lifecycle` (`tombstoneReason: 'source_deleted'`), rào cản vĩnh viễn, ngăn chặn resurrection khi edit đến muộn.
   - `message_changed`: Mục tiêu `resource_lifecycle` (`tombstoneReason: 'source_edited'`), vô hiệu hóa đơn điệu revision cũ (`revision < editTs`), bảo toàn revision mới.
@@ -133,23 +133,16 @@ export interface SlackWorkerWatermarks {
   resumeWatermark: Date;
 }
 
-/** Giao diện Phối hợp Rào cản Vô hiệu hóa Đọc từ 03B1 */
-export interface ISlackInvalidationCoordinator {
-  commitLifecycleInvalidation(
-    client: import('pg').PoolClient,
-    intent: import('@wap/tool-schemas').SlackPurgeTarget,
-    barrier?: {
-      barrierType: 'authorization_disconnect' | 'resource_lifecycle' | 'channel_membership_lost' | 'workspace_consent_barrier';
-      workspaceId: string;
-      connectionId?: string;
-      identityVersion?: number;
-      channelId?: string;
-      resourceType?: 'message' | 'thread' | 'channel' | 'file';
-      resourceId?: string;
-      minValidRevision?: string;
-      reason: string;
-    }
-  ): Promise<string>;
+/** Hợp đồng Đầu vào Phối hợp Rào cản Vô hiệu hóa Đọc 03B1 */
+export interface StageLifecycleInvalidationInput {
+  target: import('@wap/tool-schemas').SlackPurgeTarget;
+  eventId: string;
+  sourceEventTs: string;
+}
+
+/** Giao diện Phối hợp Rào cản Vô hiệu hóa Đọc từ 03B1 (Transaction-Bound) */
+export interface SlackTransactionBoundInvalidationService {
+  stageInTransaction(client: import('pg').PoolClient, input: StageLifecycleInvalidationInput): Promise<void>;
 }
 ```
 
@@ -205,7 +198,7 @@ CREATE INDEX IF NOT EXISTS idx_slack_lifecycle_intents_pending ON slack_lifecycl
   - T1.5: Interval `[t, t+1)` cho `tokens_revoked`: `< t` ngắt kết nối (`status='disconnected'`, `config=NULL`); `[t, t+1)` chuyển `reconnect_required`, giữ `config`, tăng `identity_version`; `>= t+1` không ảnh hưởng.
   - T1.6: Rào cản 03B1 cho `message_deleted` (tombstone vĩnh viễn) và `message_changed` (`min_valid_revision = edit_ts`), ngăn chặn resurrection.
 - [ ] **Step 2:** Chạy test; mong đợi FAIL (chưa có DDL/repo).
-- [ ] **Step 3 (GREEN Implementation):** Tạo migration `NNNN_slack_event_receipts.sql` và triển khai `SlackEventReceiptRepo.recordReceiptAtomic` phối hợp với `ISlackInvalidationCoordinator`.
+- [ ] **Step 3 (GREEN Implementation):** Tạo migration `NNNN_slack_event_receipts.sql` và triển khai `SlackEventReceiptRepo.recordReceiptAtomic` phối hợp với `SlackTransactionBoundInvalidationService.stageInTransaction`.
 - [ ] **Step 4:** Chạy lại test; mong đợi PASS trên PG 16 thật.
 
 ### Task 2: Cryptographic Signature & Freshness Verifier

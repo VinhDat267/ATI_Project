@@ -19,7 +19,7 @@
 
 ## 1. Mục tiêu và Phạm vi Kỹ thuật Bounded 04A
 
-Card này bóc tách và định nghĩa trọn vẹn ranh giới kỹ thuật của **Giai đoạn 04A** từ task cha SLACK-04: thiết lập điểm tiếp nhận sự kiện webhook HTTPS ký số (`POST /api/slack/events`), thu thập buffer raw body trước khi phân tích JSON, băm mật mã trực tiếp trên byte thô không roundtrip UTF-8, xác minh chữ ký HMAC-SHA256 phiên bản `v0` cùng cửa sổ độ tươi timestamp bounded `<= 300s`, phản hồi thử thách `url_verification` chuẩn Slack tức thì, áp dụng mô hình Body-Free Receipt kết hợp hợp đồng watermark 6 chiều ngăn chặn backfill F1, phân định rõ ràng 3 trường hợp interval epoch `[t, t+1)` bảo toàn credential khi ambiguity, phối hợp rào cản vô hiệu hóa đọc F3 nguyên tử qua giao diện của 03B1 (`commitLifecycleInvalidation`) trước ACK khớp schema database hiện hành (`status = 'disconnected'`), và đảm bảo cam kết bền vững giao dịch biên nhận (atomic durable receipt commit) trước khi trả về ACK HTTP 200 trong vòng ngân sách 3 giây của Slack.
+Card này bóc tách và định nghĩa trọn vẹn ranh giới kỹ thuật của **Giai đoạn 04A** từ task cha SLACK-04: thiết lập điểm tiếp nhận sự kiện webhook HTTPS ký số (`POST /api/slack/events`), thu thập buffer raw body trước khi phân tích JSON, băm mật mã trực tiếp trên byte thô không roundtrip UTF-8, xác minh chữ ký HMAC-SHA256 phiên bản `v0` cùng cửa sổ độ tươi timestamp bounded `<= 300s`, phản hồi thử thách `url_verification` chuẩn Slack tức thì, áp dụng mô hình Body-Free Receipt kết hợp hợp đồng watermark 6 chiều ngăn chặn backfill F1, phân định rõ ràng 3 trường hợp interval epoch `[t, t+1)` bảo toàn credential khi ambiguity, phối hợp rào cản vô hiệu hóa đọc F3 nguyên tử qua giao diện của 03B1 (`stageInTransaction` từ `SlackTransactionBoundInvalidationService`) trước ACK khớp schema database hiện hành (`status = 'disconnected'`), và đảm bảo cam kết bền vững giao dịch biên nhận (atomic durable receipt commit) trước khi trả về ACK HTTP 200 trong vòng ngân sách 3 giây của Slack.
 
 ### 1.1. Các Nguyên tắc Bất biến (Core Technical Invariants)
 
@@ -85,7 +85,7 @@ Card này bóc tách và định nghĩa trọn vẹn ranh giới kỹ thuật c�
         - Token IDs tuyệt đối không được đưa vào receipt, intent hay DTO.
      3. *Mới hơn rõ ràng (`connected_at >= to_timestamp(t + 1)`):* Kết nối tạo ở giây sau thời điểm revoke (kết nối mới sau revoke) -> Bỏ qua, coi là sự kiện replay cũ (no-op).
    - **Rào cản Đọc F3 Thống nhất Qua Giao diện 03B1 (Loại bỏ Bảng Tombstone Riêng Biệt):**
-     Loại bỏ hoàn toàn đề xuất bảng `slack_source_tombstones` riêng của 04A vì thiếu provenance nguồn và gây xung đột cạnh tranh với 03B1. Ingress phối hợp trực tiếp với 03B1 thông qua giao diện transaction-bound `commitLifecycleInvalidation(client, target, barrier)`:
+     Loại bỏ hoàn toàn đề xuất bảng `slack_source_tombstones` riêng của 04A vì thiếu provenance nguồn và gây xung đột cạnh tranh với 03B1. Ingress phối hợp trực tiếp với 03B1 thông qua giao diện transaction-bound `stageInTransaction(client, input)` thuộc `SlackTransactionBoundInvalidationService`:
      - `tokens_revoked`: Ghi intent `authorization_disconnect` nhắm vào các binding/epoch CŨ.
      - `app_uninstalled`: Ghi intent `authorization_disconnect` với lý do `app_reinstalled` hoặc `connection_disconnected` nhắm vào toàn bộ binding/epoch CŨ trong workspace. **TUYỆT ĐỐI KHÔNG DÙNG TOMBSTONE TOÀN CỤC `app:<id>` VỚI `channel='*'`** vì thiếu generation fencing và sẽ chặn vĩnh viễn việc cài đặt lại ứng dụng sau này!
      - `message_deleted`: Ghi rào cản `resource_lifecycle` (`tombstoneReason: 'source_deleted'`), rào cản tài nguyên vĩnh viễn, ngăn chặn resurrection khi có sự kiện edit đến muộn.
@@ -229,20 +229,19 @@ export interface RecordReceiptAtomicInput {
   status: 'pending_fanout' | 'pending_lifecycle' | 'discarded';
   discardReason?: string | null;
   lifecycleIntent?: SlackLifecycleIntentPayload;
-  barrierCoordination?: {
-    intent: import('@wap/tool-schemas').SlackPurgeTarget;
-    barrierSpec?: {
-      barrierType: 'authorization_disconnect' | 'resource_lifecycle' | 'channel_membership_lost' | 'workspace_consent_barrier';
-      workspaceId: string;
-      connectionId?: string;
-      identityVersion?: number;
-      channelId?: string;
-      resourceType?: 'message' | 'thread' | 'channel' | 'file';
-      resourceId?: string;
-      minValidRevision?: string;
-      reason: string;
-    };
-  };
+  invalidationTarget?: import('@wap/tool-schemas').SlackPurgeTarget;
+}
+
+/** Hợp đồng Đầu vào Phối hợp Rào cản Vô hiệu hóa Đọc 03B1 */
+export interface StageLifecycleInvalidationInput {
+  target: import('@wap/tool-schemas').SlackPurgeTarget;
+  eventId: string;
+  sourceEventTs: string;
+}
+
+/** Giao diện Phối hợp Rào cản Vô hiệu hóa Đọc từ 03B1 (Transaction-Bound) */
+export interface SlackTransactionBoundInvalidationService {
+  stageInTransaction(client: import('pg').PoolClient, input: StageLifecycleInvalidationInput): Promise<void>;
 }
 
 /** Hợp đồng Consumer Queue Intent cho Giai đoạn 04B */
@@ -331,7 +330,7 @@ CREATE INDEX IF NOT EXISTS idx_slack_lifecycle_intents_pending
   - Tin nhắn thường nhận HTTP 200 và discard body ngay trong memory (không ghi receipt/job).
   - Cả 4 loại sự kiện vòng đời (`tokens_revoked`, `app_uninstalled`, `message_deleted`, `message_changed`) được commit nguyên tử vào database trước khi trả về HTTP 200.
   - `tokens_revoked` xử lý interval `[t, t+1)` chuẩn tắc: `< t` ngắt kết nối (`status='disconnected'`, `config=NULL`); `[t, t+1)` chuyển `status='reconnect_required'`, giữ encrypted token trong `config`, tăng `identity_version`, ghi ambiguity intent để worker probe qua `auth.test` có CAS guard; `>= t+1` bỏ qua.
-  - Phối hợp rào cản F3 trực tiếp qua 03B1 `commitLifecycleInvalidation`: `app_uninstalled` và `tokens_revoked` nhắm đúng binding/epoch cũ (không dùng `app:*` toàn workspace chặn reinstall); `message_deleted` tombstone vĩnh viễn; `message_changed` vô hiệu hóa đơn điệu revision cũ, bảo toàn revision mới; ngăn chặn resurrection khi delete/edit out-of-order.
+  - Phối hợp rào cản F3 trực tiếp qua 03B1 `stageInTransaction`: `app_uninstalled` và `tokens_revoked` nhắm đúng binding/epoch cũ (không dùng `app:*` toàn workspace chặn reinstall); `message_deleted` tombstone vĩnh viễn; `message_changed` vô hiệu hóa đơn điệu revision cũ, bảo toàn revision mới; ngăn chặn resurrection khi delete/edit out-of-order.
 - [ ] **AC8 (Bảo vệ Log & Bí mật):** Không có access token, signing secret, hay nội dung tin nhắn nào xuất hiện trong log console, exception message hay API response.
 
 ---
@@ -365,7 +364,7 @@ git diff --check b757ae08 HEAD
 - **Phiên hiệu chỉnh tài liệu (Docs Correction):** Hoàn thành rà soát và khắc phục triệt để 5 điểm mâu thuẫn từ coordinator review tại commit `ad85b7e2`:
   1. Định nghĩa khoảng so sánh epoch mutually exclusive `[t, t+1)` giải quyết dứt điểm lỗi so sánh millisecond cùng giây;
   2. Bảo toàn encrypted token trong `config` dưới `status = 'reconnect_required'` khi ambiguity, chỉ xóa `config = NULL` khi ngắt kết nối dứt khoát `< t`;
-  3. Loại bỏ bảng `slack_source_tombstones` cạnh tranh và tombstone toàn cục `app:*`; thống nhất cơ chế rào cản đọc F3 qua giao diện 03B1 `commitLifecycleInvalidation` với target semantics chính xác theo binding/epoch cũ;
+  3. Loại bỏ bảng `slack_source_tombstones` cạnh tranh và tombstone toàn cục `app:*`; thống nhất cơ chế rào cản đọc F3 qua giao diện 03B1 `stageInTransaction` với target semantics chính xác theo binding/epoch cũ;
   4. Mở rộng hợp đồng watermark 6 chiều cho F1, parse timestamp nghiêm ngặt bằng `/^\d{1,10}(\.\d{1,6})?$/` loại bỏ suffix junk;
   5. Quy định hook in-process là bounded best-effort wakeup không block HTTP 200 response sau commit, fail-closed khi payload vòng đời malformed.
 - **Trạng thái Mã nguồn & Kiểm thử:** Không có mã nguồn runtime nào được tạo hoặc sửa đổi. Toàn bộ kiểm thử runtime được giữ nguyên trạng thái `NOT_RUN` tuân thủ kỷ luật ranh giới phase.

@@ -4,7 +4,7 @@
 **Ủy quyền:** Điều phối viên trưởng / Reviewer (Coordinator) chỉ định hiệu chỉnh dứt điểm các mâu thuẫn kỹ thuật cuối cùng cho SLACK-04A PR #195 (`task_4657a714dfd7` / `ctx_6e0e5e1be2ce`), tiếp nối các phiên lập kế hoạch trước đó (`ad85b7e2`, `55fdd0ca`, `ba805099`).
 **Nhánh làm việc:** `docs/slack-04a-ingress-plan`.
 **Nền đối chiếu đã thẩm định (Staging base):** `b757ae081751168fdcbcfdddf73713d4a1d9109d` (bao gồm PR #190 callback isolation fix, PR #187 contracts 02A, PR #185 inventory 354 methods, PR #188 macro delivery roadmap).
-**Phạm vi phiên:** **CHỈ TÀI LIỆU KẾ HOẠCH (Documentation Planning Only)**. Cập nhật và tinh chỉnh đúng 3 tệp tài liệu kế hoạch thuộc quyền sở hữu (plan, task card, handoff log). Không can thiệp mã nguồn runtime sản phẩm, không sửa `CURRENT-STATE.md`, `ROADMAP.md`, các task card khác hay inventory. Không gọi mô hình thật, không cài ứng dụng Slack live, không bật cờ và không merge PR vào `main`. Giữ plan lean <= 420 lines (thực tế: 261 dòng).
+**Phạm vi phiên:** **CHỈ TÀI LIỆU KẾ HOẠCH (Documentation Planning Only)**. Cập nhật và tinh chỉnh đúng 3 tệp tài liệu kế hoạch thuộc quyền sở hữu (plan, task card, handoff log). Không can thiệp mã nguồn runtime sản phẩm, không sửa `CURRENT-STATE.md`, `ROADMAP.md`, các task card khác hay inventory. Không gọi mô hình thật, không cài ứng dụng Slack live, không bật cờ và không merge PR vào `main`. Giữ plan lean <= 420 lines (thực tế: 254 dòng).
 
 ---
 
@@ -23,9 +23,16 @@
 - **Phù hợp Schema 02B (`0014_slack_oauth_connections.sql`):** Ràng buộc `CHECK ((status = 'disconnected' AND config IS NULL) OR status <> 'disconnected')` hoàn toàn cho phép `config` tồn tại khi `status = 'reconnect_required'`.
 - **Nguyên tắc xóa Config:** CHỈ xóa `config = NULL` khi ngắt kết nối dứt khoát (`connected_at < to_timestamp(t)`). Tôn trọng đầy đủ các trường thật của repo 02B: `refresh_in_flight`, `identity_version`, `status`. Tuyệt đối không đưa token vào receipt, intent hay DTO.
 
-### 3. Loại bỏ Tombstone Cạnh tranh & Phối hợp Rào cản Đọc F3 qua 03B1
+### 3. Loại bỏ Tombstone Cạnh tranh & Chấp nhận Giao diện Rào cản Đọc F3 từ 03B1
 - **Loại bỏ Tombstone Toàn cục `app:*`:** Rào cản `channelId: '*', resourceId: 'app:' + appId` trước đây thiếu generation fencing, có thể gây chặn vĩnh viễn việc cài đặt lại ứng dụng trong tương lai.
-- **Thống nhất Cơ chế Rào cản qua 03B1:** Loại bỏ hoàn toàn đề xuất bảng `slack_source_tombstones` riêng ở 04A. Ingress phối hợp trực tiếp với giao diện transaction-bound của 03B1: `commitLifecycleInvalidation(client, target, barrier)` trong cùng một transaction PostgreSQL trước khi gửi ACK 200:
+- **Thống nhất Cơ chế Rào cản qua 03B1:** Loại bỏ hoàn toàn đề xuất bảng `slack_source_tombstones` riêng ở 04A. Ingress phối hợp trực tiếp với giao diện transaction-bound của 03B1 (`stageInTransaction` thuộc `SlackTransactionBoundInvalidationService`) trong cùng một transaction PostgreSQL trước khi gửi ACK 200:
+  ```ts
+  export interface StageLifecycleInvalidationInput {
+    target: SlackPurgeTarget;
+    eventId: string;
+    sourceEventTs: string;
+  }
+  ```
   - `tokens_revoked` & `app_uninstalled`: Ghi intent `authorization_disconnect` nhắm vào các binding/epoch CŨ, không ảnh hưởng tới kết nối mới sau này.
   - `message_deleted`: Ghi rào cản `resource_lifecycle` (`tombstoneReason: 'source_deleted'`), rào cản tài nguyên vĩnh viễn, ngăn chặn resurrection khi có edit đến muộn.
   - `message_changed`: Ghi rào cản `resource_lifecycle` (`tombstoneReason: 'source_edited'`), vô hiệu hóa đơn điệu các revision cũ (`revision < editTs`), bảo toàn revision mới.
@@ -44,7 +51,7 @@
 
 ## 2. Kế hoạch Tinh gọn (Lean Plan <= 420 Lines)
 
-- Kế hoạch `docs/superpowers/plans/2026-10-29-slack-04a-signed-ingress.md` được rút gọn từ 632 dòng xuống còn **261 dòng** (đạt yêu cầu <= 420 dòng).
+- Kế hoạch `docs/superpowers/plans/2026-10-29-slack-04a-signed-ingress.md` được rút gọn từ 632 dòng xuống còn **254 dòng** (đạt yêu cầu <= 420 dòng).
 - Loại bỏ toàn bộ các đoạn mã giả định (speculative service bodies / contradictory SQL) dài dòng, thay bằng các bất biến kỹ thuật chính xác, định nghĩa giao diện (interfaces) và danh mục kiểm thử rõ ràng.
 
 ---
@@ -69,13 +76,13 @@ Ma trận kiểm thử cho 04A được định nghĩa toàn diện và đánh d
 | Trạng thái Working Tree | `git status --porcelain` | Sạch sẽ, đúng 3 tệp tài liệu kế hoạch |
 | Ranh giới Module | `git diff --name-only b757ae08 HEAD` | 100% thuộc `docs/` |
 | Bảo vệ Mã nguồn Sản phẩm | Kiểm tra `apps/`, `packages/`, `db/` | Không có bất kỳ thay đổi runtime code nào |
-| Số dòng Kế hoạch | `(Get-Content docs/.../plan.md).Length` | **261 dòng** (đạt yêu cầu <= 420 dòng) |
+| Số dòng Kế hoạch | `(Get-Content docs/.../plan.md).Length` | **254 dòng** (đạt yêu cầu <= 420 dòng) |
 | Tính toàn vẹn Liên kết Markdown | `Test-Path` trên toàn bộ relative paths | Tất cả liên kết hợp lệ (`True`) |
 
 ---
 
 ## 5. Danh sách Tệp Sở hữu & Bàn giao
 
-1. [`docs/superpowers/plans/2026-10-29-slack-04a-signed-ingress.md`](../../superpowers/plans/2026-10-29-slack-04a-signed-ingress.md) (261 dòng): Kế hoạch kỹ thuật tinh gọn, giải quyết triệt để 5 mâu thuẫn review.
+1. [`docs/superpowers/plans/2026-10-29-slack-04a-signed-ingress.md`](../../superpowers/plans/2026-10-29-slack-04a-signed-ingress.md) (254 dòng): Kế hoạch kỹ thuật tinh gọn, giải quyết triệt để 5 mâu thuẫn review.
 2. [`docs/handoff/tasks/SLACK-04A-signed-ingress.md`](../tasks/SLACK-04A-signed-ingress.md): Task card kỹ thuật bounded cập nhật interval `[t, t+1)`, phối hợp 03B1 barrier, và watermark 6 chiều.
 3. [`docs/handoff/log/2026-10-29-slack-04a-signed-ingress-plan.md`](2026-10-29-slack-04a-signed-ingress-plan.md): Handoff log ghi nhận chi tiết việc khắc phục 5 điểm review và tự kiểm tra.
