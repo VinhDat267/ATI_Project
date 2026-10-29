@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { decideSlackModelUse, type SlackModelPolicy, type SlackModelRequest } from '../src/index.js';
+import {
+  decideSlackModelUse,
+  decideSlackSourceStorage,
+  validateSlackPolicyReference,
+  type SlackModelPolicy,
+  type SlackModelRequest,
+  type SlackPolicyReference,
+  type SlackSourceStorageRequest,
+} from '../src/index.js';
 
 function inputs(): { policy: SlackModelPolicy; request: SlackModelRequest } {
   const binding = { atiUserId: 'ati-a', connectionId: 'conn-free', workspaceId: 'T_FREE', slackUserId: 'U_FREE_A', identityVersion: 1 };
@@ -86,5 +94,138 @@ describe('Slack source model authorization', () => {
     expect(decideSlackModelUse(policy, request)).toEqual({ allowed: false, reason: 'policy_changed' });
     request.policyVersion = policy.consent.policyVersion;
     expect(decideSlackModelUse(policy, request)).toEqual({ allowed: false, reason: 'provider_unverified' });
+  });
+
+  describe('Slack policy reference and source storage authorization', () => {
+    function storageInputs(): { policy: SlackModelPolicy; request: SlackSourceStorageRequest } {
+      const { policy } = inputs();
+      const policyRef: SlackPolicyReference = {
+        binding: { ...policy.binding },
+        purpose: 'storage',
+        requestedRetentionDays: 7,
+        providerProfileId: 'verified-provider',
+        configFingerprint: 'cfg-hash-123',
+        policyVersion: 'policy-1',
+        consentRevision: '1',
+        providerRevision: '1',
+      };
+      return {
+        policy,
+        request: {
+          binding: { ...policy.binding },
+          policyRef,
+          requestedRetentionDays: 7,
+        },
+      };
+    }
+
+    it('approves valid source storage request delegating to policy gates', () => {
+      const { policy, request } = storageInputs();
+      expect(decideSlackSourceStorage(policy, request)).toEqual({ allowed: true, maxRetentionDays: 7 });
+    });
+
+    it('prohibits persistent storage when retention is zero even with valid approval', () => {
+      const { policy, request } = storageInputs();
+      request.requestedRetentionDays = 0;
+      expect(decideSlackSourceStorage(policy, request)).toEqual({ allowed: false, reason: 'retention_zero_denied' });
+
+      const { policy: p2, request: r2 } = storageInputs();
+      p2.consent.retentionDays = 0;
+      expect(decideSlackSourceStorage(p2, r2)).toEqual({ allowed: false, reason: 'retention_zero_denied' });
+
+      const { policy: p3, request: r3 } = storageInputs();
+      r3.policyRef.requestedRetentionDays = 0;
+      expect(decideSlackSourceStorage(p3, r3)).toEqual({ allowed: false, reason: 'retention_zero_denied' });
+    });
+
+    it('rejects storage request when purpose is not storage', () => {
+      const { policy, request } = storageInputs();
+      request.policyRef.purpose = 'manual_lookup';
+      expect(decideSlackSourceStorage(policy, request)).toEqual({ allowed: false, reason: 'purpose_mismatch' });
+    });
+
+    it('delegates baseline authorization gates (connection_inactive, consent_missing, provider_unverified)', () => {
+      const { policy, request } = storageInputs();
+      policy.connectionActive = false;
+      expect(decideSlackSourceStorage(policy, request)).toEqual({ allowed: false, reason: 'connection_inactive' });
+
+      policy.connectionActive = true;
+      policy.consent.status = 'revoked';
+      expect(decideSlackSourceStorage(policy, request)).toEqual({ allowed: false, reason: 'consent_missing' });
+
+      policy.consent.status = 'granted';
+      policy.provider.verified = false;
+      expect(decideSlackSourceStorage(policy, request)).toEqual({ allowed: false, reason: 'provider_unverified' });
+    });
+
+    it('rejects identity mismatch between request.binding and request.policyRef.binding', () => {
+      const { policy, request } = storageInputs();
+      request.policyRef.binding = { ...request.binding, atiUserId: 'another-user' };
+      expect(decideSlackSourceStorage(policy, request)).toEqual({ allowed: false, reason: 'identity_changed' });
+    });
+
+    it('rejects policy version or providerProfileId mismatch between policyRef and server policy', () => {
+      const { policy, request } = storageInputs();
+      request.policyRef.policyVersion = 'policy-2';
+      expect(decideSlackSourceStorage(policy, request)).toEqual({ allowed: false, reason: 'policy_changed' });
+
+      const { policy: p2, request: r2 } = storageInputs();
+      r2.policyRef.providerProfileId = 'other-provider';
+      expect(decideSlackSourceStorage(p2, r2)).toEqual({ allowed: false, reason: 'policy_changed' });
+    });
+
+    it('obeys smaller retention ceiling among request, policyRef, consent, and provider', () => {
+      const { policy, request } = storageInputs();
+      request.requestedRetentionDays = 5;
+      expect(decideSlackSourceStorage(policy, request)).toEqual({ allowed: true, maxRetentionDays: 5 });
+
+      const { policy: p2, request: r2 } = storageInputs();
+      r2.policyRef.requestedRetentionDays = 4;
+      expect(decideSlackSourceStorage(p2, r2)).toEqual({ allowed: false, reason: 'retention_exceeded' });
+
+      const { policy: p3, request: r3 } = storageInputs();
+      r3.policyRef.requestedRetentionDays = 4;
+      r3.requestedRetentionDays = 4;
+      expect(decideSlackSourceStorage(p3, r3)).toEqual({ allowed: true, maxRetentionDays: 4 });
+    });
+
+    it('validates canonical SlackPolicyReference structure and positive decimal revisions', () => {
+      const { request } = storageInputs();
+      const valid = request.policyRef;
+      expect(validateSlackPolicyReference(valid)).toEqual(valid);
+
+      // Rejects non-canonical revisions: "0", "01", "-1", "v1", number, bigint
+      for (const badRev of ['0', '01', '-1', 'v1', '1.0', '', '  ', null, undefined, 1 as any, 1n as any]) {
+        expect(() => validateSlackPolicyReference({ ...valid, consentRevision: badRev })).toThrow(TypeError);
+        expect(() => validateSlackPolicyReference({ ...valid, providerRevision: badRev })).toThrow(TypeError);
+      }
+
+      // Rejects purpose outside 5 canonical purposes
+      for (const badPurpose of ['summarize', 'all', '', 'unknown', null, undefined]) {
+        expect(() => validateSlackPolicyReference({ ...valid, purpose: badPurpose as any })).toThrow(TypeError);
+      }
+
+      // Rejects missing or non-string fields
+      expect(() => validateSlackPolicyReference({ ...valid, providerProfileId: '' })).toThrow(TypeError);
+      expect(() => validateSlackPolicyReference({ ...valid, configFingerprint: '   ' })).toThrow(TypeError);
+      expect(() => validateSlackPolicyReference({ ...valid, policyVersion: '' })).toThrow(TypeError);
+
+      // Rejects invalid retention days
+      expect(() => validateSlackPolicyReference({ ...valid, requestedRetentionDays: -1 })).toThrow(TypeError);
+      expect(() => validateSlackPolicyReference({ ...valid, requestedRetentionDays: 1.5 })).toThrow(TypeError);
+      expect(() => validateSlackPolicyReference({ ...valid, requestedRetentionDays: '7' as any })).toThrow(TypeError);
+    });
+
+    it('strips extra properties and enforces own properties on SlackPolicyReference', () => {
+      const { request } = storageInputs();
+      const dirty = {
+        ...request.policyRef,
+        extraSecret: 'should-strip',
+        nestedSecret: { token: '123' },
+      };
+      const clean = validateSlackPolicyReference(dirty);
+      expect(clean).toEqual(request.policyRef);
+      expect((clean as any).extraSecret).toBeUndefined();
+    });
   });
 });
