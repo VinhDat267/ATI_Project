@@ -1,8 +1,8 @@
 # SLACK-03C1 · Bounded Read Adapters cho 8 Phương Thức Cốt Lõi Slack Cá Nhân
 
-**Trạng thái:** DỰ THẢO KẾ HOẠCH (Chờ Coordinator & Backend thẩm định interface; Docs-only, chưa thực thi code).
-**Nhánh dự kiến:** `docs/slack-03c1-read-plan`
-**Nền đối chiếu:** `7c6c65d8` (`integration/slack-personal-20261029`).
+**Trạng thái:** HOÀN THÀNH THI CÔNG (Mã nguồn, canonical schema và kiểm thử đạt chuẩn TDD).
+**Nhánh:** `feat/slack-03c1-read-adapters`
+**Nền đối chiếu:** `f67c0b166219b93b9e336866997bfdd4c703d062` (`integration/slack-personal-20261029`).
 **PR Đích:** Draft PR to `integration/slack-personal-20261029`.
 **Vai trò sở hữu:** Integration Engineer (`packages/tool-schemas/`, `packages/tool-adapters/`).
 **Phụ thuộc:**
@@ -188,4 +188,45 @@ Wrapper này có trách nhiệm:
 
 ## 6. Kết quả (Dành cho Agent Thi công)
 
-*(Phần này để trống cho agent thi công ghi lại kết quả RED→GREEN, commit hashes, test logs và evidence sau khi hoàn thành thi công mã nguồn).*
+**Ngày hoàn thành:** 30/10/2026 (Asia/Saigon)
+**Agent thực hiện:** Antigravity (Gemini 3.8 Flash High) · Integration Implementation Owner
+
+### 6.1. Interface Gate Acceptance
+- Backend active 03B1 owner `ctx_29765fc6b1b7` chấp thuận giao ước hooks qua `msg_150cb7b10000` và `msg_09bc561a430d`:
+  - `SlackReadPurpose = Exclude<SlackPolicyPurpose, 'storage'>`
+  - `getAccessToken(binding: SlackBinding): Promise<string>`
+  - `authorizeRead(input: { binding: SlackBinding; purpose: SlackReadPurpose; requestedRetentionDays: 0; expectedPolicyReference?: SlackPolicyReference }): Promise<{ allowed: true; policyReference: SlackPolicyReference } | { allowed: false; reason: string }>`
+  - Bắt buộc đính kèm `acquisitionPolicyReference` trong observation DTO để 03B1 kiểm tra `sameSlackPolicyEpoch`.
+- Coordinator phê duyệt qua `msg_f333d274f71e`; quyết định kỹ thuật được ghim tại `docs/handoff/decisions/2026-10-29-slack-source-ingress-contracts.md` (commit `e9088d5e`).
+
+### 6.2. Kết Quả Thi Công (TDD RED → GREEN)
+1. **Canonical Schema (`packages/tool-schemas`)**:
+   - Mở rộng `packages/tool-schemas/src/myslack-tools.ts` cho đúng 8 read methods (`conversations.list`, `conversations.info`, `conversations.history`, `conversations.replies`, `conversations.members`, `users.list`, `users.info`, `chat.getPermalink`), giữ `chat.postMessage` mẫu nhưng cấm WRITE dispatch.
+   - Bảo vệ canonical registry bằng frozen deep-clone, chống caller tampering public definitions.
+   - Thêm 8 unit tests kiểm thực canonical schemas và tampering resistance.
+2. **Injected Hooks & Two-Phase F1 Adapter (`packages/tool-adapters`)**:
+   - Tạo `packages/tool-adapters/src/slack/personal-slack-types.ts` và `packages/tool-adapters/src/slack/personal-slack-read-adapter.ts`.
+   - Kiểm thực F1 hai pha (pre-fetch và post-fetch re-auth với canonical 8-field reference).
+   - Re-authorize trước mỗi outbound request / retry; 429 backoff re-auth; dừng ngay khi consent bị thu hồi.
+   - Bounded body 2MB (stream và buffer), manual redirect rejection (3xx fail-closed).
+   - Bảo toàn chuỗi số thập phân cho `ts` và `edited.ts`; làm sạch user profile (loại bỏ email, avatar, token); deep link permalink an toàn theo format `^https:\/\/[a-z0-9_-]+\.slack\.com\/archives\/[A-Z0-9_]+\/p[0-9]+$`.
+   - Per-entity observation provenance: `resourceIdentity`, `observedAt`, `acquisitionPolicyReference`, `nativeRevision` (chỉ khi Slack trả về), `observationalDigest` (SHA-256 hex).
+   - Sanitize toàn bộ StepError message/details/cause, không rò rỉ token ra log/kết quả.
+3. **HTTP Mock Server & Behavioral Integration Tests**:
+   - Tạo `packages/tool-adapters/tests/helpers/personal-slack-mock-server.ts`.
+   - Tạo `packages/tool-adapters/tests/slack/personal-slack-read.test.ts` gồm 24 kịch bản kiểm thử hành vi toàn diện, đạt 24/24 PASS.
+
+### 6.3. Bằng Chứng Kiểm Thử Hệ Thống (Evidence Summary)
+- `npx vitest run packages/tool-schemas`: 15 passed, **274 tests PASS**.
+- `npx vitest run packages/tool-adapters`: 19 passed, **467 tests PASS**.
+- `npm run typecheck:v3`: **0 errors (Exit code 0)**.
+- `npm run build:v3` & `test-v3-web-build-security.mjs`: **PASS**.
+- `npm run test:v3`: 251 test files, **2,818 tests PASS** (schemas 274 + adapters 467 + planner 381 + executor 42 + chat-api 753 + chat-web 901).
+- `npm run test:eval:v3`: 25 test files, **406 tests PASS**.
+- Launcher & Script unit tests: **67 tests PASS** (launcher 1 + scripts 66).
+- **Tổng cộng: 3,291 tests PASS (Exit code 0)**.
+- `git diff --check`: **Clean, exit code 0**.
+
+### 6.4. Ranh Giới Nghiệm Thu Còn Lại (Remaining Gates)
+- **Live Native Slack Calls**: **NOT_RUN** (chưa cấp quyền gọi Slack thật).
+- **Joint DB / Concurrency với PostgreSQL thật**: **NOT_RUN** (chờ Backend wrapper 03B4 kết nối `TokenManager` và `PolicyService` thực tế).

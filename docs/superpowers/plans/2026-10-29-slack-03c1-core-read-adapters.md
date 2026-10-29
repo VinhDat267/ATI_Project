@@ -13,7 +13,7 @@
 **Tech Stack:** Node.js `^22.12.0 || >=24.0.0`, TypeScript 5.8, Vitest 3, `@wap/tool-schemas`.
 **Spec:** [Slack cá nhân và trợ lý công việc](../specs/2026-10-28-slack-personal-oauth-design.md) (Mục 2, 4.4, 4.5, 8, 9.1).
 **Task Cards:** [SLACK-03C1 Core Read Adapters](../../handoff/tasks/SLACK-03C1-core-read-adapters.md), [SLACK-03 Parent Task](../../handoff/tasks/SLACK-03-tool-catalog-and-source-lifecycle.md).
-**Status:** DỰ THẢO KẾ HOẠCH (Docs-only; chờ Coordinator và Backend phê duyệt interface trước khi mở PR thi công).
+**Status:** HOÀN THÀNH THI CÔNG (Tất cả 4 tasks đã hoàn tất, 24/24 integration tests và 30 schema tests xanh).
 
 ---
 
@@ -122,13 +122,13 @@ export interface PersonalSlackAdapterConfig {
 
 ## 4. Kế Hoạch Triển Khai Từng Bước (Tasks)
 
-- [ ] **Task 1: Mở Rộng Canonical Tool Registry 8 Read Methods (`packages/tool-schemas`)**
+- [x] **Task 1: Mở Rộng Canonical Tool Registry 8 Read Methods (`packages/tool-schemas`)**
   - Mở rộng `packages/tool-schemas/src/myslack-tools.ts`: giữ nguyên/tái sử dụng 3 samples (`conversations.list`, `conversations.history`, `users.info`) và bổ sung 5 definitions còn lại (`conversations.info`, `conversations.replies`, `conversations.members`, `users.list`, `chat.getPermalink`).
   - Đảm bảo metadata khớp chính xác `SlackToolDefinition` hiện hữu (`sideEffect: 'read'`, `riskLevel: 'low'`, `planTier: 'any'`, `isProbeRequired: true`, `requiresBinding: true`).
   - Cập nhật hàm validate execution args `validateSlackToolExecutionArgs` để từ chối mọi method không thuộc canonical registry kể cả cùng family.
-  - Cập nhật tests tại `packages/tool-schemas/tests/myslack-tools.test.ts` và chạy `npx vitest run packages/tool-schemas/tests/myslack-tools.test.ts`.
+  - Cập nhật tests tại `packages/tool-schemas/tests/myslack-tools.test.ts` và chạy `npx vitest run packages/tool-schemas/tests/myslack-tools.test.ts` (30 passed).
 
-- [ ] **Task 2: Xây Dựng Injected Hooks & Two-Phase F1 Transport (`packages/tool-adapters`)**
+- [x] **Task 2: Xây Dựng Injected Hooks & Two-Phase F1 Transport (`packages/tool-adapters`)**
   - Tạo `packages/tool-adapters/src/slack/personal-slack-types.ts` với `SlackTokenProviderHook`, `SlackReadPolicyHook`, `SlackObservationProvenance`.
   - Tạo `packages/tool-adapters/src/slack/personal-slack-read-adapter.ts` kế thừa `BaseAdapter`.
   - Cài đặt phương thức private request:
@@ -140,7 +140,7 @@ export interface PersonalSlackAdapterConfig {
     - Nếu Pha 2 fail -> drop payload, xóa bộ nhớ, ném `AUTH_ERROR`.
     - Gắn provenance quan sát (`SlackObservationProvenance`) kèm binding vào kết quả.
 
-- [ ] **Task 3: Triển Khai 8 Read Methods Qua Fixed Switch Dispatcher**
+- [x] **Task 3: Triển Khai 8 Read Methods Qua Fixed Switch Dispatcher**
   - Trong `execute(toolName, args, context)`, dispatch qua fixed switch statement cho đúng 8 methods; không dùng dynamic reflection.
   - Xử lý `conversations.replies`: nếu gọi với message không có reply, trả về `[root_message]` theo đúng hành vi Slack API (không giả định sai là luôn `thread_not_found`).
   - Bảo toàn chuỗi số thập phân của `ts` và `edited.ts`.
@@ -148,10 +148,10 @@ export interface PersonalSlackAdapterConfig {
   - Sinh và kiểm thực permalink an toàn cho `chat.getPermalink`.
   - Map các lỗi provider (`channel_not_found`, `not_in_channel`, `missing_scope`, `invalid_auth`, `ratelimited`) sang `StepError`.
 
-- [ ] **Task 4: Xây Dựng Package Mock Helper & Bộ Kiểm Thử Tích Hợp**
+- [x] **Task 4: Xây Dựng Package Mock Helper & Bộ Kiểm Thử Tích Hợp**
   - Tạo helper fixture `packages/tool-adapters/tests/helpers/personal-slack-mock-server.ts` (không sửa `scripts/fake-slack-personal.mjs`).
-  - Viết bộ test `packages/tool-adapters/tests/slack/personal-slack-read.test.ts` kiểm thử toàn bộ 14 kịch bản trong ma trận kiểm thử Section 5.
-  - Chạy `npm test -w @wap/tool-adapters` xác nhận toàn bộ test suites đạt kết quả xanh.
+  - Viết bộ test `packages/tool-adapters/tests/slack/personal-slack-read.test.ts` kiểm thử toàn bộ 14 kịch bản trong ma trận kiểm thử Section 5 (24 passed).
+  - Chạy `npm test -w @wap/tool-adapters` xác nhận toàn bộ test suites đạt kết quả xanh (467 passed).
 
 ---
 

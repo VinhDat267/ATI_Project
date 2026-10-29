@@ -1,0 +1,135 @@
+# 30/10/2026 · Hoàn Thành Thi Công Bounded Read Adapters SLACK-03C1 (8 Phương Thức Cốt Lõi)
+
+**Ngày lập:** 30/10/2026 (Asia/Saigon)
+**Tác giả:** Antigravity (Gemini 3.8 Flash High) · Integration Implementation Owner
+**Ủy quyền:** Coordinator điều phối và giao việc thi công trọn gói phân đoạn SLACK-03C1 (bounded read adapters cho 8 phương thức đọc Slack cá nhân).
+**Nhánh làm việc:** `feat/slack-03c1-read-adapters`
+**Base commit:** `f67c0b16` (`integration/slack-personal-20261029`).
+**PR Đích:** Draft PR to `integration/slack-personal-20261029`.
+**Phạm vi sở hữu:** Chỉ sở hữu `packages/tool-schemas/`, `packages/tool-adapters/`, task card `SLACK-03C1-core-read-adapters.md`, kế hoạch `2026-10-29-slack-03c1-core-read-adapters.md`, và **đúng 1 file nhật ký bàn giao mới này**. Tuyệt đối không đụng chạm `apps/`, `db/`, `packages/planner/`, `packages/executor/`, `scripts/`, lockfiles hay `CURRENT-STATE.md`/`ROADMAP.md`.
+
+---
+
+## 1. Thông Qua Cổng Giao Ước Hooks Với Backend (Interface Gate Acceptance)
+
+Trước khi tiến hành thi công adapter, giao ước hooks đã được Backend active 03B1 owner (`ctx_29765fc6b1b7`) và Coordinator chấp thuận chính thức:
+- **Thông điệp Backend:** `msg_09bc561a430d` (xác nhận chấp thuận `SlackReadPurpose = Exclude<SlackPolicyPurpose, 'storage'>`, `getAccessToken(binding: SlackBinding): Promise<string>`, và `authorizeRead(input: { binding, purpose, requestedRetentionDays: 0, expectedPolicyReference? })`).
+- **Thông điệp Coordinator:** `msg_f333d274f71e` và `msg_2d843e1898ac`.
+- **Hợp đồng kỹ thuật chung ghim tại:** `docs/handoff/decisions/2026-10-29-slack-source-ingress-contracts.md` (commit `e9088d5e`).
+- **Trách nhiệm Backend Wrapper (Task 03B4 riêng biệt):** Wrapper trong `apps/chat-api` chuyển đổi `SlackTokenManager.getAccessToken(userId, id, identityVersion)` và `SlackPolicyService.resolveSlackModelPolicy` với đối soát đầy đủ 5 trường binding, kiểm tra active user/connection và toàn bộ pending lifecycle/source barriers. Adapter giữ token trong private memory, không lộ ra ngoài DTO.
+- **Quan sát Provenance cho 03B1:** DTO kết quả đọc mang `acquisitionPolicyReference` (với retention 0) để 03B1 đối chiếu `sameSlackPolicyEpoch` trước khi lưu vào `SlackSourceStore`.
+
+---
+
+## 2. Chi Tiết Thi Công Mã Nguồn (Implementation Details)
+
+### 2.1. Canonical Declared Registry Trong `packages/tool-schemas`
+- **Tệp chỉnh sửa:** `packages/tool-schemas/src/myslack-tools.ts`.
+- Mở rộng canonical declared registry cho đúng 8 read methods cốt lõi:
+  1. `conversations.list` (`MYSLACK_CONVERSATIONS_LIST_TOOL`) - Tái sử dụng metadata chuẩn hiện có.
+  2. `conversations.info` (`MYSLACK_CONVERSATIONS_INFO_TOOL`) - Bổ sung mới (`channels:read, groups:read, im:read, mpim:read`).
+  3. `conversations.history` (`MYSLACK_CONVERSATIONS_HISTORY_TOOL`) - Tái sử dụng metadata chuẩn hiện có.
+  4. `conversations.replies` (`MYSLACK_CONVERSATIONS_REPLIES_TOOL`) - Bổ sung mới (`channels:history, groups:history, im:history, mpim:history`).
+  5. `conversations.members` (`MYSLACK_CONVERSATIONS_MEMBERS_TOOL`) - Bổ sung mới (`channels:read, groups:read, im:read, mpim:read`).
+  6. `users.list` (`MYSLACK_USERS_LIST_TOOL`) - Bổ sung mới (`users:read`, `listable: true`).
+  7. `users.info` (`MYSLACK_USERS_INFO_TOOL`) - Tái sử dụng metadata chuẩn hiện có.
+  8. `chat.getPermalink` (`MYSLACK_CHAT_GET_PERMALINK_TOOL`) - Bổ sung mới (`userScopes: null`, `hasUnknownScopes: true`).
+- Giữ nguyên `MYSLACK_CHAT_POST_MESSAGE_TOOL` (sample write metadata) nhưng cấm dispatch write trong adapter.
+- Export `MYSLACK_CORE_READ_TOOLS` (8 methods) và `MYSLACK_DECLARED_TOOLS` (9 methods).
+- Khởi tạo `CANONICAL_SLACK_TOOL_MAP` bằng frozen deep-clone (`deepFreeze(structuredClone(t))`) để triệt tiêu hoàn toàn rủi ro caller làm suy yếu hoặc giả mạo public definition schemas (`CANONICAL_SLACK_TOOL_MAP` không bị ảnh hưởng khi đối tượng export bên ngoài bị sửa đổi).
+- Bổ sung 8 test cases trong `packages/tool-schemas/tests/myslack-tools.test.ts` kiểm tra chặt chẽ metadata, args validation và khả năng kháng giả mạo (tampering resistance).
+
+### 2.2. Injected Hooks & Two-Phase F1 Adapter Trong `packages/tool-adapters`
+- **Tệp tạo mới:** `packages/tool-adapters/src/slack/personal-slack-types.ts`:
+  - Định nghĩa hooks: `SlackReadPolicyHook`, `SlackTokenProviderHook`, `PersonalSlackReadAdapterConfig`.
+  - Định nghĩa DTO quan sát: `SlackObservationProvenance`, `SlackResourceIdentity`, và các typed interfaces cho 8 phương thức.
+- **Tệp tạo mới:** `packages/tool-adapters/src/slack/personal-slack-read-adapter.ts`:
+  - Kế thừa `BaseAdapter`, `service = 'myslack'`.
+  - **Từ chối Ghi (Reject Write):** Chặn đứng mọi lệnh gọi write (`myslack.chat_postMessage`) trước transport (`VALIDATION`, HTTP 400).
+  - **Fixed Switch Dispatcher:** Chỉ dispatch đúng 8 methods, không dùng dynamic reflection hay generic `call(method, args)`.
+  - **Kiểm thực F1 Hai Pha (Two-Phase Policy Enforcement):**
+    - *Pha 1 (Pre-fetch):* Gọi `policy.authorizeRead({ binding, purpose, requestedRetentionDays: 0 })`. Xác thực cấu trúc đủ 8 trường chuẩn tắc của `SlackPolicyReference`. Bắt buộc khớp chính xác 5 trường binding, purpose và retention 0. Lưu giữ `prefetchPolicyRef`.
+    - *Re-auth trước mỗi lần xuất request / retry:* Kiểm tra lại với `expectedPolicyReference: prefetchPolicyRef` sau khi await token và trước mỗi outbound HTTP attempt.
+    - *Pha 2 (Post-fetch Re-Authorization):* Sau khi nhận response và parse body từ Slack, gọi lại `authorizeRead` đối chiếu với `prefetchPolicyRef`. Nếu consent bị thu hồi, identity version bị bump, provider đổi, hoặc regrant với revision mới -> lập tức giải phóng/xóa bộ nhớ (`parsed = null`), ném `AUTH_ERROR`, không giải phóng plaintext ra ngoài.
+  - **Xử lý Rate Limit 429 & Retry An Toàn:** Đọc `Retry-After`, retry tối đa 2 lần với backoff có thể hủy qua `AbortSignal`. Mỗi lần retry bắt buộc phải re-authorize Pha 1 F1. Không bao giờ retry lỗi xác thực (AUTH, scope, ACL).
+  - **Giới Hạn Bounded 2MB:** Kiểm tra `Content-Length` và stream reading chunk-by-chunk. Nếu body vượt quá 2MB -> hủy stream và ném `SERVER_ERROR` (502).
+  - **Bảo Vệ URL & Redirect:** Chỉ chấp nhận native HTTPS (`https://slack.com/api` hoặc subdomain `*.slack.com`) hoặc explicit loopback (`http://127.0.0.1:<port>`); cấu hình `redirect: 'manual'`, từ chối ngay lập tức mã 3xx.
+  - **Bảo Toàn Decimal String:** `ts`, `thread_ts`, và `edited.ts` giữ nguyên vẹn chuỗi số thập phân, không parse sang float để chống sai số IEEE 754.
+  - **Làm Sạch Profile Người Dùng:** Loại bỏ hoàn toàn `profile`, `email`, `avatar_hash`, `image_*`, chỉ giữ metadata công khai.
+  - **Kiểm Thực Deep Link:** `chat.getPermalink` bắt buộc khớp regex `^https:\/\/[a-z0-9_-]+\.slack\.com\/archives\/[A-Z0-9_]+\/p[0-9]+$`.
+  - **Hợp Đồng `conversations.replies`:** Tin nhắn hợp lệ có 0 replies trả về `[root_message]` thành công theo đúng Slack API contract.
+  - **Provenance Từng Thực Thể:** Mỗi observation (channel, message, user, member, permalink) gắn kèm `provenance` với danh tính tài nguyên, ISO timestamp, `acquisitionPolicyReference`, native revision (nếu Slack trả về), và digest SHA-256 của clean JSON payload.
+  - **Làm Sạch Lỗi (Error Sanitization):** Xóa sạch mọi token bí mật (`xoxp-...`, `Bearer ...`) khỏi message, details và cause của `StepError` trước khi ném ra ngoài.
+- **Tệp chỉnh sửa:** `packages/tool-adapters/src/slack/index.ts` và `packages/tool-adapters/src/index.ts` để export `PersonalSlackReadAdapter` và hooks interfaces.
+
+### 2.3. HTTP Mock Server & Integration Test Suite
+- **Tệp tạo mới:** `packages/tool-adapters/tests/helpers/personal-slack-mock-server.ts`:
+  - Mock server cục bộ (`http://127.0.0.1:<port>`) độc lập thuộc `@wap/tool-adapters` (không sửa `scripts/fake-slack-personal.mjs`).
+  - Mô phỏng đa actor, đa workspace (`T_WORKSPACE_A`, `T_WORKSPACE_B`, `U_ACTOR_A`, `U_ACTOR_B`, `U_COLLEAGUE`), colliding channel IDs, private channel ACL, delay injection, 429 rate limit injection, 2MB oversize body, và 302 redirect.
+- **Tệp tạo mới:** `packages/tool-adapters/tests/slack/personal-slack-read.test.ts`:
+  - 24 kịch bản kiểm thử hành vi toàn diện theo đúng ma trận Section 5 của Task Card:
+    1. Binding validation (thiếu trường, rỗng connectionId).
+    2. Pre-fetch F1 denial (0 HTTP request).
+    3. Malformed F1 decision (thiếu 8 trường canonical, lệch binding).
+    4. Post-fetch consent revoked race (delay 50ms, drop payload, throw AUTH_ERROR).
+    5. Post-fetch provider updated / epoch mismatch.
+    6. Post-fetch regrant while active (consent revision changed).
+    7. Cross-workspace token mismatch.
+    8. Cross-workspace colliding channel isolation (`C_GENERAL` của A và B).
+    9. Native ACL: private channel & colleague denial.
+    10. `conversations.replies` message with 0 replies returns `[root_message]`.
+    11. Exact decimal timestamp preservation (`ts` & `edited.ts`).
+    12. Sanitized user profile (cấm rò rỉ email/avatar) & safe deep link regex.
+    13. `AbortSignal` cancellation trước và trong khi fetch.
+    14. 429 retry re-authorizes F1 & dừng retry ngay khi consent revoked trong backoff.
+    15. Response body exceeding 2MB limit.
+    16. Manual redirect rejection (302).
+    17. WRITE tool rejection (`myslack.chat_postMessage`).
+    18. Per-entity provenance và SHA256 digest.
+
+---
+
+## 3. Bằng Chứng Kiểm Thử Toàn Diện (Evidence Gates)
+
+Tất cả các lệnh kiểm thử thực tế đã chạy trên môi trường sandbox:
+
+| Hạng mục kiểm tra | Lệnh thực hiện | Kết quả thực tế | Trạng thái |
+|---|---|---|---|
+| Whitespace & Cú Pháp | `git diff --check` | Hoàn toàn sạch, exit code 0 | **PASS** |
+| Typecheck Toàn Hệ Thống | `npm run typecheck:v3` | 0 lỗi TypeScript ở cả `apps/chat-api` và `apps/chat-web`, exit code 0 | **PASS** |
+| Package Tool-Schemas Tests | `npx vitest run packages/tool-schemas` | 15 test files, **274 tests PASS** (30 tests myslack-tools) | **PASS** |
+| Package Tool-Adapters Tests | `npx vitest run packages/tool-adapters` | 19 test files, **467 tests PASS** (24 tests personal-slack-read) | **PASS** |
+| Web Build & Security Check | `npm run build:v3 && node scripts/test-v3-web-build-security.mjs` | Build thành công, exclusion sentinels đạt | **PASS** |
+| Full Workspace Suite | `npm run test:v3` | 251 test files, **2,818 tests PASS** (schemas 274, adapters 467, planner 381, executor 42, API 753, Web 901) | **PASS** |
+| Evaluation Tests | `npm run test:eval:v3` | 25 test files, **406 tests PASS** | **PASS** |
+| Script Unit & Launcher Tests | `node --test scripts/start-v3.test.mjs ...` | **67 tests PASS** (1 launcher + 66 Node script tests) | **PASS** |
+| **Tổng Cộng Toàn Bộ Kiểm Thử** | Tổng hợp các bộ test | **3,291 tests PASS (Exit code 0)** | **PASS** |
+
+---
+
+## 4. Tuyên Bố Ranh Giới & Các Hạng Mục Chưa Nghiệm Thu
+
+1. **Live Native Slack API:** Được ghi nhận rõ ràng là **NOT_RUN** (chưa cấp quyền thực hiện cuộc gọi tới Slack API thật).
+2. **Joint DB / TokenManager Concurrency Trên PostgreSQL:** Được ghi nhận là **NOT_RUN** trong card này (phụ thuộc vào task Backend wrapper 03B4 kết nối `TokenManager.getAccessToken` và `PolicyService.resolveSlackModelPolicy` với database pool thật).
+3. **Write Dispatch & Ingress/Cascade:** Giữ nguyên phạm vi READ ONLY (retention 0, transient). Các thao tác write (`chat.postMessage`), ingress events và cascade F3 vẫn tiếp tục mở ở các tasks SLACK-03C2, SLACK-04.
+4. **Trạng Thái Method Inventory:** Giữ nguyên 343 snapshot rows (97 excluded / 246 probe_required), không tự ý thăng cấp bất kỳ row nào thành native support.
+5. **Cờ Tính Năng:** `MYSLACK_ENABLED` vẫn giữ nguyên trạng thái tắt, không đăng ký vào `ALL_TOOLS` hay `SERVICE_REGISTRY`.
+
+---
+
+## 5. Bàn Giao & Bước Tiếp Theo
+
+1. Commit các tệp thuộc sở hữu:
+   - `packages/tool-schemas/src/myslack-tools.ts`
+   - `packages/tool-schemas/tests/myslack-tools.test.ts`
+   - `packages/tool-adapters/src/slack/personal-slack-types.ts`
+   - `packages/tool-adapters/src/slack/personal-slack-read-adapter.ts`
+   - `packages/tool-adapters/src/slack/index.ts`
+   - `packages/tool-adapters/tests/helpers/personal-slack-mock-server.ts`
+   - `packages/tool-adapters/tests/slack/personal-slack-read.test.ts`
+   - `docs/handoff/tasks/SLACK-03C1-core-read-adapters.md`
+   - `docs/superpowers/plans/2026-10-29-slack-03c1-core-read-adapters.md`
+   - `docs/handoff/log/2026-10-30-slack-03c1-read-adapters-implementation.md` (file này).
+2. Push lên nhánh `feat/slack-03c1-read-adapters` và cập nhật Draft PR tới `integration/slack-personal-20261029`.
+3. Kiểm tra hòm thư điều phối `orca orchestration check`.
+4. Gửi báo cáo `worker_done` tới Coordinator qua `orca orchestration send --type worker_done`.

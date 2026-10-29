@@ -343,6 +343,192 @@ export const MYSLACK_USERS_INFO_TOOL: SlackToolDefinition = {
   },
 };
 
+export const MYSLACK_CONVERSATIONS_INFO_TOOL: SlackToolDefinition = {
+  name: 'myslack.conversations_info',
+  service: 'myslack',
+  description: 'Gets information about a conversation.',
+  method: 'conversations.info',
+  family: 'conversations',
+  sideEffect: 'read',
+  riskLevel: 'low',
+  userScopes: ['channels:read', 'groups:read', 'im:read', 'mpim:read'],
+  hasUnknownScopes: false,
+  planTier: 'any',
+  isProbeRequired: true,
+  requiresBinding: true,
+  inputSchema: {
+    type: 'object',
+    properties: {
+      binding: { type: 'object', description: 'Verified Slack identity binding' },
+      channel: { type: 'string', description: 'Channel ID to get info for' },
+      include_locale: { type: 'boolean', description: 'Include channel locale' },
+      include_num_members: { type: 'boolean', description: 'Include count of members' },
+    },
+    required: ['binding', 'channel'],
+    additionalProperties: false,
+  },
+  outputSchema: {
+    type: 'object',
+    properties: {
+      channel: { type: 'object' },
+    },
+    required: ['channel'],
+  },
+};
+
+export const MYSLACK_CONVERSATIONS_REPLIES_TOOL: SlackToolDefinition = {
+  name: 'myslack.conversations_replies',
+  service: 'myslack',
+  description: 'Fetches a thread of messages posted to a conversation.',
+  method: 'conversations.replies',
+  family: 'conversations',
+  sideEffect: 'read',
+  riskLevel: 'low',
+  userScopes: ['channels:history', 'groups:history', 'im:history', 'mpim:history'],
+  hasUnknownScopes: false,
+  planTier: 'any',
+  isProbeRequired: true,
+  requiresBinding: true,
+  inputSchema: {
+    type: 'object',
+    properties: {
+      binding: { type: 'object', description: 'Verified Slack identity binding' },
+      channel: { type: 'string', description: 'Channel ID of the conversation' },
+      ts: { type: 'string', description: 'Unique identifier of a parent message (decimal timestamp)' },
+      cursor: { type: 'string', description: 'Pagination cursor' },
+      limit: { type: 'integer', minimum: 1, maximum: 1000, description: 'Number of messages to return' },
+      latest: { type: 'string', description: 'End of time range of messages to include' },
+      oldest: { type: 'string', description: 'Start of time range of messages to include' },
+      inclusive: { type: 'boolean', description: 'Include messages with latest or oldest timestamp' },
+    },
+    required: ['binding', 'channel', 'ts'],
+    additionalProperties: false,
+  },
+  outputSchema: {
+    type: 'object',
+    properties: {
+      messages: { type: 'array' },
+      hasMore: { type: 'boolean' },
+      nextCursor: { type: 'string' },
+    },
+    required: ['messages'],
+  },
+};
+
+export const MYSLACK_CONVERSATIONS_MEMBERS_TOOL: SlackToolDefinition = {
+  name: 'myslack.conversations_members',
+  service: 'myslack',
+  description: 'Lists members in a conversation.',
+  method: 'conversations.members',
+  family: 'conversations',
+  sideEffect: 'read',
+  riskLevel: 'low',
+  userScopes: ['channels:read', 'groups:read', 'im:read', 'mpim:read'],
+  hasUnknownScopes: false,
+  planTier: 'any',
+  isProbeRequired: true,
+  requiresBinding: true,
+  inputSchema: {
+    type: 'object',
+    properties: {
+      binding: { type: 'object', description: 'Verified Slack identity binding' },
+      channel: { type: 'string', description: 'Channel ID to list members for' },
+      cursor: { type: 'string', description: 'Pagination cursor' },
+      limit: { type: 'integer', minimum: 1, maximum: 1000, description: 'Number of members to return' },
+    },
+    required: ['binding', 'channel'],
+    additionalProperties: false,
+  },
+  outputSchema: {
+    type: 'object',
+    properties: {
+      members: { type: 'array', items: { type: 'string' } },
+      nextCursor: { type: 'string' },
+    },
+    required: ['members'],
+  },
+};
+
+export const MYSLACK_USERS_LIST_TOOL: SlackToolDefinition = {
+  name: 'myslack.users_list',
+  service: 'myslack',
+  description: 'Lists users in a Slack workspace.',
+  method: 'users.list',
+  family: 'users',
+  sideEffect: 'read',
+  riskLevel: 'low',
+  userScopes: ['users:read'],
+  hasUnknownScopes: false,
+  planTier: 'any',
+  isProbeRequired: true,
+  listable: true,
+  requiresBinding: true,
+  inputSchema: {
+    type: 'object',
+    properties: {
+      binding: { type: 'object', description: 'Verified Slack identity binding' },
+      cursor: { type: 'string', description: 'Pagination cursor' },
+      limit: { type: 'integer', minimum: 1, maximum: 1000, description: 'Number of users to return' },
+      include_locale: { type: 'boolean', description: 'Include user locale' },
+    },
+    required: ['binding'],
+    additionalProperties: false,
+  },
+  outputSchema: {
+    type: 'object',
+    properties: {
+      members: { type: 'array' },
+      nextCursor: { type: 'string' },
+    },
+    required: ['members'],
+  },
+};
+
+export const MYSLACK_CHAT_GET_PERMALINK_TOOL: SlackToolDefinition = {
+  name: 'myslack.chat_getPermalink',
+  service: 'myslack',
+  description: 'Gets a permanent URL for a message in a channel.',
+  method: 'chat.getPermalink',
+  family: 'chat',
+  sideEffect: 'read',
+  riskLevel: 'low',
+  userScopes: null,
+  hasUnknownScopes: true,
+  planTier: 'any',
+  isProbeRequired: true,
+  requiresBinding: true,
+  inputSchema: {
+    type: 'object',
+    properties: {
+      binding: { type: 'object', description: 'Verified Slack identity binding' },
+      channel: { type: 'string', description: 'Channel ID where the message was posted' },
+      message_ts: { type: 'string', description: 'Timestamp of the message (decimal string)' },
+    },
+    required: ['binding', 'channel', 'message_ts'],
+    additionalProperties: false,
+  },
+  outputSchema: {
+    type: 'object',
+    properties: {
+      ok: { type: 'boolean' },
+      channel: { type: 'string' },
+      permalink: { type: 'string' },
+    },
+    required: ['ok', 'channel', 'permalink'],
+  },
+};
+
+export const MYSLACK_CORE_READ_TOOLS: readonly SlackToolDefinition[] = [
+  MYSLACK_CONVERSATIONS_LIST_TOOL,
+  MYSLACK_CONVERSATIONS_INFO_TOOL,
+  MYSLACK_CONVERSATIONS_HISTORY_TOOL,
+  MYSLACK_CONVERSATIONS_REPLIES_TOOL,
+  MYSLACK_CONVERSATIONS_MEMBERS_TOOL,
+  MYSLACK_USERS_LIST_TOOL,
+  MYSLACK_USERS_INFO_TOOL,
+  MYSLACK_CHAT_GET_PERMALINK_TOOL,
+] as const;
+
 export const MYSLACK_SAMPLE_TOOLS: readonly SlackToolDefinition[] = [
   MYSLACK_CONVERSATIONS_HISTORY_TOOL,
   MYSLACK_CONVERSATIONS_LIST_TOOL,
@@ -350,8 +536,27 @@ export const MYSLACK_SAMPLE_TOOLS: readonly SlackToolDefinition[] = [
   MYSLACK_USERS_INFO_TOOL,
 ] as const;
 
+export const MYSLACK_DECLARED_TOOLS: readonly SlackToolDefinition[] = [
+  ...MYSLACK_CORE_READ_TOOLS,
+  MYSLACK_CHAT_POST_MESSAGE_TOOL,
+] as const;
+
+function deepFreeze<T>(obj: T): T {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  Object.freeze(obj);
+  for (const key of Object.keys(obj)) {
+    const val = (obj as any)[key];
+    if (val !== null && typeof val === 'object' && !Object.isFrozen(val)) {
+      deepFreeze(val);
+    }
+  }
+  return obj;
+}
+
 const CANONICAL_SLACK_TOOL_MAP = new Map<string, SlackToolDefinition>(
-  MYSLACK_SAMPLE_TOOLS.map(t => [t.name, t])
+  MYSLACK_DECLARED_TOOLS.map(t => [t.name, deepFreeze(structuredClone(t))])
 );
 
 function validateSchemaValue(
