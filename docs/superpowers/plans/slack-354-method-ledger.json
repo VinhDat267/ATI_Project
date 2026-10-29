@@ -1,14 +1,270 @@
 {
-  "version": "1.0.0",
-  "snapshotSha": "811f5dc9 (PR 185)",
+  "version": "2.0.0",
+  "snapshotSha": "811f5dc9 (PR 185 staged in 81a27b78)",
   "totalMethods": 354,
   "excludedCount": 101,
   "probeRequiredCount": 253,
+  "methodsWithUserScopes": 265,
+  "methodsWithUnknownScopes": 89,
   "byPhase": {
     "03E": 161,
     "Excluded": 101,
     "03D": 41,
     "03C": 51
+  },
+  "byFamily": {
+    "admin": {
+      "total": 128,
+      "excluded": 92,
+      "probe_required": 36,
+      "with_scopes": 128,
+      "unknown_scopes": 0
+    },
+    "agents": {
+      "total": 11,
+      "excluded": 0,
+      "probe_required": 11,
+      "with_scopes": 0,
+      "unknown_scopes": 11
+    },
+    "api": {
+      "total": 1,
+      "excluded": 0,
+      "probe_required": 1,
+      "with_scopes": 0,
+      "unknown_scopes": 1
+    },
+    "apps": {
+      "total": 23,
+      "excluded": 2,
+      "probe_required": 21,
+      "with_scopes": 3,
+      "unknown_scopes": 20
+    },
+    "assistant": {
+      "total": 5,
+      "excluded": 0,
+      "probe_required": 5,
+      "with_scopes": 2,
+      "unknown_scopes": 3
+    },
+    "auth": {
+      "total": 3,
+      "excluded": 0,
+      "probe_required": 3,
+      "with_scopes": 0,
+      "unknown_scopes": 3
+    },
+    "blocks": {
+      "total": 1,
+      "excluded": 0,
+      "probe_required": 1,
+      "with_scopes": 0,
+      "unknown_scopes": 1
+    },
+    "bookmarks": {
+      "total": 4,
+      "excluded": 0,
+      "probe_required": 4,
+      "with_scopes": 4,
+      "unknown_scopes": 0
+    },
+    "bots": {
+      "total": 1,
+      "excluded": 0,
+      "probe_required": 1,
+      "with_scopes": 1,
+      "unknown_scopes": 0
+    },
+    "calls": {
+      "total": 6,
+      "excluded": 0,
+      "probe_required": 6,
+      "with_scopes": 6,
+      "unknown_scopes": 0
+    },
+    "canvases": {
+      "total": 7,
+      "excluded": 0,
+      "probe_required": 7,
+      "with_scopes": 7,
+      "unknown_scopes": 0
+    },
+    "chat": {
+      "total": 13,
+      "excluded": 0,
+      "probe_required": 13,
+      "with_scopes": 8,
+      "unknown_scopes": 5
+    },
+    "conversations": {
+      "total": 28,
+      "excluded": 1,
+      "probe_required": 27,
+      "with_scopes": 19,
+      "unknown_scopes": 9
+    },
+    "dialog": {
+      "total": 1,
+      "excluded": 0,
+      "probe_required": 1,
+      "with_scopes": 0,
+      "unknown_scopes": 1
+    },
+    "dnd": {
+      "total": 5,
+      "excluded": 0,
+      "probe_required": 5,
+      "with_scopes": 5,
+      "unknown_scopes": 0
+    },
+    "emoji": {
+      "total": 1,
+      "excluded": 0,
+      "probe_required": 1,
+      "with_scopes": 1,
+      "unknown_scopes": 0
+    },
+    "entity": {
+      "total": 3,
+      "excluded": 0,
+      "probe_required": 3,
+      "with_scopes": 0,
+      "unknown_scopes": 3
+    },
+    "files": {
+      "total": 15,
+      "excluded": 1,
+      "probe_required": 14,
+      "with_scopes": 12,
+      "unknown_scopes": 3
+    },
+    "functions": {
+      "total": 8,
+      "excluded": 0,
+      "probe_required": 8,
+      "with_scopes": 0,
+      "unknown_scopes": 8
+    },
+    "migration": {
+      "total": 1,
+      "excluded": 0,
+      "probe_required": 1,
+      "with_scopes": 1,
+      "unknown_scopes": 0
+    },
+    "oauth": {
+      "total": 6,
+      "excluded": 0,
+      "probe_required": 6,
+      "with_scopes": 0,
+      "unknown_scopes": 6
+    },
+    "openid": {
+      "total": 2,
+      "excluded": 0,
+      "probe_required": 2,
+      "with_scopes": 1,
+      "unknown_scopes": 1
+    },
+    "pins": {
+      "total": 3,
+      "excluded": 0,
+      "probe_required": 3,
+      "with_scopes": 3,
+      "unknown_scopes": 0
+    },
+    "reactions": {
+      "total": 4,
+      "excluded": 0,
+      "probe_required": 4,
+      "with_scopes": 4,
+      "unknown_scopes": 0
+    },
+    "reminders": {
+      "total": 5,
+      "excluded": 0,
+      "probe_required": 5,
+      "with_scopes": 5,
+      "unknown_scopes": 0
+    },
+    "rtm": {
+      "total": 2,
+      "excluded": 1,
+      "probe_required": 1,
+      "with_scopes": 0,
+      "unknown_scopes": 2
+    },
+    "search": {
+      "total": 3,
+      "excluded": 0,
+      "probe_required": 3,
+      "with_scopes": 3,
+      "unknown_scopes": 0
+    },
+    "slackLists": {
+      "total": 12,
+      "excluded": 0,
+      "probe_required": 12,
+      "with_scopes": 12,
+      "unknown_scopes": 0
+    },
+    "slackbot": {
+      "total": 7,
+      "excluded": 0,
+      "probe_required": 7,
+      "with_scopes": 7,
+      "unknown_scopes": 0
+    },
+    "stars": {
+      "total": 3,
+      "excluded": 0,
+      "probe_required": 3,
+      "with_scopes": 3,
+      "unknown_scopes": 0
+    },
+    "team": {
+      "total": 9,
+      "excluded": 2,
+      "probe_required": 7,
+      "with_scopes": 7,
+      "unknown_scopes": 2
+    },
+    "tooling": {
+      "total": 1,
+      "excluded": 0,
+      "probe_required": 1,
+      "with_scopes": 0,
+      "unknown_scopes": 1
+    },
+    "usergroups": {
+      "total": 7,
+      "excluded": 0,
+      "probe_required": 7,
+      "with_scopes": 7,
+      "unknown_scopes": 0
+    },
+    "users": {
+      "total": 13,
+      "excluded": 2,
+      "probe_required": 11,
+      "with_scopes": 12,
+      "unknown_scopes": 1
+    },
+    "views": {
+      "total": 4,
+      "excluded": 0,
+      "probe_required": 4,
+      "with_scopes": 0,
+      "unknown_scopes": 4
+    },
+    "workflows": {
+      "total": 8,
+      "excluded": 0,
+      "probe_required": 8,
+      "with_scopes": 4,
+      "unknown_scopes": 4
+    }
   },
   "methods": [
     {
@@ -19,6 +275,7 @@
       "userScopes": [
         "admin.analytics:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -34,6 +291,7 @@
       "userScopes": [
         "admin.analytics:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -49,6 +307,7 @@
       "userScopes": [
         "admin.analytics:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -64,6 +323,7 @@
       "userScopes": [
         "admin.app_activities:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -79,6 +339,7 @@
       "userScopes": [
         "admin.apps:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -94,6 +355,7 @@
       "userScopes": [
         "admin.apps:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -109,6 +371,7 @@
       "userScopes": [
         "admin.apps:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -124,6 +387,7 @@
       "userScopes": [
         "admin.apps:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -139,6 +403,7 @@
       "userScopes": [
         "admin.apps:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -154,6 +419,7 @@
       "userScopes": [
         "admin.apps:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -169,6 +435,7 @@
       "userScopes": [
         "admin.apps:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -184,6 +451,7 @@
       "userScopes": [
         "admin.apps:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -199,6 +467,7 @@
       "userScopes": [
         "admin.apps:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -214,6 +483,7 @@
       "userScopes": [
         "admin.apps:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -229,6 +499,7 @@
       "userScopes": [
         "admin.apps:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -244,6 +515,7 @@
       "userScopes": [
         "admin.apps:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -259,6 +531,7 @@
       "userScopes": [
         "admin.apps:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -274,6 +547,7 @@
       "userScopes": [
         "admin.apps:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -289,6 +563,7 @@
       "userScopes": [
         "admin.apps:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -304,6 +579,7 @@
       "userScopes": [
         "admin.apps:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -319,6 +595,7 @@
       "userScopes": [
         "admin.apps:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -334,6 +611,7 @@
       "userScopes": [
         "admin"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -349,6 +627,7 @@
       "userScopes": [
         "admin"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -364,6 +643,7 @@
       "userScopes": [
         "admin.users:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -379,6 +659,7 @@
       "userScopes": [
         "admin.users:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -394,6 +675,7 @@
       "userScopes": [
         "admin.users:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -409,6 +691,7 @@
       "userScopes": [
         "admin.barriers:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -424,6 +707,7 @@
       "userScopes": [
         "admin.barriers:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "high",
@@ -439,6 +723,7 @@
       "userScopes": [
         "admin.barriers:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -454,6 +739,7 @@
       "userScopes": [
         "admin.barriers:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -469,6 +755,7 @@
       "userScopes": [
         "admin.conversations:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "high",
@@ -484,6 +771,7 @@
       "userScopes": [
         "admin.conversations:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -499,6 +787,7 @@
       "userScopes": [
         "admin.conversations:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -514,6 +803,7 @@
       "userScopes": [
         "admin.conversations:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -529,6 +819,7 @@
       "userScopes": [
         "admin.conversations:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -544,6 +835,7 @@
       "userScopes": [
         "admin.conversations:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -559,6 +851,7 @@
       "userScopes": [
         "admin.conversations:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -574,6 +867,7 @@
       "userScopes": [
         "admin.conversations:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -589,6 +883,7 @@
       "userScopes": [
         "admin.conversations:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -604,6 +899,7 @@
       "userScopes": [
         "admin.conversations:manage_objects"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -619,6 +915,7 @@
       "userScopes": [
         "admin.conversations:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "high",
@@ -634,6 +931,7 @@
       "userScopes": [
         "admin.conversations:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -649,6 +947,7 @@
       "userScopes": [
         "admin.conversations:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -664,6 +963,7 @@
       "userScopes": [
         "admin.conversations:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -679,6 +979,7 @@
       "userScopes": [
         "admin.conversations:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -694,6 +995,7 @@
       "userScopes": [
         "admin.conversations:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -709,6 +1011,7 @@
       "userScopes": [
         "admin.conversations:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -724,6 +1027,7 @@
       "userScopes": [
         "admin.conversations:manage_objects"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -739,6 +1043,7 @@
       "userScopes": [
         "admin.conversations:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -754,6 +1059,7 @@
       "userScopes": [
         "admin.conversations:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -769,6 +1075,7 @@
       "userScopes": [
         "admin.conversations:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -784,6 +1091,7 @@
       "userScopes": [
         "admin.conversations:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -799,6 +1107,7 @@
       "userScopes": [
         "admin.conversations:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -814,6 +1123,7 @@
       "userScopes": [
         "admin.conversations:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -829,6 +1139,7 @@
       "userScopes": [
         "admin.conversations:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -844,6 +1155,7 @@
       "userScopes": [
         "admin.conversations:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -859,6 +1171,7 @@
       "userScopes": [
         "admin.conversations:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -874,6 +1187,7 @@
       "userScopes": [
         "admin.conversations:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -889,6 +1203,7 @@
       "userScopes": [
         "admin.conversations:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "high",
@@ -904,6 +1219,7 @@
       "userScopes": [
         "admin.conversations:manage_objects"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -919,6 +1235,7 @@
       "userScopes": [
         "admin.teams:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -934,6 +1251,7 @@
       "userScopes": [
         "admin.teams:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -949,6 +1267,7 @@
       "userScopes": [
         "admin.teams:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -964,6 +1283,7 @@
       "userScopes": [
         "admin.teams:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -979,6 +1299,7 @@
       "userScopes": [
         "admin.teams:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -994,6 +1315,7 @@
       "userScopes": [
         "admin.workflows:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -1009,6 +1331,7 @@
       "userScopes": [
         "admin.workflows:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -1024,6 +1347,7 @@
       "userScopes": [
         "admin.workflows:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -1039,6 +1363,7 @@
       "userScopes": [
         "admin.invites:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -1054,6 +1379,7 @@
       "userScopes": [
         "admin.invites:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -1069,6 +1395,7 @@
       "userScopes": [
         "admin.invites:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -1084,6 +1411,7 @@
       "userScopes": [
         "admin.invites:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -1099,6 +1427,7 @@
       "userScopes": [
         "admin.invites:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -1114,6 +1443,7 @@
       "userScopes": [
         "admin.roles:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1129,6 +1459,7 @@
       "userScopes": [
         "admin.roles:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -1144,6 +1475,7 @@
       "userScopes": [
         "admin.roles:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -1159,6 +1491,7 @@
       "userScopes": [
         "admin.skills:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -1174,6 +1507,7 @@
       "userScopes": [
         "admin.skills:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1189,6 +1523,7 @@
       "userScopes": [
         "admin.skills:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1204,6 +1539,7 @@
       "userScopes": [
         "admin.skills:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1219,6 +1555,7 @@
       "userScopes": [
         "admin.teams:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -1234,6 +1571,7 @@
       "userScopes": [
         "admin.teams:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1249,6 +1587,7 @@
       "userScopes": [
         "admin.teams:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -1264,6 +1603,7 @@
       "userScopes": [
         "admin.teams:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -1279,6 +1619,7 @@
       "userScopes": [
         "admin.teams:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1294,6 +1635,7 @@
       "userScopes": [
         "admin.teams:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1309,6 +1651,7 @@
       "userScopes": [
         "admin.teams:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1324,6 +1667,7 @@
       "userScopes": [
         "admin.teams:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1339,6 +1683,7 @@
       "userScopes": [
         "admin.teams:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1354,6 +1699,7 @@
       "userScopes": [
         "admin.teams:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1369,6 +1715,7 @@
       "userScopes": [
         "admin.usergroups:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1384,6 +1731,7 @@
       "userScopes": [
         "admin.teams:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -1399,6 +1747,7 @@
       "userScopes": [
         "admin.usergroups:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1414,6 +1763,7 @@
       "userScopes": [
         "admin.usergroups:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1429,6 +1779,7 @@
       "userScopes": [
         "admin.usergroups:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -1444,6 +1795,7 @@
       "userScopes": [
         "admin.usergroups:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -1459,6 +1811,7 @@
       "userScopes": [
         "admin.usergroups:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1474,6 +1827,7 @@
       "userScopes": [
         "admin.teams:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -1489,6 +1843,7 @@
       "userScopes": [
         "admin.usergroups:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1504,6 +1859,7 @@
       "userScopes": [
         "admin.usergroups:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1519,6 +1875,7 @@
       "userScopes": [
         "admin.usergroups:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1534,6 +1891,7 @@
       "userScopes": [
         "admin.users:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -1549,6 +1907,7 @@
       "userScopes": [
         "admin.users:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -1564,6 +1923,7 @@
       "userScopes": [
         "admin.users:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -1579,6 +1939,7 @@
       "userScopes": [
         "admin.users:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -1594,6 +1955,7 @@
       "userScopes": [
         "admin.users:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -1609,6 +1971,7 @@
       "userScopes": [
         "admin.users:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1624,6 +1987,7 @@
       "userScopes": [
         "admin.users:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -1639,6 +2003,7 @@
       "userScopes": [
         "admin.users:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1654,6 +2019,7 @@
       "userScopes": [
         "admin.users:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1669,6 +2035,7 @@
       "userScopes": [
         "admin.users:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1684,6 +2051,7 @@
       "userScopes": [
         "admin.users:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -1699,6 +2067,7 @@
       "userScopes": [
         "admin.users:read"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -1714,6 +2083,7 @@
       "userScopes": [
         "admin.users:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1729,6 +2099,7 @@
       "userScopes": [
         "admin.users:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1744,6 +2115,7 @@
       "userScopes": [
         "admin.users:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1759,6 +2131,7 @@
       "userScopes": [
         "admin.users:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1774,6 +2147,7 @@
       "userScopes": [
         "admin.users:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1789,6 +2163,7 @@
       "userScopes": [
         "admin.users:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1804,6 +2179,7 @@
       "userScopes": [
         "admin.users:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -1819,6 +2195,7 @@
       "userScopes": [
         "admin.users:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -1834,6 +2211,7 @@
       "userScopes": [
         "admin.workflows:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -1849,6 +2227,7 @@
       "userScopes": [
         "admin.workflows:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -1864,6 +2243,7 @@
       "userScopes": [
         "admin.workflows:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -1879,6 +2259,7 @@
       "userScopes": [
         "admin.workflows:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -1894,6 +2275,7 @@
       "userScopes": [
         "client"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -1909,6 +2291,7 @@
       "userScopes": [
         "client"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -1924,6 +2307,7 @@
       "userScopes": [
         "admin.workflows:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -1936,7 +2320,8 @@
       "family": "agents",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "high",
@@ -1949,7 +2334,8 @@
       "family": "agents",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -1962,7 +2348,8 @@
       "family": "agents",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -1975,7 +2362,8 @@
       "family": "agents",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -1988,7 +2376,8 @@
       "family": "agents",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -2001,7 +2390,8 @@
       "family": "agents",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -2014,7 +2404,8 @@
       "family": "agents",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -2027,7 +2418,8 @@
       "family": "agents",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -2040,7 +2432,8 @@
       "family": "agents",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -2053,7 +2446,8 @@
       "family": "agents",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -2066,7 +2460,8 @@
       "family": "agents",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -2079,7 +2474,8 @@
       "family": "api",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -2095,6 +2491,7 @@
       "userScopes": [
         "hosting:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -2107,7 +2504,8 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "high",
@@ -2120,7 +2518,8 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -2133,7 +2532,8 @@
       "family": "apps",
       "disposition": "excluded",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -2146,7 +2546,8 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -2159,7 +2560,8 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -2172,7 +2574,8 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -2185,7 +2588,8 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -2198,7 +2602,8 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "high",
@@ -2211,7 +2616,8 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -2224,7 +2630,8 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -2237,7 +2644,8 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -2250,7 +2658,8 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -2263,7 +2672,8 @@
       "family": "apps",
       "disposition": "excluded",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -2279,6 +2689,7 @@
       "userScopes": [
         "app_configurations:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -2291,7 +2702,8 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -2304,7 +2716,8 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -2317,7 +2730,8 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "high",
@@ -2330,7 +2744,8 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -2343,7 +2758,8 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -2356,7 +2772,8 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -2369,7 +2786,8 @@
       "family": "apps",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -2385,6 +2803,7 @@
       "userScopes": [
         "users:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -2405,6 +2824,7 @@
         "search:read.files",
         "search:read.users"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -2420,6 +2840,7 @@
       "userScopes": [
         "search:read.public"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -2432,7 +2853,8 @@
       "family": "assistant",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -2445,7 +2867,8 @@
       "family": "assistant",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -2458,7 +2881,8 @@
       "family": "assistant",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -2471,7 +2895,8 @@
       "family": "auth",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "high",
@@ -2484,7 +2909,8 @@
       "family": "auth",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -2497,7 +2923,8 @@
       "family": "auth",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -2510,7 +2937,8 @@
       "family": "blocks",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -2526,6 +2954,7 @@
       "userScopes": [
         "bookmarks:write"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "medium",
@@ -2541,6 +2970,7 @@
       "userScopes": [
         "bookmarks:write"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "medium",
@@ -2556,6 +2986,7 @@
       "userScopes": [
         "bookmarks:read"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "low",
@@ -2571,6 +3002,7 @@
       "userScopes": [
         "bookmarks:write"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "medium",
@@ -2586,6 +3018,7 @@
       "userScopes": [
         "users:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -2601,6 +3034,7 @@
       "userScopes": [
         "calls:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -2616,6 +3050,7 @@
       "userScopes": [
         "calls:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -2631,6 +3066,7 @@
       "userScopes": [
         "calls:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -2646,6 +3082,7 @@
       "userScopes": [
         "calls:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -2661,6 +3098,7 @@
       "userScopes": [
         "calls:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -2676,6 +3114,7 @@
       "userScopes": [
         "calls:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -2691,6 +3130,7 @@
       "userScopes": [
         "canvases:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "high",
@@ -2706,6 +3146,7 @@
       "userScopes": [
         "canvases:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -2721,6 +3162,7 @@
       "userScopes": [
         "canvases:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -2736,6 +3178,7 @@
       "userScopes": [
         "canvases:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "high",
@@ -2751,6 +3194,7 @@
       "userScopes": [
         "canvases:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -2766,6 +3210,7 @@
       "userScopes": [
         "canvases:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -2781,6 +3226,7 @@
       "userScopes": [
         "canvases:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -2793,7 +3239,8 @@
       "family": "chat",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "low",
@@ -2809,6 +3256,7 @@
       "userScopes": [
         "chat:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "high",
@@ -2824,6 +3272,7 @@
       "userScopes": [
         "chat:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "high",
@@ -2836,7 +3285,8 @@
       "family": "chat",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "low",
@@ -2852,6 +3302,7 @@
       "userScopes": [
         "chat:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "low",
@@ -2867,6 +3318,7 @@
       "userScopes": [
         "chat:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "high",
@@ -2882,6 +3334,7 @@
       "userScopes": [
         "chat:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "high",
@@ -2897,6 +3350,7 @@
       "userScopes": [
         "chat:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "low",
@@ -2909,7 +3363,8 @@
       "family": "chat",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "low",
@@ -2922,7 +3377,8 @@
       "family": "chat",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "medium",
@@ -2935,7 +3391,8 @@
       "family": "chat",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "medium",
@@ -2951,6 +3408,7 @@
       "userScopes": [
         "links:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "low",
@@ -2966,6 +3424,7 @@
       "userScopes": [
         "chat:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "medium",
@@ -2978,7 +3437,8 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "medium",
@@ -2991,7 +3451,8 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "medium",
@@ -3010,6 +3471,7 @@
         "mpim:write",
         "channels:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "high",
@@ -3025,6 +3487,7 @@
       "userScopes": [
         "canvases:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "medium",
@@ -3043,6 +3506,7 @@
         "mpim:write",
         "channels:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "medium",
@@ -3061,6 +3525,7 @@
         "mpim:write",
         "channels:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "medium",
@@ -3073,7 +3538,8 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "medium",
@@ -3086,7 +3552,8 @@
       "family": "conversations",
       "disposition": "excluded",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -3105,6 +3572,7 @@
         "mpim:history",
         "channels:history"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "low",
@@ -3123,6 +3591,7 @@
         "mpim:read",
         "channels:read"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "low",
@@ -3143,6 +3612,7 @@
         "im:write",
         "mpim:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "medium",
@@ -3155,7 +3625,8 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "medium",
@@ -3171,6 +3642,7 @@
       "userScopes": [
         "channels:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "medium",
@@ -3187,6 +3659,7 @@
         "groups:write",
         "channels:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "high",
@@ -3205,6 +3678,7 @@
         "mpim:write",
         "channels:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "medium",
@@ -3223,6 +3697,7 @@
         "mpim:read",
         "channels:read"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "low",
@@ -3235,7 +3710,8 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "medium",
@@ -3254,6 +3730,7 @@
         "mpim:write",
         "channels:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "medium",
@@ -3272,6 +3749,7 @@
         "mpim:read",
         "channels:read"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "low",
@@ -3290,6 +3768,7 @@
         "im:write",
         "mpim:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "medium",
@@ -3308,6 +3787,7 @@
         "mpim:write",
         "channels:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "medium",
@@ -3326,6 +3806,7 @@
         "mpim:history",
         "channels:history"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "low",
@@ -3338,7 +3819,8 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "medium",
@@ -3351,7 +3833,8 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "medium",
@@ -3364,7 +3847,8 @@
       "family": "conversations",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "medium",
@@ -3387,6 +3871,7 @@
         "im:write",
         "mpim:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "medium",
@@ -3409,6 +3894,7 @@
         "im:write",
         "mpim:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "medium",
@@ -3427,6 +3913,7 @@
         "mpim:write",
         "channels:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "high",
@@ -3439,7 +3926,8 @@
       "family": "dialog",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -3455,6 +3943,7 @@
       "userScopes": [
         "dnd:write"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "low",
@@ -3470,6 +3959,7 @@
       "userScopes": [
         "dnd:write"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "low",
@@ -3485,6 +3975,7 @@
       "userScopes": [
         "dnd:read"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "low",
@@ -3500,6 +3991,7 @@
       "userScopes": [
         "dnd:write"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "medium",
@@ -3515,6 +4007,7 @@
       "userScopes": [
         "dnd:read"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "low",
@@ -3530,6 +4023,7 @@
       "userScopes": [
         "emoji:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -3542,7 +4036,8 @@
       "family": "entity",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -3555,7 +4050,8 @@
       "family": "entity",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -3568,7 +4064,8 @@
       "family": "entity",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -3584,6 +4081,7 @@
       "userScopes": [
         "files:write"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "high",
@@ -3599,6 +4097,7 @@
       "userScopes": [
         "files:write"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "medium",
@@ -3614,6 +4113,7 @@
       "userScopes": [
         "files:write"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "high",
@@ -3629,6 +4129,7 @@
       "userScopes": [
         "files:write"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "medium",
@@ -3644,6 +4145,7 @@
       "userScopes": [
         "files:read"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "low",
@@ -3659,6 +4161,7 @@
       "userScopes": [
         "files:read"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "low",
@@ -3671,7 +4174,8 @@
       "family": "files",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "medium",
@@ -3687,6 +4191,7 @@
       "userScopes": [
         "remote_files:read"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "low",
@@ -3702,6 +4207,7 @@
       "userScopes": [
         "remote_files:read"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "low",
@@ -3714,7 +4220,8 @@
       "family": "files",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "medium",
@@ -3730,6 +4237,7 @@
       "userScopes": [
         "remote_files:share"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "low",
@@ -3742,7 +4250,8 @@
       "family": "files",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "medium",
@@ -3758,6 +4267,7 @@
       "userScopes": [
         "files:write"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "high",
@@ -3773,6 +4283,7 @@
       "userScopes": [
         "files:write"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "low",
@@ -3788,6 +4299,7 @@
       "userScopes": [
         "files:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -3800,7 +4312,8 @@
       "family": "functions",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -3813,7 +4326,8 @@
       "family": "functions",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -3826,7 +4340,8 @@
       "family": "functions",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -3839,7 +4354,8 @@
       "family": "functions",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -3852,7 +4368,8 @@
       "family": "functions",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -3865,7 +4382,8 @@
       "family": "functions",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -3878,7 +4396,8 @@
       "family": "functions",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -3891,7 +4410,8 @@
       "family": "functions",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -3907,6 +4427,7 @@
       "userScopes": [
         "tokens.basic"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -3919,7 +4440,8 @@
       "family": "oauth",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -3932,7 +4454,8 @@
       "family": "oauth",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -3945,7 +4468,8 @@
       "family": "oauth",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -3958,7 +4482,8 @@
       "family": "oauth",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -3971,7 +4496,8 @@
       "family": "oauth",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -3984,7 +4510,8 @@
       "family": "oauth",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -3997,7 +4524,8 @@
       "family": "openid",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -4013,6 +4541,7 @@
       "userScopes": [
         "openid"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -4028,6 +4557,7 @@
       "userScopes": [
         "pins:write"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "medium",
@@ -4043,6 +4573,7 @@
       "userScopes": [
         "pins:read"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "low",
@@ -4058,6 +4589,7 @@
       "userScopes": [
         "pins:write"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "medium",
@@ -4073,6 +4605,7 @@
       "userScopes": [
         "reactions:write"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "medium",
@@ -4088,6 +4621,7 @@
       "userScopes": [
         "reactions:read"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "low",
@@ -4103,6 +4637,7 @@
       "userScopes": [
         "reactions:read"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "low",
@@ -4118,6 +4653,7 @@
       "userScopes": [
         "reactions:write"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "medium",
@@ -4133,6 +4669,7 @@
       "userScopes": [
         "reminders:write"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "medium",
@@ -4148,6 +4685,7 @@
       "userScopes": [
         "reminders:write"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "medium",
@@ -4163,6 +4701,7 @@
       "userScopes": [
         "reminders:write"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "high",
@@ -4178,6 +4717,7 @@
       "userScopes": [
         "reminders:read"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "low",
@@ -4193,6 +4733,7 @@
       "userScopes": [
         "reminders:read"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "low",
@@ -4205,7 +4746,8 @@
       "family": "rtm",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -4218,7 +4760,8 @@
       "family": "rtm",
       "disposition": "excluded",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -4234,6 +4777,7 @@
       "userScopes": [
         "search:read"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "low",
@@ -4249,6 +4793,7 @@
       "userScopes": [
         "search:read"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "low",
@@ -4264,6 +4809,7 @@
       "userScopes": [
         "search:read"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "low",
@@ -4279,6 +4825,7 @@
       "userScopes": [
         "lists:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "high",
@@ -4294,6 +4841,7 @@
       "userScopes": [
         "lists:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -4309,6 +4857,7 @@
       "userScopes": [
         "lists:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -4324,6 +4873,7 @@
       "userScopes": [
         "lists:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -4339,6 +4889,7 @@
       "userScopes": [
         "lists:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -4354,6 +4905,7 @@
       "userScopes": [
         "lists:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -4369,6 +4921,7 @@
       "userScopes": [
         "lists:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "high",
@@ -4384,6 +4937,7 @@
       "userScopes": [
         "lists:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "high",
@@ -4399,6 +4953,7 @@
       "userScopes": [
         "lists:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -4414,6 +4969,7 @@
       "userScopes": [
         "lists:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -4429,6 +4985,7 @@
       "userScopes": [
         "lists:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -4444,6 +5001,7 @@
       "userScopes": [
         "lists:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -4459,6 +5017,7 @@
       "userScopes": [
         "skills:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -4474,6 +5033,7 @@
       "userScopes": [
         "skills:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "high",
@@ -4489,6 +5049,7 @@
       "userScopes": [
         "skills:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -4504,6 +5065,7 @@
       "userScopes": [
         "skills:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -4519,6 +5081,7 @@
       "userScopes": [
         "skills:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -4534,6 +5097,7 @@
       "userScopes": [
         "skills:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -4549,6 +5113,7 @@
       "userScopes": [
         "skills:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -4564,6 +5129,7 @@
       "userScopes": [
         "stars:write"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "medium",
@@ -4579,6 +5145,7 @@
       "userScopes": [
         "stars:read"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "low",
@@ -4594,6 +5161,7 @@
       "userScopes": [
         "stars:write"
       ],
+      "hasUnknownScopes": false,
       "category": "content_and_interaction",
       "proposedDeliveryPhase": "03D",
       "proposedRiskLevel": "medium",
@@ -4609,6 +5177,7 @@
       "userScopes": [
         "admin"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -4624,6 +5193,7 @@
       "userScopes": [
         "admin"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -4639,6 +5209,7 @@
       "userScopes": [
         "team.billing:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -4651,7 +5222,8 @@
       "family": "team",
       "disposition": "excluded",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -4664,7 +5236,8 @@
       "family": "team",
       "disposition": "excluded",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -4680,6 +5253,7 @@
       "userScopes": [
         "team:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -4695,6 +5269,7 @@
       "userScopes": [
         "admin"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -4710,6 +5285,7 @@
       "userScopes": [
         "team.preferences:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -4725,6 +5301,7 @@
       "userScopes": [
         "users.profile:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -4737,7 +5314,8 @@
       "family": "tooling",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -4753,6 +5331,7 @@
       "userScopes": [
         "usergroups:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -4768,6 +5347,7 @@
       "userScopes": [
         "usergroups:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -4783,6 +5363,7 @@
       "userScopes": [
         "usergroups:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -4798,6 +5379,7 @@
       "userScopes": [
         "usergroups:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -4813,6 +5395,7 @@
       "userScopes": [
         "usergroups:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -4828,6 +5411,7 @@
       "userScopes": [
         "usergroups:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -4843,6 +5427,7 @@
       "userScopes": [
         "usergroups:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -4861,6 +5446,7 @@
         "mpim:read",
         "channels:read"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "low",
@@ -4876,6 +5462,7 @@
       "userScopes": [
         "users.profile:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "high",
@@ -4888,7 +5475,8 @@
       "family": "users",
       "disposition": "excluded",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "low",
@@ -4904,6 +5492,7 @@
       "userScopes": [
         "users:read"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "low",
@@ -4919,6 +5508,7 @@
       "userScopes": [
         "identity:read"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "low",
@@ -4934,6 +5524,7 @@
       "userScopes": [
         "users:read"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "low",
@@ -4949,6 +5540,7 @@
       "userScopes": [
         "users:read"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "low",
@@ -4964,6 +5556,7 @@
       "userScopes": [
         "users:read.email"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "low",
@@ -4979,6 +5572,7 @@
       "userScopes": [
         "users.profile:read"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "low",
@@ -4994,6 +5588,7 @@
       "userScopes": [
         "users.profile:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "medium",
@@ -5009,6 +5604,7 @@
       "userScopes": [
         "users:write"
       ],
+      "hasUnknownScopes": false,
       "category": "excluded",
       "proposedDeliveryPhase": "Excluded",
       "proposedRiskLevel": "medium",
@@ -5024,6 +5620,7 @@
       "userScopes": [
         "users.profile:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "medium",
@@ -5039,6 +5636,7 @@
       "userScopes": [
         "users:write"
       ],
+      "hasUnknownScopes": false,
       "category": "core",
       "proposedDeliveryPhase": "03C",
       "proposedRiskLevel": "medium",
@@ -5051,7 +5649,8 @@
       "family": "views",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -5064,7 +5663,8 @@
       "family": "views",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -5077,7 +5677,8 @@
       "family": "views",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -5090,7 +5691,8 @@
       "family": "views",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -5106,6 +5708,7 @@
       "userScopes": [
         "bookmarks:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -5121,6 +5724,7 @@
       "userScopes": [
         "bookmarks:read"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -5136,6 +5740,7 @@
       "userScopes": [
         "bookmarks:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -5151,6 +5756,7 @@
       "userScopes": [
         "bookmarks:write"
       ],
+      "hasUnknownScopes": false,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -5163,7 +5769,8 @@
       "family": "workflows",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -5176,7 +5783,8 @@
       "family": "workflows",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "low",
@@ -5189,7 +5797,8 @@
       "family": "workflows",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",
@@ -5202,7 +5811,8 @@
       "family": "workflows",
       "disposition": "probe_required",
       "exclusionReason": null,
-      "userScopes": [],
+      "userScopes": null,
+      "hasUnknownScopes": true,
       "category": "collaboration_and_governance",
       "proposedDeliveryPhase": "03E",
       "proposedRiskLevel": "medium",

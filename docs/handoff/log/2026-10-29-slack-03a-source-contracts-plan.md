@@ -1,4 +1,4 @@
-# 29/10/2026 · Hoạch Định SLACK-03A: Hợp Đồng Nguồn, ACL, Vòng Đời & Siêu Dữ Liệu Công Cụ
+# 29/10/2026 · Hoạch Định SLACK-03A: Hợp Đồng Nguồn, ACL, Vòng Đời & Siêu Dữ Liệu Công Cụ (Hiệu Chỉnh Review)
 
 **Tác giả:** Integration / Schema Planning Owner (Antigravity gemini-3.8-flash-high).
 **Ủy quyền:** Điều phối viên trưởng (Coordinator) chỉ định Antigravity builder hoàn thiện kế hoạch chi tiết và task card cho **SLACK-03A** (Hợp đồng vòng đời nguồn, ACL, cascade purge và siêu dữ liệu công cụ theo phương thức).
@@ -11,81 +11,53 @@
 
 ---
 
-## 1. Bối Cảnh Tích Hợp & Cổng Phụ Thuộc Hợp Đồng (Context & Gates)
+## 1. Khắc Phục Triệt Để 5 Yêu Cầu Hiệu Chỉnh Từ Reviewer
 
-1. **Kế thừa các hợp đồng đã được phê duyệt:**
-   - Hợp đồng nền tảng SLACK-01 (`myslack-context.ts`, `myslack-policy.ts`) đã hoàn tất.
-   - Hợp đồng kết nối SLACK-02A (`myslack-connection.ts`) đã được chấp thuận tại commit `6871087`.
-   - Bản sửa lỗi cô lập callback SLACK-02R (`0015_slack_callback_order.sql`) đã được phê duyệt tại PR #190.
-2. **Cổng phụ thuộc Backend 02B (Prerequisite Gate):**
-   - Candidate PR #192 (`19e4e39c`) cho SLACK-02B đang trong đợt blocking review (hoàn thiện `returnTo` và policy revision / config matching).
-   - Tầng hợp đồng thuần 03A (`packages/tool-schemas`) được thiết kế hoàn toàn độc lập với mã nguồn runtime backend, không import cơ sở dữ liệu nội bộ hay token mã hóa.
-   - Các module tiêu thụ backend (03B) và adapter (03C) **bắt buộc có giao diện 02B được chấp thuận (accepted interfaces) và staging base đã được review** (cho phép xếp chồng nhánh đã review, không ép buộc phải merge main ngay).
-3. **Thỏa thuận tham chiếu chính sách và phản hồi thẩm định từ Điều phối viên trưởng:**
-   - Thông điệp `msg_cc1023f0b0f3` & `msg_2a88ad9f579a`:
-     - Thống nhất cấu trúc `SlackPolicyReference` gồm đầy đủ `SlackBinding`, `purpose` (thuộc 5 giá trị chuẩn tắc: `'manual_lookup' | 'triage' | 'planning' | 'digest' | 'storage'`), `requestedRetentionDays`, `providerProfileId`, `configFingerprint`, `policyVersion`, và hai trường `consentRevision` / `providerRevision` dưới dạng **chuỗi số thập phân dương chuẩn tắc (canonical positive decimal strings `/^[1-9][0-9]*$/`)** để an toàn JSON; số 0 và số có số 0 ở đầu bị bác bỏ.
-     - Phân định rõ ràng giữa `globalResourceKey` (tài nguyên vật lý chung) và `ownerSourceKey` (quyền sở hữu dữ liệu mang đầy đủ `binding` và mã hoá tuple JSON, ngăn delimiter ambiguity và va chạm giữa 2 user cùng workspace).
-     - Định nghĩa `SlackPurgeTarget` dưới dạng discriminated union với tagged scopes tường minh: `authorization_disconnect` (xoá riêng người ngắt, không làm ảnh hưởng người khác), `resource_lifecycle` (xoá khi tin/file bị xoá/sửa), và `workspace_consent_revocation` (xoá toàn bộ khi tổ chức rút consent).
-     - Bounded whitelisted metadata: Giới hạn các trường siêu dữ liệu an toàn (`SlackSourceMetadata`), loại bỏ việc dùng `Record<string, unknown>` mở; định danh nội dung nguồn là `untrustedContent`.
+Phiên làm việc này đã hiệu chỉnh toàn diện 4 tài liệu của PR #194 nhằm đáp ứng 100% 5 yêu cầu review độc lập từ Coordinator:
 
----
+### 1. Phân định 5 Tagged Purge Scopes & Mục tiêu Tinh gọn:
+- **Tách `retention_expired` khỏi `resource_lifecycle`:** Hết hạn lưu trữ là thuộc tính riêng của từng chủ kết nối và chính sách (`owner_retention`), không thể dùng scope toàn cục của workspace. Tagged scope `owner_retention` bắt buộc mang đầy đủ `binding: SlackBinding`, `resourceType`, `resourceId`, `revision?` và `policyRef: SlackPolicyReference`.
+- **Giới hạn phạm vi `channel_membership_lost`:** Chỉ nhắm vào đúng `channelId` mà kết nối đó bị mất quyền, tuyệt đối không xoá nhầm các kênh khác của cùng kết nối.
+- **Bảo toàn `authorization_disconnect`:** Mang đầy đủ `binding: SlackBinding`, chỉ xoá bản sao của riêng connection ngắt kết nối, không làm tổn hại người dùng B trong cùng workspace.
 
-## 2. Giải Pháp Kỹ Thuật & Kiến Trúc Đã Hoạch Định (Architectural Design)
+### 2. Khớp Chính Xác Thu Hồi Chấp Thuận Tổ Chức (`workspace_consent_revocation`):
+- Tagged scope `workspace_consent_revocation` bắt buộc bao gồm cả 4 trường: `{ workspaceId, policyVersion, providerProfileId, consentRevision }`.
+- Purge runner chỉ xoá các bản sao mang đúng `consentRevision` bị thu hồi; nếu tổ chức cấp lại consent (regrant) với một `consentRevision` mới hơn, job thu hồi cũ không được xoá các bản sao mới.
 
-1. **Kế thừa & Mở rộng Tương thích Định danh (`myslack-context.ts`):**
-   - Kế thừa trực tiếp `SlackBinding` và `SlackSourceRef` nguyên bản, tuyệt đối không tạo shadow duplicate.
-   - Mở rộng `SlackResourceType` thành kiểu union bao phủ toàn bộ các thực thể Slack từ kiểm kê 354 method:
-     `'conversation' | 'message' | 'file' | 'canvas' | 'list' | 'list_item' | 'bookmark' | 'reminder' | 'user' | 'usergroup' | 'subteam'`.
-   - Bổ sung hàm định dạng khoá cấu trúc tuple JSON (`formatSlackGlobalResourceKey`, `formatSlackOwnerSourceKey`) bảo đảm cách ly tuyệt đối giữa các workspace và giữa nhiều người dùng trong cùng một workspace (F2).
-2. **Hợp đồng Vòng đời Nguồn, Tagged Purge Scopes & Chính sách Lưu trữ F1 (`myslack-source.ts`):**
-   - `SlackSourceMetadata`: Giới hạn các trường an toàn (`channelId`, `channelName`, `threadTs`, `authorSlackUserId`, `authorName`, `fileName`, `fileMimeType`, `fileSizeBytes`, `isBotMessage`), lọc sạch thuộc tính thừa/nhạy cảm.
-   - `SlackSourceEntity`: DTO đại diện cho nguồn nguyên bản trong kho nguồn, bóc tách `untrustedContent`, tách rời khỏi token/secrets, lưu vết `observedRevision`, `capturedAt`, `expiresAt`, `tombstonedAt`, `purgedAt`.
-   - `SlackDerivedCopyRef` & `SlackSourceLineage`: Lưu vết mọi bản sao phái sinh trên 7 loại đích (`chat_history_message`, `working_memory_entity`, `plan_step_arg`, `proposal_excerpt`, `daily_digest_entry`, `scheduled_workflow_arg`, `audit_log_entry`) nhằm bảo đảm năng lực purge cascade triệt để sau này (F3).
-   - `SlackTombstoneRecord` & `SlackPurgeTarget`: Hợp đồng chỉ định mục tiêu purge cascade với tagged scopes cụ thể, triệt tiêu nguy cơ phá dữ liệu chéo người dùng.
-   - `decideSlackSourceStore`: Cổng kiểm soát lưu trữ nguồn F1; khi `retentionDays === 0`, từ chối lưu trữ lâu dài (`zero_retention_required`); từ chối lưu khi `policyVersion` không khớp với phiên bản chính sách đang hoạt động của server.
-3. **Hợp đồng Siêu Dữ Liệu Công Cụ Theo Phương Thức (`myslack-tools.ts`):**
-   - Bác bỏ generic dispatcher `method + args`. Định nghĩa `SlackToolMetadata` và `SlackToolDefinition` tường minh cho từng phương thức.
-   - Phân loại rõ ràng: `family` (36 nhóm), `sideEffect` (`read` | `write`), `riskLevel` (`low` | `medium` | `high`), `planTier` (`free` | `pro` | `any`), `requiredScopes`.
-   - `validateSlackToolExecutionArgs`: Tách biệt tham số thực thi, bắt buộc có `binding`, tự động tước bỏ mọi trường nhạy cảm (`token`, `accessToken`, `authHeader`), trả về detached whitelisted copy.
-   - Nguyên tắc bất biến: **Schemas are contracts, not authority grants**. Sự tồn tại của schema không tự cấp quyền gọi API cho runtime nếu thiếu policy validation.
-4. **Bảo toàn Cô lập Danh mục Toàn cục (`index.ts`):**
-   - Re-export toàn bộ hợp đồng ra entrypoint `@wap/tool-schemas`.
-   - Giữ nguyên invariant: `ALL_TOOLS.some(t => t.service === 'myslack') === false` và `SERVICE_REGISTRY.some(s => s.id === 'myslack') === false`.
+### 3. Lưu Giữ `policyRef` trong Nguồn & Mở Rộng `myslack-policy.ts`:
+- `SlackSourceEntity` và mỗi bản sao phái sinh (`SlackDerivedCopyRef`) bắt buộc lưu giữ `policyRef: SlackPolicyReference` đã uỷ quyền lưu trữ.
+- Không tạo engine chính sách thứ hai độc lập gây phân mảnh; mở rộng trực tiếp `myslack-policy.ts` với hàm `decideSlackSourceStorage(policy, request)`, kiểm tra `sameSlackBinding(request.binding, request.policyRef.binding)`, kiểm tra `purpose === 'storage'` và từ chối lưu trữ bền vững khi `retentionDays <= 0` (`retention_zero_denied`).
+- Định dạng `consentRevision` và `providerRevision` bắt buộc là chuỗi số thập phân dương chuẩn tắc (`/^[1-9][0-9]*$/`), bác bỏ số 0 hoặc số có số 0 ở đầu ("0", "01").
+
+### 4. Kiểm Thực Tham Số Fail-Closed Theo Schema Phương Thức Cố Định:
+- `validateSlackToolExecutionArgs` từ chối hoàn toàn tham số tuỳ ý (`additionalProperties: false` fail-closed). Mọi tham số lạ nằm ngoài `tool.inputSchema.properties` đều ném `TypeError`.
+- Định nghĩa schema tham số cố định mẫu cho 4 core 03C tools (`conversations.history`, `conversations.list`, `chat.postMessage`, `users.info`) với user scopes đối chiếu chính xác từ inventory.
+- Phân biệt rõ ràng giữa phương thức có scopes (`string[]`) và phương thức chưa xác định scopes (`null` cho 89 phương thức probe).
+
+### 5. Chính Xác 36 Snapshot Families & Đối Soát Cơ Học Sổ Cái 354 Methods:
+- Loại bỏ hoàn toàn literal ellipsis (`...`) và các tên không có trong sitemap (`skills`, `misc`). Sử dụng union chính xác 36 string literals:
+  `'admin' | 'agents' | 'api' | 'apps' | 'assistant' | 'auth' | 'blocks' | 'bookmarks' | 'bots' | 'calls' | 'canvases' | 'chat' | 'conversations' | 'dialog' | 'dnd' | 'emoji' | 'entity' | 'files' | 'functions' | 'migration' | 'oauth' | 'openid' | 'pins' | 'reactions' | 'reminders' | 'rtm' | 'search' | 'slackLists' | 'slackbot' | 'stars' | 'team' | 'tooling' | 'usergroups' | 'users' | 'views' | 'workflows'`.
+- Tệp `docs/superpowers/plans/slack-354-method-ledger.json` được tái kết xuất tự động từ `docs/slack/method-inventory.json`, bảo toàn 100% 354 phương thức (101 excluded, 253 probe_required, 265 with_scopes, 89 unknown_scopes).
 
 ---
 
-## 3. Sổ Cái Đối Soát 354 Phương Thức Slack (PR 185 Snapshot SHA 811f5dc9)
-
-Đã đối soát 100% không để bất kỳ method family nào biến mất:
-- **Tổng số canonical methods:** 354.
-- **Excluded:** 101 methods (92 Enterprise trong `admin.*`, 2 `team.*`, 2 app-level ingress token `apps.*`, 1 `conversations.externalInvitePermissions.set`, 1 deprecated `files.upload`, 1 retired `rtm.start`, 1 `users.discoverableContacts.lookup`, 1 deprecated `users.setActive`).
-- **Probe Required:** 253 methods (Bảo toàn trạng thái unknown/probe cho đến khi có bằng chứng native).
-- **Phân bổ giai đoạn:**
-  - **Phase 03C (Core):** 51 methods (`conversations` 27, `chat` 13, `users` 11).
-  - **Phase 03D (Content & Interaction):** 41 methods (`search` 3, `files` 14, `pins` 3, `reactions` 4, `bookmarks` 4, `reminders` 5, `stars` 3, `dnd` 5).
-  - **Phase 03E / 04 (Advanced & Governance):** 161 methods.
-  - **Excluded:** 101 methods.
-- Toàn bộ được kết xuất vào file sổ cái: `docs/superpowers/plans/slack-354-method-ledger.json`.
-
----
-
-## 4. Danh Mục Tài Liệu Bàn Giao
-
-1. `docs/superpowers/plans/2026-10-29-slack-03a-source-contracts.md`: Kế hoạch thi công chi tiết 5 tasks chuẩn TDD Red-Green-Refactor.
-2. `docs/handoff/tasks/SLACK-03A-source-contracts.md`: Bounded task card cho SLACK-03A.
-3. `docs/superpowers/plans/slack-354-method-ledger.json`: Sổ cái ánh xạ 354 methods sang family, owner, risk, sideEffect và phase.
-4. `docs/handoff/log/2026-10-29-slack-03a-source-contracts-plan.md`: File nhật ký bàn giao này.
-
----
-
-## 5. Kết Quả Kiểm Tra working tree & Cam Kết Tuân Thủ
+## 2. Kết Quả Kiểm Tra working tree & Lệnh Kiểm Thử
 
 | Tiêu chuẩn kiểm tra | Kết quả thực tế |
 |---|---|
-| Mã nguồn sản phẩm (`apps/`, `packages/`, `db/`) | Không có bất kỳ file nào bị sửa đổi |
-| Tài liệu quản trị (`CURRENT-STATE.md`, `ROADMAP.md`) | Không có bất kỳ thay đổi nào |
-| Tài liệu task 02 | Không sửa đổi các task card 02 |
-| Định dạng cú pháp Whitespace | `git diff --check b757ae0` sạch sẽ, exit code 0 |
-| Trạng thái git working tree | Sạch sẽ, chỉ gồm các file tài liệu kế hoạch đã commit |
+| Lệnh kiểm tra tests Slack | `npx vitest run packages/tool-schemas/tests/myslack-context.test.ts packages/tool-schemas/tests/myslack-policy.test.ts packages/tool-schemas/tests/myslack-connection.test.ts`: **116/116 tests PASS** |
+| Kiểm tra cú pháp Whitespace | `git diff --check b757ae0`: Sạch sẽ, exit code 0 |
+| Bảo toàn mã nguồn sản phẩm | Không có bất kỳ file nào trong `apps/`, `packages/`, `db/` bị sửa đổi |
+| Bảo toàn tài liệu quản trị | Không sửa `CURRENT-STATE.md`, `ROADMAP.md` hay 02 cards |
+| Số lượng file trong PR #194 | Đúng 4 file tài liệu kế hoạch |
 
-Đã commit, push và mở Draft PR #194 trên GitHub (`integration/slack-personal-20261029`), sẵn sàng gửi báo cáo `worker_done` cho Điều phối viên trưởng.
+---
+
+## 3. Danh Mục Tài Liệu Cập Nhật Trong PR #194
+
+1. `docs/superpowers/plans/2026-10-29-slack-03a-source-contracts.md`: Kế hoạch chi tiết 5 task TDD.
+2. `docs/handoff/tasks/SLACK-03A-source-contracts.md`: Task card bounded SLACK-03A.
+3. `docs/superpowers/plans/slack-354-method-ledger.json`: Sổ cái đối soát cơ học 354 phương thức.
+4. `docs/handoff/log/2026-10-29-slack-03a-source-contracts-plan.md`: Handoff log hiệu chỉnh này.
+
+Sẵn sàng commit, push bổ sung vào nhánh `VinhDat267/docs-slack-03a-source` của PR #194 và gửi `worker_done` với task ID `task_6b2369baa9a7` và dispatch ID `ctx_f9334c0e5308`.
