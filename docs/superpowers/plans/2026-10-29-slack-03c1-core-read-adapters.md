@@ -2,18 +2,18 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Triển khai bộ read adapters giới hạn chặt chẽ (bounded read adapters) cho đúng 8 phương thức đọc cốt lõi ban đầu của Slack cá nhân (`myslack`), xác thực 5 trường binding server-confirmed, bảo vệ quyền truy cập theo native Slack user ACL, kiểm thực chính sách F1 hai pha (pre-fetch & post-fetch), cách ly hoàn toàn token bí mật bên trong adapter và không lưu trữ dữ liệu nguồn ngoài ý muốn (transient read, retention 0).
+**Goal:** Triển khai bounded read adapters cho đúng 8 phương thức đọc cốt lõi ban đầu của Slack cá nhân (`myslack`), xác thực 5 trường binding server-confirmed, bảo vệ quyền truy cập theo native Slack user ACL, kiểm thực chính sách F1 hai pha (pre-fetch & post-fetch re-auth với canonical 8-field policy ref), cách ly token bí mật và provenance quan sát minh bạch (transient read, retention 0).
 
 **Architecture:**
-- **Integration Boundary:** Mã nguồn thuộc sở hữu `packages/tool-schemas/` (định nghĩa schema, JSON schema validation) và `packages/tool-adapters/` (triển khai adapter, HTTP transport, mapping lỗi). Không import trực tiếp từ `apps/` và không sửa tệp Backend.
-- **Injected Hooks:** `PersonalSlackReadAdapter` nhận qua constructor các hooks inject từ backend: `SlackTokenProviderHook` (lấy access token theo binding) và `SlackPolicyValidationHook` (kiểm tra F1 policy và trạng thái kết nối active).
-- **Two-Phase Policy Enforcement:** Kiểm tra chính sách và trạng thái kết nối trước khi phát HTTP request (Pre-fetch), và kiểm tra lại ngay sau khi provider phản hồi (Post-fetch) trước khi giải phóng kết quả; nếu kết nối bị revoke trong thời gian chờ -> Drop kết quả và ném lỗi `AUTH_ERROR`.
-- **Native Slack ACL & Bounded Outputs:** Không dùng channel allowlist tĩnh; quyền đọc do token và membership thực tế của user quyết định. Tất cả output được phân trang cursor, giới hạn ngân sách tối đa 100 items/trang, nội dung văn bản được đánh dấu là untrusted provider data.
+- **Integration Boundary:** Sở hữu `packages/tool-schemas/` và `packages/tool-adapters/`. Không import `apps/chat-api/` và không sửa backend. Backend wrapper cung cấp hooks là task Backend riêng biệt.
+- **Injected Hooks:** `PersonalSlackReadAdapter` nhận injected hooks qua constructor: `SlackTokenProviderHook` (lấy access token nội bộ theo binding) và `SlackReadPolicyHook` (kiểm thực chính sách F1 hai pha: pre-fetch và post-fetch re-authorization).
+- **Two-Phase Policy Enforcement (F1):** Trước mọi outbound HTTP request, gọi `authorizeRead` với 5-field binding, `purpose: Exclude<SlackPolicyPurpose, 'storage'>`, `requestedRetentionDays: 0`. Quyết định thành công bắt buộc trả về canonical 8-field `SlackPolicyReference`. Sau khi await transport và parse body, gọi lại `authorizeRead` truyền `expectedPolicyReference` tiền trạm. Bất kỳ thay đổi nào (epoch, purpose, TTL, consent revoked, provider updated/config changed, hoặc regrant với revision mới) đều bị từ chối; adapter hủy payload ngay lập tức và ném `AUTH_ERROR` (fail-closed, không rò rỉ dữ liệu).
+- **Native Slack ACL & Bounded Output:** Quyền đọc do user token và membership thực tế quyết định (không dùng static channel allowlist). Phân trang cursor bounded (max 100/trang); text trần là untrusted provider data.
 
 **Tech Stack:** Node.js `^22.12.0 || >=24.0.0`, TypeScript 5.8, Vitest 3, `@wap/tool-schemas`.
 **Spec:** [Slack cá nhân và trợ lý công việc](../specs/2026-10-28-slack-personal-oauth-design.md) (Mục 2, 4.4, 4.5, 8, 9.1).
 **Task Cards:** [SLACK-03C1 Core Read Adapters](../../handoff/tasks/SLACK-03C1-core-read-adapters.md), [SLACK-03 Parent Task](../../handoff/tasks/SLACK-03-tool-catalog-and-source-lifecycle.md).
-**Status:** DỰ THẢO KẾ HOẠCH (Docs-only; chờ Coordinator phê duyệt trước khi lập PR thi công).
+**Status:** DỰ THẢO KẾ HOẠCH (Docs-only; chờ Coordinator và Backend phê duyệt interface trước khi mở PR thi công).
 
 ---
 
@@ -21,159 +21,167 @@
 
 Đối soát trực tiếp từ `docs/slack/method-inventory.json` (SHA256: `e55bc180eb43c71c1131dbded5968c1e240d3424fe1314bf604139055c074f09`):
 
-| # | Phương Thức Slack | HTTP & Rate | Scopes Khai Báo Trong Inventory | Inventory Disposition | Budget Phân Trang | Output Quan Sát Bounded |
+| # | Phương Thức Slack | HTTP & Rate | User Scopes Khai Báo | Inventory Disposition | Budget Phân Trang | Output Quan Sát Bounded |
 |---|---|---|---|---|---|---|
-| 1 | `conversations.list` | GET / t2 | `channels:read, groups:read, im:read, mpim:read` | `probe_required` | 50 mặc định, max 100 | `channels: SlackConversationSummary[]`, `nextCursor`, `hasMore` |
-| 2 | `conversations.info` | GET / t3 | `channels:read, groups:read, im:read, mpim:read` | `probe_required` | N/A (single entity) | `channel: SlackConversationDetail` |
-| 3 | `conversations.history` | GET / t3 | `channels:history, groups:history, im:history, mpim:history` | `probe_required` | 20 mặc định, max 100 | `messages: SlackMessageObservation[]`, `nextCursor`, `hasMore` |
-| 4 | `conversations.replies` | GET / t3 | `channels:history, groups:history, im:history, mpim:history` | `probe_required` | 20 mặc định, max 100 | `messages: SlackMessageObservation[]`, `nextCursor`, `hasMore` |
-| 5 | `conversations.members` | GET / t4 | `channels:read, groups:read, im:read, mpim:read` | `probe_required` | 100 mặc định, max 100 | `memberIds: string[]`, `nextCursor`, `hasMore` |
-| 6 | `users.list` | GET / t2 | `users:read` | `probe_required` | 50 mặc định, max 100 | `members: SlackUserSummary[]`, `nextCursor`, `hasMore` |
-| 7 | `users.info` | GET / t4 | `users:read` | `probe_required` | N/A (single entity) | `user: SlackUserDetail` |
-| 8 | `chat.getPermalink` | GET / t5 | `null` (`userToken: undetermined`) | `probe_required` | N/A (single entity) | `permalink: string`, `channel: string` |
+| 1 | `conversations.list` | GET / t2 (20/m) | `channels:read, groups:read, im:read, mpim:read` | `probe_required` | 50 mặc định, max 100 | `channels: SlackConversationSummary[]`, `nextCursor`, `hasMore` |
+| 2 | `conversations.info` | GET / t3 (50/m) | `channels:read, groups:read, im:read, mpim:read` | `probe_required` | N/A (single entity) | `channel: SlackConversationDetail` |
+| 3 | `conversations.history` | GET / t3 (50/m) | `channels:history, groups:history, im:history, mpim:history` | `probe_required` | 20 mặc định, max 100 | `messages: SlackMessageObservation[]`, `nextCursor`, `hasMore` |
+| 4 | `conversations.replies` | GET / t3 (50/m) | `channels:history, groups:history, im:history, mpim:history` | `probe_required` | 20 mặc định, max 100 | `messages: SlackMessageObservation[]`, `nextCursor`, `hasMore` |
+| 5 | `conversations.members` | GET / t4 (100/m) | `channels:read, groups:read, im:read, mpim:read` | `probe_required` | 100 mặc định, max 100 | `memberIds: string[]`, `nextCursor`, `hasMore` |
+| 6 | `users.list` | GET / t2 (20/m) | `users:read` | `probe_required` | 50 mặc định, max 100 | `members: SlackUserSummary[]`, `nextCursor`, `hasMore` |
+| 7 | `users.info` | GET / t4 (100/m) | `users:read` | `probe_required` | N/A (single entity) | `user: SlackUserDetail` |
+| 8 | `chat.getPermalink` | GET / t5 (Tier 5) | `null` (`userToken: undetermined`) | `probe_required` | N/A (single entity) | `permalink: string`, `channel: string` |
 
-*Ghi chú quan trọng về phạm vi:*
-- 100% 8 phương thức trên giữ nguyên `disposition: probe_required` và `deliveryStatus: not_implemented` trong inventory. Schema và test fixture không chứng minh tính khả dụng native của Free/Pro.
-- Các phương thức còn lại của nhóm cốt lõi (`conversations` còn 22, `chat` còn 12, `users` còn 10) tiếp tục là backlog mở trong SLACK-03C2, 03D, 03E; không bị loại bỏ ngầm.
-- Không có thao tác ghi (write tools) hay outbox dispatch trong card này; cấm generic dispatcher `myslack.call(method, args)`.
+*Ranh giới danh mục:* Giữ nguyên `disposition: probe_required` và `deliveryStatus: not_implemented` cho toàn bộ 8 phương thức trong inventory. Không tự ý thăng cấp trạng thái native. Không có generic dispatcher `myslack.call(method, args)`. Các phương thức còn lại của nhóm cốt lõi (`conversations` còn 22, `chat` còn 12, `users` còn 10) tiếp tục là backlog mở trong 03C2, 03D, 03E. Không đăng ký vào `ALL_TOOLS` hay `SERVICE_REGISTRY`.
 
 ---
 
-## 2. Các Ràng Buộc Kiến Trúc & An Toàn Bắt Buộc
+## 2. Ràng Buộc Kiến Trúc & An Toàn Bắt Buộc
 
-1. **Định danh Binding 5 Trường Bắt Buộc:** Mọi input request bắt buộc mang `binding: SlackBinding` (`atiUserId`, `connectionId`, `workspaceId`, `slackUserId`, `identityVersion`). Trả về lỗi `VALIDATION` nếu thiếu hoặc rỗng bất kỳ trường nào.
-2. **Kiểm Thực Hai Pha F1:**
-   - *Pha 1:* Gọi `policy.resolveReadPolicy(binding, purpose, 0)` và `policy.validateBindingActive(binding)` trước khi mở socket HTTP.
-   - *Pha 2:* Gọi `policy.validateBindingActive(binding)` ngay sau khi nhận HTTP payload. Nếu phát hiện bị disconnect hoặc bumped version trong lúc await -> Hủy ngay kết quả, ném `AUTH_ERROR`.
-3. **Transient Reads (Retention 0):** Adapter đọc thuần túy, không ghi vào `SlackSourceStore` (03B). Dữ liệu trả về gắn kèm `SlackBinding` và `SlackSourceRef` để consumer giữ provenance.
-4. **Native User ACL:** Truy cập kênh theo quyền thực của user token trong workspace. Không duy trì channel allowlist tĩnh.
-5. **An Toàn Transport & Ngăn Chặn Rò Rỉ:**
-   - URL endpoint cố định trong mã nguồn. Cấm nhận URL từ phía caller.
-   - Thiết lập `redirect: 'manual'` để ngăn cản việc rò rỉ Bearer token qua redirect không an toàn.
-   - Bắt buộc gắn `AbortSignal` và giới hạn kích thước response tối đa 2MB.
-   - Xử lý 429: đọc header `Retry-After`, giới hạn retry tối đa 2 lần. Không retry mù khi thất bại xác thực hoặc lỗi logic.
-   - Token chỉ tồn tại trong bộ nhớ adapter khi gửi request; tuyệt đối không đưa token vào logs, schemas, kết quả DTO hay lỗi trả về.
+1. **Server-Confirmed 5-Field Binding:** Mọi request đọc bắt buộc mang `binding: SlackBinding` (`atiUserId`, `connectionId`, `workspaceId`, `slackUserId`, `identityVersion`). Thiếu hoặc rỗng bất kỳ trường nào bị từ chối ngay lập tức trước mạng (`VALIDATION`).
+2. **Kiểm Thực Hai Pha F1 Toàn Diện:**
+   - *Pha 1 (Pre-fetch):* Gọi `policy.authorizeRead({ binding, purpose, requestedRetentionDays: 0 })`. Discriminated union bắt buộc trả về `{ allowed: true, policyReference: SlackPolicyReference }` với đầy đủ 8 trường chuẩn tắc. Quyết định boolean-only, thiếu trường hoặc sai lệch cấu trúc đều fail-closed (`AUTH_ERROR`).
+   - *Pha 2 (Post-fetch Re-Authorization):* Sau khi nhận HTTP response và parse body, gọi lại `policy.authorizeRead({ binding, purpose, requestedRetentionDays: 0, expectedPolicyReference: prefetchRef })`. Nếu kết nối bị ngắt, identity version bị bump, consent bị thu hồi, provider bị cập nhật, config fingerprint đổi, hoặc có regrant với epoch mới trong thời gian await -> drop toàn bộ payload, làm sạch bộ nhớ, ném `AUTH_ERROR`. Không trả plaintext output.
+3. **Mục Đích Đọc Hợp Lệ:** Sử dụng `SlackReadPurpose = Exclude<SlackPolicyPurpose, 'storage'>` (`'manual_lookup' | 'triage' | 'planning' | 'digest'`). Mục đích do ngữ cảnh máy chủ cung cấp, không phải do model tự quyết định.
+4. **Transient Reads (Retention 0) & Chiến Lược Provenance Quan Sát:**
+   - Dữ liệu 03C1 đọc tức thời (transient, retention 0), không lưu trữ bền vững vào `SlackSourceStore` (03B).
+   - Với các đối tượng không có revision gốc từ Slack (channel metadata, user profile, permalink), khai báo rõ cấu trúc provenance: `nativeRevision?: string` (chỉ có khi Slack trả về, ví dụ `edited.ts || ts`) + `observationalDigest: string` (SHA-256 của JSON payload tại thời điểm quan sát). Tuyệt đối không phát minh revision Slack giả.
+   - Giữ nguyên chuỗi số thập phân chính xác của `ts` và `edited.ts` (không parse sang Float để tránh mất độ chính xác).
+   - Deep link permalink phải khớp format an toàn: `^https:\/\/[a-z0-9_-]+\.slack\.com\/archives\/[A-Z0-9]+\/p[0-9]+$`.
+   - Làm sạch profile người dùng: chỉ trích xuất thông tin cơ bản (`id`, `name`, `real_name`, `tz`, `is_bot`, `deleted`), không rò rỉ email, avatar hay credentials.
+5. **An Toàn Vận Hành & Transport:**
+   - `apiBaseUrl` chỉ chấp nhận native HTTPS (`https://slack.com/api`) hoặc explicit loopback fixture (`http://127.0.0.1:<port>`, `http://localhost:<port>`).
+   - Cấm chuyển hướng: cấu hình `redirect: 'manual'` tránh rò rỉ Bearer token.
+   - Abortable transport: truyền `AbortSignal` thực vào `fetchFn`, giới hạn response body tối đa 2MB.
+   - Rate limit 429: xử lý theo header `Retry-After`, giới hạn delay và retry tối đa 2 lần. **Mỗi lần retry bắt buộc phải re-authorize Pha 1 F1** trước khi phát lại request.
 
 ---
 
 ## 3. Tệp Triển Khai & Interface Giao Ước
 
-### 3.1. Injected Hooks Interface (`packages/tool-adapters/src/slack/personal-slack-types.ts`)
+### 3.1. Hook Interfaces (`packages/tool-adapters/src/slack/personal-slack-types.ts`)
 ```ts
-import type { SlackBinding } from '@wap/tool-schemas';
+import type { SlackBinding, SlackPolicyReference, SlackPolicyPurpose } from '@wap/tool-schemas';
 
-export interface SlackTokenProviderHook {
-  getAccessToken(binding: SlackBinding, options?: { signal?: AbortSignal; forceRefresh?: boolean }): Promise<string>;
+export type SlackReadPurpose = Exclude<SlackPolicyPurpose, 'storage'>;
+
+export type SlackPolicyHookDecision =
+  | { allowed: true; policyReference: SlackPolicyReference }
+  | { allowed: false; reason: string };
+
+export interface SlackAuthorizeReadInput {
+  binding: SlackBinding;
+  purpose: SlackReadPurpose;
+  requestedRetentionDays: 0;
+  expectedPolicyReference?: SlackPolicyReference;
 }
 
-export type SlackReadPurpose = 'conversation_read' | 'member_lookup';
+export interface SlackReadPolicyHook {
+  authorizeRead(input: SlackAuthorizeReadInput): Promise<SlackPolicyHookDecision>;
+}
 
-export interface SlackPolicyValidationHook {
-  resolveReadPolicy(binding: SlackBinding, purpose: SlackReadPurpose, requestedRetentionDays: 0): Promise<{ allowed: boolean; reason?: string }>;
-  validateBindingActive(binding: SlackBinding): Promise<boolean>;
+export interface SlackTokenProviderHook {
+  getAccessToken(binding: SlackBinding): Promise<string>;
 }
 
 export interface PersonalSlackAdapterConfig {
   tokens: SlackTokenProviderHook;
-  policy: SlackPolicyValidationHook;
-  apiBaseUrl?: string; // Mặc định https://slack.com/api, ghi đè bằng test fixture URL
+  policy: SlackReadPolicyHook;
+  apiBaseUrl?: string;
   fetchFn?: typeof fetch;
   requestTimeoutMs?: number;
 }
 ```
 
-### 3.2. Bảng Tệp Cần Tạo / Chỉnh Sửa
+### 3.2. Bảng Tệp Cần Chỉnh Sửa / Tạo Mới
 
-| Tệp | Hành Động | Trách Nhiệm |
+| Tệp | Hành Động | Ranh Giới & Trách Nhiệm |
 |---|---|---|
-| `packages/tool-schemas/src/myslack-read-tools.ts` | **Create** | Định nghĩa 8 ToolDefinitions, JSON Schemas, types tham số và kết quả, hàm validate đệ quy. |
-| `packages/tool-schemas/src/index.ts` | **Modify** | Export schemas/types mới (bảo toàn không thêm vào `ALL_TOOLS` / `SERVICE_REGISTRY`). |
-| `packages/tool-adapters/src/slack/personal-slack-types.ts` | **Create** | Chứa types nội bộ, hook interfaces (`SlackTokenProviderHook`, `SlackPolicyValidationHook`). |
-| `packages/tool-adapters/src/slack/personal-slack-read-adapter.ts` | **Create** | Lớp `PersonalSlackReadAdapter` kế thừa `BaseAdapter`, thực thi 8 methods, kiểm thực 2 pha, xử lý 429/cancellation. |
+| `packages/tool-schemas/src/myslack-tools.ts` | **Modify** | Mở rộng canonical registry cho đủ đúng 8 read methods, tái sử dụng nhất quán 3 samples hiện có, chuẩn hóa `SlackToolDefinition` không phát minh types lạ. |
+| `packages/tool-schemas/src/index.ts` | **Modify** | Export các schemas/types đọc cập nhật (không đăng ký vào `ALL_TOOLS` / `SERVICE_REGISTRY`). |
+| `packages/tool-adapters/src/slack/personal-slack-types.ts` | **Create** | Hooks interfaces (`SlackTokenProviderHook`, `SlackReadPolicyHook`), provenance types, adapter config. |
+| `packages/tool-adapters/src/slack/personal-slack-read-adapter.ts` | **Create** | Lớp `PersonalSlackReadAdapter`, kiểm thực F1 hai pha, fixed switch dispatch cho 8 methods, xử lý 429 và AbortSignal. |
 | `packages/tool-adapters/src/index.ts` | **Modify** | Export `PersonalSlackReadAdapter` và hooks interfaces. |
-| `packages/tool-schemas/tests/myslack-read-schemas.test.ts` | **Create** | Unit tests cho schemas, input/output validation, từ chối tham số lạ (fail-closed). |
-| `packages/tool-adapters/tests/slack/personal-slack-read.test.ts` | **Create** | Integration tests với HTTP fixture stateful: 8 methods, ACL native, token isolation, race post-fetch. |
+| `packages/tool-schemas/tests/myslack-tools.test.ts` | **Modify** | Tests kiểm tra canonical registry cho 8 read tools, fail-closed args validation, immutable definitions. |
+| `packages/tool-adapters/tests/helpers/personal-slack-mock-server.ts` | **Create** | Local HTTP mock server thuộc sở hữu Integration (`@wap/tool-adapters`) phục vụ test fixture (không sửa `scripts/`). |
+| `packages/tool-adapters/tests/slack/personal-slack-read.test.ts` | **Create** | Integration tests với mock server: F1 two-phase race, cross-workspace isolation, native ACL, 429 retry re-auth. |
+
+*Ghi chú Backend Wrapper:* Backend wrapper trong `apps/chat-api` chuyển đổi `SlackTokenManager.getAccessToken(userId, id, identityVersion)` và `SlackPolicyService.resolveSlackModelPolicy(...)` sang hook interfaces trên là một task Backend độc lập, cần được Coordinator phê duyệt interface trước khi thi công.
 
 ---
 
 ## 4. Kế Hoạch Triển Khai Từng Bước (Tasks)
 
-- [ ] **Task 1: Định Nghĩa Schema & JSON Validation cho 8 Read Tools (`packages/tool-schemas`)**
-  - Tạo `packages/tool-schemas/src/myslack-read-tools.ts`.
-  - Định nghĩa 8 công cụ: `myslack.conversations_list`, `myslack.conversations_info`, `myslack.conversations_history`, `myslack.conversations_replies`, `myslack.conversations_members`, `myslack.users_list`, `myslack.users_info`, `myslack.chat_getPermalink`.
-  - Cấu hình metadata: `sideEffect: 'read'`, `riskLevel: 'low'`, `planTier: 'any'`, `isProbeRequired: true`, `requiresBinding: true`.
-  - Triển khai hàm validation tham số đệ quy fail-closed (`validateSlackReadToolArgs`).
-  - Viết unit tests tại `packages/tool-schemas/tests/myslack-read-schemas.test.ts`.
-  - Chạy `npx vitest run packages/tool-schemas/tests/myslack-read-schemas.test.ts` để xác nhận tests PASS.
+- [ ] **Task 1: Mở Rộng Canonical Tool Registry 8 Read Methods (`packages/tool-schemas`)**
+  - Mở rộng `packages/tool-schemas/src/myslack-tools.ts`: giữ nguyên/tái sử dụng 3 samples (`conversations.list`, `conversations.history`, `users.info`) và bổ sung 5 definitions còn lại (`conversations.info`, `conversations.replies`, `conversations.members`, `users.list`, `chat.getPermalink`).
+  - Đảm bảo metadata khớp chính xác `SlackToolDefinition` hiện hữu (`sideEffect: 'read'`, `riskLevel: 'low'`, `planTier: 'any'`, `isProbeRequired: true`, `requiresBinding: true`).
+  - Cập nhật hàm validate execution args `validateSlackToolExecutionArgs` để từ chối mọi method không thuộc canonical registry kể cả cùng family.
+  - Cập nhật tests tại `packages/tool-schemas/tests/myslack-tools.test.ts` và chạy `npx vitest run packages/tool-schemas/tests/myslack-tools.test.ts`.
 
-- [ ] **Task 2: Xây Dựng Hạ Tầng Transport & Injected Hooks An Toàn (`packages/tool-adapters`)**
-  - Tạo `packages/tool-adapters/src/slack/personal-slack-types.ts` định nghĩa hooks và adapter config.
+- [ ] **Task 2: Xây Dựng Injected Hooks & Two-Phase F1 Transport (`packages/tool-adapters`)**
+  - Tạo `packages/tool-adapters/src/slack/personal-slack-types.ts` với `SlackTokenProviderHook`, `SlackReadPolicyHook`, `SlackObservationProvenance`.
   - Tạo `packages/tool-adapters/src/slack/personal-slack-read-adapter.ts` kế thừa `BaseAdapter`.
-  - Cài đặt phương thức `request(method, binding, params, purpose, signal)`:
-    - Kiểm tra `binding` hợp lệ.
-    - Pha 1: Gọi `policy.resolveReadPolicy` và `policy.validateBindingActive`. Nếu deny -> throw `StepError('AUTH_ERROR')`.
-    - Lấy token qua `tokens.getAccessToken(binding, { signal })`.
-    - Gửi HTTP GET tới `${apiBaseUrl}/${method}` với header `Authorization: Bearer <token>`, `redirect: 'manual'`.
-    - Bắt lỗi timeout qua `signal`, giới hạn body 2MB.
-    - Xử lý HTTP 429 và `Retry-After`.
-    - Pha 2: Gọi lại `policy.validateBindingActive(binding)` sau await. Nếu không active -> throw `StepError('AUTH_ERROR')`.
-    - Trả về payload đã làm sạch kèm binding provenance.
+  - Cài đặt phương thức private request:
+    - Pha 1: `policy.authorizeRead({ binding, purpose, requestedRetentionDays: 0 })`. Bắt buộc nhận canonical `policyReference`.
+    - Lấy token qua `tokens.getAccessToken(binding)` (private memory only).
+    - Fetch GET tới endpoint với Bearer token, `redirect: 'manual'`, timeout qua `AbortSignal`, body budget 2MB.
+    - Xử lý 429: đọc `Retry-After`, delay có thể hủy; mỗi lần retry gọi lại Pha 1 `authorizeRead`.
+    - Pha 2: `policy.authorizeRead({ binding, purpose, requestedRetentionDays: 0, expectedPolicyReference: prefetchRef })`.
+    - Nếu Pha 2 fail -> drop payload, xóa bộ nhớ, ném `AUTH_ERROR`.
+    - Gắn provenance quan sát (`SlackObservationProvenance`) kèm binding vào kết quả.
 
-- [ ] **Task 3: Hiện Thực Hóa 8 Phương Thức Đọc Bounded & Xử Lý Native ACL**
-  - Cài đặt `execute(toolName, args, context)` điều hướng vào 8 phương thức:
-    - `conversationsList`: Nhận `types`, `exclude_archived`, `limit`, `cursor`. Bounded pagination.
-    - `conversationsInfo`: Nhận `channel`. Trả về chi tiết kênh caller có quyền xem.
-    - `conversationsHistory`: Nhận `channel`, `latest`, `oldest`, `inclusive`, `limit`, `cursor`. Xác định revision qua `edited.ts || ts`.
-    - `conversationsReplies`: Nhận `channel`, `ts`, phân trang thread.
-    - `conversationsMembers`: Nhận `channel`, trả về `memberIds` phân trang.
-    - `usersList`: Trả về danh sách thành viên workspace đã làm sạch.
-    - `usersInfo`: Nhận `user` ID, trả về user profile.
-    - `chatGetPermalink`: Nhận `channel`, `message_ts`, sinh safe permalink web link.
-  - Mapping toàn diện mã lỗi Slack (`channel_not_found`, `not_in_channel`, `missing_scope`, `ratelimited`, `invalid_auth`) sang `StepError`.
+- [ ] **Task 3: Triển Khai 8 Read Methods Qua Fixed Switch Dispatcher**
+  - Trong `execute(toolName, args, context)`, dispatch qua fixed switch statement cho đúng 8 methods; không dùng dynamic reflection.
+  - Xử lý `conversations.replies`: nếu gọi với message không có reply, trả về `[root_message]` theo đúng hành vi Slack API (không giả định sai là luôn `thread_not_found`).
+  - Bảo toàn chuỗi số thập phân của `ts` và `edited.ts`.
+  - Làm sạch profile trong `users.info` và `users.list`.
+  - Sinh và kiểm thực permalink an toàn cho `chat.getPermalink`.
+  - Map các lỗi provider (`channel_not_found`, `not_in_channel`, `missing_scope`, `invalid_auth`, `ratelimited`) sang `StepError`.
 
-- [ ] **Task 4: Mở Rộng Stateful HTTP Fixture & Kiểm Thử Tích Hợp Toàn Diện**
-  - Mở rộng fixture `scripts/fake-slack-personal.mjs` để hỗ trợ đầy đủ 8 read methods, multi-actor (`T_FREE`, `T_PRO`, Actor A, B, Colleague), private channel/DM access control, và fault injection (delay, 429, revoke).
-  - Viết bộ test tích hợp `packages/tool-adapters/tests/slack/personal-slack-read.test.ts`.
-  - Kiểm thử 12 ca kiểm thử hành vi trong ma trận (Section 5).
-  - Đảm bảo toàn bộ test suites của `@wap/tool-adapters` chạy thành công bằng lệnh `npm test -w @wap/tool-adapters`.
+- [ ] **Task 4: Xây Dựng Package Mock Helper & Bộ Kiểm Thử Tích Hợp**
+  - Tạo helper fixture `packages/tool-adapters/tests/helpers/personal-slack-mock-server.ts` (không sửa `scripts/fake-slack-personal.mjs`).
+  - Viết bộ test `packages/tool-adapters/tests/slack/personal-slack-read.test.ts` kiểm thử toàn bộ 14 kịch bản trong ma trận kiểm thử Section 5.
+  - Chạy `npm test -w @wap/tool-adapters` xác nhận toàn bộ test suites đạt kết quả xanh.
 
 ---
 
 ## 5. Ma Trận Kiểm Thử Hành Vi & Không Hồi Quy (Behavior Test Matrix)
 
-| STT | Kịch Bản Kiểm Thử | Đầu Vào / Điều Kiện | Kết Quả Mong Đợi |
+| STT | Kịch Bản Kiểm Thử | Điều Kiện / Đầu Vào | Kết Quả Mong Đợi |
 |---|---|---|---|
-| 1 | **Binding Validation** | Input thiếu `identityVersion` hoặc rỗng `connectionId` | Ném lỗi `VALIDATION` trước khi gọi hook/mạng |
-| 2 | **Pre-fetch F1 Denial** | Hook policy trả về `{ allowed: false, reason: 'consent_missing' }` | Trả lỗi `AUTH_ERROR`, 0 HTTP request phát ra |
-| 3 | **Post-fetch Revoke Race** | Delay fixture 50ms; đổi mock state sang revoked trong lúc fetch | Hủy payload, ném `AUTH_ERROR`, không trả dữ liệu |
-| 4 | **Cross-Workspace Isolation** | Gọi `C_GENERAL` của Workspace A bằng token của Workspace B | Trả về dữ liệu của A, không trộn lẫn dữ liệu của B |
-| 5 | **Native ACL - Private Channel** | Actor A (thành viên `G_PRIVATE`) vs Colleague (không thuộc kênh) | Actor A đọc được; Colleague nhận `channel_not_found` |
-| 6 | **Native ACL - DM** | Đọc `D_PRIVATE` bằng actor không tham gia | Nhận `channel_not_found` / `missing_scope` |
-| 7 | **Thread Replies Integrity** | Gọi `conversations.replies` với `ts` của một tin nhắn thường | Nhận lỗi `thread_not_found` |
-| 8 | **Pagination Budget Enforcement** | Truyền `limit: 200` (vượt trần 100) hoặc `limit: -5` | Clamp về 100 hoặc reject; phân trang trả đúng số lượng |
-| 9 | **Sanitized Profile Output** | `users.list` và `users.info` | Trả về profile đã làm sạch; không rò rỉ token/email |
-| 10 | **Safe Permalink Format** | `chat.getPermalink` với kênh và timestamp hợp lệ | Trả link chuẩn web `https://.../archives/.../p...` |
-| 11 | **AbortSignal Cancellation** | Trigger `abortController.abort()` trước hoặc giữa request | Socket đóng ngay lập tức, trả lỗi `NETWORK` / aborted |
-| 12 | **Rate Limit 429 & Retry-After** | Fixture trả 429 + `Retry-After: 1` | Chờ 1s và retry thành công; vượt 2 lần thì ném `RATE_LIMIT` |
+| 1 | **Binding Validation** | Input thiếu `identityVersion` hoặc rỗng `connectionId` | Ném lỗi `VALIDATION` trước khi gọi hook hoặc mạng |
+| 2 | **Pre-fetch F1 Denial** | `authorizeRead` trả về `{ allowed: false, reason: 'consent_missing' }` | Ném `AUTH_ERROR`, 0 HTTP request được phát ra |
+| 3 | **Malformed F1 Decision** | `authorizeRead` trả về `allowed: true` nhưng thiếu canonical policyReference | Fail-closed, ném `AUTH_ERROR`, 0 HTTP request |
+| 4 | **Post-fetch Consent Revoked** | Mock server delay 50ms; consent bị thu hồi trong lúc await | Drop payload, xóa bộ nhớ, ném `AUTH_ERROR`, không trả plaintext |
+| 5 | **Post-fetch Provider Updated** | Mock server delay 50ms; provider revision / config fingerprint đổi | Drop payload, ném `AUTH_ERROR` do lệch policy epoch |
+| 6 | **Post-fetch Regrant While Active** | Mock server delay 50ms; admin cấp lại consent với revision mới | Drop payload, ném `AUTH_ERROR` do không khớp expectedPolicyReference |
+| 7 | **Cross-Workspace Token Mismatch** | Thực thi với `bindingA` nhưng token manager trả token của Workspace B | Bị chặn trước transport bởi backend wrapper / fixture auth |
+| 8 | **Cross-Workspace Colliding Channel** | 2 workspaces cùng có `C_GENERAL`; đọc bằng `bindingB` | Chỉ trả về dữ liệu của Workspace B, tuyệt đối không lộ dữ liệu A |
+| 9 | **Native ACL: Private & DM** | Đọc kênh private / DM bằng caller không có quyền | Provider trả `channel_not_found` / `not_in_channel` -> map `StepError` |
+| 10 | **Replies Root Contract** | `conversations.replies` với valid message không có replies | Trả về `[root_message]` thành công theo đúng Slack API contract |
+| 11 | **Exact Decimal Timestamp** | Tin nhắn có `ts: '1712345678.000200'` và `edited.ts` | Giữ nguyên exact decimal string, không bị làm tròn |
+| 12 | **Sanitized User Profile** | Gọi `users.info` / `users.list` | Trả về thông tin công khai an toàn; không chứa email, avatar, token |
+| 13 | **AbortSignal Cancellation** | Trigger `AbortController.abort()` trước hoặc giữa request | Socket đóng ngay lập tức, trả lỗi `NETWORK` / aborted |
+| 14 | **429 Retry Re-authorizes F1** | Mock server trả 429 kèm `Retry-After: 1` | Chờ delay và gọi lại `authorizeRead` trước khi retry; vượt trần ném `RATE_LIMIT` |
 
 ---
 
 ## 6. Cổng Bằng Chứng & Nghiệm Thu (Evidence Gates)
 
-> Vì đây là phiên lập kế hoạch tài liệu (Docs-only), các bài test mã nguồn được giữ nguyên trạng thái `[Proposed: not run]`.
+> Phiên lập kế hoạch tài liệu (Docs-only): các lệnh kiểm thử mã nguồn được ghi rõ là `[Proposed: not run]`. Nghiệm thu database / concurrency thực tế đòi hỏi joint test giữa Backend và Integration trên PostgreSQL thật, không dùng mock hook làm bằng chứng DB.
 
-1. **Kiểm tra Whitespace và Diff sạch:**
+1. **Kiểm tra Whitespace & Diff sạch:**
    ```powershell
    git diff --check 7c6c65d8..HEAD
    ```
 2. **Kiểm tra Ranh giới Files & Module Ownership:**
    ```powershell
    git status --short
-   # Chỉ hiển thị đúng 3 tệp tài liệu: 1 task card, 1 plan, 1 handoff log.
+   # Chỉ hiển thị đúng 3 tệp tài liệu: task card, implementation plan, handoff log.
    ```
-3. **[Proposed: not run] Lệnh kiểm thử thi công khi mở PR code:**
+3. **[Proposed: not run] Lệnh kiểm thử khi mở PR thi công code:**
    ```powershell
-   npx vitest run packages/tool-schemas/tests/myslack-read-schemas.test.ts
+   npx vitest run packages/tool-schemas/tests/myslack-tools.test.ts
    npx vitest run packages/tool-adapters/tests/slack/personal-slack-read.test.ts
    npm run typecheck:v3
    ```
