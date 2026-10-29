@@ -1,6 +1,6 @@
 # SLACK-01 · Contract nền, kiểm kê API và HTTP fixture
 
-**Trạng thái:** đã thi công Native; review độc lập đã chạy, Important được sửa qua RED→GREEN và toàn suite đạt; chờ CI đúng head và owner review trước tích hợp.
+**Trạng thái:** xong phần nền, đã merge #183 vào main tại `3d0edfa0` ngày 29/10/2026; review độc lập đạt và CI xanh đúng head `ce08da98`. OAuth/live và phần trợ lý Slack đầy đủ ở SLACK-02–07 vẫn mở.
 **Nhánh mã:** `feat/slack-01-foundation` · **Nền:** `2bf87b74`.
 **Phụ thuộc:** thiết kế OAUTH-04 bản sửa `d479b098` đã được chủ dự án cho chuyển sang triển khai.
 **Thiết kế:** [Slack cá nhân](../../superpowers/specs/2026-10-28-slack-personal-oauth-design.md).
@@ -20,7 +20,7 @@ Không route/API/UI Slack cá nhân, DB/OAuth/refresh thật, model, app install
 - [x] Fixture thật HTTP chứng minh scope, workspace/user, cursor và AbortSignal; timeout sau ghi không bị hiểu là chưa ghi.
 - [x] Probe chỉ loopback, từ chối redirect/live, không retry write UNKNOWN và không log token/body; report ghi verifiedLive false.
 - [x] RED→GREEN, test:slack:foundation/typecheck/check đạt; catalog và service cũ không thêm myslack.
-- [ ] Reviewer độc lập, CI đúng head, log bàn giao và kết quả đầy đủ trước tích hợp.
+- [x] Reviewer độc lập, CI đúng head, log bàn giao và kết quả đầy đủ trước tích hợp.
 
 ## Kết quả
 
@@ -32,3 +32,5 @@ Không route/API/UI Slack cá nhân, DB/OAuth/refresh thật, model, app install
 - [Review tại181325b7](../log/2026-10-29-codex-review-slack-01-pr183.md) tìm ba P2; đã sửa ở `60965b20` và `a2b94b7b`: kiểm đúng tập nguồn/tác giả Free–Pro, đủ thread seed + receipt, và XML/hierarchy hợp lệ trước khi collection ghi snapshot. Fresh reviewer xác nhận **ĐẠT F1–F3, không còn P1/P2/P3 cần sửa**. [Log sửa và RED→GREEN](../log/2026-10-29-slack-01-p2-fixes.md). CI phải kiểm lại trên head mới trước tích hợp.
 - Probe yêu cầu fresh fixture có fixed seeds; chạy lại cần tạo fixture mới. Kiểm public sitemap ngày29/10 thấy354 method (parser cũ/mới cùng354); snapshot343 giữ nguyên, 11 row phát sinh chờ refresh/review riêng.
 - Browser local/model evaluation thật, OAuth/Slack live, app install và bật cờ: **NOT_RUN**, ngoài phạm vi card này. Root khai báo trực tiếp devDependency `saxes@6.0.0` đã có trong lockfile, không thêm package/version vào dependency tree; không đăng ký tool/service.
+
+- Merge #183: `3d0edfa04bacee9eb364c29a1563d75831af5b22`, cây trùng head `ce08da98`; CI #40741479988 SUCCESS cả check/browser. [Log merge](../log/2026-10-29-reviewer-merge-183.md).
