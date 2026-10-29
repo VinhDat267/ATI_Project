@@ -26,6 +26,8 @@ for (const width of [375, 1440]) for (const theme of ['light', 'dark']) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: info.outputPath(`slack-workspaces-${width}-${theme}.png`), fullPage: true });
     await page.locator('#myslack li').first().getByRole('button', { name: /Ngắt kết nối/ }).click();
+    await expect(page.getByRole('dialog', { name: /Ngắt kết nối/ })).toBeVisible();
+    await page.getByRole('button', { name: 'Xác nhận ngắt kết nối' }).click();
     await expect(page.locator('#myslack li')).toHaveCount(1);
     await expect(page.locator('#myslack [role=status]')).toContainText('thu hồi quyền Slack');
   });

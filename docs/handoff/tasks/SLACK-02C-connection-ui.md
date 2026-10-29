@@ -1,89 +1,126 @@
 # SLACK-02C · Giao diện Cài đặt Đa Workspace & Callback View (Frontend)
 
-**Trạng thái:** chờ triển khai
-**Nhánh gợi ý:** `feat/slack-02c-connection-ui` · **Nền:** `fc12e3fb`
-**Vai trò sở hữu:** Frontend Engineer (sở hữu `apps/chat-web/` và file chạy browser test `scripts/test-v3-browser.mjs`)
-**Phụ thuộc:** SLACK-02A (contracts), SLACK-02B (API endpoints)
-**Task cha:** [SLACK-02-personal-connections](SLACK-02-personal-connections.md)
-**Kế hoạch chi tiết:** Task 6 trong [Kế hoạch SLACK-02](../../superpowers/plans/2026-10-29-slack-02-personal-connections.md).
+**Trạng thái:** đã hoàn thành thi công, sẵn sàng review  
+**Nhánh:** `VinhDat267/slack-02c-personal-connection` · **Nền:** `b757ae08` (`integration/slack-personal-20261029`)  
+**Vai trò sở hữu:** Frontend Engineer (sở hữu `apps/chat-web/`, task card `docs/handoff/tasks/SLACK-02C-connection-ui.md`, một file handoff log mới `docs/handoff/log/2026-10-29-slack-02c-connection-ui.md`)  
+**Phụ thuộc song song:** SLACK-02A (contracts tại `@ati/tool-schemas`), SLACK-02B (consent & readiness backend của `ctx_ef5aff92da54`, PR 191)  
+**Task cha:** [SLACK-02-personal-connections](SLACK-02-personal-connections.md)  
 
 ---
 
-## 1. Mục tiêu và Phạm vi
+## 1. Mục tiêu và Ranh giới Kỹ thuật
 
-Thi công giao diện người dùng trên web (`apps/chat-web`) cho tính năng kết nối Slack cá nhân đa workspace:
-- Thẻ dịch vụ `PersonalMySlack` trong mục "Của riêng bạn" tại trang Cài đặt (`/settings`).
-- Hỗ trợ hiển thị danh sách nhiều workspace đã kết nối của người dùng.
-- Thao tác kết nối thêm workspace mới và ngắt kết nối từng workspace có modal xác nhận.
-- Trang Callback (`/connections/myslack/callback`) xử lý kết quả trả về từ Slack và hỗ trợ quay lại hội thoại gốc qua `returnTo`.
-- Kiểm thử hiển thị trên 1440px (Desktop), 375px (Mobile) và cả 2 chế độ Sáng / Tối.
-
----
-
-## 2. Chi Tiết File Cần Tạo và Cập Nhật
-
-### 2.1. File Tạo Mới: `apps/chat-web/src/pages/Settings/PersonalMySlack.tsx`
-- Nhận prop danh sách các kết nối Slack `connections: SlackConnectionPublicInfo[]`.
-- Hiển thị danh sách từng workspace:
-  - Tên Workspace, Logo Slack, Tên người dùng Slack (`slackUserLabel`).
-  - Badge trạng thái:
-    - `Đã kết nối` (xanh lá) khi `processingReady === true`.
-    - `Chờ cho phép xử lý` (vàng hổ phách) khi `status === 'active' && !processingReady`.
-    - `Cần kết nối lại` (đỏ) khi `status === 'reconnect_required'`.
-    - `Chưa kết nối` (xám) khi `status === 'disconnected'`.
-  - Nút hành động cho từng workspace:
-    - Nút "Ngắt kết nối" (mở modal CockpitDialog xác nhận trước khi thực hiện).
-    - Nút "Kết nối lại" khi ở trạng thái `reconnect_required`.
-- Nút chung: **"Kết nối Workspace Slack"** (bắt đầu luồng OAuth thêm workspace mới).
-- Trạng thái trống (empty state): "Chưa có workspace nào được kết nối."
-
-### 2.2. File Tạo Mới: `apps/chat-web/src/views/MySlackCallbackView.tsx`
-- Đọc `code`, `state`, `error` từ URL query parameters.
-- Cookie trình duyệt `ati_slack_browser` là HTTP-only cookie được trình duyệt tự động gửi kèm request đến backend, JavaScript client không đọc hoặc can thiệp trực tiếp từ `document.cookie`.
-- Gọi `apiClient.completeSlackConnection(code, state)`.
-- Hiển thị trạng thái "Đang hoàn tất kết nối Slack...".
-- Xử lý các mã lỗi thân thiện:
-  - `SLACK_STATE_INVALID`: "Phiên kết nối đã hết hạn hoặc không hợp lệ. Vui lòng thử lại."
-  - `SLACK_SCOPE_MISSING`: "Chưa cấp đủ quyền đọc và thao tác cho ATI."
-  - `SLACK_IDENTITY_CONFLICT`: "Tài khoản Slack này trong workspace đã được kết nối bởi một tài khoản ATI khác."
-  - `SLACK_CONNECT_FAILED`: "Không thể hoàn tất kết nối. Hãy kiểm tra mạng và thử lại."
-- Khi thành công:
-  - Nếu có `returnTo` hợp lệ (`/c/<uuid>`): Chuyển hướng quay lại hội thoại chat.
-  - Nếu không: Chuyển hướng về `/settings#myslack`.
-
-### 2.3. Dịch Vụ & Helpers: `apps/chat-web/src/services/myslack-connection.ts`
-- Quản lý session owner, chuyển hướng tới Slack URL, parse lỗi callback.
-
-### 2.4. Hook Kích Hoạt Cờ: `apps/chat-web/src/hooks/use-myslack-enabled.ts`
-- Đọc `apiClient.getRuntime()`, kiểm tra `myslackEnabled === true`.
-- Khi cờ tắt: Không hiển thị `PersonalMySlack` trong Settings, không mount route callback.
-
-### 2.5. Cập Nhật Các Files Hệ Thống
-1. `apps/chat-web/src/routes.ts`: Thêm route `myslack-callback` (`/connections/myslack/callback`).
-2. `apps/chat-web/src/services/api-client.ts`: Thêm các hàm `startSlackConnection`, `completeSlackConnection`, `getSlackConnections`, `disconnectSlackConnection`.
-3. `apps/chat-web/src/pages/Settings/SettingsPage.tsx`: Nhúng `PersonalMySlack` vào section "Của riêng bạn".
-4. `apps/chat-web/src/App.tsx`: Định tuyến tới `MySlackCallbackView`.
+Thi công hoàn thiện giao diện người dùng trên web (`apps/chat-web`) cho kết nối Slack cá nhân đa workspace, kế thừa và mở rộng mã nền đã duyệt từ PR 184 thay vì tạo các biến thể trùng lặp:
+- **Kế thừa các file hiện hữu từ PR 184:**
+  - `apps/chat-web/src/pages/Settings/PersonalSlack.tsx` (mở rộng hiển thị đa workspace, badge readiness chuẩn, modal xác nhận ngắt kết nối `CockpitDialog`, hành động kết nối lại / kết nối thêm).
+  - `apps/chat-web/src/views/SlackCallbackView.tsx` (mở rộng single-use qua StrictMode, làm sạch `code`/`state` khỏi URL trước khi gửi mạng, hỗ trợ điều hướng an toàn qua `returnTo` `/c/<uuid>` hoặc fallback `/settings#myslack`, hiển thị workspace thật đã xác thực).
+  - `apps/chat-web/src/services/slack-connection.ts` (chuẩn hóa dữ liệu biên giới DTO 02A + tương thích an toàn legacy, hỗ trợ start mang `returnTo` và `workspaceHint`).
+  - `apps/chat-web/tests/slack-oauth.test.tsx` (bổ sung các test component HTTP cho canonical/legacy metadata, wrong readiness, duplicate names, confirmation/cancel, owner-switch stale response, malformed callback, no replay).
+  - `apps/chat-web/tests/browser/slack-oauth.spec.ts` (cập nhật bước xác nhận modal ngắt kết nối theo đúng hành vi mới).
+- **Ranh giới:**
+  - Chỉ sửa đổi trong `apps/chat-web/`, card SLACK-02C và một file handoff log mới.
+  - Không sửa API, DB, migration, schema, planner, adapters hay root package.
+  - Không gọi native Slack live, không bật cờ production, không tự ý merge vào main.
 
 ---
 
-## 3. Kiểm Thử Giao Diện & Bằng Chứng
+## 2. Hợp đồng & Chuẩn Hóa Biên Giới Dữ Liệu
 
-1. **Unit & Integration Tests (`apps/chat-web/tests/`):**
-   - `myslack-ui.test.tsx`:
-     - Render danh sách nhiều workspace (2 workspace hiển thị đúng tên và trạng thái độc lập).
-     - Click ngắt kết nối hiển thị modal xác nhận.
-     - Click kết nối lại gọi đúng API.
-     - Cờ `MYSLACK_ENABLED=off` ẩn hoàn toàn component.
-   - `myslack-callback.test.tsx`:
-     - Xử lý thành công chuyển hướng về `/settings#myslack` hoặc `returnTo`.
-     - Hiển thị đầy đủ thông báo lỗi cho các trường hợp lỗi backend.
-2. **End-to-End Browser Tests:**
-   - Cập nhật kịch bản kiểm thử giao diện cho Slack callback và Settings trong `scripts/test-v3-browser.mjs` (bảo toàn tất cả các group test cũ).
+Theo hợp đồng thống nhất từ nhóm trưởng (msg_6bc9a55fae15):
+1. **Start Connection:**
+   - Endpoint: `POST /api/connections/myslack/start`
+   - Tham số tùy chọn: `{ returnTo?: string; workspaceHint?: string }`.
+   - Kiểm tra quyền sở hữu hội thoại thực hiện phía server; `workspaceHint` chỉ là gợi ý Slack team, frontend tuyệt đối không coi hint là định danh đã xác thực.
+2. **Callback Connection:**
+   - Endpoint: `POST /api/connections/myslack/callback`
+   - Nhận: `{ code?: string; state: string; error?: string }`.
+   - Trả về canonical flat: `{ connectionId, workspaceId, workspaceName, slackUserId, returnTo? }` kèm các alias legacy an toàn trong giai đoạn chuyển đổi (`actorId`, `processingStatus`).
+   - Callback làm sạch query params khỏi URL trước khi gửi mạng; StrictMode chỉ gửi đúng 1 request; không retry sau lỗi 401 hoặc timeout; hủy trạng thái pending nếu đổi session/owner.
+   - Điều hướng chỉ chấp nhận cùng app dạng `/c/<uuid>` (`conversationReturnPath`); nếu không có hoặc không hợp lệ, fallback về `/settings#myslack`.
+3. **Danh sách Kết nối & Chuẩn Hóa Siêu Dữ Liệu:**
+   - Sử dụng DTO chuẩn 02A (`@ati/tool-schemas` `validateSlackConnectionPublicInfo`).
+   - Chuẩn hóa an toàn ở biên giới frontend:
+     - `actorId` cung cấp fallback cho `slackUserId` và `slackUserLabel` khi thiếu.
+     - Thiếu consent hoặc readiness mặc định an toàn là `consentStatus = 'pending'`, `processingReady = false`.
+     - Lưu mảng `missingScopes` được kiểm tra tường minh nếu có.
+     - Tuyệt đối không tin các thuộc tính lạ hoặc tự suy đoán readiness chỉ từ `active` + `granted` (`processingReady` phải là boolean `true` từ server và yêu cầu `status === 'active'` cùng `consentStatus === 'granted'`).
+     - Không gọi thêm request health; giữ nguyên `personalOAuth: ['myslack']` từ `GET /api/services`.
+4. **Huy hiệu Trạng thái (Badges):**
+   - `status === 'reconnect_required'`: "Cần kết nối lại" (đỏ) kèm nút "Kết nối lại".
+   - `status === 'active' && !processingReady`: "Chờ cho phép xử lý dữ liệu" (vàng hổ phách).
+   - `processingReady === true`: "Đã sẵn sàng xử lý" (xanh lá).
+   - `status === 'revoked'`: "Đã thu hồi" (hoặc cần kết nối lại).
+   - Hiển thị cả Workspace Name + Workspace ID + Slack Identity để phân biệt rõ ràng khi trùng tên workspace.
+   - Không để lộ provider keys hoặc chi tiết nội bộ cho người dùng thông thường.
+5. **Modal Xác Nhận Ngắt Kết Nối:**
+   - Dùng `CockpitDialog` hiện có; chỉ gửi `DELETE` sau khi người dùng bấm xác nhận; hủy bỏ không gửi request.
+   - Chống click đúp khi đang busy; bỏ qua response bất đồng bộ từ session/owner cũ.
+   - Thông báo rõ ràng phân biệt giữa đã thu hồi ở Slack vs chưa xác nhận thu hồi ở Slack (cần gỡ thủ công).
 
 ---
 
-## 4. Tiêu Chí Nghiệm Thu
-- [ ] Giao diện hỗ trợ mượt mà người dùng có 0, 1 hoặc nhiều workspace Slack.
-- [ ] Responsive hoàn hảo tại 1440px và 375px; hỗ trợ theme sáng và tối không vỡ layout.
-- [ ] Không có lỗi console hoặc warning React runtime.
-- [ ] Mọi test frontend trong `npm test -w apps/chat-web` đều PASS.
+## 3. Kế Hoạch Kiểm Thử TDD & Nghiệm Thu
+
+1. **RED Tests First (`apps/chat-web/tests/slack-oauth.test.tsx`):**
+   - Viết các test case component HTTP mô phỏng chính xác:
+     - Canonical metadata vs legacy metadata normalization (actorId fallback, default pending/unready).
+     - Wrong readiness (ví dụ: `active + granted` nhưng `processingReady: false` hoặc không có profile tin cậy -> vẫn unready).
+     - Hiển thị danh sách trùng tên workspace nhưng khác Workspace ID.
+     - Modal `CockpitDialog` xác nhận ngắt kết nối và hủy bỏ không gửi DELETE.
+     - Bỏ qua response cũ khi đổi chủ session/owner (`gmailSessionOwner`).
+     - Callback xử lý `returnTo` hợp lệ (`/c/<uuid>`) vs không hợp lệ / thiếu -> fallback `/settings#myslack`.
+     - StrictMode single-use, xóa query parameters trước khi fetch, không replay callback sau 401.
+2. **GREEN Minimal Implementation:**
+   - Cập nhật `apps/chat-web/src/services/slack-connection.ts`
+   - Cập nhật `apps/chat-web/src/pages/Settings/PersonalSlack.tsx`
+   - Cập nhật `apps/chat-web/src/views/SlackCallbackView.tsx`
+3. **E2E Browser Scenario (`scripts/test-v3-browser.mjs` / `tests/browser/slack-oauth.spec.ts`):**
+   - Cập nhật kịch bản browser test để tương tác với modal xác nhận ngắt kết nối mới.
+   - Chạy kịch bản `slack_oauth` trên fixture sandbox cục bộ.
+4. **Ghi Nhận Ranh Giới Nghiệm Thu Trung Thực:**
+   - Browser acceptance trên nhánh này chạy trên nền API fixture/legacy 184 với siêu dữ liệu pending.
+   - Nghiệm thu liên dịch vụ hoàn chỉnh (joint canonical-policy & server-side returnTo validation) ghi nhận là PENDING cho đến khi Backend 02B (PR 191) được tích hợp.
+
+---
+
+## 4. Kết Quả Thực Tế & Nghiệm Thu (Evidence & Acceptance)
+
+1. **Unit & Integration Component Tests (`apps/chat-web/tests/slack-oauth.test.tsx`):**
+   - **11/11 tests PASS** (Vitest, thời gian 1.27s).
+   - Bao phủ đầy đủ:
+     - Khử param secret khỏi URL trước khi gửi callback qua mạng; 1 request trong StrictMode; điều hướng về Settings fallback.
+     - Điều hướng an toàn tới `returnTo` hội thoại (`/c/<uuid>`).
+     - Fallback an toàn về `/settings#myslack` khi `returnTo` không hợp lệ (URL ngoài hoặc định dạng lạ).
+     - Không replay callback sau 401; dừng pending và báo lỗi thân thiện.
+     - Hủy pending và bỏ qua response nếu đổi session owner giữa chừng.
+     - Chuẩn hóa an toàn siêu dữ liệu legacy (`actorId` fallback, default pending/unready) song song với render đầy đủ trường canonical 02A (`processingReady === true` -> "Đã sẵn sàng xử lý").
+     - Chặn suy đoán readiness khi `active + granted` nhưng `processingReady: false` -> vẫn hiển thị "Chờ cho phép xử lý dữ liệu".
+     - Phân biệt rõ ràng khi các workspace trùng tên bằng cách hiển thị Workspace ID và Slack Identity riêng biệt.
+     - Modal `CockpitDialog` xác nhận ngắt kết nối: Hủy không gửi DELETE; Xác nhận gửi DELETE `/api/connections/myslack/:id` và cập nhật thông báo chính xác.
+     - Bỏ qua response ngắt kết nối nếu session đổi chủ giữa chừng.
+     - Nút "Kết nối lại" cho trạng thái `reconnect_required` và nút "Kết nối workspace Slack".
+
+2. **Toàn bộ Web Test Suite (`npm test -w apps/chat-web`):**
+   - **80 test files passed, 894 tests passed, 0 failed** (thời gian 45.2s).
+
+3. **Typecheck & Build & Security:**
+   - `npm run typecheck:v3`: EXIT 0 (sạch toàn bộ TypeScript cả api và web).
+   - `npm run build:v3`: EXIT 0 (Vite build thành công).
+   - `node scripts/test-v3-web-build-security.mjs`: PASS (loại trừ credential sentinels và 7 forbidden UI claims).
+
+4. **Kịch Bản Browser Playwright (`slack_oauth`):**
+   - **4/4 tests passed** (375 light, 375 dark, 1440 light, 1440 dark, thời gian 55.3s).
+   - Kiểm thử E2E trên fixture sandbox cục bộ với tương tác modal `CockpitDialog` xác nhận ngắt kết nối mới.
+
+5. **Ranh Giới Nghiệm Thu Trung Thực (Honest Acceptance Boundary):**
+   - Browser acceptance trên nhánh này chạy trên nền API fixture/legacy 184 với siêu dữ liệu pending.
+   - Nghiệm thu liên dịch vụ hoàn chỉnh (joint canonical-policy & server-side returnTo validation) ghi nhận là **PENDING** cho đến khi Backend 02B (PR 191) được tích hợp.
+
+---
+
+## 5. Tiêu Chí Hoàn Thành (Definition of Done)
+- [x] Card task và handoff log phản ánh đúng file, hợp đồng và tiến độ.
+- [x] Mọi component tests trong `slack-oauth.test.tsx` (11/11 PASS) và toàn bộ package `apps/chat-web` (80 files, 894 tests PASS).
+- [x] Typecheck và build của `apps/chat-web` hoàn toàn sạch lỗi (exit code 0).
+- [x] Kịch bản browser Slack OAuth pass với modal xác nhận mới (4/4 tests PASS).
+- [ ] Commit scoped rõ ràng, push branch và tạo DRAFT PR trỏ vào `integration/slack-personal-20261029`.
