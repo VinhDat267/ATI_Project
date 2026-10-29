@@ -65,13 +65,13 @@ Card này xây dựng hạ tầng tiếp nhận sự kiện thời gian thực t
 ### Giai đoạn 04B: Authorizations Fanout, Durable Queue & F4 Lifecycle (PR 2)
 - **Code Owner:** Backend Engineer (`apps/chat-api`, `db/v3`)
 - **Files:**
-  - Create: `db/v3/[proposed: NNNN_slack_events_and_outbox.sql]` (Số thứ tự migration được cấp sau khi chốt backend head)
+  - Create: `db/v3/[proposed: NNNN_slack_events_and_outbox.sql]` (Số thứ tự migration được cấp sau reviewed backend head; cho phép stacked branches trước merge)
   - Create: `apps/chat-api/src/services/slack/slack-authorizations-resolver.ts`
   - Create: `apps/chat-api/src/services/slack/slack-event-queue.ts`
   - Tests (proposed): `apps/chat-api/tests/slack/slack-authorizations-fanout.test.mjs`, `apps/chat-api/tests/slack/slack-ingress-lifecycle-f4.test.mjs`
 - **Nội dung:**
   - Migration tạo bảng `slack_event_receipts` có unique index trên `(slack_app_id, event_id)`; bảng `slack_triage_jobs` lưu công việc chờ xử lý với khóa `(receipt_id, connection_id, identity_version)`.
-  - Phân giải quyền: Gọi `apps.event.authorizations.list` (khi `event_context` có mặt và bị cắt trang) bằng app-level token; map Slack user ID sang active connection trong DB.
+  - Phân giải quyền: Gọi `apps.event.authorizations.list` (khi `event_context` có mặt và bị cắt trang) bằng app-level token; map Slack user ID sang active connection trong DB. Chỉ lưu metadata và `SlackBinding`, không lưu hoặc truyền credentials mã hóa.
   - Xử lý nhánh F4: Khi cờ automation tắt hoặc workspace pause:
     - Tin nhắn thường: ACK và discard payload khỏi memory; không ghi `slack_sources` hay tạo `slack_triage_jobs`.
     - Sự kiện `tokens_revoked` / `app_uninstalled`: Ghi nhận tức thì, cập nhật `slack_connections.status = 'revoked'`, tăng `identity_version` và kích hoạt `SlackPurgeRunner`.
@@ -82,8 +82,8 @@ Card này xây dựng hạ tầng tiếp nhận sự kiện thời gian thực t
 - **Files:**
   - Create: `packages/executor/src/myslack/myslack-outbox.ts`
   - Create: `apps/chat-api/src/services/slack/slack-echo-guard.ts`
-  - Modify (verified): `packages/executor/src/runner.ts`
-  - Modify (verified): `packages/executor/src/controller.ts`
+  - Modify (verified existing in repo): `packages/executor/src/runner.ts`
+  - Modify (verified existing in repo): `packages/executor/src/controller.ts`
   - Tests (proposed): `apps/chat-api/tests/slack/slack-echo-guard.test.mjs`, `packages/executor/tests/myslack-unknown-safety.test.mjs`
 - **Nội dung:**
   - Bảng `slack_outbox_ledger`: Lưu `(workspace_id, channel_id, client_msg_id, message_ts, operation_id, sent_at)`.

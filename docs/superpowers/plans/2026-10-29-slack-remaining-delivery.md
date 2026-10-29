@@ -48,10 +48,11 @@
 
 Draft PR 184 (`ac448dd39fd8b9188c4ebc967cb735454bbc803d`) hiện có migration `db/v3/0014_slack_oauth_connections.sql` định nghĩa bảng `slack_connections` và `slack_oauth_states`.
 - **Tình trạng Thẩm định SLACK-02:** PR 184 CHƯA ĐƯỢC PHÊ DUYỆT do tồn tại lỗi tái hiện trên PostgreSQL thật: hai state hợp lệ cùng session ATI nhưng khác workspace bị DELETE toàn cục làm mất 1 state; đồng thời bảng chấp thuận tổ chức F1 / provider trust `SlackConsentRecord` vẫn còn thiếu.
-- **Quy tắc Migration Database:** Tuyệt đối không tạo file trùng tên `0014_...sql`. Mọi migration tiếp theo từ SLACK-03 trở đi được đánh số đề xuất `[proposed: NNNN_...sql]` và chỉ chốt số thứ tự chính thức sau khi backend head đã được merge.
+- **Quy tắc Migration Database & Xếp chồng Nhánh (Stacked Branches):** Tuyệt đối không tạo file trùng tên `0014_...sql`. Mọi migration tiếp theo từ SLACK-03 trở đi được đánh số đề xuất `[proposed: NNNN_...sql]`. Các nhánh đã được chấp thuận trước đó có thể được xếp chồng (stacked branches) trước khi merge; việc cấp phát số thứ tự migration được thực hiện tuần tự sau reviewed backend head, không đòi hỏi user phải merge sớm vào main để tạo tiến độ.
 - **Hợp đồng Giao diện Yêu cầu (Prerequisite Requirements Gate):** Card này KHÔNG giả định chữ ký code của PR 184 đã chuẩn hóa. Tầng tiêu thụ ở SLACK-03 yêu cầu interface giao ước tối thiểu:
   ```ts
-  export interface SlackConnectionRecord {
+  // Dòng chứng chỉ nội bộ - CHỈ lưu trữ DB và TokenManager/Adapter truy cập khi executeStep
+  export interface SlackInternalCredentialRecord {
     id: string; // connectionId nội bộ
     atiUserId: string;
     slackAppId: string;
@@ -65,6 +66,20 @@ Draft PR 184 (`ac448dd39fd8b9188c4ebc967cb735454bbc803d`) hiện có migration `
     identityVersion: number;
   }
 
+  // DTO công khai / Kết quả phân giải kết nối (Connection Resolution) - TUYỆT ĐỐI KHÔNG CHỨA TOKEN
+  export interface SlackConnectionMetadata {
+    id: string;
+    atiUserId: string;
+    slackAppId: string;
+    workspaceId: string;
+    workspaceName: string;
+    slackUserId: string;
+    slackUserLabel: string;
+    scopes: string[];
+    status: 'active' | 'revoked' | 'reconnect_required';
+    identityVersion: number;
+  }
+
   export interface SlackConsentRecord {
     workspaceId: string;
     status: 'pending' | 'granted' | 'revoked';
@@ -74,12 +89,15 @@ Draft PR 184 (`ac448dd39fd8b9188c4ebc967cb735454bbc803d`) hiện có migration `
   }
 
   export interface ISlackConnectionRepository {
-    getConnectionForUser(atiUserId: string, connectionId: string, expectedIdentityVersion?: number): Promise<SlackConnectionRecord | null>;
-    getActiveConnectionsForUser(atiUserId: string): Promise<SlackConnectionRecord[]>;
+    // Phân giải kết nối cho người dùng: trả về metadata/binding hợp lệ
+    getConnectionMetadataForUser(atiUserId: string, connectionId: string, expectedIdentityVersion?: number): Promise<SlackConnectionMetadata | null>;
+    getActiveConnectionsForUser(atiUserId: string): Promise<SlackConnectionMetadata[]>;
     getConsentForWorkspace(workspaceId: string): Promise<SlackConsentRecord | null>;
+    // Truy cập token nội bộ: chỉ adapter/token manager được phép gọi khi executeStep
+    getInternalCredential(atiUserId: string, connectionId: string): Promise<SlackInternalCredentialRecord | null>;
   }
   ```
-  *Quy tắc an ninh dữ liệu:* Tuyệt đối không chấp nhận hàm tra cứu không có chủ sở hữu `getConnection(id)`. Tuyệt đối KHÔNG chuyển token mã hóa (`tokenEncrypted`, `config`) vào planner hoặc shared public DTO.
+  *Quy tắc an ninh dữ liệu:* Tuyệt đối không chấp nhận hàm tra cứu không có chủ sở hữu `getConnection(id)`. Các dòng chứng chỉ mã hóa nội bộ (`tokenEncrypted`, secrets) TUYỆT ĐỐI KHÔNG BAO GIỜ được chia sẻ làm public DTO hoặc đầu vào của planner. Tầng phân giải kết nối (connection resolution) chỉ trả về validated binding và connection metadata. Việc giải mã và truy cập token được cô lập hoàn toàn bên trong adapter / token manager.
 
 ---
 
@@ -95,7 +113,7 @@ Kế hoạch đối soát toàn diện trên snapshot mới nhất PR 185 (head 
   - `conversations`: 28 phương thức trong sitemap (27 thao tác hội thoại thông thường + 1 thao tác canvas `conversations.canvases.create` thuộc Canvases).
   - `chat`: 13 phương thức.
   - `users`: 13 phương thức (11 probe_required, 1 `users.conversations`, 1 deprecated `users.setActive`).
-  - `search`: 3 phương thức (`search.all`, `search.files`, `search.messages`) — Scope `search:read`, điều kiện gói: `probe_required` (KHÔNG mặc định yêu cầu gói Pro).
+  - `search`: 3 phương thức (`search.all`, `search.files`, `search.messages`) — Có scope tài liệu `search:read` CỘNG VỚI các điều kiện bổ sung chưa xác định (unknown additional conditions / plan constraints); siêu dữ liệu scope đơn lẻ không tự xác lập tính đủ điều kiện về token/role/plan trên môi trường native, giữ trạng thái `probe_required`.
   - `files`: 14 phương thức (13 hợp lệ + 1 deprecated `files.upload`).
   - `pins`: 3, `reactions`: 4, `bookmarks`: 4, `reminders`: 5, `stars`: 3, `dnd`: 5.
   - `canvases`: 7, `slackLists`: 12, `skills`: 7 (user-scoped).
@@ -113,7 +131,7 @@ Kế hoạch đối soát toàn diện trên snapshot mới nhất PR 185 (head 
 | Adapters | `packages/tool-adapters/src/slack/` | Integration / Adapter Engineer | Sở hữu riêng |
 | Executor & Outbox | `packages/executor/src/myslack/`, `runner.ts`, `controller.ts` | Backend Engineer | Sở hữu riêng |
 | Backend Routes & Services | `apps/chat-api/src/services/slack/`, `routes/` | Backend Engineer | Sở hữu riêng |
-| Database Migrations | `db/v3/[proposed: NNNN_...sql]` | Backend Engineer | Shared DB, số thứ tự cấp sau khi merge |
+| Database Migrations | `db/v3/[proposed: NNNN_...sql]` | Backend Engineer | Shared DB, số thứ tự cấp sau reviewed backend head (cho phép stacked branches) |
 | Prompts & Planner | `prompts/`, `packages/planner/src/slack/`, `planner.ts` | AI Engineer | Sở hữu riêng |
 | Frontend Cockpit & Inbox | `apps/chat-web/src/components/slack/` | Frontend Engineer | Sở hữu riêng |
 | Evaluations | `evaluations/slack/`, `scripts/eval-*.mjs` | AI Engineer | Sở hữu riêng |
@@ -220,7 +238,7 @@ SLACK-07: Evaluations & Live Acceptance
 - Create: `packages/tool-adapters/src/slack/files-family.ts`
 - Tests (proposed): `packages/tool-adapters/tests/slack/content-interaction.test.mjs`, `packages/tool-adapters/tests/slack/search-files.test.mjs`
 
-- [ ] **Step 1:** Viết tests cho `search.*` (kiểm tra scope `search:read`, giữ disposition `probe_required`, không suy diễn Pro); `files.*` (quy trình upload file ngoài 3 bước: `getUploadURLExternal` -> upload binary -> `completeUploadExternal`, xử lý lỗi từng bước); `pins`, `reactions`, `bookmarks`, `reminders`, `stars`, `dnd`.
+- [ ] **Step 1:** Viết tests cho `search.*` (kiểm tra scope tài liệu `search:read` cộng với các điều kiện bổ sung chưa xác định, giữ disposition `probe_required`, không tự suy diễn tính đủ điều kiện native); `files.*` (quy trình upload file ngoài 3 bước: `getUploadURLExternal` -> upload binary -> `completeUploadExternal`, xử lý lỗi từng bước); `pins`, `reactions`, `bookmarks`, `reminders`, `stars`, `dnd`.
 - [ ] **Step 2:** Chạy test; mong đợi FAIL.
 - [ ] **Step 3:** Triển khai các family theo chuẩn typed interface và error handling.
 - [ ] **Step 4:** Chạy lại tests; mong đợi PASS.
@@ -234,12 +252,12 @@ SLACK-07: Evaluations & Live Acceptance
 **Files:**
 - Create: `packages/tool-adapters/src/slack/advanced-collaboration-families.ts` (Canvases 7, SlackLists 12, Skills 7, Team 7, Usergroups 7)
 - Create: `packages/tool-adapters/src/slack/governance-automation-families.ts` (Apps 21, Assistant 5, Agents 11, Admin 36, Calls 6, Functions 8, Workflows 8, Views 4, Blocks 1, Bots 1, Dialog 1, Emoji 1, Entity 3, Migration 1, Rtm 1, Tooling 1, Auth 2, Api 1)
-- Modify (verified): `docs/slack/method-inventory.json`
+- Modify (verified existing in repo): `docs/slack/method-inventory.json`
 - Tests (proposed): `packages/tool-adapters/tests/slack/advanced-collaboration.test.mjs`
 
 - [ ] **Step 1:** Viết tests cho `canvases.*`, `slackLists.*`, `slackbot.skills.*`, `team.*`, `usergroups.*`, kiểm tra xử lý lỗi khi gọi trên gói Free (thiếu capability).
 - [ ] **Step 2:** Triển khai code các family tương ứng.
-- [ ] **Step 3:** Chạy `node scripts/slack/inventory.mjs verify --input docs/slack/method-inventory.json`; đối soát đầy đủ 354 method (101 excluded, 253 probe_required, 0 implemented).
+- [ ] **Step 3:** Chạy `node scripts/slack/inventory.mjs verify --input docs/slack/method-inventory.json`; đối soát theo dõi trạng thái phân loại (`disposition`), phân phối (`deliveryStatus`), và bằng chứng native của từng phương thức trên tập snapshot 354 method đã duyệt; chủ động giải quyết hoặc giữ lại tường minh các yếu tố chưa biết / loại trừ.
 - [ ] **Step 4:** Chạy lại test; mong đợi PASS.
 - [ ] **Step 5:** Commit: `feat(slack): complete advanced tool families and reconcile 354 inventory rows`.
 
@@ -298,7 +316,9 @@ SLACK-07: Evaluations & Live Acceptance
 
 ### Task 9: (05A) Workspace Config Schema, Migration & Rules Engine
 
-**Code Owner:** Backend Engineer (`apps/chat-api`, `db/v3`) + AI Engineer (`packages/tool-schemas`)
+**Code Owner:** Nhóm phối hợp (Coordination Group) phân rã thành các task con đơn sở hữu (single-owner child cards/PRs, schema/interface trước):
+- 05A.1 (AI / Schema Engineer): Schema & Contract định nghĩa chế độ (`packages/tool-schemas`)
+- 05A.2 (Backend Engineer): Migration `slack_workspace_configs` và Deterministic Rules Engine (`db/v3`, `apps/chat-api`)
 **Files:**
 - Create: `packages/tool-schemas/src/myslack-config.ts`
 - Create: `db/v3/[proposed: NNNN_slack_workspace_configs.sql]` (Số thứ tự migration được cấp sau khi chốt backend head)
@@ -315,15 +335,17 @@ SLACK-07: Evaluations & Live Acceptance
 
 ### Task 10: (05B) AI Triage Prompt, F1 Model Policy Gate & Budget Tracker
 
-**Code Owner:** AI Engineer (`packages/planner`, `prompts`) + Backend Engineer (`apps/chat-api`)
+**Code Owner:** Nhóm phối hợp (Coordination Group) phân rã thành các task con đơn sở hữu (single-owner child cards/PRs, schema/interface trước):
+- 05B.1 (AI Engineer): Prompt AI triage & Triage planner integration (`prompts`, `packages/planner`)
+- 05B.2 (Backend Engineer): Budget Tracker & usage storage (`apps/chat-api`)
 **Files:**
 - Create: `prompts/slack-triage.prompt.txt`
 - Create: `packages/planner/src/slack/slack-triage-planner.ts`
 - Create: `apps/chat-api/src/services/slack/slack-budget-tracker.ts`
-- Modify (verified): `packages/planner/src/planner.ts` (Tích hợp F1 policy check trước khi xử lý tin nhắn)
+- Modify (verified existing in repo): `packages/planner/src/planner.ts` (Tích hợp F1 policy check trước khi xử lý tin nhắn)
 - Tests (proposed): `packages/planner/tests/slack/slack-triage-planner.test.ts`, `apps/chat-api/tests/slack/slack-budget-tracker.test.mjs`
 
-- [ ] **Step 1:** Viết tests: prompt phân biệt việc cá nhân vs việc chung; kiểm tra F1 `decideSlackModelUse` trước khi gọi provider (consent revoked -> chặn gọi); budget tracker trừ token/lượt gọi và chuyển trạng thái `paused_budget_exceeded` khi vượt trần.
+- [ ] **Step 1:** Viết tests: prompt phân biệt việc cá nhân vs việc chung; kiểm tra F1 `decideSlackModelUse` trước khi gọi provider (consent revoked -> chặn gọi); budget tracker trừ token/lượt gọi và chuyển trạng thái `paused_budget_exceeded` khi vượt trần. Đảm bảo dữ liệu đầu vào chỉ chứa validated binding/metadata, không chứa internal encrypted credential rows.
 - [ ] **Step 2:** Chạy test; mong đợi FAIL.
 - [ ] **Step 3:** Xây dựng prompt triage, triage planner và budget tracker.
 - [ ] **Step 4:** Chạy lại tests; mong đợi PASS.
@@ -369,7 +391,7 @@ SLACK-07: Evaluations & Live Acceptance
 **Files:**
 - Create: `apps/chat-web/src/components/slack/SlackProposalInbox.tsx`
 - Create: `apps/chat-web/src/components/slack/SlackProposalCard.tsx`
-- Modify (verified): `apps/chat-web/src/routes.ts`
+- Modify (verified existing in repo): `apps/chat-web/src/routes.ts`
 - Tests (proposed): `apps/chat-web/tests/slack/SlackProposalInbox.test.tsx`
 
 - [ ] **Step 1:** Viết frontend component tests: hiển thị chia theo workspace; hiện tên workspace và danh tính đại diện; thẻ đề xuất có deep link, trích đoạn bảo vệ ACL, và các bước hành động; nút Duyệt mở preview xác nhận.
@@ -382,14 +404,17 @@ SLACK-07: Evaluations & Live Acceptance
 
 ### Task 14: (06C) Multi-Service Workflows, Daily Digest & F3 UI Masking
 
-**Code Owner:** Backend Engineer (`apps/chat-api`) + Frontend Engineer (`apps/chat-web`) + AI Engineer (`packages/planner`)
+**Code Owner:** Nhóm phối hợp (Coordination Group) phân rã thành các task con đơn sở hữu (single-owner child cards/PRs, schema/interface trước):
+- 06C.1 (AI Engineer): Cross-service plan templates trong `packages/planner` (Slack intent -> Trello card + Slack reply)
+- 06C.2 (Backend Engineer): Daily Digest service & API trong `apps/chat-api`
+- 06C.3 (Frontend Engineer): F3 UI Masking & Redaction trong `apps/chat-web`
 **Files:**
 - Create: `apps/chat-api/src/services/slack/slack-digest-service.ts`
-- Modify (verified): `packages/planner/src/planner.ts` (Thêm mẫu lập plan từ Slack intent sang Trello/Jira/Sheets)
-- Modify (verified): `apps/chat-web/src/components/slack/SlackProposalCard.tsx`
+- Modify (verified existing in repo): `packages/planner/src/planner.ts` (Thêm mẫu lập plan từ Slack intent sang Trello/Jira/Sheets)
+- Modify (future file created by Task 13): `apps/chat-web/src/components/slack/SlackProposalCard.tsx`
 - Tests (proposed): `apps/chat-api/tests/slack/slack-digest-service.test.mjs`, `apps/chat-web/tests/slack/slack-f3-redaction.test.tsx`
 
-- [ ] **Step 1:** Viết tests: workflow Slack mention -> tạo card Trello + trả lời Slack; Daily Digest quét lúc 09:00 tạo đề xuất tổng hợp (không tự ý ghi); khi source bị xóa -> UI thẻ đề xuất lập tức che nội dung trích dẫn.
+- [ ] **Step 1:** Viết tests: workflow Slack mention -> tạo card Trello + trả lời Slack; Daily Digest quét lúc 09:00 tạo đề xuất tổng hợp (không tự ý ghi); khi source bị xóa -> UI thẻ đề xuất lập tức che nội dung trích dẫn. Dữ liệu chỉ sử dụng validated binding/metadata, không truyền credential rows.
 - [ ] **Step 2:** Chạy test; mong đợi FAIL.
 - [ ] **Step 3:** Triển khai `SlackDigestService` kết nối với `schedules` và hoàn thiện logic workflow liên dịch vụ.
 - [ ] **Step 4:** Chạy lại tests; mong đợi PASS.
@@ -418,13 +443,14 @@ SLACK-07: Evaluations & Live Acceptance
 **Code Owner:** AI Engineer (`evaluations/reports`)
 **Files:**
 - Create: `evaluations/reports/slack-triage-report.md`
-- Modify (verified): `docs/PROJECT-REPORT.md`
+- Modify (verified existing in repo): `docs/PROJECT-REPORT.md`
 
-- [ ] **Step 1:** Chạy script benchmark trên LLM `gemini-3.8-flash`:
+- [ ] **Step 1:** Lựa chọn tường minh evaluation provider/config và xác minh vượt qua cổng bằng chứng no-training + retention của tổ chức/nhà cung cấp trước khi đánh giá trên nội dung nguồn. (Loại bỏ runtime model hardcode; không suy diễn từ model builder như `gemini-3.8-flash-high`).
+- [ ] **Step 2:** Phân tách rõ: Bộ harness ngoại tuyến trên dữ liệu tổng hợp (synthetic offline harness) được phép chạy độc lập; việc đánh giá trên dữ liệu live/nguồn thật bắt buộc phải có văn bản ủy quyền cụ thể (concrete authorization). Chạy script benchmark:
   `node scripts/eval-slack-triage.mjs --runs 3 --output evaluations/reports/slack-triage-report.md`
-- [ ] **Step 2:** Kiểm tra kết quả đáp ứng ngưỡng: Precision ≥ 90%, Recall ≥ 85%, Unapproved Writes = 0, Cross-User Leaks = 0.
-- [ ] **Step 3:** Cập nhật bảng kết quả benchmark vào `docs/PROJECT-REPORT.md`.
-- [ ] **Step 4:** Commit: `docs(eval): publish three-mode slack triage evaluation report`.
+- [ ] **Step 3:** Kiểm tra kết quả đáp ứng ngưỡng: Precision ≥ 90%, Recall ≥ 85%, Unapproved Writes = 0, Cross-User Leaks = 0. Ghi nhận chính xác provider/model/version vào báo cáo SAU KHI lựa chọn hợp lệ hoàn tất, không suy diễn từ cấu hình builder.
+- [ ] **Step 4:** Cập nhật bảng kết quả benchmark vào `docs/PROJECT-REPORT.md`.
+- [ ] **Step 5:** Commit: `docs(eval): publish three-mode slack triage evaluation report`.
 
 ---
 
@@ -433,7 +459,7 @@ SLACK-07: Evaluations & Live Acceptance
 **Code Owner:** Reviewer / Nhóm trưởng (`docs/handoff/evidence`)
 **Files:**
 - Create: `docs/handoff/evidence/slack-live-acceptance.md`
-- Modify (verified): `docs/slack/method-inventory.json`
+- Modify (verified existing in repo): `docs/slack/method-inventory.json`
 
 - [ ] **Step 1:** Nhóm trưởng/Reviewer cấu hình Slack App thật, kết nối 1 Workspace Free và 1 Workspace Pro với 2 tài khoản người dùng ATI.
 - [ ] **Step 2:** Gửi tin nhắn webhook thật, kiểm tra đề xuất xuất hiện trong ATI Inbox, duyệt ghi Trello + Slack reply và đối chiếu readback thật trên Slack.
@@ -443,15 +469,18 @@ SLACK-07: Evaluations & Live Acceptance
 
 ---
 
-### Task 18: (07D) PR Bật Cờ Tính năng (Release PR)
+### Task 18: (07D) Thay đổi Phát hành & Cấu hình Triển khai (Release Configuration PR)
 
 **Code Owner:** Reviewer / Nhóm trưởng
 **Files:**
-- Modify (verified): `.env.example`, tài liệu triển khai sản xuất.
+- Bảo toàn (verified existing in repo): `.env.example` (BẮT BUỘC GIỮ DEFAULT-OFF: `MYSLACK_ENABLED=off`, `MYSLACK_AUTOMATION_ENABLED=off`).
+- Modify: Tài liệu hướng dẫn triển khai sản xuất và cấu hình môi trường có tên (named deployment configuration).
 
-- [ ] **Step 1:** Tạo PR riêng biệt kích hoạt `MYSLACK_ENABLED=on` và `MYSLACK_AUTOMATION_ENABLED=on`.
-- [ ] **Step 2:** Kiểm tra toàn bộ CI xanh đúng commit head.
-- [ ] **Step 3:** Nhóm trưởng phê duyệt và merge PR kích hoạt tính năng.
+- [ ] **Step 1:** Bảo toàn `.env.example` ở trạng thái default-off; tuyệt đối không bật cờ trên `.env.example` rồi gọi đó là triển khai.
+- [ ] **Step 2:** Áp dụng thay đổi cờ vào cấu hình triển khai có tên (named deployment configuration, ví dụ staging/production secret store) sau khi đã hoàn tất nghiệm thu P-LIVE.
+- [ ] **Step 3:** Chuẩn bị kịch bản rollback chi tiết, kiểm tra trỏ đúng commit head đã qua review và nhận sự ủy quyền tường minh từ người dùng (user authorization).
+- [ ] **Step 4:** Xếp chồng các nhánh đã được chấp thuận trước đó (stacked branches) trước khi merge; việc cấp phát số thứ tự migration được thực hiện tuần tự sau reviewed backend head, không đòi hỏi user phải merge sớm vào main để tạo tiến độ.
+- [ ] **Step 5:** Kiểm tra toàn bộ CI xanh đúng commit head và ghi nhận biên bản phát hành.
 
 ---
 
@@ -459,14 +488,14 @@ SLACK-07: Evaluations & Live Acceptance
 
 | Hạng mục | Tiêu chuẩn Bắt buộc | Môi trường Kiểm tra |
 |---|---|---|
-| **Inventory** | Đủ 354 phương thức (PR 185), không generic dispatcher, 253 probe_required giữ nguyên | Script `inventory.mjs verify` |
-| **F1 Policy** | Không consent / unverified provider -> chặn mọi lời gọi model | Vitest + PG16 thật |
-| **F2 Identity** | Workspace/User binding bất biến từ read -> plan -> execute; caller-scoped lookup | Vitest + Integration DB |
+| **Inventory** | Bao phủ 354 phương thức snapshot đã duyệt (PR 185), không generic dispatcher; theo dõi disposition/delivery/native evidence thực tế; chủ động giải quyết hoặc giữ lại tường minh unknowns/exclusions; không giữ nguyên 253 probe_required vĩnh viễn mà tuyên bố live accepted; unknown eligibility không được coi là live accepted; search.* ghi nhận scope search:read + unknown additional conditions | Script `inventory.mjs verify` |
+| **F1 Policy** | Không consent / unverified provider -> chặn mọi lời gọi model; evaluation provider qua no-training evidence gate trước khi đánh giá dữ liệu nguồn | Vitest + PG16 thật |
+| **F2 Identity** | Workspace/User binding bất biến từ read -> plan -> execute; caller-scoped lookup; internal encrypted credential rows cách ly tuyệt đối, không chia sẻ làm public DTO / planner input | Vitest + Integration DB |
 | **F3 Purge** | Disconnect/Delete -> tombstone tức thì, purge sạch trích đoạn chat/memory | Integration DB + UI test |
 | **F4 Ingress** | Ký số bắt buộc; không ACK trước khi lưu bền vững; cờ tắt vẫn xử lý lifecycle và purge | Ingress HTTP tests |
 | **Safety** | Echo Guard chặn tự lặp; UNKNOWN không tự retry write; write-dispatch reviewed | Executor tests + AbortSignal |
 | **3 Modes** | Cấu hình độc lập per workspace; ranh giới cá nhân chuẩn xác; CAS versioning | Triage Worker tests |
-| **Proposal Inbox** | Duyệt trong ATI; cấm tự ý ghi; sửa tham số sinh plan mới | Web component tests |
-| **Evaluations** | Precision ≥ 90%, Recall ≥ 85%, 0 unapproved writes, 0 cross leaks | 9 runs trên dataset cam kết |
+| **Proposal Inbox** | Duyệt trong ATI; cấm tự ý ghi; sửa tham số sinh plan mới; phân biệt component hiện hữu vs tương lai (SlackProposalCard) | Web component tests |
+| **Evaluations** | Precision ≥ 90%, Recall ≥ 85%, 0 unapproved writes, 0 cross leaks; provider no-training gate passed | 9 runs trên dataset cam kết |
 | **P-LIVE** | Readback trên Free & Pro, 2 users chung workspace, revoke thật | Môi trường Slack thật |
-| **Release PR** | PR bật cờ riêng biệt, chỉ merge khi tất cả các cổng trên đều ĐẠT | GitHub Actions CI xanh |
+| **Release & Deployment** | .env.example giữ nguyên default-off; kích hoạt chỉ áp dụng trên named deployment configuration sau nghiệm thu có rollback, đúng reviewed head và user authorization; stacked branches được phép trước merge | Runbook thẩm định phát hành |

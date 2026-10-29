@@ -67,9 +67,12 @@ Card này là cổng thẩm định chất lượng cuối cùng của toàn b�
 - **Code Owner:** AI Engineer (`evaluations/reports`)
 - **Files:**
   - Create: `evaluations/reports/slack-triage-report.md`
-  - Modify (verified): `docs/PROJECT-REPORT.md` (Ghi nhận kết quả benchmark)
+  - Modify (verified existing in repo): `docs/PROJECT-REPORT.md` (Ghi nhận kết quả benchmark)
 - **Nội dung:**
-  - Chạy benchmark với mô hình LLM chính thức của dự án (`gemini-3.8-flash`).
+  - **Loại bỏ lựa chọn hardcode runtime model:** Người dùng đã chọn `gemini-3.8-flash-high` cho các agent lập trình (Antigravity BUILDERS), đây KHÔNG phải là nhà cung cấp/mô hình được ủy quyền tiếp nhận nội dung Slack. Loại bỏ hoàn toàn lựa chọn mô hình runtime hardcode (`gemini-3.8-flash`).
+  - **Cổng bằng chứng không huấn luyện & lưu trữ:** Nhà cung cấp và cấu hình đánh giá (evaluation provider/config) bắt buộc phải được lựa chọn tường minh và phải vượt qua cổng bằng chứng cam kết không dùng dữ liệu để huấn luyện và chính sách lưu giữ dữ liệu (organization/provider no-training + retention evidence gates) TRƯỚC KHI thực hiện bất kỳ phép đánh giá nào trên nội dung nguồn hoặc dữ liệu người dùng.
+  - **Phân tách harness ngoại tuyến vs đánh giá live:** Bộ harness ngoại tuyến trên dữ liệu tổng hợp (synthetic offline harness) được phép chạy độc lập; việc đánh giá trên dữ liệu live / nguồn thật bắt buộc phải có văn bản ủy quyền cụ thể (concrete authorization).
+  - **Ghi nhận cấu hình sau thẩm định:** Chỉ ghi nhận provider/model/version vào báo cáo đánh giá SAU KHI lựa chọn và phê duyệt chính thức hoàn tất; tuyệt đối không suy diễn cấu hình đánh giá từ mô hình builder.
   - Ghi nhận chi tiết:
     - Bảng so sánh 3 lượt chạy của Mode Luật, Mode AI, và Mode Kết hợp.
     - Tỷ lệ Precision và Recall đạt ngưỡng (≥90% và ≥85%).
@@ -80,7 +83,7 @@ Card này là cổng thẩm định chất lượng cuối cùng của toàn b�
 - **Code Owner:** Reviewer / Nhóm trưởng (`docs/handoff/evidence`)
 - **Files:**
   - Create: `docs/handoff/evidence/slack-live-acceptance.md`
-  - Modify (verified): `docs/slack/method-inventory.json` (Cập nhật trạng thái `live_verified` cho các method đã kiểm thử thật)
+  - Modify (verified existing in repo): `docs/slack/method-inventory.json` (Cập nhật trạng thái `live_verified` cho các method đã kiểm thử thật)
 - **Nội dung (P-LIVE do Reviewer/Nhóm trưởng thực hiện):**
   - Kết nối thực tế trên 1 Workspace Free và 1 Workspace Pro.
   - Thử nghiệm 2 tài khoản ATI kết nối cùng 1 Workspace: chứng minh tính độc lập của đề xuất và không ghi đè token của nhau.
@@ -90,13 +93,15 @@ Card này là cổng thẩm định chất lượng cuối cùng của toàn b�
     - Thao tác ghi bị timeout/lỗi: chứng minh không sinh ra hành vi duplicate write.
   - Thao tác Ngắt kết nối & Purge thật: ngắt trong Settings -> gọi `auth.revoke` -> kiểm tra dữ liệu nguồn và đề xuất bị xóa sạch trong ATI.
 
-### Giai đoạn 07D: PR Bật Cờ Tính năng (Release PR)
+### Giai đoạn 07D: Thay đổi Phát hành & Cấu hình Triển khai (Release Configuration PR)
 - **Code Owner:** Reviewer / Nhóm trưởng
 - **Files:**
-  - Modify (verified): `.env.example`, tài liệu triển khai sản xuất.
+  - Bảo toàn (verified existing in repo): `.env.example` (BẮT BUỘC GIỮ DEFAULT-OFF: `MYSLACK_ENABLED=off`, `MYSLACK_AUTOMATION_ENABLED=off`).
+  - Modify: Tài liệu hướng dẫn triển khai sản xuất và cấu hình môi trường có tên (named deployment configuration).
 - **Nội dung:**
-  - Kích hoạt `MYSLACK_ENABLED=on` và `MYSLACK_AUTOMATION_ENABLED=on`.
-  - Chỉ được merge sau khi PR 1, 2, 3 đã được phê duyệt và CI xanh 100%.
+  - **Bảo toàn .env.example default-off:** `.env.example` phải luôn duy trì giá trị mặc định tắt. Tuyệt đối không bật cờ ví dụ/mặc định rồi coi đó là quy trình triển khai.
+  - **Áp dụng vào cấu hình triển khai có tên (Named Deployment Configuration):** Thay đổi phát hành chỉ được áp dụng vào cấu hình triển khai cụ thể (production/staging environment config store) sau khi đã hoàn tất nghiệm thu P-LIVE, có kịch bản rollback rõ ràng, trỏ vào đúng commit head đã qua review chính xác, và có sự ủy quyền tường minh từ người dùng (user authorization).
+  - **Xếp chồng nhánh & cấp phát migration:** Các nhánh đã được chấp thuận trước đó có thể được xếp chồng (stacked branches) trước khi merge; việc cấp phát số thứ tự migration được thực hiện tuần tự sau reviewed backend head, không đòi hỏi user phải merge sớm vào main để tạo tiến độ.
 
 ---
 
@@ -111,8 +116,8 @@ Card này là cổng thẩm định chất lượng cuối cùng của toàn b�
   - Kết nối thành công cả Free và Pro.
   - Hai người dùng cùng workspace hoạt động độc lập không xung đột token.
   - Readback tin nhắn trên Slack đúng user token tác giả.
-- [ ] **AC5 (Xác nhận Đóng Tính năng Trung thực):** Mọi phương thức chưa có điều kiện probe thật trên Slack vẫn giữ nguyên nhãn `probe_required` trong inventory 354 method; không tuyên bố "hoàn thành toàn bộ API" khi chưa có bằng chứng.
-- [ ] **AC6 (Quy trình Bật cờ Chuẩn tắc):** PR bật cờ là PR riêng biệt, chỉ chứa cấu hình cờ, không chứa mã nguồn tính năng.
+- [ ] **AC5 (Kiểm soát Bao phủ Kiểm kê & Giải quyết Minh bạch):** Độ bao phủ kiểm kê sử dụng tập phương thức snapshot đã qua thẩm định (354 methods của PR 185), theo dõi trạng thái phân loại (`disposition`), phân phối (`deliveryStatus`), và bằng chứng native thực tế cho từng phương thức; chủ động giải quyết qua bằng chứng hoặc giữ lại một cách tường minh các yếu tố chưa biết / loại trừ. Tuyệt đối không yêu cầu 253 phương thức `probe_required` giữ nguyên vĩnh viễn trong khi vẫn tuyên bố toàn bộ năng lực đã được nghiệm thu live. Mọi phương thức có tính đủ điều kiện chưa xác định (`unknown eligibility`) KHÔNG ĐƯỢC coi là đã nghiệm thu live (`not live accepted`). Đối với `search.*`: Siêu dữ liệu scope (`search:read`) đứng riêng lẻ KHÔNG đủ để xác lập tính đủ điều kiện về token/role/plan trên môi trường native Slack; phải ghi nhận rõ scope đã có trong tài liệu CỘNG VỚI các điều kiện bổ sung chưa xác định (unknown additional conditions/plan requirements), không được tuyên bố scope là điều kiện duy nhất.
+- [ ] **AC6 (Cấu hình Triển khai Chuẩn tắc & Bảo toàn Default-off):** `.env.example` bảo toàn default-off. Kích hoạt cờ chỉ áp dụng trên named deployment configuration sau nghiệm thu, có rollback, đúng commit head đã duyệt và có ủy quyền từ người dùng. Các nhánh được phép stacked trước merge; migration cấp phát sau reviewed backend head.
 
 ---
 

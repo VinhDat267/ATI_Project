@@ -49,10 +49,12 @@ Card này xây dựng động cơ phân loại tin nhắn (Triage Engine) với 
 ## 3. Lộ trình Phân rã Bounded PRs
 
 ### Giai đoạn 05A: Schema Cấu hình, DB Migrations & Engine Luật (PR 1)
-- **Code Owner:** Backend Engineer (`apps/chat-api`, `db/v3`) + AI Engineer (`packages/tool-schemas`)
+- **Code Owner:** Nhóm phối hợp (Coordination Group) phân rã thành các task con đơn sở hữu (single-owner child cards/PRs, schema/interface trước):
+  - 05A.1 (AI / Schema Engineer): Schema & Contract định nghĩa chế độ (`packages/tool-schemas`)
+  - 05A.2 (Backend Engineer): Migration `slack_workspace_configs` và Deterministic Rules Engine (`db/v3`, `apps/chat-api`)
 - **Files:**
   - Create: `packages/tool-schemas/src/myslack-config.ts`
-  - Create: `db/v3/[proposed: NNNN_slack_workspace_configs.sql]` (Số thứ tự migration được cấp sau khi chốt backend head)
+  - Create: `db/v3/[proposed: NNNN_slack_workspace_configs.sql]` (Số thứ tự migration được cấp sau reviewed backend head; cho phép stacked branches trước merge)
   - Create: `apps/chat-api/src/services/slack/slack-rules-engine.ts`
   - Tests (proposed): `packages/tool-schemas/tests/myslack-config.test.ts`, `apps/chat-api/tests/slack/slack-rules-engine.test.mjs`
 - **Nội dung:**
@@ -62,16 +64,19 @@ Card này xây dựng động cơ phân loại tin nhắn (Triage Engine) với 
   - Unit tests cho Rules Engine chứng minh: tin có mention cá nhân -> trigger intent; tin `@here`/`@channel` không có mention -> `no_action`.
 
 ### Giai đoạn 05B: Prompt AI Triage, F1 Enforcement & Budget Tracker (PR 2)
-- **Code Owner:** AI Engineer (`packages/planner`, `prompts`) + Backend Engineer (`apps/chat-api`)
+- **Code Owner:** Nhóm phối hợp (Coordination Group) phân rã thành các task con đơn sở hữu (single-owner child cards/PRs, schema/interface trước):
+  - 05B.1 (AI Engineer): Prompt AI triage & Triage planner integration (`prompts`, `packages/planner`)
+  - 05B.2 (Backend Engineer): Budget Tracker & usage storage (`apps/chat-api`)
 - **Files:**
   - Create: `prompts/slack-triage.prompt.txt`
   - Create: `packages/planner/src/slack/slack-triage-planner.ts`
   - Create: `apps/chat-api/src/services/slack/slack-budget-tracker.ts`
-  - Modify (verified): `packages/planner/src/planner.ts` (Tích hợp F1 policy check trước khi xử lý tin nhắn)
+  - Modify (verified existing in repo): `packages/planner/src/planner.ts` (Tích hợp F1 policy check trước khi xử lý tin nhắn)
   - Tests (proposed): `packages/planner/tests/slack/slack-triage-planner.test.ts`, `apps/chat-api/tests/slack/slack-budget-tracker.test.mjs`
 - **Nội dung:**
   - Xây dựng prompt phân loại AI: Nhận ngữ cảnh tin nhắn (tối đa 20 tin / 20k ký tự), thông tin người dùng được kết nối; hướng dẫn phân biệt việc liên quan cá nhân vs việc chung; yêu cầu trích dẫn nguồn cụ thể.
   - Cổng F1 Model Policy: Tích hợp `decideSlackModelUse` trước khi gọi provider LLM trong `planner.ts`. Nếu consent thiếu hoặc provider không hợp lệ -> chặn gọi model, trả về lỗi chính sách rõ ràng.
+  - Phân tách dữ liệu chứng chỉ an toàn: Đầu vào của Triage Planner chỉ nhận validated binding và metadata kết nối; các dòng chứng chỉ mã hóa nội bộ (`tokenEncrypted`, secrets) TUYỆT ĐỐI KHÔNG BAO GIỜ được đưa vào planner hoặc public DTO.
   - `SlackBudgetTracker`: Theo dõi số token và số lượt gọi trong DB PG16; kiểm tra trước khi dispatch job; ngắt và đánh dấu `paused_budget_exceeded` khi chạm trần.
 
 ### Giai đoạn 05C: Worker Hợp nhất, CAS & Quản lý Hàng đợi (PR 3)
