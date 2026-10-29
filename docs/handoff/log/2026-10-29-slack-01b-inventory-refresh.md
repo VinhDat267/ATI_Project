@@ -1,9 +1,9 @@
 # 29/10/2026 · SLACK-01B — Làm mới kiểm kê phương thức Slack API lên 354 phương thức
 
-**Ủy quyền:** Điều phối viên giao nhiệm vụ cập nhật tài liệu kiểm kê theo đề xuất khảo sát (Reconnaissance). Chỉ thực hiện thay đổi tài liệu trong phạm vi thẻ SLACK-01B; không sửa code runtime, không gọi Slack API hay bật live.  
-**Nhánh:** `VinhDat267/slack-api-inventory-refresh`. **Nền:** `fc12e3fbd683f9ffee53322b4f5fc132d50fc2ac`.  
-**Task card:** `docs/handoff/tasks/SLACK-01B-inventory-refresh.md`.  
-**PR:** [#185](https://github.com/VinhDat267/ATI_Project/pull/185) (Draft).  
+**Ủy quyền:** Điều phối viên giao nhiệm vụ cập nhật tài liệu kiểm kê theo đề xuất khảo sát (Reconnaissance). Chỉ thực hiện thay đổi tài liệu trong phạm vi thẻ SLACK-01B; không sửa code runtime, không gọi Slack API hay bật live.
+**Nhánh:** `VinhDat267/slack-api-inventory-refresh`. **Nền:** `fc12e3fbd683f9ffee53322b4f5fc132d50fc2ac`.
+**Task card:** `docs/handoff/tasks/SLACK-01B-inventory-refresh.md`.
+**PR:** [#185](https://github.com/VinhDat267/ATI_Project/pull/185) (Draft).
 **Tài liệu sửa đổi:** `docs/slack/method-inventory.json`, `docs/slack/method-inventory.md`.
 
 ---
@@ -14,6 +14,7 @@
   - Thu thập sitemap chính thức `https://docs.slack.dev/sitemap.xml` (SHA256: `cdb9942404d682075921303e82dc858f27a3f52911042cdec76b9a9a95dd6d6b`, kích thước 329.263 bytes) qua collector HTTPS allowlist có giới hạn kết nối (tối đa 2 inflight, timeout 10 s).
   - Toàn bộ 343 phương thức trong snapshot cũ đều có mặt trong sitemap trực tiếp và giữ nguyên mã băm nguồn `sourceSha256` giống từng byte; các chú thích đã duyệt (`reviewed`) được bảo toàn tuyệt đối.
   - Toàn bộ nội dung tài liệu Markdown thô được lưu tạm tại thư mục bị ignore `.superpowers/slack-inventory-recon/cache/`, không commit nội dung thô có bản quyền vào kho mã.
+  - Snapshot SHA256 chính xác của `docs/slack/method-inventory.json`: `e55bc180eb43c71c1131dbded5968c1e240d3424fe1314bf604139055c074f09`.
 - **Thẩm định & phân loại 11 phương thức mới:**
   - **4 phương thức Enterprise Admin (`admin.slackbot.skills.*`):**
     - `admin.slackbot.skills.list` (POST, t2, user scope `admin.skills:read`)
@@ -50,11 +51,22 @@
 | `node scripts/slack/inventory.mjs verify --input docs/slack/method-inventory.json` | `{"mode":"documentation","methods":354,"dispositions":{"candidate":0,"excluded":101,"probe_required":253},"verifiedLive":false}` | `0` |
 | `node --test scripts/slack/inventory.test.mjs` | **27 tests passed**, 0 fail, 0 skipped. Thời gian: 1198 ms. | `0` |
 | `npm run test:slack:foundation` | **105 tests passed** (56 Node tests + 49 schema tests), 0 fail. | `0` |
-| `git diff --check` | Không có khoảng trắng thừa, không có lỗi định dạng hay conflict marker. | `0` |
+| `git diff --check fc12e3fb HEAD` | **Exit 0**, hoàn toàn sạch trailing whitespace trên toàn bộ diff base-to-head. | `0` |
 
 ---
 
-## 3. Giới hạn và các phạm vi không thực hiện
+## 3. Nghiệm thu độc lập từ Điều phối viên (Coordinator Independent Review)
+
+Điều phối viên đã chạy nghiệm thu độc lập tại commit `09d4ee88`:
+- **Inventory source review:** **PASS** (toàn bộ 354 file Markdown được cache khớp từng byte `sourceSha256` và metadata trích xuất; toàn bộ 343 chú thích ban đầu giữ nguyên).
+- **Fresh foundation test:** 56 Node + 49 schema = **105 passed**, exit 0.
+- **Snapshot SHA256 chính xác:** `e55bc180eb43c71c1131dbded5968c1e240d3424fe1314bf604139055c074f09`.
+- **Finding whitespace & điều chỉnh bằng chứng:** Lệnh `git diff --check fc12e3fb HEAD` phát hiện 7 dòng có trailing spaces ở taskcard và handoff log (do ký tự xuống dòng markdown `  `). Ở commit sửa chữa này, toàn bộ 7 dòng đã được xóa trailing whitespace; lệnh `git diff --check fc12e3fb HEAD` đạt exit 0 chuẩn xác từ base tới head.
+- **Quy chuẩn checklist:** Tiêu chí "test mới viết trước và fail trước khi sửa" là **N/A** (documentation refresh thuần túy không cần test runtime giả lập).
+
+---
+
+## 4. Giới hạn và các phạm vi không thực hiện
 
 - **Native Slack API / OAuth live:** **NOT_RUN**, hoàn toàn nằm ngoài phạm vi thẻ tài liệu này. Không gọi Slack endpoint thật, không tạo Slack app và không kiểm tra token live.
 - **Model evaluation / LLM prompt:** **NOT_RUN**, không đăng ký tool hay đưa bất kỳ phương thức nào vào prompt planner.
