@@ -1,5 +1,7 @@
 import type pg from 'pg';
 import { createHash } from 'node:crypto';
+import type { SlackInvalidationService } from '../../services/slack/slack-invalidation-service.js';
+import type { SlackBinding, SlackPurgeTarget } from '@wap/tool-schemas';
 const hash = (s: string) => createHash('sha256').update(s).digest('hex');
 export interface SlackConnectionRow {
   id: string; user_id: string; app_id: string; workspace_id: string; workspace_name: string; actor_id: string;
@@ -10,7 +12,7 @@ export interface SlackConnectionRow {
 interface SaveInput { appId: string; workspaceId: string; workspaceName: string; actorId: string; config: string; scopes: string[] }
 /** Owner lock survives committed refresh checkpoints, also across Node processes. */
 export class SlackConnectionRepo {
-  constructor(private pool: pg.Pool) {}
+  constructor(private pool: pg.Pool, private invalidationService?: SlackInvalidationService) {}
   async withOwner<T>(userId: string, action: (client: pg.PoolClient) => Promise<T>): Promise<T> {
     const client = await this.pool.connect();
     try {
@@ -75,6 +77,43 @@ export class SlackConnectionRepo {
       try {
         await c.query('DELETE FROM slack_oauth_states WHERE user_id=$1', [userId]);
         await c.query("UPDATE slack_connections SET status='disconnected',config=NULL,identity_version=identity_version+1,refresh_in_flight=false WHERE id=$1 AND user_id=$2 AND status<>'disconnected'", [id, userId]);
+        if (row && row.status !== 'disconnected' && this.invalidationService) {
+          const oldBinding: SlackBinding = {
+            atiUserId: row.user_id,
+            connectionId: row.id,
+            workspaceId: row.workspace_id,
+            slackUserId: row.actor_id,
+            identityVersion: row.identity_version,
+          };
+          const purgeTarget: SlackPurgeTarget = {
+            scope: 'authorization_disconnect',
+            binding: oldBinding,
+            cascadeTargetKinds: [
+              'chat_history_message',
+              'working_memory_entity',
+              'plan_step_arg',
+              'proposal_excerpt',
+              'daily_digest_entry',
+              'scheduled_workflow_arg',
+              'audit_log_entry',
+            ],
+            tombstoneReason: 'connection_disconnected',
+          };
+          await this.invalidationService.stageInTransaction(c, {
+            sourceEventKey: `disconnect:${row.id}:${row.identity_version}`,
+            effects: [
+              {
+                effectKey: 'authorization_disconnect',
+                barrier: {
+                  barrierType: 'binding',
+                  binding: oldBinding,
+                  reason: 'connection_disconnected',
+                },
+                purgeTarget,
+              },
+            ],
+          });
+        }
         await c.query('COMMIT');
       } catch (e) { await c.query('ROLLBACK'); throw e; }
       if (row?.status !== 'disconnected' && row?.config && revoke) await revoke(row);

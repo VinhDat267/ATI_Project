@@ -57,32 +57,71 @@
 
 ## 2. Published Interfaces
 
-### 2.1. Transaction-Bound Ingress Interface (Thống Nhất Cho Consumer SLACK-04A)
+### 2.1. Transaction-Bound Ingress Interface (Thống Nhất `stageInTransaction` Cho Consumer SLACK-04A & 03B1)
+Tham chiếu quyết định chuẩn tắc: [`docs/handoff/decisions/2026-10-29-slack-source-ingress-contracts.md`](../../handoff/decisions/2026-10-29-slack-source-ingress-contracts.md).
 ```ts
-export interface InvalidationBarrierInput {
-  barrierType: 'connection' | 'channel' | 'epoch' | 'resource';
-  workspaceId: string;
-  connectionId?: string;
-  channelId?: string;
-  resourceType?: SlackResourceType;
-  resourceId?: string;
-  epoch?: SlackPolicyEpoch;
-  beforeConsentRevision?: string;
-  beforeProviderRevision?: string;
+export type SlackInvalidationBarrier =
+  | {
+      barrierType: 'binding';
+      binding: SlackBinding; // đầy đủ 5 trường
+      reason: string;
+    }
+  | {
+      barrierType: 'channel';
+      binding: SlackBinding; // đầy đủ 5 trường
+      channelId: string;
+      reason: string;
+    }
+  | {
+      barrierType: 'epoch';
+      epoch: SlackPolicyEpoch;
+      reason: string;
+    }
+  | {
+      barrierType: 'resource';
+      workspaceId: string;
+      resourceType: SlackResourceType;
+      resourceId: string;
+      minValidRevision?: string;
+      deleted?: boolean;
+      reason: string;
+    }
+  | {
+      barrierType: 'provisional_auth';
+      binding: SlackBinding;
+      sourceEventKey: string;
+      credentialFingerprint?: string;
+      provisionalAction: string;
+      reason: string;
+    };
+
+export interface InvalidationEffect {
+  effectKey: string;
+  barrier: SlackInvalidationBarrier;
+  purgeTarget?: SlackPurgeTarget;
+}
+
+export interface StageInTransactionInput {
+  sourceEventKey: string; // namespaced e.g. "slack:app:evt" hoặc "policy:evt"
+  effects: InvalidationEffect[];
+}
+
+export interface StageInTransactionResult {
+  receiptId: string;
+  barrierIds: string[];
+  intentIds: string[];
 }
 
 export interface ISlackInvalidationCoordinator {
   /**
-   * Chạy trong transaction pg.PoolClient của 04A Ingress.
-   * Tạo rào chắn đọc trong slack_invalidation_barriers và ghi intent bền vững
-   * trong slack_invalidation_intents trước khi 04A commit và gửi HTTP 200 ACK cho Slack.
-   * Khóa ổn định: (target.scope, eventId, resourceKey). Không yêu cầu notification authority.
+   * Chạy trong transaction pg.PoolClient của 04A Ingress hoặc Policy Event Consumer.
+   * Tạo receipt, effects, read barriers và purge intents nguyên tử trước ACK / commit.
+   * Receipt UNIQUE(source_event_key) và Barrier/Intent UNIQUE(source_event_key, effect_key) đều NON-NULL.
    */
-  commitLifecycleInvalidation(
+  stageInTransaction(
     client: pg.PoolClient,
-    target: SlackPurgeTarget,
-    barrier?: InvalidationBarrierInput
-  ): Promise<void>;
+    input: StageInTransactionInput
+  ): Promise<StageInTransactionResult>;
 }
 ```
 
@@ -151,36 +190,55 @@ CREATE INDEX IF NOT EXISTS idx_slack_sources_expiration
 CREATE INDEX IF NOT EXISTS idx_slack_sources_lookup
   ON slack_sources(user_id, connection_id, resource_type, resource_id);
 
--- 2. Bảng rào chắn đọc tức thì (Durable Read Barriers)
+-- 2. Bảng biên nhận sự kiện vô hiệu hóa (Idempotent Event Receipt Store)
+CREATE TABLE IF NOT EXISTS slack_invalidation_receipts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  source_event_key TEXT NOT NULL UNIQUE,
+  payload_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 3. Bảng rào chắn đọc tức thì (Durable Read Barriers)
 CREATE TABLE IF NOT EXISTS slack_invalidation_barriers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  barrier_type TEXT NOT NULL CHECK (barrier_type IN ('connection', 'channel', 'epoch', 'resource')),
+  source_event_key TEXT NOT NULL,
+  effect_key TEXT NOT NULL,
+  barrier_type TEXT NOT NULL CHECK (barrier_type IN ('binding', 'channel', 'epoch', 'resource', 'provisional_auth')),
   workspace_id TEXT NOT NULL,
   connection_id UUID REFERENCES slack_connections(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  slack_user_id TEXT,
+  identity_version INT,
   channel_id TEXT,
   resource_type TEXT,
   resource_id TEXT,
+  min_valid_revision TEXT,
+  deleted BOOLEAN NOT NULL DEFAULT false,
   epoch_hash TEXT,
-  before_consent_revision TEXT,
-  before_provider_revision TEXT,
+  epoch_json JSONB,
+  provisional BOOLEAN NOT NULL DEFAULT false,
+  provisional_action TEXT,
+  credential_fingerprint TEXT,
+  reason TEXT NOT NULL,
   active BOOLEAN NOT NULL DEFAULT true,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT uq_slack_barriers_source_effect UNIQUE(source_event_key, effect_key)
 );
 CREATE INDEX IF NOT EXISTS idx_slack_barriers_active
   ON slack_invalidation_barriers(workspace_id, barrier_type) WHERE active = true;
-
--- 3. Bảng biên nhận sự kiện chính sách (Idempotent Event Receipt Store)
-CREATE TABLE IF NOT EXISTS slack_processed_policy_events (
-  event_id UUID PRIMARY KEY,
-  processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+CREATE INDEX IF NOT EXISTS idx_slack_barriers_connection
+  ON slack_invalidation_barriers(connection_id, identity_version) WHERE active = true;
+CREATE INDEX IF NOT EXISTS idx_slack_barriers_resource
+  ON slack_invalidation_barriers(workspace_id, resource_type, resource_id) WHERE active = true;
+CREATE INDEX IF NOT EXISTS idx_slack_barriers_epoch
+  ON slack_invalidation_barriers(epoch_hash) WHERE active = true;
 
 -- 4. Hàng đợi ý định vô hiệu hóa bền vững (Durable Invalidation Queue)
 CREATE TABLE IF NOT EXISTS slack_invalidation_intents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  policy_event_id UUID REFERENCES slack_policy_events(id) ON DELETE CASCADE,
+  source_event_key TEXT NOT NULL,
+  effect_key TEXT NOT NULL,
   target_kind TEXT NOT NULL,
-  epoch_hash TEXT,
   purge_target JSONB NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
   attempts INT NOT NULL DEFAULT 0,
@@ -189,7 +247,7 @@ CREATE TABLE IF NOT EXISTS slack_invalidation_intents (
   last_error TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   completed_at TIMESTAMPTZ,
-  CONSTRAINT uq_slack_intents_composite UNIQUE(policy_event_id, epoch_hash, target_kind)
+  CONSTRAINT uq_slack_intents_source_effect_target UNIQUE(source_event_key, effect_key, target_kind)
 );
 CREATE INDEX IF NOT EXISTS idx_slack_intents_claim
   ON slack_invalidation_intents(status, leased_until) WHERE status IN ('pending', 'failed');

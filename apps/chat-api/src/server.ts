@@ -22,6 +22,10 @@ import { createScheduleRuntime } from './config/schedules-runtime.js';
 import { AdapterFactory, type AdapterContext } from './services/adapter-factory.js';
 import { GmailConnectionRepo } from './db/repositories/gmail-connection-repo.js';
 import { SlackConnectionRepo } from './db/repositories/slack-connection-repo.js';
+import { SlackSourceRepo } from './db/repositories/slack-source-repo.js';
+import { SlackInvalidationService } from './services/slack/slack-invalidation-service.js';
+import { SlackPolicyEventConsumer } from './services/slack/slack-policy-event-consumer.js';
+import { SlackInvalidationRunner } from './services/slack/slack-invalidation-runner.js';
 import { GmailOAuthClient } from './services/gmail/oauth-client.js';
 import { GmailTokenManager } from './services/gmail/token-manager.js';
 import { createGmailConnectionLookup, createMyCalendarConnectionLookup, createMySheetsConnectionLookup } from './services/gmail/connection-reference.js';
@@ -348,9 +352,22 @@ async function bootstrap() {
 
   if (!env.EMAIL_ENABLED) console.warn('\x1b[33m[chat-api] Chưa cấu hình SMTP: đăng ký, xác minh email và quên mật khẩu tạm tắt (503).\x1b[0m');
 
-  // 7. Express App
+  // 7. Slack Invalidation & Source Store Runtime
+  const slackInvalidationService = pool ? new SlackInvalidationService(pool) : undefined;
+  const slackSourceRepo = pool ? new SlackSourceRepo(pool) : undefined;
+  const slackPolicyEventConsumer = (pool && slackInvalidationService && slackSourceRepo)
+    ? new SlackPolicyEventConsumer(pool, slackInvalidationService, slackSourceRepo)
+    : undefined;
+  const slackInvalidationRunner = (slackSourceRepo && slackInvalidationService && slackPolicyEventConsumer)
+    ? new SlackInvalidationRunner(slackSourceRepo, slackInvalidationService, slackPolicyEventConsumer, {
+        sweepIntervalMs: 5000,
+        batchSize: 50,
+      })
+    : undefined;
+
+  // 8. Express App
   const app = createApp({
-    myslack: env.MYSLACK_OAUTH && pool && userRepo ? { oauth: env.MYSLACK_OAUTH, repo: new SlackConnectionRepo(pool) } : undefined,
+    myslack: env.MYSLACK_OAUTH && pool && userRepo ? { oauth: env.MYSLACK_OAUTH, repo: new SlackConnectionRepo(pool, slackInvalidationService) } : undefined,
     jwtSecret: env.JWT_SECRET,
     runtimeMode: env.RUNTIME_MODE,
     userRepo,
@@ -397,6 +414,9 @@ async function bootstrap() {
     sseManager,
     executionService,
     schedules: schedules ? { service: schedules.service, emit: (convId, event, payload) => sseManager.emitEvent(convId, event, payload) } : undefined,
+    slackSourceRepo,
+    slackInvalidationService,
+    slackInvalidationRunner,
   });
 
   const host = env.RUNTIME_MODE === 'sandbox' ? '127.0.0.1' : '0.0.0.0';
@@ -404,7 +424,18 @@ async function bootstrap() {
     console.log(`\x1b[32m[chat-api] ✓ Server đang lắng nghe tại http://${host}:${port}\x1b[0m`);
     console.log(`\x1b[36m[chat-api] ✓ Health check: http://${host}:${port}/api/health\x1b[0m`);
     schedules?.runner.start();
+    slackInvalidationRunner?.start();
   });
+
+  const shutdown = async () => {
+    schedules?.runner.stop();
+    if (slackInvalidationRunner) {
+      await slackInvalidationRunner.stop();
+    }
+    process.exit(0);
+  };
+  process.once('SIGINT', shutdown);
+  process.once('SIGTERM', shutdown);
 }
 
 bootstrap().catch((err) => {
