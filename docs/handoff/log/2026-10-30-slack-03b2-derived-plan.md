@@ -27,7 +27,7 @@ Chỉ các kiểm tra tài liệu dưới đây được chạy trong phiên nà
 | Hạng mục | Lệnh / cách kiểm | Kết quả thực tế |
 |---|---|---|
 | Số dòng plan | `wc -l docs/superpowers/plans/2026-10-30-slack-03b2-derived-lineage-and-purge.md` | `260` (≤350) |
-| UTF-8, BOM, U+FFFD | Node `Buffer` + regex trên 3 tệp | Cả 3 tệp: `bom=false`, `U+FFFD=0`; task 43833 bytes, plan 30928 bytes; log tự tham chiếu nên không ghi kích thước |
+| UTF-8, BOM, U+FFFD | Node `Buffer` + regex trên 3 tệp | Cả 3 tệp: `bom=false`, `U+FFFD=0`; task 44314 bytes, plan 31359 bytes; log tự tham chiếu nên không ghi kích thước |
 | Liên kết markdown tồn tại | Script kiểm từng link tương đối trong 3 tệp | `checked=4 missing=none`, exit 0 |
 | Whitespace/conflict (working tree) | `git diff --check e9088d5e` | exit 0, không output |
 | Đúng 3 tệp sở hữu (working tree) | `git diff --name-only e9088d5e` | 3 tệp: log, task card, plan |
