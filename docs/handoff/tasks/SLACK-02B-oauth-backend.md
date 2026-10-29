@@ -68,7 +68,7 @@ Triển khai phần backend còn lại của SLACK-02, trọng tâm là **Chính
 - [x] Các tests hiện hữu của PR #184 và 02R tiếp tục pass 100% nhờ lớp tương thích chuẩn 02A (`validateSlackConnectionPublicInfo` + safe legacy aliases).
 - [x] Không có secret hay token nào bị lọt vào log, exception hay API responses.
 - [x] `npm run typecheck:v3` đạt exit code 0; `npm run check` toàn diện đạt 3,167 tests pass (exit code 0); `git diff --check` đạt 0 lỗi whitespace.
-- [x] Vượt qua 4/4 ca kiểm thử phản biện độc lập của Leader (`.superpowers/slack02b-resume/leader-policy-review.mts` EXIT 0) và 13/13 ca kiểm thử hợp đồng chính sách nghiêm ngặt (`.superpowers/slack02b-resume/leader-policy-contract-review.mts` EXIT 0).
+- [x] Vượt qua 4/4 ca kiểm thử phản biện độc lập của Leader (`.superpowers/slack02b-resume/leader-policy-review.mts` EXIT 0) và 17/17 ca kiểm thử hợp đồng chính sách toàn diện (`.superpowers/slack02b-resume/leader-policy-contract-review.mts` EXIT 0).
 - [x] Hỗ trợ đầy đủ luồng điều hướng `returnTo` (`/c/<uuid>` kiểm tra quyền sở hữu hội thoại, lưu vào state và bảo toàn tới callback kết quả; tái kiểm tra quyền sở hữu khi callback để an toàn bỏ qua nếu hội thoại bị xóa/chuyển giao) cùng tham số gợi ý workspace `workspaceHint`.
 
 ---
@@ -91,7 +91,7 @@ Triển khai phần backend còn lại của SLACK-02, trọng tâm là **Chính
   - `apps/chat-api/src/app.ts`: Gắn `conversationOwner` vào `createSlackConnectionRoutes`.
   - `apps/chat-api/package.json`: Thêm script `"admin:slack-consent"`.
 - **Bằng chứng kiểm thử thực tế:**
-  - `.superpowers/slack02b-resume/leader-policy-contract-review.mts`: **13/13 tests PASS (EXIT 0)** (JSON BigInt fix, full binding/context, empty reference rejection, tampered binding rejection, cross-user in same workspace rejection, noncanonical revision string rejection, server-owned runtime provider configuration, canonical policy reference roundtrips without invented legacy fields, numeric revision rejection, unconfigured service cannot trust caller-supplied env, missing explicit account identity never receives implicit fixture account, unknown runtime provider kind remains unverified, openai-compatible missing actual endpoint remains unverified).
+  - `.superpowers/slack02b-resume/leader-policy-contract-review.mts`: **17/17 tests PASS (EXIT 0)** (Gemini default provider, JSON BigInt fix, full binding/context, empty reference rejection, tampered binding rejection, cross-user in same workspace rejection, noncanonical revision string rejection, server-owned runtime provider configuration, canonical policy reference roundtrips without invented legacy fields, numeric revision rejection, unconfigured service cannot trust caller-supplied env, CAS revision required, unready when retention exceeds provider cap, revoke/regrant invalidation, missing explicit account identity never receives implicit fixture account, unknown runtime provider kind remains unverified, openai-compatible missing actual endpoint remains unverified).
   - `.superpowers/slack02b-resume/leader-policy-review.mts`: **4/4 tests PASS (EXIT 0)** (mô hình 3.8, CAS bắt buộc, unready khi vượt trần retention, từ chối reference cũ).
   - `apps/chat-api/tests/db/slack-consent-repo.test.ts`: **10/10 tests PASS** (PostgreSQL CAS, retention 0, events atomicity, repeat migration, bắt buộc revision).
   - `apps/chat-api/tests/cli/slack-consent-cli.test.ts`: **6/6 tests PASS** (spawn CLI child process, validation, CAS conflict).

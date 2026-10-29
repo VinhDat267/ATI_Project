@@ -47,7 +47,7 @@ Harness phản biện độc lập của Leader tại `.superpowers/slack02b-res
 
 | Bộ kiểm thử | Kết quả thực tế | Ghi chú |
 |---|---|---|
-| `.superpowers/slack02b-resume/leader-policy-contract-review.mts` | **13/13 PASS** (EXIT 0) | Vượt qua 13 ca kiểm thử hợp đồng chính sách nghiêm ngặt (BigInt serialization, context/binding, revision canonical strings, server-owned runtime config, rejection of caller env override, endpoint & account id checks) |
+| `.superpowers/slack02b-resume/leader-policy-contract-review.mts` | **17/17 PASS** (EXIT 0) | Vượt qua toàn diện 17 ca kiểm thử hợp đồng chính sách (Gemini default model, BigInt serialization, context/binding, revision canonical strings, server-owned runtime config, rejection of caller env override, endpoint & account id checks, CAS revisions, provider retention cap, revoke-regrant invalidation) |
 | `.superpowers/slack02b-resume/leader-policy-review.mts` | **4/4 PASS** (EXIT 0) | Vượt qua toàn bộ 4 bài test phản biện độc lập của Leader trên DB 55533 |
 | `tests/db/slack-consent-repo.test.ts` | **10/10 PASS** (2.20s) | CAS monotonic revisions, validation, 0 retention, atomic policy event, bắt buộc revision |
 | `tests/cli/slack-consent-cli.test.ts` | **6/6 PASS** (5.30s) | Spawn process CLI thật, attest, grant, revoke, flags validation, CAS conflict exit 1 |
