@@ -1,6 +1,6 @@
 # SLACK-03A · Hợp đồng Interface Nguồn, ACL, Vòng đời & Siêu Dữ Liệu Công Cụ (@wap/tool-schemas)
 
-**Trạng thái:** DỰ THẢO KẾ HOẠCH (Chờ Reviewer & Nhóm trưởng duyệt; chưa thực thi code).
+**Trạng thái:** HOÀN THÀNH (Đã kiểm thử 100% tests PASS; Chờ Reviewer & Nhóm trưởng nghiệm thu).
 **Nhánh công việc:** `VinhDat267/docs-slack-03a-source` · **Nền:** `b757ae0` (từ `integration/slack-personal-20261029`).
 **Vai trò sở hữu:** Integration / AI Engineer (chỉ sở hữu thư mục `packages/tool-schemas/`).
 **Phụ thuộc:**
@@ -228,14 +228,33 @@ Trước khi Backend (03B) và Adapter (03C) thi công mã nguồn, các module 
 
 ## 6. Tiêu Chí Nghiệm Thu (Acceptance Criteria)
 
-- [ ] Toàn bộ interface và hàm validator xuất phát từ `packages/tool-schemas/`.
-- [ ] Không có thay đổi nào trong `apps/`, `packages/tool-adapters/` hay `packages/executor/`.
-- [ ] Kế thừa `SlackBinding` và `SlackSourceRef` nguyên bản, không tạo bản sao trùng lặp.
-- [ ] `formatSlackOwnerSourceKey` mã hoá cấu trúc tuple JSON đầy đủ binding + tài nguyên; 2 người dùng ATI khác nhau cùng workspace có khoá nguồn riêng biệt.
-- [ ] `validateSlackPolicyReference` kiểm tra định dạng positive canonical decimal string (`/^[1-9][0-9]*$/`) cho cả `consentRevision` và `providerRevision`; từ chối số 0 hoặc số có số 0 ở đầu; kiểm tra `purpose` thuộc 5 giá trị chuẩn tắc.
-- [ ] `decideSlackSourceStorage` mở rộng trực tiếp `myslack-policy.ts`, chặn đứng việc lưu trữ bền vững khi `retentionDays === 0`.
-- [ ] Hợp đồng xoá nguồn `SlackPurgeTarget` phân biệt rõ 5 tagged scopes: `owner_retention`, `channel_membership_lost`, `authorization_disconnect`, `resource_lifecycle`, `workspace_consent_revocation`.
-- [ ] `validateSlackToolExecutionArgs` kiểm tra fail-closed theo schema tham số cố định, từ chối tham số lạ.
-- [ ] `SlackMethodFamily` chứa đúng 36 tên snapshot family từ inventory; `userScopes` phân biệt rõ `null` (unknown) với `[]` (empty).
-- [ ] `ALL_TOOLS` và `SERVICE_REGISTRY` tuyệt đối không chứa `myslack`.
-- [ ] Sổ cái 354 phương thức khớp 100% snapshot PR 185 (253 probe_required, 101 excluded, 265 with_scopes, 89 unknown_scopes).
+- [x] Toàn bộ interface và hàm validator xuất phát từ `packages/tool-schemas/`.
+- [x] Không có thay đổi nào trong `apps/`, `packages/tool-adapters/` hay `packages/executor/`.
+- [x] Kế thừa `SlackBinding` và `SlackSourceRef` nguyên bản, không tạo bản sao trùng lặp.
+- [x] `formatSlackOwnerSourceKey` mã hoá cấu trúc tuple JSON đầy đủ binding + tài nguyên; 2 người dùng ATI khác nhau cùng workspace có khoá nguồn riêng biệt.
+- [x] `validateSlackPolicyReference` kiểm tra định dạng positive canonical decimal string (`/^[1-9][0-9]*$/`) cho cả `consentRevision` và `providerRevision`; từ chối số 0 hoặc số có số 0 ở đầu; kiểm tra `purpose` thuộc 5 giá trị chuẩn tắc.
+- [x] `decideSlackSourceStorage` mở rộng trực tiếp `myslack-policy.ts` và ủy quyền `decideSlackModelUse`, chặn đứng việc lưu trữ bền vững khi `retentionDays === 0`.
+- [x] Hợp đồng xoá nguồn `SlackPurgeTarget` phân biệt rõ 5 tagged scopes: `owner_retention`, `channel_membership_lost`, `authorization_disconnect`, `resource_lifecycle`, `workspace_consent_revocation`.
+- [x] `validateSlackToolExecutionArgs` kiểm tra fail-closed theo schema tham số cố định, từ chối tham số lạ.
+- [x] `SlackMethodFamily` chứa đúng 36 tên snapshot family từ inventory; `userScopes` phân biệt rõ `null` (unknown) với `[]` (empty).
+- [x] `ALL_TOOLS` và `SERVICE_REGISTRY` tuyệt đối không chứa `myslack`.
+- [x] Sổ cái 354 phương thức khớp 100% snapshot PR 185: `sourceCommit 811f5dc9121d372f232efb63d9880d9574648e3a`, `inventoryFileSha256 e55bc180eb43c71c1131dbded5968c1e240d3424fe1314bf604139055c074f09` (253 probe_required, 101 excluded, 265 with_scopes, 89 unknown_scopes).
+
+---
+
+## 7. Kết Quả Thực Thi (Execution Results)
+
+| Tiêu chuẩn kiểm tra | Lệnh thực hiện | Kết quả thực tế |
+|---|---|---|
+| Kiểm tra toàn bộ test suite package `@wap/tool-schemas` | `npm test -w @wap/tool-schemas` | **15 test files PASS, 251 tests PASS**, exit code 0 |
+| Kiểm tra bộ test Slack đầy đủ | `npx vitest run packages/tool-schemas/tests/myslack-*.test.ts` | **5 test files PASS, 183 tests PASS** (context 47, connection 67, policy 32, source 21, tools 16), exit code 0 |
+| Kiểm tra static types toàn workspace v3 | `npm run typecheck:v3` | **PASS**, exit code 0 (`apps/chat-api` và `apps/chat-web` typecheck sạch sẽ) |
+| Kiểm tra đối soát cơ học 354 entries | Node.js assertion script | **100% 354 methods PASS**, 101 excluded khớp chính xác lý do từ `method.reason`, 253 probe_required, hash khớp `e55bc180eb43c71c1131dbded5968c1e240d3424fe1314bf604139055c074f09` |
+| Kiểm tra cú pháp Whitespace | `git diff --check b757ae0` | Sạch sẽ, exit code 0, không có trailing whitespace |
+| Ranh giới Module Ownership | Kiểm tra git status | Chỉ sửa đổi `packages/tool-schemas/` và tài liệu kế hoạch/handoff của SLACK-03A |
+
+### Ranh giới rõ ràng (Explicit Boundaries):
+- **NOT_RUN:** Không thực hiện bất kỳ lệnh gọi API Slack thực tế nào (`offline contracts only`).
+- **NOT_RUN:** Không thực hiện gọi mô hình LLM trên dữ liệu Slack.
+- **NOT_RUN:** Không chỉnh sửa mã nguồn của Backend (03B) hay Tool Adapters (03C); các module này sẽ được triển khai ở các dispatch tiếp theo sau khi 02B được nghiệm thu.
+- **Bảo toàn:** Toàn bộ công việc của các agent khác được giữ nguyên; không chỉnh sửa `CURRENT-STATE.md`, `ROADMAP.md` hay 02 cards.
