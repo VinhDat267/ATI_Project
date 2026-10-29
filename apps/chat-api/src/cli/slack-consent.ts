@@ -235,4 +235,3 @@ async function main() {
 if (process.argv[1] && process.argv[1].replace(/\\/g, '/').includes('slack-consent.ts')) {
   main();
 }
-

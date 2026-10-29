@@ -269,4 +269,3 @@ describe('Slack organization processing consent on PostgreSQL', () => {
     expect(consent?.status).toBe('revoked');
   });
 });
-
