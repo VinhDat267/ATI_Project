@@ -283,6 +283,27 @@ describe('Slack Tool Catalog Metadata & Fail-Closed Execution Contracts', () => 
         })
       ).toThrow(TypeError);
     });
+
+    it('unknown method in a known family remains rejected with a matching invented name', () => {
+      expect(() =>
+        validateSlackToolExecutionArgs(
+          { ...MYSLACK_CHAT_POST_MESSAGE_TOOL, name: 'myslack.chat_nonexistent', method: 'chat.nonexistent' },
+          { binding, channel: 'C1', text: 'fixture' }
+        )
+      ).toThrow(TypeError);
+    });
+
+    it('known method cannot weaken its canonical text schema through caller metadata', () => {
+      const weakened = structuredClone(MYSLACK_CHAT_POST_MESSAGE_TOOL);
+      (weakened.inputSchema.properties as any).text = { type: 'object', additionalProperties: true };
+      expect(() =>
+        validateSlackToolExecutionArgs(weakened, {
+          binding,
+          channel: 'C1',
+          text: { access_token: 'FIXTURE_SECRET_SHOULD_NOT_PASS' },
+        })
+      ).toThrow(TypeError);
+    });
   });
 
   describe('Global Registry Invariants', () => {

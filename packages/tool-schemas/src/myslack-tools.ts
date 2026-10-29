@@ -350,6 +350,10 @@ export const MYSLACK_SAMPLE_TOOLS: readonly SlackToolDefinition[] = [
   MYSLACK_USERS_INFO_TOOL,
 ] as const;
 
+const CANONICAL_SLACK_TOOL_MAP = new Map<string, SlackToolDefinition>(
+  MYSLACK_SAMPLE_TOOLS.map(t => [t.name, t])
+);
+
 function validateSchemaValue(
   schema: Record<string, any>,
   val: unknown,
@@ -489,15 +493,24 @@ export function validateSlackToolExecutionArgs<TParams = Record<string, unknown>
     throw new TypeError(`Tool method "${validTool.method}" family "${methodFamily}" is invalid or does not match declared family "${validTool.family}"`);
   }
 
+  // Enforce declared executable tools registry
+  const canonicalTool = CANONICAL_SLACK_TOOL_MAP.get(validTool.name);
+  if (!canonicalTool || canonicalTool.method !== validTool.method) {
+    throw new TypeError(`Tool method "${validTool.method}" is not a declared executable Slack tool`);
+  }
+
   if (!args || typeof args !== 'object' || Array.isArray(args)) {
-    throw new TypeError(`Invalid execution arguments for tool ${validTool.name}: must be an object`);
+    throw new TypeError(`Invalid execution arguments for tool ${canonicalTool.name}: must be an object`);
   }
   const record = args as Record<string, unknown>;
 
   if (!Object.hasOwn(record, 'binding')) {
-    throw new TypeError(`Execution arguments for tool ${validTool.name} missing binding`);
+    throw new TypeError(`Execution arguments for tool ${canonicalTool.name} missing binding`);
   }
   const cleanBinding = validateSlackBinding(record.binding);
+
+  // Always use the canonical declared schema (detached copy) to prevent caller weakening
+  const canonicalSchema = structuredClone(canonicalTool.inputSchema) as Record<string, any>;
 
   let rawParams: Record<string, unknown> = {};
 
@@ -505,20 +518,20 @@ export function validateSlackToolExecutionArgs<TParams = Record<string, unknown>
     // Nested envelope: fail closed if any unexpected outer properties are present
     for (const key of Object.keys(record)) {
       if (key !== 'binding' && key !== 'params') {
-        throw new TypeError(`Unknown outer argument "${key}" for tool ${validTool.name} (fail-closed)`);
+        throw new TypeError(`Unknown outer argument "${key}" for tool ${canonicalTool.name} (fail-closed)`);
       }
     }
     if (typeof record.params !== 'object' || record.params === null || Array.isArray(record.params)) {
-      throw new TypeError(`Execution arguments params for tool ${validTool.name} must be an object`);
+      throw new TypeError(`Execution arguments params for tool ${canonicalTool.name} must be an object`);
     }
     rawParams = { ...(record.params as Record<string, unknown>) };
   } else {
-    // Flat args: outer properties must match inputSchema
-    const allowedOuter = (validTool.inputSchema.properties ?? {}) as Record<string, any>;
-    if (validTool.inputSchema.additionalProperties === false) {
+    // Flat args: outer properties must match canonicalSchema
+    const allowedOuter = (canonicalSchema.properties ?? {}) as Record<string, any>;
+    if (canonicalSchema.additionalProperties === false) {
       for (const key of Object.keys(record)) {
         if (key !== 'binding' && !Object.hasOwn(allowedOuter, key)) {
-          throw new TypeError(`Unknown property "${key}" for tool ${validTool.name} (fail-closed)`);
+          throw new TypeError(`Unknown property "${key}" for tool ${canonicalTool.name} (fail-closed)`);
         }
       }
     }
@@ -532,15 +545,15 @@ export function validateSlackToolExecutionArgs<TParams = Record<string, unknown>
   // Construct parameter schema without binding
   const paramsSchema: Record<string, any> = {
     type: 'object',
-    properties: { ...validTool.inputSchema.properties },
-    additionalProperties: validTool.inputSchema.additionalProperties,
-    required: Array.isArray(validTool.inputSchema.required)
-      ? validTool.inputSchema.required.filter(r => r !== 'binding')
+    properties: { ...canonicalSchema.properties },
+    additionalProperties: canonicalSchema.additionalProperties,
+    required: Array.isArray(canonicalSchema.required)
+      ? canonicalSchema.required.filter((r: string) => r !== 'binding')
       : [],
   };
   delete paramsSchema.properties.binding;
 
-  const cleanParams = validateObjectSchema(paramsSchema, rawParams, '', validTool.name);
+  const cleanParams = validateObjectSchema(paramsSchema, rawParams, '', canonicalTool.name);
 
   return {
     binding: cleanBinding,
