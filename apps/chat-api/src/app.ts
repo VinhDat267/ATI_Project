@@ -1,5 +1,6 @@
 import express, { type Express, type Request, type Response, type NextFunction } from 'express';
 import { createAuthRoutes } from './routes/auth/index.js';
+import { createNotionConnectionRoutes, type NotionConnectionsOptions } from './routes/connections/notion.js';
 import { createSlackConnectionRoutes, type SlackConnectionsOptions } from './routes/connections/slack.js';
 import { createAccountRoutes } from './routes/auth/account.js';
 import { LoginFailures } from './auth/login-failures.js';
@@ -70,6 +71,7 @@ export interface MySheetsAppOptions {
 }
 
 export interface AppOptions extends AdminUsersOptions {
+  mynotion?: Pick<NotionConnectionsOptions, 'oauth' | 'repo' | 'fetchFn' | 'timeoutMs'>;
   myslack?: Pick<SlackConnectionsOptions, 'oauth' | 'repo' | 'fetchFn' | 'timeoutMs'>;
   jwtSecret: string;
   runtimeMode?: 'sandbox' | 'live';
@@ -205,6 +207,7 @@ export function createApp(options: AppOptions): Express {
     '/api/services',
     authMiddleware,
     createServicesRoutes({ credentialRepo: options.credentialRepo, encryptionKey: options.encryptionKey, fetchFn: options.serviceFetchFn, onCredentialsChanged: options.onCredentialsChanged, adminUserIds: options.serviceAdminUserIds,
+      notionOAuthAvailable: Boolean(options.mynotion && sessionRepo && options.encryptionKey),
       slackOAuthAvailable: Boolean(options.myslack && sessionRepo && options.encryptionKey),
       gmailAvailable: Boolean(gmailRoutes && isGmailAvailable(gmailRoutes)),
       mycalendarAvailable: Boolean(mycalendarRoutes && isMyCalendarAvailable(mycalendarRoutes)),
@@ -212,6 +215,9 @@ export function createApp(options: AppOptions): Express {
   );
 
   if (gmailRoutes) app.use('/api/connections/gmail', createGmailConnectionRoutes(gmailRoutes));
+  if (options.mynotion && sessionRepo && options.encryptionKey) app.use('/api/connections/mynotion', createNotionConnectionRoutes({
+    ...options.mynotion, jwtSecret: options.jwtSecret, sessionRepo, encryptionKey: options.encryptionKey, clock: options.authClock,
+  }));
   if (options.myslack && sessionRepo && options.encryptionKey) app.use('/api/connections/myslack', createSlackConnectionRoutes({
     ...options.myslack, jwtSecret: options.jwtSecret, sessionRepo, encryptionKey: options.encryptionKey, clock: options.authClock,
   }));
