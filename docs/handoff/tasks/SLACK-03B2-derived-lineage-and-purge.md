@@ -1,159 +1,128 @@
-# SLACK-03B2 · Phả Hệ Nguồn Bản Sao Phái Sinh & Cascade Purge Bền Vững
+# SLACK-03B2 · Phả Hệ Bản Sao Phái Sinh & Cascade Purge Bền Vững
 
-**Trạng thái:** DỰ THẢO KẾ HOẠCH — THẨM ĐỊNH BỞI ĐIỀU PHỐI VIÊN (DOCS ONLY, chưa thực thi code runtime).
-**Nhánh công việc dự kiến:** `docs/slack-03b2-derived-plan` (Draft PR vào `integration/slack-personal-20261029`).
-**Nền đối chiếu:** `e9088d5e76e95fa65e3be019226835371e40908d` (trên `integration/slack-personal-20261029`).
-**Vai trò sở hữu:** Backend Engineer (sở hữu độc quyền `apps/chat-api/` và `db/v3/`).
-**Phụ thuộc:**
-- **SLACK-01** (Foundation contracts `SlackBinding`, `SlackSourceRef`, `SlackModelPolicy`, fixture HTTP, probe offline) — ĐÃ HOÀN TẤT (`fc12e3fb`).
-- **SLACK-02** (OAuth, connections, processing consents) — Đang tích hợp qua PR #184/#192.
-- **SLACK-03A** (Schema contracts `SlackPolicyEpoch`, `SlackDerivedCopyRef`, `SlackSourceLineage`, `SlackPurgeTarget` với 6 scopes bao gồm `policy_epoch_invalidated`, PR #194, head `bc8d6b69`) — ĐÃ CHẤP THUẬN.
-- **SLACK-03B1** (Raw source store, durable barriers, queue, policy consumer — sibling `feat/slack-03b1-source-store`, `ctx_29765fc6b1b7`, PR #196) — CHƯA ĐƯỢC CHẤP THUẬN RUNTIME; giao diện consumer được xây dựng dựa trên hợp đồng đóng băng (`frozen interfaces` `e9088d5e`).
-- **SLACK-03C1** (Read adapters — sibling `feat/slack-03c1-read-adapters`, `ctx_89198a2a3d9d`) — CHƯA ĐƯỢC CHẤP THUẬN RUNTIME.
-- **SLACK-04A** (Ingress contracts — `2026-10-29-slack-source-ingress-contracts.md` / `msg_150cb7b10000`) — ĐÃ CHẤP THUẬN GIAO ƯỚC.
+**Trạng thái:** PLAN_ONLY — tài liệu kế hoạch, chưa có mã runtime sản phẩm.
+**Phạm vi bằng chứng:** Toàn bộ kiểm thử runtime trong card này là `[Proposed: NOT_RUN]`. Không có kết luận F3, native Slack, model-use hay tích hợp hai client nào được tuyên bố đã chạy.
+**Nhánh:** `docs/slack-03b2-derived-plan` (PR #198).
+**Nền đối chiếu:** `e9088d5e76e95fa65e3be019226835371e40908d`.
+**Vai trò:** Backend Planning Owner. Chỉ sở hữu 3 tài liệu trong card này.
+**Task cha:** [`SLACK-03-tool-catalog-and-source-lifecycle.md`](SLACK-03-tool-catalog-and-source-lifecycle.md).
+**Kế hoạch:** [`2026-10-30-slack-03b2-derived-lineage-and-purge.md`](../../superpowers/plans/2026-10-30-slack-03b2-derived-lineage-and-purge.md).
+**Giao ước giao diện đóng băng:** [`2026-10-29-slack-source-ingress-contracts.md`](../decisions/2026-10-29-slack-source-ingress-contracts.md).
 
-**Task cha:** [`docs/handoff/tasks/SLACK-03-tool-catalog-and-source-lifecycle.md`](SLACK-03-tool-catalog-and-source-lifecycle.md).
-**Kế hoạch chi tiết:** [`docs/superpowers/plans/2026-10-30-slack-03b2-derived-lineage-and-purge.md`](../../superpowers/plans/2026-10-30-slack-03b2-derived-lineage-and-purge.md).
-
----
-
-## 1. Mục Tiêu & Ranh Giới Phạm Vi Bounded
-
-Card này thiết kế cơ chế đăng ký phả hệ chuẩn hóa bền vững (`slack_derived_copies` và `slack_derived_provenance_segments`) cho mọi bản sao phái sinh mang dữ liệu Slack, gắn kết nguyên tử với thao tác ghi thực tế trong một giao dịch PostgreSQL, rào chắn kiểm tra toàn diện trước mọi thao tác đọc/render/model-use/SSE/lịch trình, và bộ chạy cascade purge (`SlackCascadePurgeRunner`) cho đúng **7 nhóm bản sao phái sinh** chuẩn tắc theo tiêu chuẩn nghiệm thu F3.
-
-### 1.1. Ranh Giới Phân Tầng Bounded Scope:
-1. **03B1 (Nguồn Thô) vs 03B2 (Bản Sao Phái Sinh - Card này):**
-   - 03B1 chỉ quản lý bảng dữ liệu nguồn thô `slack_sources` (trần TTL cứng `<= 7 ngày`), rào chắn tức thời `slack_invalidation_barriers`, hàng đợi `slack_invalidation_intents`, và xóa dòng nguồn thô. Hoàn thành 03B1 KHÔNG đồng nghĩa hoàn tất cascade purge F3.
-   - 03B2 sở hữu sổ bộ chuẩn hóa của mọi bản sao phái sinh (`SLACK_DERIVED_TARGET_KINDS`), quản lý trích đoạn (trần TTL `<= 30 ngày`), mở rộng bộ quét fanout sự kiện chính sách để bao gồm cả các epoch chỉ tồn tại ở bản sao phái sinh, và điều phối cascade purge thực sự xóa sạch nội dung/trích đoạn khỏi database và bộ nhớ.
-2. **03B2 vs 03B3 (Executor):**
-   - 03B2 cung cấp giao diện thẩm định `IExecutorSlackLineageGuard` để kiểm tra rào chắn trước khi phân giải tham số và serialize kết quả. 03B3 độc quyền sở hữu logic kiểm tra binding và tính toàn vẹn hash trước dispatch trong `packages/executor/`.
-3. **03B2 vs 03C (Adapters) & 04A (Ingress):**
-   - 03C sở hữu adapter đọc và thu thập transient (`retentionDays: 0`). Quyền đọc tạm thời không phải quyền lưu trữ; việc chuyển hóa sang bản sao phái sinh đòi hỏi tham chiếu chính sách mục đích `'storage'` riêng biệt dưới cùng epoch thu thập.
-   - 04A sở hữu webhook ingress và gọi `stageInTransaction` của 03B1. 03B2 tiêu thụ hàng đợi intent từ 03B1 để thực thi cascade purge.
-4. **03B2 vs 06 (Inbox & Digest):**
-   - Các thực thể `proposal_excerpt` và `daily_digest_entry` thuộc về các module Inbox/Digest tương lai của SLACK-06. 03B2 thiết lập rào chắn fail-closed: từ chối lưu trữ trích đoạn nếu chưa đăng ký hợp đồng phả hệ.
-
-### 1.2. Định Danh Observation Capture Identity & Derived-Only Epochs:
-- Định danh quan sát capture (`ObservationCaptureIdentity`) không phụ thuộc vào sự tồn tại lâu dài của bản ghi raw text trong `slack_sources`. Định danh bao gồm: `captureHash` (mã băm SHA-256 của nội dung quan sát), `capturedAt` (thời điểm thu thập ISO UTC), `sourceRef` (định danh tài nguyên và phiên bản Slack bất biến), và `targetOwnership` (`atiUserId`, `connectionId`, `workspaceId`).
-- Khi quét sự kiện chính sách (`policy_epoch_invalidated`, `consent_revoked`), bộ quét fanout truy vấn trực tiếp bảng `slack_derived_provenance_segments`, bảo đảm các bản sao phái sinh vẫn được cascade purge sạch sẽ ngay cả khi dữ liệu nguồn thô đã hết hạn (trần 7 ngày) hoặc vốn chỉ được đọc transient mà không lưu raw source.
-
-### 1.3. Chuẩn Hóa 8 Thuộc Tính storagePolicyRef & Phân Cấp TTL:
-- Bảng `slack_derived_provenance_segments` lưu đầy đủ 8 trường canonical của `storagePolicyRef`: `binding` (gồm 5 trường: `ati_user_id`, `connection_id`, `workspace_id`, `slack_user_id`, `identity_version`), `policy_purpose = 'storage'`, `storage_requested_retention_days` (1-30), `provider_profile_id`, `config_fingerprint`, `policy_version`, `consent_revision`, `provider_revision`. Đồng thời lưu bằng chứng thu thập: `acquisition_purpose` và `acquisition_requested_retention_days`.
-- Phân cấp TTL nghiêm ngặt: `expiry <= effectiveTTL <= issuedTTL <= currentauthority` và trần tối đa `<= 30 ngày`. Ràng buộc DB:
-  `storage_requested_retention_days INT NOT NULL CHECK (storage_requested_retention_days > 0 AND storage_requested_retention_days <= 30)`
-  `effective_retention_days INT NOT NULL CHECK (effective_retention_days > 0 AND effective_retention_days <= storage_requested_retention_days)`
-  `CONSTRAINT chk_slack_derived_provenance_ttl CHECK (expires_at > captured_at AND expires_at <= captured_at + make_interval(days => effective_retention_days) AND expires_at <= captured_at + INTERVAL '30 days')`
-  Điều này triệt tiêu hoàn toàn lỗ hổng cho phép khai báo 1 ngày nhưng lưu thực tế 30 ngày, và ngăn chặn việc dùng metadata `isExcerpt` để lách trần 7 ngày của nguồn thô.
-
-### 1.4. Ngữ Cảnh Chủ Sở Hữu Artifact & Chống Tái Gắn Phiên Bản:
-- Bảng `slack_derived_copies` bắt buộc lưu `ati_user_id UUID NOT NULL REFERENCES users(id)`.
-- Hàm thẩm định `assertDerivedCopyAllowed` yêu cầu đầy đủ ngữ cảnh: `callerAtiUserId`, `consumerPurpose` (mục đích của người đọc hiện tại), `targetKind`, `targetId`, `targetSubId`, và `expectedTargetVersion`.
-- Nguyên tắc bảo vệ:
-  1. Người gọi phải được xác thực: `callerAtiUserId === derivedCopy.atiUserId`. Nghiêm cấm hoàn toàn truy cập chéo giữa các người dùng ATI (`cross-ATI user`).
-  2. Nguồn đa workspace cho MỘT người dùng ATI (`multi-workspace for ONE ATI user`) là hợp lệ và được lưu đầy đủ từng phân đoạn; tuy nhiên không được phép tổng hợp chéo giữa các người dùng ATI khác nhau.
-  3. Danh sách phân đoạn rỗng hoặc thiếu KHÔNG THỂ cấp quyền đọc (fail-closed).
-  4. Chống tái gắn phiên bản: nếu caller cung cấp `expectedTargetVersion`, version đó phải khớp với version của artifact đích (ngăn chặn việc dùng ID cũ để truy cập nội dung đã bị thay đổi).
-  5. Thẩm định lưu trữ là độc lập với mục đích tiêu thụ hiện tại: dữ liệu được ghi dưới mục đích `storage`, nhưng khi đọc, người gọi phải có `consumerPurpose` hợp lệ và không bị chặn bởi rào chắn.
+**Phụ thuộc thực tế:**
+- SLACK-03A: PR #194, head `bc8d6b69`, đã chấp thuận contracts.
+- SLACK-03B1: sibling `feat/slack-03b1-source-store`, PR #200; plan #196; **runtime chưa được chấp thuận**. Migration `db/v3/0017_slack_source_store.sql` thuộc 03B1.
+- SLACK-03C1: PR #199; plan #197; **runtime chưa được chấp nhận**.
+- SLACK-04A ingress: PR #195; giao ước đã đóng băng tại `e9088d5e`.
+- Migration 03B2 dự kiến `0018`; số cuối cùng do integration quyết định sau 0017. Không sửa 0017.
 
 ---
 
-## 2. Phân Chia Module & Quyền Sở Hữu (Module Ownership)
+## 1. Mục Tiêu Bounded
 
-Tuân thủ nghiêm ngặt quy chuẩn tại [`docs/team-workflow.md`](../../team-workflow.md):
-- **Backend Engineer (Sở hữu độc quyền card này):**
-  - Cơ sở dữ liệu: `db/v3/0018_slack_derived_lineage_and_purge.sql` (Dự kiến số 0018 sau 0017 của 03B1).
-  - Repositories: `apps/chat-api/src/db/repositories/slack-derived-lineage-repo.ts`.
-  - Dịch vụ phả hệ & kiểm tra: `apps/chat-api/src/services/slack/slack-derived-lineage-store.ts`.
-  - Bộ chạy cascade purge: `apps/chat-api/src/services/slack/slack-cascade-purge-runner.ts`.
-  - Giao diện bảo vệ: `apps/chat-api/src/services/slack/slack-lineage-guards.ts`.
-  - Handlers xử lý purge (`apps/chat-api/src/services/slack/purge-handlers/`):
-    - `chat-history-message-purge-handler.ts` (hiện hữu)
-    - `working-memory-entity-purge-handler.ts` (hiện hữu)
-    - `plan-step-arg-purge-handler.ts` (hiện hữu)
-    - `scheduled-workflow-arg-purge-handler.ts` (hiện hữu)
-    - `execution-audit-purge-handler.ts` (hiện hữu)
-    - `proposal-excerpt-purge-handler.ts` (fail-closed tương lai)
-    - `daily-digest-entry-purge-handler.ts` (fail-closed tương lai)
-  - Điểm tích hợp writer thực tế:
-    - `apps/chat-api/src/services/chat-service.ts`
-    - `apps/chat-api/src/db/repositories/plan-repo.ts`
-    - `apps/chat-api/src/services/schedule-service.ts`
-    - `apps/chat-api/src/services/execution-service.ts`
-  - Điểm tích hợp reader guard:
-    - `apps/chat-api/src/routes/conversation-routes.ts`
-    - `apps/chat-api/src/routes/schedule-routes.ts`
-    - `apps/chat-api/src/services/schedule-runner.ts`
-  - Kiểm thử:
-    - `apps/chat-api/tests/db/slack-derived-lineage-repo.test.ts`
-    - `apps/chat-api/tests/services/slack/slack-cascade-purge.test.ts`
-    - `apps/chat-api/tests/services/slack/slack-derived-guards.test.ts`
-    - `apps/chat-api/tests/integration/slack-derived-writers-integration.test.ts`
-- **Không xâm phạm vùng sở hữu của vai trò khác:**
-  - AI Engineer (`packages/planner/`, `packages/tool-schemas/`, `prompts/`): Chỉ đề xuất giao diện `IPlannerSlackLineageGuard`, không trực tiếp sửa mã planner.
-  - Integration Engineer (`packages/tool-adapters/`): Chỉ tiêu thụ frozen types từ `@wap/tool-schemas`.
-  - Frontend Engineer (`apps/chat-web/`): Không sửa mã frontend; cung cấp DTOs an toàn đã được che/redact sạch.
+03B2 thiết kế:
+
+1. Sổ phả hệ chuẩn hóa `slack_derived_copies` + `slack_derived_provenance_segments`, ghi **cùng transaction** với artifact đích.
+2. Phiên bản đích do server cấp, bắt buộc và bền vững; read guard và purge handler dùng cùng một identity.
+3. Read guard trước HTTP, SSE, planner hydration, schedule run và executor.
+4. Cascade purge cho **5 nhóm artifact đang tồn tại thật** và **2 cổng fail-closed** cho `proposal_excerpt` / `daily_digest_entry` của SLACK-06.
+5. Xóa vật lý đúng trường/path; không xóa toàn bộ dictionary chung; không coi pause là đã xóa.
+
+Không thuộc phạm vi: viết mã runtime, chạy migration, gọi Slack API, gọi model, chấp nhận native provider, sửa `CURRENT-STATE.md` / `ROADMAP.md`, đóng F3.
+
+**Tuyên bố đúng:** 03B2 runtime (khi được thi công) chỉ có thể đạt "5 handler hiện hữu + từ chối 2 thành phần tương lai". Bảy nhóm đầy đủ và F3 chỉ đóng sau khi SLACK-06 có bảng/service/handler thật và test tích hợp thật.
 
 ---
 
-## 3. Bảng Ánh Xạ Độ Bao Phủ 7 Nhóm Bản Sao Phái Sinh (Coverage Table)
+## 2. Bảng Bao Phủ Theo Mã Nguồn Thực Tế
 
-| Target Kind | Bảng & Cột Lưu Trữ Thực Tế | Tác Giả Ghi (File + Symbol) | Tác Giả Đọc (File + Symbol) | Hợp Đồng Bản Sao Phái Sinh | Bộ Xử Lý Purge & Bảo Toàn Ràng Buộc DB | Thành Phần Tương Lai & Cổng Fail-Closed |
-|---|---|---|---|---|---|---|
-| `chat_history_message` | `messages.content`, `messages.metadata` (`plan`, `proposal`, `resource_labels`) | `MessageRepo.createMessage`, `ChatService.prepareResponse` / `write` | `MessageRepo.listMessages`, `ChatService` (lines 499-512 prompt hydration), `GET /api/conversations/:id/messages` | `targetKind: 'chat_history_message'`, `targetId: messages.id`, toàn bộ phân đoạn nguồn gốc trong `slack_derived_provenance_segments` | `ChatHistoryMessagePurgeHandler`: Redact nội dung tin nhắn thành `[Nội dung nguồn Slack đã bị thu hồi/xóa]`, tẩy sạch snippet Slack trong `metadata.plan`, `metadata.proposal`, `metadata.resource_labels`; nếu tin trợ lý tổng hợp từ nguồn bị thu hồi và không thể tách rời, redact toàn bộ tin trợ lý đó nhưng BẢO TOÀN tin nhắn người dùng gõ. | Hiện hữu trong `apps/chat-api`. |
-| `working_memory_entity` | `messages` (`role = 'system'`, `metadata->>'type' = 'working_memory'`, `metadata->'state'`) | `ChatService.processMessage` (ghi dòng system snapshot bộ nhớ) | `ChatService.processMessage` (lines 516-519 đọc `lastMemory` khôi phục `memory.fromJSON`) | `targetKind: 'working_memory_entity'`, `targetId: messages.id`, `targetSubId: entityKey` | `WorkingMemoryEntityPurgeHandler`: Xóa triệt để các trường Slack khỏi state JSON: `__labels`, `__gatherPending`, `__gatherIntent`, `__gatherBindings`, `__gatherMissing`, `members`, và các entities phái sinh; chặn model tái sử dụng dữ liệu cũ. | Hiện hữu trong `apps/chat-api`. |
-| `plan_step_arg` | `plans.plan_json`, `plans.plan_text`, `plans.resource_labels`, `execution_steps.args_json`, `execution_steps.output_json`, `execution_steps.error_json` | `PlanRepo.createPlan`, `ChatService`, `StepRepo.createStep`, `StepRepo.updateStepStatus` | `PlanRepo.getPlan`, `PlanRepo.getPendingPlan`, `ExecutionService.runExecution`, `GET /api/conversations/:id/plan` | `targetKind: 'plan_step_arg'`, `targetId: plans.id` / `execution_steps.id`, `targetSubId: stepId` | `PlanStepArgPurgeHandler`: Nếu kế hoạch đang `pending`, chuyển ngay sang `superseded` (thỏa mãn ràng buộc `ux_plans_one_pending_per_conversation`); nếu kế hoạch đã thực thi, scrub sạch `resource_labels`, args/output/error JSON và `plan_text`. | Hiện hữu trong `apps/chat-api` & `packages/executor`. |
-| `scheduled_workflow_arg` | `schedules.request`, `schedules.recurrence`, `schedules.status`, `schedules.pause_reason`, `schedule_runs.plan_id`, `schedule_runs.status`, `schedule_runs.error` | `ScheduleService.createSchedule` / `saveFields`, `ScheduleRunner.createRun` | `ScheduleRunner.runDue`, `ScheduleRepo.ownedSchedule`, `GET /api/schedules` | `targetKind: 'scheduled_workflow_arg'`, `targetId: schedules.id` / `schedule_runs.id` | `ScheduledWorkflowArgPurgeHandler`: BẢO TOÀN `schedules.request` gốc của người dùng (bảo đảm ràng buộc `CHECK (char_length(request) BETWEEN 1 AND 1000)`). Tạm dừng lịch (`status = 'paused'`, `pause_reason = 'slack_source_invalidated'`, `next_run_at = NULL` thỏa mãn `schedules_next_run_check`). Khi hủy plan liên kết, chuyển trạng thái `schedule_runs` sang `discarded` (bảo đảm ràng buộc `schedule_runs_plan_check CHECK ((status = 'planned') = (plan_id IS NOT NULL))`). Scrub `schedule_runs.error`. | Hiện hữu trong `apps/chat-api`. |
-| `audit_log_entry` | `execution_steps.output_json`, `execution_steps.error_json` (bản ghi audit thực thi) | `StepRepo.updateStepStatus`, `StartupReconciliationService` | `ExecutionService.getExecution`, admin audit query | `targetKind: 'audit_log_entry'`, `targetId: execution_steps.id` | `ExecutionAuditPurgeHandler`: Tẩy sạch Slack raw payload/output khỏi execution steps; chỉ lưu biên nhận tombstone `(purged_at, reason, tombstone_id)` trong metadata. (Lưu ý: Không có bảng SQL `audit_logs` riêng biệt trong migrations `db/v3/`). | Hiện hữu trong `apps/chat-api`. |
-| `proposal_excerpt` | Chưa có bảng (Thuộc SLACK-06 Inbox Proposals) | Chưa có (Dịch vụ Inbox tương lai ở SLACK-06) | Chưa có (Màn duyệt đề xuất tương lai ở SLACK-06) | `targetKind: 'proposal_excerpt'`, `targetId: proposal.id`, mọi phân đoạn provenance | `ProposalExcerptPurgeHandler`: Đánh dấu đề xuất `revoked_by_source_purge`, tẩy sạch trích đoạn khỏi payload đề xuất. | **Cổng Fail-Closed:** Thành phần Inbox tương lai BẮT BUỘC phải đăng ký vào `SlackDerivedLineageStore` trước khi persist. Nếu chưa đăng ký, ném lỗi từ chối lưu trữ trích đoạn. Nghiêm cấm đóng F3 sớm khi chưa hoàn thành component này. |
-| `daily_digest_entry` | Chưa có bảng (Thuộc SLACK-06 Daily Digest) | Chưa có (Worker sinh digest tương lai ở SLACK-06) | Chưa có (API/UI xem digest tương lai ở SLACK-06) | `targetKind: 'daily_digest_entry'`, `targetId: digest.id`, `targetSubId: entryId` | `DailyDigestEntryPurgeHandler`: Tẩy sạch mục digest chứa trích đoạn hoặc đánh dấu toàn bộ entry là `purged`. | **Cổng Fail-Closed:** Dịch vụ Daily Digest tương lai BẮT BUỘC đăng ký phả hệ trước khi lưu trữ trích đoạn. Nếu chưa đăng ký, ném lỗi từ chối lưu trữ. |
+| Target kind | Nơi lưu thật | Writer thật (file + symbol) | Reader thật (file + symbol) | Xử lý purge | Trạng thái |
+|---|---|---|---|---|---|
+| `chat_history_message` | `messages.content`; `messages.metadata` tại `plan`, `proposal`, `previous.name/request/recurrence`, `schedule.name/request/recurrence`, `schedule.lastRun.error`, `resourceLabels`, `name` (message `type='schedule_run'`), `lookups`, `clarification.options/context/reason`, `refusal.reason/suggestion` | `apps/chat-api/src/services/chat-service.ts` → `prepareResponse.write`; `apps/chat-api/src/db/repositories/message-repo.ts` → `createMessage`; `apps/chat-api/src/services/schedules/schedule-runner.ts` → `planOne`; `apps/chat-api/src/services/schedules/schedule-service.ts` → `recordState` (state message `metadata.schedule`) | `apps/chat-api/src/db/repositories/message-repo.ts` → `listMessages`; `apps/chat-api/src/services/chat-service.ts` `executePlannerPipeline` dòng 499-512 (history) và 516-519 (memory restore); `apps/chat-api/src/routes/conversation-routes.ts` → `createConversationRoutes` (GET `/:id/messages/latest`, GET `/:id`); `apps/chat-api/src/routes/stream-routes.ts` → `createStreamRoutes` (GET `/:id/stream`) | Tombstone `content`; xóa đúng path metadata; proposal bị thay `type` để `confirmProposal` không áp dụng lại; giữ message người dùng không có copy | Có artifact thật; handler phải thi công |
+| `working_memory_entity` | `messages.metadata.state` (message `role='system'`, `metadata.type='working_memory'`) | `apps/chat-api/src/services/chat-service.ts` `prepareResponse.write` (khi `target.memoryState` được truyền, dòng 428) và `executePlannerPipeline` dòng 528, từ `WorkingMemory.toJSON()` | `apps/chat-api/src/services/chat-service.ts` dòng 516-519 → `WorkingMemory.fromJSON`; `packages/planner/src/planner.ts` đọc `__observed`, `__labels`, `__gather*` | Xóa đúng selector/path Slack; giữ entry Trello/dịch vụ khác; không xóa cả `__observed`, `__labels`, `members` | Có artifact thật; handler phải thi công |
+| `plan_step_arg` | `plans.plan_json`, `plans.plan_text`, `plans.plan_hash`, `plans.resource_labels`; `execution_steps.args_json` | `apps/chat-api/src/db/repositories/plan-repo.ts` → `createPlan`; `apps/chat-api/src/services/chat-service.ts` `prepareResponse.write`; `apps/chat-api/src/db/repositories/step-repo.ts` → `createStep` | `apps/chat-api/src/db/repositories/plan-repo.ts` → `getPlan`, `getPendingPlan`, `getLatestExecutedPlan`; `apps/chat-api/src/services/execution-service.ts` → `approveAndStart`, `getLatestExecutionSnapshot`; `apps/chat-api/src/routes/conversation-routes.ts` → `createConversationRoutes` (GET `/:id/plans/active`); `apps/chat-api/src/routes/execution-routes.ts` → `createExecutionRoutes` (POST `/plans/:id/approve`, GET `/conversations/:convId/executions/latest`) | Thay `plan_json`/`plan_text` bằng tombstone hợp lệ; `plan_hash` băm lại tombstone; xóa đúng key Slack trong `resource_labels`; `args_json` thành tombstone JSON; plan `pending` → `superseded`, plan đang chạy → `failed` | Có artifact thật; handler phải thi công |
+| `proposal_excerpt` | Không có bảng/service trong `db/v3` và `apps/chat-api` hiện tại; schedule proposal hiện có nằm ở `messages.metadata.proposal` và thuộc `chat_history_message` | Không có | Không có | Không có handler; runner fail-closed `MISSING_HANDLER`, intent không completed | **Tương lai SLACK-06** |
+| `daily_digest_entry` | Không có bảng/service hiện tại | Không có | Không có | Không có handler; runner fail-closed, intent không completed | **Tương lai SLACK-06** |
+| `scheduled_workflow_arg` | `schedules.name`, `request`, `recurrence`, `services`, `status`, `pause_reason`, `next_run_at`; `schedule_runs.error`; `conversations.title` của run conversation | `apps/chat-api/src/services/schedules/schedule-service.ts` → `confirmProposal`, `saveFields` (row `schedules`), `recordState` (chỉ state message, thuộc `chat_history_message`); `apps/chat-api/src/services/schedules/schedule-runner.ts` → `planOne` (title + message) | `apps/chat-api/src/services/schedules/schedule-service.ts` → `list`, `listRuns`; `apps/chat-api/src/db/repositories/schedule-repo.ts` → `getByConversation`, `listForUser`, `listRuns`; `apps/chat-api/src/routes/schedule-routes.ts` → `createScheduleRoutes` (GET `/schedules`, GET `/schedules/:id/runs`); `apps/chat-api/src/services/chat-service.ts` dòng 513; `apps/chat-api/src/services/schedules/schedule-runner.ts` → `planOne` | Xóa từng trường có copy bằng tombstone không rỗng; `recurrence` thành `{}`; pause + `pause_reason='slack_source_invalidated'` + `next_run_at=NULL`; title thành tombstone; `services` chỉ là định danh dịch vụ nên giữ nguyên; không đụng trường không có copy | Có artifact thật; handler phải thi công |
+| `audit_log_entry` | `execution_steps.output_json`, `error_json` | `apps/chat-api/src/db/repositories/step-repo.ts` → `updateStepStatus`; `apps/chat-api/src/services/execution-service.ts` dòng 169; `apps/chat-api/src/services/startup-reconciliation.ts` → `reconcileInterruptedExecutions` (chỉ lỗi server cố định) | `apps/chat-api/src/services/execution-service.ts` → `getLatestExecutionSnapshot`, `getExecutionStatusDurable`; `apps/chat-api/src/db/repositories/step-repo.ts` → `listSteps`; `apps/chat-api/src/routes/execution-routes.ts` → `createExecutionRoutes` | Tombstone JSON output/error; không có bảng `audit_logs` riêng và không có admin query | Có artifact thật (execution steps); handler phải thi công |
+
+`ScheduleRepo.stateText` chỉ dựng nội dung state message do `recordState` ghi; không phải writer độc lập.
+
+**Không được dùng** các đường dẫn/symbol không tồn tại: `schedule-runner.ts` ở thư mục `services/` (đúng: `services/schedules/schedule-runner.ts`), `ScheduleRunner.runDue` (đúng: `tick`, `planNow`, `planOne`), `ExecutionService.getExecution` (đúng: `getLatestExecutionSnapshot`, `getExecutionStatusDurable`), `StartupReconciliationService` (đúng: hàm `reconcileInterruptedExecutions`), `apps/chat-api/src/routes/conversation-routes.ts` là đúng nhưng không có route admin audit.
 
 ---
 
-## 4. Thiết Kế Cơ Sở Dữ Liệu & Hợp Đồng Giao Diện Chuẩn Tắc
+## 3. Định Danh Copy, Phiên Bản Bắt Buộc & Chống Tái Gắn
 
-### 4.1. Migration DDL: `db/v3/0018_slack_derived_lineage_and_purge.sql`
+### 3.1. Khóa logic
+
+Mỗi copy là một **trường/path cụ thể** của artifact:
+
+- `target_id`: UUID artifact (`messages.id`, `plans.id`, `execution_steps.id`, `schedules.id`, `conversations.id`).
+- `target_sub_id`: selector chuẩn do server sinh:
+  - `content`, `metadata.plan`, `metadata.proposal`, `metadata.previous.name`, `metadata.previous.request`, `metadata.previous.recurrence`, `metadata.schedule.name`, `metadata.schedule.request`, `metadata.schedule.recurrence`, `metadata.schedule.lastRun.error`, `metadata.resourceLabels/<key>`, `metadata.lookups`, `metadata.clarification.options`, `metadata.clarification.context`, `metadata.clarification.reason`, `metadata.refusal.reason`, `metadata.refusal.suggestion`, `metadata.name` (chỉ message `type='schedule_run'`).
+  - `metadata.usedDirectory` chỉ chứa service id do `listDirectory` trả về; không đăng ký copy và giữ nguyên.
+  - `plan_json`, `plan_text`, `plan_hash`, `resource_labels/<key>`, `args_json`, `output_json`, `error_json`.
+  - `name`, `request`, `recurrence`, `error`, `title`.
+  - Working memory: `state:/__observed/<resourceType>#id=<encodeURIComponent(id)>`, `state:/__labels/<key>`, `state:/__gatherPending/candidates#id=<id>`, `state:/__gatherBindings/<entityKey>`, `state:/__gatherIntent`, `state:/__gatherMissing`, `state:/members#id=<id>`, `state:/<entityKey>#id=<id>`.
+- `target_version`: `BIGINT NOT NULL DEFAULT nextval('slack_derived_target_version_seq')`, server cấp lúc INSERT. Không có trong input từ model/client/HTTP.
+- `target_fingerprint`: SHA-256 canonical của đúng giá trị tại selector tại thời điểm đăng ký, do server tính. Canonical = JSON UTF-8 với key object sắp xếp, không whitespace thừa; field text băm đúng bytes UTF-8; `null`/absent có sentinel riêng. Read guard và purge handler tính lại từ dòng artifact thật rồi so sánh.
+
+`target_version` là **thế hệ đăng ký** do server cấp, không phải số do model/client chọn. Mỗi lần writer ghi một trường phái sinh mới, writer phải retire copy active cũ (`retired_reason='superseded'`) và insert copy mới trong cùng transaction; vì vậy một văn bản giống hệt được ghi lại dưới grant mới vẫn có version mới và segments mới. Purge cũ không được phép dùng ID cũ để xóa/rebind bản mới.
+
+### 3.2. DDL bắt buộc (0018)
+
 ```sql
--- Migration 0018: Normalized Registry for Slack-Derived Lineage & Cascade Purge Tracking
--- (Dự kiến số 0018 sau 0017 của 03B1; ingress sẽ dùng số tiếp theo)
+CREATE SEQUENCE IF NOT EXISTS slack_derived_target_version_seq AS BIGINT START 1;
+
 CREATE TABLE IF NOT EXISTS slack_derived_copies (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  ati_user_id UUID NOT NULL REFERENCES users(id),
+  ati_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   target_kind TEXT NOT NULL CHECK (target_kind IN (
-    'chat_history_message',
-    'working_memory_entity',
-    'plan_step_arg',
-    'proposal_excerpt',
-    'daily_digest_entry',
-    'scheduled_workflow_arg',
-    'audit_log_entry'
-  )),
-  target_id TEXT NOT NULL,
-  target_sub_id TEXT NOT NULL DEFAULT '',
-  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'tombstoned', 'purged')),
-  tombstoned_at TIMESTAMPTZ,
+    'chat_history_message','working_memory_entity','plan_step_arg',
+    'proposal_excerpt','daily_digest_entry','scheduled_workflow_arg','audit_log_entry')),
+  target_id TEXT NOT NULL CHECK (target_id <> ''),
+  target_sub_id TEXT NOT NULL CHECK (target_sub_id <> ''),
+  target_version BIGINT NOT NULL DEFAULT nextval('slack_derived_target_version_seq'),
+  target_fingerprint TEXT NOT NULL CHECK (target_fingerprint ~ '^[0-9a-f]{64}$'),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','retired','purged')),
+  retired_at TIMESTAMPTZ,
+  retired_reason TEXT CHECK (retired_reason IS NULL OR retired_reason IN (
+    'superseded','fingerprint_mismatch','manual')),
   purged_at TIMESTAMPTZ,
+  purge_reason TEXT CHECK (purge_reason IS NULL OR purge_reason IN (
+    'source_deleted','source_edited','channel_membership_lost','connection_disconnected',
+    'app_reinstalled','consent_revoked','retention_expired','policy_changed')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT statement_timestamp(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT statement_timestamp(),
-  CONSTRAINT uq_slack_derived_copies_target UNIQUE (target_kind, target_id, target_sub_id)
+  CONSTRAINT uq_slack_derived_copy_version
+    UNIQUE (ati_user_id, target_kind, target_id, target_sub_id, target_version),
+  CONSTRAINT chk_slack_derived_copy_terminal CHECK (
+    (status='active' AND retired_at IS NULL AND retired_reason IS NULL AND purged_at IS NULL AND purge_reason IS NULL) OR
+    (status='retired' AND retired_at IS NOT NULL AND retired_reason IS NOT NULL AND purged_at IS NULL AND purge_reason IS NULL) OR
+    (status='purged' AND purged_at IS NOT NULL AND purge_reason IS NOT NULL AND retired_at IS NULL AND retired_reason IS NULL))
 );
-
-CREATE INDEX IF NOT EXISTS idx_slack_derived_copies_active
-  ON slack_derived_copies(target_kind, target_id) WHERE status = 'active';
-CREATE INDEX IF NOT EXISTS idx_slack_derived_copies_user
+CREATE UNIQUE INDEX IF NOT EXISTS uq_slack_derived_copy_active
+  ON slack_derived_copies(ati_user_id, target_kind, target_id, target_sub_id)
+  WHERE status = 'active';
+CREATE INDEX IF NOT EXISTS idx_slack_derived_copy_lookup
+  ON slack_derived_copies(target_kind, target_id, target_sub_id, status);
+CREATE INDEX IF NOT EXISTS idx_slack_derived_copy_user
   ON slack_derived_copies(ati_user_id);
 
 CREATE TABLE IF NOT EXISTS slack_derived_provenance_segments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   derived_copy_id UUID NOT NULL REFERENCES slack_derived_copies(id) ON DELETE CASCADE,
   segment_index INT NOT NULL CHECK (segment_index >= 0),
-  capture_hash TEXT NOT NULL,
+  capture_hash TEXT NOT NULL CHECK (capture_hash ~ '^[0-9a-f]{64}$'),
   raw_source_id UUID,
   owner_source_key TEXT NOT NULL,
   resource_type TEXT NOT NULL,
   resource_id TEXT NOT NULL,
   revision TEXT NOT NULL,
-  ati_user_id UUID NOT NULL REFERENCES users(id),
-  connection_id UUID NOT NULL,
+  channel_id TEXT,
+  ati_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  connection_id UUID NOT NULL, -- no FK: provenance must survive connection deletion so purge can run
   workspace_id TEXT NOT NULL,
   slack_user_id TEXT NOT NULL,
   identity_version INT NOT NULL CHECK (identity_version > 0),
@@ -162,56 +131,46 @@ CREATE TABLE IF NOT EXISTS slack_derived_provenance_segments (
   policy_version TEXT NOT NULL,
   consent_revision TEXT NOT NULL CHECK (consent_revision ~ '^[1-9][0-9]*$'),
   provider_revision TEXT NOT NULL CHECK (provider_revision ~ '^[1-9][0-9]*$'),
-  acquisition_purpose TEXT NOT NULL CHECK (acquisition_purpose IN ('manual_lookup', 'triage', 'planning', 'digest')),
+  acquisition_purpose TEXT NOT NULL CHECK (acquisition_purpose IN ('manual_lookup','triage','planning','digest')),
   acquisition_requested_retention_days INT NOT NULL CHECK (acquisition_requested_retention_days >= 0),
   policy_purpose TEXT NOT NULL DEFAULT 'storage' CHECK (policy_purpose = 'storage'),
-  storage_requested_retention_days INT NOT NULL CHECK (storage_requested_retention_days > 0 AND storage_requested_retention_days <= 30),
-  effective_retention_days INT NOT NULL CHECK (effective_retention_days > 0 AND effective_retention_days <= storage_requested_retention_days),
+  storage_requested_retention_days INT NOT NULL
+    CHECK (storage_requested_retention_days > 0 AND storage_requested_retention_days <= 30),
+  effective_retention_days INT NOT NULL
+    CHECK (effective_retention_days > 0 AND effective_retention_days <= storage_requested_retention_days),
   captured_at TIMESTAMPTZ NOT NULL,
   expires_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT statement_timestamp(),
-  CONSTRAINT uq_slack_derived_provenance_segment UNIQUE (derived_copy_id, segment_index),
-  CONSTRAINT chk_slack_derived_provenance_ttl CHECK (
+  CONSTRAINT uq_slack_derived_segment UNIQUE (derived_copy_id, segment_index),
+  CONSTRAINT chk_slack_derived_segment_ttl CHECK (
     expires_at > captured_at AND
     expires_at <= captured_at + make_interval(days => effective_retention_days) AND
-    expires_at <= captured_at + INTERVAL '30 days'
-  )
+    expires_at <= captured_at + INTERVAL '30 days')
 );
-
-CREATE INDEX IF NOT EXISTS idx_slack_derived_provenance_lookup
+CREATE INDEX IF NOT EXISTS idx_slack_derived_segment_lookup
   ON slack_derived_provenance_segments(workspace_id, resource_type, resource_id, revision);
-CREATE INDEX IF NOT EXISTS idx_slack_derived_provenance_binding
+CREATE INDEX IF NOT EXISTS idx_slack_derived_segment_binding
   ON slack_derived_provenance_segments(ati_user_id, connection_id, identity_version);
-CREATE INDEX IF NOT EXISTS idx_slack_derived_provenance_epoch
+CREATE INDEX IF NOT EXISTS idx_slack_derived_segment_epoch
   ON slack_derived_provenance_segments(provider_profile_id, policy_version, consent_revision, provider_revision);
-CREATE INDEX IF NOT EXISTS idx_slack_derived_provenance_expires
+CREATE INDEX IF NOT EXISTS idx_slack_derived_segment_channel
+  ON slack_derived_provenance_segments(workspace_id, channel_id) WHERE channel_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_slack_derived_segment_expires
   ON slack_derived_provenance_segments(expires_at);
 ```
 
-### 4.2. Hợp Đồng Đăng Ký Phả Hệ Chuẩn Hóa (`SlackDerivedLineageStore`)
+Không có cột version/trạng thái do caller chọn. Không có `ON CONFLICT DO NOTHING` che giấu xung đột active: writer phải retire copy cũ trước khi insert version mới, hoặc transaction fail.
+
+### 3.3. Registration, read guard, purge CAS
+
 ```ts
-export interface ObservationCaptureIdentity {
-  captureHash: string;
-  rawSourceId?: string;
-  capturedAt: string;
-  sourceRef: SlackSourceRef;
-  targetOwnership: { atiUserId: string; connectionId: string; workspaceId: string };
-}
-
-export interface ProvenanceSegmentInput {
-  captureIdentity: ObservationCaptureIdentity;
-  acquisitionPolicyRef: SlackPolicyReference;
-  storagePolicyRef: SlackPolicyReference;
-  effectiveRetentionDays: number;
-}
-
 export interface RegisterDerivedCopyInput {
   atiUserId: string;
   targetKind: SlackDerivedTargetKind;
   targetId: string;
-  targetSubId?: string;
-  targetVersion?: string | number;
-  segments: ProvenanceSegmentInput[]; // Danh sách phân đoạn thu thập từ server acquisition context
+  targetSubId: string;
+  // Không có targetVersion: server tự lấy từ sequence.
+  segments: ProvenanceSegmentInput[]; // chỉ từ server acquisition context
 }
 
 export interface AssertDerivedCopyAllowedInput {
@@ -219,186 +178,198 @@ export interface AssertDerivedCopyAllowedInput {
   consumerPurpose: Exclude<SlackPolicyPurpose, 'storage'>;
   targetKind: SlackDerivedTargetKind;
   targetId: string;
-  targetSubId?: string;
-  expectedTargetVersion?: string | number;
+  targetSubId: string;
+  expectedTargetVersion: number; // bắt buộc; lấy từ bản ghi server-side, không từ HTTP/model
   signal?: AbortSignal;
 }
-
-export interface ISlackDerivedLineageStore {
-  /**
-   * Đăng ký phả hệ nguyên tử cùng client transaction với thao tác ghi thực tế.
-   */
-  registerDerivedCopyInTransaction(
-    client: pg.PoolClient,
-    input: RegisterDerivedCopyInput
-  ): Promise<{ derivedCopyId: string }>;
-
-  /**
-   * Thẩm định an toàn trước khi đọc/render/trả DTO/truyền stream.
-   * Kiểm tra:
-   * 1. Xác thực caller: callerAtiUserId === derivedCopy.atiUserId.
-   * 2. TẤT CẢ phân đoạn: không có barrier pending/provisional, cùng policy epoch, chưa hết TTL.
-   * 3. Khớp phiên bản expectedTargetVersion (chống tái gắn revision cũ).
-   * 4. Hỗ trợ tín hiệu hủy AbortSignal.
-   */
-  assertDerivedCopyAllowed(
-    input: AssertDerivedCopyAllowedInput
-  ): Promise<
-    | { allowed: true }
-    | { allowed: false; reason: 'blocked_by_barrier' | 'epoch_invalidated' | 'retention_expired' | 'unauthorized_caller' | 'version_mismatch' | 'not_found'; safeTombstoneOnly?: string }
-  >;
-}
 ```
 
-### 4.3. Hợp Đồng Cascade Purge Runner (`SlackCascadePurgeRunner`)
-```ts
-export interface ISlackCascadePurgeHandler {
-  readonly targetKind: SlackDerivedTargetKind;
-  purgeTarget(client: pg.PoolClient, targetId: string, targetSubId: string, reason: SlackTombstoneReason): Promise<void>;
-}
+`expectedTargetVersion` là bắt buộc; không có dấu `?`. Caller lấy version từ `getActiveCopyInTransaction(client, target)` (repo `SlackDerivedLineageRepo`) trong cùng transaction server, không lấy từ body/model metadata. Read guard chạy trong transaction, lấy advisory sorted trước, khóa authority `FOR SHARE` (user/connection/provider/consent) theo đúng thứ tự writer, rồi khóa artifact `FOR SHARE` theo đúng thứ tự parent-first, đọc copy và **kiểm tra lại version/fingerprint sau khi đọc artifact**; purge handler dùng `FOR UPDATE` trên cùng artifact nên hai bên xếp hàng trên cùng row, và guard đọc lại version/fingerprint sau khi lấy khóa để phát hiện thay đổi. Việc này phải được kiểm chứng bằng hai client thật (M1-M8), không suy luận từ đọc mã.
 
-export interface ISlackCascadePurgeRunner {
-  /**
-   * Xử lý một invalidation intent từ hàng đợi slack_invalidation_intents.
-   * Intent chỉ hoàn tất khi CẢ raw source lẫn TẤT CẢ 7 target kinds derived copies đã được purge sạch sẽ.
-   */
-  processInvalidationIntent(intentId: string): Promise<{ rawPurged: number; derivedPurged: number }>;
-}
-```
+Luồng purge một copy:
 
-### 4.4. Giao Diện Bảo Vệ Riêng Biệt Cho Planner & Executor
-```ts
-// Đề xuất cho AI Engineer (Planner Owner - packages/planner/)
-export interface IPlannerSlackLineageGuard {
-  filterHydratedHistory(callerAtiUserId: string, messages: ChatMessage[], signal?: AbortSignal): Promise<ChatMessage[]>;
-  sanitizeWorkingMemory(callerAtiUserId: string, state: Record<string, unknown>, signal?: AbortSignal): Promise<Record<string, unknown>>;
-}
+1. Runner đọc intent đã claim, gồm `created_at` và `purge_target`; chỉ chọn copy `status='active'`, có segment khớp `SlackPurgeTarget`, và `created_at <= intent.created_at`. Copy được đăng ký sau intent là bản mới và **không bao giờ** thuộc intent cũ.
+2. Mở transaction; lấy khóa advisory sorted từ segment của copy, trùng bộ khóa `slackSourceWriteLockKeys` / `acquireSlackInvalidationLocks` của 03B1.
+3. Khóa parent artifact trước theo thứ tự thực tế (`conversations` → `messages`; `conversations` → `plans`; `conversations` → `schedules`; `conversations` → `plans` → `execution_steps`), rồi `SELECT ... FOR UPDATE` dòng copy; kiểm tra lại `created_at <= intent.created_at` sau khi khóa.
+4. Nếu copy không còn `active`: no-op.
+5. Tính lại `target_fingerprint` từ artifact hiện tại. Nếu khác: `UPDATE ... SET status='retired', retired_reason='fingerprint_mismatch', retired_at=now() WHERE id=$1 AND target_version=$2 AND status='active'`; **không sửa artifact**; commit. Đây là đường "old intent gặp fresh artifact"; trường hợp này **không** được tính là F3 đã xóa — ghi nhận retired để backfill/review, read guard chặn, và runner **không** complete intent (`failIntent('code:STALE_LINEAGE')`).
+6. Nếu khớp: handler xóa đúng trường/path bằng tombstone hợp lệ.
+7. `UPDATE ... SET status='purged', purged_at=now(), purge_reason=$3 WHERE id=$1 AND target_version=$2 AND target_fingerprint=$4 AND status='active'`. Nếu rowCount = 0: rollback phần artifact hoặc reload và xử lý lại; không được ghi đè bản mới.
+8. Commit.
 
-// Đề xuất cho Backend Engineer (Executor Owner - packages/executor/)
-export interface IExecutorSlackLineageGuard {
-  assertPlanStepsExecutable(callerAtiUserId: string, planId: string, steps: PlanStep[], signal?: AbortSignal): Promise<void>;
-  sanitizeStepOutputForStorage(callerAtiUserId: string, stepId: string, output: unknown): Promise<unknown>;
-}
-```
+Một intent cũ không bao giờ được quét mù theo `target_id`; nó chỉ chọn copy active khớp đúng `SlackPurgeTarget` **và** có `created_at <= intent.created_at`. Target epoch/revision (`policy_epoch_invalidated`, `workspace_consent_revocation`, `owner_retention`) tiếp tục loại bản mới theo epoch; với target không mang epoch (`resource_lifecycle`, `channel_membership_lost`), cutoff `created_at` là hàng rào bắt buộc để không xóa copy được đăng ký sau intent. Nếu writer quên đăng ký lại và fingerprint đổi, bước 5 retire thay vì xóa; read guard fail-closed.
 
 ---
 
-## 5. Giao Thức Khóa Dòng, Tính Nguyên Tử & Bằng Chứng Chống Deadlock
+## 4. schedules: Xóa Đúng Trường, Không Bảo Toàn Mù
 
-Để loại trừ triệt để nguy cơ deadlock giữa các tác vụ ghi phả hệ, đọc dữ liệu, duyệt kế hoạch và thu hồi sự kiện, toàn bộ hệ thống tuân thủ nghiêm ngặt **thứ tự khóa dòng một chiều**:
+### 4.1. Hành vi thực tế
 
-```
-[1. conversations (FOR UPDATE, ORDER BY id ASC)]
-       ↓
-[2. schedules (FOR UPDATE, ORDER BY id ASC)]
-       ↓
-[3. plans (FOR UPDATE, ORDER BY id ASC)]
-       ↓
-[4. slack_connections (FOR SHARE, ORDER BY id ASC)]
-       ↓
-[5. slack_trusted_providers (FOR SHARE, ORDER BY id ASC)]
-       ↓
-[6. slack_processing_consents (FOR SHARE, ORDER BY id ASC)]
-       ↓
-[7. slack_invalidation_barriers (SELECT check / lock)]
-       ↓
-[8. slack_derived_copies & slack_derived_provenance_segments (INSERT/UPDATE/FOR UPDATE)]
-       ↓
-[9. Target Artifact Writes (messages, execution_steps, etc.)]
-```
+- `schedules.name` CHECK 1..80; `request` CHECK 1..1000; `recurrence` JSONB NOT NULL; `services TEXT[] NOT NULL`; `status` chỉ active/paused/cancelled/completed; `schedules_next_run_check` buộc `(status='active') = (next_run_at IS NOT NULL)`.
+- `schedules.name/request/recurrence/services` được ghi từ `proposal.name/request/recurrence` (output model) và `metadata.services` (router chọn, không phải model) tại `ScheduleService.confirmProposal` → `saveFields`. `pause`/`resume`/`cancel` cũng gọi `saveFields` và tăng `version`.
+- `ScheduleRepo.view` chỉ tính `nextRuns` khi `status='active'` và `next_run_at` khác NULL; vì vậy schedule paused đã purge không gọi `nextRuns({})`.
+- `ScheduleService.transition('resume')` gọi `this.next(row, now)`; `nextOccurrence({})` sẽ ném lỗi. Phải có guard typed trước lời gọi này.
+- `schedule_runs.error` hiện chỉ nhận hằng số lỗi server cố định (`BLOCKED`, `UNAPPROVED`, `DISCARDED`, `FAILED`, `TIMED_OUT`, `STOPPED`, `INTERRUPTED`; giá trị lưu là chuỗi tiếng Việt) từ `apps/chat-api/src/services/schedules/schedule-runner.ts` và `reconcileScheduleRuns`; chưa có Slack excerpt thực tế. Handler vẫn phải hỗ trợ `error` nếu writer tương lai đăng ký copy.
+- `schedule_runs_plan_check CHECK ((status='planned') = (plan_id IS NOT NULL))`.
 
-### 5.1. Bằng Chứng Xen Kẽ Hai Tiến Trình Đồng Thời (Two-Client Held-Lock Interleaving Proof):
-Giả sử có 2 tiến trình đồng thời trên PostgreSQL:
-- **Client 1 (Writer ghi lineage và artifact):**
-  1. `BEGIN;`
-  2. Khóa hội thoại: `SELECT * FROM conversations WHERE id = $1 FOR UPDATE;` (thành công).
-  3. Khóa quyền Slack: `SELECT * FROM slack_processing_consents WHERE id = $2 FOR SHARE;`
-- **Client 2 (Revoker thu hồi sự kiện chính sách trong 02B/03B1):**
-  1. `BEGIN;`
-  2. Khóa quyền Slack: `SELECT * FROM slack_processing_consents WHERE id = $2 FOR UPDATE;`
-  3. Đặt barrier vào `slack_invalidation_barriers`.
+### 4.2. Quy tắc xóa
 
-**Phân tích 2 trường hợp xen kẽ:**
-- *Trường hợp A (Client 1 lấy khóa FOR SHARE trước):*
-  Client 2 bị block tại bước 2 chờ Client 1 commit. Client 1 tiếp tục kiểm tra barrier, ghi lineage, ghi target artifact và commit. Client 2 được đánh thức, lấy được khóa FOR UPDATE, ghi nhận thu hồi và kích hoạt intent cascade purge. Artifact vừa ghi sẽ được purge sạch sẽ.
-- *Trường hợp B (Client 2 lấy khóa FOR UPDATE trước):*
-  Client 1 bị block tại bước 3 chờ Client 2 commit. Client 2 ghi nhận thu hồi, stage barrier và commit. Client 1 được đánh thức, lấy khóa FOR SHARE, tiến hành bước kiểm tra barrier: phát hiện barrier pending/revoked -> Client 1 ROLLBACK và từ chối ghi.
-- **Kết luận:** Cả hai trường hợp đều được tuần tự hóa an toàn dưới PostgreSQL MVCC; hoàn toàn không có chu trình chờ đợi lẫn nhau (circular wait) -> **KHÔNG THỂ XẢY RA DEADLOCK**.
-
-### 5.2. Chống Deadlock "Ledger-First vs Conversation-First":
-- Bộ chạy cascade purge (`SlackCascadePurgeRunner`) tuyệt đối không khóa bảng ledger `slack_derived_copies` trước khi khóa hội thoại.
-- Quy trình purger:
-  1. Query danh sách các copy cần purge ở chế độ snapshot read thông thường.
-  2. Với mỗi target copy, mở transaction con: Khóa hàng mục tiêu trước (`conversations` / `schedules` / `plans` FOR UPDATE) -> sau đó mới khóa `slack_derived_copies` FOR UPDATE -> thực thi handler tẩy sạch -> cập nhật status `'purged'` -> COMMIT.
-  3. Quy trình này trùng khớp hoàn toàn với trật tự khóa của writer, triệt tiêu mọi khả năng deadlock.
-
-### 5.3. Mối Nối Giao Tiếp với 03B1 (Handoff Seams):
-- 03B1 ghi nhận intent vào `slack_invalidation_intents`.
-- Khi 03B1 xóa xong raw sources, 03B1 KHÔNG ĐƯỢC đánh dấu intent là completed. 03B1 chỉ đánh dấu trạng thái `raw_purged`.
-- 03B2 `SlackCascadePurgeRunner` quét các intent có `status IN ('pending', 'raw_purged')`. Sau khi hoàn thành purge toàn bộ các derived copies trên cả 7 target kinds, 03B2 mới cập nhật intent thành `completed`.
-- Nếu có bất kỳ purge handler nào gặp lỗi hoặc bị thiếu, lỗi được ném ra và intent giữ nguyên trạng thái pending để retry.
+- Field có active copy: thay bằng tombstone **không rỗng**:
+  - `name`: `Lịch đã thu hồi nguồn Slack` (độ dài hợp lệ).
+  - `request`: `Yêu cầu đã bị thu hồi do nguồn Slack bị vô hiệu hóa. Vui lòng tạo lịch mới.`
+  - `recurrence`: `'{}'::jsonb`.
+- Nếu bất kỳ trường nào của schedule bị purge: nếu schedule đang `active`, đặt `status='paused'`, `pause_reason='slack_source_invalidated'`, `next_run_at=NULL`; nếu đã `paused`/`cancelled`/`completed`, giữ nguyên status nhưng vẫn tombstone các trường có copy. Pause chỉ là biện pháp phụ; **không thay thế việc xóa**. Cùng transaction tăng `schedules.version=version+1` để proposal đang giữ `baseVersion` cũ bị `STALE_PROPOSAL`.
+- Field **không có copy** được giữ nguyên. Không có quy tắc "luôn giữ request". Request do model sinh trong lượt có nguồn Slack là mixed/model-derived và phải bị tombstone nếu có copy. `services TEXT[]` chỉ là định danh dịch vụ, không phải nội dung Slack, nên giữ nguyên.
+- Không cố tách văn bản model bị trộn; tombstone toàn bộ field đã đăng ký. Không xóa các trường người dùng nhập không có copy.
+- `resume`/`update` phải kiểm tra `recurrence` hợp lệ và không phải `{}` trước `nextOccurrence`; nếu không, ném `ScheduleConflict('SCHEDULE_SOURCE_PURGED')` (typed, fail-closed; thêm mã vào `SCHEDULE_CONFLICTS`). Schedule đã purge không nhận proposal update mới trên cùng row; người dùng phải tạo lịch mới. Proposal cũ có `baseVersion` lệch sau purge phải bị `STALE_PROPOSAL`.
+- `schedule_runs.error`: nếu có active copy (writer tương lai), thay bằng tombstone không rỗng; hiện `planOne`/`reconcileScheduleRuns` chỉ ghi hằng số lỗi server nên chưa có copy Slack. State message do `recordState` ghi chứa `metadata.schedule.lastRun.error`; nếu writer tương lai đăng ký `error` thì path này cũng phải có copy và bị tombstone theo cùng selector.
+- Plan bị purge đang được `schedule_runs` tham chiếu: `UPDATE schedule_runs SET status='discarded', plan_id=NULL, error=COALESCE(error, $tombstone) WHERE plan_id=$planId AND status='planned'` để thỏa check.
+- `conversations.title` của run conversation: nếu có copy active, thay bằng tombstone **không rỗng** (không dùng NULL: `MessageRepo.createMessage` điền title từ message `user` đầu tiên khi title NULL); nếu người dùng đã rename, fingerprint lệch → retire, không ghi đè. `renameConversation` phải retire copy title cũ trong cùng transaction.
+- `messages` của run (`runMessage` chứa `request` + `name`) và `metadata.name` (message `type='schedule_run'`) do `apps/chat-api/src/services/schedules/schedule-runner.ts` ghi; các copy này thuộc `chat_history_message` và được chat handler xóa. `schedule` chỉ xử lý row `schedules`, `schedule_runs.error`, `conversations.title`.
 
 ---
 
-## 6. Xử Lý Phân Đoạn Đa Workspace/User, Fanout & Chính Sách Redaction
+## 5. Working Memory: Path Cụ Thể, Giữ Dịch Vụ Khác
 
-1. **Phân Đoạn Đa Workspace Bắt Buộc Cho 1 Người Dùng ATI:**
-   - Mỗi `SlackDerivedCopyRef` đại diện cho một phân đoạn ủy quyền.
-   - Một artifact tổng hợp đa workspace của cùng một người dùng ATI phải lưu đầy đủ TẤT CẢ các phân đoạn trong `slack_derived_provenance_segments`. Nghiêm cấm "last source wins" hoặc "first workspace wins".
-   - Nghiêm cấm tổng hợp dữ liệu giữa các người dùng ATI khác nhau.
-2. **Quét Fanout Sự Kiện Chính Sách (Derived-Only Epochs):**
-   - Quét sự kiện chính sách (`policy_epoch_invalidated`, `consent_revoked`) thu thập đầy đủ các epoch từ bảng `slack_derived_provenance_segments`, ngay cả khi nguồn thô trong `slack_sources` đã bị xóa trước đó.
-3. **Chính Sách Xóa Phân Đoạn vs Toàn Bộ Artifact:**
-   - Nếu dữ liệu Slack có thể tách rời (metadata JSON, argument cụ thể), scrub trường cụ thể đó.
-   - Nếu nội dung sinh bởi model là hỗn hợp (mixed text) không thể bóc tách an toàn giữa các nguồn: **Redact toàn bộ phần văn bản do model sinh**, thay bằng thông báo vô hiệu hóa, đồng thời bảo tồn nguyên vẹn tin nhắn gốc do người dùng viết.
-4. **Biên Nhận Audit Bất Biến Tối Thiểu:**
-   - Khi purge `audit_log_entry`, lưu giữ biên nhận gồm `(purged_at, reason, target_kind, target_id, tombstone_id)` để phục vụ kiểm toán; xóa bỏ hoàn toàn chuỗi văn bản hoặc JSON payload của Slack. Không bao giờ phục hồi lại dữ liệu Slack đã xóa khi người dùng kết nối lại (regrant).
+### 5.1. Hành vi thực tế
 
----
+- `packages/planner/src/working-memory.ts`: `toJSON()` trải `entities` và `members`; `fromJSON()` khôi phục mọi key không phải `members`. `addMember` hiện không có producer trong code đang đọc.
+- `planner.ts` `lookup()` gọi `recordObserved(memory.getEntity('__observed'), tool.discovers, stamped, tool.observedFields)`; chỉ Gmail thread ghi `__labels.thread`; `listDirectory` đọc `__observed`; `gather()` dùng `__gatherPending.candidates`, `__gatherIntent`, `__gatherBindings`, `__gatherMissing`; entity key đã chọn nằm ở top-level.
+- Slack tool hiện có `slack.search_channels` discovers `channel`; các tool `myslack.*` mẫu chưa khai báo `discovers`. Không được bịa key `user`/`message` là đã có; chỉ đăng ký path khi tool thật khai báo service/discovers.
+- `WorkingMemory` in-memory chỉ sống trong request; artifact bền vững là `messages.metadata.state`. Purge/read guard áp lên snapshot đọc từ DB trước `fromJSON`; không có bản in-memory bền vững nào khác để xóa.
 
-## 7. Tiêu Chí Nghiệm Thu Cụ Thể (Acceptance Criteria)
+### 5.2. Quy tắc purge
 
-- [ ] **AC1 (Durable Normalized Registry):** Bảng `slack_derived_copies` và `slack_derived_provenance_segments` được tạo thành công qua migration `0018`, lưu trữ `ati_user_id`, đầy đủ 8 trường canonical của `storagePolicyRef`, bằng chứng thu thập, và trần TTL `<= 30 ngày` theo ràng buộc `effective_retention_days <= storage_requested_retention_days`.
-- [ ] **AC2 (Atomic Lineage & Artifact Write):** Mọi thao tác ghi bản sao phái sinh của Slack được thực thi trong cùng 1 giao dịch PostgreSQL với trật tự khóa dòng một chiều chống deadlock.
-- [ ] **AC3 (Pre-Read Provenance & Authenticated Guard):** Trước khi trả DTO qua HTTP, SSE stream, hoặc nạp vào context của model/planner, hàm `assertDerivedCopyAllowed` kiểm tra caller ATI, phân đoạn hợp lệ, rào chắn, và phiên bản artifact; ngắt truyền tải với `AbortSignal`.
-- [ ] **AC4 (Full 7 Kinds Cascade Purge Coverage):** Bộ chạy cascade purge có đầy đủ handler cho đúng 7 kinds: `chat_history_message`, `working_memory_entity`, `plan_step_arg`, `proposal_excerpt`, `daily_digest_entry`, `scheduled_workflow_arg`, `audit_log_entry`.
-- [ ] **AC5 (Database Invariants Preservation):** Quá trình purge bảo toàn nguyên vẹn `schedules.request` (thỏa `CHECK (char_length(request) BETWEEN 1 AND 1000)`), cập nhật trạng thái `schedules` và `schedule_runs` đúng các check constraint của PostgreSQL.
-- [ ] **AC6 (Fail-Closed Gates for Future Components):** Các thực thể `proposal_excerpt` và `daily_digest_entry` của SLACK-06 được thiết lập rào chắn fail-closed rõ ràng; ném lỗi từ chối lưu trữ trích đoạn nếu chưa tích hợp handler hoàn chỉnh.
-- [ ] **AC7 (Crash Mid-Handler Resilience & Idempotency):** Nếu tiến trình purge bị crash khi đang xử lý giữa chừng (ví dụ xong 3/7 handlers), khi khởi động lại phải tiếp tục xử lý các handlers còn lại mà không gây trùng lặp hay lỗi.
-- [ ] **AC8 (Policy Event Fanout with Derived-Only Epochs):** Quét sự kiện chính sách thu thập đầy đủ các epoch từ `slack_derived_provenance_segments` ngay cả khi dữ liệu nguồn thô trong `slack_sources` đã bị xóa trước đó.
-- [ ] **AC9 (No Scope Creep & Clean Boundaries):** Chỉ bổ sung 3 tài liệu tài liệu hoạch định; không sửa đổi mã nguồn sản phẩm, không sửa `CURRENT-STATE.md` hay `ROADMAP.md`.
+- Mỗi path Slack là một copy riêng với selector ở mục 3.1. Xóa đúng phần tử theo `#id=` hoặc đúng object key; không `delete state.__observed`, không `delete state.__labels`, không xóa cả `members`.
+- `__observed.<resourceType>`: xóa phần tử có `id` khớp; giữ phần tử Trello/Google/dịch vụ khác trong cùng mảng.
+- `__labels.<key>`: xóa đúng key Slack; giữ `__labels.thread` của Gmail nếu không có segment Slack.
+- `__gatherPending.candidates`: xóa từng candidate Slack; giữ candidate dịch vụ khác. Nếu không còn candidate nào, xóa key `__gatherPending` (state tạm rỗng; câu hỏi người dùng đã nằm trong message, không giữ pending rỗng). `__gatherIntent` mặc định là text người dùng; `__gatherMissing` là `{key}`; chỉ xóa khi chính giá trị đó được đăng ký là Slack.
+- `__gatherBindings.<entityKey>`: xóa nếu value là tên Slack đã copy; không xóa toàn bộ map.
+- `members`: xóa phần tử theo `id`; giữ member Trello.
+- Entity top-level đã resolve: xóa đúng key/selector; không xóa toàn bộ entity dictionary.
+- Provenance chỉ đến từ server planner lookup context (`tool.service`, `tool.discovers`, `observedFields`, stamped parent). Không nhận danh sách segment/path do model hoặc client cung cấp. Nếu một output là model-mixed và server không chứng minh được đầy đủ các segment, fail-closed: **không ghi copy "một phần" và không ghi artifact**; toàn bộ output bị từ chối tại writer, nên không có bản ghi để read guard phục vụ. Không có quy tắc "không có copy = human-original" cho output mới chưa được chứng minh.
+- Artifact đã tồn tại trước khi bật 03B2 không được coi là human-original chỉ vì không có copy. Chúng thuộc phạm vi backfill lineage riêng; 03B2 không tuyên bố F3 cho dữ liệu legacy chưa đăng ký và không mở read guard cho chúng khi chưa có chứng cứ.
+- Không có copy **không tự động** là human-original. `assertDerivedCopyAllowed` không bao giờ trả `allowed` khi thiếu copy/version; thiếu copy là `blocked/not_found`. Absence chỉ được chấp nhận ở **writer gate 03B2** khi artifact được tạo sau cutover và mọi writer đã đi qua gate chứng nhận selector không có segment Slack; legacy bị deployment gate/backfill chặn. Nếu không có cutover marker rõ ràng, gate fail-closed.
+- Read guard cho working memory kiểm tra từng path; path bị chặn bị bỏ khỏi state trước khi `fromJSON`, không đưa Slack cũ vào model. Nếu không thể xác định path, bỏ toàn bộ snapshot và bắt đầu memory rỗng (fail-closed), không âm thầm dùng dữ liệu cũ.
 
 ---
 
-## 8. Lệnh Kiểm Tra & Cổng Bằng Chứng (Command & Evidence Gates)
+## 6. Handoff 03B1: Đúng Hàng Đợi Thực Tế
 
-> Toàn bộ các lệnh dưới đây là kiểm tra dự kiến cho giai đoạn thi công mã nguồn, sử dụng PostgreSQL 16 thật. Trong phiên lập kế hoạch này, toàn bộ được đánh dấu `[Proposed: NOT_RUN]`.
+- `slack_invalidation_intents.status` chỉ có `pending`, `processing`, `completed`, `failed`. **Không có `raw_purged`**.
+- `stageInTransaction` tạo 1 intent `slack_source_raw` + 1 intent cho mỗi kind trong `cascadeTargetKinds` (03B1 dùng đủ 7), tất cả `pending`, unique `(source_event_key, effect_key, target_kind)`.
+- `SlackInvalidationRunner` của 03B1 chỉ claim `target_kind='slack_source_raw'`; sau `purgeSourcesByTarget` nó **được phép** `completeIntent` cho raw. Bảy intent derived vẫn `pending` cho 03B2. Không yêu cầu raw phải pending đến khi cả 7 xong.
+- 03B2 runner chỉ claim 7 kind derived (không claim raw), theo lease/`SKIP LOCKED`, rồi `completeIntent` từng kind sau khi không còn active copy khớp target **và** `created_at <= intent.created_at`, **và** không còn copy `retired` lý do `fingerprint_mismatch` khớp target/cutoff (copy đó chưa được xử lý). Copy `retired` do fingerprint mismatch không được coi là đã xử lý: handler trả `retired` thì runner `failIntent('code:STALE_LINEAGE')`, receipt còn mở chờ backfill/review. Lỗi/không handler → `failIntent` với mã đã sanitize; intent **không** completed.
+- "Receipt closure" là predicate: receipt `source_event_key` chỉ đóng khi **tất cả** intent cùng key (raw + mọi derived kind) đều `completed`. Không thêm cột trạng thái receipt, không sửa 0017.
+- Đóng tổng thể một invalidation không chỉ là receipt `policy:<eventId>`: phải gồm mọi receipt fanout `derived-policy:<eventId>:<epochHash>` áp dụng. Một receipt không có effect/intent không chứng minh derived đã purge; nếu segment còn epoch chưa có fanout receipt, invalidation vẫn mở.
+- `proposal_excerpt` và `daily_digest_entry` chưa có handler: intent của chúng không bao giờ completed; receipt còn mở; đây là hành vi đúng, không phải lỗi che giấu. Full F3 chờ SLACK-06.
+- Fanout epoch chỉ tồn tại ở derived: 03B1 chỉ dựng effect từ `slack_sources`, nên 03B2 cần dịch vụ riêng quét `slack_policy_events` + `slack_derived_provenance_segments`. Với mỗi epoch cũ chưa có intent dưới receipt `policy:<eventId>`, gọi `stageInTransaction` với **sourceEventKey riêng** `derived-policy:<eventId>:<epochHash>`, effect key `derived_policy_epoch_invalidated:<epochHash>`, barrier epoch và purge target 7 kind. Không gọi lại cùng `policy:<eventId>`: `stageInTransaction` là all-or-nothing theo receipt và sẽ trả receipt cũ mà không thêm effect. Receipt riêng này idempotent; raw intent phụ do 03B1 hoàn tất vô hại.
+- Retry dùng đúng schema hiện có: `attempts`, `leased_until`, `worker_id`, `last_error`, `completed_at`; không thêm trạng thái mới.
+
+---
+
+## 7. Khóa, Cạnh Tranh & Ma Trận NOT_RUN
+
+### 7.1. Chuỗi khóa thực tế
+
+- 03B1 `saveSourceAtomic`: `acquireSlackInvalidationLocks(sorted)` → barrier check → `users FOR SHARE` → `slack_connections FOR SHARE` → `slack_trusted_providers FOR SHARE` → `slack_processing_consents FOR SHARE` → insert source.
+- 03B1 `stageInTransaction`: advisory locks cho event key + barrier keys, sorted; insert receipt/barrier/intents. Không khóa artifact.
+- 02B `SlackConsentRepo.revokeConsent`: `BEGIN` → `SELECT consent FOR UPDATE` → CAS revision → `UPDATE status='revoked'` → `INSERT slack_policy_events('consent_revoked')` → `COMMIT`. **Không stage barrier trong transaction này**; barrier do 03B1 sweep sau, tối đa chu kỳ 5 giây.
+- `ScheduleRepo.ownedSchedule(lock=true)`: conversation `FOR UPDATE` → schedule `FOR UPDATE`.
+- `PlanRepo.createPlan` / `MessageRepo.createMessage`: conversation `FOR UPDATE` trước insert.
+- 03B2 writer phải theo: advisory sorted → conversation → authority `FOR SHARE` (user/connection/provider/consent) → barrier check → artifact → **barrier/authority post-check trước commit** → registry, giữ advisory đến hết transaction. 03B2 purger: advisory sorted → conversation → artifact → registry; không lấy consent. Không có chu trình đã biết, nhưng **không có kết luận chứng minh**.
+
+### 7.2. Ma trận `[Proposed: NOT_RUN]`
+
+| Mã | Hai tác vụ và thứ tự giữ khóa thật | Kỳ vọng phải kiểm chứng bằng 2 client PostgreSQL thật | Trạng thái |
+|---|---|---|---|
+| M1 | Writer giữ `consent FOR SHARE` sau conversation; 02B revoke giữ `consent FOR UPDATE` rồi insert event, commit trước barrier | Writer trước: revoke chờ; writer commit; revoke commit event; 03B1 stage barrier sau; 03B2 purge. Revoke trước: writer thấy revoked và rollback. Trong cửa sổ event-đã-commit/barrier-chưa-stage, reader phải thấy consent revoked và chặn; barrier vắng mặt không phải consent | NOT_RUN |
+| M2 | 03B1 `stageInTransaction` giữ advisory event+barrier; writer giữ cùng bộ advisory rồi barrier check | Writer trước: stage chờ, sau đó barrier commit; artifact đã commit sẽ bị purge. Stage trước: writer thấy barrier và rollback. Không dựa vào thứ tự insert | NOT_RUN |
+| M3 | Purger giữ conversation→artifact; writer giữ conversation→authority→artifact→registry | Cùng thứ tự parent-first; một bên chờ, không có cycle. Purger không lấy consent nên không tạo cycle với revoke. Test dùng `lock_timeout` thật, không chỉ đọc code | NOT_RUN |
+| M4 | Revoke/grant/provider update (02B) vs writer đang giữ `FOR SHARE` | Grant/provider update commit event rồi barrier sau; writer cũ commit trước event thì artifact bị purge; writer sau event thấy revision mới và từ chối epoch cũ. Stale read phải fail-closed | NOT_RUN |
+| M5 | Purger target-first (sai) vs writer conversation-first (đúng) | Chỉ dùng để phát hiện cycle nếu ai đó đảo thứ tự; test phải thấy lỗi/khóa chờ và không được coi là bằng chứng deadlock-proof | NOT_RUN |
+| M6 | Crash giữa handler sau khi đã purge một số copy; lease hết hạn; runner khác claim lại | Copy đã purge không bị xử lý lại; copy còn active được xử lý; intent chỉ complete khi không còn active copy khớp; `attempts` tăng, không trùng tombstone | NOT_RUN |
+| M7 | Stale version: copy v1 bị thay bởi copy v2 dưới grant mới; intent cũ xử lý v1 | v1 retire, artifact mới không bị sửa; v2 tạo sau intent nằm ngoài cutoff `created_at` nên không bị intent cũ chọn; nếu v2 tạo trước intent dưới epoch mới, target epoch không khớp; read guard dùng đúng version v2. Nếu writer quên đăng ký lại, fingerprint lệch → retire, read guard chặn, intent `STALE_LINEAGE` không complete | NOT_RUN |
+| M8 | Hai runner cùng claim; một handler thiếu cho `proposal_excerpt` | `SKIP LOCKED` chỉ cho một claim; handler thiếu → `failIntent(MISSING_HANDLER)`, intent không completed, receipt mở; không tự bịa kết quả thành công | NOT_RUN |
+
+Không có dòng nào ở trên là bằng chứng đã chạy. Chỉ sau khi có log lệnh thật, exit code và output mới được đổi trạng thái.
+
+---
+
+## 8. Điểm Tích Hợp Thực Tế & Đề Xuất
+
+### 8.1. File hiện hữu sẽ phải sửa khi thi công
+
+- `apps/chat-api/src/services/chat-service.ts`: `prepareResponse.write`, `executePlannerPipeline`, `planScheduledRun`; mở transaction chung cho artifact + registry; guard history/memory; SSE emit guard.
+- `apps/chat-api/src/services/schedules/schedule-service.ts`: `confirmProposal`, `saveFields`, `recordState`, `setStatus` (resume guard).
+- `apps/chat-api/src/services/schedules/schedule-runner.ts`: `planOne`, `runMessage`, `reconcileScheduleRuns`.
+- `apps/chat-api/src/db/repositories/plan-repo.ts`, `apps/chat-api/src/db/repositories/message-repo.ts`, `apps/chat-api/src/db/repositories/step-repo.ts`, `apps/chat-api/src/db/repositories/schedule-repo.ts`, `apps/chat-api/src/db/repositories/conversation-repo.ts`: nhận `client` + lineage draft, hoặc guard đọc; writer `updateStepStatus` khóa `conversations` → `plans` → `execution_steps`.
+- `apps/chat-api/src/services/execution-service.ts`: `getLatestExecutionSnapshot`, `approveAndStart`, `retryStep`, `continueExecution`.
+- `apps/chat-api/src/services/startup-reconciliation.ts`: `reconcileInterruptedExecutions`.
+- `apps/chat-api/src/routes/conversation-routes.ts`, `apps/chat-api/src/routes/stream-routes.ts`, `apps/chat-api/src/routes/schedule-routes.ts`, `apps/chat-api/src/routes/execution-routes.ts`.
+
+### 8.2. Module mới đề xuất (chưa tồn tại)
+
+- `db/v3/0018_slack_derived_lineage_and_purge.sql`.
+- `apps/chat-api/src/db/repositories/slack-derived-lineage-repo.ts`.
+- `apps/chat-api/src/services/slack/slack-derived-lineage-store.ts`.
+- `apps/chat-api/src/services/slack/slack-cascade-purge-runner.ts`.
+- `apps/chat-api/src/services/slack/slack-lineage-guards.ts`.
+- `apps/chat-api/src/services/slack/slack-derived-policy-fanout.ts`.
+- `apps/chat-api/src/services/slack/purge-handlers/` với 5 handler thật và 2 module "missing-handler" (không phải handler giả hoàn tất).
+
+### 8.3. AbortSignal thực tế
+
+- `ChatService.planScheduledRun` nhận `AbortSignal` và `signal.throwIfAborted()` trước planning; `ScheduleRunner` có `AbortController`.
+- Chat thường/SSE hiện chưa có controller xuyên suốt trong `executePlannerPipeline`; đề xuất bổ sung controller gắn với request/response close và kiểm tra trước mỗi emit. Đây là thay đổi runtime **NOT_RUN**, không được mô tả như đã có.
+
+### 8.4. Điểm ghi thực tế cần đăng ký copy
+
+- `ChatService.prepareResponse.write`: working memory state, plan row + assistant plan message, proposal message (gồm `metadata.previous.*`), answer/clarification/refusal message (`metadata.lookups`, `metadata.clarification.options/context/reason`, `metadata.refusal.reason/suggestion`), `resourceLabels`.
+- `ChatService.executePlannerPipeline`: system working memory message. Hiện dòng 528 ghi snapshot **trước** `prepareResponse.write`; khi thi công phải gộp snapshot + response + registry vào cùng transaction, không để snapshot không copy nếu response fail.
+- `ScheduleService.confirmProposal`/`saveFields` ghi row `schedules`; `recordState` ghi state message `metadata.schedule.name/request/recurrence/lastRun.error`.
+- `ScheduleRunner.planOne`: conversation title + first user message + `schedule_run` metadata.
+- `StepRepo.createStep`/`updateStepStatus`: args/output/error.
+- `reconcileInterruptedExecutions`: error JSON cố định; chỉ đăng ký nếu sau này có Slack excerpt.
+- `MessageRepo.createMessage` title fallback từ message đầu tiên: nếu message đó là run message chứa Slack, title cũng phải có copy hoặc được ghi từ title tombstone.
+
+---
+
+## 9. Tiêu Chí Nghiệm Thu (PLAN_ONLY)
+
+- [ ] **AC1 — Phạm vi:** Chỉ 3 tài liệu SLACK-03B2 thay đổi; không sửa mã, `CURRENT-STATE.md`, `ROADMAP.md`, migration.
+- [ ] **AC2 — Registry & purge identity:** DDL có `target_version BIGINT NOT NULL` server-default, `target_fingerprint`, `retired_reason`, unique `(ati_user_id,target_kind,target_id,target_sub_id,target_version)`, partial unique active, trạng thái active/retired/purged. Purge chỉ chọn copy active khớp target **và** `created_at <= intent.created_at`; CAS theo version+fingerprint; mismatch thì retire, không sửa artifact mới, **không tuyên bố F3 cho copy đó** và không complete intent (`STALE_LINEAGE`).
+- [ ] **AC3 — Atomic write:** Mọi writer thật liệt kê ở mục 8.4 ghi artifact + copy trong cùng transaction; retire copy cũ trước khi insert version mới; không có version từ model/client.
+- [ ] **AC4 — Read guard:** `expectedTargetVersion` bắt buộc; kiểm tra caller, nonempty segments, 8-field storage policy ref, TTL, **authority consent/provider hiện tại**, barrier pre/post, fingerprint, current version; advisory sorted + authority `FOR SHARE` + khóa artifact `FOR SHARE` và kiểm tra lại version/fingerprint sau khi đọc; `AbortSignal` thật; nguồn multi-workspace cùng một ATI user chỉ.
+- [ ] **AC5 — schedules:** Xóa đúng từng trường có copy bằng tombstone không rỗng; `recurrence={}`, active-only pause + reason + `next_run_at` NULL; resume fail-closed; không bảo toàn mù `request`; xử lý `schedule_runs`/title đúng constraint.
+- [ ] **AC6 — Working memory:** Xóa đúng `__observed`, `__labels`, `__gather*`, `members`, entity key theo selector; giữ entry dịch vụ khác; provenance chỉ từ server; fail-closed nếu không đủ segment.
+- [ ] **AC7 — Handoff:** Raw intent có thể completed sau raw purge; 7 derived intent còn pending; không có `raw_purged`; closure là predicate tất cả intent completed; missing handler fail-closed.
+- [ ] **AC8 — Phạm vi runtime trung thực:** Chỉ 5 handler artifact thật + 2 cổng tương lai; không tuyên bố 7-kind runtime/F3; full F3 phụ thuộc SLACK-06 và test tích hợp thật.
+- [ ] **AC9 — Bằng chứng:** Mọi test runtime trong card là `[Proposed: NOT_RUN]`; không có tuyên bố tuyệt đối, không có kết luận deadlock hay F3 khi chưa có log lệnh thật.
+- [ ] **AC10 — Tài liệu:** Liên kết tồn tại; UTF-8 không U+FFFD; plan ≤350 dòng; `git diff --check` sạch; chỉ 3 file thuộc sở hữu.
+
+---
+
+## 10. Cổng Kiểm Tra
 
 ```powershell
-# 1. [Proposed: NOT_RUN] Kiểm tra Migration DDL 0018 trên PG16 thật
+# Runtime — toàn bộ [Proposed: NOT_RUN]
 # npm run migrate:v3
-
-# 2. [Proposed: NOT_RUN] Kiểm tra Repository & Atomic Lock Order Concurrency (2 PG clients)
 # npm test -w @wap/chat-api -- tests/db/slack-derived-lineage-repo.test.ts
-
-# 3. [Proposed: NOT_RUN] Kiểm tra Cascade Purge Runner cho cả 7 Target Kinds & Crash Recovery
 # npm test -w @wap/chat-api -- tests/services/slack/slack-cascade-purge.test.ts
-
-# 4. [Proposed: NOT_RUN] Kiểm tra Rào Chắn Pre-Read, SSE & Memory Sanitize
 # npm test -w @wap/chat-api -- tests/services/slack/slack-derived-guards.test.ts
-
-# 5. [Proposed: NOT_RUN] Kiểm tra Tích Hợp Real Writers Với PostgreSQL Thật
 # npm test -w @wap/chat-api -- tests/integration/slack-derived-writers-integration.test.ts
-
-# 6. [Proposed: NOT_RUN] Kiểm tra Toàn Diện Typecheck Toàn Repo
 # npm run typecheck:v3
 
-# 7. Kiểm tra Quy chuẩn Khoảng Trắng và Git Diff (DOCS ONLY)
+# Tài liệu — chạy thật trong phiên này, ghi ở log
 git diff --check e9088d5e..HEAD
+git diff --name-only e9088d5e..HEAD
 ```
 
 ---
 
-## 9. Kết Quả Thực Thi (Dành Cho Agent Thi Công)
+## 11. Kết Quả Thi Công
 
-*(Phần này được để trống cho agent thi công ghi lại kết quả RED→GREEN, commit hashes và log kiểm thử thực tế sau khi được phân công thực hiện mã nguồn).*
+**Phiên này:** PLAN_ONLY — chỉ sửa 3 tài liệu thuộc sở hữu; không có mã runtime, migration, gọi native Slack/model/provider, chấp nhận native provider, hay đóng F3. Mọi kiểm thử runtime trong card/plan giữ `[Proposed: NOT_RUN]`; kiểm chứng thật chỉ là kiểm tra tài liệu, ghi ở `docs/handoff/log/2026-10-30-slack-03b2-derived-plan.md`.
+
+*(Phần kết quả runtime chỉ được điền sau khi có mã runtime và log lệnh thật. Không dùng phần này để tuyên bố F3 đã đóng.)*
