@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "collectedAt": "2026-10-28T16:22:58.161Z",
+  "collectedAt": "2026-10-29T07:08:38.587Z",
   "index": {
     "url": "https://docs.slack.dev/sitemap.xml",
-    "sha256": "72a26dc676c04cdcbc4d3004774c36b887ddc610863563c2f64ce45cc8e8d073",
+    "sha256": "cdb9942404d682075921303e82dc858f27a3f52911042cdec76b9a9a95dd6d6b",
     "methods": [
       "admin.analytics.getFile",
       "admin.analytics.messages.activity",
@@ -81,6 +81,10 @@
       "admin.roles.addAssignments",
       "admin.roles.listAssignments",
       "admin.roles.removeAssignments",
+      "admin.slackbot.skills.list",
+      "admin.slackbot.skills.publish",
+      "admin.slackbot.skills.setAutoEnabled",
+      "admin.slackbot.skills.unpublish",
       "admin.teams.admins.list",
       "admin.teams.create",
       "admin.teams.list",
@@ -303,6 +307,13 @@
       "slackLists.items.list",
       "slackLists.items.update",
       "slackLists.update",
+      "slackbot.skills.create",
+      "slackbot.skills.delete",
+      "slackbot.skills.info",
+      "slackbot.skills.library.add",
+      "slackbot.skills.library.remove",
+      "slackbot.skills.list",
+      "slackbot.skills.update",
       "stars.add",
       "stars.list",
       "stars.remove",
@@ -354,7 +365,7 @@
     {
       "method": "admin.analytics.getFile",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.analytics.getFile",
-      "fetchedAt": "2026-10-28T16:20:53.658Z",
+      "fetchedAt": "2026-10-29T07:06:04.486Z",
       "sourceSha256": "d5ce4613807a9b224f76abdb58152584627b7b51ccfd7359e993f0f18fc7c7a5",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -378,7 +389,7 @@
     {
       "method": "admin.analytics.messages.activity",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.analytics.messages.activity",
-      "fetchedAt": "2026-10-28T16:20:54.387Z",
+      "fetchedAt": "2026-10-29T07:06:04.581Z",
       "sourceSha256": "1418805a596b0e4a180e22618d56133fbd3c584b9f3d50c8eb2765aeef337c6c",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -402,7 +413,7 @@
     {
       "method": "admin.analytics.messages.metadata",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.analytics.messages.metadata",
-      "fetchedAt": "2026-10-28T16:20:54.619Z",
+      "fetchedAt": "2026-10-29T07:06:04.784Z",
       "sourceSha256": "2f9ec415bb6bc3328d1e2814b4dca597e4165a9b721d0e24bf1fada34efe39ba",
       "httpMethod": "GET",
       "rateLimit": "t5",
@@ -426,7 +437,7 @@
     {
       "method": "admin.apps.activities.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.apps.activities.list",
-      "fetchedAt": "2026-10-28T16:20:54.672Z",
+      "fetchedAt": "2026-10-29T07:06:05.818Z",
       "sourceSha256": "beeb0b0b115b513c3bdb5ec59aa8c94068a70add136c388481f974f9f37609f3",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -450,7 +461,7 @@
     {
       "method": "admin.apps.approve",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.apps.approve",
-      "fetchedAt": "2026-10-28T16:20:55.636Z",
+      "fetchedAt": "2026-10-29T07:06:05.718Z",
       "sourceSha256": "dfbf6e2321dbd55095657d34171ef2a76fba41bc4965d6d0b240119688aab78c",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -474,7 +485,7 @@
     {
       "method": "admin.apps.approved.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.apps.approved.list",
-      "fetchedAt": "2026-10-28T16:20:55.680Z",
+      "fetchedAt": "2026-10-29T07:06:06.660Z",
       "sourceSha256": "19410595a9224db73bebbf1f51e09527349434507df8a77e0037cb4d4f87d3b1",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -498,7 +509,7 @@
     {
       "method": "admin.apps.clearResolution",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.apps.clearResolution",
-      "fetchedAt": "2026-10-28T16:20:56.633Z",
+      "fetchedAt": "2026-10-29T07:06:06.101Z",
       "sourceSha256": "69d5864d6b38e939392a593a84780bf848081ec2a7ab3126bf826f55bdfc47d0",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -522,7 +533,7 @@
     {
       "method": "admin.apps.config.lookup",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.apps.config.lookup",
-      "fetchedAt": "2026-10-28T16:20:56.699Z",
+      "fetchedAt": "2026-10-29T07:06:07.045Z",
       "sourceSha256": "ca6700a84c137e8e6eaa6dfda7ebb6648ac4f4fc70d0e08a2025450e7f08b5dd",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -546,7 +557,7 @@
     {
       "method": "admin.apps.config.set",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.apps.config.set",
-      "fetchedAt": "2026-10-28T16:20:56.912Z",
+      "fetchedAt": "2026-10-29T07:06:07.892Z",
       "sourceSha256": "7f6648822c9117a7c1b1a7ec3dc512d11c62990a60a019dd448f04fa10680043",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -570,7 +581,7 @@
     {
       "method": "admin.apps.mcp.servers.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.apps.mcp.servers.list",
-      "fetchedAt": "2026-10-28T16:20:57.702Z",
+      "fetchedAt": "2026-10-29T07:06:07.995Z",
       "sourceSha256": "7d6c0334e657281381142b8a755575c9a36d9bcdc8c95e4d1a24532fef48b519",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -594,7 +605,7 @@
     {
       "method": "admin.apps.mcp.servers.permissions.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.apps.mcp.servers.permissions.list",
-      "fetchedAt": "2026-10-28T16:20:57.937Z",
+      "fetchedAt": "2026-10-29T07:06:08.419Z",
       "sourceSha256": "55c6008d4b2c46798219e184cf5af8594fa933658544a64b4eae6da3c9c9d259",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -618,7 +629,7 @@
     {
       "method": "admin.apps.mcp.servers.permissions.set",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.apps.mcp.servers.permissions.set",
-      "fetchedAt": "2026-10-28T16:20:58.724Z",
+      "fetchedAt": "2026-10-29T07:06:08.285Z",
       "sourceSha256": "c619b29e42d163ba5618878eea4c6f620fd8dceac2640248067c387f6f3d6372",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -642,7 +653,7 @@
     {
       "method": "admin.apps.permissions.add",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.apps.permissions.add",
-      "fetchedAt": "2026-10-28T16:20:58.913Z",
+      "fetchedAt": "2026-10-29T07:06:09.228Z",
       "sourceSha256": "927930e0b40b9368792c1600a46297df94001939eb71735e05e3d24c2a7d7d95",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -666,7 +677,7 @@
     {
       "method": "admin.apps.permissions.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.apps.permissions.list",
-      "fetchedAt": "2026-10-28T16:20:59.709Z",
+      "fetchedAt": "2026-10-29T07:06:09.405Z",
       "sourceSha256": "546056849341ff475d8de27145e5636c04439be886f0364bd3c417df764328a5",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -690,7 +701,7 @@
     {
       "method": "admin.apps.permissions.remove",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.apps.permissions.remove",
-      "fetchedAt": "2026-10-28T16:20:59.930Z",
+      "fetchedAt": "2026-10-29T07:06:09.814Z",
       "sourceSha256": "3c51965e3ee80957e50c73a9590370bceaa3b847916a159a31a5059f9ae015c9",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -714,7 +725,7 @@
     {
       "method": "admin.apps.permissions.set",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.apps.permissions.set",
-      "fetchedAt": "2026-10-28T16:21:00.693Z",
+      "fetchedAt": "2026-10-29T07:06:10.361Z",
       "sourceSha256": "82a802d515030ace71016e76cb9708d1c22dff20c60b1adcc582739b5da257cb",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -738,7 +749,7 @@
     {
       "method": "admin.apps.requests.cancel",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.apps.requests.cancel",
-      "fetchedAt": "2026-10-28T16:21:00.209Z",
+      "fetchedAt": "2026-10-29T07:06:10.087Z",
       "sourceSha256": "2296ed76d4cab8c212ef70540253f3de7244d6094fd8ebf78d5ad58edfba25cc",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -762,7 +773,7 @@
     {
       "method": "admin.apps.requests.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.apps.requests.list",
-      "fetchedAt": "2026-10-28T16:21:01.215Z",
+      "fetchedAt": "2026-10-29T07:06:10.356Z",
       "sourceSha256": "6d14a1db420bbed4ed90c1e5e18239ce8fafaa21233df4194390972b7df97657",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -786,7 +797,7 @@
     {
       "method": "admin.apps.restrict",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.apps.restrict",
-      "fetchedAt": "2026-10-28T16:21:01.675Z",
+      "fetchedAt": "2026-10-29T07:06:11.326Z",
       "sourceSha256": "dd6c5cdabbb5b6c7f09f550491f706be23dbc8fed6bedc7db62ad9fae1b6ceb6",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -810,7 +821,7 @@
     {
       "method": "admin.apps.restricted.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.apps.restricted.list",
-      "fetchedAt": "2026-10-28T16:21:01.499Z",
+      "fetchedAt": "2026-10-29T07:06:10.878Z",
       "sourceSha256": "f83748970da05ede8a1c60b96474fbe18b9169b29745badd175e25033206cbc9",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -834,7 +845,7 @@
     {
       "method": "admin.apps.uninstall",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.apps.uninstall",
-      "fetchedAt": "2026-10-28T16:21:01.773Z",
+      "fetchedAt": "2026-10-29T07:06:11.164Z",
       "sourceSha256": "3eb3e3d26008913feaee04707f5a9de3b45cbcbd3c462bba71dc5f9080ed4ef8",
       "httpMethod": "POST",
       "rateLimit": "t1",
@@ -858,7 +869,7 @@
     {
       "method": "admin.audit.anomaly.allow.getItem",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.audit.anomaly.allow.getItem",
-      "fetchedAt": "2026-10-28T16:21:02.683Z",
+      "fetchedAt": "2026-10-29T07:06:12.092Z",
       "sourceSha256": "b5d86195b35c4c262ce8c5d7e0e63eed6c9cc2ef8f8fbd0bc44313eeb27d352a",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -882,7 +893,7 @@
     {
       "method": "admin.audit.anomaly.allow.updateItem",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.audit.anomaly.allow.updateItem",
-      "fetchedAt": "2026-10-28T16:21:02.766Z",
+      "fetchedAt": "2026-10-29T07:06:11.658Z",
       "sourceSha256": "a552e34c1dca0aeb4456504ac29f32e78d352378335ef6bda90dcdaee963b068",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -906,7 +917,7 @@
     {
       "method": "admin.auth.policy.assignEntities",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.auth.policy.assignEntities",
-      "fetchedAt": "2026-10-28T16:21:02.954Z",
+      "fetchedAt": "2026-10-29T07:06:11.967Z",
       "sourceSha256": "2e641f403063ed24f547dd67da58c885ca5ea974ed465d9fb2eba61a3cebfe8a",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -930,7 +941,7 @@
     {
       "method": "admin.auth.policy.getEntities",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.auth.policy.getEntities",
-      "fetchedAt": "2026-10-28T16:21:03.780Z",
+      "fetchedAt": "2026-10-29T07:06:12.263Z",
       "sourceSha256": "ef0d10f889d7ced0105d124d71a854f0045e12c98e396c86dc1bdcb9ce08ecfc",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -954,7 +965,7 @@
     {
       "method": "admin.auth.policy.removeEntities",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.auth.policy.removeEntities",
-      "fetchedAt": "2026-10-28T16:21:03.942Z",
+      "fetchedAt": "2026-10-29T07:06:13.073Z",
       "sourceSha256": "7f19c751cf493310ef5696ac3b865987f61efeb9bb5f37c3f7e5eb17111f4ddc",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -978,7 +989,7 @@
     {
       "method": "admin.barriers.create",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.barriers.create",
-      "fetchedAt": "2026-10-28T16:21:04.054Z",
+      "fetchedAt": "2026-10-29T07:06:12.515Z",
       "sourceSha256": "a6afd56a3490691f81974c9f641ee5515e2bdd97472ab201f3ad020a384f2f48",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1002,7 +1013,7 @@
     {
       "method": "admin.barriers.delete",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.barriers.delete",
-      "fetchedAt": "2026-10-28T16:21:04.907Z",
+      "fetchedAt": "2026-10-29T07:06:13.504Z",
       "sourceSha256": "6213137da0a1e0494746981f048c6b95b8d7c38a1ab060a15de1db91dda5c2ae",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1026,7 +1037,7 @@
     {
       "method": "admin.barriers.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.barriers.list",
-      "fetchedAt": "2026-10-28T16:21:05.035Z",
+      "fetchedAt": "2026-10-29T07:06:14.031Z",
       "sourceSha256": "5181a2d8f8f07610e8c2bab72697ab47591e1f073370ed3bd03b8801afac04b2",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -1050,7 +1061,7 @@
     {
       "method": "admin.barriers.update",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.barriers.update",
-      "fetchedAt": "2026-10-28T16:21:05.184Z",
+      "fetchedAt": "2026-10-29T07:06:14.733Z",
       "sourceSha256": "a791384659ecf56892972f0dbb18aea7be9229241ca760eeed38ab45fbbbf0ba",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1074,7 +1085,7 @@
     {
       "method": "admin.conversations.archive",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.archive",
-      "fetchedAt": "2026-10-28T16:21:05.318Z",
+      "fetchedAt": "2026-10-29T07:06:14.336Z",
       "sourceSha256": "82ea921467d134c87517dec00c80576977797e01101500f77c005e81960f3723",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1098,7 +1109,7 @@
     {
       "method": "admin.conversations.bulkArchive",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.bulkArchive",
-      "fetchedAt": "2026-10-28T16:21:06.177Z",
+      "fetchedAt": "2026-10-29T07:06:15.344Z",
       "sourceSha256": "086a0bfaf27a7dd4b4b182b4de57daf759634364519eb7ee0de4090eabb15b97",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1122,7 +1133,7 @@
     {
       "method": "admin.conversations.bulkDelete",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.bulkDelete",
-      "fetchedAt": "2026-10-28T16:21:06.329Z",
+      "fetchedAt": "2026-10-29T07:06:15.016Z",
       "sourceSha256": "b7fd9c3a9248b01e467059b3533cd0cfe94c3a8d832f222a6cbfa4efeb4b0996",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1146,7 +1157,7 @@
     {
       "method": "admin.conversations.bulkMove",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.bulkMove",
-      "fetchedAt": "2026-10-28T16:21:07.153Z",
+      "fetchedAt": "2026-10-29T07:06:15.338Z",
       "sourceSha256": "5cca0a7b26d7ac1abfb26084a0acd538fd94707c14580cd1f4079c0afcffcdec",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1170,7 +1181,7 @@
     {
       "method": "admin.conversations.bulkSetExcludeFromSlackAi",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.bulkSetExcludeFromSlackAi",
-      "fetchedAt": "2026-10-28T16:21:07.309Z",
+      "fetchedAt": "2026-10-29T07:06:16.345Z",
       "sourceSha256": "535d4f5087d189bc685e20b8078da3023aba79d61d09dfe9f0631d3846555e8f",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -1194,7 +1205,7 @@
     {
       "method": "admin.conversations.bulkSetProperties",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.bulkSetProperties",
-      "fetchedAt": "2026-10-28T16:21:07.427Z",
+      "fetchedAt": "2026-10-29T07:06:16.555Z",
       "sourceSha256": "7b8fc3fe9650b199232d7ee627fc8f1c1b8864f6b7771b6ab577bd26214c2374",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1218,7 +1229,7 @@
     {
       "method": "admin.conversations.convertToPrivate",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.convertToPrivate",
-      "fetchedAt": "2026-10-28T16:21:07.577Z",
+      "fetchedAt": "2026-10-29T07:06:16.598Z",
       "sourceSha256": "86f54f2e56ad49fd88d3ffc198a0567bf1c140f39a6032b17fb4423aa5d9c853",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1242,7 +1253,7 @@
     {
       "method": "admin.conversations.convertToPublic",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.convertToPublic",
-      "fetchedAt": "2026-10-28T16:21:07.816Z",
+      "fetchedAt": "2026-10-29T07:06:27.621Z",
       "sourceSha256": "e9537628372f3f3a0079d5daef71dc9914404a7945e02bf7545fa83ca7ec1428",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1266,7 +1277,7 @@
     {
       "method": "admin.conversations.create",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.create",
-      "fetchedAt": "2026-10-28T16:21:08.058Z",
+      "fetchedAt": "2026-10-29T07:06:16.899Z",
       "sourceSha256": "8506068bb830f780eb40617b84ca3a8f7d9b3a69f9d8281548866faaa208adda",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1290,7 +1301,7 @@
     {
       "method": "admin.conversations.createForObjects",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.createForObjects",
-      "fetchedAt": "2026-10-28T16:21:08.812Z",
+      "fetchedAt": "2026-10-29T07:06:19.226Z",
       "sourceSha256": "d81c357a987afbad0139543478b7a043e5fb0a5ba88dc4a902536c1165d2d323",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1314,7 +1325,7 @@
     {
       "method": "admin.conversations.delete",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.delete",
-      "fetchedAt": "2026-10-28T16:21:09.041Z",
+      "fetchedAt": "2026-10-29T07:06:20.641Z",
       "sourceSha256": "84c45c71c34e984915ab692bc4e2d058e0431ab982a5d74b954c729ac317bcc1",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1338,7 +1349,7 @@
     {
       "method": "admin.conversations.disconnectShared",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.disconnectShared",
-      "fetchedAt": "2026-10-28T16:21:09.837Z",
+      "fetchedAt": "2026-10-29T07:06:23.358Z",
       "sourceSha256": "5cb649162bc0633b5cb041a4dd33a998bbed551c61b98ba54bb4766e8011130f",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1362,7 +1373,7 @@
     {
       "method": "admin.conversations.ekm.listOriginalConnectedChannelInfo",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.ekm.listOriginalConnectedChannelInfo",
-      "fetchedAt": "2026-10-28T16:21:09.326Z",
+      "fetchedAt": "2026-10-29T07:06:26.687Z",
       "sourceSha256": "de8d4fcf0195c7eedaa1efe2e7e26e9a8c0525a2fa9c9f0e65ce576f4295da55",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1386,7 +1397,7 @@
     {
       "method": "admin.conversations.getConversationPrefs",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.getConversationPrefs",
-      "fetchedAt": "2026-10-28T16:21:10.325Z",
+      "fetchedAt": "2026-10-29T07:06:27.644Z",
       "sourceSha256": "27c2e5c5c321d1788406804ede3eb1934e0557d90292f4c269443d3131c23cab",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1410,7 +1421,7 @@
     {
       "method": "admin.conversations.getCustomRetention",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.getCustomRetention",
-      "fetchedAt": "2026-10-28T16:21:10.106Z",
+      "fetchedAt": "2026-10-29T07:06:28.567Z",
       "sourceSha256": "8ccd6e70147d55ff86f07aec195c56fdefce9341b722d68029ea074059626a8e",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1434,7 +1445,7 @@
     {
       "method": "admin.conversations.getTeams",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.getTeams",
-      "fetchedAt": "2026-10-28T16:21:11.129Z",
+      "fetchedAt": "2026-10-29T07:06:29.077Z",
       "sourceSha256": "2e2814a9b583e2a92e3981dccfe7fcdf4f6413020ca3e905b37245a78b06db9e",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -1458,7 +1469,7 @@
     {
       "method": "admin.conversations.invite",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.invite",
-      "fetchedAt": "2026-10-28T16:21:11.324Z",
+      "fetchedAt": "2026-10-29T07:06:29.552Z",
       "sourceSha256": "ecef660aa0c3336c2e0461c05d0f479150a71995f32e4e6e75cda52048ec98ae",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1482,7 +1493,7 @@
     {
       "method": "admin.conversations.linkObjects",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.linkObjects",
-      "fetchedAt": "2026-10-28T16:21:12.154Z",
+      "fetchedAt": "2026-10-29T07:06:30.113Z",
       "sourceSha256": "e1c9350af5ef7b9014b37be561b45f4d0abca5cbc1891bee80085cba6a4abbeb",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1506,7 +1517,7 @@
     {
       "method": "admin.conversations.lookup",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.lookup",
-      "fetchedAt": "2026-10-28T16:21:11.596Z",
+      "fetchedAt": "2026-10-29T07:06:29.892Z",
       "sourceSha256": "37f1f3036ddd811d6cad2bb8d68e982dfc4f05c15d2fd227a7e625e1d92ece91",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1530,7 +1541,7 @@
     {
       "method": "admin.conversations.removeCustomRetention",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.removeCustomRetention",
-      "fetchedAt": "2026-10-28T16:21:12.571Z",
+      "fetchedAt": "2026-10-29T07:06:30.897Z",
       "sourceSha256": "722519995d230028a6fb68606acb46a64804d7d968175ca33e49f141a6b1180b",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1554,7 +1565,7 @@
     {
       "method": "admin.conversations.rename",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.rename",
-      "fetchedAt": "2026-10-28T16:21:13.137Z",
+      "fetchedAt": "2026-10-29T07:06:31.116Z",
       "sourceSha256": "76d9111e65de3afff7871e215ecdce2bf69ad5d49e7b3dbd5a5c6d59c7050faa",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1578,7 +1589,7 @@
     {
       "method": "admin.conversations.restrictAccess.addGroup",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.restrictAccess.addGroup",
-      "fetchedAt": "2026-10-28T16:21:13.595Z",
+      "fetchedAt": "2026-10-29T07:06:31.948Z",
       "sourceSha256": "a4fdbf8a9a42e905f3291863c2c147401358b99e2f9061cbad1836b2512b55fa",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -1602,7 +1613,7 @@
     {
       "method": "admin.conversations.restrictAccess.listGroups",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.restrictAccess.listGroups",
-      "fetchedAt": "2026-10-28T16:21:14.149Z",
+      "fetchedAt": "2026-10-29T07:06:32.040Z",
       "sourceSha256": "a80edee23d8ac496eec3fd7e41623b514f23af7a1e88971d789a77de4018a9b1",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -1626,7 +1637,7 @@
     {
       "method": "admin.conversations.restrictAccess.removeGroup",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.restrictAccess.removeGroup",
-      "fetchedAt": "2026-10-28T16:21:14.582Z",
+      "fetchedAt": "2026-10-29T07:06:32.875Z",
       "sourceSha256": "8ebc45616ca247d450b083e8cd3a04092c62f8367f1c78ea79bc5622cd538dd8",
       "httpMethod": "GET",
       "rateLimit": "t1",
@@ -1650,7 +1661,7 @@
     {
       "method": "admin.conversations.search",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.search",
-      "fetchedAt": "2026-10-28T16:21:14.418Z",
+      "fetchedAt": "2026-10-29T07:06:33.061Z",
       "sourceSha256": "40c6b30a253e3775486fe7a33bbd3369913876eeba980abcdaf6eaaff405edab",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1674,7 +1685,7 @@
     {
       "method": "admin.conversations.setConversationPrefs",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.setConversationPrefs",
-      "fetchedAt": "2026-10-28T16:21:14.688Z",
+      "fetchedAt": "2026-10-29T07:06:33.177Z",
       "sourceSha256": "0f308bb4c390f28d304299d1140e8e7164c2c7475afb78f847e711e2aefe7978",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -1698,7 +1709,7 @@
     {
       "method": "admin.conversations.setCustomRetention",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.setCustomRetention",
-      "fetchedAt": "2026-10-28T16:21:14.862Z",
+      "fetchedAt": "2026-10-29T07:06:33.357Z",
       "sourceSha256": "b83c285a652e52832e19e0454fc947ad972f3e6a95bd82cb5024357d45ad0f27",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1722,7 +1733,7 @@
     {
       "method": "admin.conversations.setTeams",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.setTeams",
-      "fetchedAt": "2026-10-28T16:21:15.689Z",
+      "fetchedAt": "2026-10-29T07:06:33.441Z",
       "sourceSha256": "b7b41655a672205a842ba17e9a8a7821915dfb853b135ecf39834ef124bc8b75",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1746,7 +1757,7 @@
     {
       "method": "admin.conversations.unarchive",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.unarchive",
-      "fetchedAt": "2026-10-28T16:21:15.857Z",
+      "fetchedAt": "2026-10-29T07:06:34.315Z",
       "sourceSha256": "415ab038367edd27be1adbc9c8bbfd70ddb8619b820e4f170b6162636041683a",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1770,7 +1781,7 @@
     {
       "method": "admin.conversations.unlinkObjects",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.conversations.unlinkObjects",
-      "fetchedAt": "2026-10-28T16:21:16.709Z",
+      "fetchedAt": "2026-10-29T07:06:34.634Z",
       "sourceSha256": "0ae5b9c9f0cd4733dd68431c289fd65be36a06d1f88c17f6fe62048d90eb7ad5",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1794,7 +1805,7 @@
     {
       "method": "admin.emoji.add",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.emoji.add",
-      "fetchedAt": "2026-10-28T16:21:16.131Z",
+      "fetchedAt": "2026-10-29T07:06:34.567Z",
       "sourceSha256": "e4b92ee4336f81f0940149c7609ebeeca5628c8f905b6acaa3212769d1d4f266",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -1818,7 +1829,7 @@
     {
       "method": "admin.emoji.addAlias",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.emoji.addAlias",
-      "fetchedAt": "2026-10-28T16:21:16.402Z",
+      "fetchedAt": "2026-10-29T07:06:35.195Z",
       "sourceSha256": "353573165a6149c1a1f6ff2a53209267f4798a88bd054d8e945c60152c41e490",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -1842,7 +1853,7 @@
     {
       "method": "admin.emoji.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.emoji.list",
-      "fetchedAt": "2026-10-28T16:21:17.392Z",
+      "fetchedAt": "2026-10-29T07:06:34.942Z",
       "sourceSha256": "cce238ebf5a8321d5a53fcea59784109663b7c8145c7f0fa2a74d57ae4049f94",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -1866,7 +1877,7 @@
     {
       "method": "admin.emoji.remove",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.emoji.remove",
-      "fetchedAt": "2026-10-28T16:21:16.979Z",
+      "fetchedAt": "2026-10-29T07:06:35.897Z",
       "sourceSha256": "0be4c5c21c33207a465e4d9c1f13d3e7dfb9bd94efedbc7d8da9eb53d6d915ff",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -1890,7 +1901,7 @@
     {
       "method": "admin.emoji.rename",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.emoji.rename",
-      "fetchedAt": "2026-10-28T16:21:17.246Z",
+      "fetchedAt": "2026-10-29T07:06:35.738Z",
       "sourceSha256": "710afd0a30c8e474e7f996d362d500e6a6e4d669cc1e17f2f70a9c8fccc78394",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -1914,7 +1925,7 @@
     {
       "method": "admin.functions.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.functions.list",
-      "fetchedAt": "2026-10-28T16:21:18.245Z",
+      "fetchedAt": "2026-10-29T07:06:36.711Z",
       "sourceSha256": "5b67fa5831bde532bb846e86fe2121448fa79bbd1555a3f33b35c5639d835d86",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -1938,7 +1949,7 @@
     {
       "method": "admin.functions.permissions.lookup",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.functions.permissions.lookup",
-      "fetchedAt": "2026-10-28T16:21:17.660Z",
+      "fetchedAt": "2026-10-29T07:06:36.435Z",
       "sourceSha256": "91e86b1ed12d7f744541b7c314b4e2400aed9aa9a94307858fb020c02122308f",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -1962,7 +1973,7 @@
     {
       "method": "admin.functions.permissions.set",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.functions.permissions.set",
-      "fetchedAt": "2026-10-28T16:21:17.940Z",
+      "fetchedAt": "2026-10-29T07:06:37.398Z",
       "sourceSha256": "91e5787b5794fe2bb6397c6d1a24d4282d3b4db105cb19741df630eb532ff45c",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -1986,7 +1997,7 @@
     {
       "method": "admin.inviteRequests.approve",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.inviteRequests.approve",
-      "fetchedAt": "2026-10-28T16:21:18.945Z",
+      "fetchedAt": "2026-10-29T07:06:36.969Z",
       "sourceSha256": "e37ff68a00473ed060d42708cd65f150b5869e3ca57e171fc0c70e04011b9524",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -2010,7 +2021,7 @@
     {
       "method": "admin.inviteRequests.approved.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.inviteRequests.approved.list",
-      "fetchedAt": "2026-10-28T16:21:19.271Z",
+      "fetchedAt": "2026-10-29T07:06:37.901Z",
       "sourceSha256": "69ef8e869b3a96a02da9359d23405550b8325cb080722556c98f2e5ad826600f",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -2034,7 +2045,7 @@
     {
       "method": "admin.inviteRequests.denied.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.inviteRequests.denied.list",
-      "fetchedAt": "2026-10-28T16:21:19.910Z",
+      "fetchedAt": "2026-10-29T07:06:37.899Z",
       "sourceSha256": "01391b163bd01a1891422b9aa9f4812030e64df574f608c70812d81f9257ff8f",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -2058,7 +2069,7 @@
     {
       "method": "admin.inviteRequests.deny",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.inviteRequests.deny",
-      "fetchedAt": "2026-10-28T16:21:19.551Z",
+      "fetchedAt": "2026-10-29T07:06:38.416Z",
       "sourceSha256": "ae7e0933dc22716adaa6808a900b4cdce79e329791d6102e5fe26e70f2f3fbc0",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -2082,7 +2093,7 @@
     {
       "method": "admin.inviteRequests.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.inviteRequests.list",
-      "fetchedAt": "2026-10-28T16:21:19.822Z",
+      "fetchedAt": "2026-10-29T07:06:38.252Z",
       "sourceSha256": "ba8ce8092d513ce1b8aac1cf7cc26f962936d47f49c533551b47a4b9fe7c5414",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -2106,7 +2117,7 @@
     {
       "method": "admin.roles.addAssignments",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.roles.addAssignments",
-      "fetchedAt": "2026-10-28T16:21:20.106Z",
+      "fetchedAt": "2026-10-29T07:06:39.213Z",
       "sourceSha256": "7a985eb470e07c760df64de3b75aa3ef9e0ea5d263c59af708124a503d06a3b7",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -2130,7 +2141,7 @@
     {
       "method": "admin.roles.listAssignments",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.roles.listAssignments",
-      "fetchedAt": "2026-10-28T16:21:20.941Z",
+      "fetchedAt": "2026-10-29T07:06:38.830Z",
       "sourceSha256": "16d1846680d9aee6f6e8fff3855d002e0c84cfd308aa192a565165fd13b0a943",
       "httpMethod": "GET",
       "rateLimit": "t3",
@@ -2154,7 +2165,7 @@
     {
       "method": "admin.roles.removeAssignments",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.roles.removeAssignments",
-      "fetchedAt": "2026-10-28T16:21:20.391Z",
+      "fetchedAt": "2026-10-29T07:06:39.897Z",
       "sourceSha256": "7e7e07370720c53e13152edb20ba95446d8131b14618f1d893e3420b9b53e619",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -2176,9 +2187,105 @@
       "reviewState": "reviewed"
     },
     {
+      "method": "admin.slackbot.skills.list",
+      "sourceUrl": "https://docs.slack.dev/reference/methods/admin.slackbot.skills.list",
+      "fetchedAt": "2026-10-29T07:06:39.529Z",
+      "sourceSha256": "e0f9ea75e0492d16af3d51b190629e4d795f7b542a6c9557ef3c6a1c7bfddc6d",
+      "httpMethod": "POST",
+      "rateLimit": "t2",
+      "userScopes": [
+        "admin.skills:read"
+      ],
+      "userToken": "documented",
+      "planRequirement": "Enterprise plan explicitly required by the method page; outside Free/Pro.",
+      "roleRequirement": "Enterprise member/owner/admin rules are method-specific; outside this release plan scope.",
+      "sideEffect": "undetermined",
+      "risk": "undetermined",
+      "disposition": "excluded",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "evidenceUrls": [
+        "https://docs.slack.dev/reference/methods/admin.slackbot.skills.list"
+      ],
+      "atiMapping": null,
+      "deliveryStatus": "not_implemented",
+      "reviewState": "reviewed"
+    },
+    {
+      "method": "admin.slackbot.skills.publish",
+      "sourceUrl": "https://docs.slack.dev/reference/methods/admin.slackbot.skills.publish",
+      "fetchedAt": "2026-10-29T07:06:40.115Z",
+      "sourceSha256": "caa158cf6c3de9a75eff09c01e927f036d02461baaa0fae8b72232da2e22c5b0",
+      "httpMethod": "POST",
+      "rateLimit": "t2",
+      "userScopes": [
+        "admin.skills:write"
+      ],
+      "userToken": "documented",
+      "planRequirement": "Enterprise plan explicitly required by the method page; outside Free/Pro.",
+      "roleRequirement": "Enterprise member/owner/admin rules are method-specific; outside this release plan scope.",
+      "sideEffect": "undetermined",
+      "risk": "undetermined",
+      "disposition": "excluded",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "evidenceUrls": [
+        "https://docs.slack.dev/reference/methods/admin.slackbot.skills.publish"
+      ],
+      "atiMapping": null,
+      "deliveryStatus": "not_implemented",
+      "reviewState": "reviewed"
+    },
+    {
+      "method": "admin.slackbot.skills.setAutoEnabled",
+      "sourceUrl": "https://docs.slack.dev/reference/methods/admin.slackbot.skills.setAutoEnabled",
+      "fetchedAt": "2026-10-29T07:06:41.282Z",
+      "sourceSha256": "fa0c2c59fd81378e219554005a9002b0d504bddc8b3072b0c58ea8d203e37044",
+      "httpMethod": "POST",
+      "rateLimit": "t2",
+      "userScopes": [
+        "admin.skills:write"
+      ],
+      "userToken": "documented",
+      "planRequirement": "Enterprise plan explicitly required by the method page; outside Free/Pro.",
+      "roleRequirement": "Enterprise member/owner/admin rules are method-specific; outside this release plan scope.",
+      "sideEffect": "undetermined",
+      "risk": "undetermined",
+      "disposition": "excluded",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "evidenceUrls": [
+        "https://docs.slack.dev/reference/methods/admin.slackbot.skills.setAutoEnabled"
+      ],
+      "atiMapping": null,
+      "deliveryStatus": "not_implemented",
+      "reviewState": "reviewed"
+    },
+    {
+      "method": "admin.slackbot.skills.unpublish",
+      "sourceUrl": "https://docs.slack.dev/reference/methods/admin.slackbot.skills.unpublish",
+      "fetchedAt": "2026-10-29T07:06:41.126Z",
+      "sourceSha256": "120cc3714421a8f06e150bf0cfafa1e254b961f127ff3f8f0eb7169f6210c994",
+      "httpMethod": "POST",
+      "rateLimit": "t2",
+      "userScopes": [
+        "admin.skills:write"
+      ],
+      "userToken": "documented",
+      "planRequirement": "Enterprise plan explicitly required by the method page; outside Free/Pro.",
+      "roleRequirement": "Enterprise member/owner/admin rules are method-specific; outside this release plan scope.",
+      "sideEffect": "undetermined",
+      "risk": "undetermined",
+      "disposition": "excluded",
+      "reason": "Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool.",
+      "evidenceUrls": [
+        "https://docs.slack.dev/reference/methods/admin.slackbot.skills.unpublish"
+      ],
+      "atiMapping": null,
+      "deliveryStatus": "not_implemented",
+      "reviewState": "reviewed"
+    },
+    {
       "method": "admin.teams.admins.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.teams.admins.list",
-      "fetchedAt": "2026-10-28T16:21:20.669Z",
+      "fetchedAt": "2026-10-29T07:06:42.598Z",
       "sourceSha256": "cfc8e7a1fd18c324d6a2beb6b3bd6e2e41c74129046ac614695ecb713c312da4",
       "httpMethod": "GET",
       "rateLimit": "t3",
@@ -2202,7 +2309,7 @@
     {
       "method": "admin.teams.create",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.teams.create",
-      "fetchedAt": "2026-10-28T16:21:21.687Z",
+      "fetchedAt": "2026-10-29T07:06:42.756Z",
       "sourceSha256": "72c832d597b050eb29b331dcd14c84b88671fb1551e435f1a4ef963e5c321418",
       "httpMethod": "POST",
       "rateLimit": "t1",
@@ -2226,7 +2333,7 @@
     {
       "method": "admin.teams.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.teams.list",
-      "fetchedAt": "2026-10-28T16:21:21.960Z",
+      "fetchedAt": "2026-10-29T07:06:43.598Z",
       "sourceSha256": "fe97caa71b56deee9397852db21b928fe5e065df4f4a936c5e93ee18fe7823dd",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -2250,7 +2357,7 @@
     {
       "method": "admin.teams.owners.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.teams.owners.list",
-      "fetchedAt": "2026-10-28T16:21:22.661Z",
+      "fetchedAt": "2026-10-29T07:06:43.022Z",
       "sourceSha256": "fb2fb024f216cbcc5c7d4374893e49cb9e4f5e85f8a5014450a21eb7515ab869",
       "httpMethod": "GET",
       "rateLimit": "t3",
@@ -2274,7 +2381,7 @@
     {
       "method": "admin.teams.settings.info",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.teams.settings.info",
-      "fetchedAt": "2026-10-28T16:21:22.970Z",
+      "fetchedAt": "2026-10-29T07:06:43.603Z",
       "sourceSha256": "fe782b4a6a20d471dc1ff5d0115d9e077b30bf39ea232ad10a607d74e617fb75",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -2298,7 +2405,7 @@
     {
       "method": "admin.teams.settings.setDefaultChannels",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.teams.settings.setDefaultChannels",
-      "fetchedAt": "2026-10-28T16:21:23.672Z",
+      "fetchedAt": "2026-10-29T07:06:44.532Z",
       "sourceSha256": "f49fb9a4111ba602481473f41aa34eb36991f69ee4b20d009bf2a7a6196a1c82",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -2322,7 +2429,7 @@
     {
       "method": "admin.teams.settings.setDescription",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.teams.settings.setDescription",
-      "fetchedAt": "2026-10-28T16:21:23.930Z",
+      "fetchedAt": "2026-10-29T07:06:44.532Z",
       "sourceSha256": "c35a372636fecb79dae349cf0784d6abe07c17daf3f5770cae70818c2e152291",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -2346,7 +2453,7 @@
     {
       "method": "admin.teams.settings.setDiscoverability",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.teams.settings.setDiscoverability",
-      "fetchedAt": "2026-10-28T16:21:24.686Z",
+      "fetchedAt": "2026-10-29T07:06:45.761Z",
       "sourceSha256": "66aa0c4609d4cc45d60b734c42b297dc0dc85e5d6d1aa39015096800a28cdd30",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -2370,7 +2477,7 @@
     {
       "method": "admin.teams.settings.setIcon",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.teams.settings.setIcon",
-      "fetchedAt": "2026-10-28T16:21:24.197Z",
+      "fetchedAt": "2026-10-29T07:06:45.479Z",
       "sourceSha256": "e0c775d083edc3aafb23659f5bfbb00119a8f71ce1a9fea4719f5a921107c440",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -2394,7 +2501,7 @@
     {
       "method": "admin.teams.settings.setName",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.teams.settings.setName",
-      "fetchedAt": "2026-10-28T16:21:25.203Z",
+      "fetchedAt": "2026-10-29T07:06:46.695Z",
       "sourceSha256": "f58b062b43337d82c35bdb009e9b8fcfddd0359d2e1acdf5828d9d2726122865",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -2418,7 +2525,7 @@
     {
       "method": "admin.usergroups.addChannels",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.usergroups.addChannels",
-      "fetchedAt": "2026-10-28T16:21:25.713Z",
+      "fetchedAt": "2026-10-29T07:06:46.090Z",
       "sourceSha256": "70110d930378bdb9307c0bcdbafb4b858a6ef7099ff2806b0382959396bf2694",
       "httpMethod": "POST",
       "rateLimit": "t1",
@@ -2442,7 +2549,7 @@
     {
       "method": "admin.usergroups.addTeams",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.usergroups.addTeams",
-      "fetchedAt": "2026-10-28T16:21:26.228Z",
+      "fetchedAt": "2026-10-29T07:06:46.989Z",
       "sourceSha256": "f46ac557a78f69d7434cc6c80848843a53d7970f81cf19481719f5ce8a8a737d",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -2466,7 +2573,7 @@
     {
       "method": "admin.usergroups.addUsers",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.usergroups.addUsers",
-      "fetchedAt": "2026-10-28T16:21:26.695Z",
+      "fetchedAt": "2026-10-29T07:06:47.618Z",
       "sourceSha256": "5e5c2a1b5517ef3070e7c55d3bc20bdbfb5d3bfb953776b5ff50d611ea18709c",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -2490,7 +2597,7 @@
     {
       "method": "admin.usergroups.create",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.usergroups.create",
-      "fetchedAt": "2026-10-28T16:21:27.219Z",
+      "fetchedAt": "2026-10-29T07:06:47.567Z",
       "sourceSha256": "6bac8cbd91dbe5fc67bd535a65d295e1a799cbcdb52592ca1b238e0bbbd029ed",
       "httpMethod": "POST",
       "rateLimit": "t1",
@@ -2514,7 +2621,7 @@
     {
       "method": "admin.usergroups.fetch",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.usergroups.fetch",
-      "fetchedAt": "2026-10-28T16:21:26.966Z",
+      "fetchedAt": "2026-10-29T07:06:48.084Z",
       "sourceSha256": "b61c6da4a2f083043baaa83a7975f03b1c600b79741a8f26233eb95187f88aab",
       "httpMethod": "POST",
       "rateLimit": "t1",
@@ -2538,7 +2645,7 @@
     {
       "method": "admin.usergroups.listChannels",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.usergroups.listChannels",
-      "fetchedAt": "2026-10-28T16:21:27.927Z",
+      "fetchedAt": "2026-10-29T07:06:48.607Z",
       "sourceSha256": "bb91b56bcfd4a913f5ffd88440b095012b9f4d312acfa34dfbbb08137ed74680",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -2562,7 +2669,7 @@
     {
       "method": "admin.usergroups.removeChannels",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.usergroups.removeChannels",
-      "fetchedAt": "2026-10-28T16:21:28.170Z",
+      "fetchedAt": "2026-10-29T07:06:49.044Z",
       "sourceSha256": "bb348b4e233bf7a27a88f5efdbe113b2ed3b3c0cf7f52005c073f8a697f14739",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -2586,7 +2693,7 @@
     {
       "method": "admin.usergroups.removeTeams",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.usergroups.removeTeams",
-      "fetchedAt": "2026-10-28T16:21:28.919Z",
+      "fetchedAt": "2026-10-29T07:06:49.562Z",
       "sourceSha256": "061312b65d67ce34ae7e0bf96ca17e4d371ea34668dd86ac26d21e8eb0012dd3",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -2610,7 +2717,7 @@
     {
       "method": "admin.usergroups.removeUsers",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.usergroups.removeUsers",
-      "fetchedAt": "2026-10-28T16:21:28.439Z",
+      "fetchedAt": "2026-10-29T07:06:50.058Z",
       "sourceSha256": "9503306b86142b417bed9423c8e46f8e39f1fcc7ca86cea088846b01aa4c79e2",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -2634,7 +2741,7 @@
     {
       "method": "admin.usergroups.update",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.usergroups.update",
-      "fetchedAt": "2026-10-28T16:21:29.455Z",
+      "fetchedAt": "2026-10-29T07:06:50.537Z",
       "sourceSha256": "1101d0ad9e5526e9cf4d71742b8beee1739e2baf4342c7c5d6de819cf352a789",
       "httpMethod": "POST",
       "rateLimit": "t1",
@@ -2658,7 +2765,7 @@
     {
       "method": "admin.usergroups.uploadUsers",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.usergroups.uploadUsers",
-      "fetchedAt": "2026-10-28T16:21:29.923Z",
+      "fetchedAt": "2026-10-29T07:06:50.666Z",
       "sourceSha256": "d9879d9ce8325cf9cee85b609897164c1e055c5babe6a6e049f9abc24cc42821",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -2682,7 +2789,7 @@
     {
       "method": "admin.users.access.pause",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.users.access.pause",
-      "fetchedAt": "2026-10-28T16:21:30.452Z",
+      "fetchedAt": "2026-10-29T07:06:50.795Z",
       "sourceSha256": "295b3a2e2baafff857222d61461e461bedd8ba6496e09e81b71ce2fa9dc8cfe2",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -2706,7 +2813,7 @@
     {
       "method": "admin.users.access.resume",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.users.access.resume",
-      "fetchedAt": "2026-10-28T16:21:30.916Z",
+      "fetchedAt": "2026-10-29T07:06:51.600Z",
       "sourceSha256": "19a08985d291340fa34df2e3ed67fb7d5bb97c741e93649d7c493e099bea0ce0",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -2730,7 +2837,7 @@
     {
       "method": "admin.users.assign",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.users.assign",
-      "fetchedAt": "2026-10-28T16:21:30.737Z",
+      "fetchedAt": "2026-10-29T07:06:51.783Z",
       "sourceSha256": "c5e0adc31c5a30515620519cad1fb091d359a274bc9567ff9eb38a5c3eb26fe1",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -2754,7 +2861,7 @@
     {
       "method": "admin.users.deactivate",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.users.deactivate",
-      "fetchedAt": "2026-10-28T16:21:31.001Z",
+      "fetchedAt": "2026-10-29T07:06:51.995Z",
       "sourceSha256": "ff8c1044f9e65d16219dd9a7c4442f6c2acb4a71645091481887ec33c76319b9",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -2778,7 +2885,7 @@
     {
       "method": "admin.users.getExpiration",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.users.getExpiration",
-      "fetchedAt": "2026-10-28T16:21:31.904Z",
+      "fetchedAt": "2026-10-29T07:06:52.133Z",
       "sourceSha256": "2fa90fa0b2da9db4435d3b178f8aeb5dcacafe02d977cecde64b66bf223ef32f",
       "httpMethod": "GET",
       "rateLimit": "t4",
@@ -2802,7 +2909,7 @@
     {
       "method": "admin.users.invite",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.users.invite",
-      "fetchedAt": "2026-10-28T16:21:31.276Z",
+      "fetchedAt": "2026-10-29T07:06:53.025Z",
       "sourceSha256": "8641ea36a526ce86f3317b5321553238b87d521536a9639877d0f675bb4a51cd",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -2826,7 +2933,7 @@
     {
       "method": "admin.users.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.users.list",
-      "fetchedAt": "2026-10-28T16:21:31.555Z",
+      "fetchedAt": "2026-10-29T07:06:52.434Z",
       "sourceSha256": "a06738067652ad62d018e9d5ba5e518aff0c0e5b0d8c0ad0d8100659dc6db92b",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -2850,7 +2957,7 @@
     {
       "method": "admin.users.remove",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.users.remove",
-      "fetchedAt": "2026-10-28T16:21:32.562Z",
+      "fetchedAt": "2026-10-29T07:06:53.418Z",
       "sourceSha256": "4eae7b0e1d60fea646ee02e2290502eeff8368ead7878c4e0450f0e440bdc9e9",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -2874,7 +2981,7 @@
     {
       "method": "admin.users.session.clearSettings",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.users.session.clearSettings",
-      "fetchedAt": "2026-10-28T16:21:32.179Z",
+      "fetchedAt": "2026-10-29T07:06:53.979Z",
       "sourceSha256": "ba0b31075b6cb9d34bc5ff5494281c0df3a7e1ea26b67a31f24d446742c03ab7",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -2898,7 +3005,7 @@
     {
       "method": "admin.users.session.getSettings",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.users.session.getSettings",
-      "fetchedAt": "2026-10-28T16:21:33.198Z",
+      "fetchedAt": "2026-10-29T07:06:53.667Z",
       "sourceSha256": "c608ccb30e75bfad5ac48f88115e2bc21b0a56445b40fd28d8a3e5dbfabdd30f",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -2922,7 +3029,7 @@
     {
       "method": "admin.users.session.invalidate",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.users.session.invalidate",
-      "fetchedAt": "2026-10-28T16:21:32.843Z",
+      "fetchedAt": "2026-10-29T07:06:54.643Z",
       "sourceSha256": "f805da4898a1c6fb51b1d0f0e15eefa674343fbecdc210cb10a3986bf1f55de6",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -2946,7 +3053,7 @@
     {
       "method": "admin.users.session.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.users.session.list",
-      "fetchedAt": "2026-10-28T16:21:33.124Z",
+      "fetchedAt": "2026-10-29T07:06:54.973Z",
       "sourceSha256": "f27e39f1c4dcc9f3f05a8572e42b35d6ab8e7bd87b337fa6e23938508b9efeef",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -2970,7 +3077,7 @@
     {
       "method": "admin.users.session.reset",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.users.session.reset",
-      "fetchedAt": "2026-10-28T16:21:34.111Z",
+      "fetchedAt": "2026-10-29T07:06:55.200Z",
       "sourceSha256": "ae4fd427d785cfe2d61d1e12257b1ef909f2c9a7573a8844ed13f6e5d7809603",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -2994,7 +3101,7 @@
     {
       "method": "admin.users.session.resetBulk",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.users.session.resetBulk",
-      "fetchedAt": "2026-10-28T16:21:34.219Z",
+      "fetchedAt": "2026-10-29T07:06:55.302Z",
       "sourceSha256": "864b15de2e179405dcb57544691a7e26b35cc0ee5a7731601345c4f5b7bd96b2",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -3018,7 +3125,7 @@
     {
       "method": "admin.users.session.setSettings",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.users.session.setSettings",
-      "fetchedAt": "2026-10-28T16:21:34.383Z",
+      "fetchedAt": "2026-10-29T07:06:56.129Z",
       "sourceSha256": "07f0e0b8c13599a90b72adc1ce4c40483877eae91a53de7193d9499429a70049",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -3042,7 +3149,7 @@
     {
       "method": "admin.users.setAdmin",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.users.setAdmin",
-      "fetchedAt": "2026-10-28T16:21:35.197Z",
+      "fetchedAt": "2026-10-29T07:06:56.327Z",
       "sourceSha256": "038444ade226fb66bfb6b094b88c2749d433ad9782f4c0af158c20f6d168512a",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -3066,7 +3173,7 @@
     {
       "method": "admin.users.setExpiration",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.users.setExpiration",
-      "fetchedAt": "2026-10-28T16:21:34.658Z",
+      "fetchedAt": "2026-10-29T07:06:56.643Z",
       "sourceSha256": "e7c0e03d7f6cd41c78ade94df3921bcff23f78f7ab6f28b7c6169513a1657be3",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -3090,7 +3197,7 @@
     {
       "method": "admin.users.setOwner",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.users.setOwner",
-      "fetchedAt": "2026-10-28T16:21:35.681Z",
+      "fetchedAt": "2026-10-29T07:06:57.321Z",
       "sourceSha256": "f798f76c7bdbe35ec941a13740fbadc5a8e2efb4c68fc04042e4a76529795388",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -3114,7 +3221,7 @@
     {
       "method": "admin.users.setRegular",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.users.setRegular",
-      "fetchedAt": "2026-10-28T16:21:35.469Z",
+      "fetchedAt": "2026-10-29T07:06:57.632Z",
       "sourceSha256": "e22562c534907335dbf7edede77527bc13756e1c889080ea9197ef4e458eacd1",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -3138,7 +3245,7 @@
     {
       "method": "admin.users.unsupportedVersions.export",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.users.unsupportedVersions.export",
-      "fetchedAt": "2026-10-28T16:21:35.756Z",
+      "fetchedAt": "2026-10-29T07:06:58.544Z",
       "sourceSha256": "21a35f0b181966b1a3302fe82568fa1fdb2192baee8e34c33fd0de8f9b22a5b8",
       "httpMethod": "POST",
       "rateLimit": "t1",
@@ -3162,7 +3269,7 @@
     {
       "method": "admin.workflows.collaborators.add",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.workflows.collaborators.add",
-      "fetchedAt": "2026-10-28T16:21:36.672Z",
+      "fetchedAt": "2026-10-29T07:06:58.566Z",
       "sourceSha256": "5463a57b1336439654827f6dff6e4ef15746dc53ba544d235dcf80f25cc8d266",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -3186,7 +3293,7 @@
     {
       "method": "admin.workflows.collaborators.remove",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.workflows.collaborators.remove",
-      "fetchedAt": "2026-10-28T16:21:36.724Z",
+      "fetchedAt": "2026-10-29T07:06:58.838Z",
       "sourceSha256": "ebdbc9decbcebcf8386f7daf3b7d72825f3722e57000414dd09a8709a14c9bdf",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -3210,7 +3317,7 @@
     {
       "method": "admin.workflows.permissions.lookup",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.workflows.permissions.lookup",
-      "fetchedAt": "2026-10-28T16:21:36.947Z",
+      "fetchedAt": "2026-10-29T07:06:59.509Z",
       "sourceSha256": "6719e68ff9a33ffbc618aaa8acef9070e81c1ccb866d8fe5c23fbba673adabcf",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -3234,7 +3341,7 @@
     {
       "method": "admin.workflows.search",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.workflows.search",
-      "fetchedAt": "2026-10-28T16:21:37.725Z",
+      "fetchedAt": "2026-10-29T07:06:59.773Z",
       "sourceSha256": "53814b6c3272f3dc5eff0672e6668d6eb58c9514035a4b4cce8b0b7767a4736b",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -3258,7 +3365,7 @@
     {
       "method": "admin.workflows.triggers.types.permissions.lookup",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.workflows.triggers.types.permissions.lookup",
-      "fetchedAt": "2026-10-28T16:21:38.007Z",
+      "fetchedAt": "2026-10-29T07:06:59.774Z",
       "sourceSha256": "faf114dfa5c3959030758d51fb1f05851c9ad6ced50c7b64f4311df2e1b6108b",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -3282,7 +3389,7 @@
     {
       "method": "admin.workflows.triggers.types.permissions.set",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.workflows.triggers.types.permissions.set",
-      "fetchedAt": "2026-10-28T16:21:38.007Z",
+      "fetchedAt": "2026-10-29T07:07:00.728Z",
       "sourceSha256": "6f1d1f832f88b7b67a70311dfce62bf473217384eb2ba608043095884cf5e8a6",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -3306,7 +3413,7 @@
     {
       "method": "admin.workflows.unpublish",
       "sourceUrl": "https://docs.slack.dev/reference/methods/admin.workflows.unpublish",
-      "fetchedAt": "2026-10-28T16:21:38.277Z",
+      "fetchedAt": "2026-10-29T07:07:00.082Z",
       "sourceSha256": "91646b0845667dad174acd8669988d2235a1974ce0118399581f7f45e2180e70",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -3330,7 +3437,7 @@
     {
       "method": "agents.conversations.archive",
       "sourceUrl": "https://docs.slack.dev/reference/methods/agents.conversations.archive",
-      "fetchedAt": "2026-10-28T16:21:38.277Z",
+      "fetchedAt": "2026-10-29T07:07:00.383Z",
       "sourceSha256": "f64ff0929a8d10458d443c15cd3f123618605dad909f8aecf9cedd17b2f27877",
       "httpMethod": null,
       "rateLimit": null,
@@ -3352,7 +3459,7 @@
     {
       "method": "agents.conversations.create",
       "sourceUrl": "https://docs.slack.dev/reference/methods/agents.conversations.create",
-      "fetchedAt": "2026-10-28T16:21:39.252Z",
+      "fetchedAt": "2026-10-29T07:07:01.636Z",
       "sourceSha256": "7b10eddacb3e1142fc7df9209557824f3405682f0ab4373478a8c33213cd2f8c",
       "httpMethod": null,
       "rateLimit": null,
@@ -3374,7 +3481,7 @@
     {
       "method": "agents.conversations.getCanvas",
       "sourceUrl": "https://docs.slack.dev/reference/methods/agents.conversations.getCanvas",
-      "fetchedAt": "2026-10-28T16:21:39.265Z",
+      "fetchedAt": "2026-10-29T07:07:01.710Z",
       "sourceSha256": "a5b5d1e93a657f4f3f0fbaa990202b2bd33671876d525a6d71fcb3a233177028",
       "httpMethod": null,
       "rateLimit": "t3",
@@ -3396,7 +3503,7 @@
     {
       "method": "agents.conversations.listViews",
       "sourceUrl": "https://docs.slack.dev/reference/methods/agents.conversations.listViews",
-      "fetchedAt": "2026-10-28T16:21:40.242Z",
+      "fetchedAt": "2026-10-29T07:07:02.019Z",
       "sourceSha256": "f661924573503d1d47aa544e133f1e37e4f9411187ac54b85cb6e289158483b4",
       "httpMethod": null,
       "rateLimit": null,
@@ -3418,7 +3525,7 @@
     {
       "method": "agents.conversations.removeView",
       "sourceUrl": "https://docs.slack.dev/reference/methods/agents.conversations.removeView",
-      "fetchedAt": "2026-10-28T16:21:39.537Z",
+      "fetchedAt": "2026-10-29T07:07:02.020Z",
       "sourceSha256": "555d1dccd61e4b34946cf91e36580a65d0de377c2644c1c87957bfdf05a601b7",
       "httpMethod": null,
       "rateLimit": null,
@@ -3440,7 +3547,7 @@
     {
       "method": "agents.conversations.setCanvasContent",
       "sourceUrl": "https://docs.slack.dev/reference/methods/agents.conversations.setCanvasContent",
-      "fetchedAt": "2026-10-28T16:21:39.806Z",
+      "fetchedAt": "2026-10-29T07:07:02.979Z",
       "sourceSha256": "eafdb982223625751458a3c3005df692e96c3da7321d7fe8bec1b9f9bfdace01",
       "httpMethod": null,
       "rateLimit": "t3",
@@ -3462,7 +3569,7 @@
     {
       "method": "agents.conversations.setCommands",
       "sourceUrl": "https://docs.slack.dev/reference/methods/agents.conversations.setCommands",
-      "fetchedAt": "2026-10-28T16:21:40.765Z",
+      "fetchedAt": "2026-10-29T07:07:03.089Z",
       "sourceSha256": "d9c7d1a5a4f449c1273bab114494c3b8b7a714e5172bc5e6a21deda6e49d9c2a",
       "httpMethod": null,
       "rateLimit": null,
@@ -3484,7 +3591,7 @@
     {
       "method": "agents.conversations.setProperties",
       "sourceUrl": "https://docs.slack.dev/reference/methods/agents.conversations.setProperties",
-      "fetchedAt": "2026-10-28T16:21:41.258Z",
+      "fetchedAt": "2026-10-29T07:07:03.375Z",
       "sourceSha256": "daf2d7f5eb9e132e5193bd35f7ef08a25699e7072a1ff946b2a9739d7661d162",
       "httpMethod": null,
       "rateLimit": null,
@@ -3506,7 +3613,7 @@
     {
       "method": "agents.conversations.setView",
       "sourceUrl": "https://docs.slack.dev/reference/methods/agents.conversations.setView",
-      "fetchedAt": "2026-10-28T16:21:41.038Z",
+      "fetchedAt": "2026-10-29T07:07:04.091Z",
       "sourceSha256": "0642781779aa9d929cfe5918be448c0f1641fcf5065f9060b3d8868b14807bad",
       "httpMethod": null,
       "rateLimit": null,
@@ -3528,7 +3635,7 @@
     {
       "method": "agents.sessions.rename",
       "sourceUrl": "https://docs.slack.dev/reference/methods/agents.sessions.rename",
-      "fetchedAt": "2026-10-28T16:21:41.307Z",
+      "fetchedAt": "2026-10-29T07:07:04.368Z",
       "sourceSha256": "665c8b7a833dacb08528e3a51fc489c25b7c9883dc0e1dffcce5b3d12532c624",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -3550,7 +3657,7 @@
     {
       "method": "agents.sessions.setStatus",
       "sourceUrl": "https://docs.slack.dev/reference/methods/agents.sessions.setStatus",
-      "fetchedAt": "2026-10-28T16:21:42.253Z",
+      "fetchedAt": "2026-10-29T07:07:04.369Z",
       "sourceSha256": "934183734de9f0c17879e159e8461b607bfa5c08860d50cf9873178038f59986",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -3572,7 +3679,7 @@
     {
       "method": "api.test",
       "sourceUrl": "https://docs.slack.dev/reference/methods/api.test",
-      "fetchedAt": "2026-10-28T16:21:42.319Z",
+      "fetchedAt": "2026-10-29T07:07:04.633Z",
       "sourceSha256": "70e68c76e3ecd08eb823c20b07037cd2c4c84bef0eb89690c25deec6173219d1",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -3594,7 +3701,7 @@
     {
       "method": "apps.activities.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/apps.activities.list",
-      "fetchedAt": "2026-10-28T16:21:42.522Z",
+      "fetchedAt": "2026-10-29T07:07:05.306Z",
       "sourceSha256": "23ab4d4d67e1056e3dd26325dba7717f0a8b9e4459d24c45be14a8b4c4773396",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -3618,7 +3725,7 @@
     {
       "method": "apps.auth.external.delete",
       "sourceUrl": "https://docs.slack.dev/reference/methods/apps.auth.external.delete",
-      "fetchedAt": "2026-10-28T16:21:43.339Z",
+      "fetchedAt": "2026-10-29T07:07:05.913Z",
       "sourceSha256": "8d162f301047e97cf5db75784a0c330ae4edd73300ce3c806c750ce1d4e809a0",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -3640,7 +3747,7 @@
     {
       "method": "apps.auth.external.get",
       "sourceUrl": "https://docs.slack.dev/reference/methods/apps.auth.external.get",
-      "fetchedAt": "2026-10-28T16:21:42.797Z",
+      "fetchedAt": "2026-10-29T07:07:05.589Z",
       "sourceSha256": "0c176140196315250ceabe4dd744a5dec2746a57d09a65770976d282c8c2c9ae",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -3662,7 +3769,7 @@
     {
       "method": "apps.connections.open",
       "sourceUrl": "https://docs.slack.dev/reference/methods/apps.connections.open",
-      "fetchedAt": "2026-10-28T16:21:43.808Z",
+      "fetchedAt": "2026-10-29T07:07:06.550Z",
       "sourceSha256": "4c19aa1c0a946925445846d511febbc1cb039bc0165bf904018413b2bc3f2d7b",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -3684,7 +3791,7 @@
     {
       "method": "apps.datastore.bulkDelete",
       "sourceUrl": "https://docs.slack.dev/reference/methods/apps.datastore.bulkDelete",
-      "fetchedAt": "2026-10-28T16:21:44.342Z",
+      "fetchedAt": "2026-10-29T07:07:06.231Z",
       "sourceSha256": "efbeb753458a64661a88aba89b1e5761dc61fbf4fddbe9557c0da2975eafe2eb",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -3706,7 +3813,7 @@
     {
       "method": "apps.datastore.bulkGet",
       "sourceUrl": "https://docs.slack.dev/reference/methods/apps.datastore.bulkGet",
-      "fetchedAt": "2026-10-28T16:21:44.073Z",
+      "fetchedAt": "2026-10-29T07:07:06.516Z",
       "sourceSha256": "38156494155d65d7116347ffed4c1623706c742cd8a57ebeca743a672568be79",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -3728,7 +3835,7 @@
     {
       "method": "apps.datastore.bulkPut",
       "sourceUrl": "https://docs.slack.dev/reference/methods/apps.datastore.bulkPut",
-      "fetchedAt": "2026-10-28T16:21:44.337Z",
+      "fetchedAt": "2026-10-29T07:07:06.778Z",
       "sourceSha256": "53674487025e5808154101503614eb5814a46204c26bb6480187e1f5755d5c70",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -3750,7 +3857,7 @@
     {
       "method": "apps.datastore.count",
       "sourceUrl": "https://docs.slack.dev/reference/methods/apps.datastore.count",
-      "fetchedAt": "2026-10-28T16:21:45.307Z",
+      "fetchedAt": "2026-10-29T07:07:06.854Z",
       "sourceSha256": "6024f3d9b0a9c0e16555cd864d4e8a2650584b993c4c4c78e658575cea1df275",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -3772,7 +3879,7 @@
     {
       "method": "apps.datastore.delete",
       "sourceUrl": "https://docs.slack.dev/reference/methods/apps.datastore.delete",
-      "fetchedAt": "2026-10-28T16:21:45.325Z",
+      "fetchedAt": "2026-10-29T07:07:07.758Z",
       "sourceSha256": "7e060277e294265dc4511a4ea4e60565af94500c3b16886b29109452f4ce66f2",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -3794,7 +3901,7 @@
     {
       "method": "apps.datastore.get",
       "sourceUrl": "https://docs.slack.dev/reference/methods/apps.datastore.get",
-      "fetchedAt": "2026-10-28T16:21:45.580Z",
+      "fetchedAt": "2026-10-29T07:07:07.837Z",
       "sourceSha256": "d94850e9775ccb8edc5e25acb8c0c43a4ca469816ca76d4efe7462397998c128",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -3816,7 +3923,7 @@
     {
       "method": "apps.datastore.put",
       "sourceUrl": "https://docs.slack.dev/reference/methods/apps.datastore.put",
-      "fetchedAt": "2026-10-28T16:21:46.309Z",
+      "fetchedAt": "2026-10-29T07:07:08.008Z",
       "sourceSha256": "ebb4d9635e24880f70f73d1c521355f93443fbec0b7ef666edc42e5b3efdde2f",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -3838,7 +3945,7 @@
     {
       "method": "apps.datastore.query",
       "sourceUrl": "https://docs.slack.dev/reference/methods/apps.datastore.query",
-      "fetchedAt": "2026-10-28T16:21:45.843Z",
+      "fetchedAt": "2026-10-29T07:07:08.098Z",
       "sourceSha256": "cf918797df875bce86d80e438dcd3c720246645932a09afb1bc5d39f66ed1f42",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -3860,7 +3967,7 @@
     {
       "method": "apps.datastore.update",
       "sourceUrl": "https://docs.slack.dev/reference/methods/apps.datastore.update",
-      "fetchedAt": "2026-10-28T16:21:46.836Z",
+      "fetchedAt": "2026-10-29T07:07:08.978Z",
       "sourceSha256": "39332ca40651d49d7727ab6849d912c1a20b2d8ae74b9c79204dbd5533225fd6",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -3882,7 +3989,7 @@
     {
       "method": "apps.event.authorizations.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/apps.event.authorizations.list",
-      "fetchedAt": "2026-10-28T16:21:46.589Z",
+      "fetchedAt": "2026-10-29T07:07:09.032Z",
       "sourceSha256": "3d9b9fba1b0af9b3596c8e6e10b0e1883e98eeae0e9efbf207c4787017e2e525",
       "httpMethod": "POST",
       "rateLimit": "t5",
@@ -3904,7 +4011,7 @@
     {
       "method": "apps.icon.set",
       "sourceUrl": "https://docs.slack.dev/reference/methods/apps.icon.set",
-      "fetchedAt": "2026-10-28T16:21:47.588Z",
+      "fetchedAt": "2026-10-29T07:07:09.915Z",
       "sourceSha256": "231ba8e5937509c3b354f353c7d199c7f2d156dd7afc8284bb2a4115f1ec7be1",
       "httpMethod": "POST",
       "rateLimit": "t1",
@@ -3928,7 +4035,7 @@
     {
       "method": "apps.managed.permissions.set",
       "sourceUrl": "https://docs.slack.dev/reference/methods/apps.managed.permissions.set",
-      "fetchedAt": "2026-10-28T16:21:47.825Z",
+      "fetchedAt": "2026-10-29T07:07:10.011Z",
       "sourceSha256": "ae181c55eb81f29fbdf77a3f54230aa3a08a22106bea6634c75faa5126334004",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -3950,7 +4057,7 @@
     {
       "method": "apps.manifest.create",
       "sourceUrl": "https://docs.slack.dev/reference/methods/apps.manifest.create",
-      "fetchedAt": "2026-10-28T16:21:48.599Z",
+      "fetchedAt": "2026-10-29T07:07:10.853Z",
       "sourceSha256": "6554aa518b2d1674d6f74c239ebe8b20c942143901a7e7ecf1bdacee548152bd",
       "httpMethod": "POST",
       "rateLimit": "t1",
@@ -3972,7 +4079,7 @@
     {
       "method": "apps.manifest.delete",
       "sourceUrl": "https://docs.slack.dev/reference/methods/apps.manifest.delete",
-      "fetchedAt": "2026-10-28T16:21:48.091Z",
+      "fetchedAt": "2026-10-29T07:07:10.973Z",
       "sourceSha256": "4371748d09521c29a40012ca20568003b9138c9983e1c3028018f53653e70f83",
       "httpMethod": "POST",
       "rateLimit": "t1",
@@ -3994,7 +4101,7 @@
     {
       "method": "apps.manifest.export",
       "sourceUrl": "https://docs.slack.dev/reference/methods/apps.manifest.export",
-      "fetchedAt": "2026-10-28T16:21:49.063Z",
+      "fetchedAt": "2026-10-29T07:07:12.159Z",
       "sourceSha256": "4657368520b751f1b64e299633743d05c4785433bb8b0efe5d80f19d18890535",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -4016,7 +4123,7 @@
     {
       "method": "apps.manifest.update",
       "sourceUrl": "https://docs.slack.dev/reference/methods/apps.manifest.update",
-      "fetchedAt": "2026-10-28T16:21:48.868Z",
+      "fetchedAt": "2026-10-29T07:07:12.008Z",
       "sourceSha256": "8b77b1e820890e149a4f5941b9394073e3bcd7f78cfecd0a96e898f1998514dc",
       "httpMethod": "POST",
       "rateLimit": "t1",
@@ -4038,7 +4145,7 @@
     {
       "method": "apps.manifest.validate",
       "sourceUrl": "https://docs.slack.dev/reference/methods/apps.manifest.validate",
-      "fetchedAt": "2026-10-28T16:21:49.839Z",
+      "fetchedAt": "2026-10-29T07:07:12.288Z",
       "sourceSha256": "3ed6ccad501d9fda205f8c9e04c03666e86bc72d0e5661b6736a3dd674801e8d",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -4060,7 +4167,7 @@
     {
       "method": "apps.uninstall",
       "sourceUrl": "https://docs.slack.dev/reference/methods/apps.uninstall",
-      "fetchedAt": "2026-10-28T16:21:50.074Z",
+      "fetchedAt": "2026-10-29T07:07:12.409Z",
       "sourceSha256": "7c1f6a2f6dfba8fea9f6fcc582686e73f20aa8783eead1eb62faff8ffae94b04",
       "httpMethod": "POST",
       "rateLimit": "t1",
@@ -4082,7 +4189,7 @@
     {
       "method": "apps.user.connection.update",
       "sourceUrl": "https://docs.slack.dev/reference/methods/apps.user.connection.update",
-      "fetchedAt": "2026-10-28T16:21:50.860Z",
+      "fetchedAt": "2026-10-29T07:07:13.289Z",
       "sourceSha256": "826f0fda22119ec460b73ca4020e8b22be2e8d7338f2de7a94b987f717c760e1",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -4106,7 +4213,7 @@
     {
       "method": "assistant.search.context",
       "sourceUrl": "https://docs.slack.dev/reference/methods/assistant.search.context",
-      "fetchedAt": "2026-10-28T16:21:51.108Z",
+      "fetchedAt": "2026-10-29T07:07:13.588Z",
       "sourceSha256": "6dec53ee89961c177586625d5dc98e053902a7d1c18e4a875e5ea1b9bac82881",
       "httpMethod": "POST",
       "rateLimit": "t5",
@@ -4135,7 +4242,7 @@
     {
       "method": "assistant.search.info",
       "sourceUrl": "https://docs.slack.dev/reference/methods/assistant.search.info",
-      "fetchedAt": "2026-10-28T16:21:51.830Z",
+      "fetchedAt": "2026-10-29T07:07:13.816Z",
       "sourceSha256": "5f359676db448c4be8e82035b9ab7e805a5c9cf5c1c0ef84c14a949fa7da787d",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -4159,7 +4266,7 @@
     {
       "method": "assistant.threads.setStatus",
       "sourceUrl": "https://docs.slack.dev/reference/methods/assistant.threads.setStatus",
-      "fetchedAt": "2026-10-28T16:21:52.090Z",
+      "fetchedAt": "2026-10-29T07:07:14.525Z",
       "sourceSha256": "aa8b77b934e0644edf23aa303928e31fb6e02c77712c6fa87447515e952eef30",
       "httpMethod": "POST",
       "rateLimit": "t5",
@@ -4181,7 +4288,7 @@
     {
       "method": "assistant.threads.setSuggestedPrompts",
       "sourceUrl": "https://docs.slack.dev/reference/methods/assistant.threads.setSuggestedPrompts",
-      "fetchedAt": "2026-10-28T16:21:52.836Z",
+      "fetchedAt": "2026-10-29T07:07:14.357Z",
       "sourceSha256": "49f19feed65d42566d170c1aa8119c2f25c7c1e9d4e8e33fab6a90ddd4ee8729",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -4203,7 +4310,7 @@
     {
       "method": "assistant.threads.setTitle",
       "sourceUrl": "https://docs.slack.dev/reference/methods/assistant.threads.setTitle",
-      "fetchedAt": "2026-10-28T16:21:53.117Z",
+      "fetchedAt": "2026-10-29T07:07:15.649Z",
       "sourceSha256": "bf2f5ddd2476d97fa64ec5ec566d7ddee152fa59165c1abe0016d4752378d51d",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -4225,7 +4332,7 @@
     {
       "method": "auth.revoke",
       "sourceUrl": "https://docs.slack.dev/reference/methods/auth.revoke",
-      "fetchedAt": "2026-10-28T16:21:53.122Z",
+      "fetchedAt": "2026-10-29T07:07:14.813Z",
       "sourceSha256": "0089e4fd2bdf37450223bec87fa014ade606c2c2262f8706745203a16b65454b",
       "httpMethod": "GET",
       "rateLimit": "t3",
@@ -4247,7 +4354,7 @@
     {
       "method": "auth.teams.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/auth.teams.list",
-      "fetchedAt": "2026-10-28T16:21:53.393Z",
+      "fetchedAt": "2026-10-29T07:07:16.072Z",
       "sourceSha256": "2a29a7cde47bfebd35e54038d14f396bf041de107493cebbb7c10d6b050df382",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -4269,7 +4376,7 @@
     {
       "method": "auth.test",
       "sourceUrl": "https://docs.slack.dev/reference/methods/auth.test",
-      "fetchedAt": "2026-10-28T16:21:54.094Z",
+      "fetchedAt": "2026-10-29T07:07:16.593Z",
       "sourceSha256": "c5145215e592c2ce86f9a46049c6ce97df88d95f25631cb412546cafbb6d4f02",
       "httpMethod": "POST",
       "rateLimit": "t5",
@@ -4291,7 +4398,7 @@
     {
       "method": "blocks.validate",
       "sourceUrl": "https://docs.slack.dev/reference/methods/blocks.validate",
-      "fetchedAt": "2026-10-28T16:21:53.676Z",
+      "fetchedAt": "2026-10-29T07:07:17.017Z",
       "sourceSha256": "ef3317100fa782348952184209a8286066cafa977a44fe4b1a95ec8dc987c620",
       "httpMethod": "POST",
       "rateLimit": null,
@@ -4313,7 +4420,7 @@
     {
       "method": "bookmarks.add",
       "sourceUrl": "https://docs.slack.dev/reference/methods/bookmarks.add",
-      "fetchedAt": "2026-10-28T16:21:53.947Z",
+      "fetchedAt": "2026-10-29T07:07:17.530Z",
       "sourceSha256": "578f7ace07d05d9fe190c844e6885cc65c5c0ad9557dd75fb6f36855c9807ea9",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -4337,7 +4444,7 @@
     {
       "method": "bookmarks.edit",
       "sourceUrl": "https://docs.slack.dev/reference/methods/bookmarks.edit",
-      "fetchedAt": "2026-10-28T16:21:54.225Z",
+      "fetchedAt": "2026-10-29T07:07:18.017Z",
       "sourceSha256": "61d1b1b46177e02efb308adb8bcf881ea67a70b13e51b328ed4d5a0086818e0e",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -4361,7 +4468,7 @@
     {
       "method": "bookmarks.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/bookmarks.list",
-      "fetchedAt": "2026-10-28T16:21:55.078Z",
+      "fetchedAt": "2026-10-29T07:07:18.500Z",
       "sourceSha256": "ba26da9b380400ec14b6a19717785e7298fd07b33f448c5554a8cb73dc713489",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -4385,7 +4492,7 @@
     {
       "method": "bookmarks.remove",
       "sourceUrl": "https://docs.slack.dev/reference/methods/bookmarks.remove",
-      "fetchedAt": "2026-10-28T16:21:54.491Z",
+      "fetchedAt": "2026-10-29T07:07:19.051Z",
       "sourceSha256": "704c1d3d15413c64c8abb0e87c3d0ef82d12d91dc9910630f8efe5b8371e8317",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -4409,7 +4516,7 @@
     {
       "method": "bots.info",
       "sourceUrl": "https://docs.slack.dev/reference/methods/bots.info",
-      "fetchedAt": "2026-10-28T16:21:55.471Z",
+      "fetchedAt": "2026-10-29T07:07:18.749Z",
       "sourceSha256": "01b9ef19539dd9314734249bb2ffb5ec3ccb5c3d005c8078b6cbaf4e81235619",
       "httpMethod": "GET",
       "rateLimit": "t3",
@@ -4433,7 +4540,7 @@
     {
       "method": "calls.add",
       "sourceUrl": "https://docs.slack.dev/reference/methods/calls.add",
-      "fetchedAt": "2026-10-28T16:21:55.357Z",
+      "fetchedAt": "2026-10-29T07:07:19.744Z",
       "sourceSha256": "f290ea2788c687d7f326e91f7050616c77c7decbbb0229ac52b11bc3aa981b0a",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -4457,7 +4564,7 @@
     {
       "method": "calls.end",
       "sourceUrl": "https://docs.slack.dev/reference/methods/calls.end",
-      "fetchedAt": "2026-10-28T16:21:56.338Z",
+      "fetchedAt": "2026-10-29T07:07:19.996Z",
       "sourceSha256": "2173d6c918c3763aa1c11736f370188123a22ac4753a2d21d4ec6e265fe36442",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -4481,7 +4588,7 @@
     {
       "method": "calls.info",
       "sourceUrl": "https://docs.slack.dev/reference/methods/calls.info",
-      "fetchedAt": "2026-10-28T16:21:56.468Z",
+      "fetchedAt": "2026-10-29T07:07:21.088Z",
       "sourceSha256": "45551e9c76fa399ebb820172af47787bc77c1e211b020adb2a0211f4fa66a289",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -4505,7 +4612,7 @@
     {
       "method": "calls.participants.add",
       "sourceUrl": "https://docs.slack.dev/reference/methods/calls.participants.add",
-      "fetchedAt": "2026-10-28T16:21:57.359Z",
+      "fetchedAt": "2026-10-29T07:07:20.968Z",
       "sourceSha256": "2a4315a8e77e5842ad7688a463b2b95e3e95efae1f9fd8dc2c6e87af74f8fb50",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -4529,7 +4636,7 @@
     {
       "method": "calls.participants.remove",
       "sourceUrl": "https://docs.slack.dev/reference/methods/calls.participants.remove",
-      "fetchedAt": "2026-10-28T16:21:56.739Z",
+      "fetchedAt": "2026-10-29T07:07:21.912Z",
       "sourceSha256": "b7f75aa6a879c54a12fc763060c302a4d87d84210e91451806069dd589415311",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -4553,7 +4660,7 @@
     {
       "method": "calls.update",
       "sourceUrl": "https://docs.slack.dev/reference/methods/calls.update",
-      "fetchedAt": "2026-10-28T16:21:57.004Z",
+      "fetchedAt": "2026-10-29T07:07:22.023Z",
       "sourceSha256": "bd857733c5a63217b27b8cd1886e2cf7fd8c18daf72e68afec99473e3ab94e20",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -4577,7 +4684,7 @@
     {
       "method": "canvases.access.delete",
       "sourceUrl": "https://docs.slack.dev/reference/methods/canvases.access.delete",
-      "fetchedAt": "2026-10-28T16:21:57.286Z",
+      "fetchedAt": "2026-10-29T07:07:22.857Z",
       "sourceSha256": "becc623eb89150ac10b199d6cc9d4c8f683562a42f58ed808922991aaeeced15",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -4601,7 +4708,7 @@
     {
       "method": "canvases.access.set",
       "sourceUrl": "https://docs.slack.dev/reference/methods/canvases.access.set",
-      "fetchedAt": "2026-10-28T16:21:58.276Z",
+      "fetchedAt": "2026-10-29T07:07:22.344Z",
       "sourceSha256": "41376b1c057a6081ade22729216173a2de675c62c33a9c46d7e3076a80fdadc8",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -4625,7 +4732,7 @@
     {
       "method": "canvases.create",
       "sourceUrl": "https://docs.slack.dev/reference/methods/canvases.create",
-      "fetchedAt": "2026-10-28T16:21:58.335Z",
+      "fetchedAt": "2026-10-29T07:07:22.633Z",
       "sourceSha256": "7b75b8458109448bdedcc5779ac6aea7293384391e13f1b5041e23215dfbd20c",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -4649,7 +4756,7 @@
     {
       "method": "canvases.delete",
       "sourceUrl": "https://docs.slack.dev/reference/methods/canvases.delete",
-      "fetchedAt": "2026-10-28T16:21:59.251Z",
+      "fetchedAt": "2026-10-29T07:07:23.562Z",
       "sourceSha256": "6910a0f9af57a2fbfdc0407d720a7d4e714912a7749dfd94ab4d0b8b815352d1",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -4673,7 +4780,7 @@
     {
       "method": "canvases.edit",
       "sourceUrl": "https://docs.slack.dev/reference/methods/canvases.edit",
-      "fetchedAt": "2026-10-28T16:21:58.603Z",
+      "fetchedAt": "2026-10-29T07:07:23.252Z",
       "sourceSha256": "a7592de8791dff3b74707ba8f160255fa22015f5671e58199a1d0116c1348c24",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -4697,7 +4804,7 @@
     {
       "method": "canvases.getContent",
       "sourceUrl": "https://docs.slack.dev/reference/methods/canvases.getContent",
-      "fetchedAt": "2026-10-28T16:21:58.876Z",
+      "fetchedAt": "2026-10-29T07:07:23.762Z",
       "sourceSha256": "f0995b888d9fd0ad03c90e872797e8f9e0fa72c2abc6d4fdcdf79626fa1c4a4b",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -4721,7 +4828,7 @@
     {
       "method": "canvases.sections.lookup",
       "sourceUrl": "https://docs.slack.dev/reference/methods/canvases.sections.lookup",
-      "fetchedAt": "2026-10-28T16:21:59.154Z",
+      "fetchedAt": "2026-10-29T07:07:23.850Z",
       "sourceSha256": "417d8b167c1e8599b121e804e09033e76f2a3dffc187b5a1ce8c3f7b9328f334",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -4745,7 +4852,7 @@
     {
       "method": "chat.appendStream",
       "sourceUrl": "https://docs.slack.dev/reference/methods/chat.appendStream",
-      "fetchedAt": "2026-10-28T16:22:00.122Z",
+      "fetchedAt": "2026-10-29T07:07:24.735Z",
       "sourceSha256": "44bf9f2b01e3d79dcb8a42451b8cd2ed7c45e856ab5b0a550046c78082052924",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -4767,7 +4874,7 @@
     {
       "method": "chat.delete",
       "sourceUrl": "https://docs.slack.dev/reference/methods/chat.delete",
-      "fetchedAt": "2026-10-28T16:21:59.532Z",
+      "fetchedAt": "2026-10-29T07:07:24.857Z",
       "sourceSha256": "466d6617f85ca1b1e77006f18bff0a304842a453168cbac0f29a03ae8d71e633",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -4791,7 +4898,7 @@
     {
       "method": "chat.deleteScheduledMessage",
       "sourceUrl": "https://docs.slack.dev/reference/methods/chat.deleteScheduledMessage",
-      "fetchedAt": "2026-10-28T16:21:59.814Z",
+      "fetchedAt": "2026-10-29T07:07:25.793Z",
       "sourceSha256": "0d1aa3bd603cf0a579c62d49f38adc0bd8f48a73561b747f640917681d79e997",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -4815,7 +4922,7 @@
     {
       "method": "chat.getPermalink",
       "sourceUrl": "https://docs.slack.dev/reference/methods/chat.getPermalink",
-      "fetchedAt": "2026-10-28T16:22:00.793Z",
+      "fetchedAt": "2026-10-29T07:07:25.410Z",
       "sourceSha256": "aef123a69089444f883cc37ff6be11440262ddd437010cd17694aafcde522b93",
       "httpMethod": "GET",
       "rateLimit": "t5",
@@ -4837,7 +4944,7 @@
     {
       "method": "chat.meMessage",
       "sourceUrl": "https://docs.slack.dev/reference/methods/chat.meMessage",
-      "fetchedAt": "2026-10-28T16:22:01.109Z",
+      "fetchedAt": "2026-10-29T07:07:25.774Z",
       "sourceSha256": "a2da51051f68f106cb18be47b667400d7b519bd8a7fb34fa71320ca99ce2a9ad",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -4861,7 +4968,7 @@
     {
       "method": "chat.postEphemeral",
       "sourceUrl": "https://docs.slack.dev/reference/methods/chat.postEphemeral",
-      "fetchedAt": "2026-10-28T16:22:01.776Z",
+      "fetchedAt": "2026-10-29T07:07:26.718Z",
       "sourceSha256": "40dace1b55aee0af39c019dbccb6f3807bf7d3d3ca8c59fa4184b4f91e60f416",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -4885,7 +4992,7 @@
     {
       "method": "chat.postMessage",
       "sourceUrl": "https://docs.slack.dev/reference/methods/chat.postMessage",
-      "fetchedAt": "2026-10-28T16:22:02.096Z",
+      "fetchedAt": "2026-10-29T07:07:26.117Z",
       "sourceSha256": "2a2625773c8d734d453f750150cd56f4bdc16e88568b7c4693263face16534bf",
       "httpMethod": "POST",
       "rateLimit": "t5",
@@ -4909,7 +5016,7 @@
     {
       "method": "chat.scheduleMessage",
       "sourceUrl": "https://docs.slack.dev/reference/methods/chat.scheduleMessage",
-      "fetchedAt": "2026-10-28T16:22:02.754Z",
+      "fetchedAt": "2026-10-29T07:07:26.403Z",
       "sourceSha256": "73e69eaa915b06915f8301999860cc80d57efc31df3b3668e40cff8fe649a1bf",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -4933,7 +5040,7 @@
     {
       "method": "chat.scheduledMessages.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/chat.scheduledMessages.list",
-      "fetchedAt": "2026-10-28T16:22:02.365Z",
+      "fetchedAt": "2026-10-29T07:07:27.336Z",
       "sourceSha256": "3899d5570d5f9286e1c4da590be7252540f6f6489a23399b13461b08660d9511",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -4955,7 +5062,7 @@
     {
       "method": "chat.startStream",
       "sourceUrl": "https://docs.slack.dev/reference/methods/chat.startStream",
-      "fetchedAt": "2026-10-28T16:22:02.634Z",
+      "fetchedAt": "2026-10-29T07:07:27.844Z",
       "sourceSha256": "400b2ebca0fbb81a4628910f5dbfa808adf59d98c2d1eca149cfe005c4f2ec81",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -4977,7 +5084,7 @@
     {
       "method": "chat.stopStream",
       "sourceUrl": "https://docs.slack.dev/reference/methods/chat.stopStream",
-      "fetchedAt": "2026-10-28T16:22:02.906Z",
+      "fetchedAt": "2026-10-29T07:07:28.356Z",
       "sourceSha256": "cc11cf88a41cbf3984f08d53a5b5050067ad88120feb7139d5f17d4626aebe2e",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -4999,7 +5106,7 @@
     {
       "method": "chat.unfurl",
       "sourceUrl": "https://docs.slack.dev/reference/methods/chat.unfurl",
-      "fetchedAt": "2026-10-28T16:22:03.751Z",
+      "fetchedAt": "2026-10-29T07:07:28.123Z",
       "sourceSha256": "1bcff36932a6254d7d2024a95c82366980e5e598bf9276ce1bf8c551cb24858e",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -5023,7 +5130,7 @@
     {
       "method": "chat.update",
       "sourceUrl": "https://docs.slack.dev/reference/methods/chat.update",
-      "fetchedAt": "2026-10-28T16:22:03.898Z",
+      "fetchedAt": "2026-10-29T07:07:29.090Z",
       "sourceSha256": "18031ff21e7355fd0110f4480fd8240f17b62b7057dc86177cc668c58b16b611",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -5047,7 +5154,7 @@
     {
       "method": "conversations.acceptSharedInvite",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.acceptSharedInvite",
-      "fetchedAt": "2026-10-28T16:22:04.024Z",
+      "fetchedAt": "2026-10-29T07:07:28.637Z",
       "sourceSha256": "fda683c21130e70092abb4d0222bf6560e6561b204ee6207c597c258544a089a",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -5069,7 +5176,7 @@
     {
       "method": "conversations.approveSharedInvite",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.approveSharedInvite",
-      "fetchedAt": "2026-10-28T16:22:04.885Z",
+      "fetchedAt": "2026-10-29T07:07:29.305Z",
       "sourceSha256": "d11d29ee7eea60d36367de0f2332405d1b06646286588708b0f79b765bab05e7",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -5091,7 +5198,7 @@
     {
       "method": "conversations.archive",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.archive",
-      "fetchedAt": "2026-10-28T16:22:05.012Z",
+      "fetchedAt": "2026-10-29T07:07:29.348Z",
       "sourceSha256": "9b75a5b709af91a1bf8cecc886a228f73573806593373494ab5e7e1005b48979",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -5118,7 +5225,7 @@
     {
       "method": "conversations.canvases.create",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.canvases.create",
-      "fetchedAt": "2026-10-28T16:22:05.856Z",
+      "fetchedAt": "2026-10-29T07:07:30.299Z",
       "sourceSha256": "4750d61a9f4360952c862ecbeca5ba3ddbced6fd497462be812986450622a985",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -5142,7 +5249,7 @@
     {
       "method": "conversations.close",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.close",
-      "fetchedAt": "2026-10-28T16:22:06.016Z",
+      "fetchedAt": "2026-10-29T07:07:29.910Z",
       "sourceSha256": "1ceef066923415a20b08eef2c40a5bda56bc1a82ee397ddbe60bc88ef065b7ba",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -5169,7 +5276,7 @@
     {
       "method": "conversations.create",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.create",
-      "fetchedAt": "2026-10-28T16:22:06.852Z",
+      "fetchedAt": "2026-10-29T07:07:30.435Z",
       "sourceSha256": "9bd4ddffb38b434eafc5cd6e9253df8148ac9835e65ae81504083c1208d7ec18",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -5196,7 +5303,7 @@
     {
       "method": "conversations.declineSharedInvite",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.declineSharedInvite",
-      "fetchedAt": "2026-10-28T16:22:07.025Z",
+      "fetchedAt": "2026-10-29T07:07:30.622Z",
       "sourceSha256": "c667a1401b7cd443f6c2325382c0a294d8386998a3d371d44dcda9f10e5a50ca",
       "httpMethod": "GET",
       "rateLimit": "t3",
@@ -5218,7 +5325,7 @@
     {
       "method": "conversations.externalInvitePermissions.set",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.externalInvitePermissions.set",
-      "fetchedAt": "2026-10-28T16:22:07.821Z",
+      "fetchedAt": "2026-10-29T07:07:30.712Z",
       "sourceSha256": "b414a5e6ee17e59a9bab448efd919ccc848bb8758683d626a337b720d7b39935",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -5240,7 +5347,7 @@
     {
       "method": "conversations.history",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.history",
-      "fetchedAt": "2026-10-28T16:22:08.012Z",
+      "fetchedAt": "2026-10-29T07:07:31.824Z",
       "sourceSha256": "7469f138eddadc5a5865a0bda7f0caeee08ed9279982a1f3c66cf26f3f52b182",
       "httpMethod": "GET",
       "rateLimit": "t3",
@@ -5267,7 +5374,7 @@
     {
       "method": "conversations.info",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.info",
-      "fetchedAt": "2026-10-28T16:22:08.810Z",
+      "fetchedAt": "2026-10-29T07:07:31.668Z",
       "sourceSha256": "9743dabd57695406c2000c389807b0fbe3d0f6b4cb76432e622a1ccc8d9aa678",
       "httpMethod": "GET",
       "rateLimit": "t3",
@@ -5294,7 +5401,7 @@
     {
       "method": "conversations.invite",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.invite",
-      "fetchedAt": "2026-10-28T16:22:08.988Z",
+      "fetchedAt": "2026-10-29T07:07:32.643Z",
       "sourceSha256": "3417d8ca4b8cdf7cc36d2e5db04e53866bbb0695eebec2dc5e20a8164f5a3b7c",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -5323,7 +5430,7 @@
     {
       "method": "conversations.inviteShared",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.inviteShared",
-      "fetchedAt": "2026-10-28T16:22:09.227Z",
+      "fetchedAt": "2026-10-29T07:07:32.942Z",
       "sourceSha256": "610a651895d7537721f20731062c9e1f387a84f81e876a697986a8b586f0a1fa",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -5345,7 +5452,7 @@
     {
       "method": "conversations.join",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.join",
-      "fetchedAt": "2026-10-28T16:22:09.965Z",
+      "fetchedAt": "2026-10-29T07:07:33.592Z",
       "sourceSha256": "5386506c30c5ee7a3b69d7502734d0474a9e951b9ca3da2676c5320552717231",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -5369,7 +5476,7 @@
     {
       "method": "conversations.kick",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.kick",
-      "fetchedAt": "2026-10-28T16:22:10.197Z",
+      "fetchedAt": "2026-10-29T07:07:33.886Z",
       "sourceSha256": "131cdbaac938a5eefa9a5c10daab6bef433c2cd3dcf4af03d7ed084ec9321408",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -5394,7 +5501,7 @@
     {
       "method": "conversations.leave",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.leave",
-      "fetchedAt": "2026-10-28T16:22:10.242Z",
+      "fetchedAt": "2026-10-29T07:07:34.527Z",
       "sourceSha256": "8cfa19034351f7e0798a055848f9c0cb0c54e1293c8598fabdd350e0aeb47282",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -5421,7 +5528,7 @@
     {
       "method": "conversations.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.list",
-      "fetchedAt": "2026-10-28T16:22:11.200Z",
+      "fetchedAt": "2026-10-29T07:07:35.107Z",
       "sourceSha256": "60774300b288b2432918534c4f28a57bc297b2ab26c2a1ae4078d091f1de5b7c",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -5448,7 +5555,7 @@
     {
       "method": "conversations.listConnectInvites",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.listConnectInvites",
-      "fetchedAt": "2026-10-28T16:22:11.254Z",
+      "fetchedAt": "2026-10-29T07:07:35.509Z",
       "sourceSha256": "3fa053ea270b4bd3d1f7b43fac7477013b241da5877969276604a90c6c8c01c6",
       "httpMethod": "POST",
       "rateLimit": "t1",
@@ -5470,7 +5577,7 @@
     {
       "method": "conversations.mark",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.mark",
-      "fetchedAt": "2026-10-28T16:22:12.156Z",
+      "fetchedAt": "2026-10-29T07:07:36.063Z",
       "sourceSha256": "00092c1c660eaa3b0905131e081cc472f4531c4105bd848aaa5be2df39e7b169",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -5497,7 +5604,7 @@
     {
       "method": "conversations.members",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.members",
-      "fetchedAt": "2026-10-28T16:22:12.237Z",
+      "fetchedAt": "2026-10-29T07:07:36.467Z",
       "sourceSha256": "0919e02146399eae7fa75833bf77b15d1f9aa9e049a237a6005c7621859ff93a",
       "httpMethod": "GET",
       "rateLimit": "t4",
@@ -5524,7 +5631,7 @@
     {
       "method": "conversations.open",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.open",
-      "fetchedAt": "2026-10-28T16:22:13.183Z",
+      "fetchedAt": "2026-10-29T07:07:36.994Z",
       "sourceSha256": "85f2a33856cf22cd3f873235443b481551c81a0294d25ccb5ab88d4d1c0ff8eb",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -5551,7 +5658,7 @@
     {
       "method": "conversations.rename",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.rename",
-      "fetchedAt": "2026-10-28T16:22:12.513Z",
+      "fetchedAt": "2026-10-29T07:07:37.480Z",
       "sourceSha256": "8898032facf4e989a6ee10175d0759cd6bdeeb97f7015f960ec6da0c9cf71f34",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -5578,7 +5685,7 @@
     {
       "method": "conversations.replies",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.replies",
-      "fetchedAt": "2026-10-28T16:22:13.516Z",
+      "fetchedAt": "2026-10-29T07:07:37.966Z",
       "sourceSha256": "8adc058e89d645e7a504072194acc8a674fe25c66a1c6a014c89b9d067835621",
       "httpMethod": "GET",
       "rateLimit": "t3",
@@ -5605,7 +5712,7 @@
     {
       "method": "conversations.requestSharedInvite.approve",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.requestSharedInvite.approve",
-      "fetchedAt": "2026-10-28T16:22:13.444Z",
+      "fetchedAt": "2026-10-29T07:07:38.474Z",
       "sourceSha256": "39919ab0495f7d9be118f509658343d8bc46f56a7726f1d90cd852b6908f1368",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -5627,7 +5734,7 @@
     {
       "method": "conversations.requestSharedInvite.deny",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.requestSharedInvite.deny",
-      "fetchedAt": "2026-10-28T16:22:14.414Z",
+      "fetchedAt": "2026-10-29T07:07:38.892Z",
       "sourceSha256": "93d5b899338bc8ad0672c01bae8a1c7fe1bd6faf51b4e8e9fd0ef88404f537ec",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -5649,7 +5756,7 @@
     {
       "method": "conversations.requestSharedInvite.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.requestSharedInvite.list",
-      "fetchedAt": "2026-10-28T16:22:13.794Z",
+      "fetchedAt": "2026-10-29T07:07:38.878Z",
       "sourceSha256": "bbe0118afde795d076a6b0191c5146ecaf345da3448f780df9ff8f43504ee85e",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -5671,7 +5778,7 @@
     {
       "method": "conversations.setPurpose",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.setPurpose",
-      "fetchedAt": "2026-10-28T16:22:14.771Z",
+      "fetchedAt": "2026-10-29T07:07:39.859Z",
       "sourceSha256": "36d202fe31cfde483204a5fa848a9c058593cd58c2c03786bfe90f00f50f79ca",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -5702,7 +5809,7 @@
     {
       "method": "conversations.setTopic",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.setTopic",
-      "fetchedAt": "2026-10-28T16:22:14.686Z",
+      "fetchedAt": "2026-10-29T07:07:39.146Z",
       "sourceSha256": "de3cb86ed4b4bd2af160ce6cd04b2704e72efdbdcd18f85b57e2301c4cd15979",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -5733,7 +5840,7 @@
     {
       "method": "conversations.unarchive",
       "sourceUrl": "https://docs.slack.dev/reference/methods/conversations.unarchive",
-      "fetchedAt": "2026-10-28T16:22:14.960Z",
+      "fetchedAt": "2026-10-29T07:07:40.144Z",
       "sourceSha256": "6c012c45e1456ab5259d0fb51b0b31eede7f66267f0543247288ef9712b0b22d",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -5760,7 +5867,7 @@
     {
       "method": "dialog.open",
       "sourceUrl": "https://docs.slack.dev/reference/methods/dialog.open",
-      "fetchedAt": "2026-10-28T16:22:15.046Z",
+      "fetchedAt": "2026-10-29T07:07:40.151Z",
       "sourceSha256": "2a13c9250e77662400ad1f9f7a9362e4369ab2f6cd886a82d155f6049d75b9a5",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -5782,7 +5889,7 @@
     {
       "method": "dnd.endDnd",
       "sourceUrl": "https://docs.slack.dev/reference/methods/dnd.endDnd",
-      "fetchedAt": "2026-10-28T16:22:15.944Z",
+      "fetchedAt": "2026-10-29T07:07:41.339Z",
       "sourceSha256": "9126d8894e2908e9ce94acd77d7a08011769e1e45f791b2a663bdc7f46f09e24",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -5806,7 +5913,7 @@
     {
       "method": "dnd.endSnooze",
       "sourceUrl": "https://docs.slack.dev/reference/methods/dnd.endSnooze",
-      "fetchedAt": "2026-10-28T16:22:16.015Z",
+      "fetchedAt": "2026-10-29T07:07:40.432Z",
       "sourceSha256": "498acf460608fa38e174e928516ae83b30359e85a2a1bf57f96f3ea5a7205bdf",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -5830,7 +5937,7 @@
     {
       "method": "dnd.info",
       "sourceUrl": "https://docs.slack.dev/reference/methods/dnd.info",
-      "fetchedAt": "2026-10-28T16:22:16.213Z",
+      "fetchedAt": "2026-10-29T07:07:41.364Z",
       "sourceSha256": "b27a08e8af55dda79a6209c9395a327d973c5d7abf1a697bc2953416300fb381",
       "httpMethod": "GET",
       "rateLimit": "t3",
@@ -5854,7 +5961,7 @@
     {
       "method": "dnd.setSnooze",
       "sourceUrl": "https://docs.slack.dev/reference/methods/dnd.setSnooze",
-      "fetchedAt": "2026-10-28T16:22:17.000Z",
+      "fetchedAt": "2026-10-29T07:07:42.267Z",
       "sourceSha256": "7d6286a767c13f042402d7ae24a72ed66b39fa02e2550303f596ecff39217ebd",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -5878,7 +5985,7 @@
     {
       "method": "dnd.teamInfo",
       "sourceUrl": "https://docs.slack.dev/reference/methods/dnd.teamInfo",
-      "fetchedAt": "2026-10-28T16:22:17.226Z",
+      "fetchedAt": "2026-10-29T07:07:42.301Z",
       "sourceSha256": "dbcd42de8770ead5d05ed365c2092446679edb30ddca08078a02295fcc91db07",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -5902,7 +6009,7 @@
     {
       "method": "emoji.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/emoji.list",
-      "fetchedAt": "2026-10-28T16:22:17.271Z",
+      "fetchedAt": "2026-10-29T07:07:42.565Z",
       "sourceSha256": "0305f6d8fbd5d427ae864d8c65b3b9f7876644825afeb7bbd0ababac2a449d9e",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -5926,7 +6033,7 @@
     {
       "method": "entity.acknowledgeCommentAction",
       "sourceUrl": "https://docs.slack.dev/reference/methods/entity.acknowledgeCommentAction",
-      "fetchedAt": "2026-10-28T16:22:18.231Z",
+      "fetchedAt": "2026-10-29T07:07:43.234Z",
       "sourceSha256": "80474039a4068e286b85af54b8878e68321d751d27c2e0604c4929d065eabc7b",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -5948,7 +6055,7 @@
     {
       "method": "entity.presentComments",
       "sourceUrl": "https://docs.slack.dev/reference/methods/entity.presentComments",
-      "fetchedAt": "2026-10-28T16:22:18.278Z",
+      "fetchedAt": "2026-10-29T07:07:42.821Z",
       "sourceSha256": "960b6dd51fb98a3031a672640b983543ad765aeb0671bfb41118e21c60fa1148",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -5970,7 +6077,7 @@
     {
       "method": "entity.presentDetails",
       "sourceUrl": "https://docs.slack.dev/reference/methods/entity.presentDetails",
-      "fetchedAt": "2026-10-28T16:22:19.251Z",
+      "fetchedAt": "2026-10-29T07:07:43.735Z",
       "sourceSha256": "6fe38154825606fc0f5c3162e5d5078997bfa4e9a8f97d25c94830df6f278354",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -5992,7 +6099,7 @@
     {
       "method": "files.comments.delete",
       "sourceUrl": "https://docs.slack.dev/reference/methods/files.comments.delete",
-      "fetchedAt": "2026-10-28T16:22:19.305Z",
+      "fetchedAt": "2026-10-29T07:07:44.230Z",
       "sourceSha256": "b0069ce68b5d71ea12491734d3334bba14d1461629202a6627db9af91effbc09",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -6016,7 +6123,7 @@
     {
       "method": "files.completeUploadExternal",
       "sourceUrl": "https://docs.slack.dev/reference/methods/files.completeUploadExternal",
-      "fetchedAt": "2026-10-28T16:22:19.553Z",
+      "fetchedAt": "2026-10-29T07:07:43.996Z",
       "sourceSha256": "d54132c1e9a3e4239bf287d171c0260d384337dc7916f780f4f191f67c4bcc3b",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -6040,7 +6147,7 @@
     {
       "method": "files.delete",
       "sourceUrl": "https://docs.slack.dev/reference/methods/files.delete",
-      "fetchedAt": "2026-10-28T16:22:19.576Z",
+      "fetchedAt": "2026-10-29T07:07:44.259Z",
       "sourceSha256": "462d53bbbbc900f68be99db52b5830265ba46b19b10cb2ced680cca84155fa01",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -6064,7 +6171,7 @@
     {
       "method": "files.getUploadURLExternal",
       "sourceUrl": "https://docs.slack.dev/reference/methods/files.getUploadURLExternal",
-      "fetchedAt": "2026-10-28T16:22:19.831Z",
+      "fetchedAt": "2026-10-29T07:07:45.257Z",
       "sourceSha256": "7bb1cb464bb6361d32b7fbf2ca86fa15e35c0cb4802a9a7e5eed6e0f47d859a8",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -6088,7 +6195,7 @@
     {
       "method": "files.info",
       "sourceUrl": "https://docs.slack.dev/reference/methods/files.info",
-      "fetchedAt": "2026-10-28T16:22:20.594Z",
+      "fetchedAt": "2026-10-29T07:07:44.834Z",
       "sourceSha256": "cd86f8520c606b130bcdccb3d276c647623eb9a89567d7c7c407074ca6343042",
       "httpMethod": "GET",
       "rateLimit": "t4",
@@ -6112,7 +6219,7 @@
     {
       "method": "files.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/files.list",
-      "fetchedAt": "2026-10-28T16:22:20.836Z",
+      "fetchedAt": "2026-10-29T07:07:45.900Z",
       "sourceSha256": "e9c6808e94f8865cf5e2d1a3d98a8a9febc053fbcb5a3d8a18ee42144dbc6ef0",
       "httpMethod": "GET",
       "rateLimit": "t3",
@@ -6136,7 +6243,7 @@
     {
       "method": "files.remote.add",
       "sourceUrl": "https://docs.slack.dev/reference/methods/files.remote.add",
-      "fetchedAt": "2026-10-28T16:22:21.603Z",
+      "fetchedAt": "2026-10-29T07:07:46.379Z",
       "sourceSha256": "bfaab353f0d7955775c5c44e924514f96be5d01b29018855b4ccae25f3e9f8ed",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -6158,7 +6265,7 @@
     {
       "method": "files.remote.info",
       "sourceUrl": "https://docs.slack.dev/reference/methods/files.remote.info",
-      "fetchedAt": "2026-10-28T16:22:21.837Z",
+      "fetchedAt": "2026-10-29T07:07:46.889Z",
       "sourceSha256": "f6fad4f5d5aae52620c139ad52be00c04fd9de91bdce31c8e8f272976e16dc0b",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -6182,7 +6289,7 @@
     {
       "method": "files.remote.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/files.remote.list",
-      "fetchedAt": "2026-10-28T16:22:22.601Z",
+      "fetchedAt": "2026-10-29T07:07:47.395Z",
       "sourceSha256": "8e10b78a1844b1e70d794b3227b9096879070282391ad319174c7433e7f44b1a",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -6206,7 +6313,7 @@
     {
       "method": "files.remote.remove",
       "sourceUrl": "https://docs.slack.dev/reference/methods/files.remote.remove",
-      "fetchedAt": "2026-10-28T16:22:22.796Z",
+      "fetchedAt": "2026-10-29T07:07:47.897Z",
       "sourceSha256": "9a19fadb16d1c71f5802fc321286bf844cec1220080ce3c00f93d333d3d3d075",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -6228,7 +6335,7 @@
     {
       "method": "files.remote.share",
       "sourceUrl": "https://docs.slack.dev/reference/methods/files.remote.share",
-      "fetchedAt": "2026-10-28T16:22:22.880Z",
+      "fetchedAt": "2026-10-29T07:07:48.353Z",
       "sourceSha256": "52d494931a8a81d5f512bf8fa8c3ddbddc542311fd9579ee5382bf7e70b6b3ff",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -6252,7 +6359,7 @@
     {
       "method": "files.remote.update",
       "sourceUrl": "https://docs.slack.dev/reference/methods/files.remote.update",
-      "fetchedAt": "2026-10-28T16:22:23.769Z",
+      "fetchedAt": "2026-10-29T07:07:48.219Z",
       "sourceSha256": "a1624c21eb75c384964e51c7e0837352b3630276c43d6a47baa99d739d083602",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -6274,7 +6381,7 @@
     {
       "method": "files.revokePublicURL",
       "sourceUrl": "https://docs.slack.dev/reference/methods/files.revokePublicURL",
-      "fetchedAt": "2026-10-28T16:22:23.853Z",
+      "fetchedAt": "2026-10-29T07:07:48.504Z",
       "sourceSha256": "05c6ee75eee02373f3ba3f7880550e95fe770ca1b9811e024dec73e4286c6f19",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -6298,7 +6405,7 @@
     {
       "method": "files.sharedPublicURL",
       "sourceUrl": "https://docs.slack.dev/reference/methods/files.sharedPublicURL",
-      "fetchedAt": "2026-10-28T16:22:24.046Z",
+      "fetchedAt": "2026-10-29T07:07:48.726Z",
       "sourceSha256": "7c09134fc2aa15d19b9779b9392c3e97128dffe1780b38225e5e1c3ea4cb3756",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -6322,7 +6429,7 @@
     {
       "method": "files.upload",
       "sourceUrl": "https://docs.slack.dev/reference/methods/files.upload",
-      "fetchedAt": "2026-10-28T16:22:24.837Z",
+      "fetchedAt": "2026-10-29T07:07:49.451Z",
       "sourceSha256": "11a23e4239e0a73306895168ef11411257a8a3fc3b338f06cf7645f9cfc77f13",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -6346,7 +6453,7 @@
     {
       "method": "functions.completeError",
       "sourceUrl": "https://docs.slack.dev/reference/methods/functions.completeError",
-      "fetchedAt": "2026-10-28T16:22:25.053Z",
+      "fetchedAt": "2026-10-29T07:07:49.678Z",
       "sourceSha256": "9ef63cab752ed4fa8157aa983acd2905183336b135ec274e77a6c63b7f3493be",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -6368,7 +6475,7 @@
     {
       "method": "functions.completeSuccess",
       "sourceUrl": "https://docs.slack.dev/reference/methods/functions.completeSuccess",
-      "fetchedAt": "2026-10-28T16:22:25.824Z",
+      "fetchedAt": "2026-10-29T07:07:49.960Z",
       "sourceSha256": "002fa9e149e645a9436906a40fa859eb93ee224d28decbed55db2b3e2c0a10ab",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -6390,7 +6497,7 @@
     {
       "method": "functions.distributions.permissions.add",
       "sourceUrl": "https://docs.slack.dev/reference/methods/functions.distributions.permissions.add",
-      "fetchedAt": "2026-10-28T16:22:26.063Z",
+      "fetchedAt": "2026-10-29T07:07:50.651Z",
       "sourceSha256": "a6a799d94535e485ba7b45ff2108a8929cc12a8018e306ad16496774fce905ea",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -6412,7 +6519,7 @@
     {
       "method": "functions.distributions.permissions.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/functions.distributions.permissions.list",
-      "fetchedAt": "2026-10-28T16:22:26.836Z",
+      "fetchedAt": "2026-10-29T07:07:50.891Z",
       "sourceSha256": "056330a5336c8ddeb7847c59fb817b95a6ce99ea599ad6beb0ba9222bdfc138c",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -6434,7 +6541,7 @@
     {
       "method": "functions.distributions.permissions.remove",
       "sourceUrl": "https://docs.slack.dev/reference/methods/functions.distributions.permissions.remove",
-      "fetchedAt": "2026-10-28T16:22:27.060Z",
+      "fetchedAt": "2026-10-29T07:07:51.571Z",
       "sourceSha256": "e547172d2149c6830550dc861f964359df15c3dea6159f54ba22410b2a0849fe",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -6456,7 +6563,7 @@
     {
       "method": "functions.distributions.permissions.set",
       "sourceUrl": "https://docs.slack.dev/reference/methods/functions.distributions.permissions.set",
-      "fetchedAt": "2026-10-28T16:22:27.842Z",
+      "fetchedAt": "2026-10-29T07:07:51.155Z",
       "sourceSha256": "db7d6b6f91346d9b142cb3306941a86d70ba3a9b0de7bd37b05eb41c48700379",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -6478,7 +6585,7 @@
     {
       "method": "functions.workflows.steps.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/functions.workflows.steps.list",
-      "fetchedAt": "2026-10-28T16:22:27.324Z",
+      "fetchedAt": "2026-10-29T07:07:52.136Z",
       "sourceSha256": "378a2c924f60e96c70d8f5f4a5127991aa8fb74320cfc1e22449859a120fc9b5",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -6500,7 +6607,7 @@
     {
       "method": "functions.workflows.steps.responses.export",
       "sourceUrl": "https://docs.slack.dev/reference/methods/functions.workflows.steps.responses.export",
-      "fetchedAt": "2026-10-28T16:22:28.332Z",
+      "fetchedAt": "2026-10-29T07:07:52.526Z",
       "sourceSha256": "832730c3f0291834522c2abc5f3282abf7027605c79c02c092b51ad5c63e1aa0",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -6522,7 +6629,7 @@
     {
       "method": "migration.exchange",
       "sourceUrl": "https://docs.slack.dev/reference/methods/migration.exchange",
-      "fetchedAt": "2026-10-28T16:22:28.578Z",
+      "fetchedAt": "2026-10-29T07:07:52.388Z",
       "sourceSha256": "c5046c5ba4ec7c66695056f8cda9aea221288fe2fd550236d5da8827c1cb8c76",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -6546,7 +6653,7 @@
     {
       "method": "oauth.access",
       "sourceUrl": "https://docs.slack.dev/reference/methods/oauth.access",
-      "fetchedAt": "2026-10-28T16:22:28.604Z",
+      "fetchedAt": "2026-10-29T07:07:53.351Z",
       "sourceSha256": "d49f9f64d2835f83b58f3e52c5a1f720d23a55e3825d1fbb5f078dab0012e6da",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -6568,7 +6675,7 @@
     {
       "method": "oauth.v2.access",
       "sourceUrl": "https://docs.slack.dev/reference/methods/oauth.v2.access",
-      "fetchedAt": "2026-10-28T16:22:28.850Z",
+      "fetchedAt": "2026-10-29T07:07:53.741Z",
       "sourceSha256": "2401c4a7910c17af392997bb398c1a5d7f6111c8f4a51ffa06fc4cee8c4e2a23",
       "httpMethod": "POST",
       "rateLimit": "t5",
@@ -6590,7 +6697,7 @@
     {
       "method": "oauth.v2.beginShortTokenRotation",
       "sourceUrl": "https://docs.slack.dev/reference/methods/oauth.v2.beginShortTokenRotation",
-      "fetchedAt": "2026-10-28T16:22:28.882Z",
+      "fetchedAt": "2026-10-29T07:07:53.622Z",
       "sourceSha256": "1ae9180416bb7e1c803440e7e5d0b710a7c7be07ed50697c090429007787e215",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -6612,7 +6719,7 @@
     {
       "method": "oauth.v2.completeShortTokenRotation",
       "sourceUrl": "https://docs.slack.dev/reference/methods/oauth.v2.completeShortTokenRotation",
-      "fetchedAt": "2026-10-28T16:22:29.834Z",
+      "fetchedAt": "2026-10-29T07:07:54.564Z",
       "sourceSha256": "38ec94bec0c30702d6bf56fcf2799a3784d257ca549c54daeba81cad022af9df",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -6634,7 +6741,7 @@
     {
       "method": "oauth.v2.exchange",
       "sourceUrl": "https://docs.slack.dev/reference/methods/oauth.v2.exchange",
-      "fetchedAt": "2026-10-28T16:22:29.905Z",
+      "fetchedAt": "2026-10-29T07:07:54.671Z",
       "sourceSha256": "e71f994af77463867250629c7518ff4fd76a6d8125d3cfeb7ca97aa54da06e3b",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -6656,7 +6763,7 @@
     {
       "method": "oauth.v2.user.access",
       "sourceUrl": "https://docs.slack.dev/reference/methods/oauth.v2.user.access",
-      "fetchedAt": "2026-10-28T16:22:30.115Z",
+      "fetchedAt": "2026-10-29T07:07:55.522Z",
       "sourceSha256": "eca97a83b59c3349f057dfe847094b8f8e24a3939585a9e9b4f70c9d6db096d4",
       "httpMethod": "POST",
       "rateLimit": "t5",
@@ -6678,7 +6785,7 @@
     {
       "method": "openid.connect.token",
       "sourceUrl": "https://docs.slack.dev/reference/methods/openid.connect.token",
-      "fetchedAt": "2026-10-28T16:22:30.931Z",
+      "fetchedAt": "2026-10-29T07:07:55.604Z",
       "sourceSha256": "9950687caddc028f9175ecdd0ec4666c1df8222ceda60d1ddd4667001b1833a3",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -6700,7 +6807,7 @@
     {
       "method": "openid.connect.userInfo",
       "sourceUrl": "https://docs.slack.dev/reference/methods/openid.connect.userInfo",
-      "fetchedAt": "2026-10-28T16:22:31.090Z",
+      "fetchedAt": "2026-10-29T07:07:56.021Z",
       "sourceSha256": "41ad43b029b0a3f3607f4724b77251aa7deb6401aea5db48017b2813b38d5b3c",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -6724,7 +6831,7 @@
     {
       "method": "pins.add",
       "sourceUrl": "https://docs.slack.dev/reference/methods/pins.add",
-      "fetchedAt": "2026-10-28T16:22:31.931Z",
+      "fetchedAt": "2026-10-29T07:07:56.545Z",
       "sourceSha256": "7b1a994de8ab8e42db84821cb685a25bb8d2f81cd146a79ed5358c17e89f48d5",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -6748,7 +6855,7 @@
     {
       "method": "pins.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/pins.list",
-      "fetchedAt": "2026-10-28T16:22:32.077Z",
+      "fetchedAt": "2026-10-29T07:07:56.962Z",
       "sourceSha256": "24b8efcc3c3522e08efe3bc2f51361f35fe11e10a9d05c11a40438936bc3deaf",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -6772,7 +6879,7 @@
     {
       "method": "pins.remove",
       "sourceUrl": "https://docs.slack.dev/reference/methods/pins.remove",
-      "fetchedAt": "2026-10-28T16:22:32.207Z",
+      "fetchedAt": "2026-10-29T07:07:57.526Z",
       "sourceSha256": "79eda2fd9b77faf2b6cc50f012ae490a54356c064fbbf475e8fd9e9ff7b64039",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -6796,7 +6903,7 @@
     {
       "method": "reactions.add",
       "sourceUrl": "https://docs.slack.dev/reference/methods/reactions.add",
-      "fetchedAt": "2026-10-28T16:22:32.356Z",
+      "fetchedAt": "2026-10-29T07:07:57.755Z",
       "sourceSha256": "c685b7d5c8f374024e403ce19f4e33ad7ffd633e1680ce4e189272c565b30681",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -6820,7 +6927,7 @@
     {
       "method": "reactions.get",
       "sourceUrl": "https://docs.slack.dev/reference/methods/reactions.get",
-      "fetchedAt": "2026-10-28T16:22:33.202Z",
+      "fetchedAt": "2026-10-29T07:07:58.464Z",
       "sourceSha256": "471dde91ba6eb66c6cfbcdae2ca4696e5e7c3582f61b23c72f31963d87b435ee",
       "httpMethod": "GET",
       "rateLimit": "t3",
@@ -6844,7 +6951,7 @@
     {
       "method": "reactions.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/reactions.list",
-      "fetchedAt": "2026-10-28T16:22:32.635Z",
+      "fetchedAt": "2026-10-29T07:07:58.052Z",
       "sourceSha256": "97a95ac1c0c9acb32529d2cb96692393af58bf3e46ac60f96e1eda0ad1a8e01d",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -6868,7 +6975,7 @@
     {
       "method": "reactions.remove",
       "sourceUrl": "https://docs.slack.dev/reference/methods/reactions.remove",
-      "fetchedAt": "2026-10-28T16:22:33.603Z",
+      "fetchedAt": "2026-10-29T07:07:58.974Z",
       "sourceSha256": "a924e05624d68c6d7253308f8b0deda5d5ddac146ddff543925af7d372c99157",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -6892,7 +6999,7 @@
     {
       "method": "reminders.add",
       "sourceUrl": "https://docs.slack.dev/reference/methods/reminders.add",
-      "fetchedAt": "2026-10-28T16:22:34.226Z",
+      "fetchedAt": "2026-10-29T07:07:58.762Z",
       "sourceSha256": "5160d78d94e98950493403bf304252e183457f8bf273af79a9ecac6cc197771d",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -6916,7 +7023,7 @@
     {
       "method": "reminders.complete",
       "sourceUrl": "https://docs.slack.dev/reference/methods/reminders.complete",
-      "fetchedAt": "2026-10-28T16:22:34.594Z",
+      "fetchedAt": "2026-10-29T07:07:59.050Z",
       "sourceSha256": "f8b48b593e7b0530e4793e01bfe724e777a736db11d3ac8eeb2b6dad3584639d",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -6940,7 +7047,7 @@
     {
       "method": "reminders.delete",
       "sourceUrl": "https://docs.slack.dev/reference/methods/reminders.delete",
-      "fetchedAt": "2026-10-28T16:22:34.503Z",
+      "fetchedAt": "2026-10-29T07:07:59.256Z",
       "sourceSha256": "784889bf43a56bfe742f075a56457ce07ac3a69c78a85a311534cbd5e7c3fce8",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -6964,7 +7071,7 @@
     {
       "method": "reminders.info",
       "sourceUrl": "https://docs.slack.dev/reference/methods/reminders.info",
-      "fetchedAt": "2026-10-28T16:22:35.522Z",
+      "fetchedAt": "2026-10-29T07:08:00.312Z",
       "sourceSha256": "aa9428909374065b290df8e5fcec84cc4c118f6c41b2ded12123fb4eaf59779e",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -6988,7 +7095,7 @@
     {
       "method": "reminders.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/reminders.list",
-      "fetchedAt": "2026-10-28T16:22:35.635Z",
+      "fetchedAt": "2026-10-29T07:07:59.513Z",
       "sourceSha256": "14372b5200a123626d38e0701c4f8c66aa402464f762d015081a220f2547b74b",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -7012,7 +7119,7 @@
     {
       "method": "rtm.connect",
       "sourceUrl": "https://docs.slack.dev/reference/methods/rtm.connect",
-      "fetchedAt": "2026-10-28T16:22:36.510Z",
+      "fetchedAt": "2026-10-29T07:08:04.206Z",
       "sourceSha256": "dcd0cedb140dbddfbcc5a99471536d097c3dc85141db97ed0249c38cca8262a8",
       "httpMethod": "GET",
       "rateLimit": "t1",
@@ -7034,7 +7141,7 @@
     {
       "method": "rtm.start",
       "sourceUrl": "https://docs.slack.dev/reference/methods/rtm.start",
-      "fetchedAt": "2026-10-28T16:22:36.632Z",
+      "fetchedAt": "2026-10-29T07:08:02.133Z",
       "sourceSha256": "0d59530cd02e62e1de21bc774f372705bca352ffe7a252b25c70546141a17136",
       "httpMethod": "GET",
       "rateLimit": "t1",
@@ -7056,7 +7163,7 @@
     {
       "method": "search.all",
       "sourceUrl": "https://docs.slack.dev/reference/methods/search.all",
-      "fetchedAt": "2026-10-28T16:22:36.781Z",
+      "fetchedAt": "2026-10-29T07:08:04.219Z",
       "sourceSha256": "dbefe66ace008b6559e0c6bb1b08125458ae8e0145cc4b61e5ed9a113d0d2eb1",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -7080,7 +7187,7 @@
     {
       "method": "search.files",
       "sourceUrl": "https://docs.slack.dev/reference/methods/search.files",
-      "fetchedAt": "2026-10-28T16:22:37.610Z",
+      "fetchedAt": "2026-10-29T07:08:05.327Z",
       "sourceSha256": "9db147f01a062dad55f8602be1683b763c204a0c4a20c5c21cc3f065773f11cd",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -7104,7 +7211,7 @@
     {
       "method": "search.messages",
       "sourceUrl": "https://docs.slack.dev/reference/methods/search.messages",
-      "fetchedAt": "2026-10-28T16:22:37.783Z",
+      "fetchedAt": "2026-10-29T07:08:05.456Z",
       "sourceSha256": "0a7edbf25f8a6fee80ffad87d87dd8dcecc98480eff70d96de8c594e1ebcef1d",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -7128,7 +7235,7 @@
     {
       "method": "slackLists.access.delete",
       "sourceUrl": "https://docs.slack.dev/reference/methods/slackLists.access.delete",
-      "fetchedAt": "2026-10-28T16:22:38.630Z",
+      "fetchedAt": "2026-10-29T07:08:06.280Z",
       "sourceSha256": "7156e38a3edbd0349b4b6b9f644179b2e47977e968cac792c5f5558ef17f16ae",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -7153,7 +7260,7 @@
     {
       "method": "slackLists.access.set",
       "sourceUrl": "https://docs.slack.dev/reference/methods/slackLists.access.set",
-      "fetchedAt": "2026-10-28T16:22:38.795Z",
+      "fetchedAt": "2026-10-29T07:08:06.664Z",
       "sourceSha256": "c7e38a8d5c8b354e65da1ec1efe61a889663cb5a85f2812709c3824688cc9e8f",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -7178,7 +7285,7 @@
     {
       "method": "slackLists.create",
       "sourceUrl": "https://docs.slack.dev/reference/methods/slackLists.create",
-      "fetchedAt": "2026-10-28T16:22:39.621Z",
+      "fetchedAt": "2026-10-29T07:08:06.554Z",
       "sourceSha256": "b407c4c423b7845664e0aee06acdbbcf5c263425684de0d6f45fa14884d5f2fa",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -7203,7 +7310,7 @@
     {
       "method": "slackLists.download.get",
       "sourceUrl": "https://docs.slack.dev/reference/methods/slackLists.download.get",
-      "fetchedAt": "2026-10-28T16:22:39.069Z",
+      "fetchedAt": "2026-10-29T07:08:07.551Z",
       "sourceSha256": "c70867a6a2fa395787cb2cc21556d2c460cbba1e183c1a2be69e37e9dbe9fb1f",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -7228,7 +7335,7 @@
     {
       "method": "slackLists.download.start",
       "sourceUrl": "https://docs.slack.dev/reference/methods/slackLists.download.start",
-      "fetchedAt": "2026-10-28T16:22:39.341Z",
+      "fetchedAt": "2026-10-29T07:08:07.646Z",
       "sourceSha256": "838742fe5a50e408eb7324c3d78ff945630280c5e6a9dfb77c5d52c54ffce63f",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -7253,7 +7360,7 @@
     {
       "method": "slackLists.items.create",
       "sourceUrl": "https://docs.slack.dev/reference/methods/slackLists.items.create",
-      "fetchedAt": "2026-10-28T16:22:40.321Z",
+      "fetchedAt": "2026-10-29T07:08:08.525Z",
       "sourceSha256": "341ab669a103b49a8c963a94db2b94e3387ec189a534011b5acc895f0e33ffe8",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -7278,7 +7385,7 @@
     {
       "method": "slackLists.items.delete",
       "sourceUrl": "https://docs.slack.dev/reference/methods/slackLists.items.delete",
-      "fetchedAt": "2026-10-28T16:22:40.631Z",
+      "fetchedAt": "2026-10-29T07:08:07.915Z",
       "sourceSha256": "0db5c825ba158ed77302cc444f7d941834c1e8acc03dad65d4222ef27febf1f0",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -7303,7 +7410,7 @@
     {
       "method": "slackLists.items.deleteMultiple",
       "sourceUrl": "https://docs.slack.dev/reference/methods/slackLists.items.deleteMultiple",
-      "fetchedAt": "2026-10-28T16:22:41.312Z",
+      "fetchedAt": "2026-10-29T07:08:08.894Z",
       "sourceSha256": "ab55465fbfa5385503bf017568a50857eab80f527b91feee1962aa03eebce537",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -7328,7 +7435,7 @@
     {
       "method": "slackLists.items.info",
       "sourceUrl": "https://docs.slack.dev/reference/methods/slackLists.items.info",
-      "fetchedAt": "2026-10-28T16:22:40.904Z",
+      "fetchedAt": "2026-10-29T07:08:09.537Z",
       "sourceSha256": "a917e9956af31d8504e438b5814f39a0eb63222c2238fadc160a264cfc4c9a2b",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -7353,7 +7460,7 @@
     {
       "method": "slackLists.items.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/slackLists.items.list",
-      "fetchedAt": "2026-10-28T16:22:41.924Z",
+      "fetchedAt": "2026-10-29T07:08:09.852Z",
       "sourceSha256": "6ec9c935a1216f5ff1dce67acb10827b3b680e17e1cc01cb5c4391d3c2263364",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -7378,7 +7485,7 @@
     {
       "method": "slackLists.items.update",
       "sourceUrl": "https://docs.slack.dev/reference/methods/slackLists.items.update",
-      "fetchedAt": "2026-10-28T16:22:42.280Z",
+      "fetchedAt": "2026-10-29T07:08:11.065Z",
       "sourceSha256": "1f6b3fabe0df9fc02e31ca123959a9941e61b5eb893d2443514035c6723f73b3",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -7403,7 +7510,7 @@
     {
       "method": "slackLists.update",
       "sourceUrl": "https://docs.slack.dev/reference/methods/slackLists.update",
-      "fetchedAt": "2026-10-28T16:22:42.194Z",
+      "fetchedAt": "2026-10-29T07:08:10.158Z",
       "sourceSha256": "7f5a6f3677d05aba188431c510c5d7fb748d662ee8f2d868741746603b7ca9e5",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -7426,9 +7533,177 @@
       "reviewState": "reviewed"
     },
     {
+      "method": "slackbot.skills.create",
+      "sourceUrl": "https://docs.slack.dev/reference/methods/slackbot.skills.create",
+      "fetchedAt": "2026-10-29T07:08:10.417Z",
+      "sourceSha256": "0e83c915468ce1808539d71ee1b680b75e6fae02d618af1f8dc7a0c07c856555",
+      "httpMethod": "POST",
+      "rateLimit": "t2",
+      "userScopes": [
+        "skills:write"
+      ],
+      "userToken": "documented",
+      "planRequirement": "Not established by metadata; Slackbot Skills and underlying Canvas capabilities require native plan probe to verify Free/Pro entitlement.",
+      "roleRequirement": "Caller must have permission to author skills and create or own the canvas; verify caller privileges.",
+      "sideEffect": "write",
+      "risk": "medium",
+      "disposition": "probe_required",
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, organization feature enablement, caller role and native behavior remain unverified.",
+      "evidenceUrls": [
+        "https://docs.slack.dev/reference/methods/slackbot.skills.create"
+      ],
+      "atiMapping": "SLACK-03/skills (planned; no tool registered)",
+      "deliveryStatus": "not_implemented",
+      "reviewState": "reviewed"
+    },
+    {
+      "method": "slackbot.skills.delete",
+      "sourceUrl": "https://docs.slack.dev/reference/methods/slackbot.skills.delete",
+      "fetchedAt": "2026-10-29T07:08:11.503Z",
+      "sourceSha256": "46657a8e786bf3bf668421ab9303608da05d6d9c4d7b3b0c075175e4528832e2",
+      "httpMethod": "POST",
+      "rateLimit": "t2",
+      "userScopes": [
+        "skills:write"
+      ],
+      "userToken": "documented",
+      "planRequirement": "Not established by metadata; Slackbot Skills and underlying Canvas capabilities require native plan probe to verify Free/Pro entitlement.",
+      "roleRequirement": "Caller must own the skill/canvas; restricted_action if caller is not authorized.",
+      "sideEffect": "write",
+      "risk": "high",
+      "disposition": "probe_required",
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, organization feature enablement, caller role and native behavior remain unverified.",
+      "evidenceUrls": [
+        "https://docs.slack.dev/reference/methods/slackbot.skills.delete"
+      ],
+      "atiMapping": "SLACK-03/skills (planned; no tool registered)",
+      "deliveryStatus": "not_implemented",
+      "reviewState": "reviewed"
+    },
+    {
+      "method": "slackbot.skills.info",
+      "sourceUrl": "https://docs.slack.dev/reference/methods/slackbot.skills.info",
+      "fetchedAt": "2026-10-29T07:08:11.484Z",
+      "sourceSha256": "f24406d418fe355cc4acbaee7568c9a1038d9487e4c2f39ee1ded645b52f6c49",
+      "httpMethod": "POST",
+      "rateLimit": "t3",
+      "userScopes": [
+        "skills:read"
+      ],
+      "userToken": "documented",
+      "planRequirement": "Not established by metadata; Slackbot Skills and underlying Canvas capabilities require native plan probe to verify Free/Pro entitlement.",
+      "roleRequirement": "Caller must have read access to the underlying canvas/skill; skill_not_found returned if unviewable.",
+      "sideEffect": "read",
+      "risk": "low",
+      "disposition": "probe_required",
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, organization feature enablement, caller role and native behavior remain unverified.",
+      "evidenceUrls": [
+        "https://docs.slack.dev/reference/methods/slackbot.skills.info"
+      ],
+      "atiMapping": "SLACK-03/skills (planned; no tool registered)",
+      "deliveryStatus": "not_implemented",
+      "reviewState": "reviewed"
+    },
+    {
+      "method": "slackbot.skills.library.add",
+      "sourceUrl": "https://docs.slack.dev/reference/methods/slackbot.skills.library.add",
+      "fetchedAt": "2026-10-29T07:08:12.700Z",
+      "sourceSha256": "9db6b3812565016592cabc01be867f66d42bbdb7641b3f67eb054db62bbb9a76",
+      "httpMethod": "POST",
+      "rateLimit": "t3",
+      "userScopes": [
+        "skills:write"
+      ],
+      "userToken": "documented",
+      "planRequirement": "Not established by metadata; Slackbot Skills and underlying Canvas capabilities require native plan probe to verify Free/Pro entitlement.",
+      "roleRequirement": "Caller needs permission to use skills and read access to the skill, but not author permission.",
+      "sideEffect": "write",
+      "risk": "low",
+      "disposition": "probe_required",
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, organization feature enablement, caller role and native behavior remain unverified.",
+      "evidenceUrls": [
+        "https://docs.slack.dev/reference/methods/slackbot.skills.library.add"
+      ],
+      "atiMapping": "SLACK-03/skills (planned; no tool registered)",
+      "deliveryStatus": "not_implemented",
+      "reviewState": "reviewed"
+    },
+    {
+      "method": "slackbot.skills.library.remove",
+      "sourceUrl": "https://docs.slack.dev/reference/methods/slackbot.skills.library.remove",
+      "fetchedAt": "2026-10-29T07:08:12.491Z",
+      "sourceSha256": "1e4b241f9fbf67b039a3008c5804f3e4d75e1eb12560a4e5ff52c3f687293296",
+      "httpMethod": "POST",
+      "rateLimit": "t3",
+      "userScopes": [
+        "skills:write"
+      ],
+      "userToken": "documented",
+      "planRequirement": "Not established by metadata; Slackbot Skills and underlying Canvas capabilities require native plan probe to verify Free/Pro entitlement.",
+      "roleRequirement": "Caller needs permission to use skills and read access to the skill.",
+      "sideEffect": "write",
+      "risk": "low",
+      "disposition": "probe_required",
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, organization feature enablement, caller role and native behavior remain unverified.",
+      "evidenceUrls": [
+        "https://docs.slack.dev/reference/methods/slackbot.skills.library.remove"
+      ],
+      "atiMapping": "SLACK-03/skills (planned; no tool registered)",
+      "deliveryStatus": "not_implemented",
+      "reviewState": "reviewed"
+    },
+    {
+      "method": "slackbot.skills.list",
+      "sourceUrl": "https://docs.slack.dev/reference/methods/slackbot.skills.list",
+      "fetchedAt": "2026-10-29T07:08:12.773Z",
+      "sourceSha256": "194baf4ae78589145fbf6fc781e0462b355581ad4d023241964152205454d4c2",
+      "httpMethod": "POST",
+      "rateLimit": "t3",
+      "userScopes": [
+        "skills:read"
+      ],
+      "userToken": "documented",
+      "planRequirement": "Not established by metadata; Slackbot Skills and underlying Canvas capabilities require native plan probe to verify Free/Pro entitlement.",
+      "roleRequirement": "Lists skills visible from the caller's perspective; verify caller role visibility.",
+      "sideEffect": "read",
+      "risk": "low",
+      "disposition": "probe_required",
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, organization feature enablement, caller role and native behavior remain unverified.",
+      "evidenceUrls": [
+        "https://docs.slack.dev/reference/methods/slackbot.skills.list"
+      ],
+      "atiMapping": "SLACK-03/skills (planned; no tool registered)",
+      "deliveryStatus": "not_implemented",
+      "reviewState": "reviewed"
+    },
+    {
+      "method": "slackbot.skills.update",
+      "sourceUrl": "https://docs.slack.dev/reference/methods/slackbot.skills.update",
+      "fetchedAt": "2026-10-29T07:08:13.019Z",
+      "sourceSha256": "4053c9f4bbbdcfd9bd07d4365808af6506dd7f13632e9002606e3134b0337224",
+      "httpMethod": "POST",
+      "rateLimit": "t3",
+      "userScopes": [
+        "skills:write"
+      ],
+      "userToken": "documented",
+      "planRequirement": "Not established by metadata; Slackbot Skills and underlying Canvas capabilities require native plan probe to verify Free/Pro entitlement.",
+      "roleRequirement": "Caller must own or have permission to change the skill/canvas; restricted_action if unauthorized.",
+      "sideEffect": "write",
+      "risk": "medium",
+      "disposition": "probe_required",
+      "reason": "Reviewed method metadata declares user scopes; Free/Pro entitlement, organization feature enablement, caller role and native behavior remain unverified.",
+      "evidenceUrls": [
+        "https://docs.slack.dev/reference/methods/slackbot.skills.update"
+      ],
+      "atiMapping": "SLACK-03/skills (planned; no tool registered)",
+      "deliveryStatus": "not_implemented",
+      "reviewState": "reviewed"
+    },
+    {
       "method": "stars.add",
       "sourceUrl": "https://docs.slack.dev/reference/methods/stars.add",
-      "fetchedAt": "2026-10-28T16:22:42.462Z",
+      "fetchedAt": "2026-10-29T07:08:13.812Z",
       "sourceSha256": "791269c15b3f03f3c7c0471d716ea40a6e5daf707c6a0bcaa22a029e4b7db882",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -7452,7 +7727,7 @@
     {
       "method": "stars.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/stars.list",
-      "fetchedAt": "2026-10-28T16:22:43.282Z",
+      "fetchedAt": "2026-10-29T07:08:13.342Z",
       "sourceSha256": "705630f944203e716e8a47f182c36ee043e524a3107b8ebbe579d62bfcfa6bbd",
       "httpMethod": "GET",
       "rateLimit": "t3",
@@ -7476,7 +7751,7 @@
     {
       "method": "stars.remove",
       "sourceUrl": "https://docs.slack.dev/reference/methods/stars.remove",
-      "fetchedAt": "2026-10-28T16:22:42.735Z",
+      "fetchedAt": "2026-10-29T07:08:14.326Z",
       "sourceSha256": "864ad0d61e07602ac6895f060541007cfa907e0e46cf2ca690069451de2439d9",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -7500,7 +7775,7 @@
     {
       "method": "team.accessLogs",
       "sourceUrl": "https://docs.slack.dev/reference/methods/team.accessLogs",
-      "fetchedAt": "2026-10-28T16:22:43.014Z",
+      "fetchedAt": "2026-10-29T07:08:14.759Z",
       "sourceSha256": "0f32b2fe90496f30ae671565071b5eaf953b8fd3a293074d7482fb8cf4013328",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -7524,7 +7799,7 @@
     {
       "method": "team.billableInfo",
       "sourceUrl": "https://docs.slack.dev/reference/methods/team.billableInfo",
-      "fetchedAt": "2026-10-28T16:22:43.298Z",
+      "fetchedAt": "2026-10-29T07:08:15.597Z",
       "sourceSha256": "4b0a82aa9a070f4276fb47250af68d6c1c1c7f869f98a58077dba3f26d045ed2",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -7548,7 +7823,7 @@
     {
       "method": "team.billing.info",
       "sourceUrl": "https://docs.slack.dev/reference/methods/team.billing.info",
-      "fetchedAt": "2026-10-28T16:22:43.553Z",
+      "fetchedAt": "2026-10-29T07:08:15.760Z",
       "sourceSha256": "0cab86520a0c9d4a632d97609194aaf1a4e2d983a969d542e6262bf94d05064a",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -7572,7 +7847,7 @@
     {
       "method": "team.externalTeams.disconnect",
       "sourceUrl": "https://docs.slack.dev/reference/methods/team.externalTeams.disconnect",
-      "fetchedAt": "2026-10-28T16:22:44.309Z",
+      "fetchedAt": "2026-10-29T07:08:15.864Z",
       "sourceSha256": "498997a4628d51749404638fb3a6b9694cb1cb4264cbab0c2ee6c3147c0bd4d9",
       "httpMethod": "POST",
       "rateLimit": "t1",
@@ -7594,7 +7869,7 @@
     {
       "method": "team.externalTeams.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/team.externalTeams.list",
-      "fetchedAt": "2026-10-28T16:22:43.826Z",
+      "fetchedAt": "2026-10-29T07:08:16.311Z",
       "sourceSha256": "2210e78192a910e6680e7d89dc5762d216c8ccbe39964a60b08f8ef5391beac9",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -7616,7 +7891,7 @@
     {
       "method": "team.info",
       "sourceUrl": "https://docs.slack.dev/reference/methods/team.info",
-      "fetchedAt": "2026-10-28T16:22:44.811Z",
+      "fetchedAt": "2026-10-29T07:08:16.174Z",
       "sourceSha256": "454482d62cf9fd5ec30ab2973fd4c685c31aa742ca7c5eb4da0f90167936fd71",
       "httpMethod": "GET",
       "rateLimit": "t3",
@@ -7640,7 +7915,7 @@
     {
       "method": "team.integrationLogs",
       "sourceUrl": "https://docs.slack.dev/reference/methods/team.integrationLogs",
-      "fetchedAt": "2026-10-28T16:22:44.574Z",
+      "fetchedAt": "2026-10-29T07:08:17.128Z",
       "sourceSha256": "db7bcb8b5e130e244a82cab50a3f83335f757091f6f48abee193952c7c9fec35",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -7664,7 +7939,7 @@
     {
       "method": "team.preferences.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/team.preferences.list",
-      "fetchedAt": "2026-10-28T16:22:45.540Z",
+      "fetchedAt": "2026-10-29T07:08:16.603Z",
       "sourceSha256": "5a36a5f5cbaa5934e35f817def14401400877f5941e1a1b049d16994497a48e2",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -7688,7 +7963,7 @@
     {
       "method": "team.profile.get",
       "sourceUrl": "https://docs.slack.dev/reference/methods/team.profile.get",
-      "fetchedAt": "2026-10-28T16:22:45.779Z",
+      "fetchedAt": "2026-10-29T07:08:16.909Z",
       "sourceSha256": "5486189656c619a636a4d5c7f926ccb4091902151cf321f62a89b47ca99fef02",
       "httpMethod": "GET",
       "rateLimit": "t3",
@@ -7712,7 +7987,7 @@
     {
       "method": "tooling.tokens.rotate",
       "sourceUrl": "https://docs.slack.dev/reference/methods/tooling.tokens.rotate",
-      "fetchedAt": "2026-10-28T16:22:46.519Z",
+      "fetchedAt": "2026-10-29T07:08:17.176Z",
       "sourceSha256": "e28b3edff63269ef6c5c01e6485ed8ba6254cc2cf7f672125bceb219369ca180",
       "httpMethod": "POST",
       "rateLimit": "t5",
@@ -7734,7 +8009,7 @@
     {
       "method": "usergroups.create",
       "sourceUrl": "https://docs.slack.dev/reference/methods/usergroups.create",
-      "fetchedAt": "2026-10-28T16:22:46.780Z",
+      "fetchedAt": "2026-10-29T07:08:18.126Z",
       "sourceSha256": "7041d01f35f4caac00fd83379291dc710ba6626981de4a244a8fe0b9d282605b",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -7758,7 +8033,7 @@
     {
       "method": "usergroups.disable",
       "sourceUrl": "https://docs.slack.dev/reference/methods/usergroups.disable",
-      "fetchedAt": "2026-10-28T16:22:47.515Z",
+      "fetchedAt": "2026-10-29T07:08:17.423Z",
       "sourceSha256": "a481fddf95710d668fa69b61ad4f32a71db0b45691b5a48018bdd6e6c857b340",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -7782,7 +8057,7 @@
     {
       "method": "usergroups.enable",
       "sourceUrl": "https://docs.slack.dev/reference/methods/usergroups.enable",
-      "fetchedAt": "2026-10-28T16:22:47.055Z",
+      "fetchedAt": "2026-10-29T07:08:18.364Z",
       "sourceSha256": "6479d14418a527fbeaef71db02b0d9470a50bf4f94bfe25c186ce86a9a6d2169",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -7806,7 +8081,7 @@
     {
       "method": "usergroups.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/usergroups.list",
-      "fetchedAt": "2026-10-28T16:22:48.046Z",
+      "fetchedAt": "2026-10-29T07:08:18.425Z",
       "sourceSha256": "d3d1e1059de8d64c564cc94235edb796997300e2f07d1304a620b0b0e4dda37a",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -7830,7 +8105,7 @@
     {
       "method": "usergroups.update",
       "sourceUrl": "https://docs.slack.dev/reference/methods/usergroups.update",
-      "fetchedAt": "2026-10-28T16:22:48.541Z",
+      "fetchedAt": "2026-10-29T07:08:18.858Z",
       "sourceSha256": "5c5828fcb60310995af9aef0e0fdf611d66eddb03b6b1cadd3c5e0cce67e90cc",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -7854,7 +8129,7 @@
     {
       "method": "usergroups.users.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/usergroups.users.list",
-      "fetchedAt": "2026-10-28T16:22:48.792Z",
+      "fetchedAt": "2026-10-29T07:08:18.723Z",
       "sourceSha256": "38ece356f929495185b959b01c3ce04498383ddd0df9ee21aac322fd23a4c427",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -7878,7 +8153,7 @@
     {
       "method": "usergroups.users.update",
       "sourceUrl": "https://docs.slack.dev/reference/methods/usergroups.users.update",
-      "fetchedAt": "2026-10-28T16:22:49.545Z",
+      "fetchedAt": "2026-10-29T07:08:19.668Z",
       "sourceSha256": "df8cc55163f51b66396d3b97efabdfc3593b3e913fc264bcc45433151d2b4fa3",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -7902,7 +8177,7 @@
     {
       "method": "users.conversations",
       "sourceUrl": "https://docs.slack.dev/reference/methods/users.conversations",
-      "fetchedAt": "2026-10-28T16:22:49.776Z",
+      "fetchedAt": "2026-10-29T07:08:19.772Z",
       "sourceSha256": "d208bf6331a2211b064643ec596585ca41e6e1cef00c84e59c4063fb2ca20e40",
       "httpMethod": "GET",
       "rateLimit": "t3",
@@ -7929,7 +8204,7 @@
     {
       "method": "users.deletePhoto",
       "sourceUrl": "https://docs.slack.dev/reference/methods/users.deletePhoto",
-      "fetchedAt": "2026-10-28T16:22:49.812Z",
+      "fetchedAt": "2026-10-29T07:08:19.968Z",
       "sourceSha256": "f234a1b0cdff7c23f72e2e160cddcd541936a9248b2dbe7f1b369491e17ca190",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -7953,7 +8228,7 @@
     {
       "method": "users.discoverableContacts.lookup",
       "sourceUrl": "https://docs.slack.dev/reference/methods/users.discoverableContacts.lookup",
-      "fetchedAt": "2026-10-28T16:22:50.798Z",
+      "fetchedAt": "2026-10-29T07:08:20.988Z",
       "sourceSha256": "cfccb289eab76b7e4f54298a895c0226235d919d390e14208199686556060c8c",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -7975,7 +8250,7 @@
     {
       "method": "users.getPresence",
       "sourceUrl": "https://docs.slack.dev/reference/methods/users.getPresence",
-      "fetchedAt": "2026-10-28T16:22:50.093Z",
+      "fetchedAt": "2026-10-29T07:08:21.192Z",
       "sourceSha256": "88c1d76a76fe5381e0e943ca968dbbf854448ce2e07b499730663ebb85cc5bf7",
       "httpMethod": "GET",
       "rateLimit": "t3",
@@ -7999,7 +8274,7 @@
     {
       "method": "users.identity",
       "sourceUrl": "https://docs.slack.dev/reference/methods/users.identity",
-      "fetchedAt": "2026-10-28T16:22:50.367Z",
+      "fetchedAt": "2026-10-29T07:08:21.597Z",
       "sourceSha256": "e7358466a14a5c359d58a998991a8ae8d93095991371fe1c54faeb516bffd244",
       "httpMethod": "GET",
       "rateLimit": "t3",
@@ -8023,7 +8298,7 @@
     {
       "method": "users.info",
       "sourceUrl": "https://docs.slack.dev/reference/methods/users.info",
-      "fetchedAt": "2026-10-28T16:22:50.643Z",
+      "fetchedAt": "2026-10-29T07:08:22.219Z",
       "sourceSha256": "2af0ad0aa02e118da56abc67ad20989d22141e5be6b2145fe7c5f849b28c4aa1",
       "httpMethod": "GET",
       "rateLimit": "t4",
@@ -8047,7 +8322,7 @@
     {
       "method": "users.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/users.list",
-      "fetchedAt": "2026-10-28T16:22:51.657Z",
+      "fetchedAt": "2026-10-29T07:08:22.014Z",
       "sourceSha256": "d8bdbee49ac578bf8342f50c8f82807a6e02e7a106c7f8df789fe110b3380deb",
       "httpMethod": "GET",
       "rateLimit": "t2",
@@ -8071,7 +8346,7 @@
     {
       "method": "users.lookupByEmail",
       "sourceUrl": "https://docs.slack.dev/reference/methods/users.lookupByEmail",
-      "fetchedAt": "2026-10-28T16:22:51.795Z",
+      "fetchedAt": "2026-10-29T07:08:22.306Z",
       "sourceSha256": "175f317b232a287636056ceb2da6791e04c91089ddfdd2fc57a13a4591631791",
       "httpMethod": "GET",
       "rateLimit": "t3",
@@ -8095,7 +8370,7 @@
     {
       "method": "users.profile.get",
       "sourceUrl": "https://docs.slack.dev/reference/methods/users.profile.get",
-      "fetchedAt": "2026-10-28T16:22:52.042Z",
+      "fetchedAt": "2026-10-29T07:08:23.166Z",
       "sourceSha256": "05cb52a64d71b1c57c2981db43df39231b4ce6a8e7a569d817824e9e4deb7c1b",
       "httpMethod": "GET",
       "rateLimit": "t4",
@@ -8119,7 +8394,7 @@
     {
       "method": "users.profile.set",
       "sourceUrl": "https://docs.slack.dev/reference/methods/users.profile.set",
-      "fetchedAt": "2026-10-28T16:22:52.833Z",
+      "fetchedAt": "2026-10-29T07:08:22.550Z",
       "sourceSha256": "bf9e211f89eabc62ad10125c46ee6e7203d819e71de5813cbad2f502c3f7bcda",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -8143,7 +8418,7 @@
     {
       "method": "users.setActive",
       "sourceUrl": "https://docs.slack.dev/reference/methods/users.setActive",
-      "fetchedAt": "2026-10-28T16:22:52.309Z",
+      "fetchedAt": "2026-10-29T07:08:23.513Z",
       "sourceSha256": "495873b297ac56f68d93198588d703d2c6de4c45513252eff7abd5ebe75b39f9",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -8167,7 +8442,7 @@
     {
       "method": "users.setPhoto",
       "sourceUrl": "https://docs.slack.dev/reference/methods/users.setPhoto",
-      "fetchedAt": "2026-10-28T16:22:53.309Z",
+      "fetchedAt": "2026-10-29T07:08:23.446Z",
       "sourceSha256": "77f4cac023dca6b49eee2a46acb5201b411e82422e1de4d31df0319da5a48056",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -8191,7 +8466,7 @@
     {
       "method": "users.setPresence",
       "sourceUrl": "https://docs.slack.dev/reference/methods/users.setPresence",
-      "fetchedAt": "2026-10-28T16:22:53.795Z",
+      "fetchedAt": "2026-10-29T07:08:27.272Z",
       "sourceSha256": "dbc891a5ff60bf59aa9ae0339bbb9b03e552c6e51617d658ed28571e8eeed99c",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -8215,7 +8490,7 @@
     {
       "method": "views.open",
       "sourceUrl": "https://docs.slack.dev/reference/methods/views.open",
-      "fetchedAt": "2026-10-28T16:22:54.306Z",
+      "fetchedAt": "2026-10-29T07:08:24.180Z",
       "sourceSha256": "cc649645ed9b306490dac26eea37426c8f4bbd1e517221074757f3756f384014",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -8237,7 +8512,7 @@
     {
       "method": "views.publish",
       "sourceUrl": "https://docs.slack.dev/reference/methods/views.publish",
-      "fetchedAt": "2026-10-28T16:22:54.795Z",
+      "fetchedAt": "2026-10-29T07:08:26.033Z",
       "sourceSha256": "5f2d19982c306931f46d3d165cd792c38c3c863625ce7011318a871124ec7dea",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -8259,7 +8534,7 @@
     {
       "method": "views.push",
       "sourceUrl": "https://docs.slack.dev/reference/methods/views.push",
-      "fetchedAt": "2026-10-28T16:22:54.586Z",
+      "fetchedAt": "2026-10-29T07:08:29.192Z",
       "sourceSha256": "824535bb896cd6e5b94e13b23327cc6b9a14606a129ca2d5b93ae77d7e949826",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -8281,7 +8556,7 @@
     {
       "method": "views.update",
       "sourceUrl": "https://docs.slack.dev/reference/methods/views.update",
-      "fetchedAt": "2026-10-28T16:22:54.863Z",
+      "fetchedAt": "2026-10-29T07:08:28.349Z",
       "sourceSha256": "d1269adc40908ce6e869e7d96295ea07ea8bb62fb0174e5983107d29ef3b04ea",
       "httpMethod": "POST",
       "rateLimit": "t4",
@@ -8303,7 +8578,7 @@
     {
       "method": "workflows.featured.add",
       "sourceUrl": "https://docs.slack.dev/reference/methods/workflows.featured.add",
-      "fetchedAt": "2026-10-28T16:22:55.816Z",
+      "fetchedAt": "2026-10-29T07:08:28.791Z",
       "sourceSha256": "940532403b5058d0fa867241b1c297a609a443786a5fda629f680132466f5247",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -8327,7 +8602,7 @@
     {
       "method": "workflows.featured.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/workflows.featured.list",
-      "fetchedAt": "2026-10-28T16:22:55.841Z",
+      "fetchedAt": "2026-10-29T07:08:30.118Z",
       "sourceSha256": "9fd031296ce704da24a22c8041bb653680c9eca105f8ded577e40aabf9071303",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -8351,7 +8626,7 @@
     {
       "method": "workflows.featured.remove",
       "sourceUrl": "https://docs.slack.dev/reference/methods/workflows.featured.remove",
-      "fetchedAt": "2026-10-28T16:22:56.840Z",
+      "fetchedAt": "2026-10-29T07:08:38.586Z",
       "sourceSha256": "afff6e32c699ab8ff79e2d927e8931bff0de37e197769416feb3507af4ff305b",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -8375,7 +8650,7 @@
     {
       "method": "workflows.featured.set",
       "sourceUrl": "https://docs.slack.dev/reference/methods/workflows.featured.set",
-      "fetchedAt": "2026-10-28T16:22:56.863Z",
+      "fetchedAt": "2026-10-29T07:08:32.470Z",
       "sourceSha256": "b6b8029662d98777f36d14ff03599d8b3edd64b7dbac785b1c643f3049818d0a",
       "httpMethod": "POST",
       "rateLimit": "t2",
@@ -8399,7 +8674,7 @@
     {
       "method": "workflows.triggers.permissions.add",
       "sourceUrl": "https://docs.slack.dev/reference/methods/workflows.triggers.permissions.add",
-      "fetchedAt": "2026-10-28T16:22:57.122Z",
+      "fetchedAt": "2026-10-29T07:08:34.628Z",
       "sourceSha256": "3b94e7b833b308e20b54016099714e587ca9cb7681f61b312a53517f796d5f2b",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -8421,7 +8696,7 @@
     {
       "method": "workflows.triggers.permissions.list",
       "sourceUrl": "https://docs.slack.dev/reference/methods/workflows.triggers.permissions.list",
-      "fetchedAt": "2026-10-28T16:22:57.143Z",
+      "fetchedAt": "2026-10-29T07:08:35.231Z",
       "sourceSha256": "fdeeef9fc17dadb6f88090c0b09925a3ab37d3745cfbd45808e45c810331d5dc",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -8443,7 +8718,7 @@
     {
       "method": "workflows.triggers.permissions.remove",
       "sourceUrl": "https://docs.slack.dev/reference/methods/workflows.triggers.permissions.remove",
-      "fetchedAt": "2026-10-28T16:22:58.114Z",
+      "fetchedAt": "2026-10-29T07:08:36.232Z",
       "sourceSha256": "decc3eba2bab6666621f6b6fd06f1b938e3399b38e12b52192b48707ca75351c",
       "httpMethod": "POST",
       "rateLimit": "t3",
@@ -8465,7 +8740,7 @@
     {
       "method": "workflows.triggers.permissions.set",
       "sourceUrl": "https://docs.slack.dev/reference/methods/workflows.triggers.permissions.set",
-      "fetchedAt": "2026-10-28T16:22:58.160Z",
+      "fetchedAt": "2026-10-29T07:08:37.399Z",
       "sourceSha256": "9d719f2f6341fa9f937151baf3b693612747cded74fba328147ccc6ada3b46fc",
       "httpMethod": "POST",
       "rateLimit": "t3",
