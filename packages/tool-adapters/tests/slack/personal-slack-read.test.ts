@@ -590,4 +590,238 @@ describe('PersonalSlackReadAdapter (SLACK-03C1 8 Core Read Methods)', () => {
       expect(result.provenance.nativeRevision).toBeUndefined();
     });
   });
+
+  // 19. Boundary Review Regressions
+  describe('19. Boundary Review Regressions', () => {
+    const payload = { ok: true, user: { id: 'U_ACTOR_A', name: 'actor' } };
+
+    it('rejects truthy non-boolean policy approval before transport', async () => {
+      let requests = 0;
+      const adapter = new PersonalSlackReadAdapter({
+        tokens: { getAccessToken: async () => 'xoxp-opaque-token' },
+        policy: {
+          authorizeRead: async () => ({
+            allowed: 'yes' as any,
+            policyReference: canonicalPolicyRefA,
+          }),
+        },
+        fetchFn: async () => {
+          requests++;
+          return new Response(JSON.stringify(payload));
+        },
+      });
+
+      await expect(
+        adapter.execute('myslack.users_info', { binding: bindingA, user: 'U_ACTOR_A' })
+      ).rejects.toThrow(StepError);
+      expect(requests).toBe(0);
+    });
+
+    it('prevents releasing late plaintext when caller aborts during post-response auth', async () => {
+      let calls = 0;
+      let enter!: () => void;
+      let release!: () => void;
+      const entered = new Promise<void>((r) => (enter = r));
+      const gate = new Promise<void>((r) => (release = r));
+      const controller = new AbortController();
+
+      const adapter = new PersonalSlackReadAdapter({
+        tokens: { getAccessToken: async () => 'xoxp-opaque-token' },
+        policy: {
+          authorizeRead: async () => {
+            calls++;
+            if (calls === 3) {
+              enter();
+              await gate;
+            }
+            return { allowed: true, policyReference: canonicalPolicyRefA };
+          },
+        },
+        fetchFn: async () => new Response(JSON.stringify(payload)),
+      });
+
+      const pending = adapter.execute(
+        'myslack.users_info',
+        { binding: bindingA, user: 'U_ACTOR_A' },
+        { signal: controller.signal }
+      );
+      await entered;
+      controller.abort();
+      release();
+
+      await expect(pending).rejects.toThrow(StepError);
+    });
+
+    it('never escapes opaque credentials in a hook error message, cause, or details', async () => {
+      const opaque = 'fixture_OPAQUE_CREDENTIAL_91c687';
+      const adapter = new PersonalSlackReadAdapter({
+        tokens: {
+          getAccessToken: async () => {
+            throw new Error(opaque);
+          },
+        },
+        policy: {
+          authorizeRead: async () => ({
+            allowed: true,
+            policyReference: canonicalPolicyRefA,
+          }),
+        },
+        fetchFn: async () => new Response(JSON.stringify(payload)),
+      });
+
+      let error: any;
+      try {
+        await adapter.execute('myslack.users_info', { binding: bindingA, user: 'U_ACTOR_A' });
+      } catch (e) {
+        error = e;
+      }
+
+      expect(error).toBeDefined();
+      const leaked = [error.message, error.cause?.message, JSON.stringify(error.details)]
+        .join('|')
+        .includes(opaque);
+      expect(leaked).toBe(false);
+    });
+
+    it('bounds output observations to requested limit when provider overreturns', async () => {
+      const adapter = new PersonalSlackReadAdapter({
+        tokens: { getAccessToken: async () => 'xoxp-opaque-token' },
+        policy: {
+          authorizeRead: async () => ({
+            allowed: true,
+            policyReference: canonicalPolicyRefA,
+          }),
+        },
+        fetchFn: async () =>
+          new Response(
+            JSON.stringify({
+              ok: true,
+              channels: [{ id: 'C1' }, { id: 'C2' }, { id: 'C3' }],
+              response_metadata: { next_cursor: 'cursor_123' },
+            })
+          ),
+      });
+
+      const result = await adapter.execute('myslack.conversations_list', {
+        binding: bindingA,
+        limit: 1,
+      });
+
+      expect(result.channels.length).toBe(1);
+      expect(result.channels[0].id).toBe('C1');
+    });
+
+    it('rejects truthy non-boolean provider ok flag', async () => {
+      const adapter = new PersonalSlackReadAdapter({
+        tokens: { getAccessToken: async () => 'xoxp-opaque-token' },
+        policy: {
+          authorizeRead: async () => ({
+            allowed: true,
+            policyReference: canonicalPolicyRefA,
+          }),
+        },
+        fetchFn: async () => new Response(JSON.stringify({ ...payload, ok: 'yes' })),
+      });
+
+      await expect(
+        adapter.execute('myslack.users_info', { binding: bindingA, user: 'U_ACTOR_A' })
+      ).rejects.toThrow(StepError);
+    });
+
+    it('enforces native Slack API origin and rejects arbitrary endpoints', () => {
+      expect(
+        () =>
+          new PersonalSlackReadAdapter({
+            tokens: { getAccessToken: async () => 'xoxp-token' },
+            policy: {
+              authorizeRead: async () => ({
+                allowed: true,
+                policyReference: canonicalPolicyRefA,
+              }),
+            },
+            apiBaseUrl: 'https://workspace.slack.com/unrelated/path',
+          })
+      ).toThrow(StepError);
+    });
+
+    it('prevents policy hook from mutating private acquisition reference to adopt a new epoch', async () => {
+      let calls = 0;
+      const adapter = new PersonalSlackReadAdapter({
+        tokens: { getAccessToken: async () => 'xoxp-token' },
+        policy: {
+          authorizeRead: async (input) => {
+            calls++;
+            if (calls === 3 && input.expectedPolicyReference) {
+              (input.expectedPolicyReference as any).consentRevision = '2';
+              return {
+                allowed: true,
+                policyReference: {
+                  ...canonicalPolicyRefA,
+                  consentRevision: '2',
+                },
+              };
+            }
+            return { allowed: true, policyReference: canonicalPolicyRefA };
+          },
+        },
+        fetchFn: async () => new Response(JSON.stringify(payload)),
+      });
+
+      await expect(
+        adapter.execute('myslack.users_info', { binding: bindingA, user: 'U_ACTOR_A' })
+      ).rejects.toThrow();
+    });
+
+    it('rejects provider response missing mandatory identity without fabricating undefined string', async () => {
+      const adapter = new PersonalSlackReadAdapter({
+        tokens: { getAccessToken: async () => 'xoxp-token' },
+        policy: {
+          authorizeRead: async () => ({
+            allowed: true,
+            policyReference: canonicalPolicyRefA,
+          }),
+        },
+        fetchFn: async () => new Response(JSON.stringify({ ok: true, user: { name: 'no-id' } })),
+      });
+
+      await expect(
+        adapter.execute('myslack.users_info', { binding: bindingA, user: 'U_ACTOR_A' })
+      ).rejects.toThrow(StepError);
+    });
+
+    it('rejects provider user identity mismatching requested lookup identity', async () => {
+      const adapter = new PersonalSlackReadAdapter({
+        tokens: { getAccessToken: async () => 'xoxp-token' },
+        policy: {
+          authorizeRead: async () => ({
+            allowed: true,
+            policyReference: canonicalPolicyRefA,
+          }),
+        },
+        fetchFn: async () =>
+          new Response(JSON.stringify({ ok: true, user: { id: 'U_OTHER', name: 'other' } })),
+      });
+
+      await expect(
+        adapter.execute('myslack.users_info', { binding: bindingA, user: 'U_ACTOR_A' })
+      ).rejects.toThrow(StepError);
+    });
+
+    it('rejects HTTP error status even when JSON ok flag is true', async () => {
+      const adapter = new PersonalSlackReadAdapter({
+        tokens: { getAccessToken: async () => 'xoxp-token' },
+        policy: {
+          authorizeRead: async () => ({
+            allowed: true,
+            policyReference: canonicalPolicyRefA,
+          }),
+        },
+        fetchFn: async () => new Response(JSON.stringify(payload), { status: 500 }),
+      });
+
+      await expect(
+        adapter.execute('myslack.users_info', { binding: bindingA, user: 'U_ACTOR_A' })
+      ).rejects.toThrow(StepError);
+    });
+  });
 });

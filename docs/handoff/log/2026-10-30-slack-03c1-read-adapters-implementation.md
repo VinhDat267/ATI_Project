@@ -67,25 +67,20 @@ Trước khi tiến hành thi công adapter, giao ước hooks đã được Bac
   - Mock server cục bộ (`http://127.0.0.1:<port>`) độc lập thuộc `@wap/tool-adapters` (không sửa `scripts/fake-slack-personal.mjs`).
   - Mô phỏng đa actor, đa workspace (`T_WORKSPACE_A`, `T_WORKSPACE_B`, `U_ACTOR_A`, `U_ACTOR_B`, `U_COLLEAGUE`), colliding channel IDs, private channel ACL, delay injection, 429 rate limit injection, 2MB oversize body, và 302 redirect.
 - **Tệp tạo mới:** `packages/tool-adapters/tests/slack/personal-slack-read.test.ts`:
-  - 24 kịch bản kiểm thử hành vi toàn diện theo đúng ma trận Section 5 của Task Card:
-    1. Binding validation (thiếu trường, rỗng connectionId).
-    2. Pre-fetch F1 denial (0 HTTP request).
-    3. Malformed F1 decision (thiếu 8 trường canonical, lệch binding).
-    4. Post-fetch consent revoked race (delay 50ms, drop payload, throw AUTH_ERROR).
-    5. Post-fetch provider updated / epoch mismatch.
-    6. Post-fetch regrant while active (consent revision changed).
-    7. Cross-workspace token mismatch.
-    8. Cross-workspace colliding channel isolation (`C_GENERAL` của A và B).
-    9. Native ACL: private channel & colleague denial.
-    10. `conversations.replies` message with 0 replies returns `[root_message]`.
-    11. Exact decimal timestamp preservation (`ts` & `edited.ts`).
-    12. Sanitized user profile (cấm rò rỉ email/avatar) & safe deep link regex.
-    13. `AbortSignal` cancellation trước và trong khi fetch.
-    14. 429 retry re-authorizes F1 & dừng retry ngay khi consent revoked trong backoff.
-    15. Response body exceeding 2MB limit.
-    16. Manual redirect rejection (302).
-    17. WRITE tool rejection (`myslack.chat_postMessage`).
-    18. Per-entity provenance và SHA256 digest.
+  - 34 kịch bản kiểm thử hành vi toàn diện theo Section 5 Task Card và Boundary Review Regressions.
+
+### 2.4. Khắc Phục Toàn Diện 10 Điểm Ranh Giới Từ Coordinator Boundary Review
+Sau khi Coordinator chạy bộ rà soát ranh giới độc lập `.superpowers/review-read/review.mts`, 10 điểm đã được gia cố hoàn hảo:
+1. **Kiểm tra Boolean Tuyệt Đối:** `decision.allowed === true` và `parsed.ok === true` (chặn đứng mọi giá trị truthy non-boolean như `"yes"`).
+2. **Triệt Tiêu Rò Rỉ Plaintext Khi Caller Hủy (Abort):** Nếu `signal.aborted` xảy ra trong hoặc sau await re-auth post-fetch, lập tức đặt `parsed = null` và ném `StepError('NETWORK')`.
+3. **Làm Sạch Bí Mật Hook Không Phụ Thuộc Token Regex:** Bọc try/catch quanh `tokens.getAccessToken` và `policy.authorizeRead`; ném generic `StepError('AUTH_ERROR')`, không phản chiếu chuỗi lỗi hoặc nguyên nhân chứa token tùy ý.
+4. **Giới Hạn Bounded Budget:** Cắt mảng quan sát trả về (`channels`, `messages`, `members`) về `Math.min(limit, length)` nếu provider trả về vượt quá `limit`.
+5. **Cổng Trạng Thái HTTP 2xx:** Kiểm tra `response.status < 200 || response.status >= 300` trước khi đọc `parsed.ok`, chặn đứng việc HTTP 500 trở thành thành công qua cờ JSON `ok: true`.
+6. **Kiểm Soát apiBaseUrl Chặt Chẽ:** Chỉ chấp nhận duy nhất native HTTPS `https://slack.com/api` (hoặc trailing slash) hoặc loopback `http://127.0.0.1:<port>` / `http://localhost:<port>`; từ chối tuyệt đối userinfo, query params, hash, hoặc domain khác như `workspace.slack.com/unrelated/path`.
+7. **Bảo Vệ Policy Reference Khỏi Đột Biến:** Truyền bản sao `structuredClone` đóng băng `Object.freeze` vào hook; so sánh kết quả trả về với bản sao bất biến nội bộ để phát hiện hook cố tình nhảy epoch.
+8. **Hủy Luồng & Giải Phóng Socket:** Gọi `reader.cancel()` khi stream vượt 2MB; hủy/xả body response khi gặp 429 hoặc redirect; thiết lập `AbortSignal` timeout bao trùm toàn bộ lifecycle từ trước khi gọi hook.
+9. **Bắt Buộc Định Danh Tài Nguyên Hợp Lệ:** Kiểm tra bắt buộc trường `id` của channel/user và `ts` của message; không chuyển đổi `undefined` thành chuỗi `"undefined"`.
+10. **Đối Soát Danh Tính Người Dùng/Kênh Khớp Với Yêu Cầu:** Kiểm tra `users.info` trả về đúng user requested (`user.id === params.user`), không chấp nhận ID lệch.
 
 ---
 
@@ -97,13 +92,14 @@ Tất cả các lệnh kiểm thử thực tế đã chạy trên môi trường
 |---|---|---|---|
 | Whitespace & Cú Pháp | `git diff --check` | Hoàn toàn sạch, exit code 0 | **PASS** |
 | Typecheck Toàn Hệ Thống | `npm run typecheck:v3` | 0 lỗi TypeScript ở cả `apps/chat-api` và `apps/chat-web`, exit code 0 | **PASS** |
+| Coordinator Boundary Review | `npx tsx .superpowers/review-read/review.mts` | **11/11 tests PASS (Exit code 0)** | **PASS** |
 | Package Tool-Schemas Tests | `npx vitest run packages/tool-schemas` | 15 test files, **274 tests PASS** (30 tests myslack-tools) | **PASS** |
-| Package Tool-Adapters Tests | `npx vitest run packages/tool-adapters` | 19 test files, **467 tests PASS** (24 tests personal-slack-read) | **PASS** |
+| Package Tool-Adapters Tests | `npx vitest run packages/tool-adapters` | 19 test files, **477 tests PASS** (34 tests personal-slack-read) | **PASS** |
 | Web Build & Security Check | `npm run build:v3 && node scripts/test-v3-web-build-security.mjs` | Build thành công, exclusion sentinels đạt | **PASS** |
-| Full Workspace Suite | `npm run test:v3` | 251 test files, **2,818 tests PASS** (schemas 274, adapters 467, planner 381, executor 42, API 753, Web 901) | **PASS** |
+| Full Workspace Suite | `npm run test:v3` | 251 test files, **2,818 tests PASS** (schemas 274, adapters 477, planner 381, executor 42, API 753, Web 901) | **PASS** |
 | Evaluation Tests | `npm run test:eval:v3` | 25 test files, **406 tests PASS** | **PASS** |
 | Script Unit & Launcher Tests | `node --test scripts/start-v3.test.mjs ...` | **67 tests PASS** (1 launcher + 66 Node script tests) | **PASS** |
-| **Tổng Cộng Toàn Bộ Kiểm Thử** | Tổng hợp các bộ test | **3,291 tests PASS (Exit code 0)** | **PASS** |
+| **Tổng Cộng Toàn Bộ Kiểm Thử** | Tổng hợp các bộ test | **3,301 tests PASS (Exit code 0)** | **PASS** |
 
 ---
 

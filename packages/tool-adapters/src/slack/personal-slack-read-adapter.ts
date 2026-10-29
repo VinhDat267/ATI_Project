@@ -60,17 +60,32 @@ function validateApiBaseUrl(rawBase?: string): string {
     });
   }
 
-  if (
-    url.protocol === 'https:' &&
-    (url.hostname === 'slack.com' || url.hostname.endsWith('.slack.com'))
-  ) {
-    return trimmed;
+  if (url.username || url.password || url.search || url.hash) {
+    throw new StepError({
+      message: 'apiBaseUrl must not contain credentials, query parameters, or hash fragments',
+      category: 'VALIDATION',
+      statusCode: 400,
+    });
   }
-  if (
-    url.protocol === 'http:' &&
-    (url.hostname === '127.0.0.1' || url.hostname === 'localhost')
-  ) {
-    return trimmed;
+
+  // Native Slack HTTPS URL: strictly https://slack.com/api
+  if (url.protocol === 'https:') {
+    const cleanPath = url.pathname.replace(/\/+$/, '');
+    if (url.hostname === 'slack.com' && (cleanPath === '/api' || cleanPath === '')) {
+      return 'https://slack.com/api';
+    }
+    throw new StepError({
+      message: `Unsafe or disallowed apiBaseUrl: "${rawBase}". Native Slack API must be https://slack.com/api`,
+      category: 'VALIDATION',
+      statusCode: 400,
+    });
+  }
+
+  // Local loopback for tests / mock fixture: http://127.0.0.1[:port] or http://localhost[:port]
+  if (url.protocol === 'http:') {
+    if (url.hostname === '127.0.0.1' || url.hostname === 'localhost') {
+      return trimmed;
+    }
   }
 
   throw new StepError({
@@ -83,6 +98,9 @@ function validateApiBaseUrl(rawBase?: string): string {
 async function readResponseBodyBounded(response: Response, maxBytes = MAX_BODY_BYTES): Promise<string> {
   const contentLength = response.headers.get('content-length');
   if (contentLength && Number(contentLength) > maxBytes) {
+    if (response.body && typeof response.body.cancel === 'function') {
+      await response.body.cancel().catch(() => {});
+    }
     throw new StepError({
       message: `Response body exceeded 2MB limit (Content-Length: ${contentLength})`,
       category: 'SERVER_ERROR',
@@ -101,6 +119,7 @@ async function readResponseBodyBounded(response: Response, maxBytes = MAX_BODY_B
         if (value) {
           totalBytes += value.byteLength;
           if (totalBytes > maxBytes) {
+            await reader.cancel().catch(() => {});
             throw new StepError({
               message: `Response stream exceeded 2MB limit (${totalBytes} bytes)`,
               category: 'SERVER_ERROR',
@@ -261,18 +280,45 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
   private async verifyPolicy(
     binding: SlackBinding,
     purpose: SlackReadPurpose,
-    expectedRef?: SlackPolicyReference
+    expectedRef?: SlackPolicyReference,
+    signal?: AbortSignal
   ): Promise<SlackPolicyReference> {
+    if (signal?.aborted) {
+      throw new StepError({
+        message: 'Slack read aborted before policy verification',
+        category: 'NETWORK',
+        cause: signal.reason,
+      });
+    }
+
+    const clonedExpected = expectedRef ? Object.freeze(structuredClone(expectedRef)) : undefined;
     const input: SlackAuthorizeReadInput = {
-      binding,
+      binding: Object.freeze(structuredClone(binding)),
       purpose,
       requestedRetentionDays: 0,
-      ...(expectedRef ? { expectedPolicyReference: expectedRef } : {}),
+      ...(clonedExpected ? { expectedPolicyReference: clonedExpected } : {}),
     };
 
-    const decision = await this.policy.authorizeRead(input);
+    let decision: any;
+    try {
+      decision = await this.policy.authorizeRead(input);
+    } catch (policyErr: any) {
+      throw new StepError({
+        message: 'Slack read policy hook threw an error during authorization',
+        category: 'AUTH_ERROR',
+        statusCode: 403,
+      });
+    }
 
-    if (!decision || typeof decision !== 'object' || !decision.allowed) {
+    if (signal?.aborted) {
+      throw new StepError({
+        message: 'Slack read aborted during policy verification',
+        category: 'NETWORK',
+        cause: signal.reason,
+      });
+    }
+
+    if (!decision || typeof decision !== 'object' || decision.allowed !== true) {
       const reason = (decision as any)?.reason ?? 'policy_denied';
       throw new StepError({
         message: `Slack read policy authorization denied: ${reason}`,
@@ -289,7 +335,6 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
         message: `Malformed or invalid policy reference returned by read policy hook: ${valErr?.message || String(valErr)}`,
         category: 'AUTH_ERROR',
         statusCode: 403,
-        cause: valErr,
       });
     }
 
@@ -325,7 +370,7 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
     }
 
     if (expectedRef) {
-      // Re-auth comparison: verify all epoch components match exactly
+      // Re-auth comparison: verify all epoch components match exactly against internal immutable snapshot
       if (
         validatedRef.providerProfileId !== expectedRef.providerProfileId ||
         validatedRef.configFingerprint !== expectedRef.configFingerprint ||
@@ -341,7 +386,7 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
       }
     }
 
-    return validatedRef;
+    return Object.freeze(structuredClone(validatedRef));
   }
 
   private async requestSlackGet(
@@ -359,19 +404,43 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
       });
     }
 
-    // Pre-fetch Phase 1 F1 authorization
-    const prefetchPolicyRef = await this.verifyPolicy(binding, purpose);
+    // Setup combined timeout and caller signal covering the ENTIRE operation
+    const timeoutSignal = AbortSignal.timeout(this.requestTimeoutMs);
+    const combinedSignal = parentSignal
+      ? AbortSignal.any([parentSignal, timeoutSignal])
+      : timeoutSignal;
 
-    if (parentSignal?.aborted) {
+    if (combinedSignal.aborted) {
+      throw new StepError({
+        message: 'Slack read aborted before policy verification',
+        category: 'NETWORK',
+        cause: parentSignal?.reason ?? combinedSignal.reason,
+      });
+    }
+
+    // Pre-fetch Phase 1 F1 authorization
+    const prefetchPolicyRef = await this.verifyPolicy(binding, purpose, undefined, combinedSignal);
+
+    if (combinedSignal.aborted) {
       throw new StepError({
         message: 'Slack read aborted after policy verification',
         category: 'NETWORK',
-        cause: parentSignal.reason,
+        cause: parentSignal?.reason ?? combinedSignal.reason,
       });
     }
 
     // Token acquisition from private backend wrapper
-    const token = await this.tokens.getAccessToken(binding);
+    let token: string;
+    try {
+      token = await this.tokens.getAccessToken(binding);
+    } catch (tokErr: any) {
+      throw new StepError({
+        message: 'Failed to acquire access token from token provider',
+        category: 'AUTH_ERROR',
+        statusCode: 401,
+      });
+    }
+
     if (!token || typeof token !== 'string') {
       throw new StepError({
         message: 'Slack token provider returned invalid or empty token',
@@ -380,22 +449,18 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
       });
     }
 
-    if (parentSignal?.aborted) {
+    if (combinedSignal.aborted) {
       throw new StepError({
         message: 'Slack read aborted after token acquisition',
         category: 'NETWORK',
-        cause: parentSignal.reason,
+        cause: parentSignal?.reason ?? combinedSignal.reason,
       });
     }
 
-    // Setup combined timeout and caller signal
-    const timeoutSignal = AbortSignal.timeout(this.requestTimeoutMs);
-    const combinedSignal = parentSignal
-      ? AbortSignal.any([parentSignal, timeoutSignal])
-      : timeoutSignal;
-
     // Build URL with query parameters
-    const url = new URL(this.apiBase + (endpoint.startsWith('/') ? endpoint : `/${endpoint}`));
+    const cleanBase = this.apiBase.endsWith('/') ? this.apiBase.slice(0, -1) : this.apiBase;
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
+    const url = new URL(`${cleanBase}/${cleanEndpoint}`);
     for (const [key, val] of Object.entries(queryParams)) {
       if (val !== undefined && val !== null && val !== '') {
         url.searchParams.set(key, String(val));
@@ -412,18 +477,18 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
         throw new StepError({
           message: 'Slack read aborted before HTTP dispatch',
           category: 'NETWORK',
-          cause: combinedSignal.reason,
+          cause: parentSignal?.reason ?? combinedSignal.reason,
         });
       }
 
       // Re-authorize with expectedRef before EACH outbound attempt (initial and retries)
-      await this.verifyPolicy(binding, purpose, prefetchPolicyRef);
+      await this.verifyPolicy(binding, purpose, prefetchPolicyRef, combinedSignal);
 
       if (combinedSignal.aborted) {
         throw new StepError({
           message: 'Slack read aborted after retry authorization',
           category: 'NETWORK',
-          cause: combinedSignal.reason,
+          cause: parentSignal?.reason ?? combinedSignal.reason,
         });
       }
 
@@ -443,18 +508,23 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
           throw new StepError({
             message: 'Slack HTTP request aborted',
             category: 'NETWORK',
-            cause: combinedSignal.reason,
+            cause: parentSignal?.reason ?? combinedSignal.reason,
           });
         }
+        const cleanMsg = typeof fetchErr?.message === 'string'
+          ? sanitizeTokens(fetchErr.message.replaceAll(token, '[REDACTED]'))
+          : 'failed to fetch';
         throw new StepError({
-          message: `Slack network error: ${fetchErr?.message || 'failed to fetch'}`,
+          message: `Slack network error: ${cleanMsg}`,
           category: 'NETWORK',
-          cause: fetchErr,
         });
       }
 
-      // Reject redirects immediately
+      // Reject redirects immediately and cancel unneeded response body
       if (response.status >= 300 && response.status < 400) {
+        if (response.body && typeof response.body.cancel === 'function') {
+          await response.body.cancel().catch(() => {});
+        }
         throw new StepError({
           message: `Slack API returned unexpected redirect (${response.status}); redirects are rejected for security`,
           category: 'AUTH_ERROR',
@@ -464,6 +534,9 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
 
       // Handle 429 Rate Limiting
       if (response.status === 429) {
+        if (response.body && typeof response.body.cancel === 'function') {
+          await response.body.cancel().catch(() => {});
+        }
         if (attempt >= maxAttempts) {
           throw new StepError({
             message: 'Slack API rate limit exceeded (429) after max retries',
@@ -480,7 +553,7 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
           throw new StepError({
             message: 'Slack rate limit backoff wait aborted',
             category: 'NETWORK',
-            cause: waitErr,
+            cause: parentSignal?.reason ?? combinedSignal.reason,
           });
         }
         continue;
@@ -501,19 +574,35 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
         });
       }
 
-      // Handle provider application errors
-      if (!parsed.ok) {
-        const slackErr = parsed.error || 'unknown_slack_error';
+      // Non-2xx HTTP status check: HTTP errors cannot become success through a JSON ok flag!
+      if (response.status < 200 || response.status >= 300) {
+        const errorMsg = (parsed && typeof parsed.error === 'string') ? parsed.error : `http_error_${response.status}`;
+        this.mapSlackError(errorMsg, response.status);
+      }
+
+      // Strict boolean check on provider ok flag: truthy non-boolean cannot become success!
+      if (parsed.ok !== true) {
+        const slackErr = typeof parsed.error === 'string' ? parsed.error : 'slack_api_error';
         this.mapSlackError(slackErr, response.status);
       }
 
       // Post-fetch Phase 2 F1 Re-Authorization
       try {
-        await this.verifyPolicy(binding, purpose, prefetchPolicyRef);
+        await this.verifyPolicy(binding, purpose, prefetchPolicyRef, combinedSignal);
       } catch (postAuthErr) {
         // DROP payload immediately, do not release plaintext
         parsed = null;
         throw postAuthErr;
+      }
+
+      // Check abort signal during/after post-response authorization
+      if (combinedSignal.aborted || parentSignal?.aborted) {
+        parsed = null;
+        throw new StepError({
+          message: 'Slack read aborted during or after post-response authorization',
+          category: 'NETWORK',
+          cause: parentSignal?.reason ?? combinedSignal.reason,
+        });
       }
 
       return { data: parsed, policyRef: prefetchPolicyRef };
@@ -579,20 +668,23 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
     }
     if (err instanceof StepError) {
       const cleanMessage = sanitizeTokens(err.message);
+      const cleanCause =
+        err.cause instanceof Error
+          ? new Error(sanitizeTokens(err.cause.message))
+          : undefined;
       throw new StepError({
         message: cleanMessage,
         category: err.category,
         statusCode: err.statusCode,
         retryable: err.retryable,
         details: err.details ? JSON.parse(sanitizeTokens(JSON.stringify(err.details))) : undefined,
-        cause: err.cause instanceof Error ? new Error(sanitizeTokens(err.cause.message)) : err.cause,
+        cause: cleanCause,
       });
     }
     if (err instanceof Error) {
       throw new StepError({
         message: sanitizeTokens(err.message),
         category: err.name === 'AbortError' ? 'NETWORK' : 'UNKNOWN',
-        cause: err,
       });
     }
     throw new StepError({
@@ -623,11 +715,23 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
     );
 
     const now = new Date().toISOString();
-    const rawChannels = Array.isArray(data.channels) ? data.channels : [];
+    const requestedLimit = params.limit !== undefined ? Number(params.limit) : undefined;
+    let rawChannels = Array.isArray(data.channels) ? data.channels : [];
+    if (requestedLimit !== undefined && requestedLimit > 0 && rawChannels.length > requestedLimit) {
+      rawChannels = rawChannels.slice(0, requestedLimit);
+    }
 
     const channels: SlackConversationSummary[] = rawChannels.map((c: any) => {
+      if (!c || typeof c !== 'object' || !c.id || typeof c.id !== 'string') {
+        throw new StepError({
+          message: 'Slack API returned channel item missing mandatory id',
+          category: 'SERVER_ERROR',
+          statusCode: 502,
+        });
+      }
+
       const cleanSummary: Record<string, unknown> = {
-        id: String(c.id),
+        id: c.id,
         name: typeof c.name === 'string' ? c.name : undefined,
         is_channel: typeof c.is_channel === 'boolean' ? c.is_channel : undefined,
         is_group: typeof c.is_group === 'boolean' ? c.is_group : undefined,
@@ -649,7 +753,7 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
 
       const identity: SlackResourceIdentity = {
         type: 'conversation',
-        channelId: String(c.id),
+        channelId: c.id,
       };
 
       const provenance: SlackObservationProvenance = {
@@ -663,7 +767,7 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
 
       return {
         ...cleanSummary,
-        id: String(c.id),
+        id: c.id,
         provenance,
       };
     });
@@ -710,11 +814,27 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
       signal
     );
 
-    const c = data.channel || {};
+    const c = data.channel;
+    if (!c || typeof c !== 'object' || !c.id || typeof c.id !== 'string') {
+      throw new StepError({
+        message: 'Slack API response missing mandatory channel object or id',
+        category: 'SERVER_ERROR',
+        statusCode: 502,
+      });
+    }
+
+    if (String(c.id) !== String(params.channel)) {
+      throw new StepError({
+        message: `Provider returned channel identity "${c.id}" does not match requested "${params.channel}"`,
+        category: 'NOT_FOUND',
+        statusCode: 404,
+      });
+    }
+
     const now = new Date().toISOString();
 
     const cleanDetail: Record<string, unknown> = {
-      id: String(c.id),
+      id: c.id,
       name: typeof c.name === 'string' ? c.name : undefined,
       is_channel: typeof c.is_channel === 'boolean' ? c.is_channel : undefined,
       is_group: typeof c.is_group === 'boolean' ? c.is_group : undefined,
@@ -751,7 +871,7 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
 
     const identity: SlackResourceIdentity = {
       type: 'conversation',
-      channelId: String(c.id),
+      channelId: c.id,
     };
 
     const provenance: SlackObservationProvenance = {
@@ -765,7 +885,7 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
 
     const channel: SlackConversationDetail = {
       ...cleanDetail,
-      id: String(c.id),
+      id: c.id,
       provenance,
     };
 
@@ -798,9 +918,20 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
     );
 
     const now = new Date().toISOString();
-    const rawMessages = Array.isArray(data.messages) ? data.messages : [];
+    const requestedLimit = params.limit !== undefined ? Number(params.limit) : undefined;
+    let rawMessages = Array.isArray(data.messages) ? data.messages : [];
+    if (requestedLimit !== undefined && requestedLimit > 0 && rawMessages.length > requestedLimit) {
+      rawMessages = rawMessages.slice(0, requestedLimit);
+    }
 
     const messages: SlackMessageObservation[] = rawMessages.map((m: any) => {
+      if (!m || typeof m !== 'object' || !m.ts) {
+        throw new StepError({
+          message: 'Slack API returned message item missing mandatory timestamp (ts)',
+          category: 'SERVER_ERROR',
+          statusCode: 502,
+        });
+      }
       const ts = String(m.ts);
       const editedTs = m.edited?.ts ? String(m.edited.ts) : undefined;
       const nativeRevision = editedTs || ts;
@@ -894,9 +1025,20 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
     );
 
     const now = new Date().toISOString();
-    const rawMessages = Array.isArray(data.messages) ? data.messages : [];
+    const requestedLimit = params.limit !== undefined ? Number(params.limit) : undefined;
+    let rawMessages = Array.isArray(data.messages) ? data.messages : [];
+    if (requestedLimit !== undefined && requestedLimit > 0 && rawMessages.length > requestedLimit) {
+      rawMessages = rawMessages.slice(0, requestedLimit);
+    }
 
     const messages: SlackMessageObservation[] = rawMessages.map((m: any) => {
+      if (!m || typeof m !== 'object' || !m.ts) {
+        throw new StepError({
+          message: 'Slack API returned reply message item missing mandatory timestamp (ts)',
+          category: 'SERVER_ERROR',
+          statusCode: 502,
+        });
+      }
       const ts = String(m.ts);
       const editedTs = m.edited?.ts ? String(m.edited.ts) : undefined;
       const nativeRevision = editedTs || ts;
@@ -987,8 +1129,22 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
     );
 
     const now = new Date().toISOString();
-    const rawMembers = Array.isArray(data.members) ? data.members : [];
-    const members: string[] = rawMembers.map((m: any) => String(m));
+    const requestedLimit = params.limit !== undefined ? Number(params.limit) : undefined;
+    let rawMembers = Array.isArray(data.members) ? data.members : [];
+    if (requestedLimit !== undefined && requestedLimit > 0 && rawMembers.length > requestedLimit) {
+      rawMembers = rawMembers.slice(0, requestedLimit);
+    }
+
+    const members: string[] = rawMembers.map((m: any) => {
+      if (typeof m !== 'string' && typeof m !== 'number') {
+        throw new StepError({
+          message: 'Slack API returned invalid member item in conversations.members',
+          category: 'SERVER_ERROR',
+          statusCode: 502,
+        });
+      }
+      return String(m);
+    });
 
     const nextCursor = data.response_metadata?.next_cursor || undefined;
     const hasMore = Boolean(data.has_more ?? nextCursor);
@@ -1034,12 +1190,24 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
     );
 
     const now = new Date().toISOString();
-    const rawMembers = Array.isArray(data.members) ? data.members : [];
+    const requestedLimit = params.limit !== undefined ? Number(params.limit) : undefined;
+    let rawMembers = Array.isArray(data.members) ? data.members : [];
+    if (requestedLimit !== undefined && requestedLimit > 0 && rawMembers.length > requestedLimit) {
+      rawMembers = rawMembers.slice(0, requestedLimit);
+    }
 
     // Strip profile, email, avatar, credentials! Only keep public metadata
     const members: SlackUserSummary[] = rawMembers.map((u: any) => {
+      if (!u || typeof u !== 'object' || !u.id || typeof u.id !== 'string') {
+        throw new StepError({
+          message: 'Slack API returned user item missing mandatory id',
+          category: 'SERVER_ERROR',
+          statusCode: 502,
+        });
+      }
+
       const cleanUser: Record<string, unknown> = {
-        id: String(u.id),
+        id: u.id,
         team_id: typeof u.team_id === 'string' ? u.team_id : undefined,
         name: typeof u.name === 'string' ? u.name : undefined,
         deleted: typeof u.deleted === 'boolean' ? u.deleted : undefined,
@@ -1055,7 +1223,7 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
 
       const identity: SlackResourceIdentity = {
         type: 'user',
-        userId: String(u.id),
+        userId: u.id,
       };
 
       const provenance: SlackObservationProvenance = {
@@ -1069,7 +1237,7 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
 
       return {
         ...cleanUser,
-        id: String(u.id),
+        id: u.id,
         provenance,
       };
     });
@@ -1115,12 +1283,28 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
       signal
     );
 
-    const u = data.user || {};
+    const u = data.user;
+    if (!u || typeof u !== 'object' || !u.id || typeof u.id !== 'string') {
+      throw new StepError({
+        message: 'Slack API response missing mandatory user identity (id)',
+        category: 'SERVER_ERROR',
+        statusCode: 502,
+      });
+    }
+
+    if (String(u.id) !== String(params.user)) {
+      throw new StepError({
+        message: `Provider returned user identity "${u.id}" does not match requested "${params.user}"`,
+        category: 'NOT_FOUND',
+        statusCode: 404,
+      });
+    }
+
     const now = new Date().toISOString();
 
     // Whitelist clean fields, strip profile/credentials
     const cleanUser: Record<string, unknown> = {
-      id: String(u.id),
+      id: u.id,
       team_id: typeof u.team_id === 'string' ? u.team_id : undefined,
       name: typeof u.name === 'string' ? u.name : undefined,
       deleted: typeof u.deleted === 'boolean' ? u.deleted : undefined,
@@ -1136,7 +1320,7 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
 
     const identity: SlackResourceIdentity = {
       type: 'user',
-      userId: String(u.id),
+      userId: u.id,
     };
 
     const provenance: SlackObservationProvenance = {
@@ -1150,7 +1334,7 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
 
     const user: SlackUserDetail = {
       ...cleanUser,
-      id: String(u.id),
+      id: u.id,
       provenance,
     };
 
@@ -1178,12 +1362,20 @@ export class PersonalSlackReadAdapter extends BaseAdapter {
       signal
     );
 
-    const permalink = String(data.permalink || '');
-    if (!SAFE_PERMALINK_REGEX.test(permalink)) {
+    const permalink = typeof data.permalink === 'string' ? data.permalink : '';
+    if (!permalink || !SAFE_PERMALINK_REGEX.test(permalink)) {
       throw new StepError({
         message: `Slack API returned invalid or unsafe permalink format: "${permalink}"`,
         category: 'SERVER_ERROR',
         statusCode: 502,
+      });
+    }
+
+    if (data.channel && String(data.channel) !== String(params.channel)) {
+      throw new StepError({
+        message: `Provider returned permalink channel "${data.channel}" does not match requested "${params.channel}"`,
+        category: 'NOT_FOUND',
+        statusCode: 404,
       });
     }
 
