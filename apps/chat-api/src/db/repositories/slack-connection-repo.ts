@@ -5,6 +5,7 @@ export interface SlackConnectionRow {
   id: string; user_id: string; app_id: string; workspace_id: string; workspace_name: string; actor_id: string;
   identity_version: number; status: 'active' | 'reconnect_required' | 'disconnected'; config: string | null;
   scopes: string[]; refresh_in_flight: boolean; connected_at: Date;
+  last_state_order?: string | number;
 }
 interface SaveInput { appId: string; workspaceId: string; workspaceName: string; actorId: string; config: string; scopes: string[] }
 /** Owner lock survives committed refresh checkpoints, also across Node processes. */
@@ -45,17 +46,20 @@ export class SlackConnectionRepo {
       await c.query('BEGIN');
       try {
         await c.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [userId]);
-        const state = (await c.query<{ expires_at: Date; state_expires: Date; status: string }>(`SELECT s.expires_at,o.expires_at AS state_expires,u.status FROM slack_oauth_states o
+        const state = (await c.query<{ expires_at: Date; state_expires: Date; status: string; order_seq: string }>(`SELECT s.expires_at,o.expires_at AS state_expires,o.order_seq,u.status FROM slack_oauth_states o
           JOIN auth_sessions s ON s.id=o.session_id AND s.user_id=o.user_id JOIN users u ON u.id=o.user_id
           WHERE o.id=$1 AND o.user_id=$2 AND o.used_at IS NOT NULL AND s.revoked_at IS NULL FOR UPDATE OF s`, [stateId, userId])).rows[0];
         const now = clock();
         if (!state || state.status !== 'active' || state.expires_at.getTime() <= now || state.state_expires.getTime() <= now) { await c.query('ROLLBACK'); return null; }
-        const result = await c.query<SlackConnectionRow>(`INSERT INTO slack_connections(user_id,app_id,workspace_id,workspace_name,actor_id,config,scopes,connected_at)
-          VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(user_id,app_id,workspace_id) DO UPDATE SET
+        const result = await c.query<SlackConnectionRow>(`INSERT INTO slack_connections(user_id,app_id,workspace_id,workspace_name,actor_id,config,scopes,connected_at,last_state_order)
+          VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(user_id,app_id,workspace_id) DO UPDATE SET
           workspace_name=excluded.workspace_name,actor_id=excluded.actor_id,config=excluded.config,scopes=excluded.scopes,
-          status='active',identity_version=slack_connections.identity_version+1,refresh_in_flight=false,connected_at=excluded.connected_at RETURNING *`,
-          [userId, input.appId, input.workspaceId, input.workspaceName, input.actorId, input.config, input.scopes, new Date(now)]);
-        await c.query('DELETE FROM slack_oauth_states WHERE user_id=$1', [userId]);
+          status='active',identity_version=slack_connections.identity_version+1,refresh_in_flight=false,connected_at=excluded.connected_at,
+          last_state_order=excluded.last_state_order
+          WHERE excluded.last_state_order > slack_connections.last_state_order RETURNING *`,
+          [userId, input.appId, input.workspaceId, input.workspaceName, input.actorId, input.config, input.scopes, new Date(now), state.order_seq]);
+        if (!result.rows[0]) { await c.query('ROLLBACK'); return null; }
+        await c.query('DELETE FROM slack_oauth_states WHERE id=$1 AND user_id=$2', [stateId, userId]);
         await c.query('COMMIT'); return result.rows[0]!;
       } catch (e) { await c.query('ROLLBACK'); if ((e as any).code === '23505') throw new Error('SLACK_IDENTITY_CONFLICT'); throw e; }
     });
