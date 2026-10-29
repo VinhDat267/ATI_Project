@@ -52,17 +52,20 @@ Tái sử dụng và mở rộng trực tiếp policy engine hiện hữu thay v
    - `policyVersion: string;`
    - `consentRevision: string;` (chuỗi số thập phân dương chuẩn tắc `/^[1-9][0-9]*$/`, e.g. "12")
    - `providerRevision: string;` (chuỗi số thập phân dương chuẩn tắc `/^[1-9][0-9]*$/`)
-3. `validateSlackPolicyReference(input: unknown): SlackPolicyReference`: Bác bỏ số 0, số có số 0 ở đầu ("0", "01"), chữ hoặc chuỗi rỗng.
+3. `validateSlackPolicyReference(input: unknown): SlackPolicyReference`: Bác bỏ number, bigint, số 0, số có số 0 ở đầu ("0", "01"), chữ hoặc chuỗi rỗng.
 4. `interface SlackSourceStorageRequest`:
    - `binding: SlackBinding;`
    - `policyRef: SlackPolicyReference;`
    - `requestedRetentionDays: number;`
 5. `decideSlackSourceStorage(policy: SlackModelPolicy, request: SlackSourceStorageRequest)`:
-   - Tái sử dụng `SlackModelPolicy` hiện hữu.
+   - Ủy quyền (delegate/reuse) trực tiếp cho `decideSlackModelUse` để tái sử dụng toàn bộ baseline authorization gates.
    - Kiểm tra `sameSlackBinding(request.binding, request.policyRef.binding)`.
-   - Nếu `request.requestedRetentionDays <= 0` hoặc `policy.consent.retentionDays <= 0` -> `{ allowed: false, reason: 'retention_zero_denied' }`.
-   - Nếu `request.policyRef.purpose !== 'storage'` -> `{ allowed: false, reason: 'purpose_mismatch' }`.
+   - Kiểm tra khớp `providerProfileId` và `policyVersion` giữa `policyRef` và `policy`.
+   - Kiểm tra `request.policyRef.purpose === 'storage'`.
+   - Nếu `request.requestedRetentionDays <= 0` hoặc `policy.consent.retentionDays <= 0` hoặc `request.policyRef.requestedRetentionDays <= 0` -> `{ allowed: false, reason: 'retention_zero_denied' }`.
+   - Kiểm tra `request.requestedRetentionDays` là positive safe integer, bị chặn bởi `request.policyRef.requestedRetentionDays`, `policy.consent.retentionDays`, và `policy.provider.maxRetentionDays`.
    - Hợp lệ -> `{ allowed: true, maxRetentionDays: number }`.
+   - Lưu ý: Backend runtime bắt buộc revalidate persisted consent/provider revisions và current connection/ACL tại mỗi lần sử dụng; schemas thuần không tự chứng minh được DB freshness.
 
 ### 2.3. File Tạo Mới: `packages/tool-schemas/src/myslack-source.ts`
 Chứa các định nghĩa và hàm xác thực vòng đời dữ liệu nguồn (F1, F2, F3):

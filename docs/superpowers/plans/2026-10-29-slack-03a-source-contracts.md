@@ -1,238 +1,484 @@
-# SLACK-03A · Hợp đồng Interface Nguồn, ACL, Vòng đời & Siêu Dữ Liệu Công Cụ (@wap/tool-schemas)
+# SLACK-03A Implementation Plan — Source Lineage, ACL & Tool Metadata Contracts
 
-**Trạng thái:** DỰ THẢO KẾ HOẠCH (Chờ Reviewer & Nhóm trưởng duyệt; chưa thực thi code).
-**Nhánh công việc:** `VinhDat267/docs-slack-03a-source` · **Nền:** `b757ae0` (từ `integration/slack-personal-20261029`).
-**Vai trò sở hữu:** Integration / AI Engineer (chỉ sở hữu thư mục `packages/tool-schemas/`).
-**Phụ thuộc:**
-- **SLACK-01** (`myslack-context.ts`, `myslack-policy.ts`, fixture HTTP, probe offline) — ĐÃ HOÀN TẤT.
-- **SLACK-02A** (`myslack-connection.ts` tại `6871087`) — ĐÃ HOÀN TẤT.
-- **SLACK-02R** (Sửa cô lập callback tại PR #190) — ĐÃ CHẤP THUẬN.
-- **Cổng Phụ thuộc Backend 02B (Prerequisite Review Gate):** PR #192 (`19e4e39c`) đang được blocking review (hoàn thiện `returnTo` và policy revision matching). Tầng schema 03A tiến hành độc lập để chuẩn hóa giao ước; các tầng tiêu thụ Backend (03B) và Adapter (03C) **bắt buộc có giao diện 02B được chấp thuận (accepted interfaces) và staging base đã được review** (cho phép xếp chồng nhánh đã review, không ép buộc phải merge main ngay).
-**Task cha:** [SLACK-03-tool-catalog-and-source-lifecycle](SLACK-03-tool-catalog-and-source-lifecycle.md).
-**Kế hoạch chi tiết:** [`docs/superpowers/plans/2026-10-29-slack-03a-source-contracts.md`](../../superpowers/plans/2026-10-29-slack-03a-source-contracts.md).
-**Sổ cái kiểm kê 354 methods:** [`docs/superpowers/plans/slack-354-method-ledger.json`](../../superpowers/plans/slack-354-method-ledger.json) (sourceCommit `811f5dc9121d372f232efb63d9880d9574648e3a`, SHA256 `e55bc180eb43c71c1131dbded5968c1e240d3424fe1314bf604139055c074f09`).
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Xây dựng hệ thống hợp đồng TypeScript thuần và các hàm kiểm thực runtime (validation) chuẩn tắc cho vòng đời dữ liệu nguồn (F3), kiểm soát truy cập ACL/tombstone/purge có phân định 5 tagged scopes tường minh, liên kết định danh phức hợp bất biến không chứa chứng chỉ (F2), tham chiếu chính sách xử lý F1 (`SlackPolicyReference`) với mục đích chuẩn tắc và số thứ tự tăng dần chuẩn tắc, siêu dữ liệu nguồn bounded whitelisted, và siêu dữ liệu công cụ theo phương thức có schema fail-closed trên nền kiểm kê 354 methods (PR 185) trong `@wap/tool-schemas`, trước khi bất kỳ module tiêu thụ nào (Backend 03B, Adapter 03C) được thi công.
+
+**Architecture:** Áp dụng Domain-Driven Design (DDD) và Deep Modules để thiết lập ranh giới giao tiếp bất biến giữa các module. Tầng hợp đồng schema thuần (`packages/tool-schemas`) sở hữu toàn bộ types, DTOs, và runtime validators trả về đối tượng đã được whitelist/tách rời (detached copies). Không import cơ sở dữ liệu nội bộ hay token mã hóa; phân định tuyệt đối giữa hợp đồng (schemas are contracts) và quyền thực thi (not authority grants); mở rộng và tái sử dụng trực tiếp `myslack-policy.ts` thay vì tạo engine chính sách thứ hai; cô lập danh mục công cụ cá nhân khỏi `ALL_TOOLS` toàn cục.
+
+**Tech Stack:** TypeScript 5.6+, Node.js `^22.12.0 || >=24.0.0`, Vitest 4.1.11, `@wap/tool-schemas`.
+
+**Spec:** [Slack cá nhân và trợ lý công việc trong ATI](../specs/2026-10-28-slack-personal-oauth-design.md), bản duyệt `d479b098` (Mục 2, 4.4, 4.5, 8, 9.1).
 
 ---
 
-## 1. Mục tiêu và Phạm vi Nghiệp vụ
+## Global Constraints
 
-Xây dựng hệ thống hợp đồng giao diện TypeScript và các hàm kiểm thực runtime (validation) chuẩn tắc cho vòng đời dữ liệu nguồn (F3), kiểm soát truy cập ACL/tombstone/purge có phân định 5 tagged scopes tường minh, liên kết định danh phức hợp bất biến không chứa chứng chỉ (F2), tham chiếu chính sách xử lý F1 (`SlackPolicyReference`) với mục đích chuẩn tắc và số thứ tự tăng dần chuẩn tắc, siêu dữ liệu nguồn bounded whitelisted, và siêu dữ liệu công cụ theo phương thức có schema fail-closed trên nền kiểm kê 354 methods (PR 185) trong `@wap/tool-schemas`, trước khi bất kỳ module tiêu thụ nào (Backend 03B, Adapter 03C) được thi công.
-
-### Ranh giới nghiêm ngặt:
-1. **Module Ownership:** Chỉ tạo và chỉnh sửa file trong `packages/tool-schemas/`. Tuyệt đối không sửa đổi `apps/`, `packages/tool-adapters/`, `packages/executor/`, `packages/planner/` hoặc `db/v3/`.
-2. **Không có Generic Dispatcher:** Nghiêm cấm công cụ gọi tuỳ ý `myslack.call(method, args)` hoặc blanket all-API dispatcher. Mọi tool đều phải có typed schema tham số cố định kiểm tra fail-closed, rủi ro, sideEffect và user scopes cụ thể đối chiếu từ inventory.
-3. **Bề mặt công cụ đợt đầu giới hạn (Bounded Core Surface):** 03A chỉ định nghĩa hợp đồng metadata và schema; bề mặt công cụ thi công thực tế đầu tiên sẽ nằm ở 03C (nhóm cốt lõi `conversations`, `chat`, `users`), không đưa toàn bộ 253 method vào một PR.
-4. **Cô lập Danh mục Toàn cục:** Tuyệt đối không đăng ký `myslack.*` vào `ALL_TOOLS`, `TOOL_MAP` hay `SERVICE_REGISTRY` trong 03A.
-5. **Cách ly Chứng chỉ Tuyệt đối:** Không import cơ sở dữ liệu nội bộ hay token mã hóa; các hàm validator luôn trả về đối tượng tách rời (detached whitelisted copy).
-6. **Schemas are Contracts, Not Authority Grants:** Có schema công cụ không đồng nghĩa với quyền thực thi; mọi hành động đều phải qua cổng kiểm tra chính sách và consent của server.
-
----
-
-## 2. Chi Tiết File và Interface Cần Tạo & Chỉnh Sửa
-
-### 2.1. File Chỉnh Sửa: `packages/tool-schemas/src/myslack-context.ts`
-Kế thừa và mở rộng tương thích các hợp đồng nền móng từ SLACK-01 (không tạo shadow duplicate):
-1. `type SlackResourceType = 'conversation' | 'message' | 'file' | 'canvas' | 'list' | 'list_item' | 'bookmark' | 'reminder' | 'user' | 'usergroup' | 'subteam';`
-2. Cập nhật `SlackSourceRef` sử dụng `SlackResourceType`.
-3. `validateSlackSourceRef(input: unknown): SlackSourceRef`: Kiểm thực own property, không rỗng, trả về detached copy, tước bỏ thuộc tính thừa.
-4. `formatSlackGlobalResourceKey(workspaceId: string, resourceType: SlackResourceType, resourceId: string): string`: Trả về chuỗi JSON tuple `[workspaceId, resourceType, resourceId]` định danh tài nguyên vật lý chung, ngăn delimiter ambiguity.
-5. `formatSlackOwnerSourceKey(ref: SlackSourceRef): string`: Trả về chuỗi JSON tuple mang đầy đủ binding và tài nguyên:
-   `[ref.binding.atiUserId, ref.binding.connectionId, ref.binding.workspaceId, ref.binding.slackUserId, ref.binding.identityVersion, ref.resourceType, ref.resourceId, ref.revision]`.
-   Bảo đảm 2 người dùng ATI khác nhau cùng xem một tin nhắn trong cùng một workspace có 2 khoá nguồn riêng biệt!
-
-### 2.2. File Chỉnh Sửa: `packages/tool-schemas/src/myslack-policy.ts`
-Tái sử dụng và mở rộng trực tiếp policy engine hiện hữu thay vì tạo engine song song:
-1. `type SlackPolicyPurpose = 'manual_lookup' | 'triage' | 'planning' | 'digest' | 'storage';` (5 mục đích chuẩn tắc đã thống nhất với Backend 02B).
-2. `interface SlackPolicyReference`: Tham chiếu chính sách xử lý bền vững (thỏa thuận với Backend):
-   - `binding: SlackBinding;`
-   - `purpose: SlackPolicyPurpose;`
-   - `requestedRetentionDays: number;`
-   - `providerProfileId: string;`
-   - `configFingerprint: string;`
-   - `policyVersion: string;`
-   - `consentRevision: string;` (chuỗi số thập phân dương chuẩn tắc `/^[1-9][0-9]*$/`, e.g. "12")
-   - `providerRevision: string;` (chuỗi số thập phân dương chuẩn tắc `/^[1-9][0-9]*$/`)
-3. `validateSlackPolicyReference(input: unknown): SlackPolicyReference`: Bác bỏ số 0, số có số 0 ở đầu ("0", "01"), chữ hoặc chuỗi rỗng.
-4. `interface SlackSourceStorageRequest`:
-   - `binding: SlackBinding;`
-   - `policyRef: SlackPolicyReference;`
-   - `requestedRetentionDays: number;`
-5. `decideSlackSourceStorage(policy: SlackModelPolicy, request: SlackSourceStorageRequest)`:
-   - Uỷ quyền trực tiếp cho `decideSlackModelUse(policy, ...)` để tái sử dụng toàn bộ baseline gates.
-   - Kiểm tra `sameSlackBinding(request.binding, request.policyRef.binding)`.
-   - Nếu `request.requestedRetentionDays <= 0` hoặc `policy.consent.retentionDays <= 0` -> `{ allowed: false, reason: 'retention_zero_denied' }`.
-   - Nếu `request.policyRef.purpose !== 'storage'` -> `{ allowed: false, reason: 'purpose_mismatch' }`.
-   - Hợp lệ -> `{ allowed: true, maxRetentionDays: number }`.
-
-### 2.3. File Tạo Mới: `packages/tool-schemas/src/myslack-source.ts`
-Chứa các định nghĩa và hàm xác thực vòng đời dữ liệu nguồn (F1, F2, F3):
-1. `interface SlackSourceMetadata`: Bounded whitelisted metadata:
-   - `channelId?: string;`
-   - `channelName?: string;`
-   - `threadTs?: string;`
-   - `authorSlackUserId?: string;`
-   - `authorName?: string;`
-   - `fileName?: string;`
-   - `fileMimeType?: string;`
-   - `fileSizeBytes?: number;`
-   - `isBotMessage?: boolean;`
-2. `validateSlackSourceMetadata(input: unknown): SlackSourceMetadata`: Lọc sạch mọi trường ngoài danh sách whitelist.
-3. `interface SlackSourceEntity`: Bắt buộc retain `policyRef: SlackPolicyReference`:
-   - `id: string;`
-   - `sourceRef: SlackSourceRef;`
-   - `policyRef: SlackPolicyReference;`
-   - `untrustedContent: string;` (nội dung ngoại vi không đáng tin cậy)
-   - `metadata: SlackSourceMetadata;`
-   - `observedRevision: string;`
-   - `retentionDays: number;`
-   - `capturedAt: string;` (ISO 8601 UTC)
-   - `expiresAt: string;` (ISO 8601 UTC)
-   - `tombstonedAt: string | null;`
-   - `purgedAt: string | null;`
-4. `validateSlackSourceEntity(input: unknown): SlackSourceEntity`: Xác thực `sameSlackBinding(sourceRef.binding, policyRef.binding)`, `sourceRef.revision === observedRevision`, `retentionDays > 0`.
-5. `type SlackDerivedTargetKind = 'chat_history_message' | 'working_memory_entity' | 'plan_step_arg' | 'proposal_excerpt' | 'daily_digest_entry' | 'scheduled_workflow_arg' | 'audit_log_entry';`
-6. `interface SlackDerivedCopyRef`: Bắt buộc retain `policyRef: SlackPolicyReference` để phục vụ đối soát purge:
-   - `targetKind: SlackDerivedTargetKind;`
-   - `targetId: string;`
-   - `sourceRefs: SlackSourceRef[];`
-   - `policyRef: SlackPolicyReference;`
-   - `createdAt: string;`
-7. `validateSlackDerivedCopyRef(input: unknown): SlackDerivedCopyRef`
-8. `interface SlackSourceLineage`:
-   - `ownerSourceKey: string;`
-   - `origin: SlackSourceRef;`
-   - `policyRef: SlackPolicyReference;`
-   - `derivedCopies: SlackDerivedCopyRef[];`
-9. `validateSlackSourceLineage(input: unknown): SlackSourceLineage`
-10. `type SlackTombstoneReason = 'source_deleted' | 'source_edited' | 'channel_membership_lost' | 'connection_disconnected' | 'app_reinstalled' | 'consent_revoked' | 'retention_expired';`
-11. `interface SlackTombstoneRecord`:
-    - `sourceRef: SlackSourceRef;`
-    - `reason: SlackTombstoneReason;`
-    - `tombstonedAt: string;`
-    - `purgedAt: string | null;`
-12. `validateSlackTombstoneRecord(input: unknown): SlackTombstoneRecord`
-13. `type SlackPurgeTarget`: Discriminated union với 5 tagged scopes phân định rành mạch thẩm quyền, triệt tiêu nguy cơ phá dữ liệu chéo người dùng:
-    - `{ scope: 'owner_retention'; binding: SlackBinding; resourceType: SlackResourceType; resourceId: string; revision?: string; policyRef: SlackPolicyReference; cascadeTargetKinds: SlackDerivedTargetKind[]; tombstoneReason: 'retention_expired' }` (Hết hạn retention theo đúng chủ sở hữu và chính sách đã cấp, không ảnh hưởng người khác).
-    - `{ scope: 'channel_membership_lost'; binding: SlackBinding; channelId: string; cascadeTargetKinds: SlackDerivedTargetKind[]; tombstoneReason: 'channel_membership_lost' }` (Chỉ xoá bản sao của kênh bị mất quyền, giữ nguyên các kênh khác).
-    - `{ scope: 'authorization_disconnect'; binding: SlackBinding; cascadeTargetKinds: SlackDerivedTargetKind[]; tombstoneReason: 'connection_disconnected' | 'app_reinstalled' }` (Chỉ xoá bản sao của riêng người ngắt kết nối; bảo toàn người dùng B trong cùng workspace).
-    - `{ scope: 'resource_lifecycle'; workspaceId: string; resourceType: SlackResourceType; resourceId: string; revision?: string; cascadeTargetKinds: SlackDerivedTargetKind[]; tombstoneReason: 'source_deleted' | 'source_edited' }` (Xoá bản ghi khi tin/file bị sửa hoặc xoá ở Slack).
-    - `{ scope: 'workspace_consent_revocation'; workspaceId: string; policyVersion: string; providerProfileId: string; consentRevision: string; cascadeTargetKinds: SlackDerivedTargetKind[]; tombstoneReason: 'consent_revoked' }` (Xoá toàn bộ nội dung của workspace thuộc đúng policyVersion, providerProfileId và consentRevision; bảo vệ các bản sao được cấp lại dưới revision mới).
-14. `validateSlackPurgeTarget(input: unknown): SlackPurgeTarget`
-
-### 2.4. File Tạo Mới: `packages/tool-schemas/src/myslack-tools.ts`
-Chứa các định nghĩa siêu dữ liệu công cụ theo từng phương thức với 36 snapshot families chính xác:
-1. `type SlackMethodFamily = 'admin' | 'agents' | 'api' | 'apps' | 'assistant' | 'auth' | 'blocks' | 'bookmarks' | 'bots' | 'calls' | 'canvases' | 'chat' | 'conversations' | 'dialog' | 'dnd' | 'emoji' | 'entity' | 'files' | 'functions' | 'migration' | 'oauth' | 'openid' | 'pins' | 'reactions' | 'reminders' | 'rtm' | 'search' | 'slackLists' | 'slackbot' | 'stars' | 'team' | 'tooling' | 'usergroups' | 'users' | 'views' | 'workflows';` (Chính xác 36 string literals, không có ellipsis, không có skills/misc).
-2. `type SlackSideEffect = 'read' | 'write';`
-3. `type SlackRiskLevel = 'low' | 'medium' | 'high';`
-4. `type SlackPlanTier = 'free' | 'pro' | 'any';`
-5. `interface SlackToolMetadata`:
-   - `method: string;`
-   - `family: SlackMethodFamily;`
-   - `sideEffect: SlackSideEffect;`
-   - `riskLevel: SlackRiskLevel;`
-   - `userScopes: string[] | null;` (Phân định riêng biệt: string[] cho scopes đã xác định; null cho 89 phương thức probe_required chưa rõ token eligibility)
-   - `hasUnknownScopes: boolean;`
-   - `planTier: SlackPlanTier;`
-   - `isProbeRequired: boolean;`
-   - `discovers?: string;`
-   - `listable?: boolean;`
-   - `requiresBinding: true;`
-6. `interface SlackToolDefinition extends SlackToolMetadata`:
-   - `name: string;` (e.g. `'myslack.conversations_history'`)
-   - `service: 'myslack';`
-   - `description: string;`
-   - `inputSchema: JSONSchema;` (Schema tham số cố định, `additionalProperties: false`)
-   - `outputSchema: JSONSchema;`
-7. `validateSlackToolDefinition(input: unknown): SlackToolDefinition`
-8. `validateSlackToolExecutionArgs<TParams = Record<string, unknown>>(tool: SlackToolDefinition, args: unknown): { binding: SlackBinding; params: TParams }`:
-   - Bắt buộc có trường `binding` hợp lệ.
-   - Bắt buộc `params` chỉ chứa các thuộc tính được khai báo trong `tool.inputSchema.properties`. Nếu có thuộc tính lạ không thuộc schema -> ném `TypeError` (fail-closed!).
-   - Trả về detached whitelisted copy `{ binding, params }`.
-9. Định nghĩa 4 core tools mẫu chuẩn mực cho 03C:
-   - `myslack.conversations_history`: `userScopes: ['channels:history', 'groups:history', 'im:history', 'mpim:history']`, `sideEffect: 'read'`, `riskLevel: 'low'`.
-   - `myslack.conversations_list`: `userScopes: ['channels:read', 'groups:read', 'im:read', 'mpim:read']`, `sideEffect: 'read'`, `riskLevel: 'low'`.
-   - `myslack.chat_postMessage`: `userScopes: ['chat:write']`, `sideEffect: 'write'`, `riskLevel: 'high'`.
-   - `myslack.users_info`: `userScopes: ['users:read']`, `sideEffect: 'read'`, `riskLevel: 'low'`.
-
-### 2.5. File Cập Nhật: `packages/tool-schemas/src/index.ts`
-Re-export toàn bộ hợp đồng từ `./myslack-context.js`, `./myslack-policy.js`, `./myslack-source.js` và `./myslack-tools.js`. Giữ nguyên `ALL_TOOLS`, `TOOL_MAP`, `SERVICE_REGISTRY` không chứa `myslack`.
+- “OAuth bằng tài khoản Slack của người dùng; thao tác dưới danh nghĩa người đó.”
+- “Hỗ trợ Free và Pro; hướng tới toàn bộ khả năng API phù hợp với hai gói và quyền thực tế của người kết nối.”
+- “Bao phủ mọi kênh công khai, kênh riêng, DM và nhóm DM mà người kết nối được quyền truy cập; không yêu cầu chọn một danh sách kênh cho phép.”
+- “Một tài khoản ATI kết nối đồng thời nhiều workspace Slack.”
+- “Mọi gather/search/lookup mang binding do server xác nhận gồm ATI user, connectionId, workspaceId, Slack user, identityVersion.”
+- “Tuyệt đối không có công cụ gọi tùy ý method + args; không có blanket all-API dispatcher; schema tham số kiểm tra fail-closed.”
+- “Trước thu thập/lưu nội dung nguồn phải có quyền xử lý phù hợp (F1); retentionDays = 0 nghiêm cấm lưu trữ lâu dài.”
+- “Mọi derived copy / memory / history / plan args / schedule / audit / summary phải lưu vết sourceRefs và policyRef để cho phép purge trong tương lai (F3).”
+- “Purge target bắt buộc phân định 5 tagged scopes rõ ràng: `owner_retention`, `channel_membership_lost`, `authorization_disconnect`, `resource_lifecycle`, `workspace_consent_revocation`; tuyệt đối không dùng quyền mơ hồ làm ảnh hưởng chéo người dùng hoặc xoá nhầm dữ liệu sau regrant.”
+- “Purge là công việc bền vững có retry và trạng thái, vẫn chạy khi feature/automation tắt (F3/F4).”
+- “Schemas là contracts, không phải authority grants; có schema không đồng nghĩa được quyền gọi nếu thiếu chính sách server xác nhận.”
+- “`MYSLACK_ENABLED=off` và `MYSLACK_AUTOMATION_ENABLED=off` mặc định; `myslack` nằm ngoài `ALL_TOOLS` và `SERVICE_REGISTRY`.”
+- “Dòng chứng chỉ mã hóa nội bộ (`tokenEncrypted`, secrets) TUYỆT ĐỐI KHÔNG BAO GIỜ xuất hiện trong tool-schemas hoặc public DTOs.”
+- “Bảo toàn 101 method excluded và 253 method probe_required từ snapshot PR 185 head `811f5dc9`; không làm biến mất bất kỳ family nào trong 36 families.”
 
 ---
 
-## 3. Danh Sách Yêu Cầu Giao Diện Tiêu Thụ (Consumer Requirements)
+## Review Focus
 
-Trước khi Backend (03B) và Adapter (03C) thi công mã nguồn, các module này phải đáp ứng các yêu cầu hợp đồng sau:
-
-| Module Tiêu Thụ | Yêu Cầu Hợp Đồng Cần Tuân Thủ | Ghi Chú |
-|---|---|---|
-| **Backend 03B (Source Store)** | Sử dụng `SlackSourceEntity` bắt buộc lưu `policyRef: SlackPolicyReference`. Gọi `decideSlackSourceStorage` trước khi lưu vào DB. Khi `retentionDays === 0`, tuyệt đối không ghi bản ghi nội dung vào đĩa. Lưu `metadata` theo `SlackSourceMetadata`. | Bảo vệ F1 |
-| **Backend 03B (Purge Runner)** | Nhận `SlackPurgeTarget` với 5 tagged scopes cụ thể: `owner_retention`, `channel_membership_lost`, `authorization_disconnect`, `resource_lifecycle`, `workspace_consent_revocation`. Xoá theo matching rules chính xác, không xoá nhầm bản sao cấp lại dưới `consentRevision` mới. Hoạt động cả khi cờ automation tắt. | Bảo vệ F3 & F4 |
-| **Backend 03B / 02B (Policy Revalidation)** | Tiếp nhận `SlackPolicyReference`, kiểm tra khớp cả 8 trường, kiểm tra `purpose` thuộc 5 giá trị chuẩn tắc, ném lỗi khi `consentRevision` cũ hơn phiên bản hiện hành trong DB (chống stale policy ref sau revoke/regrant). Revalidate tại mọi thời điểm tiêu thụ nguồn; schema không thiết lập liveness. | Bảo vệ F1 |
-| **Integration 03C (Adapters)** | Sử dụng `validateSlackToolExecutionArgs` tại entrypoint của mỗi tool adapter, fail-closed với tham số lạ. Tách biệt token decryption bên trong adapter, không trả token ra ngoài. | Bảo mật Credential |
-| **Executor / Controller** | Kiểm tra `sameSlackBinding` và `SlackPolicyReference` trước khi gọi `executeStep`. Gặp timeout/abort -> gán trạng thái `UNKNOWN`, cấm retry write tự động. | Execution Safety |
+1. **Owner-Specific Expiry & Channel-Targeted Purge (F3):** `retention_expired` không thuộc về `resource_lifecycle` toàn cục của workspace mà thuộc tagged scope `owner_retention` (mang đầy đủ `binding`, `resourceType`, `resourceId`, `revision`, `policyRef`). Sự kiện `channel_membership_lost` bắt buộc nhắm chính xác vào `channelId` bị mất quyền của connection đó, tuyệt đối không purge các kênh khác còn quyền. Sự kiện `authorization_disconnect` mang full `binding` xoá bản sao của riêng connection ngắt kết nối.
+2. **Consent Revocation Matching Rules Against Re-grant (F1):** Tagged scope `workspace_consent_revocation` bắt buộc bao gồm `{ workspaceId, policyVersion, providerProfileId, consentRevision }`. Purge runner chỉ xoá các bản ghi khớp chính xác cả 4 tiêu chí; các bản ghi nguồn hoặc bản sao tạo sau này dưới một `consentRevision` mới hơn (khi tổ chức cấp lại consent) tuyệt đối không bị xoá bởi job thu hồi cũ.
+3. **Retention of JSON-Safe PolicyRef & Extension of `myslack-policy.ts`:** `SlackSourceEntity` và mỗi bản sao phái sinh (`SlackDerivedCopyRef`) bắt buộc lưu giữ `policyRef: SlackPolicyReference` đã uỷ quyền lưu trữ. Mở rộng và tái sử dụng trực tiếp `myslack-policy.ts` với hàm `decideSlackSourceStorage`, kiểm tra tính nhất quán giữa `sourceRef.binding` và `policyRef.binding`, kiểm tra `purpose === 'storage'` và từ chối khi `retentionDays <= 0` (`retention_zero_denied`).
+4. **Fail-Closed Method-Specific Parameter Validation:** `validateSlackToolExecutionArgs` kiểm thực tham số dựa trên schema tham số cố định theo từng phương thức, từ chối mọi thuộc tính không nhận biết (`additionalProperties: false` fail-closed). Tuyệt đối không cho phép công cụ tuỳ ý `method + args`. Bề mặt 03A chỉ định nghĩa hợp đồng mẫu cố định cho 4 core tools (`conversations.history`, `conversations.list`, `chat.postMessage`, `users.info`) với user scopes đối chiếu chính xác từ inventory.
+5. **Exact 36 Snapshot Family Names & Scope Representation:** Sử dụng union chính xác 36 string literals (từ `admin` đến `workflows`), không dùng literal ellipsis (`...`) hay các tên không có trong sitemap (`skills`, `misc`). Phân biệt rõ ràng giữa phương thức có scopes (`string[]`), phương thức chưa xác định scopes (`null` cho 89 phương thức probe), và bảo đảm sự tồn tại của schema không bao giờ tự động nâng cấp trạng thái triển khai của inventory.
 
 ---
 
-## 4. Bảng Đối Soát Cơ Học 354 Methods (PR 185 Snapshot SHA 811f5dc9121d372f232efb63d9880d9574648e3a)
+## Cổng Phụ Thuộc Hợp Đồng & Đối Chiếu 02B (Prerequisite Requirements Gate)
 
-| Nhóm Phân Loại | Số Lượng | Phương Thức Đại Diện / Đặc Điểm | Giai Đoạn Dự Kiến |
-|---|---|---|---|
-| **Core Read & Write** | 51 probe_required | `conversations` (27), `chat` (13), `users` (11) | **03C (PR 3)** |
-| **Content & Search** | 3 probe_required | `search.all`, `search.files`, `search.messages` (scope `search:read` + điều kiện bổ sung chưa xác định) | **03D (PR 4)** |
-| **Content & Files** | 14 probe_required | 13 method file hợp lệ + luồng upload 3 bước ngoài (`getUploadURLExternal` -> binary -> `completeUploadExternal`) | **03D (PR 4)** |
-| **Content & Interaction** | 24 probe_required | `pins` (3), `reactions` (4), `bookmarks` (4), `reminders` (5), `stars` (3), `dnd` (5) | **03D (PR 4)** |
-| **Advanced Collab & Skills** | 33 probe_required | `canvases` (7), `slackLists` (12), `slackbot` (7), `team` (7) | **03E (PR 5)** |
-| **Governance & Automation** | 128 probe_required | `admin` (36), `apps` (21), `agents` (11), `assistant` (5), `calls` (6), `functions` (8), `workflows` (8), `views` (4), khác (19) | **03E (PR 5) / 04** |
-| **Excluded (Enterprise)** | 92 excluded | Toàn bộ trong `admin.*` (lý do khớp `method.reason`: `"Reviewed method page explicitly restricts availability to Enterprise plans, so this is not a Free/Pro user tool."`) | **Excluded** |
-| **Excluded (Deprecated / Retired)** | 3 excluded | `files.upload`, `rtm.start`, `users.setActive` (lý do khớp `method.reason`: `"Method page explicitly documents deprecation, retirement or non-functional behavior; outside the non-deprecated API target."`) | **Excluded** |
-| **Excluded (App-Level Ingress)** | 2 excluded | `apps.connections.open`, `apps.event.authorizations.list` (lý do khớp `method.reason`: `"Method usage requires an app-level token; excluded from user-token business tools. Event authorization lookup remains separate infrastructure."`) | **Excluded / 04** |
-| **Excluded (Misc / Permissions)** | 4 excluded | `team.externalTeams.*` (2), `users.discoverableContacts.lookup` (1), `conversations.externalInvitePermissions.set` (1) (khớp `method.reason` Enterprise) | **Excluded** |
-| **TỔNG CỘNG** | **354 methods** | **253 probe_required · 101 excluded** (265 with_scopes, 89 unknown_scopes) | **Bảo toàn 100% cơ học** |
+### 1. Hiện trạng nhánh & Bối cảnh tích hợp:
+- **02A (Connection Contracts):** Đã hoàn tất và được chấp thuận tại commit `6871087`.
+- **02R (Callback Isolation Fix):** Đã hoàn tất và được chấp thuận tại PR #190 (`0015_slack_callback_order.sql`).
+- **02B (Backend Consent & OAuth):** PR #192 (`19e4e39c`) đang trong quá trình blocking review (hoàn thiện `returnTo` và policy revision / config matching). UI #193 cũng đang review song song.
+- **Quy tắc thi công & Tiến độ xếp chồng (Stacked Branches):**
+  - Tầng schema 03A thuộc `packages/tool-schemas` được **TIẾN HÀNH ĐỘC LẬP** để chuẩn hóa giao ước chung.
+  - Các module tiêu thụ backend (03B) và adapter (03C) **bắt buộc có giao diện 02B được chấp thuận (accepted interfaces)** và một staging base đã được review (cho phép xếp chồng nhánh đã review, không ép buộc phải merge vào main ngay trước khi triển khai consumer). Quyết định merge main thuộc quyền điều phối của chủ dự án và reviewer.
 
----
+### 2. Danh sách Yêu cầu Giao diện Tiêu thụ (Consumer Interface Requirements):
+Tầng schema 03A xuất xưởng các hợp đồng sau để Backend và Adapter tuân thủ:
+```ts
+// 5 mục đích xử lý chuẩn tắc đã thống nhất với 02B Backend
+export type SlackPolicyPurpose =
+  | 'manual_lookup'
+  | 'triage'
+  | 'planning'
+  | 'digest'
+  | 'storage';
 
-## 5. Lộ Trình TDD Red-Green-Refactor Chuẩn Tắc
+// 1. Tham chiếu chính sách xử lý đã thỏa thuận với Backend (Thực thi F1)
+export interface SlackPolicyReference {
+  binding: SlackBinding;
+  purpose: SlackPolicyPurpose;
+  requestedRetentionDays: number; // 0 = no retention
+  providerProfileId: string; // định danh cấu hình provider
+  configFingerprint: string; // mã băm cấu hình server
+  policyVersion: string; // phiên bản chính sách văn bản
+  consentRevision: string; // chuỗi số thập phân dương chuẩn tắc: /^[1-9][0-9]*$/ (JSON-safe)
+  providerRevision: string; // chuỗi số thập phân dương chuẩn tắc: /^[1-9][0-9]*$/
+}
 
-1. **RED:** Tạo các file kiểm thử:
-   - `packages/tool-schemas/tests/myslack-context.test.ts` (mở rộng test suite với structured owner keys và 2 users cùng workspace)
-   - `packages/tool-schemas/tests/myslack-policy.test.ts` (mở rộng với `decideSlackSourceStorage`, retention 0 block, binding consistency)
-   - `packages/tool-schemas/tests/myslack-source.test.ts` (tạo mới với 5 tagged purge scopes, whitelisted metadata, policyRef retention)
-   - `packages/tool-schemas/tests/myslack-tools.test.ts` (tạo mới với 36 families, fail-closed args validation)
-   Chạy lệnh kiểm thử:
-   ```bash
-   npm test -w @wap/tool-schemas -- tests/myslack-source.test.ts tests/myslack-tools.test.ts
-   ```
-   *Kỳ vọng:* Thất bại do chưa tồn tại module.
-2. **GREEN:**
-   - Cập nhật `myslack-context.ts` với `SlackResourceType`, `validateSlackSourceRef`, formatters cấu trúc tuple JSON.
-   - Cập nhật `myslack-policy.ts` với `SlackPolicyPurpose`, `SlackPolicyReference`, `decideSlackSourceStorage`.
-   - Tạo `myslack-source.ts` với `SlackSourceMetadata`, `SlackSourceEntity`, 5 tagged `SlackPurgeTarget`.
-   - Tạo `myslack-tools.ts` với 36 exact families, metadata và fail-closed argument validator.
-   - Cập nhật `packages/tool-schemas/src/index.ts`.
-3. **VERIFY:** Chạy lại toàn bộ test suite và typecheck:
-   ```bash
-   npm test -w @wap/tool-schemas
-   npm run typecheck
-   ```
-   *Kỳ vọng:* 100% tests PASS (13 test suites hiện hữu gồm 183 tests + các test mới), exit code 0.
-4. **COMMIT:** Chỉ commit các file trong `packages/tool-schemas/`:
-   ```bash
-   git add packages/tool-schemas/src/ packages/tool-schemas/tests/
-   git commit -m "feat(slack): implement source lifecycle, 5 tagged purge contracts and fail-closed tool metadata"
-   ```
+// 2. Yêu cầu giao diện Backend Repository (Consumer Requirements for 03B/02B)
+export interface ISlackPolicyConsumerContract {
+  // Backend revalidate policy reference mà không làm thay đổi shared schema
+  verifyPolicyReference(ref: SlackPolicyReference): Promise<{ valid: boolean; reason?: string }>;
+  // Tra cứu metadata kết nối có kiểm tra actor chủ quyền (atiUserId)
+  getConnectionMetadataForUser(atiUserId: string, connectionId: string, expectedIdentityVersion?: number): Promise<SlackConnectionMetadata | null>;
+}
+```
 
 ---
 
-## 6. Tiêu Chí Nghiệm Thu (Acceptance Criteria)
+## Đối Soát Kiểm Kê 354 Phương Thức Slack (Inventory Reconciliation Ledger)
 
-- [ ] Toàn bộ interface và hàm validator xuất phát từ `packages/tool-schemas/`.
-- [ ] Không có thay đổi nào trong `apps/`, `packages/tool-adapters/` hay `packages/executor/`.
-- [ ] Kế thừa `SlackBinding` và `SlackSourceRef` nguyên bản, không tạo bản sao trùng lặp.
-- [ ] `formatSlackOwnerSourceKey` mã hoá cấu trúc tuple JSON đầy đủ binding + tài nguyên; 2 người dùng ATI khác nhau cùng workspace có khoá nguồn riêng biệt.
-- [ ] `validateSlackPolicyReference` kiểm tra định dạng positive canonical decimal string (`/^[1-9][0-9]*$/`) cho cả `consentRevision` và `providerRevision`; từ chối số 0 hoặc số có số 0 ở đầu; kiểm tra `purpose` thuộc 5 giá trị chuẩn tắc.
-- [ ] `decideSlackSourceStorage` mở rộng trực tiếp `myslack-policy.ts` và uỷ quyền `decideSlackModelUse`, chặn đứng việc lưu trữ bền vững khi `retentionDays === 0`.
-- [ ] Hợp đồng xoá nguồn `SlackPurgeTarget` phân biệt rõ 5 tagged scopes: `owner_retention`, `channel_membership_lost`, `authorization_disconnect`, `resource_lifecycle`, `workspace_consent_revocation`.
-- [ ] `validateSlackToolExecutionArgs` kiểm tra fail-closed theo schema tham số cố định, từ chối tham số lạ.
-- [ ] `SlackMethodFamily` chứa đúng 36 tên snapshot family từ inventory; `userScopes` phân biệt rõ `null` (unknown) với `[]` (empty).
-- [ ] `ALL_TOOLS` và `SERVICE_REGISTRY` tuyệt đối không chứa `myslack`.
-- [ ] Sổ cái 354 phương thức khớp 100% snapshot PR 185: `sourceCommit 811f5dc9121d372f232efb63d9880d9574648e3a`, `inventoryFileSha256 e55bc180eb43c71c1131dbded5968c1e240d3424fe1314bf604139055c074f09`, 253 probe_required, 101 excluded với đầy đủ lý do từ `method.reason`.
+Toàn bộ 354 phương thức từ snapshot PR 185 (head `811f5dc9`, staged tại commit `81a27b78`) được đối soát cơ học 100%:
+- **Tổng số canonical methods:** 354.
+- **Phương thức loại trừ (`excluded`):** 101 methods (92 Enterprise-only trong `admin.*`, 2 Enterprise trong `team.*`, 2 app-level token `apps.connections.open` & `apps.event.authorizations.list`, 1 `conversations.externalInvitePermissions.set`, 1 deprecated `files.upload`, 1 retired `rtm.start`, 1 `users.discoverableContacts.lookup`, 1 deprecated `users.setActive`).
+- **Phương thức cần probe (`probe_required`):** 253 methods (Bảo toàn trạng thái unknown/probe cho đến khi có bằng chứng native).
+- **Phân loại scopes:** 265 methods có user scopes xác định (`with_scopes`); 89 methods có user scopes chưa xác định (`unknown_scopes: null`).
+- **Phân bổ theo giai đoạn triển khai (Delivery Phases):**
+  - **Phase 03C (Core Tool Surface):** 51 probe_required methods (`conversations` 27, `chat` 13, `users` 11).
+  - **Phase 03D (Content & Interaction):** 41 probe_required methods (`search` 3, `files` 14, `pins` 3, `reactions` 4, `bookmarks` 4, `reminders` 5, `stars` 3, `dnd` 5).
+  - **Phase 03E / 04 (Advanced Collab, Apps & Governance):** 161 probe_required methods (`canvases` 7, `slackLists` 12, `slackbot` 7, `team` 7, `usergroups` 7, `admin` 36, `apps` 21, `assistant` 5, `agents` 11, `calls` 6, `functions` 8, `workflows` 8, `views` 4, `oauth` 6, `openid` 2, `auth` 3, `api` 1, `blocks` 1, `bots` 1, `dialog` 1, `emoji` 1, `entity` 3, `migration` 1, `rtm` 1, `tooling` 1).
+  - **Excluded:** 101 methods bảo toàn lý do kỹ thuật.
+- Chi tiết từng phương thức được lưu trữ bền vững tại tệp: `docs/superpowers/plans/slack-354-method-ledger.json`.
+
+---
+
+## File Structure Plan
+
+```
+packages/tool-schemas/
+├── src/
+│   ├── myslack-context.ts      # Modify: Mở rộng SlackResourceType, validateSlackSourceRef, structured composite keys
+│   ├── myslack-policy.ts       # Modify: Mở rộng decideSlackSourceStorage (tái sử dụng policy engine hiện hữu)
+│   ├── myslack-source.ts       # Create: Hợp đồng SlackSourceEntity, Lineage, DerivedCopy, 5 Tagged PurgeTargets
+│   ├── myslack-tools.ts        # Create: 36 exact families, fail-closed per-method schemas, validateSlackToolExecutionArgs
+│   └── index.ts                # Modify: Re-export contracts (bảo đảm không thêm vào ALL_TOOLS/SERVICE_REGISTRY)
+└── tests/
+    ├── myslack-context.test.ts # Modify: Test resourceType mở rộng, sourceRef validation, composite key cấu trúc
+    ├── myslack-policy.test.ts  # Modify: Test decideSlackSourceStorage, retention 0 block, binding consistency
+    ├── myslack-source.test.ts  # Create: Test toàn diện F1 policyRef retention, F2 isolation, F3 5 tagged purge scopes
+    └── myslack-tools.test.ts   # Create: Test 36 families, fail-closed args validation, whitelisted parameter bounds
+```
+
+---
+
+## Task Decomposition
+
+### Task 1: Mở rộng Tương thích Định danh, Tham chiếu Nguồn & Khoá Cấu trúc Tuple (`myslack-context.ts`)
+
+**Files:**
+- Modify: `packages/tool-schemas/src/myslack-context.ts:1-39`
+- Modify: `packages/tool-schemas/tests/myslack-context.test.ts:1-42`
+
+**Interfaces:**
+- Consumes: Hiện trạng `SlackBinding`, `SlackSourceRef`, `validateSlackBinding`, `sameSlackBinding`.
+- Produces:
+  - `SlackResourceType`: Kiểu union mở rộng tương thích:
+    `'conversation' | 'message' | 'file' | 'canvas' | 'list' | 'list_item' | 'bookmark' | 'reminder' | 'user' | 'usergroup' | 'subteam'`
+  - `SlackSourceRef`: Giữ nguyên cấu trúc nhưng `resourceType` sử dụng `SlackResourceType`.
+  - `validateSlackSourceRef(input: unknown): SlackSourceRef`: Trả về detached whitelisted copy; ném `TypeError` nếu thiếu binding, resourceType ngoài danh mục, resourceId rỗng/whitespace, revision rỗng/whitespace.
+  - `formatSlackGlobalResourceKey(workspaceId: string, resourceType: SlackResourceType, resourceId: string): string`:
+    Định danh tài nguyên vật lý chung: `JSON.stringify([workspaceId, resourceType, resourceId])`. Tránh hoàn toàn lỗi nối chuỗi ký tự phân cách (delimiter ambiguity).
+  - `formatSlackOwnerSourceKey(ref: SlackSourceRef): string`:
+    Định danh nguồn gắn liền với quyền của người kết nối (authorization-source key):
+    `JSON.stringify([ref.binding.atiUserId, ref.binding.connectionId, ref.binding.workspaceId, ref.binding.slackUserId, ref.binding.identityVersion, ref.resourceType, ref.resourceId, ref.revision])`.
+    Bảo đảm 2 người dùng ATI khác nhau cùng xem một tin nhắn có 2 khoá nguồn riêng biệt!
+
+- [ ] **Step 1: Viết test failing trong `packages/tool-schemas/tests/myslack-context.test.ts`**
+
+```ts
+it('supports extended resource types for Canvas, List, bookmarks, and reminders', () => {
+  const extendedTypes: SlackResourceType[] = [
+    'conversation', 'message', 'file', 'canvas', 'list', 'list_item',
+    'bookmark', 'reminder', 'user', 'usergroup', 'subteam'
+  ];
+  for (const rt of extendedTypes) {
+    const ref: SlackSourceRef = { binding, resourceType: rt, resourceId: 'res-1', revision: 'rev-1' };
+    expect(validateSlackSourceRef(ref)).toEqual(ref);
+  }
+});
+
+it('formats structured owner source keys preventing collision between 2 users in same workspace', () => {
+  const bindingUserA = { ...binding, atiUserId: 'user-a', connectionId: 'conn-a', slackUserId: 'U_A' };
+  const bindingUserB = { ...binding, atiUserId: 'user-b', connectionId: 'conn-b', slackUserId: 'U_B' };
+  const refA: SlackSourceRef = { binding: bindingUserA, resourceType: 'message', resourceId: 'msg-1', revision: '1' };
+  const refB: SlackSourceRef = { binding: bindingUserB, resourceType: 'message', resourceId: 'msg-1', revision: '1' };
+
+  const keyA = formatSlackOwnerSourceKey(refA);
+  const keyB = formatSlackOwnerSourceKey(refB);
+  expect(keyA).not.toBe(keyB);
+  expect(JSON.parse(keyA)[0]).toBe('user-a');
+  expect(JSON.parse(keyB)[0]).toBe('user-b');
+});
+
+it('handles delimiter and special characters in resource IDs safely without collision', () => {
+  const key1 = formatSlackGlobalResourceKey('T:1', 'message', 'M:2');
+  const key2 = formatSlackGlobalResourceKey('T', 'message', '1:M:2');
+  expect(key1).not.toBe(key2);
+});
+
+it('strips sensitive and extra properties from SlackSourceRef', () => {
+  const dirty = {
+    binding: { ...binding, extraSecret: 'secret-token' },
+    resourceType: 'message',
+    resourceId: 'msg-123',
+    revision: '1729000000.000100',
+    maliciousPayload: '<script>',
+  };
+  const clean = validateSlackSourceRef(dirty);
+  expect(clean).toEqual({
+    binding,
+    resourceType: 'message',
+    resourceId: 'msg-123',
+    revision: '1729000000.000100',
+  });
+  expect((clean as any).maliciousPayload).toBeUndefined();
+  expect((clean.binding as any).extraSecret).toBeUndefined();
+});
+```
+
+- [ ] **Step 2: Chạy test để xác nhận FAIL**
+Run: `npx vitest run packages/tool-schemas/tests/myslack-context.test.ts`
+Expected: FAIL với lỗi "validateSlackSourceRef is not defined".
+
+- [ ] **Step 3: Triển khai mở rộng trong `packages/tool-schemas/src/myslack-context.ts`**
+Thêm `SlackResourceType`, cập nhật `SlackSourceRef`, triển khai `validateSlackSourceRef`, `formatSlackGlobalResourceKey`, `formatSlackOwnerSourceKey`. Sử dụng `Object.hasOwn` và kiểm tra kiểu nghiêm ngặt.
+
+- [ ] **Step 4: Chạy lại test để xác nhận PASS**
+Run: `npx vitest run packages/tool-schemas/tests/myslack-context.test.ts`
+Expected: PASS 100%.
+
+- [ ] **Step 5: Commit**
+```bash
+git add packages/tool-schemas/src/myslack-context.ts packages/tool-schemas/tests/myslack-context.test.ts
+git commit -m "feat(slack): extend source ref types and structured composite key formatting"
+```
+
+---
+
+### Task 2: Tái Sử Dụng & Mở Rộng Hợp Đồng Chính Sách Lưu Trữ Nguồn (`myslack-policy.ts`)
+
+**Files:**
+- Modify: `packages/tool-schemas/src/myslack-policy.ts`
+- Modify: `packages/tool-schemas/tests/myslack-policy.test.ts`
+
+**Interfaces:**
+- Consumes: Hiện hữu `SlackModelPolicy`, `sameSlackBinding`, `validateSlackBinding` từ `./myslack-context.js`.
+- Produces:
+  - `SlackPolicyPurpose`: `'manual_lookup' | 'triage' | 'planning' | 'digest' | 'storage'`.
+  - `SlackPolicyReference`:
+    `{ binding: SlackBinding; purpose: SlackPolicyPurpose; requestedRetentionDays: number; providerProfileId: string; configFingerprint: string; policyVersion: string; consentRevision: string; providerRevision: string; }`.
+  - `validateSlackPolicyReference(input: unknown): SlackPolicyReference`: Kiểm thực positive canonical decimal string (`/^[1-9][0-9]*$/`) cho cả `consentRevision` và `providerRevision`, bác bỏ number, bigint, số 0 hoặc số có số 0 ở đầu ("0", "01"), kiểm thực purpose thuộc 5 giá trị chuẩn tắc, không phát sinh trường tương thích bắt buộc thừa.
+  - `SlackSourceStorageRequest`:
+    `{ binding: SlackBinding; policyRef: SlackPolicyReference; requestedRetentionDays: number; }`.
+  - `SlackStorageBlockReason`: `'connection_inactive' | 'identity_changed' | 'consent_missing' | 'policy_changed' | 'provider_unverified' | 'retention_zero_denied' | 'retention_exceeded' | 'purpose_mismatch'`.
+  - `decideSlackSourceStorage(policy: SlackModelPolicy, request: SlackSourceStorageRequest): { allowed: true; maxRetentionDays: number } | { allowed: false; reason: SlackStorageBlockReason }`:
+    - Ủy quyền (delegate/reuse) trực tiếp cho `decideSlackModelUse` để giải quyết toàn bộ baseline authorization gates (`connection_inactive`, `consent_missing`, `policy_changed`, `provider_unverified`, `retention_exceeded`).
+    - Bổ sung quy tắc storage:
+      - `sameSlackBinding(request.binding, request.policyRef.binding)` phải true, nếu không -> `identity_changed`.
+      - Khớp providerProfileId và policyVersion giữa policyRef và policy: `request.policyRef.providerProfileId === policy.provider.profileId` và `request.policyRef.policyVersion === policy.policyVersion`, nếu không -> `policy_changed`.
+      - `request.policyRef.purpose !== 'storage'` -> `purpose_mismatch`.
+      - `policy.consent.retentionDays <= 0 || request.requestedRetentionDays <= 0 || request.policyRef.requestedRetentionDays <= 0` -> `retention_zero_denied`.
+      - `request.requestedRetentionDays` phải là positive safe integer (`Number.isSafeInteger(n) && n > 0`), bị chặn bởi `request.policyRef.requestedRetentionDays`, `policy.consent.retentionDays`, và `policy.provider.maxRetentionDays`.
+      - Nếu vượt quá bất kỳ trần nào -> `retention_exceeded`.
+      - Hợp lệ -> `{ allowed: true, maxRetentionDays: Math.min(request.requestedRetentionDays, request.policyRef.requestedRetentionDays, policy.consent.retentionDays, policy.provider.maxRetentionDays) }`.
+    - **Yêu cầu đối với Backend Runtime:** Schemas thuần chỉ là pure contracts, không tự chứng minh được tính tươi mới (freshness) của DB grants. Backend runtime bắt buộc revalidate persisted consent/provider revisions và current connection/ACL tại mỗi thời điểm tiêu thụ nguồn hoặc bộ nhớ; schemas không thiết lập liveness. Chạy test trên denied baseline gates và ref mismatches, không dùng toy authorization booleans giả lập DB races.
+
+- [ ] **Step 1: Viết test failing trong `packages/tool-schemas/tests/myslack-policy.test.ts`**
+Thêm các ca kiểm thử:
+- Chặn lưu trữ bền vững khi `retentionDays === 0` với lý do `retention_zero_denied`.
+- Từ chối `SlackPolicyReference` có `purpose: 'summarize'` (không thuộc 5 giá trị chuẩn tắc).
+- Từ chối `SlackPolicyReference` có `consentRevision: "0"` hoặc `"01"`.
+- Từ chối khi `request.binding` khác `request.policyRef.binding`.
+
+- [ ] **Step 2: Chạy test để xác nhận FAIL**
+Run: `npx vitest run packages/tool-schemas/tests/myslack-policy.test.ts`
+Expected: FAIL với lỗi "decideSlackSourceStorage is not defined".
+
+- [ ] **Step 3: Triển khai mở rộng trong `packages/tool-schemas/src/myslack-policy.ts`**
+Viết hàm `decideSlackSourceStorage` và `validateSlackPolicyReference`.
+
+- [ ] **Step 4: Chạy lại test để xác nhận PASS**
+Run: `npx vitest run packages/tool-schemas/tests/myslack-policy.test.ts`
+Expected: PASS 100%.
+
+- [ ] **Step 5: Commit**
+```bash
+git add packages/tool-schemas/src/myslack-policy.ts packages/tool-schemas/tests/myslack-policy.test.ts
+git commit -m "feat(slack): extend policy contracts with storage decision and policy reference"
+```
+
+---
+
+### Task 3: Hợp đồng Vòng đời Nguồn, 5 Tagged Purge Scopes & Whitelisted Metadata (`myslack-source.ts`)
+
+**Files:**
+- Create: `packages/tool-schemas/src/myslack-source.ts`
+- Create: `packages/tool-schemas/tests/myslack-source.test.ts`
+
+**Interfaces:**
+- Consumes: `SlackBinding`, `SlackSourceRef`, `SlackResourceType` từ `./myslack-context.js`; `SlackPolicyReference` từ `./myslack-policy.js`.
+- Produces:
+  - `SlackSourceMetadata`: Bounded whitelisted metadata:
+    `{ channelId?: string; channelName?: string; threadTs?: string; authorSlackUserId?: string; authorName?: string; fileName?: string; fileMimeType?: string; fileSizeBytes?: number; isBotMessage?: boolean; }`
+  - `validateSlackSourceMetadata(input: unknown): SlackSourceMetadata`: Tước bỏ mọi trường lạ, chỉ cho phép các trường được whitelist.
+  - `SlackSourceEntity`: DTO đại diện cho nguồn nguyên bản, bắt buộc retain `policyRef: SlackPolicyReference`:
+    `{ id: string; sourceRef: SlackSourceRef; policyRef: SlackPolicyReference; untrustedContent: string; metadata: SlackSourceMetadata; observedRevision: string; retentionDays: number; capturedAt: string; expiresAt: string; tombstonedAt: string | null; purgedAt: string | null; }`
+  - `validateSlackSourceEntity(input: unknown): SlackSourceEntity`: Xác thực `sameSlackBinding(sourceRef.binding, policyRef.binding)`, `sourceRef.revision === observedRevision`, `retentionDays > 0`, trả về detached nested copies.
+  - `SlackDerivedTargetKind`:
+    `'chat_history_message' | 'working_memory_entity' | 'plan_step_arg' | 'proposal_excerpt' | 'daily_digest_entry' | 'scheduled_workflow_arg' | 'audit_log_entry'`.
+  - `SlackDerivedCopyRef`:
+    `{ targetKind: SlackDerivedTargetKind; targetId: string; sourceRefs: SlackSourceRef[]; policyRef: SlackPolicyReference; createdAt: string; }`
+  - `validateSlackDerivedCopyRef(input: unknown): SlackDerivedCopyRef`.
+  - `SlackSourceLineage`:
+    `{ ownerSourceKey: string; origin: SlackSourceRef; policyRef: SlackPolicyReference; derivedCopies: SlackDerivedCopyRef[]; }`
+  - `validateSlackSourceLineage(input: unknown): SlackSourceLineage`.
+  - `SlackTombstoneReason`:
+    `'source_deleted' | 'source_edited' | 'channel_membership_lost' | 'connection_disconnected' | 'app_reinstalled' | 'consent_revoked' | 'retention_expired'`.
+  - `SlackTombstoneRecord`:
+    `{ sourceRef: SlackSourceRef; reason: SlackTombstoneReason; tombstonedAt: string; purgedAt: string | null; }`
+  - `validateSlackTombstoneRecord(input: unknown): SlackTombstoneRecord`.
+  - `SlackPurgeTarget`: Discriminated union với 5 tagged scopes tường minh, loại bỏ hoàn toàn thẩm quyền mơ hồ:
+    ```ts
+    export type SlackPurgeTarget =
+      | {
+          scope: 'owner_retention';
+          binding: SlackBinding; // full binding
+          resourceType: SlackResourceType;
+          resourceId: string;
+          revision?: string;
+          policyRef: SlackPolicyReference; // policy reference quy định retention này
+          cascadeTargetKinds: SlackDerivedTargetKind[];
+          tombstoneReason: 'retention_expired';
+        }
+      | {
+          scope: 'channel_membership_lost';
+          binding: SlackBinding; // connection bị ảnh hưởng
+          channelId: string; // chỉ kênh bị mất quyền, không purge kênh khác
+          cascadeTargetKinds: SlackDerivedTargetKind[];
+          tombstoneReason: 'channel_membership_lost';
+        }
+      | {
+          scope: 'authorization_disconnect';
+          binding: SlackBinding; // full binding
+          cascadeTargetKinds: SlackDerivedTargetKind[];
+          tombstoneReason: 'connection_disconnected' | 'app_reinstalled';
+        }
+      | {
+          scope: 'resource_lifecycle';
+          workspaceId: string;
+          resourceType: SlackResourceType;
+          resourceId: string;
+          revision?: string;
+          cascadeTargetKinds: SlackDerivedTargetKind[];
+          tombstoneReason: 'source_deleted' | 'source_edited';
+        }
+      | {
+          scope: 'workspace_consent_revocation';
+          workspaceId: string;
+          policyVersion: string;
+          providerProfileId: string;
+          consentRevision: string; // chuỗi số thập phân dương: chống xoá nhầm bản sao cấp lại
+          cascadeTargetKinds: SlackDerivedTargetKind[];
+          tombstoneReason: 'consent_revoked';
+        };
+    ```
+  - `validateSlackPurgeTarget(input: unknown): SlackPurgeTarget`.
+
+- [ ] **Step 1: Viết test failing trong `packages/tool-schemas/tests/myslack-source.test.ts`**
+Bao gồm các ca kiểm thử:
+- Kiểm tra `validateSlackSourceEntity` yêu cầu `policyRef` hợp lệ và khớp `binding` với `sourceRef`.
+- Kiểm tra `validateSlackPurgeTarget` với `scope: 'owner_retention'` yêu cầu đầy đủ `policyRef` và `binding`.
+- Kiểm tra `validateSlackPurgeTarget` với `scope: 'channel_membership_lost'` bắt buộc có `channelId` và `binding`.
+- Kiểm tra `validateSlackPurgeTarget` với `scope: 'workspace_consent_revocation'` bắt buộc có cả `providerProfileId` và `consentRevision`.
+- Kiểm tra tước bỏ metadata ngoài danh mục whitelist và chống prototype pollution.
+
+- [ ] **Step 2: Chạy test để xác nhận FAIL**
+Run: `npx vitest run packages/tool-schemas/tests/myslack-source.test.ts`
+Expected: FAIL với lỗi "Cannot find module '../src/myslack-source.js'".
+
+- [ ] **Step 3: Triển khai mã nguồn trong `packages/tool-schemas/src/myslack-source.ts`**
+Viết mã triển khai đầy đủ types, interfaces và validator functions chuẩn mực.
+
+- [ ] **Step 4: Chạy lại test để xác nhận PASS**
+Run: `npx vitest run packages/tool-schemas/tests/myslack-source.test.ts`
+Expected: PASS 100%.
+
+- [ ] **Step 5: Commit**
+```bash
+git add packages/tool-schemas/src/myslack-source.ts packages/tool-schemas/tests/myslack-source.test.ts
+git commit -m "feat(slack): implement source entity with retained policyRef and 5 tagged purge scopes"
+```
+
+---
+
+### Task 4: Hợp đồng 36 Nhóm Phương Thức Chuẩn Xác & Kiểm Thực Tham Số Fail-Closed (`myslack-tools.ts`)
+
+**Files:**
+- Create: `packages/tool-schemas/src/myslack-tools.ts`
+- Create: `packages/tool-schemas/tests/myslack-tools.test.ts`
+
+**Interfaces:**
+- Consumes: `SlackBinding`, `validateSlackBinding` từ `./myslack-context.js`, `JSONSchema` từ `./types.js`.
+- Produces:
+  - `SlackMethodFamily`: Kiểu union chính xác 36 string literals từ inventory:
+    `'admin' | 'agents' | 'api' | 'apps' | 'assistant' | 'auth' | 'blocks' | 'bookmarks' | 'bots' | 'calls' | 'canvases' | 'chat' | 'conversations' | 'dialog' | 'dnd' | 'emoji' | 'entity' | 'files' | 'functions' | 'migration' | 'oauth' | 'openid' | 'pins' | 'reactions' | 'reminders' | 'rtm' | 'search' | 'slackLists' | 'slackbot' | 'stars' | 'team' | 'tooling' | 'usergroups' | 'users' | 'views' | 'workflows'`
+  - `SlackSideEffect`: `'read' | 'write'`.
+  - `SlackRiskLevel`: `'low' | 'medium' | 'high'`.
+  - `SlackPlanTier`: `'free' | 'pro' | 'any'`.
+  - `SlackToolMetadata`:
+    `{ method: string; family: SlackMethodFamily; sideEffect: SlackSideEffect; riskLevel: SlackRiskLevel; userScopes: string[] | null; hasUnknownScopes: boolean; planTier: SlackPlanTier; isProbeRequired: boolean; discovers?: string; listable?: boolean; requiresBinding: true; }`
+  - `SlackToolDefinition`:
+    `SlackToolMetadata & { name: string; service: 'myslack'; description: string; inputSchema: JSONSchema; outputSchema: JSONSchema; }`
+  - `validateSlackToolDefinition(input: unknown): SlackToolDefinition`.
+  - Fixed Parameter Schemas cho 4 core 03C tools (Fail-Closed: `additionalProperties: false`):
+    - `conversations.history`: params `{ channel: string; cursor?: string; limit?: number; latest?: string; oldest?: string; inclusive?: boolean; }`
+    - `conversations.list`: params `{ cursor?: string; limit?: number; types?: string; exclude_archived?: boolean; }`
+    - `chat.postMessage`: params `{ channel: string; text: string; thread_ts?: string; }`
+    - `users.info`: params `{ user: string; include_locale?: boolean; }`
+  - `validateSlackToolExecutionArgs<TParams = Record<string, unknown>>(tool: SlackToolDefinition, args: unknown): { binding: SlackBinding; params: TParams }`:
+    - Yêu cầu bắt buộc trường `binding` thuộc own property.
+    - Validate binding qua `validateSlackBinding`.
+    - Kiểm thực `params` đối chiếu với các trường được định nghĩa trong `tool.inputSchema`: nếu có bất kỳ thuộc tính lạ nào không có trong whitelist schema -> ném `TypeError` (fail-closed!).
+    - Trả về detached `{ binding, params }`.
+
+- [ ] **Step 1: Viết test failing trong `packages/tool-schemas/tests/myslack-tools.test.ts`**
+Bao gồm các ca kiểm thử:
+- Kiểm tra `SlackMethodFamily` chứa đúng 36 tên snapshot family từ inventory; không chấp nhận `skills` hay `misc`.
+- Kiểm tra `validateSlackToolExecutionArgs` ném `TypeError` (fail-closed) khi `params` chứa thuộc tính không có trong schema (ví dụ `extraField: 'inject'` hoặc `token: 'secret'`).
+- Kiểm tra `hasUnknownScopes === true` khi `userScopes === null` (đại diện riêng biệt cho 89 phương thức chưa xác định scope).
+- Invariant: Khẳng định sự tồn tại của `SlackToolDefinition` không cấp quyền tự động cho runtime nếu thiếu policy validation.
+
+- [ ] **Step 2: Chạy test để xác nhận FAIL**
+Run: `npx vitest run packages/tool-schemas/tests/myslack-tools.test.ts`
+Expected: FAIL với lỗi "Cannot find module '../src/myslack-tools.js'".
+
+- [ ] **Step 3: Triển khai mã nguồn trong `packages/tool-schemas/src/myslack-tools.ts`**
+Xây dựng types, validation và 4 tool definitions mẫu fail-closed.
+
+- [ ] **Step 4: Chạy lại test để xác nhận PASS**
+Run: `npx vitest run packages/tool-schemas/tests/myslack-tools.test.ts`
+Expected: PASS 100%.
+
+- [ ] **Step 5: Commit**
+```bash
+git add packages/tool-schemas/src/myslack-tools.ts packages/tool-schemas/tests/myslack-tools.test.ts
+git commit -m "feat(slack): add exact 36 families, fail-closed tool schemas and execution validation"
+```
+
+---
+
+### Task 5: Tích Hợp Re-export, Cổng Tiêu Thụ & Đối Soát Sổ Cái 354 Methods
+
+**Files:**
+- Modify: `packages/tool-schemas/src/index.ts:20-40`
+- Modify: `packages/tool-schemas/tests/registry-invariants.test.ts`
+- Documentation & Ledger: `docs/superpowers/plans/slack-354-method-ledger.json`
+
+**Interfaces:**
+- Consumes: `./myslack-context.js`, `./myslack-policy.js`, `./myslack-source.js`, `./myslack-tools.js`.
+- Produces: Re-export toàn bộ hợp đồng ra entrypoint của package.
+- Invariant:
+  - `ALL_TOOLS.some(t => t.service === 'myslack') === false`.
+  - `SERVICE_REGISTRY.some(s => s.id === 'myslack') === false`.
+
+1. **Yêu cầu đối với Backend 03B (`SlackSourceStore`, `SlackPurgeRunner`):**
+   - Lưu trữ `SlackSourceEntity` bắt buộc kèm `policyRef: SlackPolicyReference`. Nếu `retentionDays === 0` -> từ chối lưu.
+   - Xử lý 5 tagged scopes của `SlackPurgeTarget`:
+     - `owner_retention`: Xoá bản sao của đúng connection/revision và policyRef khi hết hạn;
+     - `channel_membership_lost`: Xoá bản sao của kênh bị mất quyền, giữ nguyên các kênh khác;
+     - `authorization_disconnect`: Xoá toàn bộ bản sao của đúng `binding` ngắt kết nối;
+     - `resource_lifecycle`: Xoá khi tin/file bị xoá/sửa tại Slack;
+     - `workspace_consent_revocation`: So khớp cả 4 trường `{ workspaceId, policyVersion, providerProfileId, consentRevision }`, bảo vệ bản sao cấp lại dưới revision mới.
+2. **Cổng Phê Duyệt Trước Khi Code 03B/03C (Review & Staging Gate):**
+   - 02B PR 192 (`19e4e39c`) đã được chấp thuận giao diện (accepted interfaces).
+   - Cho phép xếp chồng nhánh dựa trên reviewed staging base, không ép buộc phải merge vào main ngay trước khi triển khai consumer.
+   - Leader phê duyệt hoàn tất kế hoạch 03A này.
+
+- [ ] **Step 1: Cập nhật test kiểm tra invariant trong `tests/registry-invariants.test.ts`**
+Thêm assertion kiểm tra không có bất kỳ tool hay service `myslack` nào xuất hiện trong registry mặc định.
+
+- [ ] **Step 2: Cập nhật `packages/tool-schemas/src/index.ts`**
+Export đầy đủ các module mới.
+
+- [ ] **Step 3: Chạy test suites của Slack foundation trong `@wap/tool-schemas`**
+Run:
+```bash
+npx vitest run packages/tool-schemas/tests/myslack-context.test.ts packages/tool-schemas/tests/myslack-policy.test.ts packages/tool-schemas/tests/myslack-connection.test.ts packages/tool-schemas/tests/myslack-source.test.ts packages/tool-schemas/tests/myslack-tools.test.ts packages/tool-schemas/tests/registry-invariants.test.ts
+npm run typecheck
+```
+Expected: 100% tests PASS, `typecheck` exit 0.
+
+- [ ] **Step 4: Commit**
+```bash
+git add packages/tool-schemas/src/index.ts packages/tool-schemas/tests/registry-invariants.test.ts docs/superpowers/plans/slack-354-method-ledger.json
+git commit -m "feat(slack): export source and tool contracts with reconciled 354-method ledger"
+```
+
+---
+
+## Self-Review Checklist
+
+1. **Spec Coverage:** Bao phủ toàn diện F1 (Data Retention 0, 5 mục đích chuẩn tắc & Stale Policy Ref), F2 (Multi-User & Cross-Workspace Composite Identity Isolation), F3 (5 Tagged Purge Scopes & Full Cascade Lineage), F4 (Lifecycle Independent of Automation Flag).
+2. **Step Granularity:** Mỗi task gồm 5 bước TDD Red-Green-Refactor rõ ràng, có lệnh kiểm thử cụ thể và expected outcome xác định.
+3. **Type Consistency:** Đồng bộ hoàn hảo giữa `SlackBinding`, `SlackSourceRef`, `SlackResourceType`, `SlackSourceEntity`, `SlackSourceMetadata`, `SlackPolicyReference`, `SlackPurgeTarget` và `SlackToolDefinition`.
+4. **Proportion:** Kế hoạch tập trung sâu vào hợp đồng interface và ranh giới module, không viết trước hàng nghìn dòng code triển khai của backend.
+5. **Ledger Integrity:** Toàn bộ 354 phương thức từ snapshot PR 185 (head `811f5dc9`) được kiểm kê đầy đủ qua 36 snapshot families chính xác, không thiếu sót bất kỳ method nào.
