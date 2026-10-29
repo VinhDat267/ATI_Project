@@ -1,4 +1,6 @@
 import { randomBytes } from 'node:crypto';
+import { slackOAuthEnv } from './slack-env.js';
+import type { SlackOAuthConfig } from '../services/slack/oauth-client.js';
 import { GOOGLE_ENDPOINTS, type GoogleOAuthConfig } from '../auth/google-oidc.js';
 
 /** The Gmail OAuth client of its own Google Cloud project (not the sign-in client). */
@@ -36,6 +38,7 @@ export const MYSHEETS_ENDPOINTS = {
 const MYSHEETS_ENDPOINT_OVERRIDES = { authorizationUrl: 'MYSHEETS_OAUTH_AUTH_URL', tokenUrl: 'MYSHEETS_OAUTH_TOKEN_URL', revokeUrl: 'MYSHEETS_OAUTH_REVOKE_URL', apiBaseUrl: 'MYSHEETS_API_BASE_URL' } as const;
 
 export interface EnvConfig {
+  MYSLACK_OAUTH?: SlackOAuthConfig;
   DATABASE_URL: string;
   JWT_SECRET: string;
   ENCRYPTION_KEY: string;
@@ -203,6 +206,7 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
   const SCHEDULES_ENABLED = env.SCHEDULES_ENABLED === 'on';
 
   return {
+    MYSLACK_OAUTH: slackOAuthEnv(env, isLive),
     DATABASE_URL,
     JWT_SECRET,
     ENCRYPTION_KEY,

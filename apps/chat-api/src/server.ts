@@ -21,6 +21,7 @@ import { reconcileInterruptedExecutions } from './services/startup-reconciliatio
 import { createScheduleRuntime } from './config/schedules-runtime.js';
 import { AdapterFactory, type AdapterContext } from './services/adapter-factory.js';
 import { GmailConnectionRepo } from './db/repositories/gmail-connection-repo.js';
+import { SlackConnectionRepo } from './db/repositories/slack-connection-repo.js';
 import { GmailOAuthClient } from './services/gmail/oauth-client.js';
 import { GmailTokenManager } from './services/gmail/token-manager.js';
 import { createGmailConnectionLookup, createMyCalendarConnectionLookup, createMySheetsConnectionLookup } from './services/gmail/connection-reference.js';
@@ -349,6 +350,7 @@ async function bootstrap() {
 
   // 7. Express App
   const app = createApp({
+    myslack: env.MYSLACK_OAUTH && pool && userRepo ? { oauth: env.MYSLACK_OAUTH, repo: new SlackConnectionRepo(pool) } : undefined,
     jwtSecret: env.JWT_SECRET,
     runtimeMode: env.RUNTIME_MODE,
     userRepo,
