@@ -208,7 +208,9 @@ export class SlackPolicyEventConsumer {
 
       // Receipt + barriers + intents are committed atomically before this event is counted
       // as processed or acknowledged. Empty effects still stage a receipt (no fallback
-      // wildcard barrier is created when no old source is currently stored).
+      // wildcard barrier is created when no old source is currently stored). The durable
+      // slack_policy_events row remains available to 03B2, which can find receipts without
+      // derived intents and reconstruct derived-copy obligations without blocking regrants.
       const client = await this.pool.connect();
       try {
         await client.query('BEGIN');

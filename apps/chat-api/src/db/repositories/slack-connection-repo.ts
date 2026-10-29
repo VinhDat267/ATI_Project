@@ -76,7 +76,9 @@ export class SlackConnectionRepo {
       await c.query('BEGIN');
       try {
         await c.query('DELETE FROM slack_oauth_states WHERE user_id=$1', [userId]);
-        await c.query("UPDATE slack_connections SET status='disconnected',config=NULL,identity_version=identity_version+1,refresh_in_flight=false WHERE id=$1 AND user_id=$2 AND status<>'disconnected'", [id, userId]);
+        // Acquire invalidation advisory locks before taking the connection row lock. Source
+        // writers take the same advisory locks before SELECT ... FOR SHARE on this row, so
+        // both paths follow one advisory -> authority-row hierarchy and cannot AB-BA deadlock.
         if (row && row.status !== 'disconnected' && this.invalidationService) {
           const oldBinding: SlackBinding = {
             atiUserId: row.user_id,
@@ -114,6 +116,7 @@ export class SlackConnectionRepo {
             ],
           });
         }
+        await c.query("UPDATE slack_connections SET status='disconnected',config=NULL,identity_version=identity_version+1,refresh_in_flight=false WHERE id=$1 AND user_id=$2 AND status<>'disconnected'", [id, userId]);
         await c.query('COMMIT');
       } catch (e) { await c.query('ROLLBACK'); throw e; }
       if (row?.status !== 'disconnected' && row?.config && revoke) await revoke(row);

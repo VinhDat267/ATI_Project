@@ -199,6 +199,21 @@ export class SlackSourceRepo {
       throw new Error('TTL_EXCEEDS_SERVER_CEILING: raw source expiry must stay within 7 days');
     }
 
+    // Fail closed when a caller invokes this caller-managed primitive without BEGIN:
+    // SAVEPOINT is only valid inside a transaction, and MySQL-style autocommit would
+    // otherwise let each statement below commit independently of the barrier guard.
+    try {
+      await client.query('SAVEPOINT slack_source_write_tx_guard');
+      await client.query('RELEASE SAVEPOINT slack_source_write_tx_guard');
+    } catch (err) {
+      if ((err as { code?: string }).code === '25P01') {
+        throw new Error(
+          'SAVE_SOURCE_OUTSIDE_TRANSACTION: saveSourceInTransaction requires an active transaction'
+        );
+      }
+      throw err;
+    }
+
     // Serialize against invalidation barriers for this exact binding/resource/channel/epoch
     // before evaluating them. Lock order is sorted globally, matching stageInTransaction.
     await acquireSlackInvalidationLocks(

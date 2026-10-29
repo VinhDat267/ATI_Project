@@ -3,7 +3,13 @@ import { createHash, randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { SlackConnectionRepo } from '../../src/db/repositories/slack-connection-repo.js';
+import {
+  SlackInvalidationService,
+  acquireSlackInvalidationLocks,
+  slackInvalidationLockKeys,
+} from '../../src/services/slack/slack-invalidation-service.js';
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
+import type { SlackBinding } from '@wap/tool-schemas';
 const hash = (s: string) => createHash('sha256').update(s).digest('hex');
 describe('Slack workspace connections on PostgreSQL', () => {
   let db: Awaited<ReturnType<typeof createMigratedSchema>>, repo: SlackConnectionRepo;
@@ -121,6 +127,75 @@ describe('Slack workspace connections on PostgreSQL', () => {
     expect(victimAfter!.status).toBe('reconnect_required');
     expect(await repo.list(b.id)).toHaveLength(0);
   });
+  it('disconnect takes invalidation locks before the connection row, matching the source-writer lock order', async () => {
+    const a = await db.person();
+    const f = await flow(a);
+    const state = await repo.consume({ ...f, userId: a.id, sessionId: a.sid });
+    const conn = await repo.save(a.id, state!.id, input('T_LOCK_ORDER'));
+    expect(conn).toBeTruthy();
+    const binding: SlackBinding = {
+      atiUserId: conn!.user_id,
+      connectionId: conn!.id,
+      workspaceId: conn!.workspace_id,
+      slackUserId: conn!.actor_id,
+      identityVersion: conn!.identity_version,
+    };
+
+    const invalidation = new SlackInvalidationService(db.pool);
+    let markStageEntered!: () => void;
+    const stageEntered = new Promise<void>(resolve => { markStageEntered = resolve; });
+    const originalStage = invalidation.stageInTransaction.bind(invalidation);
+    invalidation.stageInTransaction = async (client, effectInput) => {
+      markStageEntered();
+      return originalStage(client, effectInput);
+    };
+    const observedRepo = new SlackConnectionRepo(db.pool, invalidation);
+
+    // Hold the exact advisory lock a source writer takes before FOR SHARE on the connection
+    // row. If disconnect updated the row before staging, this test's FOR SHARE would time out.
+    const holder = await db.pool.connect();
+    let committed = false;
+    try {
+      await holder.query('BEGIN');
+      await holder.query("SET LOCAL lock_timeout = '1500ms'");
+      await acquireSlackInvalidationLocks(
+        holder,
+        slackInvalidationLockKeys({ barrierType: 'binding', binding, reason: 'lock_order_hold' })
+      );
+
+      const disconnectPromise = observedRepo.disconnect(a.id, conn!.id);
+      await stageEntered;
+      await holder.query('SELECT id FROM slack_connections WHERE id=$1 FOR SHARE', [conn!.id]);
+      await holder.query('COMMIT');
+      committed = true;
+      await disconnectPromise;
+    } finally {
+      if (!committed) {
+        try { await holder.query('ROLLBACK'); } catch { /* connection may have errored */ }
+      }
+      holder.release();
+    }
+
+    const after = await db.pool.query(
+      'SELECT status, identity_version FROM slack_connections WHERE id=$1',
+      [conn!.id]
+    );
+    expect(after.rows[0].status).toBe('disconnected');
+    expect(after.rows[0].identity_version).toBe(conn!.identity_version + 1);
+    const barriers = await db.pool.query(
+      'SELECT source_event_key, barrier_type FROM slack_invalidation_barriers WHERE connection_id=$1',
+      [conn!.id]
+    );
+    expect(barriers.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source_event_key: `disconnect:${conn!.id}:${conn!.identity_version}`,
+          barrier_type: 'binding',
+        }),
+      ])
+    );
+  });
+
   it('migration 0015 is idempotent and repeatable with real non-empty states and connections', async () => {
     const p = await db.person();
     // 1. Seed an existing saved connection

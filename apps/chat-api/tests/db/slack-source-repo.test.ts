@@ -617,4 +617,32 @@ describe('SlackSourceRepo on PostgreSQL (03B1)', () => {
     expect(() => compareSlackRevisions('100.1', 'not-a-number')).toThrow(TypeError);
     expect(() => compareSlackRevisions('', '100.1')).toThrow(TypeError);
   });
+
+  it('T2.11: caller-managed write primitive fails closed outside an explicit transaction', async () => {
+    const env = await seedEnvironment('T_OUTSIDE_TX');
+    const sourceRef: SlackSourceRef = {
+      binding: env.binding,
+      resourceType: 'message',
+      resourceId: 'MSG_OUTSIDE_TX',
+      revision: '7.1',
+    };
+    const client = await db.pool.connect();
+    try {
+      await expect(
+        repo.saveSourceInTransaction(client, {
+          sourceRef,
+          policyRef: env.policyRef,
+          untrustedContent: 'must never persist without a transaction',
+        })
+      ).rejects.toThrow(/SAVE_SOURCE_OUTSIDE_TRANSACTION/);
+    } finally {
+      client.release();
+    }
+
+    const rows = await db.pool.query(
+      'SELECT count(*)::int AS n FROM slack_sources WHERE owner_source_key = $1',
+      [formatSlackOwnerSourceKey(sourceRef)]
+    );
+    expect(rows.rows[0].n).toBe(0);
+  });
 });

@@ -281,7 +281,8 @@ git diff --check ce9380e9
   - `apps/chat-api/src/services/slack/slack-policy-event-consumer.ts`: Tiêu thụ sự kiện chính sách từ 02B (`slack_policy_events`) sử dụng anti-join chống starvation, mở rộng sự kiện sang exact old epochs đã lưu.
   - `apps/chat-api/src/services/slack/slack-invalidation-runner.ts`: Background periodic worker quét xóa TTL hết hạn (raw-only không cần live token), xử lý intents `slack_source_raw`, phục hồi stale lease.
   - `apps/chat-api/src/app.ts` & `apps/chat-api/src/server.ts`: Tích hợp khởi động và dọn dẹp runner trong vòng đời máy chủ Express.
-  - `apps/chat-api/tests/db/slack-source-repo.test.ts`: 11 test cases (thêm T2.8/T2.9 chứng minh khóa advisory hai client thật cho resource-delete-before-save và source-write-before-delete; T2.10 biên nội dung/metadata/capturedAt).
+  - `apps/chat-api/tests/db/slack-source-repo.test.ts`: 12 test cases (thêm T2.8/T2.9 chứng minh khóa advisory hai client thật cho resource-delete-before-save và source-write-before-delete; T2.10 biên nội dung/metadata/capturedAt; T2.11 primitive ghi caller-managed từ chối khi không có transaction).
+  - `apps/chat-api/tests/db/slack-connection-repo.test.ts`: 9 test cases (thêm kiểm chứng thứ tự khóa: `disconnect` lấy advisory lock trước row lock, cùng phân cấp với source writer).
   - `apps/chat-api/tests/services/slack/slack-invalidation-service.test.ts`: 11 test cases (thêm T3.7 concurrent duplicate dưới event lock, T3.8 payload conflict, T3.9 full 5-field binding matching, T3.10 purge target mismatch, T3.11 provisional sourceEventKey persistence).
   - `apps/chat-api/tests/services/slack/slack-source-store.test.ts`: 12 test cases (thêm T4.6 full capture identity, T4.7 runtime policy denial, T4.8 regrant race, T4.9 metadata DB inspection, T4.10 future capturedAt, T4.11 acquisition purpose denial, T4.12 expectedPolicyEpoch).
   - `apps/chat-api/tests/services/slack/slack-policy-event-consumer.test.ts`: 6 test cases (thêm T5.4 consent_granted exact old epoch, T5.5 provider_updated exact old epoch, T5.6 no-source revocation không tạo wildcard barrier và regrant mới không bị chặn).
@@ -291,18 +292,20 @@ git diff --check ce9380e9
 ```text
  RUN  v4.1.11 C:/Users/VinhDat/orca/workspaces/ATI_Project/feat-slack-03b1-source-store/apps/chat-api
 
- Test Files  5 passed (5)
-      Tests  44 passed (44)
-   Start at  00:58:57
-   Duration  5.08s (transform 2.07s, setup 0ms, import 3.36s, tests 15.38s, environment 1ms)
+ Test Files  6 passed (6)
+      Tests  54 passed (54)
+   Start at  01:22:45
+   Duration  5.97s (transform 2.56s, setup 0ms, import 4.36s, tests 25.15s, environment 1ms)
 ```
+Gồm 45 test của 5 tệp SLACK-03B1 và 9 test của `slack-connection-repo.test.ts` bị ảnh hưởng bởi thay đổi thứ tự khóa. Toàn bộ package `chat-api`: 110 tệp / 799 test PASS.
 
 ### Bằng Chứng Vòng Independent Review:
 - Baseline review harness (`.superpowers/review-source/red.log`): 1 PASS / 7 RED trước khi sửa.
-- Sau khi sửa: `npx tsx .superpowers/review-source/review.mts` trả EXIT=0, toàn bộ 8/8 assertion PASS (log `.superpowers/review-source/after-core-run.log`).
+- Sau khi sửa: `npx tsx .superpowers/review-source/review.mts` trả EXIT=0, toàn bộ 8/8 assertion PASS (log `.superpowers/review-source/after-core-run.log`; chạy lại trên mã sau rà soát an toàn tại `.superpowers/review-source/final-security-run.log`, vẫn 8/8 PASS).
 - Các sửa đổi chính: `saveSource` ủy quyền lại policy hiện tại cho cả acquisition và storage với epoch chính xác, barrier guard + advisory lock trong cùng transaction ghi; `getSource` khóa đầy đủ 5 trường binding + resource type/id/revision + epoch bất biến và đọc lại dòng mới nhất trước khi trả plaintext; metadata whitelist/bound trước DB write; capturedAt tương lai bị từ chối; consumer xử lý đủ 4 loại sự kiện, chỉ mở rộng exact old epochs, không fallback `conversation:*`; runner chỉ ghi mã lỗi thô.
+- Vòng rà soát an toàn bổ sung sau commit `a38267d1`: `disconnect` lấy advisory lock của invalidation trước khi UPDATE row (cùng phân cấp advisory → row với source writer, có test hai client); `saveSourceInTransaction` fail-closed bằng SAVEPOINT probe khi thiếu transaction; migration 0017 thêm `ALTER TABLE ... ADD COLUMN IF NOT EXISTS provisional_source_event_key` để không lệch schema đã migrate; nhánh không có nguồn cũ vẫn chỉ ghi receipt, không tạo wildcard barrier, và receipt không intent là seam rõ ràng để 03B2 tái dựng nghĩa vụ bản sao phái sinh từ `slack_policy_events`. Không mở rộng sang F3/native Slack.
 
 ### Typecheck & Git Diff Check:
 - `npm run typecheck:v3`: Exit code 0 (Hoàn toàn sạch types trên toàn bộ monorepo).
 - `git diff --check 62f7a7bb`: Exit code 0 (Không lỗi khoảng trắng, không xung đột).
-- `npm run check`: PASS trên mã cuối cùng, EXIT=0 (tool-schemas 266, tool-adapters 443, planner 381, executor 42, chat-api 797, chat-web 901, evaluations 406; build/security/launcher PASS).
+- `npm run check`: PASS trên mã cuối cùng, EXIT=0 (log `.superpowers/review-source/final-security-npm-check.log`; tool-schemas 266, tool-adapters 443, planner 381, executor 42, chat-api 799, chat-web 901, evaluations 406; build/security/launcher PASS).

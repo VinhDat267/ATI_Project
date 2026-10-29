@@ -400,6 +400,14 @@ describe('SlackPolicyEventConsumer on PostgreSQL (03B1)', () => {
     );
     expect(barriers.rows).toHaveLength(0);
 
+    // The durable policy event + receipt remains the explicit 03B2 seam: a receipt with no
+    // derived intents can be expanded later without a barrier that would block a regrant.
+    const noSourceIntents = await db.pool.query(
+      'SELECT id FROM slack_invalidation_intents WHERE source_event_key = $1',
+      [`policy:${revokeEvent.rows[0].id}`]
+    );
+    expect(noSourceIntents.rows).toHaveLength(0);
+
     const fresh = await consentRepo.grantConsent({
       workspaceId: env.workspaceId,
       providerId: 'provider-1',

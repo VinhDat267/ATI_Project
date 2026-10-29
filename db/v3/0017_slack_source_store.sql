@@ -74,6 +74,10 @@ CREATE TABLE IF NOT EXISTS slack_invalidation_barriers (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT uq_slack_barriers_source_effect UNIQUE(source_event_key, effect_key)
 );
+-- Forward-compatible for databases that created this table before the provisional source
+-- event key existed; CREATE TABLE IF NOT EXISTS alone would leave those schemas stale.
+ALTER TABLE slack_invalidation_barriers
+  ADD COLUMN IF NOT EXISTS provisional_source_event_key TEXT;
 CREATE INDEX IF NOT EXISTS idx_slack_barriers_active
   ON slack_invalidation_barriers(workspace_id, barrier_type) WHERE active = true;
 CREATE INDEX IF NOT EXISTS idx_slack_barriers_connection
