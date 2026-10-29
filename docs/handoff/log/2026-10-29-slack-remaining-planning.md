@@ -1,75 +1,78 @@
-# 29/10/2026 · Lập Kế hoạch và Soạn thảo Task Cards SLACK-03–07
+# 29/10/2026 · Lập Kế hoạch và Soạn thảo Task Cards SLACK-03–07 (Bản Sửa sau Review)
 
-**Ủy quyền:** Chủ dự án chỉ định Trưởng nhóm điều phối / Reviewer (Coordinator) và Antigravity builder xây dựng lộ trình chi tiết bằng tài liệu cho toàn bộ các task Slack còn lại (SLACK-03, 04, 05, 06, 07).
-**Phạm vi phiên:** **CHỈ TÀI LIỆU KẾ HOẠCH (Documentation Planning Only)**. Không sửa mã nguồn sản phẩm, không sửa `CURRENT-STATE.md`, `ROADMAP.md`, `SLACK-01B` hoặc `SLACK-02`. Không gọi mô hình thật, không cài ứng dụng Slack live, không bật cờ và không merge PR.
+**Ủy quyền:** Chủ dự án chỉ định Trưởng nhóm điều phối / Reviewer (Coordinator) và Antigravity builder hoàn thiện lộ trình chi tiết bằng tài liệu cho toàn bộ các task Slack còn lại (SLACK-03, 04, 05, 06, 07), khắc phục triệt để 6 nhóm ý kiến thẩm định từ Coordinator.
+**Phạm vi phiên:** **CHỈ TÀI LIỆU KẾ HOẠCH (Documentation Planning Only)**. Tuyệt đối không sửa mã nguồn sản phẩm, không sửa `CURRENT-STATE.md`, `ROADMAP.md`, `SLACK-01B` hoặc `SLACK-02`. Không gọi mô hình thật, không cài ứng dụng Slack live, không bật cờ và không merge PR.
 **Nhánh làm việc:** `VinhDat267/docs-slack-remaining-roadmap` · **Base commit:** `fc12e3fb` (sau merge SLACK-01 #183).
 
 ---
 
-## 1. Kết quả Bàn giao Tài liệu
+## 1. Khắc phục Toàn diện 6 Nhóm Ý kiến Thẩm định (Review Findings Addressed)
 
-Phiên làm việc đã tạo mới 7 tài liệu chuẩn mực đáp ứng đầy đủ quy chuẩn Superpowers `writing-plans` và giao thức bàn giao đa agent `AGENTS.md`:
+### F1. Đối chiếu Ứng viên PR 184 & Giao diện Phụ thuộc Hợp đồng
+- **Nhận diện đúng hiện trạng PR 184:** Acknowledge draft PR 184 (`ac448dd39fd8b9188c4ebc967cb735454bbc803d`) hiện có migration `db/v3/0014_slack_oauth_connections.sql` định nghĩa bảng `slack_connections` và `slack_oauth_states`.
+- **Không tạo migration trùng lặp:** Tuyệt đối không tạo file thứ hai `0014_...sql`. Các migration tiếp theo từ SLACK-03 trở đi được đánh số đề xuất `[proposed: NNNN_...sql]` và sẽ được cấp số thứ tự chính thức sau khi backend head được phê duyệt và merge.
+- **Minh bạch tình trạng thẩm định PR 184:** Ghi nhận trung thực rằng PR 184 CHƯA ĐẠT REVIEW do phát hiện lỗi tái hiện trên PostgreSQL thật (hai OAuth state hợp lệ cùng session ATI nhưng khác workspace bị lệnh DELETE toàn cục xóa mất 1 state), đồng thời PR 184 vẫn chưa có bảng chấp thuận tổ chức F1 `slack_consent_records`.
+- **Chuẩn hóa Hợp đồng Yêu cầu (Prerequisite Requirements):**
+  - Chữ ký tra cứu bắt buộc có kiểm tra quyền sở hữu của caller (caller ownership): `getConnectionForUser(atiUserId, connectionId, expectedIdentityVersion)`. Tuyệt đối không dùng hàm không an toàn `getConnection(id)`.
+  - Tuyệt đối không truyền token mã hóa (`tokenEncrypted`, `config`) vào planner hoặc shared public DTO. DTO công khai / lập kế hoạch chỉ mang `SlackBinding` và metadata sức khỏe kết nối.
 
-### A. Năm Task Cards Chi tiết tại `docs/handoff/tasks/`:
-1. [`SLACK-03-tool-catalog-and-source-lifecycle.md`](../tasks/SLACK-03-tool-catalog-and-source-lifecycle.md):
-   - Phân rã 5 giai đoạn bounded PRs: 03A (Schemas & Contracts), 03B (Source Store & Purge Runner), 03C (Core Conversations & Chat & Users), 03D (Content & Collaboration Families), 03E (Advanced Families & Inventory Reconciliation).
-   - Kiểm soát toàn diện 343 method đã đóng băng: 97 method loại trừ có lý do xác đáng, 246 method cần probe; tuyệt đối không tạo generic dispatcher `method + args`.
-   - Bảo toàn bất biến F2 (Workspace binding bất biến) và F3 (Tombstone tức thì và cascade purge khi ngắt kết nối hoặc xóa tin).
-   - Mở khóa sớm: Cho phép SLACK-04 khởi động ngay sau giai đoạn 03C.
-2. [`SLACK-04-ingress-lifecycle-and-execution-safety.md`](../tasks/SLACK-04-ingress-lifecycle-and-execution-safety.md):
-   - Ingress ký số HMAC-SHA256 trên raw buffer trong bộ nhớ; chống replay với cửa sổ timestamp 300s; ACK nhanh < 3s.
-   - Bảo toàn bất biến F4: Khi cờ automation tắt hoặc workspace tạm dừng, tin nhắn thường được ACK và bỏ qua trong bộ nhớ (không lưu body, không tạo job AI); nhưng sự kiện vòng đời (`tokens_revoked`, `app_uninstalled`, `message_deleted`, `message_changed`) vẫn được xử lý để purge dữ liệu nguồn.
-   - Phân giải quyền (Authorizations Fanout) qua app token `apps.event.authorizations.list`; cô lập hoàn toàn nội dung DM giữa các thành viên.
-   - An toàn thực thi: Echo Guard đối soát outbox ledger để chặn lặp đệ quy mà không lọc bỏ tin nhắn người dùng tự gõ; trạng thái UNKNOWN khi mạng ngắt quãng sau commit tuyệt đối không tự retry ghi mù.
-3. [`SLACK-05-workspace-modes-and-triage-engine.md`](../tasks/SLACK-05-workspace-modes-and-triage-engine.md):
-   - Ba chế độ độc lập per `(ATI user, connection)`: Luật, AI, và Kết hợp (Hybrid - mặc định).
-   - Ranh giới liên quan cá nhân chuẩn tắc (do chủ dự án phê duyệt): Chỉ tạo đề xuất việc cho tin nhắn mention cá nhân, DM trực tiếp, tự nhận việc, hoặc thread được chủ động theo dõi (`followed_threads`); tin nhắn chung `@here`/`@channel` trả về `no_action`.
-   - Cổng kiểm soát F1 Model Policy: Xác minh consent tổ chức và provider không dùng dữ liệu huấn luyện trước MỌI lời gọi mô hình.
-   - CAS configuration versioning (`configVersion`), gom tin cùng thread 30s (debounce), giới hạn ngữ cảnh 20 tin / 20k ký tự, và bảo tồn hàng đợi khi chạm trần ngân sách (`paused_budget_exceeded`).
-4. [`SLACK-06-inbox-workflows-and-approvals.md`](../tasks/SLACK-06-inbox-workflows-and-approvals.md):
-   - Giao diện Hộp đề xuất (Proposal Inbox) trong ATI Cockpit, phân chia theo workspace và danh tính người đại diện, hỗ trợ responsive 1440px / 375px và dark mode.
-   - Cổng phê duyệt bắt buộc trước MỌI thao tác ghi (Explicit Approval Gate); xem trước preview chi tiết; chỉnh sửa tham số trong chat tự động sinh kế hoạch và `planHash` mới.
-   - Workflows liên dịch vụ thực tế: Slack mention → Trello card + Slack thread reply; bug report → Jira; update → Sheets.
-   - Bản tổng hợp hàng ngày (Daily Digest lúc 09:00) tích hợp scheduler (gated by `SCHEDULES_ENABLED`), không tự ý ghi.
-   - Thực thi F3 UI Masking: Che hoặc xóa trích đoạn nguồn ngay khi tin nhắn bị xóa hoặc kết nối bị thu hồi.
-5. [`SLACK-07-evaluations-and-live-acceptance.md`](../tasks/SLACK-07-evaluations-and-live-acceptance.md):
-   - Đóng băng bộ dữ liệu đo (ground truth labels) TRƯỚC lời gọi model đầu tiên; 3 lượt đo / mode (9 runs benchmark).
-   - Ngưỡng đạt chuẩn: Precision ≥ 90%, Recall ≥ 85%, 0 unapproved writes (Hard Gate), 0 cross-user leaks (Hard Gate).
-   - Nghiệm thu thực tế (P-LIVE) trên cả Free và Pro, 2 người dùng trong cùng workspace, và readback độc lập cho từng nhóm phương thức.
-   - Quy trình bật cờ chuẩn tắc: Tách riêng một PR kích hoạt `MYSLACK_ENABLED` và `MYSLACK_AUTOMATION_ENABLED` chỉ sau khi toàn bộ suite đã được nghiệm thu.
+### F2. Đối chiếu Toàn diện Danh mục 354 Methods (PR 185 Inventory Reconciliation)
+- Cập nhật số liệu kiểm kê theo snapshot mới nhất PR 185 (head `811f5dc9`):
+  - Tổng số: **354 phương thức** canonical.
+  - **101 phương thức loại trừ (`excluded`):** 96 method Enterprise-only (bao gồm 4 method `admin.slackbot.skills.*`), 3 method deprecated/retired (`files.upload`, `rtm.start`, `users.setActive`), 2 method app-level token.
+  - **253 phương thức cần probe (`probe_required`):** Bổ sung 7 method người dùng mới `slackbot.skills.*` (yêu cầu probe Free/Pro và Canvas dependency).
+  - **265 phương thức có user scopes; 89 phương thức chưa xác định token eligibility.**
+  - **Toàn bộ 354 method hiện có trạng thái `deliveryStatus: not_implemented`.**
+- Ở task 03E, xây dựng sổ cái đối soát rõ ràng cho từng nhóm phương thức: `conversations` (28 total), `chat` (13), `users` (13 total), `search` (3), `files` (14 total), `pins` (3), `reactions` (4), `bookmarks` (4), `reminders` (5), `stars` (3), `dnd` (5), `canvases` (7), `slackLists` (12), `skills` (7), `team` (7), `usergroups` (7), `apps` (21), `assistant` (5), `agents` (11), `admin` (36), `calls` (6), `functions` (8), `workflows` (8), `views` (4), `blocks` (1), `bots` (1), `dialog` (1), `emoji` (1), `entity` (3), `migration` (1), `rtm` (1), `tooling` (1), `auth` (2), `api` (1).
+- Tuyệt đối không để nhóm nào biến mất hoặc gộp vào generic dispatcher `method + args`.
 
-### B. Kế hoạch Triển khai Tổng thể:
-- [`docs/superpowers/plans/2026-10-29-slack-remaining-delivery.md`](../../superpowers/plans/2026-10-29-slack-remaining-delivery.md):
-  - Kế hoạch đầy đủ theo chuẩn `writing-plans`: Header, Global Constraints, Review Focus (5 failure modes chí mạng), Phân rã 18 Tasks chi tiết từ 03A đến 07D.
-  - Mỗi task có đầy đủ danh mục files tạo/sửa, interface tiêu chuẩn, và chu trình TDD (Step 1 Red → Step 3 Green → Step 5 Commit).
-  - Phân định rõ 3 cấp độ bằng chứng: Offline Fixture Verification (CI xanh không cần secret), External Prerequisites (điều kiện môi trường thật cần người vận hành), và True Release Gates.
+### F3. Loại bỏ Giả định Sai về Entitlement & Xác minh Nguồn Cấp 1
+- **Xóa bỏ khẳng định sai về `search.*`:** Theo tài liệu chính thức của Slack, `search.*` yêu cầu scope `search:read`; điều kiện gói dịch vụ (plan requirement) ghi rõ: *"Not established by metadata; native plan probe required"*. Do đó, `search.*` KHÔNG được mặc định gán là "yêu cầu gói Pro", mà phải giữ đúng trạng thái `probe_required`.
+- Xác minh số lượng phương thức chính xác từ metadata: `conversations` có 28 methods (27 standard + 1 canvas op), `chat` có 13 methods, `users` có 13 methods (12 candidate/probe + 1 deprecated `setActive`).
+- Ghi rõ: Metadata và HTTP fixture không phải là bằng chứng nghiệm thu Free/Pro; không hứa hẹn tính khả dụng phổ quát khi chưa có kết quả probe native.
 
----
+### F4. Chuẩn hóa Phân chia Module & Xác minh Tệp Mã nguồn Tồn tại
+- Mỗi sub-task/PR chỉ có đúng MỘT vai trò sở hữu mã nguồn:
+  - AI / Schema: `packages/tool-schemas/`, `packages/planner/`, `prompts/`, `evaluations/`
+  - Integration / Adapter: `packages/tool-adapters/`
+  - Backend: `apps/chat-api/`, `packages/executor/`, `db/v3/`
+  - Frontend: `apps/chat-web/`
+- Loại bỏ các đường dẫn tệp không tồn tại trong codebase:
+  - Thay thế `packages/executor/src/step-executor.ts` (không tồn tại) bằng các tệp thực tế đã được xác minh: `packages/executor/src/runner.ts` và `packages/executor/src/controller.ts`.
+  - Thay thế `packages/planner/src/workflow-planner.ts` (không tồn tại) bằng `packages/planner/src/planner.ts`.
+- Gắn nhãn chuẩn xác: Tệp mới đánh dấu `Create:`, tệp hiện hữu đánh dấu `Modify (verified):`. Toàn bộ lệnh kiểm tra tương lai gắn nhãn `[Proposed: not run]`.
 
-## 2. Xử lý Cổng Phụ thuộc SLACK-02 (Explicit Review Gate)
+### F5. Bảo toàn Bất biến Cốt lõi & Khắc phục Bước Ingress 04A
+- Giữ vững 4 bất biến F1–F4:
+  - F1: Chặn mọi dữ liệu nguồn vào model nếu thiếu consent tổ chức hoặc provider chưa xác minh.
+  - F2: Bảo toàn binding bất biến từ lookup -> gather -> memory -> preview -> execution.
+  - F3: Tombstone tức thì và cascade purge toàn bộ các bản sao nguồn (chat messages, plan args, memory snapshots, schedules).
+  - F4: Vòng đời nguồn và purge hoạt động độc lập với cờ tính năng.
+- **Khắc phục then chốt cho Bước 04A:**
+  - TUYỆT ĐỐI KHÔNG gửi ACK 200 cho các sự kiện yêu cầu xử lý công việc TRƯỚC KHI receipt và queue job đã commit bền vững vào DB.
+  - Nếu DB lỗi -> trả 500/503 để Slack retry.
+  - Khi cờ automation tắt hoặc workspace pause: Ký số hợp lệ -> ACK 200 và discard body trong memory (không ghi body vào DB); nhưng các sự kiện vòng đời (`tokens_revoked`, `app_uninstalled`, `message_deleted`, `message_changed`) vẫn được ghi nhận và purge đầy đủ.
+- Giao thức ghi an toàn (Outbox ledger, Echo guard, UNKNOWN guard) bắt buộc phải được thẩm định độc lập trước khi mở bất kỳ tool ghi nào.
 
-SLACK-02 (OAuth cá nhân và multi-workspace repository) đang được lập kế hoạch song song. Để tránh giả lập pass giả:
-- Kế hoạch xác định rõ giao diện yêu cầu: `getSlackConnection()`, `getActiveConnectionsForUser()`, `getSlackConsent()`, và interface `SlackConnectionRecord`.
-- Thiết lập Review Gate độc lập: Reviewer phải thẩm định interface kết nối trước khi chạy integration test cho các module tiêu thụ ở backend.
-- Các task của SLACK-03 có thể thi công tầng schema (03A) và mock adapter contract độc lập mà không cần chờ đợi toàn bộ code SLACK-02 được merge.
-
----
-
-## 3. Kiểm tra Tự thân (Self-Review & Evidence Gates)
-
-| Hạng mục kiểm tra | Kết quả thực tế |
-|---|---|
-| Không sửa product code | `git status --porcelain` xác nhận chỉ có file mới trong `docs/` |
-| Không sửa `CURRENT-STATE.md` & `ROADMAP.md` | Giữ nguyên 100% theo đúng phân quyền `AGENTS.md` |
-| Không sửa file `SLACK-01B` / `SLACK-02` | Không có file nào bị tác động |
-| Kiểm tra cú pháp Whitespace / Diff | `git diff --check` sạch sẽ, exit code 0 |
-| Mã hóa UTF-8 | Toàn bộ 7 files lưu định dạng UTF-8 không BOM |
-| Tính toàn vẹn của liên kết tương đối | Mọi markdown link trỏ đúng cấu trúc thư mục repo |
+### F6. Kiểm tra Toàn vẹn Diff, Bàn giao và Mở Draft PR
+- Chạy `git diff --check fc12e3fb HEAD`: Đạt 100%, exit code 0, không có trailing whitespace hay lỗi CRLF/LF.
+- Mở Draft PR trên GitHub với nhãn `awaiting-review` theo đúng biểu mẫu `.github/pull_request_template.md`.
 
 ---
 
-## 4. Bàn giao và Bước tiếp theo
+## 2. Kết quả Tự Kiểm tra (Self-Review & Verification)
 
-1. Toàn bộ tài liệu được commit vào nhánh `VinhDat267/docs-slack-remaining-roadmap` dưới dạng bản thảo roadmap.
-2. Không thực hiện push/PR hay merge trước khi Trưởng nhóm điều phối (Coordinator / Reviewer) kiểm tra độc lập.
-3. Gửi thông báo `worker_done` về terminal điều phối và chuyển sang trạng thái chờ chỉ đạo tiếp theo.
+| Hạng mục kiểm tra | Lệnh thực hiện | Kết quả thực tế |
+|---|---|---|
+| Cú pháp Whitespace / Diff | `git diff --check fc12e3fb HEAD` | Clean, exit code 0 |
+| Trạng thái Working Tree | `git status --porcelain` | Sạch sẽ, không có file thừa |
+| Ranh giới Module | `git diff --name-only fc12e3fb HEAD` | 100% thuộc `docs/` |
+| Bảo vệ Mã nguồn & Trạng thái | Kiểm tra `apps/`, `packages/`, `CURRENT-STATE.md`, `ROADMAP.md` | Không có bất kỳ thay đổi nào |
+
+---
+
+## 3. Bàn giao và Bước tiếp theo
+
+1. Toàn bộ 7 tài liệu kế hoạch đã được cập nhật và commit tại nhánh `VinhDat267/docs-slack-remaining-roadmap`.
+2. Đã push nhánh lên remote origin và mở Draft PR với đầy đủ nội dung theo mẫu quy định.
+3. Gửi thông báo `worker_done` về điều phối viên với Task ID `task_3e5438e47132` và Dispatch ID `ctx_236f2b5d0bf8`, sau đó chuyển sang trạng thái chờ chỉ đạo tiếp theo.

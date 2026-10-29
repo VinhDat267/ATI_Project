@@ -4,8 +4,8 @@
 **Nhánh dự kiến:** `feat/slack-05-workspace-modes-and-triage-engine`.
 **Nền đối chiếu:** `fc12e3fb` (sau merge SLACK-01 #183).
 **Phụ thuộc:**
-- **SLACK-01** (Policy `decideSlackModelUse`, Foundation contracts) — ĐÃ HOÀN TẤT (`fc12e3fb`).
-- **SLACK-02** (Cấu hình người dùng, connection store, F1 consent) — Yêu cầu interface cấu hình và consent.
+- **SLACK-01** (Policy pure contract `decideSlackModelUse`) — ĐÃ HOÀN TẤT (`fc12e3fb`).
+- **SLACK-02 (Đối chiếu Ứng viên PR 184):** PR 184 chưa có bảng chấp thuận tổ chức F1 `slack_consent_records`; card này yêu cầu cổng chấp thuận F1 phải được định nghĩa và nạp dữ liệu trước khi cho phép AI Triage Worker hoạt động.
 - **SLACK-03** (Source store và tool adapters) — Yêu cầu `SlackSourceStore` và các công cụ đọc.
 - **SLACK-04** (Queue jobs và fanout) — Nhận `slack_triage_jobs` từ ingress.
 **Đặc tả chuẩn tắc:** [Slack cá nhân và trợ lý công việc](../../superpowers/specs/2026-10-28-slack-personal-oauth-design.md) (Mục 3, 4.4, 6, 10).
@@ -42,39 +42,43 @@ Card này xây dựng động cơ phân loại tin nhắn (Triage Engine) với 
 ## 2. Phân chia Module và Quyền sở hữu (Module Ownership)
 
 - **AI Engineer:** Sở hữu `packages/planner/src/slack/`, `prompts/slack-triage.prompt.txt`, `packages/tool-schemas/src/myslack-config.ts`.
-- **Backend Engineer:** Sở hữu `apps/chat-api/src/services/slack/slack-triage-worker.ts`, `apps/chat-api/src/services/slack/slack-rules-engine.ts`, `apps/chat-api/src/services/slack/slack-budget-tracker.ts`, `db/v3/0016_slack_workspace_configs.sql`.
+- **Backend Engineer:** Sở hữu `apps/chat-api/src/services/slack/slack-triage-worker.ts`, `apps/chat-api/src/services/slack/slack-rules-engine.ts`, `apps/chat-api/src/services/slack/slack-budget-tracker.ts`, `db/v3/[proposed: NNNN_slack_workspace_configs.sql]`.
 
 ---
 
 ## 3. Lộ trình Phân rã Bounded PRs
 
 ### Giai đoạn 05A: Schema Cấu hình, DB Migrations & Engine Luật (PR 1)
+- **Code Owner:** Backend Engineer (`apps/chat-api`, `db/v3`) + AI Engineer (`packages/tool-schemas`)
 - **Files:**
   - Create: `packages/tool-schemas/src/myslack-config.ts`
-  - Create: `db/v3/0016_slack_workspace_configs.sql`
+  - Create: `db/v3/[proposed: NNNN_slack_workspace_configs.sql]` (Số thứ tự migration được cấp sau khi chốt backend head)
   - Create: `apps/chat-api/src/services/slack/slack-rules-engine.ts`
-  - Tests: `packages/tool-schemas/tests/myslack-config.test.ts`, `apps/chat-api/tests/slack/slack-rules-engine.test.ts`
+  - Tests (proposed): `packages/tool-schemas/tests/myslack-config.test.ts`, `apps/chat-api/tests/slack/slack-rules-engine.test.mjs`
 - **Nội dung:**
   - Định nghĩa schema `SlackWorkspaceConfig`: `(atiUserId, connectionId, mode, enabled, configVersion, rules, budget, maxQueueLength, timezone)`.
-  - Migration 0016: Bảng `slack_workspace_configs` và `slack_followed_threads` với khóa ngoại và ràng buộc duy nhất.
+  - Migration tạo bảng `slack_workspace_configs` và `slack_followed_threads` với khóa ngoại và ràng buộc duy nhất.
   - Xây dựng `SlackRulesEngine`: So khớp siêu dữ liệu tin nhắn thuần túy (mentions, channel types, authors, regex patterns). Kiểm tra tính năng theo dõi thread (`followed_threads`).
   - Unit tests cho Rules Engine chứng minh: tin có mention cá nhân -> trigger intent; tin `@here`/`@channel` không có mention -> `no_action`.
 
 ### Giai đoạn 05B: Prompt AI Triage, F1 Enforcement & Budget Tracker (PR 2)
+- **Code Owner:** AI Engineer (`packages/planner`, `prompts`) + Backend Engineer (`apps/chat-api`)
 - **Files:**
   - Create: `prompts/slack-triage.prompt.txt`
   - Create: `packages/planner/src/slack/slack-triage-planner.ts`
   - Create: `apps/chat-api/src/services/slack/slack-budget-tracker.ts`
-  - Tests: `packages/planner/tests/slack/slack-triage-planner.test.ts`, `apps/chat-api/tests/slack/slack-budget-tracker.test.ts`
+  - Modify (verified): `packages/planner/src/planner.ts` (Tích hợp F1 policy check trước khi xử lý tin nhắn)
+  - Tests (proposed): `packages/planner/tests/slack/slack-triage-planner.test.ts`, `apps/chat-api/tests/slack/slack-budget-tracker.test.mjs`
 - **Nội dung:**
   - Xây dựng prompt phân loại AI: Nhận ngữ cảnh tin nhắn (tối đa 20 tin / 20k ký tự), thông tin người dùng được kết nối; hướng dẫn phân biệt việc liên quan cá nhân vs việc chung; yêu cầu trích dẫn nguồn cụ thể.
-  - Cổng F1 Model Policy: Tích hợp `decideSlackModelUse` trước khi gọi provider LLM. Nếu consent thiếu hoặc provider không hợp lệ -> chặn gọi model, trả về lỗi chính sách rõ ràng.
+  - Cổng F1 Model Policy: Tích hợp `decideSlackModelUse` trước khi gọi provider LLM trong `planner.ts`. Nếu consent thiếu hoặc provider không hợp lệ -> chặn gọi model, trả về lỗi chính sách rõ ràng.
   - `SlackBudgetTracker`: Theo dõi số token và số lượt gọi trong DB PG16; kiểm tra trước khi dispatch job; ngắt và đánh dấu `paused_budget_exceeded` khi chạm trần.
 
 ### Giai đoạn 05C: Worker Hợp nhất, CAS & Quản lý Hàng đợi (PR 3)
+- **Code Owner:** Backend Engineer (`apps/chat-api`)
 - **Files:**
   - Create: `apps/chat-api/src/services/slack/slack-triage-worker.ts`
-  - Tests: `apps/chat-api/tests/slack/slack-triage-worker.test.ts`
+  - Tests (proposed): `apps/chat-api/tests/slack/slack-triage-worker.test.mjs`
 - **Nội dung:**
   - Worker nhặt job từ `slack_triage_jobs` bằng transaction `FOR UPDATE SKIP LOCKED`.
   - Điều phối theo mode:
@@ -102,21 +106,23 @@ Card này xây dựng động cơ phân loại tin nhắn (Triage Engine) với 
 
 ## 5. Lệnh Kiểm tra và Cổng Bằng chứng (Command & Evidence Gates)
 
+> Toàn bộ script và test dưới đây sử dụng PostgreSQL 16 thật và HTTP Fixture thật, không dùng mock boolean. Các lệnh chưa chạy được đánh dấu `[Proposed: not run]`.
+
 1. **Kiểm tra Rules Engine & Ranh giới Liên quan:**
    ```powershell
-   # [Create] test cases cho deterministic rules & thread follow
-   node --test apps/chat-api/tests/slack/slack-rules-engine.test.mjs
+   # [Proposed: not run] Test cases cho deterministic rules & thread follow:
+   # node --test apps/chat-api/tests/slack/slack-rules-engine.test.mjs
    ```
 2. **Kiểm tra F1 Gate & Budget Enforcement:**
    ```powershell
-   # [Create] test F1 check trong triage planner và budget exhaustion
-   node --test packages/planner/tests/slack/slack-triage-planner.test.mjs
-   node --test apps/chat-api/tests/slack/slack-budget-tracker.test.mjs
+   # [Proposed: not run] Test F1 check trong triage planner và budget tracker:
+   # node --test packages/planner/tests/slack/slack-triage-planner.test.mjs
+   # node --test apps/chat-api/tests/slack/slack-budget-tracker.test.mjs
    ```
 3. **Kiểm tra Triage Worker, CAS & Debouncing:**
    ```powershell
-   # [Create] test concurrency CAS và thread debouncing với PG16 thật
-   node --test apps/chat-api/tests/slack/slack-triage-worker.test.mjs
+   # [Proposed: not run] Test concurrency CAS và thread debouncing với PG16 thật:
+   # node --test apps/chat-api/tests/slack/slack-triage-worker.test.mjs
    ```
 4. **Kiểm tra Toàn diện Suite:**
    ```powershell

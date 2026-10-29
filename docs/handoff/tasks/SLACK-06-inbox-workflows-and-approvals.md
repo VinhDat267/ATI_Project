@@ -43,20 +43,22 @@ Card này xây dựng giao diện Hộp đề xuất (Proposal Inbox) trong ATI,
 ## 2. Phân chia Module và Quyền sở hữu (Module Ownership)
 
 - **Frontend Engineer:** Sở hữu `apps/chat-web/src/components/slack/SlackProposalInbox.tsx`, `apps/chat-web/src/components/slack/SlackProposalCard.tsx`, `apps/chat-web/src/components/cockpit/`, `apps/chat-web/src/services/proposal-api.ts`.
-- **Backend Engineer:** Sở hữu `apps/chat-api/src/routes/slack-proposals.ts`, `apps/chat-api/src/services/slack/slack-proposal-service.ts`, `apps/chat-api/src/services/slack/slack-digest-service.ts`, `db/v3/0017_slack_proposals.sql`.
+- **Backend Engineer:** Sở hữu `apps/chat-api/src/routes/slack-proposals.ts`, `apps/chat-api/src/services/slack/slack-proposal-service.ts`, `apps/chat-api/src/services/slack/slack-digest-service.ts`, `db/v3/[proposed: NNNN_slack_proposals.sql]`.
+- **AI Engineer:** Sở hữu sửa đổi logic template liên dịch vụ trong `packages/planner/src/planner.ts`.
 
 ---
 
 ## 3. Lộ trình Phân rã Bounded PRs
 
 ### Giai đoạn 06A: API Đề xuất, DB Migration & Proposal Service (PR 1)
+- **Code Owner:** Backend Engineer (`apps/chat-api`, `db/v3`)
 - **Files:**
-  - Create: `db/v3/0017_slack_proposals.sql`
+  - Create: `db/v3/[proposed: NNNN_slack_proposals.sql]` (Số thứ tự migration được cấp sau khi chốt backend head)
   - Create: `apps/chat-api/src/routes/slack-proposals.ts`
   - Create: `apps/chat-api/src/services/slack/slack-proposal-service.ts`
-  - Tests: `apps/chat-api/tests/slack/slack-proposals-api.test.ts`
+  - Tests (proposed): `apps/chat-api/tests/slack/slack-proposals-api.test.mjs`
 - **Nội dung:**
-  - Migration 0017: Bảng `slack_proposals` lưu `(id, ati_user_id, connection_id, workspace_id, status, source_ref, intent_action, proposed_steps_json, plan_hash, missing_info_json, expires_at, created_at)`.
+  - Migration tạo bảng `slack_proposals` lưu `(id, user_id, connection_id, workspace_id, status, source_ref, intent_action, proposed_steps_json, plan_hash, missing_info_json, expires_at, created_at)`.
   - API Routes:
     - `GET /api/slack/proposals`: Danh sách đề xuất theo connection/workspace, lọc theo trạng thái.
     - `POST /api/slack/proposals/:id/approve`: Duyệt và chuyển sang dispatch executor.
@@ -65,11 +67,12 @@ Card này xây dựng giao diện Hộp đề xuất (Proposal Inbox) trong ATI,
   - Tự động hết hạn: Đề xuất chưa duyệt tự động chuyển sang `expired` sau 7 ngày; trích đoạn lưu trữ rút gọn sau 30 ngày.
 
 ### Giai đoạn 06B: Giao diện Hộp Đề xuất trong ATI Cockpit (PR 2)
+- **Code Owner:** Frontend Engineer (`apps/chat-web`)
 - **Files:**
   - Create: `apps/chat-web/src/components/slack/SlackProposalInbox.tsx`
   - Create: `apps/chat-web/src/components/slack/SlackProposalCard.tsx`
-  - Modify: `apps/chat-web/src/components/Sidebar.tsx` (hoặc vị trí định vị tab phù hợp)
-  - Tests: `apps/chat-web/tests/slack/SlackProposalInbox.test.tsx`
+  - Modify (verified): `apps/chat-web/src/routes.ts`
+  - Tests (proposed): `apps/chat-web/tests/slack/SlackProposalInbox.test.tsx`
 - **Nội dung:**
   - Giao diện Proposal Inbox đáp ứng chuẩn 1440px desktop và 375px mobile, hỗ trợ cả Light/Dark theme.
   - Bộ lọc theo Workspace và Tabs trạng thái (Chờ xem, Cần bổ sung, Đã duyệt, Lịch sử).
@@ -77,11 +80,12 @@ Card này xây dựng giao diện Hộp đề xuất (Proposal Inbox) trong ATI,
   - Tích hợp nút "Duyệt ngay", "Chỉnh sửa trong chat", và "Bỏ qua".
 
 ### Giai đoạn 06C: Workflows Liên Dịch vụ, Daily Digest & F3 UI Masking (PR 3)
+- **Code Owner:** Backend Engineer (`apps/chat-api`) + Frontend Engineer (`apps/chat-web`) + AI Engineer (`packages/planner`)
 - **Files:**
   - Create: `apps/chat-api/src/services/slack/slack-digest-service.ts`
-  - Modify: `packages/planner/src/workflow-planner.ts`
-  - Modify: `apps/chat-web/src/components/slack/SlackProposalCard.tsx`
-  - Tests: `apps/chat-api/tests/slack/slack-digest-service.test.ts`, `apps/chat-web/tests/slack/slack-f3-redaction.test.tsx`
+  - Modify (verified): `packages/planner/src/planner.ts` (Thêm mẫu lập plan từ Slack intent sang Trello/Jira/Sheets)
+  - Modify (verified): `apps/chat-web/src/components/slack/SlackProposalCard.tsx`
+  - Tests (proposed): `apps/chat-api/tests/slack/slack-digest-service.test.mjs`, `apps/chat-web/tests/slack/slack-f3-redaction.test.tsx`
 - **Nội dung:**
   - Hỗ trợ các mẫu workflow liên dịch vụ thực tế:
     - Giao việc: Tạo thẻ Trello (`trello.create_card`) + gửi tin phản hồi trong đúng thread Slack kèm permalink Trello (`myslack.chat.postMessage`).
@@ -105,20 +109,22 @@ Card này xây dựng giao diện Hộp đề xuất (Proposal Inbox) trong ATI,
 
 ## 5. Lệnh Kiểm tra và Cổng Bằng chứng (Command & Evidence Gates)
 
+> Toàn bộ script và test dưới đây sử dụng PostgreSQL 16 thật và HTTP Fixture thật, không dùng mock boolean. Các lệnh chưa chạy được đánh dấu `[Proposed: not run]`.
+
 1. **Kiểm tra API Đề xuất & Vòng đời Status:**
    ```powershell
-   # [Create] test CRUD và status transitions của proposals
-   node --test apps/chat-api/tests/slack/slack-proposals-api.test.mjs
+   # [Proposed: not run] Test CRUD và status transitions của proposals:
+   # node --test apps/chat-api/tests/slack/slack-proposals-api.test.mjs
    ```
 2. **Kiểm tra Daily Digest & Tích hợp Scheduler:**
    ```powershell
-   # [Create] test digest scheduler và no-autonomous-write invariant
-   node --test apps/chat-api/tests/slack/slack-digest-service.test.mjs
+   # [Proposed: not run] Test digest scheduler và no-autonomous-write invariant:
+   # node --test apps/chat-api/tests/slack/slack-digest-service.test.mjs
    ```
 3. **Kiểm tra Giao diện Web & F3 Redaction (Vitest/Testing Library):**
    ```powershell
-   # [Create] frontend component tests cho Inbox và UI masking
-   npm test -w @wap/chat-web -- tests/slack/SlackProposalInbox.test.tsx
+   # [Proposed: not run] Frontend component tests cho Inbox và UI masking:
+   # npm test -w @wap/chat-web -- tests/slack/SlackProposalInbox.test.tsx
    ```
 4. **Kiểm tra Toàn diện Suite:**
    ```powershell

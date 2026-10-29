@@ -17,7 +17,7 @@
 
 ## 1. Mục tiêu và Phạm vi Nghiệp vụ
 
-Card này là cổng thẩm định chất lượng cuối cùng của toàn bộ tính năng Slack Trợ lý công việc. Card bao gồm việc đóng băng bộ dữ liệu đo (ground truth labels) trước khi gọi model thật, thực hiện 3 lượt đo độc lập cho mỗi chế độ (Luật, AI, Kết hợp), nghiệm thu trực tiếp trên môi trường Slack thật (Free & Pro, 2 người dùng chung workspace), kiểm tra readback cho từng nhóm phương thức đã triển khai, và quy định thủ tục **Bật cờ tính năng bằng một PR độc lập được review riêng**.
+Card này là cổng thẩm định chất lượng cuối cùng của toàn bộ tính năng Slack Trợ lý công việc. Card bao gồm việc đóng băng bộ dữ liệu đo (ground truth labels) trước khi gọi model thật, thực hiện 3 lượt đo độc lập cho mỗi chế độ (Luật, AI, Kết hợp), nghiệm thu trực tiếp trên môi trường Slack thật (Free & Pro, 2 người dùng chung workspace), kiểm tra readback cho từng nhóm phương thức đã triển khai trên nền kiểm kê **354 method** (PR 185), và quy định thủ tục **Bật cờ tính năng bằng một PR độc lập được review riêng**.
 
 ### Ranh giới nguyên tắc cốt lõi:
 1. **Bộ nhãn cam kết trước khi chạy Model (Pre-labelled Dataset):** Toàn bộ fixture và nhãn mong muốn (ground truth) phải được commit vào repository TRƯỚC LỜI GỌI MODEL ĐẦU TIÊN; tuyệt đối không chỉnh sửa nhãn sau khi thấy kết quả model để làm đẹp số liệu.
@@ -45,11 +45,12 @@ Card này là cổng thẩm định chất lượng cuối cùng của toàn b�
 ## 3. Lộ trình Phân rã Bounded PRs
 
 ### Giai đoạn 07A: Đóng băng Bộ Dữ liệu Đo & Benchmark Harness (PR 1)
+- **Code Owner:** AI Engineer (`evaluations/slack`)
 - **Files:**
   - Create: `evaluations/slack/fixtures/slack-eval-cases.json`
   - Create: `evaluations/slack/fixtures/slack-eval-labels.json`
   - Create: `scripts/eval-slack-triage.mjs`
-  - Tests: `evaluations/tests/slack-eval-harness.test.ts`
+  - Tests (proposed): `evaluations/tests/slack-eval-harness.test.mjs`
 - **Nội dung:**
   - Bộ dữ liệu mẫu bao phủ:
     - Tiếng Việt tự nhiên, từ ngữ công việc thân mật và trang trọng.
@@ -63,9 +64,10 @@ Card này là cổng thẩm định chất lượng cuối cùng của toàn b�
   - Script benchmark thực hiện tự động hóa 3 lượt chạy cho mỗi mode, tính toán thống kê Precision, Recall, số lỗi và chi phí token.
 
 ### Giai đoạn 07B: Báo cáo Đánh giá Mô hình 3 Chế độ (PR 2)
+- **Code Owner:** AI Engineer (`evaluations/reports`)
 - **Files:**
   - Create: `evaluations/reports/slack-triage-report.md`
-  - Modify: `docs/PROJECT-REPORT.md` (Ghi nhận kết quả benchmark)
+  - Modify (verified): `docs/PROJECT-REPORT.md` (Ghi nhận kết quả benchmark)
 - **Nội dung:**
   - Chạy benchmark với mô hình LLM chính thức của dự án (`gemini-3.8-flash`).
   - Ghi nhận chi tiết:
@@ -75,9 +77,10 @@ Card này là cổng thẩm định chất lượng cuối cùng của toàn b�
     - Phân tích các trường hợp thất bại và biên bản tối ưu hóa prompt nếu có.
 
 ### Giai đoạn 07C: Nghiệm thu Live trên 2 Workspace và Readback Từng Nhóm (PR 3)
+- **Code Owner:** Reviewer / Nhóm trưởng (`docs/handoff/evidence`)
 - **Files:**
   - Create: `docs/handoff/evidence/slack-live-acceptance.md`
-  - Modify: `docs/slack/method-inventory.json` (Cập nhật trạng thái `live_verified` cho các method đã kiểm thử thật)
+  - Modify (verified): `docs/slack/method-inventory.json` (Cập nhật trạng thái `live_verified` cho các method đã kiểm thử thật)
 - **Nội dung (P-LIVE do Reviewer/Nhóm trưởng thực hiện):**
   - Kết nối thực tế trên 1 Workspace Free và 1 Workspace Pro.
   - Thử nghiệm 2 tài khoản ATI kết nối cùng 1 Workspace: chứng minh tính độc lập của đề xuất và không ghi đè token của nhau.
@@ -88,8 +91,9 @@ Card này là cổng thẩm định chất lượng cuối cùng của toàn b�
   - Thao tác Ngắt kết nối & Purge thật: ngắt trong Settings -> gọi `auth.revoke` -> kiểm tra dữ liệu nguồn và đề xuất bị xóa sạch trong ATI.
 
 ### Giai đoạn 07D: PR Bật Cờ Tính năng (Release PR)
+- **Code Owner:** Reviewer / Nhóm trưởng
 - **Files:**
-  - Modify: `.env.example`, tài liệu triển khai sản xuất.
+  - Modify (verified): `.env.example`, tài liệu triển khai sản xuất.
 - **Nội dung:**
   - Kích hoạt `MYSLACK_ENABLED=on` và `MYSLACK_AUTOMATION_ENABLED=on`.
   - Chỉ được merge sau khi PR 1, 2, 3 đã được phê duyệt và CI xanh 100%.
@@ -107,22 +111,24 @@ Card này là cổng thẩm định chất lượng cuối cùng của toàn b�
   - Kết nối thành công cả Free và Pro.
   - Hai người dùng cùng workspace hoạt động độc lập không xung đột token.
   - Readback tin nhắn trên Slack đúng user token tác giả.
-- [ ] **AC5 (Xác nhận Đóng Tính năng Trung thực):** Mọi phương thức chưa có điều kiện probe thật trên Slack vẫn giữ nguyên nhãn `probe_required` trong inventory; không tuyên bố "hoàn thành toàn bộ API" khi chưa có bằng chứng.
+- [ ] **AC5 (Xác nhận Đóng Tính năng Trung thực):** Mọi phương thức chưa có điều kiện probe thật trên Slack vẫn giữ nguyên nhãn `probe_required` trong inventory 354 method; không tuyên bố "hoàn thành toàn bộ API" khi chưa có bằng chứng.
 - [ ] **AC6 (Quy trình Bật cờ Chuẩn tắc):** PR bật cờ là PR riêng biệt, chỉ chứa cấu hình cờ, không chứa mã nguồn tính năng.
 
 ---
 
 ## 5. Lệnh Kiểm tra và Cổng Bằng chứng (Command & Evidence Gates)
 
+> Toàn bộ script và test dưới đây sử dụng PostgreSQL 16 thật và HTTP Fixture thật, không dùng mock boolean. Các lệnh chưa chạy được đánh dấu `[Proposed: not run]`.
+
 1. **Kiểm tra Suite Benchmark Ngoại tuyến:**
    ```powershell
-   # [Create] chạy test harness cho evaluation runner
-   node --test evaluations/tests/slack-eval-harness.test.mjs
+   # [Proposed: not run] Chạy test harness cho evaluation runner:
+   # node --test evaluations/tests/slack-eval-harness.test.mjs
    ```
 2. **Chạy Benchmark Đánh giá Mô hình Thực tế (3 Runs / Mode):**
    ```powershell
-   # [Create] script thực thi 9 lượt benchmark và xuất báo cáo markdown
-   node scripts/eval-slack-triage.mjs --runs 3 --output evaluations/reports/slack-triage-report.md
+   # [Proposed: not run] Script thực thi 9 lượt benchmark và xuất báo cáo markdown:
+   # node scripts/eval-slack-triage.mjs --runs 3 --output evaluations/reports/slack-triage-report.md
    ```
 3. **Kiểm tra Toàn bộ Hệ thống Trực tuyến & Ngoại tuyến:**
    ```powershell
