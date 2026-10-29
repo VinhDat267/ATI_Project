@@ -75,3 +75,7 @@ Triển khai phần backend còn lại của SLACK-02, trọng tâm là **Chính
 - [ ] Các tests hiện hữu của PR #184 và 02R tiếp tục pass 100% nhờ lớp tương thích.
 - [ ] Không có secret hay token nào bị lọt vào log, exception hay API responses.
 - [ ] `npm run typecheck` đạt exit code 0; `git diff --check` đạt 0 lỗi whitespace.
+
+## Quyết định triển khai của điều phối viên
+
+Phạm vi code còn lại được cho triển khai theo [quyết định02B ngày29/10](../decisions/2026-10-29-slack-02b-consent-decisions.md). Tài liệu quyết định này thay thế các ví dụ draft mâu thuẫn trong plan: operator CLI tạo trust, policy/provider có evidence và revision/CAS, quyền theo purpose/config thực tế, sự kiện vòng đời bền vững và metadata tương thích. Chưa cho merge hoặc bật live. Cập nhật plan theo quyết định trước khi viết code.
