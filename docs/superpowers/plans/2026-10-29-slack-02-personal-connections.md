@@ -57,6 +57,14 @@
    - `ALL_TOOLS` và `SERVICE_REGISTRY` tuyệt đối không thêm `myslack` trong SLACK-02 (dành cho SLACK-03).
    - Route `/api/health` chỉ bổ sung `myslackEnabled` khi cờ bật và đủ cấu hình (`isMySlackAvailable`).
    - Envelope cho danh sách kết nối trả về định dạng chuẩn: `{ connections: SlackConnectionPublicInfo[] }`.
+8. **Đánh Giá Phụ Thuộc & Kế Thừa Mã Nguồn Tồn Tại (PR #184 Assessment):**
+   - **Tồn tại PR #184 (`codex/slack-02-oauth`, commit `ac448dd`):** Chứa các thay đổi sơ bộ về OAuth backend và setup endpoints trong `apps/chat-api`. Đây là ứng viên tiềm năng để đối soát và kế thừa, chưa được chấp nhận hay merge vào `main`.
+   - **Lỗi Root-Cause đã phát hiện trên PostgreSQL thật trong PR #184:** Hai OAuth state hợp lệ cho hai workspace khác nhau trong cùng một session ATI không thể lưu trữ song song vì logic lưu state xóa toàn bộ state của user thay vì chỉ xóa state/workspace tương ứng.
+   - **Khoảng cách hợp đồng & DTO:** PR #184 chưa có DTO chia sẻ ở `packages/tool-schemas`, trạng thái `processingReady` đang bị gán cứng là `pending`.
+   - **Chiến lược hợp nhất:**
+     - SLACK-02A độc lập triển khai bộ contracts chuẩn tại `packages/tool-schemas`, không sửa `apps/`.
+     - SLACK-02B sẽ đối soát và hợp nhất với `slack_connections` và `slack_oauth_states` từ PR #184 trên một nhánh integration cách ly, thực hiện mapping giữa `actorId` / `status='disconnected'` (public view) sang các định danh chuẩn `slackUserId` / `status='revoked'`.
+     - Không tạo trùng lặp bảng database hoặc xung đột số thứ tự migration (`0014`).
 
 ---
 

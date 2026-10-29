@@ -17,6 +17,11 @@ Thi công toàn bộ tầng backend phục vụ kết nối Slack cá nhân đa 
 - `SlackOAuthClient` bảo mật (confidential web client, không PKCE, `user_scope`, gọi `auth.test`).
 - `SlackConnectionRepo` & `SlackTokenManager` với PostgreSQL session advisory lock (`pg_advisory_lock` trên dedicated `PoolClient`) và durable refresh-attempt marker chống phát lại refresh token sau sự cố sập tiến trình.
 - API endpoints Express 5.2.1 `/api/connections/myslack/...` sau cờ `MYSLACK_ENABLED` (mặc định `off`).
+- **Kế thừa & Đối soát với PR #184 (`codex/slack-02-oauth`, commit `ac448dd`):**
+  - Tái sử dụng và tinh chỉnh các phần hợp lệ từ PR #184 trên nhánh backend độc lập, không merge tự động khi chưa kiểm thử.
+  - Sửa lỗi root-cause concurrency: Logic lưu OAuth state không được xóa toàn bộ state của user, đảm bảo 2 workspace kết nối đồng thời không triệt tiêu state của nhau.
+  - Ánh xạ giữa `actorId` / `status = 'disconnected'` (từ PR #184) sang các contract chuẩn `slackUserId` / `status = 'revoked'` từ SLACK-02A.
+  - Không tạo trùng lặp bảng database hoặc xung đột thứ tự migration (`0014`).
 
 ---
 

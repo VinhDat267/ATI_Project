@@ -54,6 +54,10 @@
      - `SLACK-02B` (Backend: `apps/chat-api`, `db/v3`, `scripts/fake-slack-personal.*`)
      - `SLACK-02C` (Frontend: `apps/chat-web`, browser runner)
    - Trạng thái card cha là **chờ điều phối viên review và phê duyệt**. Quy trình bàn giao là các nhánh stacked branches, không tự ý merge vào `main` hay `develop` khi chưa có hướng dẫn rõ ràng.
+10. **Đánh Giá Phụ Thuộc & Kế Thừa PR #184 (Dependency Resolution):**
+   - Nhánh draft PR #184 (`codex/slack-02-oauth`, commit `ac448dd`) được đánh giá là ứng viên tái sử dụng cho backend, nhưng chưa có shared tool-schemas DTO và có bug xóa nhầm OAuth state khi kết nối 2 workspace đồng thời.
+   - SLACK-02A giữ nguyên phạm vi thêm contracts chuẩn độc lập tại `packages/tool-schemas`.
+   - SLACK-02B sẽ đối soát và hợp nhất an toàn với PR #184 trên nhánh backend độc lập; không tạo bảng trùng lặp hay migration chồng lấn.
 
 ---
 
