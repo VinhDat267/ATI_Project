@@ -44,17 +44,17 @@ beforeEach(async () => {
       startCalls.push({ body: body ? JSON.parse(body) : {} });
       res.end(JSON.stringify({ url: 'https://slack.com/oauth/v2/authorize?client_id=fake' }));
     } else if (req.url?.endsWith('/callback')) {
+      callbacks.push({ body: body ? JSON.parse(body) : {}, location: window.location.href });
       if (delayCallbackMs > 0) {
         await new Promise((r) => setTimeout(r, delayCallbackMs));
       }
-      callbacks.push({ body: body ? JSON.parse(body) : {}, location: window.location.href });
       res.statusCode = fail ? 401 : 200;
       res.end(JSON.stringify(fail ? {} : (callbackResponse ?? { id: 'conn_1', workspaceName: 'Workspace', workspaceId: 'T_1', actorId: 'U_1', identityVersion: 1, connectedAt: '2026-10-29T10:00:00.000Z', scopes: [] })));
     } else if (req.method === 'DELETE') {
+      removed.push(req.url!);
       if (delayDisconnectMs > 0) {
         await new Promise((r) => setTimeout(r, delayDisconnectMs));
       }
-      removed.push(req.url!);
       res.end(JSON.stringify({ success: true, revoked: false }));
     } else {
       const defaultList = [
@@ -148,7 +148,7 @@ it('terminates callback pending state and ignores response if session owner chan
   await waitFor(() => expect(screen.queryByText(/Đang hoàn tất/)).not.toBeInTheDocument());
   expect(screen.getByRole('alert')).toBeInTheDocument();
   expect(screen.queryByRole('heading', { name: 'Đã kết nối Slack' })).not.toBeInTheDocument();
-  await waitFor(() => expect(callbacks).toHaveLength(1));
+  expect(callbacks).toHaveLength(1);
   expect(navigate).not.toHaveBeenCalled();
 });
 
