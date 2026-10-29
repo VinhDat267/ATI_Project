@@ -89,6 +89,11 @@ export interface SlackTokenProviderHook {
 3. Chuyển đổi và gọi `tokenManager.getAccessToken(binding.atiUserId, binding.connectionId, binding.identityVersion)`.
 4. Gọi `policyService.resolveSlackModelPolicy` và chuẩn hóa policy reference qua `validateSlackPolicyReference` từ `@wap/tool-schemas` để đảm bảo định dạng 8 trường chuẩn tắc.
 
+*Yêu Cầu DTO Phối Hợp Với Backend Planning (`ctx_0b1305c28c8f` cho SLACK-03B1):*
+- Đối với các kết quả đọc có định kiểu (typed read observations), adapter đính kèm `SlackObservationProvenance` chứa `acquisitionPolicyReference: SlackPolicyReference` (mang purpose đọc và TTL = 0) cùng danh tính nguồn (`binding`, `channelId`, `ts`).
+- Backend 03B1 (`ctx_0b1305c28c8f`) khi authorize lưu trữ vào `SlackSourceStore` sẽ độc lập đối chiếu `sameSlackPolicyEpoch(slackPolicyRefToEpoch(acquisitionRef), slackPolicyRefToEpoch(storageRef))` để đảm bảo quan sát không bị bọc ngầm dưới một regrant policy mới.
+
+
 ---
 
 ## 3. Danh Mục 3 Tài Liệu Được Cập Nhật

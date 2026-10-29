@@ -109,11 +109,12 @@ Wrapper này có trách nhiệm:
      export interface SlackObservationProvenance {
        binding: SlackBinding;
        observedAt: string; // ISO 8601 UTC timestamp
+       acquisitionPolicyReference: SlackPolicyReference; // canonical 8-field ref từ authorizeRead (purpose + 0 TTL)
        nativeRevision?: string; // chỉ có khi Slack trả về (ví dụ edited.ts || ts)
        observationalDigest: string; // SHA-256 của JSON payload tại thời điểm quan sát
      }
      ```
-     Tuyệt đối không tự bịa đặt revision gốc của Slack.
+     Backend 03B1 (`ctx_0b1305c28c8f`) yêu cầu `acquisitionPolicyReference` trong observation DTO để kiểm tra `sameSlackPolicyEpoch` trước khi lưu vào `SlackSourceStore`, chống bypass qua regrant policy mới. Tuyệt đối không tự bịa đặt revision gốc của Slack.
    - Giữ nguyên chuỗi số thập phân chính xác của `ts` và `edited.ts` (không parse sang float để chống sai số IEEE 754).
 4. **Native ACL - Không Có Channel Allowlist:** Quyền đọc kênh công khai, kênh riêng, DM, nhóm DM được quyết định thuần túy bởi quyền thực tế của user token trên Slack (native Slack membership/ACL). Nếu user không có quyền vào kênh, Slack trả về `channel_not_found` hoặc `not_in_channel`; adapter map chính xác thành lỗi bảo mật tương ứng.
 5. **Contract Của `conversations.replies`:** Khi gọi với tin nhắn hợp lệ không có câu trả lời trong thread, Slack trả về `ok: true` với `messages: [root_message]`. Adapter tuân thủ đúng hợp đồng provider này, không giả định sai là luôn ném `thread_not_found`.

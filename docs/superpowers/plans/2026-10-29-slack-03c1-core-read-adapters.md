@@ -45,7 +45,17 @@
 3. **Mục Đích Đọc Hợp Lệ:** Sử dụng `SlackReadPurpose = Exclude<SlackPolicyPurpose, 'storage'>` (`'manual_lookup' | 'triage' | 'planning' | 'digest'`). Mục đích do ngữ cảnh máy chủ cung cấp, không phải do model tự quyết định.
 4. **Transient Reads (Retention 0) & Chiến Lược Provenance Quan Sát:**
    - Dữ liệu 03C1 đọc tức thời (transient, retention 0), không lưu trữ bền vững vào `SlackSourceStore` (03B).
-   - Với các đối tượng không có revision gốc từ Slack (channel metadata, user profile, permalink), khai báo rõ cấu trúc provenance: `nativeRevision?: string` (chỉ có khi Slack trả về, ví dụ `edited.ts || ts`) + `observationalDigest: string` (SHA-256 của JSON payload tại thời điểm quan sát). Tuyệt đối không phát minh revision Slack giả.
+   - Với các đối tượng không có revision gốc từ Slack (channel metadata, user profile, permalink), khai báo rõ cấu trúc provenance:
+     ```ts
+     export interface SlackObservationProvenance {
+       binding: SlackBinding;
+       observedAt: string; // ISO 8601 UTC timestamp
+       acquisitionPolicyReference: SlackPolicyReference; // Canonical 8-field ref từ authorizeRead (purpose + 0 TTL)
+       nativeRevision?: string; // Chỉ có khi Slack trả về (ví dụ edited.ts || ts)
+       observationalDigest: string; // SHA-256 của JSON payload tại thời điểm quan sát
+     }
+     ```
+     Backend 03B1 (`ctx_0b1305c28c8f`) yêu cầu `acquisitionPolicyReference` trong observation DTO để kiểm tra `sameSlackPolicyEpoch` trước khi lưu vào `SlackSourceStore`, chống bypass qua regrant policy mới. Tuyệt đối không phát minh revision Slack giả.
    - Giữ nguyên chuỗi số thập phân chính xác của `ts` và `edited.ts` (không parse sang Float để tránh mất độ chính xác).
    - Deep link permalink phải khớp format an toàn: `^https:\/\/[a-z0-9_-]+\.slack\.com\/archives\/[A-Z0-9]+\/p[0-9]+$`.
    - Làm sạch profile người dùng: chỉ trích xuất thông tin cơ bản (`id`, `name`, `real_name`, `tz`, `is_bot`, `deleted`), không rò rỉ email, avatar hay credentials.
