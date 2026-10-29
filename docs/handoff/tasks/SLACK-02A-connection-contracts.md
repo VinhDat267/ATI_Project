@@ -1,10 +1,10 @@
 # SLACK-02A · Hợp đồng Interface Kết nối Slack Cá nhân (@wap/tool-schemas)
 
-**Trạng thái:** chờ triển khai  
-**Nhánh gợi ý:** `feat/slack-02a-connection-contracts` · **Nền:** `fc12e3fb`  
-**Vai trò sở hữu:** Integration / AI Engineer (chỉ sở hữu thư mục `packages/tool-schemas/`)  
-**Phụ thuộc:** SLACK-01 (đã hoàn thành `myslack-context.ts` và `myslack-policy.ts`)  
-**Task cha:** [SLACK-02-personal-connections](SLACK-02-personal-connections.md)  
+**Trạng thái:** chờ triển khai
+**Nhánh gợi ý:** `feat/slack-02a-connection-contracts` · **Nền:** `fc12e3fb`
+**Vai trò sở hữu:** Integration / AI Engineer (chỉ sở hữu thư mục `packages/tool-schemas/`)
+**Phụ thuộc:** SLACK-01 (đã hoàn thành `myslack-context.ts` và `myslack-policy.ts`)
+**Task cha:** [SLACK-02-personal-connections](SLACK-02-personal-connections.md)
 **Kế hoạch chi tiết:** Task 1 trong [Kế hoạch SLACK-02](../../superpowers/plans/2026-10-29-slack-02-personal-connections.md).
 
 ---
@@ -35,7 +35,7 @@ Chứa các định nghĩa và hàm xác thực:
    - `status: SlackConnectionStatus;`
    - `identityVersion: number;` (Số nguyên dương an toàn)
    - `scopes: string[];` (Tập hợp user scopes đã cấp)
-   - `connectedAt: string;` (Chuỗi ISO-8601)
+   - `connectedAt: string;` (Chuỗi ISO-8601 UTC)
    - `consentStatus: SlackConsentStatus;`
    - `processingReady: boolean;` (Chỉ true khi `status === 'active'` VÀ toàn bộ điều kiện provider/evidence/retention trong policy đều thỏa mãn)
 4. `interface SlackListConnectionsResponse`:

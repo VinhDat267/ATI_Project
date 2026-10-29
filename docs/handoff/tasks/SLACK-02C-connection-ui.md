@@ -1,10 +1,10 @@
 # SLACK-02C · Giao diện Cài đặt Đa Workspace & Callback View (Frontend)
 
-**Trạng thái:** chờ triển khai  
-**Nhánh gợi ý:** `feat/slack-02c-connection-ui` · **Nền:** `fc12e3fb`  
-**Vai trò sở hữu:** Frontend Engineer (sở hữu `apps/chat-web/` và file chạy browser test `scripts/test-v3-browser.mjs`)  
-**Phụ thuộc:** SLACK-02A (contracts), SLACK-02B (API endpoints)  
-**Task cha:** [SLACK-02-personal-connections](SLACK-02-personal-connections.md)  
+**Trạng thái:** chờ triển khai
+**Nhánh gợi ý:** `feat/slack-02c-connection-ui` · **Nền:** `fc12e3fb`
+**Vai trò sở hữu:** Frontend Engineer (sở hữu `apps/chat-web/` và file chạy browser test `scripts/test-v3-browser.mjs`)
+**Phụ thuộc:** SLACK-02A (contracts), SLACK-02B (API endpoints)
+**Task cha:** [SLACK-02-personal-connections](SLACK-02-personal-connections.md)
 **Kế hoạch chi tiết:** Task 6 trong [Kế hoạch SLACK-02](../../superpowers/plans/2026-10-29-slack-02-personal-connections.md).
 
 ---
@@ -27,9 +27,10 @@ Thi công giao diện người dùng trên web (`apps/chat-web`) cho tính năng
 - Hiển thị danh sách từng workspace:
   - Tên Workspace, Logo Slack, Tên người dùng Slack (`slackUserLabel`).
   - Badge trạng thái:
-    - `Đã kết nối` (xanh lá) khi `status === 'active'` và `consentStatus === 'granted'`.
-    - `Chờ cho phép xử lý` (vàng hổ phách) khi `status === 'active'` nhưng `consentStatus !== 'granted'`.
+    - `Đã kết nối` (xanh lá) khi `processingReady === true`.
+    - `Chờ cho phép xử lý` (vàng hổ phách) khi `status === 'active' && !processingReady`.
     - `Cần kết nối lại` (đỏ) khi `status === 'reconnect_required'`.
+    - `Chưa kết nối` (xám) khi `status === 'disconnected'`.
   - Nút hành động cho từng workspace:
     - Nút "Ngắt kết nối" (mở modal CockpitDialog xác nhận trước khi thực hiện).
     - Nút "Kết nối lại" khi ở trạng thái `reconnect_required`.
@@ -38,7 +39,8 @@ Thi công giao diện người dùng trên web (`apps/chat-web`) cho tính năng
 
 ### 2.2. File Tạo Mới: `apps/chat-web/src/views/MySlackCallbackView.tsx`
 - Đọc `code`, `state`, `error` từ URL query parameters.
-- Kiểm tra cookie trình duyệt và gọi `apiClient.completeSlackConnection(code, state)`.
+- Cookie trình duyệt `ati_slack_browser` là HTTP-only cookie được trình duyệt tự động gửi kèm request đến backend, JavaScript client không đọc hoặc can thiệp trực tiếp từ `document.cookie`.
+- Gọi `apiClient.completeSlackConnection(code, state)`.
 - Hiển thị trạng thái "Đang hoàn tất kết nối Slack...".
 - Xử lý các mã lỗi thân thiện:
   - `SLACK_STATE_INVALID`: "Phiên kết nối đã hết hạn hoặc không hợp lệ. Vui lòng thử lại."

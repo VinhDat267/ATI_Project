@@ -2,15 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Triển khai hạ tầng xác thực OAuth cá nhân Slack đa workspace (Free/Pro), quản lý xoay token an toàn tuyệt đối trước sự cố crash tiến trình (crash-safe one-use refresh token), so khớp CAS trên database PostgreSQL, bảo vệ danh tính độc quyền và thiết lập ranh giới chấp thuận xử lý dữ liệu của tổ chức (F1).  
-**Architecture:** 
+**Goal:** Triển khai hạ tầng xác thực OAuth cá nhân Slack đa workspace (Free/Pro), quản lý xoay token an toàn tuyệt đối trước sự cố crash tiến trình (crash-safe one-use refresh token), so khớp CAS trên database PostgreSQL, bảo vệ danh tính độc quyền và thiết lập ranh giới chấp thuận xử lý dữ liệu của tổ chức (F1).
+**Architecture:**
 - Tách biệt hoàn toàn khỏi bảng `service_credentials` cũ (vốn giới hạn 1 user : 1 service) bằng bảng chuyên dụng `slack_personal_connections` (hỗ trợ N workspace cho 1 tài khoản ATI với stable `connectionId` per `(ati_user_id, slack_app_id, workspace_id)`) và bảng `slack_processing_consents` (lưu vết quyền tổ chức).
 - Giữ nguyên Confidential Web Client với `user_scope`, không PKCE; xác thực danh tính sau callback bắt buộc qua `auth.test`.
 - Quản lý xoay token dùng một lần qua PostgreSQL Session Advisory Lock (`pg_advisory_lock` trên dedicated `PoolClient`) kết hợp **durable refresh-attempt marker** commit vào database TRƯỚC KHI phát request ra ngoài, duy trì lock trong suốt lượt gọi HTTP và publish CAS nguyên tử, đảm bảo không bao giờ phát lại refresh token cũ sau crash.
-- Giao diện Settings hiển thị danh mục nhiều workspace độc lập trong mục "Của riêng bạn".  
-**Tech Stack:** Node.js `^22.12.0 || >=24.0.0`, TypeScript 5.8, Express 5.2.1, PostgreSQL 16 (với `pg.Pool`), Vitest 3, React 19, Tailwind CSS.  
-**Spec:** [Slack cá nhân và trợ lý công việc trong ATI](../specs/2026-10-28-slack-personal-oauth-design.md) (mục 4, 8, 9, 10).  
-**Task Cards:** [SLACK-02 Parent Card](../../handoff/tasks/SLACK-02-personal-connections.md), [SLACK-02A (Contracts)](../../handoff/tasks/SLACK-02A-connection-contracts.md), [SLACK-02B (Backend)](../../handoff/tasks/SLACK-02B-oauth-backend.md), [SLACK-02C (Frontend)](../../handoff/tasks/SLACK-02C-connection-ui.md).  
+- Giao diện Settings hiển thị danh mục nhiều workspace độc lập trong mục "Của riêng bạn".
+**Tech Stack:** Node.js `^22.12.0 || >=24.0.0`, TypeScript 5.8, Express 5.2.1, PostgreSQL 16 (với `pg.Pool`), Vitest 3, React 19, Tailwind CSS.
+**Spec:** [Slack cá nhân và trợ lý công việc trong ATI](../specs/2026-10-28-slack-personal-oauth-design.md) (mục 4, 8, 9, 10).
+**Task Cards:** [SLACK-02 Parent Card](../../handoff/tasks/SLACK-02-personal-connections.md), [SLACK-02A (Contracts)](../../handoff/tasks/SLACK-02A-connection-contracts.md), [SLACK-02B (Backend)](../../handoff/tasks/SLACK-02B-oauth-backend.md), [SLACK-02C (Frontend)](../../handoff/tasks/SLACK-02C-connection-ui.md).
 **Status:** Kế hoạch sẵn sàng thực thi; chờ điều phối viên review trước khi triển khai các nhánh stacked.
 
 ---

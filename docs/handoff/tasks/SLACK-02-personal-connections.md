@@ -1,17 +1,17 @@
 # SLACK-02 · Kết nối Slack cá nhân đa workspace, token rotation và CAS
 
-**Trạng thái:** chờ điều phối viên review và phê duyệt (awaiting coordinator review)  
-**Nhánh điều phối:** `docs/slack-02-plan` (tài liệu) · **Nhánh mã triển khai:** chia theo ba card con 02A, 02B, 02C  
-**Nền:** `fc12e3fbd683f9ffee53322b4f5fc132d50fc2ac` (origin/main sau PR #183 `3d0edfa0`)  
-**Phụ thuộc:** SLACK-01 (contracts nền, inventory và HTTP fixture đã merge)  
-**Đặc tả:** [Slack cá nhân và trợ lý công việc trong ATI](../../superpowers/specs/2026-10-28-slack-personal-oauth-design.md) (mục 4, 8, 9, 10).  
+**Trạng thái:** chờ điều phối viên review và phê duyệt (awaiting coordinator review)
+**Nhánh điều phối:** `docs/slack-02-plan` (tài liệu) · **Nhánh mã triển khai:** chia theo ba card con 02A, 02B, 02C
+**Nền:** `fc12e3fbd683f9ffee53322b4f5fc132d50fc2ac` (origin/main sau PR #183 `3d0edfa0`)
+**Phụ thuộc:** SLACK-01 (contracts nền, inventory và HTTP fixture đã merge)
+**Đặc tả:** [Slack cá nhân và trợ lý công việc trong ATI](../../superpowers/specs/2026-10-28-slack-personal-oauth-design.md) (mục 4, 8, 9, 10).
 **Kế hoạch chi tiết:** [Slack-02 Implementation Plan](../../superpowers/plans/2026-10-29-slack-02-personal-connections.md).
 
 ---
 
 ## 1. Mục tiêu và Phạm vi Điều phối
 
-Thực hiện toàn bộ hạ tầng kết nối OAuth cá nhân cho Slack nhiều workspace (Free/Pro), lưu trữ credential an toàn với stable row per `(ati_user_id, slack_app_id, workspace_id)`, xoay token (token rotation) crash-safe bảo vệ refresh token dùng một lần qua session advisory lock (`pg_advisory_lock` trên PoolClient) và durable attempt marker, kiểm soát danh tính độc quyền (exclusive identity binding trên các bản ghi non-revoked), ranh giới chấp thuận xử lý dữ liệu của tổ chức (F1) và giao diện Cài đặt đa workspace.
+Thực hiện toàn bộ hạ tầng kết nối OAuth cá nhân cho Slack nhiều workspace (Free/Pro), lưu trữ credential an toàn với stable row per `(ati_user_id, slack_app_id, workspace_id)`, xoay token (token rotation) chống phát lại refresh token đã dùng sau sự cố crash qua session advisory lock (`pg_advisory_lock` trên PoolClient) và durable attempt marker, kiểm soát danh tính độc quyền (exclusive identity binding trên các bản ghi non-revoked), ranh giới chấp thuận xử lý dữ liệu của tổ chức (F1) và giao diện Cài đặt đa workspace.
 
 ### Ranh giới Phạm vi:
 - **Thuộc phạm vi SLACK-02:**
@@ -47,9 +47,9 @@ Thực hiện toàn bộ hạ tầng kết nối OAuth cá nhân cho Slack nhi�
 
 1. **Schema Interface:** `packages/tool-schemas` export đầy đủ các interface DTO cho connection, consent và public metadata mà không làm ô nhiễm catalog `ALL_TOOLS`.
 2. **Đa Workspace & Độc quyền Danh tính:** Một tài khoản ATI kết nối được nhiều Workspace Slack khác nhau với stable row per workspace; hai tài khoản ATI khác nhau không thể cùng kết nối một tài khoản Slack trong cùng một workspace trên mọi bản ghi non-revoked (`WHERE status <> 'revoked'`).
-3. **An toàn Refresh Token Dùng Một Lần (One-Use Rotation Crash Safety):**
+3. **An toàn Refresh Token Dùng Một Lần (One-Use Rotation Safety):**
    - Refresh token của Slack xoay nguyên tử qua PostgreSQL session advisory lock (`pg_advisory_lock` trên PoolClient).
-   - Crash safety: Có durable refresh-attempt marker lưu DB trước khi gọi HTTP; tiến trình con chết đột ngột giữa chừng không bao giờ khiến tiến trình sau gửi lại refresh token cũ, mà chuyển sang `reconnect_required` có tính tất định.
+   - Cơ chế bất biến crash safety: Có durable refresh-attempt marker lưu DB trước khi gọi HTTP; tiến trình con chết đột ngột giữa chừng không bao giờ khiến tiến trình sau gửi lại refresh token cũ, mà chuyển sang `reconnect_required` có tính tất định.
 4. **Phân biệt Rõ Hình dạng Token Exchange vs Refresh:**
    - Code exchange lấy User Token từ `authed_user.access_token` (`xoxp-`), không lấy bot token ngoài cùng.
    - Refresh exchange xử lý đúng hình dạng phẳng (`token_type: 'user'`, `access_token`, `refresh_token`, `expires_in`).

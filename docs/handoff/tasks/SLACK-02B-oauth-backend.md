@@ -1,10 +1,10 @@
 # SLACK-02B · Backend OAuth Đa Workspace, Token Rotation & CAS (Backend)
 
-**Trạng thái:** chờ triển khai  
-**Nhánh gợi ý:** `feat/slack-02b-oauth-backend` · **Nền:** `fc12e3fb`  
-**Vai trò sở hữu:** Backend Engineer (sở hữu `apps/chat-api/`, `db/v3/` và scripts fixture `scripts/fake-slack-personal.*`)  
-**Phụ thuộc:** SLACK-02A (`packages/tool-schemas` đã có các contracts của kết nối)  
-**Task cha:** [SLACK-02-personal-connections](SLACK-02-personal-connections.md)  
+**Trạng thái:** chờ triển khai
+**Nhánh gợi ý:** `feat/slack-02b-oauth-backend` · **Nền:** `fc12e3fb`
+**Vai trò sở hữu:** Backend Engineer (sở hữu `apps/chat-api/`, `db/v3/` và scripts fixture `scripts/fake-slack-personal.*`)
+**Phụ thuộc:** SLACK-02A (`packages/tool-schemas` đã có các contracts của kết nối)
+**Task cha:** [SLACK-02-personal-connections](SLACK-02-personal-connections.md)
 **Kế hoạch chi tiết:** Tasks 2, 3, 4, 5 trong [Kế hoạch SLACK-02](../../superpowers/plans/2026-10-29-slack-02-personal-connections.md).
 
 ---
@@ -15,7 +15,7 @@ Thi công toàn bộ tầng backend phục vụ kết nối Slack cá nhân đa 
 - Migration `0014_slack_personal_connections.sql` tạo bảng kết nối riêng với stable row per `(ati_user_id, slack_app_id, workspace_id)`, bảng lưu vết chấp thuận tổ chức và mở rộng `oauth_states`.
 - Mở rộng HTTP provider fixture giả lập OAuth v2, code exchange, one-use rotating refresh token và revoke.
 - `SlackOAuthClient` bảo mật (confidential web client, không PKCE, `user_scope`, gọi `auth.test`).
-- `SlackConnectionRepo` & `SlackTokenManager` với PostgreSQL session advisory lock (`pg_advisory_lock` trên dedicated `PoolClient`) và **durable refresh-attempt marker** đảm bảo an toàn tuyệt đối trước sự cố crash khi dùng refresh token một lần.
+- `SlackConnectionRepo` & `SlackTokenManager` với PostgreSQL session advisory lock (`pg_advisory_lock` trên dedicated `PoolClient`) và durable refresh-attempt marker chống phát lại refresh token sau sự cố sập tiến trình.
 - API endpoints Express 5.2.1 `/api/connections/myslack/...` sau cờ `MYSLACK_ENABLED` (mặc định `off`).
 
 ---
@@ -88,7 +88,7 @@ Thi công toàn bộ tầng backend phục vụ kết nối Slack cá nhân đa 
    - Finally: Giải phóng session advisory lock qua `pg_advisory_unlock` và release client về pool.
 
 ### 2.4. Routes & API Endpoints (`apps/chat-api/src/routes/connections/myslack.ts`)
-- `POST /start`: Tạo state, gắn cookie `ati_slack_browser`, trả về link authorization với `user_scope`.
+- `POST /start`: Tạo state, gắn cookie HTTP-only `ati_slack_browser` (trình duyệt tự động gửi kèm các request tiếp theo, không đọc từ JavaScript), trả về link authorization với `user_scope`.
 - `POST /callback`:
   - Consume state theo đúng stateId của request (cho phép 2 workspace kết nối song song trong 1 session ATI qua 2 state độc lập).
   - Exchange code lấy user token từ `authed_user`.

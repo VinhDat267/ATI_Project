@@ -1,9 +1,9 @@
 # 29/10/2026 · Kế hoạch Triển khai & Task Cards cho SLACK-02
 
-**Ngày lập:** 29/10/2026 (Asia/Bangkok)  
-**Tác giả:** Antigravity Worker (gemini-3.8-flash-high)  
-**Nhánh làm việc:** `docs/slack-02-plan` (đổi tên sạch từ `VinhDat267/slack-02-implementation-plan`, không xung đột)  
-**Git Head nền:** `fc12e3fbd683f9ffee53322b4f5fc132d50fc2ac` (`origin/main`, sau khi merge PR #183 `3d0edfa0` cho SLACK-01)  
+**Ngày lập:** 29/10/2026 (Asia/Bangkok)
+**Tác giả:** Antigravity Worker (gemini-3.8-flash-high)
+**Nhánh làm việc:** `docs/slack-02-plan` (đổi tên sạch từ `VinhDat267/slack-02-implementation-plan`, không xung đột)
+**Git Head nền:** `fc12e3fbd683f9ffee53322b4f5fc132d50fc2ac` (`origin/main`, sau khi merge PR #183 `3d0edfa0` cho SLACK-01)
 **Mục đích:** Hoàn thiện kế hoạch chi tiết và các task card chuyên trách cho đợt triển khai **SLACK-02: Kết nối Slack cá nhân đa workspace, token rotation và CAS**, tuân thủ đầy đủ các điểm hiệu chỉnh và preflight review từ Điều phối viên (Coordinator).
 
 ---
@@ -68,8 +68,10 @@
 
 ---
 
-## 3. Trạng Thái Mã Nguồn & Hành Động Kế Tiếp
+## 3. Trạng Thái Mã Nguồn, Kiểm Thử & Hành Động Kế Tiếp
 
 - **Mã nguồn:** Không có product code nào bị sửa đổi.
-- **Git:** Nhánh `docs/slack-02-plan` sạch, chỉ chứa các file tài liệu và task cards mới. Không có lệnh push hoặc merge nào được thực hiện.
+- **Kiểm thử sản phẩm:** `NOT_RUN` (giai đoạn lập kế hoạch và task cards thuần túy tài liệu, không chạy kiểm thử sản phẩm trước khi code).
+- **Kiểm tra định dạng:** `git diff --check` đạt 0 lỗi trailing whitespace.
+- **Git:** Nhánh `docs/slack-02-plan` sạch, chỉ chứa các file tài liệu và task cards mới. Sẵn sàng push và mở Draft PR cho tài liệu kế hoạch.
 - **Sẵn sàng:** Bàn giao cho Điều phối viên Trưởng (Coordinator) để thẩm định và phê duyệt trước khi bắt đầu triển khai các nhánh stacked.
