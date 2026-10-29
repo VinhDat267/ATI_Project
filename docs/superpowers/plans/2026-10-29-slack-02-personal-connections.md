@@ -2,6 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> [!NOTE]
+> **Hiệu chỉnh phạm vi 02B:** Phần triển khai backend cho SLACK-02B đã được đối soát và thay thế chi tiết bởi [Kế hoạch 02B Consent Backend](2026-10-29-slack-02b-consent-backend.md) để tái sử dụng bảng hiện hữu từ PR #184 + 02R và tập trung vào chính sách chấp thuận tổ chức F1 (migration 0016), thay vì viết lại OAuth hoặc tạo bảng 0014 trùng lặp.
+
 **Goal:** Triển khai hạ tầng xác thực OAuth cá nhân Slack đa workspace (Free/Pro), quản lý xoay token an toàn tuyệt đối trước sự cố crash tiến trình (crash-safe one-use refresh token), so khớp CAS trên database PostgreSQL, bảo vệ danh tính độc quyền và thiết lập ranh giới chấp thuận xử lý dữ liệu của tổ chức (F1).
 **Architecture:**
 - Tách biệt hoàn toàn khỏi bảng `service_credentials` cũ (vốn giới hạn 1 user : 1 service) bằng bảng chuyên dụng `slack_personal_connections` (hỗ trợ N workspace cho 1 tài khoản ATI với stable `connectionId` per `(ati_user_id, slack_app_id, workspace_id)`) và bảng `slack_processing_consents` (lưu vết quyền tổ chức).
