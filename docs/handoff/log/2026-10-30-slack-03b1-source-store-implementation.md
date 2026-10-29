@@ -80,15 +80,15 @@ Triển khai phạm vi raw-only của SLACK-03B1 và kiểm thử trên PostgreS
 
 ## 3. Bằng Chứng Kiểm Thử Thực Tế (Exit Code 0)
 
-Toàn bộ 54 test cases trên 6 test files PostgreSQL thật đều đạt (45 test của 5 tệp SLACK-03B1 và 9 test của `slack-connection-repo.test.ts` bị ảnh hưởng bởi thay đổi thứ tự khóa):
+Toàn bộ 55 test cases trên 6 test files PostgreSQL thật đều đạt (46 test của 5 tệp SLACK-03B1 và 9 test của `slack-connection-repo.test.ts` bị ảnh hưởng bởi thay đổi thứ tự khóa):
 
 ```text
  RUN  v4.1.11 C:/Users/VinhDat/orca/workspaces/ATI_Project/feat-slack-03b1-source-store/apps/chat-api
 
  Test Files  6 passed (6)
-      Tests  54 passed (54)
-   Start at  01:22:45
-   Duration  5.97s (transform 2.56s, setup 0ms, import 4.36s, tests 25.15s, environment 1ms)
+      Tests  55 passed (55)
+   Start at  01:27:22
+   Duration  4.61s (transform 1.80s, setup 0ms, import 3.47s, tests 18.84s, environment 1ms)
 ```
 
 ### 3.1. Bằng Chứng Vòng Independent Review (NEEDS_WORK → PASS)
@@ -101,12 +101,12 @@ Toàn bộ 54 test cases trên 6 test files PostgreSQL thật đều đạt (45 
   - Metadata whitelist/bound trước DB write; `capturedAt` tương lai bị từ chối; TTL luôn do server quyết định (T2.10, T4.9, T4.10).
   - Consumer xử lý đủ 4 loại sự kiện, chỉ mở rộng exact old epochs, không fallback wildcard, payload conflict được từ chối (T3.7, T3.8, T5.4, T5.5, T5.6).
   - Runner chỉ ghi mã lỗi thô vào `last_error`, không lộ raw body/token (T6.4).
-- Vòng rà soát an toàn bổ sung sau commit `a38267d1`: sửa thứ tự khóa `disconnect` (advisory trước row, có test hai client chứng minh source writer không AB-BA), thêm SAVEPOINT guard cho `saveSourceInTransaction` (T2.11), thêm `ALTER TABLE ... ADD COLUMN IF NOT EXISTS provisional_source_event_key` vào migration 0017, và ghi rõ seam 03B2 cho receipt không intent khi revoke không có nguồn cũ (T5.6) — không tạo wildcard barrier và không mở rộng F3/native Slack.
+- Vòng rà soát an toàn bổ sung sau commit `a38267d1`: sửa thứ tự khóa `disconnect` (advisory trước row, có T2.12 hai client thật `saveSourceInTransaction` và `disconnect` chứng minh không AB-BA, sau đó barrier/intent disconnect purge đúng source đã ghi), thêm SAVEPOINT guard cho `saveSourceInTransaction` (T2.11), thêm `ALTER TABLE ... ADD COLUMN IF NOT EXISTS provisional_source_event_key` vào migration 0017, và ghi rõ seam 03B2 cho receipt không intent khi revoke không có nguồn cũ (T5.6) — không tạo wildcard barrier và không mở rộng F3/native Slack.
 
 Kiểm tra Static Typecheck và Quy Chuẩn Mã Nguồn:
 - `npm run typecheck:v3`: **PASS** (Exit code 0, không có lỗi TypeScript).
 - `git diff --check 62f7a7bb`: **PASS** (Exit code 0, không có lỗi khoảng trắng).
-- `npm run check`: **PASS** trên mã cuối cùng, EXIT=0 (raw output lưu tại `.superpowers/review-source/final-security-npm-check.log`): tool-schemas 266, tool-adapters 443, planner 381, executor 42, chat-api 799, chat-web 901, evaluations 406; web build PASS; security check PASS; launcher/script tests 66 PASS.
+- `npm run check`: **PASS** trên mã cuối cùng, EXIT=0 (raw output lưu tại `.superpowers/review-source/final-head-npm-check.log`): tool-schemas 266, tool-adapters 443, planner 381, executor 42, chat-api 800, chat-web 901, evaluations 406; web build PASS; security check PASS; launcher/script tests 66 PASS.
 
 ---
 

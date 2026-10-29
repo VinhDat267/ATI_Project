@@ -12,11 +12,15 @@ import {
   type GrantConsentInput,
 } from '../../src/db/repositories/slack-consent-repo.js';
 import {
+  acquireSlackInvalidationLocks,
   compareSlackRevisions,
   hashPolicyEpoch,
   SlackInvalidationService,
+  slackSourceWriteLockKeys,
 } from '../../src/services/slack/slack-invalidation-service.js';
+import { SlackConnectionRepo } from '../../src/db/repositories/slack-connection-repo.js';
 import {
+  SLACK_DERIVED_TARGET_KINDS,
   formatSlackOwnerSourceKey,
   slackPolicyRefToEpoch,
   type SlackBinding,
@@ -644,5 +648,85 @@ describe('SlackSourceRepo on PostgreSQL (03B1)', () => {
       [formatSlackOwnerSourceKey(sourceRef)]
     );
     expect(rows.rows[0].n).toBe(0);
+  });
+
+  it('T2.12: real source save and disconnect share one lock order without AB-BA', async () => {
+    const env = await seedEnvironment('T_SAVE_VS_DISCONNECT');
+    const sourceRef: SlackSourceRef = {
+      binding: env.binding,
+      resourceType: 'message',
+      resourceId: 'MSG_SAVE_VS_DISCONNECT',
+      revision: '3.2',
+    };
+    const metadata = { channelId: 'C_LOCK_ORDER' };
+
+    const invalidation = new SlackInvalidationService(db.pool);
+    let markStageEntered!: () => void;
+    const stageEntered = new Promise<void>(resolve => { markStageEntered = resolve; });
+    const originalStage = invalidation.stageInTransaction.bind(invalidation);
+    invalidation.stageInTransaction = async (client, input) => {
+      markStageEntered();
+      return originalStage(client, input);
+    };
+    const connectionRepo = new SlackConnectionRepo(db.pool, invalidation);
+
+    const writer = await db.pool.connect();
+    let committed = false;
+    let savedId: string | undefined;
+    let disconnectPromise: Promise<void> | undefined;
+    try {
+      await writer.query('BEGIN');
+      await writer.query("SET LOCAL lock_timeout = '2000ms'");
+      await acquireSlackInvalidationLocks(
+        writer,
+        slackSourceWriteLockKeys({
+          binding: env.binding,
+          epoch: slackPolicyRefToEpoch(env.policyRef),
+          resourceType: sourceRef.resourceType,
+          resourceId: sourceRef.resourceId,
+          channelId: metadata.channelId,
+        })
+      );
+
+      disconnectPromise = connectionRepo.disconnect(env.person.id, env.connectionId);
+      await stageEntered;
+
+      const saved = await repo.saveSourceInTransaction(writer, {
+        sourceRef,
+        policyRef: env.policyRef,
+        untrustedContent: 'source written before the disconnect barrier commits',
+        metadata,
+      });
+      savedId = saved.id;
+      await writer.query('COMMIT');
+      committed = true;
+      await disconnectPromise;
+    } finally {
+      if (!committed) {
+        try { await writer.query('ROLLBACK'); } catch { /* already aborted */ }
+      }
+      writer.release();
+      if (disconnectPromise) await disconnectPromise.catch(() => undefined);
+    }
+
+    expect(savedId).toBeDefined();
+    const conn = await db.pool.query(
+      'SELECT status, identity_version FROM slack_connections WHERE id=$1',
+      [env.connectionId]
+    );
+    expect(conn.rows[0].status).toBe('disconnected');
+    expect(conn.rows[0].identity_version).toBe(2);
+    expect((await invalidation.checkBarriers({ binding: env.binding })).blocked).toBe(true);
+
+    const purged = await repo.purgeSourcesByTarget({
+      scope: 'authorization_disconnect',
+      binding: env.binding,
+      cascadeTargetKinds: [...SLACK_DERIVED_TARGET_KINDS],
+      tombstoneReason: 'connection_disconnected',
+    });
+    expect(purged.purgedCount).toBe(1);
+    const after = await repo.getSourceById(savedId!);
+    expect(after!.purgedAt).not.toBeNull();
+    expect(after!.untrustedContent).toBe('');
   });
 });
