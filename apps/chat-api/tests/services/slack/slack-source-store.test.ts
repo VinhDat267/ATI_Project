@@ -8,8 +8,17 @@ import {
 import { SlackSourceRepo } from '../../../src/db/repositories/slack-source-repo.js';
 import { SlackInvalidationService } from '../../../src/services/slack/slack-invalidation-service.js';
 import { SlackPolicyService } from '../../../src/services/slack/policy-service.js';
-import { SlackConsentRepo } from '../../../src/db/repositories/slack-consent-repo.js';
-import type { SlackBinding, SlackPolicyReference, SlackSourceRef } from '@wap/tool-schemas';
+import {
+  SlackConsentRepo,
+  type GrantConsentInput,
+  type SlackPurpose,
+} from '../../../src/db/repositories/slack-consent-repo.js';
+import {
+  slackPolicyRefToEpoch,
+  type SlackBinding,
+  type SlackPolicyReference,
+  type SlackSourceRef,
+} from '@wap/tool-schemas';
 
 import { resolveRuntimeProviderIdentity } from '../../../src/config/slack-policy-runtime.js';
 
@@ -41,7 +50,10 @@ describe('SlackSourceStore on PostgreSQL (03B1)', () => {
     await db?.close();
   });
 
-  async function seedStoreEnv(workspaceId = 'T_STORE_1') {
+  async function seedStoreEnv(
+    workspaceId = 'T_STORE_1',
+    purposes: SlackPurpose[] = ['storage', 'manual_lookup', 'triage', 'planning', 'digest']
+  ) {
     const person = await db.person('Charlie');
     const connectionId = randomUUID();
     await db.pool.query(
@@ -69,16 +81,17 @@ describe('SlackSourceStore on PostgreSQL (03B1)', () => {
     }
 
     // Grant consent
-    const consent = await consentRepo.grantConsent({
+    const grantInput: GrantConsentInput = {
       workspaceId,
       providerId: runtimeIdentity.providerId,
       policyVersion: '2026-10-28',
-      purposes: ['storage', 'manual_lookup', 'triage', 'planning', 'digest'],
+      purposes,
       retentionDays: 30,
       organizationRepresentative: 'admin@example.com',
       evidenceRef: 'CONSENT-001',
       recordedBy: 'operator@example.com',
-    });
+    };
+    const consent = await consentRepo.grantConsent(grantInput);
 
     const binding: SlackBinding = {
       atiUserId: person.id,
@@ -105,7 +118,24 @@ describe('SlackSourceStore on PostgreSQL (03B1)', () => {
       requestedRetentionDays: 0,
     };
 
-    return { person, connectionId, workspaceId, binding, storagePolicyRef, acquisitionPolicyRef };
+    const sourceRef: SlackSourceRef = {
+      binding,
+      resourceType: 'message',
+      resourceId: `MSG_${workspaceId}`,
+      revision: '1.0',
+    };
+
+    return {
+      person,
+      connectionId,
+      workspaceId,
+      binding,
+      storagePolicyRef,
+      acquisitionPolicyRef,
+      sourceRef,
+      consent,
+      grantInput,
+    };
   }
 
   it('T4.1: server TTL clamping preserves requestedRetentionDays = 30 but clamps raw retention to <= 7 days', async () => {
@@ -288,5 +318,240 @@ describe('SlackSourceStore on PostgreSQL (03B1)', () => {
       expect(result.reason).toBe('retention_expired');
       expect((result as any).entity).toBeUndefined();
     }
+  });
+
+  it('T4.6: capture lookup enforces full 5-field binding plus resource type/id/revision', async () => {
+    const env = await seedStoreEnv('T_CAPTURE_IDENTITY');
+    const sourceRef = { ...env.sourceRef, resourceId: 'MSG_CAPTURE_IDENTITY', revision: '100.6' };
+    const saved = await store.saveSource({
+      sourceRef,
+      acquisitionPolicyRef: env.acquisitionPolicyRef,
+      storagePolicyRef: env.storagePolicyRef,
+      untrustedContent: 'Capture identity content',
+      metadata: { channelId: 'C_IDENTITY' },
+    });
+
+    const mismatches: SlackSourceRef[] = [
+      { ...sourceRef, resourceId: 'UNRELATED_RESOURCE' },
+      { ...sourceRef, revision: '100.7' },
+      { ...sourceRef, resourceType: 'file' },
+      { ...sourceRef, binding: { ...env.binding, workspaceId: 'T_OTHER_WORKSPACE' } },
+      { ...sourceRef, binding: { ...env.binding, slackUserId: 'U_OTHER' } },
+      { ...sourceRef, binding: { ...env.binding, identityVersion: 2 } },
+      { ...sourceRef, binding: { ...env.binding, atiUserId: randomUUID() } },
+      { ...sourceRef, binding: { ...env.binding, connectionId: randomUUID() } },
+    ];
+
+    for (const mismatched of mismatches) {
+      const got = await store.getSource({
+        expectedCaptureId: saved.id,
+        sourceRef: mismatched,
+        consumerPurpose: 'triage',
+      });
+      expect(got.status, JSON.stringify(mismatched)).toBe('not_found');
+      expect((got as any).entity).toBeUndefined();
+    }
+
+    const exact = await store.getSource({
+      expectedCaptureId: saved.id,
+      sourceRef,
+      consumerPurpose: 'triage',
+    });
+    expect(exact.status).toBe('ok');
+  });
+
+  it('T4.7: current runtime policy denial blocks persistence despite matching old profile metadata', async () => {
+    const env = await seedStoreEnv('T_RUNTIME_POLICY_DENY');
+    const changedEnv = { ...mockEnv, RUNTIME_ACCOUNT_ID: 'CHANGED_POLICY_ACCOUNT' };
+    const deniedPolicy = new SlackPolicyService(db.pool, { env: changedEnv });
+    const deniedStore = new SlackSourceStore(db.pool, sourceRepo, invalidationService, deniedPolicy, {
+      env: changedEnv,
+    });
+
+    const denied = await deniedPolicy.resolveSlackModelPolicy({
+      binding: env.binding,
+      purpose: 'storage',
+      requestedRetentionDays: 30,
+      expectedPolicyReference: env.storagePolicyRef,
+    });
+    expect(denied.allowed).toBe(false);
+
+    await expect(
+      deniedStore.saveSource({
+        sourceRef: env.sourceRef,
+        acquisitionPolicyRef: env.acquisitionPolicyRef,
+        storagePolicyRef: env.storagePolicyRef,
+        untrustedContent: 'Must not persist',
+        metadata: { channelId: 'C_DENIED' },
+      })
+    ).rejects.toThrow(/SOURCE_POLICY_DENIED/);
+
+    const rows = await db.pool.query('SELECT id FROM slack_sources WHERE connection_id = $1', [
+      env.connectionId,
+    ]);
+    expect(rows.rows).toHaveLength(0);
+  });
+
+  it('T4.8: regrant committed between storage and consumer checks cannot release the old epoch', async () => {
+    const env = await seedStoreEnv('T_REGRANT_RACE');
+    const saved = await store.saveSource({
+      sourceRef: env.sourceRef,
+      acquisitionPolicyRef: env.acquisitionPolicyRef,
+      storagePolicyRef: env.storagePolicyRef,
+      untrustedContent: 'Old epoch plaintext',
+      metadata: { channelId: 'C_REGRANT_RACE' },
+    });
+
+    const originalResolve = policyService.resolveSlackModelPolicy;
+    let granted = false;
+    (policyService as any).resolveSlackModelPolicy = async (input: any) => {
+      const actual = await originalResolve.call(policyService, input);
+      if (input.purpose === 'storage' && actual.allowed && !granted) {
+        granted = true;
+        await consentRepo.grantConsent({
+          ...env.grantInput,
+          expectedRevision: BigInt(env.consent.revision),
+        });
+      }
+      return actual;
+    };
+
+    try {
+      const got = await store.getSource({
+        expectedCaptureId: saved.id,
+        sourceRef: env.sourceRef,
+        consumerPurpose: 'triage',
+      });
+      const current = await db.pool.query(
+        'SELECT revision FROM slack_processing_consents WHERE workspace_id = $1',
+        [env.workspaceId]
+      );
+      expect(String(current.rows[0].revision)).toBe('2');
+      expect(granted).toBe(true);
+      expect(got.status).not.toBe('ok');
+      expect((got as any).entity).toBeUndefined();
+    } finally {
+      (policyService as any).resolveSlackModelPolicy = originalResolve;
+    }
+  });
+
+  it('T4.9: metadata is whitelisted and bounded before the database commit', async () => {
+    const env = await seedStoreEnv('T_METADATA_SANITIZE');
+    const saved = await store.saveSource({
+      sourceRef: env.sourceRef,
+      acquisitionPolicyRef: env.acquisitionPolicyRef,
+      storagePolicyRef: env.storagePolicyRef,
+      untrustedContent: 'Metadata content',
+      metadata: {
+        channelId: 'C_METADATA',
+        channelName: 'general',
+        private_blob: { body: 'UNTRACKED_PRIVATE_METADATA' },
+      } as any,
+    });
+
+    const rows = await db.pool.query('SELECT metadata FROM slack_sources WHERE id = $1', [saved.id]);
+    expect(rows.rows[0].metadata).toEqual({ channelId: 'C_METADATA', channelName: 'general' });
+    expect(rows.rows[0].metadata.private_blob).toBeUndefined();
+    expect(saved.metadata).toEqual({ channelId: 'C_METADATA', channelName: 'general' });
+  });
+
+  it('T4.10: caller supplied future capturedAt cannot extend the server TTL', async () => {
+    const env = await seedStoreEnv('T_FUTURE_CAPTURE');
+    await expect(
+      store.saveSource({
+        sourceRef: env.sourceRef,
+        acquisitionPolicyRef: env.acquisitionPolicyRef,
+        storagePolicyRef: env.storagePolicyRef,
+        untrustedContent: 'Future capture',
+        capturedAt: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+      })
+    ).rejects.toThrow(/CAPTURED_AT_IN_FUTURE/);
+
+    const rows = await db.pool.query('SELECT id FROM slack_sources WHERE connection_id = $1', [
+      env.connectionId,
+    ]);
+    expect(rows.rows).toHaveLength(0);
+  });
+
+  it('T4.11: declared acquisition purpose must be currently authorized, not merely declared', async () => {
+    const env = await seedStoreEnv('T_ACQUISITION_DENIED', ['storage']);
+    const acquisition = await policyService.resolveSlackModelPolicy({
+      binding: env.binding,
+      purpose: 'manual_lookup',
+      requestedRetentionDays: 0,
+    });
+    expect(acquisition.allowed).toBe(false);
+
+    await expect(
+      store.saveSource({
+        sourceRef: env.sourceRef,
+        acquisitionPolicyRef: env.acquisitionPolicyRef,
+        storagePolicyRef: env.storagePolicyRef,
+        untrustedContent: 'Acquisition not granted',
+      })
+    ).rejects.toThrow(/SOURCE_POLICY_DENIED:acquisition/);
+
+    const rows = await db.pool.query('SELECT id FROM slack_sources WHERE connection_id = $1', [
+      env.connectionId,
+    ]);
+    expect(rows.rows).toHaveLength(0);
+  });
+
+  it('T4.12: expectedPolicyEpoch is an exact alternative to capture id and requires exclusive input', async () => {
+    const env = await seedStoreEnv('T_EPOCH_LOOKUP');
+    const saved = await store.saveSource({
+      sourceRef: env.sourceRef,
+      acquisitionPolicyRef: env.acquisitionPolicyRef,
+      storagePolicyRef: env.storagePolicyRef,
+      untrustedContent: 'Epoch lookup content',
+      metadata: { channelId: 'C_EPOCH_LOOKUP' },
+    });
+    const epoch = slackPolicyRefToEpoch(env.storagePolicyRef);
+
+    const exact = await store.getSource({
+      expectedPolicyEpoch: epoch,
+      sourceRef: env.sourceRef,
+      consumerPurpose: 'triage',
+    });
+    expect(exact.status).toBe('ok');
+    if (exact.status === 'ok') {
+      expect(exact.entity.id).toBe(saved.id);
+    }
+
+    const wrongEpoch = await store.getSource({
+      expectedPolicyEpoch: { ...epoch, consentRevision: '99' },
+      sourceRef: env.sourceRef,
+      consumerPurpose: 'triage',
+    });
+    expect(wrongEpoch.status).toBe('not_found');
+
+    await expect(
+      store.getSource({
+        expectedPolicyEpoch: { ...epoch, binding: { ...env.binding, workspaceId: 'T_OTHER' } },
+        sourceRef: env.sourceRef,
+        consumerPurpose: 'triage',
+      })
+    ).rejects.toThrow(/binding must match/);
+
+    await expect(
+      store.getSource({
+        expectedCaptureId: saved.id,
+        expectedPolicyEpoch: epoch,
+        sourceRef: env.sourceRef,
+        consumerPurpose: 'triage',
+      } as any)
+    ).rejects.toThrow(/exactly one/);
+
+    await expect(
+      store.getSource({ sourceRef: env.sourceRef, consumerPurpose: 'triage' } as any)
+    ).rejects.toThrow(/exactly one/);
+
+    await expect(
+      store.getSource({
+        expectedCaptureId: randomUUID(),
+        sourceRef: env.sourceRef,
+        consumerPurpose: 'triage',
+      })
+    ).resolves.toEqual({ status: 'not_found' });
   });
 });

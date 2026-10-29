@@ -1,7 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { createMigratedSchema } from '../../helpers/gmail-test-db.js';
-import { SlackInvalidationRunner } from '../../../src/services/slack/slack-invalidation-runner.js';
+import {
+  SlackInvalidationRunner,
+  sanitizeSlackInvalidationError,
+} from '../../../src/services/slack/slack-invalidation-runner.js';
 import { SlackInvalidationService } from '../../../src/services/slack/slack-invalidation-service.js';
 import { SlackPolicyEventConsumer } from '../../../src/services/slack/slack-policy-event-consumer.js';
 import { SlackSourceRepo } from '../../../src/db/repositories/slack-source-repo.js';
@@ -237,5 +240,49 @@ describe('SlackInvalidationRunner on PostgreSQL (03B1)', () => {
 
     await runner.stop();
     expect(runner.isRunning()).toBe(false);
+  });
+
+  it('T6.4: failed intents persist only a coarse error code, never raw body or token text', async () => {
+    const sentinel = 'RAW_BODY_SECRET_TOKEN_abc123';
+    expect(sanitizeSlackInvalidationError(new Error(`${sentinel} at /slack/raw`))).toBe(
+      'code:INVALIDATION_ERROR'
+    );
+    expect(
+      sanitizeSlackInvalidationError(
+        Object.assign(new Error(`failed while handling ${sentinel}`), { code: 'PURGE_FAILED' })
+      )
+    ).toBe('code:PURGE_FAILED');
+
+    const inserted = await db.pool.query(
+      `INSERT INTO slack_invalidation_intents (
+         source_event_key, effect_key, target_kind, purge_target, status
+       ) VALUES ($1, $2, 'slack_source_raw', $3::jsonb, 'pending')
+       RETURNING id`,
+      [
+        `runner_test:bad_intent_${randomUUID()}`,
+        'runner_test:bad_effect',
+        JSON.stringify({
+          scope: 'resource_lifecycle',
+          workspaceId: 'T_BAD_INTENT',
+          resourceType: 'message',
+          resourceId: sentinel,
+          cascadeTargetKinds: [],
+          tombstoneReason: 'not_a_reason',
+          note: sentinel,
+        }),
+      ]
+    );
+
+    const stats = await runner.tick();
+    expect(stats.rawIntentsFailed).toBeGreaterThanOrEqual(1);
+
+    const rows = await db.pool.query(
+      'SELECT status, last_error, attempts FROM slack_invalidation_intents WHERE id = $1',
+      [inserted.rows[0].id]
+    );
+    expect(rows.rows[0].status).toBe('failed');
+    expect(rows.rows[0].last_error).toBe('code:INVALIDATION_ERROR');
+    expect(rows.rows[0].last_error).not.toContain(sentinel);
+    expect(rows.rows[0].attempts).toBeGreaterThanOrEqual(1);
   });
 });

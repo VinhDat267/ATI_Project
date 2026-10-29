@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS slack_invalidation_barriers (
   epoch_json JSONB,
   provisional BOOLEAN NOT NULL DEFAULT false,
   provisional_action TEXT,
+  provisional_source_event_key TEXT,
   credential_fingerprint TEXT,
   reason TEXT NOT NULL,
   active BOOLEAN NOT NULL DEFAULT true,

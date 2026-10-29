@@ -1,6 +1,8 @@
 import type pg from 'pg';
 import {
+  SLACK_DERIVED_TARGET_KINDS,
   slackPolicyRefToEpoch,
+  validateSlackPolicyReference,
   type SlackPolicyEpoch,
   type SlackPolicyReference,
 } from '@wap/tool-schemas';
@@ -15,6 +17,121 @@ export interface ConsumePolicyEventsResult {
   processedCount: number;
 }
 
+const SUPPORTED_POLICY_EVENTS = new Set([
+  'consent_granted',
+  'consent_revoked',
+  'provider_attested',
+  'provider_updated',
+]);
+
+const CANONICAL_CONSENT_REVISION = /^[1-9][0-9]*$/;
+
+interface ValidatedPolicyEvent {
+  id: string;
+  workspaceId: string;
+  providerId: string;
+  eventType: 'consent_granted' | 'consent_revoked' | 'provider_attested' | 'provider_updated';
+  policyVersion: string;
+  consentRevision: string | null;
+  providerRevision: string | null;
+}
+
+/**
+ * Validates the raw event row before it can drive any barrier. Unknown event shapes fail
+ * closed (the event stays pending) rather than being silently ignored.
+ */
+function validatePolicyEventRow(row: any): ValidatedPolicyEvent {
+  if (!row || typeof row !== 'object') {
+    throw new Error('INVALID_POLICY_EVENT: row missing');
+  }
+  const id = row.id;
+  const workspaceId = row.workspace_id;
+  const providerId = row.provider_id;
+  const eventType = row.event_type;
+
+  if (typeof id !== 'string' || !id) {
+    throw new Error('INVALID_POLICY_EVENT: id');
+  }
+  if (typeof workspaceId !== 'string' || !workspaceId.trim()) {
+    throw new Error('INVALID_POLICY_EVENT: workspace_id');
+  }
+  if (typeof providerId !== 'string' || !providerId.trim()) {
+    throw new Error('INVALID_POLICY_EVENT: provider_id');
+  }
+  if (typeof eventType !== 'string' || !SUPPORTED_POLICY_EVENTS.has(eventType)) {
+    throw new Error('INVALID_POLICY_EVENT: unsupported event_type');
+  }
+
+  const consentRevision =
+    row.consent_revision === null || row.consent_revision === undefined
+      ? null
+      : String(row.consent_revision);
+  const providerRevision =
+    row.provider_revision === null || row.provider_revision === undefined
+      ? null
+      : String(row.provider_revision);
+
+  if (eventType === 'consent_granted' || eventType === 'consent_revoked') {
+    if (!consentRevision || !CANONICAL_CONSENT_REVISION.test(consentRevision)) {
+      throw new Error('INVALID_POLICY_EVENT: non-canonical consent_revision');
+    }
+  } else if (!providerRevision || !CANONICAL_CONSENT_REVISION.test(providerRevision)) {
+    throw new Error('INVALID_POLICY_EVENT: non-canonical provider_revision');
+  }
+
+  return {
+    id,
+    workspaceId: workspaceId.trim(),
+    providerId: providerId.trim(),
+    eventType: eventType as ValidatedPolicyEvent['eventType'],
+    policyVersion: String(row.policy_version ?? ''),
+    consentRevision,
+    providerRevision,
+  };
+}
+
+function buildEpochEffects(
+  storedPolicyRefs: unknown[],
+  barrierReason: string
+): InvalidationEffect[] {
+  const byEffectKey = new Map<string, InvalidationEffect>();
+
+  for (const raw of storedPolicyRefs) {
+    const policyRef: SlackPolicyReference = validateSlackPolicyReference(raw);
+    if (policyRef.purpose !== 'storage') {
+      throw new Error('INVALID_STORED_POLICY_REFERENCE: purpose');
+    }
+
+    const epoch: SlackPolicyEpoch = slackPolicyRefToEpoch(policyRef);
+    const epochHash = hashPolicyEpoch(epoch);
+    const effectKey = `policy_epoch_invalidated:${epochHash}`;
+    if (byEffectKey.has(effectKey)) {
+      continue;
+    }
+
+    byEffectKey.set(effectKey, {
+      effectKey,
+      barrier: {
+        barrierType: 'epoch',
+        epoch,
+        reason: barrierReason,
+      },
+      purgeTarget: {
+        scope: 'policy_epoch_invalidated',
+        epoch,
+        // Raw purge only in 03B1. All seven derived target kinds are recorded and left
+        // pending for the explicit 03B2 cascade seam; raw completion never marks them done.
+        cascadeTargetKinds: [...SLACK_DERIVED_TARGET_KINDS],
+        tombstoneReason: 'policy_changed',
+      },
+    });
+  }
+
+  return [...byEffectKey.values()].sort((a, b) =>
+    a.effectKey < b.effectKey ? -1 : a.effectKey > b.effectKey ? 1 : 0
+  );
+}
+
 export class SlackPolicyEventConsumer {
   constructor(
     private readonly pool: pg.Pool,
@@ -23,11 +140,14 @@ export class SlackPolicyEventConsumer {
   ) {}
 
   /**
-   * Consumes pending policy events from 02B (slack_policy_events) using anti-join
-   * against slack_invalidation_receipts, expanding after-change events to exact old epochs.
+   * Consumes policy events from 02B using an anti-join against durable receipts.
+   *
+   * All four event kinds are handled because every one of them bumps an authorization
+   * revision (consent_granted/consent_revoked bump consentRevision,
+   * provider_attested/provider_updated bump providerRevision). Effects expand only the exact
+   * stored old epochs; there is no wildcard/empty-source fallback barrier.
    */
   async consumePendingPolicyEvents(limit = 50): Promise<ConsumePolicyEventsResult> {
-    // 1. Anti-join query prevents starvation of older events
     const eventsRes = await this.pool.query(
       `SELECT e.id, e.workspace_id, e.provider_id, e.event_type, e.policy_version,
               e.consent_revision, e.provider_revision, e.reason, e.occurred_at
@@ -47,128 +167,48 @@ export class SlackPolicyEventConsumer {
 
     let processedCount = 0;
 
-    for (const e of events) {
-      const sourceEventKey = `policy:${e.id}`;
-      const effects: InvalidationEffect[] = [];
+    for (const row of events) {
+      const event = validatePolicyEventRow(row);
+      const sourceEventKey = `policy:${event.id}`;
+      let storedPolicyRefs: unknown[] = [];
+      let barrierReason = 'policy_changed';
 
-      if (e.event_type === 'consent_revoked') {
-        // Find stored raw sources for this workspace and provider that used old consent revisions <= e.consent_revision
+      if (event.eventType === 'consent_granted' || event.eventType === 'consent_revoked') {
+        // Every stored source under a consent revision strictly older than this event is
+        // invalidated. A source written under the new revision is never touched.
         const storedEpochsRes = await this.pool.query(
           `SELECT DISTINCT policy_ref
            FROM slack_sources
            WHERE (workspace_id = $1 OR $1 = '*')
              AND (policy_ref->>'providerProfileId') = $2
-             AND ((policy_ref->>'consentRevision')::bigint <= $3)
+             AND (policy_ref->>'consentRevision') ~ '^[1-9][0-9]*$'
+             AND (policy_ref->>'consentRevision')::bigint < $3::bigint
              AND purged_at IS NULL`,
-          [e.workspace_id, e.provider_id, e.consent_revision]
+          [event.workspaceId, event.providerId, event.consentRevision]
         );
-
-        for (const row of storedEpochsRes.rows) {
-          const sourcePolicyRef = row.policy_ref as SlackPolicyReference;
-          const epoch: SlackPolicyEpoch = slackPolicyRefToEpoch(sourcePolicyRef);
-          const epochHash = hashPolicyEpoch(epoch);
-
-          effects.push({
-            effectKey: `epoch_invalidated:${epochHash}`,
-            barrier: {
-              barrierType: 'epoch',
-              epoch,
-              reason: 'consent_revoked',
-            },
-            purgeTarget: {
-              scope: 'policy_epoch_invalidated',
-              epoch,
-              cascadeTargetKinds: [
-                'chat_history_message',
-                'working_memory_entity',
-                'plan_step_arg',
-                'proposal_excerpt',
-                'daily_digest_entry',
-                'scheduled_workflow_arg',
-                'audit_log_entry',
-              ],
-              tombstoneReason: 'policy_changed',
-            },
-          });
-        }
-
-        // If workspace is specific and not wildcard, also register workspace consent revocation target
-        if (e.workspace_id !== '*' && effects.length === 0) {
-          // If no specific sources currently stored, still record barrier-only or scope
-          // to ensure future lookups or derived purges recognize it
-          effects.push({
-            effectKey: `ws_consent_revocation:${e.workspace_id}:${e.consent_revision}`,
-            barrier: {
-              barrierType: 'resource',
-              workspaceId: e.workspace_id,
-              resourceType: 'conversation',
-              resourceId: '*',
-              deleted: true,
-              reason: 'consent_revoked',
-            },
-            purgeTarget: {
-              scope: 'workspace_consent_revocation',
-              workspaceId: e.workspace_id,
-              policyVersion: e.policy_version,
-              providerProfileId: e.provider_id,
-              consentRevision: String(e.consent_revision),
-              cascadeTargetKinds: [
-                'chat_history_message',
-                'working_memory_entity',
-                'plan_step_arg',
-                'proposal_excerpt',
-                'daily_digest_entry',
-                'scheduled_workflow_arg',
-                'audit_log_entry',
-              ],
-              tombstoneReason: 'consent_revoked',
-            },
-          });
-        }
-      } else if (e.event_type === 'provider_updated') {
-        // Find stored raw sources that used old provider revisions
-        if (e.provider_revision != null) {
-          const storedEpochsRes = await this.pool.query(
-            `SELECT DISTINCT policy_ref
-             FROM slack_sources
-             WHERE (policy_ref->>'providerProfileId') = $1
-               AND ((policy_ref->>'providerRevision')::bigint < $2)
-               AND purged_at IS NULL`,
-            [e.provider_id, e.provider_revision]
-          );
-
-          for (const row of storedEpochsRes.rows) {
-            const sourcePolicyRef = row.policy_ref as SlackPolicyReference;
-            const epoch: SlackPolicyEpoch = slackPolicyRefToEpoch(sourcePolicyRef);
-            const epochHash = hashPolicyEpoch(epoch);
-
-            effects.push({
-              effectKey: `provider_epoch_invalidated:${epochHash}`,
-              barrier: {
-                barrierType: 'epoch',
-                epoch,
-                reason: 'policy_changed',
-              },
-              purgeTarget: {
-                scope: 'policy_epoch_invalidated',
-                epoch,
-                cascadeTargetKinds: [
-                  'chat_history_message',
-                  'working_memory_entity',
-                  'plan_step_arg',
-                  'proposal_excerpt',
-                  'daily_digest_entry',
-                  'scheduled_workflow_arg',
-                  'audit_log_entry',
-                ],
-                tombstoneReason: 'policy_changed',
-              },
-            });
-          }
-        }
+        storedPolicyRefs = storedEpochsRes.rows.map(r => r.policy_ref);
+        barrierReason = event.eventType === 'consent_revoked' ? 'consent_revoked' : 'policy_changed';
+      } else {
+        // Provider attestations/updates are provider-global; revoke every stored epoch whose
+        // providerRevision is older than the newly attested revision.
+        const storedEpochsRes = await this.pool.query(
+          `SELECT DISTINCT policy_ref
+           FROM slack_sources
+           WHERE (policy_ref->>'providerProfileId') = $1
+             AND (policy_ref->>'providerRevision') ~ '^[1-9][0-9]*$'
+             AND (policy_ref->>'providerRevision')::bigint < $2::bigint
+             AND purged_at IS NULL`,
+          [event.providerId, event.providerRevision]
+        );
+        storedPolicyRefs = storedEpochsRes.rows.map(r => r.policy_ref);
+        barrierReason = 'policy_changed';
       }
 
-      // Stage in transaction: receipt + effects committed atomically
+      const effects = buildEpochEffects(storedPolicyRefs, barrierReason);
+
+      // Receipt + barriers + intents are committed atomically before this event is counted
+      // as processed or acknowledged. Empty effects still stage a receipt (no fallback
+      // wildcard barrier is created when no old source is currently stored).
       const client = await this.pool.connect();
       try {
         await client.query('BEGIN');
@@ -179,7 +219,11 @@ export class SlackPolicyEventConsumer {
         await client.query('COMMIT');
         processedCount++;
       } catch (err) {
-        await client.query('ROLLBACK');
+        try {
+          await client.query('ROLLBACK');
+        } catch {
+          // connection may already be aborted by a failed COMMIT
+        }
         throw err;
       } finally {
         client.release();

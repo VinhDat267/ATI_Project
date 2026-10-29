@@ -14,6 +14,7 @@ import {
 import {
   compareSlackRevisions,
   hashPolicyEpoch,
+  SlackInvalidationService,
 } from '../../src/services/slack/slack-invalidation-service.js';
 import {
   formatSlackOwnerSourceKey,
@@ -382,6 +383,215 @@ describe('SlackSourceRepo on PostgreSQL (03B1)', () => {
         ['k2', env.person.id, env.connectionId, env.workspaceId, 'U_ALICE']
       )
     ).rejects.toThrow(/chk_slack_sources_raw_retention/);
+  });
+
+  it('T2.8: deterministic PG lock proof: committed resource-delete barrier staged before save blocks the writer', async () => {
+    const env = await seedEnvironment('T_LOCK_DELETE_BEFORE_SAVE');
+    const sourceRef: SlackSourceRef = {
+      binding: env.binding,
+      resourceType: 'message',
+      resourceId: 'MSG_DELETE_BEFORE_SAVE',
+      revision: '10.1',
+    };
+    const invalidation = new SlackInvalidationService(db.pool);
+    const stager = await db.pool.connect();
+    let writerError: Error | null = null;
+    let writerSettled = false;
+    try {
+      await stager.query('BEGIN');
+      await invalidation.stageInTransaction(stager, {
+        sourceEventKey: `slack:A_SLACK_APP:delete_first_${env.workspaceId}`,
+        effects: [
+          {
+            effectKey: 'resource_delete',
+            barrier: {
+              barrierType: 'resource',
+              workspaceId: env.workspaceId,
+              resourceType: 'message',
+              resourceId: sourceRef.resourceId,
+              deleted: true,
+              reason: 'source_deleted',
+            },
+          },
+        ],
+      });
+
+      const writerPromise = repo
+        .saveSourceAtomic({
+          sourceRef,
+          policyRef: env.policyRef,
+          untrustedContent: 'Must not be written after a committed delete',
+          metadata: { channelId: 'C123' },
+        })
+        .catch(err => {
+          writerError = err;
+        })
+        .finally(() => {
+          writerSettled = true;
+        });
+
+      // The writer holds the barriered resource's advisory lock scope and must wait.
+      await new Promise(r => setTimeout(r, 100));
+      expect(writerSettled).toBe(false);
+
+      await stager.query('COMMIT');
+      await writerPromise;
+
+      expect(writerError).not.toBeNull();
+      expect(writerError!.message).toMatch(
+        /BLOCKED_BY_INVALIDATION_BARRIER: resource:source_deleted/
+      );
+
+      const rows = await db.pool.query('SELECT id FROM slack_sources WHERE owner_source_key = $1', [
+        formatSlackOwnerSourceKey(sourceRef),
+      ]);
+      expect(rows.rows).toHaveLength(0);
+    } finally {
+      try {
+        await stager.query('ROLLBACK');
+      } catch {
+        // already committed
+      }
+      stager.release();
+    }
+  });
+
+  it('T2.9: deterministic PG lock proof: barrier staging waits for an in-flight write, then purge erases it', async () => {
+    const env = await seedEnvironment('T_LOCK_SAVE_BEFORE_DELETE');
+    const sourceRef: SlackSourceRef = {
+      binding: env.binding,
+      resourceType: 'message',
+      resourceId: 'MSG_SAVE_BEFORE_DELETE',
+      revision: '11.2',
+    };
+    const invalidation = new SlackInvalidationService(db.pool);
+    const writer = await db.pool.connect();
+    const stager = await db.pool.connect();
+    try {
+      await writer.query('BEGIN');
+      const saved = await repo.saveSourceInTransaction(writer, {
+        sourceRef,
+        policyRef: env.policyRef,
+        untrustedContent: 'Written before the delete barrier',
+        metadata: { channelId: 'C123' },
+      });
+
+      let stagerFinished = false;
+      const stagerPromise = (async () => {
+        await stager.query('BEGIN');
+        await invalidation.stageInTransaction(stager, {
+          sourceEventKey: `slack:A_SLACK_APP:delete_after_${env.workspaceId}`,
+          effects: [
+            {
+              effectKey: 'resource_delete',
+              barrier: {
+                barrierType: 'resource',
+                workspaceId: env.workspaceId,
+                resourceType: 'message',
+                resourceId: sourceRef.resourceId,
+                deleted: true,
+                reason: 'source_deleted',
+              },
+            },
+          ],
+        });
+        await stager.query('COMMIT');
+        stagerFinished = true;
+      })();
+
+      // Barrier staging must wait for the source write transaction to finish.
+      await new Promise(r => setTimeout(r, 100));
+      expect(stagerFinished).toBe(false);
+
+      await writer.query('COMMIT');
+      await stagerPromise;
+      expect(stagerFinished).toBe(true);
+
+      const purged = await repo.purgeSourcesByTarget({
+        scope: 'resource_lifecycle',
+        workspaceId: env.workspaceId,
+        resourceType: 'message',
+        resourceId: sourceRef.resourceId,
+        revision: sourceRef.revision,
+        cascadeTargetKinds: [],
+        tombstoneReason: 'source_deleted',
+      });
+      expect(purged.purgedCount).toBe(1);
+
+      const after = await repo.getSourceById(saved.id);
+      expect(after!.purgedAt).not.toBeNull();
+      expect(after!.untrustedContent).toBe('');
+      expect(after!.tombstoneReason).toBe('source_deleted');
+    } finally {
+      try {
+        await writer.query('ROLLBACK');
+      } catch {
+        // already committed
+      }
+      try {
+        await stager.query('ROLLBACK');
+      } catch {
+        // already committed
+      }
+      writer.release();
+      stager.release();
+    }
+  });
+
+  it('T2.10: rejects future capture times, oversized raw content, oversized metadata, and strips untracked fields', async () => {
+    const env = await seedEnvironment('T_BOUNDS');
+    const sourceRef: SlackSourceRef = {
+      binding: env.binding,
+      resourceType: 'message',
+      resourceId: 'MSG_BOUNDS',
+      revision: '12.3',
+    };
+
+    await expect(
+      repo.saveSourceAtomic({
+        sourceRef,
+        policyRef: env.policyRef,
+        untrustedContent: 'future',
+        capturedAt: new Date(Date.now() + 86_400_000).toISOString(),
+      })
+    ).rejects.toThrow(/CAPTURED_AT_IN_FUTURE/);
+
+    await expect(
+      repo.saveSourceAtomic({
+        sourceRef,
+        policyRef: env.policyRef,
+        untrustedContent: 'x'.repeat(1_048_577),
+      })
+    ).rejects.toThrow(/RAW_CONTENT_TOO_LARGE/);
+
+    await expect(
+      repo.saveSourceAtomic({
+        sourceRef,
+        policyRef: env.policyRef,
+        untrustedContent: 'metadata bounds',
+        metadata: { channelId: 'C_BOUNDS', channelName: 'y'.repeat(5_000) },
+      })
+    ).rejects.toThrow(/METADATA_FIELD_TOO_LARGE/);
+
+    const saved = await repo.saveSourceAtomic({
+      sourceRef,
+      policyRef: env.policyRef,
+      untrustedContent: 'sanitized metadata',
+      metadata: {
+        channelId: 'C_BOUNDS',
+        private_blob: { body: 'UNTRACKED_PRIVATE_METADATA' },
+      } as any,
+    });
+
+    const rows = await db.pool.query('SELECT metadata FROM slack_sources WHERE id = $1', [saved.id]);
+    expect(rows.rows[0].metadata).toEqual({ channelId: 'C_BOUNDS' });
+
+    // Only one physical row exists: every rejected attempt was refused before INSERT.
+    const count = await db.pool.query(
+      'SELECT count(*)::int AS n FROM slack_sources WHERE owner_source_key = $1',
+      [formatSlackOwnerSourceKey(sourceRef)]
+    );
+    expect(count.rows[0].n).toBe(1);
   });
 
   it('T2.7: compareSlackRevisions exact decimal ordering and fail-closed validation', () => {

@@ -19,6 +19,30 @@ export interface InvalidationSweepStats {
   staleLeasesRecovered: number;
 }
 
+/**
+ * Persists only a coarse error code to `last_error`. Free-form messages can contain raw
+ * source bodies, tokens, or SQL parameter echoes, so they are never written to the queue.
+ */
+export function sanitizeSlackInvalidationError(err: unknown): string {
+  const maybeCode =
+    err && typeof err === 'object' && 'code' in err
+      ? (err as { code?: unknown }).code
+      : undefined;
+
+  if (typeof maybeCode === 'string' && /^[A-Za-z0-9_]{2,64}$/.test(maybeCode)) {
+    return `code:${maybeCode}`;
+  }
+
+  if (err instanceof Error) {
+    const match = /^([A-Z][A-Z0-9_]{2,64})\b/.exec(err.message);
+    if (match?.[1]) {
+      return `code:${match[1]}`;
+    }
+  }
+
+  return 'code:INVALIDATION_ERROR';
+}
+
 export class SlackInvalidationRunner {
   private readonly sweepIntervalMs: number;
   private readonly batchSize: number;
@@ -152,8 +176,10 @@ export class SlackInvalidationRunner {
           await this.invalidationService.completeIntent(intent.id);
           stats.rawIntentsProcessed++;
         } catch (err) {
-          const errMsg = err instanceof Error ? err.message : String(err);
-          await this.invalidationService.failIntent(intent.id, errMsg);
+          await this.invalidationService.failIntent(
+            intent.id,
+            sanitizeSlackInvalidationError(err)
+          );
           stats.rawIntentsFailed++;
           if (this.onError) this.onError(err, `process_intent_${intent.id}`);
         }

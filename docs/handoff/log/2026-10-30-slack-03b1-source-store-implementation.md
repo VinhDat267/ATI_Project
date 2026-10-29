@@ -1,6 +1,6 @@
 # 30/10/2026 · Nghiệm Thu SLACK-03B1: Kho Nguồn Thô Slack, Kiểm Soát Truy Cập MVCC & Hàng Đợi Vô Hiệu Hóa Bền Vững
 
-**Tác giả:** Backend Implementation Owner (Antigravity gemini-3.8-flash-high).  
+**Tác giả:** Backend Implementation Owner.
 **Ủy quyền điều phối:** Điều phối viên trưởng (Coordinator `term_c4dfa448-7670-4256-8dac-d0a1c9157a1d`) phân công thực thi Task `task_d01c3a8596e8`, Dispatch `ctx_29765fc6b1b7`.  
 **Nhánh Git:** `feat/slack-03b1-source-store` (nền `f67c0b166219b93b9e336866997bfdd4c703d062` từ `integration/slack-personal-20261029`).  
 **Task card:** [`docs/handoff/tasks/SLACK-03B1-source-store-and-invalidation.md`](../tasks/SLACK-03B1-source-store-and-invalidation.md).  
@@ -11,7 +11,7 @@
 
 ## 1. Tóm Tắt Thực Thi & Thỏa Thuận Giao Diện Liên Tác Vụ
 
-Triển khai trọn vẹn và kiểm thử nghiêm ngặt kho nguồn thô Slack, cơ chế kiểm soát truy cập phân cấp MVCC trên PostgreSQL thật, và hệ thống hàng đợi vô hiệu hóa bền vững theo đúng thỏa thuận hợp đồng với Ingress 04A và Consumer 03C:
+Triển khai phạm vi raw-only của SLACK-03B1 và kiểm thử trên PostgreSQL thật: kho nguồn thô Slack, cơ chế kiểm soát truy cập phân cấp MVCC, và hệ thống hàng đợi vô hiệu hóa bền vững theo thỏa thuận hợp đồng với Ingress 04A và Consumer 03C. Bảy nhóm bản sao phái sinh vẫn `pending` cho 03B2; native Slack ingress và model content calls không chạy trong phạm vi này.
 
 ### 1.1. Chấp thuận Checkpoint 03C1 Hooks:
 - Đã gửi thông báo chấp thuận chính thức giao diện hook tin cậy tới Coordinator (`msg_150cb7b10000`, ack `delivery_4abbe30d9daf`):
@@ -67,7 +67,7 @@ Triển khai trọn vẹn và kiểm thử nghiêm ngặt kho nguồn thô Slack
 ### 2.5. Tiêu Thụ Sự Kiện Chính Sách Chống Starvation (`SlackPolicyEventConsumer`):
 - Sử dụng câu truy vấn Anti-Join (`slack_policy_events LEFT JOIN slack_invalidation_receipts WHERE r.id IS NULL ORDER BY occurred_at, id LIMIT $1`).
 - Xử lý đủ 4 loại sự kiện 02B: `consent_granted`, `consent_revoked`, `provider_attested`, `provider_updated`.
-- Mở rộng sự kiện `consent_revoked` và `provider_updated` sang toàn bộ các kỷ nguyên cũ (exact old epochs) đang lưu trữ trong cơ sở dữ liệu.
+- Mở rộng cả 4 loại sự kiện (`consent_granted`, `consent_revoked`, `provider_attested`, `provider_updated`) sang exact old epochs đang lưu trữ; không tạo wildcard `conversation:*` khi không có nguồn cũ.
 - Bảo toàn tuyệt đối regrant mới: Khi một consent mới được cấp lại, các nguồn được ghi nhận dưới epoch mới không bị ảnh hưởng bởi barrier của epoch cũ.
 
 ### 2.6. Tiến Trình Nền Tự Động Quét Xóa & Dọn Dẹp (`SlackInvalidationRunner`):
@@ -80,44 +80,32 @@ Triển khai trọn vẹn và kiểm thử nghiêm ngặt kho nguồn thô Slack
 
 ## 3. Bằng Chứng Kiểm Thử Thực Tế (Exit Code 0)
 
-Toàn bộ 25 test cases trên 5 test files PostgreSQL thật đều đạt kết quả tuyệt đối:
+Toàn bộ 44 test cases trên 5 test files PostgreSQL thật đều đạt:
 
 ```text
-> @wap/chat-api@0.1.0 test
-> vitest run tests/db/slack-source-repo.test.ts tests/services/slack/slack-invalidation-service.test.ts tests/services/slack/slack-source-store.test.ts tests/services/slack/slack-policy-event-consumer.test.ts tests/services/slack/slack-invalidation-runner.test.ts
-
  RUN  v4.1.11 C:/Users/VinhDat/orca/workspaces/ATI_Project/feat-slack-03b1-source-store/apps/chat-api
 
- ✓ tests/services/slack/slack-invalidation-service.test.ts (6 tests) 2335ms
- ✓ tests/services/slack/slack-invalidation-runner.test.ts (3 tests) 2326ms
- ✓ tests/services/slack/slack-source-store.test.ts (5 tests) 2527ms
- ✓ tests/db/slack-source-repo.test.ts (8 tests) 3011ms
- ✓ tests/services/slack/slack-policy-event-consumer.test.ts (3 tests) 3324ms
-     ✓ T5.3: anti-join prevents starvation across batches (> 50 events)  1044ms
-
  Test Files  5 passed (5)
-      Tests  25 passed (25)
-   Start at  00:19:29
-   Duration  4.28s
-```
-
-Kiểm tra toàn bộ test suite Slack (bao gồm các bộ kiểm thử OAuth và Consent từ 02):
-```text
- ✓ tests/db/slack-consent-repo.test.ts (10 tests) 1194ms
- ✓ tests/services/slack/slack-invalidation-service.test.ts (6 tests) 1568ms
- ✓ tests/services/slack/slack-invalidation-runner.test.ts (3 tests) 1268ms
- ✓ tests/services/slack/slack-source-store.test.ts (5 tests) 1445ms
- ✓ tests/db/slack-source-repo.test.ts (8 tests) 1862ms
- ✓ tests/services/slack/slack-policy-event-consumer.test.ts (3 tests) 1953ms
- ✓ tests/routes/slack-connections.test.ts (9 tests) 1854ms
-
- Test Files  7 passed (7)
       Tests  44 passed (44)
+   Start at  00:58:57
+   Duration  5.08s (transform 2.07s, setup 0ms, import 3.36s, tests 15.38s, environment 1ms)
 ```
+
+### 3.1. Bằng Chứng Vòng Independent Review (NEEDS_WORK → PASS)
+
+- Baseline harness `.superpowers/review-source/review.mts`: 1 PASS / 7 RED (`.superpowers/review-source/red.log`).
+- Sau khi sửa: EXIT=0, 8/8 assertion PASS (`.superpowers/review-source/after-core-run.log`).
+- Các nhóm sửa:
+  - `saveSource` ủy quyền lại policy hiện tại cho acquisition và storage với epoch chính xác; từ chối acquisition purpose/retention không được cấp; barrier guard và advisory lock binding/resource/channel/epoch nằm trong cùng transaction ghi (T2.8, T2.9, T4.7, T4.11).
+  - `getSource` khóa đầy đủ 5 trường binding + resource type/id/revision + epoch bất biến; ủy quyền lại storage/current epoch qua các await; đọc lại dòng mới nhất trước khi trả plaintext (T4.6, T4.8, T4.12).
+  - Metadata whitelist/bound trước DB write; `capturedAt` tương lai bị từ chối; TTL luôn do server quyết định (T2.10, T4.9, T4.10).
+  - Consumer xử lý đủ 4 loại sự kiện, chỉ mở rộng exact old epochs, không fallback wildcard, payload conflict được từ chối (T3.7, T3.8, T5.4, T5.5, T5.6).
+  - Runner chỉ ghi mã lỗi thô vào `last_error`, không lộ raw body/token (T6.4).
 
 Kiểm tra Static Typecheck và Quy Chuẩn Mã Nguồn:
-- `npm run typecheck:v3`: **PASS** (Exit code 0, không có bất kỳ lỗi TypeScript nào).
-- `git diff --check f67c0b16`: **PASS** (Exit code 0, không có lỗi định dạng hay khoảng trắng thừa).
+- `npm run typecheck:v3`: **PASS** (Exit code 0, không có lỗi TypeScript).
+- `git diff --check 62f7a7bb`: **PASS** (Exit code 0, không có lỗi khoảng trắng).
+- `npm run check`: **PASS** trên mã cuối cùng, EXIT=0 (raw output lưu tại `.superpowers/review-source/final-npm-check.log`): tool-schemas 266, tool-adapters 443, planner 381, executor 42, chat-api 797, chat-web 901, evaluations 406; web build PASS; security check PASS; launcher/script tests 66 PASS.
 
 ---
 

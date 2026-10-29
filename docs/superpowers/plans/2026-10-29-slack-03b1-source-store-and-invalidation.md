@@ -311,3 +311,11 @@ apps/chat-api/src/
 - [ ] **Task 6.1:** Kiểm tra toàn bộ link markdown và đường dẫn tương đối trong card, plan, log.
 - [ ] **Task 6.2:** Chạy kiểm tra quy chuẩn git diff: `git diff --check base..HEAD`.
 - [ ] **Task 6.3:** Xác nhận không có file mã nguồn hoặc file ngoài 3 docs SLACK-03B1 bị thay đổi.
+
+---
+
+## 7. Trạng Thái Triển Khai (bounded evidence, 30/10/2026)
+
+- Đã triển khai Phase 1-5 trong phạm vi raw-only trên nhánh `feat/slack-03b1-source-store` (base `62f7a7bb`), gồm migration `db/v3/0017_slack_source_store.sql`, repository/store/invalidation/consumer/runner và các test PostgreSQL thật.
+- Vòng independent review NEEDS_WORK trên PR #200 đã được xử lý: root harness 8/8 PASS (EXIT=0), 44/44 test cases của 5 file 03B1 PASS, `npm run check` PASS trên mã cuối cùng.
+- Phạm vi NOT_RUN: native Slack ingress, model content calls, cascade 7 nhóm bản sao phái sinh (03B2), kiểm tra binding/hash trước dispatch của Executor (03B3), UI/browser. Kế hoạch này không tuyên bố hoàn tất F3.
