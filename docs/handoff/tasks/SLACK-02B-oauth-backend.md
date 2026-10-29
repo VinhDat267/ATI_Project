@@ -67,7 +67,7 @@ Triển khai phần backend còn lại của SLACK-02, trọng tâm là **Chính
 - [x] Khả năng kết nối được công bố qua `GET /api/services` (`personalOAuth: ['myslack']`).
 - [x] Các tests hiện hữu của PR #184 và 02R tiếp tục pass 100% nhờ lớp tương thích chuẩn 02A (`validateSlackConnectionPublicInfo` + safe legacy aliases).
 - [x] Không có secret hay token nào bị lọt vào log, exception hay API responses.
-- [x] `npm run typecheck:v3` đạt exit code 0; `npm run check` toàn diện đạt 3,167 tests pass (exit code 0); `git diff --check` đạt 0 lỗi whitespace.
+- [x] `npm run typecheck:v3` đạt exit code 0; `npm run check` toàn diện đạt 3,161 tests pass (exit code 0); `git diff --check` đạt 0 lỗi whitespace.
 - [x] Vượt qua 4/4 ca kiểm thử phản biện độc lập của Leader (`.superpowers/slack02b-resume/leader-policy-review.mts` EXIT 0) và 17/17 ca kiểm thử hợp đồng chính sách toàn diện (`.superpowers/slack02b-resume/leader-policy-contract-review.mts` EXIT 0).
 - [x] Hỗ trợ đầy đủ luồng điều hướng `returnTo` (`/c/<uuid>` kiểm tra quyền sở hữu hội thoại, lưu vào state và bảo toàn tới callback kết quả; tái kiểm tra quyền sở hữu khi callback để an toàn bỏ qua nếu hội thoại bị xóa/chuyển giao) cùng tham số gợi ý workspace `workspaceHint`.
 
@@ -103,13 +103,13 @@ Triển khai phần backend còn lại của SLACK-02, trọng tâm là **Chính
   - `npm run test:slack:foundation`: **56 Node + 49 Vitest PASS** (105 tests).
   - `npm run typecheck:v3`: **EXIT 0** (0 lỗi TypeScript).
   - Toàn bộ `apps/chat-api` suite: **105 files PASS, 753 tests PASS**.
-  - Fullcheck toàn dự án (`npm run check`): **EXIT 0**: 2.694 v3 tests + 406 eval + 1 launcher + 66 Node = **3.167 tests PASS**.
+  - Fullcheck toàn dự án (`npm run check`): **EXIT 0**: 2.688 v3 tests + 406 eval + 1 launcher + 66 Node = **3.161 tests PASS**.
   - Whitespace check (`git diff --check`): **0 lỗi**.
   - `apps/chat-api/tests/services/slack-token-manager.test.ts`: **4/4 tests PASS**.
   - `npm run test:slack:foundation`: **56 node tests + 49 vitest tests PASS (105 tests)**.
   - `npm run typecheck:v3`: **EXIT 0**.
   - Toàn bộ `apps/chat-api` suite: **105 files PASS, 751 tests PASS** (thời gian 43.61s).
-  - Fullcheck toàn dự án (`npm run check`): **EXIT 0**: 2,694 v3 tests + 406 eval + 1 launcher + 66 Node = **3,167 tests PASS**.
+  - Fullcheck toàn dự án (`npm run check`): **EXIT 0**: 2,688 v3 tests + 406 eval + 1 launcher + 66 Node = **3,161 tests PASS**.
   - Whitespace check (`git diff --check`): **0 lỗi**.
 
 
