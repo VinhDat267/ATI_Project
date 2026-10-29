@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax.
 
-**Goal:** Triển khai kho dữ liệu nguồn thô Slack (`slack_sources`), cơ chế kiểm soát truy cập PostgreSQL MVCC tuần tự hóa tuyệt đối với 02B, trần TTL máy chủ <= 7 ngày, hàng đợi ý định vô hiệu hóa bền vững (`slack_invalidation_intents`), giao diện transaction-bound cho 04A ingress, và bộ tiêu thụ sự kiện chính sách tổ chức hỗ trợ đầy đủ 6 purge scopes (bao gồm scope `policy_epoch_invalidated` đã được chấp thuận).
+**Goal:** Triển khai kho dữ liệu nguồn thô Slack (`slack_sources`), cơ chế kiểm soát truy cập PostgreSQL MVCC tuần tự hóa tuyệt đối với 02B, trần TTL máy chủ <= 7 ngày, hàng đợi ý định vô hiệu hóa bền vững (`slack_invalidation_intents`), giao diện transaction-bound thống nhất `commitLifecycleInvalidation` cho 04A ingress, và bộ tiêu thụ sự kiện chính sách tổ chức hỗ trợ đầy đủ 6 purge scopes (bao gồm scope `policy_epoch_invalidated` đã được chấp thuận).
 
-**Architecture:** Domain-Driven Design (DDD) & Deep Modules cô lập kho nguồn thô tại `apps/chat-api` và `db/v3`. Định danh capture vật lý bất biến bằng UUID, phân biệt với khóa tài nguyên nguồn `owner_source_key`. Tham chiếu chính sách 8 trường chuẩn tắc với mục đích cố định `'storage'`. Thứ tự khóa dòng chống deadlock: `slack_connections` -> `slack_trusted_providers` -> `slack_processing_consents`. Đọc nguồn an toàn 2 pha (thẩm định lưu trữ + ủy quyền mục đích tiêu thụ). Bộ tiêu thụ sự kiện tách biệt receipt với composite intent, mở rộng sự kiện sau thay đổi thành các rào chắn và ý định vô hiệu hóa epoch cũ chính xác.
+**Architecture:** Domain-Driven Design (DDD) & Deep Modules cô lập kho nguồn thô tại `apps/chat-api` và `db/v3`. Định danh capture vật lý bất biến bằng UUID (`SlackSourceEntity.id`), phân biệt với khóa tài nguyên nguồn `owner_source_key`. Tham chiếu chính sách 8 trường chuẩn tắc. Khóa dòng chống deadlock: `slack_connections` -> `slack_trusted_providers` -> `slack_processing_consents`. Thẩm định bất biến epoch thu thập (`acquisitionPolicyRef`) khớp `sameSlackPolicyEpoch` với `storagePolicyRef`. Đọc nguồn an toàn 2 pha (lưu trữ + tiêu thụ). Giao diện `ISlackInvalidationCoordinator` nguyên tử cho 04A ingress.
 
 **Tech Stack:** Node.js `^22.12.0 || >=24.0.0`, TypeScript 5.6+, Express 5, PostgreSQL 16 (`pg` pool), Vitest.
 **Spec:** `docs/superpowers/specs/2026-10-28-slack-personal-oauth-design.md` (Mục 2, 4.4, 4.5, 8, 9.1).
@@ -23,25 +23,25 @@
    - Khắc phục nguy cơ deadlock bằng thứ tự khóa dòng thống nhất trên mọi tác vụ:
      `slack_connections` -> `slack_trusted_providers` -> `slack_processing_consents`.
    - Trong `saveSourceAtomic`: Khóa `slack_connections` (FOR SHARE) -> `slack_trusted_providers` (FOR SHARE) -> `slack_processing_consents` (FOR SHARE).
-   - Tương thích tuyệt đối với 02B: `grantConsent` khóa provider FOR UPDATE rồi consent FOR UPDATE; `revokeConsent` khóa consent FOR UPDATE. Không bao giờ đảo ngược thứ tự (provider trước consent). Khóa toàn bộ các dòng thẩm quyền (ALL authority rows) để loại trừ race lọt bản ghi insert sau khi revoke.
+   - Tương thích tuyệt đối với 02B: `grantConsent` khóa provider FOR UPDATE rồi consent FOR UPDATE; `revokeConsent` khóa consent FOR UPDATE. Không bao giờ đảo ngược thứ tự (provider trước consent). Khóa toàn bộ authority rows để loại trừ race lọt bản ghi insert sau khi revoke.
 3. **Tham Chiếu Chính Sách 8 Trường & Trần TTL Máy Chủ:**
    - Lưu trữ đầy đủ 8 trường canonical policy evidence: `binding`, `purpose` (`'storage'`), `requestedRetentionDays`, `providerProfileId`, `configFingerprint`, `policyVersion`, `consentRevision`, `providerRevision`.
    - Trường canonical là `requestedRetentionDays` (không dùng trường legacy `retentionDays`).
    - Nếu yêu cầu ủy quyền gốc là 30 ngày, lưu nguyên giá trị 30 trong `policyRef.requestedRetentionDays` và cột `policy_requested_retention_days INT NOT NULL CHECK (policy_requested_retention_days > 0)`. Không áp constraint `<= 7` lên trường canonical issued ref.
    - Áp đặt trần TTL thực tế máy chủ `<= 7 ngày` lên bản ghi thô qua `retention_days INT NOT NULL CHECK (retention_days > 0 AND retention_days <= 7 AND retention_days <= policy_requested_retention_days)` và `CONSTRAINT chk_slack_sources_raw_retention CHECK (expires_at > captured_at AND expires_at <= captured_at + INTERVAL '7 days')`.
-4. **Định Danh Capture Vật Lý Bất Biến & Epoch Recapturing:**
-   - `owner_source_key` (`formatSlackOwnerSourceKey(sourceRef)`) chỉ định danh tài nguyên và phiên bản Slack của chủ sở hữu, KHÔNG đại diện cho capture vật lý duy nhất.
-   - Mỗi lần thu thập tạo một capture vật lý với `id UUID PRIMARY KEY` riêng biệt.
-   - Ràng buộc duy nhất theo epoch: `UNIQUE (owner_source_key, policy_epoch_hash) WHERE purged_at IS NULL`.
-   - Khi có regrant hoặc epoch mới (ví dụ Grant 1 -> Revoke 2 -> Regrant 3), cùng một tin nhắn Slack không đổi nội dung/revision được thu thập hợp lệ thành capture mới thuộc epoch mới mà không làm sống lại hoặc ghi đè lên capture cũ đã purge. Tuyệt đối không tự bịa ra Slack revision để phân biệt capture.
-   - `getSource` yêu cầu định danh capture vật lý (`expectedCaptureId`) hoặc cặp `(sourceRef, expectedPolicyEpoch)`; cấm tái liên kết mù (không dùng latest capture query).
+4. **Định Danh Capture Bất Biến, Epoch Recapturing & Provenance Thu Thập:**
+   - `owner_source_key` (`formatSlackOwnerSourceKey(sourceRef)`) chỉ định danh tài nguyên và revision của chủ sở hữu, KHÔNG đại diện cho capture vật lý duy nhất.
+   - Khóa chính capture vật lý là `SlackSourceEntity.id` (UUID). Ràng buộc active epoch: `UNIQUE (owner_source_key, policy_epoch_hash) WHERE purged_at IS NULL`. Không tự tạo Slack revision giả mạo.
+   - Khi regrant/epoch mới (Grant 1 -> Revoke 2 -> Regrant 3), cùng một tin nhắn Slack không đổi nội dung được recaptured hợp lệ thành capture mới mang UUID mới mà không làm sống lại bản ghi cũ đã purge.
+   - **Bảo toàn Epoch Thu Thập (Acquisition Epoch Provenance):** `saveSource` bắt buộc nhận `acquisitionPolicyRef` từ thao tác đọc trước đó và `storagePolicyRef` được cấp cho lưu trữ. Bắt buộc kiểm tra `sameSlackPolicyEpoch(slackPolicyRefToEpoch(acquisitionPolicyRef), slackPolicyRefToEpoch(storagePolicyRef))`. Một quan sát bị trễ từ Grant 1 cũ không thể lưu trữ hợp lệ dưới Grant 3 mới.
+   - `getSource` yêu cầu định danh capture vật lý (`expectedCaptureId`) hoặc `(sourceRef, expectedPolicyEpoch)`; cấm tái liên kết mù (không query latest capture).
 5. **Cơ Chế Đọc Nguồn 2 Pha (Dual Validation in `getSource`):**
    - Pha 1 (Lưu trữ): Thẩm định `policyRef` bất biến của bản ghi dưới mục đích `'storage'`, kiểm tra chưa hết hạn, chưa tombstone/purge, và tra cứu `slack_invalidation_barriers` (nếu có rào chắn pending hoặc purge thất bại -> lập tức chặn đọc với `status: 'blocked_by_invalidation_barrier'`).
-   - Pha 2 (Tiêu thụ): Tách biệt ủy quyền mục đích sử dụng hiện tại của caller (ví dụ `'triage'`, `'planning'`, `'digest'`, `'manual_lookup'`) qua `SlackPolicyService.resolveSlackModelPolicy` với fresh consumer context. Tuyệt đối không truyền storage ref vào resolve mục đích triage như là expected ref, và không dán nhãn lại (relabel) `policyRef.purpose`.
+   - Pha 2 (Tiêu thụ): Tách biệt ủy quyền mục đích sử dụng hiện tại của caller (ví dụ `'triage'`, `'planning'`, `'digest'`, `'manual_lookup'`) qua `SlackPolicyService.resolveSlackModelPolicy` với fresh consumer context. Tuyệt đối không truyền storage ref vào resolve mục đích triage như là expected ref, và không dán nhãn lại `policyRef.purpose`.
    - Kiểm tra post-await trước khi trả dữ liệu plaintext nhằm ngăn chặn rào chắn commit trong lúc đang chờ I/O.
 6. **Tiêu Thụ Sự Kiện Chính Sách Lũy Thừa & Mở Rộng Đa Intent:**
    - Tách biệt biên nhận sự kiện (`slack_processed_policy_events`) khỏi tính duy nhất của intent. Khóa duy nhất intent là composite `(policy_event_id, epoch_hash, target_kind)`.
-   - Một sự kiện chính sách (ví dụ `consent_revoked` hoặc `provider_updated`) có thể mở rộng thành NHIỀU intents tương ứng với các epoch cũ đang lưu trữ.
+   - Một sự kiện chính sách có thể mở rộng thành NHIỀU intents tương ứng với các epoch cũ đang lưu trữ.
    - Đánh dấu sự kiện đã xử lý chỉ khi toàn bộ intents và rào chắn đọc bền vững được commit trong CÙNG một transaction. Chống starvation bằng anti-join có trật tự thời gian.
    - Xử lý đủ 4 loại sự kiện 02B: `consent_granted`, `consent_revoked`, `provider_attested`, `provider_updated`.
    - Thao tác ngắt kết nối (disconnect) bắt buộc capture binding CŨ dưới lock và ghi nhận vô hiệu hóa trước khi đổi trạng thái.
@@ -50,29 +50,39 @@
    - Backend chấp thuận chính thức hợp đồng scope thứ 6 từ `@wap/tool-schemas`:
      `SlackPolicyEpoch { binding: SlackBinding, providerProfileId: string, configFingerprint: string, policyVersion: string, consentRevision: string, providerRevision: string }`.
      `{ scope: 'policy_epoch_invalidated', epoch: SlackPolicyEpoch, cascadeTargetKinds: SlackDerivedTargetKind[], tombstoneReason: 'policy_changed' }`.
-   - Thay thế toàn bộ tag đề xuất cũ `provider_profile_revocation` bằng `policy_epoch_invalidated`; lý do tombstone chuẩn xác là `'policy_changed'` (không dùng `provider_unverified`).
+   - Thay thế toàn bộ tag đề xuất cũ `provider_profile_revocation` bằng `policy_epoch_invalidated`; lý do tombstone chuẩn xác là `'policy_changed'` (loại bỏ `provider_unverified`).
    - Mở rộng sự kiện sau thay đổi thành các exact old epochs lưu trữ, giữ nguyên ngữ nghĩa so sánh của `workspace_consent_revocation` và không chuyển barrier sau thay đổi thành grant cũ giả định.
 
 ---
 
 ## 2. Published Interfaces
 
-### 2.1. Transaction-Bound Ingress Interface (Cho Consumer SLACK-04A)
+### 2.1. Transaction-Bound Ingress Interface (Thống Nhất Cho Consumer SLACK-04A)
 ```ts
-export interface StageLifecycleInvalidationInput {
-  target: SlackPurgeTarget;
-  eventId: string;
-  sourceEventTs: string;
+export interface InvalidationBarrierInput {
+  barrierType: 'connection' | 'channel' | 'epoch' | 'resource';
+  workspaceId: string;
+  connectionId?: string;
+  channelId?: string;
+  resourceType?: SlackResourceType;
+  resourceId?: string;
+  epoch?: SlackPolicyEpoch;
+  beforeConsentRevision?: string;
+  beforeProviderRevision?: string;
 }
 
-export interface SlackTransactionBoundInvalidationService {
+export interface ISlackInvalidationCoordinator {
   /**
-   * Thực thi trong transaction hiện có của pg.PoolClient từ 04A Ingress.
-   * Tạo rào chắn đọc tức thì trong slack_invalidation_barriers và ghi intent bền vững
-   * trước khi 04A commit và gửi HTTP 200 ACK cho Slack.
-   * Khóa ổn định: (eventId, target_scope_key). Không yêu cầu quyền notification tùy chọn.
+   * Chạy trong transaction pg.PoolClient của 04A Ingress.
+   * Tạo rào chắn đọc trong slack_invalidation_barriers và ghi intent bền vững
+   * trong slack_invalidation_intents trước khi 04A commit và gửi HTTP 200 ACK cho Slack.
+   * Khóa ổn định: (target.scope, eventId, resourceKey). Không yêu cầu notification authority.
    */
-  stageInTransaction(client: pg.PoolClient, input: StageLifecycleInvalidationInput): Promise<void>;
+  commitLifecycleInvalidation(
+    client: pg.PoolClient,
+    target: SlackPurgeTarget,
+    barrier?: InvalidationBarrierInput
+  ): Promise<void>;
 }
 ```
 
@@ -80,14 +90,15 @@ export interface SlackTransactionBoundInvalidationService {
 ```ts
 export interface SaveSourceInput {
   sourceRef: SlackSourceRef;
-  policyRef: SlackPolicyReference; // purpose cố định 'storage', requestedRetentionDays > 0
+  acquisitionPolicyRef: SlackPolicyReference; // Tham chiếu ủy quyền từ thao tác đọc ban đầu
+  storagePolicyRef: SlackPolicyReference;     // Tham chiếu mục đích 'storage' được cấp phát
   untrustedContent: string;
   metadata?: SlackSourceMetadata;
   capturedAt?: string; // ISO UTC, mặc định server now()
 }
 
 export interface GetSourceInput {
-  expectedCaptureId?: string;       // Định danh vật lý bắt buộc nếu đọc bản ghi cụ thể
+  expectedCaptureId?: string;       // Định danh vật lý UUID (SlackSourceEntity.id)
   sourceRef: SlackSourceRef;
   expectedPolicyEpoch?: SlackPolicyEpoch; // Đối chiếu epoch lưu trữ chính xác
   consumerPurpose: SlackPolicyPurpose;    // 'manual_lookup' | 'triage' | 'planning' | 'digest'
@@ -194,8 +205,8 @@ apps/chat-api/src/
 │   ├── slack-source-repo.ts         # Atomic Write Gate (Lock hierarchy FOR SHARE), getSource, tombstone, purge
 │   └── slack-connection-repo.ts     # Tích hợp: Bắt binding CŨ trong transaction disconnect và ghi nhận invalidation
 ├── services/slack/
-│   ├── slack-source-store.ts        # Áp trần TTL 7 ngày, điều phối getSource 2 pha, post-await barrier check
-│   ├── slack-invalidation-service.ts# stageInTransaction (04A), hàng đợi intents SKIP LOCKED, lease recovery
+│   ├── slack-source-store.ts        # Áp trần TTL 7 ngày, kiểm tra acquisition epoch match, điều phối getSource 2 pha
+│   ├── slack-invalidation-service.ts# commitLifecycleInvalidation (04A), hàng đợi intents SKIP LOCKED, lease recovery
 │   ├── slack-invalidation-runner.ts # Tiến trình nền quét TTL và dọn dẹp intents, chạy độc lập cờ automation
 │   └── slack-policy-event-consumer.ts# Tiêu thụ sự kiện 02B, mở rộng after-change barrier thành exact old epochs
 └── app.ts                           # Khởi động runner độc lập với cờ tự động hóa (F4 invariant)
@@ -219,13 +230,14 @@ apps/chat-api/src/
 ### Phase 3: Service Layer & 2-Phase Safe Read Guard
 - [ ] **Task 3.1:** Viết kiểm thử RED trong `apps/chat-api/tests/services/slack/slack-source-store.test.ts`:
   - *Test 3.1.1 (Server TTL Clamping):* Caller truyền `requestedRetentionDays = 30` vào policyRef; `policy_requested_retention_days` lưu đúng 30; `retention_days` bị áp trần cứng `<= 7`; `expires_at` đúng bằng 7 ngày từ `captured_at`.
-  - *Test 3.1.2 (Immediate Read Barrier):* Đưa một barrier active vào `slack_invalidation_barriers`; gọi `getSource` ngay lập tức trả về `blocked_by_invalidation_barrier` mà không để lộ untrusted content.
-  - *Test 3.1.3 (Dual Purpose Validation):* Gọi `getSource` với `consumerPurpose: 'triage'`. Thẩm định lưu trữ dùng mục đích `'storage'`, sau đó ủy quyền tiêu thụ qua `resolveSlackModelPolicy` với `'triage'`. Không thay đổi mục đích lưu trữ gốc.
+  - *Test 3.1.2 (Acquisition Epoch Provenance Match):* `saveSource` từ chối lưu trữ nếu `acquisitionPolicyRef` thuộc Grant 1 cũ trong khi `storagePolicyRef` thuộc Grant 3 mới (`sameSlackPolicyEpoch` trả về false).
+  - *Test 3.1.3 (Immediate Read Barrier):* Đưa một barrier active vào `slack_invalidation_barriers`; gọi `getSource` ngay lập tức trả về `blocked_by_invalidation_barrier` mà không để lộ untrusted content.
+  - *Test 3.1.4 (Dual Purpose Validation):* Gọi `getSource` với `consumerPurpose: 'triage'`. Thẩm định lưu trữ dùng mục đích `'storage'`, sau đó ủy quyền tiêu thụ qua `resolveSlackModelPolicy` với `'triage'`. Không thay đổi mục đích lưu trữ gốc.
 - [ ] **Task 3.2:** Triển khai `SlackSourceStore` thỏa mãn toàn bộ tests Phase 3 (GREEN).
 
 ### Phase 4: Durable Invalidation & Transaction-Bound Ingress
 - [ ] **Task 4.1:** Viết kiểm thử RED trong `apps/chat-api/tests/services/slack/slack-invalidation-service.test.ts`:
-  - *Test 4.1.1 (Transaction-bound 04A Ingress):* Dùng chung 1 `pg.PoolClient`, gọi `stageInTransaction` cam kết barrier + intent được ghi nhận trong transaction trước khi commit. Rollback transaction nếu có lỗi.
+  - *Test 4.1.1 (Transaction-bound 04A Ingress):* Dùng chung 1 `pg.PoolClient`, gọi `commitLifecycleInvalidation` cam kết barrier + intent được ghi nhận trong transaction trước khi commit. Rollback transaction nếu có lỗi.
   - *Test 4.1.2 (Concurrency SKIP LOCKED & Lease Recovery):* 2 worker nhận intent song song không tranh chấp; worker bị crash quá 60s lease được phục hồi tự động.
   - *Test 4.1.3 (Disconnect Old Binding Capture):* `SlackConnectionRepo.disconnect` bắt chính xác binding cũ và ghi intent vô hiệu hóa trước khi đổi status sang disconnected.
 - [ ] **Task 4.2:** Triển khai `SlackInvalidationService` và cập nhật `SlackConnectionRepo.disconnect` (GREEN).
