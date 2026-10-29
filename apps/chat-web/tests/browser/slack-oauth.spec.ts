@@ -22,7 +22,7 @@ for (const width of [375, 1440]) for (const theme of ['light', 'dark']) {
       await page.getByRole('button', { name: 'Về Kết nối dịch vụ' }).click();
       await expect(page.locator('#myslack li')).toHaveCount(i + 1);
     }
-    await expect(page.locator('#myslack')).toContainText('ATI chưa đọc tin');
+    await expect(page.locator('#myslack')).toContainText('đang chờ cấp quyền xử lý dữ liệu');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: info.outputPath(`slack-workspaces-${width}-${theme}.png`), fullPage: true });
     await page.locator('#myslack li').first().getByRole('button', { name: /Ngắt kết nối/ }).click();

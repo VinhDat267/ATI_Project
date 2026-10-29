@@ -92,7 +92,7 @@ Theo hợp đồng thống nhất từ nhóm trưởng (msg_6bc9a55fae15):
 ## 4. Kết Quả Thực Tế & Nghiệm Thu (Evidence & Acceptance)
 
 1. **Unit & Integration Component Tests (`apps/chat-web/tests/slack-oauth.test.tsx`):**
-   - **16/16 tests PASS** (Vitest, thời gian ~1.09s).
+   - **18/18 tests PASS** (Vitest, thời gian ~1.03s).
    - Bao phủ đầy đủ:
      - Khử param secret khỏi URL trước khi gửi callback qua mạng; 1 request trong StrictMode; điều hướng về Settings fallback.
      - Điều hướng an toàn tới `returnTo` hội thoại (`/c/<uuid>`).
@@ -107,14 +107,16 @@ Theo hợp đồng thống nhất từ nhóm trưởng (msg_6bc9a55fae15):
      - Modal `CockpitDialog` xác nhận ngắt kết nối: Hủy không gửi DELETE; Xác nhận gửi DELETE `/api/connections/myslack/:id` và cập nhật thông báo chính xác.
      - Bỏ qua response ngắt kết nối nếu session đổi chủ giữa chừng.
      - Nút "Kết nối lại" mang `workspaceHint` cho trạng thái `reconnect_required` và nút "Kết nối workspace Slack".
-     - Tiêu đề phản ánh đúng siêu dữ liệu khi tất cả workspace sẵn sàng xử lý mà không nhận bừa công cụ đang live.
+     - Tiêu đề phản ánh chính xác trạng thái từng workspace (none/all/mixed/none-ready) bằng ngôn ngữ sản phẩm rõ ràng, không chứa phrasing kỹ thuật `(tinh nang cong cu Slack chua kich hoat live)` hay khẳng định vô căn cứ "ATI chưa đọc tin".
+     - Kiểm thử mô tả chính xác trạng thái mixed workspace ("Một số workspace đã sẵn sàng xử lý dữ liệu; các workspace còn lại đang chờ cấp quyền.").
+     - Kiểm thử chặn bypass validation: từ chối các thuộc tính kế thừa (inherited prototype properties) của các trường bắt buộc trên source object (`Object.hasOwn`) trước khi chiếu canonical.
      - Hiển thị lỗi mạng kèm nút "Thử lại" thay vì ẩn giao diện.
 
 2. **Bộ Test Độc Lập của Reviewer (`.superpowers/review193/`):**
-   - **3/3 tests PASS** (Vitest, 84ms) qua lệnh `node node_modules/vitest/vitest.mjs run --config .superpowers/review193/vitest.config.mts`.
+   - **5/5 tests PASS** (Vitest, 81ms) qua lệnh `node node_modules/vitest/vitest.mjs run --config .superpowers/review193/vitest.config.mts` (gồm 2 own-properties tests và 3 rereview tests).
 
-3. **Toàn bộ Web Test Suite (`npm test -w apps/chat-web`):**
-   - **80 test files passed, 899 tests passed, 0 failed** (thời gian ~43.2s).
+3. **Toàn bộ Web Test Suite (`npm test -w @wap/chat-web`):**
+   - **80 test files passed, 901 tests passed, 0 failed** (thời gian ~36.2s).
 
 4. **Typecheck & Build & Security:**
    - `npm run typecheck:v3`: EXIT 0 (sạch toàn bộ TypeScript cả api và web).
@@ -122,8 +124,8 @@ Theo hợp đồng thống nhất từ nhóm trưởng (msg_6bc9a55fae15):
    - `node scripts/test-v3-web-build-security.mjs`: PASS (loại trừ credential sentinels và 7 forbidden UI claims).
 
 5. **Kịch Bản Browser Playwright (`slack_oauth`):**
-   - **4/4 tests passed** (375 light, 375 dark, 1440 light, 1440 dark, thời gian 32.3s).
-   - Kiểm thử E2E trên fixture sandbox cục bộ với tương tác modal `CockpitDialog` xác nhận ngắt kết nối mới.
+   - **4/4 tests passed** (375 light, 375 dark, 1440 light, 1440 dark, thời gian 28.3s).
+   - Kiểm thử E2E trên fixture sandbox cục bộ với assertion cập nhật phù hợp với copy sản phẩm mới.
 
 6. **Ranh Giới Nghiệm Thu Trung Thực (Honest Acceptance Boundary):**
    - Browser acceptance trên nhánh này chạy trên nền API fixture/legacy 184 với siêu dữ liệu pending.
@@ -133,8 +135,8 @@ Theo hợp đồng thống nhất từ nhóm trưởng (msg_6bc9a55fae15):
 
 ## 5. Tiêu Chí Hoàn Thành (Definition of Done)
 - [x] Card task và handoff log phản ánh đúng file, hợp đồng và tiến độ.
-- [x] Mọi component tests trong `slack-oauth.test.tsx` (16/16 PASS), reviewer tests (3/3 PASS) và toàn bộ package `apps/chat-web` (80 files, 899 tests PASS).
+- [x] Mọi component tests trong `slack-oauth.test.tsx` (18/18 PASS), reviewer tests (5/5 PASS) và toàn bộ package `apps/chat-web` (80 files, 901 tests PASS).
 - [x] Typecheck và build của `apps/chat-web` hoàn toàn sạch lỗi (exit code 0).
-- [x] Kịch bản browser Slack OAuth pass với modal xác nhận mới (4/4 tests PASS).
-- [x] Sửa dứt điểm các lỗi trailing whitespace base-to-head.
+- [x] Kịch bản browser Slack OAuth pass với copy mới (4/4 tests PASS).
+- [x] Sửa dứt điểm các lỗi trailing whitespace base-to-head (`git diff --check b757ae08` exit 0).
 - [x] Commit scoped rõ ràng, push branch cập nhật PR 193.

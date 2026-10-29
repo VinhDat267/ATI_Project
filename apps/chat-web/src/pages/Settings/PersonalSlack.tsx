@@ -76,7 +76,19 @@ export function PersonalSlack() {
     }
   };
 
-  const allProcessingReady = rows.length > 0 && rows.every((r) => r.processingReady);
+  const getHeaderDescription = () => {
+    if (rows.length === 0) {
+      return 'Kết nối workspace để quản lý quyền xử lý dữ liệu Slack.';
+    }
+    const readyCount = rows.filter((r) => r.processingReady).length;
+    if (readyCount === rows.length) {
+      return 'Tất cả workspace đã được cấp quyền xử lý dữ liệu.';
+    }
+    if (readyCount > 0) {
+      return 'Một số workspace đã sẵn sàng xử lý dữ liệu; các workspace còn lại đang chờ cấp quyền.';
+    }
+    return 'Các workspace đang chờ cấp quyền xử lý dữ liệu.';
+  };
 
   return (
     <section
@@ -92,9 +104,7 @@ export function PersonalSlack() {
           Kết nối từng workspace bằng tài khoản Slack của bạn. Mỗi workspace được quản lý riêng.
         </p>
         <p className="text-sm text-[#6B7280] dark:text-[#9CA3AF]">
-          {allProcessingReady
-            ? 'Đã sẵn sàng xử lý dữ liệu: Các workspace đã kết nối thành công (tính năng công cụ Slack chưa kích hoạt live).'
-            : 'Chờ cho phép xử lý dữ liệu: ATI chưa đọc tin hoặc đưa nội dung Slack vào AI.'}
+          {getHeaderDescription()}
         </p>
       </div>
 

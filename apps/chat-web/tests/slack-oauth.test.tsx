@@ -88,7 +88,7 @@ function Callback() {
 it('scrubs callback secrets, makes one request in StrictMode and shows completion', async () => {
   render(<StrictMode><Callback /></StrictMode>);
   await screen.findByRole('heading', { name: 'Đã kết nối Slack' });
-  expect(callbacks).toHaveLength(1);
+  await waitFor(() => expect(callbacks).toHaveLength(1));
   expect(callbacks[0].location).not.toMatch(/PRIVATE/);
   expect(screen.queryByText(/Đang hoàn tất/)).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Về Kết nối dịch vụ' }));
@@ -128,7 +128,7 @@ it('never replays callback after 401 and safely explains failure', async () => {
   fail = true;
   render(<Callback />);
   await screen.findByRole('alert');
-  expect(callbacks).toHaveLength(1);
+  await waitFor(() => expect(callbacks).toHaveLength(1));
 });
 
 it('terminates callback pending state and ignores response if session owner changed', async () => {
@@ -148,7 +148,7 @@ it('terminates callback pending state and ignores response if session owner chan
   await waitFor(() => expect(screen.queryByText(/Đang hoàn tất/)).not.toBeInTheDocument());
   expect(screen.getByRole('alert')).toBeInTheDocument();
   expect(screen.queryByRole('heading', { name: 'Đã kết nối Slack' })).not.toBeInTheDocument();
-  expect(callbacks).toHaveLength(1);
+  await waitFor(() => expect(callbacks).toHaveLength(1));
   expect(navigate).not.toHaveBeenCalled();
 });
 
@@ -387,7 +387,54 @@ it('represents actual metadata in headline without claiming tools are live now w
   expect(screen.getByText('Đã sẵn sàng xử lý')).toBeInTheDocument();
   // Unconditional pending claim should NOT be shown
   expect(screen.queryByText(/Chờ cho phép xử lý dữ liệu: ATI chưa đọc tin/)).not.toBeInTheDocument();
-  expect(screen.getByText(/Đã sẵn sàng xử lý dữ liệu/)).toBeInTheDocument();
+  expect(screen.getByText('Tất cả workspace đã được cấp quyền xử lý dữ liệu.')).toBeInTheDocument();
+});
+
+it('describes mixed workspace readiness accurately in headline', async () => {
+  customConnections = [
+    {
+      id: 'conn_ready',
+      workspaceId: 'T_READY',
+      workspaceName: 'Ready Workspace',
+      slackUserId: 'U_READY',
+      slackUserLabel: 'Ready User',
+      status: 'active',
+      identityVersion: 1,
+      scopes: ['channels:read'],
+      connectedAt: '2026-10-29T10:00:00.000Z',
+      consentStatus: 'granted',
+      processingReady: true,
+    },
+    {
+      id: 'conn_pending',
+      workspaceId: 'T_PENDING',
+      workspaceName: 'Pending Workspace',
+      slackUserId: 'U_PENDING',
+      slackUserLabel: 'Pending User',
+      status: 'active',
+      identityVersion: 1,
+      scopes: ['channels:read'],
+      connectedAt: '2026-10-29T10:00:00.000Z',
+      consentStatus: 'pending',
+      processingReady: false,
+    },
+  ];
+  render(<PersonalSlack />);
+  await screen.findByText('Ready Workspace');
+  await screen.findByText('Pending Workspace');
+  expect(screen.getByText('Một số workspace đã sẵn sàng xử lý dữ liệu; các workspace còn lại đang chờ cấp quyền.')).toBeInTheDocument();
+});
+
+it('rejects inherited required connection identity and callback workspace before canonical projection', () => {
+  const row = { id: 'c1', workspaceId: 'T1', workspaceName: 'Fixture', slackUserId: 'U1', slackUserLabel: 'User', status: 'active', identityVersion: 1, scopes: [], connectedAt: '2026-10-29T10:00:00.000Z', consentStatus: 'pending', processingReady: false };
+  const { id, ...restRow } = row;
+  expect(normalizeSlackConnection(Object.assign(Object.create({ id }), restRow))).toBeNull();
+  expect(normalizeSlackConnection(row)?.id).toBe('c1');
+
+  const callback = { connectionId: 'c1', workspaceId: 'T1', workspaceName: 'Fixture', slackUserId: 'U1' };
+  const { workspaceId, ...restCallback } = callback;
+  expect(normalizeSlackCallbackResult(Object.assign(Object.create({ workspaceId }), restCallback))).toBeNull();
+  expect(normalizeSlackCallbackResult(callback)?.workspaceId).toBe('T1');
 });
 
 it('displays load error with retry button instead of silently hiding when GET fails', async () => {

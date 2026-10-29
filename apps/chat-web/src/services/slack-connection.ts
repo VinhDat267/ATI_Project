@@ -31,11 +31,26 @@ export function normalizeSlackConnection(raw: unknown): SlackConnectionPublicInf
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
   const r = raw as Record<string, unknown>;
 
+  // Ensure required original fields are own properties on the source object
+  if (
+    !Object.hasOwn(r, 'id') ||
+    !Object.hasOwn(r, 'workspaceId') ||
+    !Object.hasOwn(r, 'workspaceName') ||
+    (!Object.hasOwn(r, 'slackUserId') && !Object.hasOwn(r, 'actorId')) ||
+    (!Object.hasOwn(r, 'slackUserLabel') && !Object.hasOwn(r, 'actorId')) ||
+    !Object.hasOwn(r, 'status') ||
+    !Object.hasOwn(r, 'identityVersion') ||
+    !Object.hasOwn(r, 'scopes') ||
+    !Object.hasOwn(r, 'connectedAt')
+  ) {
+    return null;
+  }
+
   // Check slackUserId (canonical) vs actorId (legacy alias)
   let slackUserId: unknown;
   if (Object.hasOwn(r, 'slackUserId')) {
     slackUserId = r.slackUserId;
-  } else if (Object.hasOwn(r, 'actorId')) {
+  } else {
     slackUserId = r.actorId;
   }
 
@@ -43,7 +58,7 @@ export function normalizeSlackConnection(raw: unknown): SlackConnectionPublicInf
   let slackUserLabel: unknown;
   if (Object.hasOwn(r, 'slackUserLabel')) {
     slackUserLabel = r.slackUserLabel;
-  } else if (Object.hasOwn(r, 'actorId')) {
+  } else {
     slackUserLabel = r.actorId;
   }
 
@@ -76,7 +91,9 @@ export function normalizeSlackConnection(raw: unknown): SlackConnectionPublicInf
 
   try {
     const validated = validateSlackConnectionPublicInfo(candidate);
-    const legacyActorId = typeof r.actorId === 'string' && r.actorId.trim().length > 0 ? r.actorId.trim() : undefined;
+    const legacyActorId = Object.hasOwn(r, 'actorId') && typeof r.actorId === 'string' && r.actorId.trim().length > 0
+      ? r.actorId.trim()
+      : undefined;
     const result: SlackConnectionPublicInfo = {
       ...validated,
     };
@@ -96,11 +113,21 @@ export function normalizeSlackCallbackResult(raw: unknown): SlackCallbackResult 
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
   const r = raw as Record<string, unknown>;
 
+  // Ensure required original fields are own properties on the source object
+  if (
+    (!Object.hasOwn(r, 'connectionId') && !Object.hasOwn(r, 'id')) ||
+    !Object.hasOwn(r, 'workspaceId') ||
+    !Object.hasOwn(r, 'workspaceName') ||
+    (!Object.hasOwn(r, 'slackUserId') && !Object.hasOwn(r, 'actorId'))
+  ) {
+    return null;
+  }
+
   // Check connectionId (canonical) vs id (legacy alias)
   let connectionId: unknown;
   if (Object.hasOwn(r, 'connectionId')) {
     connectionId = r.connectionId;
-  } else if (Object.hasOwn(r, 'id')) {
+  } else {
     connectionId = r.id;
   }
 
@@ -108,7 +135,7 @@ export function normalizeSlackCallbackResult(raw: unknown): SlackCallbackResult 
   let slackUserId: unknown;
   if (Object.hasOwn(r, 'slackUserId')) {
     slackUserId = r.slackUserId;
-  } else if (Object.hasOwn(r, 'actorId')) {
+  } else {
     slackUserId = r.actorId;
   }
 
@@ -124,7 +151,9 @@ export function normalizeSlackCallbackResult(raw: unknown): SlackCallbackResult 
 
   try {
     const validated = validateSlackCallbackResult(candidate);
-    const legacyActorId = typeof r.actorId === 'string' && r.actorId.trim().length > 0 ? r.actorId.trim() : undefined;
+    const legacyActorId = Object.hasOwn(r, 'actorId') && typeof r.actorId === 'string' && r.actorId.trim().length > 0
+      ? r.actorId.trim()
+      : undefined;
     return {
       ...validated,
       actorId: legacyActorId ?? validated.slackUserId,

@@ -16,22 +16,24 @@ Sau khi nhận kết luận "NEEDS WORK" từ reviewer độc lập tại PR 193
    - Vấn đề: `subscribeAuthTokens` chỉ set `invalid.current = true` nhưng không cập nhật state `error`, khiến giao diện kẹt vĩnh viễn ở trạng thái pending (`Đang hoàn tất kết nối Slack…`).
    - Khắc phục: Khi phát hiện chủ sở hữu thay đổi giữa chừng (`!owns.current()`), dứt điểm pending ngay lập tức bằng cách set `error` ("Phiên kết nối đã hết hạn hoặc không hợp lệ. Vui lòng thử lại."), hủy `result` cũ, ngăn chặn mọi điều hướng `navigate` hoặc ghi nhận response muộn, bảo toàn tính đơn nhiệm trong StrictMode và không retry sau 401.
 
-2. **normalizeSlackCallbackResult — Loại bỏ việc tự chế định danh:**
-   - Vấn đề: Tự gán `connectionId = workspaceId` và `slackUserId = 'unknown'`, chấp nhận payload thiếu định danh chỉ có tên workspace. Fixture mặc định cũ trong `slack-oauth.test.tsx` cũng thiếu trường thực tế của PR 184.
-   - Khắc phục: Nhập validator chuẩn `validateSlackCallbackResult` từ `@wap/tool-schemas`. Chỉ chấp nhận các alias legacy đã định nghĩa (`id` -> `connectionId`, `actorId` -> `slackUserId`) khi trường canonical vắng mặt. Tuyệt đối không fallback sang alias legacy nếu trường canonical có giá trị sai (canonical wrong values must not fallback). Từ chối toàn bộ payload không có định danh thật. Sửa lại fixture mặc định trong test để đại diện đúng response PR 184 (`id`, `workspaceId`, `workspaceName`, `actorId`, `identityVersion`, `connectedAt`, `scopes`).
+2. **normalizeSlackCallbackResult & normalizeSlackConnection — Chặn Bypass Qua Thuộc Tính Kế Thừa (Own Properties):**
+   - Vấn đề: Thuộc tính kế thừa (`prototype`) trên đối tượng nguồn có thể bị chiếu thành thuộc tính riêng (`own property`) của `candidate` (`const candidate = { id: r.id, ... }`), dẫn tới việc validator schema sau đó không phát hiện được thuộc tính ban đầu là kế thừa chứ không phải own property.
+   - Khắc phục: Bắt buộc kiểm tra `Object.hasOwn(r, ...)` trực tiếp trên đối tượng nguồn `r` đối với toàn bộ các trường bắt buộc trước khi tạo `candidate` và gọi validator schema. Từ chối hoàn toàn payload có trường bắt buộc nằm ở prototype.
 
-3. **normalizeSlackConnection — Loại bỏ trùng lặp schema và dùng validator chuẩn 02A:**
+3. **normalizeSlackConnection — Chuẩn hóa An toàn & Dùng Validator Chuẩn 02A:**
    - Vấn đề: Tự chế `identityVersion = 1` khi nhận 0, chấp nhận `connectedAt = 'invalid'`, tự chế ngày hiện tại khi thiếu timestamp.
    - Khắc phục: Nhập và dùng trực tiếp `validateSlackConnectionPublicInfo` từ `@wap/tool-schemas`. Chỉ chuẩn hóa hẹp `actorId` -> `slackUserId` / `slackUserLabel` và vắng mặt consent/readiness -> `pending` / `false`. Không chế tạo generation hay timestamp vì PR 184 thật luôn cung cấp `identityVersion` và `connectedAt`. Cho phép whitelist `missingScopes` hợp lệ.
 
-4. **PersonalSlack — Tiêu đề trung thực & Xử lý lỗi tải:**
-   - Vấn đề: Tiêu đề trước đó luôn khẳng định vô điều kiện "Chờ cho phép xử lý dữ liệu: ATI chưa đọc tin..." ngay cả khi tất cả workspace đều có `processingReady === true`. Khi `GET /api/connections/myslack` gặp lỗi mạng/503 thì component im lặng ẩn đi (`return null`).
+4. **PersonalSlack & SlackCallbackView — Bản Sao Giao Diện Chính Xác, Rõ Ràng & Không Phasing Kỹ Thuật:**
+   - Vấn đề: Phasing kỹ thuật `(tinh nang cong cu Slack chua kich hoat live)` hiển thị trên UI; khẳng định vô căn cứ "ATI chưa đọc tin..."; chưa xử lý đúng trạng thái hỗn hợp (mixed ready); callback view khẳng định vô điều kiện rằng quyền xử lý đang chờ duyệt.
    - Khắc phục:
-     - Khi tất cả workspace đều `processingReady === true`: Hiển thị "Đã sẵn sàng xử lý dữ liệu: Các workspace đã kết nối thành công (tính năng công cụ Slack chưa kích hoạt live)." — trung thực với siêu dữ liệu mà không nhận bừa công cụ đang live.
-     - Bảo lưu badge "Đã sẵn sàng xử lý" (xanh lá) và trạng thái chưa sẵn sàng của từng dòng.
-     - Khi `GET` thất bại: Hiển thị thông báo lỗi có `role="alert"` kèm nút "Thử lại" (Retry) gọi lại hàm tải danh sách thay vì âm thầm ẩn giao diện.
-     - Nút "Kết nối lại" khi bấm thực sự gửi `workspaceHint` (đã có test kiểm tra click thật thay vì chỉ assert nút tồn tại).
-     - Cách ly an toàn session cũ và hủy modal khi chuyển phiên.
+     - `PersonalSlack`: Mô tả chính xác 4 trạng thái danh sách workspace:
+       - Rỗng: "Kết nối workspace để quản lý quyền xử lý dữ liệu Slack."
+       - Tất cả sẵn sàng: "Tất cả workspace đã được cấp quyền xử lý dữ liệu."
+       - Hỗn hợp: "Một số workspace đã sẵn sàng xử lý dữ liệu; các workspace còn lại đang chờ cấp quyền."
+       - Chưa có workspace nào sẵn sàng: "Các workspace đang chờ cấp quyền xử lý dữ liệu."
+     - `SlackCallbackView`: Cập nhật thông điệp thành công trung thực, trung tính hướng dẫn người dùng theo dõi trạng thái quyền xử lý tại Kết nối dịch vụ: "Kết nối workspace đã được lưu thành công. Bạn có thể kiểm tra trạng thái quyền xử lý dữ liệu tại Kết nối dịch vụ."
+     - Khi `GET` thất bại: Hiển thị thông báo lỗi có `role="alert"` kèm nút "Thử lại" (Retry).
 
 5. **Chuẩn hóa Whitespace & Tên Package:**
    - Loại bỏ toàn bộ trailing markdown whitespace trên task card `SLACK-02C-connection-ui.md` và file log trước đó, đảm bảo `git diff --check b757ae08` đạt exit code 0.
@@ -50,13 +52,13 @@ Sau khi nhận kết luận "NEEDS WORK" từ reviewer độc lập tại PR 193
 ### B. Lượt chạy mới sau khi sửa (Fresh Runs):
 | Hạng mục kiểm tra | Kết quả thực tế | Chi tiết lệnh & đầu ra |
 |---|---|---|
-| **Bộ test của Reviewer** (`.superpowers/review193/`) | **3/3 PASS** (84ms) | `node node_modules/vitest/vitest.mjs run --config .superpowers/review193/vitest.config.mts`<br>Lưu tại `.superpowers/slack02c-resume/test-review193.txt` |
-| **Component Unit Tests** (`apps/chat-web/tests/slack-oauth.test.tsx`) | **16/16 PASS** (~1.09s) | `npm test -w @wap/chat-web -- tests/slack-oauth.test.tsx`<br>Lưu tại `.superpowers/slack02c-resume/test-unit.txt`<br>Bổ sung 5 ca kiểm thử mới: owner switch terminal UI, không bịa callback identity, từ chối canonical invalid, headline trung thực, tải lỗi kèm nút thử lại |
-| **Toàn bộ Web Tests** (`apps/chat-web`) | **80 files PASS, 899 tests PASS, 0 fail** (43.23s) | `npm test -w @wap/chat-web`<br>Không có hồi quy trên toàn bộ test suite frontend |
-| **Full Typecheck** (`npm run typecheck:v3`) | **EXIT 0** | `tsc -p apps/chat-api/tsconfig.json --noEmit && tsc -p apps/chat-web/tsconfig.json --noEmit`<br>Lưu tại `.superpowers/slack02c-resume/typecheck.txt` |
-| **Web Production Build** (`npm run build:v3`) | **EXIT 0** | `npm run build -w @wap/chat-web` (Vite build sạch sẽ)<br>Lưu tại `.superpowers/slack02c-resume/build.txt` |
-| **Web Build Security** (`scripts/test-v3-web-build-security.mjs`) | **PASS** | Kiểm tra bundle loại trừ credential sentinels và 7 forbidden claims<br>Lưu tại `.superpowers/slack02c-resume/security.txt` |
-| **Playwright Browser E2E** (`scripts/test-v3-browser.mjs`, scenario `slack_oauth`) | **4/4 PASS** (32.3s) | Chạy trên sandbox fixture cục bộ: 375 light, 375 dark, 1440 light, 1440 dark (cổng web 55421, api 35421, db 55533)<br>Lưu tại `.superpowers/slack02c-resume/test-browser.txt` |
+| **Bộ test của Reviewer** (`.superpowers/review193/`) | **5/5 PASS** (81ms) | `node node_modules/vitest/vitest.mjs run --config .superpowers/review193/vitest.config.mts`<br>Bao gồm 2 test own-properties validation và 3 test re-review. |
+| **Component Unit Tests** (`apps/chat-web/tests/slack-oauth.test.tsx`) | **18/18 PASS** (~1.03s) | `npm test -w @wap/chat-web -- tests/slack-oauth.test.tsx`<br>Bổ sung 7 ca kiểm thử mới: owner switch terminal UI, không bịa callback identity, từ chối canonical invalid, headline trung thực cho all/mixed ready, từ chối inherited prototype properties, tải lỗi kèm nút thử lại |
+| **Toàn bộ Web Tests** (`apps/chat-web`) | **80 files PASS, 901 tests PASS, 0 fail** (36.24s) | `npm test -w @wap/chat-web`<br>Không có hồi quy trên toàn bộ 80 test files frontend |
+| **Full Typecheck** (`npm run typecheck:v3`) | **EXIT 0** | `tsc -p apps/chat-api/tsconfig.json --noEmit && tsc -p apps/chat-web/tsconfig.json --noEmit` |
+| **Web Production Build** (`npm run build:v3`) | **EXIT 0** | `npm run build -w @wap/chat-web` (Vite build thành công trong 788ms) |
+| **Web Build Security** (`scripts/test-v3-web-build-security.mjs`) | **PASS** | Kiểm tra bundle loại trừ credential sentinels và 7 forbidden claims |
+| **Playwright Browser E2E** (`scripts/test-v3-browser.mjs`, scenario `slack_oauth`) | **4/4 PASS** (28.3s) | Chạy trên sandbox fixture cục bộ: 375 light, 375 dark, 1440 light, 1440 dark (cổng web 55421, api 35421, db 55533) |
 | **Base-to-head Whitespace Check** | **EXIT 0** | `git diff --check b757ae08` không còn bất kỳ cảnh báo trailing whitespace nào |
 
 ### C. Các hạng mục KHÔNG CHẠY (NOT_RUN) & Lý do:

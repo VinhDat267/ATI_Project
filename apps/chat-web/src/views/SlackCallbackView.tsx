@@ -122,7 +122,7 @@ export function SlackCallbackView({
             <span>{result.workspaceName}</span> · <span>{result.workspaceId}</span>
           </p>
           <p className="text-sm text-[#4B5563]">
-            Kết nối đã được lưu. Việc đọc tin và xử lý bằng AI đang chờ cho phép xử lý dữ liệu.
+            Kết nối workspace đã được lưu thành công. Bạn có thể kiểm tra trạng thái quyền xử lý dữ liệu tại Kết nối dịch vụ.
           </p>
         </>
       ) : (
