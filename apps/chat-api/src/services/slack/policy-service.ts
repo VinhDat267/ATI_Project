@@ -24,16 +24,28 @@ export type SlackPolicyDecision =
   | { allowed: true; policyReference: SlackPolicyReference }
   | { allowed: false; reason: SlackPolicyBlockReason };
 
+export interface SlackPolicyRuntimeConfig {
+  env?: Record<string, string | undefined>;
+}
+
 export interface ResolveSlackModelPolicyInput {
   binding: SlackBinding;
   purpose: SlackPurpose;
   requestedRetentionDays: number;
   expectedPolicyVersion?: string;
+  expectedPolicyReference?: Partial<SlackPolicyReference> & {
+    binding?: Partial<SlackBinding>;
+    purpose?: SlackPurpose;
+    requestedRetentionDays?: number;
+  };
   env?: Record<string, string | undefined>;
 }
 
 export class SlackPolicyService {
-  constructor(private readonly pool: pg.Pool) {}
+  constructor(
+    private readonly pool: pg.Pool,
+    private readonly runtimeConfig?: SlackPolicyRuntimeConfig
+  ) {}
 
   async resolveSlackModelPolicy(input: ResolveSlackModelPolicyInput): Promise<SlackPolicyDecision> {
     const deny = (reason: SlackPolicyBlockReason): SlackPolicyDecision => ({ allowed: false, reason });
@@ -80,7 +92,8 @@ export class SlackPolicyService {
     }
 
     // 2. Resolve runtime provider identity and configuration fingerprint
-    const runtimeProvider = resolveRuntimeProviderIdentity(input.env);
+    const activeEnv = input.env ?? this.runtimeConfig?.env ?? process.env;
+    const runtimeProvider = resolveRuntimeProviderIdentity(activeEnv);
 
     // 3. Query trusted provider in DB
     const providerRes = await this.pool.query(
@@ -116,6 +129,51 @@ export class SlackPolicyService {
       return deny('policy_changed');
     }
 
+    if (input.expectedPolicyReference) {
+      const ref = input.expectedPolicyReference;
+      if (ref.policyVersion !== undefined && ref.policyVersion !== consent.policy_version) {
+        return deny('policy_changed');
+      }
+      if (ref.consentRevision !== undefined && BigInt(ref.consentRevision) !== BigInt(consent.revision)) {
+        return deny('policy_changed');
+      }
+      if (ref.providerRevision !== undefined && BigInt(ref.providerRevision) !== BigInt(provider.revision)) {
+        return deny('policy_changed');
+      }
+      if (ref.workspaceId !== undefined && ref.workspaceId !== validBinding.workspaceId) {
+        return deny('policy_changed');
+      }
+      if (ref.providerId !== undefined && ref.providerId !== runtimeProvider.providerId) {
+        return deny('policy_changed');
+      }
+      if (ref.retentionDays !== undefined && ref.retentionDays !== consent.retention_days) {
+        return deny('policy_changed');
+      }
+      if (ref.purpose !== undefined && ref.purpose !== input.purpose) {
+        return deny('policy_changed');
+      }
+      if (ref.requestedRetentionDays !== undefined && ref.requestedRetentionDays !== input.requestedRetentionDays) {
+        return deny('retention_exceeded');
+      }
+      if (ref.binding) {
+        if (ref.binding.atiUserId !== undefined && ref.binding.atiUserId !== validBinding.atiUserId) {
+          return deny('identity_changed');
+        }
+        if (ref.binding.connectionId !== undefined && ref.binding.connectionId !== validBinding.connectionId) {
+          return deny('identity_changed');
+        }
+        if (ref.binding.workspaceId !== undefined && ref.binding.workspaceId !== validBinding.workspaceId) {
+          return deny('identity_changed');
+        }
+        if (ref.binding.slackUserId !== undefined && ref.binding.slackUserId !== validBinding.slackUserId) {
+          return deny('identity_changed');
+        }
+        if (ref.binding.identityVersion !== undefined && ref.binding.identityVersion !== validBinding.identityVersion) {
+          return deny('identity_changed');
+        }
+      }
+    }
+
     const authorizedPurposes: string[] = consent.purposes || [];
     if (!authorizedPurposes.includes(input.purpose)) {
       return deny('policy_changed');
@@ -149,7 +207,7 @@ export class SlackPolicyService {
 
   async checkProcessingReady(
     workspaceId: string,
-    env: Record<string, string | undefined> = process.env
+    env: Record<string, string | undefined> = this.runtimeConfig?.env ?? process.env
   ): Promise<{ processingReady: boolean; consentStatus: 'pending' | 'granted' | 'revoked' }> {
     const runtimeProvider = resolveRuntimeProviderIdentity(env);
 
@@ -167,7 +225,7 @@ export class SlackPolicyService {
       return { processingReady: false, consentStatus: 'revoked' };
     }
 
-    if (consent.status === 'pending') {
+    if (consent.status !== 'granted') {
       return { processingReady: false, consentStatus: 'pending' };
     }
 
@@ -184,10 +242,22 @@ export class SlackPolicyService {
       provider.no_training === true &&
       provider.configuration_fingerprint === runtimeProvider.fingerprint &&
       Boolean(provider.evidence_ref) &&
-      Boolean(provider.verified_by);
+      Boolean(provider.verified_by) &&
+      Boolean(provider.verified_at);
+
+    const isConsentValid =
+      Boolean(consent.organization_representative) &&
+      Boolean(consent.evidence_ref) &&
+      Boolean(consent.recorded_by) &&
+      Boolean(consent.granted_at) &&
+      Array.isArray(consent.purposes) &&
+      consent.purposes.length > 0 &&
+      consent.retention_days >= 0 &&
+      provider &&
+      consent.retention_days <= provider.max_retention_days;
 
     return {
-      processingReady: Boolean(isProviderReady),
+      processingReady: Boolean(isProviderReady && isConsentValid),
       consentStatus: 'granted',
     };
   }

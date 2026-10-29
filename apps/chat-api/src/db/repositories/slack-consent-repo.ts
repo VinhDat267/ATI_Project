@@ -198,7 +198,7 @@ export class SlackConsentRepo {
 
       if (!existing) {
         if (input.expectedRevision !== undefined) {
-          throw new Error('SLACK_CAS_CONFLICT');
+          throw new Error('SLACK_CAS_CONFLICT: New provider must not specify expectedRevision');
         }
         const insertRes = await client.query(
           `INSERT INTO slack_trusted_providers (
@@ -210,8 +210,11 @@ export class SlackConsentRepo {
         row = insertRes.rows[0];
         eventType = 'provider_attested';
       } else {
-        if (input.expectedRevision !== undefined && BigInt(existing.revision) !== BigInt(input.expectedRevision)) {
-          throw new Error('SLACK_CAS_CONFLICT');
+        if (input.expectedRevision === undefined) {
+          throw new Error('SLACK_CAS_REVISION_REQUIRED: Updating existing provider requires expectedRevision');
+        }
+        if (BigInt(existing.revision) !== BigInt(input.expectedRevision)) {
+          throw new Error('SLACK_CAS_CONFLICT: Provider revision mismatch');
         }
         const updateRes = await client.query(
           `UPDATE slack_trusted_providers SET
@@ -302,7 +305,7 @@ export class SlackConsentRepo {
 
       if (!existing) {
         if (input.expectedRevision !== undefined) {
-          throw new Error('SLACK_CAS_CONFLICT');
+          throw new Error('SLACK_CAS_CONFLICT: New consent must not specify expectedRevision');
         }
         const insertRes = await client.query(
           `INSERT INTO slack_processing_consents (
@@ -314,8 +317,11 @@ export class SlackConsentRepo {
         );
         row = insertRes.rows[0];
       } else {
-        if (input.expectedRevision !== undefined && BigInt(existing.revision) !== BigInt(input.expectedRevision)) {
-          throw new Error('SLACK_CAS_CONFLICT');
+        if (input.expectedRevision === undefined) {
+          throw new Error('SLACK_CAS_REVISION_REQUIRED: Updating existing consent requires expectedRevision');
+        }
+        if (BigInt(existing.revision) !== BigInt(input.expectedRevision)) {
+          throw new Error('SLACK_CAS_CONFLICT: Consent revision mismatch');
         }
         const updateRes = await client.query(
           `UPDATE slack_processing_consents SET
@@ -377,8 +383,12 @@ export class SlackConsentRepo {
         return null;
       }
 
-      if (input.expectedRevision !== undefined && BigInt(existing.revision) !== BigInt(input.expectedRevision)) {
-        throw new Error('SLACK_CAS_CONFLICT');
+      if (input.expectedRevision === undefined) {
+        throw new Error('SLACK_CAS_REVISION_REQUIRED: Revoking consent requires expectedRevision');
+      }
+
+      if (BigInt(existing.revision) !== BigInt(input.expectedRevision)) {
+        throw new Error('SLACK_CAS_CONFLICT: Consent revision mismatch');
       }
 
       const providerRes = await client.query('SELECT revision FROM slack_trusted_providers WHERE id = $1', [providerId]);

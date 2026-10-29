@@ -143,6 +143,7 @@ describe('SlackPolicyService fail-closed authorization', () => {
       providerId: runtimeIdentity.providerId,
       reason: 'security_audit',
       recordedBy: 'operator@example.com',
+      expectedRevision: 1n,
     });
 
     const decision = await policyService.resolveSlackModelPolicy({
@@ -172,6 +173,7 @@ describe('SlackPolicyService fail-closed authorization', () => {
       organizationRepresentative: 'Bob Legal',
       evidenceRef: 'DPA-POLICY-01',
       recordedBy: 'operator@example.com',
+      expectedRevision: 2n,
     });
   });
 
@@ -266,5 +268,96 @@ describe('SlackPolicyService fail-closed authorization', () => {
     const pending = await policyService.checkProcessingReady('T_UNKNOWN_WORKSPACE', mockEnv);
     expect(pending.processingReady).toBe(false);
     expect(pending.consentStatus).toBe('pending');
+  });
+
+  it('rejects stale expectedPolicyReference after consent revocation and regrant', async () => {
+    const initialDecision = await policyService.resolveSlackModelPolicy({
+      binding: {
+        atiUserId: alice.id,
+        connectionId,
+        workspaceId: 'T_POLICY_01',
+        slackUserId: 'U_ALICE_SLACK',
+        identityVersion: 1,
+      },
+      purpose: 'triage',
+      requestedRetentionDays: 0,
+      env: mockEnv,
+    });
+    expect(initialDecision.allowed).toBe(true);
+    const staleRef = (initialDecision as any).policyReference;
+
+    // Revoke consent (revision -> 4)
+    await consentRepo.revokeConsent({
+      workspaceId: 'T_POLICY_01',
+      providerId: runtimeIdentity.providerId,
+      reason: 'rotation',
+      recordedBy: 'operator@example.com',
+      expectedRevision: 3n,
+    });
+
+    // Regrant consent with same policyVersion (revision -> 5)
+    await consentRepo.grantConsent({
+      workspaceId: 'T_POLICY_01',
+      providerId: runtimeIdentity.providerId,
+      policyVersion: 'v1.0.0',
+      purposes: ['manual_lookup', 'triage', 'planning'],
+      retentionDays: 14,
+      organizationRepresentative: 'Bob Legal',
+      evidenceRef: 'DPA-POLICY-01',
+      recordedBy: 'operator@example.com',
+      expectedRevision: 4n,
+    });
+
+    // Resolver must reject stale reference whose consentRevision is 3n when current is 5n
+    const staleCheck = await policyService.resolveSlackModelPolicy({
+      binding: {
+        atiUserId: alice.id,
+        connectionId,
+        workspaceId: 'T_POLICY_01',
+        slackUserId: 'U_ALICE_SLACK',
+        identityVersion: 1,
+      },
+      purpose: 'triage',
+      requestedRetentionDays: 0,
+      expectedPolicyVersion: 'v1.0.0',
+      expectedPolicyReference: staleRef,
+      env: mockEnv,
+    });
+    expect(staleCheck.allowed).toBe(false);
+    if (!staleCheck.allowed) {
+      expect(staleCheck.reason).toBe('policy_changed');
+    }
+  });
+
+  it('marks processingReady false when consent retention exceeds provider max retention cap', async () => {
+    // Provider with maxRetentionDays = 5
+    await consentRepo.attestProvider({
+      id: 'provider-low-cap',
+      name: 'Low Cap Provider',
+      verified: true,
+      noTraining: true,
+      maxRetentionDays: 5,
+      configurationFingerprint: runtimeIdentity.fingerprint,
+      evidenceRef: 'EVID-LOW-CAP',
+      verifiedBy: 'operator@example.com',
+      verifiedAt: new Date(),
+    });
+
+    // Consent with retentionDays = 10 (exceeds 5)
+    await consentRepo.grantConsent({
+      workspaceId: 'T_EXCEED_CAP',
+      providerId: 'provider-low-cap',
+      policyVersion: 'v1.0.0',
+      purposes: ['triage'],
+      retentionDays: 10,
+      organizationRepresentative: 'Rep',
+      evidenceRef: 'DPA',
+      recordedBy: 'operator',
+    });
+
+    const envLowCap = { ...mockEnv, LLM_PROVIDER: 'provider-low-cap' };
+    const ready = await policyService.checkProcessingReady('T_EXCEED_CAP', envLowCap);
+    expect(ready.processingReady).toBe(false);
+    expect(ready.consentStatus).toBe('granted');
   });
 });

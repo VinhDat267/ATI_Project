@@ -214,6 +214,7 @@ export function createApp(options: AppOptions): Express {
   if (gmailRoutes) app.use('/api/connections/gmail', createGmailConnectionRoutes(gmailRoutes));
   if (options.myslack && sessionRepo && options.encryptionKey) app.use('/api/connections/myslack', createSlackConnectionRoutes({
     ...options.myslack, jwtSecret: options.jwtSecret, sessionRepo, encryptionKey: options.encryptionKey, clock: options.authClock,
+    conversationOwner: options.convRepo ? async (id: string) => (await options.convRepo!.getConversation(id))?.user_id ?? null : undefined,
   }));
   if (mycalendarRoutes) app.use('/api/connections/mycalendar', createMyCalendarConnectionRoutes(mycalendarRoutes));
   if (mysheetsRoutes) app.use('/api/connections/mysheets', createMySheetsConnectionRoutes(mysheetsRoutes));

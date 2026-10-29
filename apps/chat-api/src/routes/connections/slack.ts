@@ -11,10 +11,12 @@ const cookieName = 'ati_slack_browser', cookiePath = '/api/connections/myslack';
 const random = () => randomBytes(32).toString('base64url');
 const hash = (s: string) => createHash('sha256').update(s).digest('hex');
 const valid = (s: unknown): s is string => typeof s === 'string' && /^[A-Za-z0-9_-]{43}$/.test(s);
+const CONVERSATION_PATH = /^\/c\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 export interface SlackConnectionsOptions {
   oauth: SlackOAuthConfig; repo: SlackConnectionRepo; jwtSecret: string; encryptionKey: string;
   sessionRepo: SessionRepo; fetchFn?: typeof fetch; clock?: () => number; timeoutMs?: number;
   policyService?: SlackPolicyService;
+  conversationOwner?: (conversationId: string) => Promise<string | null>;
 }
 export const slackConnectionView = (
   row: SlackConnectionRow,
@@ -58,6 +60,11 @@ export function createSlackConnectionRoutes(options: SlackConnectionsOptions): R
   const fail = (res: any, code: string) => res.status(400).json({ code, error: code === 'SLACK_IDENTITY_CONFLICT'
     ? 'Tài khoản Slack này đang liên kết với một tài khoản ATI khác. Hãy ngắt liên kết cũ trước.'
     : code === 'SLACK_DENIED' ? 'Bạn đã hủy kết nối Slack.' : 'Không hoàn tất được kết nối Slack. Hãy bắt đầu lại từ Kết nối dịch vụ.' });
+  const ownConversation = async (value: unknown, userId: string): Promise<string | null> => {
+    const id = typeof value === 'string' ? CONVERSATION_PATH.exec(value)?.[1]?.toLowerCase() : undefined;
+    if (!id || !options.conversationOwner) return null;
+    return (await options.conversationOwner(id)) === userId ? `/c/${id}` : null;
+  };
   router.get('/', async (req, res) => {
     try {
       const list = await options.repo.list(user(req).id);
@@ -77,9 +84,27 @@ export function createSlackConnectionRoutes(options: SlackConnectionsOptions): R
   router.post('/start', async (req, res) => {
     const who = user(req), state = random(), binding = valid(browser(req)) ? browser(req)! : random();
     try {
-      await options.repo.start({ userId: who.id, sessionId: who.sid!, stateHash: hash(state), browserHash: hash(binding) }, clock());
+      let returnTo: string | null = null;
+      if (req.body?.returnTo !== undefined) {
+        returnTo = await ownConversation(req.body.returnTo, who.id);
+        if (!returnTo) {
+          res.status(400).json({ error: 'Không mở được kết nối từ hội thoại này.', code: 'RETURN_TO_INVALID' });
+          return;
+        }
+      }
+      const workspaceHint = typeof req.body?.workspaceHint === 'string' && req.body.workspaceHint.trim()
+        ? req.body.workspaceHint.trim()
+        : undefined;
+
+      await options.repo.start({
+        userId: who.id,
+        sessionId: who.sid!,
+        stateHash: hash(state),
+        browserHash: hash(binding),
+        returnTo,
+      }, clock());
       res.cookie(cookieName, binding, { httpOnly: true, secure: options.oauth.redirectUri.startsWith('https:'), sameSite: 'lax', path: cookiePath, maxAge: 600000 });
-      res.json({ url: oauth.authorizationUrl(state) });
+      res.json({ url: oauth.authorizationUrl(state, workspaceHint) });
     } catch { res.status(503).json({ error: 'Không bắt đầu được kết nối Slack.' }); }
   });
   router.post('/callback', async (req, res) => {
@@ -95,7 +120,12 @@ export function createSlackConnectionRoutes(options: SlackConnectionsOptions): R
       if (!row) { fail(res, 'SLACK_STATE_INVALID'); return; }
       let readiness: { processingReady?: boolean; consentStatus?: 'pending' | 'granted' | 'revoked' } = {};
       try { readiness = await policyService.checkProcessingReady(row.workspace_id); } catch { readiness = { processingReady: false, consentStatus: 'pending' }; }
-      res.json(slackConnectionView(row, readiness));
+      const view = slackConnectionView(row, readiness);
+      res.json({
+        ...view,
+        connectionId: row.id,
+        ...(consumed.returnTo ? { returnTo: consumed.returnTo } : {}),
+      });
     } catch (e) { fail(res, e instanceof Error && e.message === 'SLACK_IDENTITY_CONFLICT' ? e.message : 'SLACK_CONNECT_FAILED'); }
   });
   router.post('/:id/check', async (req, res) => {

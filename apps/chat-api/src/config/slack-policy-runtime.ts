@@ -5,6 +5,7 @@ export interface RuntimeProviderIdentity {
   name: string;
   model: string;
   endpoint: string;
+  accountIdentifier: string;
   fingerprint: string;
 }
 
@@ -16,7 +17,7 @@ export interface RuntimeProviderIdentity {
 export function resolveRuntimeProviderIdentity(
   env: Record<string, string | undefined> = process.env
 ): RuntimeProviderIdentity {
-  const kind = (env.LLM_PROVIDER || 'gemini').trim().toLowerCase();
+  const kind = (env?.LLM_PROVIDER || 'gemini').trim().toLowerCase();
   let providerId: string;
   let name: string;
   let model: string;
@@ -25,21 +26,28 @@ export function resolveRuntimeProviderIdentity(
   if (kind === 'openai-compatible') {
     providerId = 'openai-compatible';
     name = 'OpenAI Compatible';
-    model = (env.LLM_MODEL || 'gpt-4o').trim();
-    endpoint = (env.LLM_BASE_URL || 'https://api.openai.com/v1').trim().replace(/\/+$/, '');
+    model = (env?.LLM_MODEL || '').trim();
+    endpoint = (env?.LLM_BASE_URL || '').trim().replace(/\/+$/, '');
   } else if (kind === 'gemini') {
     providerId = 'gemini';
     name = 'Google Gemini';
-    model = (env.GEMINI_MODEL || 'gemini-2.5-flash').trim();
+    model = (env?.GEMINI_MODEL || 'gemini-3.8-flash').trim();
     endpoint = 'https://generativelanguage.googleapis.com';
   } else {
     providerId = kind;
     name = kind;
-    model = (env.LLM_MODEL || 'unknown').trim();
-    endpoint = (env.LLM_BASE_URL || '').trim().replace(/\/+$/, '');
+    model = (env?.LLM_MODEL || '').trim();
+    endpoint = (env?.LLM_BASE_URL || '').trim().replace(/\/+$/, '');
   }
 
-  const canonicalConfig = `provider:${providerId}|name:${name}|model:${model}|endpoint:${endpoint}`;
+  const accountIdentifier = (
+    env?.RUNTIME_ACCOUNT_ID ||
+    env?.LLM_ACCOUNT_ID ||
+    env?.GEMINI_ACCOUNT_ID ||
+    'default'
+  ).trim();
+
+  const canonicalConfig = `provider:${providerId}|name:${name}|model:${model}|endpoint:${endpoint}|account:${accountIdentifier}`;
   const fingerprint = createHash('sha256').update(canonicalConfig).digest('hex');
 
   return {
@@ -47,6 +55,7 @@ export function resolveRuntimeProviderIdentity(
     name,
     model,
     endpoint,
+    accountIdentifier,
     fingerprint,
   };
 }

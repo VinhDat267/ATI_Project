@@ -131,7 +131,7 @@ describe('Slack organization processing consent on PostgreSQL', () => {
     expect(updated.policyVersion).toBe('v2.0.0');
     expect(updated.revision).toBe(2n);
 
-    // CAS failure
+    // CAS failure: stale revision
     await expect(repo.grantConsent({
       workspaceId: 'T_CONSENT_01',
       providerId: 'google-vertex',
@@ -143,6 +143,18 @@ describe('Slack organization processing consent on PostgreSQL', () => {
       recordedBy: 'Op',
       expectedRevision: 1n, // Stale!
     })).rejects.toThrow('SLACK_CAS_CONFLICT');
+
+    // Updating existing consent without expectedRevision is rejected
+    await expect(repo.grantConsent({
+      workspaceId: 'T_CONSENT_01',
+      providerId: 'google-vertex',
+      policyVersion: 'v3.0.0',
+      purposes: ['manual_lookup'],
+      retentionDays: 7,
+      organizationRepresentative: 'Rep',
+      evidenceRef: 'Ref',
+      recordedBy: 'Op',
+    })).rejects.toThrow('SLACK_CAS_REVISION_REQUIRED');
   });
 
   it('revokes consent with CAS and records event atomically', async () => {
@@ -171,6 +183,14 @@ describe('Slack organization processing consent on PostgreSQL', () => {
       reason: 'already_revoked',
       expectedRevision: 2n, // Stale!
     })).rejects.toThrow('SLACK_CAS_CONFLICT');
+
+    // Missing expectedRevision error on existing row
+    await expect(repo.revokeConsent({
+      workspaceId: 'T_CONSENT_01',
+      providerId: 'google-vertex',
+      recordedBy: 'operator-dave@example.com',
+      reason: 'missing_rev',
+    })).rejects.toThrow('SLACK_CAS_REVISION_REQUIRED');
   });
 
   it('returns null when revoking non-existent consent', async () => {

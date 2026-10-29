@@ -14,9 +14,18 @@ export class SlackProviderError extends Error {
 }
 export class SlackOAuthClient {
   constructor(readonly config: SlackOAuthConfig, private fetchFn: typeof fetch = fetch) {}
-  authorizationUrl(state: string): string {
+  authorizationUrl(state: string, team?: string): string {
     const url = new URL(this.config.authorizationUrl);
-    url.search = new URLSearchParams({ client_id: this.config.clientId, redirect_uri: this.config.redirectUri, state, user_scope: SLACK_USER_SCOPES.join(',') }).toString();
+    const params: Record<string, string> = {
+      client_id: this.config.clientId,
+      redirect_uri: this.config.redirectUri,
+      state,
+      user_scope: SLACK_USER_SCOPES.join(','),
+    };
+    if (team && typeof team === 'string' && team.trim()) {
+      params.team = team.trim();
+    }
+    url.search = new URLSearchParams(params).toString();
     return url.href;
   }
   private async call(method: string, body: URLSearchParams, signal: AbortSignal, token?: string): Promise<any> {

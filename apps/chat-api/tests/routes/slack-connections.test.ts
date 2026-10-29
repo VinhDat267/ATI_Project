@@ -1,9 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createServer } from 'node:http';
+import { validateSlackCallbackResult } from '@wap/tool-schemas';
 import { createApp } from '../../src/app.js';
 import { generateAccessToken } from '../../src/auth/jwt.js';
 import { SlackConnectionRepo } from '../../src/db/repositories/slack-connection-repo.js';
+import { ConversationRepo } from '../../src/db/repositories/conversation-repo.js';
 import { SLACK_USER_SCOPES } from '../../src/services/slack/oauth-client.js';
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
 const secret = 'slack-test-secret-more-than-32-chars', key = '0123456789abcdef0123456789abcdef';
@@ -36,7 +38,7 @@ describe('Slack connection routes through HTTP, sessions and PostgreSQL', () => 
     await new Promise<void>(r => server.listen(0, '127.0.0.1', r)); origin = `http://127.0.0.1:${(server.address() as any).port}`;
   });
   afterAll(async () => { server?.closeAllConnections(); if (server) await new Promise<void>(r => server.close(() => r())); await db?.close(); });
-  const app = () => createApp({ jwtSecret: secret, userRepo: db.users, encryptionKey: key,
+  const app = (convRepo?: any) => createApp({ jwtSecret: secret, userRepo: db.users, encryptionKey: key, convRepo,
     myslack: { repo, oauth: { appId: 'A_APP', clientId: 'CLIENT', clientSecret: 'CLIENT_SECRET', redirectUri: 'http://127.0.0.1:5174/connections/myslack/callback', authorizationUrl: origin + '/authorize', apiBaseUrl: origin + '/api' } } });
   const bearer = (a: any) => 'Bearer ' + generateAccessToken(a, secret, a.sid).accessToken;
   async function start(a: any) {
@@ -109,5 +111,69 @@ describe('Slack connection routes through HTTP, sessions and PostgreSQL', () => 
     expect(r2.body.workspaceId).toBe('T_ROUTE_2');
     const list = await request(app()).get('/api/connections/myslack').set('Authorization', bearer(a));
     expect(list.body.connections).toHaveLength(2);
+  });
+
+  it('supports workspaceHint parameter on start', async () => {
+    const a = await db.person();
+    const res = await request(app())
+      .post('/api/connections/myslack/start')
+      .set('Authorization', bearer(a))
+      .send({ workspaceHint: 'T_HINT_123' });
+    expect(res.status).toBe(200);
+    const parsed = new URL(res.body.url);
+    expect(parsed.searchParams.get('team')).toBe('T_HINT_123');
+  });
+
+  it('supports returnTo validation and preservation to callback result', async () => {
+    const convRepo = new ConversationRepo(db.pool);
+    const a = await db.person();
+    const other = await db.person();
+    const convA = await convRepo.createConversation(a.id);
+    const convOther = await convRepo.createConversation(other.id);
+
+    const appWithConv = app(convRepo);
+
+    // 1. Invalid returnTo format is rejected with 400 RETURN_TO_INVALID
+    const resBadFormat = await request(appWithConv)
+      .post('/api/connections/myslack/start')
+      .set('Authorization', bearer(a))
+      .send({ returnTo: 'https://evil.com' });
+    expect(resBadFormat.status).toBe(400);
+    expect(resBadFormat.body.code).toBe('RETURN_TO_INVALID');
+
+    // 2. ReturnTo for conversation owned by another user is rejected
+    const resWrongOwner = await request(appWithConv)
+      .post('/api/connections/myslack/start')
+      .set('Authorization', bearer(a))
+      .send({ returnTo: `/c/${convOther.id}` });
+    expect(resWrongOwner.status).toBe(400);
+    expect(resWrongOwner.body.code).toBe('RETURN_TO_INVALID');
+
+    // 3. Valid returnTo owned by caller succeeds
+    const startRes = await request(appWithConv)
+      .post('/api/connections/myslack/start')
+      .set('Authorization', bearer(a))
+      .send({ returnTo: `/c/${convA.id}` });
+    expect(startRes.status).toBe(200);
+    const state = new URL(startRes.body.url).searchParams.get('state')!;
+    const cookie = (startRes.headers['set-cookie'] as unknown as string[])[0]!.split(';')[0]!;
+
+    // 4. Callback returns canonical flat fields + returnTo, validating against validateSlackCallbackResult
+    team = 'T_RETURN_TO';
+    const callbackRes = await request(appWithConv)
+      .post('/api/connections/myslack/callback')
+      .set('Authorization', bearer(a))
+      .set('Cookie', cookie)
+      .send({ state, code: 'CODE' });
+
+    expect(callbackRes.status).toBe(200);
+    expect(callbackRes.body.returnTo).toBe(`/c/${convA.id}`);
+    expect(callbackRes.body.connectionId).toBeDefined();
+
+    const validated = validateSlackCallbackResult(callbackRes.body);
+    expect(validated.returnTo).toBe(`/c/${convA.id}`);
+    expect(validated.connectionId).toBe(callbackRes.body.id);
+    expect(validated.workspaceId).toBe('T_RETURN_TO');
+    expect(validated.slackUserId).toBe('U_ACTOR');
   });
 });

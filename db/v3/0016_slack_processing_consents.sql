@@ -66,3 +66,12 @@ CREATE INDEX IF NOT EXISTS idx_slack_processing_consents_lookup
 
 CREATE INDEX IF NOT EXISTS idx_slack_policy_events_lookup
   ON slack_policy_events(workspace_id, provider_id, occurred_at DESC);
+
+-- Optional returnTo support for Slack OAuth states
+ALTER TABLE slack_oauth_states
+  ADD COLUMN IF NOT EXISTS return_to text;
+
+ALTER TABLE slack_oauth_states DROP CONSTRAINT IF EXISTS slack_oauth_states_return_to_check;
+ALTER TABLE slack_oauth_states ADD CONSTRAINT slack_oauth_states_return_to_check CHECK (
+  return_to IS NULL OR return_to ~ '^/c/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+);
