@@ -43,12 +43,29 @@
 | Migration 0015 lặp lại | **PASS**: Đọc trực tiếp file SQL gốc, chạy 2 lần liên tiếp khi đã có sẵn pending state và saved connection thật; pending state hoàn tất bình thường sau migration | Khắc phục theo phản hồi live review |
 | HTTP Route song song | **PASS**: Dùng chung browser cookie phiên và gọi `Promise.all` đồng thời 2 callback, provider mock phân giải theo code/token | Khắc phục theo phản hồi live review |
 | Full typecheck (`npm run typecheck`) | **EXIT 0**: Sạch toàn bộ TypeScript cả api và web | Không có lỗi compile |
-| Full test suite (`npm run check`) | **EXIT 0**: 2.583 test v3 + 406 eval + 1 launcher + 66 Node fixtures | Không hồi quy bất kỳ module nào |
+| Full check Implementer (`npm run check`) | **EXIT 0**: 2.588 test v3 + 406 eval + 1 launcher + 66 Node fixtures | Chạy trực tiếp tại worktree này trên DB cô lập cổng 55534. Đính chính số liệu v3 thực tế là 2.588 (thay vì 2.583 kế thừa từ PR 184 chưa cộng 5 test mới) |
+| Full check Reviewer độc lập (Lead) | **EXIT 0**: 2.588 test v3 (116+443+381+42+720+886) + 406 eval + 1 launcher + 66 Node fixtures | Lần 1 exit 1 do DB review cổng 55533 thiếu bảng public (`fullcheck.log`). Sau khi migrate (`migrate.log`), lần 2 rerun đạt EXIT 0 (`fullcheck-rerun.log`) |
 
 ---
 
-## 4. Ranh giới & Bàn giao
+## 4. Nguồn gốc Thực thi & Môi trường (Provenance Details)
+
+- **Thư mục thực thi:** `C:\Users\VinhDat\orca\workspaces\ATI_Project\fix-slack-callback-isolation` (worktree hiện tại, không dùng `--prefix` sang checkout khác).
+- **Target DB Implementer:** `postgresql://ati_v3:<sanitized>@127.0.0.1:55534/ati_v3` (container độc lập cổng 55534 tạo riêng, đã dọn sau khi kiểm tra xong).
+- **Target DB Reviewer:** `postgresql://ati_v3:<sanitized>@127.0.0.1:55533/ati_v3` (container `ati-slack-review-184-20261029-postgres-1` của reviewer, được giữ nguyên).
+- **Phân nhóm test v3 thực tế:**
+  - `@wap/tool-schemas`: 12 files, 116 tests
+  - `@wap/tool-adapters`: 18 files, 443 tests
+  - `@wap/planner`: 27 files, 381 tests
+  - `@wap/executor`: 5 files, 42 tests
+  - `@wap/chat-api`: 101 files, 720 tests (22 test Slack cũ + 5 test Slack mới)
+  - `@wap/chat-web`: 80 files, 886 tests
+  - Tổng cộng: **243 test files, 2.588 tests v3 PASS**.
+
+---
+
+## 5. Ranh giới & Bàn giao
 
 - Giữ nguyên toàn bộ mã frontend, schemas, adapters, config; không bật cờ `MYSLACK_ENABLED` hoặc gọi live API.
-- Container PostgreSQL chung của reviewer (`ati-slack-review-184-20261029-postgres-1` trên cổng 55533) được bảo toàn nguyên trạng, không bị restart hay chạy đè migrations prod.
+- Container PostgreSQL chung của reviewer (`ati-slack-review-184-20261029-postgres-1` trên cổng 55533) được bảo toàn nguyên trạng, không bị restart hay xóa schema.
 - Nhánh `VinhDat267/fix-slack-callback-isolation` được tạo để mở Draft PR vào `codex/slack-02-oauth`, giữ cho diff tối giản và minh bạch, sẵn sàng cho reviewer độc lập đánh giá.

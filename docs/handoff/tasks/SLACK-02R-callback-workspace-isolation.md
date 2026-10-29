@@ -103,10 +103,24 @@
       6. Chống chiếm đoạt (hijack) danh tính của user khác ngay cả khi connection ở trạng thái `reconnect_required`, và không tự ý revoke connection của nạn nhân.
     - Test migration 0015 lặp lại 2 lần trên DB có sẵn cả pending state lẫn saved connection thực tế, đọc trực tiếp file SQL gốc; pending state vẫn sống và hoàn tất kết nối bình thường sau migration.
     - Test HTTP route: 2 lượt start dùng chung cookie browser phiên (mô phỏng 2 tab) và callback đồng thời qua `Promise.all`, map provider mock theo code/token -> cả 2 workspace đều 200 và lưu 2 kết nối.
-- **Full Verification Suite:**
-  - `npm run typecheck`: EXIT 0 (sạch typecheck trên cả `chat-api` và `chat-web`).
-  - `npm run check`: EXIT 0 (2.583 test v3 + 406 eval + 1 launcher + 66 Node fixtures).
-  - Môi trường PostgreSQL 16 cô lập đạt chuẩn, không đụng chạm hay dừng container review chung trên cổng 55533.
+- **Nghiệm thu Full Suite & Nguồn gốc Thực thi (Provenance):**
+  - **Môi trường & Thư mục làm việc:** Toàn bộ lệnh được thực thi trực tiếp tại thư mục worktree hiện tại (`C:\Users\VinhDat\orca\workspaces\ATI_Project\fix-slack-callback-isolation`), không dùng `--prefix` sang checkout khác.
+  - **Lượt chạy của Implementer:**
+    - Lệnh: `$env:DATABASE_URL="postgresql://ati_v3:<sanitized>@127.0.0.1:55534/ati_v3"; npm run check` trên container PostgreSQL 16 cô lập (cổng 55534, đã chạy migrate 0001–0015 trước khi test).
+    - Kết quả: **EXIT 0**. Chi tiết số lượng test thực tế:
+      - `@wap/tool-schemas`: 12 files, 116 passed
+      - `@wap/tool-adapters`: 18 files, 443 passed
+      - `@wap/planner`: 27 files, 381 passed
+      - `@wap/executor`: 5 files, 42 passed
+      - `@wap/chat-api`: 101 files, 720 passed (tăng 5 test so với 715 của PR #184)
+      - `@wap/chat-web`: 80 files, 886 passed
+      - Tổng v3: **243 files, 2.588 test PASS** (đính chính số liệu 2.583 trước đó bị kế thừa nhầm từ tóm tắt PR #184 cũ chưa cộng 5 test mới).
+      - `test:eval:v3`: 25 files, 406 passed; `test:launcher:v3`: 1 passed; Node fixtures: 66 passed. Tổng cộng 3.061 test passed.
+  - **Lượt chạy độc lập của Reviewer (Lead):**
+    - Lệnh: Chạy độc lập trên worktree này tại head commit `eeb70d0a2629916c48878f7c9355316843919bd2` trỏ tới DB reviewer trên `127.0.0.1:55533/ati_v3`.
+    - Lần 1: Exit 1 do schema `public` của DB chung chưa chạy migrations nền (ghi nhận tại `.superpowers/leader-review/fullcheck.log`).
+    - Lần 2: Sau khi chạy migrations 0001–0015 (`.superpowers/leader-review/migrate.log`), rerun hoàn tất **EXIT 0** (`.superpowers/leader-review/fullcheck-rerun.log`). Khớp chính xác phân nhóm v3: 116 + 443 + 381 + 42 + 720 + 886 = 2.588 test, 406 eval, 1 launcher, 66 Node.
+  - `npm run typecheck`: **EXIT 0** (sạch typecheck trên cả `chat-api` và `chat-web`).
 - **Phạm vi bảo toàn:**
   - Không sửa frontend, schemas, adapters, hoặc config ngoài phạm vi.
   - Không bật cờ `MYSLACK_ENABLED` hoặc gọi API live / model live.
