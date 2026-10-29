@@ -1,41 +1,41 @@
 # 30/10/2026 · SLACK-03B2 — Chỉnh Sửa Kế Hoạch Phả Hệ Phái Sinh & Cascade Purge (PLAN_ONLY)
 
 **Tác giả:** Backend Planning Owner.
-**Điều phối:** Task `task_e6c726ed89d4`, Dispatch `ctx_f985d0569b37`, terminal `term_7c29c391-286c-4060-ac4d-73fe04010523`.
-**Nhánh:** `docs/slack-03b2-derived-plan`, PR #198, nền đối chiếu `e9088d5e76e95fa65e3be019226835371e40908d`.
+**Điều phối:** Task `task_7a44c112b4ff`, Dispatch `ctx_2f93dc52606e`, terminal `term_33a4291d-30eb-447e-a46f-02631df10584`.
+**Nhánh:** `docs/slack-03b2-derived-plan`, PR #198, nền tài liệu `e9088d5e76e95fa65e3be019226835371e40908d`.
 **Phạm vi:** Chỉ 3 tài liệu SLACK-03B2. Không có mã runtime, migration, gọi Slack/model/provider, `npm install`, sửa `CURRENT-STATE.md`/`ROADMAP.md`, merge `main` hay đổi flag.
 
 ## 1. Mục Đích
 
-Đợt này chỉnh sửa các khiếm khuyết còn lại mà review độc lập đã nêu trong kế hoạch SLACK-03B2. Đây là tài liệu kế hoạch, không phải thi công. Mọi kiểm thử runtime trong card/plan là `[Proposed: NOT_RUN]`; không có kết luận F3, native Slack, model-use hay tích hợp hai client nào được tuyên bố đã chạy.
+Phiên này hiệu chỉnh ba khiếm khuyết còn lại mà review độc lập nêu trong kế hoạch SLACK-03B2. Đây là tài liệu kế hoạch, không phải thi công. Mọi kiểm thử runtime trong card/plan là `[Proposed: NOT_RUN]`; không có kết luận F3, native Slack, model-use hay tích hợp hai client nào được tuyên bố đã chạy.
 
-## 2. Các Sửa Đổi Chính
+## 2. Các Sửa Đổi Đã Được Chấp Thuận Trước Đó
 
-1. **`schedules.request` không còn được bảo toàn mù.** Card/plan xác định `name/request/recurrence` là field do model sinh trong lượt có nguồn Slack; `status/pause_reason/next_run_at` do server quản lý nhưng phải đổi khi purge. Trường có copy phải nhận tombstone không rỗng để thỏa `CHECK (char_length(...))`; `recurrence` thành `{}`; schedule active bị pause với `pause_reason='slack_source_invalidated'` và `next_run_at=NULL`; resume/update có guard typed trước `nextOccurrence`; plan bị purge tách khỏi `schedule_runs` bằng `status='discarded', plan_id=NULL`; title run conversation có copy bị tombstone, rename phải retire copy cũ. Không xóa trường không có copy và không tách văn bản model bị trộn.
-2. **Phiên bản đích do server cấp là bắt buộc.** DDL 0018 có `target_version BIGINT NOT NULL DEFAULT nextval(...)`, `target_fingerprint`, unique `(ati_user_id,target_kind,target_id,target_sub_id,target_version)`, partial unique active, trạng thái `active/retired/purged`. Registration không nhận version từ caller; read guard bắt buộc `expectedTargetVersion`; purge chỉ chọn copy active khớp target **và** `created_at <= intent.created_at`, rồi CAS version+fingerprint, mismatch thì retire mà không sửa artifact. Copy mới dưới grant/epoch mới hoặc đăng ký sau intent không bị intent cũ chọn.
-3. **Working memory purge theo đúng path.** Bổ sung selector cho `__observed`, `__labels`, `__gatherPending.candidates`, `__gatherBindings`, `members`, entity top-level và `__gatherIntent`/`__gatherMissing` khi chính giá trị đó là Slack. Không xóa cả dictionary; giữ entry Trello/Google/dịch vụ khác. Provenance chỉ lấy từ server planner lookup context; model/client không được cung cấp danh sách segment; thiếu chứng cứ thì fail-closed.
-4. **Handoff 03B1 đúng hàng đợi thật.** 03B1 chỉ claim `slack_source_raw` và **được phép** complete raw sau khi xóa raw; 7 intent derived còn `pending`. Không có trạng thái `raw_purged` và không bắt raw chờ đủ 7. Receipt đóng khi mọi intent cùng `source_event_key` completed; thiếu handler làm intent failed/pending và receipt mở. Fanout epoch derived dùng receipt riêng `derived-policy:<eventId>:<epochHash>` vì `stageInTransaction` all-or-nothing theo receipt; không gọi lại `policy:<eventId>` để thêm effect.
-5. **Bỏ kết luận deadlock khi chưa có bằng chứng.** Thay bằng ma trận M1-M8 `[Proposed: NOT_RUN]` với hai client PostgreSQL thật: revoke/write, stage/write, purger/writer, grant/provider update, crash/retry, stale version, duplicate claim, missing handler. Ghi rõ 02B commit policy event trước barrier (sweep 03B1 tối đa 5 giây), nên writer/reader phải revalidate authority trong transaction; barrier vắng mặt không phải consent.
-6. **Bảng bao phủ và danh sách file dùng đường dẫn thật.** Dùng đúng `services/schedules/schedule-runner.ts`; bỏ `ScheduleRunner.runDue`, `ExecutionService.getExecution`, `StartupReconciliationService`, các đường dẫn sai thư mục `services/conversation-routes.ts`/`services/schedule-routes.ts`/`services/schedule-runner.ts` và admin query không tồn tại. State message do `ScheduleService.recordState` ghi được xếp vào `chat_history_message`; thêm path `metadata.schedule.lastRun.error` để khớp `ScheduleView` thật. Chỉ rõ `ScheduleRepo.stateText` là helper dựng nội dung state message, không phải writer. Tách 5 handler artifact thật khỏi 2 cổng tương lai `proposal_excerpt`/`daily_digest_entry`; nhấn mạnh không có bảng/service cho hai kind này.
-7. **Phạm vi runtime trung thực.** 03B2 runtime chỉ có thể đạt 5 handler hiện hữu + từ chối 2 thành phần tương lai. Bảy kind đầy đủ và F3 phụ thuộc SLACK-06 có bảng/service/handler thật cùng test tích hợp thật.
-8. **Vệ sinh tài liệu.** Xóa tuyên bố tuyệt đối, dispatch ID cũ, tham chiếu PR sai và mô tả deadlock khi chưa có bằng chứng. Ba tài liệu dùng cùng contract, DDL, AC và tên trường.
+Các nhóm sau giữ nguyên về ý tưởng: (1) `schedules.request` không được bảo toàn mù, tombstone từng field có copy, `recurrence={}`, pause active-only, guard resume/update, `schedule_runs`/title; (2) `target_version` do server cấp, fingerprint, unique active, CAS và retire khi mismatch; (3) purge working memory theo selector `__observed`/`__labels`/`__gather*`/`members`/entity; (4) handoff 03B1 raw intent được complete sớm, 7 derived intent còn pending, không có `raw_purged`; (5) ma trận khóa/cạnh tranh `[Proposed: NOT_RUN]` thay cho kết luận deadlock; (6) đường dẫn/symbol thật; (7) phạm vi runtime 5 handler thật + 2 cổng tương lai; (8) vệ sinh tài liệu.
 
-## 3. Kiểm Chứng Tài Liệu Đã Chạy
+## 3. Ba Hiệu Chỉnh Của Phiên Này
+
+1. **BIGINT string xuyên suốt.** `target_version` vẫn là `BIGINT` server sequence, nhưng `targetVersion` trong kết quả register/getActive, `expectedTargetVersion` của read guard và tham số CAS của purge nay là **string thập phân canonical** (`^[1-9][0-9]*$`), không phải `number`. Cấm `Number()`/`parseInt()`/`parseFloat()`/unary `+`/JSON-number round-trip; kiểm tra thêm biên PG BIGINT `9223372036854775807` cho chuỗi 19 ký tự. `identity_version` INT vẫn là number, revision vẫn là string. Ma trận thêm M9: roundtrip `9007199254740993` qua register/getActive/read guard/purge CAS; fingerprint ổn định; so sánh `9007199254740992`/`9007199254740994` không collapse; CAS lệch một đơn vị trả 0 row.
+2. **Cutoff chỉ khoanh version, không phải freshness.** `created_at <= intent.created_at` chỉ xác định version artifact mà intent cũ được phép CAS; nó không chứng minh copy đăng ký sau cutoff là mới, hợp lệ hay đã được cấp quyền. Mọi version mới phải tái cấp quyền **toàn bộ segment** theo authority hiện tại và kiểm tra barrier bền vững khớp, dưới cùng bộ advisory lock sorted; không được ghi version mới bằng epoch/nguồn cũ đã revoke/xóa chỉ vì tạo sau intent. Ma trận thêm M10 (event/stage vs register cả hai thứ tự; nỗ lực tái dùng segment cũ sau intent bị từ chối; regrant/revision mới chỉ sống nếu authority/barrier cho phép) và M11 (legacy writer lọt sau cutoff với segment cũ đã vô hiệu hóa bị read guard chặn, không F3-clean, phải purge/repair). Không thêm trạng thái hay source-epoch protocol mới.
+3. **Cập nhật snapshot 03B1 và thứ tự khóa.** Tham chiếu 03B1 accepted head `23544be9`, integration `612ac427`; 03C1 read accepted head `390b1c54`. `SlackConnectionRepo.disconnect` lấy advisory sorted trước rồi mới cập nhật connection row, cùng phân cấp với `saveSourceAtomic`; bộ 6 suite PostgreSQL thật (55/55) tại head `23544be9` kiểm chứng save-vs-disconnect, nhưng đây là bằng chứng 03B1, không phải 03B2. Read guard được nêu cùng thứ tự parent-first với writer/purger: advisory sorted → conversation → authority `FOR SHARE` → barrier check → artifact `FOR SHARE` → post-check. Không có tuyên bố deadlock-proof; toàn bộ M1-M11 vẫn `[Proposed: NOT_RUN]`. Seam raw intent riêng và receipt fanout `derived-policy:<eventId>:<epochHash>` chỉ cho derived được giữ nguyên.
+
+## 4. Kiểm Chứng Tài Liệu Đã Chạy
 
 Chỉ các kiểm tra tài liệu dưới đây được chạy trong phiên này. Không có kiểm thử runtime nào được chạy; mọi dòng runtime trong card/plan giữ `[Proposed: NOT_RUN]`.
 
 | Hạng mục | Lệnh / cách kiểm | Kết quả thực tế |
 |---|---|---|
-| Số dòng plan | `wc -l docs/superpowers/plans/2026-10-30-slack-03b2-derived-lineage-and-purge.md` | `260` (≤350) |
-| UTF-8, BOM, U+FFFD | Node `Buffer` + regex trên 3 tệp | Cả 3 tệp: `bom=false`, `U+FFFD=0`; task 44314 bytes, plan 31359 bytes; log tự tham chiếu nên không ghi kích thước |
-| Liên kết markdown tồn tại | Script kiểm từng link tương đối trong 3 tệp | `checked=4 missing=none`, exit 0 |
-| Whitespace/conflict (working tree) | `git diff --check e9088d5e` | exit 0, không output |
-| Đúng 3 tệp sở hữu (working tree) | `git diff --name-only e9088d5e` | 3 tệp: log, task card, plan |
+| Số dòng plan | `wc -l docs/superpowers/plans/2026-10-30-slack-03b2-derived-lineage-and-purge.md` | `267` (≤350) |
+| Số dòng card | `wc -l docs/handoff/tasks/SLACK-03B2-derived-lineage-and-purge.md` | `389` |
+| UTF-8, BOM, U+FFFD | Node `Buffer` + regex trên 3 tệp | Cả 3 tệp: `bom=false`, `U+FFFD=0`; task 50857 bytes, plan 37481 bytes; log tự tham chiếu nên không ghi kích thước |
+| Liên kết markdown tồn tại | Script kiểm từng link tương đối trong 3 tệp | `checked=4 missing=0`, exit 0 |
+| Whitespace/conflict (working tree) | `git diff --check` | exit 0, không output |
+| Đúng 3 tệp sở hữu (working tree) | `git diff --name-only` | 3 tệp: log, task card, plan |
 | Trạng thái làm việc | `git status --short` trước commit | Chỉ 3 tệp thuộc sở hữu ở trạng thái `M` |
 
 Không có output runtime, exit code test sản phẩm hay log CI nào trong mục này. Bằng chứng runtime cũ (nếu có trong lịch sử) là bằng chứng lưu trữ, không phải kết quả của phiên tài liệu này.
 
-## 4. Bàn Giao
+## 5. Bàn Giao
 
 - Chỉ stage đúng 3 tệp sở hữu, commit Conventional Commits, push thường lên nhánh hiện có, không force.
 - Cập nhật PR #198 bằng template, mô tả đúng phạm vi PLAN_ONLY, không có chữ ký AI.

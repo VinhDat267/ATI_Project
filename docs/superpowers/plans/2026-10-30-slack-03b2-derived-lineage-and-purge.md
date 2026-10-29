@@ -2,7 +2,8 @@
 
 > **Trạng thái:** PLAN_ONLY. Không có mã runtime, migration hay test runtime nào được chạy trong tài liệu này. Mọi kiểm thử runtime là `[Proposed: NOT_RUN]`.
 > **Task card:** [`docs/handoff/tasks/SLACK-03B2-derived-lineage-and-purge.md`](../../handoff/tasks/SLACK-03B2-derived-lineage-and-purge.md).
-> **Nền:** `e9088d5e76e95fa65e3be019226835371e40908d`; nhánh `docs/slack-03b2-derived-plan`, PR #198.
+> **Nền tài liệu:** `e9088d5e76e95fa65e3be019226835371e40908d`; nhánh `docs/slack-03b2-derived-plan`, PR #198.
+> **Tham chiếu 03B1/03C1:** 03B1 accepted head `23544be96cf848cc5d4ff8c3feafe6e50319c399`, integration `612ac427152fcfcf8a0f1bff3158088d8f393a5d`; 03C1 accepted head `390b1c54b50a61d7412f20e928476d55eee4decb`. Thứ tự khóa 03B1 là snapshot của các head này; runtime 03B2 vẫn NOT_RUN.
 
 **Mục tiêu:** Thiết kế sổ phả hệ bản sao Slack phái sinh, ghi nguyên tử với artifact, read guard theo từng trường/path, và cascade purge cho 5 artifact đang tồn tại thật. Hai kind `proposal_excerpt`/`daily_digest_entry` chỉ có cổng fail-closed; chúng không phải là runtime coverage.
 
@@ -16,8 +17,9 @@
 2. **03B2 → SLACK-06:** `proposal_excerpt` và `daily_digest_entry` chưa có bảng/service. Không tạo handler giả. Runner không complete hai kind này; receipt còn mở.
 3. **F3:** Chỉ đóng sau khi SLACK-06 có handler thật + test tích hợp thật cho đủ 7 kind. 03B2 runtime (khi thi công) chỉ đạt 5 handler artifact thật + 2 cổng từ chối.
 4. **Người dùng:** Một `ati_user_id` có thể có nhiều workspace; mọi segment phải cùng `ati_user_id`. Cấm tổng hợp chéo ATI user.
-5. **Nguồn cấp version:** Chỉ server. `target_version` lấy từ sequence; `target_fingerprint` server băm từ artifact thật. Không nhận version/fingerprint/segment list từ model hay client.
+5. **Nguồn cấp version:** Chỉ server. `target_version` lấy từ sequence BIGINT; `target_fingerprint` server băm từ artifact thật. Mọi interface TS giữ `targetVersion`/`expectedTargetVersion` là string thập phân canonical, không ép `number`; `identity_version` INT vẫn là number. Không nhận version/fingerprint/segment list từ model hay client.
 6. **Không xóa mù:** Chỉ xóa đúng selector/path đã đăng ký. Không xóa cả `__observed`, `__labels`, `members`, không xóa mọi `schedules.request`.
+7. **Cutoff không phải freshness:** `copy.created_at <= intent.created_at` chỉ khoanh version artifact của intent cũ. Mọi version mới phải tái cấp quyền toàn bộ segment + barrier bền vững dưới cùng advisory locks; không được dùng epoch/nguồn cũ đã revoke/xóa chỉ vì tạo sau intent. Legacy slip sau cutoff không được coi là F3-clean; read guard chặn và phải purge/repair.
 
 ---
 
@@ -132,7 +134,7 @@ export interface AssertDerivedCopyAllowedInput {
   targetKind: SlackDerivedTargetKind;
   targetId: string;
   targetSubId: string;
-  expectedTargetVersion: number; // mandatory; never HTTP/model supplied
+  expectedTargetVersion: string; // canonical BIGINT decimal; mandatory; never HTTP/model supplied
   signal?: AbortSignal;
 }
 
@@ -145,32 +147,34 @@ export type DerivedAccessDecision =
 
 export interface ISlackDerivedLineageStore {
   registerDerivedCopyInTransaction(client: pg.PoolClient, input: RegisterDerivedCopyInput):
-    Promise<{ derivedCopyId: string; targetVersion: number; targetFingerprint: string }>;
+    Promise<{ derivedCopyId: string; targetVersion: string; targetFingerprint: string }>;
   getActiveCopyInTransaction(client: pg.PoolClient, target: {
     atiUserId: string; targetKind: SlackDerivedTargetKind; targetId: string; targetSubId: string;
-  }): Promise<{ derivedCopyId: string; targetVersion: number; targetFingerprint: string } | null>;
+  }): Promise<{ derivedCopyId: string; targetVersion: string; targetFingerprint: string } | null>;
   assertDerivedCopyAllowed(input: AssertDerivedCopyAllowedInput): Promise<DerivedAccessDecision>;
 }
 
 export interface ISlackDerivedPurgeHandler {
   readonly targetKind: SlackDerivedTargetKind;
-  /** Own transaction: verify created_at cutoff -> advisory locks -> parent artifact -> copy FOR UPDATE -> fingerprint -> scrub -> CAS. */
+  /** Own transaction: verify created_at cutoff -> advisory locks -> parent artifact -> copy FOR UPDATE -> fingerprint -> scrub -> CAS with target_version kept as canonical string. */
   purgeCopy(copyId: string, reason: SlackTombstoneReason, intentCreatedAt: Date):
     Promise<'purged'|'retired'|'skipped'>;
 }
 ```
 
-**Registration:** server validates segments nonempty, same ATI user, 8-field storage ref, TTL, current policy/barriers; computes `target_fingerprint = sha256(canonicalJson(valueAtSelector))` (UTF-8, object keys sorted, no insignificant whitespace; text fields hash exact UTF-8; null/absent distinct sentinels); inserts copy + segments in caller transaction. It does not accept a client version. `segments` may only come from the server planner lookup context (`tool.service`, `tool.discovers`, `observedFields`, stamped parent); model/client-provided segment or path lists are rejected. If a mixed output's segments cannot all be proven, the writer fails and persists no artifact.
+**Registration:** server validates segments nonempty, same ATI user, 8-field storage ref, TTL, current policy/barriers; computes `target_fingerprint = sha256(canonicalJson(valueAtSelector))` (UTF-8, object keys sorted, no insignificant whitespace; text fields hash exact UTF-8; null/absent distinct sentinels); inserts copy + segments in caller transaction. It does not accept a client version. `segments` may only come from the server planner lookup context (`tool.service`, `tool.discovers`, `observedFields`, stamped parent); model/client-provided segment or path lists are rejected. If a mixed output's segments cannot all be proven, the writer fails and persists no artifact. Registration must also re-authorize every segment against current authority and matching durable barriers under the same sorted advisory locks before insert; a new version is never accepted merely because it is newer or was created after an intent.
 
-**Read guard:** `expectedTargetVersion` must equal active copy version; recompute fingerprint; validate every segment's storage ref via `SlackPolicyService.resolveSlackModelPolicy` (purpose `storage`, exact expected ref), then current consent/provider authority and consumer purpose; check barriers pre/post; TTL; same ATI user. Run in one transaction: sorted advisory locks first, lock authority rows (`user`/`connection`/`provider`/`consent`) `FOR SHARE` in writer order, then lock the target artifact `FOR SHARE` in parent-first order, read copy, then re-read version/fingerprint after the artifact read; purge takes `FOR UPDATE` on the same artifact, so both order on that row and the re-read catches a change; the lock protocol itself is `[Proposed: NOT_RUN]` (M1-M8). Any failure → blocked with tombstone. A `purged` copy → `tombstone_only`; `retired` or no copy → `blocked` (`stale_lineage`/`not_found`). The guard never returns `allowed` without an active copy/version. Absence is accepted only at the 03B2 writer gate, which certifies that a writer-gated selector never had a Slack-derived segment; legacy artifacts without lineage stay behind the deployment gate/backfill and are never served as F3-clean. Guard calls `signal.throwIfAborted()` at entry, between awaits, and after post-check.
+**Version transport:** `target_version` is PostgreSQL BIGINT and every TS layer keeps it as the canonical decimal string returned by `pg`. No `Number()`, `parseInt()`, `parseFloat()`, unary `+` or JSON-number round-trip is allowed in registration results, `getActiveCopyInTransaction`, `expectedTargetVersion`, fingerprint comparison or purge CAS. Validate `^[1-9][0-9]*$`, reject more than 19 digits, and for 19 digits compare lexicographically with `9223372036854775807`; compare by canonical string equality so adjacent values such as `9007199254740992` and `9007199254740994` do not collapse. `identity_version` remains an INT number; only `target_version` is BIGINT string.
 
-**Purge CAS:** Before locking, reject any copy with `created_at > intent.createdAt` (`skipped`): a copy registered after the invalidation intent is fresh and outside that intent's obligation. Then `UPDATE slack_derived_copies SET status='purged', purged_at=now(), purge_reason=$3 WHERE id=$1 AND target_version=$2 AND target_fingerprint=$4 AND status='active'`. Zero rows → reload; if version/fingerprint changed, `retired` with `retired_reason='fingerprint_mismatch'` without touching artifact; that copy is **not** claimed as F3-purged and needs backfill/review, and the runner must `failIntent('code:STALE_LINEAGE')` rather than complete. An old intent therefore cannot erase/rebind a fresh version/regrant; a fresh copy under a new epoch or after the intent cutoff is not selected by the old `SlackPurgeTarget`.
+**Read guard:** `expectedTargetVersion` (canonical string) must equal the active copy's `target_version` by string equality; recompute fingerprint; validate every segment's storage ref via `SlackPolicyService.resolveSlackModelPolicy` (purpose `storage`, exact expected ref), then current consent/provider authority and consumer purpose; check barriers pre/post; TTL; same ATI user. Run in one transaction: sorted advisory locks first, conversation `FOR SHARE`, authority rows (`user`/`connection`/`provider`/`consent`) `FOR SHARE` in writer order, barrier check, then the target artifact `FOR SHARE` in parent-first order; read copy/segments, then re-read version/fingerprint and re-check authority/barrier after the artifact read; purge takes `FOR UPDATE` on the same artifact, so both order on that row and the re-read catches a change; the lock protocol itself is `[Proposed: NOT_RUN]` (M1-M11). Any failure → blocked with tombstone. A `purged` copy → `tombstone_only`; `retired` or no copy → `blocked` (`stale_lineage`/`not_found`). The guard never returns `allowed` without an active copy/version. Absence is accepted only at the 03B2 writer gate, which certifies that a writer-gated selector never had a Slack-derived segment; legacy artifacts without lineage stay behind the deployment gate/backfill and are never served as F3-clean. Guard calls `signal.throwIfAborted()` at entry, between awaits, and after post-check.
+
+**Purge CAS:** Before locking, reject any copy with `created_at > intent.createdAt` (`skipped`). That cutoff **only scopes which artifact version the stale intent may CAS**; it is not proof that a copy created later is fresh or authorized. Every new version must re-authorize all segments against current authority and matching durable barriers under the same sorted advisory locks; a new version carrying a revoked/deleted epoch or source is never allowed merely because it was created after the intent. Then `UPDATE slack_derived_copies SET status='purged', purged_at=now(), purge_reason=$3 WHERE id=$1 AND target_version=$2 AND target_fingerprint=$4 AND status='active'` with `$2` passed as the canonical string, never coerced to a number. Zero rows → reload; if version/fingerprint changed, `retired` with `retired_reason='fingerprint_mismatch'` without touching artifact; that copy is **not** claimed as F3-purged and needs backfill/review, and the runner must `failIntent('code:STALE_LINEAGE')` rather than complete. An old intent therefore cannot erase/rebind a fresh version/regrant; a copy under a new epoch or after the intent cutoff is not selected by the old `SlackPurgeTarget`. If a legacy writer bypasses the 03B2 gate and writes a copy after the cutoff whose segments match the old invalidated source, that copy is **not clean**: the read guard blocks it (`stale_lineage`/`policy_changed`), F3 is not claimed for it, and it must be purged by the current intent or repaired via backfill/review. No new status or source-epoch protocol is introduced.
 
 ---
 
 ## 5. Chọn Copy, Xóa Đúng Path & Handoff
 
-**Chọn copy theo target:** runner/handler query active copies `WHERE target_kind=$1 AND status='active' AND created_at <= $intentCreatedAt AND EXISTS (segment khớp target)`. Cutoff `created_at` là bắt buộc cho target không mang epoch (`resource_lifecycle`, `channel_membership_lost`); copy đăng ký sau intent không bao giờ bị intent cũ chọn. Predicate:
+**Chọn copy theo target:** runner/handler query active copies `WHERE target_kind=$1 AND status='active' AND created_at <= $intentCreatedAt AND EXISTS (segment khớp target)`. Cutoff `created_at` là bắt buộc cho target không mang epoch (`resource_lifecycle`, `channel_membership_lost`); nó chỉ khoanh version artifact mà intent cũ được CAS, **không** chứng minh copy đăng ký sau intent là mới/hợp lệ. Mọi version mới phải được writer tái cấp quyền toàn bộ segment + barrier hiện tại dưới cùng advisory locks; copy legacy lọt sau cutoff với segment cũ đã vô hiệu hóa bị read guard chặn và phải purge/repair, không được coi là sạch. Predicate:
 
 - `policy_epoch_invalidated`: khớp đủ 5 binding + `provider_profile_id` + `config_fingerprint` + `policy_version` + `consent_revision` + `provider_revision` với `target.epoch`.
 - `workspace_consent_revocation`: `workspace_id` = target.workspaceId, `provider_profile_id` = target.providerProfileId, `policy_version` = target.policyVersion, `consent_revision::bigint < target.consentRevision` (epoch cũ hơn event).
@@ -188,13 +192,13 @@ export interface ISlackDerivedPurgeHandler {
 
 **Hai cổng tương lai:** map handler thiếu → `failIntent('code:MISSING_HANDLER')`, intent vẫn `failed`/không completed; receipt chưa đóng. Không tạo bảng hay parser giả.
 
-**03B1 handoff thực tế:** `SlackInvalidationRunner` chỉ claim `slack_source_raw`; sau `purgeSourcesByTarget` được complete raw. 03B2 claim 7 kind còn lại, lease/`SKIP LOCKED`, complete từng kind khi không còn active copy khớp **và** `created_at <= intent.createdAt`, **và** không còn copy `retired` lý do `fingerprint_mismatch` khớp target/cutoff; handler trả `retired` do fingerprint mismatch thì `failIntent('code:STALE_LINEAGE')`, không complete. "Receipt closed" = mọi intent cùng `source_event_key` đều `completed`; không thêm cột/trạng thái. Đóng tổng thể một invalidation phải gồm cả receipt `policy:<eventId>` và mọi receipt fanout `derived-policy:<eventId>:<epochHash>` áp dụng; receipt không effect/intent không chứng minh derived đã purge. `stageInTransaction` là all-or-nothing theo receipt: không gọi lại cùng `policy:<eventId>` để thêm epoch derived. 03B2 fanout epoch chỉ có trong derived bằng receipt riêng `derived-policy:<eventId>:<epochHash>` + effect `derived_policy_epoch_invalidated:<epochHash>`, barrier epoch, purge target 7 kind; idempotent theo receipt riêng.
+**03B1 handoff thực tế:** `SlackInvalidationRunner` chỉ claim `slack_source_raw`; sau `purgeSourcesByTarget` được complete raw. 03B2 claim 7 kind còn lại, lease/`SKIP LOCKED`, complete từng kind khi không còn active copy khớp **và** `created_at <= intent.createdAt`, **và** không còn copy `retired` lý do `fingerprint_mismatch` khớp target/cutoff; handler trả `retired` do fingerprint mismatch thì `failIntent('code:STALE_LINEAGE')`, không complete. Cutoff chỉ khoanh nghĩa vụ của intent cũ trên version artifact đã tồn tại; completion của intent cũ không chứng minh F3 cho copy đăng ký sau cutoff. Copy sau cutoff khớp segment nguồn cũ đã vô hiệu hóa bị read guard chặn và phải purge/repair theo intent hiện hành; không đổi trạng thái intent. "Receipt closed" = mọi intent cùng `source_event_key` đều `completed`; không thêm cột/trạng thái. Đóng tổng thể một invalidation phải gồm cả receipt `policy:<eventId>` và mọi receipt fanout `derived-policy:<eventId>:<epochHash>` áp dụng; receipt không effect/intent không chứng minh derived đã purge. `stageInTransaction` là all-or-nothing theo receipt: không gọi lại cùng `policy:<eventId>` để thêm epoch derived. 03B2 fanout epoch chỉ có trong derived bằng receipt riêng `derived-policy:<eventId>:<epochHash>` + effect `derived_policy_epoch_invalidated:<epochHash>`, barrier epoch, purge target 7 kind; idempotent theo receipt riêng.
 
 ---
 
 ## 6. Khóa, Revoke Bất Đồng Bộ & Ma Trận NOT_RUN
 
-**Thứ tự thật:** 03B1 writer `advisory sorted → users/connection/provider/consent FOR SHARE → insert`. 03B1 stage `advisory event+barrier sorted → receipt/barrier/intents`. 02B revoke `consent FOR UPDATE → update revoked → insert policy event → COMMIT`; **barrier đến sau** trong sweep 03B1 (≤5s). 03B2 writer `advisory sorted → conversation → authority FOR SHARE → barrier check → artifact → barrier/authority post-check trước commit → registry`, giữ advisory đến hết transaction. 03B2 purger `advisory sorted → conversation → artifact → registry`, không lấy consent; với `execution_steps`, artifact là `plans` rồi `execution_steps` (qua `plans.conv_id`), và writer bước cũng phải join conversation lock theo cùng thứ tự.
+**Thứ tự thật (snapshot 03B1 accepted head `23544be9`, integration `612ac427`):** 03B1 `saveSourceAtomic` `advisory sorted → barrier check → users/connection/provider/consent FOR SHARE → insert`; `SlackConnectionRepo.disconnect` lấy `stageInTransaction` advisory sorted trước, ghi barrier/intent, rồi `UPDATE slack_connections`, tức advisory trước connection row như source writer. Bộ 6 suite PostgreSQL thật (55/55) tại head `23544be9` kiểm chứng cả hai thứ tự save-vs-disconnect; đây là bằng chứng 03B1, **không** phải runtime 03B2. 03B1 stage `advisory event+barrier sorted → receipt/barrier/intents`. 02B revoke `consent FOR UPDATE → update revoked → insert policy event → COMMIT`; **barrier đến sau** trong sweep 03B1 (≤5s). 03B2 writer `advisory sorted → conversation → authority FOR SHARE → barrier check → artifact → barrier/authority post-check trước commit → registry`, giữ advisory đến hết transaction. 03B2 read guard `advisory sorted → conversation FOR SHARE → authority FOR SHARE → barrier check → artifact FOR SHARE parent-first → đọc copy/segment → post-check version/fingerprint + authority/barrier`. 03B2 purger `advisory sorted → conversation → artifact → registry`, không lấy consent; với `execution_steps`, artifact là `plans` rồi `execution_steps` (qua `plans.conv_id`), và writer bước cũng phải join conversation lock theo cùng thứ tự. Ba đường 03B2 dùng cùng thứ tự parent-first; không có kết luận deadlock hay deadlock-proof.
 
 Do revoke commit event trước barrier, writer/reader phải tự revalidate authority trong transaction; **barrier vắng mặt không phải consent**. Không có kết luận deadlock hay kết luận chứng minh nào ở đây; tất cả dưới đây là kế hoạch kiểm thử hai client PostgreSQL thật.
 
@@ -206,8 +210,11 @@ Do revoke commit event trước barrier, writer/reader phải tự revalidate au
 | M4 | Grant/provider update vs writer đang `FOR SHARE` | Event sau commit của writer → purge; writer sau event thấy revision mới, từ chối epoch cũ | NOT_RUN |
 | M5 | Purger target-first (sai) vs writer | Chỉ để phát hiện đảo thứ tự; không dùng làm bằng chứng deadlock-proof | NOT_RUN |
 | M6 | Crash sau khi purge một số copy; lease hết hạn | Copy đã purge không lặp; copy còn active được xử lý; intent complete khi hết active khớp; `attempts` tăng | NOT_RUN |
-| M7 | Stale version v1 bị thay bởi v2 grant mới | v1 retire; artifact mới không sửa; v2 tạo sau intent ngoài cutoff `created_at`; v2 tạo trước intent dưới epoch mới không khớp target epoch; read guard dùng v2; fingerprint lệch thì intent `STALE_LINEAGE` không complete | NOT_RUN |
+| M7 | Stale version v1 bị thay bởi v2 grant/epoch mới | v1 retire; artifact mới không sửa; v2 sau intent chỉ ngoài cutoff của intent cũ, **không** đương nhiên hợp lệ: vẫn phải tái cấp quyền toàn bộ segment + barrier hiện tại; v2 epoch cũ bị từ chối; v2 grant mới chỉ sống nếu authority/barrier cho phép; fingerprint lệch thì intent `STALE_LINEAGE` không complete | NOT_RUN |
 | M8 | Hai runner cùng claim; handler `proposal_excerpt` thiếu | `SKIP LOCKED` một claim; missing handler → failed, receipt mở, không complete giả | NOT_RUN |
+| M9 | Canonical BIGINT string `9007199254740993` qua register/getActive/guard/purge CAS; so sánh `9007199254740992` và `9007199254740994` | Roundtrip PG BIGINT giữ đúng chuỗi; không `Number`/`parseInt`; fingerprint ổn định; version compare không collapse hai giá trị kề; CAS lệch một đơn vị trả 0 row, không purge nhầm | NOT_RUN |
+| M10 | Register version mới vs policy event/barrier, cả hai thứ tự; nỗ lực tái dùng segment cũ sau intent | Event/stage trước → register sau bị từ chối nếu segment cũ đã revoke/xóa; register trước → artifact bị purge khi event/stage commit; sau cutoff, segment cũ vẫn bị authority/barrier hiện tại từ chối. Regrant/revision mới chỉ sống nếu mọi segment được tái cấp quyền và barrier khớp; `created_at` không phải freshness proof | NOT_RUN |
+| M11 | Legacy writer bỏ qua gate 03B2, ghi copy sau cutoff khớp nguồn cũ đã vô hiệu hóa | Read guard chặn (`stale_lineage`/`policy_changed`); F3 không tuyên bố cho copy đó; phải purge bởi intent hiện hành hoặc repair/backfill; không thêm trạng thái/epoch mới, không coi là sạch | NOT_RUN |
 
 ---
 
@@ -226,10 +233,10 @@ Do revoke commit event trước barrier, writer/reader phải tự revalidate au
 ## 8. Task Decomposition (tất cả runtime NOT_RUN)
 
 - [ ] **Task 1 — Migration 0018:** sequence, copies, segments, unique active, TTL/terminal checks. `[Proposed: NOT_RUN]` migrate PG16 thật.
-- [ ] **Task 2 — Repository & lock layer:** sorted advisory locks, parent-first, version/fingerprint CAS, active copy lookup. `[Proposed: NOT_RUN]` test 2 client thật cho M2/M3/M7.
-- [ ] **Task 3 — Lineage store & guards:** mandatory `expectedTargetVersion`, segment policy/TTL/barrier pre-post, fingerprint, AbortSignal. `[Proposed: NOT_RUN]` HTTP/SSE/planner/schedule/executor guard tests.
+- [ ] **Task 2 — Repository & lock layer:** sorted advisory locks, parent-first, version/fingerprint CAS with `target_version` as canonical string, active copy lookup. `[Proposed: NOT_RUN]` test 2 client thật cho M2/M3/M7/M9.
+- [ ] **Task 3 — Lineage store & guards:** mandatory `expectedTargetVersion` canonical string, segment policy/TTL/barrier pre-post, fingerprint, AbortSignal. `[Proposed: NOT_RUN]` HTTP/SSE/planner/schedule/executor guard tests.
 - [ ] **Task 4 — Purge runner:** claim derived only, 5 real handlers, 2 missing-handler gates, lease/retry, receipt closure predicate. `[Proposed: NOT_RUN]` crash 3/5 + stale version + duplicate runner.
-- [ ] **Task 5 — Writer integration:** all §7 writers in real PG transaction, re-register on every field write, retire old version. `[Proposed: NOT_RUN]` integration test with real `ChatService`, `ScheduleService`, `PlanRepo`, `StepRepo`.
+- [ ] **Task 5 — Writer integration:** all §7 writers in real PG transaction, re-register on every field write, retire old version, re-authorize every segment + barrier under the same advisory locks. `[Proposed: NOT_RUN]` integration test with real `ChatService`, `ScheduleService`, `PlanRepo`, `StepRepo`, including M10/M11.
 - [ ] **Task 6 — Derived-only policy fanout:** separate `derived-policy:<eventId>:<epochHash>` receipt, no re-stage of `policy:<eventId>`, barrier+7 intents. `[Proposed: NOT_RUN]` expired-raw + derived-only epoch test.
 - [ ] **Task 7 — Docs/review:** 3 files only, links, UTF-8, plan ≤350 lines, `git diff --check`. Actual doc checks in log; no runtime claim.
 
@@ -237,13 +244,13 @@ Do revoke commit event trước barrier, writer/reader phải tự revalidate au
 
 ## 9. Acceptance / Evidence
 
-- AC: mandatory server version in DDL + registration + read guard + purge CAS; unique `(user,kind,id,subid,version)` + partial active; no client/model version; purge cutoff `copy.created_at <= intent.created_at` and CAS version+fingerprint; fingerprint mismatch retires with `retired_reason='fingerprint_mismatch'`, blocks completion (`STALE_LINEAGE`).
-- AC: read guard mandatory `expectedTargetVersion`; current consent/provider authority, segment policy/TTL, barrier pre/post, fingerprint, advisory + authority `FOR SHARE` + artifact `FOR SHARE` then post-check.
+- AC: mandatory server version in DDL + registration + read guard + purge CAS as canonical BIGINT string (no number coercion); unique `(user,kind,id,subid,version)` + partial active; no client/model version; purge cutoff `copy.created_at <= intent.created_at` only scopes the old intent's artifact version, not freshness; every new version re-authorizes all segments + barriers under the same advisory locks; CAS version string+fingerprint; fingerprint mismatch retires with `retired_reason='fingerprint_mismatch'`, blocks completion (`STALE_LINEAGE`); legacy post-cutoff copies with old invalidated segments are not F3-clean.
+- AC: read guard mandatory `expectedTargetVersion` canonical string; current consent/provider authority, segment policy/TTL, barrier pre/post, fingerprint, advisory + conversation + authority `FOR SHARE` + artifact `FOR SHARE` parent-first then post-check.
 - AC: schedules field-by-field tombstones (name/request/recurrence), active-only pause + resume guard, title/run error handling; no blanket request preservation.
 - AC: working memory exact `__observed`/`__labels`/`__gather*`/`members`/entity selectors; preserve other services; trusted server provenance.
 - AC: handoff raw may complete; 7 derived pending; no `raw_purged`; closure all intents; missing handler fails closed.
 - AC: 5 existing runtime integrations + 2 future gates only; full 7-kind/F3 `[Proposed: NOT_RUN]` until SLACK-06.
-- AC: no absolute or deadlock-proof claims, stale dispatch IDs, AI tool names.
+- AC: no absolute or deadlock-proof claims, no stale dispatch IDs or AI tool names; M1-M11 all `[Proposed: NOT_RUN]`.
 
 ```text
 # Runtime: toàn bộ [Proposed: NOT_RUN]
