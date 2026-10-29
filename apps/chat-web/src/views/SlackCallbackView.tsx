@@ -35,7 +35,13 @@ export function SlackCallbackView({
   useEffect(() => {
     let mounted = true;
     const stop = subscribeAuthTokens(() => {
-      if (!owns.current()) invalid.current = true;
+      if (!owns.current()) {
+        invalid.current = true;
+        if (mounted) {
+          setResult(null);
+          setError('Phiên kết nối đã hết hạn hoặc không hợp lệ. Vui lòng thử lại.');
+        }
+      }
     });
     const live = () => mounted && !invalid.current && owns.current();
     const params = data.current;

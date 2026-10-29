@@ -1,23 +1,18 @@
 import { apiClient } from './api-client';
 import { gmailSessionOwner, conversationReturnPath } from './gmail-connection';
+import {
+  validateSlackConnectionPublicInfo,
+  validateSlackCallbackResult,
+  type SlackConnectionPublicInfo as BaseSlackConnectionPublicInfo,
+  type SlackCallbackResult as BaseSlackCallbackResult,
+  type SlackConnectionStatus,
+  type SlackConsentStatus,
+} from '@wap/tool-schemas';
 
-export type SlackConnectionStatus = 'active' | 'reconnect_required' | 'revoked';
-export type SlackConsentStatus = 'pending' | 'granted' | 'revoked';
+export type { SlackConnectionStatus, SlackConsentStatus };
 
-export interface SlackConnectionPublicInfo {
-  id: string;
-  workspaceId: string;
-  workspaceName: string;
-  slackUserId: string;
-  slackUserLabel: string;
-  status: SlackConnectionStatus;
-  identityVersion: number;
-  scopes: string[];
-  connectedAt: string;
-  consentStatus: SlackConsentStatus;
-  processingReady: boolean;
+export interface SlackConnectionPublicInfo extends BaseSlackConnectionPublicInfo {
   missingScopes?: string[];
-  updatedAt?: string;
   actorId?: string;
 }
 
@@ -28,12 +23,7 @@ export interface SlackStartConnectionOptions {
   workspaceHint?: string;
 }
 
-export interface SlackCallbackResult {
-  connectionId: string;
-  workspaceId: string;
-  workspaceName: string;
-  slackUserId: string;
-  returnTo?: string;
+export interface SlackCallbackResult extends BaseSlackCallbackResult {
   actorId?: string;
 }
 
@@ -41,104 +31,107 @@ export function normalizeSlackConnection(raw: unknown): SlackConnectionPublicInf
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
   const r = raw as Record<string, unknown>;
 
-  const id = typeof r.id === 'string' && r.id.trim() ? r.id.trim() : null;
-  const workspaceId = typeof r.workspaceId === 'string' && r.workspaceId.trim() ? r.workspaceId.trim() : null;
-  const workspaceName = typeof r.workspaceName === 'string' && r.workspaceName.trim() ? r.workspaceName.trim() : null;
-  if (!id || !workspaceId || !workspaceName) return null;
+  // Check slackUserId (canonical) vs actorId (legacy alias)
+  let slackUserId: unknown;
+  if (Object.hasOwn(r, 'slackUserId')) {
+    slackUserId = r.slackUserId;
+  } else if (Object.hasOwn(r, 'actorId')) {
+    slackUserId = r.actorId;
+  }
 
-  // actorId can supply slackUserId and slackUserLabel if absent
-  const legacyActorId = typeof r.actorId === 'string' && r.actorId.trim() ? r.actorId.trim() : undefined;
-  const rawUserId = typeof r.slackUserId === 'string' && r.slackUserId.trim() ? r.slackUserId.trim() : legacyActorId;
-  if (!rawUserId) return null;
-  const slackUserId = rawUserId;
+  // Check slackUserLabel (canonical) vs actorId (legacy alias)
+  let slackUserLabel: unknown;
+  if (Object.hasOwn(r, 'slackUserLabel')) {
+    slackUserLabel = r.slackUserLabel;
+  } else if (Object.hasOwn(r, 'actorId')) {
+    slackUserLabel = r.actorId;
+  }
 
-  const rawUserLabel = typeof r.slackUserLabel === 'string' && r.slackUserLabel.trim() ? r.slackUserLabel.trim() : (legacyActorId ?? slackUserId);
-  const slackUserLabel = rawUserLabel;
+  // Absent consent defaults to 'pending'; absent readiness defaults to false
+  const consentStatus = Object.hasOwn(r, 'consentStatus') ? r.consentStatus : 'pending';
+  const processingReady = Object.hasOwn(r, 'processingReady') ? r.processingReady : false;
 
-  const rawStatus = typeof r.status === 'string' ? r.status : '';
-  const status: SlackConnectionStatus = (rawStatus === 'active' || rawStatus === 'reconnect_required' || rawStatus === 'revoked')
-    ? rawStatus
-    : 'reconnect_required';
+  const candidate: Record<string, unknown> = {
+    id: r.id,
+    workspaceId: r.workspaceId,
+    workspaceName: r.workspaceName,
+    slackUserId,
+    slackUserLabel,
+    status: r.status,
+    identityVersion: r.identityVersion,
+    scopes: r.scopes,
+    connectedAt: r.connectedAt,
+    consentStatus,
+    processingReady,
+  };
+  if (Object.hasOwn(r, 'updatedAt') && r.updatedAt !== undefined) {
+    candidate.updatedAt = r.updatedAt;
+  }
 
-  const identityVersion = typeof r.identityVersion === 'number' && Number.isSafeInteger(r.identityVersion) && r.identityVersion > 0
-    ? r.identityVersion
-    : 1;
-
-  const scopes: string[] = Array.isArray(r.scopes)
-    ? r.scopes.filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
-    : [];
-
+  // Whitelist legacy optional missingScopes with valid entries
   let missingScopes: string[] | undefined;
-  if (Array.isArray(r.missingScopes)) {
+  if (Object.hasOwn(r, 'missingScopes') && Array.isArray(r.missingScopes)) {
     missingScopes = r.missingScopes.filter((s): s is string => typeof s === 'string' && s.trim().length > 0);
   }
 
-  const connectedAt = typeof r.connectedAt === 'string' && r.connectedAt.trim()
-    ? r.connectedAt.trim()
-    : new Date().toISOString();
-
-  // Absent consent remains 'pending'
-  const consentStatus: SlackConsentStatus = (r.consentStatus === 'granted' || r.consentStatus === 'revoked')
-    ? r.consentStatus
-    : 'pending';
-
-  // processingReady requires server-owned boolean true AND active status AND granted consent.
-  // Never trust unknown properties or infer readiness from active+granted alone.
-  const processingReady = r.processingReady === true && status === 'active' && consentStatus === 'granted';
-
-  const normalized: SlackConnectionPublicInfo = {
-    id,
-    workspaceId,
-    workspaceName,
-    slackUserId,
-    slackUserLabel,
-    status,
-    identityVersion,
-    scopes,
-    connectedAt,
-    consentStatus,
-    processingReady,
-    actorId: legacyActorId ?? slackUserId,
-  };
-
-  if (missingScopes !== undefined) {
-    normalized.missingScopes = missingScopes;
+  try {
+    const validated = validateSlackConnectionPublicInfo(candidate);
+    const legacyActorId = typeof r.actorId === 'string' && r.actorId.trim().length > 0 ? r.actorId.trim() : undefined;
+    const result: SlackConnectionPublicInfo = {
+      ...validated,
+    };
+    if (missingScopes !== undefined) {
+      result.missingScopes = missingScopes;
+    }
+    if (legacyActorId !== undefined) {
+      result.actorId = legacyActorId;
+    }
+    return result;
+  } catch {
+    return null;
   }
-  if (typeof r.updatedAt === 'string' && r.updatedAt.trim()) {
-    normalized.updatedAt = r.updatedAt.trim();
-  }
-  return normalized;
 }
 
 export function normalizeSlackCallbackResult(raw: unknown): SlackCallbackResult | null {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
   const r = raw as Record<string, unknown>;
 
-  const workspaceId = typeof r.workspaceId === 'string' && r.workspaceId.trim() ? r.workspaceId.trim() : null;
-  const workspaceName = typeof r.workspaceName === 'string' && r.workspaceName.trim() ? r.workspaceName.trim() : null;
-  if (!workspaceId || !workspaceName) return null;
-
-  const connectionId = typeof r.connectionId === 'string' && r.connectionId.trim()
-    ? r.connectionId.trim()
-    : (typeof r.id === 'string' && r.id.trim() ? r.id.trim() : workspaceId);
-
-  const legacyActorId = typeof r.actorId === 'string' && r.actorId.trim() ? r.actorId.trim() : undefined;
-  const slackUserId = typeof r.slackUserId === 'string' && r.slackUserId.trim()
-    ? r.slackUserId.trim()
-    : (legacyActorId ?? 'unknown');
-
-  const result: SlackCallbackResult = {
-    connectionId,
-    workspaceId,
-    workspaceName,
-    slackUserId,
-    actorId: legacyActorId ?? slackUserId,
-  };
-
-  if (typeof r.returnTo === 'string' && r.returnTo.trim()) {
-    result.returnTo = r.returnTo.trim();
+  // Check connectionId (canonical) vs id (legacy alias)
+  let connectionId: unknown;
+  if (Object.hasOwn(r, 'connectionId')) {
+    connectionId = r.connectionId;
+  } else if (Object.hasOwn(r, 'id')) {
+    connectionId = r.id;
   }
-  return result;
+
+  // Check slackUserId (canonical) vs actorId (legacy alias)
+  let slackUserId: unknown;
+  if (Object.hasOwn(r, 'slackUserId')) {
+    slackUserId = r.slackUserId;
+  } else if (Object.hasOwn(r, 'actorId')) {
+    slackUserId = r.actorId;
+  }
+
+  const candidate: Record<string, unknown> = {
+    connectionId,
+    workspaceId: r.workspaceId,
+    workspaceName: r.workspaceName,
+    slackUserId,
+  };
+  if (Object.hasOwn(r, 'returnTo') && r.returnTo !== undefined) {
+    candidate.returnTo = r.returnTo;
+  }
+
+  try {
+    const validated = validateSlackCallbackResult(candidate);
+    const legacyActorId = typeof r.actorId === 'string' && r.actorId.trim().length > 0 ? r.actorId.trim() : undefined;
+    return {
+      ...validated,
+      actorId: legacyActorId ?? validated.slackUserId,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export const slackConnectionApi = {

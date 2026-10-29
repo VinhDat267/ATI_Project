@@ -1,10 +1,10 @@
 # 29/10/2026 · SLACK-02C — Giao diện Cài đặt Đa Workspace & Callback View (Frontend)
 
-**Tác giả:** Frontend Owner (Antigravity gemini-3.8-flash-high).  
-**Ủy quyền:** Điều phối viên trưởng chỉ định qua Orca task `task_9d8aaedeb7d0`, dispatch `ctx_d2905204c973`.  
-**Nhánh công việc:** `VinhDat267/slack-02c-personal-connection` (base: `integration/slack-personal-20261029` `b757ae08`).  
-**Task card:** [`docs/handoff/tasks/SLACK-02C-connection-ui.md`](../tasks/SLACK-02C-connection-ui.md).  
-**Phụ thuộc song song:** SLACK-02A (contracts tại `@ati/tool-schemas`), SLACK-02B (consent & readiness backend của `ctx_ef5aff92da54`, PR 191).  
+**Tác giả:** Frontend Owner (Antigravity gemini-3.8-flash-high).
+**Ủy quyền:** Điều phối viên trưởng chỉ định qua Orca task `task_9d8aaedeb7d0`, dispatch `ctx_d2905204c973`.
+**Nhánh công việc:** `VinhDat267/slack-02c-personal-connection` (base: `integration/slack-personal-20261029` `b757ae08`).
+**Task card:** [`docs/handoff/tasks/SLACK-02C-connection-ui.md`](../tasks/SLACK-02C-connection-ui.md).
+**Phụ thuộc song song:** SLACK-02A (contracts tại `@wap/tool-schemas`), SLACK-02B (consent & readiness backend của PR 192).
 
 ---
 
@@ -55,4 +55,4 @@ Hoàn thiện giao diện người dùng trên web (`apps/chat-web`) cho tính n
 ## 3. Ranh Giới Nghiệm Thu & Hạn Chế Hiện Tại
 
 - **Môi trường cục bộ:** Kịch bản browser E2E đã chạy và PASS trên fixture sandbox cục bộ và nền API legacy 184 với siêu dữ liệu pending.
-- **Nghiệm thu liên dịch vụ (Joint Acceptance):** Việc kiểm thử tích hợp đầy đủ luồng `returnTo` phía server và chính sách readiness canonical hoàn chỉnh với Backend 02B được ghi nhận là **PENDING** cho đến khi Backend 02B (`ctx_ef5aff92da54`, PR 191) được gộp vào nhánh tích hợp.
+- **Nghiệm thu liên dịch vụ (Joint Acceptance):** Việc kiểm thử tích hợp đầy đủ luồng `returnTo` phía server và chính sách readiness canonical hoàn chỉnh với Backend 02B được ghi nhận là **PENDING** cho đến khi Backend 02B (PR 192) được gộp vào nhánh tích hợp.

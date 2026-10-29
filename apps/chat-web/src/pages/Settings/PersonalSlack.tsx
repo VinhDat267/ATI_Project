@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   slackConnectionApi,
@@ -10,32 +10,30 @@ import { CockpitDialog } from '../../components/CockpitDialog';
 
 export function PersonalSlack() {
   const [rows, setRows] = useState<SlackConnectionPublicInfo[]>([]);
-  const [visible, setVisible] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState('');
   const [disconnectTarget, setDisconnectTarget] = useState<SlackConnectionPublicInfo | null>(null);
 
-  useEffect(() => {
-    let mounted = true;
+  const loadConnections = useCallback(async () => {
     const owns = slackSessionOwner();
-    slackConnectionApi
-      .list()
-      .then((data) => {
-        if (mounted && owns() && Array.isArray(data.connections)) {
-          setRows(data.connections);
-          setVisible(true);
-        }
-      })
-      .catch(() => {
-        /* Disabled route remains invisible */
-      });
-    return () => {
-      mounted = false;
-    };
+    setLoadError('');
+    try {
+      const data = await slackConnectionApi.list();
+      if (owns() && Array.isArray(data.connections)) {
+        setRows(data.connections);
+      }
+    } catch {
+      if (owns()) {
+        setLoadError('Không tải được danh sách kết nối Slack. Vui lòng thử lại.');
+      }
+    }
   }, []);
 
-  if (!visible) return null;
+  useEffect(() => {
+    void loadConnections();
+  }, [loadConnections]);
 
   const start = async (workspaceHint?: string) => {
     const owns = slackSessionOwner();
@@ -78,6 +76,8 @@ export function PersonalSlack() {
     }
   };
 
+  const allProcessingReady = rows.length > 0 && rows.every((r) => r.processingReady);
+
   return (
     <section
       id="myslack"
@@ -92,11 +92,26 @@ export function PersonalSlack() {
           Kết nối từng workspace bằng tài khoản Slack của bạn. Mỗi workspace được quản lý riêng.
         </p>
         <p className="text-sm text-[#6B7280] dark:text-[#9CA3AF]">
-          Chờ cho phép xử lý dữ liệu: ATI chưa đọc tin hoặc đưa nội dung Slack vào AI.
+          {allProcessingReady
+            ? 'Đã sẵn sàng xử lý dữ liệu: Các workspace đã kết nối thành công (tính năng công cụ Slack chưa kích hoạt live).'
+            : 'Chờ cho phép xử lý dữ liệu: ATI chưa đọc tin hoặc đưa nội dung Slack vào AI.'}
         </p>
       </div>
 
-      {rows.length === 0 ? (
+      {loadError ? (
+        <div className="v3-space-y-3">
+          <p role="alert" className="text-sm text-[#DC2626]">
+            {loadError}
+          </p>
+          <button
+            type="button"
+            onClick={() => void loadConnections()}
+            className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#FF5701] text-white hover:bg-[#E04C00] transition-colors"
+          >
+            Thử lại
+          </button>
+        </div>
+      ) : rows.length === 0 ? (
         <p className="text-sm text-[#6B7280] dark:text-[#9CA3AF]">Chưa kết nối workspace nào.</p>
       ) : (
         <ul className="v3-space-y-3">

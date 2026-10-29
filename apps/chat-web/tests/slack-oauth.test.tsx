@@ -1,11 +1,12 @@
 import { StrictMode } from 'react';
 import { createServer, type Server } from 'node:http';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { SlackCallbackView } from '../src/views/SlackCallbackView';
 import { PersonalSlack } from '../src/pages/Settings/PersonalSlack';
 import { useRoute } from '../src/hooks/use-route';
 import { authStorage } from '../src/services/auth-storage';
+import { normalizeSlackConnection, normalizeSlackCallbackResult } from '../src/services/slack-connection';
 
 const nativeFetch = fetch, navigate = vi.fn();
 let server: Server;
@@ -48,7 +49,7 @@ beforeEach(async () => {
       }
       callbacks.push({ body: body ? JSON.parse(body) : {}, location: window.location.href });
       res.statusCode = fail ? 401 : 200;
-      res.end(JSON.stringify(fail ? {} : (callbackResponse ?? { workspaceName: 'Workspace', workspaceId: 'T_1' })));
+      res.end(JSON.stringify(fail ? {} : (callbackResponse ?? { id: 'conn_1', workspaceName: 'Workspace', workspaceId: 'T_1', actorId: 'U_1', identityVersion: 1, connectedAt: '2026-10-29T10:00:00.000Z', scopes: [] })));
     } else if (req.method === 'DELETE') {
       if (delayDisconnectMs > 0) {
         await new Promise((r) => setTimeout(r, delayDisconnectMs));
@@ -57,8 +58,8 @@ beforeEach(async () => {
       res.end(JSON.stringify({ success: true, revoked: false }));
     } else {
       const defaultList = [
-        { id: 'one', workspaceName: 'Workspace One', workspaceId: 'T_1', actorId: 'U_1', status: 'active', missingScopes: [] },
-        { id: 'two', workspaceName: 'Workspace Two', workspaceId: 'T_2', actorId: 'U_2', status: 'reconnect_required', missingScopes: ['search:read'] },
+        { id: 'one', workspaceName: 'Workspace One', workspaceId: 'T_1', actorId: 'U_1', identityVersion: 1, connectedAt: '2026-10-29T10:00:00.000Z', scopes: ['channels:read'], status: 'active', missingScopes: [] },
+        { id: 'two', workspaceName: 'Workspace Two', workspaceId: 'T_2', actorId: 'U_2', identityVersion: 1, connectedAt: '2026-10-29T10:00:00.000Z', scopes: ['channels:read'], status: 'reconnect_required', missingScopes: ['search:read'] },
       ];
       const rows = (customConnections ?? defaultList).filter(r => !removed.some(path => path.endsWith('/' + r.id)));
       res.end(JSON.stringify({ connections: rows }));
@@ -136,15 +137,56 @@ it('terminates callback pending state and ignores response if session owner chan
   expect(screen.getByText(/Đang hoàn tất/)).toBeInTheDocument();
 
   // Switch session owner mid-flight
-  authStorage.setStoredTokens({
-    accessToken: 'TOKEN_2',
-    refreshToken: 'REFRESH_2',
-    user: { id: 'user_2', email: 'user2@example.test', name: 'User Two' },
+  await act(async () => {
+    authStorage.setStoredTokens({
+      accessToken: 'TOKEN_2',
+      refreshToken: 'REFRESH_2',
+      user: { id: 'user_2', email: 'user2@example.test', name: 'User Two' },
+    });
   });
 
-  await new Promise((r) => setTimeout(r, 120));
+  await waitFor(() => expect(screen.queryByText(/Đang hoàn tất/)).not.toBeInTheDocument());
+  expect(screen.getByRole('alert')).toBeInTheDocument();
   expect(screen.queryByRole('heading', { name: 'Đã kết nối Slack' })).not.toBeInTheDocument();
+  await waitFor(() => expect(callbacks).toHaveLength(1));
   expect(navigate).not.toHaveBeenCalled();
+});
+
+it('owner switch ends pending callback without another exchange or navigation', async () => {
+  authStorage.setStoredTokens({ accessToken: 'A', refreshToken: 'RA', user: { id: 'A', email: 'a@example.test', name: 'A' } });
+  const fetchSpy = vi.fn(() => new Promise<Response>(() => {}));
+  vi.stubGlobal('fetch', fetchSpy);
+  const nav = vi.fn();
+  render(<SlackCallbackView input={{ code: 'CODE', state: 'STATE' }} navigate={nav} />);
+  expect(screen.getByText(/Đang hoàn tất/)).toBeInTheDocument();
+  await act(async () => {
+    authStorage.setStoredTokens({ accessToken: 'B', refreshToken: 'RB', user: { id: 'B', email: 'b@example.test', name: 'B' } });
+  });
+  await waitFor(() => expect(screen.queryByText(/Đang hoàn tất/)).not.toBeInTheDocument());
+  expect(screen.getByRole('alert')).toBeInTheDocument();
+  expect(fetchSpy).toHaveBeenCalledTimes(1);
+  expect(nav).not.toHaveBeenCalled();
+});
+
+it('does not fabricate successful callback identity from workspace name alone', () => {
+  expect(normalizeSlackCallbackResult({ workspaceId: 'T1', workspaceName: 'Workspace' })).toBeNull();
+});
+
+it('rejects invalid canonical generation and timestamp instead of inventing metadata', () => {
+  const raw = {
+    id: 'conn',
+    workspaceId: 'T1',
+    workspaceName: 'Workspace',
+    slackUserId: 'U1',
+    slackUserLabel: 'U1',
+    status: 'active',
+    identityVersion: 0,
+    scopes: [],
+    connectedAt: 'invalid',
+    consentStatus: 'granted',
+    processingReady: true,
+  };
+  expect(normalizeSlackConnection(raw)).toBeNull();
 });
 
 it('normalizes legacy metadata safely and renders canonical 02A fields', async () => {
@@ -167,6 +209,8 @@ it('normalizes legacy metadata safely and renders canonical 02A fields', async (
       workspaceId: 'T_LEGACY',
       workspaceName: 'Acme Legacy',
       actorId: 'U_LEGACY',
+      identityVersion: 1,
+      connectedAt: '2026-10-29T10:00:00.000Z',
       status: 'active',
       scopes: ['channels:read'],
       missingScopes: ['chat:write'],
@@ -311,7 +355,86 @@ it('provides reconnect action for reconnect_required status and connects another
   const reconnectBtn = screen.getByRole('button', { name: 'Kết nối lại Workspace Two' });
   expect(reconnectBtn).toBeInTheDocument();
 
+  // Clicking reconnect triggers start with workspaceHint
+  fireEvent.click(reconnectBtn);
+  await waitFor(() => {
+    expect(startCalls.some((c) => c.body?.workspaceHint === 'T_2')).toBe(true);
+  });
+
   // "Kết nối workspace Slack" button exists
   const connectAnotherBtn = screen.getByRole('button', { name: 'Kết nối workspace Slack' });
   expect(connectAnotherBtn).toBeInTheDocument();
+});
+
+it('represents actual metadata in headline without claiming tools are live now when all rows processingReady are true', async () => {
+  customConnections = [
+    {
+      id: 'conn_ready',
+      workspaceId: 'T_READY',
+      workspaceName: 'Ready Workspace',
+      slackUserId: 'U_READY',
+      slackUserLabel: 'Ready User',
+      status: 'active',
+      identityVersion: 1,
+      scopes: ['channels:read'],
+      connectedAt: '2026-10-29T10:00:00.000Z',
+      consentStatus: 'granted',
+      processingReady: true,
+    },
+  ];
+  render(<PersonalSlack />);
+  await screen.findByText('Ready Workspace');
+  expect(screen.getByText('Đã sẵn sàng xử lý')).toBeInTheDocument();
+  // Unconditional pending claim should NOT be shown
+  expect(screen.queryByText(/Chờ cho phép xử lý dữ liệu: ATI chưa đọc tin/)).not.toBeInTheDocument();
+  expect(screen.getByText(/Đã sẵn sàng xử lý dữ liệu/)).toBeInTheDocument();
+});
+
+it('displays load error with retry button instead of silently hiding when GET fails', async () => {
+  let failGet = true;
+  const errorServer = createServer(async (_req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    if (failGet) {
+      res.statusCode = 503;
+      res.end(JSON.stringify({ error: 'Service Unavailable' }));
+    } else {
+      res.statusCode = 200;
+      res.end(
+        JSON.stringify({
+          connections: [
+            {
+              id: 'c_retry',
+              workspaceId: 'T_RETRY',
+              workspaceName: 'Retry Workspace',
+              slackUserId: 'U1',
+              slackUserLabel: 'U1',
+              status: 'active',
+              identityVersion: 1,
+              scopes: [],
+              connectedAt: '2026-10-29T10:00:00.000Z',
+              consentStatus: 'pending',
+              processingReady: false,
+            },
+          ],
+        })
+      );
+    }
+  });
+  await new Promise<void>((r) => errorServer.listen(0, '127.0.0.1', r));
+  const errOrigin = `http://127.0.0.1:${(errorServer.address() as any).port}`;
+  vi.stubGlobal('fetch', (url: string, init?: RequestInit) => nativeFetch(new URL(url, errOrigin), init));
+
+  render(<PersonalSlack />);
+  const alertEl = await screen.findByRole('alert');
+  expect(alertEl).toHaveTextContent(/Không tải được danh sách kết nối Slack/);
+  const retryBtn = screen.getByRole('button', { name: /Thử lại/ });
+  expect(retryBtn).toBeInTheDocument();
+
+  failGet = false;
+  fireEvent.click(retryBtn);
+  await screen.findByText('Retry Workspace');
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+  errorServer.closeAllConnections();
+  await new Promise<void>((r) => errorServer.close(() => r()));
 });
