@@ -1,0 +1,5214 @@
+{
+  "version": "1.0.0",
+  "snapshotSha": "811f5dc9 (PR 185)",
+  "totalMethods": 354,
+  "excludedCount": 101,
+  "probeRequiredCount": 253,
+  "byPhase": {
+    "03E": 161,
+    "Excluded": 101,
+    "03D": 41,
+    "03C": 51
+  },
+  "methods": [
+    {
+      "method": "admin.analytics.getFile",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.analytics:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.analytics.messages.activity",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.analytics:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.analytics.messages.metadata",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.analytics:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.apps.activities.list",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.app_activities:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.apps.approve",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.apps:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.apps.approved.list",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.apps:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.apps.clearResolution",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.apps:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.apps.config.lookup",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.apps:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.apps.config.set",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.apps:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.apps.mcp.servers.list",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.apps:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.apps.mcp.servers.permissions.list",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.apps:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.apps.mcp.servers.permissions.set",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.apps:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.apps.permissions.add",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.apps:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.apps.permissions.list",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.apps:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.apps.permissions.remove",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.apps:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.apps.permissions.set",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.apps:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.apps.requests.cancel",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.apps:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.apps.requests.list",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.apps:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.apps.restrict",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.apps:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.apps.restricted.list",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.apps:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.apps.uninstall",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.apps:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.audit.anomaly.allow.getItem",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.audit.anomaly.allow.updateItem",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.auth.policy.assignEntities",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.users:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.auth.policy.getEntities",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.users:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.auth.policy.removeEntities",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.users:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.barriers.create",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.barriers:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.barriers.delete",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.barriers:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.barriers.list",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.barriers:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.barriers.update",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.barriers:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.archive",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.bulkArchive",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.bulkDelete",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.bulkMove",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.bulkSetExcludeFromSlackAi",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.bulkSetProperties",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.convertToPrivate",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.convertToPublic",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.create",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.createForObjects",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:manage_objects"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.delete",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.disconnectShared",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.ekm.listOriginalConnectedChannelInfo",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.getConversationPrefs",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.getCustomRetention",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.getTeams",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.invite",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.linkObjects",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:manage_objects"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.lookup",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.removeCustomRetention",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.rename",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.restrictAccess.addGroup",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.restrictAccess.listGroups",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.restrictAccess.removeGroup",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.search",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.setConversationPrefs",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.setCustomRetention",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.setTeams",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.unarchive",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.conversations.unlinkObjects",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.conversations:manage_objects"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.emoji.add",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.teams:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.emoji.addAlias",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.teams:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.emoji.list",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.teams:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.emoji.remove",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.teams:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.emoji.rename",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.teams:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.functions.list",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.workflows:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.functions.permissions.lookup",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.workflows:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.functions.permissions.set",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.workflows:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.inviteRequests.approve",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.invites:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.inviteRequests.approved.list",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.invites:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.inviteRequests.denied.list",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.invites:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.inviteRequests.deny",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.invites:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.inviteRequests.list",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.invites:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.roles.addAssignments",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.roles:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.roles.listAssignments",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.roles:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.roles.removeAssignments",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.roles:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.slackbot.skills.list",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.skills:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.slackbot.skills.publish",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.skills:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.slackbot.skills.setAutoEnabled",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.skills:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.slackbot.skills.unpublish",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.skills:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.teams.admins.list",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.teams:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.teams.create",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.teams:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.teams.list",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.teams:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.teams.owners.list",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.teams:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.teams.settings.info",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.teams:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.teams.settings.setDefaultChannels",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.teams:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.teams.settings.setDescription",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.teams:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.teams.settings.setDiscoverability",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.teams:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.teams.settings.setIcon",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.teams:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.teams.settings.setName",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.teams:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.usergroups.addChannels",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.usergroups:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.usergroups.addTeams",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.teams:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.usergroups.addUsers",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.usergroups:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.usergroups.create",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.usergroups:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.usergroups.fetch",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.usergroups:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.usergroups.listChannels",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.usergroups:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.usergroups.removeChannels",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.usergroups:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.usergroups.removeTeams",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.teams:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.usergroups.removeUsers",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.usergroups:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.usergroups.update",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.usergroups:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.usergroups.uploadUsers",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.usergroups:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.users.access.pause",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.users:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.users.access.resume",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.users:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.users.assign",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.users:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.users.deactivate",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.users:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.users.getExpiration",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.users:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.users.invite",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.users:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.users.list",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.users:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.users.remove",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.users:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.users.session.clearSettings",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.users:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.users.session.getSettings",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.users:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.users.session.invalidate",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.users:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.users.session.list",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.users:read"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.users.session.reset",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.users:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.users.session.resetBulk",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.users:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.users.session.setSettings",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.users:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.users.setAdmin",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.users:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.users.setExpiration",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.users:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.users.setOwner",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.users:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.users.setRegular",
+      "family": "admin",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.users:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.users.unsupportedVersions.export",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.users:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.workflows.collaborators.add",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.workflows:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.workflows.collaborators.remove",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.workflows:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.workflows.permissions.lookup",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.workflows:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.workflows.search",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.workflows:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.workflows.triggers.types.permissions.lookup",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "client"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.workflows.triggers.types.permissions.set",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "client"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "admin.workflows.unpublish",
+      "family": "admin",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin.workflows:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "agents.conversations.archive",
+      "family": "agents",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "agents.conversations.create",
+      "family": "agents",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "agents.conversations.getCanvas",
+      "family": "agents",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "agents.conversations.listViews",
+      "family": "agents",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "agents.conversations.removeView",
+      "family": "agents",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "agents.conversations.setCanvasContent",
+      "family": "agents",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "agents.conversations.setCommands",
+      "family": "agents",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "agents.conversations.setProperties",
+      "family": "agents",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "agents.conversations.setView",
+      "family": "agents",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "agents.sessions.rename",
+      "family": "agents",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "agents.sessions.setStatus",
+      "family": "agents",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "api.test",
+      "family": "api",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "apps.activities.list",
+      "family": "apps",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "hosting:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "apps.auth.external.delete",
+      "family": "apps",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "apps.auth.external.get",
+      "family": "apps",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "apps.connections.open",
+      "family": "apps",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "apps.datastore.bulkDelete",
+      "family": "apps",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "apps.datastore.bulkGet",
+      "family": "apps",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "apps.datastore.bulkPut",
+      "family": "apps",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "apps.datastore.count",
+      "family": "apps",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "apps.datastore.delete",
+      "family": "apps",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "apps.datastore.get",
+      "family": "apps",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "apps.datastore.put",
+      "family": "apps",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "apps.datastore.query",
+      "family": "apps",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "apps.datastore.update",
+      "family": "apps",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "apps.event.authorizations.list",
+      "family": "apps",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "apps.icon.set",
+      "family": "apps",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "app_configurations:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "apps.managed.permissions.set",
+      "family": "apps",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "apps.manifest.create",
+      "family": "apps",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "apps.manifest.delete",
+      "family": "apps",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "apps.manifest.export",
+      "family": "apps",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "apps.manifest.update",
+      "family": "apps",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "apps.manifest.validate",
+      "family": "apps",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "apps.uninstall",
+      "family": "apps",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "apps.user.connection.update",
+      "family": "apps",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "users:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "assistant.search.context",
+      "family": "assistant",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "search:read.public",
+        "search:read.private",
+        "search:read.im",
+        "search:read.mpim",
+        "search:read.files",
+        "search:read.users"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "assistant.search.info",
+      "family": "assistant",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "search:read.public"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "assistant.threads.setStatus",
+      "family": "assistant",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "assistant.threads.setSuggestedPrompts",
+      "family": "assistant",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "assistant.threads.setTitle",
+      "family": "assistant",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "auth.revoke",
+      "family": "auth",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "auth.teams.list",
+      "family": "auth",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "auth.test",
+      "family": "auth",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "blocks.validate",
+      "family": "blocks",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "bookmarks.add",
+      "family": "bookmarks",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "bookmarks:write"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "bookmarks.edit",
+      "family": "bookmarks",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "bookmarks:write"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "bookmarks.list",
+      "family": "bookmarks",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "bookmarks:read"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "bookmarks.remove",
+      "family": "bookmarks",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "bookmarks:write"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "bots.info",
+      "family": "bots",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "users:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "calls.add",
+      "family": "calls",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "calls:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "calls.end",
+      "family": "calls",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "calls:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "calls.info",
+      "family": "calls",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "calls:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "calls.participants.add",
+      "family": "calls",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "calls:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "calls.participants.remove",
+      "family": "calls",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "calls:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "calls.update",
+      "family": "calls",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "calls:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "canvases.access.delete",
+      "family": "canvases",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "canvases:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "canvases.access.set",
+      "family": "canvases",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "canvases:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "canvases.create",
+      "family": "canvases",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "canvases:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "canvases.delete",
+      "family": "canvases",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "canvases:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "canvases.edit",
+      "family": "canvases",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "canvases:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "canvases.getContent",
+      "family": "canvases",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "canvases:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "canvases.sections.lookup",
+      "family": "canvases",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "canvases:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "chat.appendStream",
+      "family": "chat",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "chat.delete",
+      "family": "chat",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "chat:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "chat.deleteScheduledMessage",
+      "family": "chat",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "chat:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "chat.getPermalink",
+      "family": "chat",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "chat.meMessage",
+      "family": "chat",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "chat:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "chat.postEphemeral",
+      "family": "chat",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "chat:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "chat.postMessage",
+      "family": "chat",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "chat:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "chat.scheduleMessage",
+      "family": "chat",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "chat:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "chat.scheduledMessages.list",
+      "family": "chat",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "chat.startStream",
+      "family": "chat",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "chat.stopStream",
+      "family": "chat",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "chat.unfurl",
+      "family": "chat",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "links:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "chat.update",
+      "family": "chat",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "chat:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.acceptSharedInvite",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.approveSharedInvite",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.archive",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "groups:write",
+        "im:write",
+        "mpim:write",
+        "channels:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.canvases.create",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "canvases:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.close",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "groups:write",
+        "im:write",
+        "mpim:write",
+        "channels:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.create",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "groups:write",
+        "im:write",
+        "mpim:write",
+        "channels:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.declineSharedInvite",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.externalInvitePermissions.set",
+      "family": "conversations",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.history",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "groups:history",
+        "im:history",
+        "mpim:history",
+        "channels:history"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.info",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "groups:read",
+        "im:read",
+        "mpim:read",
+        "channels:read"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.invite",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "channels:write.invites",
+        "groups:write.invites",
+        "channels:write",
+        "groups:write",
+        "im:write",
+        "mpim:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.inviteShared",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.join",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "channels:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.kick",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "groups:write",
+        "channels:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.leave",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "groups:write",
+        "im:write",
+        "mpim:write",
+        "channels:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.list",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "groups:read",
+        "im:read",
+        "mpim:read",
+        "channels:read"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.listConnectInvites",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.mark",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "groups:write",
+        "im:write",
+        "mpim:write",
+        "channels:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.members",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "groups:read",
+        "im:read",
+        "mpim:read",
+        "channels:read"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.open",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "channels:write",
+        "groups:write",
+        "im:write",
+        "mpim:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.rename",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "groups:write",
+        "im:write",
+        "mpim:write",
+        "channels:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.replies",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "groups:history",
+        "im:history",
+        "mpim:history",
+        "channels:history"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.requestSharedInvite.approve",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.requestSharedInvite.deny",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.requestSharedInvite.list",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.setPurpose",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "channels:write.topic",
+        "groups:write.topic",
+        "mpim:write.topic",
+        "im:write.topic",
+        "channels:write",
+        "groups:write",
+        "im:write",
+        "mpim:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.setTopic",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "channels:write.topic",
+        "groups:write.topic",
+        "mpim:write.topic",
+        "im:write.topic",
+        "channels:write",
+        "groups:write",
+        "im:write",
+        "mpim:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "conversations.unarchive",
+      "family": "conversations",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "groups:write",
+        "im:write",
+        "mpim:write",
+        "channels:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "dialog.open",
+      "family": "dialog",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "dnd.endDnd",
+      "family": "dnd",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "dnd:write"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "dnd.endSnooze",
+      "family": "dnd",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "dnd:write"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "dnd.info",
+      "family": "dnd",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "dnd:read"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "dnd.setSnooze",
+      "family": "dnd",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "dnd:write"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "dnd.teamInfo",
+      "family": "dnd",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "dnd:read"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "emoji.list",
+      "family": "emoji",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "emoji:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "entity.acknowledgeCommentAction",
+      "family": "entity",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "entity.presentComments",
+      "family": "entity",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "entity.presentDetails",
+      "family": "entity",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "files.comments.delete",
+      "family": "files",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "files:write"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "files.completeUploadExternal",
+      "family": "files",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "files:write"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "files.delete",
+      "family": "files",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "files:write"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "files.getUploadURLExternal",
+      "family": "files",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "files:write"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "files.info",
+      "family": "files",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "files:read"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "files.list",
+      "family": "files",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "files:read"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "files.remote.add",
+      "family": "files",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "files.remote.info",
+      "family": "files",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "remote_files:read"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "files.remote.list",
+      "family": "files",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "remote_files:read"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "files.remote.remove",
+      "family": "files",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "files.remote.share",
+      "family": "files",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "remote_files:share"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "files.remote.update",
+      "family": "files",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "files.revokePublicURL",
+      "family": "files",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "files:write"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "files.sharedPublicURL",
+      "family": "files",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "files:write"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "files.upload",
+      "family": "files",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "files:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "functions.completeError",
+      "family": "functions",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "functions.completeSuccess",
+      "family": "functions",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "functions.distributions.permissions.add",
+      "family": "functions",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "functions.distributions.permissions.list",
+      "family": "functions",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "functions.distributions.permissions.remove",
+      "family": "functions",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "functions.distributions.permissions.set",
+      "family": "functions",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "functions.workflows.steps.list",
+      "family": "functions",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "functions.workflows.steps.responses.export",
+      "family": "functions",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "migration.exchange",
+      "family": "migration",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "tokens.basic"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "oauth.access",
+      "family": "oauth",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "oauth.v2.access",
+      "family": "oauth",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "oauth.v2.beginShortTokenRotation",
+      "family": "oauth",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "oauth.v2.completeShortTokenRotation",
+      "family": "oauth",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "oauth.v2.exchange",
+      "family": "oauth",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "oauth.v2.user.access",
+      "family": "oauth",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "openid.connect.token",
+      "family": "openid",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "openid.connect.userInfo",
+      "family": "openid",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "openid"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "pins.add",
+      "family": "pins",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "pins:write"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "pins.list",
+      "family": "pins",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "pins:read"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "pins.remove",
+      "family": "pins",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "pins:write"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "reactions.add",
+      "family": "reactions",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "reactions:write"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "reactions.get",
+      "family": "reactions",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "reactions:read"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "reactions.list",
+      "family": "reactions",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "reactions:read"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "reactions.remove",
+      "family": "reactions",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "reactions:write"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "reminders.add",
+      "family": "reminders",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "reminders:write"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "reminders.complete",
+      "family": "reminders",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "reminders:write"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "reminders.delete",
+      "family": "reminders",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "reminders:write"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "reminders.info",
+      "family": "reminders",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "reminders:read"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "reminders.list",
+      "family": "reminders",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "reminders:read"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "rtm.connect",
+      "family": "rtm",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "rtm.start",
+      "family": "rtm",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "search.all",
+      "family": "search",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "search:read"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "search.files",
+      "family": "search",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "search:read"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "search.messages",
+      "family": "search",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "search:read"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "slackLists.access.delete",
+      "family": "slackLists",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "lists:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "slackLists.access.set",
+      "family": "slackLists",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "lists:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "slackLists.create",
+      "family": "slackLists",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "lists:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "slackLists.download.get",
+      "family": "slackLists",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "lists:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "slackLists.download.start",
+      "family": "slackLists",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "lists:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "slackLists.items.create",
+      "family": "slackLists",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "lists:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "slackLists.items.delete",
+      "family": "slackLists",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "lists:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "slackLists.items.deleteMultiple",
+      "family": "slackLists",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "lists:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "slackLists.items.info",
+      "family": "slackLists",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "lists:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "slackLists.items.list",
+      "family": "slackLists",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "lists:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "slackLists.items.update",
+      "family": "slackLists",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "lists:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "slackLists.update",
+      "family": "slackLists",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "lists:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "slackbot.skills.create",
+      "family": "slackbot",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "skills:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "slackbot.skills.delete",
+      "family": "slackbot",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "skills:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "slackbot.skills.info",
+      "family": "slackbot",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "skills:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "slackbot.skills.library.add",
+      "family": "slackbot",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "skills:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "slackbot.skills.library.remove",
+      "family": "slackbot",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "skills:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "slackbot.skills.list",
+      "family": "slackbot",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "skills:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "slackbot.skills.update",
+      "family": "slackbot",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "skills:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "stars.add",
+      "family": "stars",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "stars:write"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "stars.list",
+      "family": "stars",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "stars:read"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "stars.remove",
+      "family": "stars",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "stars:write"
+      ],
+      "category": "content_and_interaction",
+      "proposedDeliveryPhase": "03D",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "team.accessLogs",
+      "family": "team",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "team.billableInfo",
+      "family": "team",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "team.billing.info",
+      "family": "team",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "team.billing:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "team.externalTeams.disconnect",
+      "family": "team",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "team.externalTeams.list",
+      "family": "team",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "team.info",
+      "family": "team",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "team:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "team.integrationLogs",
+      "family": "team",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "admin"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "team.preferences.list",
+      "family": "team",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "team.preferences:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "team.profile.get",
+      "family": "team",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "users.profile:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "tooling.tokens.rotate",
+      "family": "tooling",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "usergroups.create",
+      "family": "usergroups",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "usergroups:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "usergroups.disable",
+      "family": "usergroups",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "usergroups:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "usergroups.enable",
+      "family": "usergroups",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "usergroups:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "usergroups.list",
+      "family": "usergroups",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "usergroups:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "usergroups.update",
+      "family": "usergroups",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "usergroups:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "usergroups.users.list",
+      "family": "usergroups",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "usergroups:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "usergroups.users.update",
+      "family": "usergroups",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "usergroups:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "users.conversations",
+      "family": "users",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "groups:read",
+        "im:read",
+        "mpim:read",
+        "channels:read"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "users.deletePhoto",
+      "family": "users",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "users.profile:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "high",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "users.discoverableContacts.lookup",
+      "family": "users",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "users.getPresence",
+      "family": "users",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "users:read"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "users.identity",
+      "family": "users",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "identity:read"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "users.info",
+      "family": "users",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "users:read"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "users.list",
+      "family": "users",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "users:read"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "users.lookupByEmail",
+      "family": "users",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "users:read.email"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "users.profile.get",
+      "family": "users",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "users.profile:read"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "users.profile.set",
+      "family": "users",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "users.profile:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "users.setActive",
+      "family": "users",
+      "disposition": "excluded",
+      "exclusionReason": null,
+      "userScopes": [
+        "users:write"
+      ],
+      "category": "excluded",
+      "proposedDeliveryPhase": "Excluded",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Architecture / Reviewer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "users.setPhoto",
+      "family": "users",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "users.profile:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "users.setPresence",
+      "family": "users",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "users:write"
+      ],
+      "category": "core",
+      "proposedDeliveryPhase": "03C",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "views.open",
+      "family": "views",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "views.publish",
+      "family": "views",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "views.push",
+      "family": "views",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "views.update",
+      "family": "views",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "workflows.featured.add",
+      "family": "workflows",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "bookmarks:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "workflows.featured.list",
+      "family": "workflows",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "bookmarks:read"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "workflows.featured.remove",
+      "family": "workflows",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "bookmarks:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "workflows.featured.set",
+      "family": "workflows",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [
+        "bookmarks:write"
+      ],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "workflows.triggers.permissions.add",
+      "family": "workflows",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "workflows.triggers.permissions.list",
+      "family": "workflows",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "low",
+      "proposedSideEffect": "read",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "workflows.triggers.permissions.remove",
+      "family": "workflows",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    },
+    {
+      "method": "workflows.triggers.permissions.set",
+      "family": "workflows",
+      "disposition": "probe_required",
+      "exclusionReason": null,
+      "userScopes": [],
+      "category": "collaboration_and_governance",
+      "proposedDeliveryPhase": "03E",
+      "proposedRiskLevel": "medium",
+      "proposedSideEffect": "write",
+      "proposedOwner": "Integration / Adapter Engineer",
+      "deliveryStatus": "not_implemented"
+    }
+  ]
+}
