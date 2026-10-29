@@ -1,85 +1,97 @@
-# 29/10/2026 · SLACK-03B1 — Lập Kế Hoạch Kho Nguồn, PostgreSQL ACL & Hàng Đợi Vô Hiệu Hóa Bền Vững
+# 29/10/2026 · SLACK-03B1 — Khắc Phục Đánh Giá Độc Lập PR 196 (Kế Hoạch Kho Nguồn & Vô Hiệu Hóa)
 
 **Tác giả:** Backend Planning Owner (Antigravity gemini-3.8-flash-high).
-**Ủy quyền:** Điều phối viên trưởng chỉ định qua Orca task `task_a6ff9ffdd23c`, dispatch `ctx_334c44d822cb`.
-**Nhánh công việc:** `docs/slack-03b1-source-plan` (base: `integration/slack-personal-20261029` commit `ce9380e9`).
-**Tài liệu sở hữu & tạo mới:**
+**Ủy quyền:** Điều phối viên trưởng chỉ định qua Orca task `task_bb864fcaee47`, dispatch `ctx_528be0135df6`.
+**Nhánh công việc:** `docs/slack-03b1-source-plan` (PR #196, base: `integration/slack-personal-20261029` commit `ce9380e9`).
+**Tài liệu cập nhật:**
 1. Task card: [`docs/handoff/tasks/SLACK-03B1-source-store-and-invalidation.md`](../tasks/SLACK-03B1-source-store-and-invalidation.md)
 2. Implementation plan: [`docs/superpowers/plans/2026-10-29-slack-03b1-source-store-and-invalidation.md`](../../superpowers/plans/2026-10-29-slack-03b1-source-store-and-invalidation.md)
 3. Handoff log: [`docs/handoff/log/2026-10-29-slack-03b1-source-plan.md`](2026-10-29-slack-03b1-source-plan.md)
-**Phụ thuộc & Tình trạng Song song:**
-- **SLACK-01 / SLACK-02A / SLACK-02R:** Đã hoàn tất và tích hợp vào base.
-- **SLACK-02C (Frontend UI, PR #193):** Đã hoàn tất, tích hợp tại commit `ce9380e9`, CI #40896650904 SUCCESS.
-- **SLACK-02B (Backend Consent, PR #192, commit `4e038967`):** Đã hoàn tất 17 contract cases, root fullcheck 3.167 tại `5fb027ef` đã pass, dọn dẹp khoảng trắng tại `4e038967` đang chờ kết quả CI cuối.
-- **SLACK-03A (Schema Contracts, PR #194, commit `6e02ca56`):** Nhận kết luận review độc lập "NEEDS WORK" (10 RED cases về bounds retention, raw 7 ngày, lineage epoch mismatches và argument detachment; đang được Schema Owner sửa đổi dưới context `ctx_3c64f98e0373`). Kế hoạch SLACK-03B1 bám sát các yêu cầu chuẩn tắc đã thống nhất (agreed requirements), KHÔNG giả định rằng bản `6e02ca56` được chấp thuận nguyên trạng mà không sửa đổi.
+**Phụ thuộc & Tình trạng Staging:**
+- **Staging Base:** Commit tích hợp `630eade5` chứa `192` (`4e038967`) và `193` (`8ed24c1b`); joint `npm run check` đã pass.
+- **SLACK-03A (Schema Contracts, PR #194):** Schema Owner đang khắc phục review findings dưới `ctx_3c64f98e0373`.
+- **SLACK-04A (Ingress Plan, PR #195):** Đang được hiệu chỉnh kế hoạch dưới `ctx_2f967703f46f`.
 - **Ranh giới Thực thi:** Phiên này thuần túy tài liệu kế hoạch (DOCS-ONLY); tuyệt đối không viết mã runtime mới hay gọi API Slack native / mô hình AI.
 
 ---
 
-## 1. Tóm tắt Nội dung Kế hoạch SLACK-03B1
+## 1. Tóm tắt Khắc phục 7 Điểm Đánh giá Độc lập (Review Remediation)
 
-Backend Planning Owner đã phân rã toàn diện giai đoạn 03B thành các ranh giới độc lập và xác lập kế hoạch chi tiết cho sub-task **SLACK-03B1**:
+Sau khi nhận kết luận "NEEDS WORK before runtime" từ reviewer độc lập đối với PR #196 tại commit `e961dd4a`, Backend Planning Owner đã rà soát toàn diện và chỉnh sửa nhất quán cả task card và implementation plan theo 7 điểm kỹ thuật cụ thể:
 
-### 1.1. Ranh giới Bounded Scope & Phân tầng Vòng đời (03B1 vs 03B2/03B3):
-- **Phạm vi của 03B1:**
-  - Bảng lưu trữ nguồn `slack_sources` có kiểm soát truy cập (ACL) đa cột, khóa phức hợp theo chủ sở hữu (`owner_source_key`), và các ràng buộc toàn vẹn PostgreSQL.
-  - Cổng ghi nguyên tử (Atomic Write Gate) kết hợp kiểm tra đồng thời trạng thái active của kết nối, sự chấp thuận (consent) của tổ chức, trạng thái xác thực của provider, và khớp số thứ tự sửa đổi (revision matching) trong cùng một câu lệnh SQL/transaction để loại bỏ hoàn toàn race condition.
-  - Cơ chế đọc có điều kiện (Conditional Read Guard) chỉ trả về siêu dữ liệu an toàn (`safeMetadataOnly`) khi nguồn bị tombstone hoặc hết hạn, ngăn chặn tuyệt đối rò rỉ nội dung thô (`untrusted_content`).
-  - Trần thời gian lưu trữ do máy chủ áp đặt (Server-Enforced TTL): tối đa 7 ngày cho nội dung thô (raw bodies), tối đa 30 ngày cho trích đoạn (excerpts); từ chối lưu trữ bền vững khi chính sách quy định `retentionDays === 0`.
-  - Hàng đợi ý định vô hiệu hóa bền vững (`slack_invalidation_intents`) cam kết ghi nhận cùng transaction với các sự kiện ngắt kết nối cục bộ hoặc thu hồi quyền; phân phối khóa hàng đợi bằng `FOR UPDATE SKIP LOCKED`, có lease timeout và retry giới hạn, hỗ trợ tự phục hồi khi tiến trình sập (crash recovery).
-  - Tiêu thụ sự kiện chính sách tổ chức từ 02B (`slack_policy_events`) với ngữ nghĩa ánh xạ epoch rào chắn (Barrier Epoch Mapping).
-- **Ranh giới Nghiêm ngặt với 03B2 & 03B3:**
-  - Tuyệt đối không tuyên bố rằng việc tạo bảng nguồn đóng F3.
-  - Cơ chế cascade purge vào các bản sao phái sinh (derived copies: lịch sử trò chuyện, bộ nhớ làm việc, kế hoạch, lịch chạy tự động) là phạm vi yêu cầu tường minh của **SLACK-03B2+**.
-  - Cơ chế thẩm định binding trước khi dispatch và tích hợp phê duyệt của Executor thuộc phạm vi **SLACK-03B3**.
-  - Các công cụ đọc nội dung và tiêu thụ nguồn tuyệt đối không được kích hoạt live khi luồng F3 đầu-cuối chưa hoàn tất.
+### 1. Khóa dòng Tuần tự hóa PostgreSQL MVCC (Row Locks & Serialization):
+- **Phản biện Reviewer:** `INSERT SELECT WHERE` không tự động tuần tự hóa với các giao dịch revoke đồng thời dưới PostgreSQL MVCC; thiếu khóa dòng và tuyên bố thái quá về loại trừ race condition.
+- **Giải pháp Khắc phục:**
+  - Định nghĩa thứ tự khóa dòng tường minh trong transaction của `saveSourceAtomic`:
+    1. Khóa connection: `SELECT ... FROM slack_connections WHERE id = $1 AND user_id = $2 FOR SHARE`.
+    2. Khóa consent: `SELECT ... FROM slack_processing_consents WHERE workspace_id = $1 AND provider_id = $2 FOR SHARE`.
+  - Khóa `FOR SHARE` tuần tự hóa trực tiếp với `SELECT ... FOR UPDATE` trong `SlackConsentRepo.revokeConsent` của 02B: nếu revoke đang chạy, insert phải đợi; nếu insert giữ khóa trước, revoke phải đợi và sau khi commit sẽ invalidate ngay bản ghi vừa tạo.
+  - Cổng thẩm định kiểm tra đầy đủ 5 trường binding, quyền mục đích `'storage'`, giới hạn retention và số thứ tự sửa đổi (revision) hiện hành.
+  - Thiết kế kịch bản kiểm thử xen kẽ 2 client PostgreSQL thật (Two-client PG interleaving test) chứng minh không bao giờ để lọt nguồn stale hoặc late insert sau revoke.
 
-### 1.2. Ranh giới Phân đoạn Provenance Đa Workspace (Provenance Segment Boundary):
-- `DerivedCopyRef` chỉ đại diện cho một phân đoạn ủy quyền với một full-binding duy nhất (`atiUserId`, `connectionId`, `workspaceId`, `slackUserId`, `identityVersion`).
-- Khi một mục tiêu phái sinh gom dữ liệu từ nhiều workspace (ví dụ: Daily Digest đa workspace), bên tiêu thụ 03B2/06C bắt buộc phải lưu trữ và tổng hợp toàn bộ các phân đoạn tương ứng (`authorizationSegments`), đồng thời tái thẩm định (revalidate) từng phân đoạn qua `SlackPolicyService` trước khi hiển thị hoặc gửi vào prompt mô hình. Tuyệt đối không dùng một phân đoạn hợp lệ duy nhất để hợp thức hóa dữ liệu của toàn bộ artifact.
+### 2. Cơ chế Đọc An toàn `getSource` & Rào chắn Đọc Tức thì:
+- **Phản biện Reviewer:** `getSource` trả về plaintext chỉ sau khi kiểm tra tombstone/expiry; thiếu revalidation binding, revision, live DB policy và barrier guard.
+- **Giải pháp Khắc phục:**
+  - Yêu cầu caller cung cấp đầy đủ 5 trường binding, định danh capture/revision chính xác, và mục đích tiêu thụ riêng biệt (`'manual_lookup' | 'triage' | 'planning' | 'digest'`). Tuyệt đối không chọn "latest resource" để bind mù vào artifact cũ.
+  - Tra cứu rào chắn vô hiệu hóa bền vững `slack_invalidation_barriers` trước khi trả dữ liệu. Nếu có active barrier, chặn đọc ngay lập tức (`status: 'blocked_by_invalidation_barrier'`) trước khi worker purge vật lý chạy.
+  - Tái thẩm định live DB qua `SlackPolicyService.resolveSlackModelPolicy`. Khẳng định rõ bảo vệ hậu mô hình (post-model / prepublication guard) là nghĩa vụ của 03B2/03B3.
 
-### 1.3. Ngữ nghĩa Ánh xạ Epoch Rào Chắn (Barrier Epoch Mapping):
-- Trong bảng `slack_policy_events` của SLACK-02B, giá trị `consent_revision` đại diện cho số thứ tự sửa đổi **SAU** khi trạng thái thay đổi.
-- Kịch bản thực tế: Grant 1 (`revision = 1`) -> Revoke Event 2 (`revision = 2`) -> Regrant 3 (`revision = 3`).
-- Khi poller xử lý sự kiện Revoke Event 2 chậm trễ, nếu so khớp theo workspace thuần túy sẽ xóa oan dữ liệu của Regrant 3; nếu so khớp bằng (`consent_revision = 2`) sẽ không xóa được nguồn nào vì nguồn cũ mang revision 1.
-- Kế hoạch 03B1 thiết lập rào chắn chuẩn tắc:
-  `WHERE workspace_id = event.workspace_id AND provider_profile_id = event.provider_id AND consent_revision < event.consent_revision`
-  Các bản ghi nguồn mới được cấp quyền lại mang `consent_revision >= event.consent_revision` được bảo toàn nguyên vẹn 100%.
+### 3. Trần TTL Kho Nguồn Thô `<= 7 ngày` (Raw-Only TTL):
+- **Phản biện Reviewer:** Cờ `metadata.isExcerpt` do caller kiểm soát và `OR NULL` làm lọt CHECK constraint; 03B1 cần trần cứng 7 ngày cho mọi loại tài nguyên thô.
+- **Giải pháp Khắc phục:**
+  - Loại bỏ hoàn toàn đường dẫn `isExcerpt` và trần 30 ngày khỏi bảng nguồn thô 03B1.
+  - Áp đặt trần cứng `<= 7 ngày` cho toàn bộ tài nguyên thô:
+    `CONSTRAINT chk_slack_sources_raw_retention CHECK (expires_at > captured_at AND expires_at <= captured_at + INTERVAL '7 days')`.
+  - Trích đoạn 30 ngày được chuyển giao cho 03B2 với lớp lưu trữ có kiểu riêng biệt (`slack_excerpts`).
+  - Đồng hồ và thời hạn hết hạn do máy chủ sở hữu; cấm upsert làm mới TTL hoặc ghi đè lên bản ghi đã tombstoned/purged. Refetch dữ liệu hợp lệ mới tạo capture revision độc lập.
 
-### 1.4. Điều tra Thực tế 7 Nhóm Bản Sao Dữ Liệu Nguồn Hiện Hữu:
-1. **History:** Bảng `messages` (`role IN ('user', 'assistant', 'system', 'summary')`, `content`, `metadata`). Consumer phải lưu giữ `sourceRefs` và ẩn/redact toàn bộ khối nội dung không thể tách rời khi nguồn bị purge.
-2. **Memory:** Bảng `messages` với `metadata->>'type' = 'working_memory'`, lưu JSON snapshot trong `metadata->'state'`. Bộ lọc memory của planner phải loại bỏ entity khi nguồn bị thu hồi.
-3. **Plan Args:** Bảng `plans` (`plan_json`, `plan_text`) và `execution_steps` (`args_json`, `output_json`). Executor phải đối chiếu binding trước khi dispatch.
-4. **Proposals:** Bảng tương lai `slack_proposals` (SLACK-06A). Proposal phải mang `sourceRefs` và bị tự động hủy (`auto_dismissed_source_revoked`) nếu nguồn bị tombstone.
-5. **Digest:** Bảng tương lai `slack_digests` (SLACK-06C). Toàn bộ digest bị ẩn nếu 1 nguồn thành phần bị thu hồi quyền.
-6. **Schedules:** Bảng `schedules` (`request`, `recurrence`, `services`) và `schedule_runs`. Chuyển sang `paused` kèm `pause_reason = 'slack_binding_invalid'` khi mất quyền kênh hoặc ngắt kết nối.
-7. **Audit:** Bảng `execution_steps` và audit logs. Chỉ lưu metadata an toàn (IDs, timestamp, status), tuyệt đối không lưu nội dung thô PII.
+### 4. Đầy đủ 8 Trường Tham Chiếu & Khớp Chữ Ký Hàm Thật:
+- **Phản biện Reviewer:** Thiếu cột DB cho `requestedRetentionDays`; dùng nhầm legacy `retentionDays`; `formatSlackOwnerSourceKey` bị gọi sai chữ ký; purge target kinds dùng alias thay vì literal chuẩn.
+- **Giải pháp Khắc phục:**
+  - Thêm cột riêng `requested_retention_days INTEGER NOT NULL CHECK (requested_retention_days > 0 AND requested_retention_days <= 7)` vào bảng `slack_sources`. Reconstruct đầy đủ 8 trường canonical policy evidence.
+  - Sửa chữ ký gọi `formatSlackOwnerSourceKey(ref: SlackSourceRef)` nhận đúng 1 tham số theo hợp đồng `@wap/tool-schemas`.
+  - Thay thế toàn bộ alias bằng đúng 7 literal chuẩn tắc từ `SLACK_DERIVED_TARGET_KINDS`:
+    `'chat_history_message' | 'working_memory_entity' | 'plan_step_arg' | 'proposal_excerpt' | 'daily_digest_entry' | 'scheduled_workflow_arg' | 'audit_log_entry'`.
+
+### 5. Tiêu Thụ Sự Kiện Chính Sách Lũy Thừa (Idempotent Event Consumption):
+- **Phản biện Reviewer:** `consumePendingPolicyEvents` đọc mãi 50 dòng đầu và gây trùng lặp; thiếu xử lý 4 loại sự kiện 02B.
+- **Giải pháp Khắc phục:**
+  - Bảng `slack_invalidation_intents` lưu cột `policy_event_id UUID UNIQUE REFERENCES slack_policy_events(id)`.
+  - Bộ quét sự kiện dùng anti-join `WHERE NOT EXISTS`, loại bỏ đọc trùng lặp và starvation.
+  - Xử lý đủ 4 loại sự kiện 02B: `consent_granted`, `consent_revoked`, `provider_attested`, `provider_updated`.
+  - Revalidation khi đọc bảo đảm nguồn cũ trở nên unconsumable ngay lập tức khi sự kiện commit.
+
+### 6. Mở Rộng Rào Chắn Epoch & Đề Xuất Hợp Đồng Cho Schema Owner:
+- **Phản biện Reviewer:** Tag `workspace_consent_revocation` của 03A có nghĩa là exact old grant revision, trong khi worker dùng `< after-change barrier`. Thiếu tag cho provider revision mutation.
+- **Giải pháp Khắc phục:**
+  - Khi nhận sự kiện sau thay đổi (`consent_revision = R_{event}`), mở rộng rào chắn thành các exact old grant targets (`exactConsentRevision = String(oldRev)`) đồng thời ghi nhận barrier `before_consent_revision = R_{event}`.
+  - Bảo đảm kịch bản Grant 1 -> Revoke 2 -> Regrant 3: nguồn 1 bị xóa, nguồn 3 tồn tại nguyên vẹn.
+  - Đề xuất bổ sung tag thứ 6 `provider_profile_revocation` cho Schema Owner. Trong 03B1 nội bộ, lý do tombstone được ghi nhận chính xác là `'policy_changed'` hoặc `'provider_unverified'`, tuyệt đối không ghi sai thành `'source_deleted'`.
+
+### 7. Giao Diện Vô Hiệu Hóa Liên Kết Giao Dịch Cho 04A Ingress & Disconnect:
+- **Phản biện Reviewer:** Cần cam kết receipt + rào chắn commit nguyên tử trước khi ACK cho Slack; disconnect cần bắt binding cũ dưới lock; runner phải độc lập với flags.
+- **Giải pháp Khắc phục:**
+  - Cung cấp hàm chuẩn tắc `commitLifecycleInvalidation(client: pg.PoolClient, intent: SlackPurgeTarget, barrier?: InvalidationBarrier)`.
+  - Webhook ingress 04A commit receipt + barrier trong cùng transaction trước khi gửi HTTP 200 ACK cho Slack.
+  - Disconnect bắt binding CŨ trong transaction dưới lock, commit barrier và intent rồi mới đổi trạng thái disconnected.
+  - Đưa `SlackInvalidationRunner` vào app startup, chạy độc lập với cờ tự động (F4 invariant).
+  - Quy chuẩn ranh giới phân đoạn provenance: `DerivedCopyRef` đại diện cho 1 segment; multi-workspace targets bắt buộc aggregate all segments và revalidate mọi dependencies.
 
 ---
 
-## 2. Danh mục File Tài liệu Đã Hoàn Thành
-
-| STT | Đường dẫn file | Nội dung & Mục đích |
-|---|---|---|
-| 1 | [`docs/handoff/tasks/SLACK-03B1-source-store-and-invalidation.md`](../tasks/SLACK-03B1-source-store-and-invalidation.md) | Task card chính thức cho SLACK-03B1 với mục tiêu, ranh giới module, điều tra 7 target kinds, DDL schema, tiêu chí nghiệm thu và quy trình TDD |
-| 2 | [`docs/superpowers/plans/2026-10-29-slack-03b1-source-store-and-invalidation.md`](../../superpowers/plans/2026-10-29-slack-03b1-source-store-and-invalidation.md) | Kế hoạch triển khai kỹ thuật chi tiết theo định dạng Superpowers, gồm 7 Phase: DDL, Repo, Store Service, Invalidation Queue, Policy Event Consumer, Multi-Segment Aggregation, và kịch bản TDD |
-| 3 | [`docs/handoff/log/2026-10-29-slack-03b1-source-plan.md`](2026-10-29-slack-03b1-source-plan.md) | Nhật ký bàn giao ghi nhận đầy đủ bối cảnh, các quyết định kiến trúc, đối chiếu PR phụ thuộc và cam kết ranh giới |
-
----
-
-## 3. Bằng chứng Xác Minh Cơ Học
+## 2. Bằng chứng Xác Minh Cơ Học
 
 | Tiêu chí kiểm tra | Lệnh thực hiện | Kết quả thực tế |
 |---|---|---|
-| **Ranh giới Sở hữu (Module Ownership)** | `git status --porcelain` | Chỉ tạo đúng 3 file tài liệu mới trong `docs/handoff/tasks/`, `docs/superpowers/plans/`, và `docs/handoff/log/`; không có bất kỳ file source hay config nào bị chạm |
-| **Kiểm tra Cú pháp & Khoảng trắng** | `git diff --check ce9380e9` | **EXIT 0**; không có trailing whitespace hay cảnh báo định dạng |
+| **Ranh giới Sở hữu (Module Ownership)** | `git status --porcelain` | Chỉ chỉnh sửa đúng 3 file tài liệu trong `docs/handoff/tasks/`, `docs/superpowers/plans/`, và `docs/handoff/log/`; không có bất kỳ file source hay config nào bị chạm |
+| **Kiểm tra Cú pháp & Khoảng trắng** | `git diff --check ce9380e9..HEAD` | **EXIT 0**; không có trailing whitespace hay cảnh báo định dạng |
 | **Tính Hợp lệ của Liên kết** | Node script kiểm tra path nội bộ | Tất cả các liên kết chéo giữa task card, plan và log đều trỏ đúng file vật lý hiện hữu |
 | **Không Thi công Sớm (Zero Runtime Mutation)** | Kiểm tra git diff | Không có bất kỳ dòng mã TypeScript/SQL runtime nào được thi công; tuân thủ nguyên tắc chờ review và chỉ đạo tiếp theo từ điều phối viên |
 
 ---
 
-## 4. Kế hoạch Tiếp theo
+## 3. Kế hoạch Tiếp theo
 
-1. Mở Draft PR trên GitHub với nhánh `docs/slack-03b1-source-plan` nhắm vào nhánh tích hợp `integration/slack-personal-20261029`.
+1. Commit và push các thay đổi tài liệu lên nhánh `docs/slack-03b1-source-plan` (PR #196).
 2. Báo cáo trạng thái hoàn tất cho Điều phối viên trưởng qua lệnh `orca orchestration send --type worker_done`.
-3. Chuyển sang trạng thái nhàn rỗi (idle prompt) chờ đánh giá độc lập từ Reviewer và chỉ đạo tiếp theo từ Nhóm trưởng.
+3. Chuyển sang trạng thái nhàn rỗi (idle prompt) chờ đánh giá độc lập từ Reviewer.
