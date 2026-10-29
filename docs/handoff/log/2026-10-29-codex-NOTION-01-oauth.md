@@ -26,4 +26,13 @@ Logs/helper và ảnh tại node_modules/.cache/oauth, node_modules/.cache/v3-br
 
 Hai nhánh cùng chạm capability/Settings/server; chuẩn bị Notion trên base PR Slack #184 để giữ cả hai kết nối và tránh giao reviewer một bản xung đột đã biết. Kết quả check/browser cây chung sẽ được ghi ở checkpoint tiếp theo trong chính log này. Không merge main hoặc liên hệ reviewer thay người dùng.
 
-Người dùng chưa có apps và HTTPS, đã yêu cầu hướng dẫn tạo và chuẩn bị HTTPS thử trên máy. Công việc môi trường sẽ dùng production build/DB riêng và công cụ tunnel chính thức có checksum; không xuất bản development server hoặc thay cấu hình thật trong repo.
+Người dùng chưa có apps và HTTPS, đã yêu cầu hướng dẫn tạo và chuẩn bị HTTPS thử trên máy. Không thay cấu hình thật trong repo.
+
+### Checkpoint tích hợp cuối
+
+- Mã Notion độc lập `173e10a`; gộp base Slack `ac448dd` (#184), giải quyết11 vùng file dùng chung bằng cách giữ cả2 import/config/route/panel/fixture và hợp nhất mảng capability. Thêm2 test capability đồng thời/off trên PostgreSQL thật, không đăng ký content tools. Không thay production source trong lượt full check cuối.
+- Full check cây chung exit0: **2.607v3 =116schemas+443adapters+381planner+42executor+737API+888web;406eval;1launcher+66Node**. Typecheck/build/security đạt. SHA256 `combined-check.log`: `609587A845098EFB3E157821CD7C2681919E07710E058D45796BAB8A4964C676`.
+- Browser cây chung chạy tuần tự: Slack **4/4** và Notion **4/4**, exit0. Không gọi LLM/Slack/Notion thật. Cờ mặc định off, không merge main. PR Notion đặt base nhánh PR184 để reviewer xem riêng delta, tích hợp sau Slack.
+- HTTPS local: tải cloudflared2026.10.5 từ release chính thức và kiểm SHA256 `db4e4c413612a0916f3e1679d3caaf376f94911952d163028fb726fb2e0516a9`. Lệnh mở tunnel đầu tiên bị automatic approval review từ chối trước thực thi vì dùng root environment/auth surface và chưa có chấp thuận công khai cụ thể. Không chạy lại hoặc đi vòng.
+- Đã thay bằng preview hoàn toàn riêng: DB tmpfs56539, account/password/JWT/encryption ngẫu nhiên riêng trong file ignored, cấu hình OAuth riêng, provider trỏ loopback không hoạt động; không đọc root.env. Production assets qua gateway127.0.0.1:5195/API3995, chỉ login/config/OAuth metadata. Không tunnel/public exposure. Local proof **13/13PASS**: login bằng account thử, chặn chat/plans/schedules/admin/signup, không phục vụ source/.env/private file, Google/signupoff và không model thật. Lượt đầu local startup lỗi do SMTP_PORT từng phần, đã đặt toàn bộ SMTP trống; local ready sau sửa.
+- Helper bỏ qua Git tại node_modules/.cache/oauth/https-preview.mjs, config `live-config.env`, credential riêng `live-runtime-private.json`, proof `https-local-proof.json`. Public mode có cờ explicit `--expose`, **chưa chạy**; cần người dùng duyệt concrete exposure sau khi xem phạm vi thu hẹp. Khi chưa được duyệt, tiếp tục dùng localhost, không tuyên bố có callbackHTTPS thật.

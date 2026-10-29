@@ -1,6 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import { notionOAuthEnv } from './notion-env.js';
 import type { NotionOAuthConfig } from '../services/notion/oauth-client.js';
+import { slackOAuthEnv } from './slack-env.js';
+import type { SlackOAuthConfig } from '../services/slack/oauth-client.js';
 import { GOOGLE_ENDPOINTS, type GoogleOAuthConfig } from '../auth/google-oidc.js';
 
 /** The Gmail OAuth client of its own Google Cloud project (not the sign-in client). */
@@ -39,6 +41,7 @@ const MYSHEETS_ENDPOINT_OVERRIDES = { authorizationUrl: 'MYSHEETS_OAUTH_AUTH_URL
 
 export interface EnvConfig {
   MYNOTION_OAUTH?: NotionOAuthConfig;
+  MYSLACK_OAUTH?: SlackOAuthConfig;
   DATABASE_URL: string;
   JWT_SECRET: string;
   ENCRYPTION_KEY: string;
@@ -207,6 +210,7 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
 
   return {
     MYNOTION_OAUTH: notionOAuthEnv(env, isLive),
+    MYSLACK_OAUTH: slackOAuthEnv(env, isLive),
     DATABASE_URL,
     JWT_SECRET,
     ENCRYPTION_KEY,

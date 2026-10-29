@@ -9,6 +9,7 @@ type Feedback = { kind: 'saved' | 'success' | 'rejected' | 'timeout'; message: s
 export function useSettings(user: User | null) {
   const [services, setServices] = useState<ServiceInfo[]>([]);
   const [notionOAuthEnabled, setNotionOAuthEnabled] = useState(false);
+  const [slackOAuthEnabled, setSlackOAuthEnabled] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -33,7 +34,7 @@ export function useSettings(user: User | null) {
     try {
       const data = await apiClient.getServices();
       if (!Array.isArray(data?.services)) throw new Error('Không tải được danh mục dịch vụ.');
-      if (owner === epoch.current && request === read.current) { setServices(data.services); setNotionOAuthEnabled(data.personalOAuth?.includes('mynotion') === true); setCanEdit(data.canConfigure === true); setLoadError(null); }
+      if (owner === epoch.current && request === read.current) { setServices(data.services); setNotionOAuthEnabled(data.personalOAuth?.includes('mynotion') === true); setSlackOAuthEnabled(data.personalOAuth?.includes('myslack') === true); setCanEdit(data.canConfigure === true); setLoadError(null); }
     } catch (error) {
       if (owner === epoch.current && request === read.current) setLoadError(userErrorMessage(error));
     } finally { if (owner === epoch.current && request === read.current) setLoading(false); }
@@ -120,7 +121,7 @@ export function useSettings(user: User | null) {
       if (owner === epoch.current) { pending.current.delete(id); setBusy(b => { const next = { ...b }; delete next[id]; return next; }); }
     }
   };
-  return { notionOAuthEnabled, list, personal, personalMyCalendar, personalMySheets, active, draft, selected, loading, loadError, refresh, canEdit, errors, results, busy, keyHelpOpen,
+  return { notionOAuthEnabled, slackOAuthEnabled, list, personal, personalMyCalendar, personalMySheets, active, draft, selected, loading, loadError, refresh, canEdit, errors, results, busy, keyHelpOpen,
     actions: { openServiceDrawer, closeServiceDrawer, toggleKeyHelp: () => setKeyHelpOpen(o => !o), addNewScopeItem,
       removeScopeItem: (index: number) => { if (active && canEdit) updateDraft(active.id, d => ({ ...d, scopes: d.scopes.filter((_, i) => i !== index) })); },
       onKeyInputChanged: (key: string, value: string) => { if (active && canEdit) updateDraft(active.id, d => ({ ...d, credentials: { ...d.credentials, [key]: value } })); },
