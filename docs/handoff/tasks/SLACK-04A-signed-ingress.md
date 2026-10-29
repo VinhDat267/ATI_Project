@@ -203,10 +203,10 @@ export interface SlackEventReceiptRow {
 }
 
 export type SlackLifecycleIntentPayload =
-  | { intentType: 'tokens_revoked'; teamId: string; appId: string; revokedActorIds: string[]; eventTime: number; resolution: 'disconnected' | 'ambiguous_reconnect_required'; capturedGeneration?: number }
-  | { intentType: 'app_uninstalled'; teamId: string; appId: string; eventTime: number }
-  | { intentType: 'message_deleted'; teamId: string; channelId: string; messageTs: string; deletedTs: string; sourceEventTime: Date }
-  | { intentType: 'message_changed'; teamId: string; channelId: string; messageTs: string; editTs: string; sourceEventTime: Date };
+  | { intentType: 'token_revocation_validation'; binding: import('@wap/tool-schemas').SlackBinding; credentialFingerprint: string; barrierId: string; sourceEventTime: Date }
+  | { intentType: 'app_uninstall_validation'; binding: import('@wap/tool-schemas').SlackBinding; credentialFingerprint: string; barrierId: string; sourceEventTime: Date }
+  | { intentType: 'message_deleted'; workspaceId: string; channelId: string; messageTs: string; deletedTs: string; sourceEventTime: Date }
+  | { intentType: 'message_changed'; workspaceId: string; channelId: string; messageTs: string; editTs: string; sourceEventTime: Date };
 
 export interface SlackLifecycleIntentRow {
   id: string;
@@ -219,29 +219,27 @@ export interface SlackLifecycleIntentRow {
   applied_at: Date | null;
 }
 
-export interface InvalidationEffect {
-  effectKey: string;
-  barrier: {
-    barrierType: 'connection' | 'channel' | 'epoch' | 'resource';
-    workspaceId: string;
-    connectionId?: string;
-    channelId?: string;
-    resourceType?: import('@wap/tool-schemas').SlackResourceType;
-    resourceId?: string;
-    minValidRevision?: string;
-    provisional?: boolean;
-    reason: string;
-  };
-  purgeTarget?: import('@wap/tool-schemas').SlackPurgeTarget;
+/** Rào cản Bền vững Phân định theo Kiểu (Discriminated Durable Barrier) */
+export type SlackDurableBarrier =
+  | { barrierType: 'connection'; binding: import('@wap/tool-schemas').SlackBinding; provisional?: boolean; reason: string }
+  | { barrierType: 'channel'; binding: import('@wap/tool-schemas').SlackBinding; channelId: string; reason: string }
+  | { barrierType: 'epoch'; epoch: import('@wap/tool-schemas').SlackPolicyEpoch; reason: string }
+  | { barrierType: 'resource'; workspaceId: string; resourceType: import('@wap/tool-schemas').SlackResourceType; resourceId: string; minValidRevision?: string; reason: string };
+
+/** Hợp đồng Đầu vào Phối hợp Rào cản Vô hiệu hóa Đọc 03B1 (Thống nhất) */
+export interface SlackInvalidationEffect {
+  effectKey: string; // NONNULL unique effect key (ví dụ 'provisional:' + connectionId)
+  barrier: SlackDurableBarrier;
+  purgeTarget?: import('@wap/tool-schemas').SlackPurgeTarget; // Tùy chọn: bỏ qua khi chỉ cần rào cản tạm thời trước probe
 }
 
 export interface StageInTransactionInput {
   sourceEventKey: string; // namespaced "app_id:event_id" hoặc "policy_event:id"
-  effects: InvalidationEffect[];
+  effects: SlackInvalidationEffect[];
 }
 
 export interface StageInTransactionResult {
-  receiptId?: string;
+  receiptId: string; // Bắt buộc trả về
   barrierIds: string[];
   intentIds: string[];
 }

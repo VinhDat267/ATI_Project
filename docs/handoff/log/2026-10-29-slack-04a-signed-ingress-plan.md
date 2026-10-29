@@ -31,29 +31,31 @@
 - **Loại bỏ Tombstone Toàn cục `app:*`:** Rào cản `channelId: '*', resourceId: 'app:' + appId` trước đây thiếu generation fencing, có thể gây chặn vĩnh viễn việc cài đặt lại ứng dụng trong tương lai.
 - **Thống nhất API Duy nhất Cho Cả 04A và 03B1:** Thống nhất với Backend runtime owner (`ctx_29765fc6b1b7`) trên giao diện transaction-bound `stageInTransaction(client, input)`:
   ```ts
-  export interface InvalidationEffect {
-    effectKey: string; // NONNULL unique effect key
-    barrier: {
-      barrierType: 'connection' | 'channel' | 'epoch' | 'resource';
-      workspaceId: string;
-      connectionId?: string;
-      channelId?: string;
-      resourceType?: SlackResourceType;
-      resourceId?: string;
-      minValidRevision?: string;
-      provisional?: boolean;
-      reason: string;
-    };
+  export type SlackDurableBarrier =
+    | { barrierType: 'connection'; binding: SlackBinding; provisional?: boolean; reason: string }
+    | { barrierType: 'channel'; binding: SlackBinding; channelId: string; reason: string }
+    | { barrierType: 'epoch'; epoch: SlackPolicyEpoch; reason: string }
+    | { barrierType: 'resource'; workspaceId: string; resourceType: SlackResourceType; resourceId: string; minValidRevision?: string; reason: string };
+
+  export interface SlackInvalidationEffect {
+    effectKey: string; // NONNULL unique effect key (ví dụ 'provisional:' + connectionId)
+    barrier: SlackDurableBarrier;
     purgeTarget?: SlackPurgeTarget; // Tùy chọn: bỏ qua khi chỉ cần rào cản tạm thời trước probe
   }
 
   export interface StageInTransactionInput {
     sourceEventKey: string; // namespaced "app_id:event_id" hoặc "policy_event:id"
-    effects: InvalidationEffect[];
+    effects: SlackInvalidationEffect[];
+  }
+
+  export interface StageInTransactionResult {
+    receiptId: string; // Bắt buộc trả về
+    barrierIds: string[];
+    intentIds: string[];
   }
   ```
-  - `tokens_revoked` (trước probe): Barrier-only `effectKey = 'provisional:' + connId`, `barrierType: 'connection'`, `provisional: true`, không kèm `purgeTarget`. Sau probe mới add purgeTarget và disconnect nếu invalid.
-  - `app_uninstalled`: Ghi intent `authorization_disconnect` nhắm vào các binding/epoch CŨ, không ảnh hưởng tới kết nối mới sau này.
+  - `tokens_revoked` (trước probe per-binding): Barrier-only `effectKey = 'provisional:' + connId`, `barrierType: 'connection'`, mang full binding, `provisional: true`, không kèm `purgeTarget`. Sau probe mới add purgeTarget và disconnect nếu invalid.
+  - `app_uninstalled`: Ghi intent `app_uninstall_validation` per-binding hoặc `authorization_disconnect` nhắm vào các binding/epoch CŨ, không ảnh hưởng tới kết nối mới sau này.
   - `message_deleted`: Ghi rào cản `resource_lifecycle` (`tombstoneReason: 'source_deleted'`), rào cản tài nguyên vĩnh viễn, ngăn chặn resurrection khi có edit đến muộn.
   - `message_changed`: Ghi rào cản `resource_lifecycle` (`tombstoneReason: 'source_edited'`), vô hiệu hóa đơn điệu các revision cũ (`revision < editTs`), bảo toàn revision mới.
 

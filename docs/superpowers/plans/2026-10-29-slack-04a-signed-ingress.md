@@ -2,20 +2,21 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Thiết lập điểm tiếp nhận sự kiện webhook HTTPS ký số từ Slack Events API (`POST /api/slack/events`), thu thập buffer raw body trước JSON middleware, xác thực HMAC-SHA256 phiên bản `v0` trực tiếp trên byte thô không roundtrip UTF-8 cùng cửa sổ độ tươi timestamp bounded `<= 300s`, phản hồi thử thách `url_verification` chuẩn Slack không bắt buộc `api_app_id`, áp dụng mô hình Body-Free Receipt kết hợp hợp đồng watermark 6 chiều ngăn chặn backfill F1, áp dụng thiết kế rào cản tạm thời trước probe (provisional read block) phối hợp qua giao diện transaction-bound thống nhất `stageInTransaction` với 03B1 dưới cùng owner advisory lock với TokenManager, và cam kết lưu trữ bền vững trước khi phản hồi HTTP 200.
+**Goal:** Thiết lập điểm tiếp nhận sự kiện webhook HTTPS ký số từ Slack Events API (`POST /api/slack/events`), thu thập buffer raw body trước JSON middleware, xác thực HMAC-SHA256 phiên bản `v0` trực tiếp trên byte thô không roundtrip UTF-8 cùng cửa sổ độ tươi timestamp bounded `<= 300s`, phản hồi thử thách `url_verification` chuẩn Slack không bắt buộc `api_app_id`, áp dụng mô hình Body-Free Receipt kết hợp hợp đồng watermark 6 chiều ngăn chặn backfill F1, áp dụng thiết kế rào cản tạm thời trước probe (provisional read block) theo từng binding cụ thể phối hợp qua giao diện transaction-bound thống nhất `stageInTransaction` với 03B1 dưới cùng owner advisory lock với TokenManager, và cam kết lưu trữ bền vững trước khi phản hồi HTTP 200.
 
 **Architecture:**
 - **Mount Route & Stream Handling:** Route `POST /api/slack/events` mount TRƯỚC `express.json()`. Middleware stream có trần cứng 1 MB (1.048.576 bytes) và timeout 5.000 ms. Khi vượt trần, trả lời HTTP 413 `Payload Too Large` và chỉ đóng kết nối sau khi phản hồi đã hoàn tất gửi đi (`res.on('finish')`).
 - **Mật mã HMAC v0 Trực tiếp trên Raw Buffer:** `createHmac('sha256', secret).update('v0:' + timestampHeader + ':').update(rawBody).digest('hex')`. Tuyệt đối không gọi `.toString('utf8')` trước khi băm. So sánh bằng `crypto.timingSafeEqual` sau khi đối soát độ dài 67 ký tự (`^v0=[0-9a-f]{64}$`). Header timestamp kiểm tra regex nghiêm ngặt `/^\d{1,10}$/` với độ lệch `<= 300s`.
 - **Thử thách URL Chuẩn Slack & Ràng buộc Sự kiện Nghiệp vụ:** Nhánh `url_verification` chấp nhận payload chuẩn `{ token, challenge, type }` không bắt buộc `api_app_id` (nếu có thì phải khớp), phản hồi HTTP 200 `{ challenge }` tức thì không ghi DB. Nhánh `event_callback` bắt buộc có `api_app_id` khớp cấu hình và `team_id` hợp lệ (tuyệt đối không fallback sang `authorizations[0]`).
 - **Body-Free Receipt & Hợp đồng Watermark 6 Chiều F1:** `slack_event_receipts` chỉ lưu routing metadata tối thiểu, tuyệt đối không lưu text/blocks tin nhắn. Lưu `source_event_time` bất biến từ epoch Slack (strict regex `/^\d{1,10}(\.\d{1,6})?$/`, fail-closed nếu thiếu, cấm `Date.now()`). Worker 04B áp dụng watermark chặn backfill: `source_event_time >= MAX(processing_start, consent_grant, identity_epoch, provider_attestation, config_revision, resume)`.
-- **Thẩm quyền Thu hồi & Rào cản Tạm thời Trước Probe (Conservative Final Design):**
-  - Tài liệu chính thức Slack `tokens_revoked` chỉ cung cấp danh sách User IDs (`tokens.oauth`), HOÀN TOÀN KHÔNG có token ID hay grant generation ID. Do đó, `connected_at < event_time` một mình không phải bằng chứng credential hiện tại bị thu hồi (kịch bản: token cũ bị thu hồi sau khi grant mới đã tạo). Timestamp chỉ là gợi ý thứ tự, không phải thẩm quyền thu hồi.
-  - *Quy trình thận trọng:*
-    1. Dưới cùng owner advisory lock (`withOwner(userId)`), bắt generation hiện tại (`identity_version`) và fingerprint private credential;
-    2. Commit một rào cản đọc tạm thời dạng barrier-only (provisional generation-scoped read block, không kèm purgeTarget) qua giao diện thống nhất 03B1 `stageInTransaction(client, input)` trước ACK, **BẢO LƯU PRIVATE CONFIG** trong database (không xóa `config`);
-    3. Trả lời HTTP 200 ACK cho Slack sau khi transaction bền vững đã commit;
-    4. Sau ACK, worker chạy probe metadata-only `auth.test` có CAS guard trên `identity_version` với captured credential:
+- **Thẩm quyền Thu hồi & Rào cản Tạm thời Theo Từng Binding (Provisional Barrier Before Probe):**
+  - Tài liệu chính thức Slack `tokens_revoked` chỉ cung cấp danh sách User IDs (`tokens.oauth`), HOÀN TOÀN KHÔNG có token ID hay grant generation ID. Do đó, `connected_at < event_time` một mình không phải bằng chứng credential hiện tại bị thu hồi (kịch bản: token cũ bị thu hồi sau khi grant mới đã tạo; tương tự với `app_uninstalled` đến muộn sau khi app đã reinstall). Timestamp chỉ là gợi ý thứ tự, không phải thẩm quyền thu hồi thế hệ hiện tại.
+  - *Quy trình thận trọng per-binding:*
+    1. Một sự kiện có thể ảnh hưởng tới nhiều actor/kết nối; mỗi kết nối có thế hệ (`identity_version`) và credential fingerprint riêng biệt. Dưới cùng owner advisory lock (`withOwner(userId)`):
+       - Bắt generation hiện tại và cấu trúc 5 trường `SlackBinding` (`atiUserId`, `connectionId`, `workspaceId`, `slackUserId`, `identityVersion`);
+       - Commit một rào cản đọc tạm thời dạng barrier-only (provisional read block per-binding, không kèm `purgeTarget`) qua giao diện thống nhất 03B1 `stageInTransaction(client, input)` trước ACK, **BẢO LƯU PRIVATE CONFIG** trong database (không xóa `config`);
+    2. Trả lời HTTP 200 ACK cho Slack sau khi transaction bền vững đã commit;
+    3. Sau ACK, worker chạy probe metadata-only `auth.test` có CAS guard trên `(connectionId, identityVersion)` với captured credential:
        - *Xác nhận invalid/revoked:* Ngắt kết nối dứt khoát (`status = 'disconnected'`, `config = NULL`, tăng `identity_version`, reset `refresh_in_flight`), gọi `stageInTransaction` ghi purgeTarget thế hệ cũ chính xác qua 03B1;
        - *Xác nhận valid (cùng actor & workspace):* Thu hồi thuộc về grant cũ; grant mới vẫn hợp lệ! Gỡ bỏ DUY NHẤT rào cản tạm thời này, không purge snapshot mới, giữ nguyên trạng thái active (trừ khi đã có disconnect thủ công hoặc barrier khác can thiệp);
        - *Lỗi mạng/timeout/rate-limit (unknown):* Giữ nguyên fail-closed ở trạng thái `reconnect_required`.
@@ -24,8 +25,7 @@
   - Các mutation vòng đời BẮT BUỘC phối hợp cùng owner advisory lock (`withOwner(userId)`) và khóa dòng, đồng thời lập kế hoạch tích hợp CAS có giới hạn (`WHERE id = $1 AND identity_version = $2`) để tuần tự hóa với khoảng thời gian refresh token mạng.
 - **Rào cản Đọc F3 Thống nhất Qua 03B1 `stageInTransaction` (Loại bỏ Bảng Cạnh tranh):**
   Ingress phối hợp trực tiếp với giao diện 03B1 `stageInTransaction(client, { sourceEventKey, effects })` trong cùng transaction DB trước ACK 200:
-  - `tokens_revoked` (trước probe): Barrier-only `effectKey = 'provisional:' + connId`, `barrierType: 'connection'`, `provisional: true`.
-  - `app_uninstalled`: Mục tiêu `authorization_disconnect` theo binding/epoch cũ, không dùng `app:*` toàn workspace gây chặn cài đặt lại.
+  - `tokens_revoked` / `app_uninstalled` (trước probe): Barrier-only `effectKey = 'provisional:' + connId`, `barrierType: 'connection'`, mang full binding, `provisional: true`.
   - `message_deleted`: Mục tiêu `resource_lifecycle` (`tombstoneReason: 'source_deleted'`), rào cản vĩnh viễn, ngăn chặn resurrection khi edit đến muộn.
   - `message_changed`: Mục tiêu `resource_lifecycle` (`tombstoneReason: 'source_edited'`), vô hiệu hóa đơn điệu revision cũ (`revision < editTs`), bảo toàn revision mới.
 - **Cam kết Bền vững Trước ACK & Wakeup Bounded:** Chỉ trả lời HTTP 200 SAU KHI receipt, intent và barrier đã commit thành công trong 1 transaction PostgreSQL (`BEGIN ... COMMIT`). Consumer hook in-memory chỉ là wakeup bất đồng bộ có giới hạn (best-effort fire-and-forget `.catch(() => {})`), không await làm block/500 sau commit. Khi crash/restart, worker 04B quét lại các trạng thái `pending_*` qua `SKIP LOCKED`. Lỗi DB trả về 500/503 để Slack retry.
@@ -44,7 +44,7 @@
 4. **Timestamp Bounded & Parse Nghiêm ngặt:** Header `X-Slack-Request-Timestamp` khớp `/^\d{1,10}$/` và `|now - ts| <= 300s`. Timestamp sự kiện trong body (`event_ts`, `event_time`) parse bằng regex `/^\d{1,10}(\.\d{1,6})?$/`, nghiêm cấm `parseFloat` chấp nhận suffix junk.
 5. **Thử thách URL vs Sự kiện Thường:** `url_verification` không bắt buộc `api_app_id` (nếu có phải khớp); `event_callback` bắt buộc có `api_app_id` khớp cấu hình và `team_id` hợp lệ (cấm fallback `authorizations[0]`).
 6. **Body-Free Receipt & Watermark 6 Chiều:** Receipt không lưu body text. Worker 04B bắt buộc đối soát `source_event_time >= MAX(processing_start, consent_grant, identity_epoch, provider_attestation, config_revision, resume)`.
-7. **Bảo toàn Credential & Rào cản Tạm thời:** Không đoán định thế hệ grant từ timestamp/userID. Dưới `withOwner(userId)`, commit provisional barrier và giữ private `config` dưới `reconnect_required`; chỉ xóa `config = NULL` khi probe `auth.test` xác nhận credential đã bị revoke.
+7. **Bảo toàn Credential & Rào cản Tạm thời Per-Binding:** Không đoán định thế hệ grant từ timestamp/userID. Dưới `withOwner(userId)`, commit provisional barrier per-binding và giữ private `config` dưới `reconnect_required`; chỉ xóa `config = NULL` khi probe `auth.test` xác nhận credential đã bị revoke.
 8. **Tuần tự hóa Lock với TokenManager:** Mọi mutation trạng thái kết nối phối hợp cùng owner advisory lock (`withOwner(userId)`) của TokenManager và CAS guard (`identity_version`) nhằm tránh race condition trong khoảng refresh mạng.
 9. **Rào cản Đọc Thống nhất 03B1 `stageInTransaction`:** Sử dụng API duy nhất `stageInTransaction` với `sourceEventKey` có namespace, `effectKey` duy nhất, hỗ trợ barrier-only auth validation trước ACK; cấm bảng tombstone cạnh tranh.
 10. **F4 Lifecycle & Bounded Wakeup:** Vòng đời hoạt động cả khi `MYSLACK_AUTOMATION_ENABLED=off`. In-process hook chỉ là wakeup bounded, không await sau commit làm lỗi HTTP 200.
@@ -60,7 +60,7 @@
 | `apps/chat-api/src/config/slack-ingress-env.ts` | Backend | Cấu hình signing secret, app ID từ biến môi trường |
 | `apps/chat-api/src/services/slack/slack-signature.ts` | Backend | HMAC-SHA256 v0 trên raw buffer, timingSafeEqual, timestamp bounded regex `/^\d{1,10}$/` |
 | `apps/chat-api/src/db/repositories/slack-event-receipt-repo.ts` | Backend | Lưu trữ receipt, intent và commit rào cản F3 qua 03B1 `stageInTransaction` nguyên tử trong 1 transaction PG |
-| `apps/chat-api/src/services/slack/slack-ingress-service.ts` | Backend | Điều phối challenge, F4 lifecycle, provisional barrier under owner lock, bounded wakeup |
+| `apps/chat-api/src/services/slack/slack-ingress-service.ts` | Backend | Điều phối challenge, F4 lifecycle, provisional barrier per-binding under owner lock, bounded wakeup |
 | `apps/chat-api/src/routes/slack-events.ts` | Backend | Route Express 5 với middleware bounded raw buffer, timeout 5s, HTTP 413 an toàn |
 | `apps/chat-api/src/app.ts` (Modify) | Backend | Mount router `slack-events` TRƯỚC `express.json()` |
 | `apps/chat-api/src/server.ts` (Modify) | Backend | Khởi tạo repo và service ingress trong server bootstrap |
@@ -74,6 +74,9 @@
 ## Typed Interfaces & Consumer Contracts
 
 ```ts
+import type { SlackBinding, SlackResourceType } from '@wap/tool-schemas';
+import type { SlackPurgeTarget, SlackPolicyEpoch } from '@wap/tool-schemas';
+
 export interface SlackSignatureInput {
   signatureHeader: string | undefined;
   timestampHeader: string | undefined;
@@ -129,35 +132,32 @@ export interface SlackEventReceiptRow {
 }
 
 export type SlackLifecycleIntentPayload =
-  | { intentType: 'tokens_revoked'; teamId: string; appId: string; revokedActorIds: string[]; eventTime: number; resolution: 'provisional_barrier_staged'; capturedGeneration: number; credentialFingerprint: string }
-  | { intentType: 'app_uninstalled'; teamId: string; appId: string; eventTime: number }
-  | { intentType: 'message_deleted'; teamId: string; channelId: string; messageTs: string; deletedTs: string; sourceEventTime: Date }
-  | { intentType: 'message_changed'; teamId: string; channelId: string; messageTs: string; editTs: string; sourceEventTime: Date };
+  | { intentType: 'token_revocation_validation'; binding: SlackBinding; credentialFingerprint: string; barrierId: string; sourceEventTime: Date }
+  | { intentType: 'app_uninstall_validation'; binding: SlackBinding; credentialFingerprint: string; barrierId: string; sourceEventTime: Date }
+  | { intentType: 'message_deleted'; workspaceId: string; channelId: string; messageTs: string; deletedTs: string; sourceEventTime: Date }
+  | { intentType: 'message_changed'; workspaceId: string; channelId: string; messageTs: string; editTs: string; sourceEventTime: Date };
+
+/** Rào cản Bền vững Phân định theo Kiểu (Discriminated Durable Barrier) */
+export type SlackDurableBarrier =
+  | { barrierType: 'connection'; binding: SlackBinding; provisional?: boolean; reason: string }
+  | { barrierType: 'channel'; binding: SlackBinding; channelId: string; reason: string }
+  | { barrierType: 'epoch'; epoch: SlackPolicyEpoch; reason: string }
+  | { barrierType: 'resource'; workspaceId: string; resourceType: SlackResourceType; resourceId: string; minValidRevision?: string; reason: string };
 
 /** Hợp đồng Đầu vào Phối hợp Rào cản Vô hiệu hóa Đọc 03B1 (Thống nhất) */
-export interface InvalidationEffect {
-  effectKey: string;
-  barrier: {
-    barrierType: 'connection' | 'channel' | 'epoch' | 'resource';
-    workspaceId: string;
-    connectionId?: string;
-    channelId?: string;
-    resourceType?: import('@wap/tool-schemas').SlackResourceType;
-    resourceId?: string;
-    minValidRevision?: string;
-    provisional?: boolean;
-    reason: string;
-  };
-  purgeTarget?: import('@wap/tool-schemas').SlackPurgeTarget;
+export interface SlackInvalidationEffect {
+  effectKey: string; // NONNULL unique effect key (ví dụ 'provisional:' + connectionId)
+  barrier: SlackDurableBarrier;
+  purgeTarget?: SlackPurgeTarget; // Tùy chọn: bỏ qua khi chỉ cần rào cản tạm thời trước probe
 }
 
 export interface StageInTransactionInput {
   sourceEventKey: string; // namespaced "app_id:event_id" hoặc "policy_event:id"
-  effects: InvalidationEffect[];
+  effects: SlackInvalidationEffect[];
 }
 
 export interface StageInTransactionResult {
-  receiptId?: string;
+  receiptId: string; // Bắt buộc trả về
   barrierIds: string[];
   intentIds: string[];
 }
@@ -227,7 +227,7 @@ CREATE INDEX IF NOT EXISTS idx_slack_lifecycle_intents_pending ON slack_lifecycl
   - T1.2: Ràng buộc UNIQUE `(slack_app_id, event_id)`: insert trùng trả về `{ inserted: false, receipt }` idempotent.
   - T1.3: Concurrency 10 insert đồng thời: đúng 1 insert thành công, 9 trả về existing.
   - T1.4: Transaction nguyên tử receipt + lifecycle intent + 03B1 barrier: fail barrier -> rollback toàn bộ.
-  - T1.5: Phối hợp rào cản tạm thời (provisional barrier) cho `tokens_revoked`: bắt generation, commit provisional barrier qua `stageInTransaction`, giữ `config`.
+  - T1.5: Phối hợp rào cản tạm thời (provisional barrier) cho `tokens_revoked`: bắt generation per-binding, commit provisional barrier qua `stageInTransaction`, giữ `config`.
   - T1.6: Rào cản 03B1 cho `message_deleted` (tombstone vĩnh viễn) và `message_changed` (`min_valid_revision = edit_ts`), ngăn chặn resurrection.
 - [ ] **Step 2:** Chạy test; mong đợi FAIL (chưa có DDL/repo).
 - [ ] **Step 3 (GREEN Implementation):** Tạo migration `NNNN_slack_event_receipts.sql` và triển khai `SlackEventReceiptRepo.recordReceiptAtomic` phối hợp với `SlackTransactionBoundInvalidationService.stageInTransaction`.
@@ -250,11 +250,11 @@ CREATE INDEX IF NOT EXISTS idx_slack_lifecycle_intents_pending ON slack_lifecycl
   - T3.3: Sự kiện `event_callback` thiếu `api_app_id` hoặc thiếu `team_id` -> 400 (không fallback sang authorizations[0]).
   - T3.4: Parse timestamp nghiêm ngặt bằng `/^\d{1,10}(\.\d{1,6})?$/`: từ chối suffix junk như `'1730214000abc'`.
   - T3.5: Cờ automation tắt: discard tin thường trong memory; 4 sự kiện vòng đời F4 vẫn commit nguyên tử trước ACK 200.
-  - T3.6: Provisional barrier under owner lock: `withOwner(userId)` bắt generation, commit read block, giữ `config` an toàn.
+  - T3.6: Provisional barrier under owner lock per-binding: `withOwner(userId)` bắt generation, commit read block per-binding, giữ `config` an toàn.
   - T3.7: In-process hook là non-blocking wakeup: hook lỗi/chậm không làm chậm hoặc fail phản hồi 200 sau khi DB commit.
   - T3.8: Malformed lifecycle event fields: fail-closed, không fall through sang automation message processing.
 - [ ] **Step 2:** Chạy test; mong đợi FAIL.
-- [ ] **Step 3 (GREEN Implementation):** Viết `SlackIngressService` với owner advisory lock coordination, strict parsing, provisional barrier và best-effort wakeup.
+- [ ] **Step 3 (GREEN Implementation):** Viết `SlackIngressService` với owner advisory lock coordination, strict parsing, provisional barrier per-binding và best-effort wakeup.
 - [ ] **Step 4:** Chạy lại test; mong đợi PASS.
 
 ### Task 4: Express Raw Body Middleware & Ingress Route
