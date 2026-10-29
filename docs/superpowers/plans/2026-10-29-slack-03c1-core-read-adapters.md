@@ -195,3 +195,15 @@ export interface PersonalSlackAdapterConfig {
    npx vitest run packages/tool-adapters/tests/slack/personal-slack-read.test.ts
    npm run typecheck:v3
    ```
+
+---
+
+## 7. Trạng Thái Vòng r2 (30/10/2026)
+
+Review ranh giới vòng 2 tại `2a761553` đạt 0/8 PASS; đã khắc phục đủ 5 nhóm lỗi (abort xuyên deadline và hook, sanitize toàn bộ lỗi, ngân sách đầu ra thực ≤100 kèm protocol error khi provider trả vượt, kiểm tra kiểu chặt cho 8 method, binding/reference bất biến). Chi tiết và bảng bằng chứng nằm ở §6.5 của task card `docs/handoff/tasks/SLACK-03C1-core-read-adapters.md`.
+
+Kết quả hiện hành:
+- Root review: **11/11 PASS** (vòng 1) và **8/8 PASS** (`review-r2.mts`, vòng 2), exit 0.
+- Package tests: schemas **274 PASS**; adapters **519 PASS** (thêm 42 kịch bản boundary HTTP fixture).
+- `npm run typecheck:v3`: exit 0. `npm run check`: exit 0, tổng **3,343 tests PASS**.
+- **Live native Slack: NOT_RUN. Joint PostgreSQL/TokenManager/PolicyService: NOT_RUN** — cần 03B4 và F3 03B2/03B3; các test adapter không thay thế nghiệm thu native/PG.

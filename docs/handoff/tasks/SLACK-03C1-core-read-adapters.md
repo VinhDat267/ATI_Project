@@ -1,6 +1,6 @@
 # SLACK-03C1 · Bounded Read Adapters cho 8 Phương Thức Cốt Lõi Slack Cá Nhân
 
-**Trạng thái:** HOÀN THÀNH THI CÔNG (Mã nguồn, canonical schema và kiểm thử đạt chuẩn TDD).
+**Trạng thái:** HOÀN THÀNH THI CÔNG (Mã nguồn, canonical schema và kiểm thử đạt chuẩn TDD). **Vòng r2 (30/10/2026):** đã khắc phục toàn bộ 8/8 kịch bản review ranh giới transport; xem §6.5.
 **Nhánh:** `feat/slack-03c1-read-adapters`
 **Nền đối chiếu:** `f67c0b166219b93b9e336866997bfdd4c703d062` (`integration/slack-personal-20261029`).
 **PR Đích:** Draft PR to `integration/slack-personal-20261029`.
@@ -230,3 +230,24 @@ Wrapper này có trách nhiệm:
 ### 6.4. Ranh Giới Nghiệm Thu Còn Lại (Remaining Gates)
 - **Live Native Slack Calls**: **NOT_RUN** (chưa cấp quyền gọi Slack thật).
 - **Joint DB / Concurrency với PostgreSQL thật**: **NOT_RUN** (chờ Backend wrapper 03B4 kết nối `TokenManager` và `PolicyService` thực tế).
+
+### 6.5. Vòng Khắc Phục r2 (30/10/2026) — Ranh Giới Transport & Sanitization
+Review ranh giới vòng 2 tại `2a761553` chạy `review-r2.mts` đạt **0/8 PASS** (raw log `.superpowers/review-read/red-r2.log`). Toàn bộ 19 assertion của vòng 1 được giữ nguyên; các nhóm lỗi đã khắc phục trong `packages/tool-adapters`:
+
+1. **Abort xuyên suốt deadline:** `awaitWithAbort` bọc mọi private hook (`authorizeRead`, `getAccessToken`), fetch, đọc stream và backoff 429; listener được gỡ khi settle; không phát transport/nội dung sau khi hủy. `requestTimeoutMs` được kiểm tra là số nguyên dương ≤ `MAX_TIMEOUT_MS` ngay trong constructor.
+2. **Lỗi không rò rỉ:** mọi đường provider/hook/network/parse/constructor/baseURL/cause/details trả reason code và message cố định; `mapSlackError` mặc định `Slack API request failed (HTTP <status>)`; không echo token, cursor hay URL thô; giữ nguyên kịch bản opaque hook cũ.
+3. **Ngân sách đầu ra thực:** wire/default limit của từng list method ≤ 100 (mặc định 50/20/20/100/50); provider trả vượt budget -> `SERVER_ERROR` protocol thay vì `.slice` im lặng gây mất dữ liệu; body ≤ 2MB, cursor ≤ 2048, id ≤ 128, text ≤ 64000; hủy body khi oversize/429/redirect; backoff có thể hủy, tối đa 2 retry (3 lần thử) cùng epoch policy ban đầu.
+4. **Kiểm tra kiểu chặt cho cả 8 method:** field bắt buộc thiếu/sai kiểu fail-closed; `ts`/`edited.ts` phải exact decimal string `^\d{10}\.\d{6}$`; `next_cursor` chỉ string; Boolean không nhận truthy; xác minh identity/permalink khớp request; DTO whitelist, không lộ prototype/field lạ. Base URL chỉ `https://slack.com/api` hoặc loopback fixture, không userinfo/query/hash.
+5. **Binding/ref bất biến:** `deepFreeze(structuredClone(...))` cho 5 field binding và canonical 8-field reference qua mọi callback/retry; token hook nhận bản frozen; provenance giữ đúng ID/revision/ref, retention 0, không `persistentSourceEntity`; mọi write bị chặn trước transport.
+
+**Bằng chứng (head `2a761553` + working tree r2):**
+- Root review vòng 1: **11/11 PASS** (`review.mts`, exit 0); vòng 2: **8/8 PASS** (`review-r2.mts`, exit 0).
+- Tệp mới `personal-slack-boundaries.test.ts`: 42 kịch bản HTTP fixture thực (RED 25 failed/17 passed trước khi sửa), hiện **42/42 PASS**; toàn bộ test Slack của package: **76/76 PASS**.
+- `npx vitest run packages/tool-schemas`: 15 files, **274 PASS**.
+- `npx vitest run packages/tool-adapters`: 20 files, **519 PASS**.
+- `npm run typecheck:v3`: **exit 0**.
+- `npm run check` (sandbox `DATABASE_URL=postgresql://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3`): **exit 0** — `test:v3` 252 files / **2,870 tests**; eval 25 files / **406 tests**; launcher + scripts **67 tests**; tổng **3,343 tests PASS**.
+- `git diff --check`: **exit 0**.
+- **Live Native Slack Calls: NOT_RUN.** **Joint DB/Concurrency PostgreSQL với `TokenManager`/`PolicyService` thật: NOT_RUN** (chờ wrapper 03B4 và F3 03B2/03B3; bằng chứng trên chỉ chứng minh ranh giới adapter, không phải nghiệm thu native/PG).
+
+> Các số 467/477 adapters, 2,818 `test:v3` và 3,291/3,301 tổng ở §6.2–§6.3 là của vòng trước; §6.5 là số liệu hiện hành.

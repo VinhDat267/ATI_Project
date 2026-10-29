@@ -1,12 +1,20 @@
 import http from 'node:http';
 import { URL } from 'node:url';
 
+export interface PersonalSlackRequestRecord {
+  path: string;
+  query: Record<string, string>;
+}
+
 export interface PersonalSlackMockServer {
   url: string;
   close: () => Promise<void>;
   setDelayMs: (ms: number) => void;
   setRateLimitRemainingAttempts: (count: number) => void;
+  setNextResponse: (status: number, body: unknown) => void;
   getRequestsCount: () => number;
+  getRequestLog: () => PersonalSlackRequestRecord[];
+  waitForRequestCount: (count: number, timeoutMs?: number) => Promise<void>;
   reset: () => void;
 }
 
@@ -14,17 +22,43 @@ export async function createPersonalSlackMockServer(): Promise<PersonalSlackMock
   let delayMs = 0;
   let rateLimitRemainingAttempts = 0;
   let requestCount = 0;
+  let nextResponse: { status: number; body: unknown } | undefined;
+  const requestLog: PersonalSlackRequestRecord[] = [];
+  const stalledSockets = new Set<import('node:net').Socket>();
+  const requestWaiters: Array<{ count: number; resolve: () => void }> = [];
+
+  function notifyRequestWaiters(): void {
+    for (let i = requestWaiters.length - 1; i >= 0; i--) {
+      const waiter = requestWaiters[i];
+      if (waiter && requestCount >= waiter.count) {
+        requestWaiters.splice(i, 1);
+        waiter.resolve();
+      }
+    }
+  }
 
   const server = http.createServer((req, res) => {
+    let clientGone = false;
+    res.once('close', () => {
+      clientGone = true;
+    });
     requestCount++;
+    if (!stalledSockets.has(req.socket)) {
+      stalledSockets.add(req.socket);
+      req.socket.once('close', () => stalledSockets.delete(req.socket));
+    }
     const authHeader = req.headers['authorization'];
     const token = authHeader?.replace(/^Bearer\s+/i, '');
 
     const reqUrl = new URL(req.url ?? '/', `http://${req.headers.host}`);
     const pathname = reqUrl.pathname;
     const query = reqUrl.searchParams;
+    requestLog.push({ path: pathname, query: Object.fromEntries(query.entries()) });
+    notifyRequestWaiters();
 
     const execute = () => {
+      if (clientGone) return;
+
       // 1. Check redirect simulation
       if (query.get('simulate_redirect') === 'true' || query.get('types') === 'simulate_redirect') {
         res.writeHead(302, { Location: 'https://malicious-site.example.com/steal' });
@@ -82,7 +116,23 @@ export async function createPersonalSlackMockServer(): Promise<PersonalSlackMock
         return;
       }
 
-      // 5. Dispatch endpoints
+      // 5. Stream stall simulation: headers plus a partial body that never ends.
+      if (query.get('simulate_stream_stall') === 'true' || query.get('types') === 'simulate_stream_stall') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.write('{"ok":true,"channels":[');
+        return;
+      }
+
+      // 6. Exact provider response fixture (used for malformed-body boundaries).
+      if (nextResponse) {
+        const { status, body } = nextResponse;
+        nextResponse = undefined;
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        res.end(typeof body === 'string' ? body : JSON.stringify(body));
+        return;
+      }
+
+      // 7. Dispatch endpoints
       if (pathname === '/conversations.list') {
         if (workspace === 'T_WORKSPACE_A') {
           res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -473,18 +523,49 @@ export async function createPersonalSlackMockServer(): Promise<PersonalSlackMock
 
   return {
     url,
-    close: () => new Promise<void>((resolve, reject) => server.close((err) => (err ? reject(err) : resolve()))),
+    close: () => new Promise<void>((resolve, reject) => {
+      for (const socket of stalledSockets) socket.destroy();
+      stalledSockets.clear();
+      server.closeAllConnections();
+      server.close((err) => (err ? reject(err) : resolve()));
+    }),
     setDelayMs: (ms: number) => {
       delayMs = ms;
     },
     setRateLimitRemainingAttempts: (count: number) => {
       rateLimitRemainingAttempts = count;
     },
+    setNextResponse: (status: number, body: unknown) => {
+      nextResponse = { status, body };
+    },
     getRequestsCount: () => requestCount,
+    getRequestLog: () => requestLog.map((entry) => ({ path: entry.path, query: { ...entry.query } })),
+    waitForRequestCount: (count: number, timeoutMs = 5000) =>
+      new Promise<void>((resolve, reject) => {
+        if (requestCount >= count) {
+          resolve();
+          return;
+        }
+        const waiter = {
+          count,
+          resolve: () => {
+            clearTimeout(timer);
+            resolve();
+          },
+        };
+        const timer = setTimeout(() => {
+          const index = requestWaiters.indexOf(waiter);
+          if (index >= 0) requestWaiters.splice(index, 1);
+          reject(new Error(`Timed out waiting for ${count} mock server requests (saw ${requestCount})`));
+        }, timeoutMs);
+        requestWaiters.push(waiter);
+      }),
     reset: () => {
       delayMs = 0;
       rateLimitRemainingAttempts = 0;
       requestCount = 0;
+      nextResponse = undefined;
+      requestLog.length = 0;
     },
   };
 }

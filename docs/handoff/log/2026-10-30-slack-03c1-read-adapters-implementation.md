@@ -129,3 +129,32 @@ Tất cả các lệnh kiểm thử thực tế đã chạy trên môi trường
 2. Push lên nhánh `feat/slack-03c1-read-adapters` và cập nhật Draft PR tới `integration/slack-personal-20261029`.
 3. Kiểm tra hòm thư điều phối `orca orchestration check`.
 4. Gửi báo cáo `worker_done` tới Coordinator qua `orca orchestration send --type worker_done`.
+
+---
+
+## 6. Bổ Sung Vòng r2 — Khắc Phục Review Ranh Giới (30/10/2026)
+
+Review vòng 2 tại head `2a761553` chạy `.superpowers/review-read/review-r2.mts` đạt **0/8 PASS** (raw log `.superpowers/review-read/red-r2.log`). Đã khắc phục trong adapter, giữ nguyên 19 assertion vòng 1:
+
+1. **Abort/deadline:** `awaitWithAbort` bọc hook policy, hook token, fetch, đọc stream và backoff 429; listener được gỡ khi settle; không phát transport/nội dung sau khi hủy; validate `requestTimeoutMs` trong constructor.
+2. **Sanitize lỗi:** reason code/message cố định cho provider, hook, network, parse, constructor, baseURL, cause, details; không echo token/cursor/URL thô.
+3. **Ngân sách đầu ra:** default/wire limit từng list method ≤ 100; provider trả vượt -> `SERVER_ERROR` (không `.slice` im lặng); body 2MB, cursor/id/text có trần; hủy body khi oversize/429/redirect; backoff hủy được, tối đa 2 retry cùng epoch policy.
+4. **Provider shape chặt:** kiểm tra kiểu đủ 8 method, fail-closed; `ts`/`edited.ts` exact decimal; cursor chỉ string; Boolean không truthy; identity/permalink khớp request; DTO whitelist.
+5. **Binding/ref bất biến:** frozen clone 5-field binding + canonical 8-field reference qua mọi callback/retry; provenance đúng revision/ref; retention 0.
+
+**Bảng bằng chứng hiện hành (thay thế số liệu §3):**
+
+| Hạng Mục | Lệnh | Kết Quả | Trạng Thái |
+|---|---|---|---|
+| Root review vòng 1 | `node --import tsx .superpowers/review-read/review.mts` | **11/11 PASS (exit 0)** | **PASS** |
+| Root review vòng 2 | `node --import tsx .superpowers/review-read/review-r2.mts` | **8/8 PASS (exit 0)** | **PASS** |
+| Boundary suite mới | `npx vitest run packages/tool-adapters/tests/slack/personal-slack-boundaries.test.ts` | **42/42 PASS** (RED 25 failed/17 passed) | **PASS** |
+| Package Tool-Schemas | `npx vitest run packages/tool-schemas` | 15 files, **274 tests PASS** | **PASS** |
+| Package Tool-Adapters | `npx vitest run packages/tool-adapters` | 20 files, **519 tests PASS** (76 test Slack, gồm 42 boundary) | **PASS** |
+| Typecheck v3 | `npm run typecheck:v3` | **exit 0** | **PASS** |
+| Full check | `npm run check` (DATABASE_URL sandbox `127.0.0.1:55533/ati_v3`) | `test:v3` 252 files / **2,870**; eval **406**; scripts **67**; tổng **3,343 tests PASS**, exit 0 | **PASS** |
+| Diff whitespace | `git diff --check` | **exit 0** | **PASS** |
+
+**Ranh giới chưa nghiệm thu:** Live Native Slack API **NOT_RUN**; Joint DB/Concurrency PostgreSQL thật với `TokenManager`/`PolicyService` **NOT_RUN** (chờ 03B4 và F3 03B2/03B3). Các test trên chỉ chứng minh ranh giới adapter với HTTP fixture, không phải nghiệm thu native/PG.
+
+**Tệp sở hữu của vòng r2:** `packages/tool-adapters/src/slack/personal-slack-read-adapter.ts`, `packages/tool-adapters/tests/helpers/personal-slack-mock-server.ts`, `packages/tool-adapters/tests/slack/personal-slack-read.test.ts`, `packages/tool-adapters/tests/slack/personal-slack-boundaries.test.ts` (mới), cùng task card, plan và log này. Số liệu 467/477 adapters và 2,818/3,301 tổng ở §3 là của vòng trước, nay được thay bằng bảng trên.

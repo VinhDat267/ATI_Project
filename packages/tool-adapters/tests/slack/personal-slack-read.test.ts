@@ -683,7 +683,7 @@ describe('PersonalSlackReadAdapter (SLACK-03C1 8 Core Read Methods)', () => {
       expect(leaked).toBe(false);
     });
 
-    it('bounds output observations to requested limit when provider overreturns', async () => {
+    it('rejects provider overreturn instead of silently dropping observations', async () => {
       const adapter = new PersonalSlackReadAdapter({
         tokens: { getAccessToken: async () => 'xoxp-opaque-token' },
         policy: {
@@ -702,13 +702,12 @@ describe('PersonalSlackReadAdapter (SLACK-03C1 8 Core Read Methods)', () => {
           ),
       });
 
-      const result = await adapter.execute('myslack.conversations_list', {
-        binding: bindingA,
-        limit: 1,
-      });
-
-      expect(result.channels.length).toBe(1);
-      expect(result.channels[0].id).toBe('C1');
+      await expect(
+        adapter.execute('myslack.conversations_list', {
+          binding: bindingA,
+          limit: 1,
+        })
+      ).rejects.toMatchObject({ category: 'SERVER_ERROR' });
     });
 
     it('rejects truthy non-boolean provider ok flag', async () => {
