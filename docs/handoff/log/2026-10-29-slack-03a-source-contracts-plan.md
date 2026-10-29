@@ -20,10 +20,13 @@
 2. **Cổng phụ thuộc Backend 02B (Prerequisite Gate):**
    - Candidate PR #192 (`19e4e39c`) cho SLACK-02B đang trong đợt blocking review (hoàn thiện `returnTo` và policy revision / config matching).
    - Tầng hợp đồng thuần 03A (`packages/tool-schemas`) được thiết kế hoàn toàn độc lập với mã nguồn runtime backend, không import cơ sở dữ liệu nội bộ hay token mã hóa.
-   - Các module tiêu thụ backend (03B) và adapter (03C) **bắt buộc đợi 02B được nghiệm thu và merge chính thức** trước khi thi công mã nguồn.
-3. **Thỏa thuận tham chiếu chính sách với Backend (Coordinator Direction):**
-   - Nhận chỉ đạo trực tiếp từ Điều phối viên trưởng qua thông điệp `msg_cc1023f0b0f3`: Thống nhất cấu trúc `SlackPolicyReference` gồm đầy đủ `SlackBinding`, `purpose`, `requestedRetentionDays`, `providerProfileId`, `configFingerprint`, `policyVersion`, và hai trường `consentRevision` / `providerRevision` dưới dạng **chuỗi số thập phân chuẩn tắc (canonical decimal strings)** để an toàn JSON (BigInt lưu trữ nội bộ repository).
-   - Kiểm tra revalidation bắt buộc so khớp toàn bộ các trường này; nếu quyền bị thu hồi rồi cấp lại (kể cả khi trùng nhãn người dùng), `consentRevision` tăng lên sẽ làm vô hiệu hóa tham chiếu cũ ngay lập tức.
+   - Các module tiêu thụ backend (03B) và adapter (03C) **bắt buộc có giao diện 02B được chấp thuận (accepted interfaces) và staging base đã được review** (cho phép xếp chồng nhánh đã review, không ép buộc phải merge main ngay).
+3. **Thỏa thuận tham chiếu chính sách và phản hồi thẩm định từ Điều phối viên trưởng:**
+   - Thông điệp `msg_cc1023f0b0f3` & `msg_2a88ad9f579a`:
+     - Thống nhất cấu trúc `SlackPolicyReference` gồm đầy đủ `SlackBinding`, `purpose` (thuộc 5 giá trị chuẩn tắc: `'manual_lookup' | 'triage' | 'planning' | 'digest' | 'storage'`), `requestedRetentionDays`, `providerProfileId`, `configFingerprint`, `policyVersion`, và hai trường `consentRevision` / `providerRevision` dưới dạng **chuỗi số thập phân dương chuẩn tắc (canonical positive decimal strings `/^[1-9][0-9]*$/`)** để an toàn JSON; số 0 và số có số 0 ở đầu bị bác bỏ.
+     - Phân định rõ ràng giữa `globalResourceKey` (tài nguyên vật lý chung) và `ownerSourceKey` (quyền sở hữu dữ liệu mang đầy đủ `binding` và mã hoá tuple JSON, ngăn delimiter ambiguity và va chạm giữa 2 user cùng workspace).
+     - Định nghĩa `SlackPurgeTarget` dưới dạng discriminated union với tagged scopes tường minh: `authorization_disconnect` (xoá riêng người ngắt, không làm ảnh hưởng người khác), `resource_lifecycle` (xoá khi tin/file bị xoá/sửa), và `workspace_consent_revocation` (xoá toàn bộ khi tổ chức rút consent).
+     - Bounded whitelisted metadata: Giới hạn các trường siêu dữ liệu an toàn (`SlackSourceMetadata`), loại bỏ việc dùng `Record<string, unknown>` mở; định danh nội dung nguồn là `untrustedContent`.
 
 ---
 
@@ -33,11 +36,12 @@
    - Kế thừa trực tiếp `SlackBinding` và `SlackSourceRef` nguyên bản, tuyệt đối không tạo shadow duplicate.
    - Mở rộng `SlackResourceType` thành kiểu union bao phủ toàn bộ các thực thể Slack từ kiểm kê 354 method:
      `'conversation' | 'message' | 'file' | 'canvas' | 'list' | 'list_item' | 'bookmark' | 'reminder' | 'user' | 'usergroup' | 'subteam'`.
-   - Bổ sung hàm định dạng khoá phức hợp (`formatSlackCompositeResourceKey`, `formatSlackSourceKey`) bảo đảm cách ly tuyệt đối giữa các workspace, triệt tiêu nguy cơ va chạm ID kênh hoặc người dùng trùng tên/ID giữa hai tổ chức (F2).
-2. **Hợp đồng Vòng đời Nguồn, Purge Cascade & Chính sách Lưu trữ F1 (`myslack-source.ts`):**
-   - `SlackSourceEntity`: DTO đại diện cho nguồn nguyên bản trong kho nguồn, tách rời khỏi token/secrets, lưu vết `observedRevision`, `capturedAt`, `expiresAt`, `tombstonedAt`, `purgedAt`.
+   - Bổ sung hàm định dạng khoá cấu trúc tuple JSON (`formatSlackGlobalResourceKey`, `formatSlackOwnerSourceKey`) bảo đảm cách ly tuyệt đối giữa các workspace và giữa nhiều người dùng trong cùng một workspace (F2).
+2. **Hợp đồng Vòng đời Nguồn, Tagged Purge Scopes & Chính sách Lưu trữ F1 (`myslack-source.ts`):**
+   - `SlackSourceMetadata`: Giới hạn các trường an toàn (`channelId`, `channelName`, `threadTs`, `authorSlackUserId`, `authorName`, `fileName`, `fileMimeType`, `fileSizeBytes`, `isBotMessage`), lọc sạch thuộc tính thừa/nhạy cảm.
+   - `SlackSourceEntity`: DTO đại diện cho nguồn nguyên bản trong kho nguồn, bóc tách `untrustedContent`, tách rời khỏi token/secrets, lưu vết `observedRevision`, `capturedAt`, `expiresAt`, `tombstonedAt`, `purgedAt`.
    - `SlackDerivedCopyRef` & `SlackSourceLineage`: Lưu vết mọi bản sao phái sinh trên 7 loại đích (`chat_history_message`, `working_memory_entity`, `plan_step_arg`, `proposal_excerpt`, `daily_digest_entry`, `scheduled_workflow_arg`, `audit_log_entry`) nhằm bảo đảm năng lực purge cascade triệt để sau này (F3).
-   - `SlackTombstoneRecord` & `SlackPurgeTarget`: Hợp đồng chỉ định mục tiêu purge cascade khi có các sự kiện vòng đời (`source_deleted`, `source_edited`, `channel_membership_lost`, `connection_disconnected`, `app_reinstalled`, `consent_revoked`, `retention_expired`).
+   - `SlackTombstoneRecord` & `SlackPurgeTarget`: Hợp đồng chỉ định mục tiêu purge cascade với tagged scopes cụ thể, triệt tiêu nguy cơ phá dữ liệu chéo người dùng.
    - `decideSlackSourceStore`: Cổng kiểm soát lưu trữ nguồn F1; khi `retentionDays === 0`, từ chối lưu trữ lâu dài (`zero_retention_required`); từ chối lưu khi `policyVersion` không khớp với phiên bản chính sách đang hoạt động của server.
 3. **Hợp đồng Siêu Dữ Liệu Công Cụ Theo Phương Thức (`myslack-tools.ts`):**
    - Bác bỏ generic dispatcher `method + args`. Định nghĩa `SlackToolMetadata` và `SlackToolDefinition` tường minh cho từng phương thức.
@@ -82,6 +86,6 @@
 | Tài liệu quản trị (`CURRENT-STATE.md`, `ROADMAP.md`) | Không có bất kỳ thay đổi nào |
 | Tài liệu task 02 | Không sửa đổi các task card 02 |
 | Định dạng cú pháp Whitespace | `git diff --check b757ae0` sạch sẽ, exit code 0 |
-| Trạng thái git working tree | Sạch sẽ, chỉ gồm 4 file tài liệu mới tạo |
+| Trạng thái git working tree | Sạch sẽ, chỉ gồm các file tài liệu kế hoạch đã commit |
 
-Kế hoạch sẵn sàng để commit, push và mở Draft PR vào `integration/slack-personal-20261029`, sau đó gửi báo cáo `worker_done` cho Điều phối viên trưởng.
+Đã commit, push và mở Draft PR #194 trên GitHub (`integration/slack-personal-20261029`), sẵn sàng gửi báo cáo `worker_done` cho Điều phối viên trưởng.
