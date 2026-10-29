@@ -47,17 +47,18 @@ Harness phản biện độc lập của Leader tại `.superpowers/slack02b-res
 
 | Bộ kiểm thử | Kết quả thực tế | Ghi chú |
 |---|---|---|
+| `.superpowers/slack02b-resume/leader-policy-contract-review.mts` | **13/13 PASS** (EXIT 0) | Vượt qua 13 ca kiểm thử hợp đồng chính sách nghiêm ngặt (BigInt serialization, context/binding, revision canonical strings, server-owned runtime config, rejection of caller env override, endpoint & account id checks) |
 | `.superpowers/slack02b-resume/leader-policy-review.mts` | **4/4 PASS** (EXIT 0) | Vượt qua toàn bộ 4 bài test phản biện độc lập của Leader trên DB 55533 |
-| `tests/db/slack-consent-repo.test.ts` | **11/11 PASS** (1.68s) | CAS monotonic revisions, validation, 0 retention, atomic policy event, bắt buộc revision |
-| `tests/cli/slack-consent-cli.test.ts` | **6/6 PASS** (4.18s) | Spawn process CLI thật, attest, grant, revoke, flags validation, CAS conflict exit 1 |
-| `tests/services/slack-policy-service.test.ts` | **10/10 PASS** (1.87s) | 6 tiêu chí fail-closed, fingerprint mismatch, expectedPolicyReference revalidation, provider retention cap |
-| `tests/routes/slack-compatibility.test.ts` | **3/3 PASS** (1.45s) | 02A canonical envelope validation, dynamic `processingReady`, legacy aliases, HTTP mutation rejected with 404 |
-| `tests/routes/slack-connections.test.ts` | **8/8 PASS** (2.29s) | Setup OAuth, 2 flow song song, `workspaceHint`, `returnTo` validation và canonical `validateSlackCallbackResult` |
+| `tests/db/slack-consent-repo.test.ts` | **10/10 PASS** (2.20s) | CAS monotonic revisions, validation, 0 retention, atomic policy event, bắt buộc revision |
+| `tests/cli/slack-consent-cli.test.ts` | **6/6 PASS** (5.30s) | Spawn process CLI thật, attest, grant, revoke, flags validation, CAS conflict exit 1 |
+| `tests/services/slack-policy-service.test.ts` | **11/11 PASS** (2.53s) | 6 tiêu chí fail-closed, fingerprint mismatch, expectedPolicyReference revalidation, provider retention cap, string revisions, server-owned config |
+| `tests/routes/slack-compatibility.test.ts` | **3/3 PASS** (2.13s) | 02A canonical envelope validation, dynamic `processingReady`, legacy aliases, HTTP mutation rejected with 404 |
+| `tests/routes/slack-connections.test.ts` | **9/9 PASS** (3.09s) | Setup OAuth, 2 flow song song, `workspaceHint`, `returnTo` validation, canonical `validateSlackCallbackResult`, và an toàn bỏ qua returnTo nếu hội thoại bị xóa/chuyển giao |
 | `tests/db/slack-connection-repo.test.ts` | **8/8 PASS** (3.02s) | 02R callback ordering và isolation |
 | `tests/services/slack-token-manager.test.ts` | **4/4 PASS** (2.18s) | Token manager và refresh |
 | `npm run test:slack:foundation` | **56 Node + 49 Vitest PASS** (105 tests) | Foundation contract và inventory giữ nguyên 100% |
 | `npm run typecheck:v3` | **EXIT 0** | Sạch hoàn toàn lỗi TypeScript trên cả chat-api và chat-web |
-| Toàn bộ `apps/chat-api` suite | **105 files PASS, 751 tests PASS** (43.61s) | Tăng từ 747 tests lên 751 tests |
+| Toàn bộ `apps/chat-api` suite | **105 files PASS, 753 tests PASS** (44.85s) | 105 files pass toàn diện |
 | Fullcheck toàn dự án (`npm run check`) | **EXIT 0**: 2.694 v3 tests + 406 eval + 1 launcher + 66 Node = **3.167 tests PASS** | Đạt 100% chất lượng vận hành |
 | Whitespace check (`git diff --check`) | **0 lỗi** | Không có trailing whitespace hay conflict marker |
 

@@ -34,8 +34,8 @@ export function resolveRuntimeProviderIdentity(
     model = (env?.GEMINI_MODEL || 'gemini-3.8-flash').trim();
     endpoint = 'https://generativelanguage.googleapis.com';
   } else {
-    providerId = kind;
-    name = kind;
+    providerId = 'unknown';
+    name = kind || 'Unknown';
     model = (env?.LLM_MODEL || '').trim();
     endpoint = (env?.LLM_BASE_URL || '').trim().replace(/\/+$/, '');
   }
@@ -44,7 +44,8 @@ export function resolveRuntimeProviderIdentity(
     env?.RUNTIME_ACCOUNT_ID ||
     env?.LLM_ACCOUNT_ID ||
     env?.GEMINI_ACCOUNT_ID ||
-    'default'
+    env?.SLACK_POLICY_ACCOUNT_ID ||
+    ''
   ).trim();
 
   const canonicalConfig = `provider:${providerId}|name:${name}|model:${model}|endpoint:${endpoint}|account:${accountIdentifier}`;

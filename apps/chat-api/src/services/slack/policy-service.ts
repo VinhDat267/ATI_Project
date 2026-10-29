@@ -4,12 +4,18 @@ import { ALLOWED_SLACK_PURPOSES, type SlackPurpose } from '../../db/repositories
 import { resolveRuntimeProviderIdentity } from '../../config/slack-policy-runtime.js';
 
 export interface SlackPolicyReference {
-  workspaceId: string;
+  binding: SlackBinding;
+  purpose: SlackPurpose;
+  requestedRetentionDays: number;
+  providerProfileId: string;
   providerId: string;
+  configFingerprint: string;
+  configurationFingerprint: string;
   policyVersion: string;
-  consentRevision: bigint;
-  providerRevision: bigint;
+  consentRevision: string;
+  providerRevision: string;
   retentionDays: number;
+  workspaceId?: string;
 }
 
 export type SlackPolicyBlockReason =
@@ -91,9 +97,18 @@ export class SlackPolicyService {
       return deny('identity_changed');
     }
 
-    // 2. Resolve runtime provider identity and configuration fingerprint
-    const activeEnv = input.env ?? this.runtimeConfig?.env ?? process.env;
+    // 2. Resolve runtime provider identity and configuration fingerprint from server-owned config
+    const activeEnv = this.runtimeConfig?.env ?? process.env;
     const runtimeProvider = resolveRuntimeProviderIdentity(activeEnv);
+
+    if (
+      !runtimeProvider.accountIdentifier ||
+      !runtimeProvider.model ||
+      !runtimeProvider.endpoint ||
+      runtimeProvider.providerId === 'unknown'
+    ) {
+      return deny('provider_unverified');
+    }
 
     // 3. Query trusted provider in DB
     const providerRes = await this.pool.query(
@@ -129,48 +144,85 @@ export class SlackPolicyService {
       return deny('policy_changed');
     }
 
+    // 5. Consumption checks on expectedPolicyReference
     if (input.expectedPolicyReference) {
-      const ref = input.expectedPolicyReference;
-      if (ref.policyVersion !== undefined && ref.policyVersion !== consent.policy_version) {
+      const ref = input.expectedPolicyReference as Partial<SlackPolicyReference>;
+
+      const providerProfileId = ref.providerProfileId ?? ref.providerId;
+      const configFingerprint = ref.configFingerprint ?? ref.configurationFingerprint;
+
+      // Require complete canonical expected reference
+      if (
+        !ref ||
+        typeof ref !== 'object' ||
+        !ref.binding ||
+        !ref.purpose ||
+        ref.requestedRetentionDays === undefined ||
+        !providerProfileId ||
+        !configFingerprint ||
+        !ref.policyVersion ||
+        ref.consentRevision === undefined ||
+        ref.providerRevision === undefined
+      ) {
         return deny('policy_changed');
       }
-      if (ref.consentRevision !== undefined && BigInt(ref.consentRevision) !== BigInt(consent.revision)) {
+
+      // Revisions must be canonical decimal strings, not numbers or non-canonical strings
+      if (
+        typeof ref.consentRevision !== 'string' ||
+        typeof ref.providerRevision !== 'string'
+      ) {
         return deny('policy_changed');
       }
-      if (ref.providerRevision !== undefined && BigInt(ref.providerRevision) !== BigInt(provider.revision)) {
+
+      const CANONICAL_REVISION_RE = /^[1-9][0-9]*$/;
+      if (
+        !CANONICAL_REVISION_RE.test(ref.consentRevision) ||
+        !CANONICAL_REVISION_RE.test(ref.providerRevision)
+      ) {
         return deny('policy_changed');
       }
-      if (ref.workspaceId !== undefined && ref.workspaceId !== validBinding.workspaceId) {
+
+      // Check binding tampering
+      const b = ref.binding;
+      if (
+        !b ||
+        typeof b !== 'object' ||
+        b.atiUserId !== validBinding.atiUserId ||
+        b.connectionId !== validBinding.connectionId ||
+        b.workspaceId !== validBinding.workspaceId ||
+        b.slackUserId !== validBinding.slackUserId ||
+        b.identityVersion !== validBinding.identityVersion
+      ) {
+        return deny('identity_changed');
+      }
+
+      // Check purpose tampering
+      if (ref.purpose !== input.purpose) {
         return deny('policy_changed');
       }
-      if (ref.providerId !== undefined && ref.providerId !== runtimeProvider.providerId) {
-        return deny('policy_changed');
-      }
-      if (ref.retentionDays !== undefined && ref.retentionDays !== consent.retention_days) {
-        return deny('policy_changed');
-      }
-      if (ref.purpose !== undefined && ref.purpose !== input.purpose) {
-        return deny('policy_changed');
-      }
-      if (ref.requestedRetentionDays !== undefined && ref.requestedRetentionDays !== input.requestedRetentionDays) {
+
+      // Check requested retention tampering
+      if (ref.requestedRetentionDays !== input.requestedRetentionDays) {
         return deny('retention_exceeded');
       }
-      if (ref.binding) {
-        if (ref.binding.atiUserId !== undefined && ref.binding.atiUserId !== validBinding.atiUserId) {
-          return deny('identity_changed');
-        }
-        if (ref.binding.connectionId !== undefined && ref.binding.connectionId !== validBinding.connectionId) {
-          return deny('identity_changed');
-        }
-        if (ref.binding.workspaceId !== undefined && ref.binding.workspaceId !== validBinding.workspaceId) {
-          return deny('identity_changed');
-        }
-        if (ref.binding.slackUserId !== undefined && ref.binding.slackUserId !== validBinding.slackUserId) {
-          return deny('identity_changed');
-        }
-        if (ref.binding.identityVersion !== undefined && ref.binding.identityVersion !== validBinding.identityVersion) {
-          return deny('identity_changed');
-        }
+
+      // Check provider and fingerprint
+      if (
+        providerProfileId !== runtimeProvider.providerId ||
+        configFingerprint !== runtimeProvider.fingerprint
+      ) {
+        return deny('provider_unverified');
+      }
+
+      // Check policy version and revisions
+      if (
+        ref.policyVersion !== consent.policy_version ||
+        ref.consentRevision !== String(consent.revision) ||
+        ref.providerRevision !== String(provider.revision) ||
+        (ref.retentionDays !== undefined && ref.retentionDays !== consent.retention_days)
+      ) {
+        return deny('policy_changed');
       }
     }
 
@@ -183,7 +235,7 @@ export class SlackPolicyService {
       return deny('consent_missing');
     }
 
-    // 5. Retention limit check
+    // 6. Retention limit check
     if (
       input.requestedRetentionDays > consent.retention_days ||
       input.requestedRetentionDays > provider.max_retention_days
@@ -191,16 +243,28 @@ export class SlackPolicyService {
       return deny('retention_exceeded');
     }
 
-    // All fail-closed gates passed
+    // All fail-closed gates passed -> return JSON-safe policy reference
     return {
       allowed: true,
       policyReference: {
-        workspaceId: validBinding.workspaceId,
+        binding: {
+          atiUserId: validBinding.atiUserId,
+          connectionId: validBinding.connectionId,
+          workspaceId: validBinding.workspaceId,
+          slackUserId: validBinding.slackUserId,
+          identityVersion: validBinding.identityVersion,
+        },
+        purpose: input.purpose,
+        requestedRetentionDays: input.requestedRetentionDays,
+        providerProfileId: runtimeProvider.providerId,
         providerId: runtimeProvider.providerId,
+        configFingerprint: runtimeProvider.fingerprint,
+        configurationFingerprint: runtimeProvider.fingerprint,
         policyVersion: consent.policy_version,
-        consentRevision: BigInt(consent.revision),
-        providerRevision: BigInt(provider.revision),
+        consentRevision: String(consent.revision),
+        providerRevision: String(provider.revision),
         retentionDays: consent.retention_days,
+        workspaceId: validBinding.workspaceId,
       },
     };
   }
@@ -210,6 +274,15 @@ export class SlackPolicyService {
     env: Record<string, string | undefined> = this.runtimeConfig?.env ?? process.env
   ): Promise<{ processingReady: boolean; consentStatus: 'pending' | 'granted' | 'revoked' }> {
     const runtimeProvider = resolveRuntimeProviderIdentity(env);
+
+    if (
+      !runtimeProvider.accountIdentifier ||
+      !runtimeProvider.model ||
+      !runtimeProvider.endpoint ||
+      runtimeProvider.providerId === 'unknown'
+    ) {
+      return { processingReady: false, consentStatus: 'pending' };
+    }
 
     const consentRes = await this.pool.query(
       'SELECT * FROM slack_processing_consents WHERE workspace_id = $1 AND provider_id = $2',

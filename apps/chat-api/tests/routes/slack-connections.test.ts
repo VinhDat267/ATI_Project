@@ -176,4 +176,36 @@ describe('Slack connection routes through HTTP, sessions and PostgreSQL', () => 
     expect(validated.workspaceId).toBe('T_RETURN_TO');
     expect(validated.slackUserId).toBe('U_ACTOR');
   });
+
+  it('omits returnTo safely if conversation was deleted or transferred before callback', async () => {
+    const convRepo = new ConversationRepo(db.pool);
+    const a = await db.person();
+    const convA = await convRepo.createConversation(a.id);
+    const appWithConv = app(convRepo);
+
+    // Start with valid conversation
+    const startRes = await request(appWithConv)
+      .post('/api/connections/myslack/start')
+      .set('Authorization', bearer(a))
+      .send({ returnTo: `/c/${convA.id}` });
+    expect(startRes.status).toBe(200);
+    const state = new URL(startRes.body.url).searchParams.get('state')!;
+    const cookie = (startRes.headers['set-cookie'] as unknown as string[])[0]!.split(';')[0]!;
+
+    // Delete conversation before callback
+    await db.pool.query('DELETE FROM conversations WHERE id = $1', [convA.id]);
+
+    // Callback completes connection save with 200 OK, but returnTo is omitted (undefined)
+    team = 'T_DELETED_CONV';
+    const callbackRes = await request(appWithConv)
+      .post('/api/connections/myslack/callback')
+      .set('Authorization', bearer(a))
+      .set('Cookie', cookie)
+      .send({ state, code: 'CODE' });
+
+    expect(callbackRes.status).toBe(200);
+    expect(callbackRes.body.returnTo).toBeUndefined();
+    expect(callbackRes.body.connectionId).toBeDefined();
+    expect(callbackRes.body.workspaceId).toBe('T_DELETED_CONV');
+  });
 });

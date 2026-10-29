@@ -26,13 +26,14 @@ describe('Slack 02A compatibility and HTTP trust boundary', () => {
 
   const jwtSecret = 'test-jwt-secret-very-long-32-chars-at-least';
   const encryptionKey = '01234567890123456789012345678901';
-  const runtimeIdentity = resolveRuntimeProviderIdentity();
+  const testEnv = { ...process.env, RUNTIME_ACCOUNT_ID: 'TEST_COMPAT_ACCOUNT' };
+  const runtimeIdentity = resolveRuntimeProviderIdentity(testEnv);
 
   beforeAll(async () => {
     db = await createMigratedSchema('slack_compat');
     connectionRepo = new SlackConnectionRepo(db.pool);
     consentRepo = new SlackConsentRepo(db.pool);
-    policyService = new SlackPolicyService(db.pool);
+    policyService = new SlackPolicyService(db.pool, { env: testEnv });
     sessionRepo = new SessionRepo(db.pool);
     alice = await db.person('Alice');
     aliceToken = generateAccessToken({ id: alice.id, email: alice.email, name: alice.name, role: alice.role }, jwtSecret, alice.sid).accessToken;

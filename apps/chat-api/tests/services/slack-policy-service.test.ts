@@ -17,6 +17,7 @@ describe('SlackPolicyService fail-closed authorization', () => {
   const mockEnv = {
     LLM_PROVIDER: 'gemini',
     GEMINI_MODEL: 'gemini-2.5-flash',
+    RUNTIME_ACCOUNT_ID: 'TEST_POLICY_ACCOUNT',
   };
   const runtimeIdentity = resolveRuntimeProviderIdentity(mockEnv);
 
@@ -24,7 +25,7 @@ describe('SlackPolicyService fail-closed authorization', () => {
     db = await createMigratedSchema('slack_policy_svc');
     consentRepo = new SlackConsentRepo(db.pool);
     connectionRepo = new SlackConnectionRepo(db.pool);
-    policyService = new SlackPolicyService(db.pool);
+    policyService = new SlackPolicyService(db.pool, { env: mockEnv });
     alice = await db.person('Alice');
 
     // Setup active connection for Alice
@@ -91,11 +92,13 @@ describe('SlackPolicyService fail-closed authorization', () => {
     if (decision.allowed) {
       expect(decision.policyReference.workspaceId).toBe('T_POLICY_01');
       expect(decision.policyReference.providerId).toBe(runtimeIdentity.providerId);
+      expect(decision.policyReference.providerProfileId).toBe(runtimeIdentity.providerId);
+      expect(decision.policyReference.configFingerprint).toBe(runtimeIdentity.fingerprint);
       expect(decision.policyReference.policyVersion).toBe('v1.0.0');
-      expect(decision.policyReference.consentRevision).toBe(1n);
-      expect(decision.policyReference.providerRevision).toBe(1n);
-      // Zero secrets present
-      expect(JSON.stringify(decision, (_, v) => typeof v === 'bigint' ? v.toString() : v)).not.toContain('ENCRYPTED_CONFIG');
+      expect(decision.policyReference.consentRevision).toBe('1');
+      expect(decision.policyReference.providerRevision).toBe('1');
+      // Zero secrets present and serializes to ordinary JSON without bigint replacer
+      expect(JSON.stringify(decision)).not.toContain('ENCRYPTED_CONFIG');
     }
   });
 
@@ -221,9 +224,11 @@ describe('SlackPolicyService fail-closed authorization', () => {
     const alteredEnv = {
       LLM_PROVIDER: 'gemini',
       GEMINI_MODEL: 'gemini-1.5-pro',
+      RUNTIME_ACCOUNT_ID: 'TEST_POLICY_ACCOUNT',
     };
+    const alteredPolicyService = new SlackPolicyService(db.pool, { env: alteredEnv });
 
-    const decision = await policyService.resolveSlackModelPolicy({
+    const decision = await alteredPolicyService.resolveSlackModelPolicy({
       binding: {
         atiUserId: alice.id,
         connectionId,
@@ -233,7 +238,6 @@ describe('SlackPolicyService fail-closed authorization', () => {
       },
       purpose: 'triage',
       requestedRetentionDays: 0,
-      env: alteredEnv,
     });
     expect(decision.allowed).toBe(false);
     if (!decision.allowed) {
@@ -330,34 +334,112 @@ describe('SlackPolicyService fail-closed authorization', () => {
   });
 
   it('marks processingReady false when consent retention exceeds provider max retention cap', async () => {
+    const envLowCap = {
+      LLM_PROVIDER: 'openai-compatible',
+      LLM_MODEL: 'test-model',
+      LLM_BASE_URL: 'http://127.0.0.1:8000',
+      RUNTIME_ACCOUNT_ID: 'TEST_ACCT',
+    };
+    const runtimeLowCap = resolveRuntimeProviderIdentity(envLowCap);
+    const existing = await consentRepo.getTrustedProvider(runtimeLowCap.providerId);
+
     // Provider with maxRetentionDays = 5
     await consentRepo.attestProvider({
-      id: 'provider-low-cap',
-      name: 'Low Cap Provider',
+      id: runtimeLowCap.providerId,
+      name: runtimeLowCap.name,
       verified: true,
       noTraining: true,
       maxRetentionDays: 5,
-      configurationFingerprint: runtimeIdentity.fingerprint,
+      configurationFingerprint: runtimeLowCap.fingerprint,
       evidenceRef: 'EVID-LOW-CAP',
       verifiedBy: 'operator@example.com',
       verifiedAt: new Date(),
+      expectedRevision: existing?.revision,
     });
 
+    const existingConsent = await consentRepo.getConsent('T_EXCEED_CAP', runtimeLowCap.providerId);
     // Consent with retentionDays = 10 (exceeds 5)
     await consentRepo.grantConsent({
       workspaceId: 'T_EXCEED_CAP',
-      providerId: 'provider-low-cap',
+      providerId: runtimeLowCap.providerId,
       policyVersion: 'v1.0.0',
       purposes: ['triage'],
       retentionDays: 10,
       organizationRepresentative: 'Rep',
       evidenceRef: 'DPA',
       recordedBy: 'operator',
+      expectedRevision: existingConsent?.revision,
     });
 
-    const envLowCap = { ...mockEnv, LLM_PROVIDER: 'provider-low-cap' };
     const ready = await policyService.checkProcessingReady('T_EXCEED_CAP', envLowCap);
     expect(ready.processingReady).toBe(false);
     expect(ready.consentStatus).toBe('granted');
+  });
+
+  it('rejects empty expectedPolicyReference and missing binding', async () => {
+    const valid = await policyService.resolveSlackModelPolicy({
+      binding: {
+        atiUserId: alice.id,
+        connectionId,
+        workspaceId: 'T_POLICY_01',
+        slackUserId: 'U_ALICE_SLACK',
+        identityVersion: 1,
+      },
+      purpose: 'triage',
+      requestedRetentionDays: 0,
+      env: mockEnv,
+    });
+    expect(valid.allowed).toBe(true);
+    const ref = (valid as any).policyReference;
+
+    // Empty expectedPolicyReference
+    const emptyCheck = await policyService.resolveSlackModelPolicy({
+      binding: {
+        atiUserId: alice.id,
+        connectionId,
+        workspaceId: 'T_POLICY_01',
+        slackUserId: 'U_ALICE_SLACK',
+        identityVersion: 1,
+      },
+      purpose: 'triage',
+      requestedRetentionDays: 0,
+      expectedPolicyReference: {} as any,
+      env: mockEnv,
+    });
+    expect(emptyCheck.allowed).toBe(false);
+
+    // Missing binding in expectedPolicyReference
+    const missingBinding = { ...ref };
+    delete missingBinding.binding;
+    const missingBindingCheck = await policyService.resolveSlackModelPolicy({
+      binding: {
+        atiUserId: alice.id,
+        connectionId,
+        workspaceId: 'T_POLICY_01',
+        slackUserId: 'U_ALICE_SLACK',
+        identityVersion: 1,
+      },
+      purpose: 'triage',
+      requestedRetentionDays: 0,
+      expectedPolicyReference: missingBinding,
+      env: mockEnv,
+    });
+    expect(missingBindingCheck.allowed).toBe(false);
+
+    // Noncanonical revision string e.g. '01'
+    const noncanonicalCheck = await policyService.resolveSlackModelPolicy({
+      binding: {
+        atiUserId: alice.id,
+        connectionId,
+        workspaceId: 'T_POLICY_01',
+        slackUserId: 'U_ALICE_SLACK',
+        identityVersion: 1,
+      },
+      purpose: 'triage',
+      requestedRetentionDays: 0,
+      expectedPolicyReference: { ...ref, consentRevision: '01' },
+      env: mockEnv,
+    });
+    expect(noncanonicalCheck.allowed).toBe(false);
   });
 });

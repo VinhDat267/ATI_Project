@@ -68,14 +68,14 @@ Triển khai phần backend còn lại của SLACK-02, trọng tâm là **Chính
 - [x] Các tests hiện hữu của PR #184 và 02R tiếp tục pass 100% nhờ lớp tương thích chuẩn 02A (`validateSlackConnectionPublicInfo` + safe legacy aliases).
 - [x] Không có secret hay token nào bị lọt vào log, exception hay API responses.
 - [x] `npm run typecheck:v3` đạt exit code 0; `npm run check` toàn diện đạt 3,167 tests pass (exit code 0); `git diff --check` đạt 0 lỗi whitespace.
-- [x] Vượt qua 4/4 ca kiểm thử phản biện độc lập của Leader (`.superpowers/slack02b-resume/leader-policy-review.mts` EXIT 0): model Gemini 3.8 Flash, bắt buộc CAS revision trên update/revoke hàng hiện hữu, unready khi retention > provider cap, và từ chối policyReference cũ sau khi revoke/regrant.
-- [x] Hỗ trợ đầy đủ luồng điều hướng `returnTo` (`/c/<uuid>` kiểm tra quyền sở hữu hội thoại, lưu vào state và bảo toàn tới callback kết quả) cùng tham số gợi ý workspace `workspaceHint`.
+- [x] Vượt qua 4/4 ca kiểm thử phản biện độc lập của Leader (`.superpowers/slack02b-resume/leader-policy-review.mts` EXIT 0) và 13/13 ca kiểm thử hợp đồng chính sách nghiêm ngặt (`.superpowers/slack02b-resume/leader-policy-contract-review.mts` EXIT 0).
+- [x] Hỗ trợ đầy đủ luồng điều hướng `returnTo` (`/c/<uuid>` kiểm tra quyền sở hữu hội thoại, lưu vào state và bảo toàn tới callback kết quả; tái kiểm tra quyền sở hữu khi callback để an toàn bỏ qua nếu hội thoại bị xóa/chuyển giao) cùng tham số gợi ý workspace `workspaceHint`.
 
 ---
 
 ## 4. Kết Quả Triển Khai
 
-- **Trạng thái:** Hoàn thành (Completed & Leader Regressions Addressed).
+- **Trạng thái:** Hoàn thành (Completed & Leader Contract Regressions Addressed).
 - **Branch:** `feat/slack-02b-consent-backend`.
 - **Base Integration Branch:** `integration/slack-personal-20261029`.
 - **PR:** #192 (Draft PR).
@@ -83,21 +83,28 @@ Triển khai phần backend còn lại của SLACK-02, trọng tâm là **Chính
   - `db/v3/0016_slack_processing_consents.sql`: Tạo bảng `slack_trusted_providers`, `slack_processing_consents`, `slack_policy_events` với monotonic `revision`, constraints chặt chẽ; bổ sung cột và constraint `return_to` cho `slack_oauth_states`.
   - `apps/chat-api/src/db/repositories/slack-consent-repo.ts`: Quản lý CAS atomic update, monotonic revisions, bắt buộc `expectedRevision` khi update/revoke bản ghi hiện hữu (`SLACK_CAS_REVISION_REQUIRED`), retentionDays >= 0, và lưu vết `slack_policy_events`.
   - `apps/chat-api/src/db/repositories/slack-connection-repo.ts`: Lưu trữ và trả về `returnTo` trong `start` và `consume`.
-  - `apps/chat-api/src/config/slack-policy-runtime.ts`: Tính toán SHA-256 configuration fingerprint từ runtime model environment (khớp model mặc định `gemini-3.8-flash` từ `packages/planner`, không bịa đặt cấu hình openai-compatible, gắn `accountIdentifier` không chứa bí mật).
+  - `apps/chat-api/src/config/slack-policy-runtime.ts`: Tính toán SHA-256 configuration fingerprint từ runtime model environment (khớp model mặc định `gemini-3.8-flash` từ `packages/planner`, không bịa đặt cấu hình openai-compatible, gắn `accountIdentifier` không chứa bí mật, không cấp fixture account ngầm định, từ chối provider kind lạ).
   - `apps/chat-api/src/cli/slack-consent.ts`: Operator CLI (`attest-provider`, `grant`, `revoke`, `list`) với argument parsing, validation, CAS support.
-  - `apps/chat-api/src/services/slack/policy-service.ts`: `resolveSlackModelPolicy` thẩm định fail-closed 6 tiêu chí, kiểm tra toàn diện `expectedPolicyReference` (từ chối policyReference cũ khi revoke/regrant); `checkProcessingReady` tính toán dynamic readiness (chặn unready khi retention vượt trần provider).
+  - `apps/chat-api/src/services/slack/policy-service.ts`: `resolveSlackModelPolicy` thẩm định fail-closed 6 tiêu chí, kiểm tra toàn diện `expectedPolicyReference` (JSON serializable, chuỗi revision chính tắc `^[1-9][0-9]*$`, từ chối tham chiếu cũ sau revoke/regrant, khóa chặt server-owned runtime config không tin cậy request env, bắt buộc endpoint thật và account id thật); `checkProcessingReady` tính toán dynamic readiness (chặn unready khi retention vượt trần provider).
   - `apps/chat-api/src/services/slack/oauth-client.ts`: Hỗ trợ tham số `team` (gợi ý workspace) trong `authorizationUrl`.
-  - `apps/chat-api/src/routes/connections/slack.ts`: Trả về `SlackConnectionPublicInfo` chuẩn 02A (`slackUserId`, `slackUserLabel`, `consentStatus`, dynamic `processingReady`), bảo toàn safe legacy aliases (`actorId`, `processingStatus`), xử lý `returnTo` và trả về envelope `SlackCallbackResult` (`connectionId`, `returnTo`).
+  - `apps/chat-api/src/routes/connections/slack.ts`: Trả về `SlackConnectionPublicInfo` chuẩn 02A (`slackUserId`, `slackUserLabel`, `consentStatus`, dynamic `processingReady`), bảo toàn safe legacy aliases (`actorId`, `processingStatus`), xử lý `returnTo` và trả về envelope `SlackCallbackResult` (`connectionId`, `returnTo`), tái kiểm tra sở hữu hội thoại khi callback để an toàn bỏ qua nếu hội thoại bị xóa/chuyển giao.
   - `apps/chat-api/src/app.ts`: Gắn `conversationOwner` vào `createSlackConnectionRoutes`.
   - `apps/chat-api/package.json`: Thêm script `"admin:slack-consent"`.
 - **Bằng chứng kiểm thử thực tế:**
+  - `.superpowers/slack02b-resume/leader-policy-contract-review.mts`: **13/13 tests PASS (EXIT 0)** (JSON BigInt fix, full binding/context, empty reference rejection, tampered binding rejection, cross-user in same workspace rejection, noncanonical revision string rejection, server-owned runtime provider configuration, canonical policy reference roundtrips without invented legacy fields, numeric revision rejection, unconfigured service cannot trust caller-supplied env, missing explicit account identity never receives implicit fixture account, unknown runtime provider kind remains unverified, openai-compatible missing actual endpoint remains unverified).
   - `.superpowers/slack02b-resume/leader-policy-review.mts`: **4/4 tests PASS (EXIT 0)** (mô hình 3.8, CAS bắt buộc, unready khi vượt trần retention, từ chối reference cũ).
-  - `apps/chat-api/tests/db/slack-consent-repo.test.ts`: **11/11 tests PASS** (PostgreSQL CAS, retention 0, events atomicity, repeat migration, bắt buộc revision).
+  - `apps/chat-api/tests/db/slack-consent-repo.test.ts`: **10/10 tests PASS** (PostgreSQL CAS, retention 0, events atomicity, repeat migration, bắt buộc revision).
   - `apps/chat-api/tests/cli/slack-consent-cli.test.ts`: **6/6 tests PASS** (spawn CLI child process, validation, CAS conflict).
-  - `apps/chat-api/tests/services/slack-policy-service.test.ts`: **10/10 tests PASS** (fail-closed gates, fingerprint mismatch, purpose checks, expectedPolicyReference revalidation, provider retention cap).
+  - `apps/chat-api/tests/services/slack-policy-service.test.ts`: **11/11 tests PASS** (fail-closed gates, fingerprint mismatch, purpose checks, expectedPolicyReference revalidation, provider retention cap, canonical revisions string, server-owned config).
   - `apps/chat-api/tests/routes/slack-compatibility.test.ts`: **3/3 tests PASS** (02A envelope validation, legacy aliases, HTTP mutation rejected with 404).
-  - `apps/chat-api/tests/routes/slack-connections.test.ts`: **8/8 tests PASS** (setup routes, parallel flows, workspaceHint, returnTo validation và canonical callback result).
+  - `apps/chat-api/tests/routes/slack-connections.test.ts`: **9/9 tests PASS** (setup routes, parallel flows, workspaceHint, returnTo validation, canonical callback result, safe returnTo omission when conversation deleted/transferred).
   - `apps/chat-api/tests/db/slack-connection-repo.test.ts`: **8/8 tests PASS** (02R callback ordering và isolation).
+  - `apps/chat-api/tests/services/slack-token-manager.test.ts`: **4/4 tests PASS** (token manager và refresh).
+  - `npm run test:slack:foundation`: **56 Node + 49 Vitest PASS** (105 tests).
+  - `npm run typecheck:v3`: **EXIT 0** (0 lỗi TypeScript).
+  - Toàn bộ `apps/chat-api` suite: **105 files PASS, 753 tests PASS**.
+  - Fullcheck toàn dự án (`npm run check`): **EXIT 0**: 2.694 v3 tests + 406 eval + 1 launcher + 66 Node = **3.167 tests PASS**.
+  - Whitespace check (`git diff --check`): **0 lỗi**.
   - `apps/chat-api/tests/services/slack-token-manager.test.ts`: **4/4 tests PASS**.
   - `npm run test:slack:foundation`: **56 node tests + 49 vitest tests PASS (105 tests)**.
   - `npm run typecheck:v3`: **EXIT 0**.

@@ -118,13 +118,23 @@ export function createSlackConnectionRoutes(options: SlackConnectionsOptions): R
       const config = encryptCredentials({ accessToken: grant.accessToken, ...(grant.refreshToken ? { refreshToken: grant.refreshToken, expiresAt: clock() + grant.expiresIn! * 1000 } : {}) }, options.encryptionKey);
       const row = await options.repo.save(who.id, consumed.id, { ...grant, config }, clock);
       if (!row) { fail(res, 'SLACK_STATE_INVALID'); return; }
+
+      // Recheck conversation ownership on callback: if deleted or transferred, omit returnTo safely
+      let returnTo: string | undefined = undefined;
+      if (consumed.returnTo) {
+        const verified = await ownConversation(consumed.returnTo, who.id);
+        if (verified) {
+          returnTo = verified;
+        }
+      }
+
       let readiness: { processingReady?: boolean; consentStatus?: 'pending' | 'granted' | 'revoked' } = {};
       try { readiness = await policyService.checkProcessingReady(row.workspace_id); } catch { readiness = { processingReady: false, consentStatus: 'pending' }; }
       const view = slackConnectionView(row, readiness);
       res.json({
         ...view,
         connectionId: row.id,
-        ...(consumed.returnTo ? { returnTo: consumed.returnTo } : {}),
+        ...(returnTo ? { returnTo } : {}),
       });
     } catch (e) { fail(res, e instanceof Error && e.message === 'SLACK_IDENTITY_CONFLICT' ? e.message : 'SLACK_CONNECT_FAILED'); }
   });
