@@ -1,5 +1,11 @@
 import { expect, it } from 'vitest';
-import { GMAIL_SERVICE, SERVICE_REGISTRY, type ServiceDefinition } from '../src/index.js';
+import {
+  ALL_TOOLS,
+  GMAIL_SERVICE,
+  SERVICE_REGISTRY,
+  MYSLACK_SAMPLE_TOOLS,
+  type ServiceDefinition,
+} from '../src/index.js';
 
 const banned = new Set(['lịch', 'bảng', 'trang', 'tin nhắn', 'message', 'thông báo', 'báo', 'kênh', 'channel', 'issue', 'issues', 'task', 'tasks', 'chat', 'nhóm', 'page', 'database', 'sprint', 'board', 'list', 'note', 'dòng', 'row']);
 // Existing intent behavior is the routing baseline. Only these exact old words are grandfathered.
@@ -41,4 +47,14 @@ it.each([...banned])('rejects new-service generic phrase %s but permits longer s
   const other = { ...SERVICE_REGISTRY[0]!, id: 'demo', name: 'Demo', intentKeywords: [phrase], fallbackIntentKeywords: [] };
   expect(problems([other])).toEqual(['banned: ' + phrase]);
   expect(problems([{ ...other, intentKeywords: ['lên lịch', 'demo ' + phrase] }])).toEqual([]);
+});
+
+it('guarantees personal Slack tools are isolated from default discovery catalogs', () => {
+  expect(ALL_TOOLS.some(t => t.service === 'myslack')).toBe(false);
+  expect(SERVICE_REGISTRY.some(s => s.id === 'myslack')).toBe(false);
+  for (const tool of MYSLACK_SAMPLE_TOOLS) {
+    expect(ALL_TOOLS.some(t => t.name === tool.name)).toBe(false);
+    expect(tool.service).toBe('myslack');
+    expect(tool.requiresBinding).toBe(true);
+  }
 });
