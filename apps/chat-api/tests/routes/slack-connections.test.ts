@@ -13,10 +13,25 @@ describe('Slack connection routes through HTTP, sessions and PostgreSQL', () => 
   beforeAll(async () => {
     db = await createMigratedSchema('slack_routes'); repo = new SlackConnectionRepo(db.pool);
     server = createServer(async (req, res) => {
-      for await (const _ of req) { /* drain */ } calls++; res.setHeader('Content-Type', 'application/json');
-      if (req.url === '/api/auth.test') res.end(JSON.stringify(revoked ? { ok: false, error: 'token_revoked' } : { ok: true, team_id: team, user_id: 'U_ACTOR' }));
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      const body = Buffer.concat(chunks).toString('utf8');
+      const params = new URLSearchParams(body);
+      const code = params.get('code');
+      const authHeader = req.headers.authorization ?? '';
+      calls++; res.setHeader('Content-Type', 'application/json');
+      if (req.url === '/api/auth.test') {
+        const teamForToken = authHeader.includes('TOKEN_FOR_T1') ? 'T_ROUTE_1'
+          : authHeader.includes('TOKEN_FOR_T2') ? 'T_ROUTE_2'
+          : team;
+        res.end(JSON.stringify(revoked ? { ok: false, error: 'token_revoked' } : { ok: true, team_id: teamForToken, user_id: 'U_ACTOR' }));
+      }
       else if (req.url === '/api/auth.revoke') res.end(JSON.stringify({ ok: true, revoked: true }));
-      else res.end(JSON.stringify({ ok: true, app_id: 'A_APP', team: { id: team, name: 'Same name' }, authed_user: { id: 'U_ACTOR', token_type: 'user', access_token: 'SECRET_ACCESS_TOKEN', scope: SLACK_USER_SCOPES.join(',') } }));
+      else {
+        const teamForCode = code === 'CODE_T1' ? 'T_ROUTE_1' : code === 'CODE_T2' ? 'T_ROUTE_2' : team;
+        const tokenForCode = code === 'CODE_T1' ? 'TOKEN_FOR_T1' : code === 'CODE_T2' ? 'TOKEN_FOR_T2' : 'SECRET_ACCESS_TOKEN';
+        res.end(JSON.stringify({ ok: true, app_id: 'A_APP', team: { id: teamForCode, name: 'Workspace ' + teamForCode }, authed_user: { id: 'U_ACTOR', token_type: 'user', access_token: tokenForCode, scope: SLACK_USER_SCOPES.join(',') } }));
+      }
     });
     await new Promise<void>(r => server.listen(0, '127.0.0.1', r)); origin = `http://127.0.0.1:${(server.address() as any).port}`;
   });
@@ -28,7 +43,7 @@ describe('Slack connection routes through HTTP, sessions and PostgreSQL', () => 
     const r = await request(app()).post('/api/connections/myslack/start').set('Authorization', bearer(a));
     expect(r.status).toBe(200); return { state: new URL(r.body.url).searchParams.get('state')!, cookie: (r.headers['set-cookie'] as unknown as string[])[0]!.split(';')[0]! };
   }
-  const finish = (a: any, f: any) => request(app()).post('/api/connections/myslack/callback').set('Authorization', bearer(a)).set('Cookie', f.cookie).send({ code: 'CODE', state: f.state });
+  const finish = (a: any, f: any, code = 'CODE') => request(app()).post('/api/connections/myslack/callback').set('Authorization', bearer(a)).set('Cookie', f.cookie).send({ code, state: f.state });
   it('is absent when not configured and requires a persistent session when enabled', async () => {
     const a = await db.person();
     expect((await request(createApp({ jwtSecret: secret })).get('/api/connections/myslack')).status).toBe(404);
@@ -69,5 +84,30 @@ describe('Slack connection routes through HTTP, sessions and PostgreSQL', () => 
     const check = await request(app()).post(`/api/connections/myslack/${connected.body.id}/check`).set('Authorization', bearer(a));
     expect(check.body.status).toBe('reconnect_required');
     expect((await repo.list(a.id))[0]).toMatchObject({ status: 'reconnect_required', config: null }); revoked = false;
+  });
+  it('allows two parallel OAuth flows to both complete for different workspaces', async () => {
+    const a = await db.person();
+    // 1. Start first flow, receiving browser cookie
+    const start1 = await request(app()).post('/api/connections/myslack/start').set('Authorization', bearer(a));
+    expect(start1.status).toBe(200);
+    const cookie = (start1.headers['set-cookie'] as unknown as string[])[0]!.split(';')[0]!;
+    const state1 = new URL(start1.body.url).searchParams.get('state')!;
+
+    // 2. Start second flow in the same browser session (passing shared browser cookie)
+    const start2 = await request(app()).post('/api/connections/myslack/start').set('Authorization', bearer(a)).set('Cookie', cookie);
+    expect(start2.status).toBe(200);
+    const state2 = new URL(start2.body.url).searchParams.get('state')!;
+
+    // 3. Complete both callbacks concurrently via Promise.all
+    const [r1, r2] = await Promise.all([
+      finish(a, { state: state1, cookie }, 'CODE_T1'),
+      finish(a, { state: state2, cookie }, 'CODE_T2'),
+    ]);
+    expect(r1.status).toBe(200);
+    expect(r2.status).toBe(200);
+    expect(r1.body.workspaceId).toBe('T_ROUTE_1');
+    expect(r2.body.workspaceId).toBe('T_ROUTE_2');
+    const list = await request(app()).get('/api/connections/myslack').set('Authorization', bearer(a));
+    expect(list.body.connections).toHaveLength(2);
   });
 });
