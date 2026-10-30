@@ -41,4 +41,4 @@ Interfaces: `SlackIdentityClient(apiBaseUrl,fetchFn?)` exposes verify only (boun
 
 - [x] Run `npm run check` against isolated PostgreSQL55533; expected exit0.
 - [x] One fresh independent whole-branch review; fix actionable findings directly with RED→GREEN, rerun checks. Rule explicitly on deferred limits.
-- [ ] Fill card/log and publish draft staging PR; await exact-head CI before staging integration. No main/live enable/fullF4 claim.
+- [x] Fill card/log and publish draft staging PR; await exact-head CI before staging integration. No main/live enable/fullF4 claim.
