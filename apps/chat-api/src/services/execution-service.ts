@@ -1,12 +1,13 @@
 import type { PlanRepo, PlanRow } from '../db/repositories/plan-repo.js';
 import type { StepRepo } from '../db/repositories/step-repo.js';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
-import { StepRunner, ExecutionController, type StepState } from '@wap/executor';
+import { StepRunner, ExecutionController, type StepState,type StepOutputs,type ExecuteStepOptions } from '@wap/executor';
 import type { PlanStep } from '@wap/tool-schemas';
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { readableRecoveryPlan, recoveryConflict, restoredProgress, validateRecoveryAction, verifiedRecoveryPlan, verifiedRecoverySteps } from './execution-recovery.js';
 import type { AdapterContext } from './adapter-factory.js';
+import { isSlackSourceArtifact } from './slack/slack-plan-lineage.js';
 
 export interface ApproveResult {
   success: boolean;
@@ -41,6 +42,7 @@ export class ExecutionService {
   private queuedStarts = new Set<string>();
   private stopRequests = new Set<string>();
   private executionOutcomes = new Map<string, { status: string; pausedStepId?: string }>();
+  private sourceSnapshots = new Map<string,{hash:string;userId:string}>();
 
   constructor(options: ExecutionServiceOptions) {
     this.planRepo = options.planRepo;
@@ -48,6 +50,14 @@ export class ExecutionService {
     this.convRepo = options.convRepo;
     this.adapterFactory = options.adapterFactory;
     this.sseManager = options.sseManager;
+  }
+
+  private emitExecution(convId:string,event:string,payload:any):void{
+    if(this.sourceSnapshots.has(payload?.planId)){
+      this.sseManager?.emitEvent(convId,'source_changed',{planId:payload.planId,reload:true});
+      return;
+    }
+    this.sseManager?.emitEvent(convId,event,payload);
   }
 
   getPlanRepo(): PlanRepo {
@@ -71,18 +81,24 @@ export class ExecutionService {
     } catch (persistError) {
       console.error('Failed to persist failed plan status:', persistError);
     }
-    this.sseManager?.emitEvent(convId, 'exec_done', {
+    this.emitExecution(convId, 'exec_done', {
       planId, status: 'failed', error: { message: err instanceof Error ? err.message : 'Execution persistence failed' },
     });
   }
 
   async getOwnedPlan(planId: string, userId: string) {
-    const plan = await this.planRepo.getPlan(planId);
+    const plan = await this.planRepo.getPlan(planId,'planning');
     if (!plan) throw Object.assign(new Error('Plan not found'), { status: 404 });
     if (!userId || !this.convRepo) throw Object.assign(new Error('Ownership verification unavailable'), { status: 403 });
     const conversation = await this.convRepo.getConversation(plan.conv_id);
     if (!conversation || conversation.user_id !== userId) {
       throw Object.assign(new Error('Forbidden: you do not own this plan'), { status: 403 });
+    }
+    if(isSlackSourceArtifact(plan)){
+      if(!this.stepRepo)throw Object.assign(new Error('SLACK_EXECUTION_STORAGE_REQUIRED'),{status:409});
+      const old=this.sourceSnapshots.get(planId);
+      if(old&&old.hash!==plan.plan_hash)throw Object.assign(new Error('SLACK_SOURCE_UNAVAILABLE'),{status:409});
+      this.sourceSnapshots.set(planId,{hash:plan.plan_hash,userId});
     }
     return plan;
   }
@@ -133,7 +149,7 @@ export class ExecutionService {
     const steps: PlanStep[] = planJson?.steps || [];
 
     // Emit exec_start
-    this.sseManager?.emitEvent(convId, 'exec_start', { planId });
+    this.emitExecution(convId, 'exec_start', { planId });
 
     // Launch background execution
     this.queuedStarts.add(planId);
@@ -142,7 +158,7 @@ export class ExecutionService {
       this.activeRuns.set(planId, run);
       this.queuedStarts.delete(planId);
       run.catch((err) => {
-        this.sseManager?.emitEvent(convId, 'error', {
+        this.emitExecution(convId, 'error', {
           planId,
           message: err?.message || 'Unexpected execution error',
         });
@@ -162,12 +178,25 @@ export class ExecutionService {
   private buildController(convId: string, planId: string, steps: PlanStep[], dbIds: Map<string, string>, context: AdapterContext, initialStates?: Record<string, StepState>) {
     return new ExecutionController({
       // The executor keeps its interface; who runs and which connection was previewed travel in this closure.
-      runner: new StepRunner({ getAdapter: serviceName => this.adapterFactory.getAdapterForService(serviceName, context) }),
+      runner: {executeStep:async(step:PlanStep,outputs:StepOutputs,runOptions?:ExecuteStepOptions)=>new StepRunner({ getAdapter: async serviceName => {
+        const adapter=await this.adapterFactory.getAdapterForService(serviceName,context),source=this.sourceSnapshots.get(planId);
+        if(!source)return adapter;
+        return {execute:async(tool:string,args:any,options?:{signal?:AbortSignal})=>{
+          const detached=structuredClone(args);
+          const freeze=(value:any):any=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};freeze(detached);
+          if(tool.startsWith('myslack.')||step.tool!==tool)throw Object.assign(new Error('SLACK_DISPATCH_BINDING_REQUIRED'),{category:'AUTH_ERROR',details:{requestSent:false}});
+          await this.planRepo.assertSourceDispatchAllowed(planId,source.userId,source.hash,step.id,tool,options?.signal);
+          options?.signal?.throwIfAborted();return adapter.execute(tool,detached,options);
+        }};
+      } }).executeStep(step,outputs,runOptions)},
       steps, initialStates,
       onStepUpdate: async (stepId, state) => {
         const dbId = dbIds.get(stepId);
-        if (dbId && this.stepRepo) await this.stepRepo.updateStepStatus(dbId, state.status, state.output, state.error);
-        this.sseManager?.emitEvent(convId, 'exec_step', {
+        if (dbId && this.stepRepo) {
+          const saved=await this.stepRepo.updateStepStatus(dbId,state.status,state.output,state.error);
+          if(isSlackSourceArtifact(saved)&&saved.status!==state.status)throw new Error('SLACK_SOURCE_UNAVAILABLE');
+        }
+        this.emitExecution(convId, 'exec_step', {
           planId, stepId, status: state.status, output: state.output, error: state.error,
         });
       },
@@ -181,14 +210,14 @@ export class ExecutionService {
     const { steps, connections } = verifiedRecoveryPlan(plan);
     // Callers checked ownership with getOwnedPlan; claimRecovery checks it again in SQL.
     const context = this.executionContext(userId, connections);
-    const before = restoredProgress(steps, await this.stepRepo.listSteps(plan.id));
+    const before = restoredProgress(steps, await this.stepRepo.listSteps(plan.id,'planning'));
     validateRecoveryAction(plan.status, before.states, stepId, action);
     if (!await this.planRepo.claimRecovery(plan, userId, 'executing')) {
       throw recoveryConflict('Execution changed or recovery is already running');
     }
     try {
       // Read progress after the CAS: a stale request must not replay an earlier snapshot.
-      const saved = restoredProgress(steps, await this.stepRepo.listSteps(plan.id));
+      const saved = restoredProgress(steps, await this.stepRepo.listSteps(plan.id,'planning'));
       validateRecoveryAction(plan.status, saved.states, stepId, action);
       const controller = this.buildController(plan.conv_id, plan.id, steps, saved.dbIds, context, saved.states);
       this.activeControllers.set(plan.id, controller);
@@ -225,7 +254,7 @@ export class ExecutionService {
       const summary = await controller.runUntilPause();
       await this.planRepo.updatePlanStatus(planId, summary.status);
       this.executionOutcomes.set(planId, { status: summary.status, pausedStepId: summary.pausedAtStepId });
-      this.sseManager?.emitEvent(convId, 'exec_done', { planId, ...summary });
+      this.emitExecution(convId, 'exec_done', { planId, ...summary });
     } catch (err: any) {
       await this.markExecutionFailed(planId, convId, err);
     }
@@ -246,13 +275,13 @@ export class ExecutionService {
     }
     const controller = await this.restoreController(plan, userId, '', 'continue');
     this.executionOutcomes.delete(planId);
-    this.sseManager?.emitEvent(plan.conv_id, 'exec_start', { planId });
+    this.emitExecution(plan.conv_id, 'exec_start', { planId });
     const run = (async () => {
       try {
         const summary = await controller.runUntilPause();
         await this.planRepo.updatePlanStatus(planId, summary.status);
         this.executionOutcomes.set(planId, { status: summary.status, pausedStepId: summary.pausedAtStepId });
-        this.sseManager?.emitEvent(plan.conv_id, 'exec_done', { planId, ...summary });
+        this.emitExecution(plan.conv_id, 'exec_done', { planId, ...summary });
         return summary;
       } catch (err) {
         await this.markExecutionFailed(planId, plan.conv_id, err);
@@ -307,7 +336,7 @@ export class ExecutionService {
       }
       this.executionOutcomes.set(planId, { status: summary.status, pausedStepId: summary.pausedAtStepId });
       if (convId && this.sseManager) {
-        this.sseManager.emitEvent(convId, 'exec_done', {
+        this.emitExecution(convId, 'exec_done', {
           planId,
           status: summary.status,
           pausedAtStepId: summary.pausedAtStepId,
@@ -342,7 +371,7 @@ export class ExecutionService {
       if (!await this.planRepo.claimRecovery(planRow, userId, 'stopped')) throw recoveryConflict('Execution changed or recovery is already running');
       await controller?.stop();
       this.executionOutcomes.set(planId, { status: 'stopped' });
-      this.sseManager?.emitEvent(planRow.conv_id, 'exec_done', { planId, status: 'stopped' });
+      this.emitExecution(planRow.conv_id, 'exec_done', { planId, status: 'stopped' });
       return { status: 'stopped' };
     }
     if (!controller) {
@@ -357,7 +386,7 @@ export class ExecutionService {
         throw err;
       }
       this.executionOutcomes.set(planId, { status: 'stopped' });
-      this.sseManager?.emitEvent(planRow.conv_id, 'exec_done', { planId, status: 'stopped' });
+      this.emitExecution(planRow.conv_id, 'exec_done', { planId, status: 'stopped' });
       return { status: 'stopped' };
     }
     const run = this.activeRuns.get(planId);
@@ -378,7 +407,7 @@ export class ExecutionService {
       throw err;
     }
     this.executionOutcomes.set(planId, summary);
-    this.sseManager?.emitEvent(planRow.conv_id, 'exec_done', { planId, ...summary });
+    this.emitExecution(planRow.conv_id, 'exec_done', { planId, ...summary });
     return summary;
   }
 
@@ -406,11 +435,13 @@ export class ExecutionService {
     const conversation = await this.convRepo?.getConversation(convId);
     if (!conversation) throw Object.assign(new Error('Conversation not found'), { status: 404 });
     if (conversation.user_id !== userId) throw Object.assign(new Error('Forbidden'), { status: 403 });
-    const plan = await this.planRepo.getLatestExecutedPlan(convId);
+    let plan = await this.planRepo.getLatestExecutedPlan(convId);
     if (!plan) throw Object.assign(new Error('No execution found'), { status: 404 });
+    const sourceSnapshot=isSlackSourceArtifact(plan)?await this.planRepo.getSourceExecutionSnapshot(plan.id):undefined;
+    if(sourceSnapshot)plan=sourceSnapshot.plan;
     const parsed = readableRecoveryPlan(plan);
     const execution = await this.getExecutionStatusDurable(plan.id);
-    const rows = this.stepRepo ? await this.stepRepo.listSteps(plan.id) : [];
+    const rows = sourceSnapshot?.steps ?? (this.stepRepo ? await this.stepRepo.listSteps(plan.id) : []);
     const order = new Map<string, number>((parsed?.steps ?? []).map((step: PlanStep, index: number) => [step.id, index]));
     rows.sort((a, b) => (order.get(a.step_id) ?? Infinity) - (order.get(b.step_id) ?? Infinity));
     let recoveryActions: string[] = [];
