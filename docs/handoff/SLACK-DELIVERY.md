@@ -1,6 +1,6 @@
 # Slack delivery · trạng thái và cổng nghiệm thu
 
-Đối chiếu ngày30/10/2026 trên `integration/slack-personal-20261029`, tới PR208 (`2821d426`). Đây là nơi theo dõi tiến độ xuyên task; spec/card giữ yêu cầu, log giữ bằng chứng lịch sử. Cập nhật bảng sau mỗi lần tích hợp, không suy trạng thái hiện tại từ câu “pending” trong log cũ. Staging chưa vào main, hai cờ nội dung/automation vẫn tắt.
+Đối chiếu ngày30/10/2026 trên `integration/slack-personal-20261029`, tới PR209 (`0a59e754`, reviewer docs `2b1d8ccb`). Đây là nơi theo dõi tiến độ xuyên task; spec/card giữ yêu cầu, log giữ bằng chứng lịch sử. Cập nhật bảng sau mỗi lần tích hợp, không suy trạng thái hiện tại từ câu “pending” trong log cũ. Staging chưa vào main, hai cờ nội dung/automation vẫn tắt.
 
 ## Cách đọc trạng thái
 
@@ -20,7 +20,7 @@
 | Private read wrapper · [03B4A](tasks/SLACK-03B4A-private-read-wrapper.md) | #203 `3a9fa3e4`, [review](log/2026-10-30-slack-03b2a-03b4a-joint-review.md) | Nội bộ; chưa public routing/planner/executor/UI | Chờ07 |
 | Derived registry · [03B2A](tasks/SLACK-03B2A-derived-registry.md) | #204 `e2aa4f8c`, [review](log/2026-10-30-slack-03b2a-03b4a-joint-review.md) | `messages.content` có registration/read guard; không chứng nhận writer khác/backfill | Chờ07 |
 | Message handler/consumer · [03B2B](tasks/SLACK-03B2B-message-content-purge.md), [03B2C](tasks/SLACK-03B2C-message-purge-consumer.md) | #206 `3ea9fbd9`, #208 `145a6016`; [integration](log/2026-10-30-slack-03b2c-review-integration.md) | Native sandbox bootstrap xóa registered message khi cờ tắt/không Slack config; sáu kind khác vẫn pending | Chờ07 |
-| Derived policy fanout ·03B2D | Implementation `9f60a50e`, review thành phần PASS; đang kiểm tra sau gộp208 | Chưa accepted staging tại mốc bảng này; không coi stage obligations là physical erasure | Chờ07 |
+| Derived policy fanout · [03B2D](tasks/SLACK-03B2D-derived-policy-fanout.md) | #209 `5bdfbd68`, [CI/review/integration](log/2026-10-30-slack-03b2d-review-integration.md) | Native sweep stages derived obligations dù raw đã hết retention; không coi stage obligations là physical erasure | Chờ07 |
 | Signed ingress · [04A](tasks/SLACK-04A-signed-ingress.md) | #202 `6d0e82af`, integration `3770f261` | Raw signature→durable receipt/queue; không có content/authorization fanout đầy đủ | Chờ07 |
 | Validation/runtime · [04B1](tasks/SLACK-04B1-lifecycle-validation.md), [04B2](tasks/SLACK-04B2-validation-runtime.md) | #205 `3e19386e`, #207 `76f55a3c`; [integration](log/2026-10-30-slack-04b2-review-integration.md) | Metadata auth.test supervisor khi cờ tắt. Credential có refresh token gặp invalid_auth giữ gate đóng; recovery còn mở | Chờ07 |
 | Committed bootstrap chain · [DELIVERY-01](tasks/SLACK-DELIVERY-01-workflow-repair.md) | Nhánh này, chưa accepted staging | Signed revoke→validation→disconnect→message purge; owner khác giữ nguyên. Probe không Slack config. [Test](../../apps/chat-api/tests/integration/slack-native-runtime.test.ts), [log](log/2026-10-30-slack-delivery-workflow-repair.md) | Không thay07 |
@@ -34,7 +34,7 @@
 
 | Mốc | Deliverable kiểm chứng được | Điều kiện chốt |
 |---|---|---|
-| M1 · cleanup chạy thật, nội bộ | Hoàn tất03B2D đang dở và DELIVERY-01; ký sự kiện→durable job→metadata validation→registered message erasure, cờ tắt, cách ly owner | Review độc lập + committed bootstrap regressions trong CI. Không đóng03/04 hay fullF3/F4 |
+| M1 · cleanup chạy thật, nội bộ |03B2D đã accepted; chốt DELIVERY-01: ký sự kiện→durable job→metadata validation→registered message erasure, cờ tắt, cách ly owner | Review độc lập + committed bootstrap regressions trong CI. Không đóng03/04 hay fullF3/F4 |
 | M2 · nguồn an toàn và đọc thủ công trong ATI | Hoàn tất core03B2: bốn kind hiện hữu còn lại, các selector, writer/read gates và backfill; sau đó nối03B3(read)+03B4 public route/planner/executor/UI | Một yêu cầu đọc được duyệt chạy xuyên app; revoke/edit/delete/policy-change chặn tái sử dụng và xóa đúng mọi core artifact, hai ATI user/workspace không lẫn.05/06 chưa được giả lập để đóngF3 |
 | M3 · ghi an toàn dưới danh nghĩa user |04B authorization fanout/sáu watermark/rotation recovery;04C outbox+echo+UNKNOWN, rồi03C writes/03B3 write dispatch | Provider commit rồi timeout bằng AbortSignal không ghi lặp/retry mù; readback/reconciliation, approval và binding đúng.03C writes phụ thuộc04C, không đặt trước04 |
 | M4 · trợ lý và full lifecycle |05 ba mode,06 Inbox/digest trong ATI; tích hợp hai kind mới vào03B2 | Thu hồi nguồn không còn excerpt ở bất kỳ surface nào; khi đủ bảy kind + mọi yêu cầu khác mới đánh giá fullF3/F4 |
