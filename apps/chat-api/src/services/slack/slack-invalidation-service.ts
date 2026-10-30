@@ -622,12 +622,25 @@ export class SlackInvalidationService {
     client: pg.PoolClient,
     input: StageInTransactionInput
   ): Promise<StageInTransactionResult> {
+    return this.stageIntentsInTransaction(client,input,false);
+  }
+
+  /** Separate receipt/hash domain for obligations reconstructed from derived
+   * lineage. Never replay an immutable raw-policy receipt to append effects. */
+  async stageDerivedInTransaction(client:pg.PoolClient,input:StageInTransactionInput):Promise<StageInTransactionResult> {
+    await client.query('SAVEPOINT slack_derived_policy_tx_guard');
+    await client.query('RELEASE SAVEPOINT slack_derived_policy_tx_guard');
+    return this.stageIntentsInTransaction(client,input,true);
+  }
+
+  private async stageIntentsInTransaction(client:pg.PoolClient,input:StageInTransactionInput,derivedOnly:boolean):Promise<StageInTransactionResult> {
     if (!input || typeof input !== 'object') {
       throw new TypeError('stageInTransaction input must be an object');
     }
     const sourceEventKey = requireNonBlankString(input.sourceEventKey, 'sourceEventKey');
     const effects = normalizeInvalidationEffects(input.effects);
-    const payloadHash = hashInvalidationEffects(effects);
+    const originalHash = hashInvalidationEffects(effects);
+    const payloadHash = derivedOnly ? createHash('sha256').update(`derived-only:${originalHash}`).digest('hex') : originalHash;
 
     const lockKeys = [eventLockKey(sourceEventKey)];
     for (const effect of effects) {
@@ -780,6 +793,7 @@ export class SlackInvalidationService {
       // If purgeTarget provided, create intents (raw + cascade derived kinds).
       // Derived kinds stay pending here; 03B2 owns their execution seam.
       if (purgeTarget) {
+        if (!derivedOnly) {
         const rawIntentRes = await client.query(
           `INSERT INTO slack_invalidation_intents (
             source_event_key, effect_key, target_kind, purge_target, status
@@ -788,6 +802,7 @@ export class SlackInvalidationService {
           [sourceEventKey, effectKey, JSON.stringify(purgeTarget)]
         );
         intentIds.push(rawIntentRes.rows[0].id);
+        }
 
         for (const cascadeKind of purgeTarget.cascadeTargetKinds) {
           const cascadeRes = await client.query(
