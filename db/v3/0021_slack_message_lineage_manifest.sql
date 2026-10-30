@@ -1,10 +1,14 @@
 -- Server-owned coverage certificate. NULL is legacy/unclassified, never proof of no Slack dependency.
-ALTER TABLE messages ADD COLUMN slack_lineage_manifest JSONB;
-ALTER TABLE messages ADD CONSTRAINT chk_slack_message_manifest
-  CHECK (slack_lineage_manifest IS NULL OR jsonb_typeof(slack_lineage_manifest)='array');
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS slack_lineage_manifest JSONB;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='messages'::regclass AND conname='chk_slack_message_manifest') THEN
+    ALTER TABLE messages ADD CONSTRAINT chk_slack_message_manifest
+      CHECK (slack_lineage_manifest IS NULL OR jsonb_typeof(slack_lineage_manifest)='array');
+  END IF;
+END $$;
 
 -- Queue selection only. Authorization and physical mutation use the TypeScript selector implementation.
-CREATE FUNCTION slack_selector_decode(v TEXT) RETURNS TEXT LANGUAGE plpgsql IMMUTABLE STRICT AS $$
+CREATE OR REPLACE FUNCTION slack_selector_decode(v TEXT) RETURNS TEXT LANGUAGE plpgsql IMMUTABLE STRICT AS $$
 DECLARE result BYTEA := ''::bytea; i INT := 1;
 BEGIN
   WHILE i <= length(v) LOOP
@@ -13,7 +17,7 @@ BEGIN
   END LOOP;
   RETURN convert_from(result,'UTF8');
 END $$;
-CREATE FUNCTION slack_message_selector_value(content TEXT, metadata JSONB, kind TEXT, selector TEXT)
+CREATE OR REPLACE FUNCTION slack_message_selector_value(content TEXT, metadata JSONB, kind TEXT, selector TEXT)
 RETURNS JSONB LANGUAGE plpgsql IMMUTABLE AS $$
 DECLARE path TEXT[]; bits TEXT[]; values_json JSONB; element JSONB; selected JSONB; hits INT := 0; k TEXT;
 BEGIN

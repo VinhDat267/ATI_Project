@@ -11,6 +11,7 @@ import request from 'supertest';
 import { createConversationRoutes } from '../../src/routes/conversation-routes.js';
 import { ConversationRepo } from '../../src/db/repositories/conversation-repo.js';
 import { messageOutputSelectors, memoryOutputSelectors, messageSelectorKind } from '../../src/services/slack/slack-message-selectors.js';
+import { ScheduleService } from '../../src/services/schedules/schedule-service.js';
 
 describe('message and working-memory writer to physical erasure, real PostgreSQL', () => {
   let env: SlackReadEnvironment, messages: MessageRepo;
@@ -168,5 +169,14 @@ describe('message and working-memory writer to physical erasure, real PostgreSQL
     const stored = (await env.db.pool.query('SELECT metadata FROM messages WHERE id=$1', [row.id])).rows[0].metadata.state;
     expect(JSON.stringify(stored)).not.toContain('private'); expect(stored.channels).toEqual([{ id: 'TRELLO', name: 'keep' }]);
     expect(stored.__gatherBindings).toEqual({trello:'keep'});
+  });
+  it('does not confirm a registered Slack-derived schedule proposal through the raw SQL confirmation reader', async () => {
+    const f = await fixture();
+    const metadata = { type: 'schedule_proposal', proposal: { kind: 'schedule', action: 'create', name: 'private schedule', request: 'private request', recurrence: { type: 'daily', time: '09:00' }, summary: 'private' },
+      services: ['trello'], nextRuns: [], scheduleId: null, baseVersion: null, previous: null };
+    const row = await messages.createSlackMessage(f.conv, 'assistant', 'private', metadata, { segments: f.segments, selectors: ['content', 'metadata.proposal'] });
+    await invalidate(f);
+    await expect(new ScheduleService({ pool: env.db.pool, timeZone: 'Asia/Ho_Chi_Minh' }).confirmProposal({ userId: f.owner.person.id, convId: f.conv, messageId: row.id, now: new Date() })).rejects.toMatchObject({ code: 'SCHEDULE_SOURCE_PURGED' });
+    expect((await env.db.pool.query('SELECT count(*)::int AS n FROM schedules WHERE conv_id=$1', [f.conv])).rows[0].n).toBe(0);
   });
 });
