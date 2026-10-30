@@ -13,6 +13,7 @@
 ## Global constraints
 
 - Claim `chat_history_message` only. Other six derived kinds remain pending; no whole receipt/F3 closure.
+- Order claims by attempts then creation/id so permanently failed old jobs cannot monopolize the native batch. Preserve them as unresolved durable retries.
 - Exact five-field binding, six target matching predicates, canonical BIGINT strings, exclusive decimal edit cutoff, actual intent timestamp cutoff. Do not silently miss matching late/mismatched/resurrected registered copies.
 - Queue consumer requires actual staging receipt and matching active barrier. Current stage contract cannot prove workspace_consent_revocation: keep unprovable jobs failed, do not invent a global proof/lock.
 - All batch source/barrier advisory keys acquired sorted before conversation/message/copy/job rows. Prelock every conversation parent in deterministic order before per-copy erasure: disjoint workspace source keys can still share conversations. Re-read candidate versions/keys/proof after waits. Lock job row last; expiry checked in a fresh statement after real wait.
@@ -28,6 +29,8 @@
 4. Late/stale/unsupported/resurrected copies and unlinked barrier proof must remain unresolved, including retries after fingerprint retirement.
 5. Native flags-off sweeps may complete raw/message intents only; remaining kinds and unregistered artifacts are not certified clean.
 
+Review fix rulings: verified fresh registered successor text outside an old target is not a resurrected old payload. Match owner/selector/new server version and actual fingerprint, recheck candidates after parent locks, and rescan unresolved work under the target barrier so verified history larger than the batch limit can finish. This metadata proof grants no content-read authority; ungated/backfilled artifacts remain a separate deployment gate.
+
 ### Task 1: Consumer and native sweep integration
 
 Files: create `apps/chat-api/src/services/slack/slack-message-purge-consumer.ts`; modify `slack-message-content-purger.ts` (metadata-only batch source-key preparation), `slack-invalidation-runner.ts` (optional consumer hook/stats), `apps/chat-api/src/server.ts` (native injection); create `apps/chat-api/tests/services/slack/slack-message-purge-consumer.test.ts`; card/plan/one log.
@@ -41,6 +44,6 @@ Interfaces: `SlackMessagePurgeConsumer(pool,{batchSize?,leaseSeconds?,purger?})`
 
 ### Task 2: Review/publication
 
-- [ ] Run `npm run check`, expected exit0 on isolated PostgreSQL55533.
-- [ ] Fresh independent read-only whole-branch review, one direct RED→GREEN fix pass if needed, fresh checks after source changes.
+- [x] Run `npm run check`, expected exit0 on isolated PostgreSQL55533.
+- [x] Fresh independent read-only whole-branch review, one direct RED→GREEN fix pass if needed, fresh checks after source changes.
 - [ ] Fill card/log, publish draft staging PR, require exact-head CI before integration. No main/flag enable/fullF3 closure.

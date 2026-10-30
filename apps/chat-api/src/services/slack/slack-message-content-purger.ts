@@ -64,7 +64,8 @@ export class SlackMessageContentPurger {
   /** Metadata-only preparation for a caller processing several copies. Acquire
    * this complete union before taking any parent/artifact/job row locks. */
   async sourceLockKeysInTransaction(client:pg.PoolClient,copyIds:string[]):Promise<string[]> {
-    if(copyIds.length>100 || copyIds.some(id=>!isUuid(id))) throw new TypeError('INVALID_PURGE_INPUT');
+    // A consumer batch may include each old copy plus its current replacement.
+    if(copyIds.length>200 || copyIds.some(id=>!isUuid(id))) throw new TypeError('INVALID_PURGE_INPUT');
     if(copyIds.length===0) return [];
     const rows=(await client.query(`SELECT s.*,c.ati_user_id AS copy_owner FROM slack_derived_provenance_segments s
       JOIN slack_derived_copies c ON c.id=s.derived_copy_id WHERE c.id=ANY($1::uuid[]) ORDER BY c.id,s.segment_index`,[copyIds])).rows;

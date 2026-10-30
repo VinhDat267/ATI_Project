@@ -205,4 +205,43 @@ describe('03B2C fenced registered-message erasure on real PostgreSQL',()=>{
       expect(waiting).toBe(true);release();expect(await Promise.all([pa,pb])).toEqual(['completed','completed']);
     }finally{release?.();await pa;await pb;await poolB.end();}
   },10000);
+  it('rotates repeatedly failed old jobs so a later valid disconnect is not starved by the native batch limit',async()=>{
+    const stale=await fixture();await env.db.pool.query("UPDATE messages SET content='Unregistered replacement' WHERE id=$1",[stale.targetId]);
+    for(let i=0;i<5;i++)await stage(stale);
+    const healthy=await fixture(),later=await stage(healthy),consumer=new SlackMessagePurgeConsumer(env.db.pool);
+    for(let i=0;i<4;i++)await consumer.runOnce();
+    expect((await job(later.id)).status).toBe('completed');expect(await content(healthy)).toBe('Slack content is unavailable.');
+    const unresolved=(await env.db.pool.query("SELECT status,last_error,attempts FROM slack_invalidation_intents WHERE target_kind='chat_history_message' AND id<>$1",[later.id])).rows;
+    expect(unresolved).toHaveLength(5);expect(unresolved.every(row=>row.status==='failed'&&row.last_error==='code:STALE_LINEAGE'&&row.attempts>0)).toBe(true);
+  });
+  it.each([false,true])('distinguishes properly registered fresh content from unregistered resurrection (tamper=%s)',async tamper=>{
+    const f=await fixture(),resource=f.input.segments[0]!.sourceRef;
+    const target:SlackPurgeTarget={scope:'resource_lifecycle',workspaceId:f.seed.binding.workspaceId,resourceType:'message',resourceId:resource.resourceId,beforeRevision:'1730000000.000002',cascadeTargetKinds:[...SLACK_DERIVED_TARGET_KINDS],tombstoneReason:'source_edited'};
+    const barrier:SlackInvalidationBarrier={barrierType:'resource',workspaceId:f.seed.binding.workspaceId,resourceType:'message',resourceId:resource.resourceId,minValidRevision:'1730000000.000002',reason:'edited'};
+    await stage(f,target,barrier);const duplicate=await stage(f,target,barrier),consumer=new SlackMessagePurgeConsumer(env.db.pool);
+    expect(await consumer.process(onlyLease(await consumer.claim(1)))).toBe('completed');
+    const fresh={...f.input,segments:f.input.segments.map(s=>({...s,sourceRef:{...s.sourceRef,revision:'1730000000.000002'}}))},c=await env.db.pool.connect();
+    try {await c.query('BEGIN');await repo.prepareMessageWriteInTransaction(c,fresh);
+      await c.query("UPDATE messages SET content='Authorized revision two' WHERE id=$1",[f.targetId]);await repo.registerDerivedCopyInTransaction(c,fresh);await c.query('COMMIT');
+    }finally{c.release();}
+    if(tamper)await env.db.pool.query("UPDATE messages SET content='Unregistered resurrection after fresh registration' WHERE id=$1",[f.targetId]);
+    await consumer.runOnce();
+    expect((await job(duplicate.id)).status).toBe(tamper?'failed':'completed');expect(await content(f)).toBe(tamper?'Unregistered resurrection after fresh registration':'Authorized revision two');
+    expect((await env.db.pool.query("SELECT count(*)::int AS n FROM slack_derived_copies WHERE target_id=$1 AND status='active'",[f.targetId])).rows[0].n).toBe(1);
+  });
+  it('can finish an old edit when verified fresh replacements exceed the copy batch limit',async()=>{
+    const f=await fixture(),c=await env.db.pool.connect();let secondId:string;
+    try {await c.query('BEGIN');secondId=(await c.query("INSERT INTO messages(conv_id,role,content) VALUES($1,'assistant','Second old body') RETURNING id",[f.conv])).rows[0].id;
+      await repo.registerDerivedCopyInTransaction(c,{...f.input,targetId:secondId});await c.query('COMMIT');}finally{c.release();}
+    const resource=f.input.segments[0]!.sourceRef,target:SlackPurgeTarget={scope:'resource_lifecycle',workspaceId:f.seed.binding.workspaceId,resourceType:'message',resourceId:resource.resourceId,beforeRevision:'1730000000.000002',cascadeTargetKinds:[...SLACK_DERIVED_TARGET_KINDS],tombstoneReason:'source_edited'};
+    const barrier:SlackInvalidationBarrier={barrierType:'resource',workspaceId:f.seed.binding.workspaceId,resourceType:'message',resourceId:resource.resourceId,minValidRevision:'1730000000.000002',reason:'edited'};
+    const original=await stage(f,target,barrier),consumer=new SlackMessagePurgeConsumer(env.db.pool,{batchSize:1});await consumer.runOnce(1);await consumer.runOnce(1);expect((await job(original.id)).status).toBe('completed');
+    const duplicate=await stage(f,target,barrier);
+    for(const id of [f.targetId,secondId!]) {
+      const fresh={...f.input,targetId:id,segments:f.input.segments.map(s=>({...s,sourceRef:{...s.sourceRef,revision:'1730000000.000002'}}))},writer=await env.db.pool.connect();
+      try {await writer.query('BEGIN');await repo.prepareMessageWriteInTransaction(writer,fresh);await writer.query("UPDATE messages SET content='Verified fresh body' WHERE id=$1",[id]);await repo.registerDerivedCopyInTransaction(writer,fresh);await writer.query('COMMIT');}finally{writer.release();}
+    }
+    for(let i=0;i<3;i++)await consumer.runOnce(1);
+    expect((await job(duplicate.id)).status).toBe('completed');expect(await content(f)).toBe('Verified fresh body');
+  });
 });

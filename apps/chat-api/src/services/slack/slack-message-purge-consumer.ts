@@ -73,7 +73,7 @@ export class SlackMessagePurgeConsumer {
     bound(limit,50);
     const rows=(await this.pool.query(`WITH due AS (SELECT id FROM slack_invalidation_intents WHERE target_kind='chat_history_message'
       AND (status IN ('pending','failed') OR (status='processing' AND leased_until<=clock_timestamp()))
-      ORDER BY created_at,id LIMIT $1 FOR UPDATE SKIP LOCKED)
+      ORDER BY attempts,created_at,id LIMIT $1 FOR UPDATE SKIP LOCKED)
       UPDATE slack_invalidation_intents j SET status='processing',worker_id=gen_random_uuid()::text,
         leased_until=clock_timestamp()+$2 * interval '1 second',attempts=j.attempts+1
       FROM due WHERE j.id=due.id RETURNING j.id,j.worker_id,j.leased_until::text AS expiry`,[limit,this.seconds])).rows;
@@ -94,19 +94,28 @@ export class SlackMessagePurgeConsumer {
       WHERE b.source_event_key=$1 AND b.effect_key=$2 AND b.active=true ${lock?'FOR SHARE OF b':''}`,[row.source_event_key,row.effect_key])).rows[0];
     return proofBarrier(barrier,target);
   }
-  private async candidates(client:pg.PoolClient,t:SlackPurgeTarget,cutoff:string):Promise<any[]> {
+  private async candidates(client:pg.PoolClient,t:SlackPurgeTarget,cutoff:string,unresolvedOnly=false):Promise<any[]> {
     const {sql,values}=selection(t);
     const orphanOwner=t.scope==='resource_lifecycle'||t.scope==='workspace_consent_revocation'?undefined:
       t.scope==='policy_epoch_invalidated'?t.epoch.binding.atiUserId:t.binding.atiUserId;
     let orphanScope='';if(orphanOwner){values.push(orphanOwner);orphanScope=`AND c.ati_user_id=$${values.length}::uuid`;}
-    values.push(cutoff);const date=`$${values.length}`;values.push(this.size+1);
-    return (await client.query(`SELECT c.id,c.target_version,c.target_fingerprint,c.status,c.target_sub_id,c.created_at::text AS created_exact
+    values.push(cutoff);const date=`$${values.length}`;values.push(unresolvedOnly);const remaining=`$${values.length}`;values.push(this.size+1);
+    return (await client.query(`WITH candidates AS (SELECT c.id,c.target_version,c.target_fingerprint,c.status,c.target_sub_id,c.created_at::text AS created_exact,
+        CASE WHEN c.status='active' AND c.target_sub_id='content' AND c.created_at<=${date}::timestamptz THEN 0 ELSE 1 END AS priority,
+        n.id AS replacement_id,n.target_version AS replacement_version,n.target_fingerprint AS replacement_fingerprint,
+        (n.target_fingerprint=encode(sha256(convert_to(m.content,'UTF8')),'hex') AND
+         EXISTS(SELECT 1 FROM slack_derived_provenance_segments s WHERE s.derived_copy_id=n.id) AND
+         NOT EXISTS(SELECT 1 FROM slack_derived_provenance_segments s WHERE s.derived_copy_id=n.id AND s.ati_user_id<>n.ati_user_id) AND
+         NOT EXISTS(SELECT 1 FROM slack_derived_provenance_segments s WHERE s.derived_copy_id=n.id AND (${sql}))) AS replacement_outside_target
       FROM slack_derived_copies c LEFT JOIN messages m ON m.id::text=c.target_id
+      LEFT JOIN slack_derived_copies n ON c.status='purged' AND n.status='active' AND n.ati_user_id=c.ati_user_id
+        AND n.target_kind=c.target_kind AND n.target_id=c.target_id AND n.target_sub_id=c.target_sub_id AND n.target_version>c.target_version
       WHERE c.target_kind='chat_history_message' AND (c.status='active' OR (c.status='retired' AND c.retired_reason='fingerprint_mismatch') OR
         (c.status='purged' AND m.id IS NOT NULL AND m.content<>'Slack content is unavailable.'))
       AND (EXISTS(SELECT 1 FROM slack_derived_provenance_segments s WHERE s.derived_copy_id=c.id AND (${sql})) OR
-        (NOT EXISTS(SELECT 1 FROM slack_derived_provenance_segments s WHERE s.derived_copy_id=c.id) ${orphanScope}))
-      ORDER BY CASE WHEN c.status='active' AND c.target_sub_id='content' AND c.created_at<=${date}::timestamptz THEN 0 ELSE 1 END,c.id
+        (NOT EXISTS(SELECT 1 FROM slack_derived_provenance_segments s WHERE s.derived_copy_id=c.id) ${orphanScope})))
+      SELECT * FROM candidates WHERE NOT (${remaining}::boolean AND status='purged' AND replacement_outside_target IS TRUE)
+      ORDER BY priority,id
       LIMIT $${values.length}`,values)).rows;
   }
   private async finish(client:pg.PoolClient,job:MessagePurgeLease,code?:Code,identity?:{target:unknown;cutoff:string}):Promise<boolean> {
@@ -127,7 +136,8 @@ export class SlackMessagePurgeConsumer {
       try {target=validateSlackPurgeTarget(row.purge_target);}catch{throw new Failure('INVALID_PROVENANCE');}
       if(!target.cascadeTargetKinds.includes('chat_history_message'))throw new Failure('INVALID_PROVENANCE');
       const barrier=await this.proof(client,row,target),cutoff=(await client.query('SELECT created_at::text AS cutoff FROM slack_invalidation_intents WHERE id=$1',[job.id])).rows[0].cutoff;
-      const first=await this.candidates(client,target,cutoff),ids=first.slice(0,this.size).map(r=>r.id);
+      const first=await this.candidates(client,target,cutoff),ids=[...new Set<string>(first.slice(0,this.size).flatMap(r=>
+        r.status==='purged'&&r.replacement_id?[r.id,r.replacement_id]:[r.id]))];
       let keys:string[];try {keys=await this.purger.sourceLockKeysInTransaction(client,ids);}catch{throw new Failure('STALE_LINEAGE');}
       await acquireSlackInvalidationLocks(client,[...slackInvalidationLockKeys(barrier),...keys]);
       if(signal?.aborted)throw new Failure('ABORTED');await this.owned(client,job);await this.proof(client,row,target,true);
@@ -139,12 +149,24 @@ export class SlackMessagePurgeConsumer {
         SELECT DISTINCT m.conv_id,c.ati_user_id FROM slack_derived_copies c JOIN messages m ON m.id::text=c.target_id
         WHERE c.id=ANY($1::uuid[])) parents ON v.id=parents.conv_id AND v.user_id=parents.ati_user_id
         ORDER BY v.id FOR UPDATE OF v`,[ids]);
-      let code:Code|undefined=first.length>this.size?'PARTIAL_PURGE':undefined;
+      // Fingerprint/supersession checks above read the artifact without its row
+      // lock. Recheck while parents serialize the actual registered writer.
+      if(JSON.stringify(first)!==JSON.stringify(await this.candidates(client,target,cutoff)))throw new Failure('RETRY_SCAN');
+      let code:Code|undefined;
       for(const copy of first.slice(0,this.size)) {
         if(signal?.aborted)throw new Failure('ABORTED');
+        // This old physical payload was already erased. A newer, structurally
+        // valid registered version now owns the exact text and is outside the
+        // old target. Its source keys and parent are held with the old copy's.
+        if(copy.status==='purged'&&copy.replacement_id&&copy.replacement_outside_target===true)continue;
         const result=await this.purger.purgeInTransaction(client,{intentId:job.id,derivedCopyId:copy.id,expectedTargetVersion:copy.target_version,signal});
         if(!['purged','already_purged'].includes(result.status))code=result.status==='missing_handler'?'MISSING_HANDLER':'STALE_LINEAGE';
       }
+      // Recheck all remaining work under the target barrier. Server-registered
+      // successor text outside that target is not an unresolved physical copy;
+      // otherwise batches of already-purged history could never make progress.
+      // This metadata test grants no authority to read the successor content.
+      if(!code&&(await this.candidates(client,target,cutoff,true)).length>0)code='PARTIAL_PURGE';
       if(signal?.aborted)throw new Failure('ABORTED');if(!await this.finish(client,job,code,{target:row.purge_target,cutoff}))throw new LostLease();
       if(signal?.aborted)throw new Failure('ABORTED');await client.query('COMMIT');return code?'retried':'completed';
     }catch(error){await client.query('ROLLBACK').catch(()=>{});if(error instanceof LostLease)return 'lost';failure=error instanceof Failure?error.safeCode:'PURGE_FAILED';}
