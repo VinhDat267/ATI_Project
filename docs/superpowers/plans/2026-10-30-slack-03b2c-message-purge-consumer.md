@@ -15,7 +15,7 @@
 - Claim `chat_history_message` only. Other six derived kinds remain pending; no whole receipt/F3 closure.
 - Exact five-field binding, six target matching predicates, canonical BIGINT strings, exclusive decimal edit cutoff, actual intent timestamp cutoff. Do not silently miss matching late/mismatched/resurrected registered copies.
 - Queue consumer requires actual staging receipt and matching active barrier. Current stage contract cannot prove workspace_consent_revocation: keep unprovable jobs failed, do not invent a global proof/lock.
-- All batch source/barrier advisory keys acquired sorted before conversation/message/copy/job rows. Re-read candidate versions/keys/proof after waits. Lock job row last; expiry checked in a fresh statement after real wait.
+- All batch source/barrier advisory keys acquired sorted before conversation/message/copy/job rows. Prelock every conversation parent in deterministic order before per-copy erasure: disjoint workspace source keys can still share conversations. Re-read candidate versions/keys/proof after waits. Lock job row last; expiry checked in a fresh statement after real wait.
 - Erasure + registry + fenced complete/partial status share the transaction. Lost lease rolls all effects back. Failures persist fixed codes only, never payload/error messages.
 - Bounded copy batch default20 (1..100), lease60s (1..600 for tests/config). Partial work remains retryable. Live tokens/consent not needed to erase. Flags remain off; no model/network calls.
 - Existing invalidation supervisor shutdown limitations remain; this task does not promise immediate SQL cancellation or whole-process grace. Already dispatched COMMIT may finish.
@@ -24,7 +24,7 @@
 
 1. Candidate SQL must agree with the concrete handler for binding/epoch/channel and exact revision semantics, including absent/contradictory channel metadata.
 2. Lost/reclaimed lease or row-lock expiry must rollback actual erasure, not only deny queue status.
-3. Duplicate workers and overlapping intents must follow common lock order across the entire batch, preserving fresh registrations.
+3. Duplicate workers and overlapping intents must follow common lock order across the entire batch, including disjoint workspace jobs with opposite conversation orders, preserving fresh registrations.
 4. Late/stale/unsupported/resurrected copies and unlinked barrier proof must remain unresolved, including retries after fingerprint retirement.
 5. Native flags-off sweeps may complete raw/message intents only; remaining kinds and unregistered artifacts are not certified clean.
 

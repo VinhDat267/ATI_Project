@@ -165,4 +165,44 @@ describe('03B2C fenced registered-message erasure on real PostgreSQL',()=>{
       const result=await real.purgeInTransaction(c,input);controller.abort();return result;}}});
     expect((await consumer.runOnce(5,controller.signal)).retried).toBe(1);expect(await content(f)).toBe('Queue fixture');expect(await job(j.id)).toEqual({status:'failed',last_error:'code:ABORTED'});
   });
+  it('orders parents across two conversations when disjoint workspace jobs would otherwise take opposite orders',async()=>{
+    const f=await fixture(),secondConnection=randomUUID(),secondWorkspace=`T${randomUUID()}`,secondActor=`U${randomUUID()}`;
+    await env.db.pool.query(`INSERT INTO slack_connections(id,user_id,app_id,workspace_id,workspace_name,actor_id,identity_version,status,config,scopes,connected_at,last_state_order)
+      VALUES($1,$2,'A_READ',$3,'Second workspace',$4,1,'active','FIXTURE',ARRAY['channels:history'],now(),'1')`,[secondConnection,f.seed.person.id,secondWorkspace,secondActor]);
+    const binding={...f.seed.binding,connectionId:secondConnection,workspaceId:secondWorkspace,slackUserId:secondActor};
+    await env.consentRepo.grantConsent({workspaceId:secondWorkspace,providerId:env.runtimeIdentity.providerId,policyVersion:'v1.0.0',purposes:['storage','manual_lookup'],retentionDays:14,organizationRepresentative:'fixture',evidenceRef:'FIXTURE',recordedBy:'fixture'});
+    const decision=await env.policyService.resolveSlackModelPolicy({binding,purpose:'storage',requestedRetentionDays:7,env:TEST_ENV});if(!decision.allowed)throw new Error('Fixture second storage denied');
+    const storage=decision.policyReference as SlackPolicyReference,sourceB={...f.input.segments[0]!,sourceRef:{...f.input.segments[0]!.sourceRef,binding},storagePolicyRef:storage,acquisitionPolicyRef:{...storage,purpose:'manual_lookup' as const,requestedRetentionDays:0}};
+    const convY=(await env.db.pool.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id',[f.seed.person.id])).rows[0].id;
+    async function extra(conv:string,segments:RegisterDerivedCopyInput['segments']) {
+      const c=await env.db.pool.connect();try {await c.query('BEGIN');const id=(await c.query("INSERT INTO messages(conv_id,role,content) VALUES($1,'assistant','Batch lock fixture') RETURNING id",[conv])).rows[0].id;
+        const copy=await repo.registerDerivedCopyInTransaction(c,{...f.input,targetId:id,segments});await c.query('COMMIT');return copy;
+      }finally{c.release();}
+    }
+    const ay=await extra(convY,f.input.segments),by=await extra(convY,[sourceB]),bx=await extra(f.conv,[sourceB]);
+    // Deterministic valid server metadata IDs exercise a possible UUID ordering:
+    // workspace A selects X then Y, workspace B selects Y then X. Versions stay in PG.
+    async function rekey(oldId:string,newId:string) {
+      const c=await env.db.pool.connect();try {await c.query('BEGIN');
+        await c.query('CREATE TEMP TABLE rekey_copy ON COMMIT DROP AS SELECT * FROM slack_derived_copies WHERE id=$1',[oldId]);
+        await c.query('CREATE TEMP TABLE rekey_segments ON COMMIT DROP AS SELECT * FROM slack_derived_provenance_segments WHERE derived_copy_id=$1',[oldId]);
+        await c.query('DELETE FROM slack_derived_copies WHERE id=$1',[oldId]);
+        await c.query('INSERT INTO slack_derived_copies SELECT (jsonb_populate_record(NULL::slack_derived_copies,to_jsonb(r)||jsonb_build_object(\'id\',$1::uuid))).* FROM rekey_copy r',[newId]);
+        await c.query('INSERT INTO slack_derived_provenance_segments SELECT (jsonb_populate_record(NULL::slack_derived_provenance_segments,to_jsonb(r)||jsonb_build_object(\'derived_copy_id\',$1::uuid))).* FROM rekey_segments r',[newId]);await c.query('COMMIT');
+      }finally{c.release();}
+    }
+    const ids=['10000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000001','30000000-0000-4000-8000-000000000001','40000000-0000-4000-8000-000000000001'];
+    await rekey(f.copy.derivedCopyId,ids[0]!);await rekey(by.derivedCopyId,ids[1]!);await rekey(ay.derivedCopyId,ids[2]!);await rekey(bx.derivedCopyId,ids[3]!);
+    const ja=await stage(f),jb=await stage({...f,seed:{...f.seed,binding}}),real=new SlackMessageContentPurger();
+    let reached!:()=>void,release!:()=>void;const first=new Promise<void>(r=>{reached=r;}),resume=new Promise<void>(r=>{release=r;});
+    const a=new SlackMessagePurgeConsumer(env.db.pool,{purger:{sourceLockKeysInTransaction:(...args)=>real.sourceLockKeysInTransaction(...args),purgeInTransaction:async(c,input)=>{
+      const result=await real.purgeInTransaction(c,input);if(input.derivedCopyId===ids[0]){reached();await resume;}return result;}}});
+    const poolB=new pg.Pool({connectionString:env.db.pool.options.connectionString,max:1}),b=new SlackMessagePurgeConsumer(poolB);
+    let pa:ReturnType<typeof a.process>|undefined,pb:ReturnType<typeof b.process>|undefined;
+    try {const la=onlyLease(await a.claim(1)),lb=onlyLease(await b.claim(1));expect(la.id).toBe(ja.id);expect(lb.id).toBe(jb.id);
+      const pid=(await poolB.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;pa=a.process(la);await first;pb=b.process(lb);
+      const end=Date.now()+1500;let waiting=false;while(Date.now()<end){waiting=(await env.db.pool.query("SELECT wait_event_type='Lock' AS waiting FROM pg_stat_activity WHERE pid=$1",[pid])).rows[0]?.waiting===true;if(waiting)break;await new Promise(r=>setTimeout(r,10));}
+      expect(waiting).toBe(true);release();expect(await Promise.all([pa,pb])).toEqual(['completed','completed']);
+    }finally{release?.();await pa;await pb;await poolB.end();}
+  },10000);
 });

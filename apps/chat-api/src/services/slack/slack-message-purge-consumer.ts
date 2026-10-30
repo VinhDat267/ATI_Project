@@ -133,6 +133,12 @@ export class SlackMessagePurgeConsumer {
       if(signal?.aborted)throw new Failure('ABORTED');await this.owned(client,job);await this.proof(client,row,target,true);
       const second=await this.candidates(client,target,cutoff),freshKeys=await this.purger.sourceLockKeysInTransaction(client,ids);
       if(JSON.stringify(first)!==JSON.stringify(second)||JSON.stringify(keys)!==JSON.stringify(freshKeys))throw new Failure('RETRY_SCAN');
+      // Different workspace bindings can touch the same conversations without
+      // sharing source keys. Order ALL parents before any per-copy erasure.
+      await client.query(`SELECT v.id FROM conversations v JOIN (
+        SELECT DISTINCT m.conv_id,c.ati_user_id FROM slack_derived_copies c JOIN messages m ON m.id::text=c.target_id
+        WHERE c.id=ANY($1::uuid[])) parents ON v.id=parents.conv_id AND v.user_id=parents.ati_user_id
+        ORDER BY v.id FOR UPDATE OF v`,[ids]);
       let code:Code|undefined=first.length>this.size?'PARTIAL_PURGE':undefined;
       for(const copy of first.slice(0,this.size)) {
         if(signal?.aborted)throw new Failure('ABORTED');
