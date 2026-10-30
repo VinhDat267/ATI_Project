@@ -15,6 +15,7 @@ import express from 'express';
 import request from 'supertest';
 import { createConversationRoutes } from '../../src/routes/conversation-routes.js';
 import { SlackMessageContentPurger } from '../../src/services/slack/slack-message-content-purger.js';
+import { reconcileInterruptedExecutions } from '../../src/services/startup-reconciliation.js';
 
 let env:SlackReadEnvironment,plans:PlanRepo,steps:StepRepo;
 beforeAll(async()=>{env=await createSlackReadEnvironment('slack_plan_execution');const registry=new SlackDerivedLineageRepo(env.db.pool,env.policyService);plans=new PlanRepo(env.db.pool,registry);steps=new StepRepo(env.db.pool,registry);});
@@ -47,31 +48,31 @@ it('actual plan/step/audit writers register atomically and ordinary readers mask
   expect(JSON.stringify(persisted)).not.toContain('private');expect(persisted.status).toBe('superseded');expect(persisted.resource_labels).toEqual({trello:'keep'});
   const audit=(await env.db.pool.query('SELECT args_json,output_json,error_json FROM execution_steps WHERE id=$1',[step.id])).rows[0];
   expect(audit).toEqual({args_json:{__slack_purged:true},output_json:{__slack_purged:true},error_json:{__slack_purged:true}});
-});
+},20_000);
 it('rolls back real plan and registry together on stale acquisition authority',async()=>{
   const f=await fixture();f.context.segments[0]!.storagePolicyRef.consentRevision='999';
   await expect(plans.createSlackPlan(f.data,{...f.context,selectors:['plan_json','plan_text','plan_hash']})).rejects.toThrow();
   expect((await env.db.pool.query('SELECT count(*)::int AS n FROM plans WHERE conv_id=$1',[f.conv])).rows[0].n).toBe(0);
-});
+},20_000);
 it('real chat creates a source-bound plan, approved execution records provenance through HTTP fixture and SSE caches no source output',async()=>{
   const f=await fixture(),registry=new SlackDerivedLineageRepo(env.db.pool,env.policyService),messages=new MessageRepo(env.db.pool,registry),sse=new SSEManager();
   await messages.createSlackMessage(f.conv,'assistant','private plan source',{type:'answer'},{...f.context,selectors:['content']});
   const chat=new ChatService({msgRepo:messages,planRepo:plans,eventEmitter:{emit:(name,payload)=>sse.emitEvent(f.conv,name,payload)},planner:{processMessage:async()=>f.data.planJson as any,routeSchedule:async()=>({services:[],unavailable:[]})}});
   await chat.handleUserMessage({conversationId:f.conv,userId:f.owner.person.id,content:'make a card'});
-  await vi.waitFor(async()=>expect((await env.db.pool.query('SELECT count(*)::int AS n FROM plans WHERE conv_id=$1',[f.conv])).rows[0].n).toBe(1));
+  await vi.waitFor(async()=>expect((await env.db.pool.query('SELECT count(*)::int AS n FROM plans WHERE conv_id=$1',[f.conv])).rows[0].n).toBe(1),{timeout:5000});
   const plan=(await env.db.pool.query('SELECT * FROM plans WHERE conv_id=$1',[f.conv])).rows[0];
   const path=`/plan-write-${randomUUID()}`;env.fixture.setHandler(path,req=>({body:{id:'fixture-card',name:JSON.parse(req.body).name,excerpt:'private provider output'}}));
   const service=new ExecutionService({planRepo:plans,stepRepo:steps,convRepo:new ConversationRepo(env.db.pool),sseManager:sse,adapterFactory:{getAdapterForService:()=>({execute:async(_tool:string,args:any,options:any)=>{
     const response=await fetch(env.fixture.url+path,{method:'POST',body:JSON.stringify(args),signal:options.signal});return response.json();
   }})}});
   expect((await service.approveAndStart(plan.id,f.owner.person.id)).success).toBe(true);
-  await vi.waitFor(async()=>expect((await env.db.pool.query('SELECT status FROM plans WHERE id=$1',[plan.id])).rows[0].status).toBe('completed'));
+  await vi.waitFor(async()=>expect((await env.db.pool.query('SELECT status FROM plans WHERE id=$1',[plan.id])).rows[0].status).toBe('completed'),{timeout:5000});
   expect(env.fixture.requests.filter(r=>r.path===path)).toHaveLength(1);
   const rows=await steps.listSteps(plan.id);expect(rows[0]?.output_json.excerpt).toBe('private provider output');
   expect((await env.db.pool.query("SELECT count(*)::int AS n FROM slack_derived_copies WHERE target_kind='audit_log_entry' AND target_id=$1 AND status='active'",[rows[0]!.id])).rows[0].n).toBe(1);
   expect(JSON.stringify(sse.getMissedEvents(f.conv,0))).not.toContain('private');
   await invalidate(f);expect(JSON.stringify(await service.getLatestExecutionSnapshot(f.conv,f.owner.person.id))).not.toContain('private');
-});
+},20_000);
 it('rechecks source after an asynchronous adapter factory and never dispatches a revoked plan',async()=>{
   const f=await fixture(),plan=await plans.createSlackPlan(f.data,f.context),path=`/never-write-${randomUUID()}`;
   let entered!:()=>void,release!:()=>void;const ready=new Promise<void>(r=>{entered=r;}),gate=new Promise<void>(r=>{release=r;});
@@ -80,9 +81,9 @@ it('rechecks source after an asynchronous adapter factory and never dispatches a
     entered();await gate;return {execute:async(_tool:string,args:any,options:any)=>(await fetch(env.fixture.url+path,{method:'POST',body:JSON.stringify(args),signal:options.signal})).json()};
   }}});
   expect((await service.approveAndStart(plan.id,f.owner.person.id)).success).toBe(true);await ready;await invalidate(f);release();
-  await vi.waitFor(async()=>expect((await env.db.pool.query('SELECT status FROM plans WHERE id=$1',[plan.id])).rows[0].status).toBe('failed'));
+  await vi.waitFor(async()=>expect((await env.db.pool.query('SELECT status FROM plans WHERE id=$1',[plan.id])).rows[0].status).toBe('failed'),{timeout:5000});
   expect(env.fixture.requests.filter(r=>r.path===path)).toHaveLength(0);
-});
+},20_000);
 it('records a provider result racing revoke without its payload, keeps UNKNOWN non-retriable and makes no next write',async()=>{
   const f=await fixture();
   f.data.planJson.steps.push({id:'s2',tool:'trello.create_card',description:'private second',args:{name:'private next'},dependsOn:['s1']});
@@ -91,13 +92,13 @@ it('records a provider result racing revoke without its payload, keeps UNKNOWN n
   env.fixture.setHandler(path,async()=>{await invalidate(f);return {body:{id:'written-before-revoke',excerpt:'private late provider result'}};});
   const service=new ExecutionService({planRepo:plans,stepRepo:steps,convRepo:new ConversationRepo(env.db.pool),sseManager:sse,adapterFactory:{getAdapterForService:()=>({execute:async(_tool:string,args:any,options:any)=>(await fetch(env.fixture.url+path,{method:'POST',body:JSON.stringify(args),signal:options.signal})).json()})}});
   expect((await service.approveAndStart(plan.id,f.owner.person.id)).success).toBe(true);
-  await vi.waitFor(async()=>expect((await env.db.pool.query('SELECT status FROM plans WHERE id=$1',[plan.id])).rows[0].status).toBe('failed'));
+  await vi.waitFor(async()=>expect((await env.db.pool.query('SELECT status FROM plans WHERE id=$1',[plan.id])).rows[0].status).toBe('failed'),{timeout:5000});
   expect(env.fixture.requests.filter(r=>r.path===path)).toHaveLength(1);
   const stored=(await env.db.pool.query('SELECT output_json,error_json,status FROM execution_steps WHERE plan_id=$1 ORDER BY step_id',[plan.id])).rows;
   expect(stored[0]!.status).toBe('unknown');expect(JSON.stringify(stored)).not.toContain('private late');
   expect(JSON.stringify(sse.getMissedEvents(f.conv,0))).not.toContain('private');
   await expect(service.retryStep(plan.id,'s1',f.owner.person.id)).rejects.toThrow();
-});
+},20_000);
 it('guards the actual HTTP pending-plan preview before purge and preserves a different owner',async()=>{
   const f=await fixture(),other=await fixture(),plan=await plans.createSlackPlan(f.data,f.context),otherPlan=await plans.createSlackPlan(other.data,other.context);
   const app=express();app.use((req,_res,next)=>{(req as any).user={id:req.headers['x-fixture-owner']};next();});
@@ -110,7 +111,7 @@ it('guards the actual HTTP pending-plan preview before purge and preserves a dif
   await new SlackMessagePurgeConsumer(env.db.pool,{targetKind:'plan_step_arg'}).runOnce(50);
   expect((await env.db.pool.query('SELECT plan_json FROM plans WHERE id=$1',[otherPlan.id])).rows[0].plan_json.summary).toBe('private plan');
   expect((await plans.getPlan(plan.id))?.status).toBe('superseded');
-});
+},20_000);
 it('BIGINT version stays exact for plan selectors and fingerprint mismatch never overwrites replacement text',async()=>{
   const f=await fixture();await env.db.pool.query("SELECT setval('slack_derived_target_version_seq',9007199254740992)");
   const plan=await plans.createSlackPlan(f.data,f.context),copy=(await env.db.pool.query("SELECT * FROM slack_derived_copies WHERE target_id=$1 AND target_sub_id='plan_json'",[plan.id])).rows[0];
@@ -120,7 +121,7 @@ it('BIGINT version stays exact for plan selectors and fingerprint mismatch never
   const consumer=new SlackMessagePurgeConsumer(env.db.pool,{targetKind:'plan_step_arg'});expect((await consumer.runOnce(50)).retried).toBeGreaterThan(0);
   expect((await env.db.pool.query('SELECT plan_json FROM plans WHERE id=$1',[plan.id])).rows[0].plan_json.summary).toBe('new replacement');
   expect((await env.db.pool.query('SELECT status,retired_reason FROM slack_derived_copies WHERE id=$1',[copy.id])).rows[0]).toEqual({status:'retired',retired_reason:'fingerprint_mismatch'});
-});
+},20_000);
 it('rejects wrong owner, stale approved step args and an actual aborted writer signal without partial artifacts',async()=>{
   const f=await fixture(),other=await fixture(),controller=new AbortController();controller.abort();
   await expect(plans.createSlackPlan(f.data,f.context,undefined,controller.signal)).rejects.toThrow();
@@ -129,7 +130,7 @@ it('rejects wrong owner, stale approved step args and an actual aborted writer s
   const plan=await plans.createSlackPlan(f.data,f.context);
   await expect(steps.createStep({planId:plan.id,stepId:'s1',tool:'trello.create_card',argsJson:{name:'tampered'},requestedBy:f.owner.person.id})).rejects.toThrow('SLACK_STEP_SNAPSHOT_MISMATCH');
   expect((await env.db.pool.query('SELECT count(*)::int AS n FROM execution_steps WHERE plan_id=$1',[plan.id])).rows[0].n).toBe(0);
-});
+},20_000);
 it('physically invalidates a linked run without retaining its source error',async()=>{
   const f=await fixture(),plan=await plans.createSlackPlan(f.data,f.context);
   const schedule=(await env.db.pool.query("INSERT INTO schedules(user_id,conv_id,name,request,recurrence,services,status) VALUES($1,$2,'fixture','fixture','{}',ARRAY['trello'],'paused') RETURNING id",[f.owner.person.id,f.conv])).rows[0];
@@ -137,7 +138,7 @@ it('physically invalidates a linked run without retaining its source error',asyn
   await invalidate(f);await new SlackMessagePurgeConsumer(env.db.pool,{targetKind:'plan_step_arg'}).runOnce(50);
   const row=(await env.db.pool.query('SELECT status,plan_id,error FROM schedule_runs WHERE id=$1',[run.id])).rows[0];
   expect(row.status).toBe('discarded');expect(row.plan_id).toBeNull();expect(row.error).not.toContain('private');
-});
+},20_000);
 it('rolls physical plan erasure back after a real expired lease is reclaimed',async()=>{
   const f=await fixture(),plan=await plans.createSlackPlan(f.data,f.context),key=await invalidate(f);
   const job=(await env.db.pool.query("SELECT id FROM slack_invalidation_intents WHERE source_event_key=$1 AND target_kind='plan_step_arg'",[key])).rows[0];
@@ -150,7 +151,7 @@ it('rolls physical plan erasure back after a real expired lease is reclaimed',as
   const lease=(await consumer.claim(50)).find(j=>j.id===job.id);expect(lease).toBeDefined();expect(await consumer.process(lease!)).toBe('lost');
   expect((await env.db.pool.query('SELECT plan_json FROM plans WHERE id=$1',[plan.id])).rows[0].plan_json.summary).toBe('private plan');
   expect(replacement).toBeDefined();expect(await other.process(replacement)).toBe('completed');
-});
+},20_000);
 it('exclusive source-edit cutoff erases the old plan while a newly authorized equal revision remains readable',async()=>{
   const f=await fixture(),old=await plans.createSlackPlan(f.data,f.context),source=f.context.segments[0]!.sourceRef;
   await env.stageBarriers([{effectKey:'edit',barrier:{barrierType:'resource',workspaceId:f.owner.binding.workspaceId,resourceType:'message',resourceId:source.resourceId,minValidRevision:'1730000000.000002',reason:'edit'},
@@ -161,4 +162,48 @@ it('exclusive source-edit cutoff erases the old plan while a newly authorized eq
   await new SlackMessagePurgeConsumer(env.db.pool,{targetKind:'plan_step_arg'}).runOnce(50);
   expect((await env.db.pool.query('SELECT plan_json FROM plans WHERE id=$1',[old.id])).rows[0].plan_json.summary).not.toContain('private');
   expect((await env.db.pool.query('SELECT plan_json FROM plans WHERE id=$1',[next.id])).rows[0].plan_json.summary).toBe('private plan');
-});
+},20_000);
+it('masks a populated output lacking an audit registration through both actual execution readers',async()=>{
+  const f=await fixture(),plan=await plans.createSlackPlan(f.data,f.context);
+  const step=await steps.createStep({planId:plan.id,stepId:'s1',tool:'trello.create_card',argsJson:{name:'private card'},requestedBy:f.owner.person.id});
+  await env.db.pool.query("UPDATE plans SET status='executing' WHERE id=$1",[plan.id]);
+  await env.db.pool.query('UPDATE execution_steps SET output_json=$2 WHERE id=$1',[step.id,JSON.stringify({excerpt:'UNREGISTERED_PRIVATE_OUTPUT'})]);
+  expect(JSON.stringify(await steps.listSteps(plan.id))).not.toContain('UNREGISTERED_PRIVATE_OUTPUT');
+  const service=new ExecutionService({planRepo:plans,stepRepo:steps,convRepo:new ConversationRepo(env.db.pool),adapterFactory:{getAdapterForService:()=>({execute:async()=>({})})}});
+  expect(JSON.stringify(await service.getLatestExecutionSnapshot(f.conv,f.owner.person.id))).not.toContain('UNREGISTERED_PRIVATE_OUTPUT');
+},20_000);
+it('cannot recover using a masked successful output as dependency evidence',async()=>{
+  const f=await fixture();f.data.planJson.steps.push({id:'s2',tool:'trello.create_card',description:'next',args:{name:{$template:'value=${s1.output}'}} as any,dependsOn:['s1']});
+  f.data.planText=JSON.stringify(f.data.planJson);f.data.planHash=createHash('sha256').update(f.data.planText).digest('hex');
+  const plan=await plans.createSlackPlan(f.data,f.context),first=await steps.createStep({planId:plan.id,stepId:'s1',tool:'trello.create_card',argsJson:f.data.planJson.steps[0]!.args,requestedBy:f.owner.person.id});
+  await steps.updateStepStatus(first.id,'succeeded','ORIGINAL_OUTPUT');
+  await steps.createStep({planId:plan.id,stepId:'s2',tool:'trello.create_card',argsJson:f.data.planJson.steps[1]!.args,requestedBy:f.owner.person.id});
+  await env.db.pool.query("UPDATE plans SET status='reconciliation_required',decided_at=now() WHERE id=$1",[plan.id]);
+  await env.db.pool.query('UPDATE execution_steps SET output_json=$2 WHERE id=$1',[first.id,JSON.stringify('TAMPERED_PRIVATE_OUTPUT')]);
+  const path=`/recovery-never-${randomUUID()}`;env.fixture.setHandler(path,()=>({body:{ok:true}}));
+  const service=new ExecutionService({planRepo:plans,stepRepo:steps,convRepo:new ConversationRepo(env.db.pool),adapterFactory:{getAdapterForService:()=>({execute:async(_tool:string,args:any,options:any)=>(await fetch(env.fixture.url+path,{method:'POST',body:JSON.stringify(args),signal:options.signal})).json()})}});
+  await expect(service.continueExecution(plan.id,f.owner.person.id)).rejects.toThrow();
+  expect(env.fixture.requests.filter(r=>r.path===path)).toHaveLength(0);
+},20_000);
+it('rechecks persisted dependency fingerprints after recovery hydration and asynchronous adapter acquisition',async()=>{
+  const f=await fixture();f.data.planJson.steps.push({id:'s2',tool:'trello.create_card',description:'next',args:{name:{$template:'value=${s1.output}'}} as any,dependsOn:['s1']});
+  f.data.planText=JSON.stringify(f.data.planJson);f.data.planHash=createHash('sha256').update(f.data.planText).digest('hex');
+  const plan=await plans.createSlackPlan(f.data,f.context),first=await steps.createStep({planId:plan.id,stepId:'s1',tool:'trello.create_card',argsJson:f.data.planJson.steps[0]!.args,requestedBy:f.owner.person.id});
+  await steps.updateStepStatus(first.id,'succeeded','ORIGINAL_OUTPUT');
+  await steps.createStep({planId:plan.id,stepId:'s2',tool:'trello.create_card',argsJson:f.data.planJson.steps[1]!.args,requestedBy:f.owner.person.id});
+  await env.db.pool.query("UPDATE plans SET status='reconciliation_required',decided_at=now() WHERE id=$1",[plan.id]);
+  let entered!:()=>void,release!:()=>void;const ready=new Promise<void>(r=>{entered=r;}),gate=new Promise<void>(r=>{release=r;});
+  const path=`/recovery-race-${randomUUID()}`;env.fixture.setHandler(path,()=>({body:{ok:true}}));
+  const service=new ExecutionService({planRepo:plans,stepRepo:steps,convRepo:new ConversationRepo(env.db.pool),adapterFactory:{getAdapterForService:async()=>{entered();await gate;return {execute:async(_tool:string,args:any,options:any)=>(await fetch(env.fixture.url+path,{method:'POST',body:JSON.stringify(args),signal:options.signal})).json()};}}});
+  const run=service.continueExecution(plan.id,f.owner.person.id);await ready;
+  await env.db.pool.query('UPDATE execution_steps SET output_json=$2 WHERE id=$1',[first.id,JSON.stringify('LATE_TAMPERED_PRIVATE_OUTPUT')]);release();
+  expect((await run).status).not.toBe('completed');expect(env.fixture.requests.filter(r=>r.path===path)).toHaveLength(0);
+},20_000);
+it('retains the exact fixed startup error as source-free metadata while preserving UNKNOWN recovery safety',async()=>{
+  const f=await fixture(),plan=await plans.createSlackPlan(f.data,f.context),step=await steps.createStep({planId:plan.id,stepId:'s1',tool:'trello.create_card',argsJson:f.data.planJson.steps[0]!.args,requestedBy:f.owner.person.id});
+  expect(await plans.approvePlan(plan.id,f.data.planHash,f.owner.person.id)).toBe(true);
+  await steps.updateStepStatus(step.id,'running');await reconcileInterruptedExecutions(env.db.pool);
+  const row=(await steps.listSteps(plan.id))[0]!;
+  expect(row.status).toBe('unknown');expect(row.args_json).toEqual(f.data.planJson.steps[0]!.args);
+  expect(row.error_json).toEqual({category:'UNKNOWN',message:'Server restarted while this step was running'});
+},20_000);

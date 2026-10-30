@@ -1,4 +1,5 @@
 import type pg from 'pg';
+import { isDeepStrictEqual } from 'node:util';
 import { isUuid } from './uuid.js';
 import { SlackDerivedLineageRepo } from './slack-derived-lineage-repo.js';
 import { SlackPolicyService } from '../../services/slack/policy-service.js';
@@ -138,6 +139,10 @@ export class PlanRepo {
       const owner=(await client.query('SELECT user_id FROM conversations WHERE id=$1',[checked.row.conv_id])).rows[0]?.user_id;
       if(!checked.allowed||owner!==userId||checked.row.plan_hash!==expectedHash||!['approved','executing'].includes(checked.row.status)||
         !checked.row.plan_json.steps?.some((s:any)=>s.id===stepId&&s.tool===tool))throw Object.assign(new Error('SLACK_SOURCE_UNAVAILABLE'),{category:'AUTH_ERROR',details:{requestSent:false}});
+      const stored=(await client.query('SELECT * FROM execution_steps WHERE plan_id=$1 ORDER BY step_id FOR SHARE',[planId])).rows;
+      const safe=await guardStepRowsInTransaction(client,this.slack,checked,stored,'planning'),step=safe.find(s=>s.step_id===stepId&&s.tool===tool);
+      const approved=checked.row.plan_json.steps.find((s:any)=>s.id===stepId);
+      if(!step||safe.some(s=>s.status==='unknown')||!isDeepStrictEqual(step.args_json,approved.args??{}))throw Object.assign(new Error('SLACK_SOURCE_UNAVAILABLE'),{category:'AUTH_ERROR',details:{requestSent:false}});
       signal?.throwIfAborted();
     });
   }

@@ -53,10 +53,12 @@ export async function guardPlanInTransaction(client:pg.PoolClient,registry:Slack
 }
 
 export async function guardStepRowsInTransaction(client:pg.PoolClient,registry:SlackDerivedLineageRepo,plan:Awaited<ReturnType<typeof guardPlanInTransaction>>,rows:any[],purpose:'planning'|'manual_lookup') {
-  if(!plan.source && !rows.some(r=>r.slack_lineage_manifest!=null||hasSlackMarker(r.args_json)||hasSlackMarker(r.output_json)||hasSlackMarker(r.error_json)))return rows;
+  if(!plan.source && !rows.some(r=>r.slack_lineage_manifest!=null||hasSlackMarker(r.args_json)||hasSlackMarker(r.output_json)||hasSlackMarker(r.error_json))){for(const row of rows)delete row.slack_lineage_manifest;return rows;}
   for(let i=0;i<rows.length;i++){
     const row=rows[i],manifest=row.slack_lineage_manifest;
-    let allowed=plan.allowed&&Array.isArray(manifest)&&manifest.includes('args_json')&&new Set(manifest).size===manifest.length;
+    const fixedRestartError=row.error_json && Object.keys(row.error_json).length===2 && row.error_json.category==='UNKNOWN' && row.error_json.message==='Server restarted while this step was running';
+    let allowed=plan.source&&plan.allowed&&Array.isArray(manifest)&&manifest.includes('args_json')&&new Set(manifest).size===manifest.length&&
+      (row.output_json==null||manifest.includes('output_json'))&&(row.error_json==null||manifest.includes('error_json')||fixedRestartError);
     if(allowed){
       for(const selector of manifest){
         const kind=selector==='args_json'?'plan_step_arg':'audit_log_entry';
@@ -65,7 +67,7 @@ export async function guardStepRowsInTransaction(client:pg.PoolClient,registry:S
       }
       if(plan.copies.some(c=>c.target_id===row.id&&c.status==='active'&&!manifest.includes(c.target_sub_id)))allowed=false;
     }
-    const safe=allowed?row:{...row,args_json:JSON_TOMBSTONE,output_json:row.output_json==null?null:JSON_TOMBSTONE,error_json:row.error_json==null?null:JSON_TOMBSTONE};
+    const safe=allowed?row:{...row,status:'unknown',args_json:JSON_TOMBSTONE,output_json:row.output_json==null?null:JSON_TOMBSTONE,error_json:row.error_json==null?null:JSON_TOMBSTONE};
     delete safe.slack_lineage_manifest;tagSlackSourceArtifact(safe);rows[i]=safe;
   }
   return rows;

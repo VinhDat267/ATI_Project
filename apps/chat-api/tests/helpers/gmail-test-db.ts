@@ -6,6 +6,11 @@ import { UserRepo } from '../../src/db/repositories/user-repo.js';
 
 const directory = fileURLToPath(new URL('../../../../db/v3/', import.meta.url));
 
+/** Current repositories are tested against the complete current runtime schema. */
+export async function applyV3Migrations(db: Pick<pg.Pool,'query'>): Promise<void> {
+  for (const f of (await readdir(directory)).filter(f => /^\d{4}_.*\.sql$/.test(f)).sort()) await db.query(await readFile(`${directory}/${f}`, 'utf8'));
+}
+
 /** A private schema with every v3 migration, for one test file on the real PostgreSQL. */
 export async function createMigratedSchema(prefix: string) {
   const db = process.env.DATABASE_URL || 'postgresql://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3';
@@ -14,7 +19,7 @@ export async function createMigratedSchema(prefix: string) {
   await admin.query(`CREATE SCHEMA "${schema}"`);
   const url = new URL(db); url.searchParams.set('options', `-c search_path=${schema}`);
   const pool = new pg.Pool({ connectionString: url.href, max: 12 });
-  for (const f of (await readdir(directory)).filter((f) => /^\d{4}_.*\.sql$/.test(f)).sort()) await pool.query(await readFile(`${directory}/${f}`, 'utf8'));
+  await applyV3Migrations(pool);
   const users = new UserRepo(pool);
   return {
     pool, users,

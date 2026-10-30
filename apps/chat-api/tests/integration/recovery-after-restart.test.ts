@@ -16,6 +16,7 @@ import { ExecutionService } from '../../src/services/execution-service.js';
 import { reconcileInterruptedExecutions } from '../../src/services/startup-reconciliation.js';
 import { createApp } from '../../src/app.js';
 import { generateTokens } from '../../src/auth/jwt.js';
+import { applyV3Migrations } from '../helpers/gmail-test-db.js';
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
 const databaseUrl = process.env.DATABASE_URL || 'postgresql://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3';
@@ -63,9 +64,7 @@ describe('recovering a stopped executor with real PostgreSQL and HTTP', () => {
     adminPool = new pg.Pool({ connectionString: databaseUrl });
     await adminPool.query(`CREATE SCHEMA "${schema}"`);
     pool = new pg.Pool({ connectionString: scopedUrl.href });
-    for (const migration of ['0001_v3_core.sql', '0002_v3_invariants.sql', '0006_fe03_resource_labels.sql']) {
-      await pool.query(await readFile(resolve(root, 'db/v3', migration), 'utf8'));
-    }
+    await applyV3Migrations(pool);
     planRepo = new PlanRepo(pool); stepRepo = new StepRepo(pool); convRepo = new ConversationRepo(pool);
     const users = new UserRepo(pool);
     const owner = await users.createUser({ email: 'owner@recovery.test', name: 'Owner', password: 'Fixture-password' });

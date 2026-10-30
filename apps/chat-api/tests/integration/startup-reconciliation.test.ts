@@ -12,6 +12,7 @@ import { ConversationRepo } from '../../src/db/repositories/conversation-repo.js
 import { PlanRepo } from '../../src/db/repositories/plan-repo.js';
 import { StepRepo } from '../../src/db/repositories/step-repo.js';
 import { generateAccessToken } from '../../src/auth/jwt.js';
+import { applyV3Migrations } from '../helpers/gmail-test-db.js';
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
 const databaseUrl = process.env.DATABASE_URL || 'postgresql://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3';
@@ -85,14 +86,13 @@ describe('startup execution reconciliation on real PostgreSQL', () => {
     adminPool = new pg.Pool({ connectionString: databaseUrl });
     await adminPool.query(`CREATE SCHEMA "${schema}"`);
     pool = new pg.Pool({ connectionString: scopedUrl.href });
-    for (const migration of ['0001_v3_core.sql', '0002_v3_invariants.sql', '0006_fe03_resource_labels.sql']) {
-      await pool.query(await readFile(resolve(root, 'db/v3', migration), 'utf8'));
-    }
+    await applyV3Migrations(pool);
     planRepo = new PlanRepo(pool);
     stepRepo = new StepRepo(pool);
     convRepo = new ConversationRepo(pool);
     const users = new UserRepo(pool);
     const user = await users.createUser({ email: 'reconciliation@localhost.test', name: 'Fixture', password: 'Fixture-test-password' });
+    await pool.query("UPDATE users SET status='active',email_verified=true WHERE id=$1",[user.id]);
     await pool.query(await readFile(resolve(root, 'db/v3/0003_auth_sessions.sql'), 'utf8'));
     userId = user.id;
     const session = await users.sessions.create(user.id, 'Startup reconciliation fixture');
