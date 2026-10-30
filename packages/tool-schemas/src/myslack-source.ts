@@ -475,6 +475,11 @@ export type SlackPurgeTarget =
       resourceType: SlackResourceType;
       resourceId: string;
       revision?: string;
+      /** Edit invalidation: erase only revisions strictly below this exact decimal watermark.
+       * Every raw/derived consumer must preserve equal/newer revisions. Opaque revisions
+       * cannot prove freshness and must fail closed. Mutually exclusive with revision.
+       */
+      beforeRevision?: string;
       cascadeTargetKinds: SlackDerivedTargetKind[];
       tombstoneReason: 'source_deleted' | 'source_edited';
     }
@@ -629,12 +634,24 @@ export function validateSlackPurgeTarget(input: unknown): SlackPurgeTarget {
         throw new TypeError('resource_lifecycle requires tombstoneReason source_deleted or source_edited');
       }
 
+      let beforeRevision: string | undefined;
+      if (record.tombstoneReason === 'source_edited') {
+        if (revision !== undefined || typeof record.beforeRevision !== 'string' ||
+            record.beforeRevision.length > 256 || !/^[0-9]+(?:\.[0-9]+)?$/.test(record.beforeRevision)) {
+          throw new TypeError('source_edited requires decimal beforeRevision and no exact revision');
+        }
+        beforeRevision = record.beforeRevision;
+      } else if (record.beforeRevision !== undefined) {
+        throw new TypeError('beforeRevision is only valid for source_edited');
+      }
+
       return {
         scope: 'resource_lifecycle',
         workspaceId: record.workspaceId.trim(),
         resourceType: record.resourceType as SlackResourceType,
         resourceId: record.resourceId.trim(),
         ...(revision ? { revision } : {}),
+        ...(beforeRevision ? { beforeRevision } : {}),
         cascadeTargetKinds,
         tombstoneReason: record.tombstoneReason,
       };

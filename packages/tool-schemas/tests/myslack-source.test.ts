@@ -401,9 +401,16 @@ describe('Slack Source Lifecycle, Lineage & Purge Contracts (F1, F2, F3)', () =>
 
       const edited: SlackPurgeTarget = {
         ...target,
+        revision: undefined,
+        beforeRevision: '1730000002.000002',
         tombstoneReason: 'source_edited',
       };
       expect(validateSlackPurgeTarget(edited)).toEqual(edited);
+      for (const beforeRevision of [undefined, '', 'opaque', '1e10', -1, ' 2.0']) {
+        expect(() => validateSlackPurgeTarget({ ...edited, beforeRevision })).toThrow(TypeError);
+      }
+      expect(() => validateSlackPurgeTarget({ ...edited, revision: '1' })).toThrow(TypeError);
+      expect(() => validateSlackPurgeTarget({ ...target, beforeRevision: '2' })).toThrow(TypeError);
     });
 
     it('validates scope: workspace_consent_revocation requiring all 4 matching fields and consent_revoked reason', () => {

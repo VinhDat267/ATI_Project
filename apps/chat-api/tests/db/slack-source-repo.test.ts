@@ -19,6 +19,7 @@ import {
   slackSourceWriteLockKeys,
 } from '../../src/services/slack/slack-invalidation-service.js';
 import { SlackConnectionRepo } from '../../src/db/repositories/slack-connection-repo.js';
+import { SlackEventReceiptRepo } from '../../src/db/repositories/slack-event-receipt-repo.js';
 import {
   SLACK_DERIVED_TARGET_KINDS,
   formatSlackOwnerSourceKey,
@@ -106,6 +107,51 @@ describe('SlackSourceRepo on PostgreSQL (03B1)', () => {
 
     return { person, connectionId, workspaceId, binding, policyRef, consent };
   }
+
+  it('late edit purge erases only older captures and carries its cutoff to all derived intents', async () => {
+    const env = await seedEnvironment('T_LATE_EDIT_PURGE');
+    const resourceId = JSON.stringify(['C_LATE', '1730000000.000001']);
+    const versions = ['1730000001.000001', '1730000002.000002', '1730000003.000003'];
+    const sources = [];
+    for (const revision of versions) {
+      sources.push(await repo.saveSourceAtomic({
+        sourceRef: { binding: env.binding, resourceType: 'message', resourceId, revision },
+        policyRef: env.policyRef,
+        untrustedContent: `Revision ${revision}`,
+        metadata: { channelId: 'C_LATE' },
+      }));
+    }
+    const invalidation = new SlackInvalidationService(db.pool);
+    const ingress = new SlackEventReceiptRepo(db.pool, invalidation);
+    const eventId = `Ev${randomUUID().replaceAll('-', '')}`;
+    await ingress.recordLifecycle({
+      appId: 'A_SLACK_APP', eventId, teamId: env.workspaceId,
+      eventType: 'message', eventSubtype: 'message_changed', eventContext: null,
+      sourceEventTs: '1730000004.000004', sourceEventTimeIso: '2024-10-27T03:33:24.000004Z',
+      channelId: 'C_LATE', messageTs: '1730000000.000001', payloadHash: 'a'.repeat(64),
+      lifecycle: { intentType: 'message_changed', channelId: 'C_LATE',
+        messageTs: '1730000000.000001', editTs: versions[1]! },
+    });
+    const targets = await db.pool.query(
+      'SELECT target_kind, purge_target FROM slack_invalidation_intents WHERE source_event_key=$1',
+      [`slack:A_SLACK_APP:${eventId}`]
+    );
+    const raw = targets.rows.find(row => row.target_kind === 'slack_source_raw');
+    expect(raw).toBeDefined();
+    // Exercise the actual queued target, rather than constructing a safe target in the test.
+    expect((await repo.purgeSourcesByTarget(raw.purge_target)).purgedCount).toBe(1);
+    for (let index = 0; index < sources.length; index++) {
+      const after = await repo.getSourceById(sources[index]!.id);
+      expect(after!.untrustedContent).toBe(index === 0 ? '' : `Revision ${versions[index]}`);
+      expect(after!.purgedAt !== null).toBe(index === 0);
+    }
+    expect(targets.rowCount).toBe(8);
+    for (const row of targets.rows) {
+      expect(row.purge_target.beforeRevision).toBe(versions[1]);
+    }
+    // A repeated old edit must also preserve a capture saved after the first edit.
+    expect((await repo.purgeSourcesByTarget(raw.purge_target)).purgedCount).toBe(0);
+  });
 
   it('T2.1: saves raw source atomically under lock hierarchy and verifies row contents', async () => {
     const env = await seedEnvironment('T_SAVE_1');
