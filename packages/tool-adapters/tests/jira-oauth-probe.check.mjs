@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { providerFixture, configFor, site } from './helpers/jira-oauth-probe-fixture.mjs';
 import { createProbeClient } from '../scripts/jira-probe/client.mjs';
 
@@ -217,4 +219,97 @@ test('invalid_grant on refresh requires reconnect and cancellation consumes stat
   await assert.rejects(session.callback({ state, error: 'access_denied', browserBinding: 'browser-a' }), /CONSENT_DENIED/);
   await assert.rejects(session.callback({ state, code: 'code', browserBinding: 'browser-a' }), /INVALID_STATE/);
   assert.equal(f.requests.length, before);
+});
+
+async function runner(t) {
+  const f = await providerFixture(); t.after(() => f.close());
+  const { startProbeServer } = await import('../scripts/jira-probe/server.mjs');
+  const server = await startProbeServer(configFor(f, { redirectUri: 'http://127.0.0.1:0/oauth/callback' }));
+  t.after(() => server.close());
+  const first = await fetch(server.url);
+  const cookieHeader = first.headers.get('set-cookie');
+  return { f, server, first, cookie: cookieHeader.split(';', 1)[0], cookieHeader };
+}
+const post = (url, cookie, flow = 'identity', origin = new URL(url).origin) => fetch(url, {
+  method: 'POST', redirect: 'manual', headers: { Cookie: cookie, Origin: origin, 'Content-Type': 'application/x-www-form-urlencoded' },
+  body: new URLSearchParams({ flow }),
+});
+
+test('runner binds one browser and protects report and mutations from other browsers/origins', async t => {
+  const { f, server, first, cookie, cookieHeader } = await runner(t);
+  assert.equal(first.status, 200);
+  assert.match(cookieHeader, /HttpOnly/i); assert.match(cookieHeader, /SameSite=Lax/i);
+  assert.equal(first.headers.get('cache-control'), 'no-store');
+  assert.equal(first.headers.get('referrer-policy'), 'no-referrer');
+  assert.equal((await fetch(`${server.url}report`)).status, 403);
+  assert.equal((await fetch(server.url)).status, 403);
+  assert.equal((await post(`${server.url}start`, cookie, 'identity', 'https://evil.example')).status, 403);
+  assert.equal((await post(`${server.url}start`, 'probe_owner=other')).status, 403);
+  const report = await (await fetch(`${server.url}report`, { headers: { Cookie: cookie } })).json();
+  assert.equal(report.provenance, 'local_fixture');
+  assert.equal(report.nativeGate, 'NOT_RUN');
+  assert.equal(f.requests.length, 0);
+});
+
+test('runner performs callback exchange once, removes code/state from displayed URL and never returns tokens', async t => {
+  const { f, server, cookie } = await runner(t);
+  const start = await post(`${server.url}start`, cookie);
+  assert.equal(start.status, 303);
+  const authUrl = new URL(start.headers.get('location'));
+  assert.equal(authUrl.origin, f.baseUrl);
+  const state = authUrl.searchParams.get('state'); const code = f.issueCode();
+  const url = `${server.url}oauth/callback?state=${state}&code=${code}`;
+  const wrong = await fetch(url, { redirect: 'manual' }); assert.equal(wrong.status, 403);
+  const result = await fetch(url, { redirect: 'manual', headers: { Cookie: cookie } });
+  assert.equal(result.status, 303); assert.equal(result.headers.get('location'), '/');
+  assert.doesNotMatch(await result.text(), /SENTINEL|state=/);
+  const reportResponse = await fetch(`${server.url}report`, { headers: { Cookie: cookie } });
+  const raw = await reportResponse.text(); assert.doesNotMatch(raw, /SENTINEL|account-one/);
+  assert.equal(JSON.parse(raw).connected, true);
+  const replay = await fetch(url, { redirect: 'manual', headers: { Cookie: cookie } });
+  assert.equal(replay.status, 303);
+  assert.equal(f.requests.filter(r => r.path === '/oauth/token').length, 1);
+  const home = await (await fetch(server.url, { headers: { Cookie: cookie } })).text();
+  assert.match(home, /INVALID_STATE/); assert.doesNotMatch(home, /SENTINEL/);
+});
+
+test('runner rejects duplicate callback parameters and handles consent denial without raw descriptions', async t => {
+  const { f, server, cookie } = await runner(t);
+  const start = await post(`${server.url}start`, cookie);
+  const state = new URL(start.headers.get('location')).searchParams.get('state');
+  const duplicate = await fetch(`${server.url}oauth/callback?state=${state}&state=other&code=CODE_SENTINEL`, { redirect: 'manual', headers: { Cookie: cookie } });
+  assert.equal(duplicate.status, 400); assert.doesNotMatch(await duplicate.text(), /CODE_SENTINEL/);
+  const denied = await fetch(`${server.url}oauth/callback?state=${state}&error=access_denied&error_description=SECRET_SENTINEL`, { redirect: 'manual', headers: { Cookie: cookie } });
+  assert.equal(denied.status, 303); assert.equal(denied.headers.get('location'), '/');
+  const page = await (await fetch(server.url, { headers: { Cookie: cookie } })).text();
+  assert.match(page, /CONSENT_DENIED/); assert.doesNotMatch(page, /SECRET_SENTINEL/);
+  assert.equal(f.requests.length, 0);
+});
+
+test('unexpected provider scope text is not reflected in HTML or the redacted report', async t => {
+  const { f, server, cookie } = await runner(t);
+  const start = await post(`${server.url}start`, cookie);
+  const state = new URL(start.headers.get('location')).searchParams.get('state');
+  const code = f.issueCode({ scopes: [...identityScopes, 'ACCESS_SENTINEL_<script>bad</script>'] });
+  await fetch(`${server.url}oauth/callback?state=${state}&code=${code}`, { redirect: 'manual', headers: { Cookie: cookie } });
+  for (const path of ['', 'report']) {
+    const body = await (await fetch(`${server.url}${path}`, { headers: { Cookie: cookie } })).text();
+    assert.doesNotMatch(body, /SENTINEL|<script>/);
+  }
+});
+
+test('runner rejects a remote callback before opening any listener', async () => {
+  const { startProbeServer } = await import('../scripts/jira-probe/server.mjs');
+  await assert.rejects(startProbeServer({ ...configFor({ baseUrl: 'http://127.0.0.1:1234' }), redirectUri: 'https://evil.example/oauth/callback' }), /INVALID_CONFIG/);
+});
+
+test('CLI help and config errors have safe exit codes and never print supplied secrets', () => {
+  const cli = fileURLToPath(new URL('../scripts/jira-probe/cli.mjs', import.meta.url));
+  const env = { ...process.env, JIRA_PROBE_CLIENT_ID: '', JIRA_PROBE_CLIENT_SECRET: '', JIRA_PROBE_REDIRECT_URI: '' };
+  const run = (args, extra = {}) => spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8', env: { ...env, ...extra }, timeout: 5000 });
+  const help = run(['--help']); assert.equal(help.status, 0); assert.match(help.stdout, /--live/);
+  const missing = run(['--check-config']); assert.equal(missing.status, 2); assert.match(missing.stderr, /JIRA_PROBE_CLIENT_ID/);
+  const implicit = run([]); assert.equal(implicit.status, 2); assert.match(implicit.stderr, /--live/);
+  const bad = run(['--check-config'], { JIRA_PROBE_CLIENT_ID: 'client', JIRA_PROBE_CLIENT_SECRET: 'SECRET_SENTINEL', JIRA_PROBE_REDIRECT_URI: 'https://evil.example/oauth/callback' });
+  assert.equal(bad.status, 2); assert.doesNotMatch(bad.stdout + bad.stderr, /SECRET_SENTINEL|evil\.example/);
 });

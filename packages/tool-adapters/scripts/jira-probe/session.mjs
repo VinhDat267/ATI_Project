@@ -96,7 +96,7 @@ export function createProbeSession({ client, mode, clock = Date.now }) {
       bind(browserBinding);
       return {
         schemaVersion: 1, provenance: mode === 'live' ? 'atlassian_live' : 'local_fixture',
-        connected: Boolean(grant), scopes: [...(grant?.scopes ?? [])], siteCount, adminSiteCount,
+        connected: Boolean(grant), scopes: (grant?.scopes ?? []).filter(scope => scopesFor.jira.includes(scope)), siteCount, adminSiteCount,
         observations: { ...observations },
         nativeGate: mode === 'fixture' ? 'NOT_RUN' : 'REQUIRES_REVIEW',
         noSiteMembership: 'REQUIRES_OPERATOR_ATTESTATION',
