@@ -1,5 +1,7 @@
 # Slack Personal Assistant Delivery Plan (SLACK-03 through SLACK-07)
 
+**Cập nhật điều phối30/10:** dùng [ma trận bàn giao](../../handoff/SLACK-DELIVERY.md) cho trạng thái/gates hiện tại. Các Task1–18 bên dưới là danh sách phạm vi; không còn là18 PR cố định hay thứ tự thi công tuyến tính. Root tự triển khai, không gọi Antigravity/Claude CLI. Một review độc lập toàn branch sau khi freeze, CI đúng head giữ nguyên.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Hoàn thiện toàn bộ kiến trúc trợ lý công việc và tích hợp Slack cá nhân đa workspace trong ATI — từ danh mục công cụ typed schema theo phương thức trên nền kiểm kê 354 methods (PR 185), kho lưu trữ nguồn có ACL và purge cascade (F3), gắn kết binding định danh bất biến (F2), ingress ký số và an toàn thực thi UNKNOWN (F4), ba chế độ phân loại theo ranh giới liên quan cá nhân có kiểm soát F1, đến Hộp đề xuất duyệt việc trong ATI và bộ đo đánh giá live.
@@ -141,35 +143,15 @@ Kế hoạch đối soát toàn diện trên snapshot mới nhất PR 185 (head 
 
 ## 4. Danh mục Chi tiết Nhiệm vụ Triển khai (Detailed Task Breakdown)
 
-```
-SLACK-03: Tool Catalog & Source Lifecycle
-  ├── Task 1 (03A): Tool Schemas, Definition Contracts & Source ACL Schemas (PR 1 - AI/Schema)
-  ├── Task 2 (03B): Database Migration, Source Store & Cascade Purge Runner (PR 2 - Backend)
-  ├── Task 3 (03C): First Valid Family (Conversations, Chat, Users) & UNKNOWN Safety (PR 3 - Integration)
-  ├── Task 4 (03D): Content & Collaboration Families (Search, Files, Pins, Reactions) (PR 4 - Integration)
-  └── Task 5 (03E): Advanced Families & 354 Method Reconciliation Ledger (PR 5 - Integration/AI)
+| Mốc nghiệm thu | Phần việc trong các Task bên dưới | Điều kiện đầu ra |
+|---|---|---|
+| M1 cleanup nội bộ |03B2D + DELIVERY-01, nối04A/04B validation với03B2C | Committed actual-server regression, cờ tắt/cách ly owner, CI/review; không đóng toàn03/04 |
+| M2 source safety + manual read | Hoàn tất core03B2, rồi03B3 read và03B4 public integration | Năm kind hiện hữu, writer/read/erasure/backfill gates, một read chạy xuyên ATI |
+| M3 safe writes |04B authorization fanout/watermarks/rotation +04C trước03C write dispatch | Outbox/echo/UNKNOWN/readback/binding; timeout sau commit không retry mù |
+| M4 assistant/full lifecycle |05 ba mode,06 Inbox/digest và hai kind mới của03B2 | Tích hợp artifact thật; đủ tất cả yêu cầu mới đánh giá fullF3/F4 |
+| M5 full scope/release |03D/03E và07 benchmark/native Free/Pro/hai user | Đối soát từng method + native/model evidence; duyệt trước main/bật cờ |
 
-SLACK-04: Ingress Lifecycle & Execution Safety (Bắt đầu sau Task 3 / PR 3 của SLACK-03)
-  ├── Task 6 (04A): Signed Webhook Route, Timestamp Freshness & Durable Commit ACK (PR 6 - Backend)
-  ├── Task 7 (04B): Authorizations Fanout via App Token, Durable Queue & F4 Lifecycle (PR 7 - Backend)
-  └── Task 8 (04C): Outbox Ledger, Echo Guard vs User Typing & UNKNOWN State Guard (PR 8 - Backend)
-
-SLACK-05: Workspace Modes & Triage Engine
-  ├── Task 9 (05A): Workspace Configuration Schema, Migration & Rules Engine (PR 9 - Backend/AI)
-  ├── Task 10 (05B): AI Triage Prompt, F1 Model Policy Gate & Budget Tracker (PR 10 - AI/Backend)
-  └── Task 11 (05C): Unified Triage Worker, CAS Configuration Versioning & Debounce (PR 11 - Backend)
-
-SLACK-06: Proposal Inbox & Approval Gates
-  ├── Task 12 (06A): Proposals API, Migration & Proposal Service (PR 12 - Backend)
-  ├── Task 13 (06B): Proposal Inbox React UI, Workspace Partitioning & Cockpit Preview (PR 13 - Frontend)
-  └── Task 14 (06C): Multi-Service Workflows, Daily Digest & F3 UI Masking (PR 14 - Backend/Frontend/AI)
-
-SLACK-07: Evaluations & Live Acceptance
-  ├── Task 15 (07A): Pre-labelled Dataset Commitment & Benchmark Harness (PR 15 - AI)
-  ├── Task 16 (07B): 3-Mode Benchmark Execution (3 Runs / Mode) & Performance Report (PR 16 - AI)
-  ├── Task 17 (07C): Live Acceptance on Free & Pro Workspaces, 2 Users & Readback (PR 17 - Reviewer/Leader)
-  └── Task 18 (07D): Release PR Toggling MYSLACK_ENABLED and MYSLACK_AUTOMATION_ENABLED (PR 18 - Reviewer/Leader)
-```
+Không cần chờ mọi read/write family03C để bắt đầu04A/04B. Write dispatch phụ thuộc04C. FullF3 phụ thuộc hai artifact tương lai06; core source milestone không được đổi tên thành fullF3. Task2/3 bên dưới được chia theo deliverable ở các card con, không bắt buộc một PR mỗi task lớn.
 
 ---
 
@@ -225,7 +207,7 @@ SLACK-07: Evaluations & Live Acceptance
 - [ ] **Step 3:** Triển khai `PersonalSlackAdapter` và ba family cốt lõi. Triển khai cơ chế kiểm tra abort signal và gán trạng thái `UNKNOWN`.
 - [ ] **Step 4:** Chạy lại tests; mong đợi PASS.
 - [ ] **Step 5:** Commit: `feat(slack): implement core conversations, chat and users tool families`.
-*(Cột mốc quan trọng: Mở khóa triển khai SLACK-04 ngay sau Task này).*
+*(Read core03C1 đã mở các tích hợp đọc.04A/04B không chờ toàn Task3;04C là gate bắt buộc trước dispatch write. Xem ma trận hiện tại.)*
 
 ---
 

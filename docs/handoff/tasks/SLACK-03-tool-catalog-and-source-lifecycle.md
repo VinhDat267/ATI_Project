@@ -1,13 +1,12 @@
 # SLACK-03 · Tool Catalog, Source Store và Vòng đời Dữ liệu Nguồn
 
-**Trạng thái:** DỰ THẢO KẾ HOẠCH (Chờ Reviewer & Nhóm trưởng duyệt; chưa thực thi code).
+**Trạng thái:** ĐANG TRIỂN KHAI MỘT PHẦN trên staging. Contracts,8 private read adapters, raw store, wrapper và registry/purge `messages.content` đã có mã; public integration và fullF3 còn mở. [Ma trận tiến độ và cổng nghiệm thu](../SLACK-DELIVERY.md) là trạng thái xuyên task hiện tại; các phần dưới giữ yêu cầu thiết kế.
 **Nhánh dự kiến:** `feat/slack-03-tool-catalog-and-source-lifecycle` (tách nhánh con theo từng bounded PR).
 **Nền đối chiếu:** `fc12e3fb` (sau merge SLACK-01 #183).
 **Phụ thuộc:**
 - **SLACK-01** (Foundation contracts `SlackBinding`, `SlackSourceRef`, `SlackModelPolicy`, fixture HTTP, probe offline) — ĐÃ HOÀN TẤT (`fc12e3fb`).
-- **SLACK-02 (Đối chiếu Ứng viên PR 184):** Draft PR 184 (`ac448dd39fd8b9188c4ebc967cb735454bbc803d`) hiện có migration `db/v3/0014_slack_oauth_connections.sql` định nghĩa bảng `slack_connections` và `slack_oauth_states`.
-  - **Tình trạng Thẩm định SLACK-02:** PR 184 CHƯA ĐƯỢC PHÊ DUYỆT (tồn tại lỗi tái hiện trên PostgreSQL thật: hai state hợp lệ cùng session ATI nhưng khác workspace bị DELETE toàn cục làm mất 1 state; đồng thời bảng chấp thuận tổ chức F1 / provider trust `SlackConsentRecord` vẫn còn thiếu).
-  - **Cổng Kiểm soát Hợp đồng (Prerequisite Requirements Gate):** Card này KHÔNG giả định chữ ký code của PR 184 đã chuẩn hóa. Tầng tiêu thụ ở SLACK-03 yêu cầu interface giao ước tối thiểu:
+- **SLACK-02:** Backend/consent và UI đã vào staging; [review chung](../log/2026-10-29-slack-02-joint-review.md). Các lỗi của ứng viên PR184 cũ không phải trạng thái hiện tại. Native acceptance vẫn mở.
+  - **Cổng hợp đồng:** Các interface minh họa dưới đây là bản thiết kế lịch sử, không phải chữ ký runtime mới. Khi thi công dùng binding5 trường/contracts đã đóng băng trong03A và các card con accepted; không sao chép DTO credential vào planner/public API.
     ```ts
     // Dòng chứng chỉ nội bộ - CHỈ lưu trữ DB và TokenManager/Adapter truy cập khi executeStep
     export interface SlackInternalCredentialRecord {
