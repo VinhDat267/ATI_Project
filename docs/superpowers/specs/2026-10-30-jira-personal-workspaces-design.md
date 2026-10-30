@@ -1,6 +1,6 @@
 # Jira OAuth cá nhân và workspace ATI — thiết kế, lộ trình đề xuất
 
-**Ngày:** 30/10/2026 (Asia/Saigon). **Trạng thái:** DRAFT — chờ chủ dự án duyệt; chưa cho phép triển khai mã sản phẩm hoặc bật live.
+**Ngày:** 30/10/2026 (Asia/Saigon). **Trạng thái:** chủ dự án duyệt ngày 31/10/2026 bằng yêu cầu “Được thực hiện giúp tôi đi”. Được triển khai tuần tự qua các gate; chưa cho phép bỏ qua JIRA-01 hoặc bật live.
 **Task tài liệu:** [JIRA-00](../../handoff/tasks/JIRA-00-oauth-workspaces-design.md).
 **Nền đối chiếu:** `origin/main` tại `fc12e3fbd683f9ffee53322b4f5fc132d50fc2ac`, không phải checkout SCHED-03 tại `91642f4`.
 **Phạm vi của tài liệu:** bản thiết kế đủ chi tiết để đánh giá cùng lộ trình chia việc; task card thi công và các bước RED/GREEN cụ thể sẽ được lập sau khi thiết kế được duyệt.
@@ -17,7 +17,7 @@
 
 “Jira site” là hệ thống ở một địa chỉ như `company.atlassian.net`; một site có nhiều project. Workspace ATI là nhóm do ATI quản lý, không phải site hay Organization của Atlassian.
 
-Các nội dung gắn **Đề xuất** dưới đây là lựa chọn của người viết, chưa được coi là quyết định đã duyệt. Đặc biệt: nhiều site trong một kế hoạch, vai trò quản trị team, namespace `myjira`, phương thức mời và giới hạn bản đầu cần được đọc cùng khi duyệt tài liệu.
+Các nội dung gắn **Đề xuất** ghi lại nguồn gốc lựa chọn của người viết; chúng nằm trong bản được chủ dự án duyệt ngày 31/10. Các điều kiện khả thi và nghiệm thu vẫn giữ nguyên. Kế hoạch thi công đầu tiên: [JIRA-01](../plans/2026-10-31-jira-oauth-feasibility.md).
 
 ## 2. Mục tiêu, giới hạn và điều kiện nghiệm thu
 

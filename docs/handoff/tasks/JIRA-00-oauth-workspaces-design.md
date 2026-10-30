@@ -1,6 +1,6 @@
 # JIRA-00 · Thiết kế Jira OAuth cá nhân và workspace ATI
 
-**Trạng thái:** DRAFT_READY_FOR_OWNER_REVIEW — tài liệu đề xuất, chưa có phê duyệt triển khai.
+**Trạng thái:** thiết kế được chủ dự án duyệt 31/10/2026; chuyển sang lập kế hoạch/thi công JIRA-01, chưa nghiệm thu tính năng.
 **Ngày:** 30/10/2026. **Phạm vi:** chỉ tài liệu. **Nhánh:** `codex/docs-jira-oauth-workspaces`.
 **Nền:** `origin/main` tại `fc12e3fbd683f9ffee53322b4f5fc132d50fc2ac`.
 
@@ -29,4 +29,4 @@ Chủ dự án yêu cầu brainstorm một kế hoạch chi tiết sau khi đã 
 - Builder context mới chỉ đọc, trả “nothing important left”; đây là kiểm độ đủ của thiết kế để lập kế hoạch, không phải review mã hoặc nghiệm thu sản phẩm.
 - Kiểm tài liệu: ba Markdown, bốn local links, 15 mục, 11 milestone và hai source reference hiện hữu đạt, exit 0. `git diff --cached --check` đạt, exit 0; kiểm lại trước commit.
 - Không sửa product code/CURRENT-STATE/ROADMAP; không chạy product suite, model, OAuth hay Jira thật. Không mở PR triển khai.
-- Chủ dự án chưa duyệt thiết kế; JIRA-01–11 mới là mã phân rã dự kiến, chưa phải task card đã giao. Bước tiếp theo là chủ dự án đọc các mặc định ở mục 14 rồi duyệt/sửa thiết kế trước kế hoạch thi công theo từng bước.
+- Chủ dự án duyệt ngày 31/10 bằng “Được thực hiện giúp tôi đi”. Đã tạo [card JIRA-01](JIRA-01-oauth-feasibility.md) và [kế hoạch đầu tiên](../../superpowers/plans/2026-10-31-jira-oauth-feasibility.md); các phần phụ thuộc chưa được vượt cổng khả thi. Kết quả ngày 30/10 phía trên được giữ làm lịch sử, không suy ra đã kiểm Jira thật.
