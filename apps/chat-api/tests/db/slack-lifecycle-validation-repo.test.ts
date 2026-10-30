@@ -20,6 +20,10 @@ describe('04B1 leased credential validation jobs on real PostgreSQL', () => {
       eventType:'tokens_revoked',eventSubtype:null,eventContext:null,sourceEventTs:'1730000000.000001',
       sourceEventTimeIso:'2024-10-27T03:33:20.000001Z',channelId:null,messageTs:null,payloadHash:'a'.repeat(64),
       lifecycle:{intentType:'token_revocation_validation',slackUserIds:['U_JOBS']} });
+    // These tests start with due jobs, then exercise retry/lease clocks
+    // explicitly. PG microseconds can be later than Date.now() immediately
+    // after INSERT; do not make safe-code assertions depend on that boundary.
+    await db.pool.query("UPDATE slack_lifecycle_intents SET validation_next_attempt_at='2000-01-01T00:00:00Z' WHERE status='pending'");
   }
   it('claims concurrently with SKIP LOCKED and no shared job ownership', async () => {
     await seed(8);
