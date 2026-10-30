@@ -14,3 +14,5 @@ Spec: [personal Slack](../specs/2026-10-28-slack-personal-oauth-design.md), appr
 6. Freeze product/base, run fullcheck, review whole branch, fix any finding and repeat only justified verification. Publish PR to staging and accept only exact-head check/browser success and matching merge tree. Update matrix/checkpoint at the proper acceptance phase.
 
 Review focus: missing selectors or provenance, mutable output read after guard, superseded/purged copy resurrection, duplicate memory IDs, cross-owner or cross-workspace confusion, current authority vs absent barriers, SQL lock order and cancellation, derived output escaping through plan/schedule/SSE.
+
+Accepted into staging31/10 via PR211, head `72eb477d`, exact-head CI41093241608 check/browserSUCCESS; merge `acec5ca7` tree identical. Fullcheck3666PASS and independent reviewPASS; [integration log](../../handoff/log/2026-10-31-slack-03b2e-review-integration.md). Other core kinds/backfill/TTL/public routing/native remain open.
