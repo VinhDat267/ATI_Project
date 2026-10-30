@@ -1,6 +1,6 @@
 # Lộ trình đến cuối kỳ
 
-**Staging Slack 30/10:** #202 ingress ký số, #203 wrapper đọc nội bộ, #204 registry `messages.content` và #205 consumer credential đã review/CI xanh và tích hợp vào `integration/slack-personal-20261029` (`036b0b4e`). Main/cờ live chưa đổi. Runner purge/những selector còn lại, xoay token provisional, fanout, executor, ba mode/Inbox và nghiệm thu Free/Pro/hai user vẫn mở; F3/F4/toàn tính năng chưa đóng. Xem [log #205](log/2026-10-30-slack-04b1-review-integration.md). Handler03B2B đang review trên nhánh riêng.
+**Staging Slack 30/10:** #202 ingress ký số, #203 wrapper đọc nội bộ, #204 registry `messages.content`, #205 consumer credential và #206 handler xóa `messages.content` đã review/CI xanh và tích hợp vào `integration/slack-personal-20261029` (`fab169d2`). Main/cờ live chưa đổi. Runner purge/những selector còn lại, xoay token provisional, fanout, executor, ba mode/Inbox và nghiệm thu Free/Pro/hai user vẫn mở; F3/F4/toàn tính năng chưa đóng. Xem [log #206](log/2026-10-30-slack-03b2b-review-integration.md), [log #205](log/2026-10-30-slack-04b1-review-integration.md). Runtime consumer04B2 đang triển khai trên nhánh riêng.
 
 Nguồn: mục 5.2 của báo cáo giữa kỳ. Hạn cuối kỳ dự kiến 11/11/2026. Trạng thái: `xong`, `đang làm` (ghi nhánh), `chờ` (đã có task card), `chưa có task card` (cần Claude Code lập kế hoạch trước khi giao).
 

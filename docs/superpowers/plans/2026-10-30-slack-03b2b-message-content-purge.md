@@ -41,4 +41,4 @@
 
 - [x] Run `npm run check` with isolated PostgreSQL55533; expected exit0.
 - [x] Fresh independent read-only review of complete branch and review focus. One direct fix pass with RED→GREEN and fresh relevant/full checks after source changes.
-- [ ] Fill card/log with actual evidence and ruled limits, publish draft staging PR, require exact-head CI before staging merge. Keep fullF3 and broader derived runner/integration open.
+- [x] Fill card/log with actual evidence and ruled limits, publish draft staging PR, require exact-head CI before staging merge. Keep fullF3 and broader derived runner/integration open.
