@@ -27,6 +27,6 @@ Files: create `apps/chat-api/tests/integration/slack-native-runtime.test.ts`, `d
 - [x] Write the single requirement→task→head→evidence matrix, milestone gates and next deliverable; correct parent/macro instructions that still say no code or all03 must precede04.
 - [x] Run targeted tests/typecheck, then freeze source/base and one full `npm run check`. Update task/log with actual counts and omitted validation.
 - [x] Fresh independent whole-branch review; one fix pass completed for the stale03B2D headerP3. Source/test unchanged, diff-checkPASS.
-- [ ] Publish staging PR; require exact-head CI/browser before integration.
+- [x] PR210 published; final headfc6a00f9 CI41079775902 SUCCESS including browser, staging mergec7077b66 tree identical. No main/flag enable.
 
 Pre-flight: metadata validation produces binding invalidation consumed by registered-message purge. Both must be wired into the same real server child. FullF3 consumes future06 artifacts; therefore the current source milestone cannot close fullF3. Write dispatch consumes04C safety, so no03→04 sequential barrier is valid.
