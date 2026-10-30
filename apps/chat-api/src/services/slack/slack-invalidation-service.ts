@@ -523,7 +523,7 @@ function barrierMatchesBinding(row: any, binding: SlackBinding): boolean {
  * exact epoch/resource identity; there is no wildcard fallback.
  */
 export async function checkSlackInvalidationBarriers(
-  executor: pg.Pool | pg.PoolClient,
+  executor: Pick<pg.Pool | pg.PoolClient, 'query'>,
   query: CheckBarriersQuery
 ): Promise<CheckBarriersResult> {
   const wsId = query.workspaceId || query.binding?.workspaceId || query.epoch?.binding.workspaceId;
@@ -800,8 +800,8 @@ export class SlackInvalidationService {
     return { receiptId, barrierIds, intentIds };
   }
 
-  async checkBarriers(query: CheckBarriersQuery): Promise<CheckBarriersResult> {
-    return checkSlackInvalidationBarriers(this.pool, query);
+  async checkBarriers(query: CheckBarriersQuery, db: Pick<pg.Pool | pg.PoolClient, 'query'> = this.pool): Promise<CheckBarriersResult> {
+    return checkSlackInvalidationBarriers(db, query);
   }
 
   /**

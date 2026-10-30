@@ -23,6 +23,10 @@ Review boundaries ruled explicitly: native Slack/ACL/model/public integration/fu
 
 Final fix-pass `npm run check` **exit0**, **3,449 tests PASS**, finished `2026-10-30T03:06:36.9656696Z` using the isolated review PostgreSQL55533: schemas274, adapters519, planner381, executor42, API859, web901, evaluation406, launcher1, scripts66. Typecheck, production build and build-security also passed. The subsequent two-line timeout-budget/abort refinement was checked with fresh typecheck and both targeted suites before commit; no unrelated suite was changed. CI at the published head remains a separate gate before staging integration.
 
+Cross-slice review found that nested policy/barrier pool checkout while an owner/snapshot client is held can stall a saturated pool. A new real single-connection-pool regression was RED with INTERNAL. The policy and barrier services now accept the existing query client, and both wrapper owner gates pass it to every policy/barrier query. The shared policy fix is cherry-picked from03B2A96ed9799. Targeted suites now **60/60 PASS**, including all earlier final-authorization and cancellation cases. Prior CI40995663340 succeeded atc1aa1c91; it does not certify this follow-up head. Fresh full check/CI are required below before integration.
+
+Final pool-fix `npm run check` **exit0,3,450 tests PASS** (`2026-10-30T03:31:28.1831681Z`), PostgreSQL55533; typecheck/build/security also passed. API860, other workspace/eval/script counts unchanged. `git diff --check` exit0. This supersedes the earlier full-check evidence for publication; exact new-head CI remains required.
+
 ## Remaining gates
 
 This is an internal transient boundary at retention0. Public integration, ingress credential probe consumer04B, derived persistence/erasure, executor binding, Inbox/modes and native/model acceptance remain open. No F3/whole-feature acceptance or main merge is implied.

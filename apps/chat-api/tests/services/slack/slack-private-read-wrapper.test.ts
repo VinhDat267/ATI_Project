@@ -1,4 +1,8 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import pg from 'pg';
+import { SlackPolicyService } from '../../../src/services/slack/policy-service.js';
+import { SlackConnectionRepo } from '../../../src/db/repositories/slack-connection-repo.js';
+import { SlackInvalidationService } from '../../../src/services/slack/slack-invalidation-service.js';
 import { decryptCredentials, PersonalSlackReadAdapter } from '@wap/tool-adapters';
 import {
   SlackPrivateReadError,
@@ -794,6 +798,19 @@ describe('provider errors and per-invocation isolation', () => {
 });
 
 describe('configuration guards', () => {
+  it('reuses the held transaction client for real policy and barrier checks with a single-connection pool', async () => {
+    const single = new pg.Pool({ ...env.db.pool.options, max: 1, connectionTimeoutMillis: 200 });
+    try {
+      const { wrapper } = env.buildWrapper({
+        policyService: new SlackPolicyService(single, { env: TEST_ENV }),
+        ownerGate: new SlackConnectionRepo(single),
+        invalidationService: new SlackInvalidationService(single),
+      });
+      const result = await wrapper.executeRead(request(alice));
+      expect(result.data).toHaveProperty('channel.id', 'C_GENERAL');
+    } finally { await single.end(); }
+  });
+
   it('keeps the same injected env for the feature flag and policy provider identity', async () => {
     const policyService = new (await import('../../../src/services/slack/policy-service.js')).SlackPolicyService(
       env.db.pool,

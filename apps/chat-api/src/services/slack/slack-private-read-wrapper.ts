@@ -1,3 +1,4 @@
+import type pg from 'pg';
 import {
   MYSLACK_CORE_READ_TOOLS,
   slackPolicyRefToEpoch,
@@ -470,9 +471,9 @@ export class SlackPrivateReadWrapper {
       throw error;
     };
 
-    const assertNoBarrier = async (query: CheckBarriersQuery): Promise<void> => {
+    const assertNoBarrier = async (query: CheckBarriersQuery, db?: Pick<pg.PoolClient, 'query'>): Promise<void> => {
       const result = await race(
-        Promise.resolve().then(() => this.deps.invalidationService.checkBarriers(query))
+        Promise.resolve().then(() => this.deps.invalidationService.checkBarriers(query, db))
       ).catch((error: unknown) => {
         if (error instanceof SlackPrivateReadError) throw error;
         return fail('SLACK_READ_INTERNAL');
@@ -481,7 +482,7 @@ export class SlackPrivateReadWrapper {
       if (result.blocked === true) fail('SLACK_READ_BARRIERED');
     };
 
-    const authorize = async (input: SlackAuthorizeReadInput): Promise<SlackPolicyHookDecision> => {
+    const authorize = async (input: SlackAuthorizeReadInput, db?: Pick<pg.PoolClient, 'query'>): Promise<SlackPolicyHookDecision> => {
       throwIfAborted();
 
       let inputBinding: SlackBinding;
@@ -516,7 +517,7 @@ export class SlackPrivateReadWrapper {
             ...(input.expectedPolicyReference
               ? { expectedPolicyReference: input.expectedPolicyReference }
               : {}),
-          })
+          }, db)
         )
       ).catch((error: unknown) => {
         if (error instanceof SlackPrivateReadError) throw error;
@@ -551,10 +552,10 @@ export class SlackPrivateReadWrapper {
         pinned = canonical;
       }
 
-      await assertNoBarrier({ binding: cleanBinding });
-      await assertNoBarrier({ binding: cleanBinding, epoch: slackPolicyRefToEpoch(pinned!) });
+      await assertNoBarrier({ binding: cleanBinding }, db);
+      await assertNoBarrier({ binding: cleanBinding, epoch: slackPolicyRefToEpoch(pinned!) }, db);
       if (facts.channelId) {
-        await assertNoBarrier({ binding: cleanBinding, channelId: facts.channelId });
+        await assertNoBarrier({ binding: cleanBinding, channelId: facts.channelId }, db);
       }
       for (const resource of facts.resources) {
         await assertNoBarrier({
@@ -562,7 +563,7 @@ export class SlackPrivateReadWrapper {
           resourceType: resource.type,
           resourceId: resource.id,
           ...(resource.revision !== undefined ? { revision: resource.revision } : {}),
-        });
+        }, db);
       }
 
       return { allowed: true, policyReference: canonical };
@@ -617,13 +618,13 @@ export class SlackPrivateReadWrapper {
         // regrant window between credential acquisition and credential handoff.
         await race(
           Promise.resolve().then(() =>
-            this.deps.ownerGate.withOwner(cleanBinding.atiUserId, async () => {
+            this.deps.ownerGate.withOwner(cleanBinding.atiUserId, async client => {
               await authorize({
                 binding: cleanBinding,
                 purpose,
                 requestedRetentionDays: 0,
                 expectedPolicyReference: pinned!,
-              });
+              }, client);
             })
           )
         );
@@ -719,8 +720,8 @@ export class SlackPrivateReadWrapper {
         await client.query('SELECT id FROM slack_trusted_providers WHERE id=$1 FOR SHARE', [pinned!.providerProfileId]);
         await client.query('SELECT workspace_id FROM slack_processing_consents WHERE workspace_id=$1 AND provider_id=$2 FOR SHARE',
           [cleanBinding.workspaceId, pinned!.providerProfileId]);
-        await authorize({ binding: cleanBinding, purpose, requestedRetentionDays: 0, expectedPolicyReference: pinned! });
-        for (const query of observedQueries) await assertNoBarrier(query);
+        await authorize({ binding: cleanBinding, purpose, requestedRetentionDays: 0, expectedPolicyReference: pinned! }, client);
+        for (const query of observedQueries) await assertNoBarrier(query, client);
         throwIfAborted();
         await client.query('COMMIT');
       } catch (error) {
