@@ -5,6 +5,7 @@ import { ScheduleRepo, type Queryable, type ScheduleRow } from '../../db/reposit
 import { isUuid } from '../../db/repositories/uuid.js';
 import { runState, runView } from './run-state.js';
 import { nextOccurrence } from './next-occurrence.js';
+import { hasSlackMarker } from '../slack/slack-message-selectors.js';
 
 export const SCHEDULE_CONFLICTS = {
   STALE_PROPOSAL: 'Đề xuất này đã cũ. Hãy xem đề xuất mới nhất.',
@@ -15,6 +16,7 @@ export const SCHEDULE_CONFLICTS = {
   STALE_VERSION: 'Lịch vừa thay đổi ở nơi khác. Đã tải lại.',
   RUN_IN_PROGRESS: 'Lịch đang lập kế hoạch cho một lượt. Hãy chờ lượt đó xong.',
   RUN_NOT_REPLANNABLE: 'Lượt này không cần lập lại kế hoạch.',
+  SCHEDULE_SOURCE_PURGED: 'Nguồn Slack của đề xuất này chưa thể dùng để tạo lịch. Hãy tạo đề xuất mới.',
 } as const;
 export type ScheduleConflictCode = keyof typeof SCHEDULE_CONFLICTS;
 
@@ -142,8 +144,13 @@ export class ScheduleService {
       const owner = await client.query('SELECT user_id FROM conversations WHERE id=$1 FOR UPDATE', [convId]);
       if (owner.rows[0]?.user_id !== userId) throw new ScheduleNotFound();
       const message = await client.query(
-        "SELECT metadata FROM messages WHERE id=$1 AND conv_id=$2 AND metadata->>'type'='schedule_proposal'", [messageId, convId]);
+        `SELECT metadata,slack_lineage_manifest,EXISTS(SELECT 1 FROM slack_derived_copies c WHERE c.target_id=messages.id::text
+          AND c.target_kind IN ('chat_history_message','working_memory_entity')) AS slack_registered
+         FROM messages WHERE id=$1 AND conv_id=$2 AND metadata->>'type'='schedule_proposal'`, [messageId, convId]);
       if (!message.rowCount) throw new ScheduleNotFound();
+      // This direct SQL reader must not bypass message guards and copy Slack into
+      // schedules before that artifact's transactional lineage/erasure exists.
+      if (message.rows[0].slack_lineage_manifest != null || message.rows[0].slack_registered || hasSlackMarker(message.rows[0].metadata)) throw new ScheduleConflict('SCHEDULE_SOURCE_PURGED');
       const metadata = message.rows[0].metadata as ScheduleProposalMetadata;
       const existing: ScheduleRow | undefined = (await client.query('SELECT * FROM schedules WHERE conv_id=$1 FOR UPDATE', [convId])).rows[0];
       // Confirming an applied proposal again changes nothing.

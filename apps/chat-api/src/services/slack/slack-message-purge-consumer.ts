@@ -3,11 +3,12 @@ import { sameSlackBinding,sameSlackPolicyEpoch,validateSlackPurgeTarget,type Sla
 import { isUuid } from '../../db/repositories/uuid.js';
 import { acquireSlackInvalidationLocks,compareSlackRevisions,hashPolicyEpoch,slackInvalidationLockKeys,type SlackInvalidationBarrier } from './slack-invalidation-service.js';
 import { SlackMessageContentPurger } from './slack-message-content-purger.js';
+import { messageFingerprint, messageSelectorValue } from './slack-message-selectors.js';
 
 export interface MessagePurgeLease {id:string;workerNonce:string;leaseUntil:string}
 type Outcome='completed'|'retried'|'lost';
 type Code='STALE_LINEAGE'|'MISSING_HANDLER'|'INVALID_PROVENANCE'|'PARTIAL_PURGE'|'RETRY_SCAN'|'ABORTED'|'PURGE_FAILED';
-interface Options {batchSize?:number;leaseSeconds?:number;purger?:Pick<SlackMessageContentPurger,'purgeInTransaction'|'sourceLockKeysInTransaction'>}
+interface Options {batchSize?:number;leaseSeconds?:number;targetKind?:'chat_history_message'|'working_memory_entity';purger?:Pick<SlackMessageContentPurger,'purgeInTransaction'|'sourceLockKeysInTransaction'>}
 class Failure extends Error {constructor(readonly safeCode:Code){super(safeCode);}}
 class LostLease extends Error {}
 function bound(value:number,max:number):void {if(!Number.isSafeInteger(value)||value<1||value>max)throw new TypeError('INVALID_PURGE_BOUND');}
@@ -66,12 +67,15 @@ function selection(target:SlackPurgeTarget):{sql:string;values:unknown[]} {
  * six other derived kinds or artifacts that never passed the writer gate. */
 export class SlackMessagePurgeConsumer {
   private readonly size:number;private readonly seconds:number;private readonly purger:NonNullable<Options['purger']>;
+  private readonly kind: 'chat_history_message'|'working_memory_entity';
   constructor(private readonly pool:pg.Pool,options:Options={}) {
     this.size=options.batchSize??20;this.seconds=options.leaseSeconds??60;bound(this.size,100);bound(this.seconds,600);this.purger=options.purger??new SlackMessageContentPurger();
+    this.kind=options.targetKind??'chat_history_message';
+    if(!['chat_history_message','working_memory_entity'].includes(this.kind))throw new TypeError('INVALID_PURGE_KIND');
   }
   async claim(limit=5):Promise<MessagePurgeLease[]> {
     bound(limit,50);
-    const rows=(await this.pool.query(`WITH due AS (SELECT id FROM slack_invalidation_intents WHERE target_kind='chat_history_message'
+    const rows=(await this.pool.query(`WITH due AS (SELECT id FROM slack_invalidation_intents WHERE target_kind='${this.kind}'
       AND (status IN ('pending','failed') OR (status='processing' AND leased_until<=clock_timestamp()))
       ORDER BY attempts,created_at,id LIMIT $1 FOR UPDATE SKIP LOCKED)
       UPDATE slack_invalidation_intents j SET status='processing',worker_id=gen_random_uuid()::text,
@@ -86,7 +90,7 @@ export class SlackMessagePurgeConsumer {
   }
   private async owned(client:pg.PoolClient,job:MessagePurgeLease):Promise<any> {
     const row=(await client.query(`SELECT * FROM slack_invalidation_intents WHERE id=$1 AND worker_id=$2 AND leased_until=$3::timestamptz
-      AND leased_until>clock_timestamp() AND status='processing' AND target_kind='chat_history_message'`,[job.id,job.workerNonce,job.leaseUntil])).rows[0];
+      AND leased_until>clock_timestamp() AND status='processing' AND target_kind='${this.kind}'`,[job.id,job.workerNonce,job.leaseUntil])).rows[0];
     if(!row)throw new LostLease();return row;
   }
   private async proof(client:pg.PoolClient,row:any,target:SlackPurgeTarget,lock=false):Promise<SlackInvalidationBarrier> {
@@ -99,24 +103,44 @@ export class SlackMessagePurgeConsumer {
     const orphanOwner=t.scope==='resource_lifecycle'||t.scope==='workspace_consent_revocation'?undefined:
       t.scope==='policy_epoch_invalidated'?t.epoch.binding.atiUserId:t.binding.atiUserId;
     let orphanScope='';if(orphanOwner){values.push(orphanOwner);orphanScope=`AND c.ati_user_id=$${values.length}::uuid`;}
-    values.push(cutoff);const date=`$${values.length}`;values.push(unresolvedOnly);const remaining=`$${values.length}`;values.push(this.size+1);
-    return (await client.query(`WITH candidates AS (SELECT c.id,c.target_version,c.target_fingerprint,c.status,c.target_sub_id,c.created_at::text AS created_exact,
-        CASE WHEN c.status='active' AND c.target_sub_id='content' AND c.created_at<=${date}::timestamptz THEN 0 ELSE 1 END AS priority,
+    values.push(cutoff);const date=`$${values.length}`;values.push(this.size+1);const pageSize=`$${values.length}`;
+    values.push(0);const offset=`$${values.length}`;
+    const query = `WITH candidates AS (SELECT c.id,c.target_version,c.target_fingerprint,c.status,c.target_kind,c.target_sub_id,c.created_at::text AS created_exact,
+        m.content AS artifact_content,m.metadata AS artifact_metadata,
+        CASE WHEN c.status='active' AND c.created_at<=${date}::timestamptz THEN 0 ELSE 1 END AS priority,
         n.id AS replacement_id,n.target_version AS replacement_version,n.target_fingerprint AS replacement_fingerprint,
-        (n.target_fingerprint=encode(sha256(convert_to(m.content,'UTF8')),'hex') AND
-         EXISTS(SELECT 1 FROM slack_derived_provenance_segments s WHERE s.derived_copy_id=n.id) AND
+        (EXISTS(SELECT 1 FROM slack_derived_provenance_segments s WHERE s.derived_copy_id=n.id) AND
          NOT EXISTS(SELECT 1 FROM slack_derived_provenance_segments s WHERE s.derived_copy_id=n.id AND s.ati_user_id<>n.ati_user_id) AND
          NOT EXISTS(SELECT 1 FROM slack_derived_provenance_segments s WHERE s.derived_copy_id=n.id AND (${sql}))) AS replacement_outside_target
       FROM slack_derived_copies c LEFT JOIN messages m ON m.id::text=c.target_id
       LEFT JOIN slack_derived_copies n ON c.status='purged' AND n.status='active' AND n.ati_user_id=c.ati_user_id
         AND n.target_kind=c.target_kind AND n.target_id=c.target_id AND n.target_sub_id=c.target_sub_id AND n.target_version>c.target_version
-      WHERE c.target_kind='chat_history_message' AND (c.status='active' OR (c.status='retired' AND c.retired_reason='fingerprint_mismatch') OR
-        (c.status='purged' AND m.id IS NOT NULL AND m.content<>'Slack content is unavailable.'))
+      WHERE c.target_kind='${this.kind}' AND (c.status='active' OR (c.status='retired' AND c.retired_reason='fingerprint_mismatch') OR
+        (c.status='purged' AND m.id IS NOT NULL AND
+          CASE WHEN c.target_sub_id='content' THEN m.content<>'Slack content is unavailable.'
+          ELSE slack_message_selector_value(m.content,m.metadata,c.target_kind,c.target_sub_id) IS NOT NULL END))
       AND (EXISTS(SELECT 1 FROM slack_derived_provenance_segments s WHERE s.derived_copy_id=c.id AND (${sql})) OR
         (NOT EXISTS(SELECT 1 FROM slack_derived_provenance_segments s WHERE s.derived_copy_id=c.id) ${orphanScope})))
-      SELECT * FROM candidates WHERE NOT (${remaining}::boolean AND status='purged' AND replacement_outside_target IS TRUE)
+      SELECT * FROM candidates
       ORDER BY priority,id
-      LIMIT $${values.length}`,values)).rows;
+      LIMIT ${pageSize} OFFSET ${offset}`;
+    for (let page=0;page<100;page++) {
+    const result = (await client.query(query,values)).rows;
+    // Read the current concrete selector, including JSON/memory IDs, before trusting a successor.
+    for(const row of result) {
+      if(row.replacement_outside_target===true) {
+        try {row.replacement_outside_target=messageFingerprint(messageSelectorValue({content:row.artifact_content,metadata:row.artifact_metadata},row.target_kind,row.target_sub_id),row.target_sub_id)===row.replacement_fingerprint;}
+        catch {row.replacement_outside_target=false;}
+      }
+      delete row.artifact_content;delete row.artifact_metadata;
+    }
+    if(!unresolvedOnly)return result;
+    const unresolved=result.filter(row=>!(row.status==='purged'&&row.replacement_outside_target===true));
+    if(unresolved.length || result.length<this.size+1)return unresolved;
+    // Do not certify closure from only the first page of valid fresh replacements.
+    values[values.length-1]=Number(values[values.length-1])+result.length;
+    }
+    throw new Failure('RETRY_SCAN');
   }
   private async finish(client:pg.PoolClient,job:MessagePurgeLease,code?:Code,identity?:{target:unknown;cutoff:string}):Promise<boolean> {
     // Lock first, then evaluate the volatile server clock in a new statement.
@@ -134,7 +158,7 @@ export class SlackMessagePurgeConsumer {
       if(signal?.aborted)throw new Failure('ABORTED');
       const row=await this.owned(client,job);let target:SlackPurgeTarget;
       try {target=validateSlackPurgeTarget(row.purge_target);}catch{throw new Failure('INVALID_PROVENANCE');}
-      if(!target.cascadeTargetKinds.includes('chat_history_message'))throw new Failure('INVALID_PROVENANCE');
+      if(!target.cascadeTargetKinds.includes(this.kind))throw new Failure('INVALID_PROVENANCE');
       const barrier=await this.proof(client,row,target),cutoff=(await client.query('SELECT created_at::text AS cutoff FROM slack_invalidation_intents WHERE id=$1',[job.id])).rows[0].cutoff;
       const first=await this.candidates(client,target,cutoff),ids=[...new Set<string>(first.slice(0,this.size).flatMap(r=>
         r.status==='purged'&&r.replacement_id?[r.id,r.replacement_id]:[r.id]))];

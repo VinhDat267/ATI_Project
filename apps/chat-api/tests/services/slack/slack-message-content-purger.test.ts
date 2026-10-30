@@ -103,7 +103,7 @@ describe('03B2B concrete message-content erasure on real PostgreSQL', () => {
   });
   it('returns missing handler for unsupported selector and rejects malformed channel lineage',async()=>{
     const f=await fixture(),id=await intent(target(f));
-    await db.pool.query("UPDATE slack_derived_copies SET target_sub_id='metadata.lookups' WHERE id=$1",[f.copy.derivedCopyId]);
+    await db.pool.query("UPDATE slack_derived_copies SET target_sub_id='metadata.unsupported' WHERE id=$1",[f.copy.derivedCopyId]);
     expect(await erase(f,id)).toEqual({status:'missing_handler'});
     await db.pool.query("UPDATE slack_derived_copies SET target_sub_id='content' WHERE id=$1",[f.copy.derivedCopyId]);
     await db.pool.query("UPDATE slack_derived_provenance_segments SET channel_id='CONTRADICTORY' WHERE derived_copy_id=$1",[f.copy.derivedCopyId]);

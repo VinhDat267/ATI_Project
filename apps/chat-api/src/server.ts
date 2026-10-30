@@ -370,6 +370,7 @@ async function bootstrap() {
         batchSize: 50,
         derivedPolicyFanout: pool && slackInvalidationService ? new SlackDerivedPolicyFanout(pool,slackInvalidationService) : undefined,
         messagePurgeConsumer: pool ? new SlackMessagePurgeConsumer(pool) : undefined,
+        memoryPurgeConsumer: pool ? new SlackMessagePurgeConsumer(pool,{targetKind:'working_memory_entity'}) : undefined,
       })
     : undefined;
 

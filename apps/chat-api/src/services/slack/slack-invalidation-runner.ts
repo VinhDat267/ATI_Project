@@ -13,6 +13,7 @@ export interface SlackInvalidationRunnerOptions {
   onError?: (err: unknown, context: string) => void;
   derivedPolicyFanout?: Pick<SlackDerivedPolicyFanout,'runOnce'>;
   messagePurgeConsumer?: Pick<SlackMessagePurgeConsumer,'runOnce'>;
+  memoryPurgeConsumer?: Pick<SlackMessagePurgeConsumer,'runOnce'>;
 }
 
 export interface InvalidationSweepStats {
@@ -58,6 +59,7 @@ export class SlackInvalidationRunner {
   private readonly onError?: (err: unknown, context: string) => void;
   private readonly derivedPolicyFanout?: Pick<SlackDerivedPolicyFanout,'runOnce'>;
   private readonly messagePurgeConsumer?: Pick<SlackMessagePurgeConsumer,'runOnce'>;
+  private readonly memoryPurgeConsumer?: Pick<SlackMessagePurgeConsumer,'runOnce'>;
 
   private running = false;
   private timerHandle: NodeJS.Timeout | null = null;
@@ -76,6 +78,7 @@ export class SlackInvalidationRunner {
     this.onError = options.onError;
     this.derivedPolicyFanout = options.derivedPolicyFanout;
     this.messagePurgeConsumer = options.messagePurgeConsumer;
+    this.memoryPurgeConsumer = options.memoryPurgeConsumer;
   }
 
   isRunning(): boolean {
@@ -215,6 +218,10 @@ export class SlackInvalidationRunner {
         const result=await this.messagePurgeConsumer.runOnce(Math.min(this.batchSize,5));
         stats.messageIntentsCompleted=result.completed;stats.messageIntentsRetried=result.retried;
       } catch(err) {if(this.onError)this.onError(err,'message_purge');}
+    }
+    if (this.memoryPurgeConsumer) {
+      try { await this.memoryPurgeConsumer.runOnce(Math.min(this.batchSize,5)); }
+      catch(err) { if(this.onError)this.onError(err,'memory_purge'); }
     }
     return stats;
   }
