@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { SlackSourceRepo } from '../../db/repositories/slack-source-repo.js';
 import type { SlackInvalidationService } from './slack-invalidation-service.js';
 import type { SlackPolicyEventConsumer } from './slack-policy-event-consumer.js';
+import type { SlackDerivedPolicyFanout } from './slack-derived-policy-fanout.js';
 
 export interface SlackInvalidationRunnerOptions {
   sweepIntervalMs?: number;
@@ -9,6 +10,7 @@ export interface SlackInvalidationRunnerOptions {
   leaseSeconds?: number;
   workerId?: string;
   onError?: (err: unknown, context: string) => void;
+  derivedPolicyFanout?: Pick<SlackDerivedPolicyFanout,'runOnce'>;
 }
 
 export interface InvalidationSweepStats {
@@ -17,6 +19,7 @@ export interface InvalidationSweepStats {
   rawIntentsProcessed: number;
   rawIntentsFailed: number;
   staleLeasesRecovered: number;
+  derivedPolicyEpochsStaged: number;
 }
 
 /**
@@ -49,6 +52,7 @@ export class SlackInvalidationRunner {
   private readonly leaseSeconds: number;
   private readonly workerId: string;
   private readonly onError?: (err: unknown, context: string) => void;
+  private readonly derivedPolicyFanout?: Pick<SlackDerivedPolicyFanout,'runOnce'>;
 
   private running = false;
   private timerHandle: NodeJS.Timeout | null = null;
@@ -65,6 +69,7 @@ export class SlackInvalidationRunner {
     this.leaseSeconds = options.leaseSeconds ?? 60;
     this.workerId = options.workerId ?? `slack-runner-${randomUUID()}`;
     this.onError = options.onError;
+    this.derivedPolicyFanout = options.derivedPolicyFanout;
   }
 
   isRunning(): boolean {
@@ -131,6 +136,7 @@ export class SlackInvalidationRunner {
       rawIntentsProcessed: 0,
       rawIntentsFailed: 0,
       staleLeasesRecovered: 0,
+      derivedPolicyEpochsStaged: 0,
     };
 
     // 1. Sweep retention TTL expired sources (raw erasure without live token)
@@ -147,6 +153,12 @@ export class SlackInvalidationRunner {
       stats.policyEventsProcessed = polRes.processedCount;
     } catch (err) {
       if (this.onError) this.onError(err, 'consume_policy_events');
+    }
+
+    // Derived lineage can outlive raw sources and the raw policy receipt.
+    if(this.derivedPolicyFanout) {
+      try {stats.derivedPolicyEpochsStaged=(await this.derivedPolicyFanout.runOnce(Math.min(this.batchSize,100))).staged;}
+      catch(err){if(this.onError)this.onError(err,'derived_policy_fanout');}
     }
 
     // 3. Recover stale leases
