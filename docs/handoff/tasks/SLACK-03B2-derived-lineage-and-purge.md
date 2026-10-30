@@ -1,6 +1,6 @@
 # SLACK-03B2 · Phả Hệ Bản Sao Phái Sinh & Cascade Purge Bền Vững
 
-**Trạng thái hiện tại:** ĐANG TRIỂN KHAI MỘT PHẦN qua03B2A/B/C; registry và consumer `messages.content` đã accepted staging.03B2D đang chốt riêng. Xem [ma trận hiện tại](../SLACK-DELIVERY.md). Bốn core kind khác, selector/writer/read integration/backfill và fullF3 vẫn mở.
+**Trạng thái hiện tại:** ĐANG TRIỂN KHAI MỘT PHẦN qua03B2A/B/C/D; registry/consumer `messages.content` và derived-policy fanout03B2D (#209) đã accepted staging. Xem [ma trận hiện tại](../SLACK-DELIVERY.md). Bốn core kind khác, selector/writer/read integration/backfill và fullF3 vẫn mở.
 **Phạm vi bằng chứng:** Nội dung thiết kế và `[Proposed: NOT_RUN]` bên dưới là snapshot kế hoạch PR198; bằng chứng đã chạy nằm ở card/log con liên kết trong ma trận. Không có kết luận fullF3, native Slack hay model-use từ việc merge các slice này.
 **Nhánh:** `docs/slack-03b2-derived-plan` (PR #198).
 **Nền đối chiếu:** `e9088d5e76e95fa65e3be019226835371e40908d`.

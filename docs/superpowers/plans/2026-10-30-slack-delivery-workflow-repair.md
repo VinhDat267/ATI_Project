@@ -22,10 +22,11 @@
 
 Files: create `apps/chat-api/tests/integration/slack-native-runtime.test.ts`, `docs/handoff/SLACK-DELIVERY.md`, task/plan/log; update parent03/04, macro delivery plan, handoff README and `docs/slack/method-inventory.md` (snapshot semantics only). No edits to implementation files or frozen inventory JSON.
 
-- [ ] Add integration regressions using the existing PG/HTTP fixture, actual server child and signed ingress.
-- [ ] Temporarily remove native lifecycle/message-consumer wiring in this isolated branch; observe both regressions RED. Restore exact source, observe GREEN. Tests protect existing integration, so mutation evidence is the appropriate failure check.
-- [ ] Write the single requirement→task→head→evidence matrix, milestone gates and next deliverable; correct parent/macro instructions that still say no code or all03 must precede04.
-- [ ] Run targeted tests/typecheck, then freeze source/base and one full `npm run check`. Update task/log with actual counts and omitted validation.
-- [ ] Fresh independent whole-branch review; one fix pass if needed, rerun affected checks. Publish staging PR; require exact-head CI/browser before integration.
+- [x] Add integration regressions using the existing PG/HTTP fixture, actual server child and signed ingress.
+- [x] Temporarily remove native lifecycle/message-consumer wiring in this isolated branch; observe both regressions RED. Restore exact source, observe GREEN. Tests protect existing integration, so mutation evidence is the appropriate failure check.
+- [x] Write the single requirement→task→head→evidence matrix, milestone gates and next deliverable; correct parent/macro instructions that still say no code or all03 must precede04.
+- [x] Run targeted tests/typecheck, then freeze source/base and one full `npm run check`. Update task/log with actual counts and omitted validation.
+- [x] Fresh independent whole-branch review; one fix pass completed for the stale03B2D headerP3. Source/test unchanged, diff-checkPASS.
+- [ ] Publish staging PR; require exact-head CI/browser before integration.
 
 Pre-flight: metadata validation produces binding invalidation consumed by registered-message purge. Both must be wired into the same real server child. FullF3 consumes future06 artifacts; therefore the current source milestone cannot close fullF3. Write dispatch consumes04C safety, so no03→04 sequential barrier is valid.
