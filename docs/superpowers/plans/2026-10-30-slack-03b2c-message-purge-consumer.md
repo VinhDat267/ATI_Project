@@ -46,4 +46,4 @@ Interfaces: `SlackMessagePurgeConsumer(pool,{batchSize?,leaseSeconds?,purger?})`
 
 - [x] Run `npm run check`, expected exit0 on isolated PostgreSQL55533.
 - [x] Fresh independent read-only whole-branch review, one direct RED→GREEN fix pass if needed, fresh checks after source changes.
-- [ ] Fill card/log, publish draft staging PR, require exact-head CI before integration. No main/flag enable/fullF3 closure.
+- [x] Fill card/log, publish draft staging PR, require exact-head CI before integration. No main/flag enable/fullF3 closure.

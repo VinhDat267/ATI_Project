@@ -33,4 +33,4 @@ Interfaces: `stageDerivedInTransaction(client,StageInTransactionInput):Promise<S
 ### Task 2: Review/publication
 
 - [x] Fresh independent whole-branch review; one direct RED→GREEN fix pass if needed, full checks after source fixes.
-- [ ] Fill task/log, draft staging PR, require exact-head CI before staging integration. No main/live enable or fullF3/F4 claim.
+- [x] Fill task/log, draft staging PR, require exact-head CI before staging integration. No main/live enable or fullF3/F4 claim.
