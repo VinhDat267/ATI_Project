@@ -1,5 +1,7 @@
 # Lộ trình đến cuối kỳ
 
+**Staging Slack 30/10:** #202 ingress ký số, #203 wrapper đọc nội bộ, #204 registry `messages.content` và #205 consumer credential đã review/CI xanh và tích hợp vào `integration/slack-personal-20261029` (`036b0b4e`). Main/cờ live chưa đổi. Runner purge/những selector còn lại, xoay token provisional, fanout, executor, ba mode/Inbox và nghiệm thu Free/Pro/hai user vẫn mở; F3/F4/toàn tính năng chưa đóng. Xem [log #205](log/2026-10-30-slack-04b1-review-integration.md). Handler03B2B đang review trên nhánh riêng.
+
 Nguồn: mục 5.2 của báo cáo giữa kỳ. Hạn cuối kỳ dự kiến 11/11/2026. Trạng thái: `xong`, `đang làm` (ghi nhánh), `chờ` (đã có task card), `chưa có task card` (cần Claude Code lập kế hoạch trước khi giao).
 
 **Cập nhật 29/10 (SLACK-01, merge #183):** phần nền Slack cá nhân đã vào `main` tại `3d0edfa0`, cây trùng head `ce08da98` có CI xanh cả check/browser. Foundation 105 test; full check 2.558 v3 + 406 eval fixture + 67 Node. Ba P2 đã sửa và review độc lập đạt. SLACK-01 đóng phần nền; OAuth/live và trợ lý đầy đủ vẫn mở ở SLACK-02–07. Snapshot 343 row giữ nguyên; 11 method mới trong public index chờ refresh/review. Xem [log merge](log/2026-10-29-reviewer-merge-183.md) và [lộ trình Slack](../superpowers/plans/2026-10-28-slack-foundation.md).

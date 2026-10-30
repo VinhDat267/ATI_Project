@@ -9,8 +9,9 @@ export interface SlackGrant {
   accessToken: string; refreshToken?: string; expiresIn?: number; scopes: string[]; missingScopes: string[];
 }
 const text = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length <= 8192;
+export type SlackProviderAuthCode = 'invalid_auth' | 'token_revoked' | 'token_expired' | 'account_inactive' | 'invalid_grant' | 'identity_mismatch' | 'unknown';
 export class SlackProviderError extends Error {
-  constructor(readonly authenticationLost: boolean) { super('SLACK_PROVIDER_FAILED'); }
+  constructor(readonly authenticationLost: boolean, readonly authCode: SlackProviderAuthCode = 'unknown') { super('SLACK_PROVIDER_FAILED'); }
 }
 export class SlackOAuthClient {
   constructor(readonly config: SlackOAuthConfig, private fetchFn: typeof fetch = fetch) {}
@@ -40,13 +41,23 @@ export class SlackOAuthClient {
       } finally { await reader.cancel().catch(() => {}); }
       const raw = Buffer.concat(chunks).toString('utf8');
       const data = JSON.parse(raw);
-      if (!response.ok || data.ok !== true) throw new SlackProviderError(['invalid_auth', 'token_revoked', 'token_expired', 'account_inactive', 'invalid_grant'].includes(data.error));
+      if (!response.ok || data.ok !== true) {
+        const lost = response.status < 500 && response.status !== 429 &&
+          ['invalid_auth', 'token_revoked', 'token_expired', 'account_inactive', 'invalid_grant'].includes(data.error);
+        throw new SlackProviderError(lost, lost ? data.error as SlackProviderAuthCode : 'unknown');
+      }
       return data;
     } catch (e) { throw e instanceof SlackProviderError ? e : new SlackProviderError(false); }
   }
   async verify(accessToken: string, workspaceId: string, actorId: string, signal: AbortSignal): Promise<void> {
     const data = await this.call('auth.test', new URLSearchParams(), signal, accessToken);
-    if (data.team_id !== workspaceId || data.user_id !== actorId || data.bot_id) throw new SlackProviderError(true);
+    const identity = (value: unknown): value is string => typeof value === 'string' && /^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(value);
+    // Missing/malformed metadata proves nothing about credential validity. In
+    // particular, it must never authorize destructive lifecycle processing.
+    if (!identity(data.team_id) || !identity(data.user_id) || (data.bot_id !== undefined && !identity(data.bot_id))) {
+      throw new SlackProviderError(false);
+    }
+    if (data.team_id !== workspaceId || data.user_id !== actorId || data.bot_id) throw new SlackProviderError(true, 'identity_mismatch');
   }
   async exchange(code: string, signal: AbortSignal): Promise<SlackGrant> {
     const data = await this.call('oauth.v2.access', new URLSearchParams({ client_id: this.config.clientId, client_secret: this.config.clientSecret, redirect_uri: this.config.redirectUri, code }), signal);
