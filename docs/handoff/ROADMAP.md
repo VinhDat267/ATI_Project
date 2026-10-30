@@ -1,10 +1,8 @@
 # Lộ trình đến cuối kỳ
 
-**Staging purge30/10:** #208 đã merge `2821d426`, head `145a6016` có CI41042072139 xanh cả check/browser và cây merge trùng head. Runner tự xóa bản sao `messages.content` đã đăng ký; sáu loại derived khác còn pending, chưa đóng F3/F4. [Log nghiệm thu](log/2026-10-30-slack-03b2c-review-integration.md).
+**Slack staging30/10:** `integration/slack-personal-20261029` đã nhận #202–209: signed ingress,8 private read adapters/wrapper, raw source/barrier, registry/handler/consumer `messages.content`, metadata validation/runtime và derived-policy fanout. #209 head `5bdfbd68` có [CI41045953165](https://github.com/VinhDat267/ATI_Project/actions/runs/41045953165) xanh cả check/browser; merge `0a59e754` có cây bằng head. Combined fullcheck3637PASS. [Log #209](log/2026-10-30-slack-03b2d-review-integration.md), [log #208](log/2026-10-30-slack-03b2c-review-integration.md).
 
-**Staging runtime30/10:** #207 startup/shutdown consumer metadata đã review/sửaP2/CI đúng head xanh và merge `ffa6e381`; cờ nội dung vẫn tắt, không OAuth secret cho auth.test. Chưa đóng native Slack/Free/Pro/hai user/F4. Consumer message purge03B2C đang triển khai riêng. [Log](log/2026-10-30-slack-04b2-review-integration.md).
-
-**Staging Slack 30/10:** #202 ingress ký số, #203 wrapper đọc nội bộ, #204 registry `messages.content`, #205 consumer credential và #206 handler xóa `messages.content` đã review/CI xanh và tích hợp vào `integration/slack-personal-20261029` (`fab169d2`). Main/cờ live chưa đổi. Runner purge/những selector còn lại, xoay token provisional, fanout, executor, ba mode/Inbox và nghiệm thu Free/Pro/hai user vẫn mở; F3/F4/toàn tính năng chưa đóng. Xem [log #206](log/2026-10-30-slack-03b2b-review-integration.md), [log #205](log/2026-10-30-slack-04b1-review-integration.md). Runtime consumer04B2 đang triển khai trên nhánh riêng.
+**Phạm vi còn mở:** bốn core derived kind khác, message selectors ngoài content, writer/read/backfill/planner/executor/public integration, authorization fanout/sáu watermark/rotation recovery,04C safety, ba mode/Inbox, API reconciliation và native Slack Free/Pro/hai user/model. Sáu intent derived khác vẫn có thể pending. Chưa đóng toàn03/04/fullF3/F4; main/cờ live chưa đổi. Nhánh DELIVERY-01 đang đưa actual-server regressions vào CI và sửa cách theo dõi, chưa accepted staging.
 
 Nguồn: mục 5.2 của báo cáo giữa kỳ. Hạn cuối kỳ dự kiến 11/11/2026. Trạng thái: `xong`, `đang làm` (ghi nhánh), `chờ` (đã có task card), `chưa có task card` (cần Claude Code lập kế hoạch trước khi giao).
 
