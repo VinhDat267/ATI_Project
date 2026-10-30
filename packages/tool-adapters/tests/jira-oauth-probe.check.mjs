@@ -259,7 +259,7 @@ test('runner performs callback exchange once, removes code/state from displayed 
   assert.equal(authUrl.origin, f.baseUrl);
   const state = authUrl.searchParams.get('state'); const code = f.issueCode();
   const url = `${server.url}oauth/callback?state=${state}&code=${code}`;
-  const wrong = await fetch(url, { redirect: 'manual' }); assert.equal(wrong.status, 403);
+  const wrong = await fetch(url, { redirect: 'manual' }); assert.equal(wrong.status, 303); assert.equal(wrong.headers.get('location'), '/');
   const result = await fetch(url, { redirect: 'manual', headers: { Cookie: cookie } });
   assert.equal(result.status, 303); assert.equal(result.headers.get('location'), '/');
   assert.doesNotMatch(await result.text(), /SENTINEL|state=/);
@@ -278,7 +278,7 @@ test('runner rejects duplicate callback parameters and handles consent denial wi
   const start = await post(`${server.url}start`, cookie);
   const state = new URL(start.headers.get('location')).searchParams.get('state');
   const duplicate = await fetch(`${server.url}oauth/callback?state=${state}&state=other&code=CODE_SENTINEL`, { redirect: 'manual', headers: { Cookie: cookie } });
-  assert.equal(duplicate.status, 400); assert.doesNotMatch(await duplicate.text(), /CODE_SENTINEL/);
+  assert.equal(duplicate.status, 303); assert.equal(duplicate.headers.get('location'), '/'); assert.doesNotMatch(await duplicate.text(), /CODE_SENTINEL/);
   const denied = await fetch(`${server.url}oauth/callback?state=${state}&error=access_denied&error_description=SECRET_SENTINEL`, { redirect: 'manual', headers: { Cookie: cookie } });
   assert.equal(denied.status, 303); assert.equal(denied.headers.get('location'), '/');
   const page = await (await fetch(server.url, { headers: { Cookie: cookie } })).text();
@@ -312,4 +312,67 @@ test('CLI help and config errors have safe exit codes and never print supplied s
   const implicit = run([]); assert.equal(implicit.status, 2); assert.match(implicit.stderr, /--live/);
   const bad = run(['--check-config'], { JIRA_PROBE_CLIENT_ID: 'client', JIRA_PROBE_CLIENT_SECRET: 'SECRET_SENTINEL', JIRA_PROBE_REDIRECT_URI: 'https://evil.example/oauth/callback' });
   assert.equal(bad.status, 2); assert.doesNotMatch(bad.stdout + bad.stderr, /SECRET_SENTINEL|evil\.example/);
+});
+
+test('review regression: observations reset on disconnect and cannot carry from Jira account one into identity-only account two', async t => {
+  const f = await providerFixture(); t.after(() => f.close()); const session = await newSession(f);
+  await authorize(session, f, 'jira', { sites: [site()], admin: true });
+  await session.refresh('browser-a');
+  assert.equal(session.report('browser-a').observations.tokenRotation, true);
+  session.disconnect('browser-a');
+  assert.deepEqual(session.report('browser-a').observations, { identity: false, jiraAuthorization: false, tokenRotation: false, permissionsRead: false });
+  await authorize(session, f, 'identity', { accountId: 'account-two' });
+  assert.deepEqual(session.report('browser-a').observations, { identity: true, jiraAuthorization: false, tokenRotation: false, permissionsRead: false });
+  session.start('jira', 'browser-a');
+  assert.deepEqual(session.report('browser-a').observations, { identity: false, jiraAuthorization: false, tokenRotation: false, permissionsRead: false });
+});
+
+test('review regression: duplicate resource rows cannot become evidence of two distinct Jira sites', async t => {
+  const f = await providerFixture(); t.after(() => f.close()); const session = await newSession(f);
+  await authorize(session, f, 'jira', { sites: [site(), site()] });
+  assert.equal(session.report('browser-a').siteCount, 1);
+  assert.equal(f.requests.filter(r => r.path.endsWith('/mypermissions')).length, 1);
+});
+
+test('review regression: duplicate cloudId with conflicting site URL or scopes fails closed', async t => {
+  const f = await providerFixture(); t.after(() => f.close()); const client = createProbeClient(configFor(f));
+  for (const conflicting of [{ ...site(), url: 'https://other-site.atlassian.net' }, site('site-one', ['read:jira-work'])]) {
+    const tokens = await client.exchangeCode(f.issueCode({ scopes: jiraScopes, sites: [site(), conflicting] }));
+    await assert.rejects(client.resources(tokens.accessToken), /PROVIDER_RESPONSE/);
+  }
+});
+
+test('an old callback delayed at profile cannot overwrite a newer account and its usable grant', async t => {
+  const f = await providerFixture(); t.after(() => f.close()); const session = await newSession(f);
+  const barrier = f.pauseNext('/me');
+  const old = authorize(session, f); await barrier.reached;
+  await authorize(session, f, 'identity', { accountId: 'account-two' });
+  barrier.release();
+  await assert.rejects(old, /FLOW_SUPERSEDED/);
+  await session.refresh('browser-a');
+  assert.equal(session.report('browser-a').connected, true);
+});
+
+test('re-consent while a refresh is delayed preserves the new grant after the old result is rejected', async t => {
+  const f = await providerFixture(); t.after(() => f.close()); const session = await newSession(f);
+  await authorize(session, f);
+  const barrier = f.pauseRefresh(); const old = session.refresh('browser-a'); await barrier.reached;
+  await authorize(session, f);
+  assert.equal(session.report('browser-a').observations.tokenRotation, false);
+  barrier.release(); await assert.rejects(old, /FLOW_SUPERSEDED/);
+  await session.refresh('browser-a');
+  assert.equal(session.report('browser-a').connected, true);
+});
+
+test('upstream token errors are rendered as safe codes and the local server closes its listener', async t => {
+  const { f, server, cookie } = await runner(t);
+  f.overrides.set('/oauth/token', { status: 400, body: { error: 'invalid_request', error_description: 'SECRET_SENTINEL', access_token: 'ACCESS_SENTINEL' } });
+  const start = await post(`${server.url}start`, cookie);
+  const state = new URL(start.headers.get('location')).searchParams.get('state');
+  const response = await fetch(`${server.url}oauth/callback?state=${state}&code=CODE_SENTINEL`, { redirect: 'manual', headers: { Cookie: cookie } });
+  assert.equal(response.headers.get('location'), '/');
+  const page = await (await fetch(server.url, { headers: { Cookie: cookie } })).text();
+  assert.match(page, /PROVIDER_REJECTED/); assert.doesNotMatch(page, /SENTINEL/);
+  await server.close();
+  await assert.rejects(fetch(server.url));
 });

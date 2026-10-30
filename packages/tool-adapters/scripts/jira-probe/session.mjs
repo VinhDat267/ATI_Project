@@ -13,7 +13,8 @@ export function createProbeSession({ client, mode, clock = Date.now }) {
   if (!['fixture', 'live'].includes(mode) || client.mode !== mode) throw new ProbeError('INVALID_CONFIG');
   let owner, generation = 0, pending, accountId, grant, inflight;
   let siteCount = 0, adminSiteCount = 0;
-  const observations = { identity: false, jiraAuthorization: false, tokenRotation: false, permissionsRead: false };
+  const emptyObservations = () => ({ identity: false, jiraAuthorization: false, tokenRotation: false, permissionsRead: false });
+  let observations = emptyObservations();
   function bind(browserBinding) {
     if (typeof browserBinding !== 'string' || !browserBinding) throw new ProbeError('BROWSER_MISMATCH');
     if (owner === undefined) owner = browserBinding;
@@ -34,6 +35,7 @@ export function createProbeSession({ client, mode, clock = Date.now }) {
       const state = randomBytes(32).toString('base64url');
       const version = ++generation;
       grant = undefined; inflight = undefined; siteCount = 0; adminSiteCount = 0;
+      observations = emptyObservations();
       pending = { hash: digest(state), expires: clock() + 600_000, version, flow };
       return { authorizationUrl: client.authorizationUrl({ state, scopes: [...scopesFor[flow]] }) };
     },
@@ -91,6 +93,7 @@ export function createProbeSession({ client, mode, clock = Date.now }) {
     },
     disconnect(browserBinding) {
       bind(browserBinding); generation++; pending = undefined; grant = undefined; accountId = undefined; inflight = undefined; siteCount = 0; adminSiteCount = 0;
+      observations = emptyObservations();
     },
     report(browserBinding) {
       bind(browserBinding);

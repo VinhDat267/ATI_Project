@@ -37,14 +37,19 @@ export async function startProbeServer(config) {
         owner = randomBytes(32).toString('base64url'); binding = owner;
         res.setHeader('Set-Cookie', `probe_owner=${owner}; HttpOnly; SameSite=Lax; Path=/`);
       }
-      if (!same(owner, binding)) return send(403, 'BROWSER_MISMATCH');
+      if (!same(owner, binding)) {
+        if (req.method === 'GET' && url.pathname === '/oauth/callback') return redirectHome();
+        return send(403, 'BROWSER_MISMATCH');
+      }
       if (req.method === 'GET' && url.pathname === '/') {
         const report = session.report(binding);
         return send(200, `<!doctype html><html lang="vi"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>ATI Jira OAuth probe</title><body><main><h1>ATI Jira OAuth — JIRA-01</h1><p>Chỉ kiểm chứng danh tính, site và quyền. Không tạo issue hoặc comment.</p><p>Trình duyệt đầu tiên giữ phiên này. Muốn dùng trình duyệt khác, dừng và chạy lại probe.</p><p>${escapeHtml(notice)}</p><form action="/start" method="post"><button name="flow" value="identity">1. Kết nối danh tính (read:me)</button><button name="flow" value="jira">2. Cấp quyền Jira / thêm site</button></form><form action="/refresh" method="post"><button>Làm mới token và kiểm rotation</button></form><form action="/disconnect" method="post"><button>Ngắt phiên local</button></form><p><a href="/report">Xem report an toàn</a></p><p>Account chưa có site cần chủ tài khoản xác nhận riêng; danh sách site rỗng không chứng minh điều đó.</p><pre>${escapeHtml(JSON.stringify(report, null, 2))}</pre></main></body></html>`, 'text/html; charset=utf-8');
       }
       if (req.method === 'GET' && url.pathname === '/report') return send(200, JSON.stringify(session.report(binding), null, 2), 'application/json; charset=utf-8');
       if (req.method === 'GET' && url.pathname === '/oauth/callback') {
-        if (['state', 'code', 'error', 'error_description'].some(key => url.searchParams.getAll(key).length > 1) || (url.searchParams.has('code') && url.searchParams.has('error'))) return send(400, 'INVALID_CALLBACK');
+        if (['state', 'code', 'error', 'error_description'].some(key => url.searchParams.getAll(key).length > 1) || (url.searchParams.has('code') && url.searchParams.has('error'))) {
+          notice = 'INVALID_CALLBACK'; return redirectHome();
+        }
         try {
           await session.callback({ state: url.searchParams.get('state'), code: url.searchParams.get('code'), error: url.searchParams.get('error'), browserBinding: binding });
           notice = 'CALLBACK_OBSERVED — chưa đồng nghĩa hoàn tất native gate.';

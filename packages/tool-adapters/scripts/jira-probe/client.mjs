@@ -78,14 +78,17 @@ export function createProbeClient(config) {
     async resources(accessToken) {
       const value = await request(`${apiBase}/oauth/token/accessible-resources`, { token: accessToken });
       if (!Array.isArray(value)) throw new ProbeError('PROVIDER_RESPONSE');
-      const sites = [];
+      const sites = new Map();
       for (const item of value) {
         if (!object(item) || !Array.isArray(item.scopes) || !item.scopes.every(s => typeof s === 'string')) throw new ProbeError('PROVIDER_RESPONSE');
         if (!item.scopes.some(s => s.endsWith(':jira') || s.startsWith('read:jira-') || s.startsWith('write:jira-') || s.startsWith('manage:jira-'))) continue;
         if (!nonempty(item.id) || !cloudIdPattern.test(item.id) || !nonempty(item.name) || typeof item.url !== 'string' || !/^https:\/\/[a-z0-9-]+\.atlassian\.net\/?$/.test(item.url)) throw new ProbeError('PROVIDER_RESPONSE');
-        sites.push({ id: item.id, name: item.name, url: item.url.replace(/\/$/, ''), scopes: [...item.scopes] });
+        const normalized = { id: item.id, name: item.name, url: item.url.replace(/\/$/, ''), scopes: [...new Set(item.scopes)].sort() };
+        const previous = sites.get(item.id);
+        if (previous && (previous.url !== normalized.url || previous.name !== normalized.name || JSON.stringify(previous.scopes) !== JSON.stringify(normalized.scopes))) throw new ProbeError('PROVIDER_RESPONSE');
+        sites.set(item.id, normalized);
       }
-      return sites;
+      return [...sites.values()];
     },
     async permissions(accessToken, cloudId) {
       if (typeof cloudId !== 'string' || !cloudIdPattern.test(cloudId)) throw new ProbeError('INVALID_INPUT');

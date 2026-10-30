@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { once } from 'node:events';
 
 export async function providerFixture() {
-  const requests = [], overrides = new Map(), codes = new Map(), access = new Map(), refresh = new Map();
+  const requests = [], overrides = new Map(), codes = new Map(), access = new Map(), refresh = new Map(), barriers = new Map();
   let sequence = 0, refreshBarrier;
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
@@ -10,6 +10,8 @@ export async function providerFixture() {
     let body; try { body = raw ? JSON.parse(raw) : undefined; } catch { body = 'NOT_JSON'; }
     const record = { method: req.method, path: url.pathname, query: Object.fromEntries(url.searchParams), headers: req.headers, body, closedEarly: false };
     requests.push(record);
+    const barrier = barriers.get(url.pathname);
+    if (barrier) { barriers.delete(url.pathname); barrier.started(); await barrier.wait; }
     res.on('close', () => { if (!res.writableEnded) record.closedEarly = true; });
     const send = (status, value, headers = {}) => {
       if (res.destroyed) return;
@@ -50,6 +52,10 @@ export async function providerFixture() {
     pauseRefresh() {
       let release, started; const wait = new Promise(r => { release = r; }); const reached = new Promise(r => { started = r; });
       refreshBarrier = { wait, started }; return { release, reached };
+    },
+    pauseNext(path) {
+      let release, started; const wait = new Promise(r => { release = r; }); const reached = new Promise(r => { started = r; });
+      barriers.set(path, { wait, started }); return { release, reached };
     },
     async close() { server.closeAllConnections(); await new Promise(r => server.close(r)); },
   };
