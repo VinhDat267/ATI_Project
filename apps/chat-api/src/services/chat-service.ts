@@ -505,7 +505,7 @@ export class ChatService {
     });
 
     // Retrieve previous messages for conversation context
-    const previousMessages = await this.msgRepo.listMessages(conversationId);
+    const previousMessages = await this.msgRepo.listMessages(conversationId, 100, 'planning');
     const slackContext = mergeSlackMessageContexts(previousMessages);
     const lastMemory = [...previousMessages].reverse().find((m: any) => m.metadata?.type === 'working_memory');
     const history: ChatMessage[] = previousMessages

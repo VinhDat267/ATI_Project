@@ -210,4 +210,23 @@ describe('message and working-memory writer to physical erasure, real PostgreSQL
     await new SlackMessagePurgeConsumer(env.db.pool,{targetKind:'working_memory_entity'}).runOnce(50);
     expect((await env.db.pool.query('SELECT metadata FROM messages WHERE id=$1',[row.id])).rows[0].metadata.state).toEqual({board:{id:'B_TRELLO',name:'keep'}});
   });
+  it('hydrates planning-only consent with planning purpose while HTTP remains manual_lookup', async () => {
+    const f = await fixture(), current = await env.consentRepo.getConsent(f.owner.binding.workspaceId, env.runtimeIdentity.providerId);
+    await env.consentRepo.grantConsent({workspaceId:f.owner.binding.workspaceId,providerId:env.runtimeIdentity.providerId,expectedRevision:current!.revision,
+      policyVersion:'v1.0.0',purposes:['storage','planning'],retentionDays:14,organizationRepresentative:'fixture',evidenceRef:'FIXTURE',recordedBy:'fixture'});
+    const policy = await env.policyService.resolveSlackModelPolicy({binding:f.owner.binding,purpose:'storage',requestedRetentionDays:7,env:TEST_ENV});
+    if(!policy.allowed)throw new Error('fixture planning storage denied');
+    const segments = [{...f.segments[0]!,storagePolicyRef:policy.policyReference,acquisitionPolicyRef:{...policy.policyReference,purpose:'planning' as const,requestedRetentionDays:0}}];
+    await messages.createSlackMessage(f.conv,'assistant','PLANNING_ONLY_SOURCE',{type:'answer'},{segments,selectors:['content']});
+    expect(JSON.stringify(await messages.listMessages(f.conv))).not.toContain('PLANNING_ONLY_SOURCE');
+    expect(JSON.stringify(await messages.listMessages(f.conv,100,'planning'))).toContain('PLANNING_ONLY_SOURCE');
+    const events:any[]=[];
+    const service=new ChatService({msgRepo:messages,eventEmitter:{emit:(name,value)=>events.push({name,value})},planner:{processMessage:async input=>{
+      expect(JSON.stringify(input.history)).toContain('PLANNING_ONLY_SOURCE');return {kind:'answer',text:'planning completed',lookups:[],usedDirectory:[]};
+    },routeSchedule:async()=>({services:[],unavailable:[]})}});
+    await service.handleUserMessage({conversationId:f.conv,userId:f.owner.person.id,content:'summarize'});
+    await vi.waitFor(()=>expect(events.some(e=>e.name==='source_changed'||e.name==='error')).toBe(true));
+    expect(events.some(e=>e.name==='error')).toBe(false);
+    expect((await env.db.pool.query("SELECT count(*)::int AS n FROM slack_derived_copies c JOIN messages m ON m.id::text=c.target_id WHERE m.conv_id=$1 AND m.content='planning completed' AND c.target_sub_id='content'",[f.conv])).rows[0].n).toBe(1);
+  });
 });
