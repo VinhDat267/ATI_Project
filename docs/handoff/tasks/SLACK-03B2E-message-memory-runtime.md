@@ -8,14 +8,14 @@ Owner: Backend, `apps/chat-api/`, one new migration after0020, this card/plan an
 
 Acceptance:
 
-- [ ] Real PostgreSQL RED→GREEN: same-transaction writer/registry rollback; canonical version/fingerprint; precise metadata/memory erasure; retain Trello/Google entries; wrong-owner and mixed-owner rejection.
-- [ ] Actual MessageRepo reads and chat history/memory hydration mask invalid data before reuse; malformed/legacy/uncovered selectors fail closed; no model/client provenance is trusted.
-- [ ] Revoke/edit/delete/policy/TTL block before purge; consumer retains lease/barrier/cutoff fences and handles the new selectors and working-memory kind.
-- [ ] Real AbortSignal and PostgreSQL contention tests; no weakened guard or fictitious DB mock.
+- [x] Real PostgreSQL RED→GREEN: same-transaction writer/registry rollback; canonical version/fingerprint; precise metadata/memory erasure; retain Trello/Google entries; wrong-owner and mixed-owner rejection.
+- [x] Actual MessageRepo reads and chat history/memory hydration mask invalid data before reuse; malformed/legacy/uncovered selectors fail closed; no model/client provenance is trusted.
+- [x] Revoke/edit/delete/policy/TTL block before purge; consumer retains lease/barrier/cutoff fences and handles the new selectors and working-memory kind.
+- [x] Real AbortSignal and PostgreSQL contention tests; no weakened guard or fictitious DB mock.
 - [ ] Freeze base/code, fullcheck, one independent read-only whole-branch Codex review, exact published-head CI check/browser, merge-tree comparison before staging acceptance.
 
 Other core kinds (`plan_step_arg`, `scheduled_workflow_arg`, `audit_log_entry`) require the next integrated card. Slack-derived plan/schedule publication remains gated until their writers/readers/handlers exist. Public read routing03B3/03B4, future06 kinds, fullF3/F4 and native Slack/model acceptance remain open.
 
 ## Kết quả
 
-Implementation and verification in progress. No integration/native acceptance claimed.
+Message/metadata/memory runtime implemented. Frozen pre-review fullcheck3662PASS; two independent-reviewP2 fixed with observed2RED→GREEN, focused94PASS/typecheckPASS and additional singleton erasure1PASS. Final post-fix fullcheck and published-head CI/check/browser remain separate gates. [Evidence and limits](../log/2026-10-30-slack-03b2e-message-memory-runtime.md). No integration/native acceptance claimed yet; full legacy backfill and derived TTL cascade remain open under coreM2.

@@ -534,7 +534,9 @@ export class ChatService {
       history,
       memory,
       actor: { userId },
-      onGatherEvent: (event) => this.eventEmitter.emit('gather_progress', { conversationId, ...event }),
+      // Gather callbacks may contain a query, labels or model-derived source text.
+      // Keep those payloads out of live SSE and its replay cache on source-bound turns.
+      onGatherEvent: (event) => { if (!slackContext) this.eventEmitter.emit('gather_progress', { conversationId, ...event }); },
       ...(schedule ? { schedule: { services: schedule.services } } : {}),
     });
     const memoryState = memory.toJSON();

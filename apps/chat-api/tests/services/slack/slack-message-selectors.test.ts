@@ -11,7 +11,7 @@ it('queue SQL and runtime extraction agree for all concrete selectors, escaped U
     { content: '', metadata: { type: 'clarification', options: ['x'], context: null, reason: 'x' } },
     { content: '', metadata: { type: 'refusal', reason: 'x', suggestion: 'x' } },
     { content: '', metadata: { type: 'schedule_run', name: 'x' } },
-    { content: '', metadata: { type: 'working_memory', state: { __observed: { channel: [{ id: 'C/#🧪', name: 'x' }] }, __labels: { 'k/🧪': 'x' }, __gatherBindings: { key: 'x' }, __gatherIntent: 'x', __gatherMissing: { key: 'x' }, __gatherPending: { query: 'x', candidates: [{ id: 'C/#🧪', name: 'x' }] }, members: [{ id: 'U', name: 'x' }] } } },
+    { content: '', metadata: { type: 'working_memory', state: { board: { id: 'B/#🧪', name: 'x' }, __observed: { channel: [{ id: 'C/#🧪', name: 'x' }] }, __labels: { 'k/🧪': 'x' }, __gatherBindings: { key: 'x' }, __gatherIntent: 'x', __gatherMissing: { key: 'x' }, __gatherPending: { query: 'x', candidates: [{ id: 'C/#🧪', name: 'x' }] }, members: [{ id: 'U', name: 'x' }] } } },
   ];
   for (const row of rows) {
     const selectors = row.metadata.type === 'working_memory' ? memoryOutputSelectors(row.metadata.state!) : messageOutputSelectors(row);

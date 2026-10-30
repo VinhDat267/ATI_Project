@@ -34,8 +34,11 @@ BEGIN
   values_json := metadata->'state' #> path;
   IF array_length(bits,1)=1 THEN RETURN values_json; END IF;
   IF values_json IS NULL THEN RETURN NULL; END IF;
-  IF jsonb_typeof(values_json)<>'array' THEN RETURN '{"__invalid_selector":true}'::jsonb; END IF;
   k := slack_selector_decode(bits[2]);
+  IF jsonb_typeof(values_json)='object' AND jsonb_typeof(values_json->'id')='string' THEN
+    IF values_json->>'id'=k THEN RETURN values_json; ELSE RETURN NULL; END IF;
+  END IF;
+  IF jsonb_typeof(values_json)<>'array' THEN RETURN '{"__invalid_selector":true}'::jsonb; END IF;
   FOR element IN SELECT value FROM jsonb_array_elements(values_json) LOOP
     IF element->>'id'=k THEN selected := element; hits := hits+1; END IF;
   END LOOP;

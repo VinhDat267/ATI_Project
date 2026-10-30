@@ -12,6 +12,7 @@ import { createConversationRoutes } from '../../src/routes/conversation-routes.j
 import { ConversationRepo } from '../../src/db/repositories/conversation-repo.js';
 import { messageOutputSelectors, memoryOutputSelectors, messageSelectorKind } from '../../src/services/slack/slack-message-selectors.js';
 import { ScheduleService } from '../../src/services/schedules/schedule-service.js';
+import { SSEManager } from '../../src/sse/sse-manager.js';
 
 describe('message and working-memory writer to physical erasure, real PostgreSQL', () => {
   let env: SlackReadEnvironment, messages: MessageRepo;
@@ -178,5 +179,35 @@ describe('message and working-memory writer to physical erasure, real PostgreSQL
     await invalidate(f);
     await expect(new ScheduleService({ pool: env.db.pool, timeZone: 'Asia/Ho_Chi_Minh' }).confirmProposal({ userId: f.owner.person.id, convId: f.conv, messageId: row.id, now: new Date() })).rejects.toMatchObject({ code: 'SCHEDULE_SOURCE_PURGED' });
     expect((await env.db.pool.query('SELECT count(*)::int AS n FROM schedules WHERE conv_id=$1', [f.conv])).rows[0].n).toBe(0);
+  });
+  it('keeps normal singular Trello entities usable on a restored Slack-context chat turn', async () => {
+    const f = await fixture();
+    await messages.createMessage(f.conv, 'system', '', { type: 'working_memory', state: { board: { id: 'B_TRELLO', name: 'keep' } } });
+    await messages.createSlackMessage(f.conv, 'assistant', 'allowed history', { type: 'answer' }, { segments: f.segments, selectors: ['content'] });
+    const events: any[] = [];
+    const service = new ChatService({ msgRepo: messages, eventEmitter: { emit: (name, value) => events.push({ name, value }) },
+      planner: { processMessage: async input => { expect(input.memory!.getEntity('board')).toEqual({id:'B_TRELLO',name:'keep'}); return { kind: 'answer', text: 'singular success', lookups: [], usedDirectory: [] }; }, routeSchedule: async () => ({services:[],unavailable:[]}) } });
+    await service.handleUserMessage({conversationId:f.conv,userId:f.owner.person.id,content:'summarize'});
+    await vi.waitFor(() => expect(events.some(e => e.name === 'source_changed' || e.name === 'error')).toBe(true));
+    expect(events.some(e => e.name === 'error')).toBe(false);
+    expect((await env.db.pool.query("SELECT count(*)::int AS n FROM messages WHERE conv_id=$1 AND content='singular success'", [f.conv])).rows[0].n).toBe(1);
+  });
+  it('never stores source-bearing gather callback payloads in the actual SSE replay cache', async () => {
+    const f = await fixture(), sse = new SSEManager();
+    await messages.createSlackMessage(f.conv, 'assistant', 'allowed history', {type:'answer'}, {segments:f.segments,selectors:['content']});
+    const service = new ChatService({msgRepo:messages,eventEmitter:{emit:(name,value)=>sse.emitEvent(f.conv,name,value)},planner:{
+      processMessage:async input=>{input.onGatherEvent?.({tool:'trello.search_boards',phase:'completed',output:{excerpt:'PRIVATE_GATHER_SOURCE'}} as any);return {kind:'answer',text:'safe completion',lookups:[],usedDirectory:[]};},routeSchedule:async()=>({services:[],unavailable:[]})}});
+    await service.handleUserMessage({conversationId:f.conv,userId:f.owner.person.id,content:'summarize'});
+    await vi.waitFor(()=>expect(sse.getMissedEvents(f.conv,0).some(e=>e.event==='source_changed')).toBe(true));
+    expect(JSON.stringify(sse.getMissedEvents(f.conv,0))).not.toContain('PRIVATE_GATHER_SOURCE');
+  });
+  it('guards and physically erases a singular source entity while preserving another service entity', async () => {
+    const f = await fixture();
+    const row = await messages.createSlackMessage(f.conv,'system','',{type:'working_memory',state:{channel:{id:'C/#',name:'private singleton'},board:{id:'B_TRELLO',name:'keep'}}},
+      {segments:f.segments,selectors:['state:/channel#id=C%2F%23']});
+    await invalidate(f);
+    expect((await messages.listMessages(f.conv))[0]?.metadata.state).toEqual({board:{id:'B_TRELLO',name:'keep'}});
+    await new SlackMessagePurgeConsumer(env.db.pool,{targetKind:'working_memory_entity'}).runOnce(50);
+    expect((await env.db.pool.query('SELECT metadata FROM messages WHERE id=$1',[row.id])).rows[0].metadata.state).toEqual({board:{id:'B_TRELLO',name:'keep'}});
   });
 });

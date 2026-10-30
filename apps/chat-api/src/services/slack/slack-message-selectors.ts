@@ -49,7 +49,11 @@ function pathFor(row: Message, kind: string, selector: string): string[] {
   let array: any = row.metadata?.state;
   for (const key of keys) array = own(array, key) ? array[key] : undefined;
   if (array === undefined) return ['metadata', 'state', ...keys, '-1'];
-  if (!Array.isArray(array)) throw new Error('stale_lineage');
+  // Gather bindings store singular {id,...} entities; observations/members use arrays.
+  if (!Array.isArray(array)) {
+    if (!array || typeof array !== 'object' || typeof array.id !== 'string') throw new Error('stale_lineage');
+    return ['metadata', 'state', ...keys, ...(array.id === id ? [] : ['-1'])];
+  }
   const indices = array.flatMap((value, index) => value && value.id === id ? [String(index)] : []);
   if (indices.length > 1) throw new Error('stale_lineage');
   return ['metadata', 'state', ...keys, indices[0] ?? '-1'];
@@ -105,6 +109,9 @@ export function messageOutputSelectors(row: Message): string[] {
 export function memoryOutputSelectors(state: Record<string, any>): string[] {
   const result: string[] = [];
   const array = (prefix: string, values: any) => {
+    if (values && typeof values === 'object' && !Array.isArray(values) && typeof values.id === 'string' && values.id) {
+      result.push(`state:/${prefix}#id=${encodeURIComponent(values.id)}`); return;
+    }
     if (!Array.isArray(values) || values.some(v => !v || typeof v.id !== 'string' || !v.id)) throw new Error('SLACK_MEMORY_PROVENANCE_REQUIRED');
     for (const v of values) result.push(`state:/${prefix}#id=${encodeURIComponent(v.id)}`);
   };
