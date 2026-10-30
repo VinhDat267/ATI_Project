@@ -54,7 +54,8 @@ export function createProbeClient(config) {
     return { accessToken: value.access_token, refreshToken: value.refresh_token, expiresInSeconds: value.expires_in, scopes: typeof value.scope === 'string' ? value.scope.split(/\s+/).filter(Boolean) : [] };
   }
 
-  return {
+  return Object.freeze({
+    mode: config.mode,
     authorizationUrl({ state, scopes }) {
       if (!nonempty(state) || !Array.isArray(scopes) || !scopes.length || !scopes.every(s => nonempty(s) && !/\s/.test(s))) throw new ProbeError('INVALID_INPUT');
       const url = new URL('/authorize', authBase);
@@ -93,5 +94,5 @@ export function createProbeClient(config) {
       if (typeof allowed !== 'boolean') throw new ProbeError('PROVIDER_RESPONSE');
       return { administer: allowed };
     },
-  };
+  });
 }
