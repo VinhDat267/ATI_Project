@@ -38,25 +38,25 @@ Authority: [personal Slack spec](../specs/2026-10-28-slack-personal-oauth-design
 
 ## Task1: leased durable jobs
 
-- [ ] Write real PostgreSQL tests before implementation: concurrent SKIP LOCKED claims, no overlap, due-time filtering, expired-lease reclaim with a new token, stale worker CAS denied, pending/failed recovery retained, no body/token columns.
-- [ ] Run and observe RED.
-- [ ] Add0020 and claim API `claim(limit,workerId,leaseSeconds,now)` returning validated payload plus lease token. Support only credential-validation intents; source edit/delete jobs already have their separate durable barrier/purge chain and are not falsely certified here.
-- [ ] Implement `retry(jobId,leaseToken,nextAttempt,safeCode)` and fenced finalization. All finalization writes require current lease ownership and expiry bounds. Use exact checked UUID/decimal/time metadata.
-- [ ] Run GREEN; commit exact task files with evidence.
+- [x] Write real PostgreSQL tests before implementation: concurrent SKIP LOCKED claims, no overlap, due-time filtering, expired-lease reclaim with a new token, stale worker CAS denied, pending/failed recovery retained, no body/token columns.
+- [x] Run and observe RED.
+- [x] Add0020 and claim API `claim(limit,workerId,leaseSeconds,now)` returning validated payload plus lease token. Support only credential-validation intents; source edit/delete jobs already have their separate durable barrier/purge chain and are not falsely certified here.
+- [x] Implement `retry(jobId,leaseToken,nextAttempt,safeCode)` and fenced finalization. All finalization writes require current lease ownership and expiry bounds. Use exact checked UUID/decimal/time metadata.
+- [x] Run GREEN; commit exact task files with evidence.
 
 ## Task2: conservative credential consumer
 
-- [ ] Write fixture auth.test tests plus real PG state tests: valid captured token; expired/in-flight/rotating uncertainty; hard invalid nonrotating token; transient429/5xx/timeout; wrong actor/workspace; delayed old revoke after regrant; stale fingerprint; disconnect vs probe; two pending barriers; wrong barrier/receipt ownership; caller abort and stale lease during probe.
-- [ ] Observe RED. Tests must inspect real persisted barrier/config/status/job rows and actual AbortSignal behavior.
-- [ ] Implement bounded owner-gated metadata verification. Do not keep a DB transaction/row lock open over HTTP. Before/after the probe, recheck lease/binding/fingerprint. Final transaction order: owner → common sorted invalidation advisory keys → connection/barrier/job rows, with lease and config CAS.
-- [ ] Valid: clear only that owned provisional barrier; restore active only when all full-binding authority conditions permit it. Invalid: atomically stage permanent old-generation binding barrier/purge, clear captured config and invalidate its generation. Unknown: preserve config and barrier and schedule a bounded retry/manual-reconnect outcome with fixed safe code.
-- [ ] Ensure a race cannot lose an uncommitted outcome yet report applied. Fenced stale workers release all locks without touching current authority.
-- [ ] Run GREEN, typecheck/check and commit evidence.
+- [x] Write fixture auth.test tests plus real PG state tests: valid captured token; expired/in-flight/rotating uncertainty; hard invalid nonrotating token; transient429/5xx/timeout; wrong actor/workspace; delayed old revoke after regrant; stale fingerprint; disconnect vs probe; two pending barriers; wrong barrier/receipt ownership; caller abort and stale lease during probe.
+- [x] Observe RED. Tests must inspect real persisted barrier/config/status/job rows and actual AbortSignal behavior.
+- [x] Implement bounded owner-gated metadata verification. Do not keep a DB transaction/row lock open over HTTP. Before/after the probe, recheck lease/binding/fingerprint. Final transaction order: owner → common sorted invalidation advisory keys → connection/barrier/job rows, with lease and config CAS.
+- [x] Valid: clear only that owned provisional barrier; restore active only when all full-binding authority conditions permit it. Invalid: atomically stage permanent old-generation binding barrier/purge, clear captured config and invalidate its generation. Unknown: preserve config and barrier and schedule a bounded retry/manual-reconnect outcome with fixed safe code.
+- [x] Ensure a race cannot lose an uncommitted outcome yet report applied. Fenced stale workers release all locks without touching current authority.
+- [x] Run GREEN, typecheck/check and commit evidence.
 
 ## Task3: review and publication
 
-- [ ] Independent read-only review of full branch, including grant/lease ownership, unknown refresh semantics, common lock order, cancellation and no-secret paths.
-- [ ] One direct fix pass with actual RED→GREEN reproductions; full checks after source changes.
+- [x] Independent read-only review of full branch, including grant/lease ownership, unknown refresh semantics, common lock order, cancellation and no-secret paths.
+- [x] One direct fix pass with actual RED→GREEN reproductions; full checks after source changes.
 - [ ] Fill task result and one log, publish draft PR to staging, await exact-head CI before integration. Never close fullSLACK04/F4/F3 from this slice.
 
 ## Official metadata sources checked30Oct2026

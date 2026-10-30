@@ -10,4 +10,8 @@ Acceptance: actual SKIP LOCKED claims and lease recovery; two workers without du
 
 ## Kết quả
 
-Task1 lease repository/migration implemented; **6 real-PG tests PASS**, typecheckPASS. Includes actual SKIP LOCKED concurrency, stale lease fencing and a row-lock expiry regression observed RED→GREEN. Task2 credential consumer and Task3 independent review/full check/CI remain open. No provider validation, native/fullF4 acceptance or merge from this partial evidence. [Progress log](../log/2026-10-30-slack-04b1-validation-consumer.md).
+Private lease repository and metadata-only consumer implemented. **29 real-PG/loopback tests PASS**; final typecheck PASS. `npm run check` passed **3,552 tests**, typecheck/build/security (exit0); two additional race/fingerprint tests were then added and the full targeted suite rerun, with no further product changes. Exact published-head CI remains required before staging integration.
+
+Independent review found a P1: malformed successful auth.test metadata could be treated as a contradictory principal and destructively invalidate a nonrotating credential. Five regressions were observed RED, then GREEN after identity shape validation precedes comparison. Unknown responses now retain config and the provisional barrier. Actual manual-disconnect/probe ordering, lease expiry after a real row-lock wait, stale fingerprint/generation, abort, rollback and unrelated barriers are covered. [Progress log](../log/2026-10-30-slack-04b1-validation-consumer.md).
+
+Bounded acceptance only: no runtime wiring, safe rotating-token recovery, authorizations fanout, six-watermark processing, derived purge consumers, native Slack/Free/Pro/model acceptance or fullF4 closure. Flags remain off; no main merge.
