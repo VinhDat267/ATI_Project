@@ -1,5 +1,7 @@
 # Lộ trình đến cuối kỳ
 
+**Staging purge30/10:** #208 đã merge `2821d426`, head `145a6016` có CI41042072139 xanh cả check/browser và cây merge trùng head. Runner tự xóa bản sao `messages.content` đã đăng ký; sáu loại derived khác còn pending, chưa đóng F3/F4. [Log nghiệm thu](log/2026-10-30-slack-03b2c-review-integration.md).
+
 **Staging runtime30/10:** #207 startup/shutdown consumer metadata đã review/sửaP2/CI đúng head xanh và merge `ffa6e381`; cờ nội dung vẫn tắt, không OAuth secret cho auth.test. Chưa đóng native Slack/Free/Pro/hai user/F4. Consumer message purge03B2C đang triển khai riêng. [Log](log/2026-10-30-slack-04b2-review-integration.md).
 
 **Staging Slack 30/10:** #202 ingress ký số, #203 wrapper đọc nội bộ, #204 registry `messages.content`, #205 consumer credential và #206 handler xóa `messages.content` đã review/CI xanh và tích hợp vào `integration/slack-personal-20261029` (`fab169d2`). Main/cờ live chưa đổi. Runner purge/những selector còn lại, xoay token provisional, fanout, executor, ba mode/Inbox và nghiệm thu Free/Pro/hai user vẫn mở; F3/F4/toàn tính năng chưa đóng. Xem [log #206](log/2026-10-30-slack-03b2b-review-integration.md), [log #205](log/2026-10-30-slack-04b1-review-integration.md). Runtime consumer04B2 đang triển khai trên nhánh riêng.
