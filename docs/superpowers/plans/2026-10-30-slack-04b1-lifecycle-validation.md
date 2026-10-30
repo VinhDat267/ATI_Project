@@ -57,7 +57,7 @@ Authority: [personal Slack spec](../specs/2026-10-28-slack-personal-oauth-design
 
 - [x] Independent read-only review of full branch, including grant/lease ownership, unknown refresh semantics, common lock order, cancellation and no-secret paths.
 - [x] One direct fix pass with actual RED→GREEN reproductions; full checks after source changes.
-- [ ] Fill task result and one log, publish draft PR to staging, await exact-head CI before integration. Never close fullSLACK04/F4/F3 from this slice.
+- [x] Fill task result and one log, publish draft PR to staging, await exact-head CI before integration. Never close fullSLACK04/F4/F3 from this slice.
 
 ## Official metadata sources checked30Oct2026
 
