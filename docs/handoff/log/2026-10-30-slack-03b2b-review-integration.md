@@ -1,0 +1,7 @@
+# SLACK-03B2B: bounded handler accepted into staging
+
+[PR206](https://github.com/VinhDat267/ATI_Project/pull/206), published head `3ea9fbd993011ee714ee3d61a7d7f6228146f4a1`; [CI41031086243](https://github.com/VinhDat267/ATI_Project/actions/runs/41031086243) SUCCESS including browser. Merge `fab169d26acc75e4bf68c774eccf625b2f797f31`; `git diff --quiet <head> <merge>` exit0, identical trees.
+
+Fresh independent whole-branch review at source checkpoint447632fa passed with no P1/P2/P3. Reviewer independently reran36 targeted real-PG tests plus3 additional probes, allPASS. Implementer fullcheck3547PASS; after accepted04B1 merge, fresh combined fullcheck3576PASS, typecheck/build/securityPASS. No purger/test source changes followed review or combined verification; published-head CI certified the exact merged tree. [Implementation log](2026-10-30-slack-03b2b-message-content-purge.md).
+
+Accepted only the actual `chat_history_message/content` transactional eraser. It uses durable intent metadata, exact binding/epoch/revision/cutoff/version/fingerprint checks and common source/parent/artifact locks. Stale/newer/mismatched artifacts remain unresolved and are not overwritten. Unsupported selectors remain missing_handler. The handler does not claim/complete queue jobs or certify receipt closure. Runner/fencing/enumeration, other selectors, writer/read integration, general TTL sweep and fullF3/native/model acceptance remain open. Main and content flags unchanged.
