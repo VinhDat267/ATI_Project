@@ -8,4 +8,4 @@ Scope: one derived-only stage API, metadata fanout, native hook and real-PG test
 
 ## Kết quả
 
-Implementation complete; independent whole-branch review PASS with no actionable P1/P2/P3. Real-PG targeted47/47 and fullcheck3604PASS, exit0 (2026-10-30T10:39:52Z); reviewer reran33 focused PG tests and35 additional SQL/JavaScript hash parity cases. No product changes after review. Publication/base integration and exact-head CI remain pending; this is staging of derived obligations, not physical erasure or fullF3/F4. See the [evidence log](../log/2026-10-30-slack-03b2d-derived-policy-fanout.md).
+Implementation complete; independent whole-branch review PASS with no actionable P1/P2/P3. Real-PG targeted47/47 and initial fullcheck3604PASS, exit0 (2026-10-30T10:39:52Z); reviewer reran33 focused PG tests and35 additional SQL/JavaScript hash parity cases. Accepted208 integrated preserving both native hooks; combined fullcheck3637PASS, exit0 at11:06:36Z. Publication/exact-head CI remain pending; this stages derived obligations, not physical erasure or fullF3/F4. See the [evidence log](../log/2026-10-30-slack-03b2d-derived-policy-fanout.md).

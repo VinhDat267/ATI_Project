@@ -25,12 +25,12 @@ Files: modify `apps/chat-api/src/services/slack/slack-invalidation-service.ts` (
 
 Interfaces: `stageDerivedInTransaction(client,StageInTransactionInput):Promise<StageInTransactionResult>` stages cascade kinds only with its own hash domain; existing `stageInTransaction` unchanged. `SlackDerivedPolicyFanout(pool,invalidation).runOnce(limit=50):Promise<{staged:number}>` returns committed pairs only; idempotent duplicate stage may count handled but never inserts duplicate rows. Runner options `derivedPolicyFanout?:Pick<..., 'runOnce'>`, stat `derivedPolicyEpochsStaged` default0.
 
-- [ ] Write real-PG tests before product: raw source absent + existing immutable raw receipt, all four event types, exact old/equal/new provider/consent revisions, Unicode epoch hash and >2^53 revisions, concurrent workers/idempotency, rollback crash, >limit processed early pairs then later pending work, native no-content-config hook stages7 only. Missing/malformed epoch leaves no forged receipt.
-- [ ] Run new suite, expect RED missing fanout module/API.
-- [ ] Implement shared private stage core with derived-only hash domain/raw suppression; candidate SQL computes exact canonical-array hash, validates it against TypeScript, and stages per-pair atomic transactions. Native hook before message erasure, independent of flags.
-- [ ] Run new suite plus existing policy/invalidator/registry suites, expected PASS; typecheck/check and commit exact task files.
+- [x] Write real-PG tests before product: raw source absent + existing immutable raw receipt, all four event types, exact old/equal/new provider/consent revisions, Unicode epoch hash and >2^53 revisions, concurrent workers/idempotency, rollback crash, >limit processed early pairs then later pending work, native no-content-config hook stages7 only. Missing/malformed epoch leaves no forged receipt.
+- [x] Run new suite, expect RED missing fanout module/API.
+- [x] Implement shared private stage core with derived-only hash domain/raw suppression; candidate SQL computes exact canonical-array hash, validates it against TypeScript, and stages per-pair atomic transactions. Native hook before message erasure, independent of flags.
+- [x] Run new suite plus existing policy/invalidator/registry suites, expected PASS; typecheck/check and commit exact task files.
 
 ### Task 2: Review/publication
 
-- [ ] Fresh independent whole-branch review; one direct RED→GREEN fix pass if needed, full checks after source fixes.
+- [x] Fresh independent whole-branch review; one direct RED→GREEN fix pass if needed, full checks after source fixes.
 - [ ] Fill task/log, draft staging PR, require exact-head CI before staging integration. No main/live enable or fullF3/F4 claim.
