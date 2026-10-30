@@ -13,25 +13,12 @@ export type SlackProviderAuthCode = 'invalid_auth' | 'token_revoked' | 'token_ex
 export class SlackProviderError extends Error {
   constructor(readonly authenticationLost: boolean, readonly authCode: SlackProviderAuthCode = 'unknown') { super('SLACK_PROVIDER_FAILED'); }
 }
-export class SlackOAuthClient {
-  constructor(readonly config: SlackOAuthConfig, private fetchFn: typeof fetch = fetch) {}
-  authorizationUrl(state: string, team?: string): string {
-    const url = new URL(this.config.authorizationUrl);
-    const params: Record<string, string> = {
-      client_id: this.config.clientId,
-      redirect_uri: this.config.redirectUri,
-      state,
-      user_scope: SLACK_USER_SCOPES.join(','),
-    };
-    if (team && typeof team === 'string' && team.trim()) {
-      params.team = team.trim();
-    }
-    url.search = new URLSearchParams(params).toString();
-    return url.href;
-  }
-  private async call(method: string, body: URLSearchParams, signal: AbortSignal, token?: string): Promise<any> {
+/** Metadata verification does not require OAuth installation credentials. */
+export class SlackIdentityClient {
+  constructor(private readonly apiBaseUrl: string, private fetchFn: typeof fetch = fetch) {}
+  protected async call(method: string, body: URLSearchParams, signal: AbortSignal, token?: string): Promise<any> {
     try {
-      const response = await this.fetchFn(`${this.config.apiBaseUrl}/${method}`, { method: 'POST', redirect: 'error', signal,
+      const response = await this.fetchFn(`${this.apiBaseUrl}/${method}`, { method: 'POST', redirect: 'error', signal,
         headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body });
       const reader = response.body?.getReader();
       if (!reader) throw new Error();
@@ -58,6 +45,23 @@ export class SlackOAuthClient {
       throw new SlackProviderError(false);
     }
     if (data.team_id !== workspaceId || data.user_id !== actorId || data.bot_id) throw new SlackProviderError(true, 'identity_mismatch');
+  }
+}
+export class SlackOAuthClient extends SlackIdentityClient {
+  constructor(readonly config: SlackOAuthConfig, fetchFn: typeof fetch = fetch) { super(config.apiBaseUrl, fetchFn); }
+  authorizationUrl(state: string, team?: string): string {
+    const url = new URL(this.config.authorizationUrl);
+    const params: Record<string, string> = {
+      client_id: this.config.clientId,
+      redirect_uri: this.config.redirectUri,
+      state,
+      user_scope: SLACK_USER_SCOPES.join(','),
+    };
+    if (team && typeof team === 'string' && team.trim()) {
+      params.team = team.trim();
+    }
+    url.search = new URLSearchParams(params).toString();
+    return url.href;
   }
   async exchange(code: string, signal: AbortSignal): Promise<SlackGrant> {
     const data = await this.call('oauth.v2.access', new URLSearchParams({ client_id: this.config.clientId, client_secret: this.config.clientSecret, redirect_uri: this.config.redirectUri, code }), signal);
