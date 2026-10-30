@@ -29,6 +29,7 @@ import { SlackInvalidationRunner } from './services/slack/slack-invalidation-run
 import { SlackEventReceiptRepo } from './db/repositories/slack-event-receipt-repo.js';
 import { SlackIngressService } from './services/slack/slack-ingress-service.js';
 import { slackIngressEnv } from './config/slack-ingress-env.js';
+import { createSlackLifecycleRuntime } from './services/slack/slack-lifecycle-runtime.js';
 import { GmailOAuthClient } from './services/gmail/oauth-client.js';
 import { GmailTokenManager } from './services/gmail/token-manager.js';
 import { createGmailConnectionLookup, createMyCalendarConnectionLookup, createMySheetsConnectionLookup } from './services/gmail/connection-reference.js';
@@ -377,6 +378,10 @@ async function bootstrap() {
   const slackIngress = slackEventReceiptRepo
     ? { service: new SlackIngressService({ config: slackIngressConfig, repo: slackEventReceiptRepo }) }
     : undefined;
+  const slackLifecycleRuntime = createSlackLifecycleRuntime({
+    pool: pool ?? undefined, encryptionKey: env.ENCRYPTION_KEY, env: process.env, live: env.RUNTIME_MODE === 'live',
+    onError: (code) => console.warn('[chat-api]', code),
+  });
   if (slackIngressConfig && !slackIngress) {
     console.warn('\x1b[33m[chat-api] MYSLACK_ENABLED=on nhưng chưa có PostgreSQL: Slack signed ingress tạm tắt.\x1b[0m');
   }
@@ -454,14 +459,13 @@ async function bootstrap() {
     console.log(`\x1b[36m[chat-api] ✓ Health check: http://${host}:${port}/api/health\x1b[0m`);
     schedules?.runner.start();
     slackInvalidationRunner?.start();
+    slackLifecycleRuntime?.start();
   });
 
   const shutdown = async () => {
     schedules?.runner.stop();
     if (slackReceiptCleanupTimer) clearInterval(slackReceiptCleanupTimer);
-    if (slackInvalidationRunner) {
-      await slackInvalidationRunner.stop();
-    }
+    await Promise.all([slackInvalidationRunner?.stop(), slackLifecycleRuntime?.stop()]);
     process.exit(0);
   };
   process.once('SIGINT', shutdown);
