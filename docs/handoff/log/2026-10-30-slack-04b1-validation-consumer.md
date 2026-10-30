@@ -1,0 +1,9 @@
+# SLACK-04B1: credential validation consumer in progress
+
+Basec013933e, branch `feat/slack-04b1-lifecycle-validation`, reusing the isolated worktree after04A was completed/merged. No CLI implementer was launched. [Plan](../../superpowers/plans/2026-10-30-slack-04b1-lifecycle-validation.md) follows the frozen conservative ownership/probe contract. No runtime consumer or native acceptance is claimed yet.
+
+Task1 adds migration0020 and the private lifecycle validation lease repository. Only credential-validation intent types are claimed. Real PostgreSQL SKIP LOCKED claims assign unique worker/token ownership, reclaim expired leases and fence retry/completion; failed jobs keep the pending recovery metadata. Completion requires the caller transaction so its future barrier/status changes and job result commit together.
+
+Evidence: new test file initially RED due missing module; six real-PG tests now PASS, including concurrent claims, lease reclaim/stale-worker rejection, retry due-time filtering, transactional completion rollback, safe fixed error codes and expiry after waiting for a real row lock. The latter was RED (expired job incorrectly completed using an earlier caller timestamp), then GREEN after acquiring the row lock before a new statement checks `GREATEST(callerClock,clock_timestamp())`. Query ownership is rechecked after the wait. Typecheck passed. No network/model/provider calls were made by these repository tests.
+
+Task2 remains open: typed safe auth.test classification, bounded owner-gated worker, per-barrier ownership and binding/fingerprint/lease CAS, valid/invalid/unknown processing, real HTTP/PG race tests. Expiry/refresh ambiguity stays UNKNOWN and preserves encrypted config. Task3 independent whole-branch review/fullcheck/CI is also open. This branch must not be merged or marked complete from the six repository tests alone.
