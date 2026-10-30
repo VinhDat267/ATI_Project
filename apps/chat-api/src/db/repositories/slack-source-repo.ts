@@ -467,6 +467,13 @@ export class SlackSourceRepo {
           params.push(cleanTarget.revision);
           revClause = ` AND revision = $${params.length}`;
         }
+        if (cleanTarget.beforeRevision) {
+          params.push(cleanTarget.beforeRevision);
+          // Numeric is exact; a float would collapse distinct Slack timestamp revisions.
+          // Unknown/opaque revisions cannot prove freshness and are erased fail-closed.
+          revClause = ` AND CASE WHEN revision ~ '^[0-9]+([.][0-9]+)?$'
+                        THEN revision::numeric < $${params.length}::numeric ELSE true END`;
+        }
         query = `UPDATE slack_sources
                  SET untrusted_content = '', metadata = '{}'::jsonb, purged_at = now(),
                      tombstoned_at = COALESCE(tombstoned_at, now()), tombstone_reason = COALESCE(tombstone_reason, $1)

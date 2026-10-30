@@ -337,6 +337,11 @@ function assertPurgeTargetMatchesBarrier(
       if (!matchesResource && !matchesOwner) {
         throw new TypeError('resource barrier purgeTarget must target the same workspace/type/resource');
       }
+      if (purgeTarget.scope === 'resource_lifecycle' && purgeTarget.tombstoneReason === 'source_edited' &&
+          (barrier.deleted || !barrier.minValidRevision || !purgeTarget.beforeRevision ||
+           compareSlackRevisions(purgeTarget.beforeRevision, barrier.minValidRevision) !== 0)) {
+        throw new TypeError('edit purge cutoff must match the resource barrier watermark');
+      }
       return;
     }
 

@@ -26,6 +26,9 @@ import { SlackSourceRepo } from './db/repositories/slack-source-repo.js';
 import { SlackInvalidationService } from './services/slack/slack-invalidation-service.js';
 import { SlackPolicyEventConsumer } from './services/slack/slack-policy-event-consumer.js';
 import { SlackInvalidationRunner } from './services/slack/slack-invalidation-runner.js';
+import { SlackEventReceiptRepo } from './db/repositories/slack-event-receipt-repo.js';
+import { SlackIngressService } from './services/slack/slack-ingress-service.js';
+import { slackIngressEnv } from './config/slack-ingress-env.js';
 import { GmailOAuthClient } from './services/gmail/oauth-client.js';
 import { GmailTokenManager } from './services/gmail/token-manager.js';
 import { createGmailConnectionLookup, createMyCalendarConnectionLookup, createMySheetsConnectionLookup } from './services/gmail/connection-reference.js';
@@ -365,6 +368,19 @@ async function bootstrap() {
       })
     : undefined;
 
+  // Signed ingress is mounted whenever PostgreSQL is available. A missing Slack configuration
+  // leaves it mounted but fail-closed (503 CONFIG_MISSING), never silently acknowledging events.
+  const slackIngressConfig = slackIngressEnv(process.env, env.RUNTIME_MODE === 'live');
+  const slackEventReceiptRepo = pool && slackInvalidationService
+    ? new SlackEventReceiptRepo(pool, slackInvalidationService)
+    : undefined;
+  const slackIngress = slackEventReceiptRepo
+    ? { service: new SlackIngressService({ config: slackIngressConfig, repo: slackEventReceiptRepo }) }
+    : undefined;
+  if (slackIngressConfig && !slackIngress) {
+    console.warn('\x1b[33m[chat-api] MYSLACK_ENABLED=on nhưng chưa có PostgreSQL: Slack signed ingress tạm tắt.\x1b[0m');
+  }
+
   // 8. Express App
   const app = createApp({
     myslack: env.MYSLACK_OAUTH && pool && userRepo ? { oauth: env.MYSLACK_OAUTH, repo: new SlackConnectionRepo(pool, slackInvalidationService) } : undefined,
@@ -417,7 +433,20 @@ async function bootstrap() {
     slackSourceRepo,
     slackInvalidationService,
     slackInvalidationRunner,
+    slackIngress,
   });
+
+  // Receipts are body-free routing metadata kept for 7 days so Slack retries stay idempotent.
+  // Unfinished lifecycle validation keeps its receipt until resolved; durable barriers
+  // are independent of receipt cleanup.
+  const slackReceiptCleanupTimer = slackEventReceiptRepo
+    ? setInterval(() => {
+        void slackEventReceiptRepo.purgeExpiredReceipts(new Date()).catch((err) => {
+          console.warn('\x1b[33m[chat-api] Dọn receipt Slack thất bại:\x1b[0m', err?.message || err);
+        });
+      }, 6 * 60 * 60 * 1000)
+    : undefined;
+  slackReceiptCleanupTimer?.unref?.();
 
   const host = env.RUNTIME_MODE === 'sandbox' ? '127.0.0.1' : '0.0.0.0';
   app.listen(port, host, () => {
@@ -429,6 +458,7 @@ async function bootstrap() {
 
   const shutdown = async () => {
     schedules?.runner.stop();
+    if (slackReceiptCleanupTimer) clearInterval(slackReceiptCleanupTimer);
     if (slackInvalidationRunner) {
       await slackInvalidationRunner.stop();
     }

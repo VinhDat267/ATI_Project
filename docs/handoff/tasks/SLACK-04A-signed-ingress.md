@@ -369,6 +369,18 @@ git diff --check b757ae08 HEAD
 
 ## 7. Kết quả Thực thi (Dành cho Agent Thi công)
 
+### Runtime ingress — 30/10/2026
+
+Nền triển khai `612ac427` đã có source03B1 `23544be9` và read03C1 `390b1c54` được review độc lập. Code ingress gồm migration0019, repo receipt/intents, HMAC verifier, service, raw HTTP route và app/server wiring. Sau khi người dùng dừng CLI delegation, Codex trực tiếp tiếp quản và sửa các lỗi khóa,413/keepalive, flag lifecycle, cleanup job chưa xong và deadline DB toàn giao dịch.
+
+Kiểm thử trước review: **58/58 PASS trong7 files**, PostgreSQL riêng và HTTP local; gồm TokenManager refresh thật qua HTTP, held-lock của hai PG clients, trạng thái pg_stat_activity và trigger pg_sleep. Review độc lập tìm2P2: purge của edit đến muộn xóa nhầm bản mới và configNULL của một binding làm rollback các binding khác. Codex trực tiếp sửa, có RED→GREEN PostgreSQL và hợp đồng `beforeRevision` được giữ trên cả8 purge intents. Các quyết định và bằng chứng ghi tại [log implementation](../log/2026-10-30-slack-04a-ingress-implementation.md). Full check/CI của cây cuối đang chờ ghi kết quả.
+
+Sau sửa review: `npm run check` với PostgreSQL riêng55533 **exit0**, **3.451 tests PASS**, không bỏ qua test DB; typecheck/build/security đạt (`2026-10-30T02:41:12Z`). `git diff --check` exit0. CI đúng head là cổng riêng trước tích hợp; kết quả này chỉ xác nhận phần ingress đã mô tả.
+
+**Ranh giới còn mở:** ingress chỉ commit provisional read block + validation intent trướcACK; chưa chạy auth.test hay quyết định valid/invalid sauACK. Consumer04B và watermark6 chiều chưa triển khai; không đánh dấu AC6/AC7 hoàn tất, không tuyên bố native/F3 hoặc toàn bộSLACK-04A đã đóng. Lifecycle đã cấu hình vẫn hoạt động khi cả hai cờ content tắt. Cleanup chỉ xóa receipt cũ khi không còn lifecycle job pending/failed; metadata recovery tối thiểu giữ tới khi job xử lý xong.
+
+### Lịch sử lập kế hoạch (trước runtime)
+
 - **Phiên hiệu chỉnh tài liệu (Docs Correction):** Hoàn thành rà soát và khắc phục triệt để các mâu thuẫn kỹ thuật theo hướng dẫn thẩm định của coordinator:
   1. Áp dụng thiết kế thận trọng (conservative final design): official `tokens_revoked` chỉ cung cấp user IDs (không có grant generation ID); không đoán định thế hệ grant từ timestamp/userID. Dưới `withOwner(userId)`, bắt generation hiện tại, commit provisional read block qua 03B1 `stageInTransaction` trước ACK và giữ private `config` dưới `reconnect_required`; sau ACK probe `auth.test` có CAS guard; xác thực chính xác kịch bản old token revoke after newer grant.
   2. Đồng bộ khóa owner advisory lock (`withOwner(userId)`) của `SlackTokenManager` với các mutation trạng thái vòng đời: ingress sử dụng bounded try-lock acquisition (`pg_try_advisory_xact_lock` hoặc lock_timeout <= 2.000 ms) trả về HTTP 503 nhanh chóng khi lock bận, không chờ vô hạn quá deadline ACK 3s của Slack, tuyệt đối không fake 200 trước khi commit.

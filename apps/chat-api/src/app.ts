@@ -34,6 +34,7 @@ import type { GmailTokenManager } from './services/gmail/token-manager.js';
 import type { SlackSourceRepo } from './db/repositories/slack-source-repo.js';
 import type { SlackInvalidationService } from './services/slack/slack-invalidation-service.js';
 import type { SlackInvalidationRunner } from './services/slack/slack-invalidation-runner.js';
+import { createSlackEventsRouter, type SlackEventsRouterOptions } from './routes/slack-events.js';
 
 /** Gmail as each member's own connection (GMAIL_ENABLED). Absent or disabled: the routes do not exist. */
 export interface GmailAppOptions {
@@ -108,6 +109,8 @@ export interface AppOptions extends AdminUsersOptions {
   slackSourceRepo?: SlackSourceRepo;
   slackInvalidationService?: SlackInvalidationService;
   slackInvalidationRunner?: SlackInvalidationRunner;
+  /** Signed Slack Events API ingress. Undefined: the endpoint is not mounted. */
+  slackIngress?: SlackEventsRouterOptions;
 }
 
 export function createApp(options: AppOptions): Express {
@@ -141,6 +144,10 @@ export function createApp(options: AppOptions): Express {
     driveApiBaseUrl: options.mysheets.driveApiBaseUrl,
     pickerLimiter: options.mysheets.pickerLimiter,
   } : undefined;
+
+  // Slack signs the exact bytes it sends, so this router must see the raw stream before
+  // express.json() parses it and before the user-facing error rewrite can alter a response.
+  if (options.slackIngress) app.use(createSlackEventsRouter(options.slackIngress));
 
   app.use(express.json());
   app.use((_req, res, next) => {
