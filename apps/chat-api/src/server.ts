@@ -26,6 +26,7 @@ import { SlackSourceRepo } from './db/repositories/slack-source-repo.js';
 import { SlackInvalidationService } from './services/slack/slack-invalidation-service.js';
 import { SlackPolicyEventConsumer } from './services/slack/slack-policy-event-consumer.js';
 import { SlackInvalidationRunner } from './services/slack/slack-invalidation-runner.js';
+import { SlackMessagePurgeConsumer } from './services/slack/slack-message-purge-consumer.js';
 import { SlackEventReceiptRepo } from './db/repositories/slack-event-receipt-repo.js';
 import { SlackIngressService } from './services/slack/slack-ingress-service.js';
 import { slackIngressEnv } from './config/slack-ingress-env.js';
@@ -365,6 +366,7 @@ async function bootstrap() {
     ? new SlackInvalidationRunner(slackSourceRepo, slackInvalidationService, slackPolicyEventConsumer, {
         sweepIntervalMs: 5000,
         batchSize: 50,
+        messagePurgeConsumer: pool ? new SlackMessagePurgeConsumer(pool) : undefined,
       })
     : undefined;
 
