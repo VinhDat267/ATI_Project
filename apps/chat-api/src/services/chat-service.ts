@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type pg from 'pg';
-import type { MessageRepo } from '../db/repositories/message-repo.js';
+import { mergeSlackMessageContexts, slackMessageContext, type MessageRepo, type SlackMessageWriteContext } from '../db/repositories/message-repo.js';
+import { messageOutputSelectors, memoryOutputSelectors, messageSelectorValue, messageFingerprint } from './slack/slack-message-selectors.js';
 import type { ConversationRepo } from '../db/repositories/conversation-repo.js';
 import type { PlanRepo } from '../db/repositories/plan-repo.js';
 import type { ScheduleRepo } from '../db/repositories/schedule-repo.js';
@@ -405,10 +406,11 @@ export class ChatService {
    * With `memoryState`, `write` saves the working memory first.
    */
   private async prepareResponse(
-    target: { conversationId: string; userId: string; correlation: Correlation; schedule?: ScheduleView | null; memoryState?: unknown },
+    target: { conversationId: string; userId: string; correlation: Correlation; schedule?: ScheduleView | null; memoryState?: unknown; slackContext?: SlackMessageWriteContext; memorySelectors?: string[] },
     planned: PlannerResponse, memory: WorkingMemory, userTexts: string[], signal?: AbortSignal,
   ): Promise<PreparedResponse> {
     const { conversationId, correlation } = target;
+    if (target.slackContext && (planned.kind === 'plan' || planned.kind === 'schedule')) throw new Error('SLACK_CORE_ARTIFACT_GATE');
     let response = planned.kind === 'plan' ? await this.bindConnections(planned, target.userId, signal) : planned;
     signal?.throwIfAborted();
     let proposal: ScheduleProposalMetadata | null = null;
@@ -420,11 +422,16 @@ export class ChatService {
     let planId: string | null = null, messageId = '', labels: Record<string, string> = {};
     if (response.kind === 'plan') labels = resourceLabels(response, memory, userTexts);
 
-    const write = async (client?: pg.PoolClient) => {
+    const write = async (client?: pg.PoolClient): Promise<{planId: string | null}> => {
+      if (target.slackContext && !client) return this.msgRepo.inSlackTransaction(conversationId, target.slackContext, held => write(held), signal);
       // Without a client the repositories keep their own transactions, called exactly as before.
-      const save = (role: string, content: string, metadata: Record<string, unknown>) => client
-        ? this.msgRepo.createMessage(conversationId, role, content, metadata, client)
-        : this.msgRepo.createMessage(conversationId, role, content, metadata);
+      const save = (role: string, content: string, metadata: Record<string, unknown>) => {
+        if (target.slackContext) {
+          const selectors = metadata.type === 'working_memory' ? target.memorySelectors ?? [] : messageOutputSelectors({content,metadata});
+          if (selectors.length) return this.msgRepo.createSlackMessage(conversationId, role, content, metadata, { segments: target.slackContext.segments, selectors }, client, signal);
+        }
+        return client ? this.msgRepo.createMessage(conversationId, role, content, metadata, client) : this.msgRepo.createMessage(conversationId, role, content, metadata);
+      };
       if (target.memoryState !== undefined) await save('system', '', { type: 'working_memory', state: target.memoryState });
       if (response.kind === 'plan') {
         const planHash = createHash('sha256')
@@ -464,6 +471,8 @@ export class ChatService {
     };
 
     const announce = () => {
+      // No source-derived plaintext enters the replay cache. Re-open through guarded HTTP history.
+      if (target.slackContext) { emit('source_changed', { reload: true }); emit('agent_state', { state: 'idle' }); return; }
       if (response.kind === 'plan') {
         emit('plan_preview', { planId, plan: response, resourceLabels: labels });
         emit('agent_state', { state: 'waiting_for_approval' });
@@ -497,6 +506,7 @@ export class ChatService {
 
     // Retrieve previous messages for conversation context
     const previousMessages = await this.msgRepo.listMessages(conversationId);
+    const slackContext = mergeSlackMessageContexts(previousMessages);
     const lastMemory = [...previousMessages].reverse().find((m: any) => m.metadata?.type === 'working_memory');
     const history: ChatMessage[] = previousMessages
       .filter((m: any) => m.id !== currentMessageId && m.metadata?.type !== 'working_memory' &&
@@ -517,6 +527,8 @@ export class ChatService {
     if (lastMemory?.metadata?.state && typeof lastMemory.metadata.state === 'object') {
       memory.fromJSON(lastMemory.metadata.state);
     }
+    const previousState = structuredClone(memory.toJSON());
+    if (slackContext) await this.msgRepo.inSlackTransaction(conversationId, slackContext, async () => undefined, undefined, 'planning');
     const plannerResponse: PlannerResponse = await this.planner.processMessage({
       userMessage: content,
       history,
@@ -525,8 +537,15 @@ export class ChatService {
       onGatherEvent: (event) => this.eventEmitter.emit('gather_progress', { conversationId, ...event }),
       ...(schedule ? { schedule: { services: schedule.services } } : {}),
     });
-    await this.msgRepo.createMessage(conversationId, 'system', '', { type: 'working_memory', state: memory.toJSON() });
-    const prepared = await this.prepareResponse({ conversationId, userId, correlation, schedule }, plannerResponse, memory,
+    const memoryState = memory.toJSON();
+    let memorySelectors: string[] | undefined;
+    if (slackContext) {
+      const inherited = new Set(lastMemory ? slackMessageContext(lastMemory)?.selectors ?? [] : []);
+      memorySelectors = memoryOutputSelectors(memoryState).filter(selector => inherited.has(selector) ||
+        messageFingerprint(messageSelectorValue({content:'',metadata:{type:'working_memory',state:memoryState}}, 'working_memory_entity', selector),selector) !==
+        messageFingerprint(messageSelectorValue({content:'',metadata:{type:'working_memory',state:previousState}}, 'working_memory_entity', selector),selector));
+    }
+    const prepared = await this.prepareResponse({ conversationId, userId, correlation, schedule, memoryState, slackContext, memorySelectors }, plannerResponse, memory,
       [...history.filter(m => m.role === 'user').map(m => m.content), content]);
     await prepared.write();
     prepared.announce();

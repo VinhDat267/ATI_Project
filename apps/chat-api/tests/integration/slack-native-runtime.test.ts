@@ -168,6 +168,15 @@ it('actual server erases a durable registered message without any Slack config a
     const user = await env.addUser({ name: 'native-purge', workspaceId: `T${randomUUID()}`, actorId: `U${randomUUID()}` });
     await allowStorage(env, user.binding.workspaceId);
     const id = await registerMessage(env, user, 'Offline purge fixture');
+    const { MessageRepo } = await import('../../src/db/repositories/message-repo.js');
+    const registry = new SlackDerivedLineageRepo(env.db.pool, env.policyService);
+    const copy = (await env.db.pool.query('SELECT id FROM slack_derived_copies WHERE target_id=$1', [id])).rows[0];
+    const held = await env.db.pool.connect();
+    const segments = await registry.segmentsInTransaction(held, copy.id); held.release();
+    const convId = (await env.db.pool.query('SELECT conv_id FROM messages WHERE id=$1', [id])).rows[0].conv_id;
+    const memory = await new MessageRepo(env.db.pool, registry).createSlackMessage(convId, 'system', '',
+      { type: 'working_memory', state: { members: [{ id: 'SLACK', name: 'Private memory' }, { id: 'TRELLO', name: 'Keep' }] } },
+      { segments, selectors: ['state:/members#id=SLACK'] });
     const key = `native-disconnect:${randomUUID()}`;
     await env.stageBarriers([{
       effectKey: 'disconnect', barrier: { barrierType: 'binding', binding: user.binding, reason: 'disconnect' },
@@ -176,9 +185,11 @@ it('actual server erases a durable registered message without any Slack config a
     native = await startNative(env, false);
     await native.until(() => health(native!.url), 'health without Slack config');
     await native.until(async () => (await env.db.pool.query('SELECT content FROM messages WHERE id=$1', [id])).rows[0].content === unavailable, 'durable purge without Slack config');
+    await native.until(async () => JSON.stringify((await env.db.pool.query('SELECT metadata FROM messages WHERE id=$1', [memory.id])).rows[0]).includes('Private memory') === false, 'working memory purge without Slack config');
     const jobs = (await env.db.pool.query('SELECT target_kind,status FROM slack_invalidation_intents WHERE source_event_key=$1', [key])).rows;
-    expect(jobs.filter(row => row.status === 'completed').map(row => row.target_kind).sort()).toEqual(['chat_history_message', 'slack_source_raw']);
-    expect(jobs.filter(row => row.status === 'pending')).toHaveLength(6);
+    expect(jobs.filter(row => row.status === 'completed').map(row => row.target_kind).sort()).toEqual(['chat_history_message', 'slack_source_raw', 'working_memory_entity']);
+    expect(jobs.filter(row => row.status === 'pending')).toHaveLength(5);
+    expect((await env.db.pool.query('SELECT metadata FROM messages WHERE id=$1', [memory.id])).rows[0].metadata.state.members).toEqual([{ id: 'TRELLO', name: 'Keep' }]);
     expect(env.fixture.requests).toHaveLength(0);
     expect((await fetch(`${native.url}/api/slack/events`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(1000) })).status).toBe(503);
   } finally {

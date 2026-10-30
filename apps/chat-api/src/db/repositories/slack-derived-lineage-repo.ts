@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import type pg from 'pg';
 import {
   formatSlackOwnerSourceKey, sameSlackBinding, sameSlackPolicyEpoch, slackPolicyRefToEpoch,
@@ -10,6 +9,7 @@ import {
   acquireSlackInvalidationLocks, checkSlackInvalidationBarriers, slackSourceWriteLockKeys,
 } from '../../services/slack/slack-invalidation-service.js';
 import { isUuid } from './uuid.js';
+import { messageFingerprint as fingerprint, messageSelectorValue, validateMessageSelector } from '../../services/slack/slack-message-selectors.js';
 
 /** Private server acquisition context, never HTTP/model-supplied lineage. */
 export interface DerivedSegmentInput {
@@ -44,7 +44,6 @@ export type DerivedAccessDecision = { status: 'allowed' } | {
 };
 const TOMBSTONE = 'Slack content is unavailable.';
 const DAY = 86_400_000;
-const fingerprint = (value: string) => createHash('sha256').update(value, 'utf8').digest('hex');
 function deny(reason: string): never { throw new Error(reason); }
 function version(value: unknown): string {
   if (typeof value !== 'string' || !/^[1-9][0-9]{0,18}$/.test(value) ||
@@ -53,7 +52,7 @@ function version(value: unknown): string {
 }
 function validateTarget(target: Target): void {
   if (!isUuid(target.atiUserId) || !isUuid(target.targetId)) deny('invalid_target');
-  if (target.targetKind !== 'chat_history_message' || target.targetSubId !== 'content') deny('unsupported_target');
+  validateMessageSelector(target.targetKind, target.targetSubId);
 }
 function cleanSegment(input: DerivedSegmentInput, owner: string): DerivedSegmentInput {
   if (!input || typeof input !== 'object') deny('invalid_segment');
@@ -103,7 +102,7 @@ function fromRow(row: any): DerivedSegmentInput {
     ...(row.channel_id ? { channelId: row.channel_id } : {}), ...(row.raw_source_id ? { rawSourceId: row.raw_source_id } : {}) };
 }
 
-/** First concrete selector only. Other artifacts remain denied until their handlers exist. */
+/** Message and working-memory selectors. Other artifact families remain fail-closed. */
 export class SlackDerivedLineageRepo {
   constructor(private readonly pool: pg.Pool, private readonly policy: Pick<SlackPolicyService, 'resolveSlackModelPolicy'>) {}
 
@@ -129,7 +128,7 @@ export class SlackDerivedLineageRepo {
   }
 
   private async lockTarget(client: pg.PoolClient, target: Target, write: boolean,
-    segments: DerivedSegmentInput[], purpose?: AssertDerivedCopyAllowedInput['consumerPurpose']): Promise<string> {
+    segments: DerivedSegmentInput[], purpose?: AssertDerivedCopyAllowedInput['consumerPurpose']): Promise<unknown> {
     const found = (await client.query('SELECT conv_id FROM messages WHERE id=$1', [target.targetId])).rows[0];
     if (!found) deny('not_found');
     const mode = write ? 'UPDATE' : 'SHARE';
@@ -138,9 +137,9 @@ export class SlackDerivedLineageRepo {
     if (conversation.rowCount !== 1) deny('unauthorized_caller');
     await this.authorize(client, segments, purpose);
     // Parent first; re-read the concrete artifact under its own lock after the parent.
-    const message = (await client.query(`SELECT conv_id,content FROM messages WHERE id=$1 FOR ${mode}`, [target.targetId])).rows[0];
+    const message = (await client.query(`SELECT conv_id,content,metadata FROM messages WHERE id=$1 FOR ${mode}`, [target.targetId])).rows[0];
     if (!message || message.conv_id !== found.conv_id) deny('stale_lineage');
-    return message.content;
+    return messageSelectorValue(message, target.targetKind, target.targetSubId);
   }
 
   private async authorize(client: pg.PoolClient, segments: DerivedSegmentInput[], purpose?: AssertDerivedCopyAllowedInput['consumerPurpose']): Promise<void> {
@@ -181,17 +180,38 @@ export class SlackDerivedLineageRepo {
     await this.lockTarget(client, input, true, segments);
   }
 
+  /** Whole source union before any conversation/artifact locks, including new artifacts. */
+  async prepareConversationWriteInTransaction(client: pg.PoolClient, convId: string, atiUserId: string,
+    inputs: DerivedSegmentInput[], purpose?: AssertDerivedCopyAllowedInput['consumerPurpose']): Promise<void> {
+    if (!isUuid(convId) || !isUuid(atiUserId) || inputs.length === 0 || inputs.length > 256) deny('invalid_target');
+    const segments = inputs.map(s => cleanSegment(s, atiUserId));
+    await this.requireTransaction(client);
+    await this.lockSources(client, segments);
+    if ((await client.query('SELECT id FROM conversations WHERE id=$1 AND user_id=$2 FOR UPDATE', [convId, atiUserId])).rowCount !== 1) deny('unauthorized_caller');
+    await this.authorize(client, segments, purpose);
+  }
+
+  async lockSegmentsInTransaction(client: pg.PoolClient, inputs: DerivedSegmentInput[], owner: string): Promise<void> {
+    await this.requireTransaction(client);
+    await this.lockSources(client, inputs.map(s => cleanSegment(s, owner)));
+  }
+
+  async segmentsInTransaction(client: pg.PoolClient, copyId: string): Promise<DerivedSegmentInput[]> {
+    return (await client.query('SELECT * FROM slack_derived_provenance_segments WHERE derived_copy_id=$1 ORDER BY segment_index', [copyId])).rows.map(fromRow);
+  }
+
   async registerDerivedCopyInTransaction(client: pg.PoolClient, input: RegisterDerivedCopyInput): Promise<Copy> {
     const segments = this.normalize(input);
     await this.requireTransaction(client);
     await this.lockSources(client, segments);
     const content = await this.lockTarget(client, input, true, segments);
+    if (content === undefined) deny('not_found');
     await client.query(`UPDATE slack_derived_copies SET status='retired',retired_at=statement_timestamp(),
       retired_reason='superseded',updated_at=statement_timestamp() WHERE ati_user_id=$1 AND target_kind=$2
       AND target_id=$3 AND target_sub_id=$4 AND status='active'`,
     [input.atiUserId, input.targetKind, input.targetId, input.targetSubId]);
     const row = (await client.query(`INSERT INTO slack_derived_copies(ati_user_id,target_kind,target_id,target_sub_id,target_fingerprint)
-      VALUES($1,$2,$3,$4,$5) RETURNING *`, [input.atiUserId,input.targetKind,input.targetId,input.targetSubId,fingerprint(content)])).rows[0];
+      VALUES($1,$2,$3,$4,$5) RETURNING *`, [input.atiUserId,input.targetKind,input.targetId,input.targetSubId,fingerprint(content,input.targetSubId)])).rows[0];
     for (const [index,s] of segments.entries()) {
       const b = s.sourceRef.binding, p = s.storagePolicyRef, a = s.acquisitionPolicyRef;
       await client.query(`INSERT INTO slack_derived_provenance_segments(derived_copy_id,segment_index,capture_hash,
@@ -236,7 +256,12 @@ export class SlackDerivedLineageRepo {
     });
   }
 
-  private async assertInTransaction(input: AssertDerivedCopyAllowedInput): Promise<DerivedAccessDecision> {
+  async assertDerivedCopyAllowedInTransaction(client: pg.PoolClient, input: AssertDerivedCopyAllowedInput): Promise<DerivedAccessDecision> {
+    await this.requireTransaction(client);
+    return this.assertInTransaction(input, client);
+  }
+
+  private async assertInTransaction(input: AssertDerivedCopyAllowedInput, heldClient?: pg.PoolClient): Promise<DerivedAccessDecision> {
     let client: pg.PoolClient | undefined;
     try {
       if (input.signal?.aborted) deny('aborted');
@@ -245,9 +270,8 @@ export class SlackDerivedLineageRepo {
       validateTarget(target);
       const expected = version(input.expectedTargetVersion);
       if (!['manual_lookup','triage','planning','digest'].includes(input.consumerPurpose)) deny('invalid_purpose');
-      client = await this.pool.connect();
-      await client.query('BEGIN');
-      await client.query("SET LOCAL statement_timeout='5s'");
+      client = heldClient ?? await this.pool.connect();
+      if (!heldClient) { await client.query('BEGIN'); await client.query("SET LOCAL statement_timeout='5s'"); }
       const first = await this.getActiveCopyInTransaction(client, target);
       if (!first || first.targetVersion !== expected) deny('version_mismatch');
       const rows = (await client.query('SELECT * FROM slack_derived_provenance_segments WHERE derived_copy_id=$1 ORDER BY segment_index', [first.derivedCopyId])).rows;
@@ -258,19 +282,20 @@ export class SlackDerivedLineageRepo {
       const content = await this.lockTarget(client, target, false, segments, input.consumerPurpose);
       const current = await this.getActiveCopyInTransaction(client, target);
       if (!current || current.derivedCopyId !== first.derivedCopyId || current.targetVersion !== expected) deny('version_mismatch');
-      if (fingerprint(content) !== current.targetFingerprint) deny('stale_lineage');
+      if (fingerprint(content,input.targetSubId) !== current.targetFingerprint) deny('stale_lineage');
       for (const r of rows) {
         if (r.expires_at.getTime() <= Date.now() || r.expires_at.getTime() > r.captured_at.getTime() + r.effective_retention_days * DAY ||
             r.owner_source_key !== formatSlackOwnerSourceKey(fromRow(r).sourceRef)) deny('retention_expired');
       }
+      await this.authorize(client, segments, input.consumerPurpose);
       if (input.signal?.aborted) deny('aborted');
-      await client.query('COMMIT');
+      if (!heldClient) await client.query('COMMIT');
       return { status: 'allowed' };
     } catch (error) {
-      if (client) await client.query('ROLLBACK').catch(() => {});
+      if (client && !heldClient) await client.query('ROLLBACK').catch(() => {});
       const reasons = new Set(['version_mismatch','unsupported_target','unauthorized_caller','not_found','empty_segments',
         'retention_expired','policy_changed','blocked_by_barrier','stale_lineage','aborted']);
       return { status: 'blocked', reason: error instanceof Error && reasons.has(error.message) ? error.message : 'stale_lineage', tombstone: TOMBSTONE };
-    } finally { client?.release(); }
+    } finally { if (!heldClient) client?.release(); }
   }
 }
