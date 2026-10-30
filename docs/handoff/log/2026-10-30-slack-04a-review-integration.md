@@ -1,0 +1,9 @@
+# SLACK-04A: bounded ingress review and staging integration
+
+Accepted [PR202](https://github.com/VinhDat267/ATI_Project/pull/202) at `6d0e82af878254966966ca1f0d8931a162c39c4c` for the signed-ingress boundary. [CI40993257986](https://github.com/VinhDat267/ATI_Project/actions/runs/40993257986) succeeded at that exact head, including full check and browser. Merge into `integration/slack-personal-20261029`: `3770f261c4ba1e1abaa90f2fc4411cb8b32ce2ad`.
+
+Independent read-only review initially returned NEEDS WORK: late edit purge erased newer captures; a NULL-config generation prevented other bindings from being fenced. Both were fixed directly and observed RED→GREEN on real PostgreSQL. The queued edit purge now carries an exact exclusive `beforeRevision` through raw and all seven derived intents. Credentialless local generations receive their own durable generation fence/purge; credentialed generations retain provisional barriers and validation jobs. Regrant generation2 remains outside generation1's barrier.
+
+Final local `npm run check` used isolated review PostgreSQL55533 and passed **3,451 tests**, exit0 (`2026-10-30T02:41:12Z`), plus typecheck/build/security. No DB skips. Regression suites include actual owner-lock refresh contention via HTTP, two-client source lock ordering, pool acquisition/cumulative statement deadlines, and cleanup of completed receipts while retaining pending recovery jobs. `git diff --check` exit0. Evidence and contract rulings are in [implementation log](2026-10-30-slack-04a-ingress-implementation.md).
+
+Acceptance is bounded:04B credential validation/auth.test/CAS and complete watermark fanout remain open, as do derived consumers, executor/routing, Inbox/modes and native/model acceptance. A queued purge is not proof of seven-kind physical erasure. Content flags remain off. This staging integration does not merge to main or close the Slack feature.
