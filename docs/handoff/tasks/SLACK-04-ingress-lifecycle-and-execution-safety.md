@@ -1,12 +1,12 @@
 # SLACK-04 · Ingress Ký số, Phân phối Quyền và An toàn Thực thi
 
-**Trạng thái:** DỰ THẢO KẾ HOẠCH (Chờ Reviewer & Nhóm trưởng duyệt; chưa thực thi code).
+**Trạng thái:** ĐANG TRIỂN KHAI MỘT PHẦN trên staging:04A ingress,04B1 validation và04B2 native runtime đã accepted; authorization fanout/sáu watermark, rotation recovery,04C và fullF4 vẫn mở. [Ma trận tiến độ và cổng nghiệm thu](../SLACK-DELIVERY.md) giữ trạng thái hiện tại; các phần dưới giữ yêu cầu thiết kế.
 **Nhánh dự kiến:** `feat/slack-04-ingress-lifecycle-and-execution-safety`.
 **Nền đối chiếu:** `fc12e3fb` (sau merge SLACK-01 #183).
 **Phụ thuộc:**
 - **SLACK-01** (Foundation contracts & HTTP fixture) — ĐÃ HOÀN TẤT (`fc12e3fb`).
-- **SLACK-02 (Đối chiếu Ứng viên PR 184):** Draft PR 184 cung cấp bảng `slack_connections`. Card này yêu cầu phương thức tra cứu an toàn `getConnectionForUser(atiUserId, connectionId)`. Lưu ý: PR 184 đang được review độc lập, chưa pass; nếu DB connection repository thay đổi thì adapter interface sẽ cập nhật tương ứng.
-- **SLACK-03C** (Nhóm phương thức đọc cốt lõi `conversations` + `users` hoàn tất) — ĐỦ ĐIỀU KIỆN BẮT ĐẦU (Không cần chờ toàn bộ API của 03D/03E).
+- **SLACK-02:** Backend/consent/UI đã accepted staging; tra cứu phải ràng buộc ATI owner, binding và version theo contract hiện hành. Không dùng trạng thái ứng viên PR184 cũ làm gate.
+- **03A/03B1 và connection contracts** mở khóa ingress/metadata lifecycle; không cần chờ toàn03C. Phần read core03C1 đã accepted riêng. Write dispatch của03C/03B3 phải chờ04C.
 **Đặc tả chuẩn tắc:** [Slack cá nhân và trợ lý công việc](../../superpowers/specs/2026-10-28-slack-personal-oauth-design.md) (Mục 5, 8, 9.1, 9.2).
 **Kế hoạch chi tiết:** [Slack Remaining Delivery Plan](../../superpowers/plans/2026-10-29-slack-remaining-delivery.md).
 
@@ -17,7 +17,7 @@
 Card này xây dựng hạ tầng tiếp nhận sự kiện thời gian thực từ Slack Events API qua webhook HTTPS ký số, giải quyết bài toán phân phối quyền (Authorizations Fanout) qua app-level token, đảm bảo an toàn thực thi tuyệt đối (chống lặp vô tận bằng Echo Guard, trạng thái UNKNOWN không retry mù), và duy trì vòng đời dữ liệu độc lập với cờ tính năng (F4).
 
 ### Ranh giới nghiệp vụ cốt lõi:
-1. **Khởi động sớm:** SLACK-04 được triển khai ngay sau khi nhóm phương thức đọc cốt lõi (03C) hoàn tất; không phải chờ đợi các nhóm phương thức phụ của 03D/03E.
+1. **Thứ tự phụ thuộc:** ingress/metadata lifecycle làm sớm khi contracts sẵn sàng; read integration đi theo gate nguồn của03B2/03B3/03B4.04C phải đạt trước write dispatch. Không có gate “hoàn tất mọi03 rồi mới04”; xem các mốc trong ma trận.
 2. **Ký số & Raw Body:** Xác thực chữ ký `X-Slack-Signature` và timestamp freshness (< 300s) trực tiếp trên raw buffer trong bộ nhớ trước khi phân tích cú pháp JSON.
 3. **Quy tắc ACK và Lưu trữ Bền vững (Step 04A Invariant):**
    - TUYỆT ĐỐI KHÔNG gửi ACK `{ ok: true }` cho các sự kiện yêu cầu xử lý công việc TRƯỚC KHI receipt và queue job đã được ghi nhận bền vững vào DB.
