@@ -53,7 +53,14 @@ export class SlackPolicyService {
     private readonly runtimeConfig?: SlackPolicyRuntimeConfig
   ) {}
 
-  async resolveSlackModelPolicy(input: ResolveSlackModelPolicyInput): Promise<SlackPolicyDecision> {
+  /** Pass the caller's query client when authority rows are locked in its transaction.
+   * Reusing that client avoids a second pool checkout and keeps every policy read
+   * in the same transaction. Decorators must forward the query client as well.
+   */
+  async resolveSlackModelPolicy(
+    input: ResolveSlackModelPolicyInput,
+    db: Pick<pg.Pool | pg.PoolClient, 'query'> = this.pool,
+  ): Promise<SlackPolicyDecision> {
     const deny = (reason: SlackPolicyBlockReason): SlackPolicyDecision => ({ allowed: false, reason });
 
     let validBinding: SlackBinding;
@@ -76,7 +83,7 @@ export class SlackPolicyService {
     }
 
     // 1. Verify connection and identity binding against real DB
-    const connRes = await this.pool.query(
+    const connRes = await db.query(
       `SELECT c.id, c.user_id, c.workspace_id, c.actor_id, c.identity_version, c.status, u.status AS user_status
        FROM slack_connections c
        JOIN users u ON u.id = c.user_id
@@ -111,7 +118,7 @@ export class SlackPolicyService {
     }
 
     // 3. Query trusted provider in DB
-    const providerRes = await this.pool.query(
+    const providerRes = await db.query(
       'SELECT * FROM slack_trusted_providers WHERE id = $1',
       [runtimeProvider.providerId]
     );
@@ -131,7 +138,7 @@ export class SlackPolicyService {
     }
 
     // 4. Query organization processing consent in DB
-    const consentRes = await this.pool.query(
+    const consentRes = await db.query(
       'SELECT * FROM slack_processing_consents WHERE workspace_id = $1 AND provider_id = $2',
       [validBinding.workspaceId, runtimeProvider.providerId]
     );
