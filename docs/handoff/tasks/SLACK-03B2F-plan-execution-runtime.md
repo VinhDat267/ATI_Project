@@ -8,15 +8,15 @@ Owner: Backend, `apps/chat-api/`, `db/v3/0022_*`; repository/runtime plan/card a
 
 Acceptance:
 
-- [ ] Actual chat plan+preview/message and plan/step/output writers register in the same transaction; invalidation during model/provider await cannot publish stale source text.
-- [ ] PlanRepo/StepRepo readers, approval/recovery and each adapter dispatch guard current versions/fingerprints/policy/barriers and owner; SSE never caches source-derived execution content.
-- [ ] Plan fields/selected labels, step args/output/error physically erased by fenced native consumers with flags off; stale generation/CAS/cutoff fail closed; unrelated user/service label survives.
-- [ ] Source plan invalidation marks pending superseded/in-flight failed; affected schedule_run references are discarded without retaining source content.
-- [ ] Real PostgreSQL rollback/concurrency, HTTP fixture dispatch/readback and cancellation regressions; focused tests; freeze then fullcheck and one read-only independent whole-branch review.
+- [x] Actual chat plan+preview/message and plan/step/output writers register in the same transaction; invalidation during model/provider await cannot publish stale source text.
+- [x] PlanRepo/StepRepo readers, approval/recovery and each adapter dispatch guard current versions/fingerprints/policy/barriers and owner; SSE never caches source-derived execution content.
+- [x] Plan fields/selected labels, step args/output/error physically erased by fenced native consumers with flags off; stale generation/CAS/cutoff fail closed; unrelated user/service label survives.
+- [x] Source plan invalidation marks pending superseded/in-flight failed; affected schedule_run references are discarded without retaining source content.
+- [x] Real PostgreSQL rollback/concurrency, HTTP fixture dispatch/readback and cancellation regressions; focused tests; freeze then fullcheck and one read-only independent whole-branch review.
 - [ ] Exact-head CI check/browser before staging merge, compare merge tree and record acceptance.
 
 Schedule artifact lifecycle, full legacy backfill/derived TTL cascade, public read03B3/03B4,04C/modes/Inbox/native/fullF3 remain open. Future proposal/digest kinds stay unsupported.
 
 ## Kết quả
 
-In progress. No code/integration/native acceptance yet.
+Code and internal fixture flow verified at frozen `5c2f7a91a2f762b64d56e80eebf5dfd365f1e304`: fullcheck3681PASS, exit0, typecheck/build/securityPASS. Independent whole-branch audit found twoP2, both fixed with real regressions/omission mutations; final exact-head fix verification PASS,76/76 tests, no actionableP1/P2/P3. Actual ChatService→PlanRepo→approval→HTTP fixture→StepRepo and guarded snapshots work; native bootstrap erases plan/step/audit with flags/config absent. [Evidence, original failures and limits](../log/2026-10-31-slack-03b2f-plan-execution-runtime.md). Staging publication gate remains pending; no native Slack acceptance, fullM2/F3/F4 or public Slack dispatch claim.
