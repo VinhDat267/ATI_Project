@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import pg from 'pg';
-import {fixtureConversation,fixtureMessage} from './persisted-artifacts.fixture.js';
+import {fixtureConversation,fixtureMessage,certifyFixturePlan} from './persisted-artifacts.fixture.js';
 import { createHash } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 
@@ -50,6 +50,7 @@ for(const width of [1440,375]) for(const theme of ['light','dark'] as const) {
         const states=moment===7?['succeeded','succeeded','failed','pending']:moment===9?['succeeded','succeeded','pending','pending']:['succeeded','succeeded','succeeded','unknown'];
         const text=JSON.stringify(plan);const planId=(await db.query("INSERT INTO plans(conv_id,plan_json,plan_text,plan_hash,status,expires_at,decided_at) VALUES($1,$2::jsonb,$3,$4,$5,now()+interval '30 minutes',now()) RETURNING id",[id,text,text,createHash('sha256').update(text).digest('hex'),status])).rows[0].id;
         for(const [index,step] of plan.steps.entries()) await db.query("INSERT INTO execution_steps(plan_id,step_id,tool,args_json,status,output_json,error_json,requested_by,duration_ms) VALUES($1,$2,$3,$4::jsonb,$5,$6::jsonb,$7::jsonb,$8,$9)",[planId,step.id,step.tool,JSON.stringify(step.args),states[index],index===0?JSON.stringify({id:'card',url:'https://trello.com/c/sample-auth-fix',title:'Sửa lỗi đăng nhập'}):index===1?JSON.stringify({number:42,html_url:'https://github.com/org/ati-test/issues/42'}):null,states[index]==='failed'?JSON.stringify({message:'Google Sheets từ chối ghi vì ATI chưa có quyền chỉnh sửa bảng tính ATI Test Tracker.'}):null,owner,index<2?250:null]);
+        await certifyFixturePlan(db,planId);
         await page.goto(`/c/${id}`);const stage=page.locator(`#moment-${moment}`);await expect(stage).toBeVisible();
         await expect(page.locator('textarea:visible')).toHaveCount(1);
         const overflow=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,viewport:innerWidth}));expect(overflow.scroll).toBeLessThanOrEqual(overflow.viewport);

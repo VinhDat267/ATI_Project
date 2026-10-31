@@ -1,6 +1,6 @@
 import { test, expect, type Page, type TestInfo } from '@playwright/test';
 import pg from 'pg';
-import {fixtureConversation,fixtureMessage} from './persisted-artifacts.fixture.js';
+import {fixtureConversation,fixtureMessage,certifyFixturePlan} from './persisted-artifacts.fixture.js';
 import { createHash } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 
@@ -24,8 +24,9 @@ async function seed(page: Page, pending = false, longURL = false, resultURL?: st
     const oldId=await insert(old,'completed');
     const url=resultURL ?? (longURL?'https://github.com/VinhDat267/ATI_Project/issues/12345':'https://github.com/ati/test/issues/42');
     await db.query("INSERT INTO execution_steps(plan_id,step_id,tool,args_json,status,output_json,requested_by,started_at,completed_at,duration_ms) VALUES($1,'step_1','github.create_issue',$2::jsonb,'succeeded',$3::jsonb,$4,now()-interval '3 seconds',now(),3000)",[oldId,JSON.stringify(old.steps[0].args),JSON.stringify({id:'old-issue',number:42,title:'Old issue',url,repo:'VinhDat267/ATI_Project'}),owner]);
+    await certifyFixturePlan(db,oldId);
     let newId;
-    if(pending) newId=await insert({kind:'plan',summary:'NEW pending plan',steps:[{id:'step_1',tool:'slack.send_message',description:'NEW operation: send a message',args:{channel:'#general',text:'New content'}}]},'pending');
+    if(pending){newId=await insert({kind:'plan',summary:'NEW pending plan',steps:[{id:'step_1',tool:'slack.send_message',description:'NEW operation: send a message',args:{channel:'#general',text:'New content'}}]},'pending');await certifyFixturePlan(db,newId);}
     await page.goto(`/c/${convId}`); await expect(page.getByRole('region',{name:/Cockpit|Tôi sẽ làm|Đang thực hiện công việc|Đã xong/})).toHaveAttribute('data-moment',pending?'4':'6');
     return {convId,oldId,newId};
   } finally { await db.end(); }

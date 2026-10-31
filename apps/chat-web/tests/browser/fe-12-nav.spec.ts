@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import pg from 'pg';
-import {fixtureConversation,fixtureMessage} from './persisted-artifacts.fixture.js';
+import {fixtureConversation,fixtureMessage,certifyFixturePlan} from './persisted-artifacts.fixture.js';
 import { hashPassword } from '../../../chat-api/src/db/repositories/user-repo.js';
 
 const TABS = [
@@ -55,7 +55,8 @@ async function seedPlanWithManyMessages(db: pg.Pool, userId: string, request: st
   await fixtureMessage(db,id,'user',request);
   const plan = { kind: 'plan', summary: 'FE12 kế hoạch chờ duyệt', steps: [{ id: 'step_1', tool: 'slack.send_message', description: 'Báo Slack', args: { channel: '#ati-test', text: 'FE12' } }], warnings: [] };
   const text = JSON.stringify(plan);
-  await db.query("INSERT INTO plans(conv_id,plan_json,plan_text,plan_hash,status,expires_at) VALUES($1,$2::jsonb,$3,$4,'pending',now()+interval '30 minutes')", [id, text, text, createHash('sha256').update(text).digest('hex')]);
+  const planId=(await db.query("INSERT INTO plans(conv_id,plan_json,plan_text,plan_hash,status,expires_at) VALUES($1,$2::jsonb,$3,$4,'pending',now()+interval '30 minutes') RETURNING id", [id, text, text, createHash('sha256').update(text).digest('hex')])).rows[0].id;
+  await certifyFixturePlan(db,planId);
   return id as string;
 }
 type Box = { left: number; right: number; top: number; bottom: number };
@@ -167,6 +168,7 @@ test('FE-12: a long request without spaces wraps in every cockpit moment and nev
         const error = status === 'failed' ? { message: 'Slack từ chối gửi tin nhắn.' } : null;
         await db.query('INSERT INTO execution_steps(plan_id,step_id,tool,args_json,status,output_json,error_json,requested_by,duration_ms) VALUES($1,$2,$3,$4::jsonb,$5,$6::jsonb,$7::jsonb,$8,$9)', [planId, step.id, step.tool, JSON.stringify(step.args), status, output && JSON.stringify(output), error && JSON.stringify(error), user.id, 250]);
       }
+      await certifyFixturePlan(db,planId);
       seeded.push({ moment: entry.moment, conversation });
     }
     for (const width of [375, 1024]) {

@@ -1,6 +1,6 @@
 import { test,expect } from '@playwright/test';
 import pg from 'pg';
-import {fixtureConversation,fixtureMessage} from './persisted-artifacts.fixture.js';
+import {fixtureConversation,fixtureMessage,certifyFixturePlan} from './persisted-artifacts.fixture.js';
 import { createHash } from 'node:crypto';
 
 for(const width of [1440,375]) for(const theme of ['light','dark'] as const) {
@@ -18,6 +18,7 @@ for(const width of [1440,375]) for(const theme of ['light','dark'] as const) {
       const text=JSON.stringify(plan);
       const id=(await db.query("INSERT INTO plans(conv_id,plan_json,plan_text,plan_hash,status,expires_at) VALUES($1,$2::jsonb,$2,$3,'pending',now()+interval '30 minutes') RETURNING id",[conv,text,createHash('sha256').update(text).digest('hex')])).rows[0].id;
       for(const [i,step] of plan.steps.entries()) await db.query("INSERT INTO execution_steps(plan_id,step_id,tool,args_json,status,output_json,requested_by,duration_ms,started_at,completed_at) VALUES($1,$2,$3,$4::jsonb,$5,$6::jsonb,$7,$8,now()-interval '1 second',CASE WHEN $5='succeeded' THEN now() ELSE NULL END)",[id,step.id,step.tool,JSON.stringify(step.args),i?'running':'succeeded',JSON.stringify(i?{number:999,url:'https://slack.com/app_redirect?channel=general'}:{number:42,url:'https://github.com/owner/repo/issues/42'}),owner,i?7:1200]);
+      await certifyFixturePlan(db,id);
       await page.goto(`/c/${conv}`);await expect(page.locator('#moment-4')).toBeVisible();await expect(page.locator('textarea:visible')).toHaveCount(0);
       const historyOpener=page.getByRole('button',{name:'Mở danh sách hội thoại'});await historyOpener.click();
       const history=page.getByRole('dialog',{name:'Lịch sử yêu cầu'});
