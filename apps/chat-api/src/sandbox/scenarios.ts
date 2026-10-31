@@ -2,6 +2,15 @@ import { MockLLMProvider } from '@wap/planner';
 
 export function createSandboxProvider(scenario?: string) {
   const mockProvider = new MockLLMProvider();
+  if(scenario==='slack_read'){
+    mockProvider.generatePlan=async input=>{
+      const content=input.conversationHistory.at(-1)?.content??'';
+      const history=content.includes('C_FIXTURE');
+      return JSON.stringify({kind:'plan',thinking:'Read only after approval',summary:history?'Đọc tin Slack bạn chọn':'Liệt kê kênh Slack',warnings:[],
+        steps:[{id:'step_1',tool:history?'myslack.conversations_history':'myslack.conversations_list',description:history?'Đọc10tin ở kênh C_FIXTURE':'Liệt kê kênh',args:history?{channel:'C_FIXTURE',limit:10}:{limit:10},dependsOn:[]}]});
+    };
+    return mockProvider;
+  }
   if (scenario === 'gmail') {
     const responses = [
       { kind: 'search', calls: [{ tool: 'gmail.search_threads', args: { query: 'Họp nhóm ATI', limit: 10 } }] },

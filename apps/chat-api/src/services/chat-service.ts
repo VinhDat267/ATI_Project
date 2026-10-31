@@ -12,6 +12,7 @@ import { resourceLabels } from './resource-labels.js';
 import { nextRuns } from './schedules/next-occurrence.js';
 import { runMessage, type PreparedRun, type RunToPlan } from './schedules/schedule-runner.js';
 import { resolveRef } from '@wap/executor';
+import type { SlackReadProposalService } from './slack/slack-read-proposals.js';
 
 /** Only the server writes plan connections; the model's version is never kept or shown back to it. */
 function withoutConnections(plan: PlanResponse): PlanResponse {
@@ -121,6 +122,7 @@ export interface ChatPlanner {
 }
 
 export interface ChatServiceOptions {
+  slackReads?: SlackReadProposalService;
   msgRepo: MessageRepo;
   convRepo?: ConversationRepo;
   planRepo?: PlanRepo;
@@ -170,8 +172,10 @@ export class ChatService {
   private getAdapter?: ChatServiceOptions['getAdapter'];
   private lookupTool?: ChatServiceOptions['lookupTool'];
   private mysheetsLookupTimeoutMs: number;
+  private slackReads?: SlackReadProposalService;
 
   constructor(options: ChatServiceOptions) {
+    this.slackReads=options.slackReads;
     this.gmailConnection = options.gmailConnection;
     this.mycalendarConnection = options.mycalendarConnection;
     this.mysheetsConnection = options.mysheetsConnection;
@@ -210,6 +214,28 @@ export class ChatService {
       status: 202,
       messageId: message.id,
     };
+  }
+
+  hasSlackReads():boolean{return Boolean(this.slackReads&&this.planRepo&&this.convRepo);}
+
+  /** Metadata-only proposal path; previous service data/history never enters this planner. */
+  async handleSlackReadProposal(input:HandleUserMessageInput&{connectionId:string}):Promise<IngestionResult>{
+    if(!this.hasSlackReads()||(await this.convRepo!.getConversation(input.conversationId))?.user_id!==input.userId)throw Object.assign(new Error('Conversation not found'),{status:404});
+    const message=await this.msgRepo.createMessage(input.conversationId,'user',input.content,input.requestId?{requestId:input.requestId}:{});
+    const correlation={replyToMessageId:message.id,...(input.requestId?{requestId:input.requestId}:{})};
+    setImmediate(()=>{
+      void (async()=>{
+        this.eventEmitter.emit('agent_state',{conversationId:input.conversationId,state:'planning',...correlation});
+        const proposal=await this.slackReads!.propose({userId:input.userId,connectionId:input.connectionId,request:input.content});
+        const prepared=await this.prepareResponse({conversationId:input.conversationId,userId:input.userId,correlation,slackReadPlan:true,readLabels:proposal.labels},proposal.response,new WorkingMemory(),[input.content]);
+        await prepared.write();prepared.announce();
+      })().catch(async()=>{
+        const text='Không lập được yêu cầu đọc Slack. Hãy thử lại.';
+        try{await this.msgRepo.createMessage(input.conversationId,'system',text,{type:'planning_error',...correlation});}catch{}
+        this.eventEmitter.emit('error',{conversationId:input.conversationId,message:text,...correlation});
+      });
+    });
+    return {status:202,messageId:message.id};
   }
 
   /**
@@ -407,12 +433,12 @@ export class ChatService {
    * With `memoryState`, `write` saves the working memory first.
    */
   private async prepareResponse(
-    target: { conversationId: string; userId: string; correlation: Correlation; schedule?: ScheduleView | null; memoryState?: unknown; slackContext?: SlackMessageWriteContext; memorySelectors?: string[] },
+    target: { conversationId: string; userId: string; correlation: Correlation; schedule?: ScheduleView | null; memoryState?: unknown; slackContext?: SlackMessageWriteContext; memorySelectors?: string[];slackReadPlan?:boolean;readLabels?:Record<string,string> },
     planned: PlannerResponse, memory: WorkingMemory, userTexts: string[], signal?: AbortSignal,
   ): Promise<PreparedResponse> {
     const { conversationId, correlation } = target;
     if (target.slackContext && planned.kind === 'plan' && (!this.planRepo || planned.steps.some(s=>/^(myslack|slack)\./.test(s.tool)))) throw new Error('SLACK_DISPATCH_BINDING_REQUIRED');
-    let response = planned.kind === 'plan' ? await this.bindConnections(planned, target.userId, signal) : planned;
+    let response = planned.kind === 'plan' && !target.slackReadPlan ? await this.bindConnections(planned, target.userId, signal) : planned;
     signal?.throwIfAborted();
     let proposal: ScheduleProposalMetadata | null = null;
     if (response.kind === 'schedule') {
@@ -421,7 +447,7 @@ export class ChatService {
     }
     const emit = (event: string, payload: Record<string, unknown>) => this.eventEmitter.emit(event, { conversationId, ...payload, ...correlation });
     let planId: string | null = null, messageId = '', labels: Record<string, string> = {};
-    if (response.kind === 'plan') labels = resourceLabels(response, memory, userTexts);
+    if (response.kind === 'plan') labels = target.readLabels??resourceLabels(response, memory, userTexts);
 
     const write = async (client?: pg.PoolClient): Promise<{planId: string | null}> => {
       if (target.slackContext && !client) return this.msgRepo.inSlackTransaction(conversationId, target.slackContext, held => write(held), signal);
@@ -449,11 +475,11 @@ export class ChatService {
             expiresAt,
             resourceLabels: labels,
           };
-          planId = (target.slackContext ? await this.planRepo.createSlackPlan(data,{segments:target.slackContext.segments},client,signal) :
+          planId = (target.slackReadPlan ? await this.planRepo.createSlackReadPlan(data,target.userId) : target.slackContext ? await this.planRepo.createSlackPlan(data,{segments:target.slackContext.segments},client,signal) :
             client ? await this.planRepo.createPlan(data, client) : await this.planRepo.createPlan(data)).id;
         }
         await save('assistant', `Kế hoạch: ${response.summary}`, {
-          type: 'plan', planId, plan: response, resourceLabels: labels, ...correlation,
+          type: 'plan', planId, plan: target.slackReadPlan?withoutConnections(response):response, resourceLabels: labels, ...correlation,
         });
       } else if (proposal) {
         messageId = (await save('assistant', proposal.proposal.summary, { ...proposal, ...correlation })).id;

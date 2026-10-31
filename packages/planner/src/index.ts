@@ -11,3 +11,4 @@ export * from './planner.js';
 export * from './search.js';
 export * from './recipients.js';
 export * from './prompts/tool-listing.js';
+export * from './slack-read-plan.js';

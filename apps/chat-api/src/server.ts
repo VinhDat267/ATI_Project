@@ -33,6 +33,7 @@ import { SlackEventReceiptRepo } from './db/repositories/slack-event-receipt-rep
 import { SlackIngressService } from './services/slack/slack-ingress-service.js';
 import { slackIngressEnv } from './config/slack-ingress-env.js';
 import { createSlackLifecycleRuntime } from './services/slack/slack-lifecycle-runtime.js';
+import { createPersonalSlackReadRuntime } from './config/slack-read-runtime.js';
 import { GmailOAuthClient } from './services/gmail/oauth-client.js';
 import { GmailTokenManager } from './services/gmail/token-manager.js';
 import { createGmailConnectionLookup, createMyCalendarConnectionLookup, createMySheetsConnectionLookup } from './services/gmail/connection-reference.js';
@@ -290,7 +291,9 @@ async function bootstrap() {
     },
   };
 
+  const personalSlackReads=createPersonalSlackReadRuntime({pool:pool??undefined,oauth:env.MYSLACK_OAUTH,encryptionKey:env.ENCRYPTION_KEY,plans:planRepo,steps:stepRepo,provider,env:process.env});
   const chatService = new ChatService({
+    slackReads:personalSlackReads?.proposals,
     msgRepo,
     convRepo,
     planRepo,
@@ -350,6 +353,7 @@ async function bootstrap() {
 
   // 6. ExecutionService
   const executionService = new ExecutionService({
+    slackRead:personalSlackReads?.execution,
     planRepo,
     stepRepo,
     convRepo,

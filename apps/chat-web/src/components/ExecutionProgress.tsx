@@ -3,6 +3,7 @@ import type { StepState, PlanStatus } from '../types';
 import { type JSONSchema } from '@wap/tool-schemas';
 import { toolDefinition } from '../services/tool-definitions';
 import { ServiceLogo } from './ServiceLogo';
+import { SlackReadResult } from './SlackReadResult';
 
 export interface ExecutionStepInfo {
   id: string;
@@ -49,6 +50,7 @@ function collectionRows(value: unknown, tool: string): unknown[] | undefined {
 export function ResultFields({ output, tool }: { output: unknown; tool: string }) {
   let value = output;
   if (typeof output === 'string') { try { value = JSON.parse(output); } catch { /* Plain text remains visible. */ } }
+  if (tool.startsWith('myslack.')) return <SlackReadResult value={value} />;
   const rows = collectionRows(value, tool);
   return <div className="mt-2 text-xs text-text-secondary break-words">
     {isRecord(value) && <FieldList value={value} />}

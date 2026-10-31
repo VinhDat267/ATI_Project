@@ -1,4 +1,4 @@
-import type { ToolDefinition, PlannerResponse, PlanStep } from '@wap/tool-schemas';
+import { isSlackReadTool, type ToolDefinition, type PlannerResponse, type PlanStep } from '@wap/tool-schemas';
 import { normalizedRecipient, observedThreads, userEmailAddresses } from './recipients.js';
 
 export interface ValidationSuccess {
@@ -33,6 +33,8 @@ export interface GroundingContext {
 
 export interface ValidatePlanOptions {
   grounding?: GroundingContext;
+  /** Only the dedicated personal Slack metadata proposal path may request approved read plans. */
+  slackReadPlan?: boolean;
 }
 
 export const INJECTION_PATTERNS = [
@@ -508,7 +510,8 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
   }
 
   // A workflow must perform an action. Mixed read/write plans keep their existing contract.
-  if (!steps.some(step => catalogMap.get(step.tool)?.sideEffect === 'write')) {
+  if (!steps.some(step => catalogMap.get(step.tool)?.sideEffect === 'write') &&
+      !(options.slackReadPlan===true && steps.every(step=>isSlackReadTool(step.tool)))) {
     return { valid: false, layer: 'semantic', code: 'READ_ONLY_PLAN', error: 'Plan must contain at least one write step' };
   }
 

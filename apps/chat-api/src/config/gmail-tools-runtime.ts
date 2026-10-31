@@ -85,7 +85,7 @@ export function createToolRuntimeFactory(
   sandbox = createSandboxAdapter,
 ) {
   return createRuntimeAdapterFactory<AdapterContext>(mode, personal,
-    (name, context) => (name === 'gmail' || name === 'mycalendar' || name === 'mysheets') ? personal(name, context) : sandbox(name));
+    (name, context) => (name === 'gmail' || name === 'mycalendar' || name === 'mysheets' || name === 'myslack') ? personal(name, context) : sandbox(name));
 }
 
 /** A failed Gmail, MyCalendar or MySheets request must not become a canned shared-service write. */

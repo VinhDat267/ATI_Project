@@ -402,7 +402,7 @@ export class ApiClient {
     return this.request('/api/auth/logout-all', { method: 'POST' });
   }
 
-  async getRuntime(): Promise<{ runtimeMode: 'sandbox' | 'live'; gmailEnabled?: boolean; mycalendarEnabled?: boolean; mysheetsEnabled?: boolean; schedulesEnabled?: boolean }> {
+  async getRuntime(): Promise<{ runtimeMode: 'sandbox' | 'live'; gmailEnabled?: boolean; mycalendarEnabled?: boolean; mysheetsEnabled?: boolean; myslackEnabled?: boolean; schedulesEnabled?: boolean }> {
     return this.request('/api/health');
   }
 
@@ -466,10 +466,10 @@ export class ApiClient {
   }
 
   async getConversation(
-    id: string
+    id: string, signal?: AbortSignal
   ): Promise<{ conversation: Conversation; messages: ChatMessage[] }> {
     return this.request<{ conversation: Conversation; messages: ChatMessage[] }>(
-      `/api/conversations/${encodeURIComponent(id)}`
+      `/api/conversations/${encodeURIComponent(id)}`, { signal }
     );
   }
 
@@ -495,10 +495,16 @@ export class ApiClient {
   }
 
   // --- Plans ---
-  async getActivePlan(convId: string): Promise<ActivePlan | null> {
+  async sendSlackReadMessage(convId: string, content: string, tempId: string, connectionId: string): Promise<any> {
+    return this.request(`/api/conversations/${encodeURIComponent(convId)}/slack-read-plans`, {
+      method: 'POST', body: JSON.stringify({ content, tempId, connectionId }),
+    });
+  }
+
+  async getActivePlan(convId: string, signal?: AbortSignal): Promise<ActivePlan | null> {
     try {
       const data = await this.request<any>(
-        `/api/conversations/${encodeURIComponent(convId)}/plans/active`
+        `/api/conversations/${encodeURIComponent(convId)}/plans/active`, { signal }
       );
       return data;
     } catch (err: any) {
@@ -522,9 +528,9 @@ export class ApiClient {
   }
 
   // --- Executions ---
-  async getLatestExecutionSnapshot(convId: string): Promise<ExecutionSnapshot | null> {
+  async getLatestExecutionSnapshot(convId: string, signal?: AbortSignal): Promise<ExecutionSnapshot | null> {
     try {
-      return await this.request<ExecutionSnapshot>(`/api/conversations/${encodeURIComponent(convId)}/executions/latest`);
+      return await this.request<ExecutionSnapshot>(`/api/conversations/${encodeURIComponent(convId)}/executions/latest`, { signal });
     } catch (err: any) {
       if (err.status === 404) return null;
       throw err;
