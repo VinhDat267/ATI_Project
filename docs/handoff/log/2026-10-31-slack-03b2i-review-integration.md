@@ -1,0 +1,9 @@
+# SLACK-03B2I accepted into staging
+
+[PR215](https://github.com/VinhDat267/ATI_Project/pull/215), published head `77c0c563d65f51cbf0c487bb963a962ae5877340`; [CI 41195886792](https://github.com/VinhDat267/ATI_Project/actions/runs/41195886792) SUCCESS on that head. Steps `npm run check` and `npm run test:browser:v3` both SUCCESS, completed 2026-10-31T11:25:32Z. Merge `7d00de3f9994b6c9f8e524749ad141cc9502ca0a`, merged 2026-10-31T11:27:21Z. Fresh `git diff --exit-code 77c0c563d65f51cbf0c487bb963a962ae5877340 7d00de3f9994b6c9f8e524749ad141cc9502ca0a` exit 0: identical merge tree. Main and live flags unchanged.
+
+This checkpoint records the published-head CI and merge tree. It does not re-run the frozen fullcheck. The implementation log already records fullcheck 3738 PASS at freeze `62500f1b` and an independent whole-29-file review PASS; the published commit is the docs-only delta after that freeze. Local full-default browser 94 pass / 2 fail / 1 skip is still not a green combined run. The two corrected locators passed when run alone, and the published-head CI browser suite passed.
+
+Accepted: actual message, memory and conversation-title writers seal a private owner-bound source-free remainder in the same transaction. HTTP, history, search and model hydration reject unmarked legacy and raw-SQL bypasses. Bounded backfill stays dry-run unless `--apply` is explicit, accepts only evidence-backed rows, and was not run on production or native data. Registered Slack selectors keep their separate policy, barrier, TTL and copy guards.
+
+M2 remains open. Plan, step, audit and schedule origin certification, plus legacy approval, dispatch and run gates, are next and are required before public read 03B3/03B4. A message-producer proof does not certify those surfaces. No native Slack Free/Pro, two-user, model, full F3/F4, main merge or live flag claim.
