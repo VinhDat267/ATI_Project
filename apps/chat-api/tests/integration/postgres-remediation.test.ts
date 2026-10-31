@@ -46,10 +46,12 @@ describe('real PostgreSQL plan invariants', () => {
     try {
       await pool.query('INSERT INTO users (id, email, password, name) VALUES ($1, $2, $3, $4)', [userId, `${userId}@example.test`, 'test-only', 'Test']);
       await pool.query('INSERT INTO conversations (id, user_id) VALUES ($1, $2)', [convId, userId]);
-      await pool.query(`INSERT INTO messages (conv_id, role, content, created_at)
-        SELECT $1, 'user', 'm' || i, now() + i * interval '1 millisecond'
-        FROM generate_series(1, 102) AS i`, [convId]);
-      const messages = await new MessageRepo(pool).listMessages(convId);
+      const repo=new MessageRepo(pool);
+      for(let i=1;i<=102;i++){
+        const row=await repo.createMessage(convId,'user',`m${i}`);
+        await pool.query("UPDATE messages SET created_at='2026-01-01T00:00:00Z'::timestamptz+$2*interval '1 millisecond' WHERE id=$1",[row.id,i]);
+      }
+      const messages = await repo.listMessages(convId);
       expect(messages).toHaveLength(100);
       expect(messages[0]?.content).toBe('m3');
       expect(messages.at(-1)?.content).toBe('m102');

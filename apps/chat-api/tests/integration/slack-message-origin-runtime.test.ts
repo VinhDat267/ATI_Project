@@ -16,6 +16,7 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
 import {SlackDerivedLineageRepo} from '../../src/db/repositories/slack-derived-lineage-repo.js';
+import {SlackMessageContentPurger} from '../../src/services/slack/slack-message-content-purger.js';
 
 let db:Awaited<ReturnType<typeof createMigratedSchema>>,messages:MessageRepo,conversations:ConversationRepo;
 let env:Awaited<ReturnType<typeof createSlackReadEnvironment>>;
@@ -105,7 +106,9 @@ async function sourceFixture(){
   return {owner,conv,segments};
 }
 async function invalidateSource(f:Awaited<ReturnType<typeof sourceFixture>>){
-  await env.stageBarriers([{effectKey:'origin revoke',barrier:{barrierType:'binding',binding:f.owner.binding,reason:'fixture'},purgeTarget:{scope:'authorization_disconnect',binding:f.owner.binding,cascadeTargetKinds:[...SLACK_DERIVED_TARGET_KINDS],tombstoneReason:'connection_disconnected'}}],`origin:${randomUUID()}`);
+  const key=`origin:${randomUUID()}`;
+  await env.stageBarriers([{effectKey:'origin revoke',barrier:{barrierType:'binding',binding:f.owner.binding,reason:'fixture'},purgeTarget:{scope:'authorization_disconnect',binding:f.owner.binding,cascadeTargetKinds:[...SLACK_DERIVED_TARGET_KINDS],tombstoneReason:'connection_disconnected'}}],key);
+  return key;
 }
 
 it('keeps certified mixed-service remainder after invalidation/physical erasure but never launders a tampered remainder',async()=>{
@@ -273,4 +276,62 @@ it('snapshots a source-free writer input before a real parent-lock wait',async()
     expect(row.metadata).toEqual({type:'answer'});
     expect((await messages.listMessages(conv.id))[0]?.content).toBe('stable writer input');
   }finally{await blocker.query('ROLLBACK').catch(()=>{});blocker.release();}
+});
+
+it('binds proposal type and gather-container incidental bytes instead of normalizing an unregistered mutation away',async()=>{
+  const f=await sourceFixture();
+  const proposal=await messages.createSlackMessage(f.conv.id,'assistant','source proposal',{type:'schedule_proposal',proposal:{summary:'source proposal'}},{segments:f.segments,selectors:['content','metadata.proposal']});
+  const pending=await messages.createSlackMessage(f.conv.id,'system','',{type:'working_memory',state:{__gatherPending:{key:'channel',query:'source query',candidates:[{id:'S',name:'source candidate'}]}}},
+    {segments:f.segments,selectors:['state:/__gatherPending/query','state:/__gatherPending/candidates#id=S']});
+  await db.pool.query("UPDATE messages SET metadata=jsonb_set(metadata,'{type}','\"unregistered type secret\"') WHERE id=$1",[proposal.id]);
+  await db.pool.query("UPDATE messages SET metadata=jsonb_set(metadata,'{state,__gatherPending,extra}','\"unregistered gather secret\"') WHERE id=$1",[pending.id]);
+  expect(JSON.stringify(await messages.listMessages(f.conv.id))).not.toContain('unregistered');
+  const before=(await db.pool.query("SELECT artifact_id,remainder_fingerprint,producer FROM slack_message_origins WHERE artifact_id=ANY($1::uuid[]) ORDER BY artifact_id",[[proposal.id,pending.id]])).rows;
+  await invalidateSource(f);await new SlackMessagePurgeConsumer(db.pool).runOnce(50);await new SlackMessagePurgeConsumer(db.pool,{targetKind:'working_memory_entity'}).runOnce(50);
+  expect((await db.pool.query("SELECT artifact_id,remainder_fingerprint,producer FROM slack_message_origins WHERE artifact_id=ANY($1::uuid[]) ORDER BY artifact_id",[[proposal.id,pending.id]])).rows).toEqual(before);
+});
+
+it('physically purges legitimate proposal/pending metadata and keeps certified unrelated memory readable',async()=>{
+  const f=await sourceFixture();
+  const proposal=await messages.createSlackMessage(f.conv.id,'assistant','source proposal',{type:'schedule_proposal',proposal:{summary:'source proposal'}},{segments:f.segments,selectors:['content','metadata.proposal']});
+  const pending=await messages.createSlackMessage(f.conv.id,'system','',{type:'working_memory',state:{other:[{id:'T',name:'certified other memory'}],__gatherPending:{key:'channel',query:'source query',candidates:[{id:'S',name:'source candidate'}]}}},
+    {segments:f.segments,selectors:['state:/__gatherPending/query','state:/__gatherPending/candidates#id=S']});
+  await invalidateSource(f);await new SlackMessagePurgeConsumer(db.pool).runOnce(50);await new SlackMessagePurgeConsumer(db.pool,{targetKind:'working_memory_entity'}).runOnce(50);
+  const rows=await messages.listMessages(f.conv.id);expect(rows.find(m=>m.id===proposal.id)?.metadata.type).toBe('schedule_proposal_purged');
+  expect(rows.find(m=>m.id===pending.id)?.metadata.state).toEqual({other:[{id:'T',name:'certified other memory'}]});
+});
+
+it('backfill cannot certify incidental legacy gather fields just because the eraser drops their container',async()=>{
+  const f=await sourceFixture();
+  const row=await messages.createSlackMessage(f.conv.id,'system','',{type:'working_memory',state:{__gatherPending:{query:'source query',extra:'unproven legacy incidental',candidates:[{id:'S',name:'source candidate'}]}}},
+    {segments:f.segments,selectors:['state:/__gatherPending/query','state:/__gatherPending/candidates#id=S']});
+  await db.pool.query("DELETE FROM slack_message_origins WHERE artifact_table='messages' AND artifact_id=$1",[row.id]);
+  await new SlackMessageOriginBackfill(db.pool).page('messages',{limit:200,apply:true});
+  expect((await db.pool.query("SELECT 1 FROM slack_message_origins WHERE artifact_table='messages' AND artifact_id=$1",[row.id])).rowCount).toBe(0);
+  expect(JSON.stringify(await messages.listMessages(f.conv.id))).not.toContain('unproven legacy incidental');
+});
+
+it('lease reclaim rolls back both physical erasure and its origin reseal before the replacement worker succeeds',async()=>{
+  const f=await sourceFixture(),row=await messages.createSlackMessage(f.conv.id,'assistant','lease private source',{type:'schedule_proposal',proposal:{summary:'lease private source'}},{segments:f.segments,selectors:['content','metadata.proposal']});
+  const before=(await db.pool.query("SELECT * FROM slack_message_origins WHERE artifact_table='messages' AND artifact_id=$1",[row.id])).rows[0];
+  const key=await invalidateSource(f),real=new SlackMessageContentPurger(),next=new SlackMessagePurgeConsumer(db.pool);let replacement:any;
+  const first=new SlackMessagePurgeConsumer(db.pool,{purger:{sourceLockKeysInTransaction:(...args)=>real.sourceLockKeysInTransaction(...args),purgeInTransaction:async(client,input)=>{
+    const result=await real.purgeInTransaction(client,input);
+    if(!replacement){await db.pool.query("UPDATE slack_invalidation_intents SET leased_until=clock_timestamp()-interval '1 second' WHERE id=$1",[input.intentId]);replacement=(await next.claim(50)).find(j=>j.id===input.intentId);}return result;
+  }}});
+  const intent=(await db.pool.query("SELECT id FROM slack_invalidation_intents WHERE source_event_key=$1 AND target_kind='chat_history_message'",[key])).rows[0];
+  const lease=(await first.claim(50)).find(j=>j.id===intent.id);expect(lease).toBeTruthy();expect(await first.process(lease!)).toBe('lost');
+  expect((await db.pool.query("SELECT * FROM slack_message_origins WHERE artifact_table='messages' AND artifact_id=$1",[row.id])).rows[0]).toEqual(before);
+  expect((await db.pool.query('SELECT content FROM messages WHERE id=$1',[row.id])).rows[0].content).toBe('lease private source');
+  expect(await next.process(replacement)).toBe('completed');expect((await messages.listMessages(f.conv.id))[0]?.metadata.type).toBe('schedule_proposal_purged');
+});
+
+it('disabled origin cutover cannot prevent physical erasure and cannot cause an origin reseal',async()=>{
+  const f=await sourceFixture(),row=await messages.createSlackMessage(f.conv.id,'assistant','disabled-cutover source',{type:'answer'},{segments:f.segments,selectors:['content']});
+  await invalidateSource(f);await db.pool.query('UPDATE slack_message_origin_cutovers SET enabled=false');
+  try{
+    expect((await new SlackMessagePurgeConsumer(db.pool).runOnce(50)).completed).toBeGreaterThan(0);
+    expect((await db.pool.query('SELECT content FROM messages WHERE id=$1',[row.id])).rows[0].content).toBe('Slack content is unavailable.');
+    expect((await db.pool.query("SELECT producer FROM slack_message_origins WHERE artifact_table='messages' AND artifact_id=$1",[row.id])).rows[0].producer).toBe('message_writer');
+  }finally{await db.pool.query('UPDATE slack_message_origin_cutovers SET enabled=true');}
 });

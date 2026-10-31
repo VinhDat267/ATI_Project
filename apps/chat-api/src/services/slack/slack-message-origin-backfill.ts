@@ -10,6 +10,8 @@ function empty(value:unknown):boolean{return value!==null&&typeof value==='objec
  * Arbitrary other-service text, role=user and absent copies prove nothing. */
 function fullyCovered(row:any,table:MessageOriginTable):boolean{
   if(table==='conversations')return true; // selector proof below must cover title
+  if(row.slack_lineage_manifest.some((s:string)=>s.startsWith('state:/__gatherPending/'))&&
+    Object.keys(row.metadata?.state?.__gatherPending??{}).some(key=>!['query','candidates'].includes(key)))return false;
   const remainder=structuredClone({content:row.content,metadata:row.metadata});
   for(const selector of row.slack_lineage_manifest)eraseMessageSelector(remainder,messageSelectorKind(selector),selector);
   if(!['',SLACK_MESSAGE_TOMBSTONE].includes(remainder.content))return false;

@@ -88,23 +88,12 @@ describe('apps/chat-api (Task 7: Database Repositories with Optimistic Locking)'
 
   describe('MessageRepo', () => {
     it('creates and retrieves messages for conversation in chronological order', async () => {
-      const mockQuery = vi.fn().mockImplementation(async (sql: string) => {
-        if (sql.includes('INSERT INTO messages')) {
-          return { rowCount: 1, rows: [{ id: 'm1', role: 'user', content: 'hello' }] };
-        }
-        return { rowCount: 1, rows: [{ id: 'm1', role: 'user', content: 'hello' }] };
-      });
-      const repo = new MessageRepo({ query: mockQuery } as any);
-
-      const msg = await repo.createMessage('c1', 'user', 'hello', { source: 'test' });
-      expect(msg.id).toBe('m1');
-
-      const history = await repo.listMessages('c1');
-      expect(history).toHaveLength(1);
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('ORDER BY created_at DESC, id DESC'),
-        ['c1', 100]
-      );
+      const owner=await db.person(),conv=await new ConversationRepo(db.pool).createConversation(owner.id),repo=new MessageRepo(db.pool);
+      const first=await repo.createMessage(conv.id,'user','hello',{source:'test'});
+      const second=await repo.createMessage(conv.id,'assistant','reply');
+      const history=await repo.listMessages(conv.id);
+      expect(history.map(row=>[row.id,row.content])).toEqual([[first.id,'hello'],[second.id,'reply']]);
+      expect(history[0]!.metadata).toEqual({source:'test'});
     });
   });
 

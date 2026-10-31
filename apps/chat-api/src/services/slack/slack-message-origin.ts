@@ -2,7 +2,7 @@ import type pg from 'pg';
 import {eraseMessageSelector,messageFingerprint,messageSelectorKind,validateMessageSelector} from './slack-message-selectors.js';
 
 export type MessageOriginTable='messages'|'conversations';
-type Producer='message_writer'|'title_first_user'|'conversation_create'|'title_manual'|'schedule_title'|'backfill_covered'|'backfill_manual';
+type Producer='message_writer'|'title_first_user'|'conversation_create'|'title_manual'|'schedule_title'|'backfill_covered'|'backfill_manual'|'physical_purge';
 const cutover='message-origin-v1';
 function manifest(row:any,table:MessageOriginTable):string[]{
   const selectors=row.slack_lineage_manifest??[];
@@ -18,13 +18,23 @@ function manifest(row:any,table:MessageOriginTable):string[]{
  * payload/status/timestamps from unrelated artifacts or client attestations. */
 export function messageOriginFingerprint(table:MessageOriginTable,row:any,owner:string):{selectors:string[];fingerprint:string}{
   const selectors=manifest(row,table);
+  // The concrete eraser also changes a proposal's type and may drop an empty
+  // gather container (including its key). Those bytes are NOT selected source
+  // paths: bind them separately so normalization cannot hide their mutation.
+  const incidental:any={};
+  if(table==='messages'&&selectors.includes('metadata.proposal'))incidental.metadataType=row.metadata?.type;
+  if(table==='messages'&&selectors.some(s=>s.startsWith('state:/__gatherPending/'))){
+    const pending=row.metadata?.state?.__gatherPending;
+    incidental.pendingRemainder=pending===undefined?{}:pending!==null&&typeof pending==='object'&&!Array.isArray(pending)?
+      Object.fromEntries(Object.entries(pending).filter(([key])=>!['query','candidates'].includes(key))):pending;
+  }
   const remainder=table==='messages'?structuredClone({content:row.content,metadata:row.metadata}):{title:row.title};
   for(const selector of selectors){
     if(table==='conversations')(remainder as any).title='';
     else eraseMessageSelector(remainder as any,messageSelectorKind(selector),selector);
   }
   return {selectors,fingerprint:messageFingerprint({protocol:cutover,table,id:row.id,owner,convId:table==='messages'?row.conv_id:row.id,
-    role:table==='messages'?row.role:null,selectors,remainder},'origin')};
+    role:table==='messages'?row.role:null,selectors,remainder,incidental},'origin')};
 }
 /** Callers hold the common conversation/artifact lock. A missing/disabled
  * cutover or certificate never falls back to absence-of-lineage semantics. */
