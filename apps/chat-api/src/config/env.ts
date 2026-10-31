@@ -35,6 +35,21 @@ export const MYSHEETS_ENDPOINTS = {
 };
 const MYSHEETS_ENDPOINT_OVERRIDES = { authorizationUrl: 'MYSHEETS_OAUTH_AUTH_URL', tokenUrl: 'MYSHEETS_OAUTH_TOKEN_URL', revokeUrl: 'MYSHEETS_OAUTH_REVOKE_URL', apiBaseUrl: 'MYSHEETS_API_BASE_URL' } as const;
 
+export interface TrelloOAuthConfig {
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+  authorizationUrl: string;
+  tokenUrl: string;
+  apiBaseUrl: string;
+}
+export const TRELLO_ENDPOINTS = {
+  authorizationUrl: 'https://auth.atlassian.com/authorize',
+  tokenUrl: 'https://auth.atlassian.com/oauth/token',
+  apiBaseUrl: 'https://api.trello.com/1',
+};
+const TRELLO_ENDPOINT_OVERRIDES = { authorizationUrl: 'TRELLO_OAUTH_AUTH_URL', tokenUrl: 'TRELLO_OAUTH_TOKEN_URL', apiBaseUrl: 'TRELLO_API_BASE_URL' } as const;
+
 export interface EnvConfig {
   DATABASE_URL: string;
   JWT_SECRET: string;
@@ -65,6 +80,7 @@ export interface EnvConfig {
   /** Complete only when the flag is on; sandbox also needs every fake endpoint. Missing in sandbox means 503. */
   MYSHEETS_OAUTH?: GmailOAuthConfig;
   MYSHEETS_PICKER?: { apiKey: string; appId: string };
+  TRELLO_OAUTH?: TrelloOAuthConfig;
   /** The SCHEDULES_ENABLED flag (default off). Schedules also need PostgreSQL. */
   SCHEDULES_ENABLED: boolean;
   /** False only in live without SMTP: signup and every email route answer 503 (AUTH-02b). Sandbox uses the outbox. */
@@ -201,6 +217,7 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
   if (isLive && (MYCALENDAR_ENABLED || MYSHEETS_ENABLED)) validatePersonalGoogleProjects(env);
   if (env.SCHEDULES_ENABLED && !['on', 'off'].includes(env.SCHEDULES_ENABLED)) throw new Error('SCHEDULES_ENABLED must be on or off');
   const SCHEDULES_ENABLED = env.SCHEDULES_ENABLED === 'on';
+  const TRELLO_OAUTH = trelloOAuth(env, isLive);
 
   return {
     DATABASE_URL,
@@ -223,6 +240,7 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
     MYSHEETS_ENABLED,
     MYSHEETS_OAUTH,
     MYSHEETS_PICKER,
+    TRELLO_OAUTH,
     SCHEDULES_ENABLED,
     EMAIL_ENABLED,
     APP_BASE_URL,
@@ -391,4 +409,55 @@ function mysheetsPicker(env: Record<string, string | undefined>, isLive: boolean
     return { apiKey: apiKey || 'fake-picker-api-key', appId: appId && /^\d+$/.test(appId) ? appId : '1234567890' };
   }
   return undefined;
+}
+
+function trelloOAuth(env: Record<string, string | undefined>, isLive: boolean): TrelloOAuthConfig | undefined {
+  const clientId = env.TRELLO_OAUTH_CLIENT_ID?.trim();
+  const clientSecret = env.TRELLO_OAUTH_CLIENT_SECRET?.trim();
+  const rawRedirect = env.TRELLO_OAUTH_REDIRECT_URI?.trim();
+
+  if (!clientId || !clientSecret || !rawRedirect) {
+    return undefined;
+  }
+
+  let redirectUri: string;
+  try {
+    const url = new URL(rawRedirect);
+    const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname);
+    if (
+      !['http:', 'https:'].includes(url.protocol) ||
+      (url.protocol === 'http:' && !loopback) ||
+      url.username ||
+      url.password ||
+      url.pathname !== '/connections/trello/callback' ||
+      url.search ||
+      url.hash
+    ) {
+      throw new Error();
+    }
+    redirectUri = url.href;
+  } catch {
+    throw new Error('TRELLO_OAUTH_REDIRECT_URI must be the web /connections/trello/callback URL without query, fragment or credentials (HTTPS, or loopback HTTP)');
+  }
+
+  const endpoints = { ...TRELLO_ENDPOINTS };
+  if (!isLive) {
+    for (const [key, field] of Object.entries(TRELLO_ENDPOINT_OVERRIDES)) {
+      if (!env[field]?.trim()) continue;
+      try {
+        const url = new URL(env[field]!.trim());
+        if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.hash) throw new Error();
+        endpoints[key as keyof typeof endpoints] = url.href.replace(/\/$/, '');
+      } catch {
+        throw new Error(`${field} must be an HTTP(S) endpoint without credentials or fragment`);
+      }
+    }
+  }
+
+  return {
+    clientId,
+    clientSecret,
+    redirectUri,
+    ...endpoints,
+  };
 }
