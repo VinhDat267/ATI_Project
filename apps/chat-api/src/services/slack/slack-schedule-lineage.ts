@@ -1,5 +1,6 @@
 import type pg from 'pg';
 import {messageOriginAllowed,sealMessageOrigin} from './slack-message-origin.js';
+import {scheduleOriginAllowed,sealScheduleOrigin} from './slack-schedule-origin.js';
 import type {DerivedSegmentInput} from '../../db/repositories/slack-derived-lineage-repo.js';
 import {SlackDerivedLineageRepo} from '../../db/repositories/slack-derived-lineage-repo.js';
 import {SlackPolicyService} from './policy-service.js';
@@ -65,7 +66,10 @@ export async function guardScheduleArtifact(client:pg.PoolClient,registry:SlackD
     if(fresh.some(s=>!state.segments.some(old=>JSON.stringify(old)===JSON.stringify(s))))throw Error('SLACK_SCHEDULE_CHANGED');
   }
   if((state.table==='conversations'||state.table==='messages')&&!await messageOriginAllowed(client,state.table,row,state.owner))return {row:maskScheduleArtifact(row,state.table),allowed:false,source:state.source,segments:[]};
-  if(!state.source)return {row,allowed:true,source:false,segments:[]};
+  if(!state.source){
+    if(state.table==='schedules'&&!await scheduleOriginAllowed(client,row,state.owner))return {row:maskScheduleArtifact(row,state.table),allowed:false,source:false,segments:[]};
+    return {row,allowed:true,source:false,segments:[]};
+  }
   // Human rename is a server-written certificate, never client provenance. Old
   // purged evidence stays immutable and cannot invalidate an unrelated new title.
   if(state.table==='conversations' && row.slack_title_manual_fingerprint===messageFingerprint(row.title,'title') &&
@@ -89,7 +93,11 @@ export function maskScheduleArtifact(row:any,table:Table):any {
   return {...row,name:SLACK_MESSAGE_TOMBSTONE,request:SLACK_MESSAGE_TOMBSTONE,recurrence:{},status:row.status==='active'?'paused':row.status,pause_reason:'slack_source_invalidated',next_run_at:null};
 }
 export async function registerScheduleFields(client:pg.PoolClient,registry:SlackDerivedLineageRepo,table:Exclude<Table,'messages'>,id:string,owner:string,segments:DerivedSegmentInput[],selectors:string[]):Promise<void> {
-  if(!segments.length){if(table==='conversations')await sealMessageOrigin(client,'conversations',id,'schedule_title');return;}
+  if(!segments.length){
+    if(table==='conversations')await sealMessageOrigin(client,'conversations',id,'schedule_title');
+    if(table==='schedules')await sealScheduleOrigin(client,id,'schedule_writer');
+    return;
+  }
   await client.query(`UPDATE ${table} SET slack_lineage_manifest=$2 WHERE id=$1`,[id,JSON.stringify(selectors)]);
   if(table==='conversations')await client.query('UPDATE conversations SET slack_title_manual_fingerprint=NULL WHERE id=$1',[id]);
   for(const selector of selectors)await registry.registerDerivedCopyInTransaction(client,{atiUserId:owner,targetKind:'scheduled_workflow_arg',targetId:id,targetSubId:selector,segments});

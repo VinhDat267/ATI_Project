@@ -3,6 +3,7 @@ import pg from 'pg';
 import type { ScheduleRecurrence } from '@wap/tool-schemas';
 import { ScheduleRunner, reconcileScheduleRuns, type PlanRun, type PreparedRun, type RunToPlan } from '../../../src/services/schedules/schedule-runner.js';
 import { ScheduleService } from '../../../src/services/schedules/schedule-service.js';
+import { certifyScheduleFixture } from '../../../src/services/slack/slack-schedule-origin.js';
 import { createMigratedSchema } from '../../helpers/gmail-test-db.js';
 
 const VN = 'Asia/Ho_Chi_Minh';
@@ -38,9 +39,11 @@ describe('ScheduleRunner on PostgreSQL', () => {
   };
   const schedule = async (next: string | null, recurrence: ScheduleRecurrence = daily, who: Person = owner) => {
     const convId = (await db.pool.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [who.id])).rows[0].id;
-    return (await db.pool.query(`INSERT INTO schedules(user_id,conv_id,name,request,recurrence,services,status,next_run_at)
+    const row = (await db.pool.query(`INSERT INTO schedules(user_id,conv_id,name,request,recurrence,services,status,next_run_at)
       VALUES($1,$2,'Lịch họp','Gửi lịch họp hôm nay lên Slack #ati-test',$3,'{calendar,slack}',$4,$5) RETURNING *`,
       [who.id, convId, JSON.stringify(recurrence), next ? 'active' : 'paused', next])).rows[0];
+    await certifyScheduleFixture(db.pool, row.id);
+    return row;
   };
   const runs = async (scheduleId: string) => (await db.pool.query('SELECT * FROM schedule_runs WHERE schedule_id=$1 ORDER BY created_at, id', [scheduleId])).rows;
   const scheduleRow = async (id: string) => (await db.pool.query('SELECT * FROM schedules WHERE id=$1', [id])).rows[0];

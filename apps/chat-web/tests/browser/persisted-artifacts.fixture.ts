@@ -2,6 +2,7 @@ import type pg from 'pg';
 import {ConversationRepo} from '../../../chat-api/src/db/repositories/conversation-repo.js';
 import {MessageRepo} from '../../../chat-api/src/db/repositories/message-repo.js';
 import {sealPlanOrigin} from '../../../chat-api/src/services/slack/slack-plan-origin.js';
+import {certifyScheduleFixture} from '../../../chat-api/src/services/slack/slack-schedule-origin.js';
 
 /** Known sandbox fixture data uses the same origin gate as actual backend writes.
  * SQL remains available to tests for technical timestamps/statuses, never as an
@@ -25,4 +26,8 @@ export async function certifyFixturePlan(db:pg.Pool,planId:string):Promise<void>
     await client.query('COMMIT');
   }catch(error){await client.query('ROLLBACK').catch(()=>{});throw error;}
   finally{client.release();}
+}
+/** Call after a SQL schedule seed or a SQL edit of name, request, recurrence, or services. */
+export async function certifyFixtureSchedule(db:pg.Pool,scheduleId:string):Promise<void>{
+  await certifyScheduleFixture(db,scheduleId);
 }

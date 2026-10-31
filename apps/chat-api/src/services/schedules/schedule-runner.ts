@@ -178,7 +178,7 @@ export class ScheduleRunner {
         WHERE s.id=$2 AND s.status='active' AND s.next_run_at<=$1 FOR UPDATE OF c,s SKIP LOCKED`,[now,candidate.id]);
       for (const row of due.rows as Array<ScheduleRow & { owner_status: string }>) {
         const checked=await guardScheduleArtifact(client,this.registry,state,'planning','UPDATE');
-        if(!checked.allowed){await this.pause(client,row.id,'slack_source_invalidated');continue;}
+        if(!checked.allowed){if(checked.source)await this.pause(client,row.id,'slack_source_invalidated');continue;}
         const segments=checked.segments;
         tagScheduleContext(row,segments);
         // A run started by hand is still planning; look again next tick.
