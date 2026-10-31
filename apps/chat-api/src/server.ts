@@ -1,3 +1,4 @@
+import {SlackDerivedExpiryFanout} from './services/slack/slack-derived-expiry.js';
 import { EventEmitter } from 'node:events';
 import { createMemoryConversationRepositories } from './db/repositories/memory-conversations.js';
 import { validateEnv } from './config/env.js';
@@ -370,6 +371,7 @@ async function bootstrap() {
         batchSize: 50,
         derivedPolicyFanout: pool && slackInvalidationService ? new SlackDerivedPolicyFanout(pool,slackInvalidationService) : undefined,
         messagePurgeConsumer: pool ? new SlackMessagePurgeConsumer(pool) : undefined,
+        derivedExpiryFanout:pool?new SlackDerivedExpiryFanout(pool):undefined,
         memoryPurgeConsumer: pool ? new SlackMessagePurgeConsumer(pool,{targetKind:'working_memory_entity'}) : undefined,
         artifactPurgeConsumers: pool ? [new SlackMessagePurgeConsumer(pool,{targetKind:'plan_step_arg'}),new SlackMessagePurgeConsumer(pool,{targetKind:'audit_log_entry'}),new SlackMessagePurgeConsumer(pool,{targetKind:'scheduled_workflow_arg'})] : [],
       })

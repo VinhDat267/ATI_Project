@@ -1,3 +1,4 @@
+import type {SlackDerivedExpiryFanout} from './slack-derived-expiry.js';
 import { randomUUID } from 'node:crypto';
 import type { SlackSourceRepo } from '../../db/repositories/slack-source-repo.js';
 import type { SlackInvalidationService } from './slack-invalidation-service.js';
@@ -12,6 +13,7 @@ export interface SlackInvalidationRunnerOptions {
   workerId?: string;
   onError?: (err: unknown, context: string) => void;
   derivedPolicyFanout?: Pick<SlackDerivedPolicyFanout,'runOnce'>;
+  derivedExpiryFanout?:Pick<SlackDerivedExpiryFanout,'runOnce'>;
   messagePurgeConsumer?: Pick<SlackMessagePurgeConsumer,'runOnce'>;
   memoryPurgeConsumer?: Pick<SlackMessagePurgeConsumer,'runOnce'>;
   artifactPurgeConsumers?: Array<Pick<SlackMessagePurgeConsumer,'runOnce'>>;
@@ -59,6 +61,7 @@ export class SlackInvalidationRunner {
   private readonly workerId: string;
   private readonly onError?: (err: unknown, context: string) => void;
   private readonly derivedPolicyFanout?: Pick<SlackDerivedPolicyFanout,'runOnce'>;
+  private readonly derivedExpiryFanout?:Pick<SlackDerivedExpiryFanout,'runOnce'>;
   private readonly messagePurgeConsumer?: Pick<SlackMessagePurgeConsumer,'runOnce'>;
   private readonly memoryPurgeConsumer?: Pick<SlackMessagePurgeConsumer,'runOnce'>;
   private readonly artifactPurgeConsumers: Array<Pick<SlackMessagePurgeConsumer,'runOnce'>>;
@@ -79,6 +82,7 @@ export class SlackInvalidationRunner {
     this.workerId = options.workerId ?? `slack-runner-${randomUUID()}`;
     this.onError = options.onError;
     this.derivedPolicyFanout = options.derivedPolicyFanout;
+    this.derivedExpiryFanout=options.derivedExpiryFanout;
     this.messagePurgeConsumer = options.messagePurgeConsumer;
     this.memoryPurgeConsumer = options.memoryPurgeConsumer;
     this.artifactPurgeConsumers = options.artifactPurgeConsumers ?? [];
@@ -173,6 +177,11 @@ export class SlackInvalidationRunner {
     if(this.derivedPolicyFanout) {
       try {stats.derivedPolicyEpochsStaged=(await this.derivedPolicyFanout.runOnce(Math.min(this.batchSize,100))).staged;}
       catch(err){if(this.onError)this.onError(err,'derived_policy_fanout');}
+    }
+
+    if(this.derivedExpiryFanout){
+      try{await this.derivedExpiryFanout.runOnce(Math.min(this.batchSize,100));}
+      catch(error){if(this.onError)this.onError(error,'derived_expiry_fanout');}
     }
 
     // 3. Recover stale leases

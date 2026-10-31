@@ -161,7 +161,7 @@ it('actual server drains signed revocation through validation and purge with fla
   }
 }, 65_000);
 
-it('actual server erases a durable registered message without any Slack config and leaves unsupported kinds pending', async () => {
+it.each(['disconnect','derived expiry'])('actual server erases durable core artifacts without Slack config, unsupported kinds pending (%s)', async (mode) => {
   const env = await createSlackReadEnvironment('slack_native_no_config');
   let native: Awaited<ReturnType<typeof startNative>> | undefined;
   try {
@@ -197,10 +197,32 @@ it('actual server erases a durable registered message without any Slack config a
       await scheduleClient.query('COMMIT');
     }finally{scheduleClient.release();}
     const key = `native-disconnect:${randomUUID()}`;
+    let freshId:string|undefined,otherId:string|undefined;
+    if(mode==='disconnect'){
     await env.stageBarriers([{
       effectKey: 'disconnect', barrier: { barrierType: 'binding', binding: user.binding, reason: 'disconnect' },
       purgeTarget: { scope: 'authorization_disconnect', binding: user.binding, cascadeTargetKinds: [...SLACK_DERIVED_TARGET_KINDS], tombstoneReason: 'connection_disconnected' },
     }], key);
+    }else{
+      expect((await env.db.pool.query('SELECT count(*)::int AS n FROM slack_sources')).rows[0].n).toBe(0);
+      const {SlackSourceRepo}=await import('../../src/db/repositories/slack-source-repo.js');
+      const sources=new SlackSourceRepo(env.db.pool),oldBody='Old raw capture before retention';
+      const raw=await sources.saveSourceAtomic({sourceRef:segments[0]!.sourceRef,policyRef:segments[0]!.storagePolicyRef,untrustedContent:oldBody,capturedAt:segments[0]!.capturedAt});
+      await env.db.pool.query('UPDATE slack_derived_provenance_segments SET raw_source_id=$2,capture_hash=$3 WHERE ati_user_id=$1',[user.person.id,raw.id,createHash('sha256').update(oldBody).digest('hex')]);
+      await env.db.pool.query("UPDATE slack_sources SET captured_at=statement_timestamp()-interval '8 days',expires_at=statement_timestamp()-interval '1 day' WHERE id=$1",[raw.id]);
+      expect((await sources.purgeExpiredSources(50)).purgedCount).toBe(1);
+      expect((await sources.getSourceById(raw.id))?.untrustedContent).toBe('');
+      // Remove the now-empty fixture row as an additional proof that lineage
+      // cleanup never relies on a surviving raw-store row or FK.
+      await env.db.pool.query('DELETE FROM slack_sources WHERE id=$1',[raw.id]);
+      await env.db.pool.query("UPDATE slack_derived_provenance_segments SET captured_at=statement_timestamp()-interval '8 days',expires_at=statement_timestamp()-interval '1 day' WHERE ati_user_id=$1",[user.person.id]);
+      // An equal source/revision/policy can be acquired again: its new capture
+      // must survive local expiry without a fabricated global source barrier.
+      const freshBody='Fresh raw capture after retention',fresh=await sources.saveSourceAtomic({sourceRef:segments[0]!.sourceRef,policyRef:segments[0]!.storagePolicyRef,untrustedContent:freshBody});
+      freshId=(await new MessageRepo(env.db.pool,registry).createSlackMessage(convId,'assistant','Fresh same-source capture',{type:'answer'},{segments:segments.map(s=>({...s,rawSourceId:fresh.id,captureHash:createHash('sha256').update(freshBody).digest('hex'),capturedAt:fresh.capturedAt.toISOString()})),selectors:['content']})).id;
+      const other=await env.addUser({name:'fresh-other-owner',workspaceId:user.binding.workspaceId,actorId:`U${randomUUID()}`});
+      otherId=await registerMessage(env,other,'Keep other ATI owner');
+    }
     native = await startNative(env, false);
     await native.until(() => health(native!.url), 'health without Slack config');
     await native.until(async () => (await env.db.pool.query('SELECT content FROM messages WHERE id=$1', [id])).rows[0].content === unavailable, 'durable purge without Slack config');
@@ -210,9 +232,24 @@ it('actual server erases a durable registered message without any Slack config a
     await native.until(async()=>!(JSON.stringify((await env.db.pool.query('SELECT name,request FROM schedules WHERE id=$1',[scheduleId])).rows[0]).includes('Private native')),'schedule erasure without Slack config');
     await native.until(async()=>!(JSON.stringify((await env.db.pool.query('SELECT title FROM conversations WHERE id=$1',[runConvId])).rows[0]).includes('Private native')),'run title erasure without Slack config');
     await native.until(async()=>!(JSON.stringify((await env.db.pool.query('SELECT error FROM schedule_runs WHERE id=$1',[runId])).rows[0]).includes('Private native')),'run error erasure without Slack config');
+    if(mode==='disconnect'){
     const jobs = (await env.db.pool.query('SELECT target_kind,status FROM slack_invalidation_intents WHERE source_event_key=$1', [key])).rows;
     expect(jobs.filter(row => row.status === 'completed').map(row => row.target_kind).sort()).toEqual(['audit_log_entry','chat_history_message','plan_step_arg','scheduled_workflow_arg','slack_source_raw','working_memory_entity']);
     expect(jobs.filter(row => row.status === 'pending')).toHaveLength(2);
+    }else{
+      await native.until(async()=>{
+        const pending=await env.db.pool.query("SELECT 1 FROM slack_invalidation_intents WHERE source_event_key LIKE 'derived-expiry:%' AND target_kind IN ('chat_history_message','working_memory_entity','plan_step_arg','audit_log_entry','scheduled_workflow_arg') AND status<>'completed'");
+        return pending.rowCount===0;
+      },'derived expiry intent completion');
+      const jobs=(await env.db.pool.query("SELECT target_kind,status FROM slack_invalidation_intents WHERE source_event_key LIKE 'derived-expiry:%'")).rows;
+      for(const kind of ['chat_history_message','working_memory_entity','plan_step_arg','audit_log_entry','scheduled_workflow_arg'])expect(jobs.filter(j=>j.target_kind===kind).every(j=>j.status==='completed')&&jobs.some(j=>j.target_kind===kind)).toBe(true);
+      expect(jobs.some(j=>j.target_kind==='proposal_excerpt'&&j.status==='pending')).toBe(true);
+      expect(jobs.some(j=>j.target_kind==='daily_digest_entry'&&j.status==='pending')).toBe(true);
+      expect((await env.db.pool.query('SELECT content FROM messages WHERE id=$1',[freshId])).rows[0].content).toBe('Fresh same-source capture');
+      expect((await env.db.pool.query('SELECT content FROM messages WHERE id=$1',[otherId])).rows[0].content).toBe('Keep other ATI owner');
+      expect((await env.db.pool.query("SELECT count(*)::int AS n FROM slack_invalidation_barriers")).rows[0].n).toBe(0);
+      expect((await new MessageRepo(env.db.pool,registry).listMessages(convId)).find(m=>m.id===freshId)?.content).toBe('Fresh same-source capture');
+    }
     expect((await env.db.pool.query('SELECT metadata FROM messages WHERE id=$1', [memory.id])).rows[0].metadata.state.members).toEqual([{ id: 'TRELLO', name: 'Keep' }]);
     expect(env.fixture.requests).toHaveLength(0);
     expect((await fetch(`${native.url}/api/slack/events`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(1000) })).status).toBe(503);
