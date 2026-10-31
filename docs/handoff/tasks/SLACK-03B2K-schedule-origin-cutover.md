@@ -1,6 +1,6 @@
 # SLACK-03B2K - Schedule origin cutover
 
-Status: IMPLEMENTED, pending review. Do not mark accepted until exact-head CI is green and the merge tree matches. This card does not close M2.
+Status: ACCEPTED on staging. PR #219 merge `eabb4455`, published head `f22fa4ba`. [CI 41223770927](https://github.com/VinhDat267/ATI_Project/actions/runs/41223770927) pass on that head, check and browser. `git diff --exit-code` exit 0. [Reviewer checkpoint](../log/2026-11-01-slack-03b2k-review-integration.md). M2 stays open.
 
 Scope: `schedules` and the run that `tick`, `planNow` and `planOne` would start. `sealMessageOrigin` on a conversation title does not certify the schedule row. 03B2G lineage stays in place for Slack-sourced schedules.
 
