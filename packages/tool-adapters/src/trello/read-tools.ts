@@ -13,14 +13,8 @@ export class TrelloReadTools extends TrelloBaseAdapter {
     const queryLower = (args.query || '').toLowerCase();
     const limit = Math.min(Math.max(args.limit ?? 10, 1), 10);
 
-    let filtered = rawBoards.filter((b) =>
-      (b.name || '').toLowerCase().includes(queryLower)
-    );
-
-    // Apply AllowedScope board whitelist if configured
-    if (this.allowedScope?.boards && this.allowedScope.boards.length > 0) {
-      filtered = filtered.filter((b) => this.allowedScope!.boards!.includes(b.id));
-    }
+    let filtered = rawBoards.filter((b) => this.allowedBoardIds.includes(b.id));
+    filtered = filtered.filter((b) => (b.name || '').toLowerCase().includes(queryLower));
 
     return filtered.slice(0, limit).map((b) => ({
       id: String(b.id),
@@ -112,12 +106,9 @@ export class TrelloReadTools extends TrelloBaseAdapter {
     const rawCards: any[] = Array.isArray(res?.cards) ? res.cards : Array.isArray(res) ? res : [];
     const limit = Math.min(Math.max(args.limit ?? 10, 1), 10);
 
-    let filtered = rawCards;
+    let filtered = rawCards.filter((c) => typeof c.idBoard === 'string' && this.allowedBoardIds.includes(c.idBoard));
     if (args.boardId) {
       filtered = filtered.filter((c) => c.idBoard === args.boardId);
-    }
-    if (this.allowedScope?.boards && this.allowedScope.boards.length > 0) {
-      filtered = filtered.filter((c) => typeof c.idBoard === 'string' && this.allowedScope!.boards!.includes(c.idBoard));
     }
     if (args.listId) {
       filtered = filtered.filter((c) => c.idList === args.listId);
@@ -146,9 +137,7 @@ export class TrelloReadTools extends TrelloBaseAdapter {
     idMembers: string[];
   }> {
     const card = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
-    if (this.allowedScope?.boards && this.allowedScope.boards.length > 0) {
-      this.assertParentBoard(card);
-    }
+    this.assertParentBoard(card);
 
     return {
       id: String(card.id),

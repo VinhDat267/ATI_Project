@@ -46,7 +46,7 @@ describe('packages/tool-adapters (Task 4b: Trello Read Tools & Allowed Scope Val
         status: 200,
         json: async () => ({
           cards: [
-            { id: 'c1', name: 'Fix homepage UI bug', url: 'https://trello.com/c/c1', idList: 'l1' },
+            { id: 'c1', name: 'Fix homepage UI bug', url: 'https://trello.com/c/c1', idList: 'l1', idBoard: 'b1' },
           ],
         }),
       };
@@ -62,6 +62,7 @@ describe('packages/tool-adapters (Task 4b: Trello Read Tools & Allowed Scope Val
           desc: 'Urgent fix required',
           url: 'https://trello.com/c/c1',
           idList: 'l1',
+          idBoard: 'b1',
           idMembers: ['m1'],
         }),
       };
@@ -77,7 +78,8 @@ describe('packages/tool-adapters (Task 4b: Trello Read Tools & Allowed Scope Val
 
   it('searches boards and filters by query and allowedScope whitelist', async () => {
     const adapter = new TrelloReadTools({
-      credentials: { apiKey: 'k', token: 't' },
+      credentials: { accessToken: 't' },
+      allowedBoardIds: ['b1', 'b2'],
       allowedScope: { boards: ['b1', 'b2'] },
       fetchFn: mockFetch as any,
     });
@@ -91,7 +93,8 @@ describe('packages/tool-adapters (Task 4b: Trello Read Tools & Allowed Scope Val
 
   it('searches lists in an allowed board and rejects forbidden boards', async () => {
     const adapter = new TrelloReadTools({
-      credentials: { apiKey: 'k', token: 't' },
+      credentials: { accessToken: 't' },
+      allowedBoardIds: ['b1'],
       allowedScope: { boards: ['b1'] },
       fetchFn: mockFetch as any,
     });
@@ -109,7 +112,8 @@ describe('packages/tool-adapters (Task 4b: Trello Read Tools & Allowed Scope Val
 
   it('searches members in board and enforces scope', async () => {
     const adapter = new TrelloReadTools({
-      credentials: { apiKey: 'k', token: 't' },
+      credentials: { accessToken: 't' },
+      allowedBoardIds: ['b1'],
       allowedScope: { boards: ['b1'] },
       fetchFn: mockFetch as any,
     });
@@ -125,7 +129,9 @@ describe('packages/tool-adapters (Task 4b: Trello Read Tools & Allowed Scope Val
 
   it('searches cards and gets card details', async () => {
     const adapter = new TrelloReadTools({
-      credentials: { apiKey: 'k', token: 't' },
+      credentials: { accessToken: 't' },
+      allowedBoardIds: ['b1'],
+      allowedScope: { boards: ['b1'] },
       fetchFn: mockFetch as any,
     });
 

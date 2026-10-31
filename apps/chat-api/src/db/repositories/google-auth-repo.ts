@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import type { GoogleProfile } from '../../auth/google-oidc.js';
 import type { UserRow } from './user-repo.js';
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
-export type OAuthMode = 'login' | 'link' | 'connect_gmail' | 'connect_mycalendar' | 'connect_mysheets';
+export type OAuthMode = 'login' | 'link' | 'connect_gmail' | 'connect_mycalendar' | 'connect_mysheets' | 'connect_trello';
 export interface OAuthState {
   id?: string;
   state_hash: string; browser_binding_hash: string; code_verifier: string; nonce: string;
