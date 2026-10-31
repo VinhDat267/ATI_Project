@@ -67,7 +67,7 @@ export async function guardStepRowsInTransaction(client:pg.PoolClient,registry:S
     const owner=(await client.query('SELECT user_id FROM conversations WHERE id=$1',[plan.row.conv_id])).rows[0]?.user_id as string;
     for(let i=0;i<rows.length;i++){
       const row=rows[i];
-      const certified=plan.allowed&&owner&&await planOriginAllowed(client,'execution_steps',row,owner);
+      const certified=!!owner&&await planOriginAllowed(client,'execution_steps',row,owner);
       if(!certified)rows[i]={...row,status:'unknown',args_json:JSON_TOMBSTONE,output_json:row.output_json==null?null:JSON_TOMBSTONE,error_json:row.error_json==null?null:JSON_TOMBSTONE};
       delete rows[i].slack_lineage_manifest;
     }

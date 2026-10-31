@@ -44,7 +44,16 @@ export async function planOriginAllowed(client: pg.PoolClient, table: PlanOrigin
   catch { return false; }
 }
 
-/** Caller may already hold the conversation lock. This repeats that lock, then the plan, then the artifact. */
+/** Reconciliation already holds the plan row lock. Do not lock the conversation here. */
+export async function resealHeldExecutionStep(client: pg.PoolClient, stepId: string): Promise<void> {
+  const row = (await client.query(`SELECT s.*, p.conv_id, v.user_id AS origin_owner
+    FROM execution_steps s JOIN plans p ON p.id=s.plan_id JOIN conversations v ON v.id=p.conv_id
+    WHERE s.id=$1 FOR UPDATE OF s`, [stepId])).rows[0];
+  if (!row) return;
+  const fingerprint = planOriginFingerprint('execution_steps', row, row.origin_owner);
+  await client.query(`UPDATE slack_plan_origins SET remainder_fingerprint=$2, producer='step_status', recorded_at=clock_timestamp()
+    WHERE artifact_table='execution_steps' AND artifact_id=$1`, [stepId, fingerprint]);
+}
 export async function sealPlanOrigin(client: pg.PoolClient, table: PlanOriginTable, id: string, producer: Producer): Promise<void> {
   await client.query('SAVEPOINT plan_origin_tx_guard');
   await client.query('RELEASE SAVEPOINT plan_origin_tx_guard');

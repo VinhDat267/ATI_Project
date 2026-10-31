@@ -158,7 +158,7 @@ export class PlanRepo {
     if (!plan.revision) return false;
     return this.transaction(async client=>{
     const checked=await guardPlanInTransaction(client,this.slack,plan.id,'planning');
-    if(!checked.allowed)return false;
+    if(!checked.allowed && nextStatus!=='stopped')return false;
     const result = await client.query(
       `UPDATE plans SET status = $6
        WHERE id = $1 AND plan_hash = $2 AND status = $3 AND xmin::text = $4

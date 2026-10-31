@@ -252,15 +252,15 @@ describe('startup execution reconciliation on real PostgreSQL', () => {
   }, API_TEST_TIMEOUT_MS);
 
   it('reconciles persisted progress after killing the actual execution process mid-write', async () => {
-    const plan = await fixture('pending', []);
-    const planJson = { steps: [
+    const conv = await convRepo.createConversation(userId);
+    const planJson = { kind: 'plan', thinking: 'Fixture', warnings: [], steps: [
       { id: 'step_1', tool: 'trello.create_card', description: 'Complete before crash', args: { listId: 'test-list', title: 'Fixture' }, dependsOn: [] },
       { id: 'step_2', tool: 'slack.send_message', description: 'Interrupted write', args: { channel: 'test-channel', text: 'Fixture' }, dependsOn: ['step_1'] },
       { id: 'step_3', tool: 'trello.create_card', description: 'Never started', args: { listId: 'test-list', title: 'Pending' }, dependsOn: ['step_2'] },
     ] };
     const text = JSON.stringify(planJson);
-    await pool.query('UPDATE plans SET plan_json = $2, plan_text = $3, plan_hash = $4 WHERE id = $1',
-      [plan.id, planJson, text, createHash('sha256').update(text).digest('hex')]);
+    const plan = await planRepo.createPlan({ convId: conv.id, planJson, planText: text,
+      planHash: createHash('sha256').update(text).digest('hex'), expiresAt: new Date(Date.now() + 60_000) });
     const worker = spawn(process.execPath, ['--import', 'tsx', 'apps/chat-api/tests/integration/fixtures/interrupted-execution-worker.ts'], {
       cwd: root, env: { ...process.env, DATABASE_URL: scopedUrl.href, TEST_PLAN_ID: plan.id, TEST_USER_ID: userId },
       stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
