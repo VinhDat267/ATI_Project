@@ -1,4 +1,5 @@
 import type pg from 'pg';
+import { decryptCredentials, encryptCredentials } from '@wap/tool-adapters';
 
 export type CredentialStatus = 'active' | 'reconnect_required';
 
@@ -18,7 +19,10 @@ function requireUser(userId: string | null | undefined): string {
 }
 
 export class CredentialRepo {
-  constructor(private pool: pg.Pool) {}
+  constructor(
+    private pool: pg.Pool,
+    private encryptionKey: string = process.env.ENCRYPTION_KEY || '01234567890123456789012345678901'
+  ) {}
 
   async saveCredentials(
     service: string,
@@ -96,6 +100,60 @@ export class CredentialRepo {
       [service, requireUser(userId), credentialId],
     );
     return (res.rowCount ?? 0) > 0;
+  }
+
+  /** Rotates a personal single-use refresh token inside a transaction with plaintext comparison. */
+  async rotatePersonalSecret(input: {
+    service: 'trello';
+    userId: string;
+    credentialId: string;
+    previousRefreshToken: string;
+    nextRefreshToken: string;
+  }): Promise<'rotated' | 'mismatch' | 'missing'> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const res = await client.query<ServiceCredentialRow>(
+        'SELECT * FROM service_credentials WHERE id = $1 AND service = $2 AND user_id = $3 FOR UPDATE',
+        [input.credentialId, input.service, requireUser(input.userId)]
+      );
+      const row = res.rows[0];
+      if (!row) {
+        await client.query('ROLLBACK');
+        return 'missing';
+      }
+
+      let data: Record<string, any>;
+      try {
+        data = decryptCredentials(row.config, this.encryptionKey);
+      } catch {
+        await client.query('ROLLBACK');
+        return 'mismatch';
+      }
+
+      if (data.refreshToken !== input.previousRefreshToken) {
+        await client.query('ROLLBACK');
+        return 'mismatch';
+      }
+
+      const updatedData = { ...data, refreshToken: input.nextRefreshToken };
+      const newConfig = encryptCredentials(updatedData, this.encryptionKey);
+
+      await client.query(
+        `UPDATE service_credentials
+         SET config = $1, status = 'active', status_changed_at = now()
+         WHERE id = $2`,
+        [newConfig, row.id]
+      );
+
+      await client.query('COMMIT');
+      return 'rotated';
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 
   /** Read and transform shared config under the same lock as key replacement. */
