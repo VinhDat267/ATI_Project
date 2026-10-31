@@ -1,8 +1,8 @@
 # Lộ trình đến cuối kỳ
 
-**Slack staging31/10:** PR217 accepted at merge `471c8a83`, published head `1344feca`; [CI41213639586](https://github.com/VinhDat267/ATI_Project/actions/runs/41213639586) check and browser SUCCESS on that head. Merge tree identical (`git diff --exit-code` exit 0). Plan/step/audit origin cutover accepted as03B2J. Schedule origin remains open. [Integration log](log/2026-10-31-slack-03b2j-review-integration.md), [current matrix](SLACK-DELIVERY.md). M1 accepted; M2 remains open.
+**Slack staging 01/11:** PR #219 accepted at merge `eabb4455`, published head `f22fa4ba`; [CI 41223770927](https://github.com/VinhDat267/ATI_Project/actions/runs/41223770927) check and browser SUCCESS on that head. Merge tree identical (`git diff --exit-code` exit 0). Schedule origin cutover accepted as 03B2K. Public read remains open. [Integration log](log/2026-11-01-slack-03b2k-review-integration.md), [current matrix](SLACK-DELIVERY.md). M1 accepted; M2 remains open.
 
-**Remaining Slack scope:** schedule origin certification (03B2K); public read03B3/03B4; authorization fanout/six watermarks/rotation recovery,04C; three modes/Inbox, API reconciliation, native Slack Free/Pro/two-user/model. Future proposal/digest kinds remain unsupported. Public Slack dispatch stays gated for source-bound plans in both namespaces. Main/live flags unchanged; fullF3/F4 open. The03B2J cutover does not certify schedule rows.
+**Remaining Slack scope:** public read 03B3, then 03B4; authorization fanout/six watermarks/rotation recovery, 04C; three modes/Inbox, API reconciliation, native Slack Free/Pro/two-user/model. Future proposal/digest kinds remain unsupported. Public Slack dispatch stays gated for source-bound plans in both namespaces. Main/live flags unchanged; full F3/F4 open. The 03B2K cutover does not add a public Slack read. The 03B3 plan anchored at `612ac427` is not the implementation baseline.
 
 Nguồn: mục 5.2 của báo cáo giữa kỳ. Hạn cuối kỳ dự kiến 11/11/2026. Trạng thái: `xong`, `đang làm` (ghi nhánh), `chờ` (đã có task card), `chưa có task card` (cần Claude Code lập kế hoạch trước khi giao).
 
