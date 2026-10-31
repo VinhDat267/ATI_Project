@@ -1,6 +1,6 @@
 # SLACK-03B2I - Message/memory/title origin cutover
 
-Status: CODE_COMPLETE; independent final review/publication pending. Base `993d17ce`, after accepted PR214. Root implements directly in the same sole worktree/branch. [Parent03B2](SLACK-03B2-derived-lineage-and-purge.md), [M2](../SLACK-DELIVERY.md), [runtime plan](../../superpowers/plans/2026-10-31-slack-03b2i-message-origin-cutover.md).
+Status: CODE_COMPLETE / REVIEW_PASS; staging publication pending. Base `993d17ce`, after accepted PR214. Root implements directly in the same sole worktree/branch. [Parent03B2](SLACK-03B2-derived-lineage-and-purge.md), [M2](../SLACK-DELIVERY.md), [runtime plan](../../superpowers/plans/2026-10-31-slack-03b2i-message-origin-cutover.md).
 
 Deliverable: actual message/memory and conversation-title writers atomically certify source-free remainder under an explicit cutover; actual HTTP/history/search/model hydration rejects unknown legacy and direct-SQL bypasses; deterministic bounded backfill classifies only evidence-backed artifacts and leaves ambiguous bytes quarantined. Existing source lineage/authority/TTL/CAS/physical purge remains mandatory for registered selectors. This is one end-to-end message lifecycle, not a detached certificate primitive.
 
@@ -12,12 +12,12 @@ Acceptance:
 - [x] Unknown unmarked legacy, new raw SQL bypass and payload/certificate substitution never reach actual HTTP/history/search/model; legitimate source-free chat still works.
 - [x] Mixed-source registered memory preserves certified other-service remainder through invalidation and physical erasure; tampered unknown remainder is never resealed by purge.
 - [x] Bounded deterministic backfill: dry-run default, explicit apply, evidence-only eligibility, idempotency, aggregate unresolved counts; ambiguous data unchanged and blocked. No native/production backfill run.
-- [ ] Real PostgreSQL locks/rollback/AbortSignal and native bootstrap fixture evidence; focused tests, frozen fullcheck and independent whole-branch review.
+- [x] Real PostgreSQL locks/rollback/AbortSignal and native bootstrap fixture evidence; focused tests, frozen fullcheck and independent whole-branch review.
 - [ ] Exact published-head check/browser CI, identical merge tree and reviewer checkpoint.
 
 ## Kết quả
 
-Prior freeze `eb18241fdc3fe19a4fc59cffa7c79a36ed5541d1`: fullcheck3735PASS, exit0; typecheck/build/securityPASS. That run included24 origin regressions covering real SQL/HTTP/model/CLI/lock/AbortSignal/lease/remainder; actual native bootstrap4 tests run in fullcheck with flags/config absent. [Original REDs, fixture failures and fixes](../log/2026-10-31-slack-03b2i-message-origin-cutover.md). Independent review found one P2 in legacy dictionary-key eligibility after103/103 focusedPASS; root reproduced3RED and tightened remaining-state eligibility. Revised origin27/27PASS, exit0,14.69s. Revised frozen fullcheck/final review and exact-head publication remain pending.
+Frozen `e8349895e20e36e2b3aa17a36b11256f835f8016`: fullcheck3738PASS, exit0; typecheck/build/securityPASS. Origin27 regressions cover real SQL/HTTP/model/CLI/locks/AbortSignal/lease/remainder; actual native bootstrap4 tests run with flags/config absent. [Original REDs, fixture failures and fixes](../log/2026-10-31-slack-03b2i-message-origin-cutover.md). Earlier independent103/103PASS still found one P2 via actual PostgreSQL/HTTP/planner probe; root reproduced3RED and tightened legacy dictionary-key eligibility. Final independent whole-branch/fix review PASS,106/106 fresh tests plus original P2 probe PASS (quarantined, no HTTP/model leak, bytes preserved). Exact-head check/browser CI and staging publication pending.
 
 Maintenance command: `node --import tsx apps/chat-api/src/cli/slack-message-origin-backfill.ts` with explicitly selected DATABASE_URL; defaults to dry run, `--apply` writes only evidence-backed private manifest/origin proofs. Reports aggregate eligible/quarantined counts; ambiguous bytes remain blocked and unchanged. Executed only in isolated synthetic schemas; production/native data NOT_RUN.
 
