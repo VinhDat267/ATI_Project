@@ -1,8 +1,8 @@
 # Lộ trình đến cuối kỳ
 
-**Slack staging31/10:** PR215 accepted at merge `7d00de3f`, published head `77c0c563`; [CI41195886792](https://github.com/VinhDat267/ATI_Project/actions/runs/41195886792) check and browser SUCCESS on that head. Merge tree identical (`git diff --exit-code` exit 0). Message/memory/title origin cutover accepted as03B2I. Plan/step/audit/schedule origin gates remain open. [Integration log](log/2026-10-31-slack-03b2i-review-integration.md), [current matrix](SLACK-DELIVERY.md). M1 accepted; M2 remains open.
+**Slack staging31/10:** PR217 accepted at merge `471c8a83`, published head `1344feca`; [CI41213639586](https://github.com/VinhDat267/ATI_Project/actions/runs/41213639586) check and browser SUCCESS on that head. Merge tree identical (`git diff --exit-code` exit 0). Plan/step/audit origin cutover accepted as03B2J. Schedule origin remains open. [Integration log](log/2026-10-31-slack-03b2j-review-integration.md), [current matrix](SLACK-DELIVERY.md). M1 accepted; M2 remains open.
 
-**Remaining Slack scope:** plan/step/audit/schedule origin certification and legacy approval/dispatch/run gates; public read03B3/03B4; authorization fanout/six watermarks/rotation recovery,04C; three modes/Inbox, API reconciliation, native Slack Free/Pro/two-user/model. Future proposal/digest kinds remain unsupported. Public Slack dispatch stays gated for source-bound plans in both namespaces. Main/live flags unchanged; fullF3/F4 open. The03B2I cutover does not certify plan, step, audit or schedule origins.
+**Remaining Slack scope:** schedule origin certification (03B2K); public read03B3/03B4; authorization fanout/six watermarks/rotation recovery,04C; three modes/Inbox, API reconciliation, native Slack Free/Pro/two-user/model. Future proposal/digest kinds remain unsupported. Public Slack dispatch stays gated for source-bound plans in both namespaces. Main/live flags unchanged; fullF3/F4 open. The03B2J cutover does not certify schedule rows.
 
 Nguồn: mục 5.2 của báo cáo giữa kỳ. Hạn cuối kỳ dự kiến 11/11/2026. Trạng thái: `xong`, `đang làm` (ghi nhánh), `chờ` (đã có task card), `chưa có task card` (cần Claude Code lập kế hoạch trước khi giao).
 
