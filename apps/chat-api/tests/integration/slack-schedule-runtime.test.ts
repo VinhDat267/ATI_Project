@@ -166,9 +166,9 @@ it('timeout aborts real HTTP planning and stores no late result',async()=>{
   const f=await confirmed();let release!:()=>void;const gate=new Promise<void>(r=>{release=r;});let aborted=false;
   const path=`/slow-schedule-${randomUUID()}`;env.fixture.setHandler(path,async()=>{await gate;return {body:{kind:'answer',text:'private late',lookups:[],usedDirectory:[]}};});
   const chat=new ChatService({msgRepo:messages,planRepo:new PlanRepo(env.db.pool,registry),schedules:{repo:f.service.repo,timeZone:zone},eventEmitter:{emit:()=>{}},planner:{routeSchedule:async()=>({services:[],unavailable:[]}),processMessage:async input=>{try{return await(await fetch(env.fixture.url+path,{signal:input.signal})).json();}finally{aborted=input.signal?.aborted===true;}}}});
-  const runner=new ScheduleRunner({pool:env.db.pool,timeZone:zone,planTimeoutMs:150,recordState:(...args)=>f.service.recordState(...args),planRun:(...args)=>chat.planScheduledRun(...args)});
+  const runner=new ScheduleRunner({pool:env.db.pool,timeZone:zone,planTimeoutMs:5000,recordState:(...args)=>f.service.recordState(...args),planRun:(...args)=>chat.planScheduledRun(...args)});
   const run=await f.service.startRun({userId:f.owner.person.id,scheduleId:f.change.schedule.id,trigger:'manual',now:new Date()});
-  try{await runner.planNow(run.id);await vi.waitFor(()=>expect(aborted).toBe(true));}finally{release();await runner.stop();}
+  try{await runner.planNow(run.id);await vi.waitFor(()=>expect(aborted).toBe(true));expect(env.fixture.requests.filter(r=>r.path===path)).toHaveLength(1);}finally{release();await runner.stop();}
   const row=(await env.db.pool.query('SELECT status,conv_id,plan_id FROM schedule_runs WHERE id=$1',[run.id])).rows[0];expect(row.status).toBe('planning_failed');expect(row.plan_id).toBeNull();
   expect(JSON.stringify((await env.db.pool.query('SELECT content,metadata FROM messages WHERE conv_id=$1',[row.conv_id])).rows)).not.toContain('private late');
 },20_000);
@@ -244,4 +244,16 @@ it('two source workspaces for the same ATI owner confirm concurrently without a 
   const results=await Promise.allSettled([{convId:f.conv,messageId:f.message.id},{convId:conv,messageId:message.id}].map(input=>service.confirmProposal({...input,userId:f.owner.person.id,now})));
   expect(results.map(r=>r.status)).toEqual(['fulfilled','fulfilled']);
   expect((await env.db.pool.query('SELECT count(*)::int AS n FROM schedules WHERE user_id=$1',[f.owner.person.id])).rows[0].n).toBe(2);
+},20_000);
+
+it('manual title history does not keep an intent open after a later registered title was physically erased',async()=>{
+  const f=await fixture(),repo=new ConversationRepo(env.db.pool);
+  const write=async(segments:typeof f.context.segments,title:string)=>{const client=await env.db.pool.connect();try{await client.query('BEGIN');await registry.prepareConversationWriteInTransaction(client,f.conv,f.owner.person.id,segments);await client.query('UPDATE conversations SET title=$2 WHERE id=$1',[f.conv,title]);await registerScheduleFields(client,registry,'conversations',f.conv,f.owner.person.id,segments,['title']);await client.query('COMMIT');}finally{client.release();}};
+  await write(f.context.segments,'private title A');await repo.renameConversation(f.conv,f.owner.person.id,'Human replacement');
+  const b=structuredClone(f.context.segments);b[0]!.sourceRef.resourceId=JSON.stringify(['C_SCHEDULE','1730000000.000002']);b[0]!.sourceRef.revision='1730000000.000002';await write(b,'private title B');
+  await env.stageBarriers([{effectKey:'delete-B',barrier:{barrierType:'resource',workspaceId:f.owner.binding.workspaceId,resourceType:'message',resourceId:b[0]!.sourceRef.resourceId,deleted:true,reason:'fixture'},purgeTarget:{scope:'resource_lifecycle',workspaceId:f.owner.binding.workspaceId,resourceType:'message',resourceId:b[0]!.sourceRef.resourceId,cascadeTargetKinds:[...SLACK_DERIVED_TARGET_KINDS],tombstoneReason:'source_deleted'}}]);
+  const consumer=new SlackMessagePurgeConsumer(env.db.pool,{targetKind:'scheduled_workflow_arg' as any});await consumer.runOnce(50);
+  expect((await env.db.pool.query('SELECT title FROM conversations WHERE id=$1',[f.conv])).rows[0].title).toBe('Slack content is unavailable.');
+  const key=await invalidate(f);await consumer.runOnce(50);
+  expect((await env.db.pool.query("SELECT status FROM slack_invalidation_intents WHERE source_event_key=$1 AND target_kind='scheduled_workflow_arg'",[key])).rows[0].status).toBe('completed');
 },20_000);
