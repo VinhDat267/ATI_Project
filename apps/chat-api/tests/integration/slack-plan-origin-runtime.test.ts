@@ -56,7 +56,9 @@ it('seals a real source-free plan and its step output, then hides a later SQL by
   });
   expect(JSON.stringify(await plans.getPlan(plan.id))).toContain('certified source-free plan');
   expect(await plans.approvePlan(plan.id, body.planHash, owner.id)).toBe(true);
-  const step = await steps.createStep({planId: plan.id, stepId: 's1', tool: 'trello.create_card', argsJson: body.planJson.steps[0].args, requestedBy: owner.id});
+  const args = body.planJson.steps[0]?.args;
+  if (!args) throw new Error('fixture step missing');
+  const step = await steps.createStep({planId: plan.id, stepId: 's1', tool: 'trello.create_card', argsJson: args, requestedBy: owner.id});
   await steps.updateStepStatus(step.id, 'succeeded', {url: 'https://example.test/card'});
   const snapshot = await plans.getSourceExecutionSnapshot(plan.id);
   expect(JSON.stringify(snapshot.steps)).toContain('https://example.test/card');
