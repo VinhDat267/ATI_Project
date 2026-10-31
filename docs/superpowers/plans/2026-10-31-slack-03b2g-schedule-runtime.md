@@ -10,3 +10,5 @@ Execution: root directly, one read-only independent whole-branch reviewer at fre
 6. Freeze product/test/base, run fullcheck once, independent whole-branch review; fix real findings with RED->GREEN and rerun only when justified. Publish card/log/PR, require exact-head check/browser and identical merge tree, then reviewer CURRENT/ROADMAP/matrix checkpoint.
 
 Review focus: confirmation/run lock order and changed source union; revoke during model await; source copy in title/state/previous proposal/run errors; title search leaking masked text; legitimate rename versus unregistered resurrection; paused/cancelled/completed schedule resume; source plan child/execution interactions and late result rollback.
+
+Code/fixture verification at frozen3485e8cc: fullcheck3696PASS, independent whole-branch/final-fix reviewPASS, fresh28/28 independent tests. [Evidence and failures](../../handoff/log/2026-10-31-slack-03b2g-schedule-runtime.md). Publication/check/browser/merge-tree gates remain pending.
