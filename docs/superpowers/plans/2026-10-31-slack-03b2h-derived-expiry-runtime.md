@@ -12,3 +12,6 @@ Execution: root directly; one independent read-only whole-branch reviewer at fin
 Review focus: a newer capture with identical source reference survives; raw retention is independent of derived expiry; any expired segment invalidates mixed output; proof cannot be substituted by a prefix/other owner/version/time; microsecond and canonical BIGINT identity; active source barriers/normal events unchanged; cancellation/lease loss rolls back physical erasure; receipt completion never certifies unknown fingerprint or future handler.
 
 Code/fixture verification at frozen9074bce1: fullcheck3710PASS; independent whole-branch/final-fix reviewPASS, fresh82/82 tests. [Evidence and failures](../../handoff/log/2026-10-31-slack-03b2h-derived-expiry-runtime.md). Exact-head check/browser and staging merge-tree gates remain pending.
+
+
+Accepted PR214 at published a30625fe, CI41165560075 check/browser SUCCESS; merge d8c9119f at2026-10-31T03:58:08Z, identical tree diff0. [Reviewer checkpoint](../../handoff/log/2026-10-31-slack-03b2h-review-integration.md). Explicit writer certification/cutover and legacy backfill/quarantine remain next; public read stays pending.
