@@ -8,6 +8,8 @@ import { isDeepStrictEqual } from 'node:util';
 import { readableRecoveryPlan, recoveryConflict, restoredProgress, validateRecoveryAction, verifiedRecoveryPlan, verifiedRecoverySteps } from './execution-recovery.js';
 import type { AdapterContext } from './adapter-factory.js';
 import { isSlackSourceArtifact } from './slack/slack-plan-lineage.js';
+import type { SlackReadRuntime } from './slack/slack-read-runtime.js';
+import type { SlackExecutionSnapshot } from '@wap/executor';
 
 export interface ApproveResult {
   success: boolean;
@@ -17,6 +19,7 @@ export interface ApproveResult {
 }
 
 export interface ExecutionServiceOptions {
+  slackRead?: SlackReadRuntime;
   planRepo: PlanRepo;
   stepRepo?: StepRepo;
   convRepo?: {
@@ -43,8 +46,10 @@ export class ExecutionService {
   private stopRequests = new Set<string>();
   private executionOutcomes = new Map<string, { status: string; pausedStepId?: string }>();
   private sourceSnapshots = new Map<string,{hash:string;userId:string}>();
+  private slackRead?: SlackReadRuntime;
 
   constructor(options: ExecutionServiceOptions) {
+    this.slackRead=options.slackRead;
     this.planRepo = options.planRepo;
     this.stepRepo = options.stepRepo;
     this.convRepo = options.convRepo;
@@ -94,7 +99,7 @@ export class ExecutionService {
     if (!conversation || conversation.user_id !== userId) {
       throw Object.assign(new Error('Forbidden: you do not own this plan'), { status: 403 });
     }
-    if(isSlackSourceArtifact(plan)){
+    if(isSlackSourceArtifact(plan)||plan.plan_json?.connections?.myslack){
       if(!this.stepRepo)throw Object.assign(new Error('SLACK_EXECUTION_STORAGE_REQUIRED'),{status:409});
       const old=this.sourceSnapshots.get(planId);
       if(old&&old.hash!==plan.plan_hash)throw Object.assign(new Error('SLACK_SOURCE_UNAVAILABLE'),{status:409});
@@ -134,6 +139,11 @@ export class ExecutionService {
 
     // Everything that can fail is done before the approval CAS commits.
     const context = this.executionContext(userId, planJson?.connections);
+    if(planJson?.connections?.myslack){
+      if(!this.slackRead||!this.stepRepo)return {success:false,status:409,error:'SLACK_READ_UNAVAILABLE'};
+      try{await this.slackRead.assertApproval({planId,planHash:planRow.plan_hash,userId,steps:planJson.steps,bindings:planJson.connections.myslack});}
+      catch{return {success:false,status:409,error:'SLACK_READ_POLICY_DENIED'};}
+    }
 
     // 1. Optimistic Locking: only succeeds if current status is 'pending' and not expired
     const approved = await this.planRepo.approvePlan(planId, planRow.plan_hash, userId);
@@ -176,9 +186,15 @@ export class ExecutionService {
   }
 
   private buildController(convId: string, planId: string, steps: PlanStep[], dbIds: Map<string, string>, context: AdapterContext, initialStates?: Record<string, StepState>, dispatch?: {userId: string; planHash: string}) {
+    const slackSnapshot:SlackExecutionSnapshot|undefined=context.connections?.myslack&&dispatch?{planId,planHash:dispatch.planHash,userId:dispatch.userId,steps,bindings:context.connections.myslack,
+      outputOrigins:Object.fromEntries(Object.entries(initialStates??{}).filter(([,s])=>s.status==='succeeded').map(([id])=>[id,'persisted' as const]))}:undefined;
     return new ExecutionController({
       // The executor keeps its interface; who runs and which connection was previewed travel in this closure.
-      runner: {executeStep:async(step:PlanStep,outputs:StepOutputs,runOptions?:ExecuteStepOptions)=>new StepRunner({ getAdapter: async serviceName => {
+      runner: {executeStep:async(step:PlanStep,outputs:StepOutputs,runOptions?:ExecuteStepOptions)=>new StepRunner({ slackSnapshot,slackDispatchGuard:slackSnapshot&&this.slackRead?this.slackRead.guard(slackSnapshot):undefined,getAdapter: async serviceName => {
+        if(serviceName==='myslack'){
+          if(!this.slackRead||!slackSnapshot)throw new Error('SLACK_READ_UNAVAILABLE');
+          return this.slackRead.adapter(slackSnapshot.userId);
+        }
         const adapter=await this.adapterFactory.getAdapterForService(serviceName,context),source=this.sourceSnapshots.get(planId);
         if(!source && !(dispatch && typeof this.planRepo.assertSourceDispatchAllowed === 'function'))return adapter;
         return {execute:async(tool:string,args:any,options?:{signal?:AbortSignal})=>{
@@ -193,7 +209,9 @@ export class ExecutionService {
       onStepUpdate: async (stepId, state) => {
         const dbId = dbIds.get(stepId);
         if (dbId && this.stepRepo) {
-          const saved=await this.stepRepo.updateStepStatus(dbId,state.status,state.output,state.error);
+          const saved=slackSnapshot&&state.status==='succeeded'&&steps.find(s=>s.id===stepId)?.tool.startsWith('myslack.')
+            ? await this.slackRead!.persist(dbId,state.output,slackSnapshot,stepId)
+            : await this.stepRepo.updateStepStatus(dbId,state.status,state.output,state.error);
           if(isSlackSourceArtifact(saved)&&saved.status!==state.status)throw new Error('SLACK_SOURCE_UNAVAILABLE');
         }
         this.emitExecution(convId, 'exec_step', {
@@ -312,11 +330,17 @@ export class ExecutionService {
       this.activeControllers.delete(planId);
       controller = undefined;
     }
+    const reuseController=Boolean(controller);
     if (!controller) controller = await this.restoreController(planRow, userId, stepId, action);
     if (controller.isExecuting()) {
       throw Object.assign(new Error('Execution is already running'), { status: 409 });
     }
     validateRecoveryAction(status, controller.getAllStepStates(), stepId, action);
+    if(reuseController&&planRow.plan_json?.connections?.myslack){
+      if(!this.slackRead)throw recoveryConflict('SLACK_READ_UNAVAILABLE');
+      await this.slackRead.assertApproval({planId,planHash:planRow.plan_hash,userId,steps:planRow.plan_json.steps,bindings:planRow.plan_json.connections.myslack});
+      if(!await this.planRepo.claimRecovery(planRow,userId,'executing'))throw recoveryConflict('Execution changed or recovery is already running');
+    }
     this.executionOutcomes.delete(planId);
     const convId = planRow?.conv_id || '';
     const run = (async () => {

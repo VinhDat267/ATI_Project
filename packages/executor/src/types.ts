@@ -36,6 +36,8 @@ export interface AdapterExecutor {
 }
 
 export interface StepRunnerOptions {
+  slackSnapshot?: import('./slack/read-guard.js').SlackExecutionSnapshot;
+  slackDispatchGuard?: import('./slack/read-guard.js').SlackDispatchGuard;
   getAdapter: (serviceName: string) => AdapterExecutor | Promise<AdapterExecutor>;
 }
 

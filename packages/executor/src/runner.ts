@@ -1,6 +1,8 @@
 import type { PlanStep, ToolDefinition } from '@wap/tool-schemas';
 import { ALL_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS } from '@wap/tool-schemas';
 import { resolveArgs } from './resolver.js';
+import { executeSlackRead } from './slack/read-guard.js';
+import { isSlackReadTool } from '@wap/tool-schemas';
 import type {
   StepOutputs,
   StepRunnerOptions,
@@ -16,6 +18,7 @@ const catalog = new Map<string, ToolDefinition>(
 );
 
 export function isWriteTool(toolName: string): boolean {
+  if (toolName.startsWith('myslack.')) return !isSlackReadTool(toolName);
   const def = catalog.get(toolName);
   if (def) {
     return def.sideEffect === 'write';
@@ -83,6 +86,10 @@ export class StepRunner {
     const combinedSignal = combineSignals(timeoutSignal, options?.signal);
 
     try {
+      if (step.tool.startsWith('myslack.')) {
+        const output = await executeSlackRead({step,outputs:stepOutputs,snapshot:this.options.slackSnapshot,guard:this.options.slackDispatchGuard,getAdapter:this.options.getAdapter,signal:combinedSignal});
+        return {stepId:step.id,status:'success',output,error:null,durationMs:Date.now()-startTime};
+      }
       // 1. Resolve arguments ($ref, $template)
       const resolvedArgs = resolveArgs(step.args || {}, stepOutputs);
 
