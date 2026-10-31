@@ -10,3 +10,5 @@ Execution: root directly; one independent read-only whole-branch reviewer at fin
 6. Freeze base/product/test; fullcheck, one independent whole-branch review and necessary RED->GREEN fixes. Publish card/log, exact-head check/browser CI, merge/tree comparison, then reviewer CURRENT/ROADMAP/matrix checkpoint. Do not repeat fullcheck without changes/failure/unresolved concern.
 
 Review focus: a newer capture with identical source reference survives; raw retention is independent of derived expiry; any expired segment invalidates mixed output; proof cannot be substituted by a prefix/other owner/version/time; microsecond and canonical BIGINT identity; active source barriers/normal events unchanged; cancellation/lease loss rolls back physical erasure; receipt completion never certifies unknown fingerprint or future handler.
+
+Code/fixture verification at frozen9074bce1: fullcheck3710PASS; independent whole-branch/final-fix reviewPASS, fresh82/82 tests. [Evidence and failures](../../handoff/log/2026-10-31-slack-03b2h-derived-expiry-runtime.md). Exact-head check/browser and staging merge-tree gates remain pending.
