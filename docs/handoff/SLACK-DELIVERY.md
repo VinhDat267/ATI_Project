@@ -1,6 +1,6 @@
 # Slack delivery · trạng thái và cổng nghiệm thu
 
-Đối chiếu ngày31/10/2026 trên `integration/slack-personal-20261029`, tới PR211 (`acec5ca7`). Đây là nơi theo dõi tiến độ xuyên task; spec/card giữ yêu cầu, log giữ bằng chứng lịch sử. Cập nhật bảng sau mỗi lần tích hợp, không suy trạng thái hiện tại từ câu “pending” trong log cũ. Staging chưa vào main, hai cờ nội dung/automation vẫn tắt.
+Verified31/10/2026 on `integration/slack-personal-20261029` through PR212 (`83519243`). Canonical current cross-task matrix; spec/cards retain requirements and logs retain historical evidence. Staging is not main; content/automation flags remain off.
 
 ## Cách đọc trạng thái
 
@@ -25,7 +25,8 @@
 | Validation/runtime · [04B1](tasks/SLACK-04B1-lifecycle-validation.md), [04B2](tasks/SLACK-04B2-validation-runtime.md) | #205 `3e19386e`, #207 `76f55a3c`; [integration](log/2026-10-30-slack-04b2-review-integration.md) | Metadata auth.test supervisor khi cờ tắt. Credential có refresh token gặp invalid_auth giữ gate đóng; recovery còn mở | Chờ07 |
 | Committed bootstrap chain · [DELIVERY-01](tasks/SLACK-DELIVERY-01-workflow-repair.md) | #210 `fc6a00f9`, [CI/review/integration](log/2026-10-30-slack-delivery-review-integration.md) | Signed revoke→validation→disconnect→message purge; owner khác giữ nguyên. Probe không Slack config. [Test](../../apps/chat-api/tests/integration/slack-native-runtime.test.ts) chạy trong CI | Không thay07 |
 | Message/memory lifecycle · [03B2E](tasks/SLACK-03B2E-message-memory-runtime.md) | #211 `72eb477d`, integration `acec5ca7`; [CI/review](log/2026-10-31-slack-03b2e-review-integration.md) | Writer thật cùng transaction, metadata/array/singular memory selectors, guarded HTTP/history/planner; native server purge với cờ/config tắt. Plan/schedule bị chặn; legacy có gate, chưa full backfill/TTL cascade | Chờ07 |
-| Các core artifact còn lại, writer/read guard · [03B2](tasks/SLACK-03B2-derived-lineage-and-purge.md) | Mở: `plan_step_arg`, `scheduled_workflow_arg`, `audit_log_entry` | Cần registration cùng transaction, masking/physical erasure qua plan/schedule/executor, full legacy backfill và derived TTL sweep | Chờ07 |
+| Plan/execution lifecycle - [03B2F](tasks/SLACK-03B2F-plan-execution-runtime.md) | #212 `2395eeb7`, integration `83519243`; [CI/review](log/2026-10-31-slack-03b2f-review-integration.md) | Actual chat/plan/step/audit transactional provenance, guarded preview/approval/recovery/HTTP dispatch and native fixture physical erasure. Schedule/public Slack dispatch gated | Pending07 |
+| Core schedule and migration gates - [03B2](tasks/SLACK-03B2-derived-lineage-and-purge.md) | Open: scheduled_workflow_arg, full legacy backfill/derived TTL cascade | Actual schedule/run/title writer/read/run gates and erasure, then complete migration/TTL | Pending07 |
 | Binding/approval/dispatch · [03B3](tasks/SLACK-03B3-executor-binding-and-approval.md),03B4 phần còn lại | PLAN_ONLY / chưa public integration | Read integration trước; write dispatch bị chặn tới04C | Chờ07 |
 | FullF4 · [04](tasks/SLACK-04-ingress-lifecycle-and-execution-safety.md) | Mở: authorization fanout/app token, sáu watermark, rotation recovery,04C outbox/echo/UNKNOWN | Không đóng bằng ingress và auth.test riêng lẻ | Chờ07 |
 | FullF3, ba mode theo user/workspace, Inbox/digest ·03B2+05+06 | Mở | Năm nhóm artifact hiện hữu là mốc core; `proposal_excerpt`/`daily_digest_entry` chỉ nghiệm thu khi06 có artifact/writer/reader thật | Chờ07 |
@@ -36,7 +37,7 @@
 | Mốc | Deliverable kiểm chứng được | Điều kiện chốt |
 |---|---|---|
 | M1 · ĐÃ ĐẠT (nội bộ/fixture) |03B2D và DELIVERY-01 đã accepted: ký sự kiện→durable job→metadata validation→registered message erasure, cờ tắt, cách ly owner | Review độc lập đạt, committed bootstrap regressions và exact-head CI/check/browser xanh. Không đóng03/04 hay fullF3/F4 |
-| M2 · nguồn an toàn và đọc thủ công trong ATI |03B2E đã accepted message/memory. Hoàn tất ba core kind còn lại, writer/read gates, backfill/TTL; sau đó nối03B3(read)+03B4 public route/planner/executor/UI | Một yêu cầu đọc được duyệt chạy xuyên app; revoke/edit/delete/policy-change chặn tái sử dụng và xóa đúng mọi core artifact, hai ATI user/workspace không lẫn.05/06 chưa được giả lập để đóngF3 |
+| M2 - source safety and manual reads in ATI |03B2E/F accepted message/memory and plan/step/audit. Complete core schedule, backfill/TTL, then03B3(read)+03B4 public route/planner/executor/UI | Approved read through real app; revoke/edit/delete/policy change blocks reuse and erases core artifacts; owner/workspace isolation.05/06 required for fullF3 |
 | M3 · ghi an toàn dưới danh nghĩa user |04B authorization fanout/sáu watermark/rotation recovery;04C outbox+echo+UNKNOWN, rồi03C writes/03B3 write dispatch | Provider commit rồi timeout bằng AbortSignal không ghi lặp/retry mù; readback/reconciliation, approval và binding đúng.03C writes phụ thuộc04C, không đặt trước04 |
 | M4 · trợ lý và full lifecycle |05 ba mode,06 Inbox/digest trong ATI; tích hợp hai kind mới vào03B2 | Thu hồi nguồn không còn excerpt ở bất kỳ surface nào; khi đủ bảy kind + mọi yêu cầu khác mới đánh giá fullF3/F4 |
 | M5 · phạm vi đầy đủ và phát hành |03D/03E đối soát từng method;07 benchmark/live Free/Pro/hai user; release gate | Không mất scope đã duyệt. Native evidence từng method/luồng, model×3 theo spec, exact-head CI và duyệt trước main/bật cờ |

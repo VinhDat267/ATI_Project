@@ -10,3 +10,5 @@ Execution: root directly; one independent read-only reviewer at final freeze. Ap
 6. Freeze, fullcheck, independent review, exact-head check/browser CI, staging merge/tree verification then checkpoint. Do not repeat fullcheck without source/base changes or a specific unresolved concern.
 
 Review focus: source-bound plans with only non-Slack write steps; output-derived next-step refs; provider success racing revoke; late persistence and retry/recovery; two owners with same resource IDs; JSON selector/hash integrity; global parent/source lock order; orphan/superseded/resurrected copies and partial queue batches; no source payload in SSE.
+
+Accepted: PR212 `2395eeb7`, CI41101135831 check/browserSUCCESS, merge `83519243` identical tree. [Integration checkpoint](../../handoff/log/2026-10-31-slack-03b2f-review-integration.md). Remaining scope stays open as the card states.
