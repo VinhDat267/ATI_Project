@@ -6,6 +6,7 @@ import { SlackMessageContentPurger } from './slack-message-content-purger.js';
 import { messageFingerprint } from './slack-message-selectors.js';
 
 export interface MessagePurgeLease {id:string;workerNonce:string;leaseUntil:string}
+const replaceableHistory=(row:any)=>row.status==='purged'||(row.status==='retired'&&row.retired_reason==='manual');
 type Outcome='completed'|'retried'|'lost';
 type Code='STALE_LINEAGE'|'MISSING_HANDLER'|'INVALID_PROVENANCE'|'PARTIAL_PURGE'|'RETRY_SCAN'|'ABORTED'|'PURGE_FAILED';
 type SupportedKind='chat_history_message'|'working_memory_entity'|'plan_step_arg'|'audit_log_entry'|'scheduled_workflow_arg';
@@ -106,7 +107,7 @@ export class SlackMessagePurgeConsumer {
     let orphanScope='';if(orphanOwner){values.push(orphanOwner);orphanScope=`AND c.ati_user_id=$${values.length}::uuid`;}
     values.push(cutoff);const date=`$${values.length}`;values.push(this.size+1);const pageSize=`$${values.length}`;
     values.push(0);const offset=`$${values.length}`;
-    const query = `WITH candidates AS (SELECT c.id,c.target_version,c.target_fingerprint,c.status,c.target_kind,c.target_sub_id,c.created_at::text AS created_exact,
+    const query = `WITH candidates AS (SELECT c.id,c.target_version,c.target_fingerprint,c.status,c.retired_reason,c.target_kind,c.target_sub_id,c.created_at::text AS created_exact,
         m.payload AS artifact_payload,m.payload IS NOT NULL AS artifact_payload_present,
         CASE WHEN c.status='active' AND c.created_at<=${date}::timestamptz THEN 0 ELSE 1 END AS priority,
         n.id AS replacement_id,n.target_version AS replacement_version,n.target_fingerprint AS replacement_fingerprint,
@@ -114,10 +115,11 @@ export class SlackMessagePurgeConsumer {
          NOT EXISTS(SELECT 1 FROM slack_derived_provenance_segments s WHERE s.derived_copy_id=n.id AND s.ati_user_id<>n.ati_user_id) AND
          NOT EXISTS(SELECT 1 FROM slack_derived_provenance_segments s WHERE s.derived_copy_id=n.id AND (${sql}))) AS replacement_outside_target
       FROM slack_derived_copies c LEFT JOIN slack_derived_artifact_payloads m ON m.copy_id=c.id
-      LEFT JOIN slack_derived_copies n ON c.status='purged' AND n.status='active' AND n.ati_user_id=c.ati_user_id
+      LEFT JOIN slack_derived_copies n ON (c.status='purged' OR (c.status='retired' AND c.retired_reason='manual')) AND n.status='active' AND n.ati_user_id=c.ati_user_id
         AND n.target_kind=c.target_kind AND n.target_id=c.target_id AND n.target_sub_id=c.target_sub_id AND n.target_version>c.target_version
       WHERE c.target_kind='${this.kind}' AND (c.status='active' OR (c.status='retired' AND c.retired_reason='fingerprint_mismatch') OR
-        (c.status='purged' AND m.copy_id IS NOT NULL AND NOT slack_artifact_erased(c.target_kind,c.target_sub_id,m.payload)))
+        (c.status='purged' AND m.copy_id IS NOT NULL AND NOT slack_artifact_erased(c.target_kind,c.target_sub_id,m.payload)) OR
+        (c.status='retired' AND c.retired_reason='manual' AND c.target_kind='scheduled_workflow_arg' AND c.target_sub_id='title' AND m.copy_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM conversations v WHERE v.id::text=c.target_id AND v.slack_title_manual_fingerprint=encode(sha256(convert_to(to_jsonb(v.title)::text,'UTF8')),'hex'))))
       AND NOT(c.status='purged' AND c.target_kind='scheduled_workflow_arg' AND c.target_sub_id='title' AND EXISTS(SELECT 1 FROM conversations v WHERE v.id::text=c.target_id AND v.slack_title_manual_fingerprint=encode(sha256(convert_to(to_jsonb(v.title)::text,'UTF8')),'hex') AND NOT EXISTS(SELECT 1 FROM slack_derived_copies active WHERE active.target_id=c.target_id AND active.target_kind=c.target_kind AND active.status='active')))
       AND (EXISTS(SELECT 1 FROM slack_derived_provenance_segments s WHERE s.derived_copy_id=c.id AND (${sql})) OR
         (NOT EXISTS(SELECT 1 FROM slack_derived_provenance_segments s WHERE s.derived_copy_id=c.id) ${orphanScope})))
@@ -135,7 +137,7 @@ export class SlackMessagePurgeConsumer {
       delete row.artifact_payload;delete row.artifact_payload_present;
     }
     if(!unresolvedOnly)return result;
-    const unresolved=result.filter(row=>!(row.status==='purged'&&row.replacement_outside_target===true));
+    const unresolved=result.filter(row=>!(replaceableHistory(row)&&row.replacement_outside_target===true));
     if(unresolved.length || result.length<this.size+1)return unresolved;
     // Do not certify closure from only the first page of valid fresh replacements.
     values[values.length-1]=Number(values[values.length-1])+result.length;
@@ -161,7 +163,7 @@ export class SlackMessagePurgeConsumer {
       if(!target.cascadeTargetKinds.includes(this.kind))throw new Failure('INVALID_PROVENANCE');
       const barrier=await this.proof(client,row,target),cutoff=(await client.query('SELECT created_at::text AS cutoff FROM slack_invalidation_intents WHERE id=$1',[job.id])).rows[0].cutoff;
       const first=await this.candidates(client,target,cutoff),ids=[...new Set<string>(first.slice(0,this.size).flatMap(r=>
-        r.status==='purged'&&r.replacement_id?[r.id,r.replacement_id]:[r.id]))];
+        replaceableHistory(r)&&r.replacement_id?[r.id,r.replacement_id]:[r.id]))];
       let keys:string[];try {keys=await this.purger.sourceLockKeysInTransaction(client,ids);}catch{throw new Failure('STALE_LINEAGE');}
       await acquireSlackInvalidationLocks(client,[...slackInvalidationLockKeys(barrier),...keys]);
       if(signal?.aborted)throw new Failure('ABORTED');await this.owned(client,job);await this.proof(client,row,target,true);
@@ -182,7 +184,7 @@ export class SlackMessagePurgeConsumer {
         // This old physical payload was already erased. A newer, structurally
         // valid registered version now owns the exact text and is outside the
         // old target. Its source keys and parent are held with the old copy's.
-        if(copy.status==='purged'&&copy.replacement_id&&copy.replacement_outside_target===true)continue;
+        if(replaceableHistory(copy)&&copy.replacement_id&&copy.replacement_outside_target===true)continue;
         const result=await this.purger.purgeInTransaction(client,{intentId:job.id,derivedCopyId:copy.id,expectedTargetVersion:copy.target_version,signal});
         if(!['purged','already_purged'].includes(result.status))code=result.status==='missing_handler'?'MISSING_HANDLER':'STALE_LINEAGE';
       }

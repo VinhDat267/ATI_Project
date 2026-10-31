@@ -411,7 +411,7 @@ export class ChatService {
     planned: PlannerResponse, memory: WorkingMemory, userTexts: string[], signal?: AbortSignal,
   ): Promise<PreparedResponse> {
     const { conversationId, correlation } = target;
-    if (target.slackContext && planned.kind === 'plan' && (!this.planRepo || planned.steps.some(s=>s.tool.startsWith('myslack.')))) throw new Error('SLACK_DISPATCH_BINDING_REQUIRED');
+    if (target.slackContext && planned.kind === 'plan' && (!this.planRepo || planned.steps.some(s=>/^(myslack|slack)\./.test(s.tool)))) throw new Error('SLACK_DISPATCH_BINDING_REQUIRED');
     let response = planned.kind === 'plan' ? await this.bindConnections(planned, target.userId, signal) : planned;
     signal?.throwIfAborted();
     let proposal: ScheduleProposalMetadata | null = null;

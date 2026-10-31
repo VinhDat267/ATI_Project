@@ -153,6 +153,13 @@ export class ScheduleService {
       let saved=existingId?await captureScheduleArtifact(client,this.registry,'schedules',existingId):null;
       if(!proposed||proposed.convId!==convId||proposed.owner!==userId)throw new ScheduleNotFound();
       await prelockScheduleArtifacts(client,this.registry,[proposed,saved]);
+      // Capacity is exclusive before any registry authority FOR SHARE. Two
+      // workspaces of one ATI owner have disjoint source keys; upgrading two
+      // shared user locks later in ensureRoom would deadlock. Preserve global
+      // source -> conversation -> schedule -> owner -> artifact ordering.
+      await client.query('SELECT id FROM conversations WHERE id=$1 AND user_id=$2 FOR UPDATE',[convId,userId]);
+      if(saved)await client.query('SELECT id FROM schedules WHERE id=$1 FOR UPDATE',[saved.id]);
+      await client.query('SELECT id FROM users WHERE id=$1 FOR UPDATE',[userId]);
       const guarded=await guardScheduleArtifact(client,this.registry,proposed,'planning','UPDATE');
       if(!guarded.allowed)throw new ScheduleConflict('SCHEDULE_SOURCE_PURGED');
       const metadata=guarded.row.metadata as ScheduleProposalMetadata;

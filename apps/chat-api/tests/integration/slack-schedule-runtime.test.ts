@@ -1,10 +1,12 @@
-import {randomUUID} from 'node:crypto';
+import {randomUUID,createHash} from 'node:crypto';
 import {afterAll,beforeAll,expect,it,vi} from 'vitest';
 import {SLACK_DERIVED_TARGET_KINDS} from '@wap/tool-schemas';
 import {createSlackReadEnvironment,TEST_ENV,type SlackReadEnvironment} from '../helpers/slack-private-read-fixture.js';
 import {SlackDerivedLineageRepo} from '../../src/db/repositories/slack-derived-lineage-repo.js';
 import {MessageRepo} from '../../src/db/repositories/message-repo.js';
 import {PlanRepo} from '../../src/db/repositories/plan-repo.js';
+import {StepRepo} from '../../src/db/repositories/step-repo.js';
+import {ExecutionService} from '../../src/services/execution-service.js';
 import {ConversationRepo} from '../../src/db/repositories/conversation-repo.js';
 import {ChatService} from '../../src/services/chat-service.js';
 import {ScheduleService} from '../../src/services/schedules/schedule-service.js';
@@ -181,4 +183,65 @@ it('uncovered or expired schedule provenance blocks real reads and run creation 
   expect(JSON.stringify(await f.service.list(f.owner.person.id,new Date()))).not.toContain('private');
   await expect(f.service.startRun({userId:f.owner.person.id,scheduleId:id,trigger:'manual',now:new Date()})).rejects.toMatchObject({code:'SCHEDULE_SOURCE_PURGED'});
   expect((await env.db.pool.query('SELECT count(*)::int AS n FROM schedule_runs WHERE schedule_id=$1',[id])).rows[0].n).toBe(0);
+},20_000);
+
+it('manual retirement cannot certify closure when its authenticated title replacement has been overwritten',async()=>{
+  const f=await fixture(),repo=new ConversationRepo(env.db.pool),held=await env.db.pool.connect();
+  try{await held.query('BEGIN');await registry.prepareConversationWriteInTransaction(held,f.conv,f.owner.person.id,f.context.segments);
+    await held.query("UPDATE conversations SET title='private registered title' WHERE id=$1",[f.conv]);await registerScheduleFields(held,registry,'conversations',f.conv,f.owner.person.id,f.context.segments,['title']);await held.query('COMMIT');}finally{held.release();}
+  await repo.renameConversation(f.conv,f.owner.person.id,'Human replacement');
+  await env.db.pool.query("UPDATE conversations SET title='private resurrected title' WHERE id=$1",[f.conv]);const key=await invalidate(f);
+  const result=await new SlackMessagePurgeConsumer(env.db.pool,{targetKind:'scheduled_workflow_arg' as any}).runOnce(50);
+  expect(result.retried).toBeGreaterThan(0);
+  expect((await env.db.pool.query("SELECT status FROM slack_invalidation_intents WHERE source_event_key=$1 AND target_kind='scheduled_workflow_arg'",[key])).rows[0].status).toBe('failed');
+  expect((await repo.getConversation(f.conv))?.title).toBe('Slack content is unavailable.');
+  expect((await env.db.pool.query('SELECT title FROM conversations WHERE id=$1',[f.conv])).rows[0].title).toBe('private resurrected title');
+},20_000);
+
+it('source scheduled planning rejects the legacy Slack namespace before publishing an executable plan',async()=>{
+  const f=await confirmed();
+  const chat=new ChatService({msgRepo:messages,planRepo:new PlanRepo(env.db.pool,registry),schedules:{repo:f.service.repo,timeZone:zone},eventEmitter:{emit:()=>{}},planner:{routeSchedule:async()=>({services:[],unavailable:[]}),processMessage:async()=>({kind:'plan',thinking:'',summary:'private bot',warnings:[],steps:[{id:'s1',tool:'slack.send_message',args:{channel:'C_OTHER_BOT_WORKSPACE',text:'private leak'},description:'private',dependsOn:[]}]})}});
+  const runner=new ScheduleRunner({pool:env.db.pool,timeZone:zone,recordState:(...args)=>f.service.recordState(...args),planRun:(...args)=>chat.planScheduledRun(...args)});
+  const run=await f.service.startRun({userId:f.owner.person.id,scheduleId:f.change.schedule.id,trigger:'manual',now:new Date()});await runner.planNow(run.id);
+  const row=(await env.db.pool.query('SELECT status,conv_id,plan_id FROM schedule_runs WHERE id=$1',[run.id])).rows[0];
+  expect(row.status).toBe('planning_failed');expect(row.plan_id).toBeNull();
+  expect((await env.db.pool.query('SELECT count(*)::int AS n FROM plans WHERE conv_id=$1',[row.conv_id])).rows[0].n).toBe(0);
+},20_000);
+
+it('last dispatch rejects an older registered source plan using legacy Slack while source-free legacy plans still execute',async()=>{
+  const f=await fixture(),plans=new PlanRepo(env.db.pool,registry),json={kind:'plan',thinking:'',summary:'private old plan',warnings:[],steps:[{id:'s1',tool:'trello.create_card',description:'private',args:{name:'private'},dependsOn:[]}]};
+  const text=JSON.stringify(json),plan=await plans.createSlackPlan({convId:f.conv,planJson:json,planText:text,planHash:createHash('sha256').update(text).digest('hex'),expiresAt:new Date(Date.now()+600000)},f.context);
+  const old={...json,steps:[{id:'s1',tool:'slack.send_message',description:'private',args:{channel:'C_OTHER_BOT_WORKSPACE',text:'private legacy payload'},dependsOn:[]}]},oldText=JSON.stringify(old),oldHash=createHash('sha256').update(oldText).digest('hex');
+  const held=await env.db.pool.connect();try{await held.query('BEGIN');await registry.prepareConversationWriteInTransaction(held,f.conv,f.owner.person.id,f.context.segments);
+    await held.query('UPDATE plans SET plan_json=$2,plan_text=$3,plan_hash=$4 WHERE id=$1',[plan.id,JSON.stringify(old),oldText,oldHash]);
+    for(const selector of ['plan_json','plan_text','plan_hash'])await registry.registerDerivedCopyInTransaction(held,{atiUserId:f.owner.person.id,targetKind:'plan_step_arg',targetId:plan.id,targetSubId:selector,segments:f.context.segments});await held.query('COMMIT');}finally{held.release();}
+  const path=`/legacy-slack-${randomUUID()}`;env.fixture.setHandler(path,()=>({body:{id:'fixture-write'}}));
+  const execution=new ExecutionService({planRepo:plans,stepRepo:new StepRepo(env.db.pool,registry),convRepo:new ConversationRepo(env.db.pool),sseManager:new SSEManager(),adapterFactory:{getAdapterForService:()=>({execute:async(_tool:string,args:any,options:any)=>(await fetch(env.fixture.url+path,{method:'POST',body:JSON.stringify(args),signal:options.signal})).json()})}});
+  expect((await execution.approveAndStart(plan.id,f.owner.person.id)).success).toBe(true);
+  await vi.waitFor(async()=>expect(['partial','failed','completed']).toContain((await env.db.pool.query('SELECT status FROM plans WHERE id=$1',[plan.id])).rows[0].status),{timeout:5000});
+  expect(env.fixture.requests.filter(r=>r.path===path)).toHaveLength(0);
+  const plain=(await new ConversationRepo(env.db.pool).createConversation(f.owner.person.id)).id;
+  const baseline=await plans.createPlan({convId:plain,planJson:old,planText:oldText,planHash:oldHash,expiresAt:new Date(Date.now()+600000)});
+  expect((await execution.approveAndStart(baseline.id,f.owner.person.id)).success).toBe(true);
+  await vi.waitFor(async()=>expect((await env.db.pool.query('SELECT status FROM plans WHERE id=$1',[baseline.id])).rows[0].status).toBe('completed'),{timeout:5000});
+  expect(env.fixture.requests.filter(r=>r.path===path)).toHaveLength(1);
+},20_000);
+
+it('two source workspaces for the same ATI owner confirm concurrently without a shared-to-exclusive user deadlock',async()=>{
+  const f=await fixture(),second=await env.addUser({name:'second workspace',workspaceId:`T${randomUUID()}`,actorId:`U${randomUUID()}`});
+  // Seed a second real connection for the existing ATI identity; all policy and
+  // proposal writes below use the actual new binding, not fabricated decisions.
+  await env.db.pool.query('UPDATE slack_connections SET user_id=$2 WHERE id=$1',[second.binding.connectionId,f.owner.person.id]);second.binding.atiUserId=f.owner.person.id;
+  const consent=await env.consentRepo.getConsent(second.binding.workspaceId,env.runtimeIdentity.providerId);
+  await env.consentRepo.grantConsent({workspaceId:second.binding.workspaceId,providerId:env.runtimeIdentity.providerId,expectedRevision:consent!.revision,policyVersion:'v1.0.0',purposes:['storage','manual_lookup','planning'],retentionDays:14,organizationRepresentative:'fixture',evidenceRef:'FIXTURE',recordedBy:'fixture'});
+  const policy=await env.policyService.resolveSlackModelPolicy({binding:second.binding,purpose:'storage',requestedRetentionDays:7,env:TEST_ENV});if(!policy.allowed)throw Error('fixture denied');
+  const conv=(await new ConversationRepo(env.db.pool).createConversation(f.owner.person.id)).id;
+  const context={segments:[{...f.context.segments[0]!,sourceRef:{...f.context.segments[0]!.sourceRef,binding:second.binding},storagePolicyRef:policy.policyReference,acquisitionPolicyRef:{...policy.policyReference,purpose:'planning' as const,requestedRetentionDays:0}}],selectors:['content','metadata.proposal']};
+  const message=await messages.createSlackMessage(conv,'assistant',f.proposal.summary,{type:'schedule_proposal',proposal:f.proposal,services:['trello'],nextRuns:[],scheduleId:null,baseVersion:null},context);
+  let reached=0,release!:()=>void;const gate=new Promise<void>(r=>{release=r;});
+  const observed=new Proxy(env.db.pool,{get(target,key){if(key==='connect')return async()=>{const client=await target.connect();return {query:async(...args:any[])=>{if(args[0]==='SELECT id FROM users WHERE id=$1 FOR UPDATE'){if(++reached===2)release();await gate;}return (client.query as any)(...args);},release:()=>client.release()};};const value=Reflect.get(target,key);return typeof value==='function'?value.bind(target):value;}});
+  const service=new ScheduleService({pool:observed,timeZone:zone}),now=new Date();
+  const results=await Promise.allSettled([{convId:f.conv,messageId:f.message.id},{convId:conv,messageId:message.id}].map(input=>service.confirmProposal({...input,userId:f.owner.person.id,now})));
+  expect(results.map(r=>r.status)).toEqual(['fulfilled','fulfilled']);
+  expect((await env.db.pool.query('SELECT count(*)::int AS n FROM schedules WHERE user_id=$1',[f.owner.person.id])).rows[0].n).toBe(2);
 },20_000);

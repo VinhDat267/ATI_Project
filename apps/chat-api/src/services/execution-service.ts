@@ -184,7 +184,7 @@ export class ExecutionService {
         return {execute:async(tool:string,args:any,options?:{signal?:AbortSignal})=>{
           const detached=structuredClone(args);
           const freeze=(value:any):any=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};freeze(detached);
-          if(tool.startsWith('myslack.')||step.tool!==tool)throw Object.assign(new Error('SLACK_DISPATCH_BINDING_REQUIRED'),{category:'AUTH_ERROR',details:{requestSent:false}});
+          if(/^(myslack|slack)\./.test(tool)||step.tool!==tool)throw Object.assign(new Error('SLACK_DISPATCH_BINDING_REQUIRED'),{category:'AUTH_ERROR',details:{requestSent:false}});
           await this.planRepo.assertSourceDispatchAllowed(planId,source.userId,source.hash,step.id,tool,options?.signal);
           options?.signal?.throwIfAborted();return adapter.execute(tool,detached,options);
         }};
