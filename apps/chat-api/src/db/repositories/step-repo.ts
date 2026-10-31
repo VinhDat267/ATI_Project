@@ -5,6 +5,7 @@ import { SlackPolicyService } from '../../services/slack/policy-service.js';
 import { guardPlanInTransaction,guardStepRowsInTransaction,tagSlackSourceArtifact } from '../../services/slack/slack-plan-lineage.js';
 import { JSON_TOMBSTONE } from '../../services/slack/slack-artifact-targets.js';
 import { hasSlackMarker } from '../../services/slack/slack-message-selectors.js';
+import { sealPlanOrigin } from '../../services/slack/slack-plan-origin.js';
 
 export interface ExecutionStepRow {
   id: string;
@@ -60,6 +61,7 @@ export class StepRepo {
     const row=res.rows[0];
     if(context.source){await this.slack.registerDerivedCopyInTransaction(client,{atiUserId:context.segments[0]!.sourceRef.binding.atiUserId,targetKind:'plan_step_arg',targetId:row.id,targetSubId:'args_json',segments:context.segments});
       await client.query('UPDATE execution_steps SET slack_lineage_manifest=$2 WHERE id=$1',[row.id,JSON.stringify(['args_json'])]);tagSlackSourceArtifact(row);}
+    else await sealPlanOrigin(client,'execution_steps',row.id,'step_writer');
     delete row.slack_lineage_manifest;return row;
     });
   }
@@ -117,7 +119,7 @@ export class StepRepo {
         output_json=CASE WHEN output_json IS NOT NULL THEN $2::jsonb ELSE NULL END,
         error_json=$2::jsonb WHERE id=$1 RETURNING *`,[id,JSON.stringify(JSON_TOMBSTONE)])).rows[0];
       await client.query('UPDATE execution_steps SET slack_lineage_manifest=$2 WHERE id=$1',[id,JSON.stringify(selectors)]);tagSlackSourceArtifact(row);
-    }
+    } else await sealPlanOrigin(client,'execution_steps',id,'step_status');
     delete row.slack_lineage_manifest;return row;
     });
   }

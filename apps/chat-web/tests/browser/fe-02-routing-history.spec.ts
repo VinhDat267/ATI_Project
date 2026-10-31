@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import pg from 'pg';
 import { createHash } from 'node:crypto';
-import {fixtureConversation,fixtureMessage} from './persisted-artifacts.fixture.js';
+import {fixtureConversation,fixtureMessage,certifyFixturePlan} from './persisted-artifacts.fixture.js';
 
 const email = process.env.CHAT_ADMIN_EMAIL!;
 const password = process.env.CHAT_ADMIN_PASSWORD!;
@@ -31,6 +31,7 @@ test('FE-02: Back/Forward, direct reload restores pending plan and saved executi
       const text = JSON.stringify(plan);
       const planId = (await db.query("INSERT INTO plans(conv_id,plan_json,plan_text,plan_hash,status,expires_at) VALUES($1,$2::jsonb,$3,$4,$5,now()+interval '30 minutes') RETURNING id", [id, text, text, createHash('sha256').update(text).digest('hex'), status])).rows[0].id;
       if (status !== 'pending') await db.query("INSERT INTO execution_steps(plan_id,step_id,tool,args_json,status,requested_by,error_json) VALUES($1,'step_1','slack.send_message',$2::jsonb,'unknown',$3,$4::jsonb)", [planId, JSON.stringify(plan.steps[0].args), userId, JSON.stringify({ message: 'Interrupted saved write' })]);
+      await certifyFixturePlan(db, planId);
     }
     await page.goto(`/c/${id}`); await page.reload();
     await expect(page.getByText('FE02 saved request')).toBeVisible();
@@ -84,7 +85,8 @@ test('FE-02: empty chat starts at top', async ({ page }, testInfo) => {
     // The source hides chat at moment 1; an empty saved preview exposes the drawer.
     const id=await fixtureConversation(db,await owner(db),'Empty transcript preview');
     const text=JSON.stringify({kind:'plan',summary:'Empty transcript',steps:[{id:'step_1',tool:'slack.send_message',description:'Saved preview',args:{channel:'#general',text:'Empty transcript fixture'}}],warnings:[]});
-    await db.query("INSERT INTO plans(conv_id,plan_json,plan_text,plan_hash,status,expires_at) VALUES($1,$2::jsonb,$3,$4,'pending',now()+interval '30 minutes')",[id,text,text,createHash('sha256').update(text).digest('hex')]);
+    const planId=(await db.query("INSERT INTO plans(conv_id,plan_json,plan_text,plan_hash,status,expires_at) VALUES($1,$2::jsonb,$3,$4,'pending',now()+interval '30 minutes') RETURNING id",[id,text,text,createHash('sha256').update(text).digest('hex')])).rows[0].id;
+    await certifyFixturePlan(db,planId);
     await page.goto(`/c/${id}`);
   } finally {await db.end();}
   await page.getByRole('button',{name:'Xem hội thoại',exact:true}).click();

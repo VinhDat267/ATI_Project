@@ -1,7 +1,8 @@
 import type pg from 'pg';
 import type { DerivedSegmentInput,SlackDerivedLineageRepo } from '../../db/repositories/slack-derived-lineage-repo.js';
 import { hasSlackMarker } from './slack-message-selectors.js';
-import { JSON_TOMBSTONE,redactPlanRow } from './slack-artifact-targets.js';
+import { JSON_TOMBSTONE,PLAN_TOMBSTONE,PLAN_TOMBSTONE_TEXT,redactPlanRow } from './slack-artifact-targets.js';
+import { planOriginAllowed } from './slack-plan-origin.js';
 
 export interface SlackPlanWriteContext {segments:DerivedSegmentInput[];selectors?:string[]}
 const sourceBound=Symbol('server source-bound plan/step');
@@ -20,7 +21,16 @@ export async function guardPlanInTransaction(client:pg.PoolClient,registry:Slack
     ORDER BY id`,[id])).rows;
   const planCopies=copies.filter(c=>c.target_id===id&&c.target_kind==='plan_step_arg'&&c.target_sub_id!=='args_json');
   const source=first.slack_lineage_manifest!=null||copies.length>0||hasSlackMarker(first.plan_json)||hasSlackMarker(first.resource_labels);
-  if(!source){delete first.user_id;delete first.slack_lineage_manifest;return {row:first,source:false,allowed:true,segments:[] as DerivedSegmentInput[],copies};}
+  if(!source){
+    const owner=first.user_id as string;
+    const certified=await planOriginAllowed(client,'plans',first,owner);
+    delete first.user_id;delete first.slack_lineage_manifest;
+    if(!certified){
+      const row={...first,plan_json:structuredClone(PLAN_TOMBSTONE),plan_text:PLAN_TOMBSTONE_TEXT};
+      return {row,source:false,allowed:false,segments:[] as DerivedSegmentInput[],copies};
+    }
+    return {row:first,source:false,allowed:true,segments:[] as DerivedSegmentInput[],copies};
+  }
   const segments:DerivedSegmentInput[]=[];
   for(const c of copies.filter(c=>c.status==='active'))segments.push(...await registry.segmentsInTransaction(client,c.id));
   const union=uniqueSegments(segments);
@@ -53,7 +63,16 @@ export async function guardPlanInTransaction(client:pg.PoolClient,registry:Slack
 }
 
 export async function guardStepRowsInTransaction(client:pg.PoolClient,registry:SlackDerivedLineageRepo,plan:Awaited<ReturnType<typeof guardPlanInTransaction>>,rows:any[],purpose:'planning'|'manual_lookup') {
-  if(!plan.source && !rows.some(r=>r.slack_lineage_manifest!=null||hasSlackMarker(r.args_json)||hasSlackMarker(r.output_json)||hasSlackMarker(r.error_json))){for(const row of rows)delete row.slack_lineage_manifest;return rows;}
+  if(!plan.source && !rows.some(r=>r.slack_lineage_manifest!=null||hasSlackMarker(r.args_json)||hasSlackMarker(r.output_json)||hasSlackMarker(r.error_json))){
+    const owner=(await client.query('SELECT user_id FROM conversations WHERE id=$1',[plan.row.conv_id])).rows[0]?.user_id as string;
+    for(let i=0;i<rows.length;i++){
+      const row=rows[i];
+      const certified=!!owner&&await planOriginAllowed(client,'execution_steps',row,owner);
+      if(!certified)rows[i]={...row,status:'unknown',args_json:JSON_TOMBSTONE,output_json:row.output_json==null?null:JSON_TOMBSTONE,error_json:row.error_json==null?null:JSON_TOMBSTONE};
+      delete rows[i].slack_lineage_manifest;
+    }
+    return rows;
+  }
   for(let i=0;i<rows.length;i++){
     const row=rows[i],manifest=row.slack_lineage_manifest;
     const fixedRestartError=row.error_json && Object.keys(row.error_json).length===2 && row.error_json.category==='UNKNOWN' && row.error_json.message==='Server restarted while this step was running';

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import pg from 'pg';
-import {fixtureConversation,fixtureMessage} from './persisted-artifacts.fixture.js';
+import {fixtureConversation,fixtureMessage,certifyFixturePlan} from './persisted-artifacts.fixture.js';
 import { createHash } from 'node:crypto';
 
 /** The send button of the main chat composer; a clarification card has its own "Gửi" button. */
@@ -34,6 +34,7 @@ test('real browser and PostgreSQL: login, chat, approval and execution recovery 
         [planId, step.id, step.tool, JSON.stringify(step.args), ['succeeded', 'unknown', 'pending'][index],
           index === 0 ? JSON.stringify({ id: 'saved-browser-card', url: 'https://trello.com/c/saved-browser' }) : null, owner, index < 2]);
     }
+    await certifyFixturePlan(pool, planId);
     const before = (await pool.query('SELECT * FROM execution_steps WHERE plan_id = $1 AND step_id = $2', [planId, 'step_1'])).rows[0];
     const writes: string[] = [];
     page.on('request', request => { if (request.method() === 'POST' && request.url().includes(`/api/executions/${planId}`)) writes.push(new URL(request.url()).pathname); });
@@ -102,6 +103,7 @@ test('real browser and PostgreSQL: login, chat, approval and execution Continue 
       VALUES ($1, $2, $3, $4::jsonb, $5, $6::jsonb, $7)`,
       [planId, step.id, step.tool, JSON.stringify(step.args), index === 0 ? 'succeeded' : 'pending',
         index === 0 ? JSON.stringify({ id: 'saved-continue-card', url: 'https://trello.com/c/saved-continue' }) : null, owner]);
+    await certifyFixturePlan(pool, planId);
     const before = (await pool.query("SELECT * FROM execution_steps WHERE plan_id = $1 AND step_id = 'step_1'", [planId])).rows[0];
     const writes: string[] = [];
     page.on('request', req => { if (req.method() === 'POST' && req.url().includes('/api/executions/')) writes.push(new URL(req.url()).pathname); });

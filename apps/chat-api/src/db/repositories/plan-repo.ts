@@ -5,6 +5,7 @@ import { SlackDerivedLineageRepo } from './slack-derived-lineage-repo.js';
 import { SlackPolicyService } from '../../services/slack/policy-service.js';
 import { guardPlanInTransaction,guardStepRowsInTransaction,planSelectors,type SlackPlanWriteContext } from '../../services/slack/slack-plan-lineage.js';
 import { hasSlackMarker } from '../../services/slack/slack-message-selectors.js';
+import { sealPlanOrigin } from '../../services/slack/slack-plan-origin.js';
 
 export interface PlanRow {
   id: string;
@@ -55,19 +56,22 @@ export class PlanRepo {
   /** A client inside the caller's transaction; otherwise the plan is saved in a transaction of its own. */
   db?: pg.PoolClient): Promise<PlanRow> {
     if(hasSlackMarker(data.planJson)||hasSlackMarker(data.resourceLabels))throw new Error('SLACK_PROVENANCE_REQUIRED');
-    if (db) return this.insertPlan(db, data);
-    const client = await this.pool.connect();
-    try {
+    const save=async(client:pg.PoolClient)=>{
+      const plan=await this.insertPlan(client,data);
+      await sealPlanOrigin(client,'plans',plan.id,'plan_writer');
+      return plan;
+    };
+    if(db)return save(db);
+    const client=await this.pool.connect();
+    try{
       await client.query('BEGIN');
-      const plan = await this.insertPlan(client, data);
+      const plan=await save(client);
       await client.query('COMMIT');
       return plan;
-    } catch (err) {
+    }catch(err){
       await client.query('ROLLBACK');
       throw err;
-    } finally {
-      client.release();
-    }
+    }finally{client.release();}
   }
 
   private async insertPlan(client: pg.PoolClient, data: Parameters<PlanRepo['createPlan']>[0]): Promise<PlanRow> {
@@ -164,7 +168,7 @@ export class PlanRepo {
     if (!plan.revision) return false;
     return this.transaction(async client=>{
     const checked=await guardPlanInTransaction(client,this.slack,plan.id,'planning');
-    if(!checked.allowed)return false;
+    if(!checked.allowed && nextStatus!=='stopped')return false;
     const result = await client.query(
       `UPDATE plans SET status = $6
        WHERE id = $1 AND plan_hash = $2 AND status = $3 AND xmin::text = $4
