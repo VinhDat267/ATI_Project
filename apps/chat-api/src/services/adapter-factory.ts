@@ -268,8 +268,8 @@ export class AdapterFactory {
     if (context?.phase === 'execution') {
       const previewed = context.connections?.trello;
       if (previewed) {
-        const missing = previewed.boardIds.some((id: string) => !currentTeamBoardIds.has(id));
-        if (missing) {
+        const inTeamScope = previewed.boardIds.filter((id: string) => currentTeamBoardIds.has(id));
+        if (inTeamScope.length === 0) {
           throw trelloError('AUTH_ERROR', 'Bảng Trello trong kế hoạch đã bị bỏ khỏi phạm vi nhóm.');
         }
       }
@@ -309,22 +309,15 @@ export class AdapterFactory {
       liveMemberBoardIds = new Set<string>(callerBoards.filter((b: any) => b.member === true).map((b: any) => String(b.id)));
     }
 
-    if (context?.phase === 'execution') {
-      const previewed = context.connections?.trello;
-      if (previewed) {
-        const notMember = previewed.boardIds.some((id: string) => !liveMemberBoardIds.has(id));
-        if (notMember) {
-          throw trelloError('AUTH_ERROR', 'Bạn không còn là thành viên của bảng Trello trong kế hoạch.');
-        }
-      }
-    }
-
     const previewedBoardIds: string[] = (context?.connections?.trello?.boardIds ?? Array.from(currentTeamBoardIds)) as string[];
     const allowedBoardIds: string[] = previewedBoardIds.filter(
       (id: string) => currentTeamBoardIds.has(id) && liveMemberBoardIds.has(id)
     );
 
     if (allowedBoardIds.length === 0) {
+      if (context?.phase === 'execution') {
+        throw trelloError('AUTH_ERROR', 'Bạn không còn là thành viên của bảng Trello trong kế hoạch.');
+      }
       throw trelloError('AUTH_ERROR', 'Không có bảng Trello nào hợp lệ để thực thi.');
     }
 

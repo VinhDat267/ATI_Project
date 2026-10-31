@@ -474,5 +474,117 @@ describe('Task 8: Trello planning, catalog, refusal, and execution guards', () =
         allowedBoardIds: ['b1'],
       });
     });
+
+    it('creates adapter with allowedBoardIds [b1] when boardIds has [b1, b2] but team scope only has b1 and caller is member of b1', async () => {
+      const mockCredRepo = {
+        getPersonalCredentials: vi.fn().mockResolvedValue({
+          id: 'cred-1',
+          status: 'active',
+          config: JSON.stringify({ refreshToken: 'ref-1', username: 'alice' }),
+        }),
+      };
+      const mockTeamRepo = {
+        get: vi.fn().mockResolvedValue({
+          workspaceId: 'ws-1',
+          workspaceName: 'Work',
+          boards: [{ boardId: 'b1', boardName: 'Frontend' }], // Only b1 in team scope
+        }),
+      };
+      mockOAuthClient.boards.mockResolvedValueOnce([
+        { id: 'b1', name: 'Frontend', member: true },
+      ]);
+
+      let createdWith: any;
+      const factory = new AdapterFactory({
+        credentialRepo: mockCredRepo as any,
+        encryptionKey,
+        trelloTokens: mockTokens as any,
+        trelloOAuthClient: mockOAuthClient as any,
+        trelloTeamRepo: mockTeamRepo as any,
+        createTrelloAdapter: (input) => {
+          createdWith = input;
+          return { execute: vi.fn() } as any;
+        },
+      });
+
+      const context = {
+        userId,
+        phase: 'execution' as const,
+        connections: {
+          trello: {
+            credentialId: 'cred-1',
+            memberId: 'm1',
+            username: 'alice',
+            boardIds: ['b1', 'b2'],
+          },
+        },
+      };
+
+      const adapter = await factory.getAdapterForService('trello', context);
+      expect(adapter).toBeDefined();
+      expect(createdWith).toEqual({
+        userId,
+        accessToken: 'live-access-token',
+        allowedBoardIds: ['b1'],
+      });
+    });
+
+    it('creates adapter with allowedBoardIds [b1] when boardIds has [b1, b2], both in team scope, but caller is only member of b1', async () => {
+      const mockCredRepo = {
+        getPersonalCredentials: vi.fn().mockResolvedValue({
+          id: 'cred-1',
+          status: 'active',
+          config: JSON.stringify({ refreshToken: 'ref-1', username: 'alice' }),
+        }),
+      };
+      const mockTeamRepo = {
+        get: vi.fn().mockResolvedValue({
+          workspaceId: 'ws-1',
+          workspaceName: 'Work',
+          boards: [
+            { boardId: 'b1', boardName: 'Frontend' },
+            { boardId: 'b2', boardName: 'Backend' },
+          ],
+        }),
+      };
+      mockOAuthClient.boards.mockResolvedValueOnce([
+        { id: 'b1', name: 'Frontend', member: true },
+        { id: 'b2', name: 'Backend', member: false }, // Lost membership in b2
+      ]);
+
+      let createdWith: any;
+      const factory = new AdapterFactory({
+        credentialRepo: mockCredRepo as any,
+        encryptionKey,
+        trelloTokens: mockTokens as any,
+        trelloOAuthClient: mockOAuthClient as any,
+        trelloTeamRepo: mockTeamRepo as any,
+        createTrelloAdapter: (input) => {
+          createdWith = input;
+          return { execute: vi.fn() } as any;
+        },
+      });
+
+      const context = {
+        userId,
+        phase: 'execution' as const,
+        connections: {
+          trello: {
+            credentialId: 'cred-1',
+            memberId: 'm1',
+            username: 'alice',
+            boardIds: ['b1', 'b2'],
+          },
+        },
+      };
+
+      const adapter = await factory.getAdapterForService('trello', context);
+      expect(adapter).toBeDefined();
+      expect(createdWith).toEqual({
+        userId,
+        accessToken: 'live-access-token',
+        allowedBoardIds: ['b1'],
+      });
+    });
   });
 });
