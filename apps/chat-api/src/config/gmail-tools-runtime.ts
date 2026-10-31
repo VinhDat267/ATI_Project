@@ -29,10 +29,33 @@ export async function runtimeToolCatalog(
   mode: RuntimeMode,
   repo: CredentialRepo,
   key: string,
-  options: { userId?: string; gmailEnabled: boolean; mycalendarEnabled?: boolean; mysheetsEnabled?: boolean },
+  options: {
+    userId?: string;
+    gmailEnabled: boolean;
+    mycalendarEnabled?: boolean;
+    mysheetsEnabled?: boolean;
+    trelloEnabled?: boolean;
+    trelloTeamRepo?: any;
+    trelloOAuthClient?: any;
+    trelloTokens?: any;
+    trelloConnection?: (userId: string) => Promise<any>;
+  },
 ) {
   const personal = await getToolCatalogFor(repo, key, options);
-  return mode === 'live' ? personal : [...ALL_TOOLS, ...personal.filter((t) => t.service === 'gmail' || t.service === 'mycalendar' || t.service === 'mysheets')];
+  if (mode === 'live') return personal;
+  const hasTrello = personal.some((t) => t.service === 'trello');
+  const baseTools = ALL_TOOLS.filter((t) => t.service !== 'trello');
+  const tools = [
+    ...baseTools,
+    ...personal.filter(
+      (t) =>
+        t.service === 'gmail' ||
+        t.service === 'mycalendar' ||
+        t.service === 'mysheets' ||
+        t.service === 'trello'
+    ),
+  ];
+  return Array.from(new Map(tools.map((t) => [t.name, t])).values());
 }
 
 export function runtimeGmailAdapter(mode: RuntimeMode, tokens: GmailAccessTokenProvider, baseUrl?: string) {

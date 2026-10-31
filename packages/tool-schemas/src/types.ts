@@ -86,6 +86,7 @@ export interface PlanConnections {
   gmail?: { credentialId: string; email: string };
   mycalendar?: { credentialId: string; email: string; allowedCalendars: string[] };
   mysheets?: { credentialId: string; email: string; allowedSpreadsheets: string[] };
+  trello?: { credentialId: string; memberId: string; username: string; boardIds: string[] };
 }
 
 export interface PersonalCalendarItem {

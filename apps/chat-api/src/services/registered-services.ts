@@ -1,5 +1,5 @@
 import { decryptCredentials } from '@wap/tool-adapters';
-import { ALL_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
+import { ALL_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, TRELLO_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import type { ServiceTransport } from './transports/types.js';
 import { TRELLO_TRANSPORT } from './transports/trello.js';
@@ -71,9 +71,21 @@ export async function getConfiguredToolCatalog(credentialRepo: CredentialRepo, e
 export async function getToolCatalogFor(
   credentialRepo: CredentialRepo,
   encryptionKey: string,
-  options: { userId?: string; gmailEnabled: boolean; mycalendarEnabled?: boolean; mysheetsEnabled?: boolean },
+  options: {
+    userId?: string;
+    gmailEnabled: boolean;
+    mycalendarEnabled?: boolean;
+    mysheetsEnabled?: boolean;
+    trelloEnabled?: boolean;
+    trelloTeamRepo?: any;
+    trelloOAuthClient?: any;
+    trelloTokens?: any;
+    trelloConnection?: (userId: string) => Promise<any>;
+  },
 ): Promise<ToolDefinition[]> {
-  let catalog = await getConfiguredToolCatalog(credentialRepo, encryptionKey);
+  let catalog = (await getConfiguredToolCatalog(credentialRepo, encryptionKey)).filter(
+    (tool) => tool.service !== 'trello'
+  );
   if (!options.userId) return catalog;
   if (options.gmailEnabled) {
     const gmail = await credentialRepo.getPersonalCredentials('gmail', options.userId);
@@ -109,6 +121,40 @@ export async function getToolCatalogFor(
             : [];
         if (spreadsheets.length > 0) {
           catalog = [...catalog, ...MYSHEETS_TOOLS];
+        }
+      } catch {
+        // stale or unreadable connection does not add tools
+      }
+    }
+  }
+  if (options.trelloConnection) {
+    try {
+      const trello = await options.trelloConnection(options.userId);
+      if (trello?.status === 'connected' && trello.connection?.boardIds?.length > 0) {
+        catalog = [...catalog, ...TRELLO_TOOLS];
+      }
+    } catch {
+      // ignore
+    }
+  } else if (options.trelloTeamRepo && options.trelloOAuthClient && options.trelloTokens) {
+    const cred = await credentialRepo.getPersonalCredentials('trello', options.userId);
+    if (cred && cred.status === 'active') {
+      try {
+        const scope = await options.trelloTeamRepo.get();
+        if (scope && scope.boards && scope.boards.length > 0) {
+          const dec = decryptCredentials(cred.config, encryptionKey);
+          if (dec.refreshToken) {
+            const provider = options.trelloTokens.forConnection(options.userId, cred.id, dec.refreshToken);
+            const accessToken = await provider.getAccessToken();
+            const callerBoards = await options.trelloOAuthClient.boards(
+              accessToken,
+              scope.workspaceId,
+              AbortSignal.timeout(10_000)
+            );
+            if (scope.boards.some((b: any) => callerBoards.some((cb: any) => cb.id === b.boardId && cb.member === true))) {
+              catalog = [...catalog, ...TRELLO_TOOLS];
+            }
+          }
         }
       } catch {
         // stale or unreadable connection does not add tools
