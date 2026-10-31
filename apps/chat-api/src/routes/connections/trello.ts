@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { createHash, randomBytes } from 'node:crypto';
 import { decryptCredentials, encryptCredentials } from '@wap/tool-adapters';
-import { createAuthMiddleware, type AuthUser } from '../../auth/jwt.js';
+import { createAuthMiddleware, isAdmin, type AuthUser } from '../../auth/jwt.js';
 import type { TrelloOAuthConfig } from '../../config/env.js';
 import type { CredentialRepo } from '../../db/repositories/credential-repo.js';
 import type { GoogleAuthRepo } from '../../db/repositories/google-auth-repo.js';
@@ -247,6 +247,120 @@ export function createTrelloConnectionRoutes(options: TrelloConnectionsOptions):
       res.json({ success: true });
     } catch {
       res.status(500).json({ error: 'Không ngắt được kết nối Trello. Vui lòng thử lại.' });
+    }
+  });
+
+  router.get('/workspaces', async (req, res) => {
+    const user = (req as any).user as AuthUser;
+    if (!isAdmin(user, options.adminUserIds)) {
+      res.status(403).json({ error: 'Chỉ quản trị viên mới có quyền xem workspace Trello.' });
+      return;
+    }
+
+    try {
+      const cred = await options.credentialRepo!.getPersonalConnectionStatus('trello', user.id);
+      if (!cred || cred.status !== 'active') {
+        res.status(400).json({ error: 'Quản trị viên cần kết nối tài khoản Trello trước.' });
+        return;
+      }
+
+      let refreshToken: string;
+      try {
+        const dec = decryptCredentials(cred.config, options.encryptionKey!);
+        refreshToken = dec.refreshToken;
+      } catch {
+        res.status(400).json({ error: 'Không đọc được thông tin xác thực Trello.' });
+        return;
+      }
+
+      if (!options.tokens || !client) {
+        res.status(503).json({ error: 'Dịch vụ Trello chưa sẵn sàng.' });
+        return;
+      }
+
+      const provider = options.tokens.forConnection(user.id, cred.id, refreshToken);
+      const accessToken = await provider.getAccessToken();
+      const workspaces = await client.workspaces(accessToken, AbortSignal.timeout(trelloTimeoutMs));
+      res.json({ workspaces });
+    } catch {
+      res.status(500).json({ error: 'Không tải được danh sách workspace Trello.' });
+    }
+  });
+
+  router.put('/scope', async (req, res) => {
+    const user = (req as any).user as AuthUser;
+    if (!isAdmin(user, options.adminUserIds)) {
+      res.status(403).json({ error: 'Chỉ quản trị viên mới có quyền chọn bảng Trello cho nhóm.' });
+      return;
+    }
+
+    const workspaceId = req.body?.workspaceId;
+    const boardIds = req.body?.boardIds;
+
+    if (
+      typeof workspaceId !== 'string' ||
+      !workspaceId.trim() ||
+      !Array.isArray(boardIds) ||
+      boardIds.length < 1 ||
+      boardIds.length > 10 ||
+      !boardIds.every((id) => typeof id === 'string' && id.trim())
+    ) {
+      res.status(400).json({ error: 'Phải chọn từ 1 đến 10 bảng trong cùng một workspace.' });
+      return;
+    }
+
+    try {
+      const cred = await options.credentialRepo!.getPersonalConnectionStatus('trello', user.id);
+      if (!cred || cred.status !== 'active') {
+        res.status(400).json({ error: 'Quản trị viên cần kết nối tài khoản Trello trước.' });
+        return;
+      }
+
+      let refreshToken: string;
+      try {
+        const dec = decryptCredentials(cred.config, options.encryptionKey!);
+        refreshToken = dec.refreshToken;
+      } catch {
+        res.status(400).json({ error: 'Không đọc được thông tin xác thực Trello.' });
+        return;
+      }
+
+      if (!options.tokens || !client || !options.teamRepo) {
+        res.status(503).json({ error: 'Dịch vụ Trello chưa sẵn sàng.' });
+        return;
+      }
+
+      const provider = options.tokens.forConnection(user.id, cred.id, refreshToken);
+      const accessToken = await provider.getAccessToken();
+
+      const wsList = await client.workspaces(accessToken, AbortSignal.timeout(trelloTimeoutMs));
+      const ws = wsList.find((w) => w.id === workspaceId);
+      if (!ws) {
+        res.status(400).json({ error: 'Workspace không tồn tại hoặc bạn không thuộc workspace này.' });
+        return;
+      }
+
+      const liveBoards = await client.boards(accessToken, workspaceId, AbortSignal.timeout(trelloTimeoutMs));
+      const selectedBoards: { boardId: string; boardName: string }[] = [];
+      for (const id of boardIds) {
+        const found = liveBoards.find((b) => b.id === id && b.member === true);
+        if (!found) {
+          res.status(400).json({ error: 'Bảng không hợp lệ hoặc bạn không phải thành viên của bảng.' });
+          return;
+        }
+        selectedBoards.push({ boardId: found.id, boardName: found.name });
+      }
+
+      const saved = await options.teamRepo.replace({
+        chosenBy: user.id,
+        workspaceId,
+        workspaceName: ws.name,
+        boards: selectedBoards,
+      });
+
+      res.json(saved);
+    } catch {
+      res.status(500).json({ error: 'Không lưu được danh sách bảng Trello.' });
     }
   });
 
