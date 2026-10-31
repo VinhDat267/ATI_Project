@@ -1,6 +1,6 @@
 # SLACK-03B2G - Schedule source lifecycle runtime
 
-Status: CODE_COMPLETE / REVIEW_PASS; staging publication pending. Base `83c61de3196663718cdc172a939911052b6a5c03`, after acceptedPR212. Same one Orca worktree/branch; root implements directly. [Parent03B2](SLACK-03B2-derived-lineage-and-purge.md), [deliveryM2](../SLACK-DELIVERY.md), [runtime plan](../../superpowers/plans/2026-10-31-slack-03b2g-schedule-runtime.md).
+Status: DONE - accepted staging PR213 at `3a8ae6452069bf532836035b166280697bd1ac98`. Base `83c61de3196663718cdc172a939911052b6a5c03`, after acceptedPR212. Same one Orca worktree/branch; root implements directly. [Parent03B2](SLACK-03B2-derived-lineage-and-purge.md), [deliveryM2](../SLACK-DELIVERY.md), [runtime plan](../../superpowers/plans/2026-10-31-slack-03b2g-schedule-runtime.md).
 
 Deliverable: actual source-history proposal -> confirmation and schedule/state registration -> guarded schedule/manual or due run -> transactional title/run message/plan provenance -> invalidation/read masking/physical erasure. No detached primitive or public Slack dispatch. Preserve approved per-run approval, limits, missed-run and version semantics.
 
@@ -13,10 +13,10 @@ Acceptance:
 - [x] Scheduled and manual runs check source before model and result persistence; revoke during real async work cannot publish stale plans/titles/messages or run again from a purged schedule.
 - [x] Fenced native consumer physically erases schedule name/request/recurrence, registered run error/title; pauses active schedule and bumps version, preserves terminal status/services and independent owners.
 - [x] Real PostgreSQL/HTTP/AbortSignal RED->GREEN; fullcheck3696PASS; independent whole-branch audit/final exact-head verification PASS,28/28 focused.
-- [ ] Exact published-head check/browser CI, staging merge/tree comparison and reviewer checkpoint.
+- [x] CI41161952523 check/browser SUCCESS at published e6af7128; merge3a8ae645 identical tree, diff exit0; reviewer checkpoint recorded.
 
 Full legacy backfill/derived TTL cascade and public read03B3/03B4 remain separate gates. No fullM2/F3/F4 or native Slack acceptance; future06 kinds unsupported. Main/live flags unchanged.
 
 ## Kết quả
 
-Code and fixture flow verified at frozen `3485e8cc019097818f30369646cb4328ffa4d678`: fullcheck3696PASS, exit0, typecheck/build/securityPASS. Real source schedule suite15 plus native bootstrap and lock-order evidence, independent review findings/fixes and original failed runs are recorded in the [implementation log](../log/2026-10-31-slack-03b2g-schedule-runtime.md). Independent whole-branch review/final exact-head verification PASS,28/28 tests, no remaining P1/P2/P3; all findings reproduced and fixed. Staging publication gate remains pending. No native Slack or fullM2/F3/F4 acceptance.
+Code and fixture flow verified at frozen `3485e8cc019097818f30369646cb4328ffa4d678`: fullcheck3696PASS, exit0, typecheck/build/securityPASS. Real source schedule suite15 plus native bootstrap and lock-order evidence, independent review findings/fixes and original failed runs are recorded in the [implementation log](../log/2026-10-31-slack-03b2g-schedule-runtime.md). Independent whole-branch review/final exact-head verification PASS,28/28 tests, no remaining P1/P2/P3; all findings reproduced and fixed. [Staging accepted](../log/2026-10-31-slack-03b2g-review-integration.md). No native Slack or fullM2/F3/F4 acceptance.

@@ -12,3 +12,5 @@ Execution: root directly, one read-only independent whole-branch reviewer at fre
 Review focus: confirmation/run lock order and changed source union; revoke during model await; source copy in title/state/previous proposal/run errors; title search leaking masked text; legitimate rename versus unregistered resurrection; paused/cancelled/completed schedule resume; source plan child/execution interactions and late result rollback.
 
 Code/fixture verification at frozen3485e8cc: fullcheck3696PASS, independent whole-branch/final-fix reviewPASS, fresh28/28 independent tests. [Evidence and failures](../../handoff/log/2026-10-31-slack-03b2g-schedule-runtime.md). Publication/check/browser/merge-tree gates remain pending.
+
+Staging accepted PR213 e6af7128, CI41161952523 check/browserSUCCESS; merge3a8ae645 identical tree. [Reviewer integration checkpoint](../../handoff/log/2026-10-31-slack-03b2g-review-integration.md). Remaining M2 and native gates stay open.
