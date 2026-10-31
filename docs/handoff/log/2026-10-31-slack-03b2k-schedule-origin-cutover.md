@@ -10,4 +10,4 @@ Source-free schedules are certified in the writer transaction. Slack-sourced sch
 
 M2 remains open. 03B3 and 03B4 are not in this branch. The delivery matrix is unchanged until a record PR after merge.
 
-Review of `b92f6564` was Chưa đạt. The same branch now quarantines unmarked legacy and a mismatched certificate, continues the due scan past uncertified rows, and includes `schedules.user_id` in the fingerprint. Focused rerun: origin file 6/6, schedule suites 59/59, Slack schedule runtime and locks 18/18. Typecheck exit 0.
+Review of `b92f6564` was Chưa đạt. The same branch now quarantines unmarked legacy and a mismatched certificate, continues the due scan past uncertified rows, and includes `schedules.user_id` in the fingerprint. A second review at `59d43278` found the scan cursor dropping microseconds: the cursor now keeps `next_run_at::text`. Focused rerun after that fix: origin file 7/7, schedule runner and runtime config included in 26/26.

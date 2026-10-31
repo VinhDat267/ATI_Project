@@ -178,6 +178,40 @@ it('plans a certified schedule that sits behind five uncertified due rows', asyn
   expect(stored.rows).toEqual([0, 1, 2, 3, 4].map(i => ({name: `blocked ${i}`, status: 'active', pause_reason: null})));
 });
 
+it('plans a certified schedule behind five rows that share a microsecond timestamp', async () => {
+  const blockedOwner = await db.person();
+  const owner = await db.person();
+  const stamp = '2026-10-25T00:59:00.000001Z';
+  const blocked = [];
+  for (let i = 0; i < 5; i++) {
+    const conv = await conversations.createConversation(blockedOwner.id);
+    const row = (await db.pool.query(
+      `INSERT INTO schedules(user_id,conv_id,name,request,recurrence,services,status,next_run_at)
+       VALUES($1,$2,$3,$4,'{"type":"daily","time":"08:00"}','{calendar}','active',$5::timestamptz) RETURNING id`,
+      [blockedOwner.id, conv.id, `micro ${i}`, `micro request ${i}`, stamp],
+    )).rows[0];
+    blocked.push(row.id as string);
+  }
+  expect((await db.pool.query('SELECT next_run_at::text AS at FROM schedules WHERE id=$1', [blocked[0]])).rows[0].at).toContain('000001');
+  const created = await proposal(owner.id, 'Lịch sau microsecond', 'create', null);
+  const change = await schedules.confirmProposal({userId: owner.id, convId: created.convId, messageId: created.messageId, now: beforeDue});
+  await db.pool.query('UPDATE schedules SET next_run_at=$2 WHERE id=$1', [change.schedule.id, due]);
+  const seen: string[] = [];
+  const planned = new ScheduleRunner({
+    pool: db.pool, timeZone: zone, now: () => tickAt,
+    recordState: (client, row, at) => schedules.recordState(client, row, at),
+    planRun: async (run) => { seen.push(run.name); return {async persist() { return {state: 'needs_attention' as const}; }, afterCommit() {}}; },
+  });
+  const runs = async () => (await db.pool.query('SELECT count(*)::int AS n FROM schedule_runs WHERE schedule_id=$1', [change.schedule.id])).rows[0].n as number;
+  await planned.tick();
+  await planned.tick();
+  await planned.tick();
+  expect(await runs()).toBeGreaterThan(0);
+  expect(seen).toContain('Lịch sau microsecond');
+  const stored = await db.pool.query('SELECT name, status, pause_reason FROM schedules WHERE id=ANY($1::uuid[]) ORDER BY name', [blocked]);
+  expect(stored.rows).toEqual([0, 1, 2, 3, 4].map(i => ({name: `micro ${i}`, status: 'active', pause_reason: null})));
+});
+
 it('hides a schedule whose user id was rewritten from its owner', async () => {
   const owner = await db.person();
   const other = await db.person();

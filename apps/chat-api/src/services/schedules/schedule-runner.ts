@@ -94,7 +94,7 @@ export class ScheduleRunner {
   private queue: Promise<void> = Promise.resolve();
   private current: AbortController | null = null;
   private stopping = false;
-  private scanCursor: { at: Date; id: string } | null = null;
+  private scanCursor: { at: string; id: string } | null = null;
 
   constructor(private options: ScheduleRunnerOptions) {
     this.messages = new MessageRepo(options.pool);
@@ -173,11 +173,11 @@ export class ScheduleRunner {
     while (toPlan.length < DUE_PER_TICK && inspected < SCAN_CAP) {
     const scan=await this.options.pool.connect();
     let candidates:any[];
-    try{candidates=(await scan.query(`SELECT id, next_run_at FROM schedules WHERE status='active' AND next_run_at<=$1
+    try{candidates=(await scan.query(`SELECT id, next_run_at::text AS cursor_at FROM schedules WHERE status='active' AND next_run_at<=$1
       AND ($2::timestamptz IS NULL OR (next_run_at, id) > ($2::timestamptz, $3::uuid))
       ORDER BY next_run_at, id LIMIT ${DUE_PER_TICK}`,[now, this.scanCursor?.at ?? null, this.scanCursor?.id ?? null])).rows;}finally{scan.release();}
     if (!candidates.length) { this.scanCursor = null; break; }
-    let last: { id: string; next_run_at: Date } | null = null;
+    let last: { id: string; cursor_at: string } | null = null;
     for(const candidate of candidates){
       if (toPlan.length >= DUE_PER_TICK) break;
       inspected++;
@@ -228,7 +228,7 @@ export class ScheduleRunner {
       });
       changes.push(...committed);
     }
-    this.scanCursor = last && candidates.length === DUE_PER_TICK && toPlan.length < DUE_PER_TICK ? { at: new Date(last.next_run_at), id: last.id } : null;
+    this.scanCursor = last && candidates.length === DUE_PER_TICK && toPlan.length < DUE_PER_TICK ? { at: last.cursor_at, id: last.id } : null;
     if (this.scanCursor === null) break;
     }
     this.announce(changes);
