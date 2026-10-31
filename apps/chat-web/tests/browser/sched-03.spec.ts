@@ -3,7 +3,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import { mkdir, appendFile, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import pg from 'pg';
-import {fixtureConversation,fixtureMessage} from './persisted-artifacts.fixture.js';
+import {fixtureConversation,fixtureMessage,certifyFixtureSchedule} from './persisted-artifacts.fixture.js';
 import { hashPassword } from '../../../chat-api/src/db/repositories/user-repo.js';
 
 const enabled = process.env.SANDBOX_SCENARIO === 'schedule';
@@ -165,7 +165,8 @@ test('SCHED-03: stale versions reload before a second action', async ({ page }) 
   try {
     const owner = await login(page, db); await create(page); await page.goto('/history');
     const section = page.getByRole('region', { name: 'Lịch chạy' }); await expect(section.getByRole('button', { name: 'Tạm dừng', exact: true })).toBeVisible();
-    await db.query("UPDATE schedules SET version=version+1,name='Phiên bản mới' WHERE user_id=$1", [owner]);
+    const renamed = await db.query("UPDATE schedules SET version=version+1,name='Phiên bản mới' WHERE user_id=$1 RETURNING id", [owner]);
+    for (const row of renamed.rows) await certifyFixtureSchedule(db, row.id);
     await section.getByRole('button', { name: 'Tạm dừng', exact: true }).click();
     await expect(section.getByRole('alert')).toHaveText('Lịch vừa thay đổi ở nơi khác. Đã tải lại.');
     await expect(section.getByRole('heading', { name: 'Phiên bản mới' })).toBeVisible();

@@ -42,6 +42,7 @@ async function invalidate(f:Awaited<ReturnType<typeof fixture>>){const key=`sche
 it('actual proposal confirmation registers schedule and state atomically; ordinary reads mask before physical erasure',async()=>{
   const f=await confirmed(),other=await confirmed(),id=f.change.schedule.id;
   expect(f.change.schedule.request).toBe('private request');
+  expect((await env.db.pool.query('SELECT count(*)::int AS n FROM slack_schedule_origins WHERE schedule_id=$1',[id])).rows[0].n).toBe(0);
   const copies=(await env.db.pool.query("SELECT target_sub_id FROM slack_derived_copies WHERE target_kind='scheduled_workflow_arg' AND target_id=$1 AND status='active' ORDER BY target_sub_id",[id])).rows;
   expect(copies.map(c=>c.target_sub_id)).toEqual(['name','recurrence','request']);
   const app=express();app.use(express.json());app.use((req,_res,next)=>{(req as any).user={id:req.headers['x-fixture-owner']};next();});app.use('/api',createScheduleRoutes({service:f.service}));
