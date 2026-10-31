@@ -13,7 +13,8 @@ Acceptance:
 - [x] A later SQL insert or a mutated `plan_text` is hidden.
 - [x] Backfill defaults to dry run. `--apply` certifies plans with no Slack marker and leaves text containing `myslack` quarantined.
 - [x] Focused PostgreSQL test `tests/integration/slack-plan-origin-runtime.test.ts` 3/3 on temporary Postgres `127.0.0.1:56541`.
-- [ ] Exact published-head check and browser CI, identical merge tree, reviewer checkpoint.
+- [x] Exact published-head CI [41212419829](https://github.com/VinhDat267/ATI_Project/actions/runs/41212419829) pass on `2a01022f`, check and browser.
+- [ ] Merge tree identical to that head, and the reviewer matrix checkpoint. Those happen after merge.
 
 ## Kết quả
 
