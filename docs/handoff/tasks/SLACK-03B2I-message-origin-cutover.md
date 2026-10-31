@@ -17,7 +17,7 @@ Acceptance:
 
 ## Kết quả
 
-Frozen `e8349895e20e36e2b3aa17a36b11256f835f8016`: fullcheck3738PASS, exit0; typecheck/build/securityPASS. Origin27 regressions cover real SQL/HTTP/model/CLI/locks/AbortSignal/lease/remainder; actual native bootstrap4 tests run with flags/config absent. [Original REDs, fixture failures and fixes](../log/2026-10-31-slack-03b2i-message-origin-cutover.md). Earlier independent103/103PASS still found one P2 via actual PostgreSQL/HTTP/planner probe; root reproduced3RED and tightened legacy dictionary-key eligibility. Final independent whole-branch/fix review PASS,106/106 fresh tests plus original P2 probe PASS (quarantined, no HTTP/model leak, bytes preserved). Exact-head check/browser CI and staging publication pending.
+Frozen `62500f1b497db143c072c3cec615332fef362e27`: fullcheck3738PASS, exit0; typecheck/build/securityPASS. Origin27 and actual native bootstrap4 included; isolated HTTP/PG/AbortSignal/lease/physical purge and strict legacy-key backfill verified. Final independent whole29-file/call-path/fix reviewPASS; inherited106 backend tests and original P2 probePASS, plus fresh2/2 Chromium casesPASS,15.7s. [All REDs, fixture failures, fixes and scope](../log/2026-10-31-slack-03b2i-message-origin-cutover.md). Published exact-head check/browser CI, merge-tree and reviewer checkpoint pending.
 
 Maintenance command: `node --import tsx apps/chat-api/src/cli/slack-message-origin-backfill.ts` with explicitly selected DATABASE_URL; defaults to dry run, `--apply` writes only evidence-backed private manifest/origin proofs. Reports aggregate eligible/quarantined counts; ambiguous bytes remain blocked and unchanged. Executed only in isolated synthetic schemas; production/native data NOT_RUN.
 
@@ -27,3 +27,5 @@ Plan/step/audit/schedule origins and legacy approval/dispatch/run gates remain n
 Browser fixture compatibility: raw-SQL saved-history RED reproduced in real Chromium;10 existing specs now use actual writers via one test helper, preserving assertions and technical timestamps/statuses. FE02 all4PASS. Product/backend unchanged; broader browser/exact-headCI and final binding pending. See implementation log for superseded CI and isolated fixture boundary.
 
 Browser follow-up: default94PASS/2FAIL/1SKIP, both obsolete placeholder locators corrected then focused2PASS; schedule22PASS. Strict frontend unused-parameter diagnostic corrected without changing behavior/flags. Final source/test freeze/fullcheck and exact-headCI rerun pending; no green full-default claim from combined runs.
+
+Final browser evidence: FE02all4PASS; full-default94PASS/2FAIL/1SKIP (not green), both corrected first-title locators focused2PASS; schedule22PASS; independent2browserPASS. Exact published-headCI must run the complete browser suite before acceptance. No production compiler flag/guard changes.

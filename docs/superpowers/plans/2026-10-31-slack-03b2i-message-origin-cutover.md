@@ -25,3 +25,5 @@ Frozen e8349895: fullcheck3738PASS, exit0; typecheck/build/securityPASS. [Failur
 Browser fixture follow-up: actual FE02 RED from raw SQL seeds, then4/4PASS after actual-writer conversion across10 existing specs/shared helper. Source/backend unchanged; branch audit now29files. Freeze browser fixtures, run broader browser and exact-headCI; retain existing local/database guards and assertions.
 
 Browser validation: FE02 4PASS; default94PASS/2FAIL/1SKIP, two first-title locator fixes focused2PASS; schedule22PASS. Minimal unused parameter rename resolves strict frontend compiler after actual writer imports. Final re-freeze/fullcheck/review binding before exact-headCI.
+
+Final combined freeze62500f1b: rootfullcheck3738PASS, typecheck/build/securityPASS; independentwhole29filereviewPASS,2freshChromiumPASS15.7s, inheriting106backend/P2probe on runtime-identical product. ExactpublishedCIcheck/browser/merge-tree pending. Full-default localfailed thenfocused2PASS remains separately scoped, not a green combinedrun.
