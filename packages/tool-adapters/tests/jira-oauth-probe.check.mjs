@@ -235,15 +235,30 @@ const post = (url, cookie, flow = 'identity', origin = new URL(url).origin) => f
   body: new URLSearchParams({ flow }),
 });
 
+test('live runner permits Atlassian login redirects without permitting arbitrary form destinations', async t => {
+  const reservation = await providerFixture();
+  const origin = reservation.baseUrl;
+  await reservation.close();
+  const { startProbeServer } = await import('../scripts/jira-probe/server.mjs');
+  const server = await startProbeServer({ mode: 'live', clientId: 'client', clientSecret: 'SECRET_SENTINEL', redirectUri: `${origin}/oauth/callback` });
+  t.after(() => server.close());
+  const page = await fetch(server.url);
+  const formAction = page.headers.get('content-security-policy').split(';').map(value => value.trim()).find(value => value.startsWith('form-action '));
+  assert.deepEqual(new Set(formAction.split(/\s+/).slice(1)), new Set(["'self'", 'https://auth.atlassian.com', 'https://id.atlassian.com']));
+});
+
 test('runner binds one browser and protects report and mutations from other browsers/origins', async t => {
   const { f, server, first, cookie, cookieHeader } = await runner(t);
   assert.equal(first.status, 200);
   assert.match(cookieHeader, /HttpOnly/i); assert.match(cookieHeader, /SameSite=Lax/i);
   assert.equal(first.headers.get('cache-control'), 'no-store');
-  assert.equal(first.headers.get('referrer-policy'), 'no-referrer');
+  // Native form POSTs need their real Origin; no-referrer makes browsers send null.
+  assert.equal(first.headers.get('referrer-policy'), 'same-origin');
   assert.equal((await fetch(`${server.url}report`)).status, 403);
   assert.equal((await fetch(server.url)).status, 403);
   assert.equal((await post(`${server.url}start`, cookie, 'identity', 'https://evil.example')).status, 403);
+  assert.equal((await post(`${server.url}start`, cookie, 'identity', 'null')).status, 403);
+  assert.equal((await fetch(`${server.url}start`, { method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'flow=identity', redirect: 'manual' })).status, 403);
   assert.equal((await post(`${server.url}start`, 'probe_owner=other')).status, 403);
   const report = await (await fetch(`${server.url}report`, { headers: { Cookie: cookie } })).json();
   assert.equal(report.provenance, 'local_fixture');
@@ -262,6 +277,7 @@ test('runner performs callback exchange once, removes code/state from displayed 
   const wrong = await fetch(url, { redirect: 'manual' }); assert.equal(wrong.status, 303); assert.equal(wrong.headers.get('location'), '/');
   const result = await fetch(url, { redirect: 'manual', headers: { Cookie: cookie } });
   assert.equal(result.status, 303); assert.equal(result.headers.get('location'), '/');
+  assert.equal(result.headers.get('referrer-policy'), 'no-referrer');
   assert.doesNotMatch(await result.text(), /SENTINEL|state=/);
   const reportResponse = await fetch(`${server.url}report`, { headers: { Cookie: cookie } });
   const raw = await reportResponse.text(); assert.doesNotMatch(raw, /SENTINEL|account-one/);

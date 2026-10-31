@@ -39,7 +39,9 @@ This matrix is not a claim that scope alone grants a native permission. No admin
 | Global permission read | NOT_RUN | Actual response from site; both admin and non-admin cases if available |
 | Re-consent / wrong account / denial | NOT_RUN | Actual provider/browser result and local connection state; no callback URL/code in report |
 
-Owner confirmed on 31/10 that no Atlassian OAuth app existed yet and requested setup guidance. Configuration check currently reports missing client ID/secret; the ignored local file and runnable commands are ready. This is an external setup dependency, not a failed provider capability test. No Jira request was made with production credentials in this implementation session.
+Owner created/configured the development app after setup guidance. The local configuration check now passes; console grant type remains unrecorded. The owner confirms having an account without any Jira site membership and intends to use it for the first consent, but that condition has not yet been tied to a completed `/me` observation.
+
+On 31/10 the actual authorization endpoint returned a 302 to the official Atlassian login host; after fixing the local runner's form policies, the browser visibly reached that login page. This proves navigation only. No authorization-code exchange, `/me`, Jira resource read or refresh has been observed yet; those native cases remain NOT_RUN pending the owner's login/consent. See the [browser-start log](../handoff/log/2026-10-31-codex-jira-01-browser-origin.md).
 
 **Gate verdict: NOT_COMPLETE.** Local probe verification may finish independently; JIRA-02–11 do not start until the provider gate is resolved as required by the approved design.
 

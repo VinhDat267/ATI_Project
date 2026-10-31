@@ -23,7 +23,7 @@ export async function startProbeServer(config) {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Content-Security-Policy', `default-src 'none'; style-src 'unsafe-inline'; form-action 'self' ${config.mode === 'live' ? 'https://auth.atlassian.com' : new URL(config.fixtureBaseUrl).origin}; frame-ancestors 'none'`);
+    res.setHeader('Content-Security-Policy', `default-src 'none'; style-src 'unsafe-inline'; form-action 'self' ${config.mode === 'live' ? 'https://auth.atlassian.com https://id.atlassian.com' : new URL(config.fixtureBaseUrl).origin}; frame-ancestors 'none'`);
     const send = (status, body, contentType = 'text/plain; charset=utf-8') => {
       if (res.destroyed) return; res.writeHead(status, { 'Content-Type': contentType }); res.end(body);
     };
@@ -42,6 +42,9 @@ export async function startProbeServer(config) {
         return send(403, 'BROWSER_MISMATCH');
       }
       if (req.method === 'GET' && url.pathname === '/') {
+        // no-referrer makes native form POSTs send Origin: null. Preserve the
+        // local Origin here; callbacks/redirects keep no-referrer for code safety.
+        res.setHeader('Referrer-Policy', 'same-origin');
         const report = session.report(binding);
         return send(200, `<!doctype html><html lang="vi"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>ATI Jira OAuth probe</title><body><main><h1>ATI Jira OAuth — JIRA-01</h1><p>Chỉ kiểm chứng danh tính, site và quyền. Không tạo issue hoặc comment.</p><p>Trình duyệt đầu tiên giữ phiên này. Muốn dùng trình duyệt khác, dừng và chạy lại probe.</p><p>${escapeHtml(notice)}</p><form action="/start" method="post"><button name="flow" value="identity">1. Kết nối danh tính (read:me)</button><button name="flow" value="jira">2. Cấp quyền Jira / thêm site</button></form><form action="/refresh" method="post"><button>Làm mới token và kiểm rotation</button></form><form action="/disconnect" method="post"><button>Ngắt phiên local</button></form><p><a href="/report">Xem report an toàn</a></p><p>Account chưa có site cần chủ tài khoản xác nhận riêng; danh sách site rỗng không chứng minh điều đó.</p><pre>${escapeHtml(JSON.stringify(report, null, 2))}</pre></main></body></html>`, 'text/html; charset=utf-8');
       }
