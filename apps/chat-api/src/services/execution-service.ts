@@ -154,7 +154,7 @@ export class ExecutionService {
     // Launch background execution
     this.queuedStarts.add(planId);
     setImmediate(() => {
-      const run = this.executePlan(convId, planId, steps, userId, context);
+      const run = this.executePlan(convId, planId, steps, userId, context, planRow.plan_hash);
       this.activeRuns.set(planId, run);
       this.queuedStarts.delete(planId);
       run.catch((err) => {
@@ -175,17 +175,17 @@ export class ExecutionService {
     };
   }
 
-  private buildController(convId: string, planId: string, steps: PlanStep[], dbIds: Map<string, string>, context: AdapterContext, initialStates?: Record<string, StepState>) {
+  private buildController(convId: string, planId: string, steps: PlanStep[], dbIds: Map<string, string>, context: AdapterContext, initialStates?: Record<string, StepState>, dispatch?: {userId: string; planHash: string}) {
     return new ExecutionController({
       // The executor keeps its interface; who runs and which connection was previewed travel in this closure.
       runner: {executeStep:async(step:PlanStep,outputs:StepOutputs,runOptions?:ExecuteStepOptions)=>new StepRunner({ getAdapter: async serviceName => {
         const adapter=await this.adapterFactory.getAdapterForService(serviceName,context),source=this.sourceSnapshots.get(planId);
-        if(!source)return adapter;
+        if(!source && !(dispatch && typeof this.planRepo.assertSourceDispatchAllowed === 'function'))return adapter;
         return {execute:async(tool:string,args:any,options?:{signal?:AbortSignal})=>{
           const detached=structuredClone(args);
           const freeze=(value:any):any=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};freeze(detached);
-          if(/^(myslack|slack)\./.test(tool)||step.tool!==tool)throw Object.assign(new Error('SLACK_DISPATCH_BINDING_REQUIRED'),{category:'AUTH_ERROR',details:{requestSent:false}});
-          await this.planRepo.assertSourceDispatchAllowed(planId,source.userId,source.hash,step.id,tool,options?.signal);
+          if(source && (/^(myslack|slack)\./.test(tool)||step.tool!==tool))throw Object.assign(new Error('SLACK_DISPATCH_BINDING_REQUIRED'),{category:'AUTH_ERROR',details:{requestSent:false}});
+          await this.planRepo.assertSourceDispatchAllowed(planId,source?.userId ?? dispatch!.userId,source?.hash ?? dispatch!.planHash,step.id,tool,options?.signal);
           options?.signal?.throwIfAborted();return adapter.execute(tool,detached,options);
         }};
       } }).executeStep(step,outputs,runOptions)},
@@ -219,7 +219,7 @@ export class ExecutionService {
       // Read progress after the CAS: a stale request must not replay an earlier snapshot.
       const saved = restoredProgress(steps, await this.stepRepo.listSteps(plan.id,'planning'));
       validateRecoveryAction(plan.status, saved.states, stepId, action);
-      const controller = this.buildController(plan.conv_id, plan.id, steps, saved.dbIds, context, saved.states);
+      const controller = this.buildController(plan.conv_id, plan.id, steps, saved.dbIds, context, saved.states, {userId, planHash: plan.plan_hash});
       this.activeControllers.set(plan.id, controller);
       return controller;
     } catch (error) {
@@ -234,6 +234,7 @@ export class ExecutionService {
     steps: PlanStep[],
     userId: string,
     context: AdapterContext,
+    planHash?: string,
   ): Promise<void> {
     try {
       if (this.stopRequests.has(planId)) return;
@@ -249,7 +250,7 @@ export class ExecutionService {
 
       if (this.stopRequests.has(planId)) return;
 
-      const controller = this.buildController(convId, planId, steps, stepDbIdMap, context);
+      const controller = this.buildController(convId, planId, steps, stepDbIdMap, context, undefined, planHash ? {userId, planHash} : undefined);
       this.activeControllers.set(planId, controller);
       const summary = await controller.runUntilPause();
       await this.planRepo.updatePlanStatus(planId, summary.status);

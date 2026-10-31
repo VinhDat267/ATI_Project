@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type pg from 'pg';
 import {messageOriginAllowed,sealMessageOrigin} from './slack-message-origin.js';
+import {planOriginAllowed,sealPlanOrigin} from './slack-plan-origin.js';
 import { eraseMessageSelector,messageSelectorValue,validateMessageSelector,SLACK_MESSAGE_TOMBSTONE } from './slack-message-selectors.js';
 
 export interface SlackArtifactTarget { atiUserId:string;targetKind:string;targetId:string;targetSubId:string }
@@ -64,9 +65,14 @@ export function redactPlanRow(row:any):any {
 export async function eraseSlackArtifact(client:pg.PoolClient,target:SlackArtifactTarget,artifact:Awaited<ReturnType<typeof lockSlackArtifact>>):Promise<void> {
   const originTable=artifact.table==='messages'||artifact.table==='conversations'?artifact.table:null;
   const validOrigin=originTable?await messageOriginAllowed(client,originTable,artifact.row,target.atiUserId):false;
+  const planTable=artifact.table==='plans'||artifact.table==='execution_steps'?artifact.table:null;
+  const validPlanOrigin=planTable?await planOriginAllowed(client,planTable,artifact.row,target.atiUserId):false;
   // Only the previously certified remainder may survive a trusted eraser's
   // incidental transformation. Unknown/tampered legacy is never certified here.
-  const reseal=async()=>{if(originTable&&validOrigin)await sealMessageOrigin(client,originTable,target.targetId,'physical_purge');};
+  const reseal=async()=>{
+    if(originTable&&validOrigin)await sealMessageOrigin(client,originTable,target.targetId,'physical_purge');
+    if(planTable&&validPlanOrigin)await sealPlanOrigin(client,planTable,target.targetId,'physical_purge');
+  };
   if(artifact.table==='messages') {
     eraseMessageSelector(artifact.row,target.targetKind,target.targetSubId);
     await client.query('UPDATE messages SET content=$2,metadata=$3 WHERE id=$1',[target.targetId,artifact.row.content,JSON.stringify(artifact.row.metadata)]);await reseal();return;

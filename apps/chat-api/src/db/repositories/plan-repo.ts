@@ -5,6 +5,7 @@ import { SlackDerivedLineageRepo } from './slack-derived-lineage-repo.js';
 import { SlackPolicyService } from '../../services/slack/policy-service.js';
 import { guardPlanInTransaction,guardStepRowsInTransaction,planSelectors,type SlackPlanWriteContext } from '../../services/slack/slack-plan-lineage.js';
 import { hasSlackMarker } from '../../services/slack/slack-message-selectors.js';
+import { sealPlanOrigin } from '../../services/slack/slack-plan-origin.js';
 
 export interface PlanRow {
   id: string;
@@ -55,19 +56,12 @@ export class PlanRepo {
   /** A client inside the caller's transaction; otherwise the plan is saved in a transaction of its own. */
   db?: pg.PoolClient): Promise<PlanRow> {
     if(hasSlackMarker(data.planJson)||hasSlackMarker(data.resourceLabels))throw new Error('SLACK_PROVENANCE_REQUIRED');
-    if (db) return this.insertPlan(db, data);
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
-      const plan = await this.insertPlan(client, data);
-      await client.query('COMMIT');
+    const save=async(client:pg.PoolClient)=>{
+      const plan=await this.insertPlan(client,data);
+      await sealPlanOrigin(client,'plans',plan.id,'plan_writer');
       return plan;
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
-    }
+    };
+    return db?save(db):this.transaction(save);
   }
 
   private async insertPlan(client: pg.PoolClient, data: Parameters<PlanRepo['createPlan']>[0]): Promise<PlanRow> {
