@@ -7,3 +7,5 @@ Review on the PR: Chưa đạt at `b92f6564` and `59d43278`, then Đạt trong p
 Accepted: a source-free schedule carries a private origin certificate from the real writer. The fingerprint is name, request, recurrence, services and `schedules.user_id`, checked against the conversation owner. `tick` refuses before `insertRun` and the due scan keeps PostgreSQL timestamp text so a shared microsecond cannot repeat the same page. `planNow` and `planOne` refuse again. Backfill does not certify unmarked legacy and does not overwrite a certificate that no longer matches. Slack-sourced schedules keep the 03B2G lineage gate and are not written into `slack_schedule_origins`. No production backfill was run.
 
 M2 remains open. Next is a public read, 03B3, then 03B4. The 03B3 plan anchored at `612ac427` is not the implementation baseline. No native Free/Pro, two-user, model, full F3/F4 or live flag claim.
+
+Review of the record at `56132334` was Đạt sau khi sửa nhỏ. The 03B2I matrix row and the parent 03B2 current status no longer say schedule origin is still open.
