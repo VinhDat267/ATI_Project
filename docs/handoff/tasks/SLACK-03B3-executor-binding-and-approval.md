@@ -127,6 +127,13 @@ Không đổi: `isWriteTool` cho Gmail/Calendar/Sheets, `AdapterFactory` persona
 
 ## 7. Kết quả
 
+### Thi công runtime 01/11/2026
+
+- Chủ dự án yêu cầu hoàn tất M2. Nhánh `feat/slack-03b3-read-binding`, baseline `f5167983`; kế hoạch hiện hành [M2 read integration](../../superpowers/plans/2026-11-01-slack-m2-read-integration.md) thay các giả định triển khai cũ ở `612ac427`.
+- Đã có shared binding/dependency validators, immutable executor envelope, backend authority hook, writer cho binding-only read plan, transactional promotion của kết quả sang lineage toàn plan/step và SSE reload-only.
+- OAuth thêm `users:read`; grant thiếu quyền bị chặn trước transport. Plan đọc bền vững yêu cầu tổ chức cho phép storage1day; private retention0 không đổi.
+- Focused schema9, executor guard9 và PostgreSQL integration8 đạt; fullcheck3774 (3301v3+406eval+1launcher+66Node) exit0, typecheck/build/security đạt; browser OAuth4/4. Review độc lập tìm P2 per-member lineage và known retry defect, đã sửa RED→GREEN; writer text/hash cũng được khóa. [Log](../log/2026-11-01-slack-03b3-read-runtime.md). CI chờ đúng published head; chưa tuyên bố accepted staging/M2 hoặc public route/planner/UI/native.
+
 - Đã hiệu chỉnh 3 tài liệu 03B3 theo 6 khe hở review: envelope đầy đủ thay digest; dependency selector server-derived + resolver grammar + provenance per-entity; TOCTOU detach/freeze/abort/reauthorize; validator runtime Task 1 + lệnh test đúng; multi-workspace explicit; anchor `612ac427`/`390b1c54`/`23544be9`.
 - Hiệu chỉnh cuối: digest chỉ băm `slackDigestInput` (bỏ `digest`, Backend dùng cùng projection); phân biệt `transient`/`stored`/`persisted`, persisted/derived bị deny tới 03B2, stored qua `getSource`; provenance type đặt tại tool-schemas, executor không import tool-adapters.
 - Kiểm tra tài liệu thật: xem mục "Kiểm chứng" trong nhật ký (đếm link nội bộ, UTF-8, số dòng kế hoạch, `git diff --check`).

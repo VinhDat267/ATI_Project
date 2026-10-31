@@ -83,6 +83,7 @@ export interface PlanStep {
 
 /** The personal connections a plan was previewed with. */
 export interface PlanConnections {
+  myslack?: import('./myslack-plan-bindings.js').SlackPlanBindings;
   gmail?: { credentialId: string; email: string };
   mycalendar?: { credentialId: string; email: string; allowedCalendars: string[] };
   mysheets?: { credentialId: string; email: string; allowedSpreadsheets: string[] };

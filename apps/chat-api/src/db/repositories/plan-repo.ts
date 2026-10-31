@@ -1,11 +1,13 @@
 import type pg from 'pg';
 import { isDeepStrictEqual } from 'node:util';
+import { createHash } from 'node:crypto';
 import { isUuid } from './uuid.js';
 import { SlackDerivedLineageRepo } from './slack-derived-lineage-repo.js';
 import { SlackPolicyService } from '../../services/slack/policy-service.js';
 import { guardPlanInTransaction,guardStepRowsInTransaction,planSelectors,type SlackPlanWriteContext } from '../../services/slack/slack-plan-lineage.js';
 import { hasSlackMarker } from '../../services/slack/slack-message-selectors.js';
 import { sealPlanOrigin } from '../../services/slack/slack-plan-origin.js';
+import { isBoundSlackReadPlan } from '../../services/slack/slack-read-plan.js';
 
 export interface PlanRow {
   id: string;
@@ -72,6 +74,21 @@ export class PlanRepo {
       await client.query('ROLLBACK');
       throw err;
     }finally{client.release();}
+  }
+
+  /** Internal writer for server-bound read proposals, with no Slack source payload. */
+  async createSlackReadPlan(data:Parameters<PlanRepo['createPlan']>[0],userId:string):Promise<PlanRow>{
+    const snapshot=structuredClone(data);
+    if(!isBoundSlackReadPlan(snapshot.planJson,userId)||hasSlackMarker(snapshot.resourceLabels))throw new Error('SLACK_READ_PLAN_INVALID');
+    const text=snapshot.planText??JSON.stringify(snapshot.planJson);
+    try{
+      if(!isDeepStrictEqual(JSON.parse(text),snapshot.planJson)||createHash('sha256').update(text).digest('hex')!==snapshot.planHash)throw new Error();
+    }catch{throw new Error('SLACK_READ_PLAN_INVALID');}
+    return this.transaction(async client=>{
+      const owner=(await client.query('SELECT user_id FROM conversations WHERE id=$1 FOR UPDATE',[snapshot.convId])).rows[0]?.user_id;
+      if(owner!==userId)throw new Error('SLACK_READ_IDENTITY_MISMATCH');
+      const row=await this.insertPlan(client,snapshot);await sealPlanOrigin(client,'plans',row.id,'plan_writer');return row;
+    });
   }
 
   private async insertPlan(client: pg.PoolClient, data: Parameters<PlanRepo['createPlan']>[0]): Promise<PlanRow> {
@@ -141,7 +158,7 @@ export class PlanRepo {
   async assertSourceDispatchAllowed(planId:string,userId:string,expectedHash:string,stepId:string,tool:string,signal?:AbortSignal):Promise<void>{
     signal?.throwIfAborted();await this.transaction(async client=>{
       const checked=await guardPlanInTransaction(client,this.slack,planId,'planning');
-      if(checked.source&&/^(myslack|slack)\./.test(tool))throw Object.assign(new Error('SLACK_DISPATCH_BINDING_REQUIRED'),{category:'AUTH_ERROR',details:{requestSent:false}});
+      if(checked.source&&/^(myslack|slack)\./.test(tool)&&!isBoundSlackReadPlan(checked.row.plan_json,userId))throw Object.assign(new Error('SLACK_DISPATCH_BINDING_REQUIRED'),{category:'AUTH_ERROR',details:{requestSent:false}});
       const owner=(await client.query('SELECT user_id FROM conversations WHERE id=$1',[checked.row.conv_id])).rows[0]?.user_id;
       if(!checked.allowed||owner!==userId||checked.row.plan_hash!==expectedHash||!['approved','executing'].includes(checked.row.status)||
         !checked.row.plan_json.steps?.some((s:any)=>s.id===stepId&&s.tool===tool))throw Object.assign(new Error('SLACK_SOURCE_UNAVAILABLE'),{category:'AUTH_ERROR',details:{requestSent:false}});

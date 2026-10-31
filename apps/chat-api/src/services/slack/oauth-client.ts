@@ -1,5 +1,5 @@
 /** Metadata-only until SLACK-03 enforces content/model authorization. */
-export const SLACK_USER_SCOPES = ['channels:read', 'groups:read', 'im:read', 'mpim:read', 'channels:history', 'groups:history', 'im:history', 'mpim:history', 'search:read', 'chat:write'];
+export const SLACK_USER_SCOPES = ['channels:read', 'groups:read', 'im:read', 'mpim:read', 'channels:history', 'groups:history', 'im:history', 'mpim:history', 'users:read', 'search:read', 'chat:write'];
 export interface SlackOAuthConfig {
   clientId: string; clientSecret: string; appId: string; redirectUri: string;
   authorizationUrl: string; apiBaseUrl: string;

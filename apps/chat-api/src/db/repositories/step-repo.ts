@@ -2,7 +2,9 @@ import type pg from 'pg';
 import { isDeepStrictEqual } from 'node:util';
 import { SlackDerivedLineageRepo } from './slack-derived-lineage-repo.js';
 import { SlackPolicyService } from '../../services/slack/policy-service.js';
-import { guardPlanInTransaction,guardStepRowsInTransaction,tagSlackSourceArtifact } from '../../services/slack/slack-plan-lineage.js';
+import { guardPlanInTransaction,guardStepRowsInTransaction,tagSlackSourceArtifact,uniqueSegments,planSelectors } from '../../services/slack/slack-plan-lineage.js';
+import type { DerivedSegmentInput } from './slack-derived-lineage-repo.js';
+import { isBoundSlackReadPlan } from '../../services/slack/slack-read-plan.js';
 import { JSON_TOMBSTONE } from '../../services/slack/slack-artifact-targets.js';
 import { hasSlackMarker } from '../../services/slack/slack-message-selectors.js';
 import { sealPlanOrigin } from '../../services/slack/slack-plan-origin.js';
@@ -134,6 +136,42 @@ export class StepRepo {
       [planId]
     );
     return guardStepRowsInTransaction(client,this.slack,context,res.rows,purpose);
+    });
+  }
+
+  /** Called only with private wrapper evidence. Fresh output and its complete lineage commit together. */
+  async updateSlackReadResult(id:string,output:unknown,segments:DerivedSegmentInput[],expected:{userId:string;planHash:string;stepId:string},signal?:AbortSignal):Promise<ExecutionStepRow>{
+    const data=structuredClone({output,segments,expected});
+    return this.transaction(async client=>{
+      signal?.throwIfAborted();
+      const first=(await client.query('SELECT p.id,p.conv_id FROM execution_steps s JOIN plans p ON p.id=s.plan_id WHERE s.id=$1',[id])).rows[0];
+      if(!first)throw new Error('SLACK_READ_SNAPSHOT_CHANGED');
+      const copies=(await client.query(`SELECT c.* FROM slack_derived_copies c WHERE c.status='active' AND
+        (c.target_id=$1 OR c.target_id IN (SELECT id::text FROM execution_steps WHERE plan_id=$1::uuid)) ORDER BY c.id`,[first.id])).rows;
+      const inherited:DerivedSegmentInput[]=[];for(const copy of copies)inherited.push(...await this.slack.segmentsInTransaction(client,copy.id));
+      const union=uniqueSegments([...inherited,...data.segments]);
+      await this.slack.prepareConversationWriteInTransaction(client,first.conv_id,data.expected.userId,union,'planning');
+      const checked=await guardPlanInTransaction(client,this.slack,first.id,'planning');
+      const plan=(await client.query('SELECT * FROM plans WHERE id=$1 FOR UPDATE',[first.id])).rows[0];
+      if(!checked.allowed||!isBoundSlackReadPlan(plan.plan_json,data.expected.userId)||plan.plan_hash!==data.expected.planHash||!['approved','executing'].includes(plan.status))throw new Error('SLACK_READ_SNAPSHOT_CHANGED');
+      const rows=(await client.query('SELECT * FROM execution_steps WHERE plan_id=$1 ORDER BY step_id FOR UPDATE',[first.id])).rows;
+      const step=rows.find(s=>s.id===id),approved=plan.plan_json.steps.find((s:any)=>s.id===data.expected.stepId);
+      if(!step||step.step_id!==data.expected.stepId||step.tool!==approved?.tool||!isDeepStrictEqual(step.args_json,approved.args)||!['pending','running'].includes(step.status))throw new Error('SLACK_READ_SNAPSHOT_CHANGED');
+      const current=(await client.query(`SELECT id FROM slack_derived_copies WHERE status='active' AND
+        (target_id=$1 OR target_id IN (SELECT id::text FROM execution_steps WHERE plan_id=$1::uuid)) ORDER BY id`,[first.id])).rows;
+      if(JSON.stringify(current.map(r=>r.id))!==JSON.stringify(copies.map(c=>c.id)))throw new Error('SLACK_READ_SNAPSHOT_CHANGED');
+      const saved=(await client.query("UPDATE execution_steps SET output_json=$2,status='succeeded',error_json=NULL,completed_at=clock_timestamp() WHERE id=$1 RETURNING *",[id,JSON.stringify(data.output)])).rows[0];
+      Object.assign(step,saved);
+      const selectors=planSelectors({resourceLabels:plan.resource_labels});
+      for(const selector of selectors)await this.slack.registerDerivedCopyInTransaction(client,{atiUserId:data.expected.userId,targetKind:'plan_step_arg',targetId:first.id,targetSubId:selector,segments:union});
+      await client.query('UPDATE plans SET slack_lineage_manifest=$2 WHERE id=$1',[first.id,JSON.stringify(selectors)]);
+      for(const row of rows){
+        const manifest=['args_json',...(row.output_json==null?[]:['output_json']),...(row.error_json==null?[]:['error_json'])];
+        for(const selector of manifest)await this.slack.registerDerivedCopyInTransaction(client,{atiUserId:data.expected.userId,targetKind:selector==='args_json'?'plan_step_arg':'audit_log_entry',targetId:row.id,targetSubId:selector,segments:union});
+        await client.query('UPDATE execution_steps SET slack_lineage_manifest=$2 WHERE id=$1',[row.id,JSON.stringify(manifest)]);
+      }
+      await client.query("DELETE FROM slack_plan_origins WHERE (artifact_table='plans' AND artifact_id=$1) OR (artifact_table='execution_steps' AND plan_id=$1)",[first.id]);
+      signal?.throwIfAborted();delete saved.slack_lineage_manifest;return tagSlackSourceArtifact(saved);
     });
   }
 }
