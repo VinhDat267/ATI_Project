@@ -32,7 +32,7 @@ export async function captureScheduleArtifact(client:pg.PoolClient,registry:Slac
   for(const c of copies.filter(c=>c.status==='active'))segments.push(...await registry.segmentsInTransaction(client,c.id));
   return {table,id,row,convId:row.root_conv,owner:row.owner,copies,segments:uniqueSegments(segments),source:row.slack_lineage_manifest!=null||copies.length>0||hasSlackMarker(row)};
 }
-export async function prelockScheduleArtifacts(client:pg.PoolClient,registry:SlackDerivedLineageRepo,states:Array<ScheduleArtifactState|null>):Promise<void> {
+export async function prelockScheduleArtifacts(client:pg.PoolClient,_registry:SlackDerivedLineageRepo,states:Array<ScheduleArtifactState|null>):Promise<void> {
   const present=states.filter((s):s is ScheduleArtifactState=>!!s);
   // A transaction never mixes owners; reject rather than lock a new authority late.
   if(new Set(present.map(s=>s.owner)).size>1)throw Error('SLACK_SCHEDULE_UNAVAILABLE');

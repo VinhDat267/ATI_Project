@@ -25,3 +25,5 @@ Plan/step/audit/schedule origins and legacy approval/dispatch/run gates remain n
 
 
 Browser fixture compatibility: raw-SQL saved-history RED reproduced in real Chromium;10 existing specs now use actual writers via one test helper, preserving assertions and technical timestamps/statuses. FE02 all4PASS. Product/backend unchanged; broader browser/exact-headCI and final binding pending. See implementation log for superseded CI and isolated fixture boundary.
+
+Browser follow-up: default94PASS/2FAIL/1SKIP, both obsolete placeholder locators corrected then focused2PASS; schedule22PASS. Strict frontend unused-parameter diagnostic corrected without changing behavior/flags. Final source/test freeze/fullcheck and exact-headCI rerun pending; no green full-default claim from combined runs.
