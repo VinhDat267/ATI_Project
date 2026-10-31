@@ -6,6 +6,9 @@ import { expect, it } from 'vitest';
 import { SLACK_DERIVED_TARGET_KINDS } from '@wap/tool-schemas';
 import { createSlackReadEnvironment, TEST_ENV, TEST_KEY } from '../helpers/slack-private-read-fixture.js';
 import { SlackDerivedLineageRepo } from '../../src/db/repositories/slack-derived-lineage-repo.js';
+import {MessageRepo} from '../../src/db/repositories/message-repo.js';
+import {ConversationRepo} from '../../src/db/repositories/conversation-repo.js';
+import {generateAccessToken} from '../../src/auth/jwt.js';
 
 type Environment = Awaited<ReturnType<typeof createSlackReadEnvironment>>;
 type User = Awaited<ReturnType<Environment['addUser']>>;
@@ -120,6 +123,33 @@ async function health(url: string) {
   try { return (await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(1000) })).ok; }
   catch { return false; }
 }
+
+it('actual server gates unmarked legacy message/memory/title and serves genuine new writes without Slack config',async()=>{
+  const env=await createSlackReadEnvironment('slack_native_origin');
+  let native:Awaited<ReturnType<typeof startNative>>|undefined;
+  try{
+    const person=await env.db.person('native origin'),conversations=new ConversationRepo(env.db.pool),messages=new MessageRepo(env.db.pool);
+    const conv=await conversations.createConversation(person.id);
+    await messages.createMessage(conv.id,'user','certified native user text');
+    await env.db.pool.query('UPDATE conversations SET title=$2 WHERE id=$1',[conv.id,'unknown native private title']);
+    await env.db.pool.query("INSERT INTO messages(conv_id,role,content,metadata) VALUES($1,'assistant','unknown native private answer',$2),($1,'system','',$3)",
+      [conv.id,{type:'answer'},{type:'working_memory',state:{thread:{id:'OLD',name:'unknown native private memory'}}}]);
+    native=await startNative(env,false);await native.until(()=>health(native!.url),'origin gate bootstrap without Slack config');
+    const headers={Authorization:`Bearer ${generateAccessToken(person,'native-runtime-fixture-secret-longer-than-thirty-two-bytes',person.sid).accessToken}`,'Content-Type':'application/json'};
+    for(const path of [`/api/conversations/${conv.id}`,`/api/conversations/${conv.id}/messages/latest`,'/api/conversations?search=unknown%20native']){
+      const response=await fetch(native.url+path,{headers,signal:AbortSignal.timeout(5000)});expect(response.status).toBe(200);
+      const body=await response.text();expect(body).not.toContain('unknown native private');expect(body).not.toContain('remainder_fingerprint');
+      if(path===`/api/conversations/${conv.id}`)expect(body).toContain('certified native user text');
+    }
+    const create=await fetch(native.url+'/api/conversations',{method:'POST',headers,signal:AbortSignal.timeout(5000)});expect(create.status).toBe(201);
+    const created=await create.json() as any;
+    const write=await fetch(native.url+`/api/conversations/${created.conversation.id}/messages`,{method:'POST',headers,body:JSON.stringify({content:'new native human request'}),signal:AbortSignal.timeout(5000)});expect(write.status).toBe(202);
+    const read=await fetch(native.url+`/api/conversations/${created.conversation.id}`,{headers,signal:AbortSignal.timeout(5000)});expect(read.status).toBe(200);
+    expect(await read.text()).toContain('new native human request');
+    expect((await env.db.pool.query("SELECT content FROM messages WHERE conv_id=$1 AND content='unknown native private answer'",[conv.id])).rowCount).toBe(1);
+    expect(env.fixture.requests).toEqual([]);
+  }finally{try{await native?.stop();}finally{await env.close();}}
+},65_000);
 
 it('actual server drains signed revocation through validation and purge with flags off, preserving the other ATI owner', async () => {
   const env = await createSlackReadEnvironment('slack_native_chain');

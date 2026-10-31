@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type pg from 'pg';
+import {messageOriginAllowed,sealMessageOrigin} from './slack-message-origin.js';
 import { eraseMessageSelector,messageSelectorValue,validateMessageSelector,SLACK_MESSAGE_TOMBSTONE } from './slack-message-selectors.js';
 
 export interface SlackArtifactTarget { atiUserId:string;targetKind:string;targetId:string;targetSubId:string }
@@ -61,9 +62,14 @@ export function redactPlanRow(row:any):any {
 }
 /** Caller holds common source+conversation+artifact locks and rechecks copy CAS. */
 export async function eraseSlackArtifact(client:pg.PoolClient,target:SlackArtifactTarget,artifact:Awaited<ReturnType<typeof lockSlackArtifact>>):Promise<void> {
+  const originTable=artifact.table==='messages'||artifact.table==='conversations'?artifact.table:null;
+  const validOrigin=originTable?await messageOriginAllowed(client,originTable,artifact.row,target.atiUserId):false;
+  // Only the previously certified remainder may survive a trusted eraser's
+  // incidental transformation. Unknown/tampered legacy is never certified here.
+  const reseal=async()=>{if(originTable&&validOrigin)await sealMessageOrigin(client,originTable,target.targetId,'physical_purge');};
   if(artifact.table==='messages') {
     eraseMessageSelector(artifact.row,target.targetKind,target.targetSubId);
-    await client.query('UPDATE messages SET content=$2,metadata=$3 WHERE id=$1',[target.targetId,artifact.row.content,JSON.stringify(artifact.row.metadata)]);return;
+    await client.query('UPDATE messages SET content=$2,metadata=$3 WHERE id=$1',[target.targetId,artifact.row.content,JSON.stringify(artifact.row.metadata)]);await reseal();return;
   }
   const selector=target.targetSubId;
   if(target.targetKind==='scheduled_workflow_arg'){
@@ -71,6 +77,7 @@ export async function eraseSlackArtifact(client:pg.PoolClient,target:SlackArtifa
       status=CASE WHEN status='active' THEN 'paused' ELSE status END,pause_reason='slack_source_invalidated',next_run_at=NULL,
       version=version+1,updated_at=clock_timestamp() WHERE id=$1`,[target.targetId,selector==='recurrence'?'{}':SLACK_MESSAGE_TOMBSTONE]);
     else await client.query(`UPDATE ${artifact.table} SET ${selector}=$2 WHERE id=$1`,[target.targetId,SLACK_MESSAGE_TOMBSTONE]);
+    await reseal();
     return;
   }
   if(artifact.table==='plans') {

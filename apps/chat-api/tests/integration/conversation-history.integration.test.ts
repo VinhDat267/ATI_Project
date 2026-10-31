@@ -88,7 +88,8 @@ describe('FE-02 conversation history: real PostgreSQL and HTTP', () => {
     const ids: string[] = [];
     for (let index = 0; index < 57; index++) ids.push((await repo.createConversation(owner)).id);
     await repo.createConversation(other);
-    await pool.query("UPDATE conversations SET updated_at='2026-10-03T12:00:00.123456Z', title='Frontend 100%_ literal' WHERE user_id=$1", [owner]);
+    for(const id of ids)await repo.renameConversation(id,owner,'Frontend 100%_ literal');
+    await pool.query("UPDATE conversations SET updated_at='2026-10-03T12:00:00.123456Z' WHERE user_id=$1", [owner]);
     const app = createApp({ jwtSecret: secret, convRepo: repo, msgRepo: messages, chatService: {} as any });
     const collected: string[] = [];
     let cursor: string | null = null;

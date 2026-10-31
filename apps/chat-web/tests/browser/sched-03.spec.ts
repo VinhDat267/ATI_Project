@@ -3,6 +3,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import { mkdir, appendFile, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import pg from 'pg';
+import {fixtureConversation,fixtureMessage} from './persisted-artifacts.fixture.js';
 import { hashPassword } from '../../../chat-api/src/db/repositories/user-repo.js';
 
 const enabled = process.env.SANDBOX_SCENARIO === 'schedule';
@@ -104,7 +105,8 @@ for (const width of [1440, 375]) for (const theme of ['light', 'dark'] as const)
       await send(page, 'Mỗi sáng 8 giờ, gửi lịch họp hôm nay lên Slack #ati-test');
       const old = (await db.query("SELECT m.* FROM messages m JOIN conversations c ON c.id=m.conv_id WHERE c.user_id=$1 AND m.metadata->>'type'='schedule_proposal'", [owner])).rows[0];
       const metadata = { ...old.metadata, proposal: { ...old.metadata.proposal, name: 'Đề xuất mới nhất' } };
-      await db.query("INSERT INTO messages(conv_id,role,content,metadata,created_at) VALUES($1,'assistant','Đề xuất mới',$2,now()+interval '1 second')", [old.conv_id, metadata]);
+      const newest=await fixtureMessage(db,old.conv_id,'assistant','Đề xuất mới',metadata);
+      await db.query("UPDATE messages SET created_at=now()+interval '1 second' WHERE id=$1",[newest]);
       await page.getByRole('button', { name: 'Xác nhận', exact: true }).click();
       await expect(page.getByRole('alert')).toHaveText('Đề xuất này đã cũ. Hãy xem đề xuất mới nhất.');
       await expect(page.getByRole('heading', { name: 'Đề xuất mới nhất', exact: true })).toBeVisible();
@@ -148,9 +150,9 @@ test('SCHED-03: long names and requests fit 375 pixels and ignore remains local'
   test.skip(!enabled); const db = pool();
   try {
     await page.setViewportSize({ width: 375, height: 900 }); const owner = await login(page, db);
-    const convId = (await db.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [owner])).rows[0].id;
+    const convId = await fixtureConversation(db,owner);
     const metadata = { type: 'schedule_proposal', proposal: { kind: 'schedule', action: 'create', name: 'a'.repeat(80), request: 'b'.repeat(1000), recurrence: { type: 'daily', time: '08:00' }, summary: 'Lịch dài' }, services: ['calendar', 'slack'], nextRuns: [], previous: null, baseVersion: null, scheduleId: null };
-    await db.query("INSERT INTO messages(conv_id,role,content,metadata) VALUES($1,'assistant','Lịch dài',$2)", [convId, metadata]);
+    await fixtureMessage(db,convId,'assistant','Lịch dài',metadata);
     await page.goto(`/c/${convId}`); await expect(page.locator('[data-moment="schedule"]')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     const mutations: string[] = []; page.on('request', request => { if (request.method() !== 'GET' && /schedules|schedule-proposals/.test(request.url())) mutations.push(request.url()); });
@@ -181,7 +183,7 @@ for (const state of ['expired', 'planning_failed', 'interrupted'] as const) test
       await db.query('UPDATE schedule_runs SET status=$2,plan_id=null WHERE id=$1', [run.id, state]);
       await db.query("UPDATE plans SET status='failed' WHERE id=$1", [run.plan_id]);
       const first = (await db.query("SELECT id FROM messages WHERE conv_id=$1 AND metadata->>'type'='schedule_run'", [run.conv_id])).rows[0].id;
-      await db.query("INSERT INTO messages(conv_id,role,content,metadata) VALUES($1,'system','Không lập được kế hoạch',$2)", [run.conv_id, { type: 'planning_error', replyToMessageId: first }]);
+      await fixtureMessage(db,run.conv_id,'system','Không lập được kế hoạch',{type:'planning_error',replyToMessageId:first});
     }
     await page.reload(); await expect(page.getByRole('button', { name: 'Lập lại kế hoạch', exact: true })).toBeVisible();
     if (state !== 'expired') { await expect(page.locator('[data-schedule-origin]')).toBeVisible(); await expect(page.getByText('Câu yêu cầu của bạn:')).toHaveCount(0); }

@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import pg from 'pg';
+import {fixtureConversation,fixtureMessage} from './persisted-artifacts.fixture.js';
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { hashPassword } from '../../../chat-api/src/db/repositories/user-repo.js';
@@ -30,11 +31,10 @@ for (const width of [1440, 375]) for (const theme of ['light', 'dark'] as const)
     try {
       const owner = (await db.query('SELECT id FROM users WHERE email=$1', [process.env.CHAT_ADMIN_EMAIL])).rows[0].id;
       for (const fixture of fixtures) {
-        const id = (await db.query('INSERT INTO conversations(user_id,title) VALUES($1,$2) RETURNING id', [owner, `FE06B ${fixture.key} ${width} ${theme}`])).rows[0].id;
-        await db.query("INSERT INTO messages(conv_id,role,content) VALUES($1,'user',$2)", [id, fixture.prompt]);
-        await db.query("INSERT INTO messages(conv_id,role,content,metadata) VALUES($1,'assistant',$2,$3::jsonb)", [id, fixture.content, JSON.stringify(fixture.metadata)]);
+        const id = await fixtureConversation(db,owner,`FE06B ${fixture.key} ${width} ${theme}`);
+        await fixtureMessage(db,id,'user',fixture.prompt);
         // Planning errors are persisted as system messages in production.
-        if (fixture.key === 'server') await db.query("UPDATE messages SET role='system' WHERE conv_id=$1 AND role='assistant'", [id]);
+        await fixtureMessage(db,id,fixture.key==='server'?'system':'assistant',fixture.content,fixture.metadata);
         await page.goto(`/c/${id}`);
         if (fixture.key === 'server') await expect(page.getByText('Không thể lập kế hoạch lúc này. Hãy thử lại.', { exact: true })).toBeVisible();
         else await expect(page.getByText('Chưa có gì được ghi lên công cụ nào.', { exact: true })).toBeVisible();
@@ -50,9 +50,9 @@ for (const width of [1440, 375]) for (const theme of ['light', 'dark'] as const)
       await expect(page.locator('#network-offline-banner').getByRole('button')).toHaveText('Thử lại');
       await context.setOffline(false); await expect(page.locator('#network-offline-banner')).toHaveCount(0);
 
-      const slowId = (await db.query('INSERT INTO conversations(user_id,title) VALUES($1,$2) RETURNING id', [owner, 'FE06B slow request'])).rows[0].id;
+      const slowId = await fixtureConversation(db,owner,'FE06B slow request');
       const slowPrompt = 'Tạo card Trello, gửi Slack, tạo issue GitHub rồi ghi vào Google Sheets';
-      await db.query("INSERT INTO messages(conv_id,role,content) VALUES($1,'user',$2)", [slowId, slowPrompt]);
+      await fixtureMessage(db,slowId,'user',slowPrompt);
       await page.route(`**/api/conversations/${slowId}/stream`, route => route.fulfill({ status: 200, contentType: 'text/event-stream', body: 'event: agent_state\ndata: {"state":"planning","requestId":"slow-case"}\n\nevent: gather_progress\ndata: {"steps":[{"tool":"trello.list_boards","status":"completed","result":"To Do"},{"tool":"slack.list_channels","status":"completed","result":"#ati-test"},{"tool":"github.search_issues","status":"running"}],"summary":"2/3 công cụ đã khảo sát"}\n\n' }));
       await page.clock.install(); await page.goto(`/c/${slowId}`); await expect(page.locator('#moment-2')).toBeVisible(); await page.clock.fastForward(16_000);
       await expect(page.getByRole('button', { name: 'Thôi chờ, giữ lại câu yêu cầu' })).toBeVisible(); await capture(page, 'slow', width, theme);
@@ -65,9 +65,9 @@ test('FE-06B: durable responses respect member permissions and session expiry re
   try {
     await db.query("INSERT INTO users(id,email,password,name,status,role,email_verified) VALUES($1,$2,$3,'FE06B Member','active','member',true)", [id, email, hashPassword(password)]);
     await login(page, email, password);
-    const conv = (await db.query('INSERT INTO conversations(user_id,title) VALUES($1,$2) RETURNING id', [id, 'FE06B member refusal'])).rows[0].id;
-    await db.query("INSERT INTO messages(conv_id,role,content) VALUES($1,'user',$2)", [conv, fixtures[0].prompt]);
-    await db.query("INSERT INTO messages(conv_id,role,content,metadata) VALUES($1,'assistant',$2,$3::jsonb)", [conv, fixtures[0].content, JSON.stringify(fixtures[0].metadata)]);
+    const conv = await fixtureConversation(db,id,'FE06B member refusal');
+    await fixtureMessage(db,conv,'user',fixtures[0].prompt);
+    await fixtureMessage(db,conv,'assistant',fixtures[0].content,fixtures[0].metadata);
     await page.goto(`/c/${conv}`); await expect(page.getByText(/Chỉ quản trị viên kết nối được dịch vụ mới/)).toBeVisible(); await expect(page.getByRole('link', { name: 'Kết nối Notion' })).toHaveCount(0);
     await page.getByRole('textbox').fill('Bản nháp chưa gửi');
     await page.evaluate(async modulePath => { const { authStorage } = await import(modulePath); authStorage.clearStoredTokens(); }, '/src/services/auth-storage.ts');

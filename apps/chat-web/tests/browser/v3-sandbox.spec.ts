@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import pg from 'pg';
+import {fixtureConversation,fixtureMessage} from './persisted-artifacts.fixture.js';
 import { createHash } from 'node:crypto';
 
 /** The send button of the main chat composer; a clarification card has its own "Gửi" button. */
@@ -15,9 +16,9 @@ test('real browser and PostgreSQL: login, chat, approval and execution recovery 
   try {
     await login(page);
     const owner = (await pool.query('SELECT id FROM users WHERE email = $1', [email])).rows[0].id;
-    const convId = (await pool.query('INSERT INTO conversations (user_id) VALUES ($1) RETURNING id', [owner])).rows[0].id;
+    const convId = await fixtureConversation(pool,owner);
     const title = `Đối soát E2E ${Date.now()}`;
-    await pool.query("INSERT INTO messages (conv_id, role, content) VALUES ($1, 'user', $2)", [convId, title]);
+    await fixtureMessage(pool,convId,'user',title);
     const plan = { kind: 'plan', summary: 'Khôi phục sau restart', steps: [
       { id: 'step_1', tool: 'trello.create_card', description: 'Tạo thẻ trước restart', args: { listId: 'list_1', title: 'Task đã tạo' }, dependsOn: [] },
       { id: 'step_2', tool: 'trello.add_member', description: 'Gán Minh vào thẻ đã tạo', args: { cardId: { $ref: 'step_1.output.id' }, memberId: 'minh' }, dependsOn: ['step_1'] },
@@ -36,8 +37,7 @@ test('real browser and PostgreSQL: login, chat, approval and execution recovery 
     const before = (await pool.query('SELECT * FROM execution_steps WHERE plan_id = $1 AND step_id = $2', [planId, 'step_1'])).rows[0];
     const writes: string[] = [];
     page.on('request', request => { if (request.method() === 'POST' && request.url().includes(`/api/executions/${planId}`)) writes.push(new URL(request.url()).pathname); });
-    // PostgreSQL conversations currently have no title field; select the newest row
-    // after verifying the real list endpoint returned the seeded conversation first.
+    // Select the actual first-user title after verifying the persisted list order.
     await page.reload();
     // APIRequestContext is independent of navigation; an in-flight response from
     // before reload can lose its body when the browser replaces the document.
@@ -45,7 +45,7 @@ test('real browser and PostgreSQL: login, chat, approval and execution recovery 
     const listed = await page.request.get('/api/conversations', { headers: { Authorization: `Bearer ${access}` } });
     expect((await listed.json()).conversations[0].id).toBe(convId);
     await page.getByRole('button', { name: 'Mở danh sách hội thoại' }).click();
-    await page.getByRole('button', { name: /^Hội thoại mới/ }).first().click();
+    await page.getByRole('button', { name: new RegExp(`^${title}`) }).click();
     const notice = page.getByRole('region', { name: /Hệ thống vừa khởi động lại|Chưa rõ kết quả/ });
     await expect(notice).toBeVisible();
     await notice.getByText('Chi tiết để đối chiếu').click();
@@ -86,8 +86,9 @@ test('real browser and PostgreSQL: login, chat, approval and execution Continue 
   try {
     await login(page);
     const owner = (await pool.query('SELECT id FROM users WHERE email = $1', [email])).rows[0].id;
-    const convId = (await pool.query('INSERT INTO conversations (user_id) VALUES ($1) RETURNING id', [owner])).rows[0].id;
-    await pool.query("INSERT INTO messages (conv_id, role, content) VALUES ($1, 'user', $2)", [convId, `Continue E2E ${Date.now()}`]);
+    const convId = await fixtureConversation(pool,owner);
+    const title=`Continue E2E ${Date.now()}`;
+    await fixtureMessage(pool,convId,'user',title);
     const plan = { kind: 'plan', summary: 'Chạy tiếp sau restart', steps: [
       { id: 'step_1', tool: 'trello.create_card', description: 'Thẻ đã tạo', args: { listId: 'list_1', title: 'Saved task' }, dependsOn: [] },
       { id: 'step_2', tool: 'slack.send_message', description: 'Thông báo chưa gửi', args: { channel: '#general', text: { $template: 'Saved ${step_1.output.url}' } }, dependsOn: ['step_1'] },
@@ -106,7 +107,7 @@ test('real browser and PostgreSQL: login, chat, approval and execution Continue 
     page.on('request', req => { if (req.method() === 'POST' && req.url().includes('/api/executions/')) writes.push(new URL(req.url()).pathname); });
     await page.reload();
     await page.getByRole('button', { name: 'Mở danh sách hội thoại' }).click();
-    await page.getByRole('button', { name: /^Hội thoại mới/ }).first().click();
+    await page.getByRole('button', { name: new RegExp(`^${title}`) }).click();
     const notice = page.getByRole('region', { name: /Hệ thống vừa khởi động lại|Chưa rõ kết quả/ });
     await expect(notice.getByText(/chưa từng được gửi/)).toBeVisible();
     await expect(notice.getByRole('button', { name: /Skip/ })).toHaveCount(0);

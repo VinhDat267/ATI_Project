@@ -46,10 +46,18 @@ describe('real PostgreSQL plan invariants', () => {
     try {
       await pool.query('INSERT INTO users (id, email, password, name) VALUES ($1, $2, $3, $4)', [userId, `${userId}@example.test`, 'test-only', 'Test']);
       await pool.query('INSERT INTO conversations (id, user_id) VALUES ($1, $2)', [convId, userId]);
-      await pool.query(`INSERT INTO messages (conv_id, role, content, created_at)
-        SELECT $1, 'user', 'm' || i, now() + i * interval '1 millisecond'
-        FROM generate_series(1, 102) AS i`, [convId]);
-      const messages = await new MessageRepo(pool).listMessages(convId);
+      const repo=new MessageRepo(pool);
+      const client=await pool.connect();
+      try{
+        await client.query('BEGIN');
+        for(let i=1;i<=102;i++){
+          const row=await repo.createMessage(convId,'user',`m${i}`,undefined,client);
+          await client.query("UPDATE messages SET created_at='2026-01-01T00:00:00Z'::timestamptz+$2*interval '1 millisecond' WHERE id=$1",[row.id,i]);
+        }
+        await client.query('COMMIT');
+      }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+      expect((await pool.query("SELECT count(*)::int AS n FROM slack_message_origins WHERE artifact_table='messages' AND conv_id=$1",[convId])).rows[0].n).toBe(102);
+      const messages = await repo.listMessages(convId);
       expect(messages).toHaveLength(100);
       expect(messages[0]?.content).toBe('m3');
       expect(messages.at(-1)?.content).toBe('m102');
@@ -59,7 +67,7 @@ describe('real PostgreSQL plan invariants', () => {
       await pool.query('DELETE FROM users WHERE id = $1', [userId]);
       await pool.end();
     }
-  });
+  },20_000);
 
   it('rejects a second pending plan inserted outside the repository', async () => {
     const pool = new pg.Pool({ connectionString });

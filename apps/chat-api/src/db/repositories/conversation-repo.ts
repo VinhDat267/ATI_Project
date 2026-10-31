@@ -1,6 +1,7 @@
 import {readScheduleArtifact,captureScheduleArtifact,prelockScheduleArtifacts,scheduleRegistry} from '../../services/slack/slack-schedule-lineage.js';
 import {messageFingerprint} from '../../services/slack/slack-message-selectors.js';
 import type pg from 'pg';
+import {sealMessageOrigin} from '../../services/slack/slack-message-origin.js';
 import { encodeConversationCursor, validateConversationPage, validateConversationTitle, type ConversationPageOptions } from './conversation-history.js';
 import { isUuid } from './uuid.js';
 
@@ -17,13 +18,15 @@ export class ConversationRepo {
   constructor(private pool: pg.Pool) {}
 
   async createConversation(userId: string): Promise<ConversationRow> {
-    const res = await this.pool.query(
+    const client=await this.pool.connect();
+    try{await client.query('BEGIN');const res = await client.query(
       `INSERT INTO conversations (user_id, status)
        VALUES ($1, 'chatting')
        RETURNING *`,
       [userId]
     );
-    return res.rows[0];
+    await sealMessageOrigin(client,'conversations',res.rows[0].id,'conversation_create');await client.query('COMMIT');return res.rows[0];
+    }catch(error){await client.query('ROLLBACK').catch(()=>{});throw error;}finally{client.release();}
   }
 
   async listConversations(userId: string, limit: number = 50): Promise<ConversationRow[]> {
@@ -81,6 +84,7 @@ export class ConversationRepo {
       if(JSON.stringify(current?.copies)!==JSON.stringify(snapshot.copies))throw Error('SLACK_TITLE_CHANGED');
       await client.query("UPDATE slack_derived_copies SET status='retired',retired_at=clock_timestamp(),retired_reason='manual',updated_at=clock_timestamp() WHERE target_kind='scheduled_workflow_arg' AND target_id=$1 AND target_sub_id='title' AND status='active'",[id]);
       const result=await client.query('UPDATE conversations SET title=$3,updated_at=now(),slack_title_manual_fingerprint=$4,slack_lineage_manifest=NULL WHERE id=$1 AND user_id=$2 RETURNING *',[id,userId,cleaned,messageFingerprint(cleaned,'title')]);
+      await sealMessageOrigin(client,'conversations',id,'title_manual');
       await client.query('COMMIT');
       const row=result.rows[0];delete row.slack_lineage_manifest;delete row.slack_title_manual_fingerprint;return row;
     }catch(error){await client.query('ROLLBACK').catch(()=>{});throw error;}finally{client.release();}
