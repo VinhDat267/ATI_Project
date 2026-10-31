@@ -3,12 +3,13 @@ import { sameSlackBinding,sameSlackPolicyEpoch,validateSlackPurgeTarget,type Sla
 import { isUuid } from '../../db/repositories/uuid.js';
 import { acquireSlackInvalidationLocks,compareSlackRevisions,hashPolicyEpoch,slackInvalidationLockKeys,type SlackInvalidationBarrier } from './slack-invalidation-service.js';
 import { SlackMessageContentPurger } from './slack-message-content-purger.js';
-import { messageFingerprint, messageSelectorValue } from './slack-message-selectors.js';
+import { messageFingerprint } from './slack-message-selectors.js';
 
 export interface MessagePurgeLease {id:string;workerNonce:string;leaseUntil:string}
 type Outcome='completed'|'retried'|'lost';
 type Code='STALE_LINEAGE'|'MISSING_HANDLER'|'INVALID_PROVENANCE'|'PARTIAL_PURGE'|'RETRY_SCAN'|'ABORTED'|'PURGE_FAILED';
-interface Options {batchSize?:number;leaseSeconds?:number;targetKind?:'chat_history_message'|'working_memory_entity';purger?:Pick<SlackMessageContentPurger,'purgeInTransaction'|'sourceLockKeysInTransaction'>}
+type SupportedKind='chat_history_message'|'working_memory_entity'|'plan_step_arg'|'audit_log_entry';
+interface Options {batchSize?:number;leaseSeconds?:number;targetKind?:SupportedKind;purger?:Pick<SlackMessageContentPurger,'purgeInTransaction'|'sourceLockKeysInTransaction'>}
 class Failure extends Error {constructor(readonly safeCode:Code){super(safeCode);}}
 class LostLease extends Error {}
 function bound(value:number,max:number):void {if(!Number.isSafeInteger(value)||value<1||value>max)throw new TypeError('INVALID_PURGE_BOUND');}
@@ -63,15 +64,15 @@ function selection(target:SlackPurgeTarget):{sql:string;values:unknown[]} {
   return {sql,values};
 }
 
-/** Registered messages only. A completed message intent says nothing about the
- * six other derived kinds or artifacts that never passed the writer gate. */
+/** One concrete kind per fenced consumer. Completion says nothing about other
+ * kinds or legacy artifacts that never passed their writer gate. */
 export class SlackMessagePurgeConsumer {
   private readonly size:number;private readonly seconds:number;private readonly purger:NonNullable<Options['purger']>;
-  private readonly kind: 'chat_history_message'|'working_memory_entity';
+  private readonly kind: SupportedKind;
   constructor(private readonly pool:pg.Pool,options:Options={}) {
     this.size=options.batchSize??20;this.seconds=options.leaseSeconds??60;bound(this.size,100);bound(this.seconds,600);this.purger=options.purger??new SlackMessageContentPurger();
     this.kind=options.targetKind??'chat_history_message';
-    if(!['chat_history_message','working_memory_entity'].includes(this.kind))throw new TypeError('INVALID_PURGE_KIND');
+    if(!['chat_history_message','working_memory_entity','plan_step_arg','audit_log_entry'].includes(this.kind))throw new TypeError('INVALID_PURGE_KIND');
   }
   async claim(limit=5):Promise<MessagePurgeLease[]> {
     bound(limit,50);
@@ -106,19 +107,17 @@ export class SlackMessagePurgeConsumer {
     values.push(cutoff);const date=`$${values.length}`;values.push(this.size+1);const pageSize=`$${values.length}`;
     values.push(0);const offset=`$${values.length}`;
     const query = `WITH candidates AS (SELECT c.id,c.target_version,c.target_fingerprint,c.status,c.target_kind,c.target_sub_id,c.created_at::text AS created_exact,
-        m.content AS artifact_content,m.metadata AS artifact_metadata,
+        m.payload AS artifact_payload,m.payload IS NOT NULL AS artifact_payload_present,
         CASE WHEN c.status='active' AND c.created_at<=${date}::timestamptz THEN 0 ELSE 1 END AS priority,
         n.id AS replacement_id,n.target_version AS replacement_version,n.target_fingerprint AS replacement_fingerprint,
         (EXISTS(SELECT 1 FROM slack_derived_provenance_segments s WHERE s.derived_copy_id=n.id) AND
          NOT EXISTS(SELECT 1 FROM slack_derived_provenance_segments s WHERE s.derived_copy_id=n.id AND s.ati_user_id<>n.ati_user_id) AND
          NOT EXISTS(SELECT 1 FROM slack_derived_provenance_segments s WHERE s.derived_copy_id=n.id AND (${sql}))) AS replacement_outside_target
-      FROM slack_derived_copies c LEFT JOIN messages m ON m.id::text=c.target_id
+      FROM slack_derived_copies c LEFT JOIN slack_derived_artifact_payloads m ON m.copy_id=c.id
       LEFT JOIN slack_derived_copies n ON c.status='purged' AND n.status='active' AND n.ati_user_id=c.ati_user_id
         AND n.target_kind=c.target_kind AND n.target_id=c.target_id AND n.target_sub_id=c.target_sub_id AND n.target_version>c.target_version
       WHERE c.target_kind='${this.kind}' AND (c.status='active' OR (c.status='retired' AND c.retired_reason='fingerprint_mismatch') OR
-        (c.status='purged' AND m.id IS NOT NULL AND
-          CASE WHEN c.target_sub_id='content' THEN m.content<>'Slack content is unavailable.'
-          ELSE slack_message_selector_value(m.content,m.metadata,c.target_kind,c.target_sub_id) IS NOT NULL END))
+        (c.status='purged' AND m.copy_id IS NOT NULL AND NOT slack_artifact_erased(c.target_kind,c.target_sub_id,m.payload)))
       AND (EXISTS(SELECT 1 FROM slack_derived_provenance_segments s WHERE s.derived_copy_id=c.id AND (${sql})) OR
         (NOT EXISTS(SELECT 1 FROM slack_derived_provenance_segments s WHERE s.derived_copy_id=c.id) ${orphanScope})))
       SELECT * FROM candidates
@@ -129,10 +128,10 @@ export class SlackMessagePurgeConsumer {
     // Read the current concrete selector, including JSON/memory IDs, before trusting a successor.
     for(const row of result) {
       if(row.replacement_outside_target===true) {
-        try {row.replacement_outside_target=messageFingerprint(messageSelectorValue({content:row.artifact_content,metadata:row.artifact_metadata},row.target_kind,row.target_sub_id),row.target_sub_id)===row.replacement_fingerprint;}
+        try {row.replacement_outside_target=messageFingerprint(row.artifact_payload_present?row.artifact_payload:undefined,row.target_sub_id)===row.replacement_fingerprint;}
         catch {row.replacement_outside_target=false;}
       }
-      delete row.artifact_content;delete row.artifact_metadata;
+      delete row.artifact_payload;delete row.artifact_payload_present;
     }
     if(!unresolvedOnly)return result;
     const unresolved=result.filter(row=>!(row.status==='purged'&&row.replacement_outside_target===true));
@@ -170,7 +169,7 @@ export class SlackMessagePurgeConsumer {
       // Different workspace bindings can touch the same conversations without
       // sharing source keys. Order ALL parents before any per-copy erasure.
       await client.query(`SELECT v.id FROM conversations v JOIN (
-        SELECT DISTINCT m.conv_id,c.ati_user_id FROM slack_derived_copies c JOIN messages m ON m.id::text=c.target_id
+        SELECT DISTINCT m.conv_id,c.ati_user_id FROM slack_derived_copies c JOIN slack_derived_artifact_payloads m ON m.copy_id=c.id
         WHERE c.id=ANY($1::uuid[])) parents ON v.id=parents.conv_id AND v.user_id=parents.ati_user_id
         ORDER BY v.id FOR UPDATE OF v`,[ids]);
       // Fingerprint/supersession checks above read the artifact without its row

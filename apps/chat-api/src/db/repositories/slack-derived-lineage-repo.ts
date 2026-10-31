@@ -9,7 +9,8 @@ import {
   acquireSlackInvalidationLocks, checkSlackInvalidationBarriers, slackSourceWriteLockKeys,
 } from '../../services/slack/slack-invalidation-service.js';
 import { isUuid } from './uuid.js';
-import { messageFingerprint as fingerprint, messageSelectorValue, validateMessageSelector } from '../../services/slack/slack-message-selectors.js';
+import { messageFingerprint as fingerprint } from '../../services/slack/slack-message-selectors.js';
+import { lockSlackArtifact,slackArtifactLocation,slackArtifactValue,validateSlackArtifactTarget } from '../../services/slack/slack-artifact-targets.js';
 
 /** Private server acquisition context, never HTTP/model-supplied lineage. */
 export interface DerivedSegmentInput {
@@ -52,7 +53,7 @@ function version(value: unknown): string {
 }
 function validateTarget(target: Target): void {
   if (!isUuid(target.atiUserId) || !isUuid(target.targetId)) deny('invalid_target');
-  validateMessageSelector(target.targetKind, target.targetSubId);
+  validateSlackArtifactTarget(target.targetKind, target.targetSubId);
 }
 function cleanSegment(input: DerivedSegmentInput, owner: string): DerivedSegmentInput {
   if (!input || typeof input !== 'object') deny('invalid_segment');
@@ -102,7 +103,7 @@ function fromRow(row: any): DerivedSegmentInput {
     ...(row.channel_id ? { channelId: row.channel_id } : {}), ...(row.raw_source_id ? { rawSourceId: row.raw_source_id } : {}) };
 }
 
-/** Message and working-memory selectors. Other artifact families remain fail-closed. */
+/** Concrete message/memory/plan/step/audit selectors. Future/schedule kinds remain fail-closed. */
 export class SlackDerivedLineageRepo {
   constructor(private readonly pool: pg.Pool, private readonly policy: Pick<SlackPolicyService, 'resolveSlackModelPolicy'>) {}
 
@@ -129,17 +130,16 @@ export class SlackDerivedLineageRepo {
 
   private async lockTarget(client: pg.PoolClient, target: Target, write: boolean,
     segments: DerivedSegmentInput[], purpose?: AssertDerivedCopyAllowedInput['consumerPurpose']): Promise<unknown> {
-    const found = (await client.query('SELECT conv_id FROM messages WHERE id=$1', [target.targetId])).rows[0];
-    if (!found) deny('not_found');
+    const found = await slackArtifactLocation(client,target);
     const mode = write ? 'UPDATE' : 'SHARE';
     const conversation = await client.query(`SELECT id FROM conversations WHERE id=$1 AND user_id=$2 FOR ${mode}`,
-      [found.conv_id, target.atiUserId]);
+      [found.convId, target.atiUserId]);
     if (conversation.rowCount !== 1) deny('unauthorized_caller');
     await this.authorize(client, segments, purpose);
     // Parent first; re-read the concrete artifact under its own lock after the parent.
-    const message = (await client.query(`SELECT conv_id,content,metadata FROM messages WHERE id=$1 FOR ${mode}`, [target.targetId])).rows[0];
-    if (!message || message.conv_id !== found.conv_id) deny('stale_lineage');
-    return messageSelectorValue(message, target.targetKind, target.targetSubId);
+    const artifact = await lockSlackArtifact(client,target,mode);
+    if (artifact.convId !== found.convId) deny('stale_lineage');
+    return slackArtifactValue(artifact.row, target.targetKind, target.targetSubId);
   }
 
   private async authorize(client: pg.PoolClient, segments: DerivedSegmentInput[], purpose?: AssertDerivedCopyAllowedInput['consumerPurpose']): Promise<void> {

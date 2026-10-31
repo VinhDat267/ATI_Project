@@ -410,7 +410,8 @@ export class ChatService {
     planned: PlannerResponse, memory: WorkingMemory, userTexts: string[], signal?: AbortSignal,
   ): Promise<PreparedResponse> {
     const { conversationId, correlation } = target;
-    if (target.slackContext && (planned.kind === 'plan' || planned.kind === 'schedule')) throw new Error('SLACK_CORE_ARTIFACT_GATE');
+    if (target.slackContext && planned.kind === 'schedule') throw new Error('SLACK_CORE_ARTIFACT_GATE');
+    if (target.slackContext && planned.kind === 'plan' && (!this.planRepo || planned.steps.some(s=>s.tool.startsWith('myslack.')))) throw new Error('SLACK_DISPATCH_BINDING_REQUIRED');
     let response = planned.kind === 'plan' ? await this.bindConnections(planned, target.userId, signal) : planned;
     signal?.throwIfAborted();
     let proposal: ScheduleProposalMetadata | null = null;
@@ -448,7 +449,8 @@ export class ChatService {
             expiresAt,
             resourceLabels: labels,
           };
-          planId = (client ? await this.planRepo.createPlan(data, client) : await this.planRepo.createPlan(data)).id;
+          planId = (target.slackContext ? await this.planRepo.createSlackPlan(data,{segments:target.slackContext.segments},client,signal) :
+            client ? await this.planRepo.createPlan(data, client) : await this.planRepo.createPlan(data)).id;
         }
         await save('assistant', `Kế hoạch: ${response.summary}`, {
           type: 'plan', planId, plan: response, resourceLabels: labels, ...correlation,

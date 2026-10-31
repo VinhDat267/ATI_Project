@@ -111,7 +111,7 @@ async function allowStorage(env: Environment, workspaceId: string) {
   if (!previous) throw new Error('Fixture consent missing');
   await env.consentRepo.grantConsent({
     workspaceId, providerId: env.runtimeIdentity.providerId, policyVersion: 'v1.0.0',
-    expectedRevision: previous.revision, purposes: ['storage', 'manual_lookup'], retentionDays: 14,
+    expectedRevision: previous.revision, purposes: ['storage', 'manual_lookup','planning'], retentionDays: 14,
     organizationRepresentative: 'fixture', evidenceRef: 'FIXTURE', recordedBy: 'fixture',
   });
 }
@@ -177,6 +177,13 @@ it('actual server erases a durable registered message without any Slack config a
     const memory = await new MessageRepo(env.db.pool, registry).createSlackMessage(convId, 'system', '',
       { type: 'working_memory', state: { members: [{ id: 'SLACK', name: 'Private memory' }, { id: 'TRELLO', name: 'Keep' }] } },
       { segments, selectors: ['state:/members#id=SLACK'] });
+    const {PlanRepo}=await import('../../src/db/repositories/plan-repo.js');
+    const {StepRepo}=await import('../../src/db/repositories/step-repo.js');
+    const {createHash}=await import('node:crypto');
+    const json={kind:'plan',thinking:'',summary:'Private native plan',warnings:[],steps:[{id:'s1',tool:'trello.create_card',args:{name:'Private native args'},description:'Private',dependsOn:[]}]};
+    const planText=JSON.stringify(json),plan=await new PlanRepo(env.db.pool,registry).createSlackPlan({convId,planJson:json,planText,planHash:createHash('sha256').update(planText).digest('hex'),expiresAt:new Date(Date.now()+600000)},{segments});
+    const stepRepo=new StepRepo(env.db.pool,registry),step=await stepRepo.createStep({planId:plan.id,stepId:'s1',tool:'trello.create_card',argsJson:{name:'Private native args'},requestedBy:user.person.id});
+    await stepRepo.updateStepStatus(step.id,'succeeded',{text:'Private native output'});
     const key = `native-disconnect:${randomUUID()}`;
     await env.stageBarriers([{
       effectKey: 'disconnect', barrier: { barrierType: 'binding', binding: user.binding, reason: 'disconnect' },
@@ -186,9 +193,11 @@ it('actual server erases a durable registered message without any Slack config a
     await native.until(() => health(native!.url), 'health without Slack config');
     await native.until(async () => (await env.db.pool.query('SELECT content FROM messages WHERE id=$1', [id])).rows[0].content === unavailable, 'durable purge without Slack config');
     await native.until(async () => JSON.stringify((await env.db.pool.query('SELECT metadata FROM messages WHERE id=$1', [memory.id])).rows[0]).includes('Private memory') === false, 'working memory purge without Slack config');
+    await native.until(async()=>!(JSON.stringify((await env.db.pool.query('SELECT plan_json,plan_text FROM plans WHERE id=$1',[plan.id])).rows[0]).includes('Private native')),'plan erasure without Slack config');
+    await native.until(async()=>!(JSON.stringify((await env.db.pool.query('SELECT args_json,output_json FROM execution_steps WHERE id=$1',[step.id])).rows[0]).includes('Private native')),'step erasure without Slack config');
     const jobs = (await env.db.pool.query('SELECT target_kind,status FROM slack_invalidation_intents WHERE source_event_key=$1', [key])).rows;
-    expect(jobs.filter(row => row.status === 'completed').map(row => row.target_kind).sort()).toEqual(['chat_history_message', 'slack_source_raw', 'working_memory_entity']);
-    expect(jobs.filter(row => row.status === 'pending')).toHaveLength(5);
+    expect(jobs.filter(row => row.status === 'completed').map(row => row.target_kind).sort()).toEqual(['audit_log_entry','chat_history_message','plan_step_arg','slack_source_raw','working_memory_entity']);
+    expect(jobs.filter(row => row.status === 'pending')).toHaveLength(3);
     expect((await env.db.pool.query('SELECT metadata FROM messages WHERE id=$1', [memory.id])).rows[0].metadata.state.members).toEqual([{ id: 'TRELLO', name: 'Keep' }]);
     expect(env.fixture.requests).toHaveLength(0);
     expect((await fetch(`${native.url}/api/slack/events`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(1000) })).status).toBe(503);
