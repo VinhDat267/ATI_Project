@@ -371,7 +371,7 @@ async function bootstrap() {
         derivedPolicyFanout: pool && slackInvalidationService ? new SlackDerivedPolicyFanout(pool,slackInvalidationService) : undefined,
         messagePurgeConsumer: pool ? new SlackMessagePurgeConsumer(pool) : undefined,
         memoryPurgeConsumer: pool ? new SlackMessagePurgeConsumer(pool,{targetKind:'working_memory_entity'}) : undefined,
-        artifactPurgeConsumers: pool ? [new SlackMessagePurgeConsumer(pool,{targetKind:'plan_step_arg'}),new SlackMessagePurgeConsumer(pool,{targetKind:'audit_log_entry'})] : [],
+        artifactPurgeConsumers: pool ? [new SlackMessagePurgeConsumer(pool,{targetKind:'plan_step_arg'}),new SlackMessagePurgeConsumer(pool,{targetKind:'audit_log_entry'}),new SlackMessagePurgeConsumer(pool,{targetKind:'scheduled_workflow_arg'})] : [],
       })
     : undefined;
 

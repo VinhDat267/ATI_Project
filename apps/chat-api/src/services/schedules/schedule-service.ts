@@ -5,7 +5,9 @@ import { ScheduleRepo, type Queryable, type ScheduleRow } from '../../db/reposit
 import { isUuid } from '../../db/repositories/uuid.js';
 import { runState, runView } from './run-state.js';
 import { nextOccurrence } from './next-occurrence.js';
-import { hasSlackMarker } from '../slack/slack-message-selectors.js';
+import { captureScheduleArtifact,guardScheduleArtifact,prelockScheduleArtifacts,registerScheduleFields,scheduleRegistry,scheduleSourceContext,tagScheduleContext } from '../slack/slack-schedule-lineage.js';
+import { messageOutputSelectors } from '../slack/slack-message-selectors.js';
+import type { DerivedSegmentInput } from '../../db/repositories/slack-derived-lineage-repo.js';
 
 export const SCHEDULE_CONFLICTS = {
   STALE_PROPOSAL: 'Đề xuất này đã cũ. Hãy xem đề xuất mới nhất.',
@@ -32,6 +34,7 @@ export interface ScheduleChange {
   schedule: ScheduleView;
   convId: string;
   /** Null when the request changed nothing (a repeated confirmation, pausing a paused schedule). */
+  sourceBound?: boolean;
   state: { messageId: string; metadata: ScheduleStateMetadata } | null;
 }
 
@@ -54,14 +57,16 @@ export class ScheduleService {
   readonly repo: ScheduleRepo;
   private messages: MessageRepo;
   private maxSchedules: number;
+  private registry;
 
   constructor(private options: ScheduleServiceOptions) {
     this.repo = new ScheduleRepo(options.pool, options.timeZone);
     this.messages = new MessageRepo(options.pool);
+    this.registry = scheduleRegistry(options.pool);
     this.maxSchedules = options.maxSchedules ?? 10;
   }
 
-  private async transaction<T>(work: (client: pg.PoolClient) => Promise<T>): Promise<T> {
+  private async transaction<T>(work: (client: pg.PoolClient) => Promise<T>, staleCode:'STALE_VERSION'|'STALE_PROPOSAL'='STALE_VERSION'): Promise<T> {
     const client = await this.options.pool.connect();
     try {
       await client.query('BEGIN');
@@ -70,6 +75,7 @@ export class ScheduleService {
       return result;
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
+      if(error instanceof Error&&error.message==='SLACK_SCHEDULE_CHANGED')throw new ScheduleConflict(staleCode);
       throw error;
     } finally {
       client.release();
@@ -107,22 +113,24 @@ export class ScheduleService {
     }
   }
 
-  private async saveFields(client: pg.PoolClient, id: string, fields: Fields, proposalId: string | null): Promise<ScheduleRow> {
+  private async saveFields(client: pg.PoolClient, id: string, fields: Fields, proposalId: string | null, segments: DerivedSegmentInput[] = []): Promise<ScheduleRow> {
     const res = await client.query(
       `UPDATE schedules SET name=$2, request=$3, recurrence=$4, services=$5, status=$6, pause_reason=$7, next_run_at=$8,
          version=version+1, updated_at=now(), last_proposal_id=COALESCE($9, last_proposal_id)
        WHERE id=$1 RETURNING *`,
       [id, fields.name, fields.request, JSON.stringify(fields.recurrence), fields.services, fields.status, fields.pause_reason, fields.next_run_at, proposalId],
     );
-    return res.rows[0];
+    await registerScheduleFields(client,this.registry,'schedules',id,res.rows[0].user_id,segments,['name','request','recurrence']);
+    return tagScheduleContext(res.rows[0],segments);
   }
 
   /** Writes the state message in the same transaction as the change. */
   async recordState(client: Queryable, row: ScheduleRow, now: Date): Promise<ScheduleChange> {
     const schedule = this.repo.view(row, await this.repo.lastRun(row.id, client), now);
     const metadata: ScheduleStateMetadata = { type: 'schedule_state', schedule };
-    const message = await this.messages.createMessage(row.conv_id, 'assistant', this.repo.stateText(schedule), metadata, client);
-    return { schedule, convId: row.conv_id, state: { messageId: message.id, metadata } };
+    const context=scheduleSourceContext(row),content=this.repo.stateText(schedule);
+    const message = context ? await this.messages.createSlackMessage(row.conv_id,'assistant',content,metadata,{...context,selectors:messageOutputSelectors({content,metadata})},client as pg.PoolClient) : await this.messages.createMessage(row.conv_id,'assistant',content,metadata,client);
+    return { schedule, convId: row.conv_id, sourceBound:!!context, state: { messageId: message.id, metadata } };
   }
 
   private async unchanged(client: Queryable, row: ScheduleRow, now: Date): Promise<ScheduleChange> {
@@ -140,19 +148,26 @@ export class ScheduleService {
     const { userId, convId, messageId, now } = input;
     if (!isUuid(convId) || !isUuid(messageId)) throw new ScheduleNotFound();
     return this.transaction(async (client) => {
-      // The conversation row serializes confirmations, including the first one.
-      const owner = await client.query('SELECT user_id FROM conversations WHERE id=$1 FOR UPDATE', [convId]);
-      if (owner.rows[0]?.user_id !== userId) throw new ScheduleNotFound();
-      const message = await client.query(
-        `SELECT metadata,slack_lineage_manifest,EXISTS(SELECT 1 FROM slack_derived_copies c WHERE c.target_id=messages.id::text
-          AND c.target_kind IN ('chat_history_message','working_memory_entity')) AS slack_registered
-         FROM messages WHERE id=$1 AND conv_id=$2 AND metadata->>'type'='schedule_proposal'`, [messageId, convId]);
-      if (!message.rowCount) throw new ScheduleNotFound();
-      // This direct SQL reader must not bypass message guards and copy Slack into
-      // schedules before that artifact's transactional lineage/erasure exists.
-      if (message.rows[0].slack_lineage_manifest != null || message.rows[0].slack_registered || hasSlackMarker(message.rows[0].metadata)) throw new ScheduleConflict('SCHEDULE_SOURCE_PURGED');
-      const metadata = message.rows[0].metadata as ScheduleProposalMetadata;
-      const existing: ScheduleRow | undefined = (await client.query('SELECT * FROM schedules WHERE conv_id=$1 FOR UPDATE', [convId])).rows[0];
+      const proposed=await captureScheduleArtifact(client,this.registry,'messages',messageId);
+      const existingId=(await client.query('SELECT id FROM schedules WHERE conv_id=$1',[convId])).rows[0]?.id;
+      let saved=existingId?await captureScheduleArtifact(client,this.registry,'schedules',existingId):null;
+      if(!proposed||proposed.convId!==convId||proposed.owner!==userId)throw new ScheduleNotFound();
+      await prelockScheduleArtifacts(client,this.registry,[proposed,saved]);
+      const guarded=await guardScheduleArtifact(client,this.registry,proposed,'planning','UPDATE');
+      if(!guarded.allowed)throw new ScheduleConflict('SCHEDULE_SOURCE_PURGED');
+      const metadata=guarded.row.metadata as ScheduleProposalMetadata;
+      if(metadata?.type!=='schedule_proposal')throw new ScheduleNotFound();
+      if(!saved){
+        const arrived=(await client.query('SELECT id FROM schedules WHERE conv_id=$1',[convId])).rows[0];
+        if(arrived){
+          saved=await captureScheduleArtifact(client,this.registry,'schedules',arrived.id);
+          if(saved?.segments.some(s=>!proposed.segments.some(p=>JSON.stringify(p)===JSON.stringify(s))))throw new ScheduleConflict('STALE_PROPOSAL');
+        }
+      }
+      const checked=saved?await guardScheduleArtifact(client,this.registry,saved,'planning','UPDATE'):null;
+      if(checked&&!checked.allowed)throw new ScheduleConflict('SCHEDULE_SOURCE_PURGED');
+      const existing:ScheduleRow|undefined=checked?.row;
+      const segments=[...guarded.segments,...(checked?.segments??[])];
       // Confirming an applied proposal again changes nothing.
       if (existing?.last_proposal_id === messageId) return this.unchanged(client, existing, now);
       const latest = await client.query(
@@ -169,7 +184,8 @@ export class ScheduleService {
            VALUES($1, $2, $3, $4, $5, $6, 'active', $7, $8) RETURNING *`,
           [userId, convId, proposal.name, proposal.request, JSON.stringify(proposal.recurrence), metadata.services, next, messageId],
         );
-        return this.recordState(client, created.rows[0], now);
+        await registerScheduleFields(client,this.registry,'schedules',created.rows[0].id,userId,segments,['name','request','recurrence']);
+        return this.recordState(client, tagScheduleContext(created.rows[0],segments), now);
       }
       if (!existing || metadata.baseVersion !== existing.version) throw new ScheduleConflict('STALE_PROPOSAL');
       const fields = this.transition(existing, proposal.action, proposal, metadata.services, now);
@@ -179,18 +195,28 @@ export class ScheduleService {
       }
       // Turning a finished schedule back on takes a place again.
       if (!OPEN.has(existing.status) && OPEN.has(fields.status)) await this.ensureRoom(client, userId);
-      return this.recordState(client, await this.saveFields(client, existing.id, fields, messageId), now);
-    });
+      return this.recordState(client, await this.saveFields(client, existing.id, fields, messageId,segments), now);
+    },'STALE_PROPOSAL');
+  }
+
+  private async lockSchedule(client:pg.PoolClient,id:string,owner:string):Promise<ScheduleRow|null> {
+    if(!isUuid(id))return null;
+    const state=await captureScheduleArtifact(client,this.registry,'schedules',id);
+    if(!state||state.owner!==owner)return null;
+    await prelockScheduleArtifacts(client,this.registry,[state]);
+    const guarded=await guardScheduleArtifact(client,this.registry,state,'planning','UPDATE');
+    if(!guarded.allowed)throw new ScheduleConflict('SCHEDULE_SOURCE_PURGED');
+    return guarded.row;
   }
 
   async setStatus(input: { userId: string; scheduleId: string; action: 'pause' | 'resume' | 'cancel'; version: number; now: Date }): Promise<ScheduleChange> {
     return this.transaction(async (client) => {
-      const row = await this.repo.ownedSchedule(input.scheduleId, input.userId, client, true);
+      const row = await this.lockSchedule(client,input.scheduleId,input.userId);
       if (!row) throw new ScheduleNotFound();
       if (row.version !== input.version) throw new ScheduleConflict('STALE_VERSION');
       const fields = this.transition(row, input.action, null, null, input.now);
       if (!fields) return this.unchanged(client, row, input.now);
-      return this.recordState(client, await this.saveFields(client, row.id, fields, null), input.now);
+      return this.recordState(client, await this.saveFields(client, row.id, fields, null,scheduleSourceContext(row)?.segments??[]), input.now);
     });
   }
 
@@ -213,14 +239,14 @@ export class ScheduleService {
     const row = await this.transaction(async (client) => {
       let scheduleId: string;
       if (input.trigger === 'replan') {
-        const previous = await this.repo.run(input.runId, client);
+        const previous = await this.repo.run(input.runId,client);
         if (!previous || !await this.repo.ownedSchedule(previous.schedule_id, userId, client)) throw new ScheduleNotFound();
         if (!REPLANNABLE.has(runState(previous, now))) throw new ScheduleConflict('RUN_NOT_REPLANNABLE');
         scheduleId = previous.schedule_id;
       } else {
         scheduleId = input.scheduleId;
       }
-      const schedule = await this.repo.ownedSchedule(scheduleId, userId, client, true);
+      const schedule = await this.lockSchedule(client,scheduleId,userId);
       if (!schedule) throw new ScheduleNotFound();
       // A finished one-off schedule may plan again for a run that needs it, but not start new runs.
       if (schedule.status === 'cancelled' || (input.trigger === 'manual' && schedule.status === 'completed')) throw new ScheduleConflict('SCHEDULE_CLOSED');

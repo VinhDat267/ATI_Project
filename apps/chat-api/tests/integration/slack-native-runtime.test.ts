@@ -184,6 +184,18 @@ it('actual server erases a durable registered message without any Slack config a
     const planText=JSON.stringify(json),plan=await new PlanRepo(env.db.pool,registry).createSlackPlan({convId,planJson:json,planText,planHash:createHash('sha256').update(planText).digest('hex'),expiresAt:new Date(Date.now()+600000)},{segments});
     const stepRepo=new StepRepo(env.db.pool,registry),step=await stepRepo.createStep({planId:plan.id,stepId:'s1',tool:'trello.create_card',argsJson:{name:'Private native args'},requestedBy:user.person.id});
     await stepRepo.updateStepStatus(step.id,'succeeded',{text:'Private native output'});
+    const {registerScheduleFields}=await import('../../src/services/slack/slack-schedule-lineage.js');
+    const scheduleClient=await env.db.pool.connect();let scheduleId:string,runConvId:string,runId:string;
+    try{
+      await scheduleClient.query('BEGIN');await registry.prepareConversationWriteInTransaction(scheduleClient,convId,user.person.id,segments);
+      const schedule=(await scheduleClient.query("INSERT INTO schedules(user_id,conv_id,name,request,recurrence,services,status) VALUES($1,$2,'Private native schedule','Private native request','{}',ARRAY['trello'],'paused') RETURNING id",[user.person.id,convId])).rows[0];scheduleId=schedule.id;
+      await registerScheduleFields(scheduleClient,registry,'schedules',scheduleId,user.person.id,segments,['name','request','recurrence']);
+      runConvId=(await scheduleClient.query("INSERT INTO conversations(user_id,title) VALUES($1,'Private native title') RETURNING id",[user.person.id])).rows[0].id;
+      await registerScheduleFields(scheduleClient,registry,'conversations',runConvId,user.person.id,segments,['title']);
+      runId=(await scheduleClient.query("INSERT INTO schedule_runs(schedule_id,schedule_version,trigger,due_at,status,conv_id,error) VALUES($1,1,'manual',now(),'planning_failed',$2,'Private native run error') RETURNING id",[scheduleId,runConvId])).rows[0].id;
+      await registerScheduleFields(scheduleClient,registry,'schedule_runs',runId,user.person.id,segments,['error']);
+      await scheduleClient.query('COMMIT');
+    }finally{scheduleClient.release();}
     const key = `native-disconnect:${randomUUID()}`;
     await env.stageBarriers([{
       effectKey: 'disconnect', barrier: { barrierType: 'binding', binding: user.binding, reason: 'disconnect' },
@@ -195,9 +207,12 @@ it('actual server erases a durable registered message without any Slack config a
     await native.until(async () => JSON.stringify((await env.db.pool.query('SELECT metadata FROM messages WHERE id=$1', [memory.id])).rows[0]).includes('Private memory') === false, 'working memory purge without Slack config');
     await native.until(async()=>!(JSON.stringify((await env.db.pool.query('SELECT plan_json,plan_text FROM plans WHERE id=$1',[plan.id])).rows[0]).includes('Private native')),'plan erasure without Slack config');
     await native.until(async()=>!(JSON.stringify((await env.db.pool.query('SELECT args_json,output_json FROM execution_steps WHERE id=$1',[step.id])).rows[0]).includes('Private native')),'step erasure without Slack config');
+    await native.until(async()=>!(JSON.stringify((await env.db.pool.query('SELECT name,request FROM schedules WHERE id=$1',[scheduleId])).rows[0]).includes('Private native')),'schedule erasure without Slack config');
+    await native.until(async()=>!(JSON.stringify((await env.db.pool.query('SELECT title FROM conversations WHERE id=$1',[runConvId])).rows[0]).includes('Private native')),'run title erasure without Slack config');
+    await native.until(async()=>!(JSON.stringify((await env.db.pool.query('SELECT error FROM schedule_runs WHERE id=$1',[runId])).rows[0]).includes('Private native')),'run error erasure without Slack config');
     const jobs = (await env.db.pool.query('SELECT target_kind,status FROM slack_invalidation_intents WHERE source_event_key=$1', [key])).rows;
-    expect(jobs.filter(row => row.status === 'completed').map(row => row.target_kind).sort()).toEqual(['audit_log_entry','chat_history_message','plan_step_arg','slack_source_raw','working_memory_entity']);
-    expect(jobs.filter(row => row.status === 'pending')).toHaveLength(3);
+    expect(jobs.filter(row => row.status === 'completed').map(row => row.target_kind).sort()).toEqual(['audit_log_entry','chat_history_message','plan_step_arg','scheduled_workflow_arg','slack_source_raw','working_memory_entity']);
+    expect(jobs.filter(row => row.status === 'pending')).toHaveLength(2);
     expect((await env.db.pool.query('SELECT metadata FROM messages WHERE id=$1', [memory.id])).rows[0].metadata.state.members).toEqual([{ id: 'TRELLO', name: 'Keep' }]);
     expect(env.fixture.requests).toHaveLength(0);
     expect((await fetch(`${native.url}/api/slack/events`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(1000) })).status).toBe(503);

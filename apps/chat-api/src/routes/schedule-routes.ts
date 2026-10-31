@@ -37,7 +37,7 @@ export function createScheduleRoutes(options: ScheduleRoutesOptions): Router {
   const announce = async (change: ScheduleChange) => {
     if (!change.state) return;
     try {
-      await options.emit?.(change.convId, 'schedule_updated', { conversationId: change.convId, messageId: change.state.messageId, ...change.state.metadata });
+      await options.emit?.(change.convId, 'schedule_updated', change.sourceBound ? {conversationId:change.convId,reload:true} : { conversationId: change.convId, messageId: change.state.messageId, ...change.state.metadata });
     } catch (error) {
       console.error('[schedules] could not announce a change:', error instanceof Error ? error.message : error);
     }

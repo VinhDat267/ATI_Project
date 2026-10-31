@@ -1,3 +1,4 @@
+import {applyV3Migrations} from '../helpers/gmail-test-db.js';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import pg from 'pg';
@@ -33,21 +34,30 @@ describe('FE-02 conversation history: real PostgreSQL and HTTP', () => {
     if (!connectionString) throw new Error('DATABASE_URL is required for FE-02 PostgreSQL evidence');
     await admin.query('CREATE EXTENSION IF NOT EXISTS pgcrypto');
     await admin.query(`CREATE SCHEMA ${schema}`);
-    await pool.query(await readFile(new URL('../../../../db/v3/0001_v3_core.sql', import.meta.url), 'utf8'));
+    await applyV3Migrations(pool);
   });
   afterAll(async () => { await pool.end(); await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`); await admin.end(); });
 
   it('backfills existing first-user titles once and preserves data on a second migration', async () => {
-    const owner = await user();
-    const conversation = await repo.createConversation(owner);
-    await pool.query("INSERT INTO messages(conv_id,role,content) VALUES($1,'assistant','not a user title'),($1,'user',$2)", [conversation.id, 'Lịch sử trước migration']);
+    // Migration-only evidence uses an unmigrated independent schema. Runtime
+    // readers in the remaining cases use the complete current schema above.
+    const preSchema=`history_pre_${randomUUID().replaceAll('-','')}`;
+    await admin.query(`CREATE SCHEMA ${preSchema}`);
+    const pre=new pg.Pool({connectionString,options:`-c search_path=${preSchema}`});
+    try{
+      await pre.query(await readFile(new URL('../../../../db/v3/0001_v3_core.sql',import.meta.url),'utf8'));
+      const owner=randomUUID();await pre.query("INSERT INTO users(id,email,password,name) VALUES($1,$2,'fixture','Fixture')",[owner,`${owner}@example.test`]);
+      const conversation=(await pre.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id',[owner])).rows[0];
+    await pre.query("INSERT INTO messages(conv_id,role,content) VALUES($1,'assistant','not a user title'),($1,'user',$2)", [conversation.id, 'Lịch sử trước migration']);
     const sql = await migration();
-    await pool.query(sql);
-    expect((await repo.getConversation(conversation.id) as any).title).toBe('Lịch sử trước migration');
-    await pool.query('UPDATE conversations SET title=$2 WHERE id=$1', [conversation.id, 'Tên đã đổi']);
-    const before = (await pool.query('SELECT * FROM conversations WHERE id=$1', [conversation.id])).rows[0];
-    await pool.query(sql);
-    expect((await pool.query('SELECT * FROM conversations WHERE id=$1', [conversation.id])).rows[0]).toEqual(before);
+    await pre.query(sql);
+    expect((await pre.query('SELECT title FROM conversations WHERE id=$1',[conversation.id])).rows[0].title).toBe('Lịch sử trước migration');
+    await pre.query('UPDATE conversations SET title=$2 WHERE id=$1', [conversation.id, 'Tên đã đổi']);
+    const before = (await pre.query('SELECT * FROM conversations WHERE id=$1', [conversation.id])).rows[0];
+    await pre.query(sql);
+    expect((await pre.query('SELECT * FROM conversations WHERE id=$1', [conversation.id])).rows[0]).toEqual(before);
+    }finally{await pre.end();await admin.query(`DROP SCHEMA ${preSchema} CASCADE`);}
+
   });
 
   it('sets first user title to 60 Unicode characters and preserves it on later messages/rename', async () => {

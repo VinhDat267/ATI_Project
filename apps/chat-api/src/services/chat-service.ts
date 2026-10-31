@@ -1,3 +1,4 @@
+import {scheduleSourceContext,tagScheduleContext} from './slack/slack-schedule-lineage.js';
 import { createHash } from 'node:crypto';
 import type pg from 'pg';
 import { mergeSlackMessageContexts, slackMessageContext, type MessageRepo, type SlackMessageWriteContext } from '../db/repositories/message-repo.js';
@@ -410,7 +411,6 @@ export class ChatService {
     planned: PlannerResponse, memory: WorkingMemory, userTexts: string[], signal?: AbortSignal,
   ): Promise<PreparedResponse> {
     const { conversationId, correlation } = target;
-    if (target.slackContext && planned.kind === 'schedule') throw new Error('SLACK_CORE_ARTIFACT_GATE');
     if (target.slackContext && planned.kind === 'plan' && (!this.planRepo || planned.steps.some(s=>s.tool.startsWith('myslack.')))) throw new Error('SLACK_DISPATCH_BINDING_REQUIRED');
     let response = planned.kind === 'plan' ? await this.bindConnections(planned, target.userId, signal) : planned;
     signal?.throwIfAborted();
@@ -508,7 +508,7 @@ export class ChatService {
 
     // Retrieve previous messages for conversation context
     const previousMessages = await this.msgRepo.listMessages(conversationId, 100, 'planning');
-    const slackContext = mergeSlackMessageContexts(previousMessages);
+    let slackContext = mergeSlackMessageContexts(previousMessages);
     const lastMemory = [...previousMessages].reverse().find((m: any) => m.metadata?.type === 'working_memory');
     const history: ChatMessage[] = previousMessages
       .filter((m: any) => m.id !== currentMessageId && m.metadata?.type !== 'working_memory' &&
@@ -522,7 +522,9 @@ export class ChatService {
           : m.metadata?.type === 'plan' && m.metadata.plan ? JSON.stringify(withoutConnections(m.metadata.plan))
           : m.metadata?.type === 'schedule_proposal' && m.metadata.proposal ? JSON.stringify(m.metadata.proposal) : m.content,
       }));
-    const schedule = this.schedules ? await this.schedules.repo.getByConversation(conversationId, this.schedules.now?.() ?? new Date()) : null;
+    const schedule = this.schedules ? await this.schedules.repo.getByConversation(conversationId, this.schedules.now?.() ?? new Date(),'planning') : null;
+    const scheduleContext=scheduleSourceContext(schedule);
+    if(scheduleContext)slackContext={segments:[...(slackContext?.segments??[]),...scheduleContext.segments],selectors:[]};
 
     // Call planner
     const memory = new WorkingMemory();
@@ -564,17 +566,19 @@ export class ChatService {
     signal.throwIfAborted();
     if (!this.schedules) throw new Error('Schedules are off');
     const userMessage = runMessage(run, this.schedules.timeZone);
-    const first = (await this.msgRepo.listMessages(convId)).find((m: any) => m.metadata?.type === 'schedule_run' && m.metadata.runId === run.runId);
+    const first = (await this.msgRepo.listMessages(convId,100,'planning',signal)).find((m: any) => m.metadata?.type === 'schedule_run' && m.metadata.runId === run.runId);
+    const slackContext=scheduleSourceContext(run);
+    if(slackContext)await this.msgRepo.inSlackTransaction(convId,slackContext,async()=>undefined,signal,'planning');
     const correlation: Correlation = first ? { replyToMessageId: first.id } : {};
     this.eventEmitter.emit('agent_state', { conversationId: convId, state: 'planning', ...correlation });
     const memory = new WorkingMemory();
     const response = await this.planner.processMessage({
       userMessage, history: [], memory, signal, actor: { userId: run.userId }, scheduledRun: true,
-      onGatherEvent: (event) => this.eventEmitter.emit('gather_progress', { conversationId: convId, ...event }),
+      onGatherEvent: (event) => {if(!slackContext)this.eventEmitter.emit('gather_progress', { conversationId: convId, ...event });},
     });
     signal.throwIfAborted();
     if (response.kind === 'schedule') throw new Error('A scheduled run must be planned, not scheduled again');
-    const prepared = await this.prepareResponse({ conversationId: convId, userId: run.userId, correlation, memoryState: memory.toJSON() },
+    const prepared = await this.prepareResponse({ conversationId: convId, userId: run.userId, correlation, memoryState: memory.toJSON(),slackContext,memorySelectors:slackContext?memoryOutputSelectors(memory.toJSON()):undefined },
       response, memory, [userMessage], signal);
     return {
       persist: async (client) => {

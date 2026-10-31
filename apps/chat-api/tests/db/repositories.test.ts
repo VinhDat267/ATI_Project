@@ -76,19 +76,13 @@ describe('apps/chat-api (Task 7: Database Repositories with Optimistic Locking)'
       expect(query).not.toHaveBeenCalled();
     });
     it('creates and lists conversations for user', async () => {
-      const mockQuery = vi.fn().mockImplementation(async (sql: string) => {
-        if (sql.includes('INSERT INTO conversations')) {
-          return { rowCount: 1, rows: [{ id: 'conv-1', user_id: 'u1', status: 'chatting' }] };
-        }
-        return { rowCount: 1, rows: [{ id: 'conv-1', user_id: 'u1', status: 'chatting' }] };
-      });
-      const repo = new ConversationRepo({ query: mockQuery } as any);
+      const owner=await db.person(),other=await db.person(),repo=new ConversationRepo(db.pool);
+      const created=await repo.createConversation(owner.id);await repo.createConversation(other.id);
+      await repo.renameConversation(created.id,owner.id,'Human title');
+      const list=await repo.listConversations(owner.id);
+      expect(list).toHaveLength(1);expect(list[0]).toMatchObject({id:created.id,user_id:owner.id,title:'Human title'});
+      expect(await repo.renameConversation(created.id,other.id,'Wrong owner')).toBeNull();
 
-      const created = await repo.createConversation('u1');
-      expect(created.id).toBe('conv-1');
-
-      const list = await repo.listConversations('u1');
-      expect(list).toHaveLength(1);
     });
   });
 

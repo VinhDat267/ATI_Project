@@ -8,7 +8,7 @@ import { messageFingerprint } from './slack-message-selectors.js';
 export interface MessagePurgeLease {id:string;workerNonce:string;leaseUntil:string}
 type Outcome='completed'|'retried'|'lost';
 type Code='STALE_LINEAGE'|'MISSING_HANDLER'|'INVALID_PROVENANCE'|'PARTIAL_PURGE'|'RETRY_SCAN'|'ABORTED'|'PURGE_FAILED';
-type SupportedKind='chat_history_message'|'working_memory_entity'|'plan_step_arg'|'audit_log_entry';
+type SupportedKind='chat_history_message'|'working_memory_entity'|'plan_step_arg'|'audit_log_entry'|'scheduled_workflow_arg';
 interface Options {batchSize?:number;leaseSeconds?:number;targetKind?:SupportedKind;purger?:Pick<SlackMessageContentPurger,'purgeInTransaction'|'sourceLockKeysInTransaction'>}
 class Failure extends Error {constructor(readonly safeCode:Code){super(safeCode);}}
 class LostLease extends Error {}
@@ -72,7 +72,7 @@ export class SlackMessagePurgeConsumer {
   constructor(private readonly pool:pg.Pool,options:Options={}) {
     this.size=options.batchSize??20;this.seconds=options.leaseSeconds??60;bound(this.size,100);bound(this.seconds,600);this.purger=options.purger??new SlackMessageContentPurger();
     this.kind=options.targetKind??'chat_history_message';
-    if(!['chat_history_message','working_memory_entity','plan_step_arg','audit_log_entry'].includes(this.kind))throw new TypeError('INVALID_PURGE_KIND');
+    if(!['chat_history_message','working_memory_entity','plan_step_arg','audit_log_entry','scheduled_workflow_arg'].includes(this.kind))throw new TypeError('INVALID_PURGE_KIND');
   }
   async claim(limit=5):Promise<MessagePurgeLease[]> {
     bound(limit,50);
@@ -118,6 +118,7 @@ export class SlackMessagePurgeConsumer {
         AND n.target_kind=c.target_kind AND n.target_id=c.target_id AND n.target_sub_id=c.target_sub_id AND n.target_version>c.target_version
       WHERE c.target_kind='${this.kind}' AND (c.status='active' OR (c.status='retired' AND c.retired_reason='fingerprint_mismatch') OR
         (c.status='purged' AND m.copy_id IS NOT NULL AND NOT slack_artifact_erased(c.target_kind,c.target_sub_id,m.payload)))
+      AND NOT(c.status='purged' AND c.target_kind='scheduled_workflow_arg' AND c.target_sub_id='title' AND EXISTS(SELECT 1 FROM conversations v WHERE v.id::text=c.target_id AND v.slack_title_manual_fingerprint=encode(sha256(convert_to(to_jsonb(v.title)::text,'UTF8')),'hex') AND NOT EXISTS(SELECT 1 FROM slack_derived_copies active WHERE active.target_id=c.target_id AND active.target_kind=c.target_kind AND active.status='active')))
       AND (EXISTS(SELECT 1 FROM slack_derived_provenance_segments s WHERE s.derived_copy_id=c.id AND (${sql})) OR
         (NOT EXISTS(SELECT 1 FROM slack_derived_provenance_segments s WHERE s.derived_copy_id=c.id) ${orphanScope})))
       SELECT * FROM candidates
