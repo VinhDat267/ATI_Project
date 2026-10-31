@@ -335,3 +335,23 @@ it('disabled origin cutover cannot prevent physical erasure and cannot cause an 
     expect((await db.pool.query("SELECT producer FROM slack_message_origins WHERE artifact_table='messages' AND artifact_id=$1",[row.id])).rows[0].producer).toBe('message_writer');
   }finally{await db.pool.query('UPDATE slack_message_origin_cutovers SET enabled=true');}
 });
+
+it.each([
+  {PRIVATE_UNPROVEN_SOURCE_IN_KEY:{}},
+  {__observed:{PRIVATE_UNPROVEN_SOURCE_IN_KEY:[]}},
+  {PRIVATE_UNPROVEN_SOURCE_IN_KEY:[]},
+])('backfill quarantines unknown memory key bytes before HTTP/model hydration (%j)',async state=>{
+  const f=await sourceFixture(),row=await messages.createSlackMessage(f.conv.id,'system','covered source body',{type:'working_memory',state:{}},{segments:f.segments,selectors:['content']});
+  await db.pool.query("DELETE FROM slack_message_origins WHERE artifact_table='messages' AND artifact_id=$1",[row.id]);
+  await db.pool.query("UPDATE messages SET metadata=jsonb_set(metadata,'{state}',$2) WHERE id=$1",[row.id,JSON.stringify(state)]);
+  expect(JSON.stringify(await messages.listMessages(f.conv.id))).not.toContain('PRIVATE_UNPROVEN_SOURCE_IN_KEY');
+  await new SlackMessageOriginBackfill(db.pool).page('messages',{limit:200,apply:true});
+  const response=await request(app(f.owner.person.id)).get(`/conversations/${f.conv.id}`);expect(response.status).toBe(200);
+  expect(response.text).not.toContain('PRIVATE_UNPROVEN_SOURCE_IN_KEY');
+  const memory:any[]=[],events:string[]=[];
+  const chat=new ChatService({msgRepo:messages,planner:{processMessage:async input=>{memory.push(input.memory.toJSON());return {kind:'answer',text:'safe response',lookups:[],usedDirectory:[]};},routeSchedule:async()=>({services:[],unavailable:[]})},eventEmitter:{emit:name=>events.push(name)}});
+  await chat.handleUserMessage({conversationId:f.conv.id,userId:f.owner.person.id,content:'new human request'});
+  await vi.waitFor(()=>expect(events).toContain('answer'));expect(memory).toHaveLength(1);expect(JSON.stringify(memory)).not.toContain('PRIVATE_UNPROVEN_SOURCE_IN_KEY');
+  expect((await db.pool.query("SELECT 1 FROM slack_message_origins WHERE artifact_table='messages' AND artifact_id=$1",[row.id])).rowCount).toBe(0);
+  expect((await db.pool.query('SELECT metadata FROM messages WHERE id=$1',[row.id])).rows[0].metadata.state).toEqual(state);
+});

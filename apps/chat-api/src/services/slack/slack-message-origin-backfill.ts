@@ -5,7 +5,9 @@ import {eraseMessageSelector,messageFingerprint,messageSelectorKind,messageSelec
 import {slackArtifactIsErased} from './slack-artifact-targets.js';
 
 type Options={afterId?:string;limit?:number;apply?:boolean;signal?:AbortSignal};
-function empty(value:unknown):boolean{return value!==null&&typeof value==='object'&&Object.values(value).every(v=>v!==null&&typeof v==='object'&&empty(v));}
+// Dictionary keys are payload too. Empty descendants cannot prove their parent
+// keys source-free; only a genuinely empty remaining state is eligible.
+function empty(value:unknown):boolean{return value!==null&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).length===0;}
 /** Only literal server control fields and a fully erased source payload remain.
  * Arbitrary other-service text, role=user and absent copies prove nothing. */
 function fullyCovered(row:any,table:MessageOriginTable):boolean{

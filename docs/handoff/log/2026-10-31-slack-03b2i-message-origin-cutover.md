@@ -32,3 +32,13 @@ Added actual lease reclaim regression: first worker physically changes payload a
 
 
 Second fullcheck at5a2b4e64 exit1: only the converted102-message bulk seed exceeded inherited Vitest5s under whole API load (API1144PASS/1FAIL; web901PASS). Production code and every origin/lease/native regression passed in that run. Fixture now seeds102 genuine MessageRepo writes in one held real transaction, asserts102 persisted private certificates, retains exact latest100 m3..m102/order checks, and has an explicit bounded20s integration harness deadline. No production timer/guard/lease/barrier changed. This real bulk fixture file7/7PASS, exit0,3.06s. Final fixture-only freeze and fullcheck follow.
+
+
+Final frozen product/test `eb18241fdc3fe19a4fc59cffa7c79a36ed5541d1`: `npm run check` exit0,3735PASS (274 schemas+519 adapters+381 planner+42 executor+1145 API+901 web+406 eval+1 launcher+66 scripts), typecheck/build/securityPASS. Raw fullcheck-i-r3.log. Source/test/base unchanged; same reviewer now running independent bounded real PG/HTTP/native verification. Exact published-head check/browser, merge-tree, native Slack/model and remaining core origin gates stay separate.
+
+
+Independent whole-branch/final-delta reviewer at frozeneb18241f: fresh103/103PASS, five files,49.25s, exit0, but NEEDS_WORK for one P2 from an additional isolated PostgreSQL/HTTP/ChatService probe. Recursive empty(value) considered only values, ignoring dictionary key text; legacy content-registered working_memory with state {PRIVATE_UNPROVEN_SOURCE_IN_KEY:{}} was falsely eligible/applied, and HTTP/planner received that unproven key. Probe exit0,7.70s, no provider calls, schema cleaned, no repository edits. No other actionable P1/P2/P3 from the full18-file/call-path audit. Prior fullcheck3735 is not final acceptance after this finding.
+
+Root permanent direct-key/nested-key/array-key regressions observed3RED at actual HTTP response after real backfill. One fix pass makes remaining legacy working-memory state eligible only when it is genuinely an empty object, not a nonempty dictionary of empty descendants. Arbitrary keys and nonempty containers stay quarantined without byte changes; actual trusted new-writer mixed remainder is unaffected. These regressions also assert actual planner WorkingMemory.toJSON never receives the keys. Revised focused/freeze/fullcheck/review evidence follows.
+
+Revised origin27/27PASS, exit0,14.69s, includes all three permanent dictionary-key RED->GREEN cases. No source/base change beyond this eligibility fix and its tests; re-freezing for required fullcheck and same-reviewer final verification.
