@@ -223,4 +223,29 @@ describe('TrelloTokenManager', () => {
     });
     expect(reconnectCalls).toEqual([{ service: 'trello', userId, credentialId }]);
   });
+
+  it('rejects when refresh succeeds without returning a new refreshToken, marks reconnect required, and prevents subsequent calls from refreshing', async () => {
+    mockClient.refresh.mockResolvedValueOnce({
+      accessToken: 'access-token-without-refresh',
+      expiresInSeconds: 3600,
+    });
+    const manager = createManager();
+    const provider = manager.forConnection(userId, credentialId, initialRefreshToken);
+
+    await expect(provider.getAccessToken()).rejects.toMatchObject({
+      category: 'AUTH_ERROR',
+      message: 'Trello cần được kết nối lại.',
+    });
+
+    expect(rotateCalls.length).toBe(0);
+    expect(reconnectCalls).toEqual([{ service: 'trello', userId, credentialId }]);
+    expect(onReconnectCalls).toEqual([userId]);
+
+    refreshCalls = [];
+    await expect(provider.getAccessToken()).rejects.toMatchObject({
+      category: 'AUTH_ERROR',
+      message: 'Trello cần được kết nối lại.',
+    });
+    expect(refreshCalls.length).toBe(0);
+  });
 });

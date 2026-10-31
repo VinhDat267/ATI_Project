@@ -129,7 +129,12 @@ export class TrelloTokenManager {
       throw this.failure('NETWORK');
     }
 
-    const nextRefreshToken = tokens.refreshToken || currentRefreshToken;
+    if (typeof tokens.refreshToken !== 'string' || !tokens.refreshToken.trim()) {
+      await this.handleLostGrant(userId, credentialId, key);
+      throw this.failure('AUTH_ERROR', 400);
+    }
+
+    const nextRefreshToken = tokens.refreshToken;
 
     let rotateResult: 'rotated' | 'mismatch' | 'missing';
     try {
