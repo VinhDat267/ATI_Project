@@ -1,6 +1,6 @@
 # SLACK-03B2 · Phả Hệ Bản Sao Phái Sinh & Cascade Purge Bền Vững
 
-**Current status:** PARTIAL - registered core message/memory/plan/step/audit/schedule/title runtime accepted through03B2E/F/G/H (PR211/212/213/214), on top of accepted03B2A/B/C/D. [Canonical current matrix](../SLACK-DELIVERY.md). Explicit writer cutover/source-free certification, legacy backfill/fail-closed gates and future06 proposal/digest artifacts remain open; no fullF3 claim. Historical PLAN_ONLY/result and proposed interfaces below remain design history, not current runtime status.
+**Current status:** PARTIAL - registered core message/memory/plan/step/audit/schedule/title runtime accepted through03B2E/F/G/H (PR211/212/213/214), and message/memory/title origin cutover accepted as03B2I (PR215), on top of accepted03B2A/B/C/D. [Canonical current matrix](../SLACK-DELIVERY.md). Plan/step/audit/schedule origin certification, legacy approval/dispatch/run gates and future06 proposal/digest artifacts remain open; no fullF3 claim. Historical PLAN_ONLY/result and proposed interfaces below remain design history, not current runtime status.
 **Phạm vi bằng chứng:** Nội dung thiết kế và `[Proposed: NOT_RUN]` bên dưới là snapshot kế hoạch PR198; bằng chứng đã chạy nằm ở card/log con liên kết trong ma trận. Không có kết luận fullF3, native Slack hay model-use từ việc merge các slice này.
 **Nhánh:** `docs/slack-03b2-derived-plan` (PR #198).
 **Nền đối chiếu:** `e9088d5e76e95fa65e3be019226835371e40908d`.
