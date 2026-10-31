@@ -1,20 +1,15 @@
 import type pg from 'pg';
 import {isUuid} from '../../db/repositories/uuid.js';
-import {hasSlackMarker} from './slack-message-selectors.js';
-import {scheduleOriginAllowed, sealScheduleOrigin} from './slack-schedule-origin.js';
+import {scheduleOriginAllowed} from './slack-schedule-origin.js';
 
 type Options = {afterId?: string; limit?: number; apply?: boolean; signal?: AbortSignal};
 
-function mentionsSlack(row: any): boolean {
-  const blob = JSON.stringify({name: row.name, request: row.request, recurrence: row.recurrence, services: row.services});
-  return row.slack_lineage_manifest != null || blob.includes('myslack') || hasSlackMarker(row.recurrence);
-}
-
-/** Bounded maintenance. Default is a dry run. Slack-sourced rows stay on 03B2G lineage. */
+/** Bounded maintenance. Default is a dry run. `--apply` still cannot mint a certificate:
+ * absence of a Slack copy is not proof, and a certificate that no longer matches is never rewritten. */
 export class SlackScheduleOriginBackfill {
   constructor(private readonly pool: pg.Pool) {}
   async page(options: Options = {}) {
-    const {afterId, limit = 50, apply = false, signal} = options;
+    const {afterId, limit = 50, signal} = options;
     signal?.throwIfAborted();
     if (!Number.isInteger(limit) || limit < 1 || limit > 200 || (afterId !== undefined && !isUuid(afterId))) {
       throw new TypeError('INVALID_ORIGIN_BACKFILL_PAGE');
@@ -34,17 +29,9 @@ export class SlackScheduleOriginBackfill {
         await client.query('SELECT id FROM schedules WHERE id=$1 FOR UPDATE', [id]);
         const row = (await client.query(`SELECT s.*, v.user_id AS origin_owner FROM schedules s
           JOIN conversations v ON v.id=s.conv_id WHERE s.id=$1 FOR UPDATE OF s`, [id])).rows[0];
-        const sourced = (await client.query("SELECT 1 FROM slack_derived_copies WHERE target_kind='scheduled_workflow_arg' AND target_id=$1 LIMIT 1", [id])).rowCount;
         if (!row) { await client.query('ROLLBACK'); continue; }
         if (await scheduleOriginAllowed(client, row, row.origin_owner)) counts.alreadyValid++;
-        else if (sourced || mentionsSlack(row)) counts.quarantined++;
-        else {
-          counts.eligible++;
-          if (apply) {
-            await sealScheduleOrigin(client, id, 'backfill_plain');
-            counts.applied++;
-          }
-        }
+        else counts.quarantined++;
         await client.query('COMMIT');
       } catch (error) {
         await client.query('ROLLBACK').catch(() => {});

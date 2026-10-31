@@ -11,12 +11,13 @@ export function scheduleOriginFingerprint(row: any, owner: string): string {
     body: {
       name: row.name, request: row.request, recurrence: row.recurrence ?? {},
       services: [...(row.services ?? [])].map(String).sort(),
+      userId: row.user_id,
     },
   }, 'origin');
 }
 
 export async function scheduleOriginAllowed(client: pg.PoolClient, row: any, owner: string): Promise<boolean> {
-  if (!row?.id) return false;
+  if (!row?.id || row.user_id !== owner) return false;
   const proof = (await client.query(`SELECT o.* FROM slack_schedule_origins o
     JOIN slack_schedule_origin_cutovers c ON c.id=o.cutover_id
     WHERE o.schedule_id=$1 AND c.id=$2 AND c.enabled FOR SHARE OF o, c`,

@@ -38,6 +38,8 @@ export interface ScheduleRunnerOptions {
 
 const LATE_MS = 10 * 60_000;
 const DUE_PER_TICK = 5;
+/** Uncertified rows stay due. A tick walks past them instead of rereading the same five. */
+const SCAN_CAP = 50;
 const MAX_MISSED = 1000;
 const BLOCKED = 'Tài khoản không còn hoạt động.';
 const UNAPPROVED = '3 lượt liền không được duyệt';
@@ -92,6 +94,7 @@ export class ScheduleRunner {
   private queue: Promise<void> = Promise.resolve();
   private current: AbortController | null = null;
   private stopping = false;
+  private scanCursor: { at: Date; id: string } | null = null;
 
   constructor(private options: ScheduleRunnerOptions) {
     this.messages = new MessageRepo(options.pool);
@@ -165,10 +168,20 @@ export class ScheduleRunner {
     const changes:ScheduleChange[]=[];
     // Read only bounded IDs first. Each candidate takes its complete source union
     // before conversation/schedule claims; SKIP LOCKED still applies to both.
+    // A refused source-free row keeps its due time, so the cursor moves past it.
+    let inspected = 0;
+    while (toPlan.length < DUE_PER_TICK && inspected < SCAN_CAP) {
     const scan=await this.options.pool.connect();
     let candidates:any[];
-    try{candidates=(await scan.query(`SELECT id FROM schedules WHERE status='active' AND next_run_at<=$1 ORDER BY next_run_at,id LIMIT ${DUE_PER_TICK}`,[now])).rows;}finally{scan.release();}
+    try{candidates=(await scan.query(`SELECT id, next_run_at FROM schedules WHERE status='active' AND next_run_at<=$1
+      AND ($2::timestamptz IS NULL OR (next_run_at, id) > ($2::timestamptz, $3::uuid))
+      ORDER BY next_run_at, id LIMIT ${DUE_PER_TICK}`,[now, this.scanCursor?.at ?? null, this.scanCursor?.id ?? null])).rows;}finally{scan.release();}
+    if (!candidates.length) { this.scanCursor = null; break; }
+    let last: { id: string; next_run_at: Date } | null = null;
     for(const candidate of candidates){
+      if (toPlan.length >= DUE_PER_TICK) break;
+      inspected++;
+      last = candidate;
       const committed=await inTransaction(this.options.pool,async(client)=>{
       const changes:ScheduleChange[]=[];
       const state=await captureScheduleArtifact(client,this.registry,'schedules',candidate.id);
@@ -214,6 +227,9 @@ export class ScheduleRunner {
       return changes;
       });
       changes.push(...committed);
+    }
+    this.scanCursor = last && candidates.length === DUE_PER_TICK && toPlan.length < DUE_PER_TICK ? { at: new Date(last.next_run_at), id: last.id } : null;
+    if (this.scanCursor === null) break;
     }
     this.announce(changes);
     for (const runId of toPlan) await this.planNow(runId);
