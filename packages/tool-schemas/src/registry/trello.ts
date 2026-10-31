@@ -3,10 +3,7 @@ import type { ServiceDefinition } from '../types.js';
 export const TRELLO_SERVICE: ServiceDefinition = {
     id: 'trello', name: 'Trello', description: 'Task and project management',
     scopes: ['read:boards', 'write:cards', 'write:checklists'], scopeKey: 'boards', scopeLabel: 'Board ID',
-    credentialFields: [
-      { key: 'apiKey', label: 'API key', type: 'text' },
-      { key: 'token', label: 'API token', type: 'password' },
-    ],
+    credentialFields: [],
     intentKeywords: ['trello', 'card', 'cards', 'board', 'boards', 'list', 'lists', 'checklist', 'thẻ'],
     // A creation verb makes "task" a work item to create, not a reference such as "about task X".
     intentPatterns: [/(?<![\p{L}\p{N}_])(?:tạo|thêm|giao|create|add|assign)\s+(?:(?:một|1|a|an|new)\s+)?(?:task|tasks|công việc|việc)(?![\p{L}\p{N}_])/iu],

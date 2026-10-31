@@ -48,6 +48,7 @@ export function hasValidCredentials(fields: readonly { key: string; pattern?: st
 export async function getConfiguredToolCatalog(credentialRepo: CredentialRepo, encryptionKey: string) {
   const available = new Set<string>();
   for (const definition of getRegisteredServices()) {
+    if (definition.id === 'trello') continue;
     const record = await credentialRepo.getCredentials(definition.id);
     if (!record) continue;
     try {
