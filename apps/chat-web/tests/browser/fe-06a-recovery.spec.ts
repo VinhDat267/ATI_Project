@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import pg from 'pg';
+import {fixtureConversation,fixtureMessage} from './persisted-artifacts.fixture.js';
 import { createHash } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 
@@ -35,10 +36,10 @@ for(const width of [1440,375]) for(const theme of ['light','dark'] as const) {
     try {
       const owner=(await db.query('SELECT id FROM users WHERE email=$1',[process.env.CHAT_ADMIN_EMAIL])).rows[0].id;
       for(const moment of [7,8,9,'unsuccessful'] as const) {
-        const id=(await db.query('INSERT INTO conversations(user_id,title) VALUES($1,$2) RETURNING id',[owner,`FE06 ${moment} ${theme} ${width}`])).rows[0].id;
-        await db.query("INSERT INTO messages(conv_id,role,content) VALUES($1,'user',$2)",[id,'Tạo thẻ, tạo issue, ghi bảng tính rồi báo nhóm']);
+        const id=await fixtureConversation(db,owner,`FE06 ${moment} ${theme} ${width}`);
+        await fixtureMessage(db,id,'user','Tạo thẻ, tạo issue, ghi bảng tính rồi báo nhóm');
         // A long unbroken value (as an edited recovery request can carry) must wrap inside the conversation drawer.
-        if(moment===7) await db.query("INSERT INTO messages(conv_id,role,content) VALUES($1,'user',$2)",[id,`Làm lại việc 3 với nội dung: ${'https://docs.google.com/spreadsheets/d/'+'x'.repeat(160)}`]);
+        if(moment===7) await fixtureMessage(db,id,'user',`Làm lại việc 3 với nội dung: ${'https://docs.google.com/spreadsheets/d/'+'x'.repeat(160)}`);
         const plan={kind:'plan',summary:'Theo dõi công việc của nhóm',steps:[
           {id:'step_1',tool:'trello.create_card',description:'Tạo card Trello',args:{listId:'list_1',name:'Sửa lỗi đăng nhập'}},
           {id:'step_2',tool:'github.create_issue',description:'Tạo issue kho ati-test',args:{repo:'org/ati-test',title:'Sửa lỗi đăng nhập'}},

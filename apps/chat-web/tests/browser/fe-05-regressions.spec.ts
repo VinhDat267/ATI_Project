@@ -1,5 +1,6 @@
 import { test, expect, type Page, type TestInfo } from '@playwright/test';
 import pg from 'pg';
+import {fixtureConversation,fixtureMessage} from './persisted-artifacts.fixture.js';
 import { createHash } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 
@@ -13,8 +14,8 @@ async function seed(page: Page, pending = false, longURL = false, resultURL?: st
   const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
   try {
     const owner = (await db.query('SELECT id FROM users WHERE email=$1',[process.env.CHAT_ADMIN_EMAIL])).rows[0].id;
-    const convId = (await db.query('INSERT INTO conversations(user_id,title) VALUES($1,$2) RETURNING id',[owner,'Reviewer isolated fixture'])).rows[0].id;
-    await db.query("INSERT INTO messages(conv_id,role,content) VALUES($1,'user','Original completed request')",[convId]);
+    const convId = await fixtureConversation(db,owner,'Reviewer isolated fixture');
+    await fixtureMessage(db,convId,'user','Original completed request');
     const old = {kind:'plan',summary:'OLD completed plan',steps:[{id:'step_1',tool:'github.create_issue',description:'OLD operation: create an issue',args:{repo:'VinhDat267/ATI_Project',title:'Old issue'}}]};
     const insert = async (plan: any,status:string) => {
       const text=JSON.stringify(plan);

@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import pg from 'pg';
 import { createHash } from 'node:crypto';
+import {fixtureConversation,fixtureMessage} from './persisted-artifacts.fixture.js';
 
 const email = process.env.CHAT_ADMIN_EMAIL!;
 const password = process.env.CHAT_ADMIN_PASSWORD!;
@@ -23,8 +24,8 @@ test('FE-02: Back/Forward, direct reload restores pending plan and saved executi
     await page.goForward(); await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
     await login(page); await expect(page).toHaveURL(/\/$/);
     const userId = await owner(db);
-    const id = (await db.query('INSERT INTO conversations(user_id,title) VALUES($1,$2) RETURNING id', [userId, 'FE02 direct saved'])).rows[0].id;
-    await db.query("INSERT INTO messages(conv_id,role,content) VALUES($1,'user','FE02 saved request')", [id]);
+    const id = await fixtureConversation(db,userId,'FE02 direct saved');
+    await fixtureMessage(db,id,'user','FE02 saved request');
     for (const [status, summary] of [['reconciliation_required', 'FE02 saved UNKNOWN'], ['pending', 'FE02 pending preview']]) {
       const plan = { kind: 'plan', summary, steps: [{ id: 'step_1', tool: 'slack.send_message', description: 'Saved operation', args: { channel: '#general', text: 'Saved output' } }], warnings: [] };
       const text = JSON.stringify(plan);
@@ -40,8 +41,8 @@ test('FE-02: Back/Forward, direct reload restores pending plan and saved executi
     await expect(page).not.toHaveURL(new RegExp(`/c/${id}$`));
     await page.goBack(); await expect(page.getByText('FE02 saved request')).toBeVisible();
     const foreignUser = (await db.query("INSERT INTO users(email,password,name) VALUES($1,'fixture-hash','Foreign fixture') RETURNING id", [`foreign-fe02-${Date.now()}@example.test`])).rows[0].id;
-    const foreign = (await db.query('INSERT INTO conversations(user_id,title) VALUES($1,$2) RETURNING id', [foreignUser, 'Foreign private title'])).rows[0].id;
-    await db.query("INSERT INTO messages(conv_id,role,content) VALUES($1,'user','Foreign private message')", [foreign]);
+    const foreign = await fixtureConversation(db,foreignUser,'Foreign private title');
+    await fixtureMessage(db,foreign,'user','Foreign private message');
     await page.goto(`/c/${foreign}`);
     await expect(page.getByText('Không tìm thấy hội thoại.')).toBeVisible();
     await expect(page.getByText('Foreign private message')).toHaveCount(0);
@@ -54,8 +55,9 @@ test('FE-02: history cursor reaches older than 50, literal title search and rena
   const db = pool();
   try {
     await login(page); const userId = await owner(db); const prefix = `FE02-${Date.now()}`;
-    const oldest = (await db.query("INSERT INTO conversations(user_id,title,updated_at) VALUES($1,$2,now()-interval '60 days') RETURNING id", [userId, `${prefix} oldest %_`])).rows[0].id;
-    for (let index = 0; index < 55; index++) await db.query('INSERT INTO conversations(user_id,title) VALUES($1,$2)', [userId, `${prefix} history ${index}`]);
+    const oldest = await fixtureConversation(db,userId,`${prefix} oldest %_`);
+    await db.query("UPDATE conversations SET updated_at=now()-interval '60 days' WHERE id=$1",[oldest]);
+    for (let index = 0; index < 55; index++) await fixtureConversation(db,userId,`${prefix} history ${index}`);
     await page.reload(); await page.getByRole('button',{name:'Mở danh sách hội thoại'}).click(); const history = page.getByRole('region', { name: 'Danh sách hội thoại' });
     await expect(history.getByText(`${prefix} history 54`)).toBeVisible();
     await expect(history.getByText(`${prefix} oldest %_`)).toHaveCount(0);
@@ -80,7 +82,7 @@ test('FE-02: empty chat starts at top', async ({ page }, testInfo) => {
   const db = pool();
   try {
     // The source hides chat at moment 1; an empty saved preview exposes the drawer.
-    const id=(await db.query('INSERT INTO conversations(user_id,title) VALUES($1,$2) RETURNING id',[await owner(db),'Empty transcript preview'])).rows[0].id;
+    const id=await fixtureConversation(db,await owner(db),'Empty transcript preview');
     const text=JSON.stringify({kind:'plan',summary:'Empty transcript',steps:[{id:'step_1',tool:'slack.send_message',description:'Saved preview',args:{channel:'#general',text:'Empty transcript fixture'}}],warnings:[]});
     await db.query("INSERT INTO plans(conv_id,plan_json,plan_text,plan_hash,status,expires_at) VALUES($1,$2::jsonb,$3,$4,'pending',now()+interval '30 minutes')",[id,text,text,createHash('sha256').update(text).digest('hex')]);
     await page.goto(`/c/${id}`);
@@ -96,8 +98,8 @@ test('FE-02: messages follow near bottom and preserve reading above', async ({ p
   const db = pool();
   try {
     await login(page);
-    const id = (await db.query('INSERT INTO conversations(user_id,title) VALUES($1,$2) RETURNING id', [await owner(db), 'FE02 scrolling'])).rows[0].id;
-    for (let index = 0; index < 25; index++) await db.query("INSERT INTO messages(conv_id,role,content) VALUES($1,'user',$2)", [id, `Saved message ${index}: ${'Long scroll content. '.repeat(50)}`]);
+    const id = await fixtureConversation(db,await owner(db),'FE02 scrolling');
+    for (let index = 0; index < 25; index++) await fixtureMessage(db,id,'user',`Saved message ${index}: ${'Long scroll content. '.repeat(50)}`);
     await page.goto(`/c/${id}`);
     await page.getByRole('textbox',{name:'Mô tả công việc bạn muốn thực hiện'}).fill('Tạo công việc Trello và thông báo Slack');
     await page.getByRole('textbox',{name:'Mô tả công việc bạn muốn thực hiện'}).press('Enter');

@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import pg from 'pg';
+import {fixtureMessage} from './persisted-artifacts.fixture.js';
 const email = process.env.CHAT_ADMIN_EMAIL, password = process.env.CHAT_ADMIN_PASSWORD;
 const connectionString = process.env.DATABASE_URL;
 if (!email || !password || !connectionString) throw new Error('FE-03 browser requires provisioned local test account and database');
@@ -19,12 +20,12 @@ test('FE-03: grounded display names survive preview reload and approved result l
     const convId = (await response.json()).conversation.id;
     // Grounding fixture is explicit sandbox data; live lookups are exercised in the
     // PostgreSQL integration test. The production ChatService derives all labels.
-    await pool.query("INSERT INTO messages(conv_id,role,content,metadata) VALUES($1,'system','',$2::jsonb)", [convId, JSON.stringify({ type: 'working_memory', state: { __observed: {
+    await fixtureMessage(pool,convId,'system','',{ type: 'working_memory', state: { __observed: {
       board: [{ id: 'board_frontend', name: 'Frontend' }],
       list: [{ id: 'list_frontend_todo', name: 'Cần làm', boardId: 'board_frontend' }],
       member: [{ id: 'member_minh_dev', name: 'Minh Dev', boardId: 'board_frontend' }],
       channel: [{ id: '#general', name: 'general' }],
-    } } })]);
+    } } });
     await page.goto(`/c/${convId}`);
     await page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }).fill('Tạo công việc Trello và thông báo Slack');
     await composer(page).getByRole('button', { name: /^(Gửi|Gửi tin nhắn|Gửi yêu cầu)$/ }).click();

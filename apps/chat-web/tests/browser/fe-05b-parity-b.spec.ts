@@ -1,5 +1,6 @@
 import { test,expect } from '@playwright/test';
 import pg from 'pg';
+import {fixtureConversation,fixtureMessage} from './persisted-artifacts.fixture.js';
 import { createHash } from 'node:crypto';
 
 for(const width of [1440,375]) for(const theme of ['light','dark'] as const) {
@@ -11,8 +12,8 @@ for(const width of [1440,375]) for(const theme of ['light','dark'] as const) {
     try {
       const owner=(await db.query('SELECT id FROM users WHERE email=$1',[process.env.CHAT_ADMIN_EMAIL])).rows[0].id;
       const title=`Kiểm chứng biên nhận ${width} ${theme} ${Date.now()}`;
-      const conv=(await db.query('INSERT INTO conversations(user_id,title) VALUES($1,$2) RETURNING id',[owner,title])).rows[0].id;
-      await db.query("INSERT INTO messages(conv_id,role,content) VALUES($1,'user','Tạo issue rồi báo nhóm')",[conv]);
+      const conv=await fixtureConversation(db,owner,title);
+      await fixtureMessage(db,conv,'user','Tạo issue rồi báo nhóm');
       const plan={kind:'plan',summary:'Tạo issue rồi báo nhóm',resourceLabels:{'owner/repo':'owner/repo','#general':'#general'},steps:[{id:'step_1',tool:'github.create_issue',description:'Tạo issue',args:{repo:'owner/repo',title:'Kiểm chứng',body:'Mô tả'}},{id:'step_2',tool:'slack.send_message',description:'Báo nhóm',args:{channel:'#general',text:{$template:'Issue ${step_1.output.number}'}}}]};
       const text=JSON.stringify(plan);
       const id=(await db.query("INSERT INTO plans(conv_id,plan_json,plan_text,plan_hash,status,expires_at) VALUES($1,$2::jsonb,$2,$3,'pending',now()+interval '30 minutes') RETURNING id",[conv,text,createHash('sha256').update(text).digest('hex')])).rows[0].id;

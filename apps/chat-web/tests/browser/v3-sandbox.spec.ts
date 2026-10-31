@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import pg from 'pg';
+import {fixtureConversation,fixtureMessage} from './persisted-artifacts.fixture.js';
 import { createHash } from 'node:crypto';
 
 /** The send button of the main chat composer; a clarification card has its own "Gửi" button. */
@@ -15,9 +16,9 @@ test('real browser and PostgreSQL: login, chat, approval and execution recovery 
   try {
     await login(page);
     const owner = (await pool.query('SELECT id FROM users WHERE email = $1', [email])).rows[0].id;
-    const convId = (await pool.query('INSERT INTO conversations (user_id) VALUES ($1) RETURNING id', [owner])).rows[0].id;
+    const convId = await fixtureConversation(pool,owner);
     const title = `Đối soát E2E ${Date.now()}`;
-    await pool.query("INSERT INTO messages (conv_id, role, content) VALUES ($1, 'user', $2)", [convId, title]);
+    await fixtureMessage(pool,convId,'user',title);
     const plan = { kind: 'plan', summary: 'Khôi phục sau restart', steps: [
       { id: 'step_1', tool: 'trello.create_card', description: 'Tạo thẻ trước restart', args: { listId: 'list_1', title: 'Task đã tạo' }, dependsOn: [] },
       { id: 'step_2', tool: 'trello.add_member', description: 'Gán Minh vào thẻ đã tạo', args: { cardId: { $ref: 'step_1.output.id' }, memberId: 'minh' }, dependsOn: ['step_1'] },
@@ -86,8 +87,8 @@ test('real browser and PostgreSQL: login, chat, approval and execution Continue 
   try {
     await login(page);
     const owner = (await pool.query('SELECT id FROM users WHERE email = $1', [email])).rows[0].id;
-    const convId = (await pool.query('INSERT INTO conversations (user_id) VALUES ($1) RETURNING id', [owner])).rows[0].id;
-    await pool.query("INSERT INTO messages (conv_id, role, content) VALUES ($1, 'user', $2)", [convId, `Continue E2E ${Date.now()}`]);
+    const convId = await fixtureConversation(pool,owner);
+    await fixtureMessage(pool,convId,'user',`Continue E2E ${Date.now()}`);
     const plan = { kind: 'plan', summary: 'Chạy tiếp sau restart', steps: [
       { id: 'step_1', tool: 'trello.create_card', description: 'Thẻ đã tạo', args: { listId: 'list_1', title: 'Saved task' }, dependsOn: [] },
       { id: 'step_2', tool: 'slack.send_message', description: 'Thông báo chưa gửi', args: { channel: '#general', text: { $template: 'Saved ${step_1.output.url}' } }, dependsOn: ['step_1'] },

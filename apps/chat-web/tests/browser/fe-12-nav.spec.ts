@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import pg from 'pg';
+import {fixtureConversation,fixtureMessage} from './persisted-artifacts.fixture.js';
 import { hashPassword } from '../../../chat-api/src/db/repositories/user-repo.js';
 
 const TABS = [
@@ -46,11 +47,12 @@ async function currentTab(page: Page) {
 }
 // A conversation waiting for approval with a two-digit message count: the widest cockpit bar.
 async function seedPlanWithManyMessages(db: pg.Pool, userId: string, request: string) {
-  const id = (await db.query('INSERT INTO conversations(user_id,title) VALUES($1,$2) RETURNING id', [userId, 'FE12 nav'])).rows[0].id;
+  const id = await fixtureConversation(db,userId,'FE12 nav');
   for (let index = 0; index < 11; index++) {
-    await db.query("INSERT INTO messages(conv_id,role,content,created_at) VALUES($1,$2,$3,now() - make_interval(secs => $4))", [id, index % 2 ? 'assistant' : 'user', `FE12 lượt ${index}`, 60 - index]);
+    const message=await fixtureMessage(db,id,index%2?'assistant':'user',`FE12 lượt ${index}`);
+    await db.query('UPDATE messages SET created_at=now()-make_interval(secs => $2) WHERE id=$1',[message,60-index]);
   }
-  await db.query("INSERT INTO messages(conv_id,role,content,created_at) VALUES($1,'user',$2,now())", [id, request]);
+  await fixtureMessage(db,id,'user',request);
   const plan = { kind: 'plan', summary: 'FE12 kế hoạch chờ duyệt', steps: [{ id: 'step_1', tool: 'slack.send_message', description: 'Báo Slack', args: { channel: '#ati-test', text: 'FE12' } }], warnings: [] };
   const text = JSON.stringify(plan);
   await db.query("INSERT INTO plans(conv_id,plan_json,plan_text,plan_hash,status,expires_at) VALUES($1,$2::jsonb,$3,$4,'pending',now()+interval '30 minutes')", [id, text, text, createHash('sha256').update(text).digest('hex')]);
@@ -156,8 +158,8 @@ test('FE-12: a long request without spaces wraps in every cockpit moment and nev
     ];
     const seeded: { moment: string; conversation: string }[] = [];
     for (const entry of cases) {
-      const conversation = (await db.query('INSERT INTO conversations(user_id,title) VALUES($1,$2) RETURNING id', [user.id, `FE12 long ${entry.moment}`])).rows[0].id;
-      await db.query("INSERT INTO messages(conv_id,role,content) VALUES($1,'user',$2)", [conversation, request]);
+      const conversation = await fixtureConversation(db,user.id,`FE12 long ${entry.moment}`);
+      await fixtureMessage(db,conversation,'user',request);
       const planId = (await db.query("INSERT INTO plans(conv_id,plan_json,plan_text,plan_hash,status,expires_at,decided_at) VALUES($1,$2::jsonb,$3,$4,$5,now()+interval '30 minutes',CASE WHEN $5='pending' THEN NULL ELSE now() END) RETURNING id", [conversation, text, text, createHash('sha256').update(text).digest('hex'), entry.status])).rows[0].id;
       for (const [index, status] of entry.steps.entries()) {
         const step = plan.steps[index];

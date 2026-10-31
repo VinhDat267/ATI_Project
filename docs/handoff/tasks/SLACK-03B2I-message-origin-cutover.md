@@ -22,3 +22,6 @@ Frozen `e8349895e20e36e2b3aa17a36b11256f835f8016`: fullcheck3738PASS, exit0; typ
 Maintenance command: `node --import tsx apps/chat-api/src/cli/slack-message-origin-backfill.ts` with explicitly selected DATABASE_URL; defaults to dry run, `--apply` writes only evidence-backed private manifest/origin proofs. Reports aggregate eligible/quarantined counts; ambiguous bytes remain blocked and unchanged. Executed only in isolated synthetic schemas; production/native data NOT_RUN.
 
 Plan/step/audit/schedule origins and legacy approval/dispatch/run gates remain next before publicread03B3/03B4. H derived expiry remains accepted. No fullM2/F3/F4 or native Slack Free/Pro/two-user/model acceptance; live flags/main unchanged.
+
+
+Browser fixture compatibility: raw-SQL saved-history RED reproduced in real Chromium;10 existing specs now use actual writers via one test helper, preserving assertions and technical timestamps/statuses. FE02 all4PASS. Product/backend unchanged; broader browser/exact-headCI and final binding pending. See implementation log for superseded CI and isolated fixture boundary.
