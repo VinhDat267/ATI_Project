@@ -129,3 +129,23 @@ it('an expiry proof binds the original artifact fingerprint and cannot bless an 
   const c=new SlackMessagePurgeConsumer(env.db.pool);expect(await c.process(await lease(c,f.copy.id))).toBe('retried');
   expect((await env.db.pool.query('SELECT content FROM messages WHERE id=$1',[f.message.id])).rows[0].content).toBe(replacement);
 },20_000);
+
+it.each(['future','microsecond'])('expiry rejects a rewritten %s intent cutoff and preserves a healthy equal-reference capture',async(mode)=>{
+  const f=await fixture();await expire(f.copy.id);await fanout.runOnce(100);const job=await intent(f.copy.id);
+  const fresh=await messages.createSlackMessage(f.conv,'assistant','Healthy equal-reference capture',{type:'answer'},{segments:f.segments.map(s=>({...s,capturedAt:new Date().toISOString()})),selectors:['content']});
+  const alive=(await env.db.pool.query('SELECT expires_at>clock_timestamp() AS valid FROM slack_derived_provenance_segments WHERE derived_copy_id IN(SELECT id FROM slack_derived_copies WHERE target_id=$1)',[fresh.id])).rows[0];expect(alive.valid).toBe(true);
+  await env.db.pool.query(mode==='future'?"UPDATE slack_invalidation_intents SET created_at=clock_timestamp()+interval '8 days' WHERE id=$1":"UPDATE slack_invalidation_intents SET created_at=created_at+interval '1 microsecond' WHERE id=$1",[job.id]);
+  const c=new SlackMessagePurgeConsumer(env.db.pool);expect(await c.process(await lease(c,f.copy.id))).toBe('retried');
+  const stored=(await env.db.pool.query('SELECT id,content FROM messages WHERE id=ANY($1::uuid[])',[[f.message.id,fresh.id]])).rows;
+  expect(stored.find(r=>r.id===f.message.id).content).toBe('private expired content');expect(stored.find(r=>r.id===fresh.id).content).toBe('Healthy equal-reference capture');
+  expect((await intent(f.copy.id)).status).toBe('failed');
+},20_000);
+
+it('rewriting proof, receipt and intent clocks together still fails the sealed receipt hash',async()=>{
+  const f=await fixture();await expire(f.copy.id);await fanout.runOnce(100);const job=await intent(f.copy.id);
+  const changed=(await env.db.pool.query("UPDATE slack_derived_expiry_proofs SET cutoff_at=cutoff_at+interval '1 microsecond' WHERE source_event_key=$1 RETURNING to_char(cutoff_at AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS cutoff",[job.source_event_key])).rows[0].cutoff;
+  await env.db.pool.query('UPDATE slack_invalidation_receipts SET created_at=$2::timestamptz WHERE source_event_key=$1',[job.source_event_key,changed]);
+  await env.db.pool.query('UPDATE slack_invalidation_intents SET created_at=$2::timestamptz WHERE source_event_key=$1',[job.source_event_key,changed]);
+  const c=new SlackMessagePurgeConsumer(env.db.pool);expect(await c.process(await lease(c,f.copy.id))).toBe('retried');
+  expect((await env.db.pool.query('SELECT content FROM messages WHERE id=$1',[f.message.id])).rows[0].content).toBe('private expired content');
+},20_000);
