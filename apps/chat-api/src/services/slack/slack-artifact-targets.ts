@@ -8,6 +8,7 @@ export const JSON_TOMBSTONE = {__slack_purged:true};
 export const PLAN_TOMBSTONE_TEXT = JSON.stringify(PLAN_TOMBSTONE);
 export const PLAN_TOMBSTONE_HASH = createHash('sha256').update(PLAN_TOMBSTONE_TEXT).digest('hex');
 export function validateSlackArtifactTarget(kind:string,selector:string):void {
+  if(kind==='scheduled_workflow_arg' && ['name','request','recurrence','title','error'].includes(selector))return;
   if(kind==='plan_step_arg') {
     if(['plan_json','plan_text','plan_hash','args_json'].includes(selector))return;
     if(selector.startsWith('resource_labels/')) {
@@ -18,21 +19,23 @@ export function validateSlackArtifactTarget(kind:string,selector:string):void {
   else if(['chat_history_message','working_memory_entity'].includes(kind))return validateMessageSelector(kind,selector);
   throw new Error('unsupported_target');
 }
-export function artifactTable(kind:string,selector:string):'messages'|'plans'|'execution_steps' {
+export function artifactTable(kind:string,selector:string):'messages'|'plans'|'execution_steps'|'schedules'|'schedule_runs'|'conversations' {
   validateSlackArtifactTarget(kind,selector);
+  if(kind==='scheduled_workflow_arg')return selector==='title'?'conversations':selector==='error'?'schedule_runs':'schedules';
   return ['chat_history_message','working_memory_entity'].includes(kind)?'messages':kind==='audit_log_entry'||selector==='args_json'?'execution_steps':'plans';
 }
 export async function slackArtifactLocation(client:pg.PoolClient,target:SlackArtifactTarget) {
   const table=artifactTable(target.targetKind,target.targetSubId);
-  const row=(await client.query(table==='execution_steps'?`SELECT p.conv_id,p.id AS plan_id FROM execution_steps s JOIN plans p ON p.id=s.plan_id WHERE s.id=$1`:
+  const row=(await client.query(table==='conversations'?'SELECT id AS conv_id FROM conversations WHERE id=$1':table==='schedule_runs'?'SELECT s.conv_id,r.schedule_id FROM schedule_runs r JOIN schedules s ON s.id=r.schedule_id WHERE r.id=$1':table==='execution_steps'?`SELECT p.conv_id,p.id AS plan_id FROM execution_steps s JOIN plans p ON p.id=s.plan_id WHERE s.id=$1`:
     `SELECT conv_id FROM ${table} WHERE id=$1`,[target.targetId])).rows[0];
-  if(!row)throw new Error('not_found');return {table,convId:row.conv_id as string,planId:(row.plan_id??(table==='plans'?target.targetId:undefined)) as string|undefined};
+  if(!row)throw new Error('not_found');return {table,convId:row.conv_id as string,scheduleId:row.schedule_id as string|undefined,planId:(row.plan_id??(table==='plans'?target.targetId:undefined)) as string|undefined};
 }
 export async function lockSlackArtifact(client:pg.PoolClient,target:SlackArtifactTarget,mode:'SHARE'|'UPDATE') {
   const location=await slackArtifactLocation(client,target);
   if(location.table==='execution_steps')await client.query(`SELECT id FROM plans WHERE id=$1 FOR ${mode}`,[location.planId]);
+  if(location.table==='schedule_runs')await client.query(`SELECT id FROM schedules WHERE id=$1 FOR ${mode}`,[location.scheduleId]);
   const row=(await client.query(`SELECT * FROM ${location.table} WHERE id=$1 FOR ${mode}`,[target.targetId])).rows[0];
-  if(!row || (location.table==='execution_steps'?row.plan_id!==location.planId:row.conv_id!==location.convId))throw new Error('stale_lineage');
+  if(!row || (location.table==='conversations'?row.id!==location.convId:location.table==='schedule_runs'?row.schedule_id!==location.scheduleId:location.table==='execution_steps'?row.plan_id!==location.planId:row.conv_id!==location.convId))throw new Error('stale_lineage');
   return {row,...location};
 }
 export function slackArtifactValue(row:any,kind:string,selector:string):unknown {
@@ -42,6 +45,7 @@ export function slackArtifactValue(row:any,kind:string,selector:string):unknown 
   return row[selector];
 }
 export function slackArtifactIsErased(value:unknown,kind:string,selector:string):boolean {
+  if(kind==='scheduled_workflow_arg')return selector==='recurrence'?value!==null&&typeof value==='object'&&Object.keys(value).length===0:value===SLACK_MESSAGE_TOMBSTONE;
   if(['chat_history_message','working_memory_entity'].includes(kind))return selector==='content'?value===SLACK_MESSAGE_TOMBSTONE:value===undefined;
   if(selector==='plan_text')return value===PLAN_TOMBSTONE_TEXT;
   if(selector==='plan_hash')return value===PLAN_TOMBSTONE_HASH;
@@ -62,6 +66,13 @@ export async function eraseSlackArtifact(client:pg.PoolClient,target:SlackArtifa
     await client.query('UPDATE messages SET content=$2,metadata=$3 WHERE id=$1',[target.targetId,artifact.row.content,JSON.stringify(artifact.row.metadata)]);return;
   }
   const selector=target.targetSubId;
+  if(target.targetKind==='scheduled_workflow_arg'){
+    if(artifact.table==='schedules')await client.query(`UPDATE schedules SET ${selector}=$2${selector==='recurrence'?'::jsonb':''},
+      status=CASE WHEN status='active' THEN 'paused' ELSE status END,pause_reason='slack_source_invalidated',next_run_at=NULL,
+      version=version+1,updated_at=clock_timestamp() WHERE id=$1`,[target.targetId,selector==='recurrence'?'{}':SLACK_MESSAGE_TOMBSTONE]);
+    else await client.query(`UPDATE ${artifact.table} SET ${selector}=$2 WHERE id=$1`,[target.targetId,SLACK_MESSAGE_TOMBSTONE]);
+    return;
+  }
   if(artifact.table==='plans') {
     if(selector.startsWith('resource_labels/'))await client.query('UPDATE plans SET resource_labels=resource_labels-$2 WHERE id=$1',[target.targetId,decodeURIComponent(selector.slice(16))]);
     else await client.query(`UPDATE plans SET ${selector}=$2 WHERE id=$1`,[target.targetId,selector==='plan_json'?JSON.stringify(PLAN_TOMBSTONE):selector==='plan_text'?PLAN_TOMBSTONE_TEXT:PLAN_TOMBSTONE_HASH]);

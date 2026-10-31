@@ -59,10 +59,22 @@ export class MessageRepo {
   /** Private server entrypoint. HTTP/model payloads never supply this context. */
   async createSlackMessage(convId: string, role: string, content: string, metadata: any,
     context: SlackMessageWriteContext, held?: pg.PoolClient, signal?: AbortSignal): Promise<MessageRow> {
+    return this.writeSlackMessage(convId,role,content,metadata,context,held,signal);
+  }
+
+  /** Server-created user-role seed only: linked durable run and owner must match. */
+  async createSlackRunMessage(convId:string,content:string,metadata:any,context:SlackMessageWriteContext,held:pg.PoolClient):Promise<MessageRow>{
+    const run=(await held.query(`SELECT r.id,s.user_id FROM schedule_runs r JOIN schedules s ON s.id=r.schedule_id
+      WHERE r.id=$1 AND r.conv_id=$2 AND r.status='planning' AND r.schedule_id=$3`,[metadata.runId,convId,metadata.scheduleId])).rows[0];
+    if(metadata.type!=='schedule_run'||run?.user_id!==context.segments[0]?.sourceRef.binding.atiUserId)throw Error('SLACK_PROVENANCE_REQUIRED');
+    return this.writeSlackMessage(convId,'user',content,metadata,context,held,undefined,true);
+  }
+
+  private async writeSlackMessage(convId:string,role:string,content:string,metadata:any,context:SlackMessageWriteContext,held?:pg.PoolClient,signal?:AbortSignal,runSeed=false):Promise<MessageRow>{
     signal?.throwIfAborted();
     const snapshot = structuredClone({ content, metadata, context });
     const { selectors, segments } = snapshot.context;
-    if (!['assistant','system'].includes(role) || !Array.isArray(selectors) || selectors.length === 0 || selectors.length > 256 || new Set(selectors).size !== selectors.length || !Array.isArray(segments) || segments.length === 0) throw new Error('SLACK_PROVENANCE_REQUIRED');
+    if ((!['assistant','system'].includes(role) && !(runSeed&&role==='user')) || !Array.isArray(selectors) || selectors.length === 0 || selectors.length > 256 || new Set(selectors).size !== selectors.length || !Array.isArray(segments) || segments.length === 0) throw new Error('SLACK_PROVENANCE_REQUIRED');
     for (const selector of selectors) {
       validateMessageSelector(messageSelectorKind(selector), selector);
       if (messageSelectorValue(snapshot, messageSelectorKind(selector), selector) === undefined) throw new Error('SLACK_SELECTOR_MISSING');

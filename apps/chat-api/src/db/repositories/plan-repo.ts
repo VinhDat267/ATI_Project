@@ -31,6 +31,7 @@ export class PlanRepo {
 
   async createSlackPlan(data:Parameters<PlanRepo['createPlan']>[0],context:SlackPlanWriteContext,held?:pg.PoolClient,signal?:AbortSignal):Promise<PlanRow>{
     const snapshot=structuredClone({data,context});
+    if(snapshot.data.planJson.steps?.some((s:any)=>/^(myslack|slack)\./.test(s.tool)))throw new Error('SLACK_DISPATCH_BINDING_REQUIRED');
     const save=async(client:pg.PoolClient)=>{
       signal?.throwIfAborted();const owner=snapshot.context.segments[0]?.sourceRef.binding.atiUserId;
       if(!owner)throw new Error('SLACK_PROVENANCE_REQUIRED');
@@ -136,6 +137,7 @@ export class PlanRepo {
   async assertSourceDispatchAllowed(planId:string,userId:string,expectedHash:string,stepId:string,tool:string,signal?:AbortSignal):Promise<void>{
     signal?.throwIfAborted();await this.transaction(async client=>{
       const checked=await guardPlanInTransaction(client,this.slack,planId,'planning');
+      if(checked.source&&/^(myslack|slack)\./.test(tool))throw Object.assign(new Error('SLACK_DISPATCH_BINDING_REQUIRED'),{category:'AUTH_ERROR',details:{requestSent:false}});
       const owner=(await client.query('SELECT user_id FROM conversations WHERE id=$1',[checked.row.conv_id])).rows[0]?.user_id;
       if(!checked.allowed||owner!==userId||checked.row.plan_hash!==expectedHash||!['approved','executing'].includes(checked.row.status)||
         !checked.row.plan_json.steps?.some((s:any)=>s.id===stepId&&s.tool===tool))throw Object.assign(new Error('SLACK_SOURCE_UNAVAILABLE'),{category:'AUTH_ERROR',details:{requestSent:false}});
