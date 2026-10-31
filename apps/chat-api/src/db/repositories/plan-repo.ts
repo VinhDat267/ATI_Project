@@ -61,7 +61,17 @@ export class PlanRepo {
       await sealPlanOrigin(client,'plans',plan.id,'plan_writer');
       return plan;
     };
-    return db?save(db):this.transaction(save);
+    if(db)return save(db);
+    const client=await this.pool.connect();
+    try{
+      await client.query('BEGIN');
+      const plan=await save(client);
+      await client.query('COMMIT');
+      return plan;
+    }catch(err){
+      await client.query('ROLLBACK');
+      throw err;
+    }finally{client.release();}
   }
 
   private async insertPlan(client: pg.PoolClient, data: Parameters<PlanRepo['createPlan']>[0]): Promise<PlanRow> {
