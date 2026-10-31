@@ -1,3 +1,4 @@
+import {derivedExpiryProof} from './slack-derived-expiry.js';
 import type pg from 'pg';
 import { sameSlackBinding,sameSlackPolicyEpoch,validateSlackPurgeTarget,type SlackPurgeTarget } from '@wap/tool-schemas';
 import { isUuid } from '../../db/repositories/uuid.js';
@@ -95,13 +96,16 @@ export class SlackMessagePurgeConsumer {
       AND leased_until>clock_timestamp() AND status='processing' AND target_kind='${this.kind}'`,[job.id,job.workerNonce,job.leaseUntil])).rows[0];
     if(!row)throw new LostLease();return row;
   }
-  private async proof(client:pg.PoolClient,row:any,target:SlackPurgeTarget,lock=false):Promise<SlackInvalidationBarrier> {
+  private async proof(client:pg.PoolClient,row:any,target:SlackPurgeTarget,lock=false):Promise<{lockKeys:string[];expiry:boolean}> {
+    const expiry=await derivedExpiryProof(client,row,lock);
+    if(expiry)return {lockKeys:expiry.lockKeys,expiry:true};
     const barrier=(await client.query(`SELECT b.* FROM slack_invalidation_barriers b JOIN slack_invalidation_receipts r ON r.source_event_key=b.source_event_key
       WHERE b.source_event_key=$1 AND b.effect_key=$2 AND b.active=true ${lock?'FOR SHARE OF b':''}`,[row.source_event_key,row.effect_key])).rows[0];
-    return proofBarrier(barrier,target);
+    return {lockKeys:slackInvalidationLockKeys(proofBarrier(barrier,target)),expiry:false};
   }
-  private async candidates(client:pg.PoolClient,t:SlackPurgeTarget,cutoff:string,unresolvedOnly=false):Promise<any[]> {
-    const {sql,values}=selection(t);
+  private async candidates(client:pg.PoolClient,t:SlackPurgeTarget,cutoff:string,unresolvedOnly=false,expiry=false):Promise<any[]> {
+    const selected=selection(t),values=selected.values;let sql=selected.sql;
+    if(expiry){values.push(cutoff);sql=`(${sql}) AND s.expires_at<=$${values.length}::timestamptz`;}
     const orphanOwner=t.scope==='resource_lifecycle'||t.scope==='workspace_consent_revocation'?undefined:
       t.scope==='policy_epoch_invalidated'?t.epoch.binding.atiUserId:t.binding.atiUserId;
     let orphanScope='';if(orphanOwner){values.push(orphanOwner);orphanScope=`AND c.ati_user_id=$${values.length}::uuid`;}
@@ -162,12 +166,14 @@ export class SlackMessagePurgeConsumer {
       try {target=validateSlackPurgeTarget(row.purge_target);}catch{throw new Failure('INVALID_PROVENANCE');}
       if(!target.cascadeTargetKinds.includes(this.kind))throw new Failure('INVALID_PROVENANCE');
       const barrier=await this.proof(client,row,target),cutoff=(await client.query('SELECT created_at::text AS cutoff FROM slack_invalidation_intents WHERE id=$1',[job.id])).rows[0].cutoff;
-      const first=await this.candidates(client,target,cutoff),ids=[...new Set<string>(first.slice(0,this.size).flatMap(r=>
+      const first=await this.candidates(client,target,cutoff,false,barrier.expiry),ids=[...new Set<string>(first.slice(0,this.size).flatMap(r=>
         replaceableHistory(r)&&r.replacement_id?[r.id,r.replacement_id]:[r.id]))];
       let keys:string[];try {keys=await this.purger.sourceLockKeysInTransaction(client,ids);}catch{throw new Failure('STALE_LINEAGE');}
-      await acquireSlackInvalidationLocks(client,[...slackInvalidationLockKeys(barrier),...keys]);
-      if(signal?.aborted)throw new Failure('ABORTED');await this.owned(client,job);await this.proof(client,row,target,true);
-      const second=await this.candidates(client,target,cutoff),freshKeys=await this.purger.sourceLockKeysInTransaction(client,ids);
+      await acquireSlackInvalidationLocks(client,[...barrier.lockKeys,...keys]);
+      if(signal?.aborted)throw new Failure('ABORTED');await this.owned(client,job);
+      const currentProof=await this.proof(client,row,target,true);
+      if(JSON.stringify(currentProof)!==JSON.stringify(barrier))throw new Failure('INVALID_PROVENANCE');
+      const second=await this.candidates(client,target,cutoff,false,barrier.expiry),freshKeys=await this.purger.sourceLockKeysInTransaction(client,ids);
       if(JSON.stringify(first)!==JSON.stringify(second)||JSON.stringify(keys)!==JSON.stringify(freshKeys))throw new Failure('RETRY_SCAN');
       // Different workspace bindings can touch the same conversations without
       // sharing source keys. Order ALL parents before any per-copy erasure.
@@ -177,7 +183,7 @@ export class SlackMessagePurgeConsumer {
         ORDER BY v.id FOR UPDATE OF v`,[ids]);
       // Fingerprint/supersession checks above read the artifact without its row
       // lock. Recheck while parents serialize the actual registered writer.
-      if(JSON.stringify(first)!==JSON.stringify(await this.candidates(client,target,cutoff)))throw new Failure('RETRY_SCAN');
+      if(JSON.stringify(first)!==JSON.stringify(await this.candidates(client,target,cutoff,false,barrier.expiry)))throw new Failure('RETRY_SCAN');
       let code:Code|undefined;
       for(const copy of first.slice(0,this.size)) {
         if(signal?.aborted)throw new Failure('ABORTED');
@@ -192,7 +198,7 @@ export class SlackMessagePurgeConsumer {
       // successor text outside that target is not an unresolved physical copy;
       // otherwise batches of already-purged history could never make progress.
       // This metadata test grants no authority to read the successor content.
-      if(!code&&(await this.candidates(client,target,cutoff,true)).length>0)code='PARTIAL_PURGE';
+      if(!code&&(await this.candidates(client,target,cutoff,true,barrier.expiry)).length>0)code='PARTIAL_PURGE';
       if(signal?.aborted)throw new Failure('ABORTED');if(!await this.finish(client,job,code,{target:row.purge_target,cutoff}))throw new LostLease();
       if(signal?.aborted)throw new Failure('ABORTED');await client.query('COMMIT');return code?'retried':'completed';
     }catch(error){await client.query('ROLLBACK').catch(()=>{});if(error instanceof LostLease)return 'lost';failure=error instanceof Failure?error.safeCode:'PURGE_FAILED';}

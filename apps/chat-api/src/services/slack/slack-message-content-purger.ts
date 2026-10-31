@@ -1,3 +1,4 @@
+import {derivedExpiryProof} from './slack-derived-expiry.js';
 import type pg from 'pg';
 import { formatSlackOwnerSourceKey, sameSlackBinding, sameSlackPolicyEpoch, slackPolicyRefToEpoch,
   validateSlackPolicyReference, validateSlackPurgeTarget, validateSlackSourceRef,
@@ -78,11 +79,12 @@ export class SlackMessageContentPurger {
        !/^[1-9][0-9]{0,18}$/.test(input.expectedTargetVersion) || BigInt(input.expectedTargetVersion)>9223372036854775807n) throw new TypeError('INVALID_PURGE_INPUT');
     await client.query('SAVEPOINT slack_message_purge_tx_guard');
     await client.query('RELEASE SAVEPOINT slack_message_purge_tx_guard');
-    const intent=(await client.query('SELECT target_kind,purge_target,created_at::text AS cutoff,status FROM slack_invalidation_intents WHERE id=$1',[input.intentId])).rows[0];
+    const intent=(await client.query('SELECT id,source_event_key,effect_key,target_kind,purge_target,created_at::text AS cutoff,status FROM slack_invalidation_intents WHERE id=$1',[input.intentId])).rows[0];
     if(!intent || intent.status==='completed') return {status:'skipped'};
     if(!['chat_history_message','working_memory_entity','plan_step_arg','audit_log_entry','scheduled_workflow_arg'].includes(intent.target_kind)) return {status:'missing_handler'};
     let target:SlackPurgeTarget;
     try {target=validateSlackPurgeTarget(intent.purge_target);} catch {return {status:'stale_lineage'};}
+    const expiry=await derivedExpiryProof(client,intent);
     if(!target.cascadeTargetKinds.includes(intent.target_kind)) return {status:'stale_lineage'};
     const loadCopy=async(lock=false)=>(await client.query(`SELECT *,created_at<=$2::timestamptz AS eligible FROM slack_derived_copies WHERE id=$1 ${lock?'FOR UPDATE':''}`,[input.derivedCopyId,intent.cutoff])).rows[0];
     const first=await loadCopy();
@@ -90,14 +92,14 @@ export class SlackMessageContentPurger {
     if(first.target_kind!==intent.target_kind) return {status:'missing_handler'};
     try {validateSlackArtifactTarget(first.target_kind,first.target_sub_id);} catch {return {status:'missing_handler'};}
     if(first.target_version!==input.expectedTargetVersion) return {status:'stale_lineage'};
-    const loadSegments=async()=>(await client.query('SELECT * FROM slack_derived_provenance_segments WHERE derived_copy_id=$1 ORDER BY segment_index',[input.derivedCopyId])).rows;
+    const loadSegments=async()=>(await client.query('SELECT *,expires_at<=$2::timestamptz AS expiry_eligible FROM slack_derived_provenance_segments WHERE derived_copy_id=$1 ORDER BY segment_index',[input.derivedCopyId,intent.cutoff])).rows;
     const rows=await loadSegments();
     let segments:Segment[];
     try {
       if(rows.length===0 || rows.length>256) throw new Error('STALE_LINEAGE');
       segments=rows.map(r=>segment(r,first.ati_user_id));
     } catch {return {status:'stale_lineage'};}
-    if(!segments.some(s=>matches(s,target))) return {status:'skipped'};
+    if(!segments.some((s,index)=>matches(s,target)&&(!expiry||rows[index].expiry_eligible===true))) return {status:'skipped'};
     if(!first.eligible) return {status:'stale_lineage'};
     await acquireSlackInvalidationLocks(client,segments.flatMap(s=>slackSourceWriteLockKeys({binding:s.source.binding,
       epoch:slackPolicyRefToEpoch(s.policy),resourceType:s.source.resourceType,resourceId:s.source.resourceId,channelId:s.channelId})));
