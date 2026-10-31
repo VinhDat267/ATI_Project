@@ -1,6 +1,6 @@
 # SLACK-03B2J - Plan, step and audit origin cutover
 
-Status: CODE_COMPLETE on `feat/slack-03b2j`. Base `6dbbaa9b` (PR #216 head). Independent review, exact-head CI and staging publication are pending. M2 stays open.
+Status: ACCEPTED on staging. PR #217 merge `471c8a83`, published head `1344feca`. M2 stays open.
 
 Deliverable: a source-free plan and its execution steps carry a private origin certificate from the real writer transaction. Approval, execution snapshot and dispatch reject an unmarked or mutated plan. Audit is `output_json` and `error_json` on `execution_steps`. This does not redo 03B2F lineage for Slack-sourced plans.
 
@@ -13,8 +13,7 @@ Acceptance:
 - [x] A later SQL insert or a mutated `plan_text` is hidden.
 - [x] Backfill defaults to dry run. `--apply` certifies plans with no Slack marker and leaves text containing `myslack` quarantined.
 - [x] Focused PostgreSQL test `tests/integration/slack-plan-origin-runtime.test.ts` 3/3 on temporary Postgres `127.0.0.1:56541`.
-- [x] Exact published-head CI [41212419829](https://github.com/VinhDat267/ATI_Project/actions/runs/41212419829) pass on `2a01022f`, check and browser.
-- [ ] Merge tree identical to that head, and the reviewer matrix checkpoint. Those happen after merge.
+- [x] Exact published-head CI [41213639586](https://github.com/VinhDat267/ATI_Project/actions/runs/41213639586) pass on `1344feca`, check and browser. Merge `471c8a83`; `git diff --exit-code` exit 0. [Reviewer checkpoint](../log/2026-10-31-slack-03b2j-review-integration.md).
 
 ## Kết quả
 
