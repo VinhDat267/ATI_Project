@@ -644,3 +644,49 @@ export const CAPABILITIES_DATA: Capability[] = [
         ]
       }
     ];
+
+export const GUIDE_HERO_FLOW_SERVICES: string[] = ['github', 'trello', 'slack'];
+
+export interface GuideOAuthShowcaseCard {
+  service: string;
+  title: string;
+  badge: string;
+  badgeStyle: 'oauth' | 'workspace';
+  iconClassName: string;
+  description: string;
+}
+
+export const GUIDE_OAUTH_SHOWCASE_CARDS: GuideOAuthShowcaseCard[] = [
+  {
+    service: 'mycalendar',
+    title: 'Google Calendar',
+    badge: 'OAuth 2.0 · 1-Click',
+    badgeStyle: 'oauth',
+    iconClassName: 'w-4 h-4',
+    description: 'Kết nối lịch cá nhân & tự gửi bản tin sáng không cần dán khoá.',
+  },
+  {
+    service: 'trello',
+    title: 'Trello cá nhân',
+    badge: 'OAuth 2.0 · 1-Click',
+    badgeStyle: 'oauth',
+    iconClassName: 'w-4 h-4 text-[#0079BF]',
+    description: 'Cấp quyền 1 chạm và khoá đúng bảng Trello được phép thao tác.',
+  },
+  {
+    service: 'sheets',
+    title: 'Google Sheets',
+    badge: 'OAuth 2.0 · 1-Click',
+    badgeStyle: 'oauth',
+    iconClassName: 'w-4 h-4 text-[#16A34A]',
+    description: 'Chọn file bảng tính hoặc dán URL trực tiếp để đọc/ghi và lập báo cáo.',
+  },
+  {
+    service: 'slack',
+    title: 'Slack & GitHub',
+    badge: 'Workspace',
+    badgeStyle: 'workspace',
+    iconClassName: 'w-4 h-4 text-[#E11D48]',
+    description: 'Tích hợp kênh nhóm, kho mã và trang tài liệu dùng chung của dự án.',
+  },
+];

@@ -58,6 +58,18 @@ export function RequestMoment({
 }: Props) {
   const [workspace, setWorkspace] = useState(getActiveWorkspaceSummary());
   useEffect(() => subscribeWorkspace(() => setWorkspace(getActiveWorkspaceSummary())), []);
+  useEffect(() => {
+    try {
+      const prefill = sessionStorage.getItem('ati_prefill_prompt');
+      if (prefill) {
+        sessionStorage.removeItem('ati_prefill_prompt');
+        onDraft(prefill);
+        input.current?.focus();
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }, [onDraft, input]);
 
   return (
     <section

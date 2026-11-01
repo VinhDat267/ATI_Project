@@ -11,7 +11,7 @@ import { useGmailEnabled, useMySheetsEnabled } from '../../hooks/use-gmail-enabl
 import { useSchedulesEnabled } from '../../hooks/use-schedules';
 import { GMAIL_GUIDE, GMAIL_PROMPTS, GMAIL_CAPABILITY } from './gmail-data';
 import { MYSHEETS_GUIDE, MYSHEETS_PROMPTS, MYSHEETS_SCHEDULE_PROMPT, MYSHEETS_CAPABILITY } from './mysheets-data';
-import { CAPABILITIES_DATA as BASE_CAPABILITIES, SAMPLE_PROMPTS as BASE_PROMPTS, SERVICE_GUIDES as BASE_GUIDES, SERVICE_SVGS, type ServiceGuide } from './data';
+import { CAPABILITIES_DATA as BASE_CAPABILITIES, SAMPLE_PROMPTS as BASE_PROMPTS, SERVICE_GUIDES as BASE_GUIDES, SERVICE_SVGS, GUIDE_HERO_FLOW_SERVICES, GUIDE_OAUTH_SHOWCASE_CARDS, type ServiceGuide } from './data';
 
 const SERVICE_GUIDES = BASE_GUIDES, SAMPLE_PROMPTS = BASE_PROMPTS, CAPABILITIES_DATA = BASE_CAPABILITIES;
 type MainTab = 'keys' | 'prompts' | 'capabilities';
@@ -456,7 +456,7 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
                 OAuth 2.0 · 1-Click
               </span>
             </div>
-            <WorkflowFlowCanvas services={['github', 'trello', 'slack']} mode="preview" />
+            <WorkflowFlowCanvas services={GUIDE_HERO_FLOW_SERVICES} mode="preview" />
           </div>
 
           {/* Cài đặt dịch vụ 1-Click OAuth Showcase */}
@@ -470,46 +470,18 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
               </a>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] flex flex-col justify-between gap-2">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-7 h-7 rounded-lg bg-white border border-[#E7E7E2] flex items-center justify-center"><ServiceLogo service="mycalendar" className="w-4 h-4" /></span>
-                    <span className="text-xs font-bold text-[#111827]">Google Calendar</span>
+              {GUIDE_OAUTH_SHOWCASE_CARDS.map(card => (
+                <div key={card.service} className="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] flex flex-col justify-between gap-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-7 h-7 rounded-lg bg-white border border-[#E7E7E2] flex items-center justify-center"><ServiceLogo service={card.service} className={card.iconClassName} /></span>
+                      <span className="text-xs font-bold text-[#111827]">{card.title}</span>
+                    </div>
+                    <span className={card.badgeStyle === 'oauth' ? 'text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200' : 'text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white text-[#4B5563] border border-[#E7E7E2]'}>{card.badge}</span>
                   </div>
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">OAuth 2.0 · 1-Click</span>
+                  <p className="text-[11px] text-[#4B5563]">{card.description}</p>
                 </div>
-                <p className="text-[11px] text-[#4B5563]">Kết nối lịch cá nhân &amp; tự gửi bản tin sáng không cần dán khoá.</p>
-              </div>
-              <div className="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] flex flex-col justify-between gap-2">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-7 h-7 rounded-lg bg-white border border-[#E7E7E2] flex items-center justify-center"><ServiceLogo service="trello" className="w-4 h-4 text-[#0079BF]" /></span>
-                    <span className="text-xs font-bold text-[#111827]">Trello cá nhân</span>
-                  </div>
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">OAuth 2.0 · 1-Click</span>
-                </div>
-                <p className="text-[11px] text-[#4B5563]">Cấp quyền 1 chạm và khoá đúng bảng Trello được phép thao tác.</p>
-              </div>
-              <div className="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] flex flex-col justify-between gap-2">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-7 h-7 rounded-lg bg-white border border-[#E7E7E2] flex items-center justify-center"><ServiceLogo service="sheets" className="w-4 h-4 text-[#16A34A]" /></span>
-                    <span className="text-xs font-bold text-[#111827]">Google Sheets</span>
-                  </div>
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">OAuth 2.0 · 1-Click</span>
-                </div>
-                <p className="text-[11px] text-[#4B5563]">Chọn file bảng tính hoặc dán URL trực tiếp để đọc/ghi và lập báo cáo.</p>
-              </div>
-              <div className="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] flex flex-col justify-between gap-2">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-7 h-7 rounded-lg bg-white border border-[#E7E7E2] flex items-center justify-center"><ServiceLogo service="slack" className="w-4 h-4 text-[#E11D48]" /></span>
-                    <span className="text-xs font-bold text-[#111827]">Slack &amp; GitHub</span>
-                  </div>
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white text-[#4B5563] border border-[#E7E7E2]">Workspace</span>
-                </div>
-                <p className="text-[11px] text-[#4B5563]">Tích hợp kênh nhóm, kho mã và trang tài liệu dùng chung của dự án.</p>
-              </div>
+              ))}
             </div>
           </div>
 

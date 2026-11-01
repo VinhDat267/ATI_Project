@@ -1,8 +1,10 @@
 /** @vitest-environment jsdom */
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createRef, useState } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { GuidePage } from '../src/pages/Guide/GuidePage';
+import { RequestMoment } from '../src/pages/Cockpit/RequestMoments';
 import { apiClient } from '../src/services/api-client';
 
 beforeEach(() => {
@@ -51,9 +53,9 @@ describe('GuidePage — OAuth-First AI Automation Playbook & Make.com Orbital Sh
     expect(screen.getAllByText(/OAuth 2\.0 · 1-Click/i).length).toBeGreaterThanOrEqual(1);
   });
 
-  it('provides clickable AI Prompt Templates with "Dùng thử mẫu lệnh này" that navigate to /', async () => {
+  it('provides clickable AI Prompt Templates with "Dùng thử mẫu lệnh này" that navigate to / and prefill RequestMoment prompt input', async () => {
     const navigate = vi.fn();
-    render(<GuidePage navigate={navigate} />);
+    const { unmount } = render(<GuidePage navigate={navigate} />);
     await waitFor(() => expect(apiClient.getRuntime).toHaveBeenCalled());
 
     fireEvent.click(document.getElementById('tab-btn-prompts')!);
@@ -63,6 +65,34 @@ describe('GuidePage — OAuth-First AI Automation Playbook & Make.com Orbital Sh
 
     fireEvent.click(tryButtons[0]);
     expect(navigate).toHaveBeenCalledWith('/');
+    expect(sessionStorage.getItem('ati_prefill_prompt')).toBeTruthy();
+    unmount();
+
+    function Harness() {
+      const [draft, setDraft] = useState('');
+      const inputRef = createRef<HTMLTextAreaElement>();
+      return (
+        <RequestMoment
+          services={[]}
+          loading={false}
+          error={null}
+          draft={draft}
+          planning={false}
+          input={inputRef}
+          onDraft={setDraft}
+          onSend={vi.fn()}
+          onKeyDown={vi.fn()}
+          onSettings={vi.fn()}
+          navigate={vi.fn()}
+          servicePrompt={(s) => s.name}
+        />
+      );
+    }
+
+    render(<Harness />);
+    const promptInput = document.getElementById('prompt-input') as HTMLTextAreaElement;
+    expect(promptInput.value.length).toBeGreaterThan(10);
+    expect(sessionStorage.getItem('ati_prefill_prompt')).toBeNull();
   });
 
   it('collapses legacy shared-workspace API token instructions inside a <details> drawer titled Dành cho Quản trị viên Workspace (Nâng cao)', async () => {

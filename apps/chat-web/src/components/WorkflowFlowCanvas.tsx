@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { getServiceDefinition } from '@wap/tool-schemas';
+import assets from '../assets/cockpit-services.json';
 import type { PlanStep, StepState } from '../types';
 import { ServiceLogo } from './ServiceLogo';
 import { operation, serviceId } from '../pages/Cockpit/presentation';
@@ -34,84 +36,17 @@ interface OrbitalServiceMeta {
   badgeClass: string;
 }
 
-const SERVICE_ORBITAL_META: Record<string, OrbitalServiceMeta> = {
-  trello: {
-    label: 'Trello',
-    ringClass: 'ring-[#0079BF]/25 border-[#0079BF]',
-    strokeHex: '#0079BF',
-    badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',
-  },
-  slack: {
-    label: 'Slack',
-    ringClass: 'ring-[#E01E5A]/25 border-[#E01E5A]',
-    strokeHex: '#E01E5A',
-    badgeClass: 'bg-purple-50 text-purple-800 border-purple-200',
-  },
-  github: {
-    label: 'GitHub',
-    ringClass: 'ring-[#24292E]/25 border-[#24292E]',
-    strokeHex: '#24292E',
-    badgeClass: 'bg-neutral-100 text-neutral-800 border-neutral-300',
-  },
-  sheets: {
-    label: 'Google Sheets',
-    ringClass: 'ring-[#188038]/25 border-[#188038]',
-    strokeHex: '#188038',
-    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-  },
-  mysheets: {
-    label: 'Google Sheets',
-    ringClass: 'ring-[#188038]/25 border-[#188038]',
-    strokeHex: '#188038',
-    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-  },
-  calendar: {
-    label: 'Google Calendar',
-    ringClass: 'ring-[#1A73E8]/25 border-[#1A73E8]',
-    strokeHex: '#1A73E8',
-    badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',
-  },
-  mycalendar: {
-    label: 'Google Calendar',
-    ringClass: 'ring-[#1A73E8]/25 border-[#1A73E8]',
-    strokeHex: '#1A73E8',
-    badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',
-  },
-  gmail: {
-    label: 'Gmail',
-    ringClass: 'ring-[#EA4335]/25 border-[#EA4335]',
-    strokeHex: '#EA4335',
-    badgeClass: 'bg-red-50 text-red-700 border-red-200',
-  },
-  notion: {
-    label: 'Notion',
-    ringClass: 'ring-[#111827]/20 border-[#111827]',
-    strokeHex: '#111827',
-    badgeClass: 'bg-neutral-100 text-neutral-800 border-neutral-300',
-  },
-  telegram: {
-    label: 'Telegram',
-    ringClass: 'ring-[#229ED9]/25 border-[#229ED9]',
-    strokeHex: '#229ED9',
-    badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',
-  },
-  jira: {
-    label: 'Jira',
-    ringClass: 'ring-[#0052CC]/25 border-[#0052CC]',
-    strokeHex: '#0052CC',
-    badgeClass: 'bg-blue-50 text-blue-800 border-blue-200',
-  },
-};
+const orbitalAssets = assets.services as Record<string, { orbital?: OrbitalServiceMeta }>;
 
 function getOrbitalMeta(service: string): OrbitalServiceMeta {
-  return (
-    SERVICE_ORBITAL_META[service] ?? {
-      label: service,
-      ringClass: 'ring-[#FF5701]/25 border-[#FF5701]',
-      strokeHex: '#FF5701',
-      badgeClass: 'bg-orange-50 text-orange-800 border-orange-200',
-    }
-  );
+  const configured = orbitalAssets[service]?.orbital;
+  if (configured) return configured;
+  return {
+    label: getServiceDefinition(service)?.name ?? service,
+    ringClass: 'ring-[#FF5701]/25 border-[#FF5701]',
+    strokeHex: '#FF5701',
+    badgeClass: 'bg-orange-50 text-orange-800 border-orange-200',
+  };
 }
 
 interface GroupedServiceNode {

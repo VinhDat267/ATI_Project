@@ -98,6 +98,16 @@ export function Cockpit(props: Props) {
   }, [editOpen]);
   useEffect(() => { setEditOpen(false); }, [state.conversationId, state.activePlan?.id]);
   useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem('ati_prefill_prompt');
+      if (stored) {
+        sessionStorage.removeItem('ati_prefill_prompt');
+        setDraft(stored);
+        input.current?.focus();
+      }
+    } catch {
+      // ignore storage errors
+    }
     const prefill = (event: Event) => { const text = (event as CustomEvent<{ text: string }>).detail?.text; if (text) { setDraft(text); input.current?.focus(); } };
     window.addEventListener('chat:prefill', prefill); return () => window.removeEventListener('chat:prefill', prefill);
   }, []);
