@@ -516,7 +516,7 @@ export function WorkflowFlowCanvas({
                     <span className="mt-1.5 text-[11px] font-bold text-emerald-800 whitespace-nowrap">
                       Auto-Digest
                     </span>
-                    <span className="text-[10px] text-[#4B5563]">Tự gửi an toàn</span>
+                    <span className="text-[10px] text-[#4B5563]">Gửi tự động</span>
                   </div>
                 </>
               )}
