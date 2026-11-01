@@ -1,11 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { apiClient } from '../../services/api-client';
 import { userErrorMessage } from '../../services/user-error';
+import { getActiveWorkspaceId, subscribeWorkspace } from '../../services/workspace-storage';
 import { useChatStore } from '../../store/chat-store';
 import type { Conversation, User } from '../../types';
 
 export function useHistory(user: User | null) {
   const [rows, setRows] = useState<Conversation[]>([]), [search, setSearch] = useState(''), [cursor, setCursor] = useState<string | null>(null);
+  const [workspaceId, setWorkspaceId] = useState(getActiveWorkspaceId());
   const [loading, setLoading] = useState(false), [error, setError] = useState<string | null>(null), [notice, setNotice] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null), [title, setTitle] = useState(''), [saving, setSaving] = useState(false);
   const generation = useRef(0), busy = useRef(false), renameBusy = useRef(false), draftRevision = useRef(0);
@@ -17,6 +19,7 @@ export function useHistory(user: User | null) {
     returnFocus.current = null;
   }, [editing]);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  useEffect(() => subscribeWorkspace(() => setWorkspaceId(getActiveWorkspaceId())), []);
   const load = async (nextCursor: string | undefined, owner = generation.current) => {
     busy.current = true; setLoading(true); setError(null);
     try {
@@ -32,7 +35,7 @@ export function useHistory(user: User | null) {
     setRows([]); setCursor(null); setEditing(null); draftRevision.current++;
     void load(undefined, owner);
     return () => { generation.current++; };
-  }, [search, user?.id]);
+  }, [search, user?.id, workspaceId]);
   const edit = (id: string) => { draftRevision.current++; setEditing(id); setTitle(rows.find(row => row.id === id)?.title ?? ''); setError(null); setNotice(null); };
   const cancel = () => { draftRevision.current++; returnFocus.current = editing; setEditing(null); setError(null); };
   const rename = async (id: string) => {

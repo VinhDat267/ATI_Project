@@ -1,15 +1,17 @@
 import { Router, type Request, type Response } from 'express';
 import type { SSEManager } from '../sse/sse-manager.js';
 import type { ConversationRepo } from '../db/repositories/conversation-repo.js';
+import type { WorkspaceRepo } from '../db/repositories/workspace-repo.js';
 
 export interface StreamRoutesOptions {
   sseManager: SSEManager;
   convRepo?: ConversationRepo;
+  workspaceRepo?: WorkspaceRepo;
 }
 
 export function createStreamRoutes(options: StreamRoutesOptions): Router {
   const router = Router();
-  const { sseManager, convRepo } = options;
+  const { sseManager, convRepo, workspaceRepo } = options;
 
   // GET /api/conversations/:id/stream
   router.get('/:id/stream', async (req: Request, res: Response): Promise<void> => {
@@ -30,6 +32,13 @@ export function createStreamRoutes(options: StreamRoutesOptions): Router {
         if (conv.user_id !== userId) {
           res.status(403).json({ error: 'Forbidden' });
           return;
+        }
+        if (conv.workspace_mode === 'organization' && conv.workspace_id && workspaceRepo) {
+          const member = await workspaceRepo.findMember(conv.workspace_id, userId);
+          if (!member || member.status !== 'active') {
+            res.status(403).json({ error: 'WORKSPACE_ACCESS_DENIED' });
+            return;
+          }
         }
       } catch (err: any) {
         res.status(500).json({ error: err?.message || 'Database error' });

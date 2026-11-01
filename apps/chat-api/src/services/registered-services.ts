@@ -24,6 +24,17 @@ export function getRegisteredService(id: string) {
   return definition ? { definition, transport: SERVICE_TRANSPORTS[id]! } : undefined;
 }
 
+export function isServiceAccountService(definitionOrId: ServiceDefinition | string): boolean {
+  const def = typeof definitionOrId === 'string' ? getRegisteredService(definitionOrId)?.definition : definitionOrId;
+  if (def) {
+    return def.credentialFields.some(field => field.key === 'privateKey');
+  }
+  return (
+    typeof definitionOrId === 'string' &&
+    (definitionOrId === 'google-calendar' || definitionOrId === 'google-sheets')
+  );
+}
+
 export function normalizeAllowedScope(definition: ServiceDefinition, value: unknown): AllowedScope | null {
   const { scopeKey, scopePattern } = definition;
   const raw = Array.isArray(value)
@@ -45,11 +56,30 @@ export function hasValidCredentials(fields: readonly { key: string; pattern?: st
 }
 
 /** Only scoped, configured services may be described to the live planner. */
-export async function getConfiguredToolCatalog(credentialRepo: CredentialRepo, encryptionKey: string) {
+export async function getConfiguredToolCatalog(
+  credentialRepo: CredentialRepo,
+  encryptionKey: string,
+  scope?: {
+    workspaceMode?: 'legacy' | 'personal' | 'organization';
+    workspaceId?: string | null;
+    userId?: string;
+  }
+) {
   const available = new Set<string>();
+  const mode = scope?.workspaceMode ?? 'legacy';
   for (const definition of getRegisteredServices()) {
     if (definition.id === 'trello') continue;
-    const record = await credentialRepo.getCredentials(definition.id);
+    if (mode === 'personal' && isServiceAccountService(definition)) continue;
+    let record;
+    if (mode === 'personal') {
+      if (!scope?.userId) continue;
+      record = await credentialRepo.getPersonalCredentials(definition.id, scope.userId);
+    } else if (mode === 'organization') {
+      if (!scope?.workspaceId) continue;
+      record = await credentialRepo.getCredentials(definition.id, scope.workspaceId);
+    } else {
+      record = await credentialRepo.getCredentials(definition.id);
+    }
     if (!record) continue;
     try {
       const config = decryptCredentials(record.config, encryptionKey);
@@ -74,6 +104,8 @@ export async function getToolCatalogFor(
   encryptionKey: string,
   options: {
     userId?: string;
+    workspaceMode?: 'legacy' | 'personal' | 'organization';
+    workspaceId?: string | null;
     gmailEnabled: boolean;
     mycalendarEnabled?: boolean;
     mysheetsEnabled?: boolean;
@@ -81,12 +113,16 @@ export async function getToolCatalogFor(
     trelloTeamRepo?: any;
     trelloOAuthClient?: any;
     trelloTokens?: any;
-    trelloConnection?: (userId: string) => Promise<any>;
+    trelloConnection?: (userId: string, scopeId?: string) => Promise<any>;
   },
 ): Promise<ToolDefinition[]> {
-  let catalog = (await getConfiguredToolCatalog(credentialRepo, encryptionKey)).filter(
-    (tool) => tool.service !== 'trello'
-  );
+  let catalog = (
+    await getConfiguredToolCatalog(credentialRepo, encryptionKey, {
+      workspaceMode: options.workspaceMode,
+      workspaceId: options.workspaceId,
+      userId: options.userId,
+    })
+  ).filter((tool) => tool.service !== 'trello');
   if (!options.userId) return catalog;
   if (options.gmailEnabled) {
     const gmail = await credentialRepo.getPersonalCredentials('gmail', options.userId);
@@ -128,9 +164,17 @@ export async function getToolCatalogFor(
       }
     }
   }
+  const trelloScopeId =
+    options.workspaceMode === 'organization' && options.workspaceId
+      ? options.workspaceId
+      : options.workspaceMode === 'personal' && options.userId
+        ? `personal:${options.userId}`
+        : undefined;
   if (options.trelloConnection) {
     try {
-      const trello = await options.trelloConnection(options.userId);
+      const trello = trelloScopeId
+        ? await options.trelloConnection(options.userId, trelloScopeId)
+        : await options.trelloConnection(options.userId);
       if (trello?.status === 'connected' && trello.connection?.boardIds?.length > 0) {
         catalog = [...catalog, ...TRELLO_TOOLS];
       }
@@ -141,7 +185,9 @@ export async function getToolCatalogFor(
     const cred = await credentialRepo.getPersonalCredentials('trello', options.userId);
     if (cred && cred.status === 'active') {
       try {
-        const scope = await options.trelloTeamRepo.get();
+        const scope = trelloScopeId
+          ? await options.trelloTeamRepo.get(trelloScopeId)
+          : await options.trelloTeamRepo.get();
         if (scope && scope.boards && scope.boards.length > 0) {
           const dec = decryptCredentials(cred.config, encryptionKey);
           if (dec.refreshToken) {

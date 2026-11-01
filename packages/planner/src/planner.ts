@@ -46,8 +46,12 @@ export interface GatherSearchRequest {
   tool: string;
   args: Record<string, unknown>;
   signal?: AbortSignal;
-  /** Who is planning; forwarded untouched so personal connections (Gmail) use the caller's own adapter. */
-  actor?: { userId: string };
+  /** Who is planning; forwarded untouched so personal/workspace connections use the caller's own adapter. */
+  actor?: {
+    userId: string;
+    workspaceId?: string | null;
+    workspaceMode?: 'legacy' | 'personal' | 'organization';
+  };
 }
 
 export interface GatherEvent {
@@ -67,7 +71,11 @@ export interface ProcessMessageInput {
   /** Internal turn clock forwarded through all phases. */
   timingStarted?: number;
   /** The signed-in caller. The planner never reads it; it only passes it to `gatherSearch`. */
-  actor?: { userId: string };
+  actor?: {
+    userId: string;
+    workspaceId?: string | null;
+    workspaceMode?: 'legacy' | 'personal' | 'organization';
+  };
   /** The conversation's schedule: its services join the routed ones, and only update, pause, resume or cancel are accepted. */
   schedule?: { services: string[] };
   /** Planning a run of a schedule: the prompt is the one of schedules off and a schedule is refused. */

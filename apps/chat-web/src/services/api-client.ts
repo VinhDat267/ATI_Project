@@ -1,4 +1,5 @@
 import { authStorage } from './auth-storage';
+import { getActiveWorkspaceId, getExplicitWorkspaceId, setActiveWorkspaceId } from './workspace-storage';
 import type { ScheduleView, ScheduleRunView } from '@wap/tool-schemas';
 import type {
   ActivePlan,
@@ -11,6 +12,7 @@ import type {
   AuthMessageResponse,
   AccountProfile, AccountSession,
   PersonalSpreadsheetItem, MySheetsPickerSession,
+  WorkspaceSummary, WorkspacesListResponse,
 } from '../types';
 
 export function sharesAuthSession(previous: string | null, current: string | null): boolean {
@@ -50,6 +52,12 @@ export class ApiClient {
     if (accessToken) {
       if (isRetry || !headers.has('Authorization')) {
         headers.set('Authorization', `Bearer ${accessToken}`);
+      }
+      if (!headers.has('X-Workspace-Id')) {
+        const explicitWorkspaceId = getExplicitWorkspaceId();
+        if (explicitWorkspaceId) {
+          headers.set('X-Workspace-Id', explicitWorkspaceId);
+        }
       }
     }
 
@@ -127,13 +135,25 @@ export class ApiClient {
       if (response.status === 401 && latest.accessToken === requestToken && latest.refreshToken === requestRefresh) {
         authStorage.clearStoredTokens();
       }
-      const error: any = new Error(
-        (typeof data?.error === 'object' ? data.error?.message : data?.error) ||
-          data?.message ||
-          `Request failed with status ${response.status}`
-      );
+      const errCode = typeof data?.error === 'object' ? data.error?.code : typeof data?.code === 'string' ? data.code : typeof data?.error === 'string' && /^[A-Z0-9_]+$/.test(data.error) ? data.error : undefined;
+      if (
+        response.status === 403 &&
+        (errCode === 'WORKSPACE_MEMBER_PENDING' ||
+          errCode === 'WORKSPACE_MEMBER_DISABLED' ||
+          errCode === 'WORKSPACE_ACCESS_DENIED') &&
+        !url.includes('/api/workspaces/join') &&
+        getActiveWorkspaceId() !== 'personal'
+      ) {
+        setActiveWorkspaceId('personal');
+      }
+      const rawErrorText = typeof data?.error === 'object' ? data.error?.message : data?.error;
+      const preferredMessage =
+        typeof rawErrorText === 'string' && /^[A-Z0-9_]+$/.test(rawErrorText) && typeof data?.message === 'string' && data.message
+          ? data.message
+          : rawErrorText || data?.message || `Request failed with status ${response.status}`;
+      const error: any = new Error(preferredMessage);
       error.status = response.status;
-      error.code = data?.error?.code;
+      error.code = errCode;
       error.data = data;
       error.response = response;
       throw error;
@@ -476,6 +496,46 @@ export class ApiClient {
 
   async changeAdminUser(id: string, action: 'approve' | 'disable' | 'enable' | 'role', role?: 'member' | 'admin'): Promise<{ user: AdminUser }> {
     return this.request(`/api/admin/users/${encodeURIComponent(id)}/${action}`, { method: 'POST', ...(action === 'role' ? { body: JSON.stringify({ role }) } : {}) });
+  }
+
+  async approveAllAdminUsers(): Promise<{ approvedCount: number; approvedUsers: AdminUser[] }> {
+    return this.request('/api/admin/users/approve-all', { method: 'POST' });
+  }
+
+  async rejectAdminUser(id: string): Promise<{ rejectedId: string }> {
+    return this.request(`/api/admin/users/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ action: 'reject' }) });
+  }
+
+  // --- Workspaces ---
+  async getWorkspaces(): Promise<WorkspacesListResponse> {
+    return this.request<WorkspacesListResponse>('/api/workspaces');
+  }
+
+  async createWorkspace(name: string, requireApproval = true): Promise<{ workspace: WorkspaceSummary }> {
+    return this.request<{ workspace: WorkspaceSummary }>('/api/workspaces', {
+      method: 'POST',
+      body: JSON.stringify({ name, requireApproval }),
+    });
+  }
+
+  async joinWorkspace(inviteCode: string): Promise<{ workspace: WorkspaceSummary; created: boolean }> {
+    return this.request<{ workspace: WorkspaceSummary; created: boolean }>('/api/workspaces/join', {
+      method: 'POST',
+      body: JSON.stringify({ inviteCode }),
+    });
+  }
+
+  async regenerateInviteCode(workspaceId: string): Promise<{ inviteCode: string }> {
+    return this.request<{ inviteCode: string }>(`/api/workspaces/${encodeURIComponent(workspaceId)}/invite-code/regenerate`, {
+      method: 'POST',
+    });
+  }
+
+  async updateWorkspaceSettings(workspaceId: string, settings: { requireApproval: boolean }): Promise<{ requireApproval: boolean }> {
+    return this.request<{ requireApproval: boolean }>(`/api/workspaces/${encodeURIComponent(workspaceId)}/settings`, {
+      method: 'PATCH',
+      body: JSON.stringify(settings),
+    });
   }
 
   // --- Own account (AUTH-05) ---

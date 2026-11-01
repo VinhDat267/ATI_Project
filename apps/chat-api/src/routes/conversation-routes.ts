@@ -12,6 +12,14 @@ export interface ConversationRoutesOptions {
   planRepo?: PlanRepo;
 }
 
+function isConvInWorkspace(conv: { workspace_id?: string | null; workspace_mode?: string }, req: Request): boolean {
+  const mode = req.workspace?.mode ?? 'legacy';
+  if (mode === 'organization') {
+    return conv.workspace_id === req.workspace?.workspaceId;
+  }
+  return !conv.workspace_id;
+}
+
 export function createConversationRoutes(options: ConversationRoutesOptions): Router {
   const router = Router();
   const { convRepo, msgRepo, chatService, planRepo } = options;
@@ -24,7 +32,10 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
         res.status(401).json({ error: 'Unauthorized' });
         return;
       }
-      const conversation = await convRepo.createConversation(userId);
+      const scope = req.workspace
+        ? { workspaceMode: req.workspace.mode, workspaceId: req.workspace.workspaceId }
+        : undefined;
+      const conversation = await convRepo.createConversation(userId, scope);
       res.status(201).json({ conversation });
     } catch (err: any) {
       res.status(500).json({ error: err?.message || 'Failed to create conversation' });
@@ -41,11 +52,14 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
       }
       const { limit, cursor, search } = req.query;
       if ([limit, cursor, search].some(value => value !== undefined && typeof value !== 'string')) throw new HistoryValidationError('Tham số lịch sử không hợp lệ.');
+      const scope = req.workspace
+        ? { workspaceMode: req.workspace.mode, workspaceId: req.workspace.workspaceId }
+        : undefined;
       const page = await convRepo.listConversationPage(userId, {
         ...(limit !== undefined ? { limit: Number(limit) } : {}),
         ...(cursor !== undefined ? { cursor: cursor as string } : {}),
         ...(search !== undefined ? { search: search as string } : {}),
-      });
+      }, scope);
       res.status(200).json(page);
     } catch (err: any) {
       res.status(err instanceof HistoryValidationError ? 400 : 500).json({ error: err instanceof HistoryValidationError ? err.message : 'Không tải được lịch sử hội thoại.' });
@@ -62,7 +76,7 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
       }
       const conversationId = req.params.id as string;
       const conv = await convRepo.getConversation(conversationId);
-      if (!conv) {
+      if (!conv || !isConvInWorkspace(conv, req)) {
         res.status(404).json({ error: 'Conversation not found' });
         return;
       }
@@ -105,7 +119,7 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
       }
       const conversationId = req.params.id as string;
       const conv = await convRepo.getConversation(conversationId);
-      if (!conv) {
+      if (!conv || !isConvInWorkspace(conv, req)) {
         res.status(404).json({ error: 'Conversation not found' });
         return;
       }
@@ -135,11 +149,7 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
       }
       const conversationId = req.params.id as string;
       const conversation = await convRepo.getConversation(conversationId);
-      if (!conversation) {
-        res.status(404).json({ error: 'Conversation not found' });
-        return;
-      }
-      if (conversation.user_id !== userId) {
+      if (!conversation || conversation.user_id !== userId || !isConvInWorkspace(conversation, req)) {
         res.status(404).json({ error: 'Conversation not found' });
         return;
       }
@@ -154,6 +164,11 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
     try {
       const userId = (req as any).user?.id;
       if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+      const conv = await convRepo.getConversation(req.params.id as string);
+      if (!conv || conv.user_id !== userId || !isConvInWorkspace(conv, req)) {
+        res.status(404).json({ error: 'Conversation not found' });
+        return;
+      }
       const title = validateConversationTitle(req.body?.title);
       const conversation = await convRepo.renameConversation(req.params.id as string, userId, title);
       if (!conversation) { res.status(404).json({ error: 'Conversation not found' }); return; }
@@ -173,7 +188,7 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
       }
       const conversationId = req.params.id as string;
       const conv = await convRepo.getConversation(conversationId);
-      if (!conv) {
+      if (!conv || !isConvInWorkspace(conv, req)) {
         res.status(404).json({ error: 'Conversation not found' });
         return;
       }

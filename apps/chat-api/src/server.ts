@@ -9,6 +9,7 @@ import {
   StepRepo,
   CredentialRepo,
   UserRepo,
+  WorkspaceRepo,
 } from './db/repositories/index.js';
 import { DEMO_ADMIN_ID } from './routes/auth-routes.js';
 import { verifyPassword } from './db/repositories/user-repo.js';
@@ -59,6 +60,7 @@ async function bootstrap() {
   let planRepo: any = null;
   let stepRepo: any = null;
   let credRepo: any = null;
+  let workspaceRepo: any = null;
 
   try {
     const dbUrl = env.DATABASE_URL;
@@ -73,6 +75,7 @@ async function bootstrap() {
     planRepo = new PlanRepo(pool);
     stepRepo = new StepRepo(pool);
     credRepo = new CredentialRepo(pool, env.ENCRYPTION_KEY);
+    workspaceRepo = new WorkspaceRepo(pool);
 
     if (env.RUNTIME_MODE === 'live') {
       const seededAdmin = await userRepo.findByEmail('admin@wap.local');
@@ -266,11 +269,27 @@ async function bootstrap() {
   const backupMockProvider = createBackupSandboxProvider();
 
   let gatherAdapterFactory: { getAdapterForService: (serviceName: string, context?: AdapterContext) => Promise<any> | any } | null = null;
-  const gatherSearch = async ({ tool, args, signal, actor }: { tool: string; args: Record<string, unknown>; signal?: AbortSignal; actor?: { userId: string } }) => {
+  const gatherSearch = async ({
+    tool,
+    args,
+    signal,
+    actor,
+  }: {
+    tool: string;
+    args: Record<string, unknown>;
+    signal?: AbortSignal;
+    actor?: { userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization' };
+  }) => {
     if (!gatherAdapterFactory) throw new Error('Gather adapter factory is not ready');
     const serviceName = tool.split('.')[0]!;
-    // Lookups during planning use the planning member's own connection for personal services.
-    const adapter = await gatherAdapterFactory.getAdapterForService(serviceName, { userId: actor?.userId, phase: 'planning' });
+    // Lookups during planning use the planning member's own connection and active workspace context.
+    const defaultMode = workspaceRepo ? ('personal' as const) : undefined;
+    const adapter = await gatherAdapterFactory.getAdapterForService(serviceName, {
+      userId: actor?.userId,
+      phase: 'planning',
+      workspaceMode: actor?.workspaceMode ?? defaultMode,
+      ...(actor?.workspaceId !== undefined ? { workspaceId: actor.workspaceId } : {}),
+    });
     return adapter.execute(tool, args, { signal });
   };
   // Sandbox providers return canned plans without reading working memory, so
@@ -283,10 +302,16 @@ async function bootstrap() {
   });
 
   // One planner per call: the member's own catalog decides which services are configured.
-  const plannerFor = async (actor?: { userId: string }) => new AIPlanner({
+  const plannerFor = async (actor?: {
+    userId: string;
+    workspaceId?: string | null;
+    workspaceMode?: 'legacy' | 'personal' | 'organization';
+  }) => new AIPlanner({
     provider: env.RUNTIME_MODE === 'sandbox' && (process.env.SANDBOX_SCENARIO === 'gmail' || process.env.SANDBOX_SCENARIO === 'mycalendar' || process.env.SANDBOX_SCENARIO === 'mysheets') ? createSandboxProvider(process.env.SANDBOX_SCENARIO) : provider,
     toolCatalog: await runtimeToolCatalog(env.RUNTIME_MODE, credRepo, env.ENCRYPTION_KEY, {
       userId: actor?.userId,
+      workspaceMode: actor?.workspaceMode ?? (workspaceRepo ? 'personal' : undefined),
+      workspaceId: actor?.workspaceId,
       gmailEnabled: gmailAvailable,
       mycalendarEnabled: mycalendarAvailable,
       mysheetsEnabled: mysheetsAvailable,
@@ -311,7 +336,10 @@ async function bootstrap() {
         if (!mayFallbackToShared(input, gmailAvailable, mycalendarAvailable, mysheetsAvailable)) throw new Error('Personal service planning failed');
         return backupPlanner.processMessage(input);
       }),
-    routeSchedule: async (request: string, actor: { userId: string }) => (await plannerFor(actor)).routeSchedule(request),
+    routeSchedule: async (
+      request: string,
+      actor: { userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization' }
+    ) => (await plannerFor(actor)).routeSchedule(request),
   };
 
   // 4. ChatService Event Bridge to SSE
@@ -329,6 +357,7 @@ async function bootstrap() {
     msgRepo,
     convRepo,
     planRepo,
+    workspaceRepo,
     planner: planner as any,
     eventEmitter: chatEventEmitter,
     gmailConnection: gmailAvailable ? createGmailConnectionLookup(credRepo, env.ENCRYPTION_KEY) : undefined,
@@ -407,6 +436,7 @@ async function bootstrap() {
     planRepo,
     stepRepo,
     convRepo,
+    workspaceRepo,
     adapterFactory,
     sseManager,
   });
@@ -419,6 +449,7 @@ async function bootstrap() {
     runtimeMode: env.RUNTIME_MODE,
     userRepo,
     adminUserRepo: pool && userRepo ? new AdminUserRepo(pool) : undefined,
+    workspaceRepo,
     signupEnabled: env.AUTH_SIGNUP_ENABLED,
     googleSignupEnabled: env.GOOGLE_SIGNUP_ENABLED,
     googleOAuth: env.GOOGLE_OAUTH,
@@ -434,7 +465,7 @@ async function bootstrap() {
     credentialRepo: credRepo,
     encryptionKey: env.ENCRYPTION_KEY,
     serviceAdminUserIds: (process.env.SERVICE_ADMIN_USER_IDS || '').split(',').map((id) => id.trim()).filter(Boolean),
-    onCredentialsChanged: (service) => realAdapterFactory.clearCache(service),
+    onCredentialsChanged: (service, workspaceId, userId) => realAdapterFactory.clearCache(service, workspaceId, userId),
     gmail: env.GMAIL_ENABLED ? {
       enabled: true,
       oauth: gmailAvailable ? env.GMAIL_OAUTH : undefined,

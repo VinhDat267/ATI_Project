@@ -9,6 +9,9 @@ import { createExecutionRoutes } from './routes/execution-routes.js';
 import { createServicesRoutes } from './routes/services-routes.js';
 import { createScheduleRoutes, isSchedulePath, type ScheduleRoutesOptions } from './routes/schedule-routes.js';
 import { createAuthMiddleware } from './auth/jwt.js';
+import { createWorkspaceContextMiddleware } from './middleware/workspace-context.js';
+import { createWorkspacesRouter } from './routes/workspaces-routes.js';
+import type { WorkspaceRepo } from './db/repositories/workspace-repo.js';
 import type { ConversationRepo } from './db/repositories/conversation-repo.js';
 import type { MessageRepo } from './db/repositories/message-repo.js';
 import type { PlanRepo } from './db/repositories/plan-repo.js';
@@ -101,7 +104,7 @@ export interface AppOptions extends AdminUsersOptions {
   credentialRepo?: CredentialRepo;
   encryptionKey?: string;
   serviceFetchFn?: typeof fetch;
-  onCredentialsChanged?: (service: string) => void;
+  onCredentialsChanged?: (service: string, workspaceId?: string | null, userId?: string) => void;
   serviceAdminUserIds?: string[];
   chatService?: ChatService;
   sseManager?: SSEManager;
@@ -114,6 +117,7 @@ export interface AppOptions extends AdminUsersOptions {
   trello?: TrelloAppOptions;
   trelloTokens?: Pick<TrelloTokenManager, 'forConnection'>;
   trelloTeamRepo?: TrelloTeamRepo;
+  workspaceRepo?: WorkspaceRepo;
   /** Scheduled workflows; present only when SCHEDULES_ENABLED is on and PostgreSQL is available. */
   schedules?: ScheduleRoutesOptions;
 }
@@ -158,6 +162,7 @@ export function createApp(options: AppOptions): Express {
     onConnectionChanged: options.trello?.onConnectionChanged,
     conversationOwner: options.convRepo ? async (id: string) => (await options.convRepo!.getConversation(id))?.user_id ?? null : undefined,
     tokens: trelloTokens, adminUserIds: options.serviceAdminUserIds,
+    workspaceRepo: options.workspaceRepo,
   };
 
   app.use(express.json());
@@ -185,7 +190,7 @@ export function createApp(options: AppOptions): Express {
       }
     } else res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Last-Event-ID');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Last-Event-ID, X-Workspace-Id');
     if (req.method === 'OPTIONS') {
       res.sendStatus(204);
       return;
@@ -217,17 +222,31 @@ export function createApp(options: AppOptions): Express {
     sessionRepo: options.sessionRepo, clock: options.authClock, loginFailures }));
 
   const authMiddleware = createAuthMiddleware(options.jwtSecret, { sessionRepo: options.sessionRepo ?? options.userRepo?.sessions, clock: options.authClock });
+  const workspaceContextMiddleware = createWorkspaceContextMiddleware(options.workspaceRepo);
+  const withAuthAndWorkspace = (req: Request, res: Response, next: NextFunction) => {
+    authMiddleware(req, res, (err?: any) => {
+      if (err) return next(err);
+      workspaceContextMiddleware(req, res, next);
+    });
+  };
 
   // Memory storage cannot manage persistent accounts, even with a legacy JWT.
   app.use('/api/admin/users', (req, res, next) => {
     if (!options.adminUserRepo) { res.status(503).json({ error: 'Quản trị người dùng cần PostgreSQL.' }); return; }
-    authMiddleware(req, res, next);
+    withAuthAndWorkspace(req, res, next);
   }, createAdminUsersRoutes(options));
+
+  if (options.workspaceRepo) {
+    app.use('/api/workspaces', authMiddleware, createWorkspacesRouter({
+      workspaceRepo: options.workspaceRepo,
+      emailSender: options.emailSender,
+    }));
+  }
 
   // Services routes (protected via Bearer header)
   app.use(
     '/api/services',
-    authMiddleware,
+    withAuthAndWorkspace,
     createServicesRoutes({ credentialRepo: options.credentialRepo, encryptionKey: options.encryptionKey, fetchFn: options.serviceFetchFn, onCredentialsChanged: options.onCredentialsChanged, adminUserIds: options.serviceAdminUserIds,
       gmailAvailable: Boolean(gmailRoutes && isGmailAvailable(gmailRoutes)),
       mycalendarAvailable: Boolean(mycalendarRoutes && isMyCalendarAvailable(mycalendarRoutes)),
@@ -240,15 +259,15 @@ export function createApp(options: AppOptions): Express {
   app.use('/api/connections/trello', createTrelloConnectionRoutes(trelloRoutes));
 
   // Only schedule paths pass through this auth check, so other /api requests are not checked twice.
-  if (options.schedules) app.use('/api', (req, res, next) => isSchedulePath(req.path) ? authMiddleware(req, res, next) : next(),
+  if (options.schedules) app.use('/api', (req, res, next) => isSchedulePath(req.path) ? withAuthAndWorkspace(req, res, next) : next(),
     createScheduleRoutes(options.schedules));
 
   // Stream routes require the Authorization header and a conversation owner check.
   if (options.sseManager) {
     app.use(
       '/api/conversations',
-      authMiddleware,
-      createStreamRoutes({ sseManager: options.sseManager, convRepo: options.convRepo })
+      withAuthAndWorkspace,
+      createStreamRoutes({ sseManager: options.sseManager, convRepo: options.convRepo, workspaceRepo: options.workspaceRepo })
     );
   }
 
@@ -256,7 +275,7 @@ export function createApp(options: AppOptions): Express {
   if (options.convRepo && options.msgRepo && options.chatService) {
     app.use(
       '/api/conversations',
-      authMiddleware,
+      withAuthAndWorkspace,
       createConversationRoutes({
         convRepo: options.convRepo,
         msgRepo: options.msgRepo,
@@ -270,7 +289,7 @@ export function createApp(options: AppOptions): Express {
   if (options.executionService) {
     app.use(
       '/api',
-      authMiddleware,
+      withAuthAndWorkspace,
       createExecutionRoutes({ executionService: options.executionService })
     );
   }
