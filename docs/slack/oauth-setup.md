@@ -39,6 +39,14 @@ Luồng có lịch sử này cần các mục đích `planning`, `manual_lookup`
 
 API đề xuất: `POST /api/conversations/:id/slack-read-plans` với `{content,connectionId,tempId?}`. Chỉ chủ hội thoại được gọi; máy chủ không nhận binding/workspace/policy do client tự gán. Mọi thao tác ghi cá nhân, lịch tự chạy, ba mode/Inbox và full API vẫn nằm ngoài M2.
 
+## Authorizations fanout ·04B3
+
+Hạ tầng M3 dùng `MYSLACK_APP_TOKEN` riêng, có scope `authorizations:read`, để gọi `apps.event.authorizations.list` qua header Authorization và đọc đủ các trang. Token này chỉ được cấu hình ở backend; không đưa vào UI, model hoặc tool nghiệp vụ bằng user token. Tham khảo [phương thức Slack](https://docs.slack.dev/reference/methods/apps.event.authorizations.list/).
+
+`MYSLACK_AUTOMATION_ENABLED=off` vẫn là mặc định. Khi thử đường fanout trong sandbox, dùng app token fixture và endpoint HTTP loopback riêng; live cố định endpoint Slack. Thiếu cấu hình app token khi bật automation live làm bootstrap từ chối với lỗi cố định. Ingress lifecycle/purge vẫn chạy khi automation tắt, nếu signing/app configuration được giữ lại.
+
+Card04B3 chỉ tạo intent metadata riêng theo binding, chưa đọc nội dung, gọi model hoặc tự ghi. Processing controls là giao diện nội bộ cho05 và mặc định chưa bật. Từng intent phải qua sáu mốc bắt đầu: processing start, consent grant, identity epoch, provider attestation, config revision và resume. Khởi động/bật lại ghi mốc mới; không tự chạy bù tin cũ. Sự kiện thiếu event_context bị bỏ qua thay vì đoán người nhận; cần probe native riêng trước khi mở các đường nhận chủ động.
+
 Nghiệm thu thật yêu cầu app/workspace của nhóm, người dùng tự cấp/thu hồi quyền và kiểm đúng actor/workspace. Bằng chứng fixture/browser không chứng minh Slack thật. Chưa phân phối rộng hoặc tuyên bố full Slack.
 
 Nguồn đối chiếu 29/10/2026: [OAuth](https://docs.slack.dev/authentication/installing-with-oauth/), [rotation](https://docs.slack.dev/authentication/using-token-rotation/), [auth.revoke](https://docs.slack.dev/reference/methods/auth.revoke/). Thiết kế chuẩn tắc vẫn là [Slack cá nhân](../superpowers/specs/2026-10-28-slack-personal-oauth-design.md).

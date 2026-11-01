@@ -33,6 +33,7 @@ import { SlackEventReceiptRepo } from './db/repositories/slack-event-receipt-rep
 import { SlackIngressService } from './services/slack/slack-ingress-service.js';
 import { slackIngressEnv } from './config/slack-ingress-env.js';
 import { createSlackLifecycleRuntime } from './services/slack/slack-lifecycle-runtime.js';
+import { createSlackFanoutRuntime } from './services/slack/slack-fanout-runtime.js';
 import { createPersonalSlackReadRuntime } from './config/slack-read-runtime.js';
 import { GmailOAuthClient } from './services/gmail/oauth-client.js';
 import { GmailTokenManager } from './services/gmail/token-manager.js';
@@ -394,6 +395,10 @@ async function bootstrap() {
     pool: pool ?? undefined, encryptionKey: env.ENCRYPTION_KEY, env: process.env, live: env.RUNTIME_MODE === 'live',
     onError: (code) => console.warn('[chat-api]', code),
   });
+  const slackFanoutRuntime = await createSlackFanoutRuntime({
+    pool: pool ?? undefined, env: process.env, live: env.RUNTIME_MODE === 'live',
+    onError: (code) => console.warn('[chat-api]', code),
+  });
   if (slackIngressConfig && !slackIngress) {
     console.warn('\x1b[33m[chat-api] MYSLACK_ENABLED=on nhưng chưa có PostgreSQL: Slack signed ingress tạm tắt.\x1b[0m');
   }
@@ -472,12 +477,13 @@ async function bootstrap() {
     schedules?.runner.start();
     slackInvalidationRunner?.start();
     slackLifecycleRuntime?.start();
+    slackFanoutRuntime?.start();
   });
 
   const shutdown = async () => {
     schedules?.runner.stop();
     if (slackReceiptCleanupTimer) clearInterval(slackReceiptCleanupTimer);
-    await Promise.all([slackInvalidationRunner?.stop(), slackLifecycleRuntime?.stop()]);
+    await Promise.all([slackInvalidationRunner?.stop(), slackLifecycleRuntime?.stop(), slackFanoutRuntime?.stop()]);
     process.exit(0);
   };
   process.once('SIGINT', shutdown);
