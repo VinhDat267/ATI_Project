@@ -6,6 +6,7 @@ import { authStorage } from '../services/auth-storage';
 import { apiClient } from '../services/api-client';
 import { refreshExecutionSnapshot } from '../services/execution-snapshot';
 import { scheduleLabel } from '../services/schedule-text';
+import { refreshSlackConversation } from '../services/slack-read-refresh';
 
 const lastEventSeq = new Map<string, { epoch: string; seq: number }>();
 const fallbackConversationKey = '__no_conversation__';
@@ -62,6 +63,9 @@ export function handleSSEEvent(
     ? store.executionSnapshot : null;
 
   switch (event) {
+    case 'source_changed':
+      if (store.conversationId) void refreshSlackConversation(store.conversationId, true);
+      break;
     case 'schedule_proposal':
     case 'schedule_updated': {
       if (data.conversationId && data.conversationId !== store.conversationId) break;

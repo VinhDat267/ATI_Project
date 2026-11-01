@@ -129,7 +129,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
     finally { newConversation.current = null; }
   };
 
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = async (content: string, options?: { slackConnectionId: string }) => {
     const tempId = `temp-${crypto.randomUUID()}`;
     const pendingConversation = newConversation.current;
     let currentConvId = route.kind === 'conversation' ? route.conversationId : null;
@@ -167,7 +167,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
     if (useChatStore.getState().conversationId === currentConvId) addOptimisticMessage({ id: tempId, content });
 
     try {
-      const result = await apiClient.sendMessage(
+      const result = options?.slackConnectionId ? await apiClient.sendSlackReadMessage(currentConvId, content, tempId, options.slackConnectionId) : await apiClient.sendMessage(
         currentConvId,
         content,
         tempId

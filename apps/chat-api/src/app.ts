@@ -189,6 +189,7 @@ export function createApp(options: AppOptions): Express {
       ...(gmailRoutes ? { gmailEnabled: isGmailAvailable(gmailRoutes) } : {}),
       ...(mycalendarRoutes ? { mycalendarEnabled: isMyCalendarAvailable(mycalendarRoutes) } : {}),
       ...(mysheetsRoutes ? { mysheetsEnabled: isMySheetsAvailable(mysheetsRoutes) } : {}),
+      ...(options.chatService?.hasSlackReads?.() ? { myslackEnabled: true } : {}),
       ...(options.schedules ? { schedulesEnabled: true } : {}) });
   });
 

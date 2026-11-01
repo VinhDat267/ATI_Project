@@ -1,4 +1,4 @@
-import type { AnswerLookup, ScheduleResponse, ScheduleView, ScheduleProposalMetadata } from '@wap/tool-schemas';
+import type { AnswerLookup, ScheduleResponse, ScheduleView, ScheduleProposalMetadata, SlackPlanBindings } from '@wap/tool-schemas';
 export type MessageRole = 'user' | 'assistant' | 'system';
 export interface AuthMessageResponse { message: string }
 export type MessageStatus = 'sending' | 'sent' | 'failed';
@@ -49,6 +49,7 @@ export type MySheetsPickerSession =
 
 export interface ActivePlan {
   connections?: {
+    myslack?: SlackPlanBindings;
     gmail?: { credentialId: string; email: string };
     mycalendar?: {
       credentialId: string;

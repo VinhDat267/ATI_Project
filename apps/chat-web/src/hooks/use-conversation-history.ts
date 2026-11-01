@@ -5,6 +5,7 @@ import { userErrorMessage } from '../services/user-error';
 import { useChatStore, type ChatStoreState } from '../store/chat-store';
 import type { ChatMessage } from '../types';
 import { normalizeConversationMessages } from '../services/conversation-messages';
+import { captureConversationRead } from '../services/conversation-read-guard';
 
 // SSE plan/answer ids can differ from the persisted message id. Correlation
 // identifies the same response without moving replayed history behind new work.
@@ -13,9 +14,14 @@ const messageKey = (message: ChatMessage) => message.metadata?.type === 'plan' &
   : message.metadata?.replyToMessageId ? `${message.metadata.type}:${message.metadata.replyToMessageId}` : message.id;
 
 export async function loadConversationHistory(id: string, isCurrent: () => boolean, expected?: Pick<ChatStoreState, 'messages' | 'planRevision'>) {
+  const ownsRead = captureConversationRead(id);
   const store = useChatStore.getState();
-  const data = await apiClient.getConversation(id);
-  if (!isCurrent()) return;
+  const data = await apiClient.getConversation(id).catch(error => {
+    if (!isCurrent() || !ownsRead()) return null;
+    throw error;
+  });
+  if (!data) return;
+  if (!isCurrent() || !ownsRead()) return;
   if (expected && (useChatStore.getState().messages !== expected.messages || useChatStore.getState().planRevision !== expected.planRevision)) return;
   const hydrateResponse = useChatStore.getState().messages === store.messages &&
     useChatStore.getState().planRevision === store.planRevision;
@@ -47,7 +53,7 @@ export async function loadConversationHistory(id: string, isCurrent: () => boole
   try {
     const revision = useChatStore.getState().planRevision;
     const activePlan = await apiClient.getActivePlan(id);
-    if (!isCurrent()) return;
+    if (!isCurrent() || !ownsRead()) return;
     const current = useChatStore.getState();
     const alreadyExecuted = activePlan?.id && (current.executionSnapshot?.plan.id === activePlan.id ||
       (current.activePlan?.id === activePlan.id && ['executing', 'partial', 'reconciliation_required', 'completed', 'stopped', 'failed'].includes(current.planStatus)));
@@ -57,7 +63,7 @@ export async function loadConversationHistory(id: string, isCurrent: () => boole
       store.setPlanStatus(!status || status === 'pending' ? 'preview' : status === 'approved' ? 'executing' : status);
     }
   } catch { /* A missing pending plan still permits loading durable execution evidence. */ }
-  if (isCurrent()) {
+  if (isCurrent() && ownsRead()) {
     try { await refreshExecutionSnapshot(id); }
     catch { /* Optional snapshot errors use the helper's error state/revision guards; keep loaded detail and preview. */ }
   }
