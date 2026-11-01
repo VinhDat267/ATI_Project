@@ -1,7 +1,7 @@
 # JIRA-03 · Cơ sở dữ liệu và API Quản trị Workspace cá nhân Jira (Tích hợp Workspace Tổ chức Chung)
 
 **Trạng thái:** Đã triển khai và kiểm chứng cục bộ trên nền PR #237; chờ review toàn nhánh, CI của PR và chủ dự án review/merge. Không bật runtime Jira.
-**Nhiệm vụ:** Xây dựng additive migration `0016_jira_workspaces.sql` tích hợp trên nền migration `0015_workspaces.sql` của PR #237 (`2c62565f`), repository nghiệp vụ mô đun hóa (`WorkspaceRepo` façade), route handlers quản trị workspace, bootstrap admin nguyên tử hoặc kích hoạt Jira cho tổ chức hiện hữu, hệ thống invite bảo mật với token 256-bit lưu duy nhất băm SHA-256, gia nhập có điều kiện kết nối danh tính Atlassian server-side và thành viên tổ chức active, kiểm tra đồng thời hai lớp quyền (tổ chức + Jira), SQL CAS duyệt/từ chối/loại bỏ thành viên chống race condition và write-skew, cô lập mọi đường dẫn hội thoại theo cờ bền vững `jira_context` và workspace bất biến, và chính sách fail-closed cho liên kết Jira site/project trước khi nối native verifier tại JIRA-05.
+**Nhiệm vụ:** Xây dựng additive migration `0017_jira_workspaces.sql` tích hợp trên nền migration `0015_workspaces.sql` của PR #237 (`2c62565f`), repository nghiệp vụ mô đun hóa (`WorkspaceRepo` façade), route handlers quản trị workspace, bootstrap admin nguyên tử hoặc kích hoạt Jira cho tổ chức hiện hữu, hệ thống invite bảo mật với token 256-bit lưu duy nhất băm SHA-256, gia nhập có điều kiện kết nối danh tính Atlassian server-side và thành viên tổ chức active, kiểm tra đồng thời hai lớp quyền (tổ chức + Jira), SQL CAS duyệt/từ chối/loại bỏ thành viên chống race condition và write-skew, cô lập mọi đường dẫn hội thoại theo cờ bền vững `jira_context` và workspace bất biến, và chính sách fail-closed cho liên kết Jira site/project trước khi nối native verifier tại JIRA-05.
 **Quyền lực chuẩn tắc:**
 - Bổ sung thiết kế tích hợp: [Jira dùng workspace tổ chức chung](../../superpowers/specs/2026-11-02-jira-shared-workspace-amendment.md) (Quyết định ngày 02/11/2026 của chủ dự án).
 - Thiết kế nền tảng Jira: [Đặc tả Jira cá nhân và workspace ATI](../../superpowers/specs/2026-10-30-jira-personal-workspaces-design.md) (Mục 4–9 và 11).
@@ -21,7 +21,7 @@ Thực thi quyết định của chủ dự án ngày 02/11/2026: **Dùng worksp
 Bảng `ati_workspaces` của Jira trở thành phần mở rộng chính sách (policy extension) có khóa chính đồng thời là khóa ngoại tham chiếu `workspaces(id)` từ PR #237; không tự sinh UUID hoặc tổ chức thứ hai. Mọi quyền Jira yêu cầu đồng thời hai lớp thành viên (`workspace_members` active VÀ `ati_workspace_memberships` active). Hội thoại tổ chức thông thường giữ nguyên hoạt động; hội thoại Jira được gắn cờ bền vững `jira_context = true` bất biến sau khi tạo, kiểm tra nghiêm ngặt hai lớp quyền và tuân thủ ranh giới sẵn sàng 503 ở môi trường production cho tới khi hoàn tất JIRA-05/08.
 
 ### 1.2. Phạm vi bao gồm (Scope In):
-1. **Additive Migration (`db/v3/0016_jira_workspaces.sql`):**
+1. **Additive Migration (`db/v3/0017_jira_workspaces.sql`):**
    - Đặt sau `0015_workspaces.sql` của PR #237.
    - Bảng `ati_workspaces`: `id UUID PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE`, `slug` unique, `status` (`active`, `archived`), `version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0)`, `created_by UUID REFERENCES users(id)`. Tên tổ chức đọc trực tiếp từ `workspaces.name` (không nhân bản tên, tránh lỗi thời).
    - Bảng `ati_workspace_memberships`: PK kép `(workspace_id, user_id)`, `workspace_id REFERENCES ati_workspaces(id) ON DELETE CASCADE`, `user_id REFERENCES users(id) ON DELETE CASCADE`, `role` (`admin`, `member`), `status` (`pending`, `active`, `rejected`, `removed`), CAS `version`, `requested_at`, `decided_at`, `decided_by`.
@@ -108,7 +108,7 @@ Bảng `ati_workspaces` của Jira trở thành phần mở rộng chính sách 
 
 | File | Hành động | Mục đích |
 |---|---|---|
-| `db/v3/0016_jira_workspaces.sql` | Tạo mới | Additive migration: `ati_workspaces` (FK đến `workspaces.id`), 8 bảng Jira liên kết, `conversations.jira_context`, trigger bất biến, composite FKs, partial unique indexes |
+| `db/v3/0017_jira_workspaces.sql` | Tạo mới | Additive migration: `ati_workspaces` (FK đến `workspaces.id`), 8 bảng Jira liên kết, `conversations.jira_context`, trigger bất biến, composite FKs, partial unique indexes |
 | `apps/chat-api/src/db/repositories/workspace/workspace-core-repo.ts` | Tạo mới | Tạo atomic org+Jira, enable Jira cho org hiện hữu, archive, recovery, listing workspace Jira |
 | `apps/chat-api/src/db/repositories/workspace/workspace-membership-repo.ts` | Tạo mới | CAS quyết định thành viên, khóa cấp workspace, bảo vệ last admin, chống self-approve, re-validate org membership |
 | `apps/chat-api/src/db/repositories/workspace/workspace-invite-repo.ts` | Tạo mới | Sinh invite 256-bit (hash-only), join kiểm tra connected account VÀ org membership, clock_timestamp monotonic rejoin rule |
@@ -125,8 +125,8 @@ Bảng `ati_workspaces` của Jira trở thành phần mở rộng chính sách 
 | `apps/chat-api/src/routes/schedule-routes.ts` | Cập nhật | Áp dụng guard `conversation-access` cho các thao tác schedule theo convId |
 | `apps/chat-api/src/app.ts` | Cập nhật | Wire `workspaceRepo` và đăng ký routes Jira workspace bên cạnh routes PR #237 |
 | `apps/chat-api/src/server.ts` | Cập nhật | Khởi tạo `WorkspaceRepo` với PostgreSQL pool và truyền vào `createApp` |
-| `apps/chat-api/tests/helpers/jira-test-db.ts` | Tạo mới | Test helper cho JIRA-03: nạp migration 0001–0016, hỗ trợ cổng 56534 hoặc CI loopback 5432 (từ chối 55533) |
-| `apps/chat-api/tests/db/jira-workspace-migration.test.ts` | Tạo mới | Kiểm thử PostgreSQL thật: idempotence migration 0001–0016, composite FKs, partial unique indexes, trigger bất biến `jira_context` |
+| `apps/chat-api/tests/helpers/jira-test-db.ts` | Tạo mới | Test helper cho JIRA-03: nạp migration 0001–0017, hỗ trợ cổng 56534 hoặc CI loopback 5432 (từ chối 55533) |
+| `apps/chat-api/tests/db/jira-workspace-migration.test.ts` | Tạo mới | Kiểm thử PostgreSQL thật: idempotence migration 0001–0017, composite FKs, partial unique indexes, trigger bất biến `jira_context` |
 | `apps/chat-api/tests/db/jira-workspace-repo.test.ts` | Tạo mới | Kiểm thử PostgreSQL thật: atomic create, enable existing org, 2 admin CAS có barrier, bảo vệ last admin, join clock_timestamp |
 | `apps/chat-api/tests/routes/jira-workspaces.test.ts` | Tạo mới | Kiểm thử API routes: system-admin create, enable route, private listing, invite secret 1 lần, site config fail-closed, 404 hidden |
 | `apps/chat-api/tests/routes/jira-workspace-conversations.test.ts` | Tạo mới | Kiểm thử cô lập hội thoại: tạo atomic có cờ Jira, stream, execution, schedule guards, bảo vệ legacy NULL và org bình thường |
@@ -140,7 +140,7 @@ Bảng `ati_workspaces` của Jira trở thành phần mở rộng chính sách 
 - [x] **Enable Jira on Existing Organization:** Endpoint `POST /api/admin/jira-workspaces/:workspaceId/enable` cho phép System Admin kiêm Org Admin bật Jira; trả về 409 Conflict nếu đã bật; không tự ý reset membership hoặc version.
 - [x] **Organization Auto-Join Isolation:** Tổ chức có `require_approval = false` không tự động cấp quyền Jira; gia nhập Jira bắt buộc qua invite token Jira và kiểm tra danh tính Atlassian server-side.
 - [x] **Jira Invite Precondition:** Gia nhập Jira qua invite token bắt buộc caller đã là thành viên active của tổ chức; người ngoài tổ chức không thể gia nhập Jira.
-- [x] **Migration Idempotence & Schema:** `0016_jira_workspaces.sql` chạy an toàn sau `0015_workspaces.sql`, chạy lặp lại nhiều lần không lỗi; mọi bảng có check constraints, composite FK `(workspace_id, site_id, cloud_id)`, và partial unique indexes.
+- [x] **Migration Idempotence & Schema:** `0017_jira_workspaces.sql` chạy an toàn sau `0015_workspaces.sql`, chạy lặp lại nhiều lần không lỗi; mọi bảng có check constraints, composite FK `(workspace_id, site_id, cloud_id)`, và partial unique indexes.
 - [x] **Dual Active Account Protection:** Ràng buộc partial unique trên `jira_accounts` ngăn chặn việc gán cùng 1 Atlassian account active cho 2 người dùng ATI khác nhau.
 - [x] **Independent Project Policy Version:** Mỗi project row có `policy_version` dương riêng biệt, quản lý độc lập với site version.
 - [x] **Conversation Jira Context Immutability:** Cột `jira_context` trong `conversations` là bất biến sau khi tạo; không thể nâng cấp hội thoại legacy/personal/tổ chức cũ thành hội thoại Jira; ràng buộc check bảo đảm `jira_context = true` chỉ khi ở mode organization.
@@ -191,10 +191,14 @@ DATABASE_URL="$TEST_DATABASE_URL" npm run check
   - Scoped reviews: spec PASS, quality PASS.
   *(Lưu ý: Bằng chứng trên chỉ là baseline pre-237, không phải kết quả nghiệm thu cuối cùng sau tích hợp).*
 - **Kết quả sau tích hợp PR #237 (`2c62565f`):** cùng `workspaces.id`, chính sách và duyệt Jira độc lập; tên tổ chức đọc từ bảng chung. API Jira dùng tiền tố riêng; API workspace tổ chức của #237 giữ nguyên. Tạo/bật Jira, bootstrap/recovery, invite, CAS, site/project và audit đã triển khai. Hội thoại có dấu `jira_context` bất biến; hội thoại tổ chức thường không yêu cầu quyền Jira. Jira opt-in vẫn trả 503 trong server.
-- **Bằng chứng chạy thật:** `node db/v3/migrate.mjs` áp dụng 0001–0016, exit 0; `npm run typecheck:v3`, exit 0; `npm run check`, exit 0: 3.259 test v3 (API 1.130, web 909, schemas 341, adapters 456, planner 381, executor 42), 406 eval, 32 Node probe Jira, 1 launcher và 66 Node/env checks; build/security đạt. Không có test bỏ qua trong lượt check này.
-- **Đột biến:** 12/12 bị bắt bằng assertion nghiệp vụ; mỗi ca có control xanh, khôi phục đúng byte/SHA-256 và control sau khôi phục xanh. Gồm định danh tổ chức, trigger bất biến, cờ Jira, danh tính đã kết nối, invite mới sau quyết định, admin hiệu lực cuối, thiếu native verifier, 404 riêng tư, cổng 503, user bị khóa trong lúc chờ, hạn invite sau chờ khóa và membership tổ chức. Ca thiếu verifier là đột biến tổng hợp được ghi rõ, không gọi Jira thật.
+- **Bằng chứng chạy thật:** `node db/v3/migrate.mjs` áp dụng 0001–0017, exit 0; `npm run typecheck:v3`, exit 0; `npm run check`, exit 0: 3.278 test v3 (API 1.143, web 911, schemas 341, adapters 460, planner 381, executor 42), 406 eval, 32 Node probe Jira, 1 launcher và 66 Node/env checks; build/security đạt. Không có test bỏ qua trong lượt check này.
+- **Đột biến:** 13/13 bị bắt bằng assertion nghiệp vụ; mỗi ca có control xanh, khôi phục đúng byte/SHA-256 và control sau khôi phục xanh. Gồm định danh tổ chức, trigger bất biến, cờ Jira, danh tính đã kết nối, invite mới sau quyết định, admin hiệu lực cuối, thiếu native verifier, 404 riêng tư, cổng 503, user bị khóa trong lúc chờ, hạn invite sau chờ khóa và membership tổ chức. Ca thiếu verifier là đột biến tổng hợp được ghi rõ, không gọi Jira thật.
 - **Review môđun độc lập:** database/core/API, hội thoại và site/project đều spec PASS, quality APPROVED, không có lỗi Critical/Important còn mở. Comment đường dẫn cũ đã sửa; guard schedule ở app luôn được cấp repository/authority, unit test thuần service có thể không cấp các dependency đó.
 - **Sửa lỗi tìm thấy khi tích hợp:** scopeArg bị bỏ qua khi tiêu đề undefined; status quyền được kiểm tra sai thứ tự; tên/trạng thái Jira bị lộ sau gỡ quyền tổ chức; conflict bật Jira trước kiểm tra quyền; pool lỗi vẫn được truyền khi chuyển memory fallback; các fixture cũ thiếu membership/header/scope tổ chức. Tất cả có hồi quy thật; không nới guard để làm test xanh.
 - **Git/PR:** nhánh `longnguyen005/jira-03-workspaces`; checkpoint nguồn `fe061bb`, `322d799`. Commit tích hợp, kết quả review toàn nhánh và CI/browser trên SHA cuối được ghi ở PR. Chủ dự án tự review và merge; không sửa `CURRENT-STATE.md` hoặc `ROADMAP.md` trong PR này.
 - **Giới hạn:** chưa triển khai OAuth token transport JIRA-04, native verifier/policy runtime JIRA-05, planner/executor Jira hoặc UI/live JIRA-06–11. Không có thao tác ghi Jira thật và không bật tính năng. Giữ nguyên 33 tools/8 services.
 - **Nhật ký:** [bằng chứng và quyết định tích hợp](../log/2026-11-02-jira-03-shared-workspaces.md).
+
+### Tích hợp tiếp main #238
+
+Main `86b432f` bổ sung Sheets v2 và migration `0016_sheets_automation_and_digest.sql`. Jira chuyển sang `0017_jira_workspaces.sql`; route xác nhận lịch giữ guard quyền trước validation và chuyển tiếp `approvalMode`. Năm hồi quy PostgreSQL/HTTP kiểm tra `auto_digest`, thu hồi quyền Jira/tổ chức và thứ tự lỗi. `npm run check` sau tích hợp đạt 3.278 v3 + 406 eval; migrations 0001–0017 và typecheck đạt; 13/13 đột biến bị bắt, gồm guard xác nhận lịch Sheets/Jira, khôi phục byte/SHA và chạy xanh lại. Review toàn nhánh và CI đúng head cuối xem PR #240.

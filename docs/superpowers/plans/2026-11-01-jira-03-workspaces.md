@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Parent Codex runs commands and captures real test output before and after each phase.
 
-**Goal:** Xây dựng hạ tầng cơ sở dữ liệu PostgreSQL (migration `0016_jira_workspaces.sql`) tích hợp trên nền migration `0015_workspaces.sql` của PR #237 (`2c62565f`), repository nghiệp vụ mô đun hóa (`WorkspaceRepo` façade), API routes quản trị workspace ATI, lời mời 256-bit lưu băm SHA-256, gia nhập qua danh tính Atlassian server-side và thành viên tổ chức, kiểm tra đồng thời hai lớp quyền (tổ chức + Jira), SQL CAS duyệt thành viên chống write-skew/race condition, cô lập toàn diện mọi đường dẫn hội thoại theo cờ bền vững `jira_context` và workspace bất biến, và chính sách fail-closed cho liên kết Jira site/project.
+**Goal:** Xây dựng hạ tầng cơ sở dữ liệu PostgreSQL (migration `0017_jira_workspaces.sql`) tích hợp trên nền migration `0015_workspaces.sql` của PR #237 (`2c62565f`), repository nghiệp vụ mô đun hóa (`WorkspaceRepo` façade), API routes quản trị workspace ATI, lời mời 256-bit lưu băm SHA-256, gia nhập qua danh tính Atlassian server-side và thành viên tổ chức, kiểm tra đồng thời hai lớp quyền (tổ chức + Jira), SQL CAS duyệt thành viên chống write-skew/race condition, cô lập toàn diện mọi đường dẫn hội thoại theo cờ bền vững `jira_context` và workspace bất biến, và chính sách fail-closed cho liên kết Jira site/project.
 
 **Architecture:** Áp dụng mô hình kiến trúc phân lớp sạch (Clean Architecture) kết hợp thiết kế Workspace tổ chức chung (Quyết định ngày 02/11/2026):
 - Tầng lưu trữ PostgreSQL: `ati_workspaces` là **phần mở rộng chính sách (policy extension)** có khóa chính đồng thời là khóa ngoại tham chiếu `workspaces(id)` từ PR #237 (cùng một UUID, không sinh tổ chức thứ hai); `conversations.jira_context` là cờ boolean bền vững phân định hội thoại Jira và hội thoại tổ chức thông thường; trigger SQL bảo vệ tính bất biến; thứ tự khóa deterministic (`JIRA_SQL_LOCK_HIERARCHY`) chống deadlock.
@@ -24,8 +24,8 @@
 ## Kết quả thực thi 02/11/2026
 
 - [x] Tasks 1–5: schema cùng UUID, repository/quyền hai lớp, site/project, hội thoại và API tích hợp trên main #237.
-- [x] Task 6 local: migrations 0001–0016, typecheck và npm run check exit 0 (3.259 v3 + 406 eval + các kiểm tra Node/launcher/build).
-- [x] 12/12 đột biến: control xanh, assertion bắt mutant, khôi phục byte/SHA và control xanh lại; ba review môđun độc lập PASS/APPROVED.
+- [x] Task 6 local: migrations 0001–0017, typecheck và npm run check exit 0 (3.278 v3 + 406 eval + các kiểm tra Node/launcher/build).
+- [x] 13/13 đột biến: control xanh, assertion bắt mutant, khôi phục byte/SHA và control xanh lại; ba review môđun độc lập PASS/APPROVED.
 - [x] Điền kết quả task card và một nhật ký mới: docs/handoff/log/2026-11-02-jira-03-shared-workspaces.md.
 - [ ] Review toàn nhánh mới và CI/browser đúng head cuối; ghi kết quả vào PR sau push.
 - [ ] Chủ dự án review/merge; không tự merge, không bắt đầu JIRA-04.
@@ -110,7 +110,7 @@ Các bước bên dưới giữ kịch bản TDD để đối chiếu; kết qu�
 ATI_Project/
 ├── db/v3/
 │   ├── 0015_workspaces.sql                 # PR #237: Bảng workspaces, workspace_members, conversations.workspace_id
-│   └── 0016_jira_workspaces.sql            # Additive migration: ati_workspaces (FK workspaces.id), 8 bảng Jira, conversations.jira_context
+│   └── 0017_jira_workspaces.sql            # Additive migration: ati_workspaces (FK workspaces.id), 8 bảng Jira, conversations.jira_context
 ├── apps/chat-api/
 │   ├── src/
 │   │   ├── auth/
@@ -136,9 +136,9 @@ ATI_Project/
 │   │   └── server.ts                        # Khởi tạo WorkspaceRepo với PG pool
 │   └── tests/
 │       ├── helpers/
-│       │   └── jira-test-db.ts              # Helper DB: nạp migration 0001–0016, hỗ trợ port 56534 hoặc CI 5432 (từ chối 55533)
+│       │   └── jira-test-db.ts              # Helper DB: nạp migration 0001–0017, hỗ trợ port 56534 hoặc CI 5432 (từ chối 55533)
 │       ├── db/
-│       │   ├── jira-workspace-migration.test.ts  # Test migration idempotence 0001–0016, trigger bất biến jira_context, composite FKs
+│       │   ├── jira-workspace-migration.test.ts  # Test migration idempotence 0001–0017, trigger bất biến jira_context, composite FKs
 │       │   └── jira-workspace-repo.test.ts       # Test CAS concurrency (2 clients + barrier), atomic create, enable existing org
 │       └── routes/
 │           ├── jira-workspaces.test.ts           # Test API endpoints /api/jira-workspaces, enable org, join preconditions
@@ -159,7 +159,7 @@ ATI_Project/
 
 ### Task 1: Additive Migration 0016 & Database Schema Constraints
 
-**Mục tiêu:** Tạo migration file `db/v3/0016_jira_workspaces.sql` tích hợp trên nền `0015_workspaces.sql` của PR #237:
+**Mục tiêu:** Tạo migration file `db/v3/0017_jira_workspaces.sql` tích hợp trên nền `0015_workspaces.sql` của PR #237:
 - Định nghĩa bảng `ati_workspaces` là policy extension với `id UUID PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE`.
 - 8 bảng Jira đi kèm (`ati_workspace_memberships`, `ati_workspace_invites`, `jira_accounts`, `jira_oauth_grants`, `jira_grant_sites`, `ati_workspace_jira_sites`, `ati_workspace_jira_projects`, `jira_authorization_audit`).
 - Bổ sung `conversations.jira_context BOOLEAN NOT NULL DEFAULT false` kèm ràng buộc check `CHECK ((jira_context = false) OR (workspace_mode = 'organization' AND workspace_id IS NOT NULL))`.
@@ -169,7 +169,7 @@ ATI_Project/
 **Files:**
 - Create: `apps/chat-api/tests/helpers/jira-test-db.ts`
 - Create: `apps/chat-api/tests/db/jira-workspace-migration.test.ts`
-- Create: `db/v3/0016_jira_workspaces.sql`
+- Create: `db/v3/0017_jira_workspaces.sql`
 
 - [ ] **Step 1.1: Tạo helper `jira-test-db.ts` và viết test failing cho migration**
   Tạo `apps/chat-api/tests/helpers/jira-test-db.ts`: Cho phép `DATABASE_URL` cổng local `56534` hoặc CI loopback `5432` (`ati_v3`), từ chối `55533` và remote host. Nạp toàn bộ migration `0001` tới `0016`.
@@ -187,9 +187,9 @@ ATI_Project/
   ```bash
   DATABASE_URL="$TEST_DATABASE_URL" RUNTIME_MODE=sandbox npm test -w @wap/chat-api -- tests/db/jira-workspace-migration.test.ts
   ```
-  Kỳ vọng: FAIL vì chưa có file `db/v3/0016_jira_workspaces.sql` hoặc schema chưa khớp.
+  Kỳ vọng: FAIL vì chưa có file `db/v3/0017_jira_workspaces.sql` hoặc schema chưa khớp.
 
-- [ ] **Step 1.3: Tạo file migration `db/v3/0016_jira_workspaces.sql`**
+- [ ] **Step 1.3: Tạo file migration `db/v3/0017_jira_workspaces.sql`**
   Viết mã SQL idempotent hoàn chỉnh đáp ứng toàn bộ đặc tả ở trên.
 
 - [ ] **Step 1.4: Chạy test để Parent Codex ghi nhận GREEN**
@@ -588,3 +588,7 @@ export async function assertConversationAccess(
 - [ ] **Step 6.5: Cập nhật Task Card kết quả sau tích hợp**
   - Parent Codex điền mục "Kết quả" trong `docs/handoff/tasks/JIRA-03-workspaces.md`.
   - Không chỉnh sửa `docs/handoff/CURRENT-STATE.md` và `docs/handoff/ROADMAP.md` (chỉ reviewer cập nhật sau khi merge PR).
+
+## Tích hợp main #238 trước PR
+
+Base cuối `86b432f`: giữ logic approvalMode của Sheets cùng guard Jira trước mọi xác nhận lịch; migration Jira đánh số 0017 sau Sheets 0016. Thêm `tests/routes/jira-sheets-schedule-compat.test.ts` (5 ca) và đột biến thứ 13 cho guard xác nhận lịch. Toàn bộ check 3.278 v3/406 eval đạt; kết quả review toàn nhánh và CI head cuối được ghi trong PR #240.

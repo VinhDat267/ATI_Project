@@ -36,6 +36,7 @@ export interface ChatMessage {
     reason?: string; suggestion?: string; unavailableServices?: Array<{ id: string; name: string }>;
     options?: string[]; context?: string; lookups?: AnswerLookup[]; usedDirectory?: string[];
     proposal?: ScheduleResponse; schedule?: ScheduleView; previous?: ScheduleProposalMetadata['previous']; services?: string[]; nextRuns?: string[];
+    digestCandidate?: ScheduleProposalMetadata['digestCandidate'];
     scheduleId?: string | null; baseVersion?: number | null; runId?: string; name?: string; dueAt?: string; trigger?: string };
 }
 
@@ -63,6 +64,7 @@ export interface PersonalSpreadsheetItem {
   id: string;
   title: string;
   canEdit: boolean;
+  sheets?: string[];
 }
 
 export type MySheetsPickerSession =

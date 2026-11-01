@@ -32,5 +32,5 @@ export function scheduleLabel(s: ScheduleView): string {
 export function runLabel(run: ScheduleRunView): string {
   if (run.state === 'approved') return ({ executing: 'Đang chạy', approved: 'Đang chạy', completed: 'Đã xong', partial: 'Xong một phần', failed: 'Có lỗi', stopped: 'Đã dừng', reconciliation_required: 'Cần đối soát' } as Record<string, string>)[run.planStatus ?? ''] ?? 'Đang chạy';
   if (run.state === 'missed') return run.missedCount > 1 ? `Đã lỡ ${run.missedCount} lượt` : 'Đã lỡ';
-  return ({ planning: 'Đang lập kế hoạch', awaiting_approval: 'Chờ bạn duyệt', expired: 'Hết hạn duyệt', rejected: 'Bạn đã hủy kế hoạch', needs_attention: 'Cần bạn xem', planning_failed: 'Không lập được kế hoạch', interrupted: 'Bị gián đoạn', discarded: 'Đã bỏ vì lịch thay đổi', blocked: 'Bị chặn' } as Record<string, string>)[run.state];
+  return ({ planning: 'Đang lập kế hoạch', awaiting_approval: 'Chờ bạn duyệt', expired: 'Hết hạn duyệt', rejected: 'Bạn đã hủy kế hoạch', needs_attention: 'Cần bạn xem', planning_failed: 'Không lập được kế hoạch', interrupted: 'Bị gián đoạn', discarded: 'Đã bỏ vì lịch thay đổi', blocked: 'Bị chặn', digest_sent: 'Đã tự gửi báo cáo', digest_failed: 'Gửi báo cáo thất bại' } as Record<string, string>)[run.state];
 }

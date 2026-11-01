@@ -141,7 +141,14 @@ export interface ChatServiceOptions {
   /** The caller's active Trello connection lookup; absent when Trello is off or not connected. */
   trelloConnection?: (userId: string, scopeId?: string) => Promise<any>;
   /** Scheduled workflows (SCHEDULES_ENABLED); absent, conversations have no schedule. */
-  schedules?: { repo: ScheduleRepo; timeZone: string; now?: () => Date };
+  schedules?: {
+    repo: ScheduleRepo;
+    timeZone: string;
+    now?: () => Date;
+    credentialRepo?: any;
+    encryptionKey?: string;
+    mysheetsEnabled?: boolean;
+  };
   /** Optional adapter retriever or tool executor for live resource validation in planning. */
   getAdapter?: (serviceName: string, context?: any) => Promise<any> | any;
   lookupTool?: (userId: string, tool: string, args: Record<string, unknown>, context?: { signal?: AbortSignal }) => Promise<unknown>;
@@ -545,8 +552,34 @@ export class ChatService {
     const runs = recurrence && proposal.action !== 'pause' && proposal.action !== 'cancel'
       ? nextRuns(recurrence, this.schedules.now?.() ?? new Date(), this.schedules.timeZone).map((date) => date.toISOString()) : [];
     const current = proposal.action === 'create' ? null : schedule;
-    return { type: 'schedule_proposal', proposal, services, nextRuns: runs, scheduleId: current?.id ?? null, baseVersion: current?.version ?? null,
-      previous: current ? { name: current.name, request: current.request, recurrence: current.recurrence, status: current.status } : null };
+    let digestCandidate: ScheduleProposalMetadata['digestCandidate'] | undefined;
+    if (
+      (proposal.action === 'create' || proposal.action === 'update') &&
+      proposal.request &&
+      (services.includes('mysheets') || services.includes('sheets')) &&
+      this.schedules.credentialRepo &&
+      this.schedules.encryptionKey
+    ) {
+      const { analyzeSheetsDigestCandidate } = await import('./schedules/sheets-digest-candidate.js');
+      digestCandidate = await analyzeSheetsDigestCandidate({
+        userId: actor.userId,
+        request: proposal.request,
+        services,
+        credentialRepo: this.schedules.credentialRepo,
+        encryptionKey: this.schedules.encryptionKey,
+        mysheetsEnabled: this.schedules.mysheetsEnabled,
+      });
+    }
+    return {
+      type: 'schedule_proposal',
+      proposal,
+      services,
+      nextRuns: runs,
+      scheduleId: current?.id ?? null,
+      baseVersion: current?.version ?? null,
+      previous: current ? { name: current.name, request: current.request, recurrence: current.recurrence, status: current.status } : null,
+      ...(digestCandidate ? { digestCandidate } : {}),
+    };
   }
 
   private async actorForConversation(

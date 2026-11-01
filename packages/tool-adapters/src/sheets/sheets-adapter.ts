@@ -3,16 +3,21 @@ import { GoogleServiceAccount, type GoogleServiceAccountCredentials } from '../g
 import { SHEETS_MAX_CELL_CHARS, SHEETS_MAX_COLUMNS, clipText } from '../bounds.js';
 import {
   a1,
+  applySmartReadTransform,
   badResponse,
   bounded,
+  filterDuplicateRows,
   invalid,
   queryText,
+  resolveDeduplicationPolicy,
+  resolveReadRange,
   safeRows,
   sharedLimiter,
   SHEETS_API_BASE,
   spreadsheetPattern,
   spreadsheetUrl,
   titleText,
+  validateRawRows,
 } from './sheets-shared.js';
 
 export interface SheetsAdapterConfig extends BaseAdapterConfig {
@@ -115,11 +120,14 @@ export class SheetsAdapter extends BaseAdapter {
       return (await this.tabs(id, signal)).filter(tab => tab.title.toLowerCase().includes(query)).slice(0, limit);
     }
     if (toolName === 'sheets.read_range') {
-      const id = this.checkedId(args.spreadsheetId); const range = a1(args.range); const limit = bounded(args.limit, 50);
-      const value = await this.request(id + '/values/' + encodeURIComponent(range), signal);
+      const id = this.checkedId(args.spreadsheetId);
+      const limit = bounded(args.limit, 50);
+      const resolved = resolveReadRange(args.range, { limit, tail: args.tail, headerAware: args.headerAware });
+      const fetchLimit = resolved.isTail ? 500 : limit;
+      const value = await this.request(id + '/values/' + encodeURIComponent(resolved.apiRange), signal);
       if (typeof value?.range !== 'string' || (value.values !== undefined && (!Array.isArray(value.values) || value.values.some((row: unknown) => !Array.isArray(row))))) badResponse();
       let truncated = false;
-      const values = (value.values ?? []).slice(0, limit).map((row: unknown[]) => {
+      const values = (value.values ?? []).slice(0, fetchLimit).map((row: unknown[]) => {
         if (row.length > SHEETS_MAX_COLUMNS) truncated = true;
         return row.slice(0, SHEETS_MAX_COLUMNS).map(cell => {
           const clipped = clipText(cell == null ? '' : String(cell), SHEETS_MAX_CELL_CHARS);
@@ -127,16 +135,46 @@ export class SheetsAdapter extends BaseAdapter {
           return clipped.text;
         });
       });
-      return { range: value.range, values, ...(truncated ? { truncated: true } : {}) };
+      return applySmartReadTransform(value.range, values, resolved, limit, truncated);
     }
     if (toolName === 'sheets.append_rows') {
-      const id = this.checkedId(args.spreadsheetId); const sheet = titleText(args.sheet); const rows = safeRows(args.rows);
+      const id = this.checkedId(args.spreadsheetId);
+      const sheet = titleText(args.sheet);
+      const rawRows = validateRawRows(args.rows);
+      const dedupPolicy = resolveDeduplicationPolicy(rawRows, args);
       const tabs = await this.tabs(id, signal);
       if (!tabs.some(tab => tab.title === sheet)) throw new StepError({ message: 'Sheets tab not found in the allowed spreadsheet', category: 'NOT_FOUND', statusCode: 404 });
+      const quotedSheet = /\s|'/.test(sheet) ? "'" + sheet.replaceAll("'", "''") + "'" : sheet;
       const range = "'" + sheet.replaceAll("'", "''") + "'!A1";
+      let rowsToWrite = rawRows;
+      let skippedDuplicates = 0;
+      if (dedupPolicy.enabled) {
+        const readRange = `${quotedSheet}!A1:Z500`;
+        const existingData = await this.request(id + '/values/' + encodeURIComponent(readRange), signal);
+        const existingRows = Array.isArray(existingData?.values) ? existingData.values : [];
+        const filtered = filterDuplicateRows(rawRows, existingRows, dedupPolicy.keyColumns);
+        rowsToWrite = filtered.newRows;
+        skippedDuplicates = filtered.skippedDuplicates;
+        if (rowsToWrite.length === 0) {
+          return {
+            spreadsheetId: id,
+            updatedRange: `${quotedSheet}!A1`,
+            updatedRows: 0,
+            skippedDuplicates,
+            url: this.url(id),
+          };
+        }
+      }
+      const rows = safeRows(rowsToWrite);
       const value = await this.request(id + '/values/' + encodeURIComponent(range) + ':append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS', signal, { majorDimension: 'ROWS', values: rows });
       if (value?.spreadsheetId !== id || typeof value.updates?.updatedRange !== 'string' || !Number.isInteger(value.updates?.updatedRows) || value.updates.updatedRows < 0) badResponse(true);
-      return { spreadsheetId: id, updatedRange: value.updates.updatedRange, updatedRows: value.updates.updatedRows, url: this.url(id) };
+      return {
+        spreadsheetId: id,
+        updatedRange: value.updates.updatedRange,
+        updatedRows: value.updates.updatedRows,
+        ...(dedupPolicy.enabled ? { skippedDuplicates } : {}),
+        url: this.url(id),
+      };
     }
     return invalid('tool is unsupported');
   }

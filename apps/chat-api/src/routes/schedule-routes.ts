@@ -85,8 +85,20 @@ export function createScheduleRoutes(options: ScheduleRoutesOptions): Router {
         }
       );
     }
+    const rawMode = req.body?.approvalMode;
+    if (rawMode !== undefined && rawMode !== 'manual' && rawMode !== 'auto_digest') {
+      res.status(400).json({ error: { code: 'BAD_REQUEST', message: 'Chế độ xác nhận lịch không hợp lệ.' } });
+      return;
+    }
     const scope = req.workspace ? { workspaceMode: req.workspace.mode, workspaceId: req.workspace.workspaceId } : undefined;
-    const change = await service.confirmProposal({ userId, convId, messageId: String(req.params.messageId), now: now(), scope });
+    const change = await service.confirmProposal({
+      userId,
+      convId,
+      messageId: String(req.params.messageId),
+      now: now(),
+      scope,
+      ...(rawMode ? { approvalMode: rawMode } : {}),
+    });
     await announce(change);
     res.json({ schedule: change.schedule });
   }));

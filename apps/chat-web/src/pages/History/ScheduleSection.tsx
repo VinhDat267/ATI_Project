@@ -7,7 +7,7 @@ import { describeRecurrence, formatRunTime, runLabel, scheduleLabel } from '../.
 import { ScheduleActions } from '../Cockpit/ScheduleActions';
 
 function RunLink({ run, navigate }: { run: ScheduleRunView; navigate: (path: string) => void }) {
-  return <><span>{formatRunTime(run.dueAt)} · </span>{run.convId ? <a className="underline text-[#FF5701]" href={`/c/${run.convId}`} onClick={event => { if (event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); navigate(`/c/${run.convId}`); }}>{runLabel(run)}</a> : <span>{runLabel(run)}</span>}{run.error && <p className="text-xs text-[#6B7280]">{run.error}</p>}</>;
+  return <><span>{formatRunTime(run.dueAt)} · </span>{run.convId ? <a className="underline text-[#FF5701]" href={`/c/${run.convId}`} onClick={event => { if (event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); navigate(`/c/${run.convId}`); }}>{runLabel(run)}</a> : <span>{runLabel(run)}</span>}{run.delivery && <span className="text-xs text-[#6B7280]"> ({run.delivery.spreadsheetTitle} → {run.delivery.targetLabel ?? run.delivery.targetId})</span>}{run.error && <p className="text-xs text-[#6B7280]">{run.error}</p>}</>;
 }
 function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: ScheduleView; navigate: (path: string) => void; reload: () => Promise<void>; onChanged: (schedule: ScheduleView) => void }) {
   const [open, setOpen] = useState(false), [runs, setRuns] = useState<ScheduleRunView[]>([]), [error, setError] = useState('');

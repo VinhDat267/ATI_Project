@@ -14,7 +14,7 @@ Chi phí của các lựa chọn triển khai: người dùng phải được du
 
 ## Mã thay đổi
 
-- Migration `0016_jira_workspaces.sql`: phần chính sách cùng UUID, membership/invite, account/grant/site/project/audit, chỉ mục identity active, version và composite FK; cờ hội thoại và trigger bất biến. Giữ migration #237 chạy trước để backfill an toàn.
+- Migration `0017_jira_workspaces.sql`: phần chính sách cùng UUID, membership/invite, account/grant/site/project/audit, chỉ mục identity active, version và composite FK; cờ hội thoại và trigger bất biến. Giữ migration #237 chạy trước để backfill an toàn.
 - Repository `apps/chat-api/src/db/repositories/workspace/`: transaction/authority hiện tại, bootstrap/recovery, SQL CAS, last effective admin, token 256-bit lưu hash, DB clock sau mọi chờ khóa và so sánh timestamp trong PostgreSQL.
 - API, app/server và authority hội thoại: hai lớp quyền, rate limit, không fake capability khi thiếu native verifier; owner/scope trước history/plan/SSE/execution/schedule. Pool thất bại được đóng và bỏ khi chuyển sang memory sandbox.
 - Hồi quy PostgreSQL, HTTP và sandbox thật; fixture canonical typecheck; cập nhật fixture lịch sử và database test theo cấu hình. Không sửa frontend/catalog/planner trong phần chênh lệch so với main #237.
@@ -38,3 +38,11 @@ Ba reviewer môđun độc lập kết luận spec PASS, quality APPROVED: core/
 Review toàn nhánh mới và CI gồm browser trên head cuối là bước tiếp theo của PR; kết quả được bổ sung trong mô tả PR, không suy diễn từ kiểm tra local. Giữ PR cho chủ dự án review/merge; reviewer sau merge mới cập nhật trạng thái chung.
 
 JIRA-04 OAuth transport, JIRA-05 native/runtime policy, planner/executor/UI và nghiệm thu live còn thuộc task tiếp theo. Task này không gọi model/Jira live, không ghi Jira thật và không bật runtime Jira; catalog giữ 33 tools/8 services.
+
+## Tích hợp tiếp main #238 (86b432f)
+
+Sau khi tạo draft PR #240, GitHub báo xung đột với Sheets v2 vừa vào main. Giữ cả guard Jira và approvalMode trong route xác nhận lịch, kiểm tra quyền trước validation/body và tác dụng phụ. Đổi migration Jira sang **0017**, chạy sau Sheets 0016; không sửa migration Sheets hay mở runtime Jira.
+
+Bằng chứng mới thay kết quả trước #238 ở trên: migrations **0001–0017**, typecheck API/web và **npm run check exit 0**; **3.278 v3 PASS** = schemas 341 + adapters 460 + planner 381 + executor 42 + API 1.143 (129 file, không skip) + web 911; 406 eval, 32 Node probe, 1 launcher + 66 Node/env, build/security đều đạt. Năm hồi quy mới xác nhận auto_digest thường hoạt động, quyền Jira bị gỡ trả 404 trước xác nhận/validation, user mất quyền tổ chức bị chặn và body sai không gọi service.
+
+Chạy lại toàn bộ guard trên base mới: **13/13 đột biến bị bắt**, mỗi ca control xanh → assertion lỗi → khôi phục byte/SHA → control xanh. Ca mới bỏ guard hội thoại trước xác nhận auto_digest bị bắt bằng kiểm tra PostgreSQL/HTTP thật. Không dùng bằng chứng trước #238 làm nghiệm thu cuối. SHA mới, review toàn nhánh và CI/browser được cập nhật trong PR #240; giữ PR cho chủ dự án review/merge.

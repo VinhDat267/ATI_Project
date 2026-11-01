@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ScheduleView } from '@wap/tool-schemas';
+import type { ScheduleApprovalMode, ScheduleView } from '@wap/tool-schemas';
 import type { ChatMessage } from '../../types';
 import { apiClient } from '../../services/api-client';
 import { describeRecurrence, formatRunTime, scheduleLabel } from '../../services/schedule-text';
@@ -19,18 +19,23 @@ export async function reloadScheduleConversation(id: string) {
 export function ScheduleMoment({ message, convId, navigate, onEdit }: { message: ChatMessage; convId: string; navigate: (path: string) => void; onEdit: () => void }) {
   const [ignored, setIgnored] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [confirmed, setConfirmed] = useState<ScheduleView | null>(null);
+  const [approvalMode, setApprovalMode] = useState<ScheduleApprovalMode>('manual');
   const locked = useRef(false);
   const currentMessage = useRef(message.id); currentMessage.current = message.id;
-  useEffect(() => { setIgnored(false); setConfirmed(null); }, [message.id]);
+  useEffect(() => { setIgnored(false); setConfirmed(null); setApprovalMode('manual'); }, [message.id]);
   const metadata = message.metadata!;
   const schedule = confirmed ?? metadata.schedule;
   const proposal = metadata.proposal;
   const previous = metadata.previous;
+  const digestCandidate = metadata.digestCandidate;
   const confirm = async () => {
     if (locked.current) return;
     locked.current = true; setBusy(true); setError('');
     try {
-      const result = await apiClient.confirmSchedule(convId, message.id);
+      const result =
+        approvalMode === 'auto_digest'
+          ? await apiClient.confirmSchedule(convId, message.id, 'auto_digest')
+          : await apiClient.confirmSchedule(convId, message.id);
       if (currentMessage.current === message.id) setConfirmed(result.schedule); schedulesChanged();
     } catch (reason: any) {
       setError(reason.message || 'Không thể xác nhận lịch.');
@@ -53,7 +58,51 @@ export function ScheduleMoment({ message, convId, navigate, onEdit }: { message:
           {change('Việc sẽ làm', previous?.request, proposal.request)}
           <div className="flex flex-wrap gap-2">{metadata.services?.map(id => <span key={id} className="inline-flex items-center gap-2 text-xs text-[#4B5563]"><span aria-hidden="true" className={`w-6 h-6 rounded-lg border flex items-center justify-center ${servicePalette(id).icon}`}><ServiceLogo service={id} className="w-3.5 h-3.5" /></span>{serviceName(id, [])}</span>)}</div>
           {!!metadata.nextRuns?.length && <div className="text-xs text-[#4B5563] v3-space-y-1"><p className="font-semibold">Lần chạy tới:</p>{metadata.nextRuns.map(time => <p key={time}>{formatRunTime(time)}</p>)}</div>}
-          <p className="text-sm text-[#4B5563] leading-relaxed">Tới giờ, ATI lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.</p>
+          {digestCandidate && (
+            <fieldset className="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] v3-space-y-2.5">
+              <legend className="text-xs font-semibold text-[#111827] px-1">Chế độ khi tới giờ</legend>
+              <label className="flex items-start gap-2.5 text-xs sm:text-sm text-[#111827] cursor-pointer">
+                <input
+                  type="radio"
+                  name={`schedule-mode-${message.id}`}
+                  checked={approvalMode === 'manual'}
+                  onChange={() => setApprovalMode('manual')}
+                  className="mt-0.5"
+                />
+                <span>Chờ tôi duyệt mỗi lượt (mặc định)</span>
+              </label>
+              <label className={`flex items-start gap-2.5 text-xs sm:text-sm ${digestCandidate.canAutoDigest ? 'text-[#111827] cursor-pointer' : 'text-[#9CA3AF] cursor-not-allowed'}`}>
+                <input
+                  type="radio"
+                  name={`schedule-mode-${message.id}`}
+                  disabled={!digestCandidate.canAutoDigest}
+                  checked={approvalMode === 'auto_digest'}
+                  onChange={() => setApprovalMode('auto_digest')}
+                  className="mt-0.5"
+                />
+                <span>
+                  Tự gửi báo cáo, không cần duyệt lại
+                  {digestCandidate.canAutoDigest && digestCandidate.config && (
+                    <span className="block text-xs text-[#4B5563] mt-0.5">
+                      Nguồn: {digestCandidate.config.source.spreadsheetTitle}
+                      {digestCandidate.config.source.sheetName ? ` (${digestCandidate.config.source.sheetName})` : ''} · Đích:{' '}
+                      {digestCandidate.config.destination.service === 'slack'
+                        ? digestCandidate.config.destination.channelLabel ?? digestCandidate.config.destination.channelId
+                        : digestCandidate.config.destination.chatLabel ?? digestCandidate.config.destination.chatId}
+                    </span>
+                  )}
+                  {!digestCandidate.canAutoDigest && digestCandidate.reason && (
+                    <span className="block text-xs text-[#6B7280] mt-0.5">{digestCandidate.reason}</span>
+                  )}
+                </span>
+              </label>
+            </fieldset>
+          )}
+          <p className="text-sm text-[#4B5563] leading-relaxed">
+            {approvalMode === 'auto_digest'
+              ? 'Tới giờ, ATI tự đọc bảng tính đã khóa và gửi báo cáo tới kênh đích đã khóa mà không ghi thêm dữ liệu.'
+              : 'Tới giờ, ATI lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.'}
+          </p>
         </>}
         <div className="flex flex-wrap gap-2"><button type="button" disabled={busy} className={primaryScheduleButton} onClick={() => void confirm()}>Xác nhận</button><button type="button" disabled={busy} className={scheduleButton} onClick={onEdit}>Sửa</button><button type="button" disabled={busy} className={scheduleButton} onClick={() => setIgnored(true)}>Bỏ qua</button></div>
       </>}
