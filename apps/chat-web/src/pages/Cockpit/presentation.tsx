@@ -44,6 +44,9 @@ export function OutcomeLink({step,className}:{step:ExecutionStepInfo;className:s
   const url=outcomeURL(step); return url ? <a href={url} target="_blank" rel="noopener noreferrer" className={className}>{operation(step.tool).link}</a> : null;
 }
 
+export interface MultiServicePlaybook { id:string; title:string; services:string[]; prompt:string }
+export const multiServicePlaybooks:MultiServicePlaybook[]=(assets as {playbooks?:MultiServicePlaybook[]}).playbooks ?? [];
+
 export interface ReceiptReference { from:string; to:string; field:string }
 /** Only explicit executor reference constructs create a data edge; dependsOn is merely ordering. */
 export function receiptReferences(steps:PlanStep[]):ReceiptReference[] {
@@ -62,4 +65,17 @@ export function receiptReferences(steps:PlanStep[]):ReceiptReference[] {
     visit(step.args);
   }
   return edges;
+}
+
+export interface StepDataFlowBadge { fromStepId:string; fromIndex:number; toStepId:string; toIndex:number; field:string }
+export function planStepDataFlows(steps:PlanStep[]):StepDataFlowBadge[] {
+  const indexById=new Map(steps.map((s,i)=>[s.id,i+1]));
+  const rawEdges=receiptReferences(steps);
+  return rawEdges.map(edge=>({
+    fromStepId:edge.from,
+    fromIndex:indexById.get(edge.from) ?? 1,
+    toStepId:edge.to,
+    toIndex:indexById.get(edge.to) ?? 2,
+    field:edge.field,
+  }));
 }

@@ -1,4 +1,24 @@
 {
+  "playbooks": [
+    {
+      "id": "playbook-bug-triage",
+      "title": "Đồng bộ lỗi liên công cụ",
+      "services": ["trello", "github", "slack"],
+      "prompt": "Tạo card trên bảng Trello cho lỗi đăng nhập Google, tạo issue trên kho GitHub kèm nhãn bug và gửi thông báo vào kênh Slack của nhóm."
+    },
+    {
+      "id": "playbook-morning-digest",
+      "title": "Tổng hợp lịch họp & báo cáo nhóm",
+      "services": ["calendar", "sheets", "slack"],
+      "prompt": "Đọc lịch họp hôm nay trên Google Calendar, ghi danh sách cuộc họp vào bảng tính Google Sheets và gửi bản tóm tắt vào kênh Slack."
+    },
+    {
+      "id": "playbook-ops-alert",
+      "title": "Theo dõi bảng số liệu & nhắc việc",
+      "services": ["sheets", "trello", "telegram"],
+      "prompt": "Đọc bảng tiến độ tuần trên Google Sheets, tạo thẻ việc cần xử lý trên bảng Trello và gửi cảnh báo nhanh qua Telegram."
+    }
+  ],
   "services": {
     "trello": {
       "logoPath": "M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm2 3v12h4V6zm8 0v8h4V6z",
@@ -11,7 +31,13 @@
       },
       "badge": "bg-blue-50 text-blue-700",
       "receiptHover": "hover:border-blue-300",
-      "previewBadge": "bg-blue-100 text-blue-800"
+      "previewBadge": "bg-blue-100 text-blue-800",
+      "orbital": {
+        "label": "Trello",
+        "ringClass": "ring-[#0079BF]/25 border-[#0079BF]",
+        "strokeHex": "#0079BF",
+        "badgeClass": "bg-blue-50 text-blue-700 border-blue-200"
+      }
     },
     "slack": {
       "logoParts": [
@@ -41,6 +67,12 @@
       "badge": "bg-purple-50 text-purple-800",
       "receiptHover": "hover:border-purple-300",
       "previewBadge": "bg-purple-100 text-purple-800",
+      "orbital": {
+        "label": "Slack",
+        "ringClass": "ring-[#4A154B]/25 border-[#4A154B]",
+        "strokeHex": "#4A154B",
+        "badgeClass": "bg-purple-50 text-purple-800 border-purple-200"
+      },
       "recoveryLink": {
         "url": "https://slack.com/app_redirect",
         "argument": "channel",
@@ -59,7 +91,13 @@
       },
       "badge": "bg-neutral-100 text-neutral-800",
       "receiptHover": "hover:border-neutral-400",
-      "previewBadge": "bg-neutral-900 text-white"
+      "previewBadge": "bg-neutral-900 text-white",
+      "orbital": {
+        "label": "GitHub",
+        "ringClass": "ring-neutral-900/20 border-neutral-800",
+        "strokeHex": "#24292F",
+        "badgeClass": "bg-neutral-100 text-neutral-800 border-neutral-300"
+      }
     },
     "sheets": {
       "logoPath": "M5 2h10l4 4v16H5zm2 8v9h10v-9zm2 2h6v2H9zm0 4h6v1H9z",
@@ -72,7 +110,13 @@
       },
       "badge": "bg-green-50 text-green-800",
       "receiptHover": "hover:border-green-300",
-      "previewBadge": "bg-green-100 text-green-800"
+      "previewBadge": "bg-green-100 text-green-800",
+      "orbital": {
+        "label": "Sheets",
+        "ringClass": "ring-[#188038]/25 border-[#188038]",
+        "strokeHex": "#188038",
+        "badgeClass": "bg-emerald-50 text-emerald-700 border-emerald-200"
+      }
     },
     "calendar": {
       "logoPath": "M4 4h16v16H4zm2 4v10h12V8zm2 2h3v2h-1v4H8zm5 0h3v6h-3v-2h1v-2h-1z",
@@ -82,6 +126,12 @@
         "icon": "bg-blue-50 border-blue-100",
         "decoration": "bg-blue-500/5 group-hover:bg-blue-500/10",
         "name": "text-blue-600"
+      },
+      "orbital": {
+        "label": "Calendar",
+        "ringClass": "ring-[#1A73E8]/25 border-[#1A73E8]",
+        "strokeHex": "#1A73E8",
+        "badgeClass": "bg-blue-50 text-blue-700 border-blue-200"
       }
     },
     "notion": {
@@ -93,6 +143,12 @@
         "decoration": "bg-neutral-900/5 group-hover:bg-neutral-900/10",
         "name": "text-neutral-800",
         "logo": "text-neutral-900"
+      },
+      "orbital": {
+        "label": "Notion",
+        "ringClass": "ring-neutral-900/20 border-neutral-800",
+        "strokeHex": "#111111",
+        "badgeClass": "bg-neutral-100 text-neutral-800 border-neutral-300"
       }
     },
     "telegram": {
@@ -103,6 +159,12 @@
         "icon": "bg-blue-50 border-blue-100",
         "decoration": "bg-blue-500/5 group-hover:bg-blue-500/10",
         "name": "text-blue-600"
+      },
+      "orbital": {
+        "label": "Telegram",
+        "ringClass": "ring-[#229ED9]/25 border-[#229ED9]",
+        "strokeHex": "#229ED9",
+        "badgeClass": "bg-sky-50 text-sky-700 border-sky-200"
       }
     },
     "jira": {
@@ -113,6 +175,28 @@
         "icon": "bg-blue-50 border-blue-100",
         "decoration": "bg-blue-500/5 group-hover:bg-blue-500/10",
         "name": "text-blue-600"
+      },
+      "orbital": {
+        "label": "Jira",
+        "ringClass": "ring-[#0052CC]/25 border-[#0052CC]",
+        "strokeHex": "#0052CC",
+        "badgeClass": "bg-blue-50 text-blue-700 border-blue-200"
+      }
+    },
+    "gmail": {
+      "logoPath": "M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z",
+      "color": "#ea4335",
+      "prompt": "Gửi email qua {service}",
+      "suggestion": {
+        "icon": "bg-red-50 border-red-100",
+        "decoration": "bg-red-500/5 group-hover:bg-red-500/10",
+        "name": "text-red-600"
+      },
+      "orbital": {
+        "label": "Gmail",
+        "ringClass": "ring-[#EA4335]/25 border-[#EA4335]",
+        "strokeHex": "#EA4335",
+        "badgeClass": "bg-red-50 text-red-700 border-red-200"
       }
     },
     "mycalendar": {
@@ -126,7 +210,13 @@
       },
       "badge": "bg-blue-50 text-blue-700",
       "receiptHover": "hover:border-blue-300",
-      "previewBadge": "bg-blue-100 text-blue-800"
+      "previewBadge": "bg-blue-100 text-blue-800",
+      "orbital": {
+        "label": "MyCalendar",
+        "ringClass": "ring-[#1A73E8]/25 border-[#1A73E8]",
+        "strokeHex": "#1A73E8",
+        "badgeClass": "bg-blue-50 text-blue-700 border-blue-200"
+      }
     },
     "mysheets": {
       "logoPath": "M5 2h10l4 4v16H5zm2 8v9h10v-9zm2 2h6v2H9zm0 4h6v1H9z",
@@ -139,7 +229,13 @@
       },
       "badge": "bg-green-50 text-green-800",
       "receiptHover": "hover:border-green-300",
-      "previewBadge": "bg-green-100 text-green-800"
+      "previewBadge": "bg-green-100 text-green-800",
+      "orbital": {
+        "label": "MySheets",
+        "ringClass": "ring-[#188038]/25 border-[#188038]",
+        "strokeHex": "#188038",
+        "badgeClass": "bg-emerald-50 text-emerald-700 border-emerald-200"
+      }
     }
   },
   "resourceNames": {
@@ -330,7 +426,8 @@
       "done": "Đã thêm dòng",
       "receipt": "Đã thêm dòng",
       "kind": "Bảng tính",
-      "link": "Mở bảng tính"
+      "link": "Mở bảng tính",
+      "previewStyle": "rows"
     }
   }
 }

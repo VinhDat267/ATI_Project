@@ -1,13 +1,14 @@
 // Source: AppStagePage.tsx moment-6. Receipt connections come only from approved-plan references.
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
 import { toolDefinition } from '../../services/tool-definitions';
 import type { ActivePlan,PlanStep,ServiceInfo } from '../../types';
 import { ServiceLogo } from '../../components/ServiceLogo';
+import { WorkflowFlowCanvas } from '../../components/WorkflowFlowCanvas';
 import { ResultFields, type ExecutionStepInfo } from '../../components/ExecutionProgress';
 import { operation,serviceId,serviceName,servicePalette,statusLabel,resultTitle,outcomeURL,receiptReferences } from './presentation';
 import { RequestEcho } from './RequestEcho';
 interface CardProps {services:ServiceInfo[];planSteps:PlanStep[];labels?:Record<string,string>;mycalendarConnection?:NonNullable<ActivePlan['connections']>['mycalendar'];mysheetsConnection?:NonNullable<ActivePlan['connections']>['mysheets'];trelloConnection?:NonNullable<ActivePlan['connections']>['trello'];githubConnection?:NonNullable<ActivePlan['connections']>['github'];telegramConnection?:NonNullable<ActivePlan['connections']>['telegram'];destination:(step:PlanStep,labels?:Record<string,string>)=>string}
-function ReceiptCard({step,index,services,planSteps,labels,mycalendarConnection,mysheetsConnection,trelloConnection,githubConnection,telegramConnection,destination}:CardProps & {step:ExecutionStepInfo;index:number}) { const service=serviceId(step.tool),palette=servicePalette(service);return (<div className={`receipt-stagger-${Math.min(index+1,4)} flex-1 bg-white rounded-2xl border border-brand-border p-4 sm:p-5 shadow-soft-card flex flex-col justify-between ${palette.receiptHover} transition-all group`} aria-label={serviceName(service,services)}>
+function ReceiptCard({step,index,highlighted,services,planSteps,labels,mycalendarConnection,mysheetsConnection,trelloConnection,githubConnection,telegramConnection,destination}:CardProps & {step:ExecutionStepInfo;index:number;highlighted?:boolean}) { const service=serviceId(step.tool),palette=servicePalette(service);return (<div data-highlighted-step={highlighted ? 'true' : undefined} className={`receipt-stagger-${Math.min(index+1,4)} flex-1 bg-white rounded-2xl border ${highlighted ? 'border-brand-primary ring-2 ring-brand-primary/20' : 'border-brand-border'} p-4 sm:p-5 shadow-soft-card flex flex-col justify-between ${palette.receiptHover} transition-all group`} aria-label={serviceName(service,services)}>
                   <div className="v3-space-y-2.5">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2.5 min-w-0">
@@ -92,10 +93,13 @@ function ReceiptBetweenRows({from,to,sourceLabel,targetLabel,field}:{from:string
                 </div>
               </div>);}
 export function ReceiptMoment({request,terminalStatus,steps,planSteps,services,labels,mycalendarConnection,mysheetsConnection,trelloConnection,githubConnection,telegramConnection,destination,totalDuration,onNewConversation,onFollowup,servicePrompt,onSettings,servicesLoading,servicesError}:CardProps & {request?:string;terminalStatus?:string;steps:ExecutionStepInfo[];totalDuration?:string;onNewConversation:()=>void;onFollowup:(text:string)=>void;servicePrompt?:(service:ServiceInfo)=>string;onSettings?:()=>void;servicesLoading?:boolean;servicesError?:string|null}) {
+ const [selectedService,setSelectedService]=useState<string|null>(null);
  const rows:ExecutionStepInfo[][]=[];for(let index=0;index<steps.length;index+=2) rows.push(steps.slice(index,index+2));
  const ids=new Set(steps.map(step=>step.id)); const refs=receiptReferences(planSteps).filter(edge=>ids.has(edge.from) && ids.has(edge.to));
  const cardProps={services,planSteps,labels,mycalendarConnection,mysheetsConnection,trelloConnection,githubConnection,telegramConnection,destination};
  const getPrompt = servicePrompt ?? (s => s.name);
+ const stepStatuses=Object.fromEntries(steps.map(step=>[step.id,step.status]));
+ const canvasSteps:PlanStep[]=planSteps.length ? planSteps : steps.map(step=>({id:step.id,tool:step.tool,description:step.description,args:{}}));
  return (<section id={terminalStatus?"moment-unsuccessful":"moment-6"} className="stage-section is-active v3-space-y-7 w-full max-w-[1120px] mx-auto" aria-label="Cockpit" data-moment={terminalStatus?"unsuccessful":"6"} aria-labelledby="heading-moment-6">
           <div className="v3-space-y-3">
             <div className={`w-14 h-14 rounded-2xl ${terminalStatus?'bg-neutral-100 border-neutral-300 text-neutral-600':'bg-emerald-50 border-emerald-200 text-emerald-600'} flex items-center justify-center shadow-sm`}>
@@ -118,15 +122,16 @@ export function ReceiptMoment({request,terminalStatus,steps,planSteps,services,l
           </div>
           {/* NHÓM 7: Chuỗi 4 biên nhận dạng lưới 2x2 trên desktop (1->2 ở hàng trên, chuyển Z xuống 3, 3->4 ở hàng dưới), 1 cột trên mobile */}
           <div className="v3-space-y-3">
+            <WorkflowFlowCanvas steps={canvasSteps} stepStatuses={stepStatuses} resourceLabels={labels} selectedService={selectedService} onSelectService={setSelectedService} mode="receipt" />
             <div id="receipt-chain" className="flex flex-col gap-3">
               {rows.map((row,rowIndex)=>{const horizontal=row.length===2 ? refs.filter(edge=>edge.from===row[0].id && edge.to===row[1].id):[];
                 const incoming=refs.filter(edge=>row.some(step=>step.id===edge.to) && !horizontal.includes(edge));
                 return <Fragment key={row[0].id}>
                   {incoming.map(edge=><ReceiptBetweenRows key={`${edge.from}-${edge.to}-${edge.field}`} from={edge.from} to={edge.to} sourceLabel={`${serviceName(serviceId(steps.find(s=>s.id===edge.from)!.tool),services)} (việc ${steps.findIndex(s=>s.id===edge.from)+1})`} targetLabel={`${serviceName(serviceId(steps.find(s=>s.id===edge.to)!.tool),services)} (việc ${steps.findIndex(s=>s.id===edge.to)+1})`} field={edge.field}/>)}
                   <div className={`grid grid-cols-1 ${horizontal.length ? 'md:grid-cols-[1fr_auto_1fr]' : 'md:grid-cols-2'} items-stretch md:items-center gap-3`}>
-                    <ReceiptCard step={row[0]} index={rowIndex*2} {...cardProps}/>
+                    <ReceiptCard step={row[0]} index={rowIndex*2} highlighted={selectedService===serviceId(row[0].tool)} {...cardProps}/>
                     {horizontal.length>0 && <ReceiptConnector from={row[0].id} to={row[1].id} label={horizontal.map(edge=>edge.field).join(' + ')}/>}
-                    {row[1] && <ReceiptCard step={row[1]} index={rowIndex*2+1} {...cardProps}/>}
+                    {row[1] && <ReceiptCard step={row[1]} index={rowIndex*2+1} highlighted={selectedService===serviceId(row[1].tool)} {...cardProps}/>}
                   </div>
                 </Fragment>;
               })}
@@ -143,6 +148,17 @@ export function ReceiptMoment({request,terminalStatus,steps,planSteps,services,l
             </div>
             <div role="group" aria-label="Gợi ý tiếp theo" className="flex flex-wrap items-center gap-2.5">
               {services.filter(service=>service.configured).slice(0,2).map(service=><button key={service.id} type="button" onClick={()=>onFollowup(getPrompt(service))} className="px-4 py-2.5 bg-white hover:bg-neutral-50 border border-brand-border hover:border-brand-primary text-brand-text text-xs sm:text-sm font-medium rounded-xl shadow-sm transition-all flex items-center gap-2 group"><span className="text-brand-primary font-bold">+</span><span>{getPrompt(service)}</span></button>)}
+              <button
+                type="button"
+                data-testid="receipt-schedule-workflow-btn"
+                onClick={() => onFollowup(`Mỗi sáng 08:00, tự động thực hiện: ${request || 'quy trình vừa hoàn tất'}`)}
+                className="px-4 py-2.5 bg-[#FFF6EE] hover:bg-orange-100/70 border border-[#FFDFC6] text-[#FF5701] text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition-all inline-flex items-center gap-1.5"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Đặt lịch chạy định kỳ quy trình này</span>
+              </button>
               {!servicesLoading && !servicesError && !services.some(service=>service.configured) && <p className="text-xs text-brand-muted">Chưa có dịch vụ nào được kết nối. <a href="/settings" onClick={event=>{event.preventDefault();onSettings?.();}} className="underline">Kết nối thêm</a></p>}
               <button type="button" onClick={onNewConversation} className="px-5 py-2.5 bg-brand-primary hover:bg-brand-primary-hover text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition-all">Nhờ việc khác</button>
             </div>

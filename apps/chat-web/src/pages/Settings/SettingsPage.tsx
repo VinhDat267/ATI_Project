@@ -171,10 +171,15 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
             <h1 className="font-display text-3xl sm:text-4xl font-bold text-[#111827] tracking-tight">
               Kết nối dịch vụ
             </h1>
-            {hasCatalogue && <div className="inline-flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#16A34A]" />
-              <span id="summary-connected-count" className="text-sm sm:text-base font-semibold text-[#111827]">
-                {`${configured.length} / 8 dịch vụ đã thiết lập · ${okCount} kết nối tốt`}
+            {hasCatalogue && <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#16A34A]" />
+                <span id="summary-connected-count" className="text-sm sm:text-base font-semibold text-[#111827]">
+                  {`${configured.length} / 8 dịch vụ đã thiết lập · ${okCount} kết nối tốt`}
+                </span>
+              </div>
+              <span data-testid="settings-oauth-summary" className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                OAuth 1-Click cá nhân &amp; Tích hợp Workspace
               </span>
             </div>}
           </div>
@@ -197,7 +202,10 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
         {loadError && <div role="alert" className="text-xs text-[#DC2626] mb-4">{loadError} <button type="button" onClick={() => void refresh()} className="underline">Thử lại</button></div>}
         {connectedEmail && <p role="status" className="text-sm text-[#111827] mb-4">Đã kết nối {connectedEmail}</p>}
         <section aria-labelledby="heading-personal-services" className="mb-8">
-          <h2 id="heading-personal-services" className="text-xs font-bold uppercase tracking-wider text-[#6B7280] mb-3.5">Của riêng bạn</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-3.5">
+            <h2 id="heading-personal-services" className="text-xs font-bold uppercase tracking-wider text-[#6B7280]">Của riêng bạn</h2>
+            <span className="text-xs text-[#6B7280]">Tài khoản Cá nhân (OAuth 1-Click) · Chọn tài nguyên trực quan</span>
+          </div>
           <div className="v3-space-y-4">
             {personal && <PersonalGmail key={`gmail-${user?.id}`} selected={selected} service={personal} refresh={refresh} standalone={false} />}
             {personalMyCalendar && <PersonalMyCalendar key={`mycalendar-${user?.id}`} selected={selected} service={personalMyCalendar} refresh={refresh} navigate={navigate} standalone={false} />}
@@ -259,7 +267,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
               ATI — Nền tảng điều phối công việc liên dịch vụ · 2026
             </p>
             <p className="text-[11px] text-[#9CA3AF] mt-0.5">
-              {personal ? 'Dịch vụ dùng chung: chỉ quản trị viên cập nhật khoá. Gmail riêng do mỗi người tự kết nối.' : 'Khoá dịch vụ là tài nguyên dùng chung của cả nhóm · Chỉ quản trị viên có quyền cập nhật'}
+              {personal ? 'Dịch vụ dùng chung: chỉ quản trị viên cập nhật khoá. OAuth 1-Click cá nhân (Gmail, Calendar, Sheets, Trello, GitHub, Telegram) do mỗi người tự kết nối.' : 'Khoá dịch vụ là tài nguyên dùng chung của cả nhóm · Chỉ quản trị viên có quyền cập nhật'}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-4 text-xs">

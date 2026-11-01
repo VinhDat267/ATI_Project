@@ -80,27 +80,15 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
         steps: [
           {
             num: 1,
-            title: 'Truy cập cổng quản lý Trello Power-Up',
-            desc: 'Đăng nhập vào Trello, sau đó mở trang quản lý tích hợp tại <a href="https://trello.com/power-ups/admin" target="_blank" rel="noopener noreferrer" class="text-[#0079BF] font-medium underline">trello.com/power-ups/admin</a> (hoặc trello.com/app-key).',
-            callout: 'Nếu bạn chưa có Power-Up nào, bấm "New" và đặt tên là "ATI Automation".'
+            title: 'Khuyên dùng: Kết nối OAuth 1-Click & Chọn Bảng trực tiếp',
+            desc: 'Mở trang Cài đặt dịch vụ trên ATI, tại mục Trello cá nhân bấm nút <strong>Kết nối OAuth 1-Click</strong>, bấm "Allow" trên màn hình Trello và tích chọn các bảng (Board) bạn muốn cho phép ngay trên giao diện trực quan.',
+            callout: 'Không cần tự tạo Power-Up hay thêm đuôi .json để tìm Board ID thủ công.'
           },
           {
             num: 2,
-            title: 'Sao chép API Key',
-            desc: 'Tại mục "API Key", bạn sẽ thấy một chuỗi ký tự 32 chữ số. Bấm nút sao chép và dán vào ô "API key" trong Cài đặt của ATI.',
-            callout: 'Khoá này dùng để nhận diện ứng dụng của bạn với máy chủ Trello.'
-          },
-          {
-            num: 3,
-            title: 'Tạo và lấy API Token',
-            desc: 'Ngay cạnh ô API Key, bấm vào liên kết có chữ "Token" (hoặc Generate a Token). Một màn hình xin quyền mở ra, cuộn xuống và bấm nút "Allow".',
-            callout: 'Sao chép chuỗi mã Token dài hiển thị trên màn hình và dán vào ô "API token" của ATI.'
-          },
-          {
-            num: 4,
-            title: 'Lấy Board ID (Nơi được phép dùng)',
-            desc: 'Mở bảng Trello, thêm .json vào cuối địa chỉ (ví dụ https://trello.com/b/AbCd1234/to-do.json), tìm trường "id" đầu tiên (24 ký tự chữ và số) và dán vào danh sách Board ID.',
-            callout: 'Ví dụ ID mẫu: 5f1a2b3c4d5e6f7a8b9c0d1e'
+            title: 'Dành cho Quản trị viên Workspace: Cổng Trello Power-Up',
+            desc: 'Nếu nhóm muốn dùng khoá chung toàn Workspace, đăng nhập vào Trello và mở trang quản lý tích hợp tại <a href="https://trello.com/power-ups/admin" target="_blank" rel="noopener noreferrer" class="text-[#0079BF] font-medium underline">trello.com/power-ups/admin</a> (hoặc trello.com/app-key).',
+            callout: 'Sao chép API Key, tạo API Token và chọn Board được phép dùng cho nhóm.'
           }
         ]
       },
@@ -193,28 +181,16 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
         steps: [
           {
             num: 1,
-            title: 'Tạo tài khoản dịch vụ trên Google Cloud',
-            desc: 'Mở Google Cloud Console tại <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" class="text-[#0F9D58] font-medium underline">console.cloud.google.com</a>. Bật thư viện "Google Sheets API" trong mục "APIs & Services".',
-            callout: 'Vào "IAM & Admin" > "Service Accounts", bấm "Create Service Account", đặt tên "ati-sheets-bot" và bấm Done.'
+            title: 'Khuyên dùng: Kết nối OAuth 1-Click & Chọn Bảng tính trực tiếp',
+            desc: 'Trong trang Cài đặt dịch vụ, tại thẻ Google Sheets của bạn bấm nút <strong>Kết nối OAuth 1-Click</strong>, đăng nhập tài khoản Google và tích chọn các bảng tính được phép đọc/ghi ngay trên danh sách trực quan.',
+            callout: 'Hoàn tất trong 15 giây mà không cần tạo Service Account hay tải file JSON.'
           },
           {
             num: 2,
-            title: 'Tạo file khoá JSON và lấy Private Key',
-            desc: 'Bấm vào tài khoản dịch vụ vừa tạo > chọn tab "Keys" > "Add Key" > "Create new key" > chọn định dạng JSON và tải về máy.',
-            callout: 'Mở file JSON bằng Notepad: sao chép giá trị "client_email" vào ô Email, và toàn bộ khối "private_key" (kể cả -----BEGIN PRIVATE KEY-----) vào ô Private key.'
-          },
-          {
-            num: 3,
-            title: 'Lấy Spreadsheet ID từ đường link',
-            desc: 'Mở bảng tính Google Sheets bạn muốn dùng trên trình duyệt (ví dụ ATI Test Tracker). Nhìn lên thanh địa chỉ:',
+            title: 'Dành cho Quản trị viên Workspace: Google Cloud Service Account',
+            desc: 'Nếu cần cấu hình tài khoản dịch vụ dùng chung cho nhóm tại <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" class="text-[#0F9D58] font-medium underline">console.cloud.google.com</a>, bật Google Sheets API, tạo Service Account và chia sẻ quyền Editor trên bảng tính.',
             urlSample: 'https://docs.google.com/spreadsheets/d/[MÃ_SPREADSHEET_ID]/edit',
-            callout: 'Sao chép đoạn ký tự dài giữa "/d/" và "/edit" dán vào ô "Spreadsheet ID" trên ATI.'
-          },
-          {
-            num: 4,
-            title: 'Chia sẻ bảng tính cho Email Service Account',
-            desc: 'Bấm nút "Chia sẻ" (Share) màu xanh góc phải bảng tính Google Sheets. Dán địa chỉ email dạng "...@...iam.gserviceaccount.com" vào và cấp quyền "Người chỉnh sửa" (Editor).',
-            callout: 'Nếu không chia sẻ, Google sẽ từ chối và báo lỗi không có quyền ghi.'
+            callout: 'Sao chép client_email, private_key (PEM) và Spreadsheet ID vào mục tích hợp Workspace.'
           }
         ]
       },
@@ -227,25 +203,19 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
         sampleScope: 'team-calendar@group.calendar.google.com',
         timeEstimate: 'Khoảng 2 phút (dùng chung khoá Sheets)',
         summary: 'Xem lịch, kiểm tra thời gian trống và tạo sự kiện lịch họp cho các mốc sprint.',
-        importantNotice: 'Dùng chung Email Service Account và Private Key của Google Sheets. Chỉ cần chia sẻ thêm Lịch của bạn.',
+        importantNotice: 'Ưu tiên kết nối OAuth 1-Click cho lịch cá nhân hoặc dùng Service Account cho lịch phòng ban.',
         steps: [
           {
             num: 1,
-            title: 'Bật Google Calendar API trên Google Cloud',
-            desc: 'Trong cùng dự án Google Cloud Console đã tạo ở bước Google Sheets, vào thư viện API và bật thêm "Google Calendar API".',
-            callout: 'Bạn dùng lại đúng Email Service Account và Private Key (PEM) đã có từ Google Sheets.'
+            title: 'Khuyên dùng: Kết nối OAuth 1-Click & Chọn Lịch họp trực tiếp',
+            desc: 'Mở trang Cài đặt dịch vụ, tại thẻ Google Calendar của bạn bấm nút <strong>Kết nối OAuth 1-Click</strong>, uỷ quyền tài khoản Google và tích chọn các lịch (Calendar) cho phép ATI tra cứu hoặc đặt lịch họp.',
+            callout: 'Tự động liệt kê các lịch của bạn mà không cần tìm Calendar ID thủ công.'
           },
           {
             num: 2,
-            title: 'Lấy Calendar ID từ Google Calendar',
-            desc: 'Mở Google Calendar trên máy tính (<a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer" class="text-[#4285F4] font-medium underline">calendar.google.com</a>). Ở cột trái, rê chuột vào Lịch của bạn > bấm dấu ba chấm > "Cài đặt và chia sẻ" (Settings and sharing).',
-            callout: 'Cuộn xuống mục "Tích hợp lịch" (Integrate calendar) để sao chép "Mã lịch" (Calendar ID).'
-          },
-          {
-            num: 3,
-            title: 'Chia sẻ Lịch cho Email Service Account',
-            desc: 'Tại trang Cài đặt lịch đó, cuộn lên mục "Chia sẻ với những người hoặc nhóm cụ thể", bấm "Thêm người", dán Email Service Account vào và chọn quyền "Thực hiện thay đổi cho các sự kiện".',
-            callout: 'Điều này cho phép ATI tạo sự kiện mới vào lịch của bạn mà không cần hỏi lại mật khẩu.'
+            title: 'Dành cho Quản trị viên Workspace: Lịch nhóm qua Service Account',
+            desc: 'Để dùng lịch phòng ban qua Service Account trên <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer" class="text-[#4285F4] font-medium underline">calendar.google.com</a>, bật Google Calendar API và chia sẻ lịch cho Email Service Account.',
+            callout: 'Sao chép Calendar ID trong phần Tích hợp lịch (Integrate calendar) vào cấu hình Workspace.'
           }
         ]
       },
@@ -644,3 +614,49 @@ export const CAPABILITIES_DATA: Capability[] = [
         ]
       }
     ];
+
+export const GUIDE_HERO_FLOW_SERVICES: string[] = ['github', 'trello', 'slack'];
+
+export interface GuideOAuthShowcaseCard {
+  service: string;
+  title: string;
+  badge: string;
+  badgeStyle: 'oauth' | 'workspace';
+  iconClassName: string;
+  description: string;
+}
+
+export const GUIDE_OAUTH_SHOWCASE_CARDS: GuideOAuthShowcaseCard[] = [
+  {
+    service: 'mycalendar',
+    title: 'Google Calendar',
+    badge: 'OAuth 2.0 · 1-Click',
+    badgeStyle: 'oauth',
+    iconClassName: 'w-4 h-4',
+    description: 'Kết nối lịch cá nhân & tự gửi bản tin sáng không cần dán khoá.',
+  },
+  {
+    service: 'trello',
+    title: 'Trello cá nhân',
+    badge: 'OAuth 2.0 · 1-Click',
+    badgeStyle: 'oauth',
+    iconClassName: 'w-4 h-4 text-[#0079BF]',
+    description: 'Cấp quyền 1 chạm và khoá đúng bảng Trello được phép thao tác.',
+  },
+  {
+    service: 'sheets',
+    title: 'Google Sheets',
+    badge: 'OAuth 2.0 · 1-Click',
+    badgeStyle: 'oauth',
+    iconClassName: 'w-4 h-4 text-[#16A34A]',
+    description: 'Chọn file bảng tính hoặc dán URL trực tiếp để đọc/ghi và lập báo cáo.',
+  },
+  {
+    service: 'slack',
+    title: 'Slack & GitHub',
+    badge: 'Workspace',
+    badgeStyle: 'workspace',
+    iconClassName: 'w-4 h-4 text-[#E11D48]',
+    description: 'Tích hợp kênh nhóm, kho mã và trang tài liệu dùng chung của dự án.',
+  },
+];

@@ -4,13 +4,14 @@ import { MainNav } from '../../components/layout/MainNav';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
 import { usePrototypePage, type PageMeta } from '../../prototype/usePrototypePage';
 import { ServiceLogo } from '../../components/ServiceLogo';
+import { WorkflowFlowCanvas } from '../../components/WorkflowFlowCanvas';
 import type { User } from '../../types';
 import css from './page.css?inline';
 import { useGmailEnabled, useMySheetsEnabled } from '../../hooks/use-gmail-enabled';
 import { useSchedulesEnabled } from '../../hooks/use-schedules';
 import { GMAIL_GUIDE, GMAIL_PROMPTS, GMAIL_CAPABILITY } from './gmail-data';
 import { MYSHEETS_GUIDE, MYSHEETS_PROMPTS, MYSHEETS_SCHEDULE_PROMPT, MYSHEETS_CAPABILITY } from './mysheets-data';
-import { CAPABILITIES_DATA as BASE_CAPABILITIES, SAMPLE_PROMPTS as BASE_PROMPTS, SERVICE_GUIDES as BASE_GUIDES, SERVICE_SVGS, type ServiceGuide } from './data';
+import { CAPABILITIES_DATA as BASE_CAPABILITIES, SAMPLE_PROMPTS as BASE_PROMPTS, SERVICE_GUIDES as BASE_GUIDES, SERVICE_SVGS, GUIDE_HERO_FLOW_SERVICES, GUIDE_OAUTH_SHOWCASE_CARDS, type ServiceGuide } from './data';
 
 const SERVICE_GUIDES = BASE_GUIDES, SAMPLE_PROMPTS = BASE_PROMPTS, CAPABILITIES_DATA = BASE_CAPABILITIES;
 type MainTab = 'keys' | 'prompts' | 'capabilities';
@@ -133,6 +134,17 @@ const COPY_ICON = <svg className="w-3.5 h-3.5 text-neutral-500" fill="none" stro
 
 // Phân khu 2: thẻ mẫu câu lệnh (renderPromptsList).
 function PromptCard({ p, copied, onCopy, navigate }: { p: typeof SAMPLE_PROMPTS[number]; copied: boolean; onCopy: (id: string) => void; navigate: Navigate }) {
+  const handleTryPrompt = () => {
+    try {
+      sessionStorage.setItem('ati_prefill_prompt', p.prompt);
+    } catch {
+      // ignore storage errors
+    }
+    if (typeof navigator.clipboard?.writeText === 'function') {
+      onCopy(p.id);
+    }
+    navigate('/');
+  };
   return <div className="bg-white rounded-2xl border border-[#E7E7E2] p-5 shadow-sm hover:border-[#FF5701]/60 transition-all flex flex-col justify-between v3-space-y-4">
     <div className="v3-space-y-3">
       <div className="flex items-center justify-between gap-2">
@@ -148,6 +160,7 @@ function PromptCard({ p, copied, onCopy, navigate }: { p: typeof SAMPLE_PROMPTS[
       <h4 className="font-bold text-sm sm:text-base text-[#111827] leading-snug">
         {` ${p.title} `}
       </h4>
+      <WorkflowFlowCanvas services={p.services} mode="preview" compact />
       <div className="p-3 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm font-medium text-[#111827] leading-relaxed relative group">
         {` "${p.prompt}" `}
       </div>
@@ -169,17 +182,30 @@ function PromptCard({ p, copied, onCopy, navigate }: { p: typeof SAMPLE_PROMPTS[
         </ul>
       </div>
     </div>
-    <div className="pt-3 border-t border-[#E7E7E2] flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
-      <button type="button" onClick={() => onCopy(p.id)} id={`copy-btn-${p.id}`} className="px-3 py-2 sm:py-1.5 rounded-lg bg-[#F8F8F6] hover:bg-neutral-200/80 text-xs font-semibold text-[#111827] border border-[#E7E7E2] transition-colors inline-flex items-center gap-1.5 min-h-[36px]">
-        {copied ? <>
-          <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-          <span className="text-emerald-700">Đã sao chép!</span>
-        </> : <>
-          {COPY_ICON}
-          <span>Sao chép câu lệnh</span>
-        </>}
-      </button>
-      <a href="/" onClick={appLink(navigate, '/')} className="text-xs font-semibold text-[#FF5701] hover:underline inline-flex items-center gap-1 py-1 min-h-[36px]">
+    <div className="pt-3 border-t border-[#E7E7E2] flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={handleTryPrompt} className="px-3.5 py-2 sm:py-1.5 rounded-lg bg-[#FF5701] hover:bg-[#E04D00] text-xs font-semibold text-white shadow-sm transition-colors inline-flex items-center gap-1.5 min-h-[36px]">
+          <span>Dùng thử mẫu lệnh này →</span>
+        </button>
+        <button type="button" onClick={() => onCopy(p.id)} id={`copy-btn-${p.id}`} className="px-3 py-2 sm:py-1.5 rounded-lg bg-[#F8F8F6] hover:bg-neutral-200/80 text-xs font-semibold text-[#111827] border border-[#E7E7E2] transition-colors inline-flex items-center gap-1.5 min-h-[36px]">
+          {copied ? <>
+            <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+            <span className="text-emerald-700">Đã sao chép!</span>
+          </> : <>
+            {COPY_ICON}
+            <span>Sao chép câu lệnh</span>
+          </>}
+        </button>
+      </div>
+      <a
+        href="/"
+        onClick={(event) => {
+          if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          event.preventDefault();
+          handleTryPrompt();
+        }}
+        className="text-xs font-semibold text-[#FF5701] hover:underline inline-flex items-center gap-1 py-1 min-h-[36px]"
+      >
         <span>Thử trên sân khấu →</span>
       </a>
     </div>
@@ -297,6 +323,10 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
     copyPromptText(promptId: string) {
       const p = SAMPLE_PROMPTS.find(item => item.id === promptId);
       if (!p) return;
+      if (typeof navigator.clipboard?.writeText !== 'function') {
+        showToast('Không thể sao chép tự động. Bạn hãy bôi đen câu lệnh để chép tay nhé.');
+        return;
+      }
       navigator.clipboard.writeText(p.prompt).then(() => {
         showToast('Đã sao chép câu lệnh vào bộ nhớ tạm! Dán vào ô nhập của ATI để bắt đầu.');
         setCopied(state => ({ ...state, [promptId]: true }));
@@ -369,8 +399,8 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
       )}
       {/* ==================== MAIN CONTENT ==================== */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 v3-space-y-6">
-        {/* HERO / TIÊU ĐỀ TRANG */}
-        <section className="bg-white rounded-2xl border border-[#E7E7E2] p-6 sm:p-8 shadow-sm">
+        {/* HERO / TIÊU ĐỀ TRANG + OAUTH-FIRST PLAYBOOK SHOWCASE */}
+        <section className="bg-white rounded-2xl border border-[#E7E7E2] p-6 sm:p-8 shadow-sm v3-space-y-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="v3-space-y-2 max-w-2xl">
               <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#FF5701]/10 text-[#FF5701]">
@@ -386,8 +416,17 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
                 Cẩm nang kết nối &amp; Mẫu câu lệnh ATI
               </h1>
               <p className="text-sm sm:text-base text-[#4B5563] leading-relaxed">
-                Dành cho quản lý dự án, vận hành và người dùng phi kỹ thuật. Hướng dẫn trực quan từng bước lấy khoá cho 8 công cụ, thư viện mẫu câu lệnh tiếng Việt hiệu quả cao, và danh sách rõ ràng những việc ATI làm được và chưa làm được.
+                Dành cho quản lý dự án, vận hành và người dùng phi kỹ thuật. Kết nối nhanh bằng OAuth 2.0 1-Click, trực quan hoá luồng dữ liệu đa dịch vụ kiểu Make.com và sử dụng ngay thư viện mẫu câu lệnh tiếng Việt hiệu quả cao.
               </p>
+              <div className="flex flex-wrap items-center gap-2.5 pt-2">
+                <a href="/settings" onClick={appLink(navigate, '/settings')} className="px-4 py-2 rounded-xl bg-[#FF5701] hover:bg-[#E04D00] text-white text-xs sm:text-sm font-semibold shadow-sm transition-all inline-flex items-center gap-1.5">
+                  <span>Mở Cài đặt dịch vụ</span>
+                  <span>→</span>
+                </a>
+                <a href="/" onClick={appLink(navigate, '/')} className="px-4 py-2 rounded-xl bg-[#F8F8F6] hover:bg-neutral-200/70 text-[#111827] border border-[#E7E7E2] text-xs sm:text-sm font-semibold transition-all inline-flex items-center gap-1.5">
+                  <span>Quay lại trò chuyện</span>
+                </a>
+              </div>
             </div>
             {/* Thẻ số liệu tóm tắt nhanh */}
             <div className="grid grid-cols-2 gap-2 sm:gap-3 flex-shrink-0">
@@ -409,8 +448,53 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
               </div>
             </div>
           </div>
+
+          {/* Bắt đầu sử dụng ATI + Make.com Orbital Pipeline Showcase */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] v3-space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-[#111827]">
+                  Bắt đầu sử dụng ATI
+                </h2>
+                <p className="text-xs sm:text-sm text-[#4B5563]">
+                  Mọi yêu cầu phức tạp đều được ATI lập thành sơ đồ Orbital Pipeline trực quan, tự động rẽ nhánh qua Router và chờ bạn duyệt trước khi chạy.
+                </p>
+              </div>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 self-start sm:self-center">
+                OAuth 2.0 · 1-Click
+              </span>
+            </div>
+            <WorkflowFlowCanvas services={GUIDE_HERO_FLOW_SERVICES} mode="preview" />
+          </div>
+
+          {/* Cài đặt dịch vụ 1-Click OAuth Showcase */}
+          <div className="v3-space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm sm:text-base font-bold text-[#111827]">
+                Cài đặt dịch vụ
+              </h2>
+              <a href="/settings" onClick={appLink(navigate, '/settings')} className="text-xs font-semibold text-[#FF5701] hover:underline">
+                Mở Cài đặt dịch vụ →
+              </a>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {GUIDE_OAUTH_SHOWCASE_CARDS.map(card => (
+                <div key={card.service} className="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] flex flex-col justify-between gap-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-7 h-7 rounded-lg bg-white border border-[#E7E7E2] flex items-center justify-center"><ServiceLogo service={card.service} className={card.iconClassName} /></span>
+                      <span className="text-xs font-bold text-[#111827]">{card.title}</span>
+                    </div>
+                    <span className={card.badgeStyle === 'oauth' ? 'text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200' : 'text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white text-[#4B5563] border border-[#E7E7E2]'}>{card.badge}</span>
+                  </div>
+                  <p className="text-[11px] text-[#4B5563]">{card.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* 3 Tabs Điều hướng Phân khu chính */}
-          <div className="mt-8 pt-4 border-t border-[#E7E7E2]">
+          <div className="pt-4 border-t border-[#E7E7E2]">
             <nav className="flex flex-wrap gap-2" aria-label="Các phân khu cẩm nang" role="tablist">
               <button type="button" role="tab" aria-controls="section-keys" onClick={() => actions.switchMainTab('keys')} id="tab-btn-keys" {...tabProps('keys')}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -466,6 +550,21 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
           <div id="service-guide-detail" className="bg-white rounded-2xl border border-[#E7E7E2] p-6 sm:p-8 shadow-sm v3-space-y-6">
             <ServiceGuideDetail serviceId={SERVICE_GUIDES[serviceId] ? serviceId : DEFAULT_SERVICE} guides={SERVICE_GUIDES} navigate={navigate} />
           </div>
+          {/* Ngăn kéo nâng cao dành cho Quản trị viên Workspace */}
+          <details data-testid="workspace-admin-advanced-drawer" className="bg-white rounded-2xl border border-[#E7E7E2] p-5 sm:p-6 shadow-sm">
+            <summary className="cursor-pointer font-bold text-sm sm:text-base text-[#111827] flex items-center justify-between gap-2">
+              <span>Dành cho Quản trị viên Workspace (Nâng cao)</span>
+              <span className="text-xs font-medium text-[#6B7280]">Cấu hình API Token dùng chung cho nhóm</span>
+            </summary>
+            <div className="mt-4 pt-4 border-t border-[#E7E7E2] text-xs sm:text-sm text-[#4B5563] v3-space-y-2 leading-relaxed">
+              <p>
+                Các công cụ cá nhân (Google Calendar, Google Sheets, Trello cá nhân) ưu tiên kết nối trực tiếp qua <strong>OAuth 2.0 1-Click</strong> trong trang <a href="/settings" onClick={appLink(navigate, '/settings')} className="text-[#FF5701] font-semibold underline">Cài đặt dịch vụ</a> mà không cần tạo hay dán khoá thủ công.
+              </p>
+              <p>
+                Đối với các tích hợp dùng chung toàn nhóm (Slack Bot Token <code>xoxb-</code>, GitHub Personal Access Token, Notion Integration Secret, Google Drive Service Account, Telegram Bot Token), Quản trị viên Workspace có thể làm theo hướng dẫn từng bước ở trên và giới hạn phạm vi kênh/kho mã được phép truy cập.
+              </p>
+            </div>
+          </details>
         </section>
         {/* ========================================================
          PHÂN KHU 2: THƯ VIỆN CÂU LỆNH MẪU TIẾNG VIỆT HIỆU QUẢ CAO
