@@ -7,7 +7,7 @@ import { serviceView } from './data';
 
 type Draft = { credentials: Record<string, string>; scopes: string[]; newScope: string };
 type Feedback = { kind: 'saved' | 'success' | 'rejected' | 'timeout'; message: string; time: string };
-const PERSONAL_OAUTH_SERVICE_IDS = new Set(['gmail', 'mycalendar', 'mysheets', 'trello']);
+const PERSONAL_OAUTH_SERVICE_IDS = new Set(['gmail', 'mycalendar', 'mysheets', 'trello', 'github']);
 export function useSettings(user: User | null) {
   const [services, setServices] = useState<ServiceInfo[]>([]);
   const [canEdit, setCanEdit] = useState(false);

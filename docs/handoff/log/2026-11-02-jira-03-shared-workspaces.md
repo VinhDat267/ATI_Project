@@ -14,7 +14,7 @@ Chi phí của các lựa chọn triển khai: người dùng phải được du
 
 ## Mã thay đổi
 
-- Migration `0018_jira_workspaces.sql`: phần chính sách cùng UUID, membership/invite, account/grant/site/project/audit, chỉ mục identity active, version và composite FK; cờ hội thoại và trigger bất biến. Giữ migration #237 chạy trước để backfill an toàn.
+- Migration `0019_jira_workspaces.sql`: phần chính sách cùng UUID, membership/invite, account/grant/site/project/audit, chỉ mục identity active, version và composite FK; cờ hội thoại và trigger bất biến. Giữ migration #237 chạy trước để backfill an toàn.
 - Repository `apps/chat-api/src/db/repositories/workspace/`: transaction/authority hiện tại, bootstrap/recovery, SQL CAS, last effective admin, token 256-bit lưu hash, DB clock sau mọi chờ khóa và so sánh timestamp trong PostgreSQL.
 - API, app/server và authority hội thoại: hai lớp quyền, rate limit, không fake capability khi thiếu native verifier; owner/scope trước history/plan/SSE/execution/schedule. Pool thất bại được đóng và bỏ khi chuyển sang memory sandbox.
 - Hồi quy PostgreSQL, HTTP và sandbox thật; fixture canonical typecheck; cập nhật fixture lịch sử và database test theo cấu hình. Không sửa frontend/catalog/planner trong phần chênh lệch so với main #237.
@@ -58,3 +58,8 @@ Bằng chứng cuối thay các đợt trước: **npm run check exit 0**, **3.3
 Mặc dù whole-branch review và CI/browser của5f đã đạt, rà soát bổ sung tìm thấy title object có thể bị overload repository hiểu thành ConversationScope. Hai test HTTP/PostgreSQL mới tái hiện201 thay400. Route chặn mọi title ngoài string/null/omitted, rồi chuẩn hóa riêng string hoặc undefined trước gọi repository. Native implementer thực hiện bản vá; 16 test nhóm hội thoại GREEN, gồm title chuỗi, null và JSON-text giữ nguyên scope.
 
 Fullcheck sau vá exit0: **3.309 v3** = schema341 +adapter464 +planner381 +executor42 +API1.164/134file +web917;406eval,32Nodeprobe,1launcher+66Node/env,build/security đạt. Ma trận tăng lên14 đột biến; ca cuối bỏ cả type rejection và string-only normalization để tái tạo scope injection. Bộ điều phối chạy thật, khôi phục byte/SHA và kiểm tra control sau phục hồi. Scoped re-review của đúng delta và CI/browser trên head mới được ghi trong PR #240; không coi kết quả5f là nghiệm thu bản vá.
+
+
+## Tích hợp main #241 và bằng chứng hiện tại
+
+Main `956d213` thêm GitHub OAuth/digest và migration0018. Ghép cả tùy chọn GitHub và Jira trong AppOptions; giữ wiring pool, authority và cổng Jira 503 trong server. Jira chuyển sang **0019_jira_workspaces.sql**. PostgreSQL kiểm thử riêng áp dụng migrations0001–0019 thành công. `npm run check` exit0: **3.387 v3 PASS** = schemas341 + adapters466 + planner381 + executor42 + API1.228 (146 file, không skip) + web929; **406 eval**, 32 Node probe, 1 launcher +66 Node/env và build/security đạt. Chạy lại **14/14 đột biến**, tất cả bị assertion bắt, khôi phục đúng byte/SHA và control xanh. Các số liệu #238/#239/title ở trên là lịch sử; review delta và CI/browser trên SHA cuối được ghi tại PR #240.

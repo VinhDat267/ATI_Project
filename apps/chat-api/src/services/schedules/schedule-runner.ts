@@ -1,12 +1,13 @@
 import type pg from 'pg';
-import type { CalendarDigestConfig, ScheduleKind, ScheduleRunMessageMetadata } from '@wap/tool-schemas';
+import type { CalendarDigestConfig, GithubDigestConfig, ScheduleKind, ScheduleRecurrence, ScheduleRunMessageMetadata } from '@wap/tool-schemas';
 import { MessageRepo } from '../../db/repositories/message-repo.js';
 import type { Queryable, ScheduleRow } from '../../db/repositories/schedule-repo.js';
-import type { DigestRunOutcome, RunCalendarDigest } from './calendar-digest-runner.js';
+import type { DigestRunOutcome as CalendarDigestRunOutcome, RunCalendarDigest } from './calendar-digest-runner.js';
 import { RUN_SELECT, runState, type RunRow } from './run-state.js';
 import { localLabel, nextOccurrence } from './next-occurrence.js';
 import type { ScheduleChange } from './schedule-service.js';
 import type { SheetsDigestRunner } from './sheets-digest-runner.js';
+import type { DigestRunOutcome as GithubDigestRunOutcome, RunGithubDigest } from './github-digest-runner.js';
 
 export interface RunToPlan {
   runId: string; scheduleId: string; scheduleVersion: number; userId: string;
@@ -30,7 +31,8 @@ export function runMessage(run: Pick<RunToPlan, 'name' | 'request' | 'dueAt'>, t
 export interface ScheduleRunnerOptions {
   pool: pg.Pool;
   planRun: PlanRun;
-  runDigest?: RunCalendarDigest;
+  runDigest?: RunCalendarDigest | RunGithubDigest;
+  runGithubDigest?: RunGithubDigest;
   timeZone: string;
   /** Writes the state message of a schedule the runner paused or completed (ScheduleService.recordState). */
   recordState: (client: Queryable, row: ScheduleRow, now: Date) => Promise<ScheduleChange>;
@@ -47,6 +49,7 @@ const MAX_MISSED = 1000;
 const BLOCKED = 'Tài khoản không còn hoạt động.';
 const UNAPPROVED = '3 lượt liền không được duyệt';
 const DIGEST_FAILED_3X = '3 lượt gửi bản tin liên tiếp thất bại';
+const GITHUB_DIGEST_FAILED_3X = '3 lượt liền gửi thất bại';
 const DIGEST_FAILED = 'Không gửi được bản tin lịch lúc này.';
 const DISCARDED = 'Lịch đã thay đổi trong lúc lập kế hoạch. Kết quả này bị bỏ.';
 const FAILED = 'Không lập được kế hoạch lúc này. Hãy thử lại.';
@@ -204,7 +207,7 @@ export class ScheduleRunner {
           if (moved.status === 'completed') changes.push(await this.options.recordState(client, moved, now));
           continue;
         }
-        if (await this.lastThreeExpired(client, row.id, now)) {
+        if (row.kind !== 'github_digest' && await this.lastThreeExpired(client, row.id, now)) {
           changes.push(await this.options.recordState(client, await this.pause(client, row.id, UNAPPROVED), now));
           continue;
         }
@@ -280,7 +283,8 @@ export class ScheduleRunner {
         messageId: first.id,
         scheduleRow,
         kind: (run.kind ?? 'plan_approval') as ScheduleKind,
-        digestConfig: (run.digest_config ?? null) as CalendarDigestConfig | null,
+        recurrence: run.recurrence as ScheduleRecurrence,
+        digestConfig: (run.digest_config ?? null) as CalendarDigestConfig | GithubDigestConfig | null,
         digestConfigHash: (run.digest_config_hash ?? null) as string | null,
       };
     });
@@ -292,7 +296,18 @@ export class ScheduleRunner {
     }
 
     if (started.kind === 'calendar_digest') {
-      await this.runDigestOne(started);
+      await this.runDigestOne({
+        ...started,
+        digestConfig: started.digestConfig as CalendarDigestConfig | null,
+      });
+      return;
+    }
+
+    if (started.kind === 'github_digest' && (this.options.runGithubDigest || this.options.runDigest)) {
+      await this.executeDigestOne(runId, {
+        ...started,
+        digestConfig: started.digestConfig as GithubDigestConfig | null,
+      });
       return;
     }
 
@@ -483,15 +498,16 @@ export class ScheduleRunner {
     this.current = controller;
     let timedOut = false;
     const timer = setTimeout(() => { timedOut = true; controller.abort(); }, this.planTimeoutMs);
-    let outcome: DigestRunOutcome;
+    let outcome: CalendarDigestRunOutcome;
     let stoppedError = false;
     try {
-      if (!this.options.runDigest) throw new Error('Chưa nối digest runner');
+      const calendarRunner = this.options.runDigest as RunCalendarDigest | undefined;
+      if (!calendarRunner) throw new Error('Chưa nối digest runner');
       const aborted = new Promise<never>((_, reject) =>
         controller.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true }),
       );
       outcome = await Promise.race([
-        this.options.runDigest(
+        calendarRunner(
           {
             ...started.toPlan,
             digestConfig: started.digestConfig,
@@ -571,6 +587,151 @@ export class ScheduleRunner {
       this.send(started.convId, 'error', {
         conversationId: started.convId,
         message: result.ended,
+        replyToMessageId: started.messageId,
+      });
+    }
+  }
+
+  private async executeDigestOne(
+    runId: string,
+    started: {
+      toPlan: RunToPlan;
+      convId: string;
+      messageId: string;
+      recurrence: ScheduleRecurrence;
+      digestConfig: GithubDigestConfig | null;
+      digestConfigHash: string | null;
+    },
+  ): Promise<void> {
+    const { pool } = this.options;
+    const controller = new AbortController();
+    this.current = controller;
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, this.planTimeoutMs);
+
+    let outcome: GithubDigestRunOutcome | null = null;
+    let failure: string | null = null;
+    try {
+      const githubRunner = (this.options.runGithubDigest ?? this.options.runDigest) as RunGithubDigest | undefined;
+      if (!githubRunner) throw new Error('Chưa nối digest runner');
+      const aborted = new Promise<never>((_, reject) =>
+        controller.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true }),
+      );
+      outcome = await Promise.race([
+        githubRunner(
+          {
+            ...started.toPlan,
+            recurrence: started.recurrence,
+            digestConfig: started.digestConfig,
+            digestConfigHash: started.digestConfigHash,
+          },
+          started.convId,
+          controller.signal,
+        ),
+        aborted,
+      ]);
+    } catch (error) {
+      failure = timedOut ? TIMED_OUT : this.stopping ? STOPPED : 'Không gửi được bản tin lúc này. Hãy thử lại.';
+      if (!timedOut && !this.stopping) {
+        console.error('[schedules] running digest failed:', error instanceof Error ? error.message : error);
+      }
+    } finally {
+      clearTimeout(timer);
+      this.current = null;
+    }
+
+    const now = this.now();
+    const committed = await inTransaction(pool, async (client) => {
+      // Lock schedule's conversation together with schedule to preserve canonical lock order
+      const schedRes = await client.query(
+        'SELECT s.* FROM schedules s JOIN conversations c ON c.id = s.conv_id WHERE s.id = $1 FOR UPDATE OF c, s',
+        [started.toPlan.scheduleId],
+      );
+      const schedule = schedRes.rows[0] as ScheduleRow | undefined;
+      const run = (await client.query('SELECT status FROM schedule_runs WHERE id = $1 FOR UPDATE', [runId])).rows[0];
+      if (!schedule || run?.status !== 'planning') return null;
+
+      const replyTo = { replyToMessageId: started.messageId };
+      const changes: ScheduleChange[] = [];
+
+      if (failure && this.stopping) {
+        await this.messages.createMessage(started.convId, 'system', `Lỗi: ${STOPPED}`, { type: 'planning_error', ...replyTo }, client);
+        await client.query("UPDATE schedule_runs SET status='interrupted', error=$2, updated_at=now() WHERE id=$1", [runId, STOPPED]);
+        return { kind: 'error' as const, error: STOPPED, changes };
+      }
+
+      if (outcome?.state === 'discarded') {
+        await this.messages.createMessage(started.convId, 'system', DISCARDED, { type: 'schedule_discarded', ...replyTo }, client);
+        await client.query("UPDATE schedule_runs SET status='discarded', updated_at=now() WHERE id=$1", [runId]);
+        return { kind: 'error' as const, error: DISCARDED, changes };
+      }
+
+      if (outcome?.state === 'blocked') {
+        await this.messages.createMessage(started.convId, 'system', `Lỗi: ${outcome.error}`, { type: 'planning_error', ...replyTo }, client);
+        await client.query("UPDATE schedule_runs SET status='blocked', error=$2, updated_at=now() WHERE id=$1", [runId, outcome.error]);
+        if (schedule.status === 'active') {
+          const paused = await this.pause(client, schedule.id, outcome.pauseReason);
+          changes.push(await this.options.recordState(client, paused, now));
+        }
+        return { kind: 'error' as const, error: outcome.error, changes };
+      }
+
+      if (outcome?.state === 'digest_sent') {
+        await this.messages.createMessage(
+          started.convId,
+          'assistant',
+          outcome.text,
+          { type: 'answer', lookups: [], usedDirectory: [], ...replyTo },
+          client,
+        );
+        await client.query(
+          "UPDATE schedule_runs SET status='digest_sent', delivery=$2, updated_at=now() WHERE id=$1",
+          [runId, JSON.stringify(outcome.delivery)],
+        );
+        return { kind: 'sent' as const, text: outcome.text, changes };
+      }
+
+      const errText = outcome?.state === 'digest_failed' ? outcome.error : failure ?? 'Không gửi được bản tin lúc này. Hãy thử lại.';
+      await this.messages.createMessage(started.convId, 'system', `Lỗi: ${errText}`, { type: 'planning_error', ...replyTo }, client);
+      await client.query("UPDATE schedule_runs SET status='digest_failed', error=$2, updated_at=now() WHERE id=$1", [runId, errText]);
+
+      const recentRuns = await client.query(
+        'SELECT status FROM schedule_runs WHERE schedule_id = $1 ORDER BY created_at DESC, id DESC LIMIT 3',
+        [schedule.id],
+      );
+      if (
+        schedule.status === 'active' &&
+        recentRuns.rows.length === 3 &&
+        recentRuns.rows.every((r: { status: string }) => r.status === 'digest_failed')
+      ) {
+        const paused = await this.pause(client, schedule.id, GITHUB_DIGEST_FAILED_3X);
+        changes.push(await this.options.recordState(client, paused, now));
+      }
+      return { kind: 'error' as const, error: errText, changes };
+    });
+
+    if (!committed) return;
+    this.announce(committed.changes);
+    if (committed.kind === 'sent') {
+      this.send(started.convId, 'answer', {
+        conversationId: started.convId,
+        text: committed.text,
+        lookups: [],
+        usedDirectory: [],
+        replyToMessageId: started.messageId,
+      });
+      this.send(started.convId, 'agent_state', {
+        conversationId: started.convId,
+        state: 'idle',
+        replyToMessageId: started.messageId,
+      });
+    } else {
+      this.send(started.convId, 'error', {
+        conversationId: started.convId,
+        message: committed.error,
         replyToMessageId: started.messageId,
       });
     }

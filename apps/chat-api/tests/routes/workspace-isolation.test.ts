@@ -557,12 +557,12 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
         .set('X-Workspace-Id', 'personal')
         .send({ credentials: { botToken: 'xoxb-personal-slack' }, allowedScope: ['C1'] });
 
-      // Configure GitHub in Org A
+      // Configure Notion in Org A
       await request(app)
-        .post('/api/services/github/credentials')
+        .post('/api/services/notion/credentials')
         .set('Authorization', `Bearer ${aliceToken}`)
         .set('X-Workspace-Id', orgA.id)
-        .send({ credentials: { token: 'ghp_orgA_token123456' }, allowedScope: ['owner/repo'] });
+        .send({ credentials: { token: 'secret_orgA_token123456' }, allowedScope: ['00000000-0000-0000-0000-000000000001'] });
 
       // Connect Trello & save personal scope for Alice
       await connectUserTrello(alice);
@@ -582,7 +582,7 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
         } as any,
       });
 
-      // 1. Personal tool catalog for Alice includes slack & trello, NOT github
+      // 1. Personal tool catalog for Alice includes slack & trello, NOT notion
       const personalCatalog = await getToolCatalogFor(credentials, key, {
         userId: alice.id,
         workspaceMode: 'personal',
@@ -593,9 +593,9 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
       const personalServices = new Set(personalCatalog.map((t) => t.service));
       expect(personalServices.has('slack')).toBe(true);
       expect(personalServices.has('trello')).toBe(true);
-      expect(personalServices.has('github')).toBe(false);
+      expect(personalServices.has('notion')).toBe(false);
 
-      // 2. Org A tool catalog includes github, NOT Alice's personal slack or personal trello scope
+      // 2. Org A tool catalog includes notion, NOT Alice's personal slack or personal trello scope
       const orgACatalog = await getToolCatalogFor(credentials, key, {
         userId: alice.id,
         workspaceMode: 'organization',
@@ -604,7 +604,7 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
         trelloConnection: trelloLookup,
       });
       const orgAServices = new Set(orgACatalog.map((t) => t.service));
-      expect(orgAServices.has('github')).toBe(true);
+      expect(orgAServices.has('notion')).toBe(true);
       expect(orgAServices.has('slack')).toBe(false);
       expect(orgAServices.has('trello')).toBe(false);
 

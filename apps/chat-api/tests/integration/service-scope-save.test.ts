@@ -17,12 +17,16 @@ describe('scope-only service configuration on PostgreSQL', () => {
   const secret = 'fixture-secret-at-least-32-characters';
   const adminToken = generateTokens({ id: 'fixture-admin', email: 'admin@example.test', name: 'Admin' }, secret).accessToken;
   const memberToken = generateTokens({ id: 'fixture-member', email: 'member@example.test', name: 'Member' }, secret).accessToken;
-  const oldConfig = { token: 'ui-api-01-private-token', extra: { preserved: 'ui-api-01-extra-secret' }, allowedScope: { repos: ['old/repo'] } };
+  const db1 = '00000000-0000-0000-0000-000000000001';
+  const db2 = '00000000-0000-0000-0000-000000000002';
+  const db3 = '00000000-0000-0000-0000-000000000003';
+  const db4 = '00000000-0000-0000-0000-000000000004';
+  const oldConfig = { token: 'ui-api-01-private-token', extra: { preserved: 'ui-api-01-extra-secret' }, allowedScope: { databases: [db1] } };
   const changed: string[] = [];
-  const fetchFn = async () => new Response('{"id":1,"login":"fixture"}');
+  const fetchFn = async () => new Response(JSON.stringify({ object: 'database', id: db1, title: [{ plain_text: 'fixture' }] }));
   const app = createApp({ jwtSecret: secret, encryptionKey: key, credentialRepo: repo,
     serviceFetchFn: fetchFn, serviceAdminUserIds: ['fixture-admin'], onCredentialsChanged: service => { changed.push(service); } });
-  const saveScope = (allowedScope: unknown, token = adminToken, service = 'github') => request(app)
+  const saveScope = (allowedScope: unknown, token = adminToken, service = 'notion') => request(app)
     .put(`/api/services/${service}/scope`).set('Authorization', `Bearer ${token}`).send({ allowedScope });
   let logSpies: ReturnType<typeof vi.spyOn>[];
 
@@ -52,91 +56,91 @@ describe('scope-only service configuration on PostgreSQL', () => {
   });
 
   it('normalizes scope, preserves every saved key, invalidates health and refreshes configured services', async () => {
-    const original = await repo.saveCredentials('github', encryptCredentials(oldConfig, key));
-    expect((await request(app).post('/api/services/github/test').set('Authorization', `Bearer ${adminToken}`)).status).toBe(200);
-    const response = await saveScope([' new/repo ', 'new/repo', 'other/repo']);
+    const original = await repo.saveCredentials('notion', encryptCredentials(oldConfig, key));
+    expect((await request(app).post('/api/services/notion/test').set('Authorization', `Bearer ${adminToken}`)).status).toBe(200);
+    const response = await saveScope([` ${db2} `, db2, db3]);
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({ success: true, message: 'Allowed scope saved for github' });
+    expect(response.body).toEqual({ success: true, message: 'Allowed scope saved for notion' });
     expect(response.text).not.toContain(oldConfig.token);
-    const saved = (await repo.getCredentials('github'))!;
+    const saved = (await repo.getCredentials('notion'))!;
     expect(saved.config).not.toBe(original.config);
-    expect(decryptCredentials(saved.config, key)).toEqual({ token: 'ui-api-01-private-token', extra: { preserved: 'ui-api-01-extra-secret' }, allowedScope: { repos: ['new/repo', 'other/repo'] } });
+    expect(decryptCredentials(saved.config, key)).toEqual({ token: 'ui-api-01-private-token', extra: { preserved: 'ui-api-01-extra-secret' }, allowedScope: { databases: [db2, db3] } });
     const listed = await request(app).get('/api/services').set('Authorization', `Bearer ${adminToken}`);
-    expect(listed.body.services.find((service: any) => service.id === 'github')).toMatchObject({ configured: true, connected: false, connectionStatus: 'unchecked', lastCheckedAt: null, allowedScope: ['new/repo', 'other/repo'] });
-    expect(changed).toEqual(['github']);
+    expect(listed.body.services.find((service: any) => service.id === 'notion')).toMatchObject({ configured: true, connected: false, connectionStatus: 'unchecked', lastCheckedAt: null, allowedScope: [db2, db3] });
+    expect(changed).toEqual(['notion']);
   });
 
   it('accepts the existing keyed scope shape', async () => {
-    await repo.saveCredentials('github', encryptCredentials(oldConfig, key));
-    expect((await saveScope({ repos: [' new/repo ', 'new/repo'] })).status).toBe(200);
-    expect(decryptCredentials((await repo.getCredentials('github'))!.config, key).allowedScope).toEqual({ repos: ['new/repo'] });
+    await repo.saveCredentials('notion', encryptCredentials(oldConfig, key));
+    expect((await saveScope({ databases: [` ${db2} `, db2] })).status).toBe(200);
+    expect(decryptCredentials((await repo.getCredentials('notion'))!.config, key).allowedScope).toEqual({ databases: [db2] });
   });
 
   it('denies a member before reading or modifying secrets', async () => {
-    const original = await repo.saveCredentials('github', encryptCredentials(oldConfig, key));
-    expect((await saveScope(['new/repo'], memberToken)).status).toBe(403);
-    expect((await repo.getCredentials('github'))!.config).toBe(original.config);
+    const original = await repo.saveCredentials('notion', encryptCredentials(oldConfig, key));
+    expect((await saveScope([db2], memberToken)).status).toBe(403);
+    expect((await repo.getCredentials('notion'))!.config).toBe(original.config);
     expect(changed).toEqual([]);
   });
 
   it('requires authentication', async () => {
-    expect((await request(app).put('/api/services/github/scope').send({ allowedScope: ['new/repo'] })).status).toBe(401);
+    expect((await request(app).put('/api/services/notion/scope').send({ allowedScope: [db2] })).status).toBe(401);
   });
 
   it('reports missing credentials without creating them', async () => {
-    expect((await saveScope(['new/repo'])).status).toBe(409);
-    expect(await repo.getCredentials('github')).toBeNull();
+    expect((await saveScope([db2])).status).toBe(409);
+    expect(await repo.getCredentials('notion')).toBeNull();
     expect(changed).toEqual([]);
   });
 
-  it.each([[], [''], ['not-a-repo'], { channels: ['C1'] }, 'new/repo', [123], null].map(allowedScope => ({ allowedScope })))('rejects invalid scope $allowedScope without changing the encrypted config', async ({ allowedScope }) => {
-    const original = await repo.saveCredentials('github', encryptCredentials(oldConfig, key));
+  it.each([[], [''], ['not-a-repo'], { channels: ['C1'] }, db2, [123], null].map(allowedScope => ({ allowedScope })))('rejects invalid scope $allowedScope without changing the encrypted config', async ({ allowedScope }) => {
+    const original = await repo.saveCredentials('notion', encryptCredentials(oldConfig, key));
     expect((await saveScope(allowedScope)).status).toBe(400);
-    expect((await repo.getCredentials('github'))!.config).toBe(original.config);
+    expect((await repo.getCredentials('notion'))!.config).toBe(original.config);
     expect(changed).toEqual([]);
   });
 
   it('rejects unsupported services', async () => {
-    expect((await saveScope(['new/repo'], adminToken, 'unsupported')).status).toBe(400);
+    expect((await saveScope([db2], adminToken, 'unsupported')).status).toBe(400);
   });
 
   it('sanitizes a failure thrown while decrypting saved credentials', async () => {
-    await repo.saveCredentials('github', 'ui-api-01-private-token');
-    const response = await saveScope(['new/repo']);
+    await repo.saveCredentials('notion', 'ui-api-01-private-token');
+    const response = await saveScope([db2]);
     expect(response.status).toBe(500);
     expect(response.text).not.toContain('ui-api-01-private-token');
     expect(changed).toEqual([]);
   });
 
   it('ignores a connection check that finishes after scope was saved', async () => {
-    await repo.saveCredentials('github', encryptCredentials(oldConfig, key));
+    await repo.saveCredentials('notion', encryptCredentials(oldConfig, key));
     let release!: () => void;
     let entered!: () => void;
     const started = new Promise<void>(resolve => { entered = resolve; });
-    const held = new Promise<Response>(resolve => { release = () => resolve(new Response('{"id":1,"login":"fixture"}')); });
+    const held = new Promise<Response>(resolve => { release = () => resolve(new Response(JSON.stringify({ object: 'database', id: db1, title: [{ plain_text: 'fixture' }] }))); });
     const delayedApp = createApp({ jwtSecret: secret, encryptionKey: key, credentialRepo: repo,
       serviceAdminUserIds: ['fixture-admin'], serviceFetchFn: async () => { entered(); return held; } });
-    const check = request(delayedApp).post('/api/services/github/test').set('Authorization', `Bearer ${adminToken}`).then(response => response);
+    const check = request(delayedApp).post('/api/services/notion/test').set('Authorization', `Bearer ${adminToken}`).then(response => response);
     try {
       await started;
-      const saved = await request(delayedApp).put('/api/services/github/scope').set('Authorization', `Bearer ${adminToken}`).send({ allowedScope: ['new/repo'] });
+      const saved = await request(delayedApp).put('/api/services/notion/scope').set('Authorization', `Bearer ${adminToken}`).send({ allowedScope: [db2] });
       expect(saved.status).toBe(200);
     } finally { release(); await check; }
     const listed = await request(delayedApp).get('/api/services').set('Authorization', `Bearer ${adminToken}`);
-    expect(listed.body.services.find((service: any) => service.id === 'github')).toMatchObject({ configured: true, connected: false, connectionStatus: 'unchecked', lastCheckedAt: null });
+    expect(listed.body.services.find((service: any) => service.id === 'notion')).toMatchObject({ configured: true, connected: false, connectionStatus: 'unchecked', lastCheckedAt: null });
   });
 
   it('waits for a concurrent SQL credential replacement and preserves its new keys', async () => {
-    await repo.saveCredentials('github', encryptCredentials(oldConfig, key));
+    await repo.saveCredentials('notion', encryptCredentials(oldConfig, key));
     const holder = await pool.connect();
     let pending: Promise<request.Response> | undefined;
     try {
       await holder.query('BEGIN');
-      await holder.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', ['github', 'team-shared']);
+      await holder.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', ['notion', 'team-shared']);
       // Same DELETE/INSERT replacement performed by saveCredentials, still uncommitted.
-      await holder.query('DELETE FROM service_credentials WHERE service=$1 AND user_id IS NULL', ['github']);
-      await holder.query('INSERT INTO service_credentials(service,user_id,config) VALUES($1,NULL,$2)', ['github', encryptCredentials({ token: 'ui-api-01-new-token', extra: { preserved: 'new-extra' }, allowedScope: { repos: ['replacement/repo'] } }, key)]);
-      pending = saveScope(['new/repo']).then(response => response);
+      await holder.query('DELETE FROM service_credentials WHERE service=$1 AND user_id IS NULL', ['notion']);
+      await holder.query('INSERT INTO service_credentials(service,user_id,config) VALUES($1,NULL,$2)', ['notion', encryptCredentials({ token: 'ui-api-01-new-token', extra: { preserved: 'new-extra' }, allowedScope: { databases: [db4] } }, key)]);
+      pending = saveScope([db2]).then(response => response);
       const blocked = vi.waitFor(async () => {
         const result = await admin.query("SELECT count(*)::int AS count FROM pg_stat_activity WHERE application_name=$1 AND wait_event='advisory'", [schema]);
         expect(result.rows[0].count).toBe(1);
@@ -146,7 +150,7 @@ describe('scope-only service configuration on PostgreSQL', () => {
       expect(first).toBe('blocked');
       await holder.query('COMMIT');
       expect((await pending).status).toBe(200);
-      expect(decryptCredentials((await repo.getCredentials('github'))!.config, key)).toEqual({ token: 'ui-api-01-new-token', extra: { preserved: 'new-extra' }, allowedScope: { repos: ['new/repo'] } });
+      expect(decryptCredentials((await repo.getCredentials('notion'))!.config, key)).toEqual({ token: 'ui-api-01-new-token', extra: { preserved: 'new-extra' }, allowedScope: { databases: [db2] } });
     } finally {
       await holder.query('ROLLBACK');
       holder.release();

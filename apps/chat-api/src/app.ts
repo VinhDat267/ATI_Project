@@ -29,17 +29,20 @@ import type { ExecutionService } from './services/execution-service.js';
 import { userFacingError } from './services/user-facing-error.js';
 import type { EmailSender } from './services/email/index.js';
 import type { GoogleOAuthConfig } from './auth/google-oidc.js';
-import type { GmailOAuthConfig, TrelloOAuthConfig } from './config/env.js';
+import type { GmailOAuthConfig, GitHubOAuthConfig, TrelloOAuthConfig } from './config/env.js';
 import type { GmailConnectionRepo } from './db/repositories/gmail-connection-repo.js';
 import { TrelloTeamRepo } from './db/repositories/trello-team-repo.js';
+import { GitHubTeamRepo } from './db/repositories/github-team-repo.js';
 import { createGmailConnectionRoutes, isGmailAvailable } from './routes/connections/gmail.js';
 import { createMyCalendarConnectionRoutes, isMyCalendarAvailable } from './routes/connections/mycalendar.js';
 import { createMySheetsConnectionRoutes, isMySheetsAvailable } from './routes/connections/mysheets.js';
 import { createTrelloConnectionRoutes, isTrelloConnectAvailable, type TrelloConnectionsOptions } from './routes/connections/trello.js';
+import { createGitHubConnectionRoutes, type GitHubConnectionsOptions } from './routes/connections/github.js';
 import type { GlobalRateLimiter } from '@wap/tool-adapters';
 import type { GoogleAuthRepo } from './db/repositories/google-auth-repo.js';
 import type { GmailTokenManager } from './services/gmail/token-manager.js';
 import type { TrelloTokenManager } from './services/trello/token-manager.js';
+import type { GitHubTokenManager } from './services/github/token-manager.js';
 
 /** Gmail as each member's own connection (GMAIL_ENABLED). Absent or disabled: the routes do not exist. */
 export interface GmailAppOptions {
@@ -88,6 +91,16 @@ export interface TrelloAppOptions {
   teamRepo?: TrelloTeamRepo;
 }
 
+/** GitHub as each member's own OAuth connection and team repositories. */
+export interface GitHubAppOptions {
+  oauth?: GitHubOAuthConfig;
+  fetchFn?: typeof fetch;
+  githubTimeoutMs?: number;
+  onConnectionChanged?: (userId: string) => void;
+  tokens?: Pick<GitHubTokenManager, 'forConnection'>;
+  teamRepo?: GitHubTeamRepo;
+}
+
 export interface AppOptions extends AdminUsersOptions {
   jwtSecret: string;
   runtimeMode?: 'sandbox' | 'live';
@@ -127,6 +140,9 @@ export interface AppOptions extends AdminUsersOptions {
   workspaceRateLimit?: WorkspaceRateLimitConfig;
   pool?: pg.Pool;
   enableWorkspaceConversations?: boolean;
+  github?: GitHubAppOptions;
+  githubTokens?: Pick<GitHubTokenManager, 'forConnection'>;
+  githubTeamRepo?: GitHubTeamRepo;
   /** Scheduled workflows; present only when SCHEDULES_ENABLED is on and PostgreSQL is available. */
   schedules?: ScheduleRoutesOptions;
 }
@@ -173,6 +189,16 @@ export function createApp(options: AppOptions): Express {
     tokens: trelloTokens, adminUserIds: options.serviceAdminUserIds,
     workspaceRepo: options.workspaceRepo,
   };
+  const githubTeamRepo = options.githubTeamRepo ?? options.github?.teamRepo ?? (options.credentialRepo ? new GitHubTeamRepo((options.credentialRepo as any).pool) : undefined);
+  const githubTokens = options.githubTokens ?? options.github?.tokens;
+  const githubRoutes: GitHubConnectionsOptions = {
+    jwtSecret: options.jwtSecret, sessionRepo, states, credentialRepo: options.credentialRepo,
+    teamRepo: githubTeamRepo, oauth: options.github?.oauth, encryptionKey: options.encryptionKey, fetchFn: options.github?.fetchFn,
+    clock: options.authClock, githubTimeoutMs: options.github?.githubTimeoutMs,
+    onConnectionChanged: options.github?.onConnectionChanged,
+    conversationOwner: options.convRepo ? async (id: string) => (await options.convRepo!.getConversation(id))?.user_id ?? null : undefined,
+    tokens: githubTokens, adminUserIds: options.serviceAdminUserIds,
+  };
 
   app.use(express.json());
   app.use((_req, res, next) => {
@@ -189,8 +215,8 @@ export function createApp(options: AppOptions): Express {
 
   // CORS middleware
   app.use((req, res, next) => {
-    if (req.path.startsWith('/api/auth/google/') || (gmailRoutes && req.path.startsWith('/api/connections/gmail')) || (mycalendarRoutes && req.path.startsWith('/api/connections/mycalendar')) || (mysheetsRoutes && req.path.startsWith('/api/connections/mysheets')) || req.path.startsWith('/api/connections/trello')) {
-      const origins = [options.appBaseUrl, options.googleOAuth?.redirectUri, options.gmail?.oauth?.redirectUri, options.mycalendar?.oauth?.redirectUri, options.mysheets?.oauth?.redirectUri, options.trello?.oauth?.redirectUri].filter(Boolean).map(url => new URL(url!).origin);
+    if (req.path.startsWith('/api/auth/google/') || (gmailRoutes && req.path.startsWith('/api/connections/gmail')) || (mycalendarRoutes && req.path.startsWith('/api/connections/mycalendar')) || (mysheetsRoutes && req.path.startsWith('/api/connections/mysheets')) || req.path.startsWith('/api/connections/trello') || req.path.startsWith('/api/connections/github')) {
+      const origins = [options.appBaseUrl, options.googleOAuth?.redirectUri, options.gmail?.oauth?.redirectUri, options.mycalendar?.oauth?.redirectUri, options.mysheets?.oauth?.redirectUri, options.trello?.oauth?.redirectUri, options.github?.oauth?.redirectUri].filter(Boolean).map(url => new URL(url!).origin);
       const origin = req.get('Origin');
       res.vary('Origin');
       if (origin && origins.includes(origin)) {
@@ -285,6 +311,7 @@ export function createApp(options: AppOptions): Express {
   if (mycalendarRoutes) app.use('/api/connections/mycalendar', createMyCalendarConnectionRoutes(mycalendarRoutes));
   if (mysheetsRoutes) app.use('/api/connections/mysheets', createMySheetsConnectionRoutes(mysheetsRoutes));
   app.use('/api/connections/trello', createTrelloConnectionRoutes(trelloRoutes));
+  app.use('/api/connections/github', createGitHubConnectionRoutes(githubRoutes));
 
   // Only schedule paths pass through this auth check, so other /api requests are not checked twice.
   if (options.schedules) {

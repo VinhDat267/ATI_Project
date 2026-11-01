@@ -179,4 +179,82 @@ describe('GitHub adapter', () => {
     await expect(adapter.execute('github.search_repos', { query: 'x', limit: 11 })).rejects.toMatchObject({ category: 'VALIDATION' });
     expect(fetchFn).toHaveBeenCalledTimes(1);
   });
+
+  it('supports structured issue/PR filter qualifiers and shorthand queries without breaking keyword search', async () => {
+    const prItem = {
+      id: 201,
+      number: 42,
+      title: 'Feat: add OAuth',
+      html_url: 'https://github.com/team/project/pull/42',
+      repository_url: 'https://api.github.com/repos/team/project',
+      pull_request: { url: 'https://api.github.com/repos/team/project/pulls/42' },
+    };
+    const issueItem = {
+      ...issue,
+      repository_url: 'https://api.github.com/repos/team/project',
+    };
+    const fetchFn = vi.fn(async () => json({ items: [issueItem, prItem] }));
+    const adapter = new GitHubAdapter({ credentials: { token: 'test' }, allowedScope, fetchFn: fetchFn as typeof fetch });
+
+    // 1. Structured qualifiers: is:open no:assignee
+    const unassignedRes = await adapter.execute('github.search_issues', { repo, query: 'is:open no:assignee' });
+    expect(unassignedRes).toEqual([{ id: '12', number: 7, title: 'Fix login', url: issue.html_url, repo }]);
+    expect(new URL(fetchFn.mock.calls[0]![0]).searchParams.get('q')).toBe('repo:team/project is:issue is:open no:assignee');
+
+    // 2. Pull request qualifiers: is:pr is:open draft:false review:none created:<=2026-10-30T00:00:00Z
+    const prRes = await adapter.execute('github.search_issues', {
+      repo,
+      query: 'is:pr is:open draft:false review:none created:<=2026-10-30T00:00:00Z',
+    });
+    expect(prRes).toEqual([
+      { id: '12', number: 7, title: 'Fix login', url: issue.html_url, repo },
+      { id: '201', number: 42, title: 'Feat: add OAuth', url: prItem.html_url, repo },
+    ]);
+    expect(new URL(fetchFn.mock.calls[1]![0]).searchParams.get('q')).toBe(
+      'repo:team/project is:pr is:open draft:false review:none created:<=2026-10-30T00:00:00Z'
+    );
+
+    // 3. Shorthands: *, unassigned, pr
+    await adapter.execute('github.search_issues', { repo, query: '*' });
+    expect(new URL(fetchFn.mock.calls[2]![0]).searchParams.get('q')).toBe('repo:team/project is:issue is:open');
+
+    await adapter.execute('github.search_issues', { repo, query: 'unassigned' });
+    expect(new URL(fetchFn.mock.calls[3]![0]).searchParams.get('q')).toBe('repo:team/project is:issue is:open no:assignee');
+
+    await adapter.execute('github.search_issues', { repo, query: 'pr' });
+    expect(new URL(fetchFn.mock.calls[4]![0]).searchParams.get('q')).toBe('repo:team/project is:pr is:open');
+
+    // 4. Plain keyword search still wraps in quotes and filters out pull_request
+    const kwRes = await adapter.execute('github.search_issues', { repo, query: 'login crash' });
+    expect(kwRes).toEqual([{ id: '12', number: 7, title: 'Fix login', url: issue.html_url, repo }]);
+    expect(new URL(fetchFn.mock.calls[5]![0]).searchParams.get('q')).toBe('repo:team/project is:issue "login crash"');
+  });
+
+  it('supports custom baseUrl and rejects out-of-scope context.repo before HTTP dispatch', async () => {
+    const fetchFn = vi.fn(async () =>
+      json({
+        items: [
+          {
+            ...issue,
+            repository_url: 'http://127.0.0.1:9999/repos/team/project',
+          },
+        ],
+      })
+    );
+    const adapter = new GitHubAdapter({
+      credentials: { token: 'test' },
+      allowedScope,
+      baseUrl: 'http://127.0.0.1:9999/',
+      fetchFn: fetchFn as typeof fetch,
+    });
+
+    await expect(
+      adapter.execute('github.get_issue', { repo, issueNumber: 7 }, { repo: 'octo/forbidden' } as any)
+    ).rejects.toMatchObject({ category: 'AUTH_ERROR', statusCode: 403 });
+    expect(fetchFn).not.toHaveBeenCalled();
+
+    const found = await adapter.execute('github.search_issues', { repo, query: '*' });
+    expect(found).toEqual([{ id: '12', number: 7, title: 'Fix login', url: issue.html_url, repo }]);
+    expect(fetchFn.mock.calls[0]![0]).toMatch(/^http:\/\/127\.0\.0\.1:9999\/search\/issues\?/);
+  });
 });
