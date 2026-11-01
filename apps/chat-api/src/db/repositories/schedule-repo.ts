@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import type { ScheduleRecurrence, ScheduleStatus, ScheduleView } from '@wap/tool-schemas';
+import type { ScheduleKind, ScheduleRecurrence, ScheduleStatus, ScheduleView, SheetsDigestConfig } from '@wap/tool-schemas';
 import { RUN_SELECT, runView, type RunRow } from '../../services/schedules/run-state.js';
 import { localLabel, nextRuns } from '../../services/schedules/next-occurrence.js';
 import { isUuid } from './uuid.js';
@@ -26,6 +26,10 @@ export interface ScheduleRow {
   last_proposal_id: string | null;
   workspace_id?: string | null;
   workspace_mode?: 'legacy' | 'personal' | 'organization';
+  kind?: ScheduleKind;
+  digest_config?: SheetsDigestConfig | null;
+  digest_config_hash?: string | null;
+  digest_approved_at?: Date | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -39,6 +43,7 @@ export class ScheduleRepo {
   view(row: ScheduleRow, lastRun: RunRow | null, now: Date): ScheduleView {
     const first = row.status === 'active' && row.next_run_at ? new Date(row.next_run_at) : null;
     const upcoming = first ? [first, ...nextRuns(row.recurrence, first, this.timeZone, 2)] : [];
+    const isDigest = row.kind === 'sheets_digest';
     return {
       id: row.id,
       convId: row.conv_id,
@@ -51,6 +56,13 @@ export class ScheduleRepo {
       pauseReason: row.pause_reason,
       nextRuns: upcoming.map((d) => d.toISOString()),
       lastRun: lastRun ? runView(lastRun, now) : null,
+      ...(isDigest
+        ? {
+            kind: 'sheets_digest' as const,
+            approvalMode: 'auto_digest' as const,
+            digestConfig: row.digest_config ?? null,
+          }
+        : {}),
     };
   }
 

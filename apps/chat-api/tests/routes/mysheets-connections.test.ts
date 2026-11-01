@@ -397,6 +397,38 @@ describe('Routes: /api/connections/mysheets', () => {
       expect(decrypted.allowedScope.spreadsheets).toEqual([validSpreadsheetId, readOnlySpreadsheetId]);
       expect(decrypted.selectedSpreadsheets).toHaveLength(2);
     });
+
+    it('accepts full Google Sheets URLs in spreadsheetIds and discovers tab titles (sheets)', async () => {
+      const app = build();
+      await connect(app, alice);
+
+      const session = await request(app)
+        .post('/api/connections/mysheets/picker-session')
+        .set('Authorization', bearer(alice));
+      const token = session.body.accessToken;
+
+      await fetch(`${google.origin}/fake-picker/grant`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileIds: [validSpreadsheetId] }),
+      });
+
+      const fullUrl = `https://docs.google.com/spreadsheets/d/${validSpreadsheetId}/edit#gid=0`;
+      const r = await request(app)
+        .put('/api/connections/mysheets/scope')
+        .set('Authorization', bearer(alice))
+        .send({ spreadsheetIds: [fullUrl] });
+
+      expect(r.status).toBe(200);
+      expect(r.body.selectedSpreadsheets).toEqual([
+        {
+          id: validSpreadsheetId,
+          title: 'Việc của tôi',
+          canEdit: true,
+          sheets: ['Sheet1', 'Tasks'],
+        },
+      ]);
+    });
   });
 
   describe('DELETE /', () => {

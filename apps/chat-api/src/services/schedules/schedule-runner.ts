@@ -5,6 +5,7 @@ import type { Queryable, ScheduleRow } from '../../db/repositories/schedule-repo
 import { RUN_SELECT, runState, type RunRow } from './run-state.js';
 import { localLabel, nextOccurrence } from './next-occurrence.js';
 import type { ScheduleChange } from './schedule-service.js';
+import type { SheetsDigestRunner } from './sheets-digest-runner.js';
 
 export interface RunToPlan {
   runId: string; scheduleId: string; scheduleVersion: number; userId: string;
@@ -35,6 +36,7 @@ export interface ScheduleRunnerOptions {
   now?: () => Date;
   tickMs?: number;
   planTimeoutMs?: number;
+  sheetsDigestRunner?: SheetsDigestRunner;
 }
 
 const LATE_MS = 10 * 60_000;
@@ -219,7 +221,12 @@ export class ScheduleRunner {
     const { pool, timeZone } = this.options;
     const started = await inTransaction(pool, async (client) => {
       const res = await client.query(
-        `SELECT r.*, s.user_id, s.name, s.request, s.workspace_id, s.workspace_mode FROM schedule_runs r JOIN schedules s ON s.id = r.schedule_id
+        `SELECT r.*, s.user_id, s.conv_id AS schedule_conv_id, s.name, s.request, s.recurrence, s.services,
+                s.status AS schedule_status, s.pause_reason, s.version AS current_schedule_version,
+                s.next_run_at, s.last_proposal_id, s.workspace_id, s.workspace_mode,
+                s.kind, s.digest_config, s.digest_config_hash, s.digest_approved_at,
+                s.created_at AS schedule_created_at, s.updated_at AS schedule_updated_at
+         FROM schedule_runs r JOIN schedules s ON s.id = r.schedule_id
          WHERE r.id = $1 AND r.status = 'planning' FOR UPDATE OF r`, [runId]);
       const run = res.rows[0];
       if (!run) return null;
@@ -232,9 +239,36 @@ export class ScheduleRunner {
       await client.query('UPDATE schedule_runs SET conv_id=$2, updated_at=now() WHERE id=$1', [runId, convId]);
       const toPlan: RunToPlan = { runId: run.id, scheduleId: run.schedule_id, scheduleVersion: run.schedule_version, userId: run.user_id,
         name: run.name, request: run.request, dueAt, trigger: run.trigger, workspaceId: run.workspace_id ?? null, workspaceMode: run.workspace_mode ?? 'legacy' };
-      return { toPlan, convId, messageId: first.id };
+      const scheduleRow: ScheduleRow = {
+        id: run.schedule_id,
+        user_id: run.user_id,
+        conv_id: run.schedule_conv_id,
+        name: run.name,
+        request: run.request,
+        recurrence: run.recurrence,
+        services: run.services,
+        status: run.schedule_status,
+        pause_reason: run.pause_reason,
+        version: run.current_schedule_version,
+        next_run_at: run.next_run_at,
+        last_proposal_id: run.last_proposal_id,
+        workspace_id: run.workspace_id ?? null,
+        workspace_mode: run.workspace_mode ?? 'legacy',
+        kind: run.kind,
+        digest_config: run.digest_config,
+        digest_config_hash: run.digest_config_hash,
+        digest_approved_at: run.digest_approved_at,
+        created_at: run.schedule_created_at,
+        updated_at: run.schedule_updated_at,
+      };
+      return { toPlan, convId, messageId: first.id, scheduleRow };
     });
     if (!started) return;
+
+    if (started.scheduleRow.kind === 'sheets_digest' && this.options.sheetsDigestRunner) {
+      await this.executeDigestRun(runId, started);
+      return;
+    }
 
     const controller = new AbortController();
     this.current = controller;
@@ -282,5 +316,133 @@ export class ScheduleRunner {
     if (ended === 'planned') prepared!.afterCommit();
     // The page that showed "planning" for this run hears that it ended, once the ending is saved.
     else if (ended) this.send(started.convId, 'error', { conversationId: started.convId, message: ended, replyToMessageId: started.messageId });
+  }
+
+  private async executeDigestRun(
+    runId: string,
+    started: { toPlan: RunToPlan; convId: string; messageId: string; scheduleRow: ScheduleRow }
+  ): Promise<void> {
+    const { pool } = this.options;
+    const controller = new AbortController();
+    this.current = controller;
+    const timer = setTimeout(() => controller.abort(), this.planTimeoutMs);
+
+    let outcome: Awaited<ReturnType<SheetsDigestRunner['executeDigest']>>;
+    try {
+      outcome = await this.options.sheetsDigestRunner!.executeDigest(
+        started.scheduleRow,
+        started.toPlan.scheduleVersion,
+        async () => {
+          const res = await pool.query('SELECT version, status FROM schedules WHERE id=$1', [
+            started.toPlan.scheduleId,
+          ]);
+          const row = res.rows[0];
+          return Boolean(
+            row &&
+              row.version === started.toPlan.scheduleVersion &&
+              row.status !== 'cancelled' &&
+              row.status !== 'paused'
+          );
+        },
+        controller.signal
+      );
+    } catch {
+      outcome = { status: 'digest_failed', error: 'Không gửi được báo cáo tự động lúc này.' };
+    } finally {
+      clearTimeout(timer);
+      this.current = null;
+    }
+
+    const now = this.now();
+    const stateChanges = await inTransaction(pool, async (client): Promise<ScheduleChange[]> => {
+      const changes: ScheduleChange[] = [];
+      // Lock conversation before schedule to respect ScheduleRepo.ownedSchedule lock order
+      await client.query('SELECT id FROM conversations WHERE id=$1 FOR UPDATE', [started.scheduleRow.conv_id]);
+      const schedule = (
+        await client.query('SELECT * FROM schedules WHERE id=$1 FOR UPDATE', [started.toPlan.scheduleId])
+      ).rows[0] as ScheduleRow | undefined;
+      const run = (
+        await client.query('SELECT status FROM schedule_runs WHERE id=$1 FOR UPDATE', [runId])
+      ).rows[0];
+      if (!schedule || run?.status !== 'planning') return changes;
+
+      const replyTo = { replyToMessageId: started.messageId };
+
+      if (
+        outcome.status === 'discarded' ||
+        schedule.version !== started.toPlan.scheduleVersion ||
+        schedule.status === 'cancelled'
+      ) {
+        await this.messages.createMessage(
+          started.convId,
+          'system',
+          DISCARDED,
+          { type: 'schedule_discarded', ...replyTo },
+          client
+        );
+        await client.query("UPDATE schedule_runs SET status='discarded', updated_at=now() WHERE id=$1", [runId]);
+        return changes;
+      }
+
+      if (outcome.status === 'blocked') {
+        await this.messages.createMessage(
+          started.convId,
+          'system',
+          `Lỗi: ${outcome.pauseReason}`,
+          { type: 'planning_error', ...replyTo },
+          client
+        );
+        await client.query(
+          "UPDATE schedule_runs SET status='blocked', error=$2, updated_at=now() WHERE id=$1",
+          [runId, outcome.pauseReason]
+        );
+        const paused = await this.pause(client, schedule.id, outcome.pauseReason);
+        changes.push(await this.options.recordState(client, paused, now));
+        return changes;
+      }
+
+      if (outcome.status === 'digest_failed') {
+        await this.messages.createMessage(
+          started.convId,
+          'system',
+          `Lỗi: ${outcome.error}`,
+          { type: 'planning_error', ...replyTo },
+          client
+        );
+        await client.query(
+          "UPDATE schedule_runs SET status='digest_failed', error=$2, updated_at=now() WHERE id=$1",
+          [runId, outcome.error]
+        );
+        const recent = await client.query(
+          'SELECT status FROM schedule_runs WHERE schedule_id=$1 ORDER BY created_at DESC, id DESC LIMIT 3',
+          [schedule.id]
+        );
+        if (recent.rows.length === 3 && recent.rows.every((r) => r.status === 'digest_failed')) {
+          const paused = await this.pause(
+            client,
+            schedule.id,
+            'Tự dừng sau 3 lần gửi báo cáo tự động liên tiếp thất bại.'
+          );
+          changes.push(await this.options.recordState(client, paused, now));
+        }
+        return changes;
+      }
+
+      // outcome.status === 'digest_sent'
+      await this.messages.createMessage(
+        started.convId,
+        'assistant',
+        outcome.text,
+        { type: 'sheets_digest_sent', delivery: outcome.delivery, ...replyTo },
+        client
+      );
+      await client.query(
+        "UPDATE schedule_runs SET status='digest_sent', delivery=$2::jsonb, updated_at=now() WHERE id=$1",
+        [runId, JSON.stringify(outcome.delivery)]
+      );
+      return changes;
+    });
+
+    this.announce(stateChanges);
   }
 }

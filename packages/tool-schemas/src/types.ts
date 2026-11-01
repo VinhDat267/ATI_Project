@@ -104,6 +104,7 @@ export interface PersonalSpreadsheetItem {
   id: string;
   title: string;
   canEdit: boolean;
+  sheets?: string[];
 }
 
 export interface PlanResponse {
@@ -157,6 +158,45 @@ export interface ScheduleResponse {
 export type PlannerResponse = PlanResponse | ClarificationResponse | RefusalResponse | AnswerResponse | ScheduleResponse;
 
 export type ScheduleStatus = 'active' | 'paused' | 'cancelled' | 'completed';
+export type ScheduleKind = 'plan' | 'sheets_digest';
+export type ScheduleApprovalMode = 'manual' | 'auto_digest';
+
+export interface SheetsDigestConfig {
+  version: 1;
+  source: {
+    service: 'mysheets' | 'sheets';
+    credentialId?: string;
+    email?: string;
+    spreadsheetId: string;
+    spreadsheetTitle: string;
+    sheetName?: string;
+    range?: string;
+    tailRows: number;
+  };
+  destination:
+    | { service: 'slack'; channelId: string; channelLabel?: string }
+    | { service: 'telegram'; chatId: string; chatLabel?: string };
+  focus?: string;
+  includeAiSummary: boolean;
+}
+
+export interface SheetsDigestCandidate {
+  canAutoDigest: boolean;
+  config?: SheetsDigestConfig;
+  reason?: string;
+}
+
+export interface SheetsDigestDelivery {
+  destination: 'slack' | 'telegram';
+  targetId: string;
+  targetLabel?: string;
+  spreadsheetId: string;
+  spreadsheetTitle: string;
+  sheetName?: string;
+  rowCount: number;
+  summaryMode: 'ai' | 'deterministic';
+  sentAt: string;
+}
 
 export interface ScheduleView {
   id: string; convId: string; version: number;
@@ -168,12 +208,16 @@ export interface ScheduleView {
   /** ISO, at most 3; empty when no run is left. */
   nextRuns: string[];
   lastRun: ScheduleRunView | null;
+  kind?: ScheduleKind;
+  approvalMode?: ScheduleApprovalMode;
+  digestConfig?: SheetsDigestConfig | null;
 }
 
 /** Derived for display from schedule_runs.status and the run conversation's latest plan. */
 export type ScheduleRunState =
   | 'planning' | 'awaiting_approval' | 'approved' | 'expired' | 'rejected'
-  | 'needs_attention' | 'planning_failed' | 'interrupted' | 'discarded' | 'missed' | 'blocked';
+  | 'needs_attention' | 'planning_failed' | 'interrupted' | 'discarded' | 'missed' | 'blocked'
+  | 'digest_sent' | 'digest_failed';
 
 export interface ScheduleRunView {
   id: string; scheduleId: string;
@@ -187,6 +231,7 @@ export interface ScheduleRunView {
   planStatus: string | null;
   /** A Vietnamese sentence for the user. */
   error: string | null;
+  delivery?: SheetsDigestDelivery | null;
 }
 
 /** Metadata of the assistant message that carries a schedule proposal. */
@@ -198,6 +243,7 @@ export interface ScheduleProposalMetadata {
   services: string[];
   nextRuns: string[];             // computed by the backend when the proposal is saved
   previous: Pick<ScheduleView, 'name' | 'request' | 'recurrence' | 'status'> | null;
+  digestCandidate?: SheetsDigestCandidate;
 }
 
 /** Metadata of the assistant message recording the schedule after each change. */

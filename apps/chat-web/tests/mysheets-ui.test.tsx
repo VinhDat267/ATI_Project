@@ -6,6 +6,8 @@ import { RefusalMoment } from '../src/pages/Responses/ResponseMoment';
 import { PlanMoment } from '../src/pages/Cockpit/PlanMoment';
 import { ReceiptMoment } from '../src/pages/Cockpit/ReceiptMoment';
 import { RecoveryMoment } from '../src/pages/Cockpit/RecoveryMoment';
+import { ScheduleMoment } from '../src/pages/Cockpit/ScheduleMoment';
+import { runLabel } from '../src/services/schedule-text';
 import { PrivacyPage } from '../src/pages/Privacy/PrivacyPage';
 import { GuidePage } from '../src/pages/Guide/GuidePage';
 import { LandingPage } from '../src/pages/Landing/LandingPage';
@@ -620,5 +622,148 @@ describe('GuidePage and LandingPage with mysheetsEnabled', () => {
     } else {
       expect(screen.queryByText('Google Sheets · Của riêng bạn')).toBeNull();
     }
+  });
+
+  it('allows pasting a Google Sheets URL directly and displays discovered sheet tabs in MySheetsCallbackView and PersonalMySheets', async () => {
+    vi.spyOn(apiClient, 'completeMySheetsConnection').mockResolvedValue({
+      email: 'user@gmail.com',
+    });
+    vi.spyOn(apiClient, 'getMySheetsSpreadsheets').mockResolvedValue({
+      email: 'user@gmail.com',
+      selectedSpreadsheets: [],
+    });
+    const saveSpy = vi.spyOn(apiClient, 'saveMySheetsScope').mockResolvedValue({
+      email: 'user@gmail.com',
+      selectedSpreadsheets: [
+        {
+          id: '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms',
+          title: 'Bảng KPI Q4',
+          canEdit: true,
+          sheets: ['KPI Tháng 11', 'Tasks'],
+        },
+      ],
+    });
+
+    window.history.replaceState({}, '', '/connections/mysheets/callback?code=c1&state=s1');
+    const view = render(<MySheetsCallbackView navigate={() => {}} input={{ code: 'c1', state: 's1' }} />);
+
+    const urlInput = await screen.findByLabelText(/Dán liên kết hoặc ID Google Sheets/i);
+    fireEvent.change(urlInput, {
+      target: { value: 'https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit#gid=0' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Thêm từ liên kết/i }));
+
+    await waitFor(() => {
+      expect(saveSpy).toHaveBeenCalledWith({
+        spreadsheetIds: ['https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit#gid=0'],
+      });
+    });
+
+    expect(await screen.findByText('Bảng KPI Q4')).toBeTruthy();
+    expect(screen.getByText(/Tabs: KPI Tháng 11, Tasks/i)).toBeTruthy();
+    view.unmount();
+  });
+
+  it('renders ScheduleMoment mode selector (manual vs auto_digest) for Sheets digest schedules and formats digest run labels', async () => {
+    const confirmSpy = vi.spyOn(apiClient, 'confirmSchedule').mockResolvedValue({
+      schedule: {
+        id: 'sched-1',
+        convId: CONV_ID,
+        version: 1,
+        name: 'Báo cáo KPI sáng',
+        request: 'Đọc bảng Báo cáo KPI Q4 và gửi báo cáo vào Slack',
+        recurrence: { type: 'daily', time: '08:00' },
+        services: ['mysheets', 'slack'],
+        status: 'active',
+        pauseReason: null,
+        nextRuns: ['2026-11-03T01:00:00Z'],
+        lastRun: null,
+        kind: 'sheets_digest',
+        approvalMode: 'auto_digest',
+      },
+    });
+
+    const msg: ChatMessage = {
+      id: 'msg-proposal-1',
+      role: 'assistant',
+      content: 'Đề xuất lịch báo cáo KPI',
+      metadata: {
+        type: 'schedule_proposal',
+        proposal: {
+          kind: 'schedule',
+          action: 'create',
+          name: 'Báo cáo KPI sáng',
+          request: 'Đọc bảng Báo cáo KPI Q4 và gửi báo cáo vào Slack',
+          recurrence: { type: 'daily', time: '08:00' },
+          summary: 'Mỗi ngày 08:00 đọc bảng Báo cáo KPI Q4 và gửi vào Slack.',
+        },
+        scheduleId: null,
+        baseVersion: null,
+        services: ['mysheets', 'slack'],
+        nextRuns: ['2026-11-03T01:00:00Z'],
+        previous: null,
+        digestCandidate: {
+          canAutoDigest: true,
+          config: {
+            version: 1,
+            source: {
+              service: 'mysheets',
+              spreadsheetId: 'sheet-1',
+              spreadsheetTitle: 'Báo cáo KPI Q4',
+              sheetName: 'KPI Tháng 11',
+              tailRows: 20,
+            },
+            destination: {
+              service: 'slack',
+              channelId: 'C12345678',
+              channelLabel: '#bao-cao-kpi',
+            },
+            includeAiSummary: true,
+          },
+        },
+      },
+    };
+
+    render(<ScheduleMoment message={msg} convId={CONV_ID} navigate={() => {}} onEdit={() => {}} />);
+
+    const autoRadio = screen.getByRole('radio', { name: /Tự gửi báo cáo, không cần duyệt lại/i });
+    fireEvent.click(autoRadio);
+    fireEvent.click(screen.getByRole('button', { name: 'Xác nhận' }));
+
+    await waitFor(() => {
+      expect(confirmSpy).toHaveBeenCalledWith(CONV_ID, 'msg-proposal-1', 'auto_digest');
+    });
+
+    expect(
+      runLabel({
+        id: 'r1',
+        scheduleId: 'sched-1',
+        trigger: 'scheduled',
+        dueAt: '2026-11-03T01:00:00Z',
+        createdAt: '2026-11-03T01:00:00Z',
+        state: 'digest_sent',
+        missedCount: 0,
+        convId: CONV_ID,
+        planId: null,
+        planStatus: null,
+        error: null,
+      })
+    ).toBe('Đã tự gửi báo cáo');
+
+    expect(
+      runLabel({
+        id: 'r2',
+        scheduleId: 'sched-1',
+        trigger: 'scheduled',
+        dueAt: '2026-11-03T01:00:00Z',
+        createdAt: '2026-11-03T01:00:00Z',
+        state: 'digest_failed',
+        missedCount: 0,
+        convId: CONV_ID,
+        planId: null,
+        planStatus: null,
+        error: 'Lỗi mạng',
+      })
+    ).toBe('Gửi báo cáo thất bại');
   });
 });

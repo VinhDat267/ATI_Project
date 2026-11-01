@@ -432,8 +432,90 @@ describe('PersonalSheetsAdapter', () => {
     const promise = adapter.execute('mysheets.append_rows', appendArgs, { signal: controller.signal });
     const assertion = expect(promise).rejects.toMatchObject({ category: 'UNKNOWN', retryable: false });
     await reached;
-    controller.abort();
+    await controller.abort();
     await assertion;
     expect(calls).toHaveLength(2); // tabs, 1 append
+  });
+
+  it('supports smart tab-only, tail:N and headerAware reading in PersonalSheetsAdapter', async () => {
+    const { adapter, calls } = setup({
+      handler: () =>
+        json({
+          range: "'Báo cáo KPI'!A1:Z500",
+          values: [
+            ['Hạng mục', 'Chủ sở hữu', 'Trạng thái'],
+            ['KPI 1', 'Minh', 'Hoàn thành'],
+            ['KPI 2', 'Lan', 'Đang làm'],
+            ['KPI 3', 'Huy', 'Quá hạn'],
+          ],
+        }),
+    });
+
+    const res = await adapter.execute('mysheets.read_range', {
+      spreadsheetId,
+      range: 'Báo cáo KPI!tail:2',
+    });
+    expect(decodeURIComponent(calls[0]!.url.pathname)).toContain("/values/'Báo cáo KPI'!A1:Z500");
+    expect(res).toEqual({
+      range: "'Báo cáo KPI'!A1:Z500",
+      values: [
+        ['Hạng mục', 'Chủ sở hữu', 'Trạng thái'],
+        ['KPI 2', 'Lan', 'Đang làm'],
+        ['KPI 3', 'Huy', 'Quá hạn'],
+      ],
+      headers: ['Hạng mục', 'Chủ sở hữu', 'Trạng thái'],
+      records: [
+        { 'Hạng mục': 'KPI 2', 'Chủ sở hữu': 'Lan', 'Trạng thái': 'Đang làm' },
+        { 'Hạng mục': 'KPI 3', 'Chủ sở hữu': 'Huy', 'Trạng thái': 'Quá hạn' },
+      ],
+      totalDataRows: 3,
+    });
+  });
+
+  it('deduplicates mysheets.append_rows idempotently and preserves formula injection escaping', async () => {
+    const { adapter, calls } = setup({
+      handler: (url, init) => {
+        if (init.method === 'POST') {
+          return json({
+            spreadsheetId,
+            updates: { updatedRange: 'Sheet1!A3:C3', updatedRows: 1 },
+          });
+        }
+        if (url.pathname.includes('/values/')) {
+          return json({
+            range: 'Sheet1!A1:Z500',
+            values: [
+              ['Ticket', 'Summary', 'Formula'],
+              ['JIRA-101', 'Already synced', "'=1+1"],
+            ],
+          });
+        }
+        return json({
+          sheets: [{ properties: { sheetId: 0, title: 'Sheet1' } }],
+        });
+      },
+    });
+
+    const res = await adapter.execute('mysheets.append_rows', {
+      spreadsheetId,
+      sheet: 'Sheet1',
+      rows: [
+        ['JIRA-101', 'Already synced', '=1+1'],
+        ['JIRA-102', 'New ticket', '@channel +alert'],
+      ],
+    });
+
+    expect(res).toEqual({
+      spreadsheetId,
+      updatedRange: 'Sheet1!A3:C3',
+      updatedRows: 1,
+      skippedDuplicates: 1,
+      url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+    });
+    const postCalls = calls.filter((c) => c.init.method === 'POST');
+    expect(postCalls).toHaveLength(1);
+    expect(JSON.parse(String(postCalls[0]!.init.body)).values).toEqual([
+      ['JIRA-102', 'New ticket', "'@channel +alert"],
+    ]);
   });
 });
