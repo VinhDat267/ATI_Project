@@ -91,7 +91,7 @@ describe('LandingPage — Make.com Orbital & OAuth 1-Click Redesign', () => {
     expect(sheetsGrid).toHaveTextContent('Đã mở Issue #42');
 
     const stage4Canvas = screen.getByTestId('landing-stage4-orbital-canvas');
-    expect(within(stage4Canvas).getByTestId('workflow-flow-canvas')).toHaveAttribute('data-flow-mode', 'execution');
+    expect(within(stage4Canvas).getByTestId('workflow-flow-canvas')).toHaveAttribute('data-flow-mode', 'executing');
 
     const stage5Canvas = screen.getByTestId('landing-stage5-orbital-canvas');
     expect(within(stage5Canvas).getByTestId('workflow-flow-canvas')).toHaveAttribute('data-flow-mode', 'receipt');
