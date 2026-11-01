@@ -10,9 +10,14 @@ Lưu snapshot identity trước khi thay đổi observations. Sau đó thực hi
 
 Private artifact ignored: `.artifacts/jira-probe/2026-11-01-identity-and-two-refreshes.json`, gồm snapshot ban đầu và hai snapshot sau refresh, không chứa token, code, state, account ID hay site ID/name. Kiểm `git check-ignore` xác nhận artifact không vào Git. Không lưu raw provider response hoặc callback URL vào báo cáo công khai.
 
+## Xác nhận chủ tài khoản và bước tiếp
+
+Sau khi quan sát native, chủ tài khoản trả lời rõ: “Đúng, tài khoản vừa dùng chưa tham gia Jira site nào”. Ghi điều kiện **OPERATOR_ATTESTED** cho đúng tài khoản đã consent và đúng thời điểm trước khi tạo test site. Kết hợp với native `/me`, case identity-before-site đã có đủ hai loại bằng chứng; không biến attestation thành quan sát tự động của provider.
+
+Chủ dự án trả lời hiện chưa có site thử nghiệm. Bước tiếp theo là tạo Jira Free site đầu tiên với cùng tài khoản rồi thử consent Jira; sau đó thêm site thứ hai và kiểm hai site đồng thời. Chưa tạo site hoặc đổi consent Jira trong bằng chứng của log này. Trang [đăng ký Jira Free chính thức](https://www.atlassian.com/try/cloud/signup?bundle=jirasoftware&edition=free&skipBundles=true) và [cấp app access](https://support.atlassian.com/user-management/docs/give-users-access-to-products/) là hướng dẫn setup, không phải bằng chứng các site đã tồn tại.
+
 ## Điều còn thiếu
 
-- Chủ dự án trước đó xác nhận có tài khoản chưa thuộc Jira site và sẽ dùng nó; đang chờ xác nhận rằng tài khoản thực tế vừa consent đúng là tài khoản chưa thuộc site nào. Không tự nâng thành OPERATOR_ATTESTED chỉ từ site count hoặc câu “Đã kết nối”.
 - Chưa ghi console grant model; chưa consent Jira scopes, existing site/second simultaneous site, ADMINISTER read, Jira-grant rotation, wrong-account/denial hoặc native write.
 - Gate vẫn **NOT_COMPLETE**; không bắt đầu JIRA-02–11. Không đổi runtime API/web/planner/executor, schema hoặc flags trong phần nghiệm thu này.
 

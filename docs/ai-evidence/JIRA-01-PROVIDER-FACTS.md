@@ -16,7 +16,7 @@
 | Boundary | Proposed scopes / provider condition | Evidence now |
 |---|---|---|
 | Authorization code / refresh | 3LO confidential app; identity/Jira flows request `offline_access`; rotating refresh tokens | DOCUMENTED in [OAuth guide](https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/); FIXTURE_VERIFIED; identity grant exchange and two consecutive rotations LIVE_OBSERVED 01/11; Jira-scope grant NOT_RUN |
-| Identity `/me` | User Identity API `read:me`; use provider account ID, not email | DOCUMENTED in OAuth guide; FIXTURE_VERIFIED; native `/me` LIVE_OBSERVED 01/11; no-site condition for the actual account still awaits owner confirmation |
+| Identity `/me` | User Identity API `read:me`; use provider account ID, not email | DOCUMENTED in OAuth guide; FIXTURE_VERIFIED; native `/me` LIVE_OBSERVED 01/11; actual account's no-site condition OPERATOR_ATTESTED before test-site creation |
 | Accessible resources | Use returned cloudId/site scopes; account-level vs resource-level behavior depends on app/grant | DOCUMENTED in OAuth guide; container filtering FIXTURE_VERIFIED; native two-site set NOT_RUN |
 | `GET /rest/api/3/mypermissions` | `read:jira-work`; global ADMINISTER differs from issue/project permissions | DOCUMENTED in [Permissions API](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-permissions/); FIXTURE_VERIFIED for global read; native NOT_RUN |
 | Project lookup/directory | `read:jira-work`; actual visibility/project allowlist still checked | DOCUMENTED in [Projects API](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-projects/); new OAuth runtime not implemented; native NOT_RUN |
@@ -32,14 +32,14 @@ This matrix is not a claim that scope alone grants a native permission. No admin
 | Case | Current result | Needed evidence |
 |---|---|---|
 | Development app / actual grant type | App used LIVE_OBSERVED; console grant type NOT_RECORDED | Owner records account/resource-level console grant model; no client secret in evidence |
-| Identity-only before any Jira membership | Consent and `/me` LIVE_OBSERVED; actual-account no-site attestation PENDING | Owner confirms that the account actually used has no Jira memberships; empty site count alone is insufficient |
+| Identity-only before any Jira membership | LIVE_OBSERVED + OPERATOR_ATTESTED, 01/11 | Owner explicitly confirmed the actual consent account had no Jira memberships; condition applies before subsequent test-site creation, not forever |
 | Existing site | NOT_RUN | Successful consent, resource result and identity match |
 | Second simultaneous site | NOT_RUN | Repeat consent with same identity; two Jira sites observed together, not just two separate historical counts |
 | Refresh twice | LIVE_OBSERVED for identity grant, 01/11 | Two separate consecutive browser refresh submissions each returned TOKEN_ROTATION_OBSERVED and connected true; Jira-scope refresh still NOT_RUN |
 | Global permission read | NOT_RUN | Actual response from site; both admin and non-admin cases if available |
 | Re-consent / wrong account / denial | NOT_RUN | Actual provider/browser result and local connection state; no callback URL/code in report |
 
-Owner created/configured the development app after setup guidance. The local configuration check passes; console grant type remains unrecorded. The owner previously confirmed having an account without any Jira site membership and intending to use it. On 01/11 the owner reported connection complete; the live browser report confirmed identity and the exact granted scopes `offline_access read:me`. Confirmation that the account actually used has no Jira membership is pending.
+Owner created/configured the development app after setup guidance. The local configuration check passes; console grant type remains unrecorded. On 01/11 the owner reported connection complete; the live browser report confirmed identity and the exact granted scopes `offline_access read:me`. The owner then explicitly confirmed that the actual account used had not joined any Jira site. This establishes the identity-before-site case through two distinct evidence classes, LIVE_OBSERVED and OPERATOR_ATTESTED; it is not inferred from the empty site count. The owner currently has no test Jira sites; provisioning the first test site is the next external setup step.
 
 On 31/10 the authorization endpoint and browser navigation reached the official Atlassian login page ([browser-start log](../handoff/log/2026-10-31-codex-jira-01-browser-origin.md)). On 01/11 the probe observed the actual callback, identity and two successful refreshes. The initial report was saved before refresh; both sequential refresh results were saved separately in ignored local evidence. No Jira resource/permission read or write has been observed. See the [native identity log](../handoff/log/2026-11-01-codex-jira-01-native-identity.md).
 
