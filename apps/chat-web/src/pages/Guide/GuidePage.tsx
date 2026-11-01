@@ -501,7 +501,7 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                 </svg>
                 <span>
-                  1. Hướng dẫn kết nối (8 dịch vụ)
+                  1. Hướng dẫn lấy khoá (8 dịch vụ)
                 </span>
               </button>
               <button type="button" role="tab" aria-controls="section-prompts" onClick={() => actions.switchMainTab('prompts')} id="tab-btn-prompts" {...tabProps('prompts')}>
