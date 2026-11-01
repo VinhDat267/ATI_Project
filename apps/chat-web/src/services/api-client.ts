@@ -254,6 +254,17 @@ export class ApiClient {
       body: JSON.stringify({ calendarIds }),
     });
   }
+  selectPrimaryMyCalendar() {
+    return this.request<{
+      status?: 'connected';
+      email: string;
+      selectedCalendars: Array<{ id: string; summary: string; timeZone?: string; primary?: boolean }>;
+      allowedScope: string[];
+    }>('/api/connections/mycalendar/select-primary', {
+      method: 'POST',
+      credentials: 'include',
+    });
+  }
   disconnectMyCalendar() {
     return this.request<{ success: true }>('/api/connections/mycalendar', { method: 'DELETE', credentials: 'include' });
   }

@@ -27,13 +27,38 @@ export function ScheduleMoment({ message, convId, navigate, onEdit }: { message:
   const schedule = confirmed ?? metadata.schedule;
   const proposal = metadata.proposal;
   const previous = metadata.previous;
-  const digestCandidate = metadata.digestCandidate;
+  const digestCandidate = metadata.digestCandidate as any;
+  const isCalendarCandidate = Boolean(
+    digestCandidate &&
+      ('configPreview' in digestCandidate ||
+        'disabledReason' in digestCandidate ||
+        'eligible' in digestCandidate ||
+        typeof digestCandidate?.config?.source === 'string' ||
+        metadata.services?.includes('mycalendar') ||
+        metadata.services?.includes('calendar'))
+  );
+  const isEligible = Boolean(digestCandidate?.canAutoDigest ?? digestCandidate?.eligible);
+  const ineligibleReason = digestCandidate?.disabledReason ?? digestCandidate?.reason;
+  const previewEmail = digestCandidate?.configPreview?.email ?? digestCandidate?.config?.email ?? '';
+  const previewCalendars: Array<{ id: string; summary: string }> =
+    digestCandidate?.configPreview?.calendars ?? digestCandidate?.config?.calendars ?? [];
+  const previewDestination = digestCandidate?.configPreview
+    ? `${digestCandidate.configPreview.destinationService === 'slack' ? 'Slack' : 'Telegram'} ${digestCandidate.configPreview.destinationLabel}`
+    : digestCandidate?.config && isCalendarCandidate
+      ? digestCandidate.config.destination.service === 'slack'
+        ? `Slack #${digestCandidate.config.destination.channelName ?? digestCandidate.config.destination.channelId}`
+        : `Telegram ${digestCandidate.config.destination.chatTitle ?? digestCandidate.config.destination.chatId}`
+      : '';
+  const previewWindowHours = digestCandidate?.config?.windowHours ?? 24;
   const confirm = async () => {
     if (locked.current) return;
     locked.current = true; setBusy(true); setError('');
     try {
-      const result =
-        approvalMode === 'auto_digest'
+      const result = isCalendarCandidate
+        ? isEligible
+          ? await apiClient.confirmSchedule(convId, message.id, approvalMode)
+          : await apiClient.confirmSchedule(convId, message.id)
+        : approvalMode === 'auto_digest'
           ? await apiClient.confirmSchedule(convId, message.id, 'auto_digest')
           : await apiClient.confirmSchedule(convId, message.id);
       if (currentMessage.current === message.id) setConfirmed(result.schedule); schedulesChanged();
@@ -50,7 +75,17 @@ export function ScheduleMoment({ message, convId, navigate, onEdit }: { message:
     <p className="text-xs uppercase tracking-wider text-[#6B7280]">ATI · Lịch chạy workflow</p>
     <h1 tabIndex={-1} className="font-display text-3xl sm:text-4xl font-bold text-[#111827] [overflow-wrap:anywhere]">{title}</h1>
     <div className="bg-white border border-[#E7E7E2] rounded-2xl shadow-soft-card p-5 sm:p-6 v3-space-y-5 min-w-0">
-      {schedule ? <><p role="status" className="text-sm font-semibold text-[#111827]">{scheduleLabel(schedule)}</p><p className="text-sm text-[#4B5563]">{describeRecurrence(schedule.recurrence)}</p><p className="text-sm text-[#4B5563] [overflow-wrap:anywhere]">{schedule.request}</p>
+      {schedule ? <>
+        <div className="flex flex-wrap items-center gap-2">
+          <p role="status" className="text-sm font-semibold text-[#111827]">{scheduleLabel(schedule)}</p>
+          {schedule.kind === 'calendar_digest' && (
+            <span data-schedule-kind="calendar_digest" className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              Tự gửi
+            </span>
+          )}
+        </div>
+        <p className="text-sm text-[#4B5563]">{describeRecurrence(schedule.recurrence)}</p>
+        <p className="text-sm text-[#4B5563] [overflow-wrap:anywhere]">{schedule.request}</p>
         <ScheduleActions schedule={schedule} navigate={navigate} onChanged={setConfirmed} onConflict={() => reloadScheduleConversation(convId)} /></>
         : proposal && <>{manage ? <p className="text-sm text-[#4B5563]">{proposal.action === 'cancel' ? 'Lịch đã hủy không bật lại được.' : proposal.summary}</p> : <>
           {proposal.action === 'update' && previous?.name !== proposal.name && change('Tên lịch', previous?.name, proposal.name)}
@@ -58,51 +93,99 @@ export function ScheduleMoment({ message, convId, navigate, onEdit }: { message:
           {change('Việc sẽ làm', previous?.request, proposal.request)}
           <div className="flex flex-wrap gap-2">{metadata.services?.map(id => <span key={id} className="inline-flex items-center gap-2 text-xs text-[#4B5563]"><span aria-hidden="true" className={`w-6 h-6 rounded-lg border flex items-center justify-center ${servicePalette(id).icon}`}><ServiceLogo service={id} className="w-3.5 h-3.5" /></span>{serviceName(id, [])}</span>)}</div>
           {!!metadata.nextRuns?.length && <div className="text-xs text-[#4B5563] v3-space-y-1"><p className="font-semibold">Lần chạy tới:</p>{metadata.nextRuns.map(time => <p key={time}>{formatRunTime(time)}</p>)}</div>}
-          {digestCandidate && (
-            <fieldset className="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] v3-space-y-2.5">
-              <legend className="text-xs font-semibold text-[#111827] px-1">Chế độ khi tới giờ</legend>
-              <label className="flex items-start gap-2.5 text-xs sm:text-sm text-[#111827] cursor-pointer">
-                <input
-                  type="radio"
-                  name={`schedule-mode-${message.id}`}
-                  checked={approvalMode === 'manual'}
-                  onChange={() => setApprovalMode('manual')}
-                  className="mt-0.5"
-                />
-                <span>Chờ tôi duyệt mỗi lượt (mặc định)</span>
-              </label>
-              <label className={`flex items-start gap-2.5 text-xs sm:text-sm ${digestCandidate.canAutoDigest ? 'text-[#111827] cursor-pointer' : 'text-[#9CA3AF] cursor-not-allowed'}`}>
-                <input
-                  type="radio"
-                  name={`schedule-mode-${message.id}`}
-                  disabled={!digestCandidate.canAutoDigest}
-                  checked={approvalMode === 'auto_digest'}
-                  onChange={() => setApprovalMode('auto_digest')}
-                  className="mt-0.5"
-                />
-                <span>
-                  Tự gửi báo cáo, không cần duyệt lại
-                  {digestCandidate.canAutoDigest && digestCandidate.config && (
-                    <span className="block text-xs text-[#4B5563] mt-0.5">
-                      Nguồn: {digestCandidate.config.source.spreadsheetTitle}
-                      {digestCandidate.config.source.sheetName ? ` (${digestCandidate.config.source.sheetName})` : ''} · Đích:{' '}
-                      {digestCandidate.config.destination.service === 'slack'
-                        ? digestCandidate.config.destination.channelLabel ?? digestCandidate.config.destination.channelId
-                        : digestCandidate.config.destination.chatLabel ?? digestCandidate.config.destination.chatId}
+          {isCalendarCandidate ? (
+            <>
+              {isEligible ? (
+                <div className="v3-space-y-3 pt-1" role="radiogroup" aria-label="Chế độ chạy định kỳ">
+                  <p className="text-xs font-semibold text-[#6B7280]">Chế độ chạy mỗi lượt</p>
+                  <label className="flex items-start gap-2.5 text-sm text-[#111827] cursor-pointer">
+                    <input
+                      id="schedule-mode-manual"
+                      type="radio"
+                      name="schedule-approval-mode"
+                      checked={approvalMode === 'manual'}
+                      onChange={() => setApprovalMode('manual')}
+                      className="mt-1 text-[#FF5701] focus:ring-[#FF5701]"
+                    />
+                    <span>Lập kế hoạch & chờ duyệt từng lượt (Mặc định)</span>
+                  </label>
+                  <label className="flex items-start gap-2.5 text-sm text-[#111827] cursor-pointer">
+                    <input
+                      id="schedule-mode-auto-digest"
+                      type="radio"
+                      name="schedule-approval-mode"
+                      checked={approvalMode === 'auto_digest'}
+                      onChange={() => setApprovalMode('auto_digest')}
+                      className="mt-1 text-[#FF5701] focus:ring-[#FF5701]"
+                    />
+                    <span>Tự gửi bản tin Lịch theo phạm vi đã khóa (Không cần duyệt lại mỗi sáng)</span>
+                  </label>
+                  {approvalMode === 'auto_digest' && (
+                    <div
+                      id="schedule-auto-digest-scope"
+                      className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-950 v3-space-y-1.5"
+                    >
+                      <p className="font-semibold">Phạm vi tự gửi đã khóa:</p>
+                      <p>• Nguồn lịch: {previewCalendars.map((c) => c.summary).join(', ')} ({previewEmail})</p>
+                      <p>• Nơi nhận: {previewDestination}</p>
+                      <p>• Cam kết an toàn: Chỉ đọc Google Calendar (khung {previewWindowHours} giờ), tự động phát hiện trùng lịch, không tạo/sửa/xoá sự kiện.</p>
+                    </div>
+                  )}
+                </div>
+              ) : ineligibleReason ? (
+                <p className="text-xs text-[#6B7280]">{ineligibleReason}</p>
+              ) : null}
+              <p className="text-sm text-[#4B5563] leading-relaxed">Tới giờ, ATI lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.</p>
+            </>
+          ) : (
+            <>
+              {digestCandidate && (
+                <fieldset className="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] v3-space-y-2.5">
+                  <legend className="text-xs font-semibold text-[#111827] px-1">Chế độ khi tới giờ</legend>
+                  <label className="flex items-start gap-2.5 text-xs sm:text-sm text-[#111827] cursor-pointer">
+                    <input
+                      type="radio"
+                      name={`schedule-mode-${message.id}`}
+                      checked={approvalMode === 'manual'}
+                      onChange={() => setApprovalMode('manual')}
+                      className="mt-0.5"
+                    />
+                    <span>Chờ tôi duyệt mỗi lượt (mặc định)</span>
+                  </label>
+                  <label className={`flex items-start gap-2.5 text-xs sm:text-sm ${digestCandidate.canAutoDigest ? 'text-[#111827] cursor-pointer' : 'text-[#9CA3AF] cursor-not-allowed'}`}>
+                    <input
+                      type="radio"
+                      name={`schedule-mode-${message.id}`}
+                      disabled={!digestCandidate.canAutoDigest}
+                      checked={approvalMode === 'auto_digest'}
+                      onChange={() => setApprovalMode('auto_digest')}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      Tự gửi báo cáo, không cần duyệt lại
+                      {digestCandidate.canAutoDigest && digestCandidate.config && (
+                        <span className="block text-xs text-[#4B5563] mt-0.5">
+                          Nguồn: {digestCandidate.config.source.spreadsheetTitle}
+                          {digestCandidate.config.source.sheetName ? ` (${digestCandidate.config.source.sheetName})` : ''} · Đích:{' '}
+                          {digestCandidate.config.destination.service === 'slack'
+                            ? digestCandidate.config.destination.channelLabel ?? digestCandidate.config.destination.channelId
+                            : digestCandidate.config.destination.chatLabel ?? digestCandidate.config.destination.chatId}
+                        </span>
+                      )}
+                      {!digestCandidate.canAutoDigest && digestCandidate.reason && (
+                        <span className="block text-xs text-[#6B7280] mt-0.5">{digestCandidate.reason}</span>
+                      )}
                     </span>
-                  )}
-                  {!digestCandidate.canAutoDigest && digestCandidate.reason && (
-                    <span className="block text-xs text-[#6B7280] mt-0.5">{digestCandidate.reason}</span>
-                  )}
-                </span>
-              </label>
-            </fieldset>
+                  </label>
+                </fieldset>
+              )}
+              <p className="text-sm text-[#4B5563] leading-relaxed">
+                {approvalMode === 'auto_digest'
+                  ? 'Tới giờ, ATI tự đọc bảng tính đã khóa và gửi báo cáo tới kênh đích đã khóa mà không ghi thêm dữ liệu.'
+                  : 'Tới giờ, ATI lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.'}
+              </p>
+            </>
           )}
-          <p className="text-sm text-[#4B5563] leading-relaxed">
-            {approvalMode === 'auto_digest'
-              ? 'Tới giờ, ATI tự đọc bảng tính đã khóa và gửi báo cáo tới kênh đích đã khóa mà không ghi thêm dữ liệu.'
-              : 'Tới giờ, ATI lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.'}
-          </p>
         </>}
         <div className="flex flex-wrap gap-2"><button type="button" disabled={busy} className={primaryScheduleButton} onClick={() => void confirm()}>Xác nhận</button><button type="button" disabled={busy} className={scheduleButton} onClick={onEdit}>Sửa</button><button type="button" disabled={busy} className={scheduleButton} onClick={() => setIgnored(true)}>Bỏ qua</button></div>
       </>}

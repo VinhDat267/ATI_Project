@@ -32,5 +32,16 @@ export function scheduleLabel(s: ScheduleView): string {
 export function runLabel(run: ScheduleRunView): string {
   if (run.state === 'approved') return ({ executing: 'Đang chạy', approved: 'Đang chạy', completed: 'Đã xong', partial: 'Xong một phần', failed: 'Có lỗi', stopped: 'Đã dừng', reconciliation_required: 'Cần đối soát' } as Record<string, string>)[run.planStatus ?? ''] ?? 'Đang chạy';
   if (run.state === 'missed') return run.missedCount > 1 ? `Đã lỡ ${run.missedCount} lượt` : 'Đã lỡ';
-  return ({ planning: 'Đang lập kế hoạch', awaiting_approval: 'Chờ bạn duyệt', expired: 'Hết hạn duyệt', rejected: 'Bạn đã hủy kế hoạch', needs_attention: 'Cần bạn xem', planning_failed: 'Không lập được kế hoạch', interrupted: 'Bị gián đoạn', discarded: 'Đã bỏ vì lịch thay đổi', blocked: 'Bị chặn', digest_sent: 'Đã tự gửi báo cáo', digest_failed: 'Gửi báo cáo thất bại' } as Record<string, string>)[run.state];
+  if (run.state === 'digest_sent') {
+    if (run.delivery && 'totalEvents' in run.delivery) {
+      const conflictNote = run.delivery.conflictCount > 0 ? ` (${run.delivery.conflictCount} trùng lịch)` : '';
+      return `Đã tự gửi bản tin · ${run.delivery.totalEvents} sự kiện${conflictNote}`;
+    }
+    if (run.delivery && 'spreadsheetTitle' in run.delivery) {
+      return 'Đã tự gửi báo cáo';
+    }
+    return 'Đã tự gửi bản tin';
+  }
+  if (run.state === 'digest_failed') return 'Gửi bản tin thất bại';
+  return ({ planning: 'Đang lập kế hoạch', awaiting_approval: 'Chờ bạn duyệt', expired: 'Hết hạn duyệt', rejected: 'Bạn đã hủy kế hoạch', needs_attention: 'Cần bạn xem', planning_failed: 'Không lập được kế hoạch', interrupted: 'Bị gián đoạn', discarded: 'Đã bỏ vì lịch thay đổi', blocked: 'Bị chặn' } as Record<string, string>)[run.state];
 }

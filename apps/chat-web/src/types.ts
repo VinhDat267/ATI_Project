@@ -1,4 +1,4 @@
-import type { AnswerLookup, ScheduleResponse, ScheduleView, ScheduleProposalMetadata } from '@wap/tool-schemas';
+import type { AnswerLookup, CalendarDigestDelivery, ScheduleResponse, ScheduleView, ScheduleProposalMetadata } from '@wap/tool-schemas';
 export type MessageRole = 'user' | 'assistant' | 'system';
 export interface AuthMessageResponse {
   message: string;
@@ -36,7 +36,7 @@ export interface ChatMessage {
     reason?: string; suggestion?: string; unavailableServices?: Array<{ id: string; name: string }>;
     options?: string[]; context?: string; lookups?: AnswerLookup[]; usedDirectory?: string[];
     proposal?: ScheduleResponse; schedule?: ScheduleView; previous?: ScheduleProposalMetadata['previous']; services?: string[]; nextRuns?: string[];
-    digestCandidate?: ScheduleProposalMetadata['digestCandidate'];
+    digestCandidate?: ScheduleProposalMetadata['digestCandidate']; delivery?: CalendarDigestDelivery;
     scheduleId?: string | null; baseVersion?: number | null; runId?: string; name?: string; dueAt?: string; trigger?: string };
 }
 
