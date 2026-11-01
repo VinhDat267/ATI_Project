@@ -37,13 +37,15 @@ This matrix is not a claim that scope alone grants a native permission. No admin
 | Second simultaneous site | NOT_RUN | Repeat consent with same identity; two Jira sites observed together, not just two separate historical counts |
 | Refresh twice | LIVE_OBSERVED for identity grant, 01/11 | Two separate consecutive browser refresh submissions each returned TOKEN_ROTATION_OBSERVED and connected true; Jira-scope refresh still NOT_RUN |
 | Global permission read | NOT_RUN | Actual response from site; both admin and non-admin cases if available |
-| Re-consent / wrong account / denial | NOT_RUN | Actual provider/browser result and local connection state; no callback URL/code in report |
+| Re-consent / wrong account / denial | Consent denial LIVE_OBSERVED 01/11 in a fresh local session; wrong-account and Jira re-consent outcomes NOT_RUN | Cancel returned CONSENT_DENIED and local connected false; this does not claim an existing provider grant was revoked |
 
 Owner created/configured the development app after setup guidance. The local configuration check passes; console grant type remains unrecorded. On 01/11 the owner reported connection complete; the live browser report confirmed identity and the exact granted scopes `offline_access read:me`. The owner then explicitly confirmed that the actual account used had not joined any Jira site. This establishes the identity-before-site case through two distinct evidence classes, LIVE_OBSERVED and OPERATOR_ATTESTED; it is not inferred from the empty site count. The owner currently has no test Jira sites; provisioning the first test site is the next external setup step.
 
 On 31/10 the authorization endpoint and browser navigation reached the official Atlassian login page ([browser-start log](../handoff/log/2026-10-31-codex-jira-01-browser-origin.md)). On 01/11 the probe observed the actual callback, identity and two successful refreshes. The initial report was saved before refresh; both sequential refresh results were saved separately in ignored local evidence. No Jira resource/permission read or write has been observed. See the [native identity log](../handoff/log/2026-11-01-codex-jira-01-native-identity.md).
 
 **Gate verdict: NOT_COMPLETE.** Local probe verification may finish independently; JIRA-02–11 do not start until the provider gate is resolved as required by the approved design.
+
+On 01/11 the owner showed an accessible Jira site. The real consent screen was observed at `https://api.atlassian.com/oauth2/authorize/server/consent`, with a site installation target, Jira view/update scopes and an account-wide grant warning. This is a consent preview, not a successful Jira grant or proof of the console's grant-model setting. The runner's CSP was extended to this exact official host; the fresh browser flow now reaches consent. A separate identity consent was cancelled successfully before starting the real Jira consent. See the [consent-host log](../handoff/log/2026-11-01-codex-jira-01-consent-host.md).
 
 ## Local tooling evidence
 

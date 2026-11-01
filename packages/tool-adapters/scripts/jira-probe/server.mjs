@@ -23,7 +23,7 @@ export async function startProbeServer(config) {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Content-Security-Policy', `default-src 'none'; style-src 'unsafe-inline'; form-action 'self' ${config.mode === 'live' ? 'https://auth.atlassian.com https://id.atlassian.com' : new URL(config.fixtureBaseUrl).origin}; frame-ancestors 'none'`);
+    res.setHeader('Content-Security-Policy', `default-src 'none'; style-src 'unsafe-inline'; form-action 'self' ${config.mode === 'live' ? 'https://auth.atlassian.com https://id.atlassian.com https://api.atlassian.com' : new URL(config.fixtureBaseUrl).origin}; frame-ancestors 'none'`);
     const send = (status, body, contentType = 'text/plain; charset=utf-8') => {
       if (res.destroyed) return; res.writeHead(status, { 'Content-Type': contentType }); res.end(body);
     };

@@ -235,7 +235,7 @@ const post = (url, cookie, flow = 'identity', origin = new URL(url).origin) => f
   body: new URLSearchParams({ flow }),
 });
 
-test('live runner permits Atlassian login redirects without permitting arbitrary form destinations', async t => {
+test('live runner permits Atlassian login and consent redirects without arbitrary form destinations', async t => {
   const reservation = await providerFixture();
   const origin = reservation.baseUrl;
   await reservation.close();
@@ -244,7 +244,7 @@ test('live runner permits Atlassian login redirects without permitting arbitrary
   t.after(() => server.close());
   const page = await fetch(server.url);
   const formAction = page.headers.get('content-security-policy').split(';').map(value => value.trim()).find(value => value.startsWith('form-action '));
-  assert.deepEqual(new Set(formAction.split(/\s+/).slice(1)), new Set(["'self'", 'https://auth.atlassian.com', 'https://id.atlassian.com']));
+  assert.deepEqual(new Set(formAction.split(/\s+/).slice(1)), new Set(["'self'", 'https://auth.atlassian.com', 'https://id.atlassian.com', 'https://api.atlassian.com']));
 });
 
 test('runner binds one browser and protects report and mutations from other browsers/origins', async t => {
