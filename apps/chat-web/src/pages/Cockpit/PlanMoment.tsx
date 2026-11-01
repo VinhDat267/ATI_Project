@@ -2,6 +2,7 @@
 import { useState, type ReactNode } from 'react';
 import type { ActivePlan, PlanStep, ServiceInfo } from '../../types';
 import { ServiceLogo } from '../../components/ServiceLogo';
+import { WorkflowFlowCanvas } from '../../components/WorkflowFlowCanvas';
 import { operation, serviceId, servicePalette, serviceName } from './presentation';
 import { RequestEcho } from './RequestEcho';
 export function PlanMoment({request,runtimeMode,plan,services,destination,onPreview,onApprove,onCancel,onEdit,inlineComposer}:{request?:string;runtimeMode:'sandbox'|'live'|null;plan:ActivePlan;services:ServiceInfo[];destination:(step:PlanStep,labels?:Record<string,string>)=>string;onPreview:(step:PlanStep)=>void;onApprove:()=>void;onCancel:()=>void;onEdit:()=>void;inlineComposer:ReactNode}) {
@@ -22,8 +23,9 @@ export function PlanMoment({request,runtimeMode,plan,services,destination,onPrev
           {plan.connections?.trello?.username && <p className="text-sm text-brand-text break-words">Tài khoản: @{plan.connections.trello.username} (Trello của bạn)</p>}
           {plan.connections?.github?.login && <p className="text-sm text-brand-text break-words">Tài khoản: @{plan.connections.github.login} (GitHub của bạn)</p>}
           {plan.connections?.telegram?.username && <p className="text-sm text-brand-text break-words">Tài khoản: @{plan.connections.telegram.username} (Telegram của bạn)</p>}
+          <WorkflowFlowCanvas steps={plan.steps} mode="preview" resourceLabels={plan.resourceLabels} onStepPreview={onPreview} />
           {/* 4 Task Action Cards (NHÓM 2: Hiện so le dưới 300ms, NHÓM 8: Biểu tượng SVG) */}
-          <div className="v3-space-y-3" id="plan-cards-container">
+          <div className="v3-space-y-3" id="plan-cards-container" role="list" aria-label="Các bước thực thi">
             {plan.steps.map((step,index) => { const service=serviceId(step.tool), palette=servicePalette(service); return (
             <article key={step.id} className={`plan-card-stagger-${Math.min(index+1, 4)} bg-white rounded-2xl border border-brand-border p-4 sm:p-5 shadow-soft-card transition-all hover:border-neutral-300`} data-od-id={`plan-item-${index+1}`}>
               <div className="flex items-start justify-between gap-4">

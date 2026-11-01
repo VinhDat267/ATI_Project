@@ -3,6 +3,7 @@ import { Fragment } from 'react';
 import { toolDefinition } from '../../services/tool-definitions';
 import type { ActivePlan,PlanStep,ServiceInfo } from '../../types';
 import { ServiceLogo } from '../../components/ServiceLogo';
+import { WorkflowFlowCanvas } from '../../components/WorkflowFlowCanvas';
 import { ResultFields, type ExecutionStepInfo } from '../../components/ExecutionProgress';
 import { operation,serviceId,serviceName,servicePalette,statusLabel,resultTitle,outcomeURL,receiptReferences } from './presentation';
 import { RequestEcho } from './RequestEcho';
@@ -96,6 +97,8 @@ export function ReceiptMoment({request,terminalStatus,steps,planSteps,services,l
  const ids=new Set(steps.map(step=>step.id)); const refs=receiptReferences(planSteps).filter(edge=>ids.has(edge.from) && ids.has(edge.to));
  const cardProps={services,planSteps,labels,mycalendarConnection,mysheetsConnection,trelloConnection,githubConnection,telegramConnection,destination};
  const getPrompt = servicePrompt ?? (s => s.name);
+ const stepStatuses=Object.fromEntries(steps.map(step=>[step.id,step.status]));
+ const canvasSteps:PlanStep[]=planSteps.length ? planSteps : steps.map(step=>({id:step.id,tool:step.tool,description:step.description,args:{}}));
  return (<section id={terminalStatus?"moment-unsuccessful":"moment-6"} className="stage-section is-active v3-space-y-7 w-full max-w-[1120px] mx-auto" aria-label="Cockpit" data-moment={terminalStatus?"unsuccessful":"6"} aria-labelledby="heading-moment-6">
           <div className="v3-space-y-3">
             <div className={`w-14 h-14 rounded-2xl ${terminalStatus?'bg-neutral-100 border-neutral-300 text-neutral-600':'bg-emerald-50 border-emerald-200 text-emerald-600'} flex items-center justify-center shadow-sm`}>
@@ -118,6 +121,7 @@ export function ReceiptMoment({request,terminalStatus,steps,planSteps,services,l
           </div>
           {/* NHÓM 7: Chuỗi 4 biên nhận dạng lưới 2x2 trên desktop (1->2 ở hàng trên, chuyển Z xuống 3, 3->4 ở hàng dưới), 1 cột trên mobile */}
           <div className="v3-space-y-3">
+            <WorkflowFlowCanvas steps={canvasSteps} stepStatuses={stepStatuses} resourceLabels={labels} mode="receipt" />
             <div id="receipt-chain" className="flex flex-col gap-3">
               {rows.map((row,rowIndex)=>{const horizontal=row.length===2 ? refs.filter(edge=>edge.from===row[0].id && edge.to===row[1].id):[];
                 const incoming=refs.filter(edge=>row.some(step=>step.id===edge.to) && !horizontal.includes(edge));
