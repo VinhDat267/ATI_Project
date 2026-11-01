@@ -167,7 +167,6 @@ export class ChatService {
   private mycalendarConnection?: ChatServiceOptions['mycalendarConnection'];
   private mysheetsConnection?: ChatServiceOptions['mysheetsConnection'];
   private trelloConnection?: ChatServiceOptions['trelloConnection'];
-  private trelloTeamBoards?: Array<{ boardId: string; boardName: string }>;
   private schedules?: ChatServiceOptions['schedules'];
   private getAdapter?: ChatServiceOptions['getAdapter'];
   private lookupTool?: ChatServiceOptions['lookupTool'];
@@ -220,7 +219,13 @@ export class ChatService {
    * the model wrote and record the connection a Gmail, MyCalendar, MySheets or Trello step will use,
    * so the integrity check covers it. Without one the plan is refused, not saved.
    */
-  private async bindConnections(plan: PlanResponse, userId: string, signal?: AbortSignal, memory?: WorkingMemory): Promise<PlannerResponse> {
+  private async bindConnections(
+    plan: PlanResponse,
+    userId: string,
+    signal?: AbortSignal,
+    memory?: WorkingMemory,
+    onTrelloTeamBoards?: (boards: Array<{ boardId: string; boardName: string }>) => void,
+  ): Promise<PlannerResponse> {
     signal?.throwIfAborted();
     const bound = withoutConnections(plan);
     const usesGmail = bound.steps.some((step) => step.tool.startsWith('gmail.'));
@@ -384,7 +389,7 @@ export class ChatService {
         };
       } else {
         if (trello.teamBoards) {
-          this.trelloTeamBoards = trello.teamBoards;
+          onTrelloTeamBoards?.(trello.teamBoards);
         }
         const allowedBoardSet = new Set(trello.connection.boardIds);
         const teamBoardMap = new Map<string, string>(
@@ -406,11 +411,24 @@ export class ChatService {
           if (!step.tool.startsWith('trello.')) continue;
           let targetBoardId: string | undefined = typeof step.args?.boardId === 'string' ? step.args.boardId : undefined;
           if (!targetBoardId && typeof step.args?.listId === 'string') {
-            const foundList = observedLists.find((l: any) => l.id === step.args.listId);
-            if (foundList && (foundList.boardId || foundList.idBoard)) {
-              targetBoardId = foundList.boardId || foundList.idBoard;
-            } else if (teamBoardMap.has(step.args.listId)) {
-              targetBoardId = step.args.listId;
+            if (step.args.listId.startsWith('$')) {
+              const refStepId = step.args.listId.slice(1).split('.')[0];
+              if (refStepId && stepBoardMap.has(refStepId)) {
+                targetBoardId = stepBoardMap.get(refStepId);
+              }
+            } else {
+              const foundList = observedLists.find((l: any) => l.id === step.args.listId);
+              if (foundList && (foundList.boardId || foundList.idBoard)) {
+                targetBoardId = foundList.boardId || foundList.idBoard;
+              } else if (teamBoardMap.has(step.args.listId)) {
+                targetBoardId = step.args.listId;
+              }
+            }
+          } else if (!targetBoardId && typeof step.args?.listId === 'object' && step.args?.listId && '$ref' in step.args.listId) {
+            const ref = (step.args.listId as any).$ref;
+            const refStepId = typeof ref === 'string' ? ref.replace(/^\$/, '').split('.')[0] : undefined;
+            if (refStepId && stepBoardMap.has(refStepId)) {
+              targetBoardId = stepBoardMap.get(refStepId);
             }
           }
           if (!targetBoardId && step.args?.cardId) {
@@ -426,7 +444,7 @@ export class ChatService {
               }
             } else if (typeof step.args.cardId === 'object' && step.args.cardId && '$ref' in step.args.cardId) {
               const ref = (step.args.cardId as any).$ref;
-              const refStepId = typeof ref === 'string' ? ref.split('.')[0] : undefined;
+              const refStepId = typeof ref === 'string' ? ref.replace(/^\$/, '').split('.')[0] : undefined;
               if (refStepId && stepBoardMap.has(refStepId)) {
                 targetBoardId = stepBoardMap.get(refStepId);
               }
@@ -437,6 +455,9 @@ export class ChatService {
             if (foundList && (foundList.boardId || foundList.idBoard)) {
               targetBoardId = foundList.boardId || foundList.idBoard;
             }
+          }
+          if (!targetBoardId && trello.connection.boardIds.length === 1) {
+            targetBoardId = trello.connection.boardIds[0];
           }
 
           if (targetBoardId) {
@@ -520,7 +541,10 @@ export class ChatService {
     planned: PlannerResponse, memory: WorkingMemory, userTexts: string[], signal?: AbortSignal,
   ): Promise<PreparedResponse> {
     const { conversationId, correlation } = target;
-    let response = planned.kind === 'plan' ? await this.bindConnections(planned, target.userId, signal, memory) : planned;
+    let trelloTeamBoards: Array<{ boardId: string; boardName: string }> | undefined;
+    let response = planned.kind === 'plan'
+      ? await this.bindConnections(planned, target.userId, signal, memory, (boards) => { trelloTeamBoards = boards; })
+      : planned;
     signal?.throwIfAborted();
     let proposal: ScheduleProposalMetadata | null = null;
     if (response.kind === 'schedule') {
@@ -529,7 +553,7 @@ export class ChatService {
     }
     const emit = (event: string, payload: Record<string, unknown>) => this.eventEmitter.emit(event, { conversationId, ...payload, ...correlation });
     let planId: string | null = null, messageId = '', labels: Record<string, string> = {};
-    if (response.kind === 'plan') labels = resourceLabels(response, memory, userTexts, this.trelloTeamBoards);
+    if (response.kind === 'plan') labels = resourceLabels(response, memory, userTexts, trelloTeamBoards);
 
     const write = async (client?: pg.PoolClient) => {
       // Without a client the repositories keep their own transactions, called exactly as before.
