@@ -42,8 +42,15 @@ export function runLabel(run: ScheduleRunView): string {
       const total = counts.newIssues + counts.stalePrs + counts.unassignedIssues;
       return `Đã gửi · ${total} mục`;
     }
+    if (run.delivery && ('chatId' in run.delivery || 'sources' in run.delivery)) {
+      return 'Đã gửi';
+    }
     return 'Đã tự gửi báo cáo';
   }
-  if (run.state === 'digest_failed') return 'Gửi báo cáo thất bại';
+  if (run.state === 'digest_failed') {
+    return /telegram/i.test(run.error ?? '') || (run.delivery && 'chatId' in run.delivery)
+      ? 'Gửi thất bại'
+      : 'Gửi báo cáo thất bại';
+  }
   return ({ planning: 'Đang lập kế hoạch', awaiting_approval: 'Chờ bạn duyệt', expired: 'Hết hạn duyệt', rejected: 'Bạn đã hủy kế hoạch', needs_attention: 'Cần bạn xem', planning_failed: 'Không lập được kế hoạch', interrupted: 'Bị gián đoạn', discarded: 'Đã bỏ vì lịch thay đổi', blocked: 'Bị chặn' } as Record<string, string>)[run.state];
 }

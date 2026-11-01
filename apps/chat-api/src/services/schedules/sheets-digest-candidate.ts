@@ -292,7 +292,9 @@ export async function analyzeSheetsDigestCandidate(
       channelId: chosenChannel,
     };
   } else {
-    const tgRec = await credentialRepo.getCredentials('telegram');
+    const tgRec =
+      (userId ? await credentialRepo.getPersonalCredentials('telegram', userId) : null) ??
+      (await credentialRepo.getCredentials('telegram'));
     if (!tgRec) {
       return {
         canAutoDigest: false,

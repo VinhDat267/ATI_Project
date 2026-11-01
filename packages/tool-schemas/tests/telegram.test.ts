@@ -23,7 +23,7 @@ it('publishes only allowlisted chat discovery and a grounded plain-text send con
 
 it('registers numeric Chat ID scope and only the explicit Telegram keyword', () => {
   const service = getServiceDefinition('telegram'); expect(service).toBeDefined();
-  expect(service).toMatchObject({ scopeKey: 'chats', scopeLabel: 'Chat ID', intentKeywords: ['telegram'], credentialFields: [{ key: 'botToken', type: 'password' }] });
+  expect(service).toMatchObject({ scopeKey: 'chats', scopeLabel: 'Chat ID', intentKeywords: ['telegram'], credentialFields: [] });
   expect(service!.fallbackIntentKeywords ?? []).toEqual([]);
   for (const id of ['123', '-1001234567890', '9'.repeat(20)]) expect(service!.scopePattern!.test(id)).toBe(true);
   for (const id of ['', '@test', '+12', '1.2', '1e3', '9'.repeat(21)]) expect(service!.scopePattern!.test(id)).toBe(false);

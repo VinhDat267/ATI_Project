@@ -2,8 +2,17 @@ import { TELEGRAM_CHAT_ID_PATTERN, normalizeTelegramChatId } from '@wap/tool-sch
 import { BaseAdapter, StepError, type BaseAdapterConfig, type ErrorCategory } from '../base-adapter.js';
 import { GlobalRateLimiter, waitWithSignal } from '../rate-limiter.js';
 
+export interface TelegramKnownChat {
+  id: string;
+  title: string;
+  type: string;
+}
+
 export interface TelegramAdapterConfig extends BaseAdapterConfig {
   credentials: { botToken: string };
+  baseUrl?: string;
+  telegramUserId?: string;
+  knownChats?: TelegramKnownChat[];
   fetchFn?: typeof fetch;
   chatRateLimiter?: GlobalRateLimiter;
   groupRateLimiter?: GlobalRateLimiter;
@@ -21,17 +30,58 @@ const fail = (category: ErrorCategory, statusCode?: number) => new StepError({
 const record = (value: unknown): value is Record<string, any> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const integer = (value: unknown, minimum = 0): value is number => Number.isSafeInteger(value) && Number(value) >= minimum;
 
+function foldVietnamese(input: string): string {
+  return input
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/gi, 'd')
+    .toLowerCase()
+    .trim();
+}
+
+const PERSONAL_CHAT_KEYWORDS = [
+  'telegram cua toi',
+  'ca nhan',
+  'rieng',
+  'cho toi',
+  'tin nhan rieng',
+  'chat rieng',
+  'my telegram',
+  'personal',
+  'private',
+];
+
+function stripGroupPrefix(folded: string): string {
+  return folded.replace(/^(?:nhom|group|kenh|channel|chat|telegram)\s+/i, '').trim();
+}
+
 export class TelegramAdapter extends BaseAdapter {
   readonly service = 'telegram';
   private readonly token: string;
+  private readonly baseUrl: string;
+  private readonly telegramUserId?: string;
+  private readonly knownChatMap: Map<string, TelegramKnownChat>;
   private readonly fetchFn: typeof fetch;
   private readonly chatRate: GlobalRateLimiter;
   private readonly groupRate: GlobalRateLimiter;
 
   constructor(config: TelegramAdapterConfig) {
-    super(config); this.token = config.credentials.botToken; this.fetchFn = config.fetchFn ?? fetch;
+    super(config);
+    this.token = config.credentials.botToken;
+    this.baseUrl = (config.baseUrl ?? 'https://api.telegram.org').replace(/\/+$/, '');
+    this.telegramUserId = config.telegramUserId ? normalizeTelegramChatId(config.telegramUserId) : undefined;
+    this.knownChatMap = new Map(
+      (config.knownChats ?? [])
+        .filter(c => c && typeof c.id === 'string' && TELEGRAM_CHAT_ID_PATTERN.test(c.id.trim()))
+        .map(c => {
+          const normalized = normalizeTelegramChatId(c.id);
+          return [normalized, { id: normalized, title: c.title, type: c.type }];
+        }),
+    );
+    this.fetchFn = config.fetchFn ?? fetch;
     this.rateLimiter = config.rateLimiter ?? requestLimiter;
-    this.chatRate = config.chatRateLimiter ?? chatLimiter; this.groupRate = config.groupRateLimiter ?? groupLimiter;
+    this.chatRate = config.chatRateLimiter ?? chatLimiter;
+    this.groupRate = config.groupRateLimiter ?? groupLimiter;
   }
 
   async checkConnection(signal?: AbortSignal): Promise<boolean> {
@@ -40,7 +90,7 @@ export class TelegramAdapter extends BaseAdapter {
     return true;
   }
 
-  async execute(toolName: string, args: Record<string, any>, context?: { signal?: AbortSignal }): Promise<any> {
+  async execute(toolName: string, args: Record<string, any>, context?: { signal?: AbortSignal; chatId?: string }): Promise<any> {
     if (!record(args)) throw fail('VALIDATION');
     const signal = context?.signal;
     if (toolName === 'telegram.list_chats') {
@@ -48,10 +98,10 @@ export class TelegramAdapter extends BaseAdapter {
           Object.keys(args).some(key => !['query', 'limit'].includes(key)) ||
           (args.limit !== undefined && (!integer(args.limit, 1) || args.limit > 10))) throw fail('VALIDATION');
       const ids = this.scope(); const results: Array<{ id: string; title: string; type: string }> = [];
-      const query = args.query.trim().toLocaleLowerCase();
+      const query = args.query.trim();
       for (const id of ids) {
         const chat = this.chat(await this.request('getChat', { chat_id: id }, false, signal), id);
-        if (!query || chat.title.toLocaleLowerCase().includes(query)) results.push(chat);
+        if (this.matchesQuery(chat, query)) results.push(chat);
         if (results.length >= (args.limit ?? 10)) break;
       }
       return results;
@@ -62,6 +112,11 @@ export class TelegramAdapter extends BaseAdapter {
           Object.keys(args).some(key => !['chatId', 'text'].includes(key))) throw fail('VALIDATION');
       const id = normalizeTelegramChatId(args.chatId);
       if (!this.scope().includes(id)) throw fail('AUTH_ERROR', 403);
+      if (context?.chatId !== undefined) {
+        if (typeof context.chatId !== 'string' || !TELEGRAM_CHAT_ID_PATTERN.test(context.chatId.trim()) || normalizeTelegramChatId(context.chatId) !== id) {
+          throw fail('AUTH_ERROR', 403);
+        }
+      }
       // A fresh read establishes chat identity and group type before any write.
       const chat = this.chat(await this.request('getChat', { chat_id: id }, false, signal), id);
       const limiter = chat.type === 'group' || chat.type === 'supergroup' ? this.groupRate : this.chatRate;
@@ -75,6 +130,28 @@ export class TelegramAdapter extends BaseAdapter {
     throw fail('VALIDATION');
   }
 
+  private matchesQuery(chat: { id: string; title: string; type: string }, rawQuery: string): boolean {
+    if (!rawQuery) return true;
+    const lowerQuery = rawQuery.toLocaleLowerCase();
+    if (chat.title.toLocaleLowerCase().includes(lowerQuery)) return true;
+
+    const foldedQuery = foldVietnamese(rawQuery);
+    const isPersonalQuery = PERSONAL_CHAT_KEYWORDS.some(
+      kw => foldedQuery === kw || foldedQuery.includes(kw),
+    );
+    if (isPersonalQuery) {
+      return chat.type === 'private' || (this.telegramUserId !== undefined && chat.id === this.telegramUserId);
+    }
+
+    const foldedTitle = foldVietnamese(chat.title);
+    if (foldedTitle.includes(foldedQuery)) return true;
+
+    const strippedQuery = stripGroupPrefix(foldedQuery);
+    if (strippedQuery && foldedTitle.includes(strippedQuery)) return true;
+
+    return false;
+  }
+
   private scope(): string[] {
     const values = this.allowedScope?.chats;
     if (!Array.isArray(values) || !values.length || !values.every(id => typeof id === 'string' && TELEGRAM_CHAT_ID_PATTERN.test(id.trim()))) throw fail('AUTH_ERROR', 403);
@@ -83,9 +160,15 @@ export class TelegramAdapter extends BaseAdapter {
 
   private chat(value: unknown, requested: string) {
     if (!record(value) || !Number.isSafeInteger(value.id) || String(value.id) !== requested || !chatTypes.has(value.type)) throw fail('SERVER_ERROR');
-    const title = typeof value.title === 'string' && value.title.trim() ? value.title
+    let title = typeof value.title === 'string' && value.title.trim() ? value.title
       : [value.first_name, value.last_name].filter(part => typeof part === 'string' && part.trim()).join(' ') ||
         (typeof value.username === 'string' && value.username.trim() ? value.username : requested);
+    const known = this.knownChatMap.get(requested);
+    if (known && typeof known.title === 'string' && known.title.trim()) {
+      title = known.title.trim();
+    } else if (this.telegramUserId && requested === this.telegramUserId && value.type === 'private' && !foldVietnamese(title).startsWith('telegram cua toi')) {
+      title = `Telegram của tôi (${title})`;
+    }
     if (title.includes(this.token) || /api\.telegram\.org\/bot/i.test(title)) throw fail('SERVER_ERROR');
     return { id: requested, title, type: String(value.type) };
   }
@@ -122,7 +205,7 @@ export class TelegramAdapter extends BaseAdapter {
       if (signal?.aborted) throw fail('NETWORK');
       let response: Response;
       try {
-        response = await this.fetchFn('https://api.telegram.org/bot' + this.token + '/' + method, {
+        response = await this.fetchFn(this.baseUrl + '/bot' + this.token + '/' + method, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), redirect: 'error', signal,
         });
       } catch {

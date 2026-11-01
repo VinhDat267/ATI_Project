@@ -2,7 +2,7 @@ import type pg from 'pg';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import type { RunCalendarDigest } from '../services/schedules/calendar-digest-runner.js';
 import { ScheduleService } from '../services/schedules/schedule-service.js';
-import { ScheduleRunner, reconcileScheduleRuns, type PlanRun } from '../services/schedules/schedule-runner.js';
+import { ScheduleRunner, reconcileScheduleRuns, type ExecuteDigestRun, type PlanRun } from '../services/schedules/schedule-runner.js';
 import type { SheetsDigestRunner } from '../services/schedules/sheets-digest-runner.js';
 import type { RunGithubDigest } from '../services/schedules/github-digest-runner.js';
 
@@ -16,6 +16,7 @@ export interface ScheduleRuntimeOptions {
   planRun?: PlanRun;
   runDigest?: RunCalendarDigest | RunGithubDigest;
   runGithubDigest?: RunGithubDigest;
+  executeDigestRun?: ExecuteDigestRun;
   emit?: (convId: string, event: string, payload: unknown) => unknown;
   now?: () => Date;
   credentialRepo?: CredentialRepo;
@@ -44,6 +45,7 @@ export function createScheduleRuntime(options: ScheduleRuntimeOptions) {
     planRun: options.planRun ?? notConnected,
     runDigest: options.runDigest,
     runGithubDigest: options.runGithubDigest,
+    executeDigestRun: options.executeDigestRun,
     emit: options.emit,
     now: options.now,
     recordState: (client, row, now) => service.recordState(client, row, now),

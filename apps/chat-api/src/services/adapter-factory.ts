@@ -3,13 +3,15 @@ import {
   decryptCredentials,
   GitHubAdapter,
   StepError,
+  TelegramAdapter,
   TrelloAdapter,
   type GmailAccessTokenProvider,
 } from '@wap/tool-adapters';
-import type { AllowedScope, PlanConnections } from '@wap/tool-schemas';
+import { normalizeTelegramChatId, TELEGRAM_CHAT_ID_PATTERN, type AllowedScope, type PlanConnections } from '@wap/tool-schemas';
 import type { AdapterExecutor } from '@wap/executor';
 import { getRegisteredService, isServiceAccountService } from './registered-services.js';
 import type { GmailTokenManager } from './gmail/token-manager.js';
+import type { TelegramBotClient } from './telegram/bot-client.js';
 
 /** Who an adapter is for. Shared services ignore it; Gmail & MyCalendar require it. */
 export interface AdapterContext {
@@ -43,6 +45,19 @@ export interface AdapterFactoryOptions {
   githubTeamRepo?: any;
   githubOAuthClient?: any;
   githubApiBaseUrl?: string;
+  telegramBot?: {
+    botToken: string;
+    botUsername: string;
+    apiBaseUrl?: string;
+  };
+  telegramBotClient?: Pick<TelegramBotClient, 'getChatMember'>;
+  createTelegramAdapter?: (input: {
+    userId: string;
+    telegramUserId: string;
+    allowedChats: string[];
+    knownChats: Array<{ id: string; title: string; type: string }>;
+  }) => AdapterExecutor;
+  serviceFetchFn?: typeof fetch;
 }
 
 const gmailError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
@@ -54,6 +69,8 @@ const mysheetsError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =
 const trelloError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
   new StepError({ category, message, retryable: false });
 const githubError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
+  new StepError({ category, message, retryable: false });
+const telegramError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
   new StepError({ category, message, retryable: false });
 
 export class AdapterFactory {
@@ -84,13 +101,14 @@ export class AdapterFactory {
     }
   }
 
-  /** Forget the Gmail, MyCalendar, MySheets, Trello & GitHub adapters and access tokens of one member (connect, disconnect, reconnect_required). */
+  /** Forget the Gmail, MyCalendar, MySheets, Trello, GitHub & Telegram adapters and access tokens of one member (connect, disconnect, reconnect_required). */
   clearPersonal(userId: string): void {
     this.personalCache.delete(`gmail:${userId}`);
     this.personalCache.delete(`mycalendar:${userId}`);
     this.personalCache.delete(`mysheets:${userId}`);
     this.personalCache.delete(`trello:${userId}`);
     this.personalCache.delete(`github:${userId}`);
+    this.personalCache.delete(`telegram:${userId}`);
     for (const key of Array.from(this.adapterCache.keys())) {
       if (key.startsWith(`personal-shared:${userId}:`)) {
         this.adapterCache.delete(key);
@@ -109,6 +127,7 @@ export class AdapterFactory {
     if (serviceName === 'mysheets') return this.mysheetsAdapter(context);
     if (serviceName === 'trello') return this.trelloAdapter(context);
     if (serviceName === 'github') return this.githubAdapter(context);
+    if (serviceName === 'telegram') return this.telegramAdapter(context);
 
     let cacheKey = serviceName;
     if (context?.workspaceMode === 'personal' && context.userId) {
@@ -480,6 +499,118 @@ export class AdapterFactory {
       credentials: { token: accessToken },
       allowedScope: { repos: allowedRepos },
       baseUrl: this.options.githubApiBaseUrl,
+    });
+  }
+
+  /** Only the member's own active connection; at execution, credentialId match, selectedChats match and live group membership match. */
+  private async telegramAdapter(context?: AdapterContext): Promise<AdapterExecutor> {
+    const userId = context?.userId;
+    if (!userId) throw telegramError('AUTH_ERROR', 'Telegram cá nhân chỉ dùng được với kết nối của chính người dùng.');
+    const record = await this.credentialRepo.getPersonalCredentials('telegram', userId);
+    if (!record || record.status !== 'active') {
+      throw telegramError('AUTH_ERROR', 'Telegram chưa được kết nối hoặc cần kết nối lại.');
+    }
+
+    if (context?.phase === 'execution') {
+      const previewed = context.connections?.telegram;
+      if (!previewed || record.id !== previewed.credentialId) {
+        throw telegramError('AUTH_ERROR', 'Kết nối Telegram đã thay đổi, hãy lập lại kế hoạch.');
+      }
+    }
+
+    let telegramUserId: string | undefined;
+    let selectedChats: Array<{ id: string; title: string; type: string }> = [];
+    try {
+      const config = decryptCredentials(record.config, this.encryptionKey);
+      telegramUserId = typeof config.telegramUserId === 'string' && config.telegramUserId.trim()
+        ? normalizeTelegramChatId(config.telegramUserId.trim())
+        : undefined;
+      if (Array.isArray(config.selectedChats)) {
+        selectedChats = config.selectedChats
+          .filter(
+            (c: any) =>
+              c &&
+              typeof c.chatId === 'string' &&
+              TELEGRAM_CHAT_ID_PATTERN.test(c.chatId.trim()) &&
+              typeof c.title === 'string' &&
+              c.title.trim(),
+          )
+          .map((c: any) => ({
+            id: normalizeTelegramChatId(c.chatId),
+            title: c.title.trim(),
+            type: String(c.type || (c.chatId.startsWith('-') ? 'supergroup' : 'private')),
+          }));
+      }
+    } catch {
+      throw telegramError('AUTH_ERROR', 'Telegram cần được kết nối lại.');
+    }
+
+    if (!telegramUserId || selectedChats.length === 0) {
+      throw telegramError('AUTH_ERROR', 'Bạn chưa chọn cuộc trò chuyện Telegram được phép sử dụng.');
+    }
+
+    const currentChatMap = new Map(selectedChats.map((c) => [c.id, c]));
+    const targetIds = context?.phase === 'execution' && context.connections?.telegram?.chatIds
+      ? context.connections.telegram.chatIds.map((id) => normalizeTelegramChatId(id))
+      : [...currentChatMap.keys()];
+
+    if (context?.phase === 'execution') {
+      if (targetIds.length === 0 || !targetIds.every((id) => currentChatMap.has(id))) {
+        throw telegramError('AUTH_ERROR', 'Cuộc trò chuyện Telegram trong kế hoạch đã bị bỏ khỏi phạm vi đã chọn.');
+      }
+    }
+
+    const allowedChats: string[] = [];
+    for (const id of targetIds) {
+      const chat = currentChatMap.get(id);
+      if (!chat) continue;
+      if (chat.type === 'private' || id === telegramUserId) {
+        if (id === telegramUserId) allowedChats.push(id);
+        continue;
+      }
+      if (this.options.telegramBotClient) {
+        const isMember = await this.options.telegramBotClient.getChatMember(
+          id,
+          telegramUserId,
+          AbortSignal.timeout(10_000),
+        );
+        if (!isMember) {
+          if (context?.phase === 'execution') {
+            throw telegramError('AUTH_ERROR', 'Bạn không còn là thành viên của nhóm Telegram trong kế hoạch.');
+          }
+          continue;
+        }
+      }
+      allowedChats.push(id);
+    }
+
+    if (allowedChats.length === 0) {
+      if (context?.phase === 'execution') {
+        throw telegramError('AUTH_ERROR', 'Bạn không còn là thành viên của nhóm Telegram trong kế hoạch.');
+      }
+      throw telegramError('AUTH_ERROR', 'Không có cuộc trò chuyện Telegram nào hợp lệ để thực thi.');
+    }
+
+    if (this.options.createTelegramAdapter) {
+      return this.options.createTelegramAdapter({
+        userId,
+        telegramUserId,
+        allowedChats,
+        knownChats: selectedChats,
+      });
+    }
+
+    if (!this.options.telegramBot?.botToken) {
+      throw telegramError('VALIDATION', 'Telegram chưa sẵn sàng trên máy chủ này.');
+    }
+
+    return new TelegramAdapter({
+      credentials: { botToken: this.options.telegramBot.botToken },
+      baseUrl: this.options.telegramBot.apiBaseUrl,
+      telegramUserId,
+      allowedScope: { chats: allowedChats },
+      knownChats: selectedChats,
+      fetchFn: this.options.serviceFetchFn,
     });
   }
 }

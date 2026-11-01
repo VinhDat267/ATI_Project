@@ -47,6 +47,7 @@ export interface PlanStep {
   tool: string;
   description: string;
   args: Record<string, unknown>;
+  chatId?: string;
   dependsOn?: string[];
 }
 
@@ -95,6 +96,12 @@ export interface ActivePlan {
       githubUserId: string;
       login: string;
       repos: string[];
+    };
+    telegram?: {
+      credentialId: string;
+      telegramUserId: string;
+      username: string;
+      chatIds: string[];
     };
   };
   resourceLabels?: Record<string, string>;

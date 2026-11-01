@@ -224,3 +224,49 @@ it('rejects cancellation before transport and unknown tools without fetching', a
   await expect(a.execute('telegram.delete_message', {})).rejects.toMatchObject({ category: 'VALIDATION' });
   expect(fetchFn).not.toHaveBeenCalled();
 });
+
+it('matches natural private chat queries ("Telegram của tôi", "cá nhân", "riêng", "cho tôi") and Vietnamese accent-insensitive group names with knownChats and custom baseUrl', async () => {
+  const fetchFn = vi.fn(async (url: any, init: any) => {
+    expect(String(url).startsWith('https://mock-telegram.internal/bot')).toBe(true);
+    const requested = JSON.parse(init.body).chat_id;
+    if (requested === '777888999') {
+      return ok({ id: 777888999, type: 'private', first_name: 'Nguyen', last_name: 'Van A', username: 'nguyenvana' });
+    }
+    if (requested === '-100555666777') {
+      return ok({ id: -100555666777, title: 'Đội Sản Phẩm', type: 'supergroup' });
+    }
+    return error(404);
+  });
+
+  const a = make(fetchFn, {
+    baseUrl: 'https://mock-telegram.internal',
+    telegramUserId: '777888999',
+    allowedScope: { chats: ['777888999', '-100555666777'] },
+    knownChats: [
+      { id: '777888999', title: 'Telegram của tôi (Nguyen Van A)', type: 'private' },
+      { id: '-100555666777', title: 'Đội Sản Phẩm', type: 'supergroup' },
+    ],
+  });
+
+  for (const query of ['Telegram của tôi', 'cá nhân', 'riêng', 'cho tôi']) {
+    const res = await a.execute('telegram.list_chats', { query, limit: 10 });
+    expect(res).toEqual([{ id: '777888999', title: 'Telegram của tôi (Nguyen Van A)', type: 'private' }]);
+  }
+
+  for (const query of ['doi san pham', 'nhóm Đội Sản Phẩm', 'group doi san pham', 'kênh sản phẩm']) {
+    const res = await a.execute('telegram.list_chats', { query, limit: 10 });
+    expect(res).toEqual([{ id: '-100555666777', title: 'Đội Sản Phẩm', type: 'supergroup' }]);
+  }
+});
+
+it('rejects telegram.send_message when context.chatId mismatches args.chatId before making any HTTP call', async () => {
+  const fetchFn = vi.fn();
+  const a = make(fetchFn, {
+    allowedScope: { chats: [id, '777888999'] },
+  });
+  await expect(
+    a.execute('telegram.send_message', { chatId: id, text: 'hello' }, { chatId: '777888999' } as any),
+  ).rejects.toMatchObject({ category: 'AUTH_ERROR', statusCode: 403 });
+  expect(fetchFn).not.toHaveBeenCalled();
+});
+

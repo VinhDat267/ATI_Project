@@ -190,7 +190,9 @@ export class SheetsDigestRunner {
         return { ok: false, reason: 'Không đọc được cấu hình phạm vi Slack.' };
       }
     } else {
-      const tgRec = await this.options.credentialRepo.getCredentials('telegram');
+      const tgRec =
+        (await this.options.credentialRepo.getPersonalCredentials('telegram', schedule.user_id)) ??
+        (await this.options.credentialRepo.getCredentials('telegram'));
       if (!tgRec) {
         return { ok: false, reason: 'Dịch vụ Telegram không còn được cấu hình.' };
       }

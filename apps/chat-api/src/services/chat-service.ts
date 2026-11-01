@@ -11,6 +11,7 @@ import { resourceLabels } from './resource-labels.js';
 import { nextRuns } from './schedules/next-occurrence.js';
 import { runMessage, type PreparedRun, type RunToPlan } from './schedules/schedule-runner.js';
 import { evaluateGithubDigestCandidate } from './schedules/github-digest-candidate.js';
+import { evaluateTelegramDigestCandidate } from './schedules/telegram-digest-candidate.js';
 import { resolveRef } from '@wap/executor';
 import { eventsOverlap } from '@wap/tool-adapters';
 
@@ -144,6 +145,8 @@ export interface ChatServiceOptions {
   trelloConnection?: (userId: string, scopeId?: string) => Promise<any>;
   /** The caller's active GitHub connection lookup; absent when GitHub is off or not connected. */
   githubConnection?: (userId: string) => Promise<any>;
+  /** The caller's active Telegram connection lookup; absent when Telegram is off or not connected. */
+  telegramConnection?: (userId: string) => Promise<any>;
   /** Scheduled workflows (SCHEDULES_ENABLED); absent, conversations have no schedule. */
   schedules?: {
     repo: ScheduleRepo;
@@ -183,6 +186,7 @@ export class ChatService {
   private mysheetsConnection?: ChatServiceOptions['mysheetsConnection'];
   private trelloConnection?: ChatServiceOptions['trelloConnection'];
   private githubConnection?: ChatServiceOptions['githubConnection'];
+  private telegramConnection?: ChatServiceOptions['telegramConnection'];
   private schedules?: ChatServiceOptions['schedules'];
   private getAdapter?: ChatServiceOptions['getAdapter'];
   private lookupTool?: ChatServiceOptions['lookupTool'];
@@ -194,6 +198,7 @@ export class ChatService {
     this.mysheetsConnection = options.mysheetsConnection;
     this.trelloConnection = options.trelloConnection;
     this.githubConnection = options.githubConnection;
+    this.telegramConnection = options.telegramConnection;
     this.getAdapter = options.getAdapter;
     this.lookupTool = options.lookupTool;
     this.mysheetsLookupTimeoutMs = options.mysheetsLookupTimeoutMs ?? 10_000;
@@ -254,6 +259,7 @@ export class ChatService {
     onTrelloTeamBoards?: (boards: Array<{ boardId: string; boardName: string }>) => void,
     scopeId = 'default',
     onGitHubTeamRepos?: (repos: Array<{ repoId: string; fullName: string; name: string }>) => void,
+    onTelegramChats?: (chats: Array<{ chatId: string; title: string }>) => void,
   ): Promise<PlannerResponse> {
     signal?.throwIfAborted();
     const bound = withoutConnections(plan);
@@ -262,8 +268,9 @@ export class ChatService {
     const usesMySheets = bound.steps.some((step) => step.tool.startsWith('mysheets.'));
     const usesTrello = bound.steps.some((step) => step.tool.startsWith('trello.'));
     const usesGitHub = bound.steps.some((step) => step.tool.startsWith('github.'));
+    const usesTelegram = bound.steps.some((step) => step.tool.startsWith('telegram.'));
 
-    if (!usesGmail && !usesMyCalendar && !usesMySheets && !usesTrello && !usesGitHub) return bound;
+    if (!usesGmail && !usesMyCalendar && !usesMySheets && !usesTrello && !usesGitHub && !usesTelegram) return bound;
 
     const unavailableServices: Array<{ id: string; name: string }> = [];
     const reasons: string[] = [];
@@ -272,6 +279,7 @@ export class ChatService {
     let mysheetsConn: NonNullable<PlanConnections['mysheets']> | undefined;
     let trelloConn: NonNullable<PlanConnections['trello']> | undefined;
     let githubConn: NonNullable<PlanConnections['github']> | undefined;
+    let telegramConn: NonNullable<PlanConnections['telegram']> | undefined;
 
     if (usesGmail) {
       const gmail = await this.gmailConnection?.(userId);
@@ -692,6 +700,52 @@ export class ChatService {
       }
     }
 
+    if (usesTelegram) {
+      const telegram = await this.telegramConnection?.(userId);
+      if (!telegram || telegram.status === 'not_connected' || telegram.status === 'reconnect_required') {
+        unavailableServices.push({ id: 'telegram', name: 'Telegram' });
+        reasons.push('Tài khoản của bạn chưa Kết nối Telegram hoặc cần kết nối lại.');
+      } else if (telegram.status === 'needs_scope' || !telegram.connection) {
+        return {
+          kind: 'refusal',
+          reason: 'Bạn chưa chọn cuộc trò chuyện hoặc nhóm Telegram nào được phép sử dụng.',
+          suggestion: 'Hãy chọn ít nhất một cuộc trò chuyện hoặc nhóm Telegram trong trang Kết nối dịch vụ.',
+        };
+      } else {
+        if (telegram.selectedChats) {
+          onTelegramChats?.(telegram.selectedChats);
+        }
+        const allowedChatSet = new Set(telegram.connection.chatIds);
+        let forbiddenChatId: string | null = null;
+        for (const step of bound.steps) {
+          if (!step.tool.startsWith('telegram.')) continue;
+          const targetChatId = typeof step.args?.chatId === 'string' ? step.args.chatId.trim() : undefined;
+          if (targetChatId) {
+            step.chatId = targetChatId;
+            if (!allowedChatSet.has(targetChatId)) {
+              forbiddenChatId = targetChatId;
+              break;
+            }
+          } else if (step.tool === 'telegram.send_message' && telegram.connection.chatIds.length === 1) {
+            step.chatId = telegram.connection.chatIds[0];
+          }
+        }
+        if (forbiddenChatId) {
+          return {
+            kind: 'refusal',
+            reason: `Cuộc trò chuyện Telegram (${forbiddenChatId}) không nằm trong phạm vi bạn đã chọn.`,
+            suggestion: 'Hãy chọn thêm cuộc trò chuyện hoặc nhóm này trong trang Kết nối dịch vụ, rồi thử lại.',
+          };
+        }
+        telegramConn = {
+          credentialId: telegram.connection.credentialId,
+          telegramUserId: telegram.connection.telegramUserId,
+          username: telegram.connection.username,
+          chatIds: [...telegram.connection.chatIds].sort(),
+        };
+      }
+    }
+
     if (unavailableServices.length > 0) {
       return {
         kind: 'refusal',
@@ -708,6 +762,7 @@ export class ChatService {
     if (mysheetsConn) connections.mysheets = mysheetsConn;
     if (trelloConn) connections.trello = trelloConn;
     if (githubConn) connections.github = githubConn;
+    if (telegramConn) connections.telegram = telegramConn;
 
     return { ...bound, connections };
   }
@@ -736,7 +791,15 @@ export class ChatService {
       ? nextRuns(recurrence, this.schedules.now?.() ?? new Date(), this.schedules.timeZone).map((date) => date.toISOString()) : [];
     const current = proposal.action === 'create' ? null : schedule;
     let digestCandidate: ScheduleProposalMetadata['digestCandidate'] | undefined;
-    if (
+    if ((proposal.action === 'create' || proposal.action === 'update') && services.includes('telegram') && this.telegramConnection) {
+      const tgLookup = await this.telegramConnection(actor.userId).catch(() => null);
+      digestCandidate = evaluateTelegramDigestCandidate({
+        proposal,
+        services,
+        timeZone: this.schedules.timeZone,
+        telegramLookup: tgLookup,
+      });
+    } else if (
       (proposal.action === 'create' || proposal.action === 'update') &&
       proposal.request &&
       (services.includes('mysheets') || services.includes('sheets')) &&
@@ -775,6 +838,13 @@ export class ChatService {
         userId: actor.userId,
         services,
         request: proposal.request,
+      });
+    } else if ((proposal.action === 'create' || proposal.action === 'update') && services.includes('telegram')) {
+      digestCandidate = evaluateTelegramDigestCandidate({
+        proposal,
+        services,
+        timeZone: this.schedules.timeZone,
+        telegramLookup: null,
       });
     }
     return {
@@ -822,6 +892,7 @@ export class ChatService {
     const { conversationId, correlation } = target;
     let trelloTeamBoards: Array<{ boardId: string; boardName: string }> | undefined;
     let githubTeamRepos: Array<{ repoId: string; fullName: string; name: string }> | undefined;
+    let telegramChats: Array<{ chatId: string; title: string }> | undefined;
     const actor = await this.actorForConversation(conversationId, target.userId);
     let scopeId = 'default';
     if (actor.workspaceMode === 'organization' && actor.workspaceId) {
@@ -838,6 +909,7 @@ export class ChatService {
           (boards) => { trelloTeamBoards = boards; },
           scopeId,
           (repos) => { githubTeamRepos = repos; },
+          (chats) => { telegramChats = chats; },
         )
       : planned;
     signal?.throwIfAborted();
@@ -850,10 +922,11 @@ export class ChatService {
     let planId: string | null = null, messageId = '', labels: Record<string, string> = {};
     if (response.kind === 'plan') {
       const labelOptions =
-        trelloTeamBoards || githubTeamRepos
+        trelloTeamBoards || githubTeamRepos || telegramChats
           ? {
               ...(trelloTeamBoards ? { teamBoards: trelloTeamBoards } : {}),
               ...(githubTeamRepos ? { teamRepos: githubTeamRepos } : {}),
+              ...(telegramChats ? { telegramChats } : {}),
             }
           : undefined;
       labels = resourceLabels(response, memory, userTexts, labelOptions);

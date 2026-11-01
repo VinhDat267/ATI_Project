@@ -1,5 +1,5 @@
 import { decryptCredentials } from '@wap/tool-adapters';
-import { ALL_TOOLS, GITHUB_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, TRELLO_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
+import { ALL_TOOLS, GITHUB_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, TELEGRAM_TOOLS, TRELLO_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import type { ServiceTransport } from './transports/types.js';
 import { TRELLO_TRANSPORT } from './transports/trello.js';
@@ -68,7 +68,7 @@ export async function getConfiguredToolCatalog(
   const available = new Set<string>();
   const mode = scope?.workspaceMode ?? 'legacy';
   for (const definition of getRegisteredServices()) {
-    if (definition.id === 'trello' || definition.id === 'github') continue;
+    if (definition.id === 'trello' || definition.id === 'github' || definition.id === 'telegram') continue;
     if (mode === 'personal' && isServiceAccountService(definition)) continue;
     let record;
     if (mode === 'personal') {
@@ -119,6 +119,8 @@ export async function getToolCatalogFor(
     githubOAuthClient?: any;
     githubTokens?: any;
     githubConnection?: (userId: string) => Promise<any>;
+    telegramEnabled?: boolean;
+    telegramConnection?: (userId: string) => Promise<any>;
   },
 ): Promise<ToolDefinition[]> {
   let catalog = (
@@ -127,7 +129,7 @@ export async function getToolCatalogFor(
       workspaceId: options.workspaceId,
       userId: options.userId,
     })
-  ).filter((tool) => tool.service !== 'trello' && tool.service !== 'github');
+  ).filter((tool) => tool.service !== 'trello' && tool.service !== 'github' && tool.service !== 'telegram');
   if (!options.userId) return catalog;
   if (options.gmailEnabled) {
     const gmail = await credentialRepo.getPersonalCredentials('gmail', options.userId);
@@ -240,6 +242,33 @@ export async function getToolCatalogFor(
               catalog = [...catalog, ...GITHUB_TOOLS];
             }
           }
+        }
+      } catch {
+        // stale or unreadable connection does not add tools
+      }
+    }
+  }
+  if (options.telegramConnection) {
+    try {
+      const tg = await options.telegramConnection(options.userId);
+      if (tg?.status === 'connected' && tg.connection?.chatIds?.length > 0) {
+        catalog = [...catalog, ...TELEGRAM_TOOLS];
+      }
+    } catch {
+      // ignore
+    }
+  } else if (options.telegramEnabled !== false) {
+    const cred = await credentialRepo.getPersonalCredentials('telegram', options.userId);
+    if (cred && cred.status === 'active') {
+      try {
+        const config = decryptCredentials(cred.config, encryptionKey);
+        const chats = Array.isArray(config.selectedChats)
+          ? config.selectedChats
+          : Array.isArray(config.allowedScope?.chats)
+            ? config.allowedScope.chats
+            : [];
+        if (chats.length > 0) {
+          catalog = [...catalog, ...TELEGRAM_TOOLS];
         }
       } catch {
         // stale or unreadable connection does not add tools

@@ -27,6 +27,11 @@ function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: Sche
         </span>
       )}
     </h3>
+    {schedule.kind === 'telegram_digest' && (
+      <p data-schedule-kind={schedule.kind} className="text-xs font-semibold text-[#0369A1]">
+        Tự gửi Telegram{schedule.digest && 'chatTitle' in schedule.digest && schedule.digest.chatTitle ? ` · ${schedule.digest.chatTitle}` : ''}
+      </p>
+    )}
     <p className="text-sm text-[#4B5563]">{describeRecurrence(schedule.recurrence)}</p><p className="text-xs text-[#6B7280]">{scheduleLabel(schedule)}</p>
     {schedule.lastRun && <p className="text-xs text-[#4B5563]">Lần trước: <RunLink run={schedule.lastRun} navigate={navigate} /></p>}
     <ScheduleActions schedule={schedule} navigate={navigate} onChanged={onChanged} onConflict={reload} />

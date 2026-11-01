@@ -341,6 +341,14 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
     res.status(410).json({ error: 'GitHub dùng đăng nhập OAuth.' });
   });
 
+  // Shared token administration is gone for Telegram (HTTP 410 Gone).
+  router.all('/telegram/credentials', (_req, res) => {
+    res.status(410).json({ error: 'Telegram dùng kết nối 1 chạm.' });
+  });
+  router.all('/telegram/scope', (_req, res) => {
+    res.status(410).json({ error: 'Telegram dùng kết nối 1 chạm.' });
+  });
+
   // GET /api/services
   router.get('/', async (req: Request, res: Response): Promise<void> => {
     try {
@@ -356,7 +364,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
       const services: Array<Record<string, unknown>> = await Promise.all(
         registered.map(async (definition) => {
           const { id, name, description, scopes, scopeKey, scopeLabel, credentialFields } = definition;
-          const isPersonalOAuth = id === 'trello' || id === 'github';
+          const isPersonalOAuth = id === 'trello' || id === 'github' || id === 'telegram';
 
           let record: any = null;
           if (!isPersonalOAuth) {
