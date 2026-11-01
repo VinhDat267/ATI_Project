@@ -8,7 +8,7 @@ export function slackPersonalRelevance(context:SlackRuleContext):PersonalSlackRe
  if(mention)return {kind:'mention',evidence:mention[0]};
  if(context.followedThread)return {kind:'followed_thread',evidence:text.slice(0,200)||'Followed thread'};
  const plain=normalized(text);
- if(context.conversationType==='im'&&/(?:giup|nho|hay |vui long|lam |can ban|please|could you|can you|would you|\?)/.test(plain))return {kind:'direct_message',evidence:text.slice(0,200)};
+ if(context.conversationType==='im'&&context.message.user!==context.slackUserId&&/(?:giup|nho|hay |vui long|lam |can ban|chuan bi|cap nhat|kiem tra|bao cao|sua |gui |xem |tao |please|could you|can you|would you|fix|update|prepare|check|review|\?)/.test(plain))return {kind:'direct_message',evidence:text.slice(0,200)};
  if(context.message.user===context.slackUserId&&/(?:toi|minh|to|em|anh|chi) (?:se |nhan |dam nhan|tu lam)|i(?: will|'ll) /.test(plain))return {kind:'self_commitment',evidence:text.slice(0,200)};
  return null;
 }

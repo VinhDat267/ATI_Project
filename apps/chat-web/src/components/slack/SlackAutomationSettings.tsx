@@ -61,7 +61,11 @@ export function SlackAutomationSettings({connectionId,workspaceName,active}:{con
       <label className="block text-sm">Múi giờ<input className={field} value={draft.timezone} maxLength={80} onChange={e=>patch({timezone:e.target.value})}/></label>
      </div>
     </fieldset>
-    <div className="flex flex-wrap gap-2"><button type="button" className="rounded-lg bg-[#FF5701] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={busy} onClick={()=>void save()}>Lưu tự động hóa</button></div>
+    <fieldset className="space-y-3 border-t border-[#E7E7E2] dark:border-[#333333] pt-3"><legend className="font-semibold text-sm">Bản tóm tắt hàng ngày</legend>
+     <label className="flex gap-2 items-start text-sm"><input type="checkbox" checked={draft.digest.enabled} onChange={e=>patch({digest:{...draft.digest,enabled:e.target.checked}})}/>Bật bản tóm tắt hàng ngày</label>
+     <label className="block text-sm">Giờ gửi bản tóm tắt (HH:MM)<input className={field} value={draft.digest.time} maxLength={5} onChange={e=>patch({digest:{...draft.digest,time:e.target.value}})}/></label>
+    </fieldset>
+    <div className="flex flex-wrap items-center gap-2"><button type="button" className="rounded-lg bg-[#FF5701] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={busy} onClick={()=>void save()}>Lưu tự động hóa</button><a href="/inbox" className={button}>Mở hộp thư đề xuất</a></div>
     <fieldset className="space-y-3 border-t border-[#E7E7E2] dark:border-[#333333] pt-3"><legend className="text-sm font-semibold">Theo dõi một thread</legend><p className="text-sm text-[#4B5563] dark:text-[#9CA3AF]">Chỉ nhận các sự kiện mới sau khi theo dõi; không quét lại lịch sử.</p><label className="block text-sm">ID kênh<input className={field} value={channel} maxLength={64} onChange={e=>setChannel(e.target.value)}/></label><label className="block text-sm">Timestamp gốc của thread<input className={field} value={thread} maxLength={17} onChange={e=>setThread(e.target.value)}/></label><div className="flex flex-wrap gap-2"><button type="button" className={button} disabled={busy} onClick={()=>void follow(true)}>Theo dõi thread</button><button type="button" className={button} disabled={busy} onClick={()=>void follow(false)}>Dừng theo dõi thread</button></div></fieldset>
    </fieldset>}
    <button type="button" className={button} disabled={busy} onClick={()=>setReload(v=>v+1)}>Tải lại cấu hình</button>

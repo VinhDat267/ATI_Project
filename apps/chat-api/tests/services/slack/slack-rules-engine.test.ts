@@ -12,6 +12,8 @@ describe('deterministic Slack personal relevance and literal rules',()=>{
   expect(slackPersonalRelevance(context('Tôi sẽ chuẩn bị báo cáo','U_ONE'))?.kind).toBe('self_commitment');
   expect(slackPersonalRelevance(context('Mình sẽ nhận việc này','U_ONE'))?.kind).toBe('self_commitment');
   expect(slackPersonalRelevance(context('Bạn làm giúp báo cáo nhé','U_OTHER','im'))?.kind).toBe('direct_message');
+  expect(slackPersonalRelevance(context('Chuẩn bị báo cáo trước thứ Sáu','U_OTHER','im'))?.kind).toBe('direct_message');
+  expect(slackPersonalRelevance(context('Bạn làm giúp báo cáo nhé','U_ONE','im'))).toBeNull();
   expect(slackPersonalRelevance(context('Bạn làm giúp báo cáo nhé','U_OTHER','mpim'))).toBeNull();
   expect(slackPersonalRelevance(context('Hôm nay trời mưa','U_OTHER','im'))).toBeNull();
   expect(slackPersonalRelevance(context('Cập nhật vào thứ Sáu','U_OTHER','private',true))?.kind).toBe('followed_thread');

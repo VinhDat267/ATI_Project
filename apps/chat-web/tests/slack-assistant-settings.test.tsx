@@ -39,3 +39,13 @@ it('clears the previous account and rejects a delayed settings response after ac
  delay=80;render(<SlackAutomationSettings connectionId="conn-one" workspaceName="Workspace Một" active/>);fireEvent.click(screen.getByRole('button',{name:'Tự động hóa Workspace Một'}));await waitFor(()=>expect(requests).toHaveLength(1));
  act(()=>authStorage.setStoredTokens({accessToken:'token-two',refreshToken:'refresh-two',user:{id:'owner-two',email:'two@example.test',name:'Two'}}));await new Promise(r=>setTimeout(r,120));expect(screen.queryByLabelText('Chế độ')).not.toBeInTheDocument();expect(screen.queryByText(/2 việc đang chờ/)).not.toBeInTheDocument();
 });
+it('configures daily digest toggle and local time and links to the proposal inbox',async()=>{
+ await opened();
+ expect(screen.getByRole('link',{name:'Mở hộp thư đề xuất'})).toHaveAttribute('href','/inbox');
+ fireEvent.click(screen.getByLabelText('Bật bản tóm tắt hàng ngày'));
+ fireEvent.change(screen.getByLabelText('Giờ gửi bản tóm tắt (HH:MM)'),{target:{value:'08:30'}});
+ fireEvent.click(screen.getByRole('button',{name:'Lưu tự động hóa'}));
+ await waitFor(()=>expect(requests.some(r=>r.method==='PUT')).toBe(true));
+ const put=requests.find(r=>r.method==='PUT');
+ expect(put.body.config.digest).toEqual({enabled:true,time:'08:30'});
+});

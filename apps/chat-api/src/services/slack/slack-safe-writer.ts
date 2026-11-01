@@ -59,9 +59,12 @@ export class SlackSafeWriter {
  }
  private async readback(c:pg.PoolClient,i:SlackWriteInput,row:any,token:string){
   await this.membership(c,i,token,true);let cursor:string|undefined;const seen=new Set<string>(),matches:any[]=[];
+  const threadTs=i.params.thread_ts;
   for(let page=0;page<5;page++){
    await this.ready(c,i,true);
-   const data=await this.call('conversations.history',{channel:i.params.channel,limit:100,...(cursor?{cursor}:{})},token,i.signal);
+   const data=threadTs
+    ?await this.call('conversations.replies',{channel:i.params.channel,ts:threadTs,limit:100,...(cursor?{cursor}:{})},token,i.signal)
+    :await this.call('conversations.history',{channel:i.params.channel,limit:100,...(cursor?{cursor}:{})},token,i.signal);
    await this.ready(c,i,true);
    if(!Array.isArray(data.messages)||data.messages.length>100||typeof data.has_more!=='boolean')throw new Error();
    // Validate every entry, including nonmatching ones. A partial/malformed page
@@ -70,7 +73,7 @@ export class SlackSafeWriter {
    for(const m of data.messages)if(!m||typeof m!=='object'||Array.isArray(m)||typeof m.ts!=='string'||!TS.test(m.ts)||typeof m.text!=='string'||
      (m.type!==undefined&&m.type!=='message')||(!id(m.user)&&!id(m.bot_id))||(m.user!==undefined&&!id(m.user))||
      (m.client_msg_id!==undefined&&(typeof m.client_msg_id!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(m.client_msg_id))))throw new Error();
-   for(const m of data.messages){if(m.user===i.binding.slackUserId&&m.text===i.params.text&&
+   for(const m of data.messages){if(m.user===i.binding.slackUserId&&m.text===i.params.text&&(!threadTs||m.thread_ts===threadTs||m.ts===threadTs)&&
       (row.provider_ts?m.ts===row.provider_ts:m.client_msg_id===row.client_msg_id))matches.push(m);}
    const next=data.response_metadata?.next_cursor??'';if(typeof next!=='string'||next.length>2048||seen.has(next))throw new Error();
    if(!next){if(data.has_more)throw new Error();break;}if(!data.has_more||page===4)throw new Error();seen.add(next);cursor=next;

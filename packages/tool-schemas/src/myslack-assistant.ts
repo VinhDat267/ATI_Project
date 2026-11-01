@@ -80,3 +80,30 @@ export function validateSlackAssistantSettingsView(value:unknown):SlackAssistant
  let queue:SlackAssistantSettingsView['queue'];if(v.queue!==undefined){const q=object(v.queue,['pending','running','held','needsAttention']);queue={pending:integer(q.pending,0,2147483647),running:integer(q.running,0,2147483647),held:integer(q.held,0,2147483647),needsAttention:integer(q.needsAttention,0,2147483647)};}
  return {config:validateSlackAssistantConfig(v.config),configVersion:validateSlackAssistantVersion(v.configVersion),available:boolean(v.available),pausedReason,...(queue?{queue}:{})};
 }
+export const SLACK_PROPOSAL_WORKFLOW_TOOLS={
+ taskService:'trello' as const,
+ taskCreateTool:'trello.create_card' as const,
+ bugService:'jira' as const,
+ bugSearchTool:'jira.search_issues' as const,
+ bugCreateTool:'jira.create_issue' as const,
+ progressService:'mysheets' as const,
+ progressAppendTool:'mysheets.append_rows' as const,
+ replyService:'myslack' as const,
+ replyPostTool:'myslack.chat_postMessage' as const,
+} as const;
+function revisionNumber(value:unknown):number{
+ if(typeof value==='string')return integer(Number(validateSlackAssistantVersion(value)),1,2147483647);
+ return integer(value,1,2147483647);
+}
+export interface SlackProposalRevisionInput {expectedRevision:number}
+export interface SlackProposalPrepareInput {expectedRevision:number;instruction?:string;replyInThread?:boolean}
+export function validateSlackProposalRevisionInput(value:unknown):SlackProposalRevisionInput{
+ const v=object(value,['expectedRevision']);return {expectedRevision:revisionNumber(v.expectedRevision)};
+}
+export function validateSlackProposalPrepareInput(value:unknown):SlackProposalPrepareInput{
+ const v=object(value,['expectedRevision','instruction','replyInThread']);
+ const out:SlackProposalPrepareInput={expectedRevision:revisionNumber(v.expectedRevision)};
+ if(v.instruction!==undefined)out.instruction=string(v.instruction,2000,1);
+ if(v.replyInThread!==undefined)out.replyInThread=boolean(v.replyInThread);
+ return out;
+}

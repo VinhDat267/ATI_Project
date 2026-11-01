@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {defaultSlackAssistantConfig,validateSlackAssistantConfig,validateSlackAssistantVersion,validateSlackTriageDecision} from '../src/myslack-assistant.js';
+import {defaultSlackAssistantConfig,validateSlackAssistantConfig,validateSlackAssistantVersion,validateSlackTriageDecision,validateSlackProposalRevisionInput,validateSlackProposalPrepareInput,SLACK_PROPOSAL_WORKFLOW_TOOLS} from '../src/myslack-assistant.js';
 
 describe('Slack assistant owned configuration and untrusted model output',()=>{
  it('defaults to disabled hybrid with finite budgets and independent configuration objects',()=>{
@@ -35,5 +35,19 @@ describe('Slack assistant owned configuration and untrusted model output',()=>{
   const p:any=proposal();if(kind==='binding')p.binding={atiUserId:'other'};if(kind==='foreignSource')p.sourceIndices=[99];
   if(kind==='missingSource')p.sourceIndices=[];if(kind==='recipient')p.relevance.actorId='OTHER';if(kind==='noActionText'){p.kind='no_action';}
   if(kind==='overflow')p.title='x'.repeat(161);expect(()=>validateSlackTriageDecision(p,1)).toThrow();
+ });
+ it('validates proposal revision and prepare inputs and exposes catalog-backed workflow tool descriptors',()=>{
+  expect(validateSlackProposalRevisionInput({expectedRevision:1})).toEqual({expectedRevision:1});
+  expect(()=>validateSlackProposalRevisionInput({expectedRevision:0})).toThrow();
+  expect(()=>validateSlackProposalRevisionInput({expectedRevision:1,atiUserId:'other'})).toThrow();
+  expect(validateSlackProposalPrepareInput({expectedRevision:2,instruction:'Đặt hạn 2026-11-06',replyInThread:true})).toEqual({expectedRevision:2,instruction:'Đặt hạn 2026-11-06',replyInThread:true});
+  expect(validateSlackProposalPrepareInput({expectedRevision:3})).toEqual({expectedRevision:3});
+  expect(()=>validateSlackProposalPrepareInput({expectedRevision:1,instruction:'x'.repeat(2001)})).toThrow();
+  expect(SLACK_PROPOSAL_WORKFLOW_TOOLS).toMatchObject({
+   taskService:'trello',taskCreateTool:'trello.create_card',
+   bugService:'jira',bugSearchTool:'jira.search_issues',bugCreateTool:'jira.create_issue',
+   progressService:'mysheets',progressAppendTool:'mysheets.append_rows',
+   replyService:'myslack',replyPostTool:'myslack.chat_postMessage',
+  });
  });
 });

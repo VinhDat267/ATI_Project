@@ -8,7 +8,7 @@ import {SlackDerivedLineageRepo,type DerivedSegmentInput} from './slack-derived-
 import type {SlackTriageLease,SlackProposalContext,SlackProposalWriter} from './slack-assistant-repo.js';
 import {isUuid} from './uuid.js';
 type Decision=Exclude<SlackTriageDecision,{kind:'no_action'}>;
-export interface SlackProposalView {id:string;connectionId:string;convId:string;revision:string;status:string;body:any|null;createdAt:string}
+export interface SlackProposalView {id:string;connectionId:string;convId:string;revision:string;status:string;activePlanId:string|null;planHash:string|null;body:any|null;createdAt:string}
 /** One registered body selector contains every source-derived byte, including labels and references. */
 export class SlackAssistantArtifactRepo implements SlackProposalWriter {
  private readonly lineage:SlackDerivedLineageRepo;
@@ -46,14 +46,32 @@ export class SlackAssistantArtifactRepo implements SlackProposalWriter {
    const target={atiUserId:owner,targetKind:'proposal_excerpt' as const,targetId:id,targetSubId:'body_json'};
    const copy=await this.lineage.getActiveCopyInTransaction(c,target);
    const allowed=!!copy&&(await this.lineage.assertDerivedCopyAllowedInTransaction(c,{callerAtiUserId:owner,consumerPurpose:purpose,targetKind:'proposal_excerpt',targetId:id,targetSubId:'body_json',expectedTargetVersion:copy.targetVersion})).status==='allowed';
-   row=(await c.query("SELECT a.*,a.review_expires_at>clock_timestamp() AS review_current,cfg.version AS current_config_version FROM slack_assistant_artifacts a LEFT JOIN slack_workspace_configs cfg ON cfg.connection_id=a.connection_id WHERE a.id=$1 AND a.user_id=$2 FOR SHARE OF a",[id,owner])).rows[0];if(!row)throw new Error('SLACK_PROPOSAL_NOT_FOUND');
+   row=(await c.query("SELECT a.*,a.review_expires_at>clock_timestamp() AS review_current,cfg.version AS current_config_version,p.plan_hash AS active_plan_hash FROM slack_assistant_artifacts a LEFT JOIN slack_workspace_configs cfg ON cfg.connection_id=a.connection_id LEFT JOIN plans p ON p.id=a.active_plan_id WHERE a.id=$1 AND a.user_id=$2 FOR SHARE OF a",[id,owner])).rows[0];if(!row)throw new Error('SLACK_PROPOSAL_NOT_FOUND');
    let body:any=null;if(allowed&&row.review_current&&row.config_version===row.current_config_version){try{body=slackArtifactValue(row,'proposal_excerpt','body_json');if(body?.__slack_purged)body=null;}catch{body=null;}}
-   const view={id:row.id,connectionId:row.connection_id,convId:row.conv_id,revision:row.revision,status:body?row.status:'stale',body,createdAt:row.created_at.toISOString()};await c.query('COMMIT');return view;
+   const view={id:row.id,connectionId:row.connection_id,convId:row.conv_id,revision:row.revision,status:body?row.status:'stale',activePlanId:body?row.active_plan_id??null:null,planHash:body?row.active_plan_hash??null:null,body,createdAt:row.created_at.toISOString()};await c.query('COMMIT');return view;
   }catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
  }
- async reject(owner:string,id:string,revision:string):Promise<{status:'rejected';revision:string}>{
+ async getSegmentsInTransaction(c:pg.PoolClient,owner:string,id:string,purpose:'planning'|'digest'|'triage'):Promise<DerivedSegmentInput[]>{
+  if(!isUuid(owner)||!isUuid(id))throw new Error('SLACK_PROPOSAL_NOT_FOUND');
+  const target={atiUserId:owner,targetKind:'proposal_excerpt' as const,targetId:id,targetSubId:'body_json'};
+  const copy=await this.lineage.getActiveCopyInTransaction(c,target);
+  if(!copy||(await this.lineage.assertDerivedCopyAllowedInTransaction(c,{callerAtiUserId:owner,consumerPurpose:purpose,targetKind:'proposal_excerpt',targetId:id,targetSubId:'body_json',expectedTargetVersion:copy.targetVersion})).status!=='allowed')throw new Error('SLACK_PROPOSAL_STALE');
+  return this.lineage.segmentsInTransaction(c,copy.derivedCopyId);
+ }
+ async reject(owner:string,id:string,revision:string):Promise<{status:'rejected';revision:string;proposal:SlackProposalView}>{
   if(!isUuid(owner)||!isUuid(id))throw new Error('SLACK_PROPOSAL_NOT_FOUND');validateSlackAssistantVersion(revision);
-  const row=(await this.pool.query("UPDATE slack_assistant_artifacts SET status='rejected',revision=revision+1,updated_at=clock_timestamp() WHERE id=$1 AND user_id=$2 AND kind='proposal_excerpt' AND revision=$3 AND status IN ('pending','needs_info') RETURNING revision",[id,owner,revision])).rows[0];
-  if(!row)throw new Error('SLACK_PROPOSAL_VERSION_CONFLICT');return {status:'rejected',revision:row.revision};
+  const c=await this.pool.connect();
+  try{
+   await c.query('BEGIN');await c.query("SET LOCAL statement_timeout='5s'");
+   const existing=(await c.query("SELECT id,conv_id,revision,status FROM slack_assistant_artifacts WHERE id=$1 AND user_id=$2 AND kind='proposal_excerpt' FOR UPDATE",[id,owner])).rows[0];
+   if(!existing)throw new Error('SLACK_PROPOSAL_NOT_FOUND');
+   if(existing.revision!==revision||!['pending','needs_info','awaiting_approval'].includes(existing.status))throw new Error('SLACK_PROPOSAL_VERSION_CONFLICT');
+   await c.query("UPDATE plans SET status='superseded',decided_at=clock_timestamp() WHERE conv_id=$1 AND status='pending'",[existing.conv_id]);
+   const row=(await c.query("UPDATE slack_assistant_artifacts SET status='rejected',active_plan_id=NULL,revision=revision+1,updated_at=clock_timestamp() WHERE id=$1 AND user_id=$2 AND revision=$3 RETURNING revision",[id,owner,revision])).rows[0];
+   if(!row)throw new Error('SLACK_PROPOSAL_VERSION_CONFLICT');
+   await c.query('COMMIT');
+   const proposal=await this.get(owner,id,'triage');
+   return {status:'rejected',revision:row.revision,proposal};
+  }catch(e){await c.query('ROLLBACK').catch(()=>{});throw e;}finally{c.release();}
  }
 }
