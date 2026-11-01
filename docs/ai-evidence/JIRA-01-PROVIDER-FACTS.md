@@ -49,6 +49,12 @@ On 31/10 browser navigation reached the Atlassian login page ([browser-start log
 
 The real consent UI is served at `https://api.atlassian.com/oauth2/authorize/server/consent`, with a site installation target and an account-wide grant warning. Its wording is observed UI evidence, not proof of the console's grant-model setting. After the CSP fix and a separate successful consent-denial check, the owner accepted the real Jira grant and the probe observed the successful callback. See the [consent-host log](../handoff/log/2026-11-01-codex-jira-01-consent-host.md).
 
+## Personal data declaration boundary
+
+The current standalone probe retains only the opaque account ID and OAuth tokens in memory; `/me` is mapped to accountId only and profile name/email/avatar are discarded. Safe reports contain no account IDs or tokens. Atlassian's [corrected first-party clarification](https://community.developer.atlassian.com/t/do-i-have-to-implement-personal-data-reporting-in-my-oauth2-app/54402/9) says a bare account ID alone does not require the personal-data declaration. The draft is therefore No for this minimal diagnostic scope only; it has not been saved. This does not declare the future ATI runtime exempt.
+
+The earlier Yes draft was premature and exposed a required attestation that Personal Data Reporting API was implemented. It is not implemented; never check that attestation falsely. Before retaining Atlassian personal data such as display names/email in the future runtime, revisit the declaration and implement the reporting/refresh/erasure obligations in the [official privacy guide](https://developer.atlassian.com/cloud/jira/service-desk/user-privacy-developer-guide/). See [declaration log](../handoff/log/2026-11-01-codex-jira-01-data-declaration.md).
+
 ## Local tooling evidence
 
 Client tests use native fetch against a loopback HTTP fixture, redirect prevention, response limits and actual response cancellation. Session tests consume codes once, rotate tokens, preserve owner/identity/generation boundaries and reject late refresh after disconnect. Browser-route tests use real cookies, Origin checks and redirects; process tests validate CLI exit codes and redacted output.

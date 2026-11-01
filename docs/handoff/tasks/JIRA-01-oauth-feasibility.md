@@ -26,6 +26,8 @@ Nếu identity-only không đáp ứng onboarding, cần chủ dự án quyết 
 
 ## Kết quả
 
+- Khai báo dữ liệu 01/11: draft Yes theo thiết kế runtime tương lai bị chọn quá sớm; console yêu cầu xác nhận Personal Data Reporting API nhưng chưa có implementation. Đã đối chiếu source probe chỉ giữ accountId/token, không giữ profile name/email, và giải thích đã đính chính của Atlassian về bare accountId. Chuẩn bị lại draft No chỉ cho diagnostic tối giản; chưa Save Sharing hoặc xác nhận API giả. Runtime lưu thêm dữ liệu cá nhân phải xét lại Yes và reporting/refresh/erasure trước phát hành. [Log](../log/2026-11-01-codex-jira-01-data-declaration.md).
+
 - Mới nhất 01/11, sau Accept site thứ hai: **hai Jira site đồng thời LIVE_OBSERVED** trong cùng process với site đầu tiên; `connected: true`, `siteCount: 2`, `adminSiteCount: 2`, identity/jiraAuthorization/permissionsRead true. Hai refresh mới đều đạt và account-match guard giữ nguyên danh tính. Đã lưu ba snapshot safe; refresh giữ resource snapshot từ consent, không tự gọi lại resources. Còn grant-model console, wrong-account/non-admin native và review/CI; chưa đóng task tổng thể. [Log hai site](../log/2026-11-01-codex-jira-01-native-two-sites.md).
 
 - Code commits: `7b4e2d4` client, `7a58219` session, `6a91183` runner, `b49334a` sửa review. Không thay runtime API/UI, migration, planner, executor hoặc bật cờ.
