@@ -1,4 +1,5 @@
 /** @vitest-environment jsdom */
+import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { VerifyEmailView } from '../src/views/VerifyEmailView';
@@ -373,12 +374,12 @@ describe('Personal and Workspace Auth (Task 5)', () => {
       expect(listenerCalled).toBe(true);
 
       const { rerender } = render(<SettingsPage user={testUser} navigate={vi.fn()} onLogout={vi.fn()} />);
-      expect(screen.getByText(/Không gian Cá nhân/i)).toBeInTheDocument();
+      expect(screen.getByText(/Đang cấu hình kết nối cho: Không gian Cá nhân/i)).toBeInTheDocument();
 
       setActiveWorkspaceId('ws-team-alpha');
       setCachedOrganizations([sampleOrg]);
       rerender(<SettingsPage user={testUser} navigate={vi.fn()} onLogout={vi.fn()} />);
-      expect(screen.getByText(/Đội Alpha/i)).toBeInTheDocument();
+      expect(screen.getByText(/Đang cấu hình kết nối cho: Đội Alpha/i)).toBeInTheDocument();
 
       unsubscribe();
     });
