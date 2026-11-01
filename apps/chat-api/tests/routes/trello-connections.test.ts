@@ -115,6 +115,16 @@ describe('Trello connection routes', () => {
       expect(res.body.url).toBeUndefined();
     });
 
+    it('returns 503 on candidate boards endpoint when OAuth is unconfigured (no fake boards backdoor)', async () => {
+      const app = build({ oauth: undefined });
+      const res = await request(app)
+        .get('/api/connections/trello/workspaces/ws1/boards')
+        .set('Authorization', bearer(alice));
+
+      expect(res.status).toBe(503);
+      expect(res.body).toEqual({ error: 'Trello chưa được cấu hình trên máy chủ.' });
+    });
+
     it('requires a signed-in session for start', async () => {
       const app = build();
       const res = await request(app)
