@@ -21,10 +21,10 @@ export function normalizeSlackWrite(value:SlackWriteInput):SlackWriteInput {
 export class SlackWriteOutboxRepo {
  constructor(private pool:pg.Pool){}
  async withOwner<T>(input:SlackWriteInput,work:(client:pg.PoolClient)=>Promise<T>):Promise<T>{
-  const c=await this.pool.connect();let held=false;
+  const c=await this.pool.connect();let held=false,broken=false;
   try{held=(await c.query("SELECT pg_try_advisory_lock(hashtext('ati-slack-owner'),hashtext($1)) locked",[input.binding.atiUserId])).rows[0].locked;
    if(!held)throw slackWriteDenied();return await work(c);
-  }finally{try{if(held)await c.query("SELECT pg_advisory_unlock(hashtext('ati-slack-owner'),hashtext($1))",[input.binding.atiUserId]);}finally{c.release();}}
+  }finally{try{if(held)await c.query("SELECT pg_advisory_unlock(hashtext('ati-slack-owner'),hashtext($1))",[input.binding.atiUserId]);}catch(e){broken=true;throw e;}finally{c.release(broken);}}
  }
  async authority(c:pg.PoolClient,input:SlackWriteInput,readOnly=false):Promise<void>{
   input.signal?.throwIfAborted();const b=input.binding;
@@ -62,7 +62,9 @@ export class SlackWriteOutboxRepo {
  async dispatch(c:pg.PoolClient,row:any):Promise<any>{
   await c.query('SELECT operation_id FROM slack_write_outbox WHERE operation_id=$1 FOR UPDATE',[row.operation_id]);
   const result=await c.query(`UPDATE slack_write_outbox SET status='dispatching',attempt_id=gen_random_uuid(),dispatched_at=clock_timestamp()
-    WHERE operation_id=$1 AND lease_token=$2 AND lease_until>clock_timestamp() AND status='prepared' RETURNING *`,[row.operation_id,row.lease_token]);
+    WHERE operation_id=$1 AND lease_token=$2 AND lease_until>clock_timestamp() AND status='prepared'
+    AND EXISTS(SELECT 1 FROM plans p WHERE p.id=slack_write_outbox.plan_id AND p.expires_at>clock_timestamp()
+      AND p.status IN ('approved','executing','partial')) RETURNING *`,[row.operation_id,row.lease_token]);
   if(!result.rows[0])throw slackWriteDenied();return result.rows[0];
  }
  async receipt(c:pg.PoolClient,row:any,ts:string):Promise<void>{

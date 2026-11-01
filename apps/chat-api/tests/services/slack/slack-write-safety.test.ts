@@ -27,9 +27,9 @@ describe('04C real PostgreSQL/HTTP write attempt, echo and readback',()=>{
   env.fixture.setHandler('/conversations.history',()=>({body:{ok:true,messages:saved,has_more:false,response_metadata:{next_cursor:''}}}));
  });
  afterAll(async()=>{await env?.close();});
- function writer(){return new SlackSafeWriter({pool:env.db.pool,apiBaseUrl:env.fixture.url,timeoutMs:500,
+ function writer(extraAuthorize?:(i:any,c:any)=>Promise<void>){return new SlackSafeWriter({pool:env.db.pool,apiBaseUrl:env.fixture.url,timeoutMs:500,
   tokens:new SlackTokenManager(env.connectionRepo,new SlackOAuthClient({appId:seed.row.app_id,clientId:'fixture',clientSecret:'fixture',redirectUri:'http://127.0.0.1/callback',authorizationUrl:'https://slack.com/oauth/v2/authorize',apiBaseUrl:env.fixture.url}),TEST_KEY),
-  authorize:async()=>{const d=await env.policyService.resolveSlackModelPolicy({binding:seed.binding,purpose:'planning',requestedRetentionDays:0});if(!d.allowed)throw new Error('DENIED');if((await env.invalidationService.checkBarriers({binding:seed.binding,channelId:'C_FIXTURE'})).blocked)throw new Error('DENIED');}});}
+  authorize:async(i,c)=>{const d=await env.policyService.resolveSlackModelPolicy({binding:seed.binding,purpose:'planning',requestedRetentionDays:0},c);if(!d.allowed)throw new Error('DENIED');if((await env.invalidationService.checkBarriers({binding:seed.binding,channelId:'C_FIXTURE'},c)).blocked)throw new Error('DENIED');await extraAuthorize?.(i,c);}});}
  const posts=()=>env.fixture.requests.filter(r=>r.path==='/chat.postMessage');
  const outbox=async()=>(await env.db.pool.query('SELECT * FROM slack_write_outbox WHERE plan_id=$1',[input.planId])).rows[0];
  async function child(mode='execute'){
@@ -108,6 +108,26 @@ describe('04C real PostgreSQL/HTTP write attempt, echo and readback',()=>{
  });
  it('cancellation before dispatch creates no provider request or durable attempt',async()=>{
   const c=new AbortController();c.abort();await expect(writer().execute({...input,signal:c.signal})).rejects.toMatchObject({details:{requestSent:false}});expect(env.fixture.requests).toHaveLength(0);expect(await outbox()).toBeUndefined();
+ });
+ it('preserves UNKNOWN when PostgreSQL rejects persistence after the provider accepted the post',async()=>{
+  await env.db.pool.query("CREATE FUNCTION fail_unknown() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.status='unknown' THEN RAISE EXCEPTION 'fixture persistence outage'; END IF; RETURN NEW; END $$");
+  await env.db.pool.query('CREATE TRIGGER fail_unknown BEFORE UPDATE ON slack_write_outbox FOR EACH ROW EXECUTE FUNCTION fail_unknown()');
+  env.fixture.setHandler('/chat.postMessage',()=>{saved.push({committed:true});return {status:503,body:{ok:false}};});
+  try{await expect(writer().execute(input)).rejects.toMatchObject({category:'UNKNOWN',details:{requestSent:true}});expect(posts()).toHaveLength(1);expect((await outbox()).status).toBe('dispatching');}finally{await env.db.pool.query('DROP TRIGGER fail_unknown ON slack_write_outbox');}
+ });
+ it('cannot report not-sent when real SQL advisory-unlock cleanup fails after confirmation',async()=>{
+  const schema=(await env.db.pool.query('SELECT quote_ident(current_schema()) s')).rows[0].s;
+  await env.db.pool.query(`CREATE FUNCTION ${schema}.pg_advisory_unlock(integer,integer) RETURNS boolean LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'fixture cleanup outage'; END $$`);
+  try{await expect(writer(async(_i,c)=>{if((await c.query("SELECT 1 FROM slack_write_outbox WHERE plan_id=$1 AND status='dispatching'",[input.planId])).rowCount){const schema=(await c.query('SELECT quote_ident(current_schema()) s')).rows[0].s;await c.query(`SET search_path TO ${schema},pg_catalog`);}}).execute(input)).rejects.toMatchObject({category:'UNKNOWN',details:{requestSent:true}});expect((await outbox()).status).toBe('confirmed');expect(posts()).toHaveLength(1);}finally{await env.db.pool.query(`DROP FUNCTION ${schema}.pg_advisory_unlock(integer,integer)`);}
+ });
+ it('rechecks actual SQL plan expiry after the final callback before committing dispatch',async()=>{
+  await expect(writer(async(_i,c)=>{const row=(await c.query("SELECT operation_id FROM slack_write_outbox WHERE plan_id=$1 AND status='prepared'",[input.planId])).rows[0];if(row){await c.query("UPDATE plans SET expires_at=clock_timestamp()+interval '50 milliseconds' WHERE id=$1",[input.planId]);await c.query('SELECT pg_sleep(0.08)');}}).execute(input)).rejects.toMatchObject({details:{requestSent:false}});expect(posts()).toHaveLength(0);expect((await outbox()).status).toBe('prepared');
+ });
+ it('stops history pagination immediately after a real consent revocation in the first response',async()=>{
+  let reads=0;env.fixture.setHandler('/conversations.history',async()=>{reads++;if(reads===1){const [consent]=await env.consentRepo.listConsentsForWorkspace(seed.binding.workspaceId);await env.consentRepo.revokeConsent({workspaceId:seed.binding.workspaceId,providerId:consent!.providerId,recordedBy:'fixture',reason:'fixture',expectedRevision:consent!.revision});return {body:{ok:true,messages:saved,has_more:true,response_metadata:{next_cursor:'page2'}}};}return {body:{ok:true,messages:[],has_more:false}};});await expect(writer().execute(input)).rejects.toMatchObject({category:'UNKNOWN'});expect(reads).toBe(1);
+ });
+ it.each([null,{},'junk',{ts:'bad'}, {ts:'1730000000.000002',text:42}])('malformed complete history page %j cannot contribute confirmation',async malformed=>{
+  env.fixture.setHandler('/conversations.history',()=>({body:{ok:true,messages:[...saved,malformed],has_more:false,response_metadata:{next_cursor:''}}}));await expect(writer().execute(input)).rejects.toMatchObject({category:'UNKNOWN'});expect((await outbox()).status).toBe('unknown');
  });
  it('checks the actual SQL lease clock after a row-lock wait before dispatch',async()=>{
   const {repo,row}=await prepare(),holder=await env.db.pool.connect(),c=await env.db.pool.connect();let running:Promise<unknown>|undefined;
