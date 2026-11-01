@@ -229,7 +229,7 @@ describe('SettingsPage - mysheets section', () => {
 
     const personal = await screen.findByRole('region', { name: 'Của riêng bạn' });
     expect(within(personal).getByText(/Google Sheets của bạn/i)).toBeTruthy();
-    expect(within(personal).getByText('Chưa kết nối')).toBeTruthy();
+    expect(within(document.getElementById('service-row-mysheets')!).getByText('Chưa kết nối')).toBeTruthy();
     expect(within(personal).getByRole('button', { name: /Kết nối Google Sheets/i })).toBeTruthy();
   });
 

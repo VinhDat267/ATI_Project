@@ -225,7 +225,7 @@ describe('SettingsPage - mycalendar section', () => {
 
     const personal = await screen.findByRole('region', { name: 'Của riêng bạn' });
     expect(within(personal).getByText(/Google Calendar của bạn/i)).toBeTruthy();
-    expect(within(personal).getByText('Chưa kết nối')).toBeTruthy();
+    expect(within(document.getElementById('service-row-mycalendar')!).getByText('Chưa kết nối')).toBeTruthy();
     expect(within(personal).getByRole('button', { name: /Kết nối Google Calendar/i })).toBeTruthy();
   });
 

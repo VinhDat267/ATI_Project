@@ -390,7 +390,8 @@ export class ChatService {
         const teamBoardMap = new Map<string, string>(
           (trello.teamBoards ?? []).map((b: any) => [b.boardId, b.boardName])
         );
-        const observedLists: any[] = (memory?.getEntity('__observed')?.list ?? memory?.getEntity('list') ?? []) as any[];
+        const listed = memory?.getEntity('__observed')?.list ?? memory?.getEntity('list') ?? [];
+        const observedLists = (Array.isArray(listed) ? listed : [listed]) as any[];
 
         let forbiddenBoardName: string | null = null;
         for (const step of bound.steps) {

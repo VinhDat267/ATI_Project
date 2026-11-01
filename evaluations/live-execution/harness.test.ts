@@ -3,7 +3,7 @@ import type { PlanResponse } from '@wap/tool-schemas';
 import { executeApproved, planDigest, readLiveConfig, writeSteps } from './harness.js';
 
 const fullEnv = {
-  TRELLO_API_KEY: 'key', TRELLO_TOKEN: 'token', LIVE_TRELLO_BOARD_IDS: ' b1 , b2,b1 ',
+  TRELLO_ACCESS_TOKEN: 'token', LIVE_TRELLO_BOARD_IDS: ' b1 , b2,b1 ',
   SLACK_BOT_TOKEN: 'xoxb', LIVE_SLACK_CHANNELS: 'C1',
   GITHUB_TOKEN: 'ghp', LIVE_GITHUB_REPOS: 'acme/sandbox',
 };
@@ -42,9 +42,9 @@ describe('readLiveConfig', () => {
   });
 
   it('skips a service without a token or without an allowlist and says why', () => {
-    const { services, skipped } = readLiveConfig({ ...fullEnv, TRELLO_TOKEN: '', LIVE_SLACK_CHANNELS: '', LIVE_GITHUB_REPOS: 'not-a-repo' });
+    const { services, skipped } = readLiveConfig({ ...fullEnv, TRELLO_ACCESS_TOKEN: '', LIVE_SLACK_CHANNELS: '', LIVE_GITHUB_REPOS: 'not-a-repo' });
     expect(services).toEqual({});
-    expect(skipped.trello).toMatch(/TRELLO_TOKEN/);
+    expect(skipped.trello).toMatch(/TRELLO_ACCESS_TOKEN/);
     expect(skipped.slack).toMatch(/LIVE_SLACK_CHANNELS/);
     expect(skipped.github).toMatch(/owner\/name/);
   });

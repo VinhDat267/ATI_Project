@@ -54,8 +54,9 @@ describe('ChatService binds a plan to the previewed Gmail connection before hash
   });
 
   it('drops connections the model wrote on a plan without Gmail steps', async () => {
-    responses.push(plan([card], { connections: forged }));
-    const conv = await send('Tạo thẻ');
+    const note: PlanResponse['steps'][number] = { id: 'note', tool: 'slack.send_message', description: 'Note', args: { channel: 'C1', text: 'hi' }, dependsOn: [] };
+    responses.push(plan([note], { connections: forged }));
+    const conv = await send('Gửi tin Slack vào kênh');
     const row = await latestPlan(conv);
     expect(row.plan_json.connections).toBeUndefined();
     expect(row.plan_text).not.toContain('model-invented');
@@ -64,7 +65,7 @@ describe('ChatService binds a plan to the previewed Gmail connection before hash
 
   it('replaces any model-written reference with the active connection, inside plan_json and the approved hash', async () => {
     const own = await connect('owner.mail@example.test');
-    responses.push(plan([card, mail], { connections: forged }));
+    responses.push(plan([mail], { connections: forged }));
     const conv = await send('Gửi thư cho Lan');
     const row = await latestPlan(conv);
     const expected = { gmail: { credentialId: own.id, email: 'owner.mail@example.test' } };
@@ -72,7 +73,7 @@ describe('ChatService binds a plan to the previewed Gmail connection before hash
     expect(row.plan_hash).toBe(createHash('sha256').update(row.plan_text).digest('hex'));
     expect(JSON.parse(row.plan_text).connections).toEqual(expected);
     expect(row.plan_text).not.toContain('model-invented');
-    expect(verifiedRecoverySteps(row).map((s) => s.id)).toEqual(['card', 'mail']);
+    expect(verifiedRecoverySteps(row).map((s) => s.id)).toEqual(['mail']);
     expect(events.find((e) => e.event === 'plan_preview')!.payload.plan.connections).toEqual(expected);
 
     // Editing the stored reference breaks the integrity check used by approval and recovery.

@@ -229,6 +229,24 @@ async function bootstrap() {
         client: trelloOAuthClient,
       })
     : undefined;
+  // The canned sandbox plan still creates a Trello card when PostgreSQL or the
+  // OAuth client is absent. A real lookup replaces this as soon as both exist.
+  const sandboxTrelloConnection = env.RUNTIME_MODE === 'sandbox' && !trelloLookup
+    ? async () => ({
+        status: 'connected' as const,
+        teamBoards: [
+          { boardId: 'b1', boardName: 'Sprint Board' },
+          { boardId: 'b2', boardName: 'Bug Tracker' },
+        ],
+        connection: {
+          credentialId: 'sandbox-trello',
+          memberId: 'sandbox-member',
+          username: 'sandbox',
+          boardIds: ['b1', 'b2'],
+        },
+      })
+    : undefined;
+  const trelloConnection = trelloLookup ?? sandboxTrelloConnection;
 
   // 2. Initialize LLM Provider
   let provider: any;
@@ -274,7 +292,7 @@ async function bootstrap() {
       trelloTeamRepo,
       trelloOAuthClient,
       trelloTokens,
-      trelloConnection: trelloLookup,
+      trelloConnection,
     }),
     serviceRegistry: serviceRegistryForRuntime(gmailAvailable, mycalendarAvailable, mysheetsAvailable),
     gatherSearch,
@@ -318,7 +336,7 @@ async function bootstrap() {
           (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService('mysheets', { userId, phase: 'planning' })
         )
       : undefined,
-    trelloConnection: trelloLookup,
+    trelloConnection,
     getAdapter: (serviceName, context) => (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(serviceName, context),
     schedules: schedules ? { repo: schedules.service.repo, timeZone: env.APP_TIME_ZONE } : undefined,
   });
@@ -375,7 +393,9 @@ async function bootstrap() {
   });
 
   const adapterFactory = createToolRuntimeFactory(env.RUNTIME_MODE,
-    (serviceName, context) => realAdapterFactory.getAdapterForService(serviceName, context),
+    (serviceName, context) => sandboxTrelloConnection && serviceName === 'trello'
+      ? Promise.resolve(createSandboxAdapter('trello'))
+      : realAdapterFactory.getAdapterForService(serviceName, context),
     (serviceName) => createSandboxAdapter(serviceName));
   gatherAdapterFactory = adapterFactory;
 

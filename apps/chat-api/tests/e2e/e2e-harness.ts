@@ -275,6 +275,16 @@ export async function createE2EApp(options: E2EAppOptions): Promise<E2EContext> 
     planRepo: mockPlanRepo as any,
     planner,
     eventEmitter: chatEventEmitter,
+    trelloConnection: async () => ({
+      status: 'connected',
+      teamBoards: [{ boardId: 'board_frontend', boardName: 'Frontend' }],
+      connection: {
+        credentialId: 'cred-trello',
+        memberId: 'member_minh_001',
+        username: 'minh',
+        boardIds: ['board_frontend'],
+      },
+    }),
   });
 
   // 7. Mock Adapter Factory with simulated tool executions

@@ -32,7 +32,15 @@ it('real planner lookups -> SSE -> PostgreSQL -> new repositories/HTTP reload pr
   const provider = new MockLLMProvider(); provider.setPlanResponses([plan]);
   const planner = new AIPlanner({ provider, toolCatalog: TRELLO_TOOLS, gatherSearch: async ({ tool }) => tool === 'trello.search_boards' ? [{ id: 'B1', name: 'Frontend' }] : [{ id: 'L1', name: 'Cần làm', boardId: 'B1' }] });
   const events = new EventEmitter(); events.on('error', () => {});
-  const chat = new ChatService({ convRepo, msgRepo, planRepo: plans, planner, eventEmitter: { emit: (event, data) => events.emit(event, data) } });
+  const bound = { ...plan, connections: { trello: { credentialId: 'cred-trello', memberId: 'member-1', username: 'owner', boardIds: ['B1'] } } };
+  const chat = new ChatService({
+    convRepo, msgRepo, planRepo: plans, planner, eventEmitter: { emit: (event, data) => events.emit(event, data) },
+    trelloConnection: async () => ({
+      status: 'connected',
+      teamBoards: [{ boardId: 'B1', boardName: 'Frontend' }],
+      connection: { credentialId: 'cred-trello', memberId: 'member-1', username: 'owner', boardIds: ['B1'] },
+    }),
+  });
   const preview = new Promise<any>((resolve, reject) => { events.once('plan_preview', resolve); events.once('error', reject); events.once('clarification', reject); });
   const accepted = await chat.handleUserMessage({ conversationId: conv.id, userId: owner, content: 'Tạo thẻ trên board Frontend list Cần làm', requestId: 'fe03-sql-request' });
   const event = await preview;
@@ -40,8 +48,8 @@ it('real planner lookups -> SSE -> PostgreSQL -> new repositories/HTTP reload pr
   expect(event).toMatchObject({ replyToMessageId: accepted.messageId, requestId: 'fe03-sql-request' });
   const saved = await new PlanRepo(pool).getPlan(event.planId);
   expect(saved?.resource_labels).toEqual(event.resourceLabels);
-  expect(saved?.plan_text).toBe(JSON.stringify(plan));
-  expect(saved?.plan_hash).toBe(createHash('sha256').update(JSON.stringify(plan)).digest('hex'));
+  expect(saved?.plan_text).toBe(JSON.stringify(bound));
+  expect(saved?.plan_hash).toBe(createHash('sha256').update(JSON.stringify(bound)).digest('hex'));
   const secret = 'fe03-persistence-test-only-secret';
   const headers = { Authorization: `Bearer ${generateTokens({ id: owner, email: `${owner}@example.test`, name: 'Owner' }, secret).accessToken}` };
   const execution = new ExecutionService({ planRepo: new PlanRepo(pool), convRepo: new ConversationRepo(pool), stepRepo: new StepRepo(pool), adapterFactory: {} as any });

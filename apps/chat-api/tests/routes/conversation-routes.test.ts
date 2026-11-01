@@ -59,7 +59,7 @@ describe('apps/chat-api (Task 16: Chat Service Message Ingestion & Pipeline)', (
     };
     const firstPlan = {
       kind: "plan", thinking: "x", summary: "Tạo card Sửa lỗi đăng nhập",
-      steps: [{ id: "step_1", tool: "trello.create_card", description: "Tạo card", args: { listId: "l1", title: "Sửa lỗi đăng nhập" }, dependsOn: [] }],
+      steps: [{ id: "step_1", tool: "slack.send_message", description: "Gửi tin", args: { channel: "C1", text: "Sửa lỗi đăng nhập" }, dependsOn: [] }],
       warnings: [],
     };
     const histories: any[] = [];
