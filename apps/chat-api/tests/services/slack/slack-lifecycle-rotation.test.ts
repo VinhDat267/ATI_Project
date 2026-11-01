@@ -55,8 +55,8 @@ describe('04B4 single-use lifecycle rotation with real PostgreSQL/HTTP',()=>{
   it('never overwrites a different identity/config changed while the provider was in flight',async()=>{
     await event();env.fixture.setHandler('/oauth.v2.access',async()=>{await env.db.pool.query("UPDATE slack_connections SET status='disconnected',identity_version=identity_version+1,config=NULL,refresh_in_flight=false WHERE id=$1",[seed.binding.connectionId]);return {body:{ok:true,token_type:'user',access_token:'ROTATED_ACCESS',refresh_token:'ROTATED_REFRESH',expires_in:43200}};});await worker().runOnce();expect((await row()).config).toBeNull();expect((await row()).status).toBe('disconnected');expect((await env.db.pool.query('SELECT count(*)::int n FROM slack_invalidation_intents')).rows[0].n).toBe(0);
   });
-  it('retains lifecycle rotation with both flags off and retained private client credentials',async()=>{
-    await event();const service=createSlackLifecycleRuntime({pool:env.db.pool,encryptionKey:TEST_KEY,live:false,env:{MYSLACK_ENABLED:'off',MYSLACK_AUTOMATION_ENABLED:'off',MYSLACK_APP_ID:seed.row.app_id,SLACK_SIGNING_SECRET:'FIXTURE_SIGNING',MYSLACK_API_BASE_URL:env.fixture.url,MYSLACK_OAUTH_CLIENT_ID:'FIXTURE_CLIENT',MYSLACK_OAUTH_CLIENT_SECRET:'FIXTURE_SECRET'}})!;
+  it.each([false,true])('retains lifecycle rotation with both flags off and normalized retained app (padded=%s)',async padded=>{
+    await event();const service=createSlackLifecycleRuntime({pool:env.db.pool,encryptionKey:TEST_KEY,live:false,env:{MYSLACK_ENABLED:'off',MYSLACK_AUTOMATION_ENABLED:'off',MYSLACK_APP_ID:padded?` ${seed.row.app_id} `:seed.row.app_id,SLACK_SIGNING_SECRET:'FIXTURE_SIGNING',MYSLACK_API_BASE_URL:env.fixture.url,MYSLACK_OAUTH_CLIENT_ID:'FIXTURE_CLIENT',MYSLACK_OAUTH_CLIENT_SECRET:'FIXTURE_SECRET'}})!;
     service.start();try{await service.tick();expect((await row()).status).toBe('active');expect(env.fixture.refreshCalls).toBe(1);}finally{await service.stop();}
   });
   it('never uses retained client credentials to rotate another app installation',async()=>{

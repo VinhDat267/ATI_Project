@@ -18,4 +18,4 @@ TDD: expired/revoked rotation, transient non-refresh, confirmed refresh then tra
 Review Focus: single-use exchange uncertainty; lease expiry after lock waits; no config writes across current binding/app changes; sibling fingerprint transition cannot clear unrelated barriers; flags-off retained lifecycle and no secret in public/log/model. Native provider acceptance and later04C/write/05 remain open.
 
 ## Kết quả
-Đang thi công.
+Implemented at b815e653 plus normalized-app-ID review correction; final focused66/66 exit0. Independent review found one P2, reproduced RED and fixed GREEN. Fullcheck3861PASS exit0 and browser4/4 exit0; exact published-head CI acceptance pending; see ../log/2026-11-01-slack-04b4-rotation-recovery.md. No content/model/public write added.
