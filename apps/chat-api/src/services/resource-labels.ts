@@ -6,9 +6,15 @@ export function resourceLabels(
   plan: PlanResponse,
   memory: WorkingMemory,
   userTexts: string[] = [],
-  options?: Array<{ boardId: string; boardName: string }> | { teamBoards?: Array<{ boardId: string; boardName: string }> },
+  options?:
+    | Array<{ boardId: string; boardName: string }>
+    | {
+        teamBoards?: Array<{ boardId: string; boardName: string }>;
+        teamRepos?: Array<{ repoId: string; fullName: string; name: string }>;
+      },
 ): Record<string, string> {
   const teamBoards = Array.isArray(options) ? options : options?.teamBoards;
+  const teamRepos = Array.isArray(options) ? undefined : options?.teamRepos;
   const known = groundingMemory(memory.getAll(), memory.getEntity('__observed'));
   const entries = (key: string): Array<Record<string, any>> => {
     const value = known[key];
@@ -58,6 +64,13 @@ export function resourceLabels(
           const tb = teamBoards.find((b) => b.boardId === id);
           if (tb) {
             labels[id] = tb.boardName;
+            continue;
+          }
+        }
+        if (key === 'repository' && teamRepos) {
+          const tr = teamRepos.find((r) => r.fullName.toLowerCase() === id.toLowerCase() || r.repoId === id);
+          if (tr) {
+            labels[id] = tr.fullName;
             continue;
           }
         }

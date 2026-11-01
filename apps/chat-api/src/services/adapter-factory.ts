@@ -1,6 +1,7 @@
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import {
   decryptCredentials,
+  GitHubAdapter,
   StepError,
   TrelloAdapter,
   type GmailAccessTokenProvider,
@@ -37,6 +38,11 @@ export interface AdapterFactoryOptions {
   trelloTeamRepo?: any;
   trelloOAuthClient?: any;
   trelloApiBaseUrl?: string;
+  createGitHubAdapter?: (input: { userId: string; accessToken: string; allowedRepos: string[] }) => AdapterExecutor;
+  githubTokens?: any;
+  githubTeamRepo?: any;
+  githubOAuthClient?: any;
+  githubApiBaseUrl?: string;
 }
 
 const gmailError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
@@ -46,6 +52,8 @@ const mycalendarError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string)
 const mysheetsError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
   new StepError({ category, message, retryable: false });
 const trelloError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
+  new StepError({ category, message, retryable: false });
+const githubError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
   new StepError({ category, message, retryable: false });
 
 export class AdapterFactory {
@@ -76,12 +84,13 @@ export class AdapterFactory {
     }
   }
 
-  /** Forget the Gmail, MyCalendar, MySheets & Trello adapters and access tokens of one member (connect, disconnect, reconnect_required). */
+  /** Forget the Gmail, MyCalendar, MySheets, Trello & GitHub adapters and access tokens of one member (connect, disconnect, reconnect_required). */
   clearPersonal(userId: string): void {
     this.personalCache.delete(`gmail:${userId}`);
     this.personalCache.delete(`mycalendar:${userId}`);
     this.personalCache.delete(`mysheets:${userId}`);
     this.personalCache.delete(`trello:${userId}`);
+    this.personalCache.delete(`github:${userId}`);
     for (const key of Array.from(this.adapterCache.keys())) {
       if (key.startsWith(`personal-shared:${userId}:`)) {
         this.adapterCache.delete(key);
@@ -91,6 +100,7 @@ export class AdapterFactory {
     this.options.mycalendarTokens?.clear(userId);
     this.options.mysheetsTokens?.clear(userId);
     this.options.trelloTokens?.clear?.(userId);
+    this.options.githubTokens?.clear?.(userId);
   }
 
   async getAdapterForService(serviceName: string, context?: AdapterContext): Promise<any> {
@@ -98,6 +108,7 @@ export class AdapterFactory {
     if (serviceName === 'mycalendar') return this.mycalendarAdapter(context);
     if (serviceName === 'mysheets') return this.mysheetsAdapter(context);
     if (serviceName === 'trello') return this.trelloAdapter(context);
+    if (serviceName === 'github') return this.githubAdapter(context);
 
     let cacheKey = serviceName;
     if (context?.workspaceMode === 'personal' && context.userId) {
@@ -372,6 +383,103 @@ export class AdapterFactory {
       credentials: { accessToken },
       allowedBoardIds,
       baseUrl: this.options.trelloApiBaseUrl,
+    });
+  }
+
+  /** Only the member's own active connection; at execution, credentialId match, team scope match and live repo access match. */
+  private async githubAdapter(context?: AdapterContext): Promise<AdapterExecutor> {
+    const userId = context?.userId;
+    if (!userId) throw githubError('AUTH_ERROR', 'GitHub cá nhân chỉ dùng được với kết nối của chính người dùng.');
+    const record = await this.credentialRepo.getPersonalCredentials('github', userId);
+    if (!record || record.status !== 'active') throw githubError('AUTH_ERROR', 'GitHub chưa được kết nối hoặc cần kết nối lại.');
+
+    if (context?.phase === 'execution') {
+      const previewed = context.connections?.github;
+      if (!previewed || record.id !== previewed.credentialId) {
+        throw githubError('AUTH_ERROR', 'Kết nối GitHub đã thay đổi, hãy lập lại kế hoạch.');
+      }
+    }
+
+    const scope = this.options.githubTeamRepo ? await this.options.githubTeamRepo.get() : null;
+    if (!scope || !scope.repos || scope.repos.length === 0) {
+      throw githubError('AUTH_ERROR', 'Quản trị chưa chọn repository GitHub.');
+    }
+
+    const currentTeamRepos = new Set<string>(scope.repos.map((r: any) => String(r.fullName).toLowerCase()));
+    const canonicalTeamRepo = new Map<string, string>(
+      scope.repos.map((r: any) => [String(r.fullName).toLowerCase(), String(r.fullName)]),
+    );
+    if (context?.phase === 'execution') {
+      const previewed = context.connections?.github;
+      if (previewed) {
+        const inTeamScope = previewed.repos.filter((r: string) => currentTeamRepos.has(r.toLowerCase()));
+        if (inTeamScope.length === 0) {
+          throw githubError('AUTH_ERROR', 'Repository GitHub trong kế hoạch đã bị bỏ khỏi phạm vi nhóm.');
+        }
+      }
+    }
+
+    let accessTokenStored: string | undefined;
+    let refreshToken: string | undefined;
+    try {
+      const config = decryptCredentials(record.config, this.encryptionKey);
+      accessTokenStored = config.accessToken;
+      refreshToken = typeof config.refreshToken === 'string' ? config.refreshToken : undefined;
+    } catch {
+      throw githubError('AUTH_ERROR', 'GitHub cần được kết nối lại.');
+    }
+
+    if (!accessTokenStored) {
+      throw githubError('AUTH_ERROR', 'GitHub cần được kết nối lại.');
+    }
+
+    if (!this.options.githubTokens) {
+      throw githubError('VALIDATION', 'GitHub chưa sẵn sàng trên máy chủ này.');
+    }
+
+    const provider = this.options.githubTokens.forConnection(userId, record.id, {
+      accessToken: accessTokenStored,
+      refreshToken,
+    });
+    const accessToken = await provider.getAccessToken();
+
+    let liveMemberRepos: Set<string> = currentTeamRepos;
+    if (this.options.githubOAuthClient) {
+      const fetchRepos = (this.options.githubOAuthClient as any).repos ?? (this.options.githubOAuthClient as any).repositories;
+      const callerRepos: any[] = await fetchRepos.call(
+        this.options.githubOAuthClient,
+        accessToken,
+        AbortSignal.timeout(10_000),
+      );
+      liveMemberRepos = new Set<string>(
+        callerRepos
+          .filter((r: any) => r.member !== false)
+          .map((r: any) => String(r.fullName).toLowerCase()),
+      );
+    }
+
+    const previewedRepos: string[] = (
+      context?.connections?.github?.repos ?? scope.repos.map((r: any) => String(r.fullName))
+    ) as string[];
+    const allowedRepos: string[] = previewedRepos
+      .filter((r: string) => currentTeamRepos.has(r.toLowerCase()) && liveMemberRepos.has(r.toLowerCase()))
+      .map((r: string) => canonicalTeamRepo.get(r.toLowerCase()) ?? r);
+
+    if (allowedRepos.length === 0) {
+      if (context?.phase === 'execution') {
+        throw githubError('AUTH_ERROR', 'Bạn không còn quyền truy cập repository GitHub trong kế hoạch.');
+      }
+      throw githubError('AUTH_ERROR', 'Không có repository GitHub nào hợp lệ để thực thi.');
+    }
+
+    if (this.options.createGitHubAdapter) {
+      return this.options.createGitHubAdapter({ userId, accessToken, allowedRepos });
+    }
+
+    return new GitHubAdapter({
+      credentials: { token: accessToken },
+      allowedScope: { repos: allowedRepos },
+      baseUrl: this.options.githubApiBaseUrl,
     });
   }
 }

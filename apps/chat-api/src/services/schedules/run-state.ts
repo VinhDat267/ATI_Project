@@ -1,4 +1,4 @@
-import type { CalendarDigestDelivery, ScheduleRunState, ScheduleRunView, SheetsDigestDelivery } from '@wap/tool-schemas';
+import type { CalendarDigestDelivery, GithubDigestDelivery, ScheduleRunState, ScheduleRunView, SheetsDigestDelivery } from '@wap/tool-schemas';
 
 /** A schedule_runs row joined with the latest plan of its conversation (see RUN_SELECT). */
 export interface RunRow {
@@ -12,7 +12,7 @@ export interface RunRow {
   conv_id: string | null;
   plan_id: string | null;
   error: string | null;
-  delivery?: SheetsDigestDelivery | CalendarDigestDelivery | null;
+  delivery?: SheetsDigestDelivery | CalendarDigestDelivery | GithubDigestDelivery | null;
   created_at: Date | string;
   latest_plan_id?: string | null;
   plan_status?: string | null;
@@ -41,7 +41,7 @@ export function runState(row: RunRow, now: Date): ScheduleRunState {
 const iso = (value: Date | string) => new Date(value).toISOString();
 
 export function runView(row: RunRow, now: Date): ScheduleRunView {
-  return {
+  const view: ScheduleRunView = {
     id: row.id, scheduleId: row.schedule_id, trigger: row.trigger,
     dueAt: iso(row.due_at), createdAt: iso(row.created_at),
     state: runState(row, now), missedCount: row.missed_count,
@@ -49,4 +49,8 @@ export function runView(row: RunRow, now: Date): ScheduleRunView {
     planStatus: row.plan_status ?? null, error: row.error,
     delivery: row.delivery ?? null,
   };
+  if (row.delivery != null) {
+    view.delivery = row.delivery;
+  }
+  return view;
 }

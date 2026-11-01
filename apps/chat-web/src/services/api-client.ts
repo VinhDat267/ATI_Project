@@ -365,6 +365,49 @@ export class ApiClient {
       body: JSON.stringify({ workspaceId, boardIds }),
     });
   }
+  getGitHubConnection() {
+    return this.request<{
+      status: 'unconfigured' | 'not_connected' | 'reconnect_required' | 'needs_scope' | 'needs_membership' | 'connected';
+      login?: string;
+      repos: Array<{ repoId: string; fullName: string; name: string; accessible: boolean }>;
+    }>('/api/connections/github', { credentials: 'include' });
+  }
+  startGitHubConnection(options: { returnTo?: string } = {}) {
+    return this.request<{ url: string }>('/api/connections/github/start', {
+      method: 'POST',
+      credentials: 'include',
+      ...(options.returnTo ? { body: JSON.stringify({ returnTo: options.returnTo }) } : {}),
+    });
+  }
+  completeGitHubConnection(code: string, state: string) {
+    return this.request<{ login: string; returnTo?: string }>('/api/connections/github/callback', {
+      method: 'POST',
+      credentials: 'include',
+      body: JSON.stringify({ code, state }),
+    }, true);
+  }
+  disconnectGitHub() {
+    return this.request<{ success: true }>('/api/connections/github', {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+  }
+  getGitHubCandidateRepos() {
+    return this.request<{
+      repos: Array<{ repoId: string; fullName: string; name: string; private?: boolean }>;
+    }>('/api/connections/github/candidate-repos', { credentials: 'include' });
+  }
+  saveGitHubScope(repos: string[]) {
+    return this.request<{
+      chosenBy: string;
+      updatedAt: string;
+      repos: Array<{ repoId: string; fullName: string; name: string }>;
+    }>('/api/connections/github/scope', {
+      method: 'PUT',
+      credentials: 'include',
+      body: JSON.stringify({ repos }),
+    });
+  }
   unlinkGoogle(currentPassword: string) {
     return this.request<{ success: true }>('/api/auth/google/unlink', {
       method: 'POST', credentials: 'include', body: JSON.stringify({ currentPassword }),
@@ -491,7 +534,15 @@ export class ApiClient {
   getSchedules() { return this.request<{ schedules: ScheduleView[] }>('/api/schedules'); }
   getScheduleRuns(id: string, limit = 10) { return this.request<{ runs: ScheduleRunView[] }>(`/api/schedules/${encodeURIComponent(id)}/runs?limit=${limit}`); }
   getSchedulePendingCount() { return this.request<{ count: number }>('/api/schedules/pending-count'); }
-  confirmSchedule(convId: string, messageId: string, approvalMode?: ScheduleApprovalMode) {
+  confirmSchedule(
+    convId: string,
+    messageId: string,
+    approvalModeOrOptions?: ScheduleApprovalMode | { approvalMode?: ScheduleApprovalMode }
+  ) {
+    const approvalMode =
+      typeof approvalModeOrOptions === 'string'
+        ? approvalModeOrOptions
+        : approvalModeOrOptions?.approvalMode;
     return this.request<{ schedule: ScheduleView }>(
       `/api/conversations/${encodeURIComponent(convId)}/schedule-proposals/${encodeURIComponent(messageId)}/confirm`,
       {

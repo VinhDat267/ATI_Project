@@ -13,6 +13,7 @@ describe('Settings page and drawer semantics (former page/modal cases)', () => {
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
       if (url === '/api/services') return new Response(JSON.stringify({ services: [slack], canConfigure: true }));
       if (url === '/api/connections/trello') return new Response(JSON.stringify({ status: 'not_connected', boards: [] }));
+      if (url === '/api/connections/github') return new Response(JSON.stringify({ status: 'not_connected', repos: [] }));
       expect(url).toBe('/api/services/slack/credentials'); expect(init?.method).toBe('POST');
       expect(JSON.parse(init?.body as string)).toEqual({ credentials: { botToken: 'submitted' }, allowedScope: ['C01'] }); return response;
     });
@@ -46,6 +47,7 @@ describe('Settings page and drawer semantics (former page/modal cases)', () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       if (url === '/api/services') return new Response(JSON.stringify({ services: [{ ...slack, configured }], canConfigure: true }));
       if (url === '/api/connections/trello') return new Response(JSON.stringify({ status: 'not_connected', boards: [] }));
+      if (url === '/api/connections/github') return new Response(JSON.stringify({ status: 'not_connected', repos: [] }));
       configured = true; return new Response(JSON.stringify({ success: true, message: 'Saved' }));
     }));
     render(<SettingsPage {...props} />); const old = await screen.findByRole('button', { name: /Slack —/ }); fireEvent.click(old);

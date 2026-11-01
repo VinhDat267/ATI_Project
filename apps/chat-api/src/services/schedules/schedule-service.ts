@@ -1,6 +1,8 @@
 import type pg from 'pg';
 import type {
+  GithubDigestConfig,
   ScheduleApprovalMode,
+  ScheduleDigestCandidate,
   ScheduleProposalMetadata,
   ScheduleResponse,
   ScheduleRunView,
@@ -16,6 +18,7 @@ import { evaluateCalendarDigestCandidate } from './calendar-digest-candidate.js'
 import { runState, runView } from './run-state.js';
 import { nextOccurrence } from './next-occurrence.js';
 import { analyzeSheetsDigestCandidate, computeSheetsDigestHash } from './sheets-digest-candidate.js';
+import { canonicalizeDigestConfig, computeDigestConfigHash } from './github-digest-candidate.js';
 
 export const SCHEDULE_CONFLICTS = {
   STALE_PROPOSAL: 'Đề xuất này đã cũ. Hãy xem đề xuất mới nhất.',
@@ -28,11 +31,14 @@ export const SCHEDULE_CONFLICTS = {
   RUN_NOT_REPLANNABLE: 'Lượt này không cần lập lại kế hoạch.',
   DIGEST_NOT_ELIGIBLE: 'Lịch này không đủ điều kiện tự gửi báo cáo. Hãy chọn chế độ chờ duyệt mỗi lượt.',
   AUTO_DIGEST_NOT_ELIGIBLE: 'Lịch này không đủ điều kiện gửi tự động hoặc kết nối Google Calendar/kênh nhận đã thay đổi. Hãy chọn chế độ duyệt thủ công hoặc kiểm tra lại kết nối.',
+  AUTO_DIGEST_NOT_ALLOWED: 'Lịch này cần duyệt từng lượt.',
 } as const;
 export type ScheduleConflictCode = keyof typeof SCHEDULE_CONFLICTS;
 
 export class ScheduleConflict extends Error {
-  constructor(readonly code: ScheduleConflictCode) { super(SCHEDULE_CONFLICTS[code]); }
+  constructor(readonly code: ScheduleConflictCode, customMessage?: string) {
+    super(customMessage || SCHEDULE_CONFLICTS[code]);
+  }
 }
 export class ScheduleNotFound extends Error {
   constructor() { super('Không tìm thấy lịch.'); }
@@ -121,7 +127,48 @@ export class ScheduleService {
     }
   }
 
-  private async saveFields(client: pg.PoolClient, id: string, fields: Fields, proposalId: string | null): Promise<ScheduleRow> {
+  private async saveFields(
+    client: pg.PoolClient,
+    id: string,
+    fields: Fields,
+    proposalId: string | null,
+    digestUpdate?:
+      | { kind: 'plan' }
+      | { kind: 'github_digest'; config: GithubDigestConfig; configHash: string; approvedAt: Date },
+  ): Promise<ScheduleRow> {
+    if (digestUpdate?.kind === 'plan') {
+      const res = await client.query(
+        `UPDATE schedules SET name=$2, request=$3, recurrence=$4, services=$5, status=$6, pause_reason=$7, next_run_at=$8,
+           kind='plan', digest_config=NULL, digest_config_hash=NULL, digest_approved_at=NULL,
+           version=version+1, updated_at=now(), last_proposal_id=COALESCE($9, last_proposal_id)
+         WHERE id=$1 RETURNING *`,
+        [id, fields.name, fields.request, JSON.stringify(fields.recurrence), fields.services, fields.status, fields.pause_reason, fields.next_run_at, proposalId],
+      );
+      return res.rows[0];
+    }
+    if (digestUpdate?.kind === 'github_digest') {
+      const res = await client.query(
+        `UPDATE schedules SET name=$2, request=$3, recurrence=$4, services=$5, status=$6, pause_reason=$7, next_run_at=$8,
+           kind='github_digest', digest_config=$10, digest_config_hash=$11, digest_approved_at=$12,
+           version=version+1, updated_at=now(), last_proposal_id=COALESCE($9, last_proposal_id)
+         WHERE id=$1 RETURNING *`,
+        [
+          id,
+          fields.name,
+          fields.request,
+          JSON.stringify(fields.recurrence),
+          fields.services,
+          fields.status,
+          fields.pause_reason,
+          fields.next_run_at,
+          proposalId,
+          JSON.stringify(digestUpdate.config),
+          digestUpdate.configHash,
+          digestUpdate.approvedAt,
+        ],
+      );
+      return res.rows[0];
+    }
     const res = await client.query(
       `UPDATE schedules SET name=$2, request=$3, recurrence=$4, services=$5, status=$6, pause_reason=$7, next_run_at=$8,
          version=version+1, updated_at=now(), last_proposal_id=COALESCE($9, last_proposal_id)
@@ -196,8 +243,10 @@ export class ScheduleService {
       const wantAutoDigest = approvalMode === 'auto_digest';
       const isCalendarSchedule =
         metadata.services.includes('mycalendar') || metadata.services.includes('calendar');
+      const isGithubSchedule =
+        metadata.services.includes('github') || existing?.kind === 'github_digest';
       let digestFields: {
-        kind: 'plan' | 'sheets_digest' | 'calendar_digest';
+        kind: 'plan' | 'sheets_digest' | 'calendar_digest' | 'github_digest';
         digestConfig: unknown | null;
         digestConfigHash: string | null;
         digestApprovedAt: Date | null;
@@ -208,7 +257,7 @@ export class ScheduleService {
         digestApprovedAt: null,
       };
 
-      if (wantAutoDigest && (proposal.action === 'create' || proposal.action === 'update')) {
+      if (wantAutoDigest && (proposal.action === 'create' || proposal.action === 'update') && !isGithubSchedule) {
         if (isCalendarSchedule) {
           const evaluated = await evaluateCalendarDigestCandidate({
             pool: client,
@@ -261,6 +310,43 @@ export class ScheduleService {
 
       if (proposal.action === 'create') {
         if (existing) throw new ScheduleConflict('CONVERSATION_HAS_SCHEDULE');
+        if (isGithubSchedule && approvalMode === 'auto_digest') {
+          const githubCandidate = metadata.digestCandidate as ScheduleDigestCandidate | undefined;
+          if (!githubCandidate?.canAutoDigest || !githubCandidate.config) {
+            throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED', githubCandidate?.disabledReason);
+          }
+          await this.ensureRoom(client, userId, { workspaceMode: wsMode, workspaceId: wsId });
+          const next = this.next({ recurrence: proposal.recurrence! }, now);
+          const config = canonicalizeDigestConfig(githubCandidate.config);
+          const configHash = computeDigestConfigHash({
+            config,
+            recurrence: proposal.recurrence!,
+            userId,
+          });
+          const created = await client.query(
+            `INSERT INTO schedules(
+               user_id, conv_id, name, request, recurrence, services, status, next_run_at, last_proposal_id,
+               workspace_id, workspace_mode, kind, digest_config, digest_config_hash, digest_approved_at
+             )
+             VALUES($1, $2, $3, $4, $5, $6, 'active', $7, $8, $9, $10, 'github_digest', $11, $12, $13) RETURNING *`,
+            [
+              userId,
+              convId,
+              proposal.name,
+              proposal.request,
+              JSON.stringify(proposal.recurrence),
+              metadata.services,
+              next,
+              messageId,
+              wsId,
+              wsMode,
+              JSON.stringify(config),
+              configHash,
+              now,
+            ],
+          );
+          return this.recordState(client, created.rows[0], now);
+        }
         await this.ensureRoom(client, userId, { workspaceMode: wsMode, workspaceId: wsId });
         const next = this.next({ recurrence: proposal.recurrence! }, now);
         const created = await client.query(
@@ -319,6 +405,44 @@ export class ScheduleService {
           [existing.id, fields.name, fields.request, JSON.stringify(fields.recurrence), fields.services, fields.status, fields.pause_reason, fields.next_run_at, messageId, JSON.stringify(evaluated.config), evaluated.configHash, now],
         );
         return this.recordState(client, updatedDigest.rows[0], now);
+      }
+      if (proposal.action === 'update' && isGithubSchedule) {
+        let digestUpdate:
+          | { kind: 'plan' }
+          | { kind: 'github_digest'; config: GithubDigestConfig; configHash: string; approvedAt: Date }
+          | undefined;
+        if (approvalMode === 'manual') {
+          if (existing.kind === 'github_digest') {
+            digestUpdate = { kind: 'plan' };
+          }
+        } else if (approvalMode === 'auto_digest' || existing.kind === 'github_digest') {
+          const githubCandidate = metadata.digestCandidate as ScheduleDigestCandidate | undefined;
+          const candidateConfig = githubCandidate?.canAutoDigest && githubCandidate.config
+            ? githubCandidate.config
+            : existing.kind === 'github_digest' && proposal.request === existing.request
+              ? (existing.digest_config as GithubDigestConfig | undefined)
+              : undefined;
+          if (!candidateConfig) {
+            if (approvalMode === 'auto_digest') {
+              throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED', githubCandidate?.disabledReason);
+            }
+            digestUpdate = { kind: 'plan' };
+          } else {
+            const config = canonicalizeDigestConfig(candidateConfig);
+            const configHash = computeDigestConfigHash({
+              config,
+              recurrence: fields.recurrence,
+              userId,
+            });
+            digestUpdate = {
+              kind: 'github_digest',
+              config,
+              configHash,
+              approvedAt: now,
+            };
+          }
+        }
+        return this.recordState(client, await this.saveFields(client, existing.id, fields, messageId, digestUpdate), now);
       }
       let saved = await this.saveFields(client, existing.id, fields, messageId);
       if (proposal.action === 'update') {

@@ -245,11 +245,12 @@ export class CredentialRepo {
 
   /** Rotates a personal single-use refresh token inside a transaction with plaintext comparison. */
   async rotatePersonalSecret(input: {
-    service: 'trello';
+    service: 'trello' | 'github';
     userId: string;
     credentialId: string;
     previousRefreshToken: string;
     nextRefreshToken: string;
+    nextAccessToken?: string;
   }): Promise<'rotated' | 'mismatch' | 'missing'> {
     const client = await this.pool.connect();
     try {
@@ -277,7 +278,11 @@ export class CredentialRepo {
         return 'mismatch';
       }
 
-      const updatedData = { ...data, refreshToken: input.nextRefreshToken };
+      const updatedData = {
+        ...data,
+        refreshToken: input.nextRefreshToken,
+        ...(input.nextAccessToken ? { accessToken: input.nextAccessToken } : {}),
+      };
       const newConfig = encryptCredentials(updatedData, this.encryptionKey);
 
       await client.query(

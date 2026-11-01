@@ -22,6 +22,7 @@ import { reconcileInterruptedExecutions } from './services/startup-reconciliatio
 import { createScheduleRuntime } from './config/schedules-runtime.js';
 import { evaluateCalendarDigestCandidate } from './services/schedules/calendar-digest-candidate.js';
 import { createCalendarDigestExecutor } from './services/schedules/calendar-digest-runner.js';
+import { createGithubDigestRunner, type RunGithubDigest } from './services/schedules/github-digest-runner.js';
 import { AdapterFactory, type AdapterContext } from './services/adapter-factory.js';
 import { GmailConnectionRepo } from './db/repositories/gmail-connection-repo.js';
 import { GmailOAuthClient } from './services/gmail/oauth-client.js';
@@ -32,6 +33,10 @@ import { TrelloOAuthClient } from './services/trello/oauth-client.js';
 import { TrelloTeamRepo } from './db/repositories/trello-team-repo.js';
 import { StepError } from '@wap/tool-adapters';
 import { createTrelloConnectionLookup } from './services/trello/connection-reference.js';
+import { GitHubTokenManager } from './services/github/token-manager.js';
+import { GitHubOAuthClient } from './services/github/oauth-client.js';
+import { GitHubTeamRepo } from './db/repositories/github-team-repo.js';
+import { createGitHubConnectionLookup } from './services/github/connection-reference.js';
 import {
   AIPlanner,
   createProviderFromEnv,
@@ -205,6 +210,7 @@ async function bootstrap() {
 
   // Schedules need the flag and PostgreSQL; with the flag off nothing below exists.
   // A run is planned by chatService, created below; the runner starts only after listen.
+  let digestRunnerImpl: RunGithubDigest | undefined;
   const schedules = createScheduleRuntime({
     enabled: env.SCHEDULES_ENABLED,
     pool: pool && userRepo ? pool : null,
@@ -220,6 +226,10 @@ async function bootstrap() {
             (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(serviceName, context),
         })
       : undefined,
+    runGithubDigest: (run, convId, signal) => {
+      if (!digestRunnerImpl) throw new Error('Digest runner is not ready');
+      return digestRunnerImpl(run, convId, signal);
+    },
     emit: (convId, event, payload) => sseManager.emitEvent(convId, event, payload),
   });
   if (env.SCHEDULES_ENABLED && !schedules) console.warn('\x1b[33m[chat-api] SCHEDULES_ENABLED=on nhưng không có PostgreSQL: lịch chạy tạm tắt.\x1b[0m');
@@ -266,6 +276,48 @@ async function bootstrap() {
       })
     : undefined;
   const trelloConnection = trelloLookup ?? sandboxTrelloConnection;
+
+  const githubAvailable = Boolean(env.GITHUB_OAUTH && pool);
+  const githubOAuthClient = githubAvailable ? new GitHubOAuthClient(env.GITHUB_OAUTH!) : undefined;
+  const githubTeamRepo = pool ? new GitHubTeamRepo(pool) : undefined;
+  const githubTokens = githubAvailable ? new GitHubTokenManager({
+    client: githubOAuthClient!,
+    credentials: credRepo,
+    onReconnectRequired: (userId) => realAdapterFactory.clearPersonal(userId),
+  }) : undefined;
+  const githubLookup = githubAvailable && githubTeamRepo && githubTokens && githubOAuthClient
+    ? createGitHubConnectionLookup({
+        credentialRepo: credRepo,
+        teamRepo: githubTeamRepo,
+        encryptionKey: env.ENCRYPTION_KEY,
+        tokens: githubTokens,
+        client: githubOAuthClient,
+      })
+    : undefined;
+  const sandboxGitHubConnection = env.RUNTIME_MODE === 'sandbox' && !githubLookup
+    ? async () => ({
+        status: 'connected' as const,
+        teamRepos: [
+          { repoId: '100', fullName: 'owner/repo', name: 'repo' },
+          { repoId: '101', fullName: 'nhom/ati', name: 'ati' },
+          { repoId: '102', fullName: 'octo/repo', name: 'repo' },
+          { repoId: '103', fullName: 'wap/platform', name: 'platform' },
+        ],
+        memberRepos: [
+          { repoId: '100', fullName: 'owner/repo', name: 'repo' },
+          { repoId: '101', fullName: 'nhom/ati', name: 'ati' },
+          { repoId: '102', fullName: 'octo/repo', name: 'repo' },
+          { repoId: '103', fullName: 'wap/platform', name: 'platform' },
+        ],
+        connection: {
+          credentialId: 'sandbox-github',
+          githubUserId: 'sandbox-gh-user',
+          login: 'sandbox-octo',
+          repos: ['owner/repo', 'nhom/ati', 'octo/repo', 'wap/platform'],
+        },
+      })
+    : undefined;
+  const githubConnection = githubLookup ?? sandboxGitHubConnection;
 
   // 2. Initialize LLM Provider
   let provider: any;
@@ -334,6 +386,11 @@ async function bootstrap() {
       trelloOAuthClient,
       trelloTokens,
       trelloConnection,
+      githubEnabled: githubAvailable,
+      githubTeamRepo,
+      githubOAuthClient,
+      githubTokens,
+      githubConnection,
     }),
     serviceRegistry: serviceRegistryForRuntime(gmailAvailable, mycalendarAvailable, mysheetsAvailable),
     gatherSearch,
@@ -382,6 +439,7 @@ async function bootstrap() {
         )
       : undefined,
     trelloConnection,
+    githubConnection,
     getAdapter: (serviceName, context) => (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(serviceName, context),
     schedules: schedules
       ? {
@@ -453,14 +511,40 @@ async function bootstrap() {
         },
       };
     } : undefined,
+    githubTokens,
+    githubTeamRepo,
+    githubOAuthClient,
+    githubApiBaseUrl: env.GITHUB_OAUTH?.apiBaseUrl,
+    createGitHubAdapter: env.RUNTIME_MODE === 'sandbox' ? ({ allowedRepos }) => {
+      const sandbox = createSandboxAdapter('github');
+      const allowedLower = new Set(allowedRepos.map((r) => r.toLowerCase()));
+      return {
+        execute: async (tool, args, ctx) => {
+          const targetRepo = ctx?.repo ?? args?.repo;
+          if (targetRepo && !allowedLower.has(String(targetRepo).toLowerCase())) {
+            throw new StepError({ category: 'AUTH_ERROR', message: 'Repository không nằm trong phạm vi được phép.' });
+          }
+          return sandbox.execute(tool, args, ctx);
+        },
+      };
+    } : undefined,
   });
 
   const adapterFactory = createToolRuntimeFactory(env.RUNTIME_MODE,
     (serviceName, context) => sandboxTrelloConnection && serviceName === 'trello'
       ? Promise.resolve(createSandboxAdapter('trello'))
-      : realAdapterFactory.getAdapterForService(serviceName, context),
+      : sandboxGitHubConnection && serviceName === 'github'
+        ? Promise.resolve(createSandboxAdapter('github'))
+        : realAdapterFactory.getAdapterForService(serviceName, context),
     (serviceName) => createSandboxAdapter(serviceName));
   gatherAdapterFactory = adapterFactory;
+  if (pool) {
+    digestRunnerImpl = createGithubDigestRunner({
+      pool,
+      githubConnection,
+      getAdapter: (serviceName, context) => adapterFactory.getAdapterForService(serviceName, context),
+    });
+  }
 
   // 6. ExecutionService
   const executionService = new ExecutionService({
@@ -530,6 +614,17 @@ async function bootstrap() {
     },
     trelloTokens,
     trelloTeamRepo,
+    github: {
+      oauth: githubAvailable ? env.GITHUB_OAUTH : undefined,
+      onConnectionChanged: (userId: string) => {
+        realAdapterFactory.clearPersonal(userId);
+        githubTokens?.clear(userId);
+      },
+      tokens: githubTokens,
+      teamRepo: githubTeamRepo,
+    },
+    githubTokens,
+    githubTeamRepo,
     chatService,
     sseManager,
     executionService,

@@ -28,8 +28,13 @@ export function ScheduleMoment({ message, convId, navigate, onEdit }: { message:
   const proposal = metadata.proposal;
   const previous = metadata.previous;
   const digestCandidate = metadata.digestCandidate as any;
-  const isCalendarCandidate = Boolean(
+  const isGithubCandidate = Boolean(
     digestCandidate &&
+      (Array.isArray(digestCandidate?.config?.repos) || metadata.services?.includes('github'))
+  );
+  const isCalendarCandidate = Boolean(
+    !isGithubCandidate &&
+      digestCandidate &&
       ('configPreview' in digestCandidate ||
         'disabledReason' in digestCandidate ||
         'eligible' in digestCandidate ||
@@ -37,6 +42,7 @@ export function ScheduleMoment({ message, convId, navigate, onEdit }: { message:
         metadata.services?.includes('mycalendar') ||
         metadata.services?.includes('calendar'))
   );
+  const canAutoDigest = digestCandidate?.canAutoDigest === true;
   const isEligible = Boolean(digestCandidate?.canAutoDigest ?? digestCandidate?.eligible);
   const ineligibleReason = digestCandidate?.disabledReason ?? digestCandidate?.reason;
   const previewEmail = digestCandidate?.configPreview?.email ?? digestCandidate?.config?.email ?? '';
@@ -54,13 +60,19 @@ export function ScheduleMoment({ message, convId, navigate, onEdit }: { message:
     if (locked.current) return;
     locked.current = true; setBusy(true); setError('');
     try {
-      const result = isCalendarCandidate
-        ? isEligible
-          ? await apiClient.confirmSchedule(convId, message.id, approvalMode)
-          : await apiClient.confirmSchedule(convId, message.id)
-        : approvalMode === 'auto_digest'
-          ? await apiClient.confirmSchedule(convId, message.id, 'auto_digest')
-          : await apiClient.confirmSchedule(convId, message.id);
+      const result = isGithubCandidate
+        ? await apiClient.confirmSchedule(
+            convId,
+            message.id,
+            !manage && approvalMode === 'auto_digest' ? { approvalMode: 'auto_digest' } : undefined
+          )
+        : isCalendarCandidate
+          ? isEligible
+            ? await apiClient.confirmSchedule(convId, message.id, approvalMode)
+            : await apiClient.confirmSchedule(convId, message.id)
+          : approvalMode === 'auto_digest'
+            ? await apiClient.confirmSchedule(convId, message.id, 'auto_digest')
+            : await apiClient.confirmSchedule(convId, message.id);
       if (currentMessage.current === message.id) setConfirmed(result.schedule); schedulesChanged();
     } catch (reason: any) {
       setError(reason.message || 'Không thể xác nhận lịch.');
@@ -78,8 +90,8 @@ export function ScheduleMoment({ message, convId, navigate, onEdit }: { message:
       {schedule ? <>
         <div className="flex flex-wrap items-center gap-2">
           <p role="status" className="text-sm font-semibold text-[#111827]">{scheduleLabel(schedule)}</p>
-          {schedule.kind === 'calendar_digest' && (
-            <span data-schedule-kind="calendar_digest" className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          {(schedule.kind === 'calendar_digest' || schedule.kind === 'github_digest' || schedule.kind === 'sheets_digest') && (
+            <span data-schedule-kind={schedule.kind} className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
               Tự gửi
             </span>
           )}
@@ -93,7 +105,48 @@ export function ScheduleMoment({ message, convId, navigate, onEdit }: { message:
           {change('Việc sẽ làm', previous?.request, proposal.request)}
           <div className="flex flex-wrap gap-2">{metadata.services?.map(id => <span key={id} className="inline-flex items-center gap-2 text-xs text-[#4B5563]"><span aria-hidden="true" className={`w-6 h-6 rounded-lg border flex items-center justify-center ${servicePalette(id).icon}`}><ServiceLogo service={id} className="w-3.5 h-3.5" /></span>{serviceName(id, [])}</span>)}</div>
           {!!metadata.nextRuns?.length && <div className="text-xs text-[#4B5563] v3-space-y-1"><p className="font-semibold">Lần chạy tới:</p>{metadata.nextRuns.map(time => <p key={time}>{formatRunTime(time)}</p>)}</div>}
-          {isCalendarCandidate ? (
+          {isGithubCandidate ? (
+            <fieldset className="v3-space-y-2 border-t border-[#E7E7E2] pt-3">
+              <legend className="text-xs font-semibold text-[#6B7280] mb-1">Chế độ khi tới giờ</legend>
+              <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm cursor-pointer ${approvalMode === 'manual' ? 'border-[#FF5701] bg-[#FFF6EE]/40' : 'border-[#E7E7E2] bg-white'}`}>
+                <input
+                  id="schedule-mode-manual"
+                  type="radio"
+                  name={`schedule-mode-${message.id}`}
+                  checked={approvalMode === 'manual'}
+                  onChange={() => setApprovalMode('manual')}
+                  className="mt-0.5 text-[#FF5701] focus:ring-[#FF5701]"
+                />
+                <div className="v3-space-y-0.5">
+                  <p className="font-semibold text-[#111827]">Chờ tôi duyệt mỗi lượt</p>
+                  <p className="text-xs text-[#4B5563]">Tới giờ, ATI lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.</p>
+                </div>
+              </label>
+              <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm ${!canAutoDigest ? 'opacity-60 cursor-not-allowed border-[#E7E7E2] bg-neutral-50' : approvalMode === 'auto_digest' ? 'cursor-pointer border-[#FF5701] bg-[#FFF6EE]/40' : 'cursor-pointer border-[#E7E7E2] bg-white'}`}>
+                <input
+                  id="schedule-mode-auto-digest"
+                  type="radio"
+                  name={`schedule-mode-${message.id}`}
+                  checked={approvalMode === 'auto_digest'}
+                  disabled={!canAutoDigest}
+                  onChange={() => { if (canAutoDigest) setApprovalMode('auto_digest'); }}
+                  className="mt-0.5 text-[#FF5701] focus:ring-[#FF5701]"
+                />
+                <div className="v3-space-y-1 min-w-0">
+                  <p className="font-semibold text-[#111827]">Tự gửi bản tin, không cần duyệt lại</p>
+                  {canAutoDigest && digestCandidate?.config ? (
+                    <p className="text-xs text-[#4B5563] break-words">
+                      {`Repo: ${digestCandidate.config.repos.join(', ')} · Kênh Slack: #${digestCandidate.config.channelName.replace(/^#/, '')} · Nội dung: Issue mới, PR chờ review quá ${digestCandidate.config.staleDays} ngày, Issue chưa ai nhận (+ tóm tắt AI)`}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-[#6B7280] break-words">
+                      {digestCandidate?.disabledReason || 'Chỉ bật được khi lịch chỉ đọc GitHub và gửi báo cáo vào 1 kênh Slack đã chọn.'}
+                    </p>
+                  )}
+                </div>
+              </label>
+            </fieldset>
+          ) : isCalendarCandidate ? (
             <>
               {isEligible ? (
                 <div className="v3-space-y-3 pt-1" role="radiogroup" aria-label="Chế độ chạy định kỳ">
@@ -187,7 +240,7 @@ export function ScheduleMoment({ message, convId, navigate, onEdit }: { message:
             </>
           )}
         </>}
-        <div className="flex flex-wrap gap-2"><button type="button" disabled={busy} className={primaryScheduleButton} onClick={() => void confirm()}>Xác nhận</button><button type="button" disabled={busy} className={scheduleButton} onClick={onEdit}>Sửa</button><button type="button" disabled={busy} className={scheduleButton} onClick={() => setIgnored(true)}>Bỏ qua</button></div>
+        <div className="flex flex-wrap gap-2"><button type="button" disabled={busy} className={primaryScheduleButton} onClick={() => void confirm()}>{isGithubCandidate && !manage && approvalMode === 'auto_digest' ? 'Xác nhận và bật tự gửi' : 'Xác nhận'}</button><button type="button" disabled={busy} className={scheduleButton} onClick={onEdit}>Sửa</button><button type="button" disabled={busy} className={scheduleButton} onClick={() => setIgnored(true)}>Bỏ qua</button></div>
       </>}
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     </div>

@@ -27,13 +27,17 @@ const scenarios = [
   { name: 'gmail', grep: 'GMAIL-03:|OAUTH-01 from chat:' },
   { name: 'mycalendar', grep: 'MYCALENDAR:' },
   { name: 'mysheets', grep: 'MYSHEETS:' },
-  { name: 'schedule', grep: 'SCHED-03:' },
+  { name: 'schedule', grep: 'SCHED-03:|GITHUB-DIGEST:' },
 ];
 
 const passArgs = process.argv.slice(2);
 if (passArgs.length > 0) {
   process.stdout.write(`Running v3 browser targeting: ${passArgs.join(' ')}\n`);
   const env = { ...process.env, JWT_SECRET: process.env.JWT_SECRET || randomBytes(32).toString('hex') };
+  if (passArgs.some(arg => /sched-03|github-oauth-and-digest/.test(arg))) {
+    env.SANDBOX_SCENARIO = env.SANDBOX_SCENARIO || 'schedule';
+    env.SCHEDULES_ENABLED = env.SCHEDULES_ENABLED || 'on';
+  }
   const result = spawnSync(process.execPath, [cli, 'test', '--config', 'apps/chat-web/playwright.config.ts', ...passArgs], {
     env, stdio: 'inherit',
   });

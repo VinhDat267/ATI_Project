@@ -258,6 +258,14 @@ export function createSandboxProvider(scenario?: string) {
       if (text.startsWith('Tạm dừng')) return JSON.stringify({ kind: 'schedule', action: 'pause', summary: 'Tạm dừng lịch họp hằng ngày.' });
       if (text.startsWith('Chạy tiếp')) return JSON.stringify({ kind: 'schedule', action: 'resume', summary: 'Chạy tiếp lịch họp hằng ngày.' });
       if (text.startsWith('Hủy lịch')) return JSON.stringify({ kind: 'schedule', action: 'cancel', summary: 'Hủy lịch họp hằng ngày.' });
+      if (/github|bản tin/i.test(text)) return JSON.stringify({
+        kind: 'schedule',
+        action: 'create',
+        name: 'Bản tin GitHub sáng',
+        request: 'Gửi bản tin GitHub repo owner/repo lên Slack #general',
+        recurrence: { type: 'daily', time: '08:00' },
+        summary: 'Mỗi sáng 8 giờ, gửi bản tin GitHub repo owner/repo lên Slack #general.',
+      });
       return JSON.stringify({ kind: 'schedule', action: 'create', ...meeting, recurrence: { type: 'daily', time: '08:00' },
         summary: 'Mỗi sáng 8 giờ, gửi lịch họp hôm nay lên Slack #ati-test.' });
     };
