@@ -6,6 +6,9 @@ import { apiClient } from '../src/services/api-client';
 import { PlanMoment } from '../src/pages/Cockpit/PlanMoment';
 import { ResponseMoment } from '../src/pages/Responses/ResponseMoment';
 import { ReceiptMoment } from '../src/pages/Cockpit/ReceiptMoment';
+import { SettingsPage } from '../src/pages/Settings/SettingsPage';
+import { trelloConnectionNotice } from '../src/services/trello-connection';
+import { authStorage } from '../src/services/auth-storage';
 import type { ActivePlan, User } from '../src/types';
 
 describe('Task 10: Trello connection UI and chat moments', () => {
@@ -131,6 +134,71 @@ describe('Task 10: Trello connection UI and chat moments', () => {
       expect(screen.getByText('Bug Tracker')).toBeInTheDocument();
       expect(screen.getAllByText(/Bạn cần được thêm vào bảng/i).length).toBeGreaterThan(0);
     });
+
+    it('allows admin in needs_membership state to click #trello-edit-scope ("Đổi bảng") and save a new scope', async () => {
+      vi.spyOn(apiClient, 'getTrelloConnection').mockResolvedValue({
+        status: 'needs_membership',
+        username: 'charlie_trello',
+        workspaceName: 'Engineering Workspace',
+        boards: [
+          { boardId: 'b1', boardName: 'Sprint Board', member: false },
+          { boardId: 'b2', boardName: 'Bug Tracker', member: false },
+        ],
+      });
+      vi.spyOn(apiClient, 'getTrelloWorkspaces').mockResolvedValue({
+        workspaces: [{ id: 'ws-1', name: 'Engineering Workspace' }],
+      });
+      vi.spyOn(apiClient, 'getTrelloBoards').mockResolvedValue({
+        boards: [
+          { id: 'b1', name: 'Sprint Board', member: true },
+          { id: 'b2', name: 'Bug Tracker', member: true },
+        ],
+      });
+      const saveScopeSpy = vi.spyOn(apiClient, 'saveTrelloScope').mockResolvedValue({
+        chosenBy: 'u-admin',
+        workspaceId: 'ws-1',
+        workspaceName: 'Engineering Workspace',
+        boards: [{ boardId: 'b1', boardName: 'Sprint Board' }],
+      });
+
+      render(<TrelloConnection user={adminUser} refresh={vi.fn()} />);
+
+      expect(await screen.findByText(/charlie_trello/)).toBeInTheDocument();
+      const editScopeBtn = await screen.findByRole('button', { name: 'Đổi bảng' });
+      expect(editScopeBtn).toBeInTheDocument();
+      expect(editScopeBtn).toHaveAttribute('id', 'trello-edit-scope');
+
+      fireEvent.click(editScopeBtn);
+
+      const scopeArea = await screen.findByTestId('trello-scope');
+      expect(scopeArea).toBeInTheDocument();
+      expect(scopeArea).toHaveAttribute('id', 'trello-scope');
+
+      const b1Checkbox = await screen.findByRole('checkbox', { name: /Sprint Board/i });
+      fireEvent.click(b1Checkbox);
+
+      const saveBtn = screen.getByRole('button', { name: /Lưu/i });
+      expect(saveBtn).not.toBeDisabled();
+      fireEvent.click(saveBtn);
+
+      await waitFor(() => {
+        expect(saveScopeSpy).toHaveBeenCalledWith('ws-1', ['b1']);
+      });
+    });
+
+    it('displays trelloConnectionNotice when user opens settings after connecting', async () => {
+      vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+        if (url === '/api/services') return new Response(JSON.stringify({ services: [], canConfigure: false }));
+        throw new Error(`Unexpected endpoint: ${url}`);
+      }));
+      vi.spyOn(apiClient, 'getTrelloConnection').mockResolvedValue({ status: 'not_connected', boards: [] });
+      authStorage.setStoredTokens({ user: adminUser });
+      trelloConnectionNotice.set('alice_trello');
+
+      render(<SettingsPage user={adminUser} navigate={vi.fn()} onLogout={vi.fn()} />);
+
+      expect(await screen.findByText('Đã kết nối @alice_trello')).toBeInTheDocument();
+    });
   });
 
   describe('2. Chat refusal with Trello', () => {
@@ -164,6 +232,71 @@ describe('Task 10: Trello connection UI and chat moments', () => {
           returnTo: '/c/11111111-2222-3333-4444-555555555555',
         });
       });
+    });
+
+    it('calls startTrelloConnection with returnTo even when connectFromChat is false (Google flags off), and enables "Gửi lại yêu cầu" once trello personalStatus is connected', async () => {
+      const startSpy = vi.spyOn(apiClient, 'startTrelloConnection').mockResolvedValue({
+        url: 'https://auth.atlassian.com/authorize?state=xyz',
+      });
+      const assignMock = vi.fn();
+      vi.stubGlobal('location', { ...window.location, assign: assignMock, protocol: 'http:', hostname: 'localhost' });
+
+      const onResendSpy = vi.fn();
+
+      const { unmount } = render(
+        <ResponseMoment
+          request="Tạo thẻ mới trên Trello"
+          conversationId="11111111-2222-3333-4444-555555555555"
+          unavailableServices={[{ id: 'trello', name: 'Trello' }]}
+          reason="Trello cần được kết nối trước khi dùng."
+          services={[]}
+          connectFromChat={false}
+          navigate={vi.fn()}
+        />
+      );
+
+      const connectBtn = await screen.findByRole('link', { name: /Kết nối Trello/i });
+      expect(connectBtn).toBeInTheDocument();
+      expect(connectBtn).toHaveAttribute('id', 'trello-connect');
+
+      fireEvent.click(connectBtn);
+      await waitFor(() => {
+        expect(startSpy).toHaveBeenCalledWith({
+          returnTo: '/c/11111111-2222-3333-4444-555555555555',
+        });
+      });
+
+      unmount();
+
+      render(
+        <ResponseMoment
+          request="Tạo thẻ mới trên Trello"
+          conversationId="11111111-2222-3333-4444-555555555555"
+          unavailableServices={[{ id: 'trello', name: 'Trello' }]}
+          reason="Trello cần được kết nối trước khi dùng."
+          services={[
+            {
+              id: 'trello',
+              name: 'Trello',
+              configured: false,
+              connected: false,
+              tools: [],
+              personalStatus: 'connected',
+              username: 'alice_trello',
+            } as any,
+          ]}
+          connectFromChat={false}
+          navigate={vi.fn()}
+          onResend={onResendSpy}
+        />
+      );
+
+      expect(await screen.findByText(/Đã kết nối · @alice_trello/)).toBeInTheDocument();
+      const resendBtn = screen.getByRole('button', { name: 'Gửi lại yêu cầu' });
+      expect(resendBtn).toBeInTheDocument();
+
+      fireEvent.click(resendBtn);
+      expect(onResendSpy).toHaveBeenCalledWith('Tạo thẻ mới trên Trello');
     });
   });
 

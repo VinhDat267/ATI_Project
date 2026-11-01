@@ -92,7 +92,11 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
 }) {
   const refresh = useRef(onRefreshServices);
   refresh.current = onRefreshServices;
-  useEffect(() => { if (connectFromChat) refresh.current?.(); }, [message.id, connectFromChat]);
+  useEffect(() => {
+    if (connectFromChat || (message.metadata?.unavailableServices ?? []).some(row => row.id === 'trello')) {
+      refresh.current?.();
+    }
+  }, [message.id, connectFromChat]);
   const metadata = message.metadata;
   const legacy = message.content.replace(/^Từ chối yêu cầu:\s*/, '').split(/\nGợi ý:\s*/);
   const reason = metadata?.reason || legacy[0];
@@ -103,11 +107,15 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
   const rows = [...relevant, ...unavailable.filter(row => !relevant.some(service => service.id === row.id)).map(row => ({ ...row, connected: false, configured: false, connectionStatus: 'unconfigured' as const }))];
   // What the refusal named may be usable by now: Gmail/MyCalendar/MySheets once this person connected it, a shared service once configured.
   const current = (id: string) => services.find(service => service.id === id);
-  const usable = (id: string) => connectFromChat && (
-    id === 'gmail' || id === 'mycalendar' || id === 'mysheets' || id === 'trello'
-      ? current(id)?.personalStatus === 'connected'
-      : current(id)?.configured === true
-  );
+  const usable = (id: string) =>
+    id === 'trello'
+      ? current('trello')?.personalStatus === 'connected'
+      : Boolean(
+          connectFromChat &&
+            (id === 'gmail' || id === 'mycalendar' || id === 'mysheets'
+              ? current(id)?.personalStatus === 'connected'
+              : current(id)?.configured === true)
+        );
   const reconnect = connectFromChat && current('gmail')?.personalStatus === 'reconnect_required';
   const mycalStatus = current('mycalendar')?.personalStatus;
   const mysheetsStatus = current('mysheets')?.personalStatus;
@@ -250,9 +258,9 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
             href="/settings#trello"
             aria-disabled={starting || undefined}
             onClick={event => {
-              if (connectFromChat && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)) return;
+              if (back && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)) return;
               event.preventDefault();
-              if (connectFromChat && back) void connectTrello(back); else navigate('/settings#trello');
+              if (back) void connectTrello(back); else navigate('/settings#trello');
             }}
             className={`${primary} flex items-center gap-1.5`}
           >
