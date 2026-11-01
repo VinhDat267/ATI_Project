@@ -31,10 +31,7 @@ export function isServiceAccountService(definitionOrId: ServiceDefinition | stri
   }
   return (
     typeof definitionOrId === 'string' &&
-    (definitionOrId === 'calendar' ||
-      definitionOrId === 'sheets' ||
-      definitionOrId === 'google-calendar' ||
-      definitionOrId === 'google-sheets')
+    (definitionOrId === 'google-calendar' || definitionOrId === 'google-sheets')
   );
 }
 
