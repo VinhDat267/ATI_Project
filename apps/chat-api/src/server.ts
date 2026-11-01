@@ -9,6 +9,7 @@ import {
   StepRepo,
   CredentialRepo,
   UserRepo,
+  WorkspaceRepo,
 } from './db/repositories/index.js';
 import { DEMO_ADMIN_ID } from './routes/auth-routes.js';
 import { verifyPassword } from './db/repositories/user-repo.js';
@@ -59,6 +60,7 @@ async function bootstrap() {
   let planRepo: any = null;
   let stepRepo: any = null;
   let credRepo: any = null;
+  let workspaceRepo: any = null;
 
   try {
     const dbUrl = env.DATABASE_URL;
@@ -73,6 +75,7 @@ async function bootstrap() {
     planRepo = new PlanRepo(pool);
     stepRepo = new StepRepo(pool);
     credRepo = new CredentialRepo(pool, env.ENCRYPTION_KEY);
+    workspaceRepo = new WorkspaceRepo(pool);
 
     if (env.RUNTIME_MODE === 'live') {
       const seededAdmin = await userRepo.findByEmail('admin@wap.local');
@@ -419,6 +422,7 @@ async function bootstrap() {
     runtimeMode: env.RUNTIME_MODE,
     userRepo,
     adminUserRepo: pool && userRepo ? new AdminUserRepo(pool) : undefined,
+    workspaceRepo,
     signupEnabled: env.AUTH_SIGNUP_ENABLED,
     googleSignupEnabled: env.GOOGLE_SIGNUP_ENABLED,
     googleOAuth: env.GOOGLE_OAUTH,
