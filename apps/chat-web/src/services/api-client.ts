@@ -402,7 +402,7 @@ export class ApiClient {
     return this.request('/api/auth/logout-all', { method: 'POST' });
   }
 
-  async getRuntime(): Promise<{ runtimeMode: 'sandbox' | 'live'; gmailEnabled?: boolean; mycalendarEnabled?: boolean; mysheetsEnabled?: boolean; myslackEnabled?: boolean; schedulesEnabled?: boolean }> {
+  async getRuntime(): Promise<{ runtimeMode: 'sandbox' | 'live'; gmailEnabled?: boolean; mycalendarEnabled?: boolean; mysheetsEnabled?: boolean; myslackEnabled?: boolean;myslackWritesEnabled?:boolean; schedulesEnabled?: boolean }> {
     return this.request('/api/health');
   }
 
@@ -495,6 +495,11 @@ export class ApiClient {
   }
 
   // --- Plans ---
+  async sendSlackWriteMessage(convId:string,content:string,tempId:string,connectionId:string,channel:string):Promise<any>{
+    return this.request(`/api/conversations/${encodeURIComponent(convId)}/slack-write-plans`,{method:'POST',body:JSON.stringify({content,tempId,connectionId,channel})});
+  }
+  async reconcileSlackPost(planId:string,stepId:string):Promise<any>{return this.request(`/api/executions/${encodeURIComponent(planId)}/steps/${encodeURIComponent(stepId)}/slack-reconcile`,{method:'POST'});}
+
   async sendSlackReadMessage(convId: string, content: string, tempId: string, connectionId: string): Promise<any> {
     return this.request(`/api/conversations/${encodeURIComponent(convId)}/slack-read-plans`, {
       method: 'POST', body: JSON.stringify({ content, tempId, connectionId }),

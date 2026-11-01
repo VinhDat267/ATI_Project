@@ -86,6 +86,10 @@ export class StepRunner {
     const combinedSignal = combineSignals(timeoutSignal, options?.signal);
 
     try {
+      if(step.tool==='myslack.chat_postMessage'&&this.options.slackWrite){
+        const output=await this.options.slackWrite(structuredClone(step),combinedSignal);
+        return {stepId:step.id,status:'success',output,error:null,durationMs:Date.now()-startTime};
+      }
       if (step.tool.startsWith('myslack.')) {
         const output = await executeSlackRead({step,outputs:stepOutputs,snapshot:this.options.slackSnapshot,guard:this.options.slackDispatchGuard,getAdapter:this.options.getAdapter,signal:combinedSignal});
         return {stepId:step.id,status:'success',output,error:null,durationMs:Date.now()-startTime};

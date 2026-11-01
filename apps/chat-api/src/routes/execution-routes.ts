@@ -9,6 +9,12 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
   const router = Router();
   const { executionService } = options;
 
+  router.post('/executions/:planId/steps/:stepId/slack-reconcile',async(req:Request,res:Response)=>{
+    const userId=(req as any).user?.id;if(!userId){res.status(401).json({error:'Unauthorized'});return;}
+    try{res.json(await executionService.reconcileSlackPost(req.params.planId as string,req.params.stepId as string,userId));}
+    catch(e:any){res.status(e?.status??409).json({error:e?.status===404?'Plan not found':'SLACK_WRITE_UNKNOWN'});}
+  });
+
   router.post('/executions/:planId/continue', async (req: Request, res: Response): Promise<void> => {
     try {
       const userId = (req as any).user?.id;

@@ -190,6 +190,7 @@ export function createApp(options: AppOptions): Express {
       ...(mycalendarRoutes ? { mycalendarEnabled: isMyCalendarAvailable(mycalendarRoutes) } : {}),
       ...(mysheetsRoutes ? { mysheetsEnabled: isMySheetsAvailable(mysheetsRoutes) } : {}),
       ...(options.chatService?.hasSlackReads?.() ? { myslackEnabled: true } : {}),
+      ...(options.chatService?.hasSlackWrites?.() ? {myslackWritesEnabled:true}:{}),
       ...(options.schedules ? { schedulesEnabled: true } : {}) });
   });
 

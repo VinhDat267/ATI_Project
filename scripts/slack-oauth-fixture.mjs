@@ -2,8 +2,8 @@ import { createServer } from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 /** OAuth setup fixture only; never reads or writes real Slack. Codes and tokens are stateful. */
-export async function startSlackOAuthFixture({ redirectUri, readFixtures = false }) {
-  const worker = new Worker(new URL(import.meta.url), { workerData: { redirectUri, readFixtures } });
+export async function startSlackOAuthFixture({ redirectUri, readFixtures = false,writeFixtures=false }) {
+  const worker = new Worker(new URL(import.meta.url), { workerData: { redirectUri, readFixtures,writeFixtures } });
   const origin = await new Promise((resolve, reject) => {
     const timer = setTimeout(() => { void worker.terminate(); reject(new Error('Slack fixture readiness timeout')); }, 10000);
     worker.once('error', error => { clearTimeout(timer); reject(error); });
@@ -11,13 +11,13 @@ export async function startSlackOAuthFixture({ redirectUri, readFixtures = false
   });
   return { origin, stop: () => worker.terminate() };
 }
-async function serveSlackOAuthFixture({ redirectUri, readFixtures }) {
+async function serveSlackOAuthFixture({ redirectUri, readFixtures,writeFixtures }) {
   const codes = new Map(), tokens = new Map(); let installs = 0;
   const instanceId=randomBytes(6).toString('hex').toUpperCase();
-  let reads = 0;
+  let reads = 0,posts=0;const messages=new Map();
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, 'http://fixture');
-    if(readFixtures && url.pathname==='/__stats'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({reads}));return;}
+    if((readFixtures||writeFixtures) && url.pathname==='/__stats'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({reads,posts}));return;}
     if (url.pathname === '/authorize') {
       if (url.searchParams.get('client_id') !== 'slack-fixture-client' || url.searchParams.get('redirect_uri') !== redirectUri) { res.writeHead(400); res.end(); return; }
       const code = randomBytes(24).toString('base64url'), workspaceId = `T_FIXTURE_${instanceId}_${++installs}`;
@@ -40,6 +40,16 @@ async function serveSlackOAuthFixture({ redirectUri, readFixtures }) {
     if (!team) return reply({ ok: false, error: 'invalid_auth' });
     if (url.pathname === '/api/auth.test') return reply({ ok: true, team_id: team, user_id: 'U_FIXTURE' });
     if (url.pathname === '/api/auth.revoke') { tokens.delete(token); return reply({ ok: true, revoked: true }); }
+    if(writeFixtures && req.method==='POST'){
+      let json;try{json=JSON.parse(body);}catch{return reply({ok:false,error:'invalid_json'});}
+      if(url.pathname==='/api/conversations.info')return reply({ok:true,channel:{id:json.channel,is_member:json.channel==='C_FIXTURE',is_archived:false}});
+      if(url.pathname==='/api/chat.postMessage'){
+        posts++;const m={type:'message',user:'U_FIXTURE',text:json.text,client_msg_id:json.client_msg_id,ts:'1730000000.'+String(posts).padStart(6,'0')};const rows=messages.get(team)??[];rows.push(m);messages.set(team,rows);
+        if(json.text==='FIXTURE_UNKNOWN_M3'){req.socket.destroy();return;}
+        return reply({ok:true,channel:json.channel,ts:m.ts,message:m});
+      }
+      if(url.pathname==='/api/conversations.history')return reply({ok:true,messages:messages.get(team)??[],has_more:false,response_metadata:{next_cursor:''}});
+    }
     if(readFixtures && req.method==='GET'){
       const channel={id:'C_FIXTURE',name:'ati-test',is_channel:true,is_private:false};
       const message={type:'message',ts:'1730000000.000001',user:'U_FIXTURE',text:'Nội dung Slack fixture M2 · '+team};

@@ -34,6 +34,7 @@ import { SlackIngressService } from './services/slack/slack-ingress-service.js';
 import { slackIngressEnv } from './config/slack-ingress-env.js';
 import { createSlackLifecycleRuntime } from './services/slack/slack-lifecycle-runtime.js';
 import { createSlackFanoutRuntime } from './services/slack/slack-fanout-runtime.js';
+import {createPersonalSlackWriteRuntime} from './config/slack-write-runtime.js';
 import { createPersonalSlackReadRuntime } from './config/slack-read-runtime.js';
 import { GmailOAuthClient } from './services/gmail/oauth-client.js';
 import { GmailTokenManager } from './services/gmail/token-manager.js';
@@ -293,7 +294,9 @@ async function bootstrap() {
   };
 
   const personalSlackReads=createPersonalSlackReadRuntime({pool:pool??undefined,oauth:env.MYSLACK_OAUTH,encryptionKey:env.ENCRYPTION_KEY,plans:planRepo,steps:stepRepo,provider,env:process.env});
+  const personalSlackWrites=createPersonalSlackWriteRuntime({pool:pool??undefined,oauth:env.MYSLACK_OAUTH,encryptionKey:env.ENCRYPTION_KEY,plans:planRepo,env:process.env});
   const chatService = new ChatService({
+    slackWrites:personalSlackWrites,
     slackReads:personalSlackReads?.proposals,
     msgRepo,
     convRepo,
@@ -355,6 +358,7 @@ async function bootstrap() {
   // 6. ExecutionService
   const executionService = new ExecutionService({
     slackRead:personalSlackReads?.execution,
+    slackWrite:personalSlackWrites,
     planRepo,
     stepRepo,
     convRepo,

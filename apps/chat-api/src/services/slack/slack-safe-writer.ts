@@ -22,7 +22,7 @@ export class SlackSafeWriter {
  }
  private result(row:any,ts=row.provider_ts){return {operationId:row.operation_id,status:'confirmed' as const,channel:row.channel_id,ts};}
  private async ready(c:pg.PoolClient,i:SlackWriteInput,readOnly=false){
-  try{await this.repo.transaction(c,async()=>{await this.repo.authority(c,i,readOnly);await this.options.authorize(i,c);i.signal?.throwIfAborted();});}
+  try{await this.repo.transaction(c,async()=>{await this.options.authorize(i,c);await this.repo.authority(c,i,readOnly);i.signal?.throwIfAborted();});}
   catch{throw slackWriteDenied();}
  }
  private async access(i:SlackWriteInput){try{return await this.options.tokens.getAccessToken(i.binding.atiUserId,i.binding.connectionId,i.binding.identityVersion);}catch{throw slackWriteDenied();}}
@@ -44,8 +44,8 @@ export class SlackSafeWriter {
    await this.ready(c,i);let row=await this.repo.lookup(c,i);
    if(row&&row.status!=='prepared'){onDispatch();if(row.status==='confirmed')return this.result(row);throw slackWriteUnknown();}
    await this.membership(c,i,token);
-   row=await this.repo.transaction(c,async()=>{await this.repo.authority(c,i);await this.options.authorize(i,c);return this.repo.prepare(c,i);});
-   row=await this.repo.transaction(c,async()=>{await this.repo.authority(c,i);await this.options.authorize(i,c);i.signal?.throwIfAborted();const attempt=await this.repo.dispatch(c,row);
+   row=await this.repo.transaction(c,async()=>{await this.options.authorize(i,c);await this.repo.authority(c,i);return this.repo.prepare(c,i);});
+   row=await this.repo.transaction(c,async()=>{await this.options.authorize(i,c);await this.repo.authority(c,i);i.signal?.throwIfAborted();const attempt=await this.repo.dispatch(c,row);
     // Mark before COMMIT: a lost COMMIT acknowledgement is also ambiguous.
     onDispatch();return attempt;});
    try{

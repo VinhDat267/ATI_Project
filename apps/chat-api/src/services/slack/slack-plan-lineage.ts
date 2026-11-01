@@ -3,7 +3,7 @@ import type { DerivedSegmentInput,SlackDerivedLineageRepo } from '../../db/repos
 import { hasSlackMarker } from './slack-message-selectors.js';
 import { JSON_TOMBSTONE,PLAN_TOMBSTONE,PLAN_TOMBSTONE_TEXT,redactPlanRow } from './slack-artifact-targets.js';
 import { planOriginAllowed } from './slack-plan-origin.js';
-import { isBoundSlackReadPlan } from './slack-read-plan.js';
+import {isBoundSlackManualPlan} from './slack-write-plan.js';
 
 export interface SlackPlanWriteContext {segments:DerivedSegmentInput[];selectors?:string[]}
 const sourceBound=Symbol('server source-bound plan/step');
@@ -21,7 +21,7 @@ export async function guardPlanInTransaction(client:pg.PoolClient,registry:Slack
     (target_kind IN ('plan_step_arg','audit_log_entry') AND target_id IN(SELECT id::text FROM execution_steps WHERE plan_id=$1::uuid))
     ORDER BY id`,[id])).rows;
   const planCopies=copies.filter(c=>c.target_id===id&&c.target_kind==='plan_step_arg'&&c.target_sub_id!=='args_json');
-  const source=first.slack_lineage_manifest!=null||copies.length>0||(!isBoundSlackReadPlan(first.plan_json,first.user_id)&&hasSlackMarker(first.plan_json))||hasSlackMarker(first.resource_labels);
+  const source=first.slack_lineage_manifest!=null||copies.length>0||(!isBoundSlackManualPlan(first.plan_json,first.user_id)&&hasSlackMarker(first.plan_json))||hasSlackMarker(first.resource_labels);
   if(!source){
     const owner=first.user_id as string;
     const certified=await planOriginAllowed(client,'plans',first,owner);

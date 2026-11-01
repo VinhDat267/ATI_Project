@@ -129,7 +129,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
     finally { newConversation.current = null; }
   };
 
-  const handleSendMessage = async (content: string, options?: { slackConnectionId: string }) => {
+  const handleSendMessage = async (content: string, options?: { slackConnectionId: string;slackChannel?:string }) => {
     const tempId = `temp-${crypto.randomUUID()}`;
     const pendingConversation = newConversation.current;
     let currentConvId = route.kind === 'conversation' ? route.conversationId : null;
@@ -167,7 +167,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
     if (useChatStore.getState().conversationId === currentConvId) addOptimisticMessage({ id: tempId, content });
 
     try {
-      const result = options?.slackConnectionId ? await apiClient.sendSlackReadMessage(currentConvId, content, tempId, options.slackConnectionId) : await apiClient.sendMessage(
+      const result = options?.slackChannel ? await apiClient.sendSlackWriteMessage(currentConvId,content,tempId,options.slackConnectionId,options.slackChannel) : options?.slackConnectionId ? await apiClient.sendSlackReadMessage(currentConvId, content, tempId, options.slackConnectionId) : await apiClient.sendMessage(
         currentConvId,
         content,
         tempId
@@ -255,7 +255,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
             onSendMessage={handleSendMessage} onNewConversation={handleNewConversation}
             onSelectConversation={id => navigate(conversationPath(id))} onSettings={() => navigate('/settings')}
             onApprove={handleApprovePlan} onCancel={handleRejectPlan}
-            recovery={{busy:recoveryBusy,error:recoveryError,onRetry:handleRetry,onSkip:handleSkip,onStop:handleStop,onContinue:()=>recover('continue'),onEdit:handleEditRecovery}} />
+            recovery={{busy:recoveryBusy,error:recoveryError,onRetry:handleRetry,onSkip:handleSkip,onStop:handleStop,onContinue:()=>recover('continue'),onSlackReconcile:(stepId)=>recover('slack-reconcile',stepId),onEdit:handleEditRecovery}} />
         </div>
       </div>
     </div>

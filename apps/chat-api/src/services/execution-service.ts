@@ -8,6 +8,8 @@ import { isDeepStrictEqual } from 'node:util';
 import { readableRecoveryPlan, recoveryConflict, restoredProgress, validateRecoveryAction, verifiedRecoveryPlan, verifiedRecoverySteps } from './execution-recovery.js';
 import type { AdapterContext } from './adapter-factory.js';
 import { isSlackSourceArtifact } from './slack/slack-plan-lineage.js';
+import type {SlackWriteRuntime} from './slack/slack-write-runtime.js';
+import {isBoundSlackWritePlan} from './slack/slack-write-plan.js';
 import type { SlackReadRuntime } from './slack/slack-read-runtime.js';
 import type { SlackExecutionSnapshot } from '@wap/executor';
 
@@ -20,6 +22,7 @@ export interface ApproveResult {
 
 export interface ExecutionServiceOptions {
   slackRead?: SlackReadRuntime;
+  slackWrite?: SlackWriteRuntime;
   planRepo: PlanRepo;
   stepRepo?: StepRepo;
   convRepo?: {
@@ -47,9 +50,10 @@ export class ExecutionService {
   private executionOutcomes = new Map<string, { status: string; pausedStepId?: string }>();
   private sourceSnapshots = new Map<string,{hash:string;userId:string}>();
   private slackRead?: SlackReadRuntime;
+  private slackWrite?: SlackWriteRuntime;
 
   constructor(options: ExecutionServiceOptions) {
-    this.slackRead=options.slackRead;
+    this.slackRead=options.slackRead;this.slackWrite=options.slackWrite;
     this.planRepo = options.planRepo;
     this.stepRepo = options.stepRepo;
     this.convRepo = options.convRepo;
@@ -140,8 +144,9 @@ export class ExecutionService {
     // Everything that can fail is done before the approval CAS commits.
     const context = this.executionContext(userId, planJson?.connections);
     if(planJson?.connections?.myslack){
-      if(!this.slackRead||!this.stepRepo)return {success:false,status:409,error:'SLACK_READ_UNAVAILABLE'};
-      try{await this.slackRead.assertApproval({planId,planHash:planRow.plan_hash,userId,steps:planJson.steps,bindings:planJson.connections.myslack});}
+      const runtime=isBoundSlackWritePlan(planJson,userId)?this.slackWrite:this.slackRead;
+      if(!runtime||!this.stepRepo)return {success:false,status:409,error:'SLACK_READ_UNAVAILABLE'};
+      try{await runtime.assertApproval({planId,planHash:planRow.plan_hash,userId,steps:planJson.steps,bindings:planJson.connections.myslack});}
       catch{return {success:false,status:409,error:'SLACK_READ_POLICY_DENIED'};}
     }
 
@@ -186,11 +191,13 @@ export class ExecutionService {
   }
 
   private buildController(convId: string, planId: string, steps: PlanStep[], dbIds: Map<string, string>, context: AdapterContext, initialStates?: Record<string, StepState>, dispatch?: {userId: string; planHash: string}) {
-    const slackSnapshot:SlackExecutionSnapshot|undefined=context.connections?.myslack&&dispatch?{planId,planHash:dispatch.planHash,userId:dispatch.userId,steps,bindings:context.connections.myslack,
+    const writePlan=dispatch&&isBoundSlackWritePlan({kind:'plan',thinking:'',summary:'',warnings:[],steps,connections:context.connections},dispatch.userId);
+    const writeSnapshot:SlackExecutionSnapshot|undefined=writePlan&&dispatch?{planId,planHash:dispatch.planHash,userId:dispatch.userId,steps,bindings:context.connections!.myslack!}:undefined;
+    const slackSnapshot:SlackExecutionSnapshot|undefined=!writePlan&&context.connections?.myslack&&dispatch?{planId,planHash:dispatch.planHash,userId:dispatch.userId,steps,bindings:context.connections.myslack,
       outputOrigins:Object.fromEntries(Object.entries(initialStates??{}).filter(([,s])=>s.status==='succeeded').map(([id])=>[id,'persisted' as const]))}:undefined;
     return new ExecutionController({
       // The executor keeps its interface; who runs and which connection was previewed travel in this closure.
-      runner: {executeStep:async(step:PlanStep,outputs:StepOutputs,runOptions?:ExecuteStepOptions)=>new StepRunner({ slackSnapshot,slackDispatchGuard:slackSnapshot&&this.slackRead?this.slackRead.guard(slackSnapshot):undefined,getAdapter: async serviceName => {
+      runner: {executeStep:async(step:PlanStep,outputs:StepOutputs,runOptions?:ExecuteStepOptions)=>new StepRunner({ slackWrite:writeSnapshot&&this.slackWrite?(step,signal)=>this.slackWrite!.execute(writeSnapshot,step,signal):undefined,slackSnapshot,slackDispatchGuard:slackSnapshot&&this.slackRead?this.slackRead.guard(slackSnapshot):undefined,getAdapter: async serviceName => {
         if(serviceName==='myslack'){
           if(!this.slackRead||!slackSnapshot)throw new Error('SLACK_READ_UNAVAILABLE');
           return this.slackRead.adapter(slackSnapshot.userId);
@@ -289,6 +296,7 @@ export class ExecutionService {
 
   async continueExecution(planId: string, userId: string): Promise<any> {
     const plan = await this.getOwnedPlan(planId, userId);
+    if(isBoundSlackWritePlan(plan.plan_json,userId))throw recoveryConflict('SLACK_POST_RECONCILE_REQUIRED');
     if (this.activeRuns.has(planId) || this.activeControllers.get(planId)?.isExecuting()) {
       throw recoveryConflict('Execution is already running');
     }
@@ -380,6 +388,7 @@ export class ExecutionService {
 
   async stop(planId: string, userId: string): Promise<any> {
     const planRow = await this.getOwnedPlan(planId, userId);
+    if(isBoundSlackWritePlan(planRow.plan_json,userId))throw recoveryConflict('SLACK_POST_RECONCILE_REQUIRED');
     const status = this.executionOutcomes.get(planId)?.status || planRow.status;
     if (['completed', 'stopped', 'failed', 'pending', 'rejected', 'superseded', 'expired'].includes(status)) {
       throw Object.assign(new Error('Cannot stop a terminal execution'), { status: 409 });
@@ -456,6 +465,17 @@ export class ExecutionService {
     return { status: 'executing' };
   }
 
+  async reconcileSlackPost(planId:string,stepId:string,userId:string){
+    const plan=await this.getOwnedPlan(planId,userId);
+    if(!this.slackWrite||!this.stepRepo||!isBoundSlackWritePlan(plan.plan_json,userId)||this.activeRuns.has(planId)||this.activeControllers.get(planId)?.isExecuting())throw recoveryConflict('SLACK_POST_RECONCILE_UNAVAILABLE');
+    const rows=await this.stepRepo.listSteps(planId),row=rows.find(r=>r.step_id===stepId);
+    if(rows.length!==1||!row||row.status!=='unknown')throw recoveryConflict('SLACK_POST_RECONCILE_UNAVAILABLE');
+    let output;try{output=await this.slackWrite.reconcile({planId,planHash:plan.plan_hash,userId,steps:plan.plan_json.steps,bindings:plan.plan_json.connections.myslack},stepId);}catch{throw recoveryConflict('SLACK_WRITE_UNKNOWN');}
+    try{await this.stepRepo.completeSlackPostReconciliation(planId,stepId,userId,plan.plan_hash,output);}catch{throw recoveryConflict('SLACK_WRITE_UNKNOWN');}
+    this.activeControllers.delete(planId);this.executionOutcomes.set(planId,{status:'completed'});
+    this.emitExecution(plan.conv_id,'exec_done',{planId,status:'completed'});return {status:'completed',output};
+  }
+
   async getLatestExecutionSnapshot(convId: string, userId: string) {
     const conversation = await this.convRepo?.getConversation(convId);
     if (!conversation) throw Object.assign(new Error('Conversation not found'), { status: 404 });
@@ -483,6 +503,7 @@ export class ExecutionService {
         }
       } catch { /* Invalid or unstarted progress can still be stopped. */ }
     }
+    if(isBoundSlackWritePlan(parsed,userId)&&rows.some(r=>r.status==='unknown'))recoveryActions=this.slackWrite?['slack-reconcile','stop']:['stop'];
     return {
       plan: { ...parsed, id: plan.id, convId: plan.conv_id, status: plan.status, resourceLabels: plan.resource_labels ?? {} },
       execution,

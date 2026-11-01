@@ -13,6 +13,7 @@ export const serviceId=(tool:string)=>toolDefinition(tool)?.service ?? tool.spli
 export const serviceName=(id:string,services:ServiceInfo[])=>services.find(service=>service.id===id)?.name ?? getServiceDefinition(id)?.name ?? (id==='myslack' ? 'Slack của bạn' : id);
 export function servicePalette(id:string) { const palette=palettes[id] ?? {icon:'bg-neutral-100 border-neutral-200',name:'text-neutral-800'}; return {...palette,badge:palette.badge ?? `${palette.icon.split(' ').filter(cls=>cls.startsWith('bg-')).join(' ')} ${palette.name}`,receiptHover:palette.receiptHover ?? 'hover:border-neutral-300'}; }
 export function operation(tool:string):Operation {
+  if(tool==='myslack.chat_postMessage')return {action:'Gửi tin',done:'Đã gửi',receipt:'Đã gửi trên Slack',kind:'Tin nhắn',link:'Mở Slack'};
   if(operations[tool]) return operations[tool];
   const verb=tool.split('.')[1] ?? '';
   const action=toolDefinition(tool)?.sideEffect==='read' ? 'Đọc' : /^create/.test(verb) ? 'Tạo mới' : /^(send|post)/.test(verb) ? 'Gửi tin' : 'Cập nhật';

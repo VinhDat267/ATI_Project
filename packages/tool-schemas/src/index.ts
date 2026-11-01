@@ -27,6 +27,7 @@ export * from './myslack-connection.js';
 export * from './myslack-source.js';
 export * from './myslack-tools.js';
 export * from './myslack-plan-bindings.js';
+export * from './myslack-post-plan.js';
 export * from './registry/index.js';
 export * from './registry/gmail.js';
 export * from './registry/mycalendar.js';
