@@ -32,7 +32,7 @@ it('real planner lookups -> SSE -> PostgreSQL -> new repositories/HTTP reload pr
   const provider = new MockLLMProvider(); provider.setPlanResponses([plan]);
   const planner = new AIPlanner({ provider, toolCatalog: TRELLO_TOOLS, gatherSearch: async ({ tool }) => tool === 'trello.search_boards' ? [{ id: 'B1', name: 'Frontend' }] : [{ id: 'L1', name: 'Cần làm', boardId: 'B1' }] });
   const events = new EventEmitter(); events.on('error', () => {});
-  const bound = { ...plan, connections: { trello: { credentialId: 'cred-trello', memberId: 'member-1', username: 'owner', boardIds: ['B1'] } } };
+  const bound = { ...plan, steps: [{ ...plan.steps[0], boardId: 'B1' }], connections: { trello: { credentialId: 'cred-trello', memberId: 'member-1', username: 'owner', boardIds: ['B1'] } } };
   const chat = new ChatService({
     convRepo, msgRepo, planRepo: plans, planner, eventEmitter: { emit: (event, data) => events.emit(event, data) },
     trelloConnection: async () => ({
