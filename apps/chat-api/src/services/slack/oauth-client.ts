@@ -47,8 +47,17 @@ export class SlackIdentityClient {
     if (data.team_id !== workspaceId || data.user_id !== actorId || data.bot_id) throw new SlackProviderError(true, 'identity_mismatch');
   }
 }
-export class SlackOAuthClient extends SlackIdentityClient {
-  constructor(readonly config: SlackOAuthConfig, fetchFn: typeof fetch = fetch) { super(config.apiBaseUrl, fetchFn); }
+/** Retained private rotation transport; independent of OAuth-start/content flags. */
+export class SlackRefreshClient extends SlackIdentityClient {
+  constructor(apiBaseUrl:string,private readonly clientId:string,private readonly clientSecret:string,fetchFn:typeof fetch=fetch) {super(apiBaseUrl,fetchFn);}
+  async refresh(refreshToken: string, signal: AbortSignal): Promise<{ accessToken: string; refreshToken: string; expiresIn: number }> {
+    const data = await this.call('oauth.v2.access', new URLSearchParams({ client_id: this.clientId, client_secret: this.clientSecret, grant_type: 'refresh_token', refresh_token: refreshToken }), signal);
+    if (data.token_type !== 'user' || !text(data.access_token) || !text(data.refresh_token) || !Number.isSafeInteger(data.expires_in) || data.expires_in <= 0) throw new Error('SLACK_ROTATION_INVALID');
+    return { accessToken: data.access_token, refreshToken: data.refresh_token, expiresIn: data.expires_in };
+  }
+}
+export class SlackOAuthClient extends SlackRefreshClient {
+  constructor(readonly config: SlackOAuthConfig, fetchFn: typeof fetch = fetch) { super(config.apiBaseUrl,config.clientId,config.clientSecret,fetchFn); }
   authorizationUrl(state: string, team?: string): string {
     const url = new URL(this.config.authorizationUrl);
     const params: Record<string, string> = {
@@ -75,11 +84,6 @@ export class SlackOAuthClient extends SlackIdentityClient {
     return { appId: data.app_id, workspaceId: data.team.id, workspaceName: text(data.team.name) ? data.team.name : data.team.id,
       actorId: user.id, accessToken: user.access_token, ...(rotating ? { refreshToken: user.refresh_token, expiresIn: user.expires_in } : {}),
       scopes, missingScopes: SLACK_USER_SCOPES.filter(s => !scopes.includes(s)) };
-  }
-  async refresh(refreshToken: string, signal: AbortSignal): Promise<{ accessToken: string; refreshToken: string; expiresIn: number }> {
-    const data = await this.call('oauth.v2.access', new URLSearchParams({ client_id: this.config.clientId, client_secret: this.config.clientSecret, grant_type: 'refresh_token', refresh_token: refreshToken }), signal);
-    if (data.token_type !== 'user' || !text(data.access_token) || !text(data.refresh_token) || !Number.isSafeInteger(data.expires_in) || data.expires_in <= 0) throw new Error('SLACK_ROTATION_INVALID');
-    return { accessToken: data.access_token, refreshToken: data.refresh_token, expiresIn: data.expires_in };
   }
   async revoke(accessToken: string, signal: AbortSignal): Promise<void> {
     const data = await this.call('auth.revoke', new URLSearchParams(), signal, accessToken);
