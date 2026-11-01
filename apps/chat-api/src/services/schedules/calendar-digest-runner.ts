@@ -180,8 +180,10 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
     const destService = config.destination.service;
     const destRow = (
       await options.pool.query(
-        'SELECT config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL LIMIT 1',
-        [destService],
+        destService === 'telegram'
+          ? 'SELECT config, status FROM service_credentials WHERE service = $1 AND (user_id = $2 OR user_id IS NULL) ORDER BY user_id IS NULL ASC LIMIT 1'
+          : 'SELECT config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL LIMIT 1',
+        destService === 'telegram' ? [destService, run.userId] : [destService],
       )
     ).rows[0];
 

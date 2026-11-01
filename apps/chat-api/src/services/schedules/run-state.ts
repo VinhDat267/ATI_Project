@@ -1,4 +1,4 @@
-import type { CalendarDigestDelivery, GithubDigestDelivery, ScheduleRunState, ScheduleRunView, SheetsDigestDelivery } from '@wap/tool-schemas';
+import type { CalendarDigestDelivery, GithubDigestDelivery, ScheduleRunState, ScheduleRunView, SheetsDigestDelivery, TelegramDigestDelivery } from '@wap/tool-schemas';
 
 /** A schedule_runs row joined with the latest plan of its conversation (see RUN_SELECT). */
 export interface RunRow {
@@ -12,7 +12,7 @@ export interface RunRow {
   conv_id: string | null;
   plan_id: string | null;
   error: string | null;
-  delivery?: SheetsDigestDelivery | CalendarDigestDelivery | GithubDigestDelivery | null;
+  delivery?: SheetsDigestDelivery | CalendarDigestDelivery | GithubDigestDelivery | TelegramDigestDelivery | null;
   created_at: Date | string;
   latest_plan_id?: string | null;
   plan_status?: string | null;
@@ -49,8 +49,5 @@ export function runView(row: RunRow, now: Date): ScheduleRunView {
     planStatus: row.plan_status ?? null, error: row.error,
     delivery: row.delivery ?? null,
   };
-  if (row.delivery != null) {
-    view.delivery = row.delivery;
-  }
   return view;
 }

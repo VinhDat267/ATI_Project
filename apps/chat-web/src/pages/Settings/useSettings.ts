@@ -29,6 +29,7 @@ export function useSettings(user: User | null) {
     .filter(
       s =>
         !PERSONAL_OAUTH_SERVICE_IDS.has(s.id) &&
+        !(s.id === 'telegram' && Array.isArray(s.credentialFields) && s.credentialFields.length === 0) &&
         (s.connection !== 'personal' || (Array.isArray(s.credentialFields) && s.credentialFields.length > 0))
     )
     .map(serviceView);

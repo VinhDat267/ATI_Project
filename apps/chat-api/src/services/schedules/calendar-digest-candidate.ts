@@ -151,8 +151,10 @@ export async function evaluateCalendarDigestCandidate(
   // 2. Check destination service (slack or telegram)
   const destRow = (
     await pool.query(
-      'SELECT config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL LIMIT 1',
-      [destService],
+      destService === 'telegram'
+        ? 'SELECT config, status FROM service_credentials WHERE service = $1 AND (user_id = $2 OR user_id IS NULL) ORDER BY user_id IS NULL ASC LIMIT 1'
+        : 'SELECT config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL LIMIT 1',
+      destService === 'telegram' ? [destService, userId] : [destService],
     )
   ).rows[0];
 

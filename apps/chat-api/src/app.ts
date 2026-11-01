@@ -25,15 +25,17 @@ import type { ExecutionService } from './services/execution-service.js';
 import { userFacingError } from './services/user-facing-error.js';
 import type { EmailSender } from './services/email/index.js';
 import type { GoogleOAuthConfig } from './auth/google-oidc.js';
-import type { GmailOAuthConfig, GitHubOAuthConfig, TrelloOAuthConfig } from './config/env.js';
+import type { GmailOAuthConfig, GitHubOAuthConfig, TelegramBotConfig, TrelloOAuthConfig } from './config/env.js';
 import type { GmailConnectionRepo } from './db/repositories/gmail-connection-repo.js';
 import { TrelloTeamRepo } from './db/repositories/trello-team-repo.js';
 import { GitHubTeamRepo } from './db/repositories/github-team-repo.js';
+import { TelegramTeamRepo } from './db/repositories/telegram-team-repo.js';
 import { createGmailConnectionRoutes, isGmailAvailable } from './routes/connections/gmail.js';
 import { createMyCalendarConnectionRoutes, isMyCalendarAvailable } from './routes/connections/mycalendar.js';
 import { createMySheetsConnectionRoutes, isMySheetsAvailable } from './routes/connections/mysheets.js';
 import { createTrelloConnectionRoutes, isTrelloConnectAvailable, type TrelloConnectionsOptions } from './routes/connections/trello.js';
 import { createGitHubConnectionRoutes, type GitHubConnectionsOptions } from './routes/connections/github.js';
+import { createTelegramConnectionRoutes, type TelegramConnectionsOptions } from './routes/connections/telegram.js';
 import type { GlobalRateLimiter } from '@wap/tool-adapters';
 import type { GoogleAuthRepo } from './db/repositories/google-auth-repo.js';
 import type { GmailTokenManager } from './services/gmail/token-manager.js';
@@ -97,6 +99,15 @@ export interface GitHubAppOptions {
   teamRepo?: GitHubTeamRepo;
 }
 
+/** Telegram as each member's own 1-click connection and selected chats/groups. */
+export interface TelegramAppOptions {
+  bot?: TelegramBotConfig;
+  fetchFn?: typeof fetch;
+  telegramTimeoutMs?: number;
+  onConnectionChanged?: (userId: string) => void;
+  teamRepo?: TelegramTeamRepo;
+}
+
 export interface AppOptions extends AdminUsersOptions {
   jwtSecret: string;
   runtimeMode?: 'sandbox' | 'live';
@@ -134,6 +145,8 @@ export interface AppOptions extends AdminUsersOptions {
   github?: GitHubAppOptions;
   githubTokens?: Pick<GitHubTokenManager, 'forConnection'>;
   githubTeamRepo?: GitHubTeamRepo;
+  telegram?: TelegramAppOptions;
+  telegramTeamRepo?: TelegramTeamRepo;
   /** Scheduled workflows; present only when SCHEDULES_ENABLED is on and PostgreSQL is available. */
   schedules?: ScheduleRoutesOptions;
 }
@@ -190,6 +203,15 @@ export function createApp(options: AppOptions): Express {
     conversationOwner: options.convRepo ? async (id: string) => (await options.convRepo!.getConversation(id))?.user_id ?? null : undefined,
     tokens: githubTokens, adminUserIds: options.serviceAdminUserIds,
   };
+  const telegramTeamRepo = options.telegramTeamRepo ?? options.telegram?.teamRepo ?? (options.credentialRepo ? new TelegramTeamRepo((options.credentialRepo as any).pool) : undefined);
+  const telegramRoutes: TelegramConnectionsOptions = {
+    jwtSecret: options.jwtSecret, sessionRepo, states, credentialRepo: options.credentialRepo,
+    teamRepo: telegramTeamRepo, bot: options.telegram?.bot, encryptionKey: options.encryptionKey, fetchFn: options.telegram?.fetchFn,
+    clock: options.authClock, telegramTimeoutMs: options.telegram?.telegramTimeoutMs,
+    onConnectionChanged: options.telegram?.onConnectionChanged,
+    conversationOwner: options.convRepo ? async (id: string) => (await options.convRepo!.getConversation(id))?.user_id ?? null : undefined,
+    adminUserIds: options.serviceAdminUserIds,
+  };
 
   app.use(express.json());
   app.use((_req, res, next) => {
@@ -206,8 +228,8 @@ export function createApp(options: AppOptions): Express {
 
   // CORS middleware
   app.use((req, res, next) => {
-    if (req.path.startsWith('/api/auth/google/') || (gmailRoutes && req.path.startsWith('/api/connections/gmail')) || (mycalendarRoutes && req.path.startsWith('/api/connections/mycalendar')) || (mysheetsRoutes && req.path.startsWith('/api/connections/mysheets')) || req.path.startsWith('/api/connections/trello') || req.path.startsWith('/api/connections/github')) {
-      const origins = [options.appBaseUrl, options.googleOAuth?.redirectUri, options.gmail?.oauth?.redirectUri, options.mycalendar?.oauth?.redirectUri, options.mysheets?.oauth?.redirectUri, options.trello?.oauth?.redirectUri, options.github?.oauth?.redirectUri].filter(Boolean).map(url => new URL(url!).origin);
+    if (req.path.startsWith('/api/auth/google/') || (gmailRoutes && req.path.startsWith('/api/connections/gmail')) || (mycalendarRoutes && req.path.startsWith('/api/connections/mycalendar')) || (mysheetsRoutes && req.path.startsWith('/api/connections/mysheets')) || req.path.startsWith('/api/connections/trello') || req.path.startsWith('/api/connections/github') || req.path.startsWith('/api/connections/telegram')) {
+      const origins = [options.appBaseUrl, options.googleOAuth?.redirectUri, options.gmail?.oauth?.redirectUri, options.mycalendar?.oauth?.redirectUri, options.mysheets?.oauth?.redirectUri, options.trello?.oauth?.redirectUri, options.github?.oauth?.redirectUri, options.telegram?.bot?.callbackUrl].filter(Boolean).map(url => new URL(url!).origin);
       const origin = req.get('Origin');
       res.vary('Origin');
       if (origin && origins.includes(origin)) {
@@ -284,6 +306,7 @@ export function createApp(options: AppOptions): Express {
   if (mysheetsRoutes) app.use('/api/connections/mysheets', createMySheetsConnectionRoutes(mysheetsRoutes));
   app.use('/api/connections/trello', createTrelloConnectionRoutes(trelloRoutes));
   app.use('/api/connections/github', createGitHubConnectionRoutes(githubRoutes));
+  app.use('/api/connections/telegram', createTelegramConnectionRoutes(telegramRoutes));
 
   // Only schedule paths pass through this auth check, so other /api requests are not checked twice.
   if (options.schedules) app.use('/api', (req, res, next) => isSchedulePath(req.path) ? withAuthAndWorkspace(req, res, next) : next(),

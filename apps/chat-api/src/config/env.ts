@@ -67,6 +67,18 @@ export const GITHUB_ENDPOINTS = {
 export const GITHUB_OAUTH_DEFAULT_SCOPE = 'repo read:user';
 const GITHUB_ENDPOINT_OVERRIDES = { authorizationUrl: 'GITHUB_OAUTH_AUTH_URL', tokenUrl: 'GITHUB_OAUTH_TOKEN_URL', apiBaseUrl: 'GITHUB_API_BASE_URL' } as const;
 
+export interface TelegramBotConfig {
+  botToken: string;
+  botUsername: string;
+  callbackUrl: string;
+  apiBaseUrl: string;
+  deepLinkBaseUrl: string;
+}
+export const TELEGRAM_ENDPOINTS = {
+  apiBaseUrl: 'https://api.telegram.org',
+  deepLinkBaseUrl: 'https://t.me',
+};
+
 export interface EnvConfig {
   DATABASE_URL: string;
   JWT_SECRET: string;
@@ -99,6 +111,7 @@ export interface EnvConfig {
   MYSHEETS_PICKER?: { apiKey: string; appId: string };
   TRELLO_OAUTH?: TrelloOAuthConfig;
   GITHUB_OAUTH?: GitHubOAuthConfig;
+  TELEGRAM_BOT?: TelegramBotConfig;
   /** The SCHEDULES_ENABLED flag (default off). Schedules also need PostgreSQL. */
   SCHEDULES_ENABLED: boolean;
   /** False only in live without SMTP: signup and every email route answer 503 (AUTH-02b). Sandbox uses the outbox. */
@@ -237,6 +250,7 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
   const SCHEDULES_ENABLED = env.SCHEDULES_ENABLED === 'on';
   const TRELLO_OAUTH = trelloOAuth(env, isLive);
   const GITHUB_OAUTH = githubOAuth(env, isLive);
+  const TELEGRAM_BOT = telegramBotConfig(env, isLive);
 
   return {
     DATABASE_URL,
@@ -261,6 +275,7 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
     MYSHEETS_PICKER,
     TRELLO_OAUTH,
     GITHUB_OAUTH,
+    TELEGRAM_BOT,
     SCHEDULES_ENABLED,
     EMAIL_ENABLED,
     APP_BASE_URL,
@@ -545,5 +560,76 @@ function githubOAuth(env: Record<string, string | undefined>, isLive: boolean): 
     redirectUri,
     ...endpoints,
     scope,
+  };
+}
+
+function telegramBotConfig(env: Record<string, string | undefined>, isLive: boolean): TelegramBotConfig | undefined {
+  const botToken = env.TELEGRAM_BOT_TOKEN?.trim();
+  const rawUsername = env.TELEGRAM_BOT_USERNAME?.trim().replace(/^@/, '');
+  const rawCallback = env.TELEGRAM_WEB_CALLBACK_URL?.trim();
+
+  if (!botToken || !rawUsername || !rawCallback) {
+    return undefined;
+  }
+
+  if (!/^\d{1,20}:[A-Za-z0-9_-]{10,200}$/.test(botToken)) {
+    return undefined;
+  }
+
+  if (!/^[A-Za-z][A-Za-z0-9_]{2,31}$/.test(rawUsername)) {
+    return undefined;
+  }
+
+  let callbackUrl: string;
+  try {
+    const url = new URL(rawCallback);
+    const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname);
+    if (
+      !['http:', 'https:'].includes(url.protocol) ||
+      (url.protocol === 'http:' && !loopback) ||
+      url.username ||
+      url.password ||
+      url.pathname !== '/connections/telegram/callback' ||
+      url.search ||
+      url.hash
+    ) {
+      throw new Error();
+    }
+    callbackUrl = url.href;
+  } catch {
+    throw new Error('TELEGRAM_WEB_CALLBACK_URL must be the web /connections/telegram/callback URL without query, fragment or credentials (HTTPS, or loopback HTTP)');
+  }
+
+  const endpoints = { ...TELEGRAM_ENDPOINTS };
+  if (!isLive) {
+    const rawApiBase = env.TELEGRAM_API_BASE_URL?.trim();
+    if (!rawApiBase) {
+      return undefined;
+    }
+    try {
+      const url = new URL(rawApiBase);
+      if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.hash) throw new Error();
+      endpoints.apiBaseUrl = url.href.replace(/\/$/, '');
+    } catch {
+      throw new Error('TELEGRAM_API_BASE_URL must be an HTTP(S) endpoint without credentials or fragment');
+    }
+
+    const rawDeepLinkBase = env.TELEGRAM_DEEPLINK_BASE_URL?.trim();
+    if (rawDeepLinkBase) {
+      try {
+        const url = new URL(rawDeepLinkBase);
+        if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.hash) throw new Error();
+        endpoints.deepLinkBaseUrl = url.href.replace(/\/$/, '');
+      } catch {
+        throw new Error('TELEGRAM_DEEPLINK_BASE_URL must be an HTTP(S) endpoint without credentials or fragment');
+      }
+    }
+  }
+
+  return {
+    botToken,
+    botUsername: rawUsername,
+    callbackUrl,
+    ...endpoints,
   };
 }

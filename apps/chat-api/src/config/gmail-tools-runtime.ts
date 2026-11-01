@@ -46,11 +46,13 @@ export async function runtimeToolCatalog(
     githubOAuthClient?: any;
     githubTokens?: any;
     githubConnection?: (userId: string) => Promise<any>;
+    telegramEnabled?: boolean;
+    telegramConnection?: (userId: string) => Promise<any>;
   },
 ) {
   const personal = await getToolCatalogFor(repo, key, options);
   if (mode === 'live') return personal;
-  const baseTools = ALL_TOOLS.filter((t) => t.service !== 'trello' && t.service !== 'github');
+  const baseTools = ALL_TOOLS.filter((t) => t.service !== 'trello' && t.service !== 'github' && t.service !== 'telegram');
   const tools = [
     ...baseTools,
     ...personal.filter(
@@ -59,7 +61,8 @@ export async function runtimeToolCatalog(
         t.service === 'mycalendar' ||
         t.service === 'mysheets' ||
         t.service === 'trello' ||
-        t.service === 'github'
+        t.service === 'github' ||
+        t.service === 'telegram'
     ),
   ];
   return Array.from(new Map(tools.map((t) => [t.name, t])).values());
@@ -115,10 +118,10 @@ export function createToolRuntimeFactory(
   sandbox = createSandboxAdapter,
 ) {
   return createRuntimeAdapterFactory<AdapterContext>(mode, personal,
-    (name, context) => (name === 'gmail' || name === 'mycalendar' || name === 'mysheets' || name === 'trello' || name === 'github') ? personal(name, context) : sandbox(name));
+    (name, context) => (name === 'gmail' || name === 'mycalendar' || name === 'mysheets' || name === 'trello' || name === 'github' || name === 'telegram') ? personal(name, context) : sandbox(name));
 }
 
-/** A failed Gmail, MyCalendar, MySheets, Trello or GitHub request must not become a canned shared-service write. */
+/** A failed Gmail, MyCalendar, MySheets, Trello, GitHub or Telegram request must not become a canned shared-service write. */
 export function mayFallbackToShared(
   input: ProcessMessageInput,
   gmailEnabled: boolean,
@@ -134,7 +137,7 @@ export function mayFallbackToShared(
   ];
   const registry = serviceRegistryForRuntime(gmailEnabled, mycalendarEnabled, mysheetsEnabled);
   const routed = routeIntent(texts.join('\n'), catalog, registry).services;
-  if (routed.includes('trello') || routed.includes('github')) return false;
+  if (routed.includes('trello') || routed.includes('github') || routed.includes('telegram')) return false;
   if (gmailEnabled && routed.includes('gmail')) return false;
   if (mycalendarEnabled && routed.includes('mycalendar')) return false;
   if (mysheetsEnabled && routed.includes('mysheets')) return false;

@@ -31,6 +31,10 @@ import { createGmailConnectionLookup, createMyCalendarConnectionLookup, createMy
 import { TrelloTokenManager } from './services/trello/token-manager.js';
 import { TrelloOAuthClient } from './services/trello/oauth-client.js';
 import { TrelloTeamRepo } from './db/repositories/trello-team-repo.js';
+import { TelegramTeamRepo } from './db/repositories/telegram-team-repo.js';
+import { TelegramBotClient } from './services/telegram/bot-client.js';
+import { createTelegramConnectionLookup } from './services/telegram/connection-reference.js';
+import { TelegramDigestRunner } from './services/schedules/telegram-digest-runner.js';
 import { StepError } from '@wap/tool-adapters';
 import { createTrelloConnectionLookup } from './services/trello/connection-reference.js';
 import { GitHubTokenManager } from './services/github/token-manager.js';
@@ -230,6 +234,7 @@ async function bootstrap() {
       if (!digestRunnerImpl) throw new Error('Digest runner is not ready');
       return digestRunnerImpl(run, convId, signal);
     },
+    executeDigestRun: (run, signal) => telegramDigestRunner.execute(run, signal),
     emit: (convId, event, payload) => sseManager.emitEvent(convId, event, payload),
   });
   if (env.SCHEDULES_ENABLED && !schedules) console.warn('\x1b[33m[chat-api] SCHEDULES_ENABLED=on nhưng không có PostgreSQL: lịch chạy tạm tắt.\x1b[0m');
@@ -319,6 +324,33 @@ async function bootstrap() {
     : undefined;
   const githubConnection = githubLookup ?? sandboxGitHubConnection;
 
+  const telegramAvailable = Boolean(env.TELEGRAM_BOT && pool);
+  const telegramBotClient = telegramAvailable ? new TelegramBotClient(env.TELEGRAM_BOT!) : undefined;
+  const telegramTeamRepo = pool ? new TelegramTeamRepo(pool) : undefined;
+  const telegramLookup = telegramAvailable && telegramBotClient
+    ? createTelegramConnectionLookup({
+        credentialRepo: credRepo,
+        encryptionKey: env.ENCRYPTION_KEY,
+        botClient: telegramBotClient,
+      })
+    : undefined;
+  const sandboxTelegramConnection = env.RUNTIME_MODE === 'sandbox' && !telegramLookup
+    ? async () => ({
+        status: 'connected' as const,
+        selectedChats: [
+          { chatId: '100000001', title: 'Telegram của tôi (Sandbox)', type: 'private' as const },
+          { chatId: '-1001234567890', title: 'ATI Test', type: 'supergroup' as const },
+        ],
+        connection: {
+          credentialId: 'sandbox-telegram',
+          telegramUserId: '100000001',
+          username: 'sandbox',
+          chatIds: ['-1001234567890', '100000001'],
+        },
+      })
+    : undefined;
+  const telegramConnection = telegramLookup ?? sandboxTelegramConnection;
+
   // 2. Initialize LLM Provider
   let provider: any;
   if (env.RUNTIME_MODE === 'live') {
@@ -391,6 +423,8 @@ async function bootstrap() {
       githubOAuthClient,
       githubTokens,
       githubConnection,
+      telegramEnabled: telegramAvailable,
+      telegramConnection,
     }),
     serviceRegistry: serviceRegistryForRuntime(gmailAvailable, mycalendarAvailable, mysheetsAvailable),
     gatherSearch,
@@ -440,6 +474,7 @@ async function bootstrap() {
       : undefined,
     trelloConnection,
     githubConnection,
+    telegramConnection,
     getAdapter: (serviceName, context) => (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(serviceName, context),
     schedules: schedules
       ? {
@@ -499,6 +534,8 @@ async function bootstrap() {
     trelloTeamRepo,
     trelloOAuthClient,
     trelloApiBaseUrl: env.TRELLO_OAUTH?.apiBaseUrl,
+    telegramBot: env.TELEGRAM_BOT,
+    telegramBotClient,
     createTrelloAdapter: env.RUNTIME_MODE === 'sandbox' ? ({ allowedBoardIds }) => {
       const sandbox = createSandboxAdapter('trello');
       return {
@@ -528,14 +565,27 @@ async function bootstrap() {
         },
       };
     } : undefined,
+    createTelegramAdapter: env.RUNTIME_MODE === 'sandbox' ? ({ allowedChats }) => {
+      const sandbox = createSandboxAdapter('telegram');
+      return {
+        execute: async (tool, args, ctx) => {
+          const targetChatId = ctx?.chatId ?? args?.chatId;
+          if (targetChatId && !allowedChats.includes(String(targetChatId))) {
+            throw new StepError({ category: 'AUTH_ERROR', message: 'Cuộc trò chuyện không nằm trong phạm vi được phép.' });
+          }
+          return sandbox.execute(tool, args, ctx);
+        },
+      };
+    } : undefined,
   });
 
   const adapterFactory = createToolRuntimeFactory(env.RUNTIME_MODE,
-    (serviceName, context) => sandboxTrelloConnection && serviceName === 'trello'
-      ? Promise.resolve(createSandboxAdapter('trello'))
-      : sandboxGitHubConnection && serviceName === 'github'
-        ? Promise.resolve(createSandboxAdapter('github'))
-        : realAdapterFactory.getAdapterForService(serviceName, context),
+    (serviceName, context) => {
+      if (sandboxTrelloConnection && serviceName === 'trello') return Promise.resolve(createSandboxAdapter('trello'));
+      if (sandboxGitHubConnection && serviceName === 'github') return Promise.resolve(createSandboxAdapter('github'));
+      if (sandboxTelegramConnection && serviceName === 'telegram') return Promise.resolve(createSandboxAdapter('telegram'));
+      return realAdapterFactory.getAdapterForService(serviceName, context);
+    },
     (serviceName) => createSandboxAdapter(serviceName));
   gatherAdapterFactory = adapterFactory;
   if (pool) {
@@ -545,6 +595,14 @@ async function bootstrap() {
       getAdapter: (serviceName, context) => adapterFactory.getAdapterForService(serviceName, context),
     });
   }
+
+  const telegramDigestRunner = new TelegramDigestRunner({
+    credentialRepo: credRepo,
+    encryptionKey: env.ENCRYPTION_KEY,
+    adapterFactory,
+    botClient: telegramBotClient,
+    timeZone: env.APP_TIME_ZONE,
+  });
 
   // 6. ExecutionService
   const executionService = new ExecutionService({
@@ -625,6 +683,14 @@ async function bootstrap() {
     },
     githubTokens,
     githubTeamRepo,
+    telegram: {
+      bot: telegramAvailable ? env.TELEGRAM_BOT : undefined,
+      teamRepo: telegramTeamRepo,
+      onConnectionChanged: (userId: string) => {
+        realAdapterFactory.clearPersonal(userId);
+      },
+    },
+    telegramTeamRepo,
     chatService,
     sseManager,
     executionService,

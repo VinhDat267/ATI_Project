@@ -3,12 +3,15 @@ import type {
   GithubDigestConfig,
   ScheduleApprovalMode,
   ScheduleDigestCandidate,
+  ScheduleKind,
   ScheduleProposalMetadata,
   ScheduleResponse,
   ScheduleRunView,
   ScheduleStateMetadata,
   ScheduleView,
   SheetsDigestCandidate,
+  TelegramDigestConfig,
+  TelegramDigestCandidate,
 } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../../db/repositories/credential-repo.js';
 import { MessageRepo } from '../../db/repositories/message-repo.js';
@@ -19,6 +22,7 @@ import { runState, runView } from './run-state.js';
 import { nextOccurrence } from './next-occurrence.js';
 import { analyzeSheetsDigestCandidate, computeSheetsDigestHash } from './sheets-digest-candidate.js';
 import { canonicalizeDigestConfig, computeDigestConfigHash } from './github-digest-candidate.js';
+import { computeTelegramDigestConfigHash } from './telegram-digest-candidate.js';
 
 export const SCHEDULE_CONFLICTS = {
   STALE_PROPOSAL: 'Đề xuất này đã cũ. Hãy xem đề xuất mới nhất.',
@@ -53,7 +57,12 @@ export interface ScheduleChange {
 }
 
 type Action = ScheduleResponse['action'];
-type Fields = Pick<ScheduleRow, 'name' | 'request' | 'recurrence' | 'services' | 'status' | 'pause_reason' | 'next_run_at'>;
+type Fields = Pick<ScheduleRow, 'name' | 'request' | 'recurrence' | 'services' | 'status' | 'pause_reason' | 'next_run_at'> & {
+  kind?: ScheduleKind;
+  digest_config?: ScheduleRow['digest_config'];
+  digest_config_hash?: string | null;
+  digest_approved_at?: Date | string | null;
+};
 
 export interface ScheduleServiceOptions {
   pool: pg.Pool;
@@ -169,6 +178,30 @@ export class ScheduleService {
       );
       return res.rows[0];
     }
+    if (fields.kind !== undefined) {
+      const res = await client.query(
+        `UPDATE schedules SET name=$2, request=$3, recurrence=$4, services=$5, status=$6, pause_reason=$7, next_run_at=$8,
+           version=version+1, updated_at=now(), last_proposal_id=COALESCE($9, last_proposal_id),
+           kind=$10, digest_config=$11, digest_config_hash=$12, digest_approved_at=$13
+         WHERE id=$1 RETURNING *`,
+        [
+          id,
+          fields.name,
+          fields.request,
+          JSON.stringify(fields.recurrence),
+          fields.services,
+          fields.status,
+          fields.pause_reason,
+          fields.next_run_at,
+          proposalId,
+          fields.kind,
+          fields.digest_config ? JSON.stringify(fields.digest_config) : null,
+          fields.digest_config_hash ?? null,
+          fields.digest_approved_at ?? null,
+        ],
+      );
+      return res.rows[0];
+    }
     const res = await client.query(
       `UPDATE schedules SET name=$2, request=$3, recurrence=$4, services=$5, status=$6, pause_reason=$7, next_run_at=$8,
          version=version+1, updated_at=now(), last_proposal_id=COALESCE($9, last_proposal_id)
@@ -241,12 +274,14 @@ export class ScheduleService {
       const wsId = owner.rows[0].workspace_id ?? null;
       const wsMode = owner.rows[0].workspace_mode ?? 'legacy';
       const wantAutoDigest = approvalMode === 'auto_digest';
-      const isCalendarSchedule =
-        metadata.services.includes('mycalendar') || metadata.services.includes('calendar');
+      const isTelegramSchedule =
+        metadata.services.includes('telegram') || existing?.kind === 'telegram_digest';
       const isGithubSchedule =
-        metadata.services.includes('github') || existing?.kind === 'github_digest';
+        !isTelegramSchedule && (metadata.services.includes('github') || existing?.kind === 'github_digest');
+      const isCalendarSchedule =
+        !isTelegramSchedule && !isGithubSchedule && (metadata.services.includes('mycalendar') || metadata.services.includes('calendar') || existing?.kind === 'calendar_digest');
       let digestFields: {
-        kind: 'plan' | 'sheets_digest' | 'calendar_digest' | 'github_digest';
+        kind: 'plan' | 'sheets_digest' | 'calendar_digest' | 'github_digest' | 'telegram_digest';
         digestConfig: unknown | null;
         digestConfigHash: string | null;
         digestApprovedAt: Date | null;
@@ -256,9 +291,28 @@ export class ScheduleService {
         digestConfigHash: null,
         digestApprovedAt: null,
       };
+      let telegramDigestConfig: TelegramDigestConfig | null = null;
+      let telegramDigestHash: string | null = null;
 
       if (wantAutoDigest && (proposal.action === 'create' || proposal.action === 'update') && !isGithubSchedule) {
-        if (isCalendarSchedule) {
+        if (isTelegramSchedule) {
+          const candidate = metadata.digestCandidate as TelegramDigestCandidate | undefined;
+          if (!candidate || candidate.canAutoDigest !== true || !candidate.config || !candidate.configHash) {
+            throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
+          }
+          const computedHash = computeTelegramDigestConfigHash(candidate.config);
+          if (computedHash !== candidate.configHash) {
+            throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
+          }
+          telegramDigestConfig = candidate.config;
+          telegramDigestHash = computedHash;
+          digestFields = {
+            kind: 'telegram_digest',
+            digestConfig: JSON.stringify(telegramDigestConfig),
+            digestConfigHash: telegramDigestHash,
+            digestApprovedAt: now,
+          };
+        } else if (isCalendarSchedule) {
           const evaluated = await evaluateCalendarDigestCandidate({
             pool: client,
             encryptionKey: this.options.encryptionKey,
@@ -379,6 +433,37 @@ export class ScheduleService {
       }
       // Turning a finished schedule back on takes a place again.
       if (!OPEN.has(existing.status) && OPEN.has(fields.status)) await this.ensureRoom(client, userId, { workspaceMode: wsMode, workspaceId: wsId });
+      if (proposal.action === 'update' && isTelegramSchedule) {
+        if (wantAutoDigest && telegramDigestConfig && telegramDigestHash) {
+          fields.kind = 'telegram_digest';
+          fields.digest_config = telegramDigestConfig;
+          fields.digest_config_hash = telegramDigestHash;
+          fields.digest_approved_at = now;
+        } else if (approvalMode === 'manual') {
+          fields.kind = 'plan';
+          fields.digest_config = null;
+          fields.digest_config_hash = null;
+          fields.digest_approved_at = null;
+        } else if (existing.kind === 'telegram_digest' && existing.digest_config) {
+          const tgCandidate = metadata.digestCandidate as TelegramDigestCandidate | undefined;
+          if (tgCandidate?.canAutoDigest === false) {
+            fields.kind = 'plan';
+            fields.digest_config = null;
+            fields.digest_config_hash = null;
+            fields.digest_approved_at = null;
+          } else {
+            const updatedConfig: TelegramDigestConfig =
+              tgCandidate?.canAutoDigest && tgCandidate.config
+                ? tgCandidate.config
+                : { ...(existing.digest_config as TelegramDigestConfig), recurrence: fields.recurrence };
+            fields.kind = 'telegram_digest';
+            fields.digest_config = updatedConfig;
+            fields.digest_config_hash = computeTelegramDigestConfigHash(updatedConfig);
+            fields.digest_approved_at = existing.digest_approved_at ?? now;
+          }
+        }
+        return this.recordState(client, await this.saveFields(client, existing.id, fields, messageId), now);
+      }
       if (proposal.action === 'update' && existing.kind === 'calendar_digest' && approvalMode !== 'manual') {
         const evaluated = await evaluateCalendarDigestCandidate({
           pool: client,

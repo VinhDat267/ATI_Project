@@ -71,7 +71,7 @@ describe('Calendar Digest Runner & ScheduleRunner integration on PostgreSQL 16',
       await credentials.saveCredentials(
         'telegram',
         encryptCredentials({ botToken: '123456:ABC', allowedScope: { chats: ['-100123456789'] } }, key),
-        null,
+        owner.id,
       );
     }
     return mycal.id;

@@ -11,10 +11,12 @@ export function resourceLabels(
     | {
         teamBoards?: Array<{ boardId: string; boardName: string }>;
         teamRepos?: Array<{ repoId: string; fullName: string; name: string }>;
+        telegramChats?: Array<{ chatId: string; title: string }>;
       },
 ): Record<string, string> {
   const teamBoards = Array.isArray(options) ? options : options?.teamBoards;
   const teamRepos = Array.isArray(options) ? undefined : options?.teamRepos;
+  const telegramChats = Array.isArray(options) ? undefined : options?.telegramChats;
   const known = groundingMemory(memory.getAll(), memory.getEntity('__observed'));
   const entries = (key: string): Array<Record<string, any>> => {
     const value = known[key];
@@ -71,6 +73,13 @@ export function resourceLabels(
           const tr = teamRepos.find((r) => r.fullName.toLowerCase() === id.toLowerCase() || r.repoId === id);
           if (tr) {
             labels[id] = tr.fullName;
+            continue;
+          }
+        }
+        if (key === 'chat' && telegramChats) {
+          const tc = telegramChats.find((c) => c.chatId === id);
+          if (tc) {
+            labels[id] = tc.title;
             continue;
           }
         }

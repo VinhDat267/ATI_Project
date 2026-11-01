@@ -70,11 +70,11 @@ describe('Calendar auto_digest schedule candidate & confirmation on PostgreSQL 1
     );
   };
 
-  const seedTelegram = async (chats = ['-100123456789']) => {
+  const seedTelegram = async (chats = ['-100123456789'], who: Person = alice) => {
     await credentials.saveCredentials(
       'telegram',
       encryptCredentials({ botToken: '123456:ABC-DEF', allowedScope: { chats } }, key),
-      null,
+      who.id,
     );
   };
 

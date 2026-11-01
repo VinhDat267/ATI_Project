@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import type { GoogleProfile } from '../../auth/google-oidc.js';
 import type { UserRow } from './user-repo.js';
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
-export type OAuthMode = 'login' | 'link' | 'connect_gmail' | 'connect_mycalendar' | 'connect_mysheets' | 'connect_trello' | 'connect_github';
+export type OAuthMode = 'login' | 'link' | 'connect_gmail' | 'connect_mycalendar' | 'connect_mysheets' | 'connect_trello' | 'connect_github' | 'connect_telegram';
 export interface OAuthState {
   id?: string;
   state_hash: string; browser_binding_hash: string; code_verifier: string; nonce: string;
@@ -27,6 +27,12 @@ export class GoogleAuthRepo {
   async findState(state: string, binding: string, now: number, modes: OAuthMode[]): Promise<OAuthState | null> {
     return (await this.pool.query<OAuthState>(`SELECT * FROM oauth_states WHERE state_hash=$1 AND browser_binding_hash=$2
       AND used_at IS NULL AND expires_at>$3 AND mode = ANY($4)`, [hash(state), hash(binding), new Date(now), modes])).rows[0] ?? null;
+  }
+  async verifyState(state: string, binding: string, now: number, modes: OAuthMode[], userId?: string, sessionId?: string): Promise<OAuthState | null> {
+    return (await this.pool.query<OAuthState>(`SELECT o.* FROM oauth_states o WHERE state_hash=$1 AND browser_binding_hash=$2
+      AND used_at IS NULL AND expires_at>$3 AND o.mode = ANY($6) AND (mode='login' OR (o.user_id=$4 AND o.session_id=$5 AND EXISTS
+        (SELECT 1 FROM auth_sessions s JOIN users u ON u.id=s.user_id WHERE s.id=o.session_id AND s.user_id=o.user_id
+         AND s.revoked_at IS NULL AND s.expires_at>$3 AND u.status='active')))`, [hash(state), hash(binding), new Date(now), userId ?? null, sessionId ?? null, modes])).rows[0] ?? null;
   }
   async consumeState(state: string, binding: string, now: number, modes: OAuthMode[], userId?: string, sessionId?: string): Promise<OAuthState | null> {
     return (await this.pool.query<OAuthState>(`UPDATE oauth_states o SET used_at=$3 WHERE state_hash=$1 AND browser_binding_hash=$2

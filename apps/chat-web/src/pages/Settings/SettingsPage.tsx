@@ -12,9 +12,11 @@ import { PersonalMyCalendar } from './PersonalMyCalendar';
 import { PersonalMySheets } from './PersonalMySheets';
 import { TrelloConnection } from './TrelloConnection';
 import { GitHubConnection } from './GitHubConnection';
+import { TelegramConnection } from './TelegramConnection';
 import { gmailConnectionNotice } from '../../services/gmail-connection';
 import { trelloConnectionNotice } from '../../services/trello-connection';
 import { githubConnectionNotice } from '../../services/github-connection';
+import { telegramConnectionNotice } from '../../services/telegram-connection';
 import { meta } from './meta';
 
 const SAVED_PLACEHOLDER = 'Đã lưu · nhập lại nếu muốn thay';
@@ -103,9 +105,11 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
     const email = gmailConnectionNotice.take(user?.id);
     const trelloUser = trelloConnectionNotice.take(user?.id);
     const githubUser = githubConnectionNotice.take(user?.id);
+    const telegramUser = telegramConnectionNotice.take(user?.id);
     if (email) setConnectedEmail(email);
     else if (trelloUser) setConnectedEmail(`@${trelloUser}`);
     else if (githubUser) setConnectedEmail(`@${githubUser}`);
+    else if (telegramUser) setConnectedEmail(`@${telegramUser}`);
   }, [user?.id]);
   const backgroundRef = useRef<HTMLDivElement>(null), containerRef = useRef<HTMLDivElement>(null), closeButtonRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef(actions.closeServiceDrawer); closeRef.current = actions.closeServiceDrawer;
@@ -200,6 +204,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
             {personalMySheets && <PersonalMySheets key={`mysheets-${user?.id}`} selected={selected} service={personalMySheets} refresh={refresh} navigate={navigate} standalone={false} />}
             <TrelloConnection key={`trello-${user?.id}`} user={user} selected={selected} refresh={refresh} standalone={false} />
             <GitHubConnection key={`github-${user?.id}`} user={user} selected={selected} refresh={refresh} standalone={false} />
+            <TelegramConnection key={`telegram-${user?.id}`} user={user} selected={selected} refresh={refresh} navigate={navigate} standalone={false} />
           </div>
         </section>
         {/* DANH SÁCH 2 NHÓM DỊCH VỤ */}

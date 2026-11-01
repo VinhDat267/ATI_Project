@@ -98,6 +98,7 @@ export class StepRunner {
       const output = await adapter.execute(step.tool, resolvedArgs, {
         signal: combinedSignal,
         boardId: (step as any).boardId,
+        ...((step as any).chatId ? { chatId: (step as any).chatId } : {}),
       });
 
       const durationMs = Date.now() - startTime;

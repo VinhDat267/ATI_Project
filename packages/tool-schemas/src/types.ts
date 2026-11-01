@@ -83,6 +83,7 @@ export interface PlanStep {
   dependsOn: string[];
   boardId?: string;
   repo?: string;
+  chatId?: string;
 }
 
 /** The personal connections a plan was previewed with. */
@@ -92,6 +93,7 @@ export interface PlanConnections {
   mysheets?: { credentialId: string; email: string; allowedSpreadsheets: string[] };
   trello?: { credentialId: string; memberId: string; username: string; boardIds: string[] };
   github?: { credentialId: string; githubUserId: string; login: string; repos: string[] };
+  telegram?: { credentialId: string; telegramUserId: string; username: string; chatIds: string[] };
   myjira?: JiraPlanConnection;
 }
 
@@ -160,7 +162,7 @@ export interface ScheduleResponse {
 export type PlannerResponse = PlanResponse | ClarificationResponse | RefusalResponse | AnswerResponse | ScheduleResponse;
 
 export type ScheduleStatus = 'active' | 'paused' | 'cancelled' | 'completed';
-export type ScheduleKind = 'plan' | 'plan_approval' | 'sheets_digest' | 'calendar_digest' | 'github_digest';
+export type ScheduleKind = 'plan' | 'plan_approval' | 'sheets_digest' | 'calendar_digest' | 'github_digest' | 'telegram_digest';
 export type ScheduleApprovalMode = 'manual' | 'auto_digest';
 
 export interface SheetsDigestConfig {
@@ -264,6 +266,45 @@ export interface ScheduleDigestCandidate {
   configHash?: string;
 }
 
+export interface TelegramDigestSource {
+  service: string;
+  tool: string;
+  args?: Record<string, any>;
+  label: string;
+}
+
+export interface TelegramDigestConfig {
+  credentialId: string;
+  telegramUserId: string;
+  username: string;
+  chatId: string;
+  chatTitle: string;
+  sources: TelegramDigestSource[];
+  recurrence: ScheduleRecurrence;
+  timeZone: string;
+}
+
+export interface TelegramDigestDelivery {
+  chatId: string;
+  chatTitle: string;
+  messageId?: number;
+  sentAt?: string;
+  sources: Array<{
+    service: string;
+    label: string;
+    status: 'ok' | 'partial_error' | 'empty';
+    itemCount?: number;
+    error?: string;
+  }>;
+}
+
+export interface TelegramDigestCandidate {
+  canAutoDigest: boolean;
+  disabledReason?: string;
+  config?: TelegramDigestConfig;
+  configHash?: string;
+}
+
 export interface ScheduleView {
   id: string; convId: string; version: number;
   name: string; request: string; recurrence: ScheduleRecurrence;
@@ -276,8 +317,16 @@ export interface ScheduleView {
   lastRun: ScheduleRunView | null;
   kind?: ScheduleKind;
   approvalMode?: ScheduleApprovalMode;
-  digestConfig?: SheetsDigestConfig | CalendarDigestConfig | GithubDigestConfig | null;
-  digest?: { config: GithubDigestConfig; approvedAt: string } | null;
+  digestConfig?: SheetsDigestConfig | CalendarDigestConfig | GithubDigestConfig | TelegramDigestConfig | null;
+  digest?:
+    | { config: GithubDigestConfig; approvedAt: string }
+    | {
+        chatId: string;
+        chatTitle: string;
+        sources: Array<{ service: string; label: string }>;
+        approvedAt: string | null;
+      }
+    | null;
 }
 
 /** Derived for display from schedule_runs.status and the run conversation's latest plan. */
@@ -298,7 +347,7 @@ export interface ScheduleRunView {
   planStatus: string | null;
   /** A Vietnamese sentence for the user. */
   error: string | null;
-  delivery?: SheetsDigestDelivery | CalendarDigestDelivery | GithubDigestDelivery | null;
+  delivery?: SheetsDigestDelivery | CalendarDigestDelivery | GithubDigestDelivery | TelegramDigestDelivery | null;
 }
 
 /** Metadata of the assistant message that carries a schedule proposal. */
@@ -310,7 +359,7 @@ export interface ScheduleProposalMetadata {
   services: string[];
   nextRuns: string[];             // computed by the backend when the proposal is saved
   previous: Pick<ScheduleView, 'name' | 'request' | 'recurrence' | 'status'> | null;
-  digestCandidate?: SheetsDigestCandidate | CalendarDigestCandidate | ScheduleDigestCandidate;
+  digestCandidate?: SheetsDigestCandidate | CalendarDigestCandidate | ScheduleDigestCandidate | TelegramDigestCandidate;
 }
 
 /** Metadata of the assistant message recording the schedule after each change. */

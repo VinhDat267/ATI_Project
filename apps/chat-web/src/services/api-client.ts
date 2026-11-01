@@ -408,6 +408,66 @@ export class ApiClient {
       body: JSON.stringify({ repos }),
     });
   }
+  getTelegramConnection() {
+    return this.request<{
+      status: 'unconfigured' | 'not_connected' | 'reconnect_required' | 'needs_scope' | 'connected';
+      botUsername?: string;
+      telegramUserId?: string;
+      username?: string;
+      displayName?: string;
+      chats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean }>;
+      selectedChats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean }>;
+    }>('/api/connections/telegram', { credentials: 'include' });
+  }
+  startTelegramConnection(options: { returnTo?: string } = {}) {
+    return this.request<{
+      state: string;
+      botUsername: string;
+      deepLinkUrl: string;
+      groupDeepLinkUrl: string;
+    }>('/api/connections/telegram/start', {
+      method: 'POST',
+      credentials: 'include',
+      ...(options.returnTo ? { body: JSON.stringify({ returnTo: options.returnTo }) } : {}),
+    });
+  }
+  completeTelegramConnection(state: string) {
+    return this.request<{
+      status: 'connected' | 'needs_scope';
+      telegramUserId: string;
+      username: string;
+      displayName: string;
+      chats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean }>;
+      selectedChats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean }>;
+      returnTo?: string;
+    }>('/api/connections/telegram/callback', {
+      method: 'POST',
+      credentials: 'include',
+      body: JSON.stringify({ state }),
+    }, true);
+  }
+  getTelegramChats() {
+    return this.request<{
+      chats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean }>;
+      selectedChatIds: string[];
+    }>('/api/connections/telegram/chats', { credentials: 'include' });
+  }
+  saveTelegramScope(chatIds: string[]) {
+    return this.request<{
+      status: 'connected';
+      selectedChats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean }>;
+    }>('/api/connections/telegram/scope', {
+      method: 'PUT',
+      credentials: 'include',
+      body: JSON.stringify({ chatIds }),
+    });
+  }
+  disconnectTelegram() {
+    return this.request<{ success: true }>('/api/connections/telegram', {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+  }
   unlinkGoogle(currentPassword: string) {
     return this.request<{ success: true }>('/api/auth/google/unlink', {
       method: 'POST', credentials: 'include', body: JSON.stringify({ currentPassword }),
