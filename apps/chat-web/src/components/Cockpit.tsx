@@ -36,7 +36,7 @@ const errorMeta = { ...meta, id: 'errors', css: meta.css + errorCss };
 interface Props {
   user?: User | null; onLogout?: () => void; navigate?: (path: string) => void;
   services: ServiceInfo[]; servicesLoading: boolean; servicesError: string | null; onRefreshServices?: () => void;
-  onSendMessage: (text: string, options?: { slackConnectionId: string }) => void; onNewConversation: () => void;
+  onSendMessage: (text: string, options?: { slackConnectionId: string;slackChannel?:string }) => void; onNewConversation: () => void;
   onSelectConversation: (id: string) => void; onSettings: () => void;
   onApprove: () => void; onCancel: () => void; recovery: RecoveryControls | null;
   networkError?: boolean;
@@ -65,6 +65,7 @@ export function Cockpit(props: Props) {
   const [schedulesEnabled, setSchedulesEnabled] = useState(false);
   const [personalEnabled, setPersonalEnabled] = useState(false);
   const [slackEnabled, setSlackEnabled] = useState(false);
+  const [slackWritesEnabled,setSlackWritesEnabled]=useState(false),[slackWriteSelection,setSlackWriteSelection]=useState<string|null>(null),[slackChannel,setSlackChannel]=useState('');
   const [slackSelection, setSlackSelection] = useState<string | null>(null);
   const hasSlackResult = !!state.activePlan?.connections?.myslack || !!state.executionSnapshot?.plan.connections?.myslack;
   useEffect(() => {
@@ -76,7 +77,7 @@ export function Cockpit(props: Props) {
     return () => { clearInterval(timer); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); };
   }, [hasSlackResult, state.conversationId]);
   useEffect(() => { setSlackSelection(null); }, [props.user?.id]);
-  useEffect(() => { let current=true; Promise.resolve(apiClient.getRuntime?.()).then(data=>{if(!current)return;setSchedulesEnabled(data?.schedulesEnabled === true);setSlackEnabled(data?.myslackEnabled === true);if(data?.runtimeMode==='sandbox' || data?.runtimeMode==='live')setRuntimeMode(data.runtimeMode);setPersonalEnabled(data?.gmailEnabled===true || data?.mycalendarEnabled===true || data?.mysheetsEnabled===true);}).catch(()=>{});return()=>{current=false;}; }, []);
+  useEffect(() => { let current=true; Promise.resolve(apiClient.getRuntime?.()).then(data=>{if(!current)return;setSchedulesEnabled(data?.schedulesEnabled === true);setSlackEnabled(data?.myslackEnabled === true);setSlackWritesEnabled(data?.myslackWritesEnabled===true);if(data?.runtimeMode==='sandbox' || data?.runtimeMode==='live')setRuntimeMode(data.runtimeMode);setPersonalEnabled(data?.gmailEnabled===true || data?.mycalendarEnabled===true || data?.mysheetsEnabled===true);}).catch(()=>{});return()=>{current=false;}; }, []);
   const actualMoment = selectMoment(state, state.executionSnapshot);
   const pending = state.planningByConversation[state.conversationId ?? '__draft__'];
   const waitingKey = pending ? `${state.conversationId}:${pending.requestId ?? pending.startedAt}` : null;
@@ -116,9 +117,10 @@ export function Cockpit(props: Props) {
   }, []);
   useEffect(() => { setPreview(null); }, [state.conversationId, state.activePlan?.id]);
   const send = (text: string) => {
-    if (!text.trim() || state.isPlanning || slackSelection === '') return;
+    if (!text.trim() || state.isPlanning || slackSelection === '' || slackWriteSelection==='' || (slackWriteSelection!==null&&!/^[CG][A-Za-z0-9_-]{1,63}$/.test(slackChannel))) return;
     setEditingResponse(null);
-    if (slackSelection) props.onSendMessage(text.trim(), { slackConnectionId: slackSelection });
+    if(slackWriteSelection)props.onSendMessage(text,{slackConnectionId:slackWriteSelection,slackChannel});
+    else if (slackSelection) props.onSendMessage(text.trim(), { slackConnectionId: slackSelection });
     else props.onSendMessage(text.trim());
     setDraft('');
     if (state.activeClarification) state.setClarification(null);
@@ -173,7 +175,9 @@ export function Cockpit(props: Props) {
     <div data-cockpit-background className="contents" onFocusCapture={event => { editing.current = (event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement) && !drawer && !preview; }} onBlurCapture={event => { if (!(event.relatedTarget instanceof HTMLTextAreaElement || event.relatedTarget instanceof HTMLInputElement) && (event.relatedTarget !== null || (event.target as HTMLElement).isConnected)) editing.current = false; }}>
       <CockpitHeader runtimeMode={runtimeMode} historyDialogId="history-drawer" chatDialogId="chat-drawer" moment={moment} messageCount={state.messages.length} user={props.user ?? null} navigate={navigate} onLogout={props.onLogout ?? (() => {})} onSettings={props.onSettings} historyOpen={drawer === 'history'} chatOpen={drawer === 'conversation'} onHistory={() => setDrawer('history')} onConversation={() => setDrawer('conversation')} />
       <main ref={stage} id="stage-container" className={`flex-1 w-full ${moment === 6 || moment === 'unsuccessful' ? 'max-w-[1120px]' : 'max-w-4xl'} mx-auto px-4 sm:px-6 py-6 ${moment === 'refusal' || expanded || slow || planningError ? 'sm:py-8' : 'sm:py-10'} flex flex-col ${moment === 'refusal' || expanded ? '' : 'justify-center'} min-w-0`}>
-        {slackEnabled && <SlackReadControls userId={props.user?.id} busy={state.isPlanning || state.planStatus === 'executing'} value={slackSelection} onChange={setSlackSelection} />}
+        {slackEnabled && <SlackReadControls userId={props.user?.id} busy={state.isPlanning || state.planStatus === 'executing'} value={slackSelection} onChange={value=>{setSlackSelection(value);if(value!==null)setSlackWriteSelection(null);}} />}
+        {slackWritesEnabled && <><SlackReadControls purpose="write" userId={props.user?.id} busy={state.isPlanning||state.planStatus==='executing'} value={slackWriteSelection} onChange={value=>{setSlackWriteSelection(value);if(value!==null)setSlackSelection(null);}}/>{slackWriteSelection!==null&&<label className="mb-6 block text-sm">Mã kênh Slack<input aria-label="Mã kênh Slack" value={slackChannel} onChange={event=>setSlackChannel(event.target.value.trim())} disabled={state.isPlanning||state.planStatus==='executing'} placeholder="C… hoặc G…" className="mt-1 block w-full rounded-lg border border-brand-border bg-white p-2"/></label>}</>}
+
         {moment !== 4 && plan?.connections?.myslack && <aside aria-label="Nguồn kết quả Slack" className="mb-4 text-xs text-brand-muted [overflow-wrap:anywhere]">{Object.values(plan.connections.myslack.bindings).map(binding => <p key={binding.connectionId}>Workspace: {plan.resourceLabels?.[binding.connectionId] ?? `${binding.workspaceId} · ${binding.slackUserId}`}</p>)}</aside>}
         {state.isPlanning && <span role="status" className="sr-only">Đang lập kế hoạch…</span>}
         {schedulesEnabled && runMessage && <ScheduleRunRecovery key={`${state.conversationId}:${runMessage.id}`} message={runMessage} navigate={navigate} />}

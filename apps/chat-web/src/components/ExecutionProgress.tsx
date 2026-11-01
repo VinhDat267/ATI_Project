@@ -50,6 +50,7 @@ function collectionRows(value: unknown, tool: string): unknown[] | undefined {
 export function ResultFields({ output, tool }: { output: unknown; tool: string }) {
   let value = output;
   if (typeof output === 'string') { try { value = JSON.parse(output); } catch { /* Plain text remains visible. */ } }
+  if(tool==='myslack.chat_postMessage'&&isRecord(value))return <div className="mt-2 text-sm"><p>Đã xác nhận gửi trên Slack</p><p>Kênh: {String(value.channel??'')}</p><p>Mã tin: {String(value.ts??'')}</p></div>;
   if (tool.startsWith('myslack.')) return <SlackReadResult value={value} />;
   const rows = collectionRows(value, tool);
   return <div className="mt-2 text-xs text-text-secondary break-words">

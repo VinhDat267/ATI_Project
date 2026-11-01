@@ -11,7 +11,7 @@ import { RequestEcho } from './RequestEcho';
 export interface RecoveryControls {
   busy: boolean; error: string | null;
   onRetry: (stepId: string) => void; onSkip: (stepId: string) => void;
-  onStop: () => void; onContinue: () => void;
+  onSlackReconcile?:(stepId:string)=>void;onStop: () => void; onContinue: () => void;
   onEdit: (stepId: string, args: Record<string, unknown>, prompt?: string) => void;
 }
 const primary='px-6 py-3 bg-brand-primary hover:bg-brand-primary-hover text-white text-sm font-semibold rounded-xl shadow-sm transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50';
@@ -107,6 +107,7 @@ export function RecoveryMoment({request,moment,snapshot,steps,services,controls}
     {spreadsheetCheckUrl && <p className="text-sm text-brand-text">Hãy tự kiểm tra trên Google Sheets{mysheetsEmail ? ` của ${mysheetsEmail}` : ''} rồi chọn Bỏ qua hoặc Dừng. <a href={spreadsheetCheckUrl} target="_blank" rel="noopener noreferrer" className="text-brand-primary underline">Mở Google Sheets</a></p>}
     {controls?.error && <p role="alert" className="text-sm text-brand-danger">{controls.error}</p>}
     <div className="flex flex-wrap items-center gap-3">
+      {paused&&actions.includes('slack-reconcile')&&<button type="button" disabled={busy} onClick={()=>controls?.onSlackReconcile?.(paused.id)} className={primary}>Đối soát Slack</button>}
       {canRetry && <><button type="button" disabled={busy} onClick={()=>paused && controls?.onRetry(paused.id)} className={primary}>Thử lại việc {steps.findIndex(step=>step.id===paused?.id)+1}</button><button id="btn-recovery-edit" type="button" disabled={busy || !actions.includes('stop')} onClick={()=>setDialog('edit')} className={secondary}>Sửa rồi thử lại</button></>}
       {canContinue && <button type="button" disabled={busy} onClick={()=>controls?.onContinue()} className={primary}>Làm tiếp các việc còn lại</button>}
       {paused && actions.includes('skip') && <button type="button" disabled={busy} onClick={()=>controls?.onSkip(paused.id)} className={hasUnknown?primary:secondary}>{hasUnknown?'Đã thấy kết quả → Bỏ qua bước này và làm tiếp':'Bỏ qua việc này'}</button>}

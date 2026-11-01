@@ -128,7 +128,7 @@ export interface ExecutionSnapshot {
     completedAt?: string | null;
     durationMs?: number | null;
   }>;
-  recoveryActions: Array<'retry' | 'skip' | 'stop' | 'continue'>;
+  recoveryActions: Array<'retry' | 'skip' | 'stop' | 'continue'|'slack-reconcile'>;
 }
 
 export interface ClarificationState {

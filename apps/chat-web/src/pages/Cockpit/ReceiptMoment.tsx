@@ -39,7 +39,7 @@ function ReceiptCard({step,index,services,planSteps,labels,mycalendarConnection,
                     {step.status==='succeeded' && step.duration && <span className="text-xs text-neutral-500 font-body">{step.duration}</span>}
 
                   </div>
-                  {step.status==='succeeded' && toolDefinition(step.tool)?.sideEffect==='read' && step.output!=null && <ResultFields output={step.output} tool={step.tool}/>}
+                  {step.status==='succeeded' && (toolDefinition(step.tool)?.sideEffect==='read'||step.tool==='myslack.chat_postMessage') && step.output!=null && <ResultFields output={step.output} tool={step.tool}/>}
                   {!step.tool.startsWith('myslack.') && <details className="mt-2 text-xs text-brand-muted"><summary>Chi tiết kỹ thuật</summary><code>{step.tool}</code>{step.completedAt && <time className="block" dateTime={step.completedAt}>{new Date(step.completedAt).toLocaleString('vi-VN',{hour12:false})}</time>}{step.status==='succeeded' && step.output!=null && <pre className="whitespace-pre-wrap break-all">{JSON.stringify(step.output,null,2)}</pre>}</details>}
                 </div>);}
 function ReceiptConnector({from,to,label}:{from:string;to:string;label:string}) {return (<div data-receipt-connector data-from={from} data-to={to} className="connector-stagger-1 flex md:flex-col items-center justify-center py-1 md:py-0 md:px-1 flex-shrink-0">

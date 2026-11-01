@@ -7,7 +7,10 @@ import type { DerivedSegmentInput } from './slack-derived-lineage-repo.js';
 import { isBoundSlackReadPlan } from '../../services/slack/slack-read-plan.js';
 import { JSON_TOMBSTONE } from '../../services/slack/slack-artifact-targets.js';
 import { hasSlackMarker } from '../../services/slack/slack-message-selectors.js';
-import { sealPlanOrigin } from '../../services/slack/slack-plan-origin.js';
+import { sealPlanOrigin,planOriginAllowed } from '../../services/slack/slack-plan-origin.js';
+import {isBoundSlackWritePlan} from '../../services/slack/slack-write-plan.js';
+import {validateSlackPostPlan} from '@wap/tool-schemas';
+import {slackWriteHash} from './slack-write-outbox-repo.js';
 
 export interface ExecutionStepRow {
   id: string;
@@ -25,6 +28,34 @@ export interface ExecutionStepRow {
 }
 
 export class StepRepo {
+  /** Reconcile only the private confirmed outbox evidence; a concurrent Stop wins.
+   * Metadata-only receipt is origin-certified in the same transaction as completion. */
+  async completeSlackPostReconciliation(planId:string,stepId:string,userId:string,planHash:string,output:any,authorize:(client:pg.PoolClient)=>Promise<void>):Promise<void>{
+    await this.transaction(async client=>{
+      const owned=(await client.query("SELECT pg_try_advisory_xact_lock(hashtext('ati-slack-owner'),hashtext($1)) locked",[userId])).rows[0]?.locked;
+      if(!owned)throw new Error('SLACK_WRITE_UNKNOWN');
+      await authorize(client);
+      const located=(await client.query('SELECT conv_id FROM plans WHERE id=$1',[planId])).rows[0];if(!located)throw new Error('SLACK_WRITE_UNKNOWN');
+      await client.query('SELECT id FROM conversations WHERE id=$1 FOR UPDATE',[located.conv_id]);
+      const plan=(await client.query('SELECT * FROM plans WHERE id=$1 FOR UPDATE',[planId])).rows[0];
+      const checked=await guardPlanInTransaction(client,this.slack,planId,'planning');
+      const owner=(await client.query('SELECT user_id FROM conversations WHERE id=$1',[located.conv_id])).rows[0]?.user_id;
+      if(!checked.allowed||checked.source||owner!==userId||plan.plan_hash!==planHash||!['partial','reconciliation_required'].includes(plan.status)||!isBoundSlackWritePlan(plan.plan_json,userId))throw new Error('SLACK_WRITE_UNKNOWN');
+      const {step:approved,binding,params}=validateSlackPostPlan(plan.plan_json,userId);
+      const current=(await client.query('SELECT * FROM execution_steps WHERE plan_id=$1 AND step_id=$2 FOR UPDATE',[planId,stepId])).rows[0];
+      if(!current||current.status!=='unknown'||current.tool!==approved.tool||current.requested_by!==userId||
+        !isDeepStrictEqual(current.args_json,approved.args)||!await planOriginAllowed(client,'execution_steps',current,userId))throw new Error('SLACK_WRITE_UNKNOWN');
+      const evidence=(await client.query(`SELECT * FROM slack_write_outbox WHERE operation_id=$1 AND plan_id=$2 AND step_id=$3
+        AND user_id=$4 AND plan_hash=$5 AND status='confirmed' FOR SHARE`,[output.operationId,planId,stepId,userId,planHash])).rows[0];
+      if(!evidence||evidence.connection_id!==binding.connectionId||evidence.workspace_id!==binding.workspaceId||evidence.slack_user_id!==binding.slackUserId||
+        evidence.identity_version!==binding.identityVersion||evidence.request_hash!==slackWriteHash(params)||
+        output.status!=='confirmed'||output.channel!==evidence.channel_id||output.ts!==evidence.provider_ts||Object.keys(output).sort().join(',')!=='channel,operationId,status,ts')throw new Error('SLACK_WRITE_UNKNOWN');
+      const step=(await client.query("UPDATE execution_steps SET status='succeeded',output_json=$3,error_json=NULL,completed_at=clock_timestamp() WHERE plan_id=$1 AND step_id=$2 AND status='unknown' RETURNING *",[planId,stepId,JSON.stringify(output)])).rows[0];
+      if(!step)throw new Error('SLACK_WRITE_UNKNOWN');
+      await sealPlanOrigin(client,'execution_steps',step.id,'step_status');
+      await client.query("UPDATE plans SET status='completed' WHERE id=$1",[planId]);
+    });
+  }
   private readonly slack:SlackDerivedLineageRepo;
   constructor(private pool: pg.Pool,slack?:SlackDerivedLineageRepo) {this.slack=slack??new SlackDerivedLineageRepo(pool,new SlackPolicyService(pool));}
   private async transaction<T>(work:(client:pg.PoolClient)=>Promise<T>):Promise<T>{

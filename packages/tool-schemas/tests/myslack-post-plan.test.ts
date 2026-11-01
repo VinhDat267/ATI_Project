@@ -1,0 +1,8 @@
+import {it,expect} from 'vitest';
+import {validateSlackPostPlan} from '../src/myslack-post-plan.js';
+import {validateSlackPlanBindings} from '../src/myslack-plan-bindings.js';
+const binding={atiUserId:'owner',connectionId:'connection',workspaceId:'T_ONE',slackUserId:'U_ONE',identityVersion:1};
+const policy={binding,purpose:'planning',requestedRetentionDays:0,providerProfileId:'provider',configFingerprint:'a'.repeat(64),policyVersion:'v1',consentRevision:'1',providerRevision:'1'};
+const plan=()=>({kind:'plan',thinking:'',summary:'Post',warnings:[],steps:[{id:'post',tool:'myslack.chat_postMessage',description:'Post',args:{channel:'C_ONE',text:'Exact user text'},dependsOn:[]}],connections:{myslack:{bindings:{connection:binding},steps:{post:{connectionId:'connection',tool:'myslack.chat_postMessage',dependencies:[],policyReference:policy}}}}});
+it('accepts only the explicit source-free single-post shape; the existing read validator still refuses it',()=>{const p=plan();expect(validateSlackPostPlan(p,'owner').binding).toEqual(binding);expect(()=>validateSlackPlanBindings(p.connections.myslack,p.steps)).toThrow('SLACK_WRITE_DISABLED');});
+it.each(['owner','policy','dependency','dm','extra','mixed'])('denies forged %s write plans',kind=>{const p:any=plan();if(kind==='owner')p.connections.myslack.bindings.connection.atiUserId='another';if(kind==='policy')p.connections.myslack.steps.post.policyReference={...policy,binding:{...binding,workspaceId:'T_OTHER'}};if(kind==='dependency')p.steps[0].args.text={$ref:'read.output.text'};if(kind==='dm')p.steps[0].args.channel='D_OTHER';if(kind==='extra')p.connections.myslack.steps.post.trusted=true;if(kind==='mixed')p.steps.push({...p.steps[0],id:'second'});expect(()=>validateSlackPostPlan(p,'owner')).toThrow();});

@@ -13,21 +13,22 @@ export function useExecutionRecovery() {
   const context = useRef({ owner, generation: 0 });
   if (context.current.owner !== owner) { context.current = { owner, generation: context.current.generation + 1 }; }
   useEffect(() => { setRecoveryError(null); }, [conversationId, executionSnapshot?.plan.id]);
-  const recover = async (action: 'retry' | 'skip' | 'stop' | 'continue', stepId?: string): Promise<boolean> => {
+  const recover = async (action: 'retry' | 'skip' | 'stop' | 'continue'|'slack-reconcile', stepId?: string): Promise<boolean> => {
     const planId = executionSnapshot?.plan.id || activePlan?.id;
     const convId = conversationId;
     if (!planId || !convId || pending.current) return false;
     if (!executionSnapshot || !executionSnapshot.recoveryActions.includes(action)) return false;
     const unknown = executionSnapshot.steps.some(step => step.status === 'unknown') || Object.values(stepStatuses).includes('unknown');
     if (unknown && (action === 'retry' || action === 'continue')) return false;
-    if (['retry','skip'].includes(action) && (!stepId || stepId !== executionSnapshot.execution.pausedStepId)) return false;
+    if (['retry','skip','slack-reconcile'].includes(action) && (!stepId || stepId !== executionSnapshot.execution.pausedStepId)) return false;
     const generation = context.current.generation;
     const revision = useChatStore.getState().executionRevision;
     const planRevision = useChatStore.getState().planRevision;
     const owns = () => context.current.generation === generation && useChatStore.getState().conversationId === convId && useChatStore.getState().planRevision === planRevision;
     const token = Symbol(); pending.current = token; setRecoveryBusy(true); setRecoveryError(null);
     try {
-      if (action === 'stop') await apiClient.stopExecution(planId);
+      if(action==='slack-reconcile'&&stepId)await apiClient.reconcileSlackPost(planId,stepId);
+      else if (action === 'stop') await apiClient.stopExecution(planId);
       else if (action === 'continue') await apiClient.continueExecution(planId);
       else if (stepId) {
         if (action === 'retry') await apiClient.retryStep(planId, stepId);

@@ -6,7 +6,8 @@ import { operation, serviceId, servicePalette, serviceName } from './presentatio
 import { RequestEcho } from './RequestEcho';
 export function PlanMoment({request,runtimeMode,plan,services,destination,onPreview,onApprove,onCancel,onEdit,inlineComposer}:{request?:string;runtimeMode:'sandbox'|'live'|null;plan:ActivePlan;services:ServiceInfo[];destination:(step:PlanStep,labels?:Record<string,string>)=>string;onPreview:(step:PlanStep)=>void;onApprove:()=>void;onCancel:()=>void;onEdit:()=>void;inlineComposer:ReactNode}) {
  const [techOpen,setTechOpen]=useState(false);
- const slackRead = !!plan.connections?.myslack;
+ const slackRead = !!plan.connections?.myslack&&plan.steps.every(s=>s.tool!=='myslack.chat_postMessage');
+ const slackPost=plan.steps.some(s=>s.tool==='myslack.chat_postMessage');
  return (<section id="moment-4" className="stage-section is-active v3-space-y-6 relative" aria-label="Cockpit" data-moment="4" aria-labelledby="heading-moment-4">
           <div className="v3-space-y-2">
             <RequestEcho request={request} />
@@ -47,7 +48,7 @@ export function PlanMoment({request,runtimeMode,plan,services,destination,onPrev
                     </h2>
                     <p className="text-xs text-brand-muted mt-1 break-words">
                       Đích đến: {destination(step, plan.resourceLabels)}
-                    </p>
+                    </p>{step.tool==='myslack.chat_postMessage'&&<div className="mt-3 whitespace-pre-wrap break-words text-sm text-brand-text"><span className="font-semibold">Nội dung gửi:</span><p>{String(step.args.text)}</p></div>}
                   </div>
                 </div>
                 <button id={`preview-${step.id}`} type="button" onClick={() => onPreview(step)} className="flex-shrink-0 px-3 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-brand-text text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1.5" aria-label="Xem trước">
@@ -70,7 +71,7 @@ export function PlanMoment({request,runtimeMode,plan,services,destination,onPrev
             </svg>
             <div className="text-xs sm:text-sm text-neutral-800 v3-space-y-0.5">
               <div className="font-semibold text-neutral-900">
-                {slackRead ? 'Chỉ đọc Slack sau khi duyệt. Kết quả được lưu tối đa 1 ngày và có thể bị ẩn khi quyền hoặc nguồn thay đổi.' : runtimeMode==='sandbox' ? 'Các thao tác này chỉ chạy trong chế độ thử nghiệm, không ghi lên công cụ thật.' : runtimeMode==='live' ? 'Các thao tác này ghi thật vào công cụ của nhóm và không tự hoàn tác.' : 'Hãy kiểm tra chế độ máy chủ trước khi duyệt các thao tác ghi.'}
+                {slackPost?'Gửi nguyên văn bằng tài khoản Slack của bạn sau khi duyệt. Nếu chưa rõ kết quả, hãy đối soát trước khi tạo lần gửi khác.':slackRead ? 'Chỉ đọc Slack sau khi duyệt. Kết quả được lưu tối đa 1 ngày và có thể bị ẩn khi quyền hoặc nguồn thay đổi.' : runtimeMode==='sandbox' ? 'Các thao tác này chỉ chạy trong chế độ thử nghiệm, không ghi lên công cụ thật.' : runtimeMode==='live' ? 'Các thao tác này ghi thật vào công cụ của nhóm và không tự hoàn tác.' : 'Hãy kiểm tra chế độ máy chủ trước khi duyệt các thao tác ghi.'}
               </div>
               <div className="text-neutral-600">
                 Kế hoạch được giữ trong 30 phút. Bạn có thể sửa đổi bằng chat hoặc bấm duyệt để bắt đầu ngay.
