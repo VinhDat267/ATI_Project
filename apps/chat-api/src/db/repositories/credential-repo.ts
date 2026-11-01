@@ -127,32 +127,26 @@ export class CredentialRepo {
 
   async getCredentials(
     service: string,
-    workspaceIdOrUserId: string | null = null
+    workspaceId: string | null = null
   ): Promise<ServiceCredentialRow | null> {
-    if (workspaceIdOrUserId) {
-      try {
-        const userRes = await this.pool.query(
-          'SELECT * FROM service_credentials WHERE service = $1 AND user_id = $2',
-          [service, workspaceIdOrUserId]
-        );
-        if (userRes.rows[0]) {
-          const row = userRes.rows[0];
-          return { ...row, workspaceId: row.workspace_id ?? null };
-        }
-      } catch (err: any) {
-        if (err?.code !== '42703') throw err;
-      }
+    if (service === 'gmail' && workspaceId) {
+      const legacyGmail = await this.pool.query(
+        'SELECT * FROM service_credentials WHERE service = $1 AND (user_id = $2 OR user_id IS NULL) ORDER BY user_id NULLS LAST LIMIT 1',
+        [service, workspaceId]
+      );
+      const row = legacyGmail.rows[0];
+      return row ? { ...row, workspaceId: row.workspace_id ?? null } : null;
     }
 
     try {
       const res = await this.pool.query(
         'SELECT * FROM service_credentials WHERE service = $1 AND user_id IS NULL AND workspace_id IS NOT DISTINCT FROM $2',
-        [service, workspaceIdOrUserId]
+        [service, workspaceId]
       );
       const row = res.rows[0];
       if (row) return { ...row, workspaceId: row.workspace_id ?? null };
     } catch (err: any) {
-      if (err?.code === '42703') {
+      if (err?.code === '42703' && !workspaceId) {
         const legacyRes = await this.pool.query(
           'SELECT * FROM service_credentials WHERE service = $1 AND user_id IS NULL',
           [service]
@@ -161,28 +155,6 @@ export class CredentialRepo {
         if (row) return { ...row, workspaceId: null };
       } else {
         throw err;
-      }
-    }
-
-    if (workspaceIdOrUserId) {
-      try {
-        const fallbackRes = await this.pool.query(
-          'SELECT * FROM service_credentials WHERE service = $1 AND user_id IS NULL AND workspace_id IS NULL',
-          [service]
-        );
-        const row = fallbackRes.rows[0];
-        if (row) return { ...row, workspaceId: null };
-      } catch (err: any) {
-        if (err?.code === '42703') {
-          const legacyRes = await this.pool.query(
-            'SELECT * FROM service_credentials WHERE service = $1 AND user_id IS NULL',
-            [service]
-          );
-          const row = legacyRes.rows[0];
-          if (row) return { ...row, workspaceId: null };
-        } else {
-          throw err;
-        }
       }
     }
 

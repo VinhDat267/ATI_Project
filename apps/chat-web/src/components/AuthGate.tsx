@@ -6,6 +6,7 @@ import {
   consumePendingInviteCode,
   setActiveWorkspaceId,
   setCachedOrganizations,
+  resetWorkspaceStorage,
 } from '../services/workspace-storage';
 import { userErrorMessage } from '../services/user-error';
 import { useChatStore } from '../store/chat-store';
@@ -51,6 +52,7 @@ export function AuthGate({ route, navigate, children }: AuthGateProps) {
     if (tokens.user) setUser(tokens.user);
     else if (!tokens.accessToken) setUser(null);
     if (lostSession) {
+      resetWorkspaceStorage();
       useChatStore.getState().reset(); useChatStore.getState().setConversations([]);
       if (!loggingOut.current && route.kind !== 'reset-password') {
         if (source !== 'storage') saveAuthReturnTarget(currentAuthReturnTarget(), lostUserId);
@@ -151,6 +153,7 @@ export function AuthGate({ route, navigate, children }: AuthGateProps) {
     clearAuthReturnTarget();
     try { await apiClient.logout(); } catch { /* Local logout still succeeds if the server cannot be reached. */ }
     finally {
+      resetWorkspaceStorage();
       authStorage.clearStoredTokens(); setAuthToken(null); setUser(null);
       useChatStore.getState().reset(); useChatStore.getState().setConversations([]);
       navigate('/');

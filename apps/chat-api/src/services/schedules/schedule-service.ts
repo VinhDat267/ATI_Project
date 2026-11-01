@@ -128,19 +128,34 @@ export class ScheduleService {
   }
 
   /** The owner row serializes the count across the member's conversations; it comes after the conversation and schedule locks. */
-  private async ensureRoom(client: pg.PoolClient, userId: string): Promise<void> {
+  private async ensureRoom(client: pg.PoolClient, userId: string, scope?: ScheduleScope): Promise<void> {
     await client.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [userId]);
-    const open = await client.query("SELECT count(*)::int AS n FROM schedules WHERE user_id=$1 AND status IN ('active', 'paused')", [userId]);
+    let scopeClause = '';
+    const args: unknown[] = [userId];
+    if (scope?.workspaceMode === 'organization' && scope.workspaceId) {
+      args.push(scope.workspaceId);
+      scopeClause = ` AND workspace_mode='organization' AND workspace_id=$${args.length}`;
+    } else if (scope?.workspaceMode === 'personal') {
+      scopeClause = " AND workspace_mode IN ('personal', 'legacy') AND workspace_id IS NULL";
+    } else if (scope?.workspaceMode === 'legacy') {
+      scopeClause = ' AND workspace_id IS NULL';
+    }
+    const open = await client.query(
+      `SELECT count(*)::int AS n FROM schedules WHERE user_id=$1 AND status IN ('active', 'paused')${scopeClause}`,
+      args
+    );
     if (open.rows[0].n >= this.maxSchedules) throw new ScheduleConflict('LIMIT_REACHED');
   }
 
-  async confirmProposal(input: { userId: string; convId: string; messageId: string; now: Date }): Promise<ScheduleChange> {
-    const { userId, convId, messageId, now } = input;
+  async confirmProposal(input: { userId: string; convId: string; messageId: string; now: Date; scope?: ScheduleScope }): Promise<ScheduleChange> {
+    const { userId, convId, messageId, now, scope } = input;
     if (!isUuid(convId) || !isUuid(messageId)) throw new ScheduleNotFound();
     return this.transaction(async (client) => {
       // The conversation row serializes confirmations, including the first one.
       const owner = await client.query('SELECT user_id, workspace_id, workspace_mode FROM conversations WHERE id=$1 FOR UPDATE', [convId]);
       if (owner.rows[0]?.user_id !== userId) throw new ScheduleNotFound();
+      if (scope?.workspaceMode === 'organization' && owner.rows[0]?.workspace_id !== scope.workspaceId) throw new ScheduleNotFound();
+      if (scope?.workspaceMode === 'personal' && owner.rows[0]?.workspace_id) throw new ScheduleNotFound();
       const message = await client.query(
         "SELECT metadata FROM messages WHERE id=$1 AND conv_id=$2 AND metadata->>'type'='schedule_proposal'", [messageId, convId]);
       if (!message.rowCount) throw new ScheduleNotFound();
@@ -153,12 +168,12 @@ export class ScheduleService {
       if (latest.rows[0].id !== messageId) throw new ScheduleConflict('STALE_PROPOSAL');
 
       const proposal = metadata.proposal;
+      const wsId = owner.rows[0].workspace_id ?? null;
+      const wsMode = owner.rows[0].workspace_mode ?? 'legacy';
       if (proposal.action === 'create') {
         if (existing) throw new ScheduleConflict('CONVERSATION_HAS_SCHEDULE');
-        await this.ensureRoom(client, userId);
+        await this.ensureRoom(client, userId, { workspaceMode: wsMode, workspaceId: wsId });
         const next = this.next({ recurrence: proposal.recurrence! }, now);
-        const wsId = owner.rows[0].workspace_id ?? null;
-        const wsMode = owner.rows[0].workspace_mode ?? 'legacy';
         const created = await client.query(
           `INSERT INTO schedules(user_id, conv_id, name, request, recurrence, services, status, next_run_at, last_proposal_id, workspace_id, workspace_mode)
            VALUES($1, $2, $3, $4, $5, $6, 'active', $7, $8, $9, $10) RETURNING *`,
@@ -173,14 +188,14 @@ export class ScheduleService {
         return this.unchanged(client, existing, now);
       }
       // Turning a finished schedule back on takes a place again.
-      if (!OPEN.has(existing.status) && OPEN.has(fields.status)) await this.ensureRoom(client, userId);
+      if (!OPEN.has(existing.status) && OPEN.has(fields.status)) await this.ensureRoom(client, userId, { workspaceMode: wsMode, workspaceId: wsId });
       return this.recordState(client, await this.saveFields(client, existing.id, fields, messageId), now);
     });
   }
 
-  async setStatus(input: { userId: string; scheduleId: string; action: 'pause' | 'resume' | 'cancel'; version: number; now: Date }): Promise<ScheduleChange> {
+  async setStatus(input: { userId: string; scheduleId: string; action: 'pause' | 'resume' | 'cancel'; version: number; now: Date; scope?: ScheduleScope }): Promise<ScheduleChange> {
     return this.transaction(async (client) => {
-      const row = await this.repo.ownedSchedule(input.scheduleId, input.userId, client, true);
+      const row = await this.repo.ownedSchedule(input.scheduleId, input.userId, client, true, input.scope);
       if (!row) throw new ScheduleNotFound();
       if (row.version !== input.version) throw new ScheduleConflict('STALE_VERSION');
       const fields = this.transition(row, input.action, null, null, input.now);
@@ -193,8 +208,8 @@ export class ScheduleService {
     return this.repo.listForUser(userId, now, scope);
   }
 
-  async listRuns(userId: string, scheduleId: string, limit: number, now: Date) {
-    if (!await this.repo.ownedSchedule(scheduleId, userId)) throw new ScheduleNotFound();
+  async listRuns(userId: string, scheduleId: string, limit: number, now: Date, scope?: ScheduleScope) {
+    if (!await this.repo.ownedSchedule(scheduleId, userId, this.options.pool, false, scope)) throw new ScheduleNotFound();
     return this.repo.listRuns(scheduleId, limit, now);
   }
 
@@ -203,19 +218,19 @@ export class ScheduleService {
   }
 
   /** Creates a run that plans now ("Chạy lượt này ngay", "Lập lại kế hoạch") and hands it to the scheduler. */
-  async startRun(input: ({ scheduleId: string; trigger: 'manual' } | { runId: string; trigger: 'replan' }) & { userId: string; now: Date }): Promise<ScheduleRunView> {
-    const { userId, now } = input;
+  async startRun(input: ({ scheduleId: string; trigger: 'manual' } | { runId: string; trigger: 'replan' }) & { userId: string; now: Date; scope?: ScheduleScope }): Promise<ScheduleRunView> {
+    const { userId, now, scope } = input;
     const row = await this.transaction(async (client) => {
       let scheduleId: string;
       if (input.trigger === 'replan') {
         const previous = await this.repo.run(input.runId, client);
-        if (!previous || !await this.repo.ownedSchedule(previous.schedule_id, userId, client)) throw new ScheduleNotFound();
+        if (!previous || !await this.repo.ownedSchedule(previous.schedule_id, userId, client, false, scope)) throw new ScheduleNotFound();
         if (!REPLANNABLE.has(runState(previous, now))) throw new ScheduleConflict('RUN_NOT_REPLANNABLE');
         scheduleId = previous.schedule_id;
       } else {
         scheduleId = input.scheduleId;
       }
-      const schedule = await this.repo.ownedSchedule(scheduleId, userId, client, true);
+      const schedule = await this.repo.ownedSchedule(scheduleId, userId, client, true, scope);
       if (!schedule) throw new ScheduleNotFound();
       // A finished one-off schedule may plan again for a run that needs it, but not start new runs.
       if (schedule.status === 'cancelled' || (input.trigger === 'manual' && schedule.status === 'completed')) throw new ScheduleConflict('SCHEDULE_CLOSED');

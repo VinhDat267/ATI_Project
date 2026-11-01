@@ -9,6 +9,8 @@ import { WorkspaceSwitcher } from '../src/components/layout/WorkspaceSwitcher';
 import { UsersPage } from '../src/pages/Users/UsersPage';
 import { RequestMoment } from '../src/pages/Cockpit/RequestMoments';
 import { SettingsPage } from '../src/pages/Settings/SettingsPage';
+import { HistoryPage } from '../src/pages/History/HistoryPage';
+import { SchedulesCapabilityContext, useSchedulePendingCount } from '../src/hooks/use-schedules';
 import { apiClient } from '../src/services/api-client';
 import { authStorage } from '../src/services/auth-storage';
 import {
@@ -387,6 +389,96 @@ describe('Personal and Workspace Auth (Task 5)', () => {
     it('stores pending invite code via savePendingInviteCode', () => {
       savePendingInviteCode('ATI-TEST-1234');
       expect(window.localStorage.getItem('wap_pending_invite_code')).toBe('ATI-TEST-1234');
+    });
+  });
+
+  describe('6. Audit Regressions: 403 Workspace Recovery, Logout Storage Reset & Reactive Hooks', () => {
+    it('falls back to personal workspace and surfaces Vietnamese message on 403 WORKSPACE_* error', async () => {
+      authStorage.setStoredTokens({ accessToken: 'test-token', user: testUser });
+      setActiveWorkspaceId('ws-revoked-org');
+
+      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: 'WORKSPACE_MEMBER_DISABLED',
+            message: 'Tài khoản của bạn trong tổ chức này đã bị vô hiệu hóa.',
+          }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+      await expect(apiClient.request('/api/conversations')).rejects.toThrow(
+        'Tài khoản của bạn trong tổ chức này đã bị vô hiệu hóa.'
+      );
+      expect(getActiveWorkspaceId()).toBe('personal');
+    });
+
+    it('clears active workspace and cached organizations when logging out from AuthGate', async () => {
+      const navigate = vi.fn();
+      authStorage.setStoredTokens({ accessToken: 'token-123', user: testUser });
+      setActiveWorkspaceId('ws-team-alpha');
+      setCachedOrganizations([sampleOrg]);
+      vi.spyOn(apiClient, 'getMe').mockResolvedValue({ user: testUser });
+      vi.spyOn(apiClient, 'logout').mockResolvedValue(undefined as any);
+
+      render(
+        <AuthGate route={{ kind: 'home' }} navigate={navigate}>
+          {({ onLogout }) => <button onClick={onLogout}>Log Out Now</button>}
+        </AuthGate>
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Log Out Now' }));
+
+      await waitFor(() => {
+        expect(getActiveWorkspaceId()).toBe('personal');
+      });
+      expect(window.localStorage.getItem('wap_cached_orgs')).toBeNull();
+    });
+
+    it('refreshes useSchedulePendingCount and HistoryPage when switching workspaces', async () => {
+      setActiveWorkspaceId('personal');
+      const countSpy = vi
+        .spyOn(apiClient, 'getSchedulePendingCount')
+        .mockImplementation(async () => ({ count: getActiveWorkspaceId() === 'personal' ? 1 : 7 }));
+
+      const convSpy = vi
+        .spyOn(apiClient, 'getConversations')
+        .mockImplementation(async () => ({
+          conversations:
+            getActiveWorkspaceId() === 'personal'
+              ? [{ id: 'c-personal', title: 'Chat Cá Nhân', created_at: '2026-11-01T00:00:00Z', updated_at: '2026-11-01T00:00:00Z' }]
+              : [{ id: 'c-org', title: 'Chat Tổ Chức Alpha', created_at: '2026-11-01T00:00:00Z', updated_at: '2026-11-01T00:00:00Z' }],
+          nextCursor: null,
+        } as any));
+
+      function PendingBadgeProbe() {
+        const count = useSchedulePendingCount(testUser);
+        return <span data-testid="pending-count">{count}</span>;
+      }
+
+      render(
+        <SchedulesCapabilityContext.Provider value={true}>
+          <PendingBadgeProbe />
+          <HistoryPage user={testUser} navigate={vi.fn()} onLogout={vi.fn()} />
+        </SchedulesCapabilityContext.Provider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('pending-count')).toHaveTextContent('1');
+      });
+      expect(await screen.findByText('Chat Cá Nhân')).toBeInTheDocument();
+
+      // Switch workspace to ws-team-alpha
+      setActiveWorkspaceId('ws-team-alpha');
+
+      await waitFor(() => {
+        expect(screen.getByTestId('pending-count')).toHaveTextContent('7');
+      });
+      await waitFor(() => {
+        expect(convSpy).toHaveBeenCalledTimes(2);
+        expect(screen.getByText('Chat Tổ Chức Alpha')).toBeInTheDocument();
+      });
+      expect(countSpy).toHaveBeenCalled();
     });
   });
 });

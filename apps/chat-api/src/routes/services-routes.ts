@@ -71,6 +71,12 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
     string,
     { credentialVersion: string | null; connectionStatus: 'healthy' | 'unhealthy' | 'unconfigured'; lastCheckedAt: string }
   >();
+  const checkKey = (service: string, mode: string, workspaceId: string | null, userId?: string) =>
+    mode === 'personal'
+      ? `personal:${userId ?? 'anon'}:${service}`
+      : mode === 'organization'
+        ? `org:${workspaceId ?? 'none'}:${service}`
+        : `legacy:${service}`;
 
   const getContext = (req: Request) => {
     const mode = req.workspace?.mode ?? 'legacy';
@@ -362,7 +368,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
           const configured =
             !isTrello &&
             Boolean(config && hasValidCredentials(credentialFields, config) && normalizeAllowedScope(definition, scope));
-          const savedCheck = checks.get(id);
+          const savedCheck = checks.get(checkKey(id, mode, workspaceId, userId));
           const check =
             savedCheck?.credentialVersion === (record ? versionOf(record.config) : null) ? savedCheck : undefined;
 
@@ -446,7 +452,10 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
   // POST /api/services/:service/test
   router.post('/:service/test', async (req: Request, res: Response): Promise<void> => {
     const service = String(req.params.service);
-    const generation = generations.get(service) ?? 0;
+    const { mode, workspaceId } = getContext(req);
+    const userId = (req as any).user?.id;
+    const key = checkKey(service, mode, workspaceId, userId);
+    const generation = generations.get(key) ?? 0;
     let credentialVersion: string | null = null;
     try {
       if (!getRegisteredService(service)) {
@@ -454,8 +463,6 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
         return;
       }
 
-      const { mode, workspaceId } = getContext(req);
-      const userId = (req as any).user?.id;
       let record: any = null;
       if (mode === 'personal' && userId) {
         record = await credentialRepo?.getPersonalCredentials(service, userId);
@@ -467,16 +474,16 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
 
       credentialVersion = record ? versionOf(record.config) : null;
       if (!record || !encryptionKey) {
-        if ((generations.get(service) ?? 0) === generation) {
-          checks.set(service, { credentialVersion, connectionStatus: 'unconfigured', lastCheckedAt: new Date().toISOString() });
+        if ((generations.get(key) ?? 0) === generation) {
+          checks.set(key, { credentialVersion, connectionStatus: 'unconfigured', lastCheckedAt: new Date().toISOString() });
         }
         res.status(409).json({ service, status: 'unconfigured', message: `${service} credentials are not configured` });
         return;
       }
       const config = decryptCredentials(record.config, encryptionKey);
       const result = await verifyService(service, config, fetchFn);
-      if ((generations.get(service) ?? 0) === generation) {
-        checks.set(service, {
+      if ((generations.get(key) ?? 0) === generation) {
+        checks.set(key, {
           credentialVersion,
           connectionStatus: result.healthy ? 'healthy' : 'unhealthy',
           lastCheckedAt: new Date().toISOString(),
@@ -484,8 +491,8 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
       }
       res.status(result.healthy ? 200 : 502).json({ service, status: result.healthy ? 'healthy' : 'unhealthy', ...result });
     } catch (err: any) {
-      if ((generations.get(service) ?? 0) === generation) {
-        checks.set(service, { credentialVersion, connectionStatus: 'unhealthy', lastCheckedAt: new Date().toISOString() });
+      if ((generations.get(key) ?? 0) === generation) {
+        checks.set(key, { credentialVersion, connectionStatus: 'unhealthy', lastCheckedAt: new Date().toISOString() });
       }
       res.status(502).json({ status: 'unhealthy', error: 'Service connection verification failed' });
     }
@@ -542,16 +549,21 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
         encryptionKey
       );
 
+      const key = checkKey(service, mode, workspaceId, userId);
       if (mode === 'personal') {
         await credentialRepo.upsertPersonalCredentials({ service, userId, config: encrypted, status: 'active' });
+        generations.set(key, (generations.get(key) ?? 0) + 1);
+        checks.delete(key);
         options.onCredentialsChanged?.(service, null, userId);
       } else if (mode === 'organization') {
         await credentialRepo.upsertCredentials(service, encrypted, 'active', (req as any).user?.email, workspaceId);
+        generations.set(key, (generations.get(key) ?? 0) + 1);
+        checks.delete(key);
         options.onCredentialsChanged?.(service, workspaceId);
       } else {
         await credentialRepo.saveCredentials(service, encrypted);
-        generations.set(service, (generations.get(service) ?? 0) + 1);
-        checks.delete(service);
+        generations.set(key, (generations.get(key) ?? 0) + 1);
+        checks.delete(key);
         options.onCredentialsChanged?.(service);
       }
 
@@ -576,8 +588,11 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
         return;
       }
 
+      const key = checkKey(service, mode, workspaceId, userId);
       if (mode === 'personal') {
         await credentialRepo.deletePersonalCredentials(service, userId);
+        generations.set(key, (generations.get(key) ?? 0) + 1);
+        checks.delete(key);
         options.onCredentialsChanged?.(service, null, userId);
       } else if (mode === 'organization') {
         if (!isAdminUser) {
@@ -585,6 +600,8 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
           return;
         }
         await credentialRepo.deleteCredentials(service, workspaceId);
+        generations.set(key, (generations.get(key) ?? 0) + 1);
+        checks.delete(key);
         options.onCredentialsChanged?.(service, workspaceId);
       } else {
         if (!isAdminUser) {
@@ -592,6 +609,8 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
           return;
         }
         await credentialRepo.deleteCredentials(service, null);
+        generations.set(key, (generations.get(key) ?? 0) + 1);
+        checks.delete(key);
         options.onCredentialsChanged?.(service);
       }
 
@@ -634,6 +653,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
         return;
       }
 
+      const key = checkKey(service, mode, workspaceId, userId);
       if (mode === 'personal') {
         const current = await credentialRepo.getPersonalCredentials(service, userId);
         if (!current) {
@@ -643,6 +663,8 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
         const dec = decryptCredentials(current.config, encryptionKey);
         const newConfig = encryptCredentials({ ...dec, allowedScope: scope }, encryptionKey);
         await credentialRepo.upsertPersonalCredentials({ service, userId, config: newConfig, status: current.status });
+        generations.set(key, (generations.get(key) ?? 0) + 1);
+        checks.delete(key);
         options.onCredentialsChanged?.(service, null, userId);
       } else if (mode === 'organization') {
         const saved = await credentialRepo.updateCredentials(
@@ -661,6 +683,8 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
           res.status(409).json({ error: 'Hãy lưu thông tin kết nối dịch vụ trước khi đổi phạm vi tài nguyên.' });
           return;
         }
+        generations.set(key, (generations.get(key) ?? 0) + 1);
+        checks.delete(key);
         options.onCredentialsChanged?.(service, workspaceId);
       } else {
         const saved = await credentialRepo.updateCredentials(
@@ -679,8 +703,8 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
           res.status(409).json({ error: 'Hãy lưu thông tin kết nối dịch vụ trước khi đổi phạm vi tài nguyên.' });
           return;
         }
-        generations.set(service, (generations.get(service) ?? 0) + 1);
-        checks.delete(service);
+        generations.set(key, (generations.get(key) ?? 0) + 1);
+        checks.delete(key);
         options.onCredentialsChanged?.(service);
       }
 

@@ -513,11 +513,15 @@ export class ChatService {
    * Design 5.4: a new or changed schedule takes its services from the router,
    * never from the model, and is refused when one of them is not configured.
    */
-  private async prepareProposal(proposal: ScheduleResponse, userId: string, schedule: ScheduleView | null): Promise<PlannerResponse | ScheduleProposalMetadata> {
+  private async prepareProposal(
+    proposal: ScheduleResponse,
+    actor: { userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization' },
+    schedule: ScheduleView | null
+  ): Promise<PlannerResponse | ScheduleProposalMetadata> {
     if (!this.schedules) throw new Error('Schedules are off');
     let services: string[];
     if (proposal.action === 'create' || proposal.action === 'update') {
-      const route = await this.planner.routeSchedule(proposal.request!, { userId });
+      const route = await this.planner.routeSchedule(proposal.request!, actor);
       if (route.unavailable.length > 0 || route.services.length === 0) return unroutable(route.unavailable);
       services = route.services;
     } else {
@@ -532,6 +536,26 @@ export class ChatService {
       previous: current ? { name: current.name, request: current.request, recurrence: current.recurrence, status: current.status } : null };
   }
 
+  private async actorForConversation(
+    conversationId: string,
+    userId: string
+  ): Promise<{ userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization' }> {
+    if (!this.convRepo) return { userId };
+    try {
+      const conv = await this.convRepo.getConversation(conversationId);
+      if (conv?.workspace_mode && conv.workspace_mode !== 'legacy') {
+        return {
+          userId,
+          workspaceId: conv.workspace_id ?? null,
+          workspaceMode: conv.workspace_mode,
+        };
+      }
+    } catch {
+      // ignore
+    }
+    return { userId };
+  }
+
   /**
    * Shared by the chat and by scheduled runs: binds connections, labels and
    * hashes a plan, or turns a schedule into its proposal, without writing.
@@ -543,16 +567,12 @@ export class ChatService {
   ): Promise<PreparedResponse> {
     const { conversationId, correlation } = target;
     let trelloTeamBoards: Array<{ boardId: string; boardName: string }> | undefined;
+    const actor = await this.actorForConversation(conversationId, target.userId);
     let scopeId = 'default';
-    if (this.convRepo) {
-      try {
-        const conv = await this.convRepo.getConversation(conversationId);
-        if (conv?.workspace_mode === 'organization' && conv.workspace_id) {
-          scopeId = conv.workspace_id;
-        } else if (conv?.workspace_mode === 'personal' && target.userId) {
-          scopeId = `personal:${target.userId}`;
-        }
-      } catch { /* ignore */ }
+    if (actor.workspaceMode === 'organization' && actor.workspaceId) {
+      scopeId = actor.workspaceId;
+    } else if (actor.workspaceMode === 'personal' && target.userId) {
+      scopeId = `personal:${target.userId}`;
     }
     let response = planned.kind === 'plan'
       ? await this.bindConnections(planned, target.userId, signal, memory, (boards) => { trelloTeamBoards = boards; }, scopeId)
@@ -560,7 +580,7 @@ export class ChatService {
     signal?.throwIfAborted();
     let proposal: ScheduleProposalMetadata | null = null;
     if (response.kind === 'schedule') {
-      const prepared = await this.prepareProposal(response, target.userId, target.schedule ?? null);
+      const prepared = await this.prepareProposal(response, actor, target.schedule ?? null);
       if ('type' in prepared) proposal = prepared; else response = prepared;
     }
     const emit = (event: string, payload: Record<string, unknown>) => this.eventEmitter.emit(event, { conversationId, ...payload, ...correlation });
@@ -664,11 +684,12 @@ export class ChatService {
     if (lastMemory?.metadata?.state && typeof lastMemory.metadata.state === 'object') {
       memory.fromJSON(lastMemory.metadata.state);
     }
+    const actor = await this.actorForConversation(conversationId, userId);
     const plannerResponse: PlannerResponse = await this.planner.processMessage({
       userMessage: content,
       history,
       memory,
-      actor: { userId },
+      actor,
       onGatherEvent: (event) => this.eventEmitter.emit('gather_progress', { conversationId, ...event }),
       ...(schedule ? { schedule: { services: schedule.services } } : {}),
     });
@@ -692,8 +713,11 @@ export class ChatService {
     const correlation: Correlation = first ? { replyToMessageId: first.id } : {};
     this.eventEmitter.emit('agent_state', { conversationId: convId, state: 'planning', ...correlation });
     const memory = new WorkingMemory();
+    const actor = run.workspaceMode && run.workspaceMode !== 'legacy'
+      ? { userId: run.userId, workspaceId: run.workspaceId ?? null, workspaceMode: run.workspaceMode }
+      : await this.actorForConversation(convId, run.userId);
     const response = await this.planner.processMessage({
-      userMessage, history: [], memory, signal, actor: { userId: run.userId }, scheduledRun: true,
+      userMessage, history: [], memory, signal, actor, scheduledRun: true,
       onGatherEvent: (event) => this.eventEmitter.emit('gather_progress', { conversationId: convId, ...event }),
     });
     signal.throwIfAborted();

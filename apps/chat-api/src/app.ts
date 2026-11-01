@@ -104,7 +104,7 @@ export interface AppOptions extends AdminUsersOptions {
   credentialRepo?: CredentialRepo;
   encryptionKey?: string;
   serviceFetchFn?: typeof fetch;
-  onCredentialsChanged?: (service: string) => void;
+  onCredentialsChanged?: (service: string, workspaceId?: string | null, userId?: string) => void;
   serviceAdminUserIds?: string[];
   chatService?: ChatService;
   sseManager?: SSEManager;
@@ -237,7 +237,7 @@ export function createApp(options: AppOptions): Express {
   }, createAdminUsersRoutes(options));
 
   if (options.workspaceRepo) {
-    app.use('/api/workspaces', withAuthAndWorkspace, createWorkspacesRouter({
+    app.use('/api/workspaces', authMiddleware, createWorkspacesRouter({
       workspaceRepo: options.workspaceRepo,
       emailSender: options.emailSender,
     }));

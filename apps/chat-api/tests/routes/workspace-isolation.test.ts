@@ -15,6 +15,8 @@ import { AdminUserRepo } from '../../src/db/repositories/admin-user-repo.js';
 import { ScheduleService } from '../../src/services/schedules/schedule-service.js';
 import { ExecutionService } from '../../src/services/execution-service.js';
 import { TrelloTokenManager } from '../../src/services/trello/token-manager.js';
+import { getToolCatalogFor } from '../../src/services/registered-services.js';
+import { createTrelloConnectionLookup } from '../../src/services/trello/connection-reference.js';
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
 
 const secret = 'workspace_isolation_test_secret_32_chars!';
@@ -123,6 +125,8 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
       workspaceRepo,
       credentialRepo: credentials,
       encryptionKey: key,
+      serviceFetchFn: async () =>
+        new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
       convRepo,
       msgRepo,
       chatService: {
@@ -304,6 +308,67 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
         .set('X-Workspace-Id', orgB.id);
       const jiraOrgB = charlieOrgB.body.services.find((s: any) => s.id === 'jira');
       expect(jiraOrgB.configured).toBe(false);
+
+      // Even if a global legacy credential (workspace_id IS NULL) exists, Org B MUST NOT inherit it
+      await credentials.saveCredentials(
+        'jira',
+        encryptCredentials(
+          {
+            siteUrl: 'https://legacy.atlassian.net',
+            email: 'legacy@example.com',
+            apiToken: 'legacy-token',
+            allowedScope: { projects: ['LEGACY'] },
+          },
+          key
+        ),
+        null,
+        null
+      );
+      const charlieOrgBAfterLegacy = await request(app)
+        .get('/api/services')
+        .set('Authorization', `Bearer ${charlieToken}`)
+        .set('X-Workspace-Id', orgB.id);
+      const jiraOrgBAfterLegacy = charlieOrgBAfterLegacy.body.services.find((s: any) => s.id === 'jira');
+      expect(jiraOrgBAfterLegacy.configured).toBe(false);
+    });
+
+    it('isolates service health-check cache between personal and organization workspaces', async () => {
+      const aliceToken = tokenFor(alice);
+      const orgA = await workspaceRepo.create(alice.id, 'Org Health A', false);
+
+      // Configure slack in both Alice personal and Org A
+      await request(app)
+        .post('/api/services/slack/credentials')
+        .set('Authorization', `Bearer ${aliceToken}`)
+        .set('X-Workspace-Id', 'personal')
+        .send({ credentials: { botToken: 'xoxb-alice-personal' }, allowedScope: ['C1'] });
+
+      await request(app)
+        .post('/api/services/slack/credentials')
+        .set('Authorization', `Bearer ${aliceToken}`)
+        .set('X-Workspace-Id', orgA.id)
+        .send({ credentials: { botToken: 'xoxb-org-a-token' }, allowedScope: ['C2'] });
+
+      // Test connection in Personal workspace
+      const testRes = await request(app)
+        .post('/api/services/slack/test')
+        .set('Authorization', `Bearer ${aliceToken}`)
+        .set('X-Workspace-Id', 'personal');
+      expect(testRes.status).toBe(200);
+
+      // Personal workspace shows slack as healthy
+      const personalList = await request(app)
+        .get('/api/services')
+        .set('Authorization', `Bearer ${aliceToken}`)
+        .set('X-Workspace-Id', 'personal');
+      expect(personalList.body.services.find((s: any) => s.id === 'slack').connectionStatus).toBe('healthy');
+
+      // Org A workspace must still show slack as unchecked (not polluted by personal check)
+      const orgList = await request(app)
+        .get('/api/services')
+        .set('Authorization', `Bearer ${aliceToken}`)
+        .set('X-Workspace-Id', orgA.id);
+      expect(orgList.body.services.find((s: any) => s.id === 'slack').connectionStatus).toBe('unchecked');
     });
   });
 
@@ -416,6 +481,155 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
         .set('Authorization', `Bearer ${aliceToken}`)
         .set('X-Workspace-Id', org.id);
       expect(getWrong2.status).toBe(404);
+    });
+
+    it('isolates schedule mutations and run listings across workspace boundaries', async () => {
+      const aliceToken = tokenFor(alice);
+      const org = await workspaceRepo.create(alice.id, 'Sched Org', false);
+
+      // Create conversation and schedule proposal in personal space
+      const convP = await convRepo.createConversation(alice.id, { workspaceMode: 'personal', workspaceId: null });
+      const msg = await msgRepo.createMessage(convP.id, 'assistant', 'Đề xuất lịch', {
+        type: 'schedule_proposal',
+        proposal: {
+          action: 'create',
+          name: 'Báo cáo cá nhân',
+          request: 'Gửi báo cáo lên Slack',
+          summary: 'Lịch cá nhân',
+          recurrence: { kind: 'daily', time: '09:00' },
+        },
+        services: ['slack'],
+        nextRuns: [],
+        scheduleId: null,
+        baseVersion: null,
+        previous: null,
+      });
+
+      // Confirm from personal workspace -> 200
+      const confirmRes = await request(app)
+        .post(`/api/conversations/${convP.id}/schedule-proposals/${msg.id}/confirm`)
+        .set('Authorization', `Bearer ${aliceToken}`)
+        .set('X-Workspace-Id', 'personal');
+      expect(confirmRes.status).toBe(200);
+      const scheduleId = confirmRes.body.schedule.id;
+
+      // Attempting to pause, list runs, or run-now on personal schedule from org workspace -> 404
+      const runsWrongWs = await request(app)
+        .get(`/api/schedules/${scheduleId}/runs`)
+        .set('Authorization', `Bearer ${aliceToken}`)
+        .set('X-Workspace-Id', org.id);
+      expect(runsWrongWs.status).toBe(404);
+
+      const pauseWrongWs = await request(app)
+        .post(`/api/schedules/${scheduleId}/pause`)
+        .set('Authorization', `Bearer ${aliceToken}`)
+        .set('X-Workspace-Id', org.id)
+        .send({ version: 1 });
+      expect(pauseWrongWs.status).toBe(404);
+
+      const runNowWrongWs = await request(app)
+        .post(`/api/schedules/${scheduleId}/run-now`)
+        .set('Authorization', `Bearer ${aliceToken}`)
+        .set('X-Workspace-Id', org.id);
+      expect(runNowWrongWs.status).toBe(404);
+
+      // Pause from personal workspace -> 200
+      const pauseRightWs = await request(app)
+        .post(`/api/schedules/${scheduleId}/pause`)
+        .set('Authorization', `Bearer ${aliceToken}`)
+        .set('X-Workspace-Id', 'personal')
+        .send({ version: 1 });
+      expect(pauseRightWs.status).toBe(200);
+    });
+
+    it('builds isolated tool catalogs for personal vs organization workspaces during planning', async () => {
+      const aliceToken = tokenFor(alice);
+      const orgA = await workspaceRepo.create(alice.id, 'Catalog Org A', false);
+      const orgB = await workspaceRepo.create(alice.id, 'Catalog Org B', false);
+
+      // Configure Slack in Alice's personal workspace
+      await request(app)
+        .post('/api/services/slack/credentials')
+        .set('Authorization', `Bearer ${aliceToken}`)
+        .set('X-Workspace-Id', 'personal')
+        .send({ credentials: { botToken: 'xoxb-personal-slack' }, allowedScope: ['C1'] });
+
+      // Configure GitHub in Org A
+      await request(app)
+        .post('/api/services/github/credentials')
+        .set('Authorization', `Bearer ${aliceToken}`)
+        .set('X-Workspace-Id', orgA.id)
+        .send({ credentials: { token: 'ghp_orgA_token123456' }, allowedScope: ['owner/repo'] });
+
+      // Connect Trello & save personal scope for Alice
+      await connectUserTrello(alice);
+      await request(app)
+        .put('/api/connections/trello/scope')
+        .set('Authorization', `Bearer ${aliceToken}`)
+        .set('X-Workspace-Id', 'personal')
+        .send({ workspaceId: 'ws-1', boardIds: ['b-1'] });
+
+      const trelloLookup = createTrelloConnectionLookup({
+        credentialRepo: credentials,
+        teamRepo: trelloTeamRepo,
+        encryptionKey: key,
+        tokens: tokenManager,
+        client: {
+          boards: async () => [{ id: 'b-1', name: 'Sprint Board', idOrganization: 'ws-1', member: true }],
+        } as any,
+      });
+
+      // 1. Personal tool catalog for Alice includes slack & trello, NOT github
+      const personalCatalog = await getToolCatalogFor(credentials, key, {
+        userId: alice.id,
+        workspaceMode: 'personal',
+        workspaceId: null,
+        gmailEnabled: false,
+        trelloConnection: trelloLookup,
+      });
+      const personalServices = new Set(personalCatalog.map((t) => t.service));
+      expect(personalServices.has('slack')).toBe(true);
+      expect(personalServices.has('trello')).toBe(true);
+      expect(personalServices.has('github')).toBe(false);
+
+      // 2. Org A tool catalog includes github, NOT Alice's personal slack or personal trello scope
+      const orgACatalog = await getToolCatalogFor(credentials, key, {
+        userId: alice.id,
+        workspaceMode: 'organization',
+        workspaceId: orgA.id,
+        gmailEnabled: false,
+        trelloConnection: trelloLookup,
+      });
+      const orgAServices = new Set(orgACatalog.map((t) => t.service));
+      expect(orgAServices.has('github')).toBe(true);
+      expect(orgAServices.has('slack')).toBe(false);
+      expect(orgAServices.has('trello')).toBe(false);
+
+      // 3. Org B tool catalog is empty
+      const orgBCatalog = await getToolCatalogFor(credentials, key, {
+        userId: alice.id,
+        workspaceMode: 'organization',
+        workspaceId: orgB.id,
+        gmailEnabled: false,
+        trelloConnection: trelloLookup,
+      });
+      expect(orgBCatalog).toHaveLength(0);
+    });
+
+    it('allows GET /api/workspaces even when X-Workspace-Id header points to a pending or disabled workspace', async () => {
+      const aliceToken = tokenFor(alice);
+      const bobToken = tokenFor(bob);
+      const org = await workspaceRepo.create(alice.id, 'Pending Lockout Org', true);
+      await workspaceRepo.joinByInviteCode(bob.id, org.inviteCode!);
+
+      // Bob is pending in org, but sends X-Workspace-Id: org.id when fetching /api/workspaces
+      const res = await request(app)
+        .get('/api/workspaces')
+        .set('Authorization', `Bearer ${bobToken}`)
+        .set('X-Workspace-Id', org.id);
+      expect(res.status).toBe(200);
+      expect(res.body.personal.id).toBe('personal');
+      expect(res.body.organizations[0].status).toBe('pending');
     });
   });
 

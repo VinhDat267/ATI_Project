@@ -55,6 +55,12 @@ export class GoogleAuthRepo {
         }
       } else {
         user = (await client.query<UserRow>('SELECT * FROM users WHERE google_sub=$1 FOR UPDATE', [profile.sub])).rows[0];
+        if (user && user.status === 'pending') {
+          user = (await client.query<UserRow>(
+            `UPDATE users SET status='active', email_verified=true, updated_at=$2 WHERE id=$1 RETURNING *`,
+            [user.id, new Date(now)]
+          )).rows[0]!;
+        }
         if (!user) {
           user = (await client.query<UserRow>('SELECT * FROM users WHERE email=$1 FOR UPDATE', [profile.email])).rows[0];
           if (!user) {

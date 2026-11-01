@@ -131,6 +131,14 @@ describe('AUTH-04 Google OAuth with real PostgreSQL', () => {
     expect(r.body.accessToken).toBeDefined();
     expect((await users.findByEmail(email))!.status).toBe('active');
   });
+  it('elevates existing google_sub user with pending status to active upon Google login', async () => {
+    const u = await user(true, 'pending');
+    await pool.query('UPDATE users SET google_sub=$2 WHERE id=$1', [u.id, subject]);
+    const r = await login();
+    expect(r.status).toBe(200);
+    expect(r.body.accessToken).toBeDefined();
+    expect((await users.findById(u.id))!.status).toBe('active');
+  });
   it('retains disabled and refuses login with 403 ACCOUNT_DISABLED', async () => {
     await user(false, 'disabled');
     const r = await login();

@@ -1,5 +1,5 @@
 import { authStorage } from './auth-storage';
-import { getActiveWorkspaceId } from './workspace-storage';
+import { getActiveWorkspaceId, setActiveWorkspaceId } from './workspace-storage';
 import type { ScheduleView, ScheduleRunView } from '@wap/tool-schemas';
 import type {
   ActivePlan,
@@ -132,13 +132,25 @@ export class ApiClient {
       if (response.status === 401 && latest.accessToken === requestToken && latest.refreshToken === requestRefresh) {
         authStorage.clearStoredTokens();
       }
-      const error: any = new Error(
-        (typeof data?.error === 'object' ? data.error?.message : data?.error) ||
-          data?.message ||
-          `Request failed with status ${response.status}`
-      );
+      const errCode = typeof data?.error === 'object' ? data.error?.code : typeof data?.code === 'string' ? data.code : typeof data?.error === 'string' && /^[A-Z0-9_]+$/.test(data.error) ? data.error : undefined;
+      if (
+        response.status === 403 &&
+        (errCode === 'WORKSPACE_MEMBER_PENDING' ||
+          errCode === 'WORKSPACE_MEMBER_DISABLED' ||
+          errCode === 'WORKSPACE_ACCESS_DENIED') &&
+        !url.includes('/api/workspaces/join') &&
+        getActiveWorkspaceId() !== 'personal'
+      ) {
+        setActiveWorkspaceId('personal');
+      }
+      const rawErrorText = typeof data?.error === 'object' ? data.error?.message : data?.error;
+      const preferredMessage =
+        typeof rawErrorText === 'string' && /^[A-Z0-9_]+$/.test(rawErrorText) && typeof data?.message === 'string' && data.message
+          ? data.message
+          : rawErrorText || data?.message || `Request failed with status ${response.status}`;
+      const error: any = new Error(preferredMessage);
       error.status = response.status;
-      error.code = data?.error?.code;
+      error.code = errCode;
       error.data = data;
       error.response = response;
       throw error;
