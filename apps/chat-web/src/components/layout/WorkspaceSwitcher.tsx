@@ -46,8 +46,11 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
     });
   }, []);
 
-  // Fetch workspaces list from API on mount
+  // Fetch workspaces list from API when dropdown opens or when an org workspace is active on boot
   useEffect(() => {
+    if (!open && (getActiveWorkspaceId() === 'personal' || getCachedOrganizations().length > 0)) {
+      return;
+    }
     let current = true;
     const { accessToken } = authStorage.getStoredTokens();
     if (accessToken && typeof apiClient.getWorkspaces === 'function') {
@@ -65,7 +68,7 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
     return () => {
       current = false;
     };
-  }, []);
+  }, [open]);
 
   // Close dropdown on outside click
   useEffect(() => {
