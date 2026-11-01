@@ -22,15 +22,29 @@ const live = {
 };
 
 describe('Trello OAuth configuration', () => {
-  it('reads client ID, secret, redirect URI and defaults to Global Constraints endpoints when all three required variables are present', () => {
-    const config = validateEnv(trello);
+  it('pins the real Atlassian and Trello endpoints in live mode when not overridden', () => {
+    const config = validateEnv({
+      ...live,
+      ...trello,
+      TRELLO_OAUTH_REDIRECT_URI: 'https://ati.example/connections/trello/callback',
+    });
     expect(config.TRELLO_OAUTH).toBeDefined();
     expect(config.TRELLO_OAUTH?.clientId).toBe('trello-client-id');
     expect(config.TRELLO_OAUTH?.clientSecret).toBe('trello-client-secret');
-    expect(config.TRELLO_OAUTH?.redirectUri).toBe('http://127.0.0.1:5174/connections/trello/callback');
+    expect(config.TRELLO_OAUTH?.redirectUri).toBe('https://ati.example/connections/trello/callback');
     expect(config.TRELLO_OAUTH?.authorizationUrl).toBe('https://auth.atlassian.com/authorize');
     expect(config.TRELLO_OAUTH?.tokenUrl).toBe('https://auth.atlassian.com/oauth/token');
     expect(config.TRELLO_OAUTH?.apiBaseUrl).toBe('https://api.trello.com/1');
+  });
+
+  it('leaves TRELLO_OAUTH undefined in sandbox mode when client credentials are provided without mock overrides', () => {
+    const config = validateEnv({ ...trello, RUNTIME_MODE: 'sandbox' });
+    expect(config.TRELLO_OAUTH).toBeUndefined();
+
+    // Missing any one of the three overrides in sandbox leaves TRELLO_OAUTH undefined
+    expect(validateEnv({ ...trello, ...fake, TRELLO_OAUTH_AUTH_URL: undefined }).TRELLO_OAUTH).toBeUndefined();
+    expect(validateEnv({ ...trello, ...fake, TRELLO_OAUTH_TOKEN_URL: undefined }).TRELLO_OAUTH).toBeUndefined();
+    expect(validateEnv({ ...trello, ...fake, TRELLO_API_BASE_URL: undefined }).TRELLO_OAUTH).toBeUndefined();
   });
 
   it('leaves TRELLO_OAUTH undefined if any required variable is missing or empty, and process still starts', () => {
@@ -69,13 +83,13 @@ describe('Trello OAuth configuration', () => {
   });
 
   it('accepts loopback HTTP hosts and remote HTTPS redirect URIs', () => {
-    const localhost = validateEnv({ ...trello, TRELLO_OAUTH_REDIRECT_URI: 'http://localhost:5174/connections/trello/callback' });
+    const localhost = validateEnv({ ...trello, ...fake, TRELLO_OAUTH_REDIRECT_URI: 'http://localhost:5174/connections/trello/callback' });
     expect(localhost.TRELLO_OAUTH?.redirectUri).toBe('http://localhost:5174/connections/trello/callback');
 
-    const ipv6 = validateEnv({ ...trello, TRELLO_OAUTH_REDIRECT_URI: 'http://[::1]:5174/connections/trello/callback' });
+    const ipv6 = validateEnv({ ...trello, ...fake, TRELLO_OAUTH_REDIRECT_URI: 'http://[::1]:5174/connections/trello/callback' });
     expect(ipv6.TRELLO_OAUTH?.redirectUri).toBe('http://[::1]:5174/connections/trello/callback');
 
-    const https = validateEnv({ ...trello, TRELLO_OAUTH_REDIRECT_URI: 'https://example.com/connections/trello/callback' });
+    const https = validateEnv({ ...trello, ...fake, TRELLO_OAUTH_REDIRECT_URI: 'https://example.com/connections/trello/callback' });
     expect(https.TRELLO_OAUTH?.redirectUri).toBe('https://example.com/connections/trello/callback');
   });
 

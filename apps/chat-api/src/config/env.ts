@@ -442,16 +442,22 @@ function trelloOAuth(env: Record<string, string | undefined>, isLive: boolean): 
 
   const endpoints = { ...TRELLO_ENDPOINTS };
   if (!isLive) {
+    let missingOverride = false;
     for (const [key, field] of Object.entries(TRELLO_ENDPOINT_OVERRIDES)) {
-      if (!env[field]?.trim()) continue;
+      const val = env[field]?.trim();
+      if (!val) {
+        missingOverride = true;
+        continue;
+      }
       try {
-        const url = new URL(env[field]!.trim());
+        const url = new URL(val);
         if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.hash) throw new Error();
         endpoints[key as keyof typeof endpoints] = url.href.replace(/\/$/, '');
       } catch {
         throw new Error(`${field} must be an HTTP(S) endpoint without credentials or fragment`);
       }
     }
+    if (missingOverride) return undefined;
   }
 
   return {
