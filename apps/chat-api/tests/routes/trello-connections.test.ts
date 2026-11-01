@@ -142,6 +142,7 @@ describe('Trello connection routes', () => {
       expect(url.searchParams.get('redirect_uri')).toBe(mockOAuthConfig.redirectUri);
       expect(url.searchParams.get('response_type')).toBe('code');
       expect(url.searchParams.get('prompt')).toBe('consent');
+      expect(url.searchParams.get('scope')).toBe('read:board:trello write:board:trello read:member:trello read:organization:trello offline_access');
       expect(url.searchParams.get('code_challenge_method')).toBe('S256');
 
       // Crucial security constraints

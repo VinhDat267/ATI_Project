@@ -15,7 +15,7 @@
 ## Global Constraints
 
 - Không có biến `TRELLO_OAUTH_ENABLED`. Đưa phần này vào bản đang chạy là ô dán token biến mất.
-- Scope gửi đi đúng chuỗi `read:board:trello write:board:trello read:member:trello offline_access`. Không thêm scope khác. Nếu tên `write:board:trello` không có trên trang client của Trello, đổi hằng số sang tên chính thức phủ cùng bốn việc, rồi sửa test theo tên đó.
+- Scope gửi đi đúng chuỗi `read:board:trello write:board:trello read:member:trello read:organization:trello offline_access`. Không thêm scope khác. Nếu tên `write:board:trello` không có trên trang client của Trello, đổi hằng số sang tên chính thức phủ cùng bốn việc, rồi sửa test theo tên đó.
 - Ủy quyền: `https://auth.atlassian.com/authorize` với `client_id`, `scope`, `redirect_uri`, `response_type=code`, `prompt=consent`, `code_challenge`, `code_challenge_method=S256`. Không gửi `audience`. Đổi mã và làm mới: `https://auth.atlassian.com/oauth/token`. API: `https://api.trello.com/1` với `Authorization: Bearer`. Không gửi `key` hay `token` trên query.
 - Một workspace, từ 1 đến 10 bảng. Id bảng khớp `/^[0-9a-f]{24}$/i`. Bảng không thuộc workspace đã chọn không lưu được.
 - Access token không ghi vào cơ sở dữ liệu, log, kế hoạch, hay câu trả lời. Refresh token dùng một lần. Lưu token mới và bỏ token cũ trong cùng một transaction.

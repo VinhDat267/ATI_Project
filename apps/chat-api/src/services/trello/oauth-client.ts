@@ -1,6 +1,6 @@
 import type { TrelloOAuthConfig } from '../../config/env.js';
 
-export const TRELLO_OAUTH_SCOPE = 'read:board:trello write:board:trello read:member:trello offline_access';
+export const TRELLO_OAUTH_SCOPE = 'read:board:trello write:board:trello read:member:trello read:organization:trello offline_access';
 
 export class TrelloOAuthError extends Error {
   constructor(

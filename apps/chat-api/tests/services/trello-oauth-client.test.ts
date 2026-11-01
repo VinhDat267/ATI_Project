@@ -28,8 +28,8 @@ describe('TrelloOAuthClient', () => {
     expect(url.searchParams.get('state')).toBe('state-123');
     expect(url.searchParams.get('code_challenge')).toBe('challenge-xyz');
     expect(url.searchParams.get('code_challenge_method')).toBe('S256');
-    expect(url.searchParams.get('scope')).toBe('read:board:trello write:board:trello read:member:trello offline_access');
-    expect(TRELLO_OAUTH_SCOPE).toBe('read:board:trello write:board:trello read:member:trello offline_access');
+    expect(url.searchParams.get('scope')).toBe('read:board:trello write:board:trello read:member:trello read:organization:trello offline_access');
+    expect(TRELLO_OAUTH_SCOPE).toBe('read:board:trello write:board:trello read:member:trello read:organization:trello offline_access');
     expect(url.searchParams.has('audience')).toBe(false);
   });
 

@@ -134,7 +134,7 @@ Luồng theo tài liệu Trello OAuth 2.0 cho confidential client, cập nhật 
 
 - Ủy quyền: `https://auth.atlassian.com/authorize` với `response_type=code`, `prompt=consent`, PKCE S256.
 - Đổi mã và làm mới: `https://auth.atlassian.com/oauth/token`.
-- Scope gửi đi: `read:board:trello`, `write:board:trello`, `read:member:trello`, `offline_access`.
+- Scope gửi đi: `read:board:trello`, `write:board:trello`, `read:member:trello`, `read:organization:trello`, `offline_access`.
 - Gọi API bằng `Authorization: Bearer`. Không gửi API key và token trên query như adapter hiện tại.
 - Access token hết hạn sau khoảng một giờ.
 

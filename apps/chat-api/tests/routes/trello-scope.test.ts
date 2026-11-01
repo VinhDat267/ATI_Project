@@ -5,6 +5,7 @@ import { createApp } from '../../src/app.js';
 import { generateAccessToken } from '../../src/auth/jwt.js';
 import { CredentialRepo } from '../../src/db/repositories/credential-repo.js';
 import { TrelloTeamRepo } from '../../src/db/repositories/trello-team-repo.js';
+import { TRELLO_OAUTH_SCOPE } from '../../src/services/trello/oauth-client.js';
 import { TrelloTokenManager } from '../../src/services/trello/token-manager.js';
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
 
@@ -49,6 +50,9 @@ describe('Trello scope and workspace management routes', () => {
 
     // Mock workspaces endpoint
     if (url === 'https://api.trello.com/1/members/me/organizations') {
+      if (!TRELLO_OAUTH_SCOPE.includes('read:organization:trello')) {
+        return new Response(JSON.stringify({ error: 'insufficient_scope' }), { status: 403 });
+      }
       return new Response(
         JSON.stringify([
           { id: 'ws-1', displayName: 'Engineering Workspace' },
