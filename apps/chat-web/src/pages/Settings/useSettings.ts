@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiClient } from '../../services/api-client';
+import { subscribeWorkspace } from '../../services/workspace-storage';
 import { userErrorMessage } from '../../services/user-error';
 import type { ServiceInfo, User } from '../../types';
 import { serviceView } from './data';
@@ -41,6 +42,20 @@ export function useSettings(user: User | null) {
     epoch.current++; setServices([]); setCanEdit(false); setDrafts({}); setErrors({}); setResults({}); setBusy({}); pending.current.clear(); setLoading(true); void refresh();
     return () => { epoch.current++; read.current++; for (const controller of controllers.current) controller.abort(); controllers.current.clear(); };
   }, [user?.id, refresh]);
+  useEffect(() => {
+    return subscribeWorkspace(() => {
+      epoch.current++;
+      setServices([]);
+      setCanEdit(false);
+      setDrafts({});
+      setErrors({});
+      setResults({});
+      setBusy({});
+      pending.current.clear();
+      setLoading(true);
+      void refresh();
+    });
+  }, [refresh]);
   const openServiceDrawer = useCallback((id: string) => { setSelected(id); setKeyHelpOpen(false); }, []);
   useEffect(() => {
     const sync = () => {

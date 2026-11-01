@@ -1,4 +1,5 @@
 import { authStorage } from './auth-storage';
+import { getActiveWorkspaceId } from './workspace-storage';
 import type { ScheduleView, ScheduleRunView } from '@wap/tool-schemas';
 import type {
   ActivePlan,
@@ -11,6 +12,7 @@ import type {
   AuthMessageResponse,
   AccountProfile, AccountSession,
   PersonalSpreadsheetItem, MySheetsPickerSession,
+  WorkspaceSummary, WorkspacesListResponse,
 } from '../types';
 
 export function sharesAuthSession(previous: string | null, current: string | null): boolean {
@@ -50,6 +52,9 @@ export class ApiClient {
     if (accessToken) {
       if (isRetry || !headers.has('Authorization')) {
         headers.set('Authorization', `Bearer ${accessToken}`);
+      }
+      if (!headers.has('X-Workspace-Id')) {
+        headers.set('X-Workspace-Id', getActiveWorkspaceId());
       }
     }
 
@@ -476,6 +481,46 @@ export class ApiClient {
 
   async changeAdminUser(id: string, action: 'approve' | 'disable' | 'enable' | 'role', role?: 'member' | 'admin'): Promise<{ user: AdminUser }> {
     return this.request(`/api/admin/users/${encodeURIComponent(id)}/${action}`, { method: 'POST', ...(action === 'role' ? { body: JSON.stringify({ role }) } : {}) });
+  }
+
+  async approveAllAdminUsers(): Promise<{ approvedCount: number; approvedUsers: AdminUser[] }> {
+    return this.request('/api/admin/users/approve-all', { method: 'POST' });
+  }
+
+  async rejectAdminUser(id: string): Promise<{ rejectedId: string }> {
+    return this.request(`/api/admin/users/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ action: 'reject' }) });
+  }
+
+  // --- Workspaces ---
+  async getWorkspaces(): Promise<WorkspacesListResponse> {
+    return this.request<WorkspacesListResponse>('/api/workspaces');
+  }
+
+  async createWorkspace(name: string, requireApproval = true): Promise<{ workspace: WorkspaceSummary }> {
+    return this.request<{ workspace: WorkspaceSummary }>('/api/workspaces', {
+      method: 'POST',
+      body: JSON.stringify({ name, requireApproval }),
+    });
+  }
+
+  async joinWorkspace(inviteCode: string): Promise<{ workspace: WorkspaceSummary; created: boolean }> {
+    return this.request<{ workspace: WorkspaceSummary; created: boolean }>('/api/workspaces/join', {
+      method: 'POST',
+      body: JSON.stringify({ inviteCode }),
+    });
+  }
+
+  async regenerateInviteCode(workspaceId: string): Promise<{ inviteCode: string }> {
+    return this.request<{ inviteCode: string }>(`/api/workspaces/${encodeURIComponent(workspaceId)}/invite-code/regenerate`, {
+      method: 'POST',
+    });
+  }
+
+  async updateWorkspaceSettings(workspaceId: string, settings: { requireApproval: boolean }): Promise<{ requireApproval: boolean }> {
+    return this.request<{ requireApproval: boolean }>(`/api/workspaces/${encodeURIComponent(workspaceId)}/settings`, {
+      method: 'PATCH',
+      body: JSON.stringify(settings),
+    });
   }
 
   // --- Own account (AUTH-05) ---

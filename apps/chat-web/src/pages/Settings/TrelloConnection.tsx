@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import type { User } from '../../types';
 import { apiClient } from '../../services/api-client';
 import { trelloSessionOwner, redirectToTrello } from '../../services/trello-connection';
+import { getActiveWorkspaceSummary, subscribeWorkspace } from '../../services/workspace-storage';
 import { CockpitDialog } from '../../components/CockpitDialog';
 import { ServiceLogo } from '../../components/ServiceLogo';
 
@@ -55,7 +56,8 @@ export function TrelloConnection({
   const pending = useRef(false);
   const row = useRef<HTMLDivElement>(null);
 
-  const isAdmin = user?.role === 'admin';
+  const [workspace, setWorkspace] = useState(getActiveWorkspaceSummary());
+  const canSelectScope = workspace.id === 'personal' || workspace.role === 'admin' || user?.role === 'admin';
 
   const fetchStatus = async () => {
     try {
@@ -79,6 +81,13 @@ export function TrelloConnection({
   }, []);
 
   useEffect(() => {
+    return subscribeWorkspace(() => {
+      setWorkspace(getActiveWorkspaceSummary());
+      void fetchStatus();
+    });
+  }, []);
+
+  useEffect(() => {
     const focus = () => {
       if (window.location.hash === '#trello') {
         row.current?.scrollIntoView?.({ block: 'center' });
@@ -96,7 +105,7 @@ export function TrelloConnection({
 
   // Load workspaces when admin needs scope or edits scope
   useEffect(() => {
-    if (isAdmin && (data?.status === 'needs_scope' || editingScope)) {
+    if (canSelectScope && (data?.status === 'needs_scope' || editingScope)) {
       apiClient
         .getTrelloWorkspaces()
         .then((res) => {
@@ -109,7 +118,7 @@ export function TrelloConnection({
         })
         .catch(() => {});
     }
-  }, [isAdmin, data?.status, editingScope]);
+  }, [canSelectScope, data?.status, editingScope]);
 
   // Load candidate boards when workspace changes
   useEffect(() => {
@@ -259,7 +268,7 @@ export function TrelloConnection({
               </div>
             ))}
           </div>
-          {isAdmin && !editingScope && (
+          {canSelectScope && !editingScope && (
             <button
               id="trello-edit-scope"
               type="button"
@@ -302,7 +311,7 @@ export function TrelloConnection({
               </div>
             ))}
           </div>
-          {isAdmin && !editingScope && (
+          {canSelectScope && !editingScope && (
             <button
               id="trello-edit-scope"
               type="button"
@@ -343,8 +352,8 @@ export function TrelloConnection({
         )}
       </div>
 
-      {/* Admin Scope Selection Area: only when role is admin */}
-      {isAdmin && (status === 'needs_scope' || editingScope) && (
+      {/* Scope Selection Area: when canSelectScope */}
+      {canSelectScope && (status === 'needs_scope' || editingScope) && (
         <div
           id="trello-scope"
           data-testid="trello-scope"

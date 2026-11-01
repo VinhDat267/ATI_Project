@@ -3,6 +3,7 @@ import { useEffect, useState, useLayoutEffect, useRef } from 'react';
 import { MainNav } from '../../components/layout/MainNav';
 import { usePrototypePage } from '../../prototype/usePrototypePage';
 import { ServiceLogo } from '../../components/ServiceLogo';
+import { getActiveWorkspaceSummary, subscribeWorkspace } from '../../services/workspace-storage';
 import type { User } from '../../types';
 import { type Service } from './data';
 import { useSettings } from './useSettings';
@@ -92,6 +93,8 @@ function ServiceRow({ service, onOpen }: { service: Service; onOpen: (id: string
 export interface SettingsPageProps { user: User | null; navigate: (path: string) => void; onLogout: () => void; authToken?: string | null }
 export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
   usePrototypePage(meta);
+  const [workspace, setWorkspace] = useState(getActiveWorkspaceSummary());
+  useEffect(() => subscribeWorkspace(() => setWorkspace(getActiveWorkspaceSummary())), []);
   const { list, personal, personalMyCalendar, personalMySheets, active, draft, selected, loading, loadError, refresh, canEdit, errors, results, busy, keyHelpOpen, actions } = useSettings(user);
   const [connectedEmail, setConnectedEmail] = useState<string>();
   useEffect(() => {
@@ -147,6 +150,15 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-8 sm:py-10">
         {/* Tiêu đề trang & Nguyên tắc */}
         <div className="mb-8 sm:mb-10">
+          {/* Context Pill */}
+          <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#E7E7E2] bg-white text-xs text-[#111827] shadow-sm">
+            <span>{workspace.id === 'personal' ? '👤' : '🏢'}</span>
+            <span className="font-semibold text-[#4B5563]">
+              {workspace.id === 'personal'
+                ? 'Đang cấu hình kết nối cho: Không gian Cá nhân'
+                : `Đang cấu hình kết nối cho: ${workspace.name}`}
+            </span>
+          </div>
           <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 mb-3">
             <h1 className="font-display text-3xl sm:text-4xl font-bold text-[#111827] tracking-tight">
               Kết nối dịch vụ

@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { authStorage, subscribeAuthTokens } from '../services/auth-storage';
 import { apiClient, sharesAuthSession } from '../services/api-client';
+import {
+  savePendingInviteCode,
+  consumePendingInviteCode,
+  setActiveWorkspaceId,
+  setCachedOrganizations,
+} from '../services/workspace-storage';
 import { userErrorMessage } from '../services/user-error';
 import { useChatStore } from '../store/chat-store';
 import { NotFoundPage } from '../pages/NotFound/NotFoundPage';
@@ -86,6 +92,30 @@ export function AuthGate({ route, navigate, children }: AuthGateProps) {
     return () => { current = false; };
   }, []);
   useEffect(() => {
+    try {
+      const inviteParam = new URLSearchParams(window.location.search).get('invite');
+      if (inviteParam) {
+        savePendingInviteCode(inviteParam);
+      }
+    } catch {}
+  }, [route]);
+  useEffect(() => {
+    if (!authToken || !user?.id) return;
+    const pendingCode = consumePendingInviteCode();
+    if (pendingCode && typeof apiClient.joinWorkspace === 'function') {
+      apiClient.joinWorkspace(pendingCode).then(res => {
+        if (res.workspace?.status === 'active') {
+          setActiveWorkspaceId(res.workspace.id);
+        }
+        if (typeof apiClient.getWorkspaces === 'function') {
+          apiClient.getWorkspaces().then(wRes => {
+            setCachedOrganizations(wRes.organizations);
+          }).catch(() => {});
+        }
+      }).catch(() => {});
+    }
+  }, [authToken, user?.id]);
+  useEffect(() => {
     if (authToken && user?.id && route.kind === 'login' && !loginPending.current) {
       navigate(consumeAuthReturnTarget(user.id) ?? '/', true);
     }
@@ -98,13 +128,18 @@ export function AuthGate({ route, navigate, children }: AuthGateProps) {
       setAuthToken(data.accessToken); setUser(data.user); setPassword('');
       navigate(consumeAuthReturnTarget(data.user.id) ?? (route.kind === 'conversation' ? currentAuthReturnTarget() : '/'), true);
     } catch (reason) {
-      const failure = reason as { status?: number; data?: { code?: string }; response?: Response };
+      const failure = reason as { status?: number; data?: { code?: string; error?: string }; response?: Response };
       if (failure.status === 429) {
         const header = failure.response?.headers.get('Retry-After');
         const seconds = header && /^\d+(?:\.\d+)?$/.test(header.trim()) ? Number(header) : null;
         const timestamp = header && seconds === null ? Date.parse(header) : NaN;
         const deadline = seconds !== null ? Date.now() + Math.max(0, seconds) * 1000 : Number.isFinite(timestamp) ? Math.max(Date.now(), timestamp) : null;
         setBlocked({ mode: 'blocked-attempts', deadline, message: 'Sai mật khẩu quá nhiều lần. Hãy chờ hết thời gian trước khi thử lại.' });
+      } else if (failure.data?.code === 'EMAIL_NOT_VERIFIED') {
+        setBlocked({
+          mode: 'email-not-verified',
+          message: failure.data?.error || 'Bạn chưa xác minh địa chỉ email. Hãy kiểm tra hộp thư hoặc bấm gửi lại email xác minh.',
+        });
       } else if (failure.data?.code === 'ACCOUNT_PENDING') setBlocked({ mode: 'blocked-pending', message: 'Tài khoản đang chờ quản trị viên duyệt.' });
       else if (failure.data?.code === 'ACCOUNT_DISABLED') setBlocked({ mode: 'blocked-locked', message: 'Tài khoản đã bị vô hiệu hóa. Hãy liên hệ quản trị viên.' });
       else setAuthError(userErrorMessage(reason, 'Không thể xác thực với API backend'));
@@ -128,7 +163,8 @@ export function AuthGate({ route, navigate, children }: AuthGateProps) {
   const definition = routes.find(entry => entry.kind === route.kind);
   const showsLogin = route.kind === 'login' || !definition || !('publicView' in definition);
   if (showsLogin && blocked) return <AuthActionPage mode={blocked.mode} email={email} deadline={blocked.deadline} error={blocked.message}
-    navigate={(path, replace) => { setBlocked(null); setAuthError(null); navigate(path, replace); }} />;
+    navigate={(path, replace) => { setBlocked(null); setAuthError(null); navigate(path, replace); }}
+    onResend={async (targetEmail) => { await apiClient.resendVerification(targetEmail); }} />;
   const PublicView = definition && 'publicView' in definition ? definition.publicView : routes[1].publicView;
   return <PublicView navigate={navigate} email={email} setEmail={setEmail} password={password} setPassword={setPassword}
     isLoggingIn={isLoggingIn} authError={authError} onLogin={onLogin} authConfig={authConfig} onBackToLanding={() => navigate('/')}

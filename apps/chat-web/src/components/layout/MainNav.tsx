@@ -3,11 +3,13 @@
 // để prototype/theme.css lo chế độ tối như ở các trang khác.
 // Tab hiện từ 900 px: ở 768–899 px, cockpit của admin không đủ chỗ đặt 5 tab ở giữa thanh
 // (review #162, nhóm trưởng chốt 20/10/2026).
-import type { MouseEvent, ReactNode } from 'react';
+import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
 import type { User } from '../../types';
 import { UserNavMenu } from './UserNavMenu';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { useSchedulePendingCount } from '../../hooks/use-schedules';
+import { getActiveWorkspaceSummary, subscribeWorkspace } from '../../services/workspace-storage';
 
 export type NavTab = 'workspace' | 'history' | 'settings' | 'guide' | 'users';
 const TABS: { id: NavTab; path: string; name: string; short: string; adminOnly?: boolean }[] = [
@@ -39,13 +41,18 @@ export interface MainNavProps {
 
 export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pageName, actions, children }: MainNavProps) {
   const pendingCount = useSchedulePendingCount(user);
+  const [activeWorkspace, setActiveWorkspace] = useState(getActiveWorkspaceSummary());
+  useEffect(() => subscribeWorkspace(() => setActiveWorkspace(getActiveWorkspaceSummary())), []);
+
   // Bấm kèm phím bổ trợ hoặc chuột giữa thì để trình duyệt mở tab mới như link thường.
   const follow = (path: string) => (event: MouseEvent<HTMLAnchorElement>) => {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
     navigate(path);
   };
-  const tabs = TABS.filter(tab => !tab.adminOnly || user?.role === 'admin');
+  const canManageUsers = (activeWorkspace.id !== 'personal' && activeWorkspace.role === 'admin') || (activeWorkspace.id === 'personal' && user?.role === 'admin');
+  const usersPendingCount = activeWorkspace.id !== 'personal' && typeof activeWorkspace.pendingCount === 'number' ? activeWorkspace.pendingCount : 0;
+  const tabs = TABS.filter(tab => !tab.adminOnly || canManageUsers);
   return (
     <header className="sticky top-0 z-30 w-full bg-[#F8F8F6]/90 backdrop-blur-md border-b border-[#E7E7E2]">
       <div data-main-nav className="max-w-7xl mx-auto grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 sm:px-6 py-2">
@@ -58,6 +65,7 @@ export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pag
               ATI
             </span>
           </a>
+          <WorkspaceSwitcher navigate={navigate} />
           {pageName && <span data-nav-page-name className="min-[900px]:hidden text-sm font-medium text-[#4B5563] truncate">{pageName}</span>}
         </div>
         <nav aria-label="Điều hướng chính" className="col-start-2 hidden min-[900px]:flex items-center gap-1 justify-self-center">
@@ -66,6 +74,7 @@ export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pag
               <span className="xl:hidden">{tab.short}</span>
               <span className="hidden xl:inline">{tab.name}</span>
               {tab.id === 'history' && pendingCount > 0 && <span aria-hidden="true" data-schedule-count className="ml-1 rounded-full px-1.5 py-0.5 bg-[#FF5701] text-white text-[10px] font-bold">{pendingCount}</span>}
+              {tab.id === 'users' && usersPendingCount > 0 && <span aria-hidden="true" data-users-pending-count className="ml-1 rounded-full px-1.5 py-0.5 bg-[#FF5701] text-white text-[10px] font-bold">{usersPendingCount}</span>}
             </a>
           ))}
         </nav>
