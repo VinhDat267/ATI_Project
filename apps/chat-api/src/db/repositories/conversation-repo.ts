@@ -79,14 +79,21 @@ export class ConversationRepo {
       }
     }
     values.push(limit);
-    const res = await this.pool.query(
-      `SELECT * FROM conversations
-       WHERE user_id = $1${scopeClause}
-       ORDER BY updated_at DESC
-       LIMIT $${values.length}`,
-      values
-    );
-    return res.rows;
+    try {
+      const res = await this.pool.query(
+        `SELECT * FROM conversations
+         WHERE user_id = $1${scopeClause}
+         ORDER BY updated_at DESC
+         LIMIT $${values.length}`,
+        values
+      );
+      return res.rows;
+    } catch (err: any) {
+      if (err?.code === '42703' && scope?.workspaceMode === 'legacy') {
+        return this.listConversations(userId, limit, undefined);
+      }
+      throw err;
+    }
   }
 
   async getConversation(id: string): Promise<ConversationRow | null> {
@@ -113,11 +120,18 @@ export class ConversationRepo {
         scopeClause = " AND workspace_id IS NULL";
       }
     }
-    const res = await this.pool.query(
-      `SELECT * FROM conversations WHERE id = $1 AND user_id = $2${scopeClause}`,
-      values
-    );
-    return res.rows[0] || null;
+    try {
+      const res = await this.pool.query(
+        `SELECT * FROM conversations WHERE id = $1 AND user_id = $2${scopeClause}`,
+        values
+      );
+      return res.rows[0] || null;
+    } catch (err: any) {
+      if (err?.code === '42703' && scope?.workspaceMode === 'legacy') {
+        return this.getConversationForUser(userId, id, undefined);
+      }
+      throw err;
+    }
   }
 
   async listConversationPage(
@@ -147,18 +161,25 @@ export class ConversationRepo {
       where.push(`(updated_at, id) < ($${values.length - 1}::timestamptz, $${values.length}::uuid)`);
     }
     values.push(limit + 1);
-    const result = await this.pool.query<ConversationRow & { cursor_updated_at: string }>(
-      `SELECT *, to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_updated_at
-       FROM conversations WHERE ${where.join(' AND ')} ORDER BY updated_at DESC, id DESC LIMIT $${values.length}`,
-      values
-    );
-    const visible = result.rows.slice(0, limit);
-    const last = visible.at(-1);
-    const nextCursor =
-      result.rows.length > limit && last
-        ? encodeConversationCursor({ updatedAt: last.cursor_updated_at, id: last.id })
-        : null;
-    return { conversations: visible.map(({ cursor_updated_at: _timestamp, ...row }) => row), nextCursor };
+    try {
+      const result = await this.pool.query<ConversationRow & { cursor_updated_at: string }>(
+        `SELECT *, to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_updated_at
+         FROM conversations WHERE ${where.join(' AND ')} ORDER BY updated_at DESC, id DESC LIMIT $${values.length}`,
+        values
+      );
+      const visible = result.rows.slice(0, limit);
+      const last = visible.at(-1);
+      const nextCursor =
+        result.rows.length > limit && last
+          ? encodeConversationCursor({ updatedAt: last.cursor_updated_at, id: last.id })
+          : null;
+      return { conversations: visible.map(({ cursor_updated_at: _timestamp, ...row }) => row), nextCursor };
+    } catch (err: any) {
+      if (err?.code === '42703' && scope?.workspaceMode === 'legacy') {
+        return this.listConversationPage(userId, options, undefined);
+      }
+      throw err;
+    }
   }
 
   async renameConversation(id: string, userId: string, title: string): Promise<ConversationRow | null> {

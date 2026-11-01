@@ -40,27 +40,63 @@ export class CredentialRepo {
       const lockTarget = userId ?? workspaceId ?? 'team-shared';
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [service, lockTarget]);
       if (userId) {
-        await client.query('DELETE FROM service_credentials WHERE service = $1 AND user_id = $2 AND workspace_id IS NULL', [service, userId]);
-        const res = await client.query(
-          `INSERT INTO service_credentials (service, user_id, workspace_id, config, status)
-           VALUES ($1, $2, NULL, $3, 'active')
-           RETURNING *`,
-          [service, userId, config]
-        );
-        await client.query('COMMIT');
-        const row = res.rows[0];
-        return { ...row, workspaceId: row.workspace_id };
+        await client.query('SAVEPOINT sp_user');
+        try {
+          await client.query('DELETE FROM service_credentials WHERE service = $1 AND user_id = $2 AND workspace_id IS NULL', [service, userId]);
+          const res = await client.query(
+            `INSERT INTO service_credentials (service, user_id, workspace_id, config, status)
+             VALUES ($1, $2, NULL, $3, 'active')
+             RETURNING *`,
+            [service, userId, config]
+          );
+          await client.query('RELEASE SAVEPOINT sp_user');
+          await client.query('COMMIT');
+          const row = res.rows[0];
+          return { ...row, workspaceId: row.workspace_id ?? null };
+        } catch (err: any) {
+          if (err?.code === '42703') {
+            await client.query('ROLLBACK TO SAVEPOINT sp_user');
+            await client.query('DELETE FROM service_credentials WHERE service = $1 AND user_id = $2', [service, userId]);
+            const res = await client.query(
+              `INSERT INTO service_credentials (service, user_id, config)
+               VALUES ($1, $2, $3)
+               RETURNING *`,
+              [service, userId, config]
+            );
+            await client.query('COMMIT');
+            return res.rows[0];
+          }
+          throw err;
+        }
       } else {
-        await client.query('DELETE FROM service_credentials WHERE service = $1 AND user_id IS NULL AND workspace_id IS NOT DISTINCT FROM $2', [service, workspaceId]);
-        const res = await client.query(
-          `INSERT INTO service_credentials (service, user_id, workspace_id, config, status)
-           VALUES ($1, NULL, $2, $3, 'active')
-           RETURNING *`,
-          [service, workspaceId, config]
-        );
-        await client.query('COMMIT');
-        const row = res.rows[0];
-        return { ...row, workspaceId: row.workspace_id };
+        await client.query('SAVEPOINT sp_shared');
+        try {
+          await client.query('DELETE FROM service_credentials WHERE service = $1 AND user_id IS NULL AND workspace_id IS NOT DISTINCT FROM $2', [service, workspaceId]);
+          const res = await client.query(
+            `INSERT INTO service_credentials (service, user_id, workspace_id, config, status)
+             VALUES ($1, NULL, $2, $3, 'active')
+             RETURNING *`,
+            [service, workspaceId, config]
+          );
+          await client.query('RELEASE SAVEPOINT sp_shared');
+          await client.query('COMMIT');
+          const row = res.rows[0];
+          return { ...row, workspaceId: row.workspace_id ?? null };
+        } catch (err: any) {
+          if (err?.code === '42703') {
+            await client.query('ROLLBACK TO SAVEPOINT sp_shared');
+            await client.query('DELETE FROM service_credentials WHERE service = $1 AND user_id IS NULL', [service]);
+            const res = await client.query(
+              `INSERT INTO service_credentials (service, user_id, config)
+               VALUES ($1, NULL, $2)
+               RETURNING *`,
+              [service, config]
+            );
+            await client.query('COMMIT');
+            return res.rows[0];
+          }
+          throw err;
+        }
       }
     } catch (err) {
       await client.query('ROLLBACK');
@@ -91,15 +127,66 @@ export class CredentialRepo {
 
   async getCredentials(
     service: string,
-    workspaceId: string | null = null
+    workspaceIdOrUserId: string | null = null
   ): Promise<ServiceCredentialRow | null> {
-    const res = await this.pool.query(
-      'SELECT * FROM service_credentials WHERE service = $1 AND user_id IS NULL AND workspace_id IS NOT DISTINCT FROM $2',
-      [service, workspaceId]
-    );
-    const row = res.rows[0];
-    if (!row) return null;
-    return { ...row, workspaceId: row.workspace_id };
+    if (workspaceIdOrUserId) {
+      try {
+        const userRes = await this.pool.query(
+          'SELECT * FROM service_credentials WHERE service = $1 AND user_id = $2',
+          [service, workspaceIdOrUserId]
+        );
+        if (userRes.rows[0]) {
+          const row = userRes.rows[0];
+          return { ...row, workspaceId: row.workspace_id ?? null };
+        }
+      } catch (err: any) {
+        if (err?.code !== '42703') throw err;
+      }
+    }
+
+    try {
+      const res = await this.pool.query(
+        'SELECT * FROM service_credentials WHERE service = $1 AND user_id IS NULL AND workspace_id IS NOT DISTINCT FROM $2',
+        [service, workspaceIdOrUserId]
+      );
+      const row = res.rows[0];
+      if (row) return { ...row, workspaceId: row.workspace_id ?? null };
+    } catch (err: any) {
+      if (err?.code === '42703') {
+        const legacyRes = await this.pool.query(
+          'SELECT * FROM service_credentials WHERE service = $1 AND user_id IS NULL',
+          [service]
+        );
+        const row = legacyRes.rows[0];
+        if (row) return { ...row, workspaceId: null };
+      } else {
+        throw err;
+      }
+    }
+
+    if (workspaceIdOrUserId) {
+      try {
+        const fallbackRes = await this.pool.query(
+          'SELECT * FROM service_credentials WHERE service = $1 AND user_id IS NULL AND workspace_id IS NULL',
+          [service]
+        );
+        const row = fallbackRes.rows[0];
+        if (row) return { ...row, workspaceId: null };
+      } catch (err: any) {
+        if (err?.code === '42703') {
+          const legacyRes = await this.pool.query(
+            'SELECT * FROM service_credentials WHERE service = $1 AND user_id IS NULL',
+            [service]
+          );
+          const row = legacyRes.rows[0];
+          if (row) return { ...row, workspaceId: null };
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    return null;
   }
 
   async deleteCredentials(service: string, workspaceIdOrUserId: string | null = null): Promise<void> {
