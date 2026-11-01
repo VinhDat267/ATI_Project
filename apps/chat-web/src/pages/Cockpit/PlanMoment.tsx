@@ -3,10 +3,12 @@ import { useState, type ReactNode } from 'react';
 import type { ActivePlan, PlanStep, ServiceInfo } from '../../types';
 import { ServiceLogo } from '../../components/ServiceLogo';
 import { WorkflowFlowCanvas } from '../../components/WorkflowFlowCanvas';
-import { operation, serviceId, servicePalette, serviceName } from './presentation';
+import { operation, planStepDataFlows, serviceId, servicePalette, serviceName } from './presentation';
 import { RequestEcho } from './RequestEcho';
 export function PlanMoment({request,runtimeMode,plan,services,destination,onPreview,onApprove,onCancel,onEdit,inlineComposer}:{request?:string;runtimeMode:'sandbox'|'live'|null;plan:ActivePlan;services:ServiceInfo[];destination:(step:PlanStep,labels?:Record<string,string>)=>string;onPreview:(step:PlanStep)=>void;onApprove:()=>void;onCancel:()=>void;onEdit:()=>void;inlineComposer:ReactNode}) {
  const [techOpen,setTechOpen]=useState(false);
+ const [selectedService,setSelectedService]=useState<string|null>(null);
+ const dataFlows=planStepDataFlows(plan.steps);
  return (<section id="moment-4" className="stage-section is-active v3-space-y-6 relative" aria-label="Cockpit" data-moment="4" aria-labelledby="heading-moment-4">
           <div className="v3-space-y-2">
             <RequestEcho request={request} />
@@ -23,11 +25,11 @@ export function PlanMoment({request,runtimeMode,plan,services,destination,onPrev
           {plan.connections?.trello?.username && <p className="text-sm text-brand-text break-words">Tài khoản: @{plan.connections.trello.username} (Trello của bạn)</p>}
           {plan.connections?.github?.login && <p className="text-sm text-brand-text break-words">Tài khoản: @{plan.connections.github.login} (GitHub của bạn)</p>}
           {plan.connections?.telegram?.username && <p className="text-sm text-brand-text break-words">Tài khoản: @{plan.connections.telegram.username} (Telegram của bạn)</p>}
-          <WorkflowFlowCanvas steps={plan.steps} mode="preview" resourceLabels={plan.resourceLabels} onStepPreview={onPreview} />
+          <WorkflowFlowCanvas steps={plan.steps} mode="preview" resourceLabels={plan.resourceLabels} selectedService={selectedService} onSelectService={setSelectedService} onStepPreview={onPreview} />
           {/* 4 Task Action Cards (NHÓM 2: Hiện so le dưới 300ms, NHÓM 8: Biểu tượng SVG) */}
           <div className="v3-space-y-3" id="plan-cards-container" role="list" aria-label="Các bước thực thi">
-            {plan.steps.map((step,index) => { const service=serviceId(step.tool), palette=servicePalette(service); return (
-            <article key={step.id} className={`plan-card-stagger-${Math.min(index+1, 4)} bg-white rounded-2xl border border-brand-border p-4 sm:p-5 shadow-soft-card transition-all hover:border-neutral-300`} data-od-id={`plan-item-${index+1}`}>
+            {plan.steps.map((step,index) => { const service=serviceId(step.tool), palette=servicePalette(service), isHighlighted=selectedService===service, incomingFlows=dataFlows.filter(edge=>edge.toStepId===step.id); return (
+            <article key={step.id} data-highlighted-step={isHighlighted ? 'true' : undefined} className={`plan-card-stagger-${Math.min(index+1, 4)} bg-white rounded-2xl border ${isHighlighted ? 'border-brand-primary ring-2 ring-brand-primary/20' : 'border-brand-border'} p-4 sm:p-5 shadow-soft-card transition-all hover:border-neutral-300`} data-od-id={`plan-item-${index+1}`}>
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-3.5 min-w-0">
                   <div className={`w-9 h-9 rounded-xl ${palette.icon} flex items-center justify-center flex-shrink-0 mt-0.5 border shadow-sm`}><ServiceLogo service={service} className={`w-4 h-4 ${palette.logo ?? ''}`} /></div>
@@ -42,6 +44,11 @@ export function PlanMoment({request,runtimeMode,plan,services,destination,onPrev
                       <span className="text-xs text-brand-muted">
                         Việc {index+1}
                       </span>
+                      {incomingFlows.map(edge => (
+                        <span key={`${edge.fromStepId}-${edge.field}`} data-testid="plan-step-data-flow-badge" className="text-[11px] font-semibold px-2 py-0.5 bg-[#FFF6EE] text-[#FF5701] border border-[#FFDFC6] rounded-full">
+                          Dữ liệu từ Việc {edge.fromIndex} → Việc {edge.toIndex} ({edge.field})
+                        </span>
+                      ))}
                     </div>
                     <h2 className="text-base font-semibold text-brand-text mt-1.5 leading-snug">
                       {step.tool === 'mysheets.read_range'

@@ -2,11 +2,18 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { createRef, useState } from 'react';
 import { WorkflowFlowCanvas } from '../src/components/WorkflowFlowCanvas';
 import { PlanMoment } from '../src/pages/Cockpit/PlanMoment';
 import { ExecutionMoment } from '../src/pages/Cockpit/ExecutionMoment';
 import { ReceiptMoment } from '../src/pages/Cockpit/ReceiptMoment';
 import { ScheduleMoment } from '../src/pages/Cockpit/ScheduleMoment';
+import { RequestMoment } from '../src/pages/Cockpit/RequestMoments';
+import { HistoryPage } from '../src/pages/History/HistoryPage';
+import { SettingsPage } from '../src/pages/Settings/SettingsPage';
+import { SchedulesCapabilityContext } from '../src/hooks/use-schedules';
+import { apiClient } from '../src/services/api-client';
+import { useChatStore } from '../src/store/chat-store';
 import type { ActivePlan, ChatMessage, PlanStep } from '../src/types';
 
 afterEach(() => {
@@ -285,5 +292,279 @@ describe('WorkflowFlowCanvas — Make.com Orbital Workflow Visualizer', () => {
     expect(schedCanvas).toHaveAttribute('data-flow-mode', 'schedule');
     expect(screen.getByTestId('workflow-node-mycalendar')).toBeInTheDocument();
     expect(screen.getByTestId('workflow-node-slack')).toBeInTheDocument();
+  });
+
+  it('Upgrade #1: keeps upstream sequential nodes in a linear chain BEFORE Router and places Router right before parallel destination branches, with connector ears, schedule clock badge, and wrench/filter data-flow badges', () => {
+    const fourServiceSteps: PlanStep[] = [
+      {
+        id: 'step_1',
+        tool: 'mysheets.read_range',
+        description: 'Đọc danh sách khách hàng từ Google Sheets',
+        args: { spreadsheetId: 'sheet-1', range: 'A1:D20' },
+      },
+      {
+        id: 'step_2',
+        tool: 'github.create_issue',
+        description: 'Tạo issue tổng hợp trên GitHub',
+        args: { repo: 'org/repo', title: { $ref: 'step_1.output.summary' } },
+        dependsOn: ['step_1'],
+      },
+      {
+        id: 'step_3',
+        tool: 'trello.create_card',
+        description: 'Tạo thẻ theo dõi trên Trello',
+        args: { boardId: 'b1', listId: 'l1', name: { $ref: 'step_2.output.title' } },
+        dependsOn: ['step_2'],
+      },
+      {
+        id: 'step_4',
+        tool: 'slack.send_message',
+        description: 'Thông báo kết quả vào Slack',
+        args: { channel: '#ops', text: { $template: 'Đã tạo ${step_2.output.url}' } },
+        dependsOn: ['step_2'],
+      },
+    ];
+
+    const { unmount } = render(<WorkflowFlowCanvas steps={fourServiceSteps} mode="preview" />);
+
+    const upstreamSection = screen.getByTestId('workflow-upstream-chain');
+    const branchSection = screen.getByTestId('workflow-branch-chain');
+
+    // Both mysheets and github are in the upstream linear chain BEFORE Router
+    expect(within(upstreamSection).getByTestId('workflow-node-mysheets')).toBeInTheDocument();
+    expect(within(upstreamSection).getByTestId('workflow-node-github')).toBeInTheDocument();
+
+    // Trello and Slack are in the parallel branch chain AFTER Router
+    expect(within(branchSection).getByTestId('workflow-node-trello')).toBeInTheDocument();
+    expect(within(branchSection).getByTestId('workflow-node-slack')).toBeInTheDocument();
+
+    // Make.com signature connector ears & wrench/filter badges & data mapping indicator
+    const canvas = screen.getByTestId('workflow-flow-canvas');
+    expect(canvas.querySelectorAll('[data-connector-ear="true"]').length).toBeGreaterThanOrEqual(4);
+    expect(canvas.querySelectorAll('[data-flow-filter-badge="true"]').length).toBeGreaterThanOrEqual(1);
+    expect(canvas).toHaveTextContent(/Dữ liệu từ Việc 1 → Việc 2/i);
+    unmount();
+
+    // In schedule mode, first node renders a dark clock trigger badge
+    render(<WorkflowFlowCanvas services={['mycalendar', 'slack']} isAutoDigest={true} mode="schedule" />);
+    expect(document.querySelector('[data-trigger-badge="schedule"]')).not.toBeNull();
+  });
+
+  it('Upgrade #4 & Orca Audit #2: highlights matching step cards in PlanMoment when clicking an orbital service node, shows data-flow badges on PlanMoment cards, and provides a 1-click recurring schedule button in ReceiptMoment', () => {
+    const planWithDataRef: ActivePlan = {
+      id: 'plan-data-flow',
+      summary: 'Đọc GitHub rồi tạo thẻ Trello',
+      steps: [
+        {
+          id: 'step_1',
+          tool: 'github.get_issue',
+          description: 'Đọc thông tin issue #42 trên GitHub',
+          args: { repo: 'VinhDat267/ati-test', issueNumber: 42 },
+        },
+        {
+          id: 'step_2',
+          tool: 'trello.create_card',
+          description: 'Tạo thẻ theo dõi lỗi trên Trello',
+          args: { boardId: 'board-1', listId: 'list-1', name: { $ref: 'step_1.output.title' } },
+          dependsOn: ['step_1'],
+        },
+      ],
+    };
+
+    const { unmount } = render(
+      <PlanMoment
+        request="Đọc issue #42 rồi tạo thẻ Trello"
+        runtimeMode="sandbox"
+        plan={planWithDataRef}
+        services={[]}
+        destination={(step) => step.description}
+        onPreview={vi.fn()}
+        onApprove={vi.fn()}
+        onCancel={vi.fn()}
+        onEdit={vi.fn()}
+        inlineComposer={null}
+      />
+    );
+
+    // Data-flow badge rendered on step card 2 in PlanMoment
+    const step2Card = document.querySelector('[data-od-id="plan-item-2"]') as HTMLElement;
+    expect(step2Card).toHaveTextContent(/Dữ liệu từ Việc 1 → Việc 2/i);
+    expect(step2Card).not.toHaveAttribute('data-highlighted-step', 'true');
+
+    // Click trello orbital node in WorkflowFlowCanvas -> step 2 card becomes highlighted
+    fireEvent.click(screen.getByTestId('workflow-node-trello'));
+    expect(step2Card).toHaveAttribute('data-highlighted-step', 'true');
+    unmount();
+
+    const onFollowup = vi.fn();
+    render(
+      <ReceiptMoment
+        request="Đọc issue #42 rồi tạo thẻ Trello"
+        steps={planWithDataRef.steps.map((s) => ({
+          id: s.id,
+          tool: s.tool,
+          description: s.description,
+          status: 'succeeded' as const,
+        }))}
+        planSteps={planWithDataRef.steps}
+        services={[]}
+        destination={(step) => step.description}
+        onNewConversation={vi.fn()}
+        onFollowup={onFollowup}
+      />
+    );
+
+    const scheduleBtn = screen.getByTestId('receipt-schedule-workflow-btn');
+    expect(scheduleBtn).toHaveTextContent(/Đặt lịch chạy định kỳ quy trình này/i);
+    fireEvent.click(scheduleBtn);
+    expect(onFollowup).toHaveBeenCalledWith(
+      expect.stringContaining('Mỗi sáng 08:00, tự động thực hiện: Đọc issue #42 rồi tạo thẻ Trello')
+    );
+  });
+
+  it('Upgrade #3: renders Multi-Service Playbooks strip in RequestMoment that populates #prompt-input on click while preserving the 4-button single-service grid', () => {
+    function RequestHarness() {
+      const [draft, setDraft] = useState('');
+      const inputRef = createRef<HTMLTextAreaElement>();
+      return (
+        <RequestMoment
+          services={[
+            { id: 'trello', name: 'Trello', configured: true, connected: true },
+            { id: 'slack', name: 'Slack', configured: true, connected: true },
+            { id: 'github', name: 'GitHub', configured: true, connected: true },
+            { id: 'sheets', name: 'Google Sheets', configured: true, connected: true },
+          ]}
+          loading={false}
+          error={null}
+          draft={draft}
+          planning={false}
+          input={inputRef}
+          onDraft={setDraft}
+          onSend={vi.fn()}
+          onKeyDown={vi.fn()}
+          onSettings={vi.fn()}
+          navigate={vi.fn()}
+          servicePrompt={(s) => s.name}
+        />
+      );
+    }
+
+    render(<RequestHarness />);
+
+    // Single-service grid contract preserved
+    const singleGrid = screen.getByText('Gợi ý việc phổ biến theo công cụ của bạn').nextElementSibling!;
+    expect(within(singleGrid as HTMLElement).getAllByRole('button')).toHaveLength(4);
+
+    // Multi-Service Playbooks strip present and interactive
+    const playbooksSection = screen.getByTestId('multi-service-playbooks');
+    expect(playbooksSection).toBeInTheDocument();
+    const playbookButtons = within(playbooksSection).getAllByRole('button');
+    expect(playbookButtons.length).toBeGreaterThanOrEqual(2);
+
+    fireEvent.click(playbookButtons[0]);
+    const promptInput = document.getElementById('prompt-input') as HTMLTextAreaElement;
+    expect(promptInput.value.length).toBeGreaterThan(15);
+  });
+
+  it('Upgrade #5 & Orca Audit #3: renders Personal OAuth 1-Click vs Workspace summary and updated OAuth footer in SettingsPage', async () => {
+    vi.spyOn(apiClient, 'getServices').mockResolvedValue({
+      services: [
+        {
+          id: 'github',
+          name: 'GitHub',
+          connected: true,
+          configured: true,
+          connectionStatus: 'healthy',
+          lastCheckedAt: '2026-10-08T07:05:00Z',
+          tools: ['github.create_issue'],
+          allowedScope: ['org/repo'],
+        },
+        {
+          id: 'slack',
+          name: 'Slack',
+          connected: true,
+          configured: true,
+          connectionStatus: 'healthy',
+          lastCheckedAt: '2026-10-08T07:05:00Z',
+          tools: ['slack.send_message'],
+          allowedScope: ['C123456'],
+        },
+        {
+          id: 'gmail',
+          name: 'Gmail',
+          connection: 'personal',
+          connected: true,
+          configured: true,
+          connectionStatus: 'healthy',
+          lastCheckedAt: '2026-10-08T07:05:00Z',
+          tools: ['gmail.send_message'],
+        },
+      ],
+      canConfigure: true,
+    });
+
+    render(<SettingsPage user={{ id: 'u-1', email: 'u@example.com', name: 'User', role: 'admin' }} navigate={vi.fn()} onLogout={vi.fn()} />);
+
+    expect(await screen.findByText('2 / 8 dịch vụ đã thiết lập · 2 kết nối tốt')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-oauth-summary')).toBeInTheDocument();
+    expect(document.body).toHaveTextContent(/OAuth 1-Click cá nhân \(Gmail, Calendar, Sheets, Trello\)/i);
+  });
+
+  it('Upgrade #6: renders compact WorkflowFlowCanvas in ScheduleSection and status filter pills in HistoryPage', async () => {
+    vi.spyOn(apiClient, 'getSchedules').mockResolvedValue({
+      schedules: [
+        {
+          id: 'sched-1',
+          name: 'Bản tin sáng',
+          kind: 'calendar_digest',
+          request: 'Đọc lịch họp và gửi vào Slack',
+          recurrence: { type: 'daily', time: '07:30' },
+          timezone: 'Asia/Ho_Chi_Minh',
+          services: ['mycalendar', 'slack'],
+          status: 'active',
+          version: 1,
+          nextRuns: ['2026-10-26T00:30:00Z'],
+          lastRun: null,
+        } as any,
+      ],
+    });
+    vi.spyOn(apiClient, 'getConversations').mockResolvedValue({
+      conversations: [
+        {
+          id: 'conv-done',
+          title: 'Tạo thẻ Trello xong',
+          created_at: '2026-10-25T08:00:00Z',
+          updatedAt: '2026-10-25T08:01:00Z',
+          status: 'completed',
+        },
+        {
+          id: 'conv-chat',
+          title: 'Hỏi về lịch họp',
+          created_at: '2026-10-25T09:00:00Z',
+          updatedAt: '2026-10-25T09:01:00Z',
+          status: 'chatting',
+        },
+      ],
+    });
+    useChatStore.getState().setConversations([]);
+
+    render(
+      <SchedulesCapabilityContext.Provider value={true}>
+        <HistoryPage user={{ id: 'u-1', email: 'u@example.com', name: 'User', role: 'admin' }} navigate={vi.fn()} onLogout={vi.fn()} />
+      </SchedulesCapabilityContext.Provider>
+    );
+
+    expect(await screen.findByText('Tạo thẻ Trello xong')).toBeInTheDocument();
+    expect(screen.getByText('Hỏi về lịch họp')).toBeInTheDocument();
+
+    // Compact WorkflowFlowCanvas inside ScheduleRow
+    expect((await screen.findAllByTestId('workflow-flow-canvas')).length).toBeGreaterThanOrEqual(1);
+
+    // Status filter pills work and never render forbidden string "Lọc theo trạng thái"
+    expect(screen.queryByText(/Lọc theo trạng thái/)).toBeNull();
+    const filterGroup = screen.getByRole('group', { name: 'Bộ lọc trạng thái hội thoại' });
+    fireEvent.click(within(filterGroup).getByRole('button', { name: /Hoàn thành/i }));
+    expect(screen.getByText('Tạo thẻ Trello xong')).toBeInTheDocument();
+    expect(screen.queryByText('Hỏi về lịch họp')).toBeNull();
   });
 });

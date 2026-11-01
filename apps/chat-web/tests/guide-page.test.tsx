@@ -103,4 +103,27 @@ describe('GuidePage — OAuth-First AI Automation Playbook & Make.com Orbital Sh
     expect(details).not.toBeNull();
     expect(within(details as HTMLElement).getByText(/Dành cho Quản trị viên Workspace \(Nâng cao\)/i)).toBeInTheDocument();
   });
+
+  it('Upgrade #2 & Orca Audit #1: highlights OAuth 1-Click & Visual Picker steps for Trello/Sheets/Calendar and prefills prompt when clicking "Thử trên sân khấu →"', async () => {
+    const navigate = vi.fn();
+    render(<GuidePage navigate={navigate} />);
+    await waitFor(() => expect(apiClient.getRuntime).toHaveBeenCalled());
+
+    // Trello is selected by default and guides user through 1-Click OAuth
+    expect(document.getElementById('service-guide-detail')).toHaveTextContent(/Kết nối OAuth 1-Click/i);
+
+    fireEvent.click(document.getElementById('service-pill-sheets')!);
+    expect(document.getElementById('service-guide-detail')).toHaveTextContent(/Kết nối OAuth 1-Click/i);
+
+    fireEvent.click(document.getElementById('service-pill-calendar')!);
+    expect(document.getElementById('service-guide-detail')).toHaveTextContent(/Kết nối OAuth 1-Click/i);
+
+    // Clicking "Thử trên sân khấu →" on PromptCard also sets sessionStorage['ati_prefill_prompt']
+    fireEvent.click(document.getElementById('tab-btn-prompts')!);
+    sessionStorage.removeItem('ati_prefill_prompt');
+    const stageLinks = await screen.findAllByRole('link', { name: /Thử trên sân khấu/i });
+    fireEvent.click(stageLinks[0]);
+    expect(navigate).toHaveBeenCalledWith('/');
+    expect(sessionStorage.getItem('ati_prefill_prompt')).toBeTruthy();
+  });
 });

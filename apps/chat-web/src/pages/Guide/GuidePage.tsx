@@ -197,7 +197,15 @@ function PromptCard({ p, copied, onCopy, navigate }: { p: typeof SAMPLE_PROMPTS[
           </>}
         </button>
       </div>
-      <a href="/" onClick={appLink(navigate, '/')} className="text-xs font-semibold text-[#FF5701] hover:underline inline-flex items-center gap-1 py-1 min-h-[36px]">
+      <a
+        href="/"
+        onClick={(event) => {
+          if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          event.preventDefault();
+          handleTryPrompt();
+        }}
+        className="text-xs font-semibold text-[#FF5701] hover:underline inline-flex items-center gap-1 py-1 min-h-[36px]"
+      >
         <span>Thử trên sân khấu →</span>
       </a>
     </div>

@@ -147,6 +147,17 @@ export function ReceiptMoment({request,terminalStatus,steps,planSteps,services,l
             </div>
             <div role="group" aria-label="Gợi ý tiếp theo" className="flex flex-wrap items-center gap-2.5">
               {services.filter(service=>service.configured).slice(0,2).map(service=><button key={service.id} type="button" onClick={()=>onFollowup(getPrompt(service))} className="px-4 py-2.5 bg-white hover:bg-neutral-50 border border-brand-border hover:border-brand-primary text-brand-text text-xs sm:text-sm font-medium rounded-xl shadow-sm transition-all flex items-center gap-2 group"><span className="text-brand-primary font-bold">+</span><span>{getPrompt(service)}</span></button>)}
+              <button
+                type="button"
+                data-testid="receipt-schedule-workflow-btn"
+                onClick={() => onFollowup(`Mỗi sáng 08:00, tự động thực hiện: ${request || 'quy trình vừa hoàn tất'}`)}
+                className="px-4 py-2.5 bg-[#FFF6EE] hover:bg-orange-100/70 border border-[#FFDFC6] text-[#FF5701] text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition-all inline-flex items-center gap-1.5"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Đặt lịch chạy định kỳ quy trình này</span>
+              </button>
               {!servicesLoading && !servicesError && !services.some(service=>service.configured) && <p className="text-xs text-brand-muted">Chưa có dịch vụ nào được kết nối. <a href="/settings" onClick={event=>{event.preventDefault();onSettings?.();}} className="underline">Kết nối thêm</a></p>}
               <button type="button" onClick={onNewConversation} className="px-5 py-2.5 bg-brand-primary hover:bg-brand-primary-hover text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition-all">Nhờ việc khác</button>
             </div>

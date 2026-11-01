@@ -1,4 +1,24 @@
 {
+  "playbooks": [
+    {
+      "id": "playbook-bug-triage",
+      "title": "Đồng bộ lỗi liên công cụ",
+      "services": ["trello", "github", "slack"],
+      "prompt": "Tạo card trên bảng Trello cho lỗi đăng nhập Google, tạo issue trên kho GitHub kèm nhãn bug và gửi thông báo vào kênh Slack của nhóm."
+    },
+    {
+      "id": "playbook-morning-digest",
+      "title": "Tổng hợp lịch họp & báo cáo nhóm",
+      "services": ["calendar", "sheets", "slack"],
+      "prompt": "Đọc lịch họp hôm nay trên Google Calendar, ghi danh sách cuộc họp vào bảng tính Google Sheets và gửi bản tóm tắt vào kênh Slack."
+    },
+    {
+      "id": "playbook-ops-alert",
+      "title": "Theo dõi bảng số liệu & nhắc việc",
+      "services": ["sheets", "trello", "telegram"],
+      "prompt": "Đọc bảng tiến độ tuần trên Google Sheets, tạo thẻ việc cần xử lý trên bảng Trello và gửi cảnh báo nhanh qua Telegram."
+    }
+  ],
   "services": {
     "trello": {
       "logoPath": "M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm2 3v12h4V6zm8 0v8h4V6z",

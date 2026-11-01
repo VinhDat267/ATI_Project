@@ -5,6 +5,7 @@ import { apiClient } from '../../services/api-client';
 import { useSchedulesEnabled } from '../../hooks/use-schedules';
 import { describeRecurrence, formatRunTime, runLabel, scheduleLabel } from '../../services/schedule-text';
 import { ScheduleActions } from '../Cockpit/ScheduleActions';
+import { WorkflowFlowCanvas } from '../../components/WorkflowFlowCanvas';
 
 function RunLink({ run, navigate }: { run: ScheduleRunView; navigate: (path: string) => void }) {
   const sheetsDelivery = run.delivery && 'spreadsheetTitle' in run.delivery ? run.delivery : null;
@@ -33,6 +34,14 @@ function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: Sche
       </p>
     )}
     <p className="text-sm text-[#4B5563]">{describeRecurrence(schedule.recurrence)}</p><p className="text-xs text-[#6B7280]">{scheduleLabel(schedule)}</p>
+    {schedule.services && schedule.services.length > 0 && (
+      <WorkflowFlowCanvas
+        services={schedule.services}
+        isAutoDigest={schedule.kind !== 'plan'}
+        mode="schedule"
+        compact
+      />
+    )}
     {schedule.lastRun && <p className="text-xs text-[#4B5563]">Lần trước: <RunLink run={schedule.lastRun} navigate={navigate} /></p>}
     <ScheduleActions schedule={schedule} navigate={navigate} onChanged={onChanged} onConflict={reload} />
     <button type="button" className="text-xs font-semibold underline text-[#4B5563]" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? 'Ẩn các lượt gần nhất' : 'Xem 10 lượt gần nhất'}</button>
