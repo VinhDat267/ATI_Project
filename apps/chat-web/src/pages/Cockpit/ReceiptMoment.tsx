@@ -6,8 +6,8 @@ import { ServiceLogo } from '../../components/ServiceLogo';
 import { ResultFields, type ExecutionStepInfo } from '../../components/ExecutionProgress';
 import { operation,serviceId,serviceName,servicePalette,statusLabel,resultTitle,outcomeURL,receiptReferences } from './presentation';
 import { RequestEcho } from './RequestEcho';
-interface CardProps {services:ServiceInfo[];planSteps:PlanStep[];labels?:Record<string,string>;mycalendarConnection?:NonNullable<ActivePlan['connections']>['mycalendar'];mysheetsConnection?:NonNullable<ActivePlan['connections']>['mysheets'];destination:(step:PlanStep,labels?:Record<string,string>)=>string}
-function ReceiptCard({step,index,services,planSteps,labels,mycalendarConnection,mysheetsConnection,destination}:CardProps & {step:ExecutionStepInfo;index:number}) { const service=serviceId(step.tool),palette=servicePalette(service);return (<div className={`receipt-stagger-${Math.min(index+1,4)} flex-1 bg-white rounded-2xl border border-brand-border p-4 sm:p-5 shadow-soft-card flex flex-col justify-between ${palette.receiptHover} transition-all group`} aria-label={serviceName(service,services)}>
+interface CardProps {services:ServiceInfo[];planSteps:PlanStep[];labels?:Record<string,string>;mycalendarConnection?:NonNullable<ActivePlan['connections']>['mycalendar'];mysheetsConnection?:NonNullable<ActivePlan['connections']>['mysheets'];trelloConnection?:NonNullable<ActivePlan['connections']>['trello'];destination:(step:PlanStep,labels?:Record<string,string>)=>string}
+function ReceiptCard({step,index,services,planSteps,labels,mycalendarConnection,mysheetsConnection,trelloConnection,destination}:CardProps & {step:ExecutionStepInfo;index:number}) { const service=serviceId(step.tool),palette=servicePalette(service);return (<div className={`receipt-stagger-${Math.min(index+1,4)} flex-1 bg-white rounded-2xl border border-brand-border p-4 sm:p-5 shadow-soft-card flex flex-col justify-between ${palette.receiptHover} transition-all group`} aria-label={serviceName(service,services)}>
                   <div className="v3-space-y-2.5">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2.5 min-w-0">
@@ -29,6 +29,7 @@ function ReceiptCard({step,index,services,planSteps,labels,mycalendarConnection,
                       </p>
                       {service==='mycalendar' && mycalendarConnection?.email && <p className="text-xs text-brand-muted mt-1 break-words">Tài khoản: {mycalendarConnection.email} (Google Calendar của bạn)</p>}
                       {service==='mysheets' && mysheetsConnection?.email && <p className="text-xs text-brand-muted mt-1 break-words">Tài khoản: {mysheetsConnection.email} (Google Sheets của bạn)</p>}
+                      {service==='trello' && trelloConnection?.username && <p className="text-xs text-brand-muted mt-1 break-words">Tài khoản: @{trelloConnection.username} (Trello của bạn)</p>}
                     </div>
                   </div>
                   <div className="pt-3 border-t border-brand-border-subtle mt-4 flex items-center justify-between">
@@ -88,10 +89,11 @@ function ReceiptBetweenRows({from,to,sourceLabel,targetLabel,field}:{from:string
                   </span>
                 </div>
               </div>);}
-export function ReceiptMoment({request,terminalStatus,steps,planSteps,services,labels,mycalendarConnection,mysheetsConnection,destination,totalDuration,onNewConversation,onFollowup,servicePrompt,onSettings,servicesLoading,servicesError}:CardProps & {request?:string;terminalStatus?:string;steps:ExecutionStepInfo[];totalDuration?:string;onNewConversation:()=>void;onFollowup:(text:string)=>void;servicePrompt:(service:ServiceInfo)=>string;onSettings:()=>void;servicesLoading:boolean;servicesError:string|null}) {
+export function ReceiptMoment({request,terminalStatus,steps,planSteps,services,labels,mycalendarConnection,mysheetsConnection,trelloConnection,destination,totalDuration,onNewConversation,onFollowup,servicePrompt,onSettings,servicesLoading,servicesError}:CardProps & {request?:string;terminalStatus?:string;steps:ExecutionStepInfo[];totalDuration?:string;onNewConversation:()=>void;onFollowup:(text:string)=>void;servicePrompt?:(service:ServiceInfo)=>string;onSettings?:()=>void;servicesLoading?:boolean;servicesError?:string|null}) {
  const rows:ExecutionStepInfo[][]=[];for(let index=0;index<steps.length;index+=2) rows.push(steps.slice(index,index+2));
  const ids=new Set(steps.map(step=>step.id)); const refs=receiptReferences(planSteps).filter(edge=>ids.has(edge.from) && ids.has(edge.to));
- const cardProps={services,planSteps,labels,mycalendarConnection,mysheetsConnection,destination};
+ const cardProps={services,planSteps,labels,mycalendarConnection,mysheetsConnection,trelloConnection,destination};
+ const getPrompt = servicePrompt ?? (s => s.name);
  return (<section id={terminalStatus?"moment-unsuccessful":"moment-6"} className="stage-section is-active v3-space-y-7 w-full max-w-[1120px] mx-auto" aria-label="Cockpit" data-moment={terminalStatus?"unsuccessful":"6"} aria-labelledby="heading-moment-6">
           <div className="v3-space-y-3">
             <div className={`w-14 h-14 rounded-2xl ${terminalStatus?'bg-neutral-100 border-neutral-300 text-neutral-600':'bg-emerald-50 border-emerald-200 text-emerald-600'} flex items-center justify-center shadow-sm`}>
@@ -138,8 +140,8 @@ export function ReceiptMoment({request,terminalStatus,steps,planSteps,services,l
               Tiếp theo:
             </div>
             <div role="group" aria-label="Gợi ý tiếp theo" className="flex flex-wrap items-center gap-2.5">
-              {services.filter(service=>service.configured).slice(0,2).map(service=><button key={service.id} type="button" onClick={()=>onFollowup(servicePrompt(service))} className="px-4 py-2.5 bg-white hover:bg-neutral-50 border border-brand-border hover:border-brand-primary text-brand-text text-xs sm:text-sm font-medium rounded-xl shadow-sm transition-all flex items-center gap-2 group"><span className="text-brand-primary font-bold">+</span><span>{servicePrompt(service)}</span></button>)}
-              {!servicesLoading && !servicesError && !services.some(service=>service.configured) && <p className="text-xs text-brand-muted">Chưa có dịch vụ nào được kết nối. <a href="/settings" onClick={event=>{event.preventDefault();onSettings();}} className="underline">Kết nối thêm</a></p>}
+              {services.filter(service=>service.configured).slice(0,2).map(service=><button key={service.id} type="button" onClick={()=>onFollowup(getPrompt(service))} className="px-4 py-2.5 bg-white hover:bg-neutral-50 border border-brand-border hover:border-brand-primary text-brand-text text-xs sm:text-sm font-medium rounded-xl shadow-sm transition-all flex items-center gap-2 group"><span className="text-brand-primary font-bold">+</span><span>{getPrompt(service)}</span></button>)}
+              {!servicesLoading && !servicesError && !services.some(service=>service.configured) && <p className="text-xs text-brand-muted">Chưa có dịch vụ nào được kết nối. <a href="/settings" onClick={event=>{event.preventDefault();onSettings?.();}} className="underline">Kết nối thêm</a></p>}
               <button type="button" onClick={onNewConversation} className="px-5 py-2.5 bg-brand-primary hover:bg-brand-primary-hover text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition-all">Nhờ việc khác</button>
             </div>
           </div>

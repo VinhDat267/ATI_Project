@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ServiceLogo } from '../../components/ServiceLogo';
 import { apiClient } from '../../services/api-client';
 import { conversationReturnPath, gmailSessionOwner, redirectToGmail, mycalendarSessionOwner, redirectToMyCalendar, mysheetsSessionOwner, redirectToMySheets } from '../../services/gmail-connection';
+import { trelloSessionOwner, redirectToTrello } from '../../services/trello-connection';
 import type { ChatMessage, ClarificationState, ServiceInfo } from '../../types';
 import { RequestEcho, useScheduledOrigin } from '../Cockpit/RequestEcho';
 
@@ -103,19 +104,21 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
   // What the refusal named may be usable by now: Gmail/MyCalendar/MySheets once this person connected it, a shared service once configured.
   const current = (id: string) => services.find(service => service.id === id);
   const usable = (id: string) => connectFromChat && (
-    id === 'gmail' || id === 'mycalendar' || id === 'mysheets'
+    id === 'gmail' || id === 'mycalendar' || id === 'mysheets' || id === 'trello'
       ? current(id)?.personalStatus === 'connected'
       : current(id)?.configured === true
   );
   const reconnect = connectFromChat && current('gmail')?.personalStatus === 'reconnect_required';
   const mycalStatus = current('mycalendar')?.personalStatus;
   const mysheetsStatus = current('mysheets')?.personalStatus;
+  const trelloStatus = current('trello')?.personalStatus;
   const missing = unavailable.filter(row => !usable(row.id));
   const resend = unavailable.length > 0 && missing.length === 0 && !servicesLoading && onResend;
   const hasGmail = missing.some(row => row.id === 'gmail');
   const hasMyCalendar = missing.some(row => row.id === 'mycalendar');
   const hasMySheets = missing.some(row => row.id === 'mysheets');
-  const shared = missing.filter(row => row.id !== 'gmail' && row.id !== 'mycalendar' && row.id !== 'mysheets');
+  const hasTrello = missing.some(row => row.id === 'trello');
+  const shared = missing.filter(row => row.id !== 'gmail' && row.id !== 'mycalendar' && row.id !== 'mysheets' && row.id !== 'trello');
   const path = shared.length === 1 ? `/settings#${encodeURIComponent(shared[0].id)}` : '/settings';
   const back = conversationId ? conversationReturnPath(`/c/${conversationId}`) : null;
   const [starting, setStarting] = useState(false), [startError, setStartError] = useState('');
@@ -148,6 +151,15 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
     } catch { if (mounted.current && owns()) setStartError('Không thể bắt đầu kết nối Google Sheets. Hãy kiểm tra mạng và thử lại.'); }
     finally { pending.current = false; if (mounted.current) setStarting(false); }
   };
+  const connectTrello = async (returnTo?: string | null) => {
+    if (pending.current) return;
+    const owns = trelloSessionOwner(); pending.current = true; setStarting(true); setStartError('');
+    try {
+      const { url } = await apiClient.startTrelloConnection(returnTo ? { returnTo } : {});
+      if (mounted.current && owns()) redirectToTrello(url);
+    } catch { if (mounted.current && owns()) setStartError('Không thể bắt đầu kết nối Trello. Hãy kiểm tra mạng và thử lại.'); }
+    finally { pending.current = false; if (mounted.current) setStarting(false); }
+  };
   return <ResponseCard request={request} title={unavailable.length ? 'Tôi chưa làm được yêu cầu này' : 'Việc này tôi chưa làm được'} moment="refusal">
     <div id={`scenario-content-${unavailable.length ? 1 : 2}`} className="scenario-panel v3-space-y-5">
       <div className="p-3.5 sm:p-4 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] text-sm text-[#111827] font-medium flex items-start gap-3">
@@ -162,7 +174,8 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
             const gmailConnected = service.id === 'gmail' && usable('gmail');
             const mycalConnected = service.id === 'mycalendar' && usable('mycalendar');
             const mysheetsConnected = service.id === 'mysheets' && usable('mysheets');
-            const good = gmailConnected || mycalConnected || mysheetsConnected || status === 'healthy';
+            const trelloConnected = service.id === 'trello' && usable('trello');
+            const good = gmailConnected || mycalConnected || mysheetsConnected || trelloConnected || status === 'healthy';
             return <div key={service.id} className="flex items-center justify-between p-3 rounded-xl bg-white border border-[#E7E7E2] shadow-sm gap-2 flex-wrap">
               <div className="flex items-center gap-3 min-w-0"><div className="w-8 h-8 rounded-lg bg-neutral-50 border border-neutral-100 flex items-center justify-center flex-shrink-0"><ServiceLogo service={service.id} className="w-5 h-5 flex-shrink-0" /></div><span className="text-xs sm:text-sm font-semibold text-[#111827] break-words">{service.name}</span></div>
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium min-w-0 break-all ${good ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-neutral-100 text-neutral-600 border border-neutral-200'}`}><span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${good ? 'bg-emerald-500' : 'bg-neutral-400'}`} /><span>
@@ -181,6 +194,10 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
                   : service.id === 'mysheets' && mysheetsStatus === 'scope_required'
                   ? `Đã cấp quyền · Chưa chọn bảng tính${current('mysheets')?.email ? ` · ${current('mysheets')!.email}` : ''}`
                   : service.id === 'mysheets' && mysheetsStatus === 'reconnect_required'
+                  ? 'Cần kết nối lại'
+                  : trelloConnected
+                  ? `Đã kết nối${current('trello')?.username ? ` · @${current('trello')!.username}` : ''}`
+                  : service.id === 'trello' && trelloStatus === 'reconnect_required'
                   ? 'Cần kết nối lại'
                   : labels[status]}
               </span></span>
@@ -226,12 +243,66 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
             if (connectFromChat && back) void connectMySheets(back); else navigate('/settings#mysheets');
           }} className={`${primary} flex items-center gap-1.5`}>{mysheetsStatus === 'reconnect_required' ? 'Kết nối lại Google Sheets' : 'Kết nối Google Sheets'}<span aria-hidden="true">→</span></a>
         ))}
+        {hasTrello && (
+          <a
+            id="trello-connect"
+            role="link"
+            href="/settings#trello"
+            aria-disabled={starting || undefined}
+            onClick={event => {
+              if (connectFromChat && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)) return;
+              event.preventDefault();
+              if (connectFromChat && back) void connectTrello(back); else navigate('/settings#trello');
+            }}
+            className={`${primary} flex items-center gap-1.5`}
+          >
+            {trelloStatus === 'reconnect_required' ? 'Kết nối lại Trello' : 'Kết nối Trello'}
+            <span aria-hidden="true">→</span>
+          </a>
+        )}
         {shared.length > 0 && (canConfigure ? <a href={path} onClick={event => { event.preventDefault(); navigate(path); }} className={`${primary} flex items-center gap-1.5`}>{shared.length === 1 ? `Kết nối ${shared[0].name}` : 'Kết nối dịch vụ'}<span aria-hidden="true">→</span></a> : <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">Chỉ quản trị viên kết nối được dịch vụ mới. Bạn hãy báo quản trị viên của nhóm.</p>)}
         {!unavailable.length && suggestion && <button type="button" onClick={() => onEdit(suggestion)} className={primary}>Thử: {suggestion}</button>}
         <button type="button" onClick={() => onEdit(request)} className={secondary}>Sửa yêu cầu</button>
       </div>
     </div>
   </ResponseCard>;
+}
+
+export function ResponseMoment(props: {
+  request: string;
+  conversationId?: string | null;
+  unavailableServices?: Array<{ id: string; name: string }>;
+  reason?: string;
+  services?: ServiceInfo[];
+  connectFromChat?: boolean;
+  navigate?: (path: string) => void;
+  canConfigure?: boolean;
+  onEdit?: (text: string) => void;
+  onResend?: (text: string) => void;
+}) {
+  const message: ChatMessage = {
+    id: 'refusal',
+    role: 'assistant',
+    content: props.reason ?? 'Từ chối yêu cầu',
+    metadata: {
+      type: 'refusal',
+      reason: props.reason,
+      unavailableServices: props.unavailableServices,
+    },
+  };
+  return (
+    <RefusalMoment
+      message={message}
+      request={props.request}
+      services={props.services ?? []}
+      canConfigure={props.canConfigure ?? false}
+      navigate={props.navigate ?? (() => {})}
+      onEdit={props.onEdit ?? (() => {})}
+      connectFromChat={props.connectFromChat ?? true}
+      conversationId={props.conversationId}
+      onResend={props.onResend}
+    />
+  );
 }
 export function ExpandedClarificationMoment({ clarification, variant, request, services, canConfigure, selected, onSelect, onSend, onEdit, navigate, planning }: {
   clarification: ClarificationState; variant: 'read-only' | 'destination'; request: string; services: ServiceInfo[];

@@ -60,6 +60,12 @@ export interface ActivePlan {
       email: string;
       allowedSpreadsheets: string[] | PersonalSpreadsheetItem[];
     };
+    trello?: {
+      credentialId: string;
+      memberId: string;
+      username: string;
+      boardIds: string[];
+    };
   };
   resourceLabels?: Record<string, string>;
   id?: string;

@@ -283,6 +283,57 @@ export class ApiClient {
       credentials: 'include',
     });
   }
+  getTrelloConnection() {
+    return this.request<{
+      status: 'unconfigured' | 'not_connected' | 'reconnect_required' | 'needs_scope' | 'needs_membership' | 'connected';
+      username?: string;
+      workspaceName?: string;
+      boards: Array<{ boardId: string; boardName: string; member: boolean }>;
+    }>('/api/connections/trello', { credentials: 'include' });
+  }
+  startTrelloConnection(options: { returnTo?: string } = {}) {
+    return this.request<{ url: string }>('/api/connections/trello/start', {
+      method: 'POST',
+      credentials: 'include',
+      ...(options.returnTo ? { body: JSON.stringify({ returnTo: options.returnTo }) } : {}),
+    });
+  }
+  completeTrelloConnection(code: string, state: string) {
+    return this.request<{ username: string; returnTo?: string }>('/api/connections/trello/callback', {
+      method: 'POST',
+      credentials: 'include',
+      body: JSON.stringify({ code, state }),
+    }, true);
+  }
+  disconnectTrello() {
+    return this.request<{ success: true }>('/api/connections/trello', {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+  }
+  getTrelloWorkspaces() {
+    return this.request<{ workspaces: Array<{ id: string; name: string }> }>('/api/connections/trello/workspaces', {
+      credentials: 'include',
+    });
+  }
+  getTrelloBoards(workspaceId: string) {
+    return this.request<{ boards: Array<{ id: string; name: string; member: boolean }> }>(
+      `/api/connections/trello/workspaces/${encodeURIComponent(workspaceId)}/boards`,
+      { credentials: 'include' }
+    );
+  }
+  saveTrelloScope(workspaceId: string, boardIds: string[]) {
+    return this.request<{
+      chosenBy: string;
+      workspaceId: string;
+      workspaceName: string;
+      boards: Array<{ boardId: string; boardName: string }>;
+    }>('/api/connections/trello/scope', {
+      method: 'PUT',
+      credentials: 'include',
+      body: JSON.stringify({ workspaceId, boardIds }),
+    });
+  }
   unlinkGoogle(currentPassword: string) {
     return this.request<{ success: true }>('/api/auth/google/unlink', {
       method: 'POST', credentials: 'include', body: JSON.stringify({ currentPassword }),
