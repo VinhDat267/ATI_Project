@@ -331,6 +331,8 @@ export class SlackIngressService {
       messageTs: this.receiptMessageTs(event, eventType, eventSubtype),
       payloadHash,
       discardReason: timestamp.kind === 'ok' ? null : 'malformed_timestamp',
+      ...(eventType==='message' && !eventSubtype && safeId(event.user)?{echo:{slackUserId:safeId(event.user)!,
+        clientMsgId:typeof event.client_msg_id==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(event.client_msg_id)?event.client_msg_id:null}}:{}),
     });
   }
 
