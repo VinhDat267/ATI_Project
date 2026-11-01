@@ -267,7 +267,7 @@ export function createApp(options: AppOptions): Express {
     app.use(
       '/api/conversations',
       withAuthAndWorkspace,
-      createStreamRoutes({ sseManager: options.sseManager, convRepo: options.convRepo })
+      createStreamRoutes({ sseManager: options.sseManager, convRepo: options.convRepo, workspaceRepo: options.workspaceRepo })
     );
   }
 

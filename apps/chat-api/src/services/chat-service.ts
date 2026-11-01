@@ -4,6 +4,7 @@ import type { MessageRepo } from '../db/repositories/message-repo.js';
 import type { ConversationRepo } from '../db/repositories/conversation-repo.js';
 import type { PlanRepo } from '../db/repositories/plan-repo.js';
 import type { ScheduleRepo } from '../db/repositories/schedule-repo.js';
+import type { WorkspaceRepo } from '../db/repositories/workspace-repo.js';
 import { WorkingMemory, unroutable, type ChatMessage, type ProcessMessageInput, type RoutedIntent } from '@wap/planner';
 import type { PersonalSpreadsheetItem, PlanConnections, PlannerResponse, PlanResponse, PlanStep, ScheduleProposalMetadata, ScheduleResponse, ScheduleView } from '@wap/tool-schemas';
 import { resourceLabels } from './resource-labels.js';
@@ -122,6 +123,7 @@ export interface ChatServiceOptions {
   msgRepo: MessageRepo;
   convRepo?: ConversationRepo;
   planRepo?: PlanRepo;
+  workspaceRepo?: WorkspaceRepo;
   planner: ChatPlanner;
   eventEmitter: {
     emit: (event: string, payload: any) => void;
@@ -161,6 +163,7 @@ export class ChatService {
   private msgRepo: MessageRepo;
   private convRepo?: ConversationRepo;
   private planRepo?: PlanRepo;
+  private workspaceRepo?: WorkspaceRepo;
   private planner: ChatPlanner;
   private eventEmitter: { emit: (event: string, payload: any) => void };
   private gmailConnection?: ChatServiceOptions['gmailConnection'];
@@ -183,6 +186,7 @@ export class ChatService {
     this.msgRepo = options.msgRepo;
     this.convRepo = options.convRepo;
     this.planRepo = options.planRepo;
+    this.workspaceRepo = options.workspaceRepo;
     this.planner = options.planner;
     this.eventEmitter = options.eventEmitter;
     this.schedules = options.schedules;
@@ -190,6 +194,15 @@ export class ChatService {
 
   async handleUserMessage(input: HandleUserMessageInput): Promise<IngestionResult> {
     const { conversationId, userId, content, requestId } = input;
+    if (this.convRepo && this.workspaceRepo) {
+      const conv = await this.convRepo.getConversation(conversationId);
+      if (conv?.workspace_mode === 'organization' && conv.workspace_id) {
+        const member = await this.workspaceRepo.findMember(conv.workspace_id, userId);
+        if (!member || member.status !== 'active') {
+          throw Object.assign(new Error('WORKSPACE_ACCESS_DENIED'), { status: 403 });
+        }
+      }
+    }
 
     // 1. Save user message immediately to DB
     const message = requestId
@@ -540,7 +553,8 @@ export class ChatService {
     conversationId: string,
     userId: string
   ): Promise<{ userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization' }> {
-    if (!this.convRepo) return { userId };
+    const fallbackMode = this.workspaceRepo ? ('personal' as const) : undefined;
+    if (!this.convRepo) return { userId, ...(fallbackMode ? { workspaceMode: fallbackMode } : {}) };
     try {
       const conv = await this.convRepo.getConversation(conversationId);
       if (conv?.workspace_mode && conv.workspace_mode !== 'legacy') {
@@ -553,7 +567,7 @@ export class ChatService {
     } catch {
       // ignore
     }
-    return { userId };
+    return { userId, ...(fallbackMode ? { workspaceMode: fallbackMode } : {}) };
   }
 
   /**

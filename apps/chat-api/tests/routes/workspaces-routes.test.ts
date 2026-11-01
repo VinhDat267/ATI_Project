@@ -359,4 +359,46 @@ describe('Task 3: Workspaces routes, X-Workspace-Id middleware, and organization
     expect(settingsRes.status).toBe(200);
     expect(settingsRes.body.requireApproval).toBe(false);
   });
+
+  it('[AUDIT-D & AUDIT-J] validates UUID on regenerate/settings, sanitizes control chars in workspace name, and rate-limits /api/workspaces/join', async () => {
+    const aliceTokens = await login(aliceId);
+    const charlieTokens = await login(charlieId);
+
+    // Non-UUID workspace ID returns 400 INVALID_WORKSPACE_ID instead of 500
+    const badRegen = await request(app)
+      .post('/api/workspaces/not-a-valid-uuid/invite-code/regenerate')
+      .set('Authorization', `Bearer ${aliceTokens.accessToken}`);
+    expect(badRegen.status).toBe(400);
+    expect(badRegen.body.error).toBe('INVALID_WORKSPACE_ID');
+
+    const badSettings = await request(app)
+      .patch('/api/workspaces/not-a-valid-uuid/settings')
+      .set('Authorization', `Bearer ${aliceTokens.accessToken}`)
+      .send({ requireApproval: false });
+    expect(badSettings.status).toBe(400);
+    expect(badSettings.body.error).toBe('INVALID_WORKSPACE_ID');
+
+    // Control characters (\r\n\t) in workspace name are stripped
+    const createSanitized = await request(app)
+      .post('/api/workspaces')
+      .set('Authorization', `Bearer ${aliceTokens.accessToken}`)
+      .send({ name: 'Đội\r\nBảo Mật\tSố 1', requireApproval: true });
+    expect(createSanitized.status).toBe(201);
+    expect(createSanitized.body.workspace.name).toBe('Đội Bảo Mật Số 1');
+
+    // Rate-limiting on POST /api/workspaces/join: 10 attempts allowed, 11th returns 429 with Retry-After
+    for (let i = 0; i < 10; i++) {
+      const attempt = await request(app)
+        .post('/api/workspaces/join')
+        .set('Authorization', `Bearer ${charlieTokens.accessToken}`)
+        .send({ inviteCode: `ATI-FAKE-000${i}` });
+      expect(attempt.status).toBe(404);
+    }
+    const eleventh = await request(app)
+      .post('/api/workspaces/join')
+      .set('Authorization', `Bearer ${charlieTokens.accessToken}`)
+      .send({ inviteCode: 'ATI-FAKE-9999' });
+    expect(eleventh.status).toBe(429);
+    expect(eleventh.headers['retry-after']).toBeDefined();
+  });
 });

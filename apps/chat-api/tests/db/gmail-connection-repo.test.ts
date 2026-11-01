@@ -55,7 +55,7 @@ describe('personal Gmail credentials and connect_gmail states on PostgreSQL', ()
         const inTransaction = new CredentialRepo(client as unknown as pg.Pool);
         expect(await inTransaction.getPersonalCredentials('gmail', alice.id)).toBeNull();
         expect(await inTransaction.getPersonalConnectionStatus('gmail', alice.id)).toBeNull();
-        expect((await inTransaction.getCredentials('gmail', alice.id))?.config).toBe('v1:shared-gmail');
+        expect((await inTransaction.getCredentials('gmail'))?.config).toBe('v1:shared-gmail');
       } finally {
         await client.query('ROLLBACK'); client.release();
       }

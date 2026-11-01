@@ -34,13 +34,21 @@ export function createWorkspaceContextMiddleware(workspaceRepo?: WorkspaceRepo) 
         ? rawHeader[0]?.trim() ?? ''
         : '';
 
-    // Case 1: No header sent -> legacy mode
+    // Case 1: No header sent -> personal mode when workspaceRepo is enabled, legacy mode otherwise
     if (!header) {
-      req.workspace = {
-        mode: 'legacy',
-        workspaceId: null,
-        role: req.user.role === 'admin' ? 'admin' : 'member',
-      };
+      if (workspaceRepo) {
+        req.workspace = {
+          mode: 'personal',
+          workspaceId: null,
+          role: 'admin',
+        };
+      } else {
+        req.workspace = {
+          mode: 'legacy',
+          workspaceId: null,
+          role: req.user.role === 'admin' ? 'admin' : 'member',
+        };
+      }
       next();
       return;
     }

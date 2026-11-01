@@ -1,14 +1,22 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
-import { WorkspaceError, type WorkspaceRepo } from '../db/repositories/workspace-repo.js';
+import { WorkspaceError, sanitizeWorkspaceName, type WorkspaceRepo } from '../db/repositories/workspace-repo.js';
 import { sendEmailInBackground, workspaceJoinRequestEmail, type EmailSender } from '../services/email/index.js';
 
 export interface WorkspacesRouterOptions {
   workspaceRepo: WorkspaceRepo;
   emailSender?: EmailSender;
+  clock?: () => number;
 }
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const JOIN_WINDOW_MS = 15 * 60 * 1000;
+const JOIN_MAX_ATTEMPTS = 10;
 
 export function createWorkspacesRouter(options: WorkspacesRouterOptions): Router {
   const router = Router();
+  const clock = options.clock ?? Date.now;
+  const joinAttempts = new Map<string, number[]>();
+  const joinEmailCooldown = new Map<string, number>();
 
   // Authentication guard
   router.use((req: Request, res: Response, next: NextFunction) => {
@@ -41,7 +49,7 @@ export function createWorkspacesRouter(options: WorkspacesRouterOptions): Router
   router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { name, requireApproval } = req.body ?? {};
-      const trimmedName = typeof name === 'string' ? name.trim() : '';
+      const trimmedName = sanitizeWorkspaceName(name);
       if (!trimmedName || trimmedName.length > 100) {
         res.status(400).json({ error: 'INVALID_NAME', message: 'Tên tổ chức phải từ 1 đến 100 ký tự.' });
         return;
@@ -67,9 +75,33 @@ export function createWorkspacesRouter(options: WorkspacesRouterOptions): Router
         return;
       }
 
+      const now = clock();
+      const rateKey = `${req.user!.id}:${req.ip ?? 'unknown'}`;
+      const history = (joinAttempts.get(rateKey) ?? []).filter(ts => now - ts < JOIN_WINDOW_MS);
+      if (history.length >= JOIN_MAX_ATTEMPTS) {
+        const retryAfterSec = Math.max(1, Math.ceil((history[0]! + JOIN_WINDOW_MS - now) / 1000));
+        res.setHeader('Retry-After', String(retryAfterSec));
+        res.status(429).json({
+          error: 'TOO_MANY_REQUESTS',
+          message: 'Bạn đã nhập mã mời quá nhiều lần. Vui lòng thử lại sau.',
+        });
+        return;
+      }
+      history.push(now);
+      joinAttempts.set(rateKey, history);
+
       const result = await options.workspaceRepo.joinByInviteCode(req.user!.id, inviteCode.trim());
 
-      if (result.created && result.workspace.status === 'pending' && result.admins.length > 0 && options.emailSender) {
+      const emailKey = `${result.workspace.id}:${req.user!.id}`;
+      const lastEmailAt = joinEmailCooldown.get(emailKey) ?? 0;
+      if (
+        result.created &&
+        result.workspace.status === 'pending' &&
+        result.admins.length > 0 &&
+        options.emailSender &&
+        now - lastEmailAt >= JOIN_WINDOW_MS
+      ) {
+        joinEmailCooldown.set(emailKey, now);
         const requesterName = req.user!.name || req.user!.email;
         const requesterEmail = req.user!.email;
         for (const admin of result.admins) {
@@ -89,7 +121,11 @@ export function createWorkspacesRouter(options: WorkspacesRouterOptions): Router
   // POST /:id/invite-code/regenerate - Regenerate invite code
   router.post('/:id/invite-code/regenerate', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const workspaceId = typeof req.params.id === 'string' ? req.params.id : '';
+      const workspaceId = typeof req.params.id === 'string' ? req.params.id.trim() : '';
+      if (!UUID_REGEX.test(workspaceId)) {
+        res.status(400).json({ error: 'INVALID_WORKSPACE_ID', message: 'Mã không gian làm việc không hợp lệ.' });
+        return;
+      }
       const inviteCode = await options.workspaceRepo.regenerateInviteCode(req.user!.id, workspaceId);
       res.status(200).json({ inviteCode });
     } catch (err) {
@@ -100,13 +136,17 @@ export function createWorkspacesRouter(options: WorkspacesRouterOptions): Router
   // PATCH /:id/settings - Update workspace settings
   router.patch('/:id/settings', async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const workspaceId = typeof req.params.id === 'string' ? req.params.id.trim() : '';
+      if (!UUID_REGEX.test(workspaceId)) {
+        res.status(400).json({ error: 'INVALID_WORKSPACE_ID', message: 'Mã không gian làm việc không hợp lệ.' });
+        return;
+      }
       const { requireApproval } = req.body ?? {};
       if (typeof requireApproval !== 'boolean') {
         res.status(400).json({ error: 'INVALID_SETTINGS', message: 'requireApproval phải là boolean.' });
         return;
       }
 
-      const workspaceId = typeof req.params.id === 'string' ? req.params.id : '';
       const updated = await options.workspaceRepo.updateSettings(req.user!.id, workspaceId, { requireApproval });
       res.status(200).json({ requireApproval: updated.requireApproval });
     } catch (err) {

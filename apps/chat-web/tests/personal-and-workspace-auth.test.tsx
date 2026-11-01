@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { VerifyEmailView } from '../src/views/VerifyEmailView';
 import { AuthGate } from '../src/components/AuthGate';
+import { Workspace } from '../src/components/Workspace';
 import { MainNav } from '../src/components/layout/MainNav';
 import { WorkspaceSwitcher } from '../src/components/layout/WorkspaceSwitcher';
 import { UsersPage } from '../src/pages/Users/UsersPage';
@@ -16,6 +17,7 @@ import { authStorage } from '../src/services/auth-storage';
 import {
   getActiveWorkspaceId,
   getActiveWorkspaceSummary,
+  getCachedOrganizations,
   resetWorkspaceStorage,
   savePendingInviteCode,
   setActiveWorkspaceId,
@@ -432,7 +434,47 @@ describe('Personal and Workspace Auth (Task 5)', () => {
       await waitFor(() => {
         expect(getActiveWorkspaceId()).toBe('personal');
       });
-      expect(window.localStorage.getItem('wap_cached_orgs')).toBeNull();
+      expect(getCachedOrganizations()).toEqual([]);
+    });
+
+    it('[AUDIT-E] scopes activeWorkspaceId by user.id and exits open conversation to "/" when switching workspaces', async () => {
+      // User 1 selects ws-team-alpha
+      authStorage.setStoredTokens({ accessToken: 'token-1', user: testUser });
+      setActiveWorkspaceId('ws-team-alpha');
+      expect(getActiveWorkspaceId()).toBe('ws-team-alpha');
+
+      // User 2 logs in on the same browser: their active workspace is still 'personal'
+      authStorage.setStoredTokens({ accessToken: 'token-2', user: orgAdminUser });
+      expect(getActiveWorkspaceId()).toBe('personal');
+
+      // When viewing an open conversation and switching workspaces, Workspace navigates back to '/'
+      vi.spyOn(apiClient, 'getServices').mockResolvedValue({ services: [], canConfigure: true } as any);
+      vi.spyOn(apiClient, 'getConversations').mockResolvedValue({ conversations: [], nextCursor: null } as any);
+      vi.spyOn(apiClient, 'getConversation').mockResolvedValue({
+        conversation: { id: 'conv-open-1', title: 'Đang mở', created_at: '2026-11-01T00:00:00Z', updated_at: '2026-11-01T00:00:00Z' },
+        messages: [],
+      } as any);
+
+      const navigate = vi.fn();
+      useChatStore.getState().setConversationId('conv-open-1');
+      render(
+        <Workspace
+          authToken="token-2"
+          user={orgAdminUser}
+          authError={null}
+          onClearAuthError={vi.fn()}
+          onLogout={vi.fn()}
+          route={{ kind: 'conversation', conversationId: 'conv-open-1' }}
+          navigate={navigate}
+        />
+      );
+
+      setActiveWorkspaceId('ws-team-alpha');
+
+      await waitFor(() => {
+        expect(navigate).toHaveBeenCalledWith('/', true);
+      });
+      expect(useChatStore.getState().conversationId).toBeNull();
     });
 
     it('refreshes useSchedulePendingCount and HistoryPage when switching workspaces', async () => {

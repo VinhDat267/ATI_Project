@@ -14,6 +14,8 @@ import { TrelloTeamRepo } from '../../src/db/repositories/trello-team-repo.js';
 import { AdminUserRepo } from '../../src/db/repositories/admin-user-repo.js';
 import { ScheduleService } from '../../src/services/schedules/schedule-service.js';
 import { ExecutionService } from '../../src/services/execution-service.js';
+import { AdapterFactory } from '../../src/services/adapter-factory.js';
+import { SSEManager } from '../../src/sse/sse-manager.js';
 import { TrelloTokenManager } from '../../src/services/trello/token-manager.js';
 import { getToolCatalogFor } from '../../src/services/registered-services.js';
 import { createTrelloConnectionLookup } from '../../src/services/trello/connection-reference.js';
@@ -129,6 +131,7 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
         new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
       convRepo,
       msgRepo,
+      sseManager: new SSEManager(),
       chatService: {
         handleUserMessage: async () => ({ messageId: 'm1' }),
       } as any,
@@ -689,6 +692,107 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
         .set('Authorization', `Bearer ${bobToken}`);
       expect(blockedRes2.status).toBe(403);
       expect(blockedRes2.body.error).toBe('WORKSPACE_ACCESS_DENIED');
+    });
+
+    it('[AUDIT-A] defaults omitted X-Workspace-Id header to personal mode when workspaceRepo is enabled, never exposing legacy shared credentials', async () => {
+      // Legacy shared Slack credential exists in DB (user_id IS NULL, workspace_id IS NULL)
+      await credentials.saveCredentials(
+        'slack',
+        encryptCredentials({ botToken: 'xoxb-legacy-company-secret', allowedScope: { channels: ['C1'] } }, key),
+        null,
+        null
+      );
+
+      // Charlie is a newly self-activated user who calls /api/services without X-Workspace-Id
+      const charlieToken = tokenFor(charlie);
+      const res = await request(app)
+        .get('/api/services')
+        .set('Authorization', `Bearer ${charlieToken}`);
+      expect(res.status).toBe(200);
+      const slack = res.body.services.find((s: any) => s.id === 'slack');
+      expect(slack.configured).toBe(false);
+    });
+
+    it('[AUDIT-B] blocks a disabled or active member from accessing an organization conversation or SSE stream when X-Workspace-Id is omitted or personal', async () => {
+      const aliceToken = tokenFor(alice);
+      const bobToken = tokenFor(bob);
+      const org = await workspaceRepo.create(alice.id, 'Strict Org', false);
+      await workspaceRepo.joinByInviteCode(bob.id, org.inviteCode!);
+
+      const conv = await convRepo.createConversation(bob.id, {
+        workspaceMode: 'organization',
+        workspaceId: org.id,
+      });
+
+      // Disable Bob in Strict Org
+      await adminUserRepo.mutateForWorkspace(alice.id, alice.sid, org.id, bob.id, 'disable');
+
+      // Omitting X-Workspace-Id cannot read or post to org conversation
+      const getNoHeader = await request(app)
+        .get(`/api/conversations/${conv.id}`)
+        .set('Authorization', `Bearer ${bobToken}`);
+      expect(getNoHeader.status).toBe(404);
+
+      const postNoHeader = await request(app)
+        .post(`/api/conversations/${conv.id}/messages`)
+        .set('Authorization', `Bearer ${bobToken}`)
+        .send({ content: 'đọc Slack' });
+      expect(postNoHeader.status).toBe(404);
+
+      // Opening SSE stream on org conversation as a disabled member is blocked with 403
+      const streamRes = await request(app)
+        .get(`/api/conversations/${conv.id}/stream`)
+        .set('Authorization', `Bearer ${bobToken}`);
+      expect(streamRes.status).toBe(403);
+    });
+
+    it('[AUDIT-I] AdapterFactory.clearCache evicts only the targeted workspace or personal entry without sweeping unrelated workspaces', async () => {
+      const orgA = await workspaceRepo.create(alice.id, 'Cache Org A', false);
+      const orgB = await workspaceRepo.create(bob.id, 'Cache Org B', false);
+
+      await credentials.upsertCredentials(
+        'slack',
+        encryptCredentials({ botToken: 'xoxb-cache-org-a', allowedScope: { channels: ['CA'] } }, key),
+        'active',
+        alice.email,
+        orgA.id
+      );
+      await credentials.upsertCredentials(
+        'slack',
+        encryptCredentials({ botToken: 'xoxb-cache-org-b', allowedScope: { channels: ['CB'] } }, key),
+        'active',
+        bob.email,
+        orgB.id
+      );
+
+      const factory = new AdapterFactory({ credentialRepo: credentials, encryptionKey: key });
+      const adapterA1 = await factory.getAdapterForService('slack', {
+        phase: 'planning',
+        workspaceMode: 'organization',
+        workspaceId: orgA.id,
+      });
+      const adapterB1 = await factory.getAdapterForService('slack', {
+        phase: 'planning',
+        workspaceMode: 'organization',
+        workspaceId: orgB.id,
+      });
+
+      // Clear only Org A's slack cache
+      factory.clearCache('slack', orgA.id);
+
+      const adapterA2 = await factory.getAdapterForService('slack', {
+        phase: 'planning',
+        workspaceMode: 'organization',
+        workspaceId: orgA.id,
+      });
+      const adapterB2 = await factory.getAdapterForService('slack', {
+        phase: 'planning',
+        workspaceMode: 'organization',
+        workspaceId: orgB.id,
+      });
+
+      expect(adapterA2).not.toBe(adapterA1);
+      expect(adapterB2).toBe(adapterB1);
     });
   });
 });

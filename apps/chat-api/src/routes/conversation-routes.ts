@@ -17,10 +17,7 @@ function isConvInWorkspace(conv: { workspace_id?: string | null; workspace_mode?
   if (mode === 'organization') {
     return conv.workspace_id === req.workspace?.workspaceId;
   }
-  if (mode === 'personal') {
-    return !conv.workspace_id;
-  }
-  return true;
+  return !conv.workspace_id;
 }
 
 export function createConversationRoutes(options: ConversationRoutesOptions): Router {

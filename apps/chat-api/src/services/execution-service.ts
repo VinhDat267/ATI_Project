@@ -70,7 +70,7 @@ export class ExecutionService {
       phase: 'execution',
       connections,
       workspaceId: conversation?.workspace_id ?? null,
-      workspaceMode: conversation?.workspace_mode ?? 'personal',
+      workspaceMode: conversation?.workspace_mode ?? (this.workspaceRepo ? 'personal' : 'legacy'),
     };
   }
 

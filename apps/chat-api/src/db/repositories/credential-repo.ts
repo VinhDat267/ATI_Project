@@ -129,15 +129,6 @@ export class CredentialRepo {
     service: string,
     workspaceId: string | null = null
   ): Promise<ServiceCredentialRow | null> {
-    if (service === 'gmail' && workspaceId) {
-      const legacyGmail = await this.pool.query(
-        'SELECT * FROM service_credentials WHERE service = $1 AND (user_id = $2 OR user_id IS NULL) ORDER BY user_id NULLS LAST LIMIT 1',
-        [service, workspaceId]
-      );
-      const row = legacyGmail.rows[0];
-      return row ? { ...row, workspaceId: row.workspace_id ?? null } : null;
-    }
-
     try {
       const res = await this.pool.query(
         'SELECT * FROM service_credentials WHERE service = $1 AND user_id IS NULL AND workspace_id IS NOT DISTINCT FROM $2',

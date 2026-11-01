@@ -2,6 +2,11 @@ import type pg from 'pg';
 import crypto from 'node:crypto';
 
 const INVITE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function sanitizeWorkspaceName(name: unknown): string {
+  return typeof name === 'string' ? name.replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim() : '';
+}
 
 function generateRandomInviteCode(): string {
   let part1 = '';
@@ -39,7 +44,7 @@ export class WorkspaceRepo {
   constructor(private readonly pool: pg.Pool) {}
 
   async create(userId: string, name: string, requireApproval = true, now = Date.now()): Promise<WorkspaceSummary> {
-    const trimmedName = typeof name === 'string' ? name.trim() : '';
+    const trimmedName = sanitizeWorkspaceName(name);
     if (trimmedName.length < 1 || trimmedName.length > 100) {
       throw new WorkspaceError(400, 'INVALID_NAME', 'Tên tổ chức phải từ 1 đến 100 ký tự.');
     }
@@ -269,6 +274,9 @@ export class WorkspaceRepo {
   }
 
   async regenerateInviteCode(actorId: string, workspaceId: string, now = Date.now()): Promise<string> {
+    if (!UUID_REGEX.test(workspaceId)) {
+      throw new WorkspaceError(400, 'INVALID_WORKSPACE_ID', 'Mã không gian làm việc không hợp lệ.');
+    }
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
@@ -319,6 +327,9 @@ export class WorkspaceRepo {
     settings: { requireApproval: boolean },
     now = Date.now()
   ): Promise<{ requireApproval: boolean }> {
+    if (!UUID_REGEX.test(workspaceId)) {
+      throw new WorkspaceError(400, 'INVALID_WORKSPACE_ID', 'Mã không gian làm việc không hợp lệ.');
+    }
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');

@@ -153,4 +153,87 @@ describe('0015_workspaces.sql migration and schema invariants', () => {
       pool.query("INSERT INTO trello_team_scope (id, workspace_id, workspace_name, chosen_by) VALUES ('invalid-scope-id', 'trello-ws', 'Invalid', $1)", [uId])
     ).rejects.toThrow();
   });
+
+  it('[AUDIT-C] automatically migrates pre-existing shared credentials, default Trello boards, and active users into "Không gian Chung" when 0015 runs', async () => {
+    const upgradeSchema = `migration_upg_${randomUUID().replaceAll('-', '')}`;
+    await admin.query(`CREATE SCHEMA "${upgradeSchema}"`);
+    const url = new URL(databaseUrl);
+    url.searchParams.set('options', `-c search_path=${upgradeSchema}`);
+    const upgPool = new pg.Pool({ connectionString: url.href, max: 4 });
+
+    try {
+      const files = (await readdir(directory)).filter(f => /^\d{4}_.*\.sql$/.test(f)).sort();
+      for (const f of files.filter(f => !f.startsWith('0015_'))) {
+        await upgPool.query(await readFile(`${directory}/${f}`, 'utf8'));
+      }
+
+      // Seed existing pre-0015 data: 1 active admin, 1 active member, 1 pending stranger, 1 shared slack credential, 1 default trello scope, 1 conversation
+      const adminId = randomUUID();
+      const memberId = randomUUID();
+      const pendingId = randomUUID();
+      await upgPool.query(
+        `INSERT INTO users (id, email, password, name, role, status, email_verified) VALUES
+         ($1, 'admin@legacy.test', 'h', 'Legacy Admin', 'admin', 'active', true),
+         ($2, 'member@legacy.test', 'h', 'Legacy Member', 'member', 'active', true),
+         ($3, 'pending@legacy.test', 'h', 'Pending Stranger', 'member', 'pending', false)`,
+        [adminId, memberId, pendingId]
+      );
+      await upgPool.query(
+        "INSERT INTO service_credentials (service, user_id, config, status) VALUES ('slack', NULL, 'v1:legacy-shared-slack', 'active')"
+      );
+      await upgPool.query(
+        "INSERT INTO trello_team_scope (id, workspace_id, workspace_name, chosen_by) VALUES ('default', 'tr-ws-1', 'Trello Legacy WS', $1)",
+        [adminId]
+      );
+      await upgPool.query(
+        "INSERT INTO trello_team_boards (scope_id, workspace_id, board_id, board_name, position) VALUES ('default', 'tr-ws-1', 'b-leg-1', 'Board Legacy 1', 1)"
+      );
+      const convRes = await upgPool.query(
+        "INSERT INTO conversations (user_id, status, title) VALUES ($1, 'chatting', 'Hội thoại cũ') RETURNING id",
+        [memberId]
+      );
+
+      // Now run 0015_workspaces.sql
+      await upgPool.query(await readFile(`${directory}/0015_workspaces.sql`, 'utf8'));
+
+      // Verify "Không gian Chung" was created
+      const wsRes = await upgPool.query("SELECT * FROM workspaces WHERE name = 'Không gian Chung'");
+      expect(wsRes.rows).toHaveLength(1);
+      const defaultWsId = wsRes.rows[0].id as string;
+      expect(wsRes.rows[0].created_by).toBe(adminId);
+
+      // Verify active admin and active member are enrolled, but pending stranger is not
+      const membersRes = await upgPool.query(
+        'SELECT user_id, role, status FROM workspace_members WHERE workspace_id = $1 ORDER BY role ASC',
+        [defaultWsId]
+      );
+      expect(membersRes.rows).toEqual([
+        { user_id: adminId, role: 'admin', status: 'active' },
+        { user_id: memberId, role: 'member', status: 'active' },
+      ]);
+
+      // Verify shared slack credential now belongs to defaultWsId
+      const credRes = await upgPool.query("SELECT workspace_id FROM service_credentials WHERE service = 'slack'");
+      expect(credRes.rows[0].workspace_id).toBe(defaultWsId);
+
+      // Verify Trello scope and board were copied to defaultWsId
+      const trelloScopeRes = await upgPool.query('SELECT * FROM trello_team_scope WHERE id = $1', [defaultWsId]);
+      expect(trelloScopeRes.rows).toHaveLength(1);
+      const trelloBoardRes = await upgPool.query('SELECT * FROM trello_team_boards WHERE scope_id = $1', [defaultWsId]);
+      expect(trelloBoardRes.rows).toHaveLength(1);
+      expect(trelloBoardRes.rows[0].board_id).toBe('b-leg-1');
+
+      // Verify existing conversation was migrated to defaultWsId
+      const migratedConv = await upgPool.query('SELECT workspace_mode, workspace_id FROM conversations WHERE id = $1', [
+        convRes.rows[0].id,
+      ]);
+      expect(migratedConv.rows[0]).toEqual({
+        workspace_mode: 'organization',
+        workspace_id: defaultWsId,
+      });
+    } finally {
+      await upgPool.end();
+      await admin.query(`DROP SCHEMA IF EXISTS "${upgradeSchema}" CASCADE`);
+    }
+  });
 });

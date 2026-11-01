@@ -283,10 +283,11 @@ async function bootstrap() {
     if (!gatherAdapterFactory) throw new Error('Gather adapter factory is not ready');
     const serviceName = tool.split('.')[0]!;
     // Lookups during planning use the planning member's own connection and active workspace context.
+    const defaultMode = workspaceRepo ? ('personal' as const) : undefined;
     const adapter = await gatherAdapterFactory.getAdapterForService(serviceName, {
       userId: actor?.userId,
       phase: 'planning',
-      ...(actor?.workspaceMode ? { workspaceMode: actor.workspaceMode } : {}),
+      workspaceMode: actor?.workspaceMode ?? defaultMode,
       ...(actor?.workspaceId !== undefined ? { workspaceId: actor.workspaceId } : {}),
     });
     return adapter.execute(tool, args, { signal });
@@ -309,7 +310,7 @@ async function bootstrap() {
     provider: env.RUNTIME_MODE === 'sandbox' && (process.env.SANDBOX_SCENARIO === 'gmail' || process.env.SANDBOX_SCENARIO === 'mycalendar' || process.env.SANDBOX_SCENARIO === 'mysheets') ? createSandboxProvider(process.env.SANDBOX_SCENARIO) : provider,
     toolCatalog: await runtimeToolCatalog(env.RUNTIME_MODE, credRepo, env.ENCRYPTION_KEY, {
       userId: actor?.userId,
-      workspaceMode: actor?.workspaceMode,
+      workspaceMode: actor?.workspaceMode ?? (workspaceRepo ? 'personal' : undefined),
       workspaceId: actor?.workspaceId,
       gmailEnabled: gmailAvailable,
       mycalendarEnabled: mycalendarAvailable,
@@ -356,6 +357,7 @@ async function bootstrap() {
     msgRepo,
     convRepo,
     planRepo,
+    workspaceRepo,
     planner: planner as any,
     eventEmitter: chatEventEmitter,
     gmailConnection: gmailAvailable ? createGmailConnectionLookup(credRepo, env.ENCRYPTION_KEY) : undefined,

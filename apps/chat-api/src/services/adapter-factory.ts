@@ -62,9 +62,11 @@ export class AdapterFactory {
   clearCache(serviceName: string, workspaceId?: string | null, userId?: string): void {
     if (userId) {
       this.adapterCache.delete(`personal-shared:${userId}:${serviceName}`);
+      return;
     }
     if (workspaceId) {
       this.adapterCache.delete(`org:${workspaceId}:${serviceName}`);
+      return;
     }
     this.adapterCache.delete(serviceName);
     for (const key of Array.from(this.adapterCache.keys())) {
