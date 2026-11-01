@@ -605,15 +605,15 @@ describe('apps/chat-api — JIRA-03 Workspace Migration & Schema Constraints', (
       const scopedId = convScoped.rows[0].id;
       expect(convScoped.rows[0].workspace_id).toBe(ws1Id);
 
-      // Attempt W1 -> W2: REJECTED by trigger
+      // Attempt W1 -> W2: REJECTED by trigger (check_violation code 23514)
       await expect(
         pool.query(`UPDATE conversations SET workspace_id = $1 WHERE id = $2`, [ws2Id, scopedId])
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ code: '23514' });
 
-      // Attempt W1 -> NULL: REJECTED by trigger
+      // Attempt W1 -> NULL: REJECTED by trigger (check_violation code 23514)
       await expect(
-        pool.query(`UPDATE conversations SET workspace_id = NULL WHERE id = $2`, [scopedId])
-      ).rejects.toThrow();
+        pool.query(`UPDATE conversations SET workspace_id = NULL WHERE id = $1`, [scopedId])
+      ).rejects.toMatchObject({ code: '23514' });
 
       // Normal update keeping workspace_id unchanged: SUCCEEDS
       await pool.query(
@@ -636,10 +636,10 @@ describe('apps/chat-api — JIRA-03 Workspace Migration & Schema Constraints', (
       const legacyId = convLegacy.rows[0].id;
       expect(convLegacy.rows[0].workspace_id).toBeNull();
 
-      // Attempt NULL -> W1: REJECTED by trigger
+      // Attempt NULL -> W1: REJECTED by trigger (check_violation code 23514)
       await expect(
         pool.query(`UPDATE conversations SET workspace_id = $1 WHERE id = $2`, [ws1Id, legacyId])
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ code: '23514' });
 
       // Normal legacy conversation update: SUCCEEDS
       await pool.query(

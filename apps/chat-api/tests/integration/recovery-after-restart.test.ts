@@ -4,7 +4,7 @@ import request from 'supertest';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import { createHash, randomUUID } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { PlanStep } from '@wap/tool-schemas';
@@ -63,16 +63,19 @@ describe('recovering a stopped executor with real PostgreSQL and HTTP', () => {
     adminPool = new pg.Pool({ connectionString: databaseUrl });
     await adminPool.query(`CREATE SCHEMA "${schema}"`);
     pool = new pg.Pool({ connectionString: scopedUrl.href });
-    for (const migration of ['0001_v3_core.sql', '0002_v3_invariants.sql', '0006_fe03_resource_labels.sql']) {
-      await pool.query(await readFile(resolve(root, 'db/v3', migration), 'utf8'));
+    const migrationDir = resolve(root, 'db/v3');
+    const migrations = (await readdir(migrationDir)).filter(f => /^\d{4}_.*\.sql$/.test(f)).sort();
+    for (const migration of migrations) {
+      await pool.query(await readFile(resolve(migrationDir, migration), 'utf8'));
     }
     planRepo = new PlanRepo(pool); stepRepo = new StepRepo(pool); convRepo = new ConversationRepo(pool);
     const users = new UserRepo(pool);
     const owner = await users.createUser({ email: 'owner@recovery.test', name: 'Owner', password: 'Fixture-password' });
     const other = await users.createUser({ email: 'other@recovery.test', name: 'Other', password: 'Fixture-password' });
+    await pool.query("UPDATE users SET status = 'active' WHERE id = ANY($1)", [[owner.id, other.id]]);
     ownerId = owner.id;
-    ownerToken = generateTokens(owner, secret).accessToken;
-    otherToken = generateTokens(other, secret).accessToken;
+    ownerToken = generateTokens({ ...owner, status: 'active' }, secret).accessToken;
+    otherToken = generateTokens({ ...other, status: 'active' }, secret).accessToken;
   });
 
   afterEach(async () => { await Promise.all([...children].map(stopProcess)); children.clear(); });

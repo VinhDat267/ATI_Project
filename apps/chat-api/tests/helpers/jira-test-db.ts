@@ -10,6 +10,7 @@ export interface IsolatedTestContext {
   pool: pg.Pool;
   adminPool: pg.Pool;
   migrationDirectory: string;
+  createWorkerPool: (options?: { max?: number; applicationName?: string }) => pg.Pool;
   runAllMigrations: () => Promise<string[]>;
   cleanup: () => Promise<void>;
 }
@@ -81,7 +82,7 @@ export function resolveMigrationDirectory(): string {
 
 /**
  * Creates an isolated schema for tests with a connection pool bound strictly to that schema.
- * Max 12 connections total per test file (adminPool: 2, pool: 10).
+ * Max 12 connections total per test file (adminPool: 2, pool: 4, worker pools: 2+2 <= 12).
  * Search path is strictly isolated to the private schema ONLY (no public fallback).
  */
 export async function createIsolatedTestSchema(options?: {
@@ -110,12 +111,27 @@ export async function createIsolatedTestSchema(options?: {
   const isolatedUrl = new URL(databaseUrl);
   isolatedUrl.searchParams.set('options', `-c search_path=${schema}`);
 
-  const maxPoolConnections = Math.min(options?.maxConnections ?? 10, 10);
+  const maxPoolConnections = Math.min(options?.maxConnections ?? 4, 10);
   const pool = new pg.Pool({
     connectionString: isolatedUrl.href,
     max: maxPoolConnections,
     connectionTimeoutMillis: 5000,
   });
+
+  const workerPools: pg.Pool[] = [];
+
+  const createWorkerPool = (opts?: { max?: number; applicationName?: string }): pg.Pool => {
+    const workerUrl = new URL(databaseUrl);
+    workerUrl.searchParams.set('options', `-c search_path=${schema}`);
+    const worker = new pg.Pool({
+      connectionString: workerUrl.href,
+      max: opts?.max ?? 2,
+      application_name: opts?.applicationName,
+      connectionTimeoutMillis: 5000,
+    });
+    workerPools.push(worker);
+    return worker;
+  };
 
   const migrationDirectory = resolveMigrationDirectory();
 
@@ -133,6 +149,14 @@ export async function createIsolatedTestSchema(options?: {
   };
 
   const cleanup = async (): Promise<void> => {
+    for (const wp of workerPools) {
+      try {
+        await wp.end();
+      } catch {
+        // Ignore worker pool termination errors during teardown
+      }
+    }
+
     try {
       await pool.end();
     } catch {
@@ -152,6 +176,7 @@ export async function createIsolatedTestSchema(options?: {
     pool,
     adminPool,
     migrationDirectory,
+    createWorkerPool,
     runAllMigrations,
     cleanup,
   };
@@ -164,14 +189,67 @@ export const hex = (length = 64): string => {
 export async function createSyntheticUser(
   pool: pg.Pool,
   name = 'Test User',
-  emailPrefix = 'user'
+  emailPrefix = 'user',
+  options?: { role?: 'member' | 'admin'; status?: 'pending' | 'active' | 'disabled' }
 ): Promise<string> {
   const email = `${emailPrefix}_${randomUUID().slice(0, 8)}@example.test`;
+  const role = options?.role ?? 'member';
+  const status = options?.status ?? 'active';
+
   const res = await pool.query(
-    `INSERT INTO users (email, password, name)
-     VALUES ($1, 'pbkdf2:synthetic_hash', $2)
+    `INSERT INTO users (email, password, name, role, status)
+     VALUES ($1, 'pbkdf2:synthetic_hash', $2, $3, $4)
      RETURNING id`,
-    [email, name]
+    [email, name, role, status]
   );
   return res.rows[0].id;
+}
+
+export async function connectSyntheticJiraAccount(
+  pool: pg.Pool,
+  userId: string,
+  atlassianAccountId = `atlas-${randomUUID().slice(0, 8)}`
+): Promise<string> {
+  const res = await pool.query(
+    `INSERT INTO jira_accounts (user_id, atlassian_account_id, status)
+     VALUES ($1, $2, 'connected')
+     RETURNING id`,
+    [userId, atlassianAccountId]
+  );
+  return res.rows[0].id;
+}
+
+/**
+ * Deterministically polls pg_locks for active sessions waiting on a lock
+ * filtered to the exact application_names of competing race actors.
+ * Requires COUNT(DISTINCT a.pid) >= applicationNames.length before returning.
+ */
+export async function waitForBlockedQueries(
+  pool: pg.Pool,
+  applicationNames: string[],
+  timeoutMs = 5000
+): Promise<number> {
+  const start = Date.now();
+  const requiredCount = applicationNames.length;
+  while (Date.now() - start < timeoutMs) {
+    const res = await pool.query<{ count: string }>(
+      `SELECT count(DISTINCT a.pid)::text AS count
+       FROM pg_locks l
+       JOIN pg_stat_activity a ON a.pid = l.pid
+       WHERE l.granted = false
+         AND a.datname = current_database()
+         AND a.application_name = ANY($1)`,
+      [applicationNames]
+    );
+    const count = parseInt(res.rows[0]?.count ?? '0', 10);
+    if (count >= requiredCount) {
+      return count;
+    }
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  throw new Error(
+    `Timeout waiting for ${requiredCount} distinct blocked sessions with application_name in [${applicationNames.join(
+      ', '
+    )}] after ${timeoutMs}ms`
+  );
 }

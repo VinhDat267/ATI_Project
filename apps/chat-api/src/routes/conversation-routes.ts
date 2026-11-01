@@ -1,20 +1,26 @@
 import { Router, type Request, type Response } from 'express';
-import type { ConversationRepo } from '../db/repositories/conversation-repo.js';
+import type pg from 'pg';
+import { ConversationRepo, ConversationAccessError } from '../db/repositories/conversation-repo.js';
 import type { MessageRepo } from '../db/repositories/message-repo.js';
 import type { PlanRepo } from '../db/repositories/plan-repo.js';
 import type { ChatService } from '../services/chat-service.js';
 import { HistoryValidationError, validateConversationTitle } from '../db/repositories/conversation-history.js';
+import { assertConversationAccessWithFallback, ConversationAccessDeniedError } from '../services/conversation-access.js';
+import { isUuid } from '../db/repositories/uuid.js';
 
 export interface ConversationRoutesOptions {
   convRepo: ConversationRepo;
   msgRepo: MessageRepo;
   chatService: ChatService;
   planRepo?: PlanRepo;
+  pool?: pg.Pool;
+  enableWorkspaceConversations?: boolean;
 }
 
 export function createConversationRoutes(options: ConversationRoutesOptions): Router {
   const router = Router();
-  const { convRepo, msgRepo, chatService, planRepo } = options;
+  const { convRepo, msgRepo, chatService, planRepo, enableWorkspaceConversations } = options;
+  const pool = options.pool ?? convRepo.getPool?.();
 
   // POST /api/conversations
   router.post('/', async (req: Request, res: Response): Promise<void> => {
@@ -23,6 +29,43 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
       if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
+      }
+      const rawWorkspaceId = req.body?.workspaceId;
+      if (rawWorkspaceId !== undefined && rawWorkspaceId !== null) {
+        if (!enableWorkspaceConversations) {
+          res.status(503).json({
+            code: 'WORKSPACE_CONVERSATIONS_UNAVAILABLE',
+            error: 'Workspace conversation creation is disabled until model and execution isolation guards are active.',
+          });
+          return;
+        }
+        if (!isUuid(rawWorkspaceId)) {
+          res.status(400).json({ error: 'Invalid workspace ID' });
+          return;
+        }
+        if (!pool && !convRepo.getPool?.()) {
+          res.status(503).json({
+            code: 'WORKSPACE_CONVERSATIONS_UNAVAILABLE',
+            error: 'Workspace conversation authority is unavailable.',
+          });
+          return;
+        }
+        try {
+          const conversation = await convRepo.createConversation(userId, rawWorkspaceId);
+          res.status(201).json({ conversation });
+          return;
+        } catch (err: any) {
+          if (
+            err instanceof ConversationAccessError ||
+            err?.code === 'WORKSPACE_NOT_FOUND' ||
+            err?.code === 'WORKSPACE_MEMBERSHIP_REQUIRED' ||
+            err?.status === 404
+          ) {
+            res.status(404).json({ error: 'Workspace not found or membership revoked' });
+            return;
+          }
+          throw err;
+        }
       }
       const conversation = await convRepo.createConversation(userId);
       res.status(201).json({ conversation });
@@ -61,14 +104,19 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
         return;
       }
       const conversationId = req.params.id as string;
-      const conv = await convRepo.getConversation(conversationId);
-      if (!conv) {
-        res.status(404).json({ error: 'Conversation not found' });
-        return;
-      }
-      if (conv.user_id !== userId) {
-        res.status(403).json({ error: 'Forbidden' });
-        return;
+      try {
+        await assertConversationAccessWithFallback(
+          { pool, convRepo },
+          conversationId,
+          userId,
+          { legacyNonOwnerStatus: 403 }
+        );
+      } catch (err: any) {
+        if (err instanceof ConversationAccessDeniedError) {
+          res.status(err.status).json({ error: err.message });
+          return;
+        }
+        throw err;
       }
       if (!planRepo) {
         res.status(500).json({ error: 'Plan repository not configured' });
@@ -104,14 +152,19 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
         return;
       }
       const conversationId = req.params.id as string;
-      const conv = await convRepo.getConversation(conversationId);
-      if (!conv) {
-        res.status(404).json({ error: 'Conversation not found' });
-        return;
-      }
-      if (conv.user_id !== userId) {
-        res.status(403).json({ error: 'Forbidden' });
-        return;
+      try {
+        await assertConversationAccessWithFallback(
+          { pool, convRepo },
+          conversationId,
+          userId,
+          { legacyNonOwnerStatus: 403 }
+        );
+      } catch (err: any) {
+        if (err instanceof ConversationAccessDeniedError) {
+          res.status(err.status).json({ error: err.message });
+          return;
+        }
+        throw err;
       }
       const messages = await msgRepo.listMessages(conversationId);
       if (!messages || messages.length === 0) {
@@ -134,14 +187,20 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
         return;
       }
       const conversationId = req.params.id as string;
-      const conversation = await convRepo.getConversation(conversationId);
-      if (!conversation) {
-        res.status(404).json({ error: 'Conversation not found' });
-        return;
-      }
-      if (conversation.user_id !== userId) {
-        res.status(404).json({ error: 'Conversation not found' });
-        return;
+      let conversation: any;
+      try {
+        conversation = await assertConversationAccessWithFallback(
+          { pool, convRepo },
+          conversationId,
+          userId,
+          { legacyNonOwnerStatus: 404 }
+        );
+      } catch (err: any) {
+        if (err instanceof ConversationAccessDeniedError) {
+          res.status(err.status).json({ error: err.message });
+          return;
+        }
+        throw err;
       }
       const messages = await msgRepo.listMessages(conversationId);
       res.status(200).json({ conversation, messages });
@@ -154,8 +213,23 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
     try {
       const userId = (req as any).user?.id;
       if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+      const conversationId = req.params.id as string;
+      try {
+        await assertConversationAccessWithFallback(
+          { pool, convRepo },
+          conversationId,
+          userId,
+          { legacyNonOwnerStatus: 404 }
+        );
+      } catch (err: any) {
+        if (err instanceof ConversationAccessDeniedError) {
+          res.status(err.status).json({ error: err.message });
+          return;
+        }
+        throw err;
+      }
       const title = validateConversationTitle(req.body?.title);
-      const conversation = await convRepo.renameConversation(req.params.id as string, userId, title);
+      const conversation = await convRepo.renameConversation(conversationId, userId, title);
       if (!conversation) { res.status(404).json({ error: 'Conversation not found' }); return; }
       res.status(200).json({ conversation });
     } catch (error) {
@@ -172,14 +246,19 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
         return;
       }
       const conversationId = req.params.id as string;
-      const conv = await convRepo.getConversation(conversationId);
-      if (!conv) {
-        res.status(404).json({ error: 'Conversation not found' });
-        return;
-      }
-      if (conv.user_id !== userId) {
-        res.status(403).json({ error: 'Forbidden' });
-        return;
+      try {
+        await assertConversationAccessWithFallback(
+          { pool, convRepo },
+          conversationId,
+          userId,
+          { legacyNonOwnerStatus: 403 }
+        );
+      } catch (err: any) {
+        if (err instanceof ConversationAccessDeniedError) {
+          res.status(err.status).json({ error: err.message });
+          return;
+        }
+        throw err;
       }
       const { content, tempId } = req.body || {};
 
