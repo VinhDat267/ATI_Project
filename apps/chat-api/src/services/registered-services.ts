@@ -24,6 +24,14 @@ export function getRegisteredService(id: string) {
   return definition ? { definition, transport: SERVICE_TRANSPORTS[id]! } : undefined;
 }
 
+export function isServiceAccountService(definitionOrId: ServiceDefinition | string): boolean {
+  const def = typeof definitionOrId === 'string' ? getRegisteredService(definitionOrId)?.definition : definitionOrId;
+  if (def) {
+    return def.credentialFields.some(field => field.key === 'privateKey');
+  }
+  return typeof definitionOrId === 'string' && (definitionOrId === 'google-calendar' || definitionOrId === 'google-sheets');
+}
+
 export function normalizeAllowedScope(definition: ServiceDefinition, value: unknown): AllowedScope | null {
   const { scopeKey, scopePattern } = definition;
   const raw = Array.isArray(value)
@@ -58,7 +66,7 @@ export async function getConfiguredToolCatalog(
   const mode = scope?.workspaceMode ?? 'legacy';
   for (const definition of getRegisteredServices()) {
     if (definition.id === 'trello') continue;
-    if (mode === 'personal' && (definition.id === 'calendar' || definition.id === 'sheets')) continue;
+    if (mode === 'personal' && isServiceAccountService(definition)) continue;
     let record;
     if (mode === 'personal') {
       if (!scope?.userId) continue;

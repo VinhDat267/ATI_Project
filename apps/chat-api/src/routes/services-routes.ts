@@ -17,6 +17,7 @@ import {
   getRegisteredServices,
   getRegisteredService,
   hasValidCredentials,
+  isServiceAccountService,
   normalizeAllowedScope,
 } from '../services/registered-services.js';
 import { isAdmin } from '../auth/jwt.js';
@@ -343,7 +344,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
       let registered = getRegisteredServices();
       if (mode === 'personal') {
         // In personal mode, enterprise service account services are hidden
-        registered = registered.filter((s) => s.id !== 'calendar' && s.id !== 'sheets' && s.id !== 'google-calendar' && s.id !== 'google-sheets');
+        registered = registered.filter((s) => !isServiceAccountService(s));
       }
 
       const services: Array<Record<string, unknown>> = await Promise.all(
@@ -506,7 +507,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
       const userId = (req as any).user?.id;
 
       if (mode === 'personal') {
-        if (service === 'calendar' || service === 'sheets' || service === 'google-calendar' || service === 'google-sheets') {
+        if (isServiceAccountService(service)) {
           res.status(400).json({ error: 'Không gian cá nhân dùng MyCalendar/MySheets qua OAuth.', code: 'USE_PERSONAL_OAUTH' });
           return;
         }
