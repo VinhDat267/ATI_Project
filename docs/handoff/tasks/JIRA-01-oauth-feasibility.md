@@ -1,6 +1,6 @@
 # JIRA-01 · Kiểm chứng khả thi OAuth Jira
 
-**Trạng thái:** native identity OAuth và hai refresh đã quan sát thật 01/11; chờ xác nhận no-site của tài khoản thực dùng và nghiệm thu Jira nhiều site. Native gate NOT_COMPLETE. **Ủy quyền:** chủ dự án duyệt thiết kế và yêu cầu triển khai 31/10/2026.
+**Trạng thái:** JIRA-01 xong ở phạm vi probe OAuth và cổng khả thi native; reviewer độc lập/CI đạt, merge #230 ngày 01/11/2026. JIRA-02–11 và OAuth Jira trong runtime ATI chưa triển khai. **Ủy quyền:** chủ dự án duyệt thiết kế và yêu cầu triển khai 31/10/2026.
 **Thiết kế:** [Jira cá nhân/workspace](../../superpowers/specs/2026-10-30-jira-personal-workspaces-design.md).
 **Kế hoạch:** [OAuth feasibility](../../superpowers/plans/2026-10-31-jira-oauth-feasibility.md).
 **Vai trò:** Integration; chỉ package tool-adapters và tài liệu của task. Chưa sửa API/web/planner/executor/database.
@@ -14,17 +14,19 @@ Có bộ probe local dùng OAuth thật, kiểm chứng identity trước khi c�
 - [x] Client OAuth giới hạn endpoint, JSON token request, scope/identity/site parsing, timeout bằng AbortSignal và lỗi an toàn.
 - [x] Session state một lần, ràng buộc browser, thế hệ kết nối; refresh dùng token mới, không hồi sinh sau disconnect.
 - [x] CLI local 127.0.0.1:4187, cấu hình cục bộ ignored, hướng dẫn tạo app, report không có secret.
-- [x] RED/GREEN và HTTP/process tests; package suite xanh; review độc lập đã chạy, findings sửa và kiểm hồi quy (chi tiết ở kết quả; chưa có CI/merge).
-- [ ] Native identity-only bằng account chưa thuộc Jira site, có attestation của chủ tài khoản.
-- [ ] Native existing-site và thêm site thứ hai; cấp scope và refresh được kiểm thật.
-- [ ] Native quyền ADMINISTER và scope/read endpoints đủ bằng chứng; không lấy quyền hiển thị metadata làm bằng chứng write đã được thử.
-- [ ] Facts và task/log ghi rõ DOCUMENTED/FIXTURE_VERIFIED/LIVE_OBSERVED/OPERATOR_ATTESTED/NOT_RUN.
+- [x] RED/GREEN và HTTP/process tests; package suite xanh; review độc lập, CI và merge đã đạt (chi tiết ở kết quả).
+- [x] Native identity-only bằng account chưa thuộc Jira site, có attestation của chủ tài khoản.
+- [x] Native existing-site và thêm site thứ hai; cấp scope và refresh được kiểm thật.
+- [x] Native quyền ADMINISTER và scope/read endpoints đủ bằng chứng; không lấy quyền hiển thị metadata làm bằng chứng write đã được thử.
+- [x] Facts và task/log ghi rõ DOCUMENTED/FIXTURE_VERIFIED/LIVE_OBSERVED/OPERATOR_ATTESTED/NOT_RUN.
 
 ## Cổng dừng
 
 Nếu identity-only không đáp ứng onboarding, cần chủ dự án quyết ngoại lệ trước JIRA-02. Nếu chưa có app/credentials/consent/tài khoản phù hợp, hoàn tất tooling an toàn và ghi native NOT_RUN; không tự gán PASS hoặc vượt sang consumer.
 
 ## Kết quả
+
+- **Đóng JIRA-01 sau merge (reviewer, 01/11/2026):** #229 (thiết kế) merge 8cdd5a1; #230 (probe, head 728898c) merge 68039be. Reviewer độc lập kiểm scope/diff, native facts và mã probe; P3 mô tả referrer đã sửa, không còn P1–P3. [CI #229](https://github.com/VinhDat267/ATI_Project/actions/runs/41296677039) và [CI #230](https://github.com/VinhDat267/ATI_Project/actions/runs/41296918366) SUCCESS trước merge. Probe có 443 Vitest + 32 Node PASS; reviewer chạy lại 32 Node PASS. Các checkbox native ở trên dựa trên LIVE_OBSERVED/OPERATOR_ATTESTED trong facts và log, không suy ra quyền ghi/project/issue. Full check local thiếu môi trường PostgreSQL phù hợp; CI v3 của PR đã xanh. [Log reviewer](../log/2026-11-01-reviewer-merge-jira-01.md).
 
 - Hai PR đã mở: [#229 thiết kế](https://github.com/VinhDat267/ATI_Project/pull/229) vào `main` và [#230 probe](https://github.com/VinhDat267/ATI_Project/pull/230) dựa trên nhánh thiết kế; diff tách 6 docs và 21 file JIRA-01. Reviewer nêu P3 ở checklist kế hoạch nói mọi response no-referrer dù GET `/` phải same-origin để form POST mang Origin; đã sửa mô tả, source không đổi. CI `v3` của hai PR đang chạy, chưa merge. [Log PR](../log/2026-11-01-codex-jira-01-stacked-prs.md).
 
