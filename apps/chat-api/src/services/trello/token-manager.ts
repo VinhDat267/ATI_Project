@@ -62,9 +62,6 @@ export class TrelloTokenManager {
     for (const key of [...this.cache.keys()]) {
       if (key.startsWith(`${userId}:`)) this.cache.delete(key);
     }
-    for (const key of [...this.inflight.keys()]) {
-      if (key.startsWith(`${userId}:`)) this.inflight.delete(key);
-    }
     for (const key of [...this.revokedConnections]) {
       if (key.startsWith(`${userId}:`)) this.revokedConnections.delete(key);
     }

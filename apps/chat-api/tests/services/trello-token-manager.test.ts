@@ -1,7 +1,10 @@
+import { createServer } from 'node:http';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { StepError } from '@wap/tool-adapters';
+import { encryptCredentials, StepError } from '@wap/tool-adapters';
+import { CredentialRepo } from '../../src/db/repositories/credential-repo.js';
 import { TrelloTokenManager } from '../../src/services/trello/token-manager.js';
-import { TrelloOAuthError } from '../../src/services/trello/oauth-client.js';
+import { TrelloOAuthClient, TrelloOAuthError } from '../../src/services/trello/oauth-client.js';
+import { createMigratedSchema } from '../helpers/gmail-test-db.js';
 
 describe('TrelloTokenManager', () => {
   let now: number;
@@ -247,5 +250,123 @@ describe('TrelloTokenManager', () => {
       message: 'Trello cần được kết nối lại.',
     });
     expect(refreshCalls.length).toBe(0);
+  });
+
+  describe('real HTTP server and real CredentialRepo concurrency test', () => {
+    const encryptionKey = '0123456789abcdef0123456789abcdef';
+
+    it('holds initial refresh, calls clear(), requests token second time; provider only receives old token once', async () => {
+      const db = await createMigratedSchema('trello_refresh_once');
+      const credentials = new CredentialRepo(db.pool, encryptionKey);
+      const user = await db.person('TestUser');
+      const initialRefresh = 'initial-secret-refresh-token';
+
+      const savedCred = await credentials.saveCredentials(
+        'trello',
+        encryptCredentials({ refreshToken: initialRefresh, username: 'test_trello' }, encryptionKey),
+        user.id
+      );
+
+      let releaseFirstRefresh: () => void;
+      const firstRefreshHold = new Promise<void>((resolve) => {
+        releaseFirstRefresh = resolve;
+      });
+
+      const receivedRefreshTokens: string[] = [];
+      let requestCount = 0;
+
+      const server = createServer(async (req, res) => {
+        if (req.method === 'POST' && req.url === '/oauth/token') {
+          let bodyStr = '';
+          req.on('data', (chunk) => {
+            bodyStr += chunk;
+          });
+          req.on('end', async () => {
+            requestCount++;
+            const body = JSON.parse(bodyStr);
+            receivedRefreshTokens.push(body.refresh_token);
+
+            if (body.refresh_token === initialRefresh && requestCount === 1) {
+              await firstRefreshHold;
+            }
+
+            if (receivedRefreshTokens.filter((t) => t === initialRefresh).length > 1) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'invalid_grant' }));
+              return;
+            }
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(
+              JSON.stringify({
+                access_token: `access-token-step-${requestCount}`,
+                refresh_token: `refreshed-token-step-${requestCount}`,
+                expires_in: 3600,
+                token_type: 'Bearer',
+              })
+            );
+          });
+        } else {
+          res.writeHead(404);
+          res.end();
+        }
+      });
+
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+      const port = (server.address() as any).port;
+      const tokenUrl = `http://127.0.0.1:${port}/oauth/token`;
+
+      try {
+        const client = new TrelloOAuthClient({
+          clientId: 'cid',
+          clientSecret: 'csec',
+          redirectUri: 'http://127.0.0.1/callback',
+          authorizationUrl: 'http://127.0.0.1/auth',
+          tokenUrl,
+          apiBaseUrl: 'http://127.0.0.1/api',
+        });
+
+        const manager = new TrelloTokenManager({
+          client,
+          credentials,
+          refreshTimeoutMs: 5000,
+        });
+
+        const provider = manager.forConnection(user.id, savedCred.id, initialRefresh);
+
+        // 1. Start first token request (held by server)
+        const firstPromise = provider.getAccessToken();
+
+        // Give event loop a tick so request reaches server
+        await new Promise((r) => setTimeout(r, 50));
+        expect(receivedRefreshTokens).toEqual([initialRefresh]);
+
+        // 2. Call clear() while first request is in flight
+        manager.clear(user.id);
+
+        // 3. Start second token request
+        const secondPromise = provider.getAccessToken();
+
+        // Give event loop a tick
+        await new Promise((r) => setTimeout(r, 50));
+
+        // Release first refresh response from HTTP server
+        releaseFirstRefresh!();
+
+        const [token1, token2] = await Promise.all([firstPromise, secondPromise]);
+        expect(token1).toBe('access-token-step-1');
+        expect(token2).toBe('access-token-step-1');
+
+        // Crucial: Provider must only have used initialRefresh ONCE!
+        expect(receivedRefreshTokens).toEqual([initialRefresh]);
+
+        // Credential in DB is still active, not reconnect_required
+        const credStatus = await credentials.getPersonalConnectionStatus('trello', user.id);
+        expect(credStatus?.status).toBe('active');
+      } finally {
+        await new Promise((resolve) => server.close(resolve));
+        await db.close();
+      }
+    });
   });
 });
