@@ -1,0 +1,7 @@
+# 01/11/2026 · JIRA-01 · Sửa phạm vi khai báo dữ liệu
+
+Chủ dự án gửi ảnh form Sharing với Yes và yêu cầu xác nhận đã triển khai Personal Data Reporting API. API này chưa được triển khai, không tick xác nhận. Draft Yes trước đó dựa vào schema ATI tương lai, chưa phân biệt diagnostic hiện tại.
+
+Đã đọc source client/session: profile chỉ trả accountId; grant/token/accountId ở memory, không giữ email/displayName/avatar từ `/me`; resource metadata chỉ dùng trong callback và report giữ count/boolean. Đối chiếu [đính chính trực tiếp của Atlassian sau trao đổi với privacy team](https://community.developer.atlassian.com/t/do-i-have-to-implement-personal-data-reporting-in-my-oauth2-app/54402/9): account ID đơn lẻ không phải personal data cần khai báo theo cơ chế đó. Chuẩn bị draft No cho probe tối giản hiện tại, giữ vendor ATI Project/contact mà chủ dự án chọn và Sharing within organization. Chưa Save. Đây không phải cách bỏ qua nghĩa vụ khi ATI lưu thêm profile/các dữ liệu cá nhân Jira.
+
+Trước runtime lưu dữ liệu cá nhân, phải đối chiếu [privacy guide chính thức](https://developer.atlassian.com/cloud/jira/service-desk/user-privacy-developer-guide/) và triển khai reporting theo cycle-period, refresh/erase; không tự xác nhận API đã có. Không mở secret hay đưa account ID/token vào bằng chứng công khai. Không sửa code, không chạy lại suite, chỉ kiểm tài liệu; gate và các thay đổi Free/Sharing/invitation vẫn chờ xác nhận của chủ dự án. Ảnh gửi không được coi là chấp thuận ba thao tác đã đề xuất.

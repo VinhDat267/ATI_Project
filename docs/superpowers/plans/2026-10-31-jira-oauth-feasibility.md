@@ -46,11 +46,11 @@
 
 **Interfaces:** Produces `ProbeError(code)`, `createProbeClient({clientId, clientSecret, redirectUri, mode, fixtureBaseUrl?, timeoutMs?})`; client methods `authorizationUrl({state, scopes})`, `exchangeCode(code)`, `refresh(refreshToken)`, `profile(accessToken)`, `resources(accessToken)`, `permissions(accessToken, cloudId)`. Tokens stay inside trusted session code. Mode is exactly `live` or `fixture`; fixture endpoints require an explicit loopback URL, live endpoints cannot be overridden.
 
-- [ ] Write failing Node tests: token exchange sends JSON grant_type/client_id/client_secret/code/redirect_uri; authorization URL excludes the secret and Google-only parameters; resources filter Confluence entries; malformed token/body, redirect and actual deadline abort fail safely. Derive scope and request expectations as literals in the fixture.
-- [ ] Run `node --test packages/tool-adapters/tests/jira-oauth-probe.check.mjs`; record behavioral RED (missing module is the initial foundation RED only).
-- [ ] Implement the client with 10 s default request deadline, `redirect: 'error'`, 64 KiB response limit and stable error codes. Reject arbitrary live endpoints, URL credentials, non-loopback fixture hosts and invalid site/permission response shapes.
-- [ ] Run the same command; Expected: all Task 1 cases pass with no secret sentinel in errors.
-- [ ] Commit exact package client/tests/helper paths: `feat(jira): add OAuth feasibility HTTP client`.
+- [x] Write failing Node tests: token exchange sends JSON grant_type/client_id/client_secret/code/redirect_uri; authorization URL excludes the secret and Google-only parameters; resources filter Confluence entries; malformed token/body, redirect and actual deadline abort fail safely. Derive scope and request expectations as literals in the fixture.
+- [x] Run `node --test packages/tool-adapters/tests/jira-oauth-probe.check.mjs`; record behavioral RED (missing module is the initial foundation RED only).
+- [x] Implement the client with 10 s default request deadline, `redirect: 'error'`, 64 KiB response limit and stable error codes. Reject arbitrary live endpoints, URL credentials, non-loopback fixture hosts and invalid site/permission response shapes.
+- [x] Run the same command; Expected: all Task 1 cases pass with no secret sentinel in errors.
+- [x] Commit exact package client/tests/helper paths: `feat(jira): add OAuth feasibility HTTP client`.
 
 ### Task 2: Session and redacted observations
 
@@ -58,12 +58,12 @@
 
 **Interfaces:** Consumes Task 1 client. Produces `createProbeSession({client, mode, clock?})` with `start(flow, browserBinding)`, `callback({state, code?, error?, browserBinding})`, `refresh(browserBinding)`, `disconnect(browserBinding)`, `report(browserBinding)`. Flows are `identity` (`read:me offline_access`) and `jira` (`read:me read:jira-work write:jira-work offline_access`). State TTL is 600,000 ms. Session is diagnostic memory only, not the later PostgreSQL production token manager.
 
-- [ ] Write RED tests for wrong browser/state, 10-minute expiry, replay/parallel callback (exactly one HTTP exchange), superseded flow, changed provider account, missing scope and no refresh token. A second identity must not leave the first connection marked usable after re-consent.
-- [ ] Run Node test entry; Expected: new tests fail on missing session behavior while Task 1 stays green.
-- [ ] Implement one-use state deletion before async exchange, generation checks around every async result, provider account comparison and owner checks. A report records only safe counts/boolean observations, requested/granted scopes and `fixture`/`live` provenance; never tokens, codes or raw provider bodies. Empty resources are not proof an account has no Jira memberships.
-- [ ] Add RED tests for two refresh callers sharing one exchange, new refresh token used on the next exchange, disconnect beating a delayed response, and invalid_grant requiring reconnect. Implement only this memory-session behavior; do not claim PostgreSQL/multi-process concurrency is tested here.
-- [ ] Run Node test entry; Expected: complete client/session suite passes, HTTP request counts match, report remains unready for unobserved live gates.
-- [ ] Commit exact session/tests/helper files: `feat(jira): add safe OAuth probe sessions`.
+- [x] Write RED tests for wrong browser/state, 10-minute expiry, replay/parallel callback (exactly one HTTP exchange), superseded flow, changed provider account, missing scope and no refresh token. A second identity must not leave the first connection marked usable after re-consent.
+- [x] Run Node test entry; Expected: new tests fail on missing session behavior while Task 1 stays green.
+- [x] Implement one-use state deletion before async exchange, generation checks around every async result, provider account comparison and owner checks. A report records only safe counts/boolean observations, requested/granted scopes and `fixture`/`live` provenance; never tokens, codes or raw provider bodies. Empty resources are not proof an account has no Jira memberships.
+- [x] Add RED tests for two refresh callers sharing one exchange, new refresh token used on the next exchange, disconnect beating a delayed response, and invalid_grant requiring reconnect. Implement only this memory-session behavior; do not claim PostgreSQL/multi-process concurrency is tested here.
+- [x] Run Node test entry; Expected: complete client/session suite passes, HTTP request counts match, report remains unready for unobserved live gates.
+- [x] Commit exact session/tests/helper files: `feat(jira): add safe OAuth probe sessions`.
 
 ### Task 3: Local browser runner and operator setup
 
@@ -71,12 +71,12 @@
 
 **Interfaces:** Consumes session/client. Produces `startProbeServer({clientId, clientSecret, redirectUri, mode, fixtureBaseUrl?, timeoutMs?}) → {url, close}`. Live CLI is `node --env-file=.env.jira-probe packages/tool-adapters/scripts/jira-probe/cli.mjs --live`; `--help`/`--check-config` have no network side effects. Env names: `JIRA_PROBE_CLIENT_ID`, `JIRA_PROBE_CLIENT_SECRET`, `JIRA_PROBE_REDIRECT_URI`. Callback default is exactly `http://127.0.0.1:4187/oauth/callback`; runner binds only to 127.0.0.1.
 
-- [ ] Write RED HTTP/process tests for missing config, explicit live opt-in, non-loopback redirect rejection, independent browser cookie rejection, cross-origin POST rejection, cancellation, duplicate callback params, code-free redirect after callback, safe `/report` and clean shutdown. Assert no secret/code sentinel in all response bodies and process output.
-- [ ] Run Node test entry; Expected: Task 3 failures for routes/CLI not implemented.
-- [ ] Implement routes `/`, `/start` POST, `/oauth/callback` GET, `/refresh` POST, `/disconnect` POST and `/report` GET. Browser binding cookie is HttpOnly/SameSite=Lax; POST requires exact local Origin. All responses use no-store and no-referrer; callback clears code/state from the displayed URL by redirecting to `/`. No issue/comment write routes. Keep the first bound browser as owner, do not silently rebind a second browser.
-- [ ] Add `test:probe` and chain it after existing Vitest package test. Document app creation, `read:me`/Jira scopes, sharing for a second test account, callback configuration, token secrecy, provider account attestation and gate outcomes.
-- [ ] Run `npm run test:probe -w @wap/tool-adapters` and `npm test -w @wap/tool-adapters`; Expected: full package suite green. Use an explicit sandbox environment for the package; do not load the root live .env.
-- [ ] Commit exact runner/template/readme/package/test files: `feat(jira): add local OAuth feasibility runner`.
+- [x] Write RED HTTP/process tests for missing config, explicit live opt-in, non-loopback redirect rejection, independent browser cookie rejection, cross-origin POST rejection, cancellation, duplicate callback params, code-free redirect after callback, safe `/report` and clean shutdown. Assert no secret/code sentinel in all response bodies and process output.
+- [x] Run Node test entry; Expected: Task 3 failures for routes/CLI not implemented.
+- [x] Implement routes `/`, `/start` POST, `/oauth/callback` GET, `/refresh` POST, `/disconnect` POST and `/report` GET. Browser binding cookie is HttpOnly/SameSite=Lax; POST requires exact local Origin. All responses use no-store; GET `/` uses same-origin so form POST carries Origin, while callback and other routes use no-referrer. Callback clears code/state from the displayed URL by redirecting to `/`. No issue/comment write routes. Keep the first bound browser as owner, do not silently rebind a second browser.
+- [x] Add `test:probe` and chain it after existing Vitest package test. Document app creation, `read:me`/Jira scopes, sharing for a second test account, callback configuration, token secrecy, provider account attestation and gate outcomes.
+- [x] Run `npm run test:probe -w @wap/tool-adapters` and `npm test -w @wap/tool-adapters`; Expected: full package suite green. Use an explicit sandbox environment for the package; do not load the root live .env.
+- [x] Commit exact runner/template/readme/package/test files: `feat(jira): add local OAuth feasibility runner`.
 
 ### Task 4: Facts, native gate and handoff
 
