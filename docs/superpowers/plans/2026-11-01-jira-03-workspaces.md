@@ -24,8 +24,8 @@
 ## Kết quả thực thi 02/11/2026
 
 - [x] Tasks 1–5: schema cùng UUID, repository/quyền hai lớp, site/project, hội thoại và API tích hợp trên main #237.
-- [x] Task 6 local: migrations 0001–0017, typecheck và npm run check exit 0 (3.304 v3 + 406 eval + các kiểm tra Node/launcher/build).
-- [x] 13/13 đột biến: control xanh, assertion bắt mutant, khôi phục byte/SHA và control xanh lại; ba review môđun độc lập PASS/APPROVED.
+- [x] Task 6 local: migrations 0001–0017, typecheck và npm run check exit 0 (3.309 v3 + 406 eval + các kiểm tra Node/launcher/build).
+- [x] 14/14 đột biến: control xanh, assertion bắt mutant, khôi phục byte/SHA và control xanh lại; ba review môđun độc lập PASS/APPROVED.
 - [x] Điền kết quả task card và một nhật ký mới: docs/handoff/log/2026-11-02-jira-03-shared-workspaces.md.
 - [ ] Review toàn nhánh mới và CI/browser đúng head cuối; ghi kết quả vào PR sau push.
 - [ ] Chủ dự án review/merge; không tự merge, không bắt đầu JIRA-04.
@@ -591,8 +591,12 @@ export async function assertConversationAccess(
 
 ## Tích hợp main #238 trước PR
 
-Base cuối `86b432f`: giữ logic approvalMode của Sheets cùng guard Jira trước mọi xác nhận lịch; migration Jira đánh số 0017 sau Sheets 0016. Thêm `tests/routes/jira-sheets-schedule-compat.test.ts` (5 ca) và đột biến thứ 13 cho guard xác nhận lịch. Toàn bộ check 3.304 v3/406 eval đạt; kết quả review toàn nhánh và CI head cuối được ghi trong PR #240.
+Base cuối `86b432f`: giữ logic approvalMode của Sheets cùng guard Jira trước mọi xác nhận lịch; migration Jira đánh số 0017 sau Sheets 0016. Thêm `tests/routes/jira-sheets-schedule-compat.test.ts` (5 ca) và đột biến thứ 13 cho guard xác nhận lịch. Toàn bộ check 3.309 v3/406 eval đạt; kết quả review toàn nhánh và CI head cuối được ghi trong PR #240.
 
 ## Base cuối #239
 
-Tích hợp `2d5f625` (Calendar), Jira migration0018 sau Sheets0016/Calendar0017; cùng hợp đồng scope cho PostgreSQL và memory. Full check 3.304 v3 +406 eval đạt; hậu kiểm guard/migration và CI đúng head cuối được ghi tại PR #240.
+Tích hợp `2d5f625` (Calendar), Jira migration0018 sau Sheets0016/Calendar0017; cùng hợp đồng scope cho PostgreSQL và memory. Full check 3.309 v3 +406 eval đạt; hậu kiểm guard/migration và CI đúng head cuối được ghi tại PR #240.
+
+## Vá ranh giới title/scope
+
+Sau review toàn nhánh trên5f, bộ điều phối tái hiện hai test đỏ cho title object/array đi vào overload scope. Native implementer sửa validation và chuẩn hóa string-only, thêm control string/null/JSON-text. Nhóm16 PASS, fullcheck3.309 v3/406eval PASS. Đột biến thứ14 bỏ cả hai lớp bảo vệ; scoped re-review và CI phải dùng SHA mới, không dùng CI5f thay thế.

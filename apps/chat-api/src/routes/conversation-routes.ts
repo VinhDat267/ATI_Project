@@ -40,6 +40,14 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
       const headerMode = req.workspace?.mode ?? 'legacy';
       const headerWsId = req.workspace?.workspaceId ?? null;
 
+      // Validate optional title: permit string or omitted/null-as-untitled; reject all other types with 400
+      const rawTitle = req.body?.title;
+      if (rawTitle !== undefined && rawTitle !== null && typeof rawTitle !== 'string') {
+        res.status(400).json({ error: 'Invalid title: must be a string' });
+        return;
+      }
+      const title: string | undefined = typeof rawTitle === 'string' ? rawTitle : undefined;
+
       // Validate body jiraContext
       const rawJiraContext = req.body?.jiraContext;
       if (rawJiraContext !== undefined && typeof rawJiraContext !== 'boolean') {
@@ -88,7 +96,7 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
       };
 
       try {
-        const conversation = await convRepo.createConversation(userId, req.body?.title, scope);
+        const conversation = await convRepo.createConversation(userId, title, scope);
         res.status(201).json({ conversation });
       } catch (err: any) {
         if (

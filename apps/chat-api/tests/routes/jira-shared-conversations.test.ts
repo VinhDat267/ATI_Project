@@ -403,6 +403,70 @@ describe('apps/chat-api — JIRA-03 Shared Organization Workspace Conversations 
       expect(res.body.code).toBe('WORKSPACE_CONVERSATIONS_UNAVAILABLE');
     });
 
+    it('rejects an object title that attempts to inject a Jira scope through the repository overload', async () => {
+      const before = await pool.query<{ count: string }>('SELECT count(*) FROM conversations WHERE user_id=$1', [alice.id]);
+      const response = await request(prodApp).post('/api/conversations')
+        .set('Authorization', `Bearer ${alice.token}`).set('X-Workspace-Id', orgId)
+        .send({ title: { workspaceMode: 'organization', workspaceId: orgId, jiraContext: true } });
+      expect(response.status).toBe(400);
+      const after = await pool.query<{ count: string }>('SELECT count(*) FROM conversations WHERE user_id=$1', [alice.id]);
+      expect(after.rows[0]?.count).toBe(before.rows[0]?.count);
+    });
+
+    it('rejects non-string titles without creating a conversation in another scope', async () => {
+      const before = await pool.query<{ count: string }>('SELECT count(*) FROM conversations WHERE user_id=$1', [alice.id]);
+      for (const title of [[], ['injected'], true, 42, { workspaceMode: 'personal' }]) {
+        const response = await request(prodApp).post('/api/conversations')
+          .set('Authorization', `Bearer ${alice.token}`).set('X-Workspace-Id', orgId).send({ title });
+        expect(response.status).toBe(400);
+      }
+      const after = await pool.query<{ count: string }>('SELECT count(*) FROM conversations WHERE user_id=$1', [alice.id]);
+      expect(after.rows[0]?.count).toBe(before.rows[0]?.count);
+    });
+
+    it('creates an ordinary organization conversation with valid string title', async () => {
+      const res = await request(prodApp)
+        .post('/api/conversations')
+        .set('Authorization', `Bearer ${bob.token}`)
+        .set('X-Workspace-Id', orgId)
+        .send({ title: 'Sprint Retrospective' });
+
+      expect(res.status).toBe(201);
+      expect(res.body.conversation.title).toBe('Sprint Retrospective');
+      expect(res.body.conversation.workspace_id).toBe(orgId);
+      expect(res.body.conversation.workspace_mode).toBe('organization');
+      expect(res.body.conversation.jira_context).toBeFalsy();
+    });
+
+    it('creates an untitled ordinary organization conversation when title is explicitly null', async () => {
+      const res = await request(prodApp)
+        .post('/api/conversations')
+        .set('Authorization', `Bearer ${bob.token}`)
+        .set('X-Workspace-Id', orgId)
+        .send({ title: null });
+
+      expect(res.status).toBe(201);
+      expect(res.body.conversation.title).toBeNull();
+      expect(res.body.conversation.workspace_id).toBe(orgId);
+      expect(res.body.conversation.workspace_mode).toBe('organization');
+      expect(res.body.conversation.jira_context).toBeFalsy();
+    });
+
+    it('treats a string title containing JSON as a literal title string without interpreting it as scope', async () => {
+      const jsonLikeTitle = '{"workspaceMode":"organization","jiraContext":true}';
+      const res = await request(prodApp)
+        .post('/api/conversations')
+        .set('Authorization', `Bearer ${bob.token}`)
+        .set('X-Workspace-Id', orgId)
+        .send({ title: jsonLikeTitle });
+
+      expect(res.status).toBe(201);
+      expect(res.body.conversation.title).toBe(jsonLikeTitle);
+      expect(res.body.conversation.workspace_id).toBe(orgId);
+      expect(res.body.conversation.workspace_mode).toBe('organization');
+      expect(res.body.conversation.jira_context).toBeFalsy();
+    });
+
     it('creates a Jira organization conversation when jiraContext: true and user has both active memberships under fixtureApp', async () => {
       // Alice is active in Org AND active in Jira, fixtureApp enables test flag
       const res = await request(fixtureApp)

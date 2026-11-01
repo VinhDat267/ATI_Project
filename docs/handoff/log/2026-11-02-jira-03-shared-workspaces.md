@@ -52,3 +52,9 @@ Chạy lại toàn bộ guard trên base mới: **13/13 đột biến bị bắt
 Calendar v2 tiếp tục vào main trước push bản giải quyết xung đột. Ghép tự động server, giữ guard đã kiểm tra; Jira đánh số **0018** sau Sheets0016/Calendar0017. Sửa cùng hợp đồng scopeArg của memory repository sau test RED (undefined title làm mất personal mode), rồi 6/6 hồi quy memory/lịch GREEN.
 
 Bằng chứng cuối thay các đợt trước: **npm run check exit 0**, **3.304 v3 PASS** = schemas341 + adapters464 + planner381 + executor42 + API1.159 (134 file, không skip) + web917; **406 eval**, 32 Node probe, 1 launcher +66 Node/env, build/security đạt. Migrations0001–0018 áp dụng thành công. Chạy lại 13 guard trên base cuối; control/mutant/khôi phục SHA/control được lưu trong bằng chứng riêng và cập nhật PR #240. Review toàn nhánh mới và CI/browser vẫn lấy theo head PR cuối, không tái dùng phán quyết trên base cũ.
+
+## Bản vá cuối sau head5f: title/scope boundary
+
+Mặc dù whole-branch review và CI/browser của5f đã đạt, rà soát bổ sung tìm thấy title object có thể bị overload repository hiểu thành ConversationScope. Hai test HTTP/PostgreSQL mới tái hiện201 thay400. Route chặn mọi title ngoài string/null/omitted, rồi chuẩn hóa riêng string hoặc undefined trước gọi repository. Native implementer thực hiện bản vá; 16 test nhóm hội thoại GREEN, gồm title chuỗi, null và JSON-text giữ nguyên scope.
+
+Fullcheck sau vá exit0: **3.309 v3** = schema341 +adapter464 +planner381 +executor42 +API1.164/134file +web917;406eval,32Nodeprobe,1launcher+66Node/env,build/security đạt. Ma trận tăng lên14 đột biến; ca cuối bỏ cả type rejection và string-only normalization để tái tạo scope injection. Bộ điều phối chạy thật, khôi phục byte/SHA và kiểm tra control sau phục hồi. Scoped re-review của đúng delta và CI/browser trên head mới được ghi trong PR #240; không coi kết quả5f là nghiệm thu bản vá.
