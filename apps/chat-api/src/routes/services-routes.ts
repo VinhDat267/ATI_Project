@@ -279,12 +279,19 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
         const savedCheck = checks.get(id);
         const check = savedCheck?.credentialVersion === (record ? versionOf(record.config) : null) ? savedCheck : undefined;
 
-        let personalStatus: 'connected' | 'reconnect_required' | 'disconnected' = 'disconnected';
+        let personalStatus: 'connected' | 'reconnect_required' | undefined;
         let username: string | undefined;
         let connectedAt: string | undefined;
         if (isTrello && credentialRepo && typeof credentialRepo.getPersonalConnectionStatus === 'function') {
           const userId = (req as any).user?.id;
-          const personalRecord = userId ? await credentialRepo.getPersonalConnectionStatus('trello', userId) : null;
+          let personalRecord: Awaited<ReturnType<typeof credentialRepo.getPersonalConnectionStatus>> = null;
+          if (userId) {
+            try {
+              personalRecord = await credentialRepo.getPersonalConnectionStatus('trello', userId);
+            } catch {
+              personalRecord = null;
+            }
+          }
           if (personalRecord) {
             const dateVal = (personalRecord as any).updated_at ?? personalRecord.created_at;
             connectedAt = dateVal instanceof Date ? dateVal.toISOString() : (dateVal ? new Date(dateVal).toISOString() : undefined);
@@ -314,7 +321,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
           connectionStatus: configured ? (check?.connectionStatus ?? 'unchecked') : 'unconfigured',
           lastCheckedAt: check?.lastCheckedAt ?? null,
           allowedScope: Array.isArray(entries) ? entries : [],
-          ...(isTrello ? { personalStatus, ...(username ? { username } : {}), ...(connectedAt ? { connectedAt } : {}) } : {}),
+          ...(isTrello && personalStatus ? { personalStatus, ...(username ? { username } : {}), ...(connectedAt ? { connectedAt } : {}) } : {}),
         };
       }));
       if (options.gmailAvailable && credentialRepo && encryptionKey) services.push(await personalGmail((req as any).user.id));
