@@ -40,11 +40,15 @@ export class SlackLifecycleValidationRepo {
 
   async claim(limit: number, workerId: string, leaseSeconds: number, now = new Date()): Promise<ClaimedValidationJob[]> {
     positive(limit,100); positive(leaseSeconds,600); const owner = workerName(workerId); clock(now);
-    const result = await this.pool.query(`WITH due AS (
-      SELECT id FROM slack_lifecycle_intents
+    // Due and lease times belong to PostgreSQL; a caller Date can lag even
+    // a just-committed timestamp by its omitted microseconds or clock skew.
+    const result = await this.pool.query(`WITH cutoff AS MATERIALIZED (
+      SELECT GREATEST($1::timestamptz,clock_timestamp()) AS value
+    ), due AS (
+      SELECT id FROM slack_lifecycle_intents CROSS JOIN cutoff
       WHERE status IN ('pending','failed') AND intent_type IN ('token_revocation_validation','app_uninstall_validation')
-        AND validation_next_attempt_at<=$1 AND (validation_lease_until IS NULL OR validation_lease_until<=$1)
-      ORDER BY validation_next_attempt_at,created_at,id LIMIT $2 FOR UPDATE SKIP LOCKED
+        AND validation_next_attempt_at<=cutoff.value AND (validation_lease_until IS NULL OR validation_lease_until<=cutoff.value)
+      ORDER BY validation_next_attempt_at,created_at,id LIMIT $2 FOR UPDATE OF slack_lifecycle_intents SKIP LOCKED
     ) UPDATE slack_lifecycle_intents j SET validation_lease_token=gen_random_uuid(),validation_lease_owner=$3,
       validation_lease_until=GREATEST($1::timestamptz,clock_timestamp()) + $4 * interval '1 second',validation_attempts=j.validation_attempts+1
       FROM due WHERE j.id=due.id RETURNING j.*`, [now,limit,owner,leaseSeconds]);

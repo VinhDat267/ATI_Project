@@ -21,8 +21,7 @@ describe('04B1 leased credential validation jobs on real PostgreSQL', () => {
       sourceEventTimeIso:'2024-10-27T03:33:20.000001Z',channelId:null,messageTs:null,payloadHash:'a'.repeat(64),
       lifecycle:{intentType:'token_revocation_validation',slackUserIds:['U_JOBS']} });
     // These tests start with due jobs, then exercise retry/lease clocks
-    // explicitly. PG microseconds can be later than Date.now() immediately
-    // after INSERT; do not make safe-code assertions depend on that boundary.
+    // explicitly. SQL clock regression cases below override this baseline.
     await db.pool.query("UPDATE slack_lifecycle_intents SET validation_next_attempt_at='2000-01-01T00:00:00Z' WHERE status='pending'");
   }
   it('claims concurrently with SKIP LOCKED and no shared job ownership', async () => {
@@ -41,6 +40,32 @@ describe('04B1 leased credential validation jobs on real PostgreSQL', () => {
     expect(await repo.retry(b,'probe_transient',30,later)).toBe(true);
     expect(await repo.claim(1,'early',60,new Date(later.getTime()+1000))).toEqual([]);
     expect((await repo.claim(1,'due',60,new Date(later.getTime()+31_000)))).toHaveLength(1);
+  });
+  async function staleDatabaseCutoff(): Promise<Date> {
+    return (await db.pool.query("SELECT date_trunc('milliseconds',clock_timestamp()-interval '1 second') AS cutoff")).rows[0].cutoff;
+  }
+  it('claims an actually due SQL timestamp one microsecond after a stale caller clock', async () => {
+    await seed(1); const cutoff=await staleDatabaseCutoff();
+    const proof=(await db.pool.query(`UPDATE slack_lifecycle_intents SET validation_next_attempt_at=$1::timestamptz+interval '1 microsecond'
+      RETURNING validation_next_attempt_at>$1::timestamptz AS after_caller,validation_next_attempt_at<=clock_timestamp() AS due`,[cutoff])).rows[0];
+    expect(proof).toEqual({after_caller:true,due:true});
+    const claimed=await repo.claim(1,'database-clock',60,cutoff);
+    expect(claimed).toHaveLength(1); expect(claimed[0]!.attempts).toBe(1);
+  });
+  it('reclaims an actually expired SQL lease after a stale caller clock and fences its old owner', async () => {
+    await seed(1); const previous=(await repo.claim(1,'old-owner',60))[0]!,cutoff=await staleDatabaseCutoff();
+    const proof=(await db.pool.query(`UPDATE slack_lifecycle_intents SET validation_lease_until=$2::timestamptz+interval '1 microsecond'
+      WHERE id=$1 RETURNING validation_lease_until>$2::timestamptz AS after_caller,validation_lease_until<=clock_timestamp() AS expired`,[previous.id,cutoff])).rows[0];
+    expect(proof).toEqual({after_caller:true,expired:true});
+    const reclaimed=await repo.claim(1,'new-owner',60,cutoff);
+    expect(reclaimed).toHaveLength(1); expect(reclaimed[0]!.leaseToken).not.toBe(previous.leaseToken);
+    expect(await repo.retry(previous,'probe_transient',30)).toBe(false);
+  });
+  it('does not pull a genuinely future SQL due time forward with the database clock', async () => {
+    await seed(1); const cutoff=await staleDatabaseCutoff();
+    await db.pool.query("UPDATE slack_lifecycle_intents SET validation_next_attempt_at=clock_timestamp()+interval '1 hour'");
+    expect(await repo.claim(1,'too-early',60,cutoff)).toEqual([]);
+    expect((await db.pool.query('SELECT validation_attempts FROM slack_lifecycle_intents')).rows[0].validation_attempts).toBe(0);
   });
   it('fences completion inside the caller transaction and rolls it back atomically', async () => {
     await seed(1); const job=(await repo.claim(1,'owner',60))[0]!, c=await db.pool.connect();

@@ -75,8 +75,7 @@ describe('04B2 native lifecycle runtime with real PostgreSQL/HTTP',()=>{
       expect((await state())[0]?.status).not.toBe('applied');expect((await env.invalidationService.checkBarriers({binding:seed.binding})).blocked).toBe(true);
       release();env.fixture.setHandler('/auth.test',()=>({body:{ok:true,team_id:seed.binding.workspaceId,user_id:seed.binding.slackUserId}}));
       await env.db.pool.query("UPDATE slack_lifecycle_intents SET validation_next_attempt_at=now(),validation_lease_until=NULL");
-      // PostgreSQL timestamps have microseconds; the caller clock is milliseconds.
-      // A first claim can legitimately precede this freshly assigned due time.
+      // Recovery uses the database clock for this freshly scheduled intent.
       service.start();const end=Date.now()+2000;
       while((await state())[0]?.status!=='applied' && Date.now()<end) await new Promise(r=>setTimeout(r,10));
       expect((await state())[0]?.status).toBe('applied');
@@ -85,12 +84,13 @@ describe('04B2 native lifecycle runtime with real PostgreSQL/HTTP',()=>{
   it('bounds shutdown while a real PostgreSQL claim is blocked, then applies no late authority outcome',async()=>{
     await event();const holder=await env.db.pool.connect(),workerPool=new pg.Pool({connectionString:env.db.pool.options.connectionString,max:1});
     const pid=(await workerPool.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+    const holderPid=(await holder.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
     const service=runtime({pool:workerPool,stopGraceMs:50});let pending:ReturnType<typeof service.tick>|undefined;
     try {
       await holder.query('BEGIN');await holder.query('LOCK TABLE slack_lifecycle_intents IN ACCESS EXCLUSIVE MODE');service.start();pending=service.tick();
       const end=Date.now()+2000;let blocked=false;
       while(Date.now()<end) {
-        blocked=(await env.db.pool.query("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE pid=$1 AND wait_event_type='Lock' AND query LIKE 'WITH due AS (%') AS blocked",[pid])).rows[0].blocked;
+        blocked=(await env.db.pool.query("SELECT $2::int=ANY(pg_blocking_pids($1)) AS blocked",[pid,holderPid])).rows[0].blocked;
         if(blocked) break;await new Promise(r=>setTimeout(r,10));
       }
       expect(blocked).toBe(true);const started=Date.now();await service.stop();expect(Date.now()-started).toBeLessThan(500);expect(service.isRunning()).toBe(false);
