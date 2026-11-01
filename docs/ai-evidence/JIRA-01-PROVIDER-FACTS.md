@@ -1,6 +1,6 @@
 # JIRA-01 · Provider facts and current gate
 
-**Updated:** 31/10/2026 (Asia/Saigon). **Scope:** OAuth feasibility diagnostic tooling; not production Jira OAuth.
+**Updated:** 01/11/2026 (Asia/Saigon). **Scope:** OAuth feasibility diagnostic tooling; not production Jira OAuth.
 **Spec:** [Jira personal/workspaces](../superpowers/specs/2026-10-30-jira-personal-workspaces-design.md). **Task:** [JIRA-01](../handoff/tasks/JIRA-01-oauth-feasibility.md).
 
 ## Evidence vocabulary
@@ -15,8 +15,8 @@
 
 | Boundary | Proposed scopes / provider condition | Evidence now |
 |---|---|---|
-| Authorization code / refresh | 3LO confidential app; identity/Jira flows request `offline_access`; rotating refresh tokens | DOCUMENTED in [OAuth guide](https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/); exchange/rotation FIXTURE_VERIFIED; native NOT_RUN |
-| Identity `/me` | User Identity API `read:me`; use provider account ID, not email | DOCUMENTED in OAuth guide; FIXTURE_VERIFIED; genuinely unaffiliated account flow NOT_RUN |
+| Authorization code / refresh | 3LO confidential app; identity/Jira flows request `offline_access`; rotating refresh tokens | DOCUMENTED in [OAuth guide](https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/); FIXTURE_VERIFIED; identity grant exchange and two consecutive rotations LIVE_OBSERVED 01/11; Jira-scope grant NOT_RUN |
+| Identity `/me` | User Identity API `read:me`; use provider account ID, not email | DOCUMENTED in OAuth guide; FIXTURE_VERIFIED; native `/me` LIVE_OBSERVED 01/11; no-site condition for the actual account still awaits owner confirmation |
 | Accessible resources | Use returned cloudId/site scopes; account-level vs resource-level behavior depends on app/grant | DOCUMENTED in OAuth guide; container filtering FIXTURE_VERIFIED; native two-site set NOT_RUN |
 | `GET /rest/api/3/mypermissions` | `read:jira-work`; global ADMINISTER differs from issue/project permissions | DOCUMENTED in [Permissions API](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-permissions/); FIXTURE_VERIFIED for global read; native NOT_RUN |
 | Project lookup/directory | `read:jira-work`; actual visibility/project allowlist still checked | DOCUMENTED in [Projects API](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-projects/); new OAuth runtime not implemented; native NOT_RUN |
@@ -31,17 +31,17 @@ This matrix is not a claim that scope alone grants a native permission. No admin
 
 | Case | Current result | Needed evidence |
 |---|---|---|
-| Development app / actual grant type | NOT_RUN | Owner creates app and records console grant type; no client secret in evidence |
-| Identity-only before any Jira membership | NOT_RUN | Fresh account owner attestation plus observed consent and `/me`; record if provider requires a site |
+| Development app / actual grant type | App used LIVE_OBSERVED; console grant type NOT_RECORDED | Owner records account/resource-level console grant model; no client secret in evidence |
+| Identity-only before any Jira membership | Consent and `/me` LIVE_OBSERVED; actual-account no-site attestation PENDING | Owner confirms that the account actually used has no Jira memberships; empty site count alone is insufficient |
 | Existing site | NOT_RUN | Successful consent, resource result and identity match |
 | Second simultaneous site | NOT_RUN | Repeat consent with same identity; two Jira sites observed together, not just two separate historical counts |
-| Refresh twice | NOT_RUN | Two real successful exchanges using each returned replacement token; no token values in public report |
+| Refresh twice | LIVE_OBSERVED for identity grant, 01/11 | Two separate consecutive browser refresh submissions each returned TOKEN_ROTATION_OBSERVED and connected true; Jira-scope refresh still NOT_RUN |
 | Global permission read | NOT_RUN | Actual response from site; both admin and non-admin cases if available |
 | Re-consent / wrong account / denial | NOT_RUN | Actual provider/browser result and local connection state; no callback URL/code in report |
 
-Owner created/configured the development app after setup guidance. The local configuration check now passes; console grant type remains unrecorded. The owner confirms having an account without any Jira site membership and intends to use it for the first consent, but that condition has not yet been tied to a completed `/me` observation.
+Owner created/configured the development app after setup guidance. The local configuration check passes; console grant type remains unrecorded. The owner previously confirmed having an account without any Jira site membership and intending to use it. On 01/11 the owner reported connection complete; the live browser report confirmed identity and the exact granted scopes `offline_access read:me`. Confirmation that the account actually used has no Jira membership is pending.
 
-On 31/10 the actual authorization endpoint returned a 302 to the official Atlassian login host; after fixing the local runner's form policies, the browser visibly reached that login page. This proves navigation only. No authorization-code exchange, `/me`, Jira resource read or refresh has been observed yet; those native cases remain NOT_RUN pending the owner's login/consent. See the [browser-start log](../handoff/log/2026-10-31-codex-jira-01-browser-origin.md).
+On 31/10 the authorization endpoint and browser navigation reached the official Atlassian login page ([browser-start log](../handoff/log/2026-10-31-codex-jira-01-browser-origin.md)). On 01/11 the probe observed the actual callback, identity and two successful refreshes. The initial report was saved before refresh; both sequential refresh results were saved separately in ignored local evidence. No Jira resource/permission read or write has been observed. See the [native identity log](../handoff/log/2026-11-01-codex-jira-01-native-identity.md).
 
 **Gate verdict: NOT_COMPLETE.** Local probe verification may finish independently; JIRA-02–11 do not start until the provider gate is resolved as required by the approved design.
 

@@ -1,6 +1,6 @@
 # JIRA-01 · Kiểm chứng khả thi OAuth Jira
 
-**Trạng thái:** tooling local đã kiểm, cấu hình local hợp lệ và đã mở màn đăng nhập Atlassian; native gate NOT_COMPLETE, đang chờ consent của chủ dự án. **Ủy quyền:** chủ dự án duyệt thiết kế và yêu cầu triển khai 31/10/2026.
+**Trạng thái:** native identity OAuth và hai refresh đã quan sát thật 01/11; chờ xác nhận no-site của tài khoản thực dùng và nghiệm thu Jira nhiều site. Native gate NOT_COMPLETE. **Ủy quyền:** chủ dự án duyệt thiết kế và yêu cầu triển khai 31/10/2026.
 **Thiết kế:** [Jira cá nhân/workspace](../../superpowers/specs/2026-10-30-jira-personal-workspaces-design.md).
 **Kế hoạch:** [OAuth feasibility](../../superpowers/plans/2026-10-31-jira-oauth-feasibility.md).
 **Vai trò:** Integration; chỉ package tool-adapters và tài liệu của task. Chưa sửa API/web/planner/executor/database.
@@ -35,3 +35,4 @@ Nếu identity-only không đáp ứng onboarding, cần chủ dự án quyết 
 - Chủ dự án xác nhận chưa có app Atlassian và yêu cầu hướng dẫn tạo; đã có `.env.jira-probe` ignored, không in giá trị. Lần kiểm cuối báo thiếu Client ID/Secret. Native identity/no-site, thêm site, refresh và quyền thật đều **NOT_RUN**; không chuyển sang JIRA-02–11.
 - `gh auth status` chưa đăng nhập; chưa push/mở PR, không merge. CI toàn repo và nghiệm thu model/live chưa chạy trong task tooling này.
 - Tiếp tục 31/10: chủ dự án đã cập nhật cấu hình local và xác nhận có tài khoản chưa thuộc Jira site để thử. Native browser phát hiện hai lỗi khởi động: `no-referrer` làm form POST có Origin null; CSP thiếu host redirect đăng nhập chính thức. Đã tái hiện trước sửa, giữ Origin guard/callback no-referrer, cho phép đúng hai host Atlassian, và quan sát browser tới màn đăng nhập. Full package sau sửa **443 Vitest +32 Node PASS, exit 0**. Delta này chưa review độc lập; không nâng verdict review/CI hay đóng native gate. [Log](../log/2026-10-31-codex-jira-01-browser-origin.md).
+- Tiếp tục 01/11: browser live có `CALLBACK_OBSERVED`, `connected: true`, `identity: true`, scopes `offline_access read:me`; hai lần bấm refresh tuần tự đều có `TOKEN_ROTATION_OBSERVED` và kết nối vẫn dùng được. Lưu ba snapshot report an toàn trong ignored local evidence trước khi đổi consent. Chưa suy ra no-site từ `siteCount: 0`; đã hỏi chủ tài khoản xác nhận account thực dùng. Chưa có Jira grant/site/permission/native write, không chuyển sang JIRA-02–11. [Log](../log/2026-11-01-codex-jira-01-native-identity.md).
