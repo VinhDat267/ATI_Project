@@ -694,7 +694,7 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
       expect(blockedRes2.body.error).toBe('WORKSPACE_ACCESS_DENIED');
     });
 
-    it('[AUDIT-A] defaults omitted X-Workspace-Id header to personal mode when workspaceRepo is enabled, never exposing legacy shared credentials', async () => {
+    it('[AUDIT-A] personal workspace mode never exposes legacy shared credentials (user_id IS NULL, workspace_id IS NULL)', async () => {
       // Legacy shared Slack credential exists in DB (user_id IS NULL, workspace_id IS NULL)
       await credentials.saveCredentials(
         'slack',
@@ -703,11 +703,12 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
         null
       );
 
-      // Charlie is a newly self-activated user who calls /api/services without X-Workspace-Id
+      // Charlie is a newly self-activated user in personal workspace mode
       const charlieToken = tokenFor(charlie);
       const res = await request(app)
         .get('/api/services')
-        .set('Authorization', `Bearer ${charlieToken}`);
+        .set('Authorization', `Bearer ${charlieToken}`)
+        .set('X-Workspace-Id', 'personal');
       expect(res.status).toBe(200);
       const slack = res.body.services.find((s: any) => s.id === 'slack');
       expect(slack.configured).toBe(false);

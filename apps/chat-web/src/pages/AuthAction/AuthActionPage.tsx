@@ -272,12 +272,28 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                   </span>
                   {' '}
                   <h1 id="title-email-not-verified" className="font-display font-semibold text-2xl sm:text-[26px] text-[#111827] tracking-tight">
-                    Bạn cần xác minh địa chỉ email
+                    Tài khoản đang chờ duyệt
                   </h1>
+                  <p className="text-sm font-semibold text-[#D97706] mt-1">
+                    Bạn cần xác minh địa chỉ email
+                  </p>
                 </div>
                 <p className="text-sm text-[#4B5563] leading-relaxed max-w-md mx-auto">
                   {error || `Địa chỉ email ${email || 'của bạn'} chưa được xác minh. Hãy kiểm tra hộp thư hoặc bấm gửi lại link xác minh mới bên dưới.`}
                 </p>
+              </div>
+              <div className="flex items-center justify-between text-xs text-[#16A34A] bg-white p-2.5 rounded-xl border border-[#E7E7E2]">
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-[#16A34A]/10 flex items-center justify-center font-bold text-[11px]">
+                    1
+                  </span>
+                  <span className="font-medium text-[#111827]">
+                    1. Đăng ký &amp; xác thực email
+                  </span>
+                </div>
+                <span className="text-[11px] font-semibold text-[#16A34A]">
+                  Nếu chưa hoàn tất
+                </span>
               </div>
               {/* Form yêu cầu gửi lại link */}
               <form id="form-resend-verification" onSubmit={(event) => actions.handleResendVerification(event)} className="bg-[#F8F8F6] border border-[#E7E7E2] rounded-2xl p-5 v3-space-y-4">
@@ -294,11 +310,9 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
               </form>
               {/* Hộp kết quả sau khi gửi lại */}
               {resendSent && <div id="resend-success-box" className="p-4 rounded-xl bg-[#16A34A]/10 border border-[#16A34A]/20 text-xs text-[#16A34A] leading-relaxed">{resendSent}</div>}
-              <div className="text-center pt-2">
-                <a onClick={followLink} href="/login" className="inline-flex items-center gap-1.5 text-xs font-medium text-[#6B7280] hover:text-[#111827] transition-colors">
-                  <span>
-                    ← Quay lại trang đăng nhập
-                  </span>
+              <div className="v3-space-y-2.5 pt-1">
+                <a onClick={followLink} href="/login" className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl border border-[#E7E7E2] hover:bg-neutral-50 text-[#4B5563] hover:text-[#111827] font-medium text-xs sm:text-sm transition-colors">
+                  Thử đăng nhập lại
                 </a>
               </div>
             </section>}

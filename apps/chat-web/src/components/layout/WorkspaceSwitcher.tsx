@@ -80,11 +80,12 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
   }, [open]);
 
   const handleSelectWorkspace = (id: string) => {
-    if (id === getActiveWorkspaceId()) {
+    const prev = getActiveWorkspaceId();
+    setActiveWorkspaceId(id);
+    if (id === prev) {
       setOpen(false);
       return;
     }
-    setActiveWorkspaceId(id);
     useChatStore.getState().reset();
     navigate?.('/');
     setOpen(false);
@@ -169,11 +170,11 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
       >
         <span className="truncate max-w-[140px] sm:max-w-[180px] flex items-center gap-1">
           <span>{isPersonal ? '👤' : '🏢'}</span>
-          <span className="font-semibold">{activeSummary.name}</span>
+          <span className="font-semibold hidden xl:inline">{activeSummary.name}</span>
         </span>
         {!isPersonal && (
           <span
-            className={`px-1.5 py-0.2 rounded text-[10px] font-medium ${
+            className={`hidden xl:inline px-1.5 py-0.2 rounded text-[10px] font-medium ${
               activeSummary.role === 'admin'
                 ? 'bg-amber-100 text-amber-800'
                 : 'bg-neutral-100 text-neutral-600'
@@ -217,7 +218,7 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
               <span className="text-base">👤</span>
               <div>
                 <div>Không gian Cá nhân</div>
-                <div className="text-[10px] text-[#6B7280]">Gmail, Lịch, Trello & công cụ riêng</div>
+                <div className="text-[10px] text-[#6B7280]">Lịch, Trang tính, Trello & công cụ riêng</div>
               </div>
             </div>
             {isPersonal && <span className="text-sm font-bold text-[#FF5701]">✓</span>}

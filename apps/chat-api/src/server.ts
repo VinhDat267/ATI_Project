@@ -465,7 +465,7 @@ async function bootstrap() {
     credentialRepo: credRepo,
     encryptionKey: env.ENCRYPTION_KEY,
     serviceAdminUserIds: (process.env.SERVICE_ADMIN_USER_IDS || '').split(',').map((id) => id.trim()).filter(Boolean),
-    onCredentialsChanged: (service) => realAdapterFactory.clearCache(service),
+    onCredentialsChanged: (service, workspaceId, userId) => realAdapterFactory.clearCache(service, workspaceId, userId),
     gmail: env.GMAIL_ENABLED ? {
       enabled: true,
       oauth: gmailAvailable ? env.GMAIL_OAUTH : undefined,

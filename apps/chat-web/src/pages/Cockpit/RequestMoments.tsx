@@ -6,7 +6,7 @@ import { ServiceLogo } from '../../components/ServiceLogo';
 import presentation from '../../assets/cockpit-services.json';
 import type { ServiceInfo, GatherState } from '../../types';
 import { RequestEcho, useScheduledOrigin } from './RequestEcho';
-import { getActiveWorkspaceSummary, subscribeWorkspace } from '../../services/workspace-storage';
+import { getActiveWorkspaceSummary, setActiveWorkspaceId, subscribeWorkspace } from '../../services/workspace-storage';
 interface Props {
   services: ServiceInfo[];
   loading: boolean;
@@ -77,7 +77,7 @@ export function RequestMoment({
             </div>
             <p className="text-[#6B7280] text-[11px] truncate">
               {workspace.id === 'personal'
-                ? '(Gmail, Lịch, Trang tính, Trello & công cụ riêng của bạn)'
+                ? '(Lịch, Trang tính, Trello & công cụ riêng của bạn)'
                 : '(Sử dụng kết nối chung của nhóm & dịch vụ đã cấp quyền)'}
             </p>
           </div>
@@ -86,7 +86,10 @@ export function RequestMoment({
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
               type="button"
-              onClick={() => navigate('/settings')}
+              onClick={() => {
+                setActiveWorkspaceId('personal');
+                navigate('/settings');
+              }}
               className="px-2.5 py-1 rounded-lg text-xs font-medium border border-[#E7E7E2] bg-[#F8F8F6] text-[#4B5563] hover:text-[#111827] hover:bg-neutral-100 transition-colors"
             >
               Kết nối công cụ cá nhân

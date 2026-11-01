@@ -1,5 +1,5 @@
 import { authStorage } from './auth-storage';
-import { getActiveWorkspaceId, setActiveWorkspaceId } from './workspace-storage';
+import { getActiveWorkspaceId, getExplicitWorkspaceId, setActiveWorkspaceId } from './workspace-storage';
 import type { ScheduleView, ScheduleRunView } from '@wap/tool-schemas';
 import type {
   ActivePlan,
@@ -54,7 +54,10 @@ export class ApiClient {
         headers.set('Authorization', `Bearer ${accessToken}`);
       }
       if (!headers.has('X-Workspace-Id')) {
-        headers.set('X-Workspace-Id', getActiveWorkspaceId());
+        const explicitWorkspaceId = getExplicitWorkspaceId();
+        if (explicitWorkspaceId) {
+          headers.set('X-Workspace-Id', explicitWorkspaceId);
+        }
       }
     }
 

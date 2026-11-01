@@ -65,7 +65,9 @@ export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pag
               ATI
             </span>
           </a>
-          <WorkspaceSwitcher navigate={navigate} />
+          <div className="hidden sm:inline-block flex-shrink-0">
+            <WorkspaceSwitcher navigate={navigate} />
+          </div>
           {pageName && <span data-nav-page-name className="min-[900px]:hidden text-sm font-medium text-[#4B5563] truncate">{pageName}</span>}
         </div>
         <nav aria-label="Điều hướng chính" className="col-start-2 hidden min-[900px]:flex items-center gap-1 justify-self-center">

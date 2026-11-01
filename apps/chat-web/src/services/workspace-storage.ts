@@ -30,15 +30,19 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
   });
 }
 
-export function getActiveWorkspaceId(): string {
+export function getExplicitWorkspaceId(): string | null {
   try {
-    if (typeof window === 'undefined') return 'personal';
+    if (typeof window === 'undefined') return null;
     const key = storageKeyForCurrentUser();
     const val = window.localStorage.getItem(key)?.trim();
-    return val || 'personal';
+    return val || null;
   } catch {
-    return 'personal';
+    return null;
   }
+}
+
+export function getActiveWorkspaceId(): string {
+  return getExplicitWorkspaceId() || 'personal';
 }
 
 export function setActiveWorkspaceId(id: string): void {

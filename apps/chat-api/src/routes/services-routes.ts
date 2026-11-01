@@ -416,7 +416,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
             scopeKey,
             scopeLabel,
             credentialFields,
-            connection: mode === 'personal' && !isTrello ? 'personal' : definition.connection ?? 'shared',
+            connection: definition.connection ?? 'shared',
             tools: ALL_TOOLS.filter((tool) => tool.service === id).map((tool) => tool.name),
             configured,
             connected: configured && check?.connectionStatus === 'healthy',
