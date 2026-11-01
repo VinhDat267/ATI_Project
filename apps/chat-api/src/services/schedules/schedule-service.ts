@@ -6,11 +6,13 @@ import type {
   ScheduleRunView,
   ScheduleStateMetadata,
   ScheduleView,
+  SheetsDigestCandidate,
 } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../../db/repositories/credential-repo.js';
 import { MessageRepo } from '../../db/repositories/message-repo.js';
 import { ScheduleRepo, type Queryable, type ScheduleRow, type ScheduleScope } from '../../db/repositories/schedule-repo.js';
 import { isUuid } from '../../db/repositories/uuid.js';
+import { evaluateCalendarDigestCandidate } from './calendar-digest-candidate.js';
 import { runState, runView } from './run-state.js';
 import { nextOccurrence } from './next-occurrence.js';
 import { analyzeSheetsDigestCandidate, computeSheetsDigestHash } from './sheets-digest-candidate.js';
@@ -25,6 +27,7 @@ export const SCHEDULE_CONFLICTS = {
   RUN_IN_PROGRESS: 'Lịch đang lập kế hoạch cho một lượt. Hãy chờ lượt đó xong.',
   RUN_NOT_REPLANNABLE: 'Lượt này không cần lập lại kế hoạch.',
   DIGEST_NOT_ELIGIBLE: 'Lịch này không đủ điều kiện tự gửi báo cáo. Hãy chọn chế độ chờ duyệt mỗi lượt.',
+  AUTO_DIGEST_NOT_ELIGIBLE: 'Lịch này không đủ điều kiện gửi tự động hoặc kết nối Google Calendar/kênh nhận đã thay đổi. Hãy chọn chế độ duyệt thủ công hoặc kiểm tra lại kết nối.',
 } as const;
 export type ScheduleConflictCode = keyof typeof SCHEDULE_CONFLICTS;
 
@@ -191,8 +194,10 @@ export class ScheduleService {
       const wsId = owner.rows[0].workspace_id ?? null;
       const wsMode = owner.rows[0].workspace_mode ?? 'legacy';
       const wantAutoDigest = approvalMode === 'auto_digest';
+      const isCalendarSchedule =
+        metadata.services.includes('mycalendar') || metadata.services.includes('calendar');
       let digestFields: {
-        kind: 'plan' | 'sheets_digest';
+        kind: 'plan' | 'sheets_digest' | 'calendar_digest';
         digestConfig: unknown | null;
         digestConfigHash: string | null;
         digestApprovedAt: Date | null;
@@ -204,35 +209,54 @@ export class ScheduleService {
       };
 
       if (wantAutoDigest && (proposal.action === 'create' || proposal.action === 'update')) {
-        if (!metadata.digestCandidate?.canAutoDigest || !metadata.digestCandidate.config) {
-          throw new ScheduleConflict('DIGEST_NOT_ELIGIBLE');
-        }
-        // Re-verify TOCTOU scope at confirmation time if credentialRepo is wired
-        if (this.options.credentialRepo && this.options.encryptionKey) {
-          const recheck = await analyzeSheetsDigestCandidate({
-            userId,
-            request: proposal.request!,
-            services: metadata.services,
-            credentialRepo: this.options.credentialRepo,
+        if (isCalendarSchedule) {
+          const evaluated = await evaluateCalendarDigestCandidate({
+            pool: client,
             encryptionKey: this.options.encryptionKey,
-            mysheetsEnabled: this.options.mysheetsEnabled,
+            userId,
+            services: metadata.services,
+            request: proposal.request!,
           });
-          if (!recheck.canAutoDigest || !recheck.config) {
+          if (!evaluated.candidate.canAutoDigest || !evaluated.config || !evaluated.configHash) {
+            throw new ScheduleConflict('AUTO_DIGEST_NOT_ELIGIBLE');
+          }
+          digestFields = {
+            kind: 'calendar_digest',
+            digestConfig: JSON.stringify(evaluated.config),
+            digestConfigHash: evaluated.configHash,
+            digestApprovedAt: now,
+          };
+        } else {
+          const sheetsCandidate = metadata.digestCandidate as SheetsDigestCandidate | undefined;
+          if (!sheetsCandidate?.canAutoDigest || !sheetsCandidate.config) {
             throw new ScheduleConflict('DIGEST_NOT_ELIGIBLE');
           }
+          if (this.options.credentialRepo && this.options.encryptionKey) {
+            const recheck = await analyzeSheetsDigestCandidate({
+              userId,
+              request: proposal.request!,
+              services: metadata.services,
+              credentialRepo: this.options.credentialRepo,
+              encryptionKey: this.options.encryptionKey,
+              mysheetsEnabled: this.options.mysheetsEnabled,
+            });
+            if (!recheck.canAutoDigest || !recheck.config) {
+              throw new ScheduleConflict('DIGEST_NOT_ELIGIBLE');
+            }
+          }
+          const config = sheetsCandidate.config;
+          const hash = computeSheetsDigestHash({
+            userId,
+            recurrence: proposal.recurrence!,
+            config,
+          });
+          digestFields = {
+            kind: 'sheets_digest',
+            digestConfig: JSON.stringify(config),
+            digestConfigHash: hash,
+            digestApprovedAt: now,
+          };
         }
-        const config = metadata.digestCandidate.config;
-        const hash = computeSheetsDigestHash({
-          userId,
-          recurrence: proposal.recurrence!,
-          config,
-        });
-        digestFields = {
-          kind: 'sheets_digest',
-          digestConfig: JSON.stringify(config),
-          digestConfigHash: hash,
-          digestApprovedAt: now,
-        };
       }
 
       if (proposal.action === 'create') {
@@ -269,6 +293,33 @@ export class ScheduleService {
       }
       // Turning a finished schedule back on takes a place again.
       if (!OPEN.has(existing.status) && OPEN.has(fields.status)) await this.ensureRoom(client, userId, { workspaceMode: wsMode, workspaceId: wsId });
+      if (proposal.action === 'update' && existing.kind === 'calendar_digest' && approvalMode !== 'manual') {
+        const evaluated = await evaluateCalendarDigestCandidate({
+          pool: client,
+          encryptionKey: this.options.encryptionKey,
+          userId,
+          services: fields.services,
+          request: fields.request,
+        });
+        if (!evaluated.candidate.canAutoDigest || !evaluated.config || !evaluated.configHash) {
+          const downgraded = await client.query(
+            `UPDATE schedules SET name=$2, request=$3, recurrence=$4, services=$5, status=$6, pause_reason=$7, next_run_at=$8,
+               kind='plan', digest_config=NULL, digest_config_hash=NULL, digest_approved_at=NULL,
+               version=version+1, updated_at=now(), last_proposal_id=COALESCE($9, last_proposal_id)
+             WHERE id=$1 RETURNING *`,
+            [existing.id, fields.name, fields.request, JSON.stringify(fields.recurrence), fields.services, fields.status, fields.pause_reason, fields.next_run_at, messageId],
+          );
+          return this.recordState(client, downgraded.rows[0], now);
+        }
+        const updatedDigest = await client.query(
+          `UPDATE schedules SET name=$2, request=$3, recurrence=$4, services=$5, status=$6, pause_reason=$7, next_run_at=$8,
+             digest_config=$10::jsonb, digest_config_hash=$11, digest_approved_at=$12,
+             version=version+1, updated_at=now(), last_proposal_id=COALESCE($9, last_proposal_id)
+           WHERE id=$1 RETURNING *`,
+          [existing.id, fields.name, fields.request, JSON.stringify(fields.recurrence), fields.services, fields.status, fields.pause_reason, fields.next_run_at, messageId, JSON.stringify(evaluated.config), evaluated.configHash, now],
+        );
+        return this.recordState(client, updatedDigest.rows[0], now);
+      }
       let saved = await this.saveFields(client, existing.id, fields, messageId);
       if (proposal.action === 'update') {
         const updatedDigest = await client.query(

@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import type { ScheduleKind, ScheduleRecurrence, ScheduleStatus, ScheduleView, SheetsDigestConfig } from '@wap/tool-schemas';
+import type { CalendarDigestConfig, ScheduleKind, ScheduleRecurrence, ScheduleStatus, ScheduleView, SheetsDigestConfig } from '@wap/tool-schemas';
 import { RUN_SELECT, runView, type RunRow } from '../../services/schedules/run-state.js';
 import { localLabel, nextRuns } from '../../services/schedules/next-occurrence.js';
 import { isUuid } from './uuid.js';
@@ -27,7 +27,7 @@ export interface ScheduleRow {
   workspace_id?: string | null;
   workspace_mode?: 'legacy' | 'personal' | 'organization';
   kind?: ScheduleKind;
-  digest_config?: SheetsDigestConfig | null;
+  digest_config?: SheetsDigestConfig | CalendarDigestConfig | null;
   digest_config_hash?: string | null;
   digest_approved_at?: Date | null;
   created_at: Date;
@@ -43,7 +43,12 @@ export class ScheduleRepo {
   view(row: ScheduleRow, lastRun: RunRow | null, now: Date): ScheduleView {
     const first = row.status === 'active' && row.next_run_at ? new Date(row.next_run_at) : null;
     const upcoming = first ? [first, ...nextRuns(row.recurrence, first, this.timeZone, 2)] : [];
-    const isDigest = row.kind === 'sheets_digest';
+    const kind: ScheduleKind =
+      row.kind === 'sheets_digest'
+        ? 'sheets_digest'
+        : row.kind === 'calendar_digest'
+          ? 'calendar_digest'
+          : 'plan';
     return {
       id: row.id,
       convId: row.conv_id,
@@ -56,13 +61,9 @@ export class ScheduleRepo {
       pauseReason: row.pause_reason,
       nextRuns: upcoming.map((d) => d.toISOString()),
       lastRun: lastRun ? runView(lastRun, now) : null,
-      ...(isDigest
-        ? {
-            kind: 'sheets_digest' as const,
-            approvalMode: 'auto_digest' as const,
-            digestConfig: row.digest_config ?? null,
-          }
-        : {}),
+      kind,
+      approvalMode: kind === 'plan' ? 'manual' : 'auto_digest',
+      digestConfig: row.digest_config ?? null,
     };
   }
 

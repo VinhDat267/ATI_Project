@@ -185,7 +185,7 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
 
     expect(change.schedule.kind).toBe('sheets_digest');
     expect(change.schedule.approvalMode).toBe('auto_digest');
-    expect(change.schedule.digestConfig?.source.spreadsheetId).toBe(SPREADSHEET_ID);
+    expect((change.schedule.digestConfig as any)?.source.spreadsheetId).toBe(SPREADSHEET_ID);
 
     const row = await scheduleRepo.ownedSchedule(change.schedule.id, alice.id);
     expect(row?.kind).toBe('sheets_digest');
