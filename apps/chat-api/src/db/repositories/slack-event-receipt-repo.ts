@@ -156,6 +156,8 @@ interface SlackEventInputBase {
 export interface RecordOrdinaryEventInput extends SlackEventInputBase {
   /** Set exactly when the source timestamp is missing or malformed. */
   discardReason: 'malformed_timestamp' | null;
+  /** Optional signed-message metadata only, projected by the ingress boundary. */
+  echo?: {slackUserId:string;clientMsgId:string|null};
 }
 
 export interface RecordLifecycleEventInput extends SlackEventInputBase {
@@ -390,6 +392,15 @@ export class SlackEventReceiptRepo {
     }
 
     return this.withTransaction(async client => {
+      let echo:any;
+      if(!discarded && base.eventType==='message' && base.eventSubtype===null && base.channelId && base.messageTs && input.echo){
+        const actor=requireSafeId(input.echo.slackUserId,'slackUserId'),id=input.echo.clientMsgId;
+        if(id!==null && (typeof id!=='string'||! /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)))throw new TypeError('Invalid echo metadata');
+        echo=(await client.query(`SELECT operation_id,status FROM slack_write_outbox WHERE app_id=$1 AND workspace_id=$2
+          AND slack_user_id=$3 AND channel_id=$4 AND status<>'prepared'
+          AND (($5::uuid IS NOT NULL AND client_msg_id=$5::uuid) OR provider_ts=$6)
+          ORDER BY created_at LIMIT 1`,[base.appId,base.teamId,actor,base.channelId,id,base.messageTs])).rows[0];
+      }
       const inserted = await client.query(
         `INSERT INTO slack_event_receipts (
            slack_app_id, event_id, team_id, event_type, event_subtype, source_event_ts,
@@ -411,14 +422,16 @@ export class SlackEventReceiptRepo {
           base.channelId,
           base.messageTs,
           base.payloadHash,
-          discarded ? 'discarded' : 'pending_fanout',
-          discarded ? 'malformed_timestamp' : null,
+          discarded || echo ? 'discarded' : 'pending_fanout',
+          discarded ? 'malformed_timestamp' : echo ? echo.status==='confirmed'?'ati_echo':'echo_pending' : null,
         ]
       );
 
       if (inserted.rows[0]) {
         const receipt = mapReceiptRow(inserted.rows[0]);
-        return { kind: discarded ? 'discarded' : 'recorded', receipt };
+        if(echo)await client.query(`INSERT INTO slack_echo_candidates(receipt_id,operation_id,native_ts,client_msg_id,status)
+          VALUES($1,$2,$3,$4,$5)`,[receipt.id,echo.operation_id,base.messageTs,input.echo!.clientMsgId,echo.status==='confirmed'?'confirmed':'pending']);
+        return { kind: discarded || echo ? 'discarded' : 'recorded', receipt };
       }
 
       const existing = await this.findReceipt(client, base.appId, base.eventId);
