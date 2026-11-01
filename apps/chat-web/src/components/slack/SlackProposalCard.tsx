@@ -43,11 +43,12 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
     id: string;
     planHash: string;
     summary: string;
-    steps: Array<{ id: string; action: string; description: string }>;
+    steps: Array<{ id: string; tool?: string; action?: string; description: string }>;
   } | null>(null);
 
   const isStaleOrRedacted = proposal.status === 'stale' || proposal.body === null;
   const actionable = ['pending', 'needs_info', 'awaiting_approval'].includes(proposal.status) && !isStaleOrRedacted;
+  const channelLabel = proposal.channelId ?? proposal.body?.context?.[0]?.channelId ?? 'Slack';
 
   const handleRefine = async () => {
     if (busy) return;
@@ -91,9 +92,18 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
         onUpdated(res.proposal);
         if (res.status === 'needs_info') {
           setPlanPreview(null);
-          setQuestion(res.question || 'Vui lòng làm rõ thêm thông tin trước khi tạo kế hoạch.');
+          setQuestion(
+            res.clarification || res.question || 'Vui lòng làm rõ thêm thông tin trước khi tạo kế hoạch.',
+          );
         } else if (res.plan) {
-          setPlanPreview(res.plan);
+          const resolvedId = res.planId ?? res.plan.id ?? res.proposal?.activePlanId ?? '';
+          const resolvedHash = res.planHash ?? res.plan.planHash ?? res.proposal?.planHash ?? '';
+          setPlanPreview({
+            id: resolvedId,
+            planHash: resolvedHash,
+            summary: res.plan.summary,
+            steps: res.plan.steps,
+          });
           setNotice('Đã tạo bản xem trước kế hoạch. Kiểm tra các bước trước khi phê duyệt.');
         }
       }
@@ -111,7 +121,7 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
   };
 
   const handleApprove = async () => {
-    const planId = planPreview?.id ?? proposal.activePlanId;
+    const planId = planPreview?.id || proposal.activePlanId;
     if (!planId || busy) return;
     const owns = slackSessionOwner();
     setBusy(true);
@@ -160,7 +170,7 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
           {statusLabels[proposal.status] ?? proposal.status}
         </span>
         <span className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
-          Kênh {proposal.channelId} · Phiên bản {proposal.revision}
+          Kênh {channelLabel} · Phiên bản {proposal.revision}
         </span>
       </div>
 
@@ -178,6 +188,11 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
               </span>
             </div>
             <p className="text-sm text-[#4B5563] dark:text-[#9CA3AF]">{proposal.body.decision.rationale}</p>
+            {proposal.body.decision.question && (
+              <p className="text-xs font-medium text-amber-800 dark:text-amber-200">
+                {proposal.body.decision.question}
+              </p>
+            )}
             {proposal.body.context.length > 0 && (
               <blockquote className="rounded-lg border-l-2 border-[#FF5701] bg-[#F8F8F6] dark:bg-[#262626] p-2.5 text-xs text-[#374151] dark:text-[#D1D5DB]">
                 {proposal.body.context.map((msg) => (
@@ -187,13 +202,15 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
                 ))}
               </blockquote>
             )}
-            <ul className="space-y-1 text-xs text-[#374151] dark:text-[#D1D5DB]">
-              {proposal.body.decision.intents.map((intent, idx) => (
-                <li key={idx}>
-                  • [{intent.service}] {intent.summary}
-                </li>
-              ))}
-            </ul>
+            {(proposal.body.decision.intents ?? []).length > 0 && (
+              <ul className="space-y-1 text-xs text-[#374151] dark:text-[#D1D5DB]">
+                {(proposal.body.decision.intents ?? []).map((intent, idx) => (
+                  <li key={idx}>
+                    • [{intent.service}] {intent.summary}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )
       )}

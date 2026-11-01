@@ -20,16 +20,17 @@ beforeEach(async () => {
     {
       id: 'prop-1',
       connectionId: 'conn-1',
-      conversationId: 'conv-1',
-      channelId: 'C_ENG',
-      threadTs: '1793549000.000100',
-      triggerMessageTs: '1793549000.000100',
+      convId: 'conv-1',
       status: 'pending',
       revision: '1',
-      configVersion: '1',
-      reviewExpiresAt: new Date(Date.now() + 86_400_000).toISOString(),
       activePlanId: null,
+      planHash: null,
+      createdAt: '2026-11-02T01:00:00.000Z',
       body: {
+        artifactId: 'prop-1',
+        configVersion: '1',
+        payloadRevision: '1',
+        truncated: false,
         decision: {
           kind: 'proposal',
           title: 'Tạo thẻ theo dõi bản phát hành',
@@ -38,21 +39,59 @@ beforeEach(async () => {
           relevance: { kind: 'mention', sourceIndex: 0, evidence: '<@U_ONE>' },
           intents: [{ action: 'task', service: 'trello', summary: 'Chuẩn bị checklist release' }],
         },
-        context: [{ ts: '1793549000.000100', user: 'U_LEAD', text: '<@U_ONE> chuẩn bị checklist release nhé' }],
+        context: [
+          {
+            channelId: 'C_ENG',
+            ts: '1793549000.000100',
+            threadTs: '1793549000.000100',
+            user: 'U_LEAD',
+            text: '<@U_ONE> chuẩn bị checklist release nhé',
+          },
+        ],
+      },
+    },
+    {
+      id: 'prop-clarify',
+      connectionId: 'conn-1',
+      convId: 'conv-clarify',
+      status: 'needs_info',
+      revision: '1',
+      activePlanId: null,
+      planHash: null,
+      createdAt: '2026-11-02T01:10:00.000Z',
+      body: {
+        artifactId: 'prop-clarify',
+        configVersion: '1',
+        payloadRevision: '1',
+        truncated: false,
+        decision: {
+          kind: 'needs_clarification',
+          title: 'Báo cáo chiến dịch',
+          rationale: 'Thời hạn chưa cụ thể trong tin nhắn',
+          sourceIndices: [0],
+          relevance: { kind: 'mention', sourceIndex: 0, evidence: '<@U_ONE>' },
+          question: 'Vui lòng cho biết hạn chót cụ thể của báo cáo chiến dịch.',
+        },
+        context: [
+          {
+            channelId: 'C_MKT',
+            ts: '1793549000.000150',
+            threadTs: '1793549000.000150',
+            user: 'U_PM',
+            text: '<@U_ONE> gửi báo cáo chiến dịch vào tuần sau nhé',
+          },
+        ],
       },
     },
     {
       id: 'prop-stale',
       connectionId: 'conn-1',
-      conversationId: 'conv-2',
-      channelId: 'C_ENG',
-      threadTs: '1793549000.000200',
-      triggerMessageTs: '1793549000.000200',
+      convId: 'conv-2',
       status: 'stale',
       revision: '2',
-      configVersion: '1',
-      reviewExpiresAt: new Date(Date.now() - 3600_000).toISOString(),
       activePlanId: null,
+      planHash: null,
+      createdAt: '2026-11-02T00:00:00.000Z',
       body: null,
     },
   ];
@@ -61,32 +100,28 @@ beforeEach(async () => {
       id: 'dig-1',
       connectionId: 'conn-1',
       localDate: '2026-11-02',
-      status: 'pending',
+      status: 'completed',
       revision: '1',
-      configVersion: '1',
-      reviewExpiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+      createdAt: '2026-11-02T02:05:00.000Z',
       body: {
+        artifactId: 'dig-1',
         localDate: '2026-11-02',
         timezone: 'Asia/Ho_Chi_Minh',
-        generatedAt: '2026-11-02T02:05:00.000Z',
-        summary: {
-          totalProposals: 1,
-          pendingCount: 1,
-          needsInfoCount: 0,
-          awaitingApprovalCount: 0,
-          approvedCount: 0,
-          rejectedCount: 0,
-        },
-        items: [
+        summary: 'Tổng hợp 2 đề xuất ngày 2026-11-02',
+        entries: [
           {
             proposalId: 'prop-1',
-            conversationId: 'conv-1',
-            channelId: 'C_ENG',
-            threadTs: '1793549000.000100',
             title: 'Tạo thẻ theo dõi bản phát hành',
             rationale: 'Được nhắc trực tiếp trong kênh kỹ thuật',
             status: 'pending',
-            actions: [{ action: 'task', service: 'trello', summary: 'Chuẩn bị checklist release' }],
+            createdAt: '2026-11-02T01:00:00.000Z',
+          },
+          {
+            proposalId: 'prop-clarify',
+            title: 'Báo cáo chiến dịch',
+            rationale: 'Thời hạn chưa cụ thể trong tin nhắn',
+            status: 'needs_info',
+            createdAt: '2026-11-02T01:10:00.000Z',
           },
         ],
       },
@@ -148,20 +183,53 @@ beforeEach(async () => {
         status: 'awaiting_approval',
         revision: '2',
         activePlanId: 'plan-101',
+        planHash: 'a'.repeat(64),
       };
       res.end(
         JSON.stringify({
           status: 'awaiting_approval',
+          planId: 'plan-101',
+          planHash: 'a'.repeat(64),
           proposal: proposalsData[0],
           plan: {
-            id: 'plan-101',
-            planHash: 'hash-101',
+            kind: 'plan',
+            thinking: 'Tạo thẻ và phản hồi thread',
             summary: 'Tạo thẻ theo dõi bản phát hành và phản hồi thread',
+            warnings: ['Chỉ thực thi sau khi bạn phê duyệt.'],
             steps: [
-              { id: 'step_1', action: 'trello.create_card', description: 'Tạo thẻ: Tạo thẻ theo dõi bản phát hành' },
-              { id: 'step_2', action: 'myslack.reply_in_thread', description: 'Phản hồi vào đúng thread gốc với liên kết kết quả' },
+              {
+                id: 'step_1',
+                tool: 'trello.create_card',
+                description: 'Tạo thẻ: Tạo thẻ theo dõi bản phát hành',
+                args: {},
+                dependsOn: [],
+              },
+              {
+                id: 'step_2',
+                tool: 'myslack.chat_postMessage',
+                description: 'Phản hồi vào đúng thread gốc với liên kết kết quả',
+                args: {},
+                dependsOn: ['step_1'],
+              },
             ],
           },
+        }),
+      );
+      return;
+    }
+    if (req.url === '/api/slack/proposals/prop-clarify/prepare' && req.method === 'POST') {
+      proposalsData[1] = {
+        ...proposalsData[1],
+        status: 'needs_info',
+        revision: '2',
+        activePlanId: null,
+      };
+      res.end(
+        JSON.stringify({
+          status: 'needs_info',
+          clarification:
+            'Tin nhắn Slack có nhắc thời hạn chưa cụ thể. Vui lòng chọn ngày hạn chót (YYYY-MM-DD) hoặc xác nhận tạo việc không gắn hạn chót.',
+          proposal: proposalsData[1],
         }),
       );
       return;
@@ -172,7 +240,7 @@ beforeEach(async () => {
     }
     if (req.url === '/api/slack/proposals/prop-1/reject' && req.method === 'POST') {
       proposalsData[0] = { ...proposalsData[0], status: 'rejected', revision: '3', activePlanId: null };
-      res.end(JSON.stringify({ proposal: proposalsData[0] }));
+      res.end(JSON.stringify({ status: 'rejected', revision: '3', proposal: proposalsData[0] }));
       return;
     }
     if (req.url === '/api/slack/digests/dig-1/refresh-status' && req.method === 'POST') {
@@ -181,12 +249,10 @@ beforeEach(async () => {
         revision: '2',
         body: {
           ...digestsData[0].body,
-          summary: {
-            ...digestsData[0].body.summary,
-            pendingCount: 0,
-            rejectedCount: 1,
-          },
-          items: [{ ...digestsData[0].body.items[0], status: 'rejected' }],
+          entries: [
+            { ...digestsData[0].body.entries[0], status: 'rejected' },
+            digestsData[0].body.entries[1],
+          ],
         },
       };
       res.end(JSON.stringify({ digest: digestsData[0] }));
@@ -216,22 +282,26 @@ describe('SLACK-06A & SLACK-06B SlackProposalInbox UI and /inbox route', () => {
 
     // Waits for workspace connection and proposal card
     expect(await screen.findByText('Tạo thẻ theo dõi bản phát hành')).toBeInTheDocument();
+    expect(screen.getByText(/Kênh C_ENG · Phiên bản 1/)).toBeInTheDocument();
     expect(screen.getByText(/<@U_ONE> chuẩn bị checklist release nhé/)).toBeInTheDocument();
+
+    // Renders needs_clarification proposal without intents array crash and shows its question
+    expect(screen.getByText('Vui lòng cho biết hạn chót cụ thể của báo cáo chiến dịch.')).toBeInTheDocument();
 
     // Redacted/stale proposal does not render stale body content and shows safe notice
     expect(screen.getByText(/Nguồn tin nhắn đã thay đổi hoặc hết hạn xem lại/)).toBeInTheDocument();
 
     // Refine in chat triggers CAS POST and navigates to /c/conv-1
-    fireEvent.click(screen.getByRole('button', { name: 'Trao đổi thêm trong Chat' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Trao đổi thêm trong Chat' })[0]);
     await waitFor(() =>
       expect(requests.some((r) => r.url === '/api/slack/proposals/prop-1/refine' && r.body?.expectedRevision === 1)).toBe(true),
     );
     expect(navigate).toHaveBeenCalledWith('/c/conv-1');
 
-    // Prepare plan with thread reply checkbox
-    const replyCheckbox = screen.getByLabelText('Phản hồi lại vào thread nguồn kèm liên kết kết quả');
+    // Prepare plan with thread reply checkbox on prop-1
+    const replyCheckbox = screen.getAllByLabelText('Phản hồi lại vào thread nguồn kèm liên kết kết quả')[0];
     expect(replyCheckbox).toBeChecked();
-    fireEvent.click(screen.getByRole('button', { name: 'Xem trước kế hoạch' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Xem trước kế hoạch' })[0]);
     await waitFor(() =>
       expect(
         requests.some(
@@ -248,14 +318,21 @@ describe('SLACK-06A & SLACK-06B SlackProposalInbox UI and /inbox route', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Phê duyệt và thực thi' }));
     await waitFor(() => expect(requests.some((r) => r.url === '/api/plans/plan-101/approve')).toBe(true));
 
-    // Reject proposal
-    fireEvent.click(screen.getByRole('button', { name: 'Từ chối đề xuất' }));
+    // Prepare on prop-clarify returns backend `clarification` field and displays it
+    fireEvent.click(screen.getAllByRole('button', { name: 'Xem trước kế hoạch' })[1]);
+    expect(
+      await screen.findByText(/Tin nhắn Slack có nhắc thời hạn chưa cụ thể\. Vui lòng chọn ngày hạn chót/),
+    ).toBeInTheDocument();
+
+    // Reject proposal prop-1
+    fireEvent.click(screen.getAllByRole('button', { name: 'Từ chối đề xuất' })[0]);
     await waitFor(() =>
       expect(requests.some((r) => r.url === '/api/slack/proposals/prop-1/reject')).toBe(true),
     );
 
-    // Daily digest is rendered and Refresh status updates digest counts
+    // Daily digest is rendered from backend `entries` + string `summary`, and Refresh status updates digest counts
     expect(screen.getByText(/Bản tóm tắt ngày 2026-11-02/)).toBeInTheDocument();
+    expect(screen.getByText(/Tổng hợp 2 đề xuất ngày 2026-11-02/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Làm mới trạng thái' }));
     await waitFor(() =>
       expect(requests.some((r) => r.url === '/api/slack/digests/dig-1/refresh-status')).toBe(true),

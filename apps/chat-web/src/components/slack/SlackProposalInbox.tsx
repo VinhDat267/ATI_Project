@@ -206,20 +206,39 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
                       Bản tóm tắt đã hết hiệu lực hoặc nguồn dữ liệu đã thay đổi.
                     </p>
                   ) : (
-                    <div className="space-y-2 text-xs text-[#4B5563] dark:text-[#9CA3AF]">
-                      <p>
-                        Tổng {digest.body.summary.totalProposals} đề xuất · {digest.body.summary.pendingCount} đang chờ ·{' '}
-                        {digest.body.summary.awaitingApprovalCount} chờ duyệt · {digest.body.summary.approvedCount} đã duyệt ·{' '}
-                        {digest.body.summary.rejectedCount} đã từ chối
-                      </p>
-                      <ul className="space-y-1">
-                        {digest.body.items.map((item) => (
-                          <li key={item.proposalId}>
-                            • {item.title} ({item.status})
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                    (() => {
+                      const entries = digest.body.entries ?? digest.body.items ?? [];
+                      const counts =
+                        typeof digest.body.summary === 'object' && digest.body.summary !== null
+                          ? digest.body.summary
+                          : {
+                              totalProposals: entries.length,
+                              pendingCount: entries.filter((e) => e.status === 'pending' || e.status === 'needs_info')
+                                .length,
+                              awaitingApprovalCount: entries.filter((e) => e.status === 'awaiting_approval').length,
+                              approvedCount: entries.filter(
+                                (e) => e.status === 'approved' || e.status === 'completed',
+                              ).length,
+                              rejectedCount: entries.filter((e) => e.status === 'rejected').length,
+                            };
+                      return (
+                        <div className="space-y-2 text-xs text-[#4B5563] dark:text-[#9CA3AF]">
+                          {typeof digest.body.summary === 'string' && <p>{digest.body.summary}</p>}
+                          <p>
+                            Tổng {counts.totalProposals} đề xuất · {counts.pendingCount} đang chờ ·{' '}
+                            {counts.awaitingApprovalCount} chờ duyệt · {counts.approvedCount} đã duyệt ·{' '}
+                            {counts.rejectedCount} đã từ chối
+                          </p>
+                          <ul className="space-y-1">
+                            {entries.map((item) => (
+                              <li key={item.proposalId}>
+                                • {item.title} ({item.status})
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      );
+                    })()
                   )}
                 </article>
               ))}

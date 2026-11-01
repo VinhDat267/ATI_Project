@@ -33,6 +33,7 @@
 - Implemented `SlackDigestService` (`apps/chat-api/src/services/slack/slack-digest-service.ts`) and wired it to the assistant heartbeat runner (`apps/chat-api/src/config/slack-assistant-runtime.ts`) and routes (`GET /api/slack/digests`, `POST /api/slack/digests/:id/refresh-status`).
 - Enforces IANA timezone local window (`>= configured HH:MM`, default `09:00`), at most one digest per `(connection_id, local_date)`, zero external writes during digest generation, and guarded provenance registration for `daily_digest_entry`.
 - Added Daily Digest controls and `/inbox` link in `apps/chat-web/src/components/slack/SlackAutomationSettings.tsx`.
+- Aligned `apps/chat-web/src/services/slack-assistant.ts`, `SlackProposalCard.tsx`, `SlackProposalInbox.tsx`, and `apps/chat-web/tests/slack-proposal-inbox.test.tsx` with the exact `apps/chat-api` DTO shapes (`SlackDigestService.get` `entries` + string `summary`, `SlackProposalService.prepare` `clarification` + `planId`/`planHash`, `SlackAssistantArtifactRepo.get` `context[0].channelId`, and `decision.kind === 'needs_clarification'` without `intents`).
 - Verified the full 7-kind physical erasure chain (`audit_log_entry`, `chat_history_message`, `daily_digest_entry`, `plan_step_arg`, `proposal_excerpt`, `scheduled_workflow_arg`, `working_memory_entity`) in `apps/chat-api/tests/services/slack/slack-digest-service.test.ts` when a source message is deleted even with runtime flags off.
 
 ## 4. Verification Summary
