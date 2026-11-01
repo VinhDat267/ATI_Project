@@ -29,7 +29,13 @@ export function isServiceAccountService(definitionOrId: ServiceDefinition | stri
   if (def) {
     return def.credentialFields.some(field => field.key === 'privateKey');
   }
-  return typeof definitionOrId === 'string' && (definitionOrId === 'google-calendar' || definitionOrId === 'google-sheets');
+  return (
+    typeof definitionOrId === 'string' &&
+    (definitionOrId === 'calendar' ||
+      definitionOrId === 'sheets' ||
+      definitionOrId === 'google-calendar' ||
+      definitionOrId === 'google-sheets')
+  );
 }
 
 export function normalizeAllowedScope(definition: ServiceDefinition, value: unknown): AllowedScope | null {

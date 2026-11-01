@@ -795,5 +795,65 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
       expect(adapterA2).not.toBe(adapterA1);
       expect(adapterB2).toBe(adapterB1);
     });
+
+    it('[AUDIT-OAUTH] blocks Service Account calendar/sheets across AdapterFactory and all /api/services endpoints in personal mode while keeping 5 key-based services', async () => {
+      const aliceToken = tokenFor(alice);
+      const factory = new AdapterFactory({ credentialRepo: credentials, encryptionKey: key });
+
+      // 1. AdapterFactory must block 'calendar' and 'sheets' in personal mode
+      await expect(
+        factory.getAdapterForService('calendar', {
+          phase: 'planning',
+          workspaceMode: 'personal',
+          userId: alice.id,
+        })
+      ).rejects.toThrow(/không khả dụng ở không gian cá nhân/);
+
+      await expect(
+        factory.getAdapterForService('sheets', {
+          phase: 'planning',
+          workspaceMode: 'personal',
+          userId: alice.id,
+        })
+      ).rejects.toThrow(/không khả dụng ở không gian cá nhân/);
+
+      // 2. POST /:service/test, PUT /:service/scope, DELETE /:service/credentials for calendar/sheets in personal mode -> 400 USE_PERSONAL_OAUTH
+      const testCalRes = await request(app)
+        .post('/api/services/calendar/test')
+        .set('Authorization', `Bearer ${aliceToken}`)
+        .set('X-Workspace-Id', 'personal');
+      expect(testCalRes.status).toBe(400);
+      expect(testCalRes.body.code).toBe('USE_PERSONAL_OAUTH');
+
+      const scopeSheetsRes = await request(app)
+        .put('/api/services/sheets/scope')
+        .set('Authorization', `Bearer ${aliceToken}`)
+        .set('X-Workspace-Id', 'personal')
+        .send({ allowedScope: { spreadsheets: ['1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms'] } });
+      expect(scopeSheetsRes.status).toBe(400);
+      expect(scopeSheetsRes.body.code).toBe('USE_PERSONAL_OAUTH');
+
+      const delCalRes = await request(app)
+        .delete('/api/services/calendar/credentials')
+        .set('Authorization', `Bearer ${aliceToken}`)
+        .set('X-Workspace-Id', 'personal');
+      expect(delCalRes.status).toBe(400);
+      expect(delCalRes.body.code).toBe('USE_PERSONAL_OAUTH');
+
+      // 3. GET /api/services in personal mode hides calendar & sheets and returns all 5 key-based services with connection: 'shared'
+      const listRes = await request(app)
+        .get('/api/services')
+        .set('Authorization', `Bearer ${aliceToken}`)
+        .set('X-Workspace-Id', 'personal');
+      expect(listRes.status).toBe(200);
+      const ids = listRes.body.services.map((s: any) => s.id);
+      expect(ids).not.toContain('calendar');
+      expect(ids).not.toContain('sheets');
+      for (const expectedId of ['slack', 'github', 'notion', 'telegram', 'jira']) {
+        const svc = listRes.body.services.find((s: any) => s.id === expectedId);
+        expect(svc).toBeDefined();
+        expect(svc.connection).toBe('shared');
+      }
+    });
   });
 });

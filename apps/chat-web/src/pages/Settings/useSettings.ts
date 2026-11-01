@@ -7,6 +7,7 @@ import { serviceView } from './data';
 
 type Draft = { credentials: Record<string, string>; scopes: string[]; newScope: string };
 type Feedback = { kind: 'saved' | 'success' | 'rejected' | 'timeout'; message: string; time: string };
+const PERSONAL_OAUTH_SERVICE_IDS = new Set(['gmail', 'mycalendar', 'mysheets', 'trello']);
 export function useSettings(user: User | null) {
   const [services, setServices] = useState<ServiceInfo[]>([]);
   const [canEdit, setCanEdit] = useState(false);
@@ -24,7 +25,13 @@ export function useSettings(user: User | null) {
   const personal = services.find(s => s.id === 'gmail' && s.connection === 'personal');
   const personalMyCalendar = services.find(s => s.id === 'mycalendar' && s.connection === 'personal');
   const personalMySheets = services.find(s => s.id === 'mysheets' && s.connection === 'personal');
-  const list = services.filter(s => s.connection !== 'personal' && s.id !== 'trello').map(serviceView);
+  const list = services
+    .filter(
+      s =>
+        !PERSONAL_OAUTH_SERVICE_IDS.has(s.id) &&
+        (s.connection !== 'personal' || (Array.isArray(s.credentialFields) && s.credentialFields.length > 0))
+    )
+    .map(serviceView);
   const active = list.find(s => s.id === selected);
   const draft = active ? drafts[active.id] ?? { credentials: {}, scopes: active.allowedScope ?? [], newScope: '' } : null;
   const updateDraft = (id: string, update: (current: Draft) => Draft) => setDrafts(current => ({ ...current, [id]: update(current[id] ?? { credentials: {}, scopes: services.find(s => s.id === id)?.allowedScope ?? [], newScope: '' }) }));

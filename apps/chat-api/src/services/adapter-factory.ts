@@ -7,7 +7,7 @@ import {
 } from '@wap/tool-adapters';
 import type { AllowedScope, PlanConnections } from '@wap/tool-schemas';
 import type { AdapterExecutor } from '@wap/executor';
-import { getRegisteredService } from './registered-services.js';
+import { getRegisteredService, isServiceAccountService } from './registered-services.js';
 import type { GmailTokenManager } from './gmail/token-manager.js';
 
 /** Who an adapter is for. Shared services ignore it; Gmail & MyCalendar require it. */
@@ -114,7 +114,7 @@ export class AdapterFactory {
 
     let record: any = null;
     if (context?.workspaceMode === 'personal') {
-      if (serviceName === 'google-calendar' || serviceName === 'google-sheets') {
+      if (isServiceAccountService(serviceName)) {
         throw new Error(`Dịch vụ ${serviceName} không khả dụng ở không gian cá nhân; hãy dùng mycalendar/mysheets.`);
       }
       if (!context.userId) {

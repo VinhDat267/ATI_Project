@@ -522,5 +522,131 @@ describe('Personal and Workspace Auth (Task 5)', () => {
       });
       expect(countSpy).toHaveBeenCalled();
     });
+
+    it('[AUDIT-OAUTH-UI] renders all 5 key-configurable services alongside personal MyCalendar and MySheets cards in Personal Workspace even when connection is marked personal', async () => {
+      setActiveWorkspaceId('personal');
+      vi.spyOn(apiClient, 'getServices').mockResolvedValue({
+        canConfigure: true,
+        services: [
+          {
+            id: 'slack',
+            name: 'Slack',
+            connection: 'personal',
+            configured: false,
+            connected: false,
+            connectionStatus: 'unconfigured',
+            lastCheckedAt: null,
+            tools: ['slack.post_message'],
+            allowedScope: [],
+            credentialFields: [{ key: 'botToken', label: 'Bot Token', type: 'password' }],
+            scopeKey: 'channels',
+            scopeLabel: 'Kênh',
+          },
+          {
+            id: 'github',
+            name: 'GitHub',
+            connection: 'personal',
+            configured: true,
+            connected: true,
+            connectionStatus: 'healthy',
+            lastCheckedAt: '2026-11-01T10:00:00Z',
+            tools: ['github.create_issue'],
+            allowedScope: ['org/repo'],
+            credentialFields: [{ key: 'token', label: 'Personal Access Token', type: 'password' }],
+            scopeKey: 'repos',
+            scopeLabel: 'Repository',
+          },
+          {
+            id: 'notion',
+            name: 'Notion',
+            connection: 'personal',
+            configured: false,
+            connected: false,
+            connectionStatus: 'unconfigured',
+            lastCheckedAt: null,
+            tools: ['notion.create_page'],
+            allowedScope: [],
+            credentialFields: [{ key: 'token', label: 'Internal Integration Secret', type: 'password' }],
+            scopeKey: 'databases',
+            scopeLabel: 'Database',
+          },
+          {
+            id: 'telegram',
+            name: 'Telegram',
+            connection: 'personal',
+            configured: false,
+            connected: false,
+            connectionStatus: 'unconfigured',
+            lastCheckedAt: null,
+            tools: ['telegram.send_message'],
+            allowedScope: [],
+            credentialFields: [{ key: 'botToken', label: 'Bot Token', type: 'password' }],
+            scopeKey: 'chatIds',
+            scopeLabel: 'Chat ID',
+          },
+          {
+            id: 'jira',
+            name: 'Jira',
+            connection: 'personal',
+            configured: false,
+            connected: false,
+            connectionStatus: 'unconfigured',
+            lastCheckedAt: null,
+            tools: ['jira.create_issue'],
+            allowedScope: [],
+            credentialFields: [
+              { key: 'siteUrl', label: 'Site URL', type: 'text' },
+              { key: 'email', label: 'Email', type: 'text' },
+              { key: 'apiToken', label: 'API Token', type: 'password' },
+            ],
+            scopeKey: 'projects',
+            scopeLabel: 'Project',
+          },
+          {
+            id: 'mycalendar',
+            name: 'Google Calendar của bạn',
+            connection: 'personal',
+            personalStatus: 'unconnected',
+            configured: false,
+            connected: false,
+            connectionStatus: 'unconfigured',
+            lastCheckedAt: null,
+            tools: ['mycalendar.list_events', 'mycalendar.create_event'],
+            allowedScope: [],
+            credentialFields: [],
+            scopeKey: 'calendars',
+            scopeLabel: 'Lịch',
+          },
+          {
+            id: 'mysheets',
+            name: 'Google Sheets của bạn',
+            connection: 'personal',
+            personalStatus: 'unconnected',
+            configured: false,
+            connected: false,
+            connectionStatus: 'unconfigured',
+            lastCheckedAt: null,
+            tools: ['mysheets.read_range', 'mysheets.append_row'],
+            allowedScope: [],
+            credentialFields: [],
+            scopeKey: 'spreadsheets',
+            scopeLabel: 'Bảng tính',
+          },
+        ] as any,
+      });
+
+      render(<SettingsPage user={testUser} navigate={vi.fn()} onLogout={vi.fn()} />);
+
+      // Personal OAuth cards in "Của riêng bạn"
+      expect(await screen.findByText('Google Calendar của bạn')).toBeInTheDocument();
+      expect(screen.getByText('Google Sheets của bạn')).toBeInTheDocument();
+
+      // Key-configurable services in "Đã thiết lập" / "Chưa thiết lập"
+      expect(screen.getByText('Slack')).toBeInTheDocument();
+      expect(screen.getByText('GitHub')).toBeInTheDocument();
+      expect(screen.getByText('Notion')).toBeInTheDocument();
+      expect(screen.getByText('Telegram')).toBeInTheDocument();
+      expect(screen.getByText('Jira')).toBeInTheDocument();
+    });
   });
 });

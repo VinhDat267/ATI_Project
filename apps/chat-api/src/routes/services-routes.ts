@@ -459,6 +459,10 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
     const generation = generations.get(key) ?? 0;
     let credentialVersion: string | null = null;
     try {
+      if (mode === 'personal' && isServiceAccountService(service)) {
+        res.status(400).json({ error: 'Không gian cá nhân dùng MyCalendar/MySheets qua OAuth.', code: 'USE_PERSONAL_OAUTH' });
+        return;
+      }
       if (!getRegisteredService(service)) {
         res.status(400).json({ error: `Unsupported service: ${service}` });
         return;
@@ -584,6 +588,11 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
       const service = String(req.params.service);
       const userId = (req as any).user?.id;
 
+      if (mode === 'personal' && isServiceAccountService(service)) {
+        res.status(400).json({ error: 'Không gian cá nhân dùng MyCalendar/MySheets qua OAuth.', code: 'USE_PERSONAL_OAUTH' });
+        return;
+      }
+
       if (!credentialRepo) {
         res.status(500).json({ error: 'Credential repository not configured' });
         return;
@@ -639,6 +648,10 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
       }
 
       const service = String(req.params.service);
+      if (mode === 'personal' && isServiceAccountService(service)) {
+        res.status(400).json({ error: 'Không gian cá nhân dùng MyCalendar/MySheets qua OAuth.', code: 'USE_PERSONAL_OAUTH' });
+        return;
+      }
       const registration = getRegisteredService(service);
       if (!registration) {
         res.status(400).json({ error: 'Unsupported service' });
