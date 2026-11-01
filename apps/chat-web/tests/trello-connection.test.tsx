@@ -1,7 +1,6 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
-import React from 'react';
 import { TrelloConnection } from '../src/pages/Settings/TrelloConnection';
 import { apiClient } from '../src/services/api-client';
 import { PlanMoment } from '../src/pages/Cockpit/PlanMoment';
@@ -81,6 +80,7 @@ describe('Task 10: Trello connection UI and chat moments', () => {
       // Checkboxes appear for boards in the workspace
       const b1Checkbox = await screen.findByRole('checkbox', { name: /Sprint Board/i });
       const b2Checkbox = await screen.findByRole('checkbox', { name: /Bug Tracker/i });
+      expect(b2Checkbox).not.toBeChecked();
 
       // Save button disabled when 0 boards selected
       const saveBtn = screen.getByRole('button', { name: /Lưu/i });
@@ -197,6 +197,8 @@ describe('Task 10: Trello connection UI and chat moments', () => {
       render(
         <PlanMoment
           request="Tạo thẻ"
+          runtimeMode="sandbox"
+          inlineComposer={null}
           plan={plan}
           services={[{ id: 'trello', name: 'Trello', configured: true, connected: true, tools: [] } as any]}
           destination={(step, labels) => labels?.[String(step.args?.boardId)] ?? ''}

@@ -303,7 +303,7 @@ export function TrelloConnection({
 
       {/* Actions */}
       <div className="flex flex-wrap items-center gap-3 pt-2">
-        {status === 'not_connected' || status === 'reconnect_required' ? (
+        {status === 'not_connected' || status === 'reconnect_required' || status === 'unconfigured' ? (
           <button
             id="trello-connect"
             type="button"

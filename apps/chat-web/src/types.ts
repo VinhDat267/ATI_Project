@@ -159,6 +159,7 @@ export interface ServiceInfo {
   connection?: 'shared' | 'personal';
   personalStatus?: PersonalStatus;
   email?: string;
+  username?: string;
   connectedAt?: string;
   selectedCalendars?: PersonalCalendarSummary[];
   selectedSpreadsheets?: PersonalSpreadsheetItem[];

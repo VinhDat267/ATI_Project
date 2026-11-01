@@ -108,17 +108,16 @@ export function createToolRuntimeFactory(
   sandbox = createSandboxAdapter,
 ) {
   return createRuntimeAdapterFactory<AdapterContext>(mode, personal,
-    (name, context) => (name === 'gmail' || name === 'mycalendar' || name === 'mysheets') ? personal(name, context) : sandbox(name));
+    (name, context) => (name === 'gmail' || name === 'mycalendar' || name === 'mysheets' || name === 'trello') ? personal(name, context) : sandbox(name));
 }
 
-/** A failed Gmail, MyCalendar or MySheets request must not become a canned shared-service write. */
+/** A failed Gmail, MyCalendar, MySheets or Trello request must not become a canned shared-service write. */
 export function mayFallbackToShared(
   input: ProcessMessageInput,
   gmailEnabled: boolean,
   mycalendarEnabled: boolean = false,
   mysheetsEnabled: boolean = false,
 ): boolean {
-  if (!gmailEnabled && !mycalendarEnabled && !mysheetsEnabled) return true;
   const texts = [...(input.history ?? []).filter((m) => m.role === 'user').map((m) => m.content), input.userMessage];
   const catalog = [
     ...ALL_TOOLS,
@@ -128,6 +127,7 @@ export function mayFallbackToShared(
   ];
   const registry = serviceRegistryForRuntime(gmailEnabled, mycalendarEnabled, mysheetsEnabled);
   const routed = routeIntent(texts.join('\n'), catalog, registry).services;
+  if (routed.includes('trello')) return false;
   if (gmailEnabled && routed.includes('gmail')) return false;
   if (mycalendarEnabled && routed.includes('mycalendar')) return false;
   if (mysheetsEnabled && routed.includes('mysheets')) return false;

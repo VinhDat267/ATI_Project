@@ -27,6 +27,7 @@ import { createGmailConnectionLookup, createMyCalendarConnectionLookup, createMy
 import { TrelloTokenManager } from './services/trello/token-manager.js';
 import { TrelloOAuthClient } from './services/trello/oauth-client.js';
 import { TrelloTeamRepo } from './db/repositories/trello-team-repo.js';
+import { StepError } from '@wap/tool-adapters';
 import { createTrelloConnectionLookup } from './services/trello/connection-reference.js';
 import {
   AIPlanner,
@@ -360,6 +361,17 @@ async function bootstrap() {
     trelloTeamRepo,
     trelloOAuthClient,
     trelloApiBaseUrl: env.TRELLO_OAUTH?.apiBaseUrl,
+    createTrelloAdapter: env.RUNTIME_MODE === 'sandbox' ? ({ allowedBoardIds }) => {
+      const sandbox = createSandboxAdapter('trello');
+      return {
+        execute: async (tool, args, ctx) => {
+          if (args?.boardId && !allowedBoardIds.includes(String(args.boardId))) {
+            throw new StepError({ category: 'AUTH_ERROR', message: 'Bảng không nằm trong phạm vi được phép.' });
+          }
+          return sandbox.execute(tool, args, ctx);
+        },
+      };
+    } : undefined,
   });
 
   const adapterFactory = createToolRuntimeFactory(env.RUNTIME_MODE,

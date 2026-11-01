@@ -121,9 +121,13 @@ test('TRELLO: admin selects workspace and two boards, member connects via fake O
   await page.evaluate(() => localStorage.clear());
   await loginUser(page, memberEmail, memberPassword);
 
-  let memberConnectionState = {
+  let memberConnectionState: {
+    status: string;
+    username?: string;
+    boards: Array<{ boardId: string; boardName: string; member: boolean }>;
+  } = {
     status: 'not_connected',
-    boards: [] as Array<{ boardId: string; boardName: string; member: boolean }>,
+    boards: [],
   };
 
   // Override trello connection route for member

@@ -223,14 +223,14 @@ describe('AUTH-01 server sessions with real PostgreSQL and HTTP', () => {
     const key = 'a'.repeat(64);
     const credentialRepo = new CredentialRepo(pool);
     app = createApp({ jwtSecret: secret, userRepo: users, credentialRepo, encryptionKey: key });
-    const credentials = () => request(app).post('/api/services/trello/credentials').set('Authorization', `Bearer ${tokens.accessToken}`)
-      .send({ credentials: { apiKey: 'fixture-key', token: 'fixture-token' }, allowedScope: ['fixture-board'] });
+    const credentials = () => request(app).post('/api/services/slack/credentials').set('Authorization', `Bearer ${tokens.accessToken}`)
+      .send({ credentials: { botToken: 'xoxb-fixture-token' }, allowedScope: ['C1'] });
     expect((await credentials()).status).toBe(403);
-    expect(await credentialRepo.getCredentials('trello')).toBeNull();
+    expect(await credentialRepo.getCredentials('slack')).toBeNull();
     await pool.query("UPDATE users SET role='admin' WHERE id=$1", [userId]);
     expect((await credentials()).status).toBe(200);
-    const stored = await credentialRepo.getCredentials('trello');
-    expect(decryptCredentials(stored!.config, key)).toEqual({ apiKey: 'fixture-key', token: 'fixture-token', allowedScope: { boards: ['fixture-board'] } });
+    const stored = await credentialRepo.getCredentials('slack');
+    expect(decryptCredentials(stored!.config, key)).toEqual({ botToken: 'xoxb-fixture-token', allowedScope: { channels: ['C1'] } });
     await pool.query("UPDATE users SET role='member' WHERE id=$1", [userId]);
     expect((await credentials()).status).toBe(403);
     app = createApp({ jwtSecret: secret, userRepo: users, credentialRepo, encryptionKey: key, serviceAdminUserIds: [userId] });
