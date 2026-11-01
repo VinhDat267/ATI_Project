@@ -426,7 +426,8 @@
       "done": "Đã thêm dòng",
       "receipt": "Đã thêm dòng",
       "kind": "Bảng tính",
-      "link": "Mở bảng tính"
+      "link": "Mở bảng tính",
+      "previewStyle": "rows"
     }
   }
 }

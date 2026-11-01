@@ -267,7 +267,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
               ATI — Nền tảng điều phối công việc liên dịch vụ · 2026
             </p>
             <p className="text-[11px] text-[#9CA3AF] mt-0.5">
-              {personal ? 'Dịch vụ dùng chung: chỉ quản trị viên cập nhật khoá. OAuth 1-Click cá nhân (Gmail, Calendar, Sheets, Trello) do mỗi người tự kết nối.' : 'Khoá dịch vụ là tài nguyên dùng chung của cả nhóm · Chỉ quản trị viên có quyền cập nhật'}
+              {personal ? 'Dịch vụ dùng chung: chỉ quản trị viên cập nhật khoá. OAuth 1-Click cá nhân (Gmail, Calendar, Sheets, Trello, GitHub, Telegram) do mỗi người tự kết nối.' : 'Khoá dịch vụ là tài nguyên dùng chung của cả nhóm · Chỉ quản trị viên có quyền cập nhật'}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-4 text-xs">

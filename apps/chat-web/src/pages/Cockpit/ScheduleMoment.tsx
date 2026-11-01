@@ -96,7 +96,7 @@ export function ScheduleMoment({ message, convId, navigate, onEdit }: { message:
   const manage = proposal && ['pause', 'resume', 'cancel'].includes(proposal.action);
   const title = schedule?.name ?? (manage ? `${proposal.action === 'pause' ? 'Tạm dừng' : proposal.action === 'resume' ? 'Chạy tiếp' : 'Hủy'} lịch "${previous?.name ?? ''}"?` : proposal?.name);
   const scheduleServices = schedule?.services ?? metadata.services ?? [];
-  const isAutoDigestActive = approvalMode === 'auto_digest' || schedule?.kind === 'calendar_digest' || schedule?.kind === 'sheets_digest';
+  const isAutoDigestActive = approvalMode === 'auto_digest' || schedule?.kind === 'calendar_digest' || schedule?.kind === 'sheets_digest' || schedule?.kind === 'github_digest' || schedule?.kind === 'telegram_digest';
   return <section data-moment="schedule" className="w-full min-w-0 max-w-3xl mx-auto v3-space-y-5">
     <p className="text-xs uppercase tracking-wider text-[#6B7280]">ATI · Lịch chạy workflow</p>
     <h1 tabIndex={-1} className="font-display text-3xl sm:text-4xl font-bold text-[#111827] [overflow-wrap:anywhere]">{title}</h1>
@@ -314,7 +314,7 @@ export function ScheduleMoment({ message, convId, navigate, onEdit }: { message:
             </>
           )}
         </>}
-        <div className="flex flex-wrap gap-2"><button type="button" disabled={busy} className={primaryScheduleButton} onClick={() => void confirm()}>{isGithubCandidate && !manage && approvalMode === 'auto_digest' ? 'Xác nhận và bật tự gửi' : 'Xác nhận'}</button><button type="button" disabled={busy} className={scheduleButton} onClick={onEdit}>Sửa</button><button type="button" disabled={busy} className={scheduleButton} onClick={() => setIgnored(true)}>Bỏ qua</button></div>
+        <div className="flex flex-wrap gap-2"><button type="button" disabled={busy} className={primaryScheduleButton} onClick={() => void confirm()}>{isGithubCandidate && !manage && approvalMode === 'auto_digest' ? 'Xác nhận và bật tự gửi' : 'Xác nhận'}</button><button type="button" disabled={busy} className={scheduleButton} onClick={() => { try { if (proposal?.request) sessionStorage.setItem('ati_prefill_prompt', proposal.request); } catch { /* ignore */ } onEdit(); }}>Sửa</button><button type="button" disabled={busy} className={scheduleButton} onClick={() => setIgnored(true)}>Bỏ qua</button></div>
       </>}
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     </div>

@@ -8,6 +8,7 @@ import { PlanMoment } from '../src/pages/Cockpit/PlanMoment';
 import { ExecutionMoment } from '../src/pages/Cockpit/ExecutionMoment';
 import { ReceiptMoment } from '../src/pages/Cockpit/ReceiptMoment';
 import { ScheduleMoment } from '../src/pages/Cockpit/ScheduleMoment';
+import { PreviewContents } from '../src/pages/Cockpit/PreviewContents';
 import { RequestMoment } from '../src/pages/Cockpit/RequestMoments';
 import { HistoryPage } from '../src/pages/History/HistoryPage';
 import { SettingsPage } from '../src/pages/Settings/SettingsPage';
@@ -470,14 +471,14 @@ describe('WorkflowFlowCanvas — Make.com Orbital Workflow Visualizer', () => {
     vi.spyOn(apiClient, 'getServices').mockResolvedValue({
       services: [
         {
-          id: 'github',
-          name: 'GitHub',
+          id: 'notion',
+          name: 'Notion',
           connected: true,
           configured: true,
           connectionStatus: 'healthy',
           lastCheckedAt: '2026-10-08T07:05:00Z',
-          tools: ['github.create_issue'],
-          allowedScope: ['org/repo'],
+          tools: ['notion.create_page'],
+          allowedScope: ['page_123'],
         },
         {
           id: 'slack',
@@ -507,7 +508,7 @@ describe('WorkflowFlowCanvas — Make.com Orbital Workflow Visualizer', () => {
 
     expect(await screen.findByText('2 / 8 dịch vụ đã thiết lập · 2 kết nối tốt')).toBeInTheDocument();
     expect(screen.getByTestId('settings-oauth-summary')).toBeInTheDocument();
-    expect(document.body).toHaveTextContent(/OAuth 1-Click cá nhân \(Gmail, Calendar, Sheets, Trello\)/i);
+    expect(document.body).toHaveTextContent(/OAuth 1-Click cá nhân \(Gmail, Calendar, Sheets, Trello, GitHub, Telegram\)/i);
   });
 
   it('Upgrade #6: renders compact WorkflowFlowCanvas in ScheduleSection and status filter pills in HistoryPage', async () => {
@@ -566,5 +567,108 @@ describe('WorkflowFlowCanvas — Make.com Orbital Workflow Visualizer', () => {
     fireEvent.click(within(filterGroup).getByRole('button', { name: /Hoàn thành/i }));
     expect(screen.getByText('Tạo thẻ Trello xong')).toBeInTheDocument();
     expect(screen.queryByText('Hỏi về lịch họp')).toBeNull();
+  });
+
+  it('Round 3 Polish (#1, #2, #3): renders horizontal spreadsheet grid preview for mysheets.append_rows, prefills schedule request on Sửa click, and highlights steps in ExecutionMoment and ReceiptMoment on node click', () => {
+    // Round 3 Item #1: mysheets.append_rows uses previewStyle="rows" and renders spreadsheet-grid-preview
+    const mysheetsStep: PlanStep = {
+      id: 'step_sheet',
+      tool: 'mysheets.append_rows',
+      description: 'Thêm dòng KPI vào Google Sheets của bạn',
+      args: {
+        spreadsheetId: 'sheet-personal-1',
+        sheetTitle: 'KPI',
+        rows: [['Q4 Revenue', '125%', 'Đạt mục tiêu']],
+      },
+    };
+    const { unmount: unmountPreview } = render(
+      <PreviewContents
+        step={mysheetsStep}
+        destination="Bảng KPI Q4 · trang KPI"
+        labels={{ 'sheet-personal-1': 'Bảng KPI Q4' }}
+      />
+    );
+    expect(screen.getByRole('table')).toHaveClass('w-full', 'text-left', 'text-xs');
+    const gridPreview = screen.getByTestId('spreadsheet-grid-preview');
+    expect(gridPreview).toHaveTextContent('Cột A');
+    expect(gridPreview).toHaveTextContent('Cột B');
+    expect(gridPreview).toHaveTextContent('Cột C');
+    expect(gridPreview).toHaveTextContent('Q4 Revenue');
+    expect(gridPreview).toHaveTextContent('125%');
+    unmountPreview();
+
+    // Round 3 Item #2: ScheduleMoment "Sửa" button stores proposal.request in sessionStorage and invokes onEdit()
+    const onEdit = vi.fn();
+    sessionStorage.removeItem('ati_prefill_prompt');
+    const scheduleMsg: ChatMessage = {
+      id: 'msg-sched-r3',
+      role: 'assistant',
+      content: '',
+      metadata: {
+        type: 'schedule_proposal',
+        proposal: {
+          kind: 'schedule',
+          action: 'create',
+          name: 'Bản tin sáng 08:00',
+          request: 'Đọc lịch họp Google Calendar và gửi báo cáo vào Slack #general',
+          recurrence: { type: 'daily', time: '08:00' },
+          summary: 'Lịch gửi bản tin sáng',
+        },
+        services: ['mycalendar', 'slack'],
+        nextRuns: ['2026-10-26T01:00:00Z'],
+      },
+    };
+    const { unmount: unmountSched } = render(
+      <ScheduleMoment message={scheduleMsg} convId="conv-r3" navigate={vi.fn()} onEdit={onEdit} />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Sửa' }));
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    expect(sessionStorage.getItem('ati_prefill_prompt')).toBe(
+      'Đọc lịch họp Google Calendar và gửi báo cáo vào Slack #general'
+    );
+    sessionStorage.removeItem('ati_prefill_prompt');
+    unmountSched();
+
+    // Round 3 Item #3: Interactive Node-to-Step Highlighting in ExecutionMoment & ReceiptMoment
+    const execSteps = fanOutSteps.map((s, idx) => ({
+      id: s.id,
+      tool: s.tool,
+      description: s.description,
+      status: idx === 0 ? ('succeeded' as const) : ('running' as const),
+    }));
+    const { unmount: unmountExec } = render(
+      <ExecutionMoment
+        request="Đọc issue #42"
+        steps={execSteps}
+        planSteps={fanOutSteps}
+        destination={(step) => step.description}
+      />
+    );
+    const execItem2 = document.getElementById('exec-item-2')!;
+    expect(execItem2).not.toHaveAttribute('data-highlighted-step', 'true');
+    fireEvent.click(screen.getByTestId('workflow-node-trello'));
+    expect(execItem2).toHaveAttribute('data-highlighted-step', 'true');
+    unmountExec();
+
+    render(
+      <ReceiptMoment
+        request="Đọc issue #42"
+        steps={fanOutSteps.map((s) => ({
+          id: s.id,
+          tool: s.tool,
+          description: s.description,
+          status: 'succeeded' as const,
+        }))}
+        planSteps={fanOutSteps}
+        services={[]}
+        destination={(step) => step.description}
+        onNewConversation={vi.fn()}
+        onFollowup={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByTestId('workflow-node-slack'));
+    const highlightedReceiptCards = document.querySelectorAll('#receipt-chain [data-highlighted-step="true"]');
+    expect(highlightedReceiptCards).toHaveLength(1);
+    expect(highlightedReceiptCards[0]).toHaveTextContent(/Thông báo cho nhóm qua Slack/i);
   });
 });

@@ -1,4 +1,5 @@
 // Source: AppStagePage.tsx moment-5 and execution state classes. No demo timer or simulated progress.
+import { useState } from 'react';
 import type { PlanStep } from '../../types';
 import type { ExecutionStepInfo } from '../../components/ExecutionProgress';
 import { ServiceLogo } from '../../components/ServiceLogo';
@@ -13,6 +14,7 @@ const BADGE_RUNNING = 'text-xs text-brand-primary bg-orange-50 px-1.5 py-0.5 rou
 const ITEM_PENDING='p-4 bg-neutral-50 rounded-2xl border border-dashed border-neutral-200 flex items-center justify-between gap-3 opacity-60';
 const BADGE_PENDING='text-xs text-neutral-500 bg-neutral-200 px-1.5 py-0.5 rounded font-medium';
 export function ExecutionMoment({request,steps,planSteps,labels,destination}:{request?:string;steps:ExecutionStepInfo[];planSteps:PlanStep[];labels?:Record<string,string>;destination:(step:PlanStep,labels?:Record<string,string>)=>string}){
+ const [selectedService,setSelectedService]=useState<string|null>(null);
  const completed=steps.filter(step=>['succeeded','skipped'].includes(step.status)).length;
  const running=steps.findIndex(step=>step.status==='running');
  const current=running<0 ? Math.min(completed+1,steps.length) : running+1;
@@ -42,11 +44,11 @@ export function ExecutionMoment({request,steps,planSteps,labels,destination}:{re
           <div className="w-full bg-neutral-200 h-1.5 rounded-full overflow-hidden">
             <div id="exec-progress-bar" className="bg-brand-primary h-full transition-all duration-500 rounded-full" role="progressbar" aria-label="Tiến độ công việc" aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={completed} style={{ width: `${steps.length ? completed/steps.length*100 : 0}%` }} />
           </div>
-          <WorkflowFlowCanvas steps={canvasSteps} stepStatuses={stepStatuses} resourceLabels={labels} mode="executing" />
+          <WorkflowFlowCanvas steps={canvasSteps} stepStatuses={stepStatuses} resourceLabels={labels} selectedService={selectedService} onSelectService={setSelectedService} mode="executing" />
           {/* NHÓM 4 & 8: Thời lượng viết kiểu Việt Nam "1,2 giây", font thân, icon SVG dịch vụ */}
           <div className="v3-space-y-3" id="exec-timeline">
-            {steps.map((step,index)=>{const service=serviceId(step.tool), palette=servicePalette(service); return (
-            <div key={step.id} id={`exec-item-${index+1}`} className={step.status === 'running' ? ITEM_RUNNING : step.status === 'pending' ? ITEM_PENDING : step.status === 'skipped' ? ITEM_SKIPPED : ITEM_DONE}>
+            {steps.map((step,index)=>{const service=serviceId(step.tool), palette=servicePalette(service), isHighlighted=selectedService===service; return (
+            <div key={step.id} id={`exec-item-${index+1}`} data-highlighted-step={isHighlighted ? 'true' : undefined} className={step.status === 'running' ? ITEM_RUNNING : step.status === 'pending' ? ITEM_PENDING : step.status === 'skipped' ? ITEM_SKIPPED : ITEM_DONE}>
               <div className="flex items-center gap-3 min-w-0">
                 <div id={`exec-icon-${index+1}`} className={`w-8 h-8 rounded-xl ${palette.icon} flex items-center justify-center flex-shrink-0 border shadow-sm`}><ServiceLogo service={service} className={`w-4 h-4 ${palette.logo ?? ''}`}/></div>
                 <div className="min-w-0">

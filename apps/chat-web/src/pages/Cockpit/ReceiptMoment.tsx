@@ -1,5 +1,5 @@
 // Source: AppStagePage.tsx moment-6. Receipt connections come only from approved-plan references.
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
 import { toolDefinition } from '../../services/tool-definitions';
 import type { ActivePlan,PlanStep,ServiceInfo } from '../../types';
 import { ServiceLogo } from '../../components/ServiceLogo';
@@ -8,7 +8,7 @@ import { ResultFields, type ExecutionStepInfo } from '../../components/Execution
 import { operation,serviceId,serviceName,servicePalette,statusLabel,resultTitle,outcomeURL,receiptReferences } from './presentation';
 import { RequestEcho } from './RequestEcho';
 interface CardProps {services:ServiceInfo[];planSteps:PlanStep[];labels?:Record<string,string>;mycalendarConnection?:NonNullable<ActivePlan['connections']>['mycalendar'];mysheetsConnection?:NonNullable<ActivePlan['connections']>['mysheets'];trelloConnection?:NonNullable<ActivePlan['connections']>['trello'];githubConnection?:NonNullable<ActivePlan['connections']>['github'];telegramConnection?:NonNullable<ActivePlan['connections']>['telegram'];destination:(step:PlanStep,labels?:Record<string,string>)=>string}
-function ReceiptCard({step,index,services,planSteps,labels,mycalendarConnection,mysheetsConnection,trelloConnection,githubConnection,telegramConnection,destination}:CardProps & {step:ExecutionStepInfo;index:number}) { const service=serviceId(step.tool),palette=servicePalette(service);return (<div className={`receipt-stagger-${Math.min(index+1,4)} flex-1 bg-white rounded-2xl border border-brand-border p-4 sm:p-5 shadow-soft-card flex flex-col justify-between ${palette.receiptHover} transition-all group`} aria-label={serviceName(service,services)}>
+function ReceiptCard({step,index,highlighted,services,planSteps,labels,mycalendarConnection,mysheetsConnection,trelloConnection,githubConnection,telegramConnection,destination}:CardProps & {step:ExecutionStepInfo;index:number;highlighted?:boolean}) { const service=serviceId(step.tool),palette=servicePalette(service);return (<div data-highlighted-step={highlighted ? 'true' : undefined} className={`receipt-stagger-${Math.min(index+1,4)} flex-1 bg-white rounded-2xl border ${highlighted ? 'border-brand-primary ring-2 ring-brand-primary/20' : 'border-brand-border'} p-4 sm:p-5 shadow-soft-card flex flex-col justify-between ${palette.receiptHover} transition-all group`} aria-label={serviceName(service,services)}>
                   <div className="v3-space-y-2.5">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2.5 min-w-0">
@@ -93,6 +93,7 @@ function ReceiptBetweenRows({from,to,sourceLabel,targetLabel,field}:{from:string
                 </div>
               </div>);}
 export function ReceiptMoment({request,terminalStatus,steps,planSteps,services,labels,mycalendarConnection,mysheetsConnection,trelloConnection,githubConnection,telegramConnection,destination,totalDuration,onNewConversation,onFollowup,servicePrompt,onSettings,servicesLoading,servicesError}:CardProps & {request?:string;terminalStatus?:string;steps:ExecutionStepInfo[];totalDuration?:string;onNewConversation:()=>void;onFollowup:(text:string)=>void;servicePrompt?:(service:ServiceInfo)=>string;onSettings?:()=>void;servicesLoading?:boolean;servicesError?:string|null}) {
+ const [selectedService,setSelectedService]=useState<string|null>(null);
  const rows:ExecutionStepInfo[][]=[];for(let index=0;index<steps.length;index+=2) rows.push(steps.slice(index,index+2));
  const ids=new Set(steps.map(step=>step.id)); const refs=receiptReferences(planSteps).filter(edge=>ids.has(edge.from) && ids.has(edge.to));
  const cardProps={services,planSteps,labels,mycalendarConnection,mysheetsConnection,trelloConnection,githubConnection,telegramConnection,destination};
@@ -121,16 +122,16 @@ export function ReceiptMoment({request,terminalStatus,steps,planSteps,services,l
           </div>
           {/* NHÓM 7: Chuỗi 4 biên nhận dạng lưới 2x2 trên desktop (1->2 ở hàng trên, chuyển Z xuống 3, 3->4 ở hàng dưới), 1 cột trên mobile */}
           <div className="v3-space-y-3">
-            <WorkflowFlowCanvas steps={canvasSteps} stepStatuses={stepStatuses} resourceLabels={labels} mode="receipt" />
+            <WorkflowFlowCanvas steps={canvasSteps} stepStatuses={stepStatuses} resourceLabels={labels} selectedService={selectedService} onSelectService={setSelectedService} mode="receipt" />
             <div id="receipt-chain" className="flex flex-col gap-3">
               {rows.map((row,rowIndex)=>{const horizontal=row.length===2 ? refs.filter(edge=>edge.from===row[0].id && edge.to===row[1].id):[];
                 const incoming=refs.filter(edge=>row.some(step=>step.id===edge.to) && !horizontal.includes(edge));
                 return <Fragment key={row[0].id}>
                   {incoming.map(edge=><ReceiptBetweenRows key={`${edge.from}-${edge.to}-${edge.field}`} from={edge.from} to={edge.to} sourceLabel={`${serviceName(serviceId(steps.find(s=>s.id===edge.from)!.tool),services)} (việc ${steps.findIndex(s=>s.id===edge.from)+1})`} targetLabel={`${serviceName(serviceId(steps.find(s=>s.id===edge.to)!.tool),services)} (việc ${steps.findIndex(s=>s.id===edge.to)+1})`} field={edge.field}/>)}
                   <div className={`grid grid-cols-1 ${horizontal.length ? 'md:grid-cols-[1fr_auto_1fr]' : 'md:grid-cols-2'} items-stretch md:items-center gap-3`}>
-                    <ReceiptCard step={row[0]} index={rowIndex*2} {...cardProps}/>
+                    <ReceiptCard step={row[0]} index={rowIndex*2} highlighted={selectedService===serviceId(row[0].tool)} {...cardProps}/>
                     {horizontal.length>0 && <ReceiptConnector from={row[0].id} to={row[1].id} label={horizontal.map(edge=>edge.field).join(' + ')}/>}
-                    {row[1] && <ReceiptCard step={row[1]} index={rowIndex*2+1} {...cardProps}/>}
+                    {row[1] && <ReceiptCard step={row[1]} index={rowIndex*2+1} highlighted={selectedService===serviceId(row[1].tool)} {...cardProps}/>}
                   </div>
                 </Fragment>;
               })}

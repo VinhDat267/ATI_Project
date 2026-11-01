@@ -155,7 +155,7 @@ export function Cockpit(props: Props) {
     setDraft(text); setSelected(null); setDrawer(null); setEditingResponse(responseKey);
     queueMicrotask(() => { input.current?.focus(); input.current?.setSelectionRange(text.length, text.length); });
   };
-  const response = moment === 'schedule' && latestMessage && state.conversationId ? <ScheduleMoment key={state.conversationId} message={latestMessage} convId={state.conversationId} navigate={navigate} onEdit={() => input.current?.focus()} />
+  const response = moment === 'schedule' && latestMessage && state.conversationId ? <ScheduleMoment key={state.conversationId} message={latestMessage} convId={state.conversationId} navigate={navigate} onEdit={() => { const reqText = latestMessage.metadata?.proposal?.request ?? latestMessage.metadata?.schedule?.request ?? ''; if (reqText) setDraft(reqText); input.current?.focus(); }} />
     : moment === 'answer' && latestMessage ? <AnswerMoment key={latestMessage.id} message={latestMessage} request={request ?? ''} services={props.services}/>
     : moment === 'refusal' && latestMessage ? <RefusalMoment message={latestMessage} request={request ?? ''} services={props.services} canConfigure={canConfigure} navigate={navigate} onEdit={editRequest} connectFromChat={personalEnabled} conversationId={state.conversationId} onResend={send} servicesLoading={props.servicesLoading} onRefreshServices={props.onRefreshServices}/>
     : expanded && state.activeClarification && variant ? <ExpandedClarificationMoment clarification={state.activeClarification} variant={variant} request={request ?? ''} services={props.services} canConfigure={canConfigure} selected={selected} onSelect={setSelected} onSend={send} onEdit={editRequest} navigate={navigate} planning={state.isPlanning}/>
