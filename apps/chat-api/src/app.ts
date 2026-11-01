@@ -162,6 +162,7 @@ export function createApp(options: AppOptions): Express {
     onConnectionChanged: options.trello?.onConnectionChanged,
     conversationOwner: options.convRepo ? async (id: string) => (await options.convRepo!.getConversation(id))?.user_id ?? null : undefined,
     tokens: trelloTokens, adminUserIds: options.serviceAdminUserIds,
+    workspaceRepo: options.workspaceRepo,
   };
 
   app.use(express.json());

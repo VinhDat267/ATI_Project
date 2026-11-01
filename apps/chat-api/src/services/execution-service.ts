@@ -1,6 +1,7 @@
 import type { PlanRepo, PlanRow } from '../db/repositories/plan-repo.js';
 import type { StepRepo } from '../db/repositories/step-repo.js';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
+import type { WorkspaceRepo } from '../db/repositories/workspace-repo.js';
 import { StepRunner, ExecutionController, type StepState } from '@wap/executor';
 import type { PlanStep } from '@wap/tool-schemas';
 import { createHash } from 'node:crypto';
@@ -22,6 +23,7 @@ export interface ExecutionServiceOptions {
     getConversation: (id: string) => Promise<any>;
   };
   credentialRepo?: CredentialRepo;
+  workspaceRepo?: WorkspaceRepo;
   adapterFactory: {
     getAdapterForService: (serviceName: string, context?: AdapterContext) => Promise<any> | any;
   };
@@ -34,6 +36,7 @@ export class ExecutionService {
   private planRepo: PlanRepo;
   private stepRepo?: StepRepo;
   private convRepo?: ExecutionServiceOptions['convRepo'];
+  private workspaceRepo?: WorkspaceRepo;
   private adapterFactory: ExecutionServiceOptions['adapterFactory'];
   private sseManager?: ExecutionServiceOptions['sseManager'];
   private activeControllers = new Map<string, ExecutionController>();
@@ -46,6 +49,7 @@ export class ExecutionService {
     this.planRepo = options.planRepo;
     this.stepRepo = options.stepRepo;
     this.convRepo = options.convRepo;
+    this.workspaceRepo = options.workspaceRepo;
     this.adapterFactory = options.adapterFactory;
     this.sseManager = options.sseManager;
   }
@@ -60,14 +64,22 @@ export class ExecutionService {
    * database, so no further read is needed (and none can fail after approval).
    * Connections come from the integrity-checked plan.
    */
-  private executionContext(ownerId: string, connections: AdapterContext['connections']): AdapterContext {
-    return { userId: ownerId, phase: 'execution', connections };
+  private executionContext(ownerId: string, connections: AdapterContext['connections'], conversation?: any): AdapterContext {
+    return {
+      userId: ownerId,
+      phase: 'execution',
+      connections,
+      workspaceId: conversation?.workspace_id ?? null,
+      workspaceMode: conversation?.workspace_mode ?? 'personal',
+    };
   }
 
   private async markExecutionFailed(planId: string, convId: string, err: unknown): Promise<void> {
     this.executionOutcomes.set(planId, { status: 'failed' });
     try {
-      await this.planRepo.updatePlanStatus(planId, 'failed');
+      if (typeof this.planRepo.updatePlanStatus === 'function') {
+        await this.planRepo.updatePlanStatus(planId, 'failed');
+      }
     } catch (persistError) {
       console.error('Failed to persist failed plan status:', persistError);
     }
@@ -76,7 +88,7 @@ export class ExecutionService {
     });
   }
 
-  async getOwnedPlan(planId: string, userId: string) {
+  async getOwnedPlan(planId: string, userId: string): Promise<PlanRow & { conversation?: any }> {
     const plan = await this.planRepo.getPlan(planId);
     if (!plan) throw Object.assign(new Error('Plan not found'), { status: 404 });
     if (!userId || !this.convRepo) throw Object.assign(new Error('Ownership verification unavailable'), { status: 403 });
@@ -84,7 +96,13 @@ export class ExecutionService {
     if (!conversation || conversation.user_id !== userId) {
       throw Object.assign(new Error('Forbidden: you do not own this plan'), { status: 403 });
     }
-    return plan;
+    if (conversation.workspace_mode === 'organization' && conversation.workspace_id && this.workspaceRepo) {
+      const member = await this.workspaceRepo.findMember(conversation.workspace_id, userId);
+      if (!member || member.status !== 'active') {
+        throw Object.assign(new Error('WORKSPACE_ACCESS_DENIED'), { status: 403 });
+      }
+    }
+    return { ...plan, conversation };
   }
 
   async approveAndStart(planId: string, userId: string): Promise<ApproveResult> {
@@ -117,7 +135,7 @@ export class ExecutionService {
     }
 
     // Everything that can fail is done before the approval CAS commits.
-    const context = this.executionContext(userId, planJson?.connections);
+    const context = this.executionContext(userId, planJson?.connections, planRow.conversation);
 
     // 1. Optimistic Locking: only succeeds if current status is 'pending' and not expired
     const approved = await this.planRepo.approvePlan(planId, planRow.plan_hash, userId);
@@ -180,7 +198,7 @@ export class ExecutionService {
     }
     const { steps, connections } = verifiedRecoveryPlan(plan);
     // Callers checked ownership with getOwnedPlan; claimRecovery checks it again in SQL.
-    const context = this.executionContext(userId, connections);
+    const context = this.executionContext(userId, connections, (plan as any).conversation);
     const before = restoredProgress(steps, await this.stepRepo.listSteps(plan.id));
     validateRecoveryAction(plan.status, before.states, stepId, action);
     if (!await this.planRepo.claimRecovery(plan, userId, 'executing')) {
@@ -406,6 +424,12 @@ export class ExecutionService {
     const conversation = await this.convRepo?.getConversation(convId);
     if (!conversation) throw Object.assign(new Error('Conversation not found'), { status: 404 });
     if (conversation.user_id !== userId) throw Object.assign(new Error('Forbidden'), { status: 403 });
+    if (conversation.workspace_mode === 'organization' && conversation.workspace_id && this.workspaceRepo) {
+      const member = await this.workspaceRepo.findMember(conversation.workspace_id, userId);
+      if (!member || member.status !== 'active') {
+        throw Object.assign(new Error('WORKSPACE_ACCESS_DENIED'), { status: 403 });
+      }
+    }
     const plan = await this.planRepo.getLatestExecutedPlan(convId);
     if (!plan) throw Object.assign(new Error('No execution found'), { status: 404 });
     const parsed = readableRecoveryPlan(plan);

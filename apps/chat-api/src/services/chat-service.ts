@@ -225,6 +225,7 @@ export class ChatService {
     signal?: AbortSignal,
     memory?: WorkingMemory,
     onTrelloTeamBoards?: (boards: Array<{ boardId: string; boardName: string }>) => void,
+    scopeId = 'default',
   ): Promise<PlannerResponse> {
     signal?.throwIfAborted();
     const bound = withoutConnections(plan);
@@ -371,7 +372,7 @@ export class ChatService {
     }
 
     if (usesTrello) {
-      const trello = await this.trelloConnection?.(userId);
+      const trello = await this.trelloConnection?.(userId, scopeId);
       if (!trello || trello.status === 'not_connected' || trello.status === 'reconnect_required') {
         unavailableServices.push({ id: 'trello', name: 'Trello' });
         reasons.push('Tài khoản của bạn chưa Kết nối Trello hoặc cần kết nối lại.');
@@ -542,8 +543,19 @@ export class ChatService {
   ): Promise<PreparedResponse> {
     const { conversationId, correlation } = target;
     let trelloTeamBoards: Array<{ boardId: string; boardName: string }> | undefined;
+    let scopeId = 'default';
+    if (this.convRepo) {
+      try {
+        const conv = await this.convRepo.getConversation(conversationId);
+        if (conv?.workspace_mode === 'organization' && conv.workspace_id) {
+          scopeId = conv.workspace_id;
+        } else if (conv?.workspace_mode === 'personal' && target.userId) {
+          scopeId = `personal:${target.userId}`;
+        }
+      } catch { /* ignore */ }
+    }
     let response = planned.kind === 'plan'
-      ? await this.bindConnections(planned, target.userId, signal, memory, (boards) => { trelloTeamBoards = boards; })
+      ? await this.bindConnections(planned, target.userId, signal, memory, (boards) => { trelloTeamBoards = boards; }, scopeId)
       : planned;
     signal?.throwIfAborted();
     let proposal: ScheduleProposalMetadata | null = null;

@@ -1,16 +1,31 @@
 import { Router, type Request, type Response } from 'express';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import { encryptCredentials, decryptCredentials } from '@wap/tool-adapters';
-import { ALL_TOOLS, GMAIL_SERVICE, GMAIL_TOOLS, MYCALENDAR_SERVICE, MYCALENDAR_TOOLS, MYSHEETS_SERVICE, MYSHEETS_TOOLS, type PersonalCalendarItem, type PersonalSpreadsheetItem } from '@wap/tool-schemas';
+import {
+  ALL_TOOLS,
+  GMAIL_SERVICE,
+  GMAIL_TOOLS,
+  MYCALENDAR_SERVICE,
+  MYCALENDAR_TOOLS,
+  MYSHEETS_SERVICE,
+  MYSHEETS_TOOLS,
+  type PersonalCalendarItem,
+  type PersonalSpreadsheetItem,
+} from '@wap/tool-schemas';
 import { createHash } from 'node:crypto';
-import { getRegisteredServices, getRegisteredService, hasValidCredentials, normalizeAllowedScope } from '../services/registered-services.js';
+import {
+  getRegisteredServices,
+  getRegisteredService,
+  hasValidCredentials,
+  normalizeAllowedScope,
+} from '../services/registered-services.js';
 import { isAdmin } from '../auth/jwt.js';
 
 export interface ServicesRoutesOptions {
   credentialRepo?: CredentialRepo;
   encryptionKey?: string;
   fetchFn?: typeof fetch;
-  onCredentialsChanged?: (service: string) => void;
+  onCredentialsChanged?: (service: string, workspaceId?: string | null, userId?: string) => void;
   adminUserIds?: string[];
   /** Gmail is enabled and usable (flag on, OAuth and PostgreSQL configured). */
   gmailAvailable?: boolean;
@@ -24,7 +39,11 @@ const PERSONAL_ONLY = 'Gmail do mỗi người tự kết nối ở mục "Của
 const MYCALENDAR_PERSONAL_ONLY = 'Google Calendar cá nhân do mỗi người tự kết nối ở mục "Của riêng bạn"; không có khoá chung để quản trị viên cấu hình.';
 const MYSHEETS_PERSONAL_ONLY = 'Google Sheets cá nhân do mỗi người tự kết nối ở mục "Của riêng bạn"; không có khoá chung để quản trị viên cấu hình.';
 
-async function verifyService(service: string, config: Record<string, unknown>, fetchFn: typeof fetch): Promise<{ healthy: boolean; message: string; latencyMs: number }> {
+async function verifyService(
+  service: string,
+  config: Record<string, unknown>,
+  fetchFn: typeof fetch
+): Promise<{ healthy: boolean; message: string; latencyMs: number }> {
   const registration = getRegisteredService(service);
   if (!registration) throw new Error(`Unsupported service '${service}'`);
   const started = performance.now();
@@ -32,7 +51,11 @@ async function verifyService(service: string, config: Record<string, unknown>, f
   const timer = setTimeout(() => controller.abort(), 10_000);
   try {
     const healthy = await registration.transport.checkConnection(config, fetchFn, controller.signal);
-    return { healthy, message: healthy ? `Successfully connected to ${service}` : `Provider rejected ${service} credentials`, latencyMs: Math.round(performance.now() - started) };
+    return {
+      healthy,
+      message: healthy ? `Successfully connected to ${service}` : `Provider rejected ${service} credentials`,
+      latencyMs: Math.round(performance.now() - started),
+    };
   } finally {
     clearTimeout(timer);
   }
@@ -44,14 +67,33 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
   const fetchFn = options.fetchFn || fetch;
   const generations = new Map<string, number>();
   const versionOf = (config: string) => createHash('sha256').update(config).digest('hex');
-  const checks = new Map<string, { credentialVersion: string | null; connectionStatus: 'healthy' | 'unhealthy' | 'unconfigured'; lastCheckedAt: string }>();
+  const checks = new Map<
+    string,
+    { credentialVersion: string | null; connectionStatus: 'healthy' | 'unhealthy' | 'unconfigured'; lastCheckedAt: string }
+  >();
+
+  const getContext = (req: Request) => {
+    const mode = req.workspace?.mode ?? 'legacy';
+    const workspaceId = req.workspace?.workspaceId ?? null;
+    const canConfig =
+      mode === 'personal'
+        ? true
+        : mode === 'organization'
+          ? req.workspace?.role === 'admin'
+          : isAdmin((req as any).user, options.adminUserIds);
+    return { mode, workspaceId, isAdminUser: canConfig };
+  };
 
   /** The caller's own Gmail row; another person's connection is never read. */
   const personalGmail = async (userId: string) => {
     const { id, name, description, scopes, scopeKey, scopeLabel, credentialFields } = GMAIL_SERVICE;
     const record = await credentialRepo!.getPersonalConnectionStatus('gmail', userId);
     let details: { email?: string; connectedAt?: string } = {};
-    let personalStatus: 'connected' | 'reconnect_required' | 'not_connected' = record ? (record.status === 'active' ? 'connected' : 'reconnect_required') : 'not_connected';
+    let personalStatus: 'connected' | 'reconnect_required' | 'not_connected' = record
+      ? record.status === 'active'
+        ? 'connected'
+        : 'reconnect_required'
+      : 'not_connected';
     if (record) {
       try {
         const config = decryptCredentials(record.config, encryptionKey!);
@@ -62,10 +104,22 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
     }
     const connected = personalStatus === 'connected';
     return {
-      id, name, description, scopes, scopeKey, scopeLabel, credentialFields, connection: 'personal' as const,
-      tools: GMAIL_TOOLS.map(tool => tool.name),
-      configured: connected, connected, connectionStatus: connected ? 'unchecked' : 'unconfigured', lastCheckedAt: null, allowedScope: [],
-      personalStatus, ...details,
+      id,
+      name,
+      description,
+      scopes,
+      scopeKey,
+      scopeLabel,
+      credentialFields,
+      connection: 'personal' as const,
+      tools: GMAIL_TOOLS.map((tool) => tool.name),
+      configured: connected,
+      connected,
+      connectionStatus: connected ? 'unchecked' : 'unconfigured',
+      lastCheckedAt: null,
+      allowedScope: [],
+      personalStatus,
+      ...details,
     };
   };
 
@@ -96,12 +150,13 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
         // cannot decrypt
       }
     } else {
-      // record.status === 'active'
       try {
         const config = decryptCredentials(record.config, encryptionKey!);
         const email = config.email ? String(config.email) : undefined;
         const connectedAt = config.connectedAt ? String(config.connectedAt) : undefined;
-        const selectedCalendars: PersonalCalendarItem[] = Array.isArray(config.selectedCalendars) ? config.selectedCalendars : [];
+        const selectedCalendars: PersonalCalendarItem[] = Array.isArray(config.selectedCalendars)
+          ? config.selectedCalendars
+          : [];
         const allowedScope: string[] = Array.isArray(config.allowedScope?.calendars)
           ? config.allowedScope.calendars
           : selectedCalendars.map((c: any) => c.id);
@@ -181,12 +236,13 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
         // cannot decrypt
       }
     } else {
-      // record.status === 'active'
       try {
         const config = decryptCredentials(record.config, encryptionKey!);
         const email = config.email ? String(config.email) : undefined;
         const connectedAt = config.connectedAt ? String(config.connectedAt) : undefined;
-        const selectedSpreadsheets: PersonalSpreadsheetItem[] = Array.isArray(config.selectedSpreadsheets) ? config.selectedSpreadsheets : [];
+        const selectedSpreadsheets: PersonalSpreadsheetItem[] = Array.isArray(config.selectedSpreadsheets)
+          ? config.selectedSpreadsheets
+          : [];
         const allowedScope: string[] = Array.isArray(config.allowedScope?.spreadsheets)
           ? config.allowedScope.spreadsheets
           : selectedSpreadsheets.map((s: any) => s.id);
@@ -239,21 +295,28 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
     };
   };
 
-  // Shared-key administration never applies to the personal Gmail connection.
+  // Shared-key administration never applies to personal connections
   router.use('/gmail', (_req, res, next) => {
-    if (options.gmailAvailable) { res.status(400).json({ error: PERSONAL_ONLY, code: 'PERSONAL_CONNECTION' }); return; }
+    if (options.gmailAvailable) {
+      res.status(400).json({ error: PERSONAL_ONLY, code: 'PERSONAL_CONNECTION' });
+      return;
+    }
     next();
   });
 
-  // Shared-key administration never applies to the personal MyCalendar connection.
   router.use('/mycalendar', (_req, res, next) => {
-    if (options.mycalendarAvailable) { res.status(400).json({ error: MYCALENDAR_PERSONAL_ONLY, code: 'PERSONAL_CONNECTION' }); return; }
+    if (options.mycalendarAvailable) {
+      res.status(400).json({ error: MYCALENDAR_PERSONAL_ONLY, code: 'PERSONAL_CONNECTION' });
+      return;
+    }
     next();
   });
 
-  // Shared-key administration never applies to the personal MySheets connection.
   router.use('/mysheets', (_req, res, next) => {
-    if (options.mysheetsAvailable) { res.status(400).json({ error: MYSHEETS_PERSONAL_ONLY, code: 'PERSONAL_CONNECTION' }); return; }
+    if (options.mysheetsAvailable) {
+      res.status(400).json({ error: MYSHEETS_PERSONAL_ONLY, code: 'PERSONAL_CONNECTION' });
+      return;
+    }
     next();
   });
 
@@ -268,66 +331,113 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
   // GET /api/services
   router.get('/', async (req: Request, res: Response): Promise<void> => {
     try {
-      const services: Array<Record<string, unknown>> = await Promise.all(getRegisteredServices().map(async definition => {
-        const { id, name, description, scopes, scopeKey, scopeLabel, credentialFields } = definition;
-        const isTrello = id === 'trello';
-        const record = isTrello ? null : await credentialRepo?.getCredentials(id);
-        const config = record && encryptionKey ? decryptCredentials(record.config, encryptionKey) : null;
-        const scope = config?.allowedScope as Record<string, unknown> | undefined;
-        const entries = scope?.[scopeKey];
-        const configured = !isTrello && Boolean(config && hasValidCredentials(credentialFields, config) && normalizeAllowedScope(definition, scope));
-        const savedCheck = checks.get(id);
-        const check = savedCheck?.credentialVersion === (record ? versionOf(record.config) : null) ? savedCheck : undefined;
+      const { mode, workspaceId, isAdminUser } = getContext(req);
+      const userId = (req as any).user?.id;
 
-        let personalStatus: 'connected' | 'reconnect_required' | undefined;
-        let username: string | undefined;
-        let connectedAt: string | undefined;
-        if (isTrello && credentialRepo && typeof credentialRepo.getPersonalConnectionStatus === 'function') {
-          const userId = (req as any).user?.id;
-          let personalRecord: Awaited<ReturnType<typeof credentialRepo.getPersonalConnectionStatus>> = null;
-          if (userId) {
-            try {
-              personalRecord = await credentialRepo.getPersonalConnectionStatus('trello', userId);
-            } catch {
-              personalRecord = null;
+      let registered = getRegisteredServices();
+      if (mode === 'personal') {
+        // In personal mode, enterprise service account services are hidden
+        registered = registered.filter((s) => s.id !== 'calendar' && s.id !== 'sheets' && s.id !== 'google-calendar' && s.id !== 'google-sheets');
+      }
+
+      const services: Array<Record<string, unknown>> = await Promise.all(
+        registered.map(async (definition) => {
+          const { id, name, description, scopes, scopeKey, scopeLabel, credentialFields } = definition;
+          const isTrello = id === 'trello';
+
+          let record: any = null;
+          if (!isTrello) {
+            if (mode === 'personal' && userId) {
+              record = await credentialRepo?.getPersonalCredentials(id, userId);
+            } else if (mode === 'organization') {
+              record = await credentialRepo?.getCredentials(id, workspaceId);
+            } else {
+              record = await credentialRepo?.getCredentials(id, null);
             }
           }
-          if (personalRecord) {
-            const dateVal = (personalRecord as any).updated_at ?? personalRecord.created_at;
-            connectedAt = dateVal instanceof Date ? dateVal.toISOString() : (dateVal ? new Date(dateVal).toISOString() : undefined);
-            if (personalRecord.status === 'reconnect_required') {
-              personalStatus = 'reconnect_required';
-            } else if (personalRecord.status === 'active') {
-              personalStatus = 'connected';
-            }
-            if (encryptionKey) {
+
+          const config = record && encryptionKey ? decryptCredentials(record.config, encryptionKey) : null;
+          const scope = config?.allowedScope as Record<string, unknown> | undefined;
+          const entries = scope?.[scopeKey];
+          const configured =
+            !isTrello &&
+            Boolean(config && hasValidCredentials(credentialFields, config) && normalizeAllowedScope(definition, scope));
+          const savedCheck = checks.get(id);
+          const check =
+            savedCheck?.credentialVersion === (record ? versionOf(record.config) : null) ? savedCheck : undefined;
+
+          let personalStatus: 'connected' | 'reconnect_required' | undefined;
+          let username: string | undefined;
+          let connectedAt: string | undefined;
+
+          if (isTrello && credentialRepo && typeof credentialRepo.getPersonalConnectionStatus === 'function') {
+            let personalRecord: any = null;
+            if (userId) {
               try {
-                const dec = decryptCredentials(personalRecord.config, encryptionKey);
-                if (typeof dec.username === 'string') username = dec.username;
+                personalRecord = await credentialRepo.getPersonalConnectionStatus('trello', userId);
               } catch {
-                if (personalRecord.status === 'active') {
-                  personalStatus = 'reconnect_required';
+                personalRecord = null;
+              }
+            }
+            if (personalRecord) {
+              const dateVal = personalRecord.updated_at ?? personalRecord.created_at;
+              connectedAt =
+                dateVal instanceof Date ? dateVal.toISOString() : dateVal ? new Date(dateVal).toISOString() : undefined;
+              if (personalRecord.status === 'reconnect_required') {
+                personalStatus = 'reconnect_required';
+              } else if (personalRecord.status === 'active') {
+                personalStatus = 'connected';
+              }
+              if (encryptionKey) {
+                try {
+                  const dec = decryptCredentials(personalRecord.config, encryptionKey);
+                  if (typeof dec.username === 'string') username = dec.username;
+                } catch {
+                  if (personalRecord.status === 'active') {
+                    personalStatus = 'reconnect_required';
+                  }
                 }
               }
             }
           }
-        }
 
-        return {
-          id, name, description, scopes, scopeKey, scopeLabel, credentialFields, connection: definition.connection ?? 'shared',
-          tools: ALL_TOOLS.filter(tool => tool.service === id).map(tool => tool.name),
-          configured,
-          connected: configured && check?.connectionStatus === 'healthy',
-          connectionStatus: configured ? (check?.connectionStatus ?? 'unchecked') : 'unconfigured',
-          lastCheckedAt: check?.lastCheckedAt ?? null,
-          allowedScope: Array.isArray(entries) ? entries : [],
-          ...(isTrello && personalStatus ? { personalStatus, ...(username ? { username } : {}), ...(connectedAt ? { connectedAt } : {}) } : {}),
-        };
-      }));
-      if (options.gmailAvailable && credentialRepo && encryptionKey) services.push(await personalGmail((req as any).user.id));
-      if (options.mycalendarAvailable && credentialRepo && encryptionKey) services.push(await personalMyCalendar((req as any).user.id));
-      if (options.mysheetsAvailable && credentialRepo && encryptionKey) services.push(await personalMySheets((req as any).user.id));
-      res.status(200).json({ services, canConfigure: isAdmin((req as any).user, options.adminUserIds) });
+          return {
+            id,
+            name,
+            description,
+            scopes,
+            scopeKey,
+            scopeLabel,
+            credentialFields,
+            connection: mode === 'personal' && !isTrello ? 'personal' : definition.connection ?? 'shared',
+            tools: ALL_TOOLS.filter((tool) => tool.service === id).map((tool) => tool.name),
+            configured,
+            connected: configured && check?.connectionStatus === 'healthy',
+            connectionStatus: configured ? check?.connectionStatus ?? 'unchecked' : 'unconfigured',
+            lastCheckedAt: check?.lastCheckedAt ?? null,
+            allowedScope: Array.isArray(entries) ? entries : [],
+            ...(isTrello && personalStatus
+              ? { personalStatus, ...(username ? { username } : {}), ...(connectedAt ? { connectedAt } : {}) }
+              : {}),
+          };
+        })
+      );
+
+      if (options.gmailAvailable && credentialRepo && encryptionKey && userId) {
+        services.push(await personalGmail(userId));
+      }
+      if (options.mycalendarAvailable && credentialRepo && encryptionKey && userId) {
+        services.push(await personalMyCalendar(userId));
+      }
+      if (options.mysheetsAvailable && credentialRepo && encryptionKey && userId) {
+        services.push(await personalMySheets(userId));
+      }
+
+      res.status(200).json({
+        services,
+        canConfigure: mode === 'personal' ? true : isAdminUser,
+        canSelectTeamScope: mode === 'personal' ? true : isAdminUser,
+      });
     } catch (err: any) {
       res.status(500).json({ error: err?.message || 'Failed to list services' });
     }
@@ -344,32 +454,67 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
         return;
       }
 
-      const record = await credentialRepo?.getCredentials(service);
+      const { mode, workspaceId } = getContext(req);
+      const userId = (req as any).user?.id;
+      let record: any = null;
+      if (mode === 'personal' && userId) {
+        record = await credentialRepo?.getPersonalCredentials(service, userId);
+      } else if (mode === 'organization') {
+        record = await credentialRepo?.getCredentials(service, workspaceId);
+      } else {
+        record = await credentialRepo?.getCredentials(service, null);
+      }
+
       credentialVersion = record ? versionOf(record.config) : null;
       if (!record || !encryptionKey) {
-        if ((generations.get(service) ?? 0) === generation) checks.set(service, { credentialVersion, connectionStatus: 'unconfigured', lastCheckedAt: new Date().toISOString() });
+        if ((generations.get(service) ?? 0) === generation) {
+          checks.set(service, { credentialVersion, connectionStatus: 'unconfigured', lastCheckedAt: new Date().toISOString() });
+        }
         res.status(409).json({ service, status: 'unconfigured', message: `${service} credentials are not configured` });
         return;
       }
       const config = decryptCredentials(record.config, encryptionKey);
       const result = await verifyService(service, config, fetchFn);
-      // An in-flight check belongs to the credentials it read, never to a replacement.
-      if ((generations.get(service) ?? 0) === generation) checks.set(service, { credentialVersion, connectionStatus: result.healthy ? 'healthy' : 'unhealthy', lastCheckedAt: new Date().toISOString() });
+      if ((generations.get(service) ?? 0) === generation) {
+        checks.set(service, {
+          credentialVersion,
+          connectionStatus: result.healthy ? 'healthy' : 'unhealthy',
+          lastCheckedAt: new Date().toISOString(),
+        });
+      }
       res.status(result.healthy ? 200 : 502).json({ service, status: result.healthy ? 'healthy' : 'unhealthy', ...result });
     } catch (err: any) {
-      if ((generations.get(service) ?? 0) === generation) checks.set(service, { credentialVersion, connectionStatus: 'unhealthy', lastCheckedAt: new Date().toISOString() });
+      if ((generations.get(service) ?? 0) === generation) {
+        checks.set(service, { credentialVersion, connectionStatus: 'unhealthy', lastCheckedAt: new Date().toISOString() });
+      }
       res.status(502).json({ status: 'unhealthy', error: 'Service connection verification failed' });
     }
   });
 
-  // POST /api/services/:service/credentials
-  router.post('/:service/credentials', async (req: Request, res: Response): Promise<void> => {
+  // POST /api/services/:service/credentials and /api/services/:service/connect
+  const handleSaveCredentials = async (req: Request, res: Response): Promise<void> => {
     try {
-      if (!isAdmin((req as any).user, options.adminUserIds)) {
-        res.status(403).json({ error: 'Only a configured service administrator can change shared credentials' });
-        return;
-      }
+      const { mode, workspaceId, isAdminUser } = getContext(req);
       const service = String(req.params.service);
+      const userId = (req as any).user?.id;
+
+      if (mode === 'personal') {
+        if (service === 'calendar' || service === 'sheets' || service === 'google-calendar' || service === 'google-sheets') {
+          res.status(400).json({ error: 'Không gian cá nhân dùng MyCalendar/MySheets qua OAuth.', code: 'USE_PERSONAL_OAUTH' });
+          return;
+        }
+      } else if (mode === 'organization') {
+        if (!isAdminUser) {
+          res.status(403).json({ error: 'Chỉ quản trị viên tổ chức mới có quyền cấu hình dịch vụ.' });
+          return;
+        }
+      } else {
+        if (!isAdminUser) {
+          res.status(403).json({ error: 'Only a configured service administrator can change shared credentials' });
+          return;
+        }
+      }
+
       const { credentials, allowedScope } = req.body || {};
       const registration = getRegisteredService(service);
       if (!registration) {
@@ -392,24 +537,87 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
         res.status(400).json({ error: 'A non-empty allowed scope and encryption key are required' });
         return;
       }
-      const encrypted = encryptCredentials({ ...Object.fromEntries(fields.map(({ key }) => [key, credentials[key]])), allowedScope: scope }, encryptionKey);
-      await credentialRepo.saveCredentials(service, encrypted);
-      generations.set(service, (generations.get(service) ?? 0) + 1);
-      checks.delete(service);
-      options.onCredentialsChanged?.(service);
+      const encrypted = encryptCredentials(
+        { ...Object.fromEntries(fields.map(({ key }) => [key, credentials[key]])), allowedScope: scope },
+        encryptionKey
+      );
+
+      if (mode === 'personal') {
+        await credentialRepo.upsertPersonalCredentials({ service, userId, config: encrypted, status: 'active' });
+        options.onCredentialsChanged?.(service, null, userId);
+      } else if (mode === 'organization') {
+        await credentialRepo.upsertCredentials(service, encrypted, 'active', (req as any).user?.email, workspaceId);
+        options.onCredentialsChanged?.(service, workspaceId);
+      } else {
+        await credentialRepo.saveCredentials(service, encrypted);
+        generations.set(service, (generations.get(service) ?? 0) + 1);
+        checks.delete(service);
+        options.onCredentialsChanged?.(service);
+      }
+
       res.status(200).json({ success: true, message: `Credentials saved for ${service}` });
     } catch (err: any) {
       res.status(500).json({ error: err?.message || 'Failed to save credentials' });
     }
-  });
+  };
+
+  router.post('/:service/credentials', handleSaveCredentials);
+  router.post('/:service/connect', handleSaveCredentials);
+
+  // DELETE /api/services/:service and /api/services/:service/credentials
+  const handleDeleteCredentials = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { mode, workspaceId, isAdminUser } = getContext(req);
+      const service = String(req.params.service);
+      const userId = (req as any).user?.id;
+
+      if (!credentialRepo) {
+        res.status(500).json({ error: 'Credential repository not configured' });
+        return;
+      }
+
+      if (mode === 'personal') {
+        await credentialRepo.deletePersonalCredentials(service, userId);
+        options.onCredentialsChanged?.(service, null, userId);
+      } else if (mode === 'organization') {
+        if (!isAdminUser) {
+          res.status(403).json({ error: 'Chỉ quản trị viên tổ chức mới có quyền xóa kết nối dịch vụ.' });
+          return;
+        }
+        await credentialRepo.deleteCredentials(service, workspaceId);
+        options.onCredentialsChanged?.(service, workspaceId);
+      } else {
+        if (!isAdminUser) {
+          res.status(403).json({ error: 'Only a configured service administrator can change shared credentials' });
+          return;
+        }
+        await credentialRepo.deleteCredentials(service, null);
+        options.onCredentialsChanged?.(service);
+      }
+
+      res.status(200).json({ success: true, message: `Credentials deleted for ${service}` });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Failed to delete credentials' });
+    }
+  };
+
+  router.delete('/:service', handleDeleteCredentials);
+  router.delete('/:service/credentials', handleDeleteCredentials);
 
   // PUT /api/services/:service/scope
   router.put('/:service/scope', async (req: Request, res: Response): Promise<void> => {
     try {
-      if (!isAdmin((req as any).user, options.adminUserIds)) {
+      const { mode, workspaceId, isAdminUser } = getContext(req);
+      const userId = (req as any).user?.id;
+
+      if (mode === 'organization' && !isAdminUser) {
+        res.status(403).json({ error: 'Only a configured service administrator can change shared credentials' });
+        return;
+      } else if (mode === 'legacy' && !isAdminUser) {
         res.status(403).json({ error: 'Only a configured service administrator can change shared credentials' });
         return;
       }
+
       const service = String(req.params.service);
       const registration = getRegisteredService(service);
       if (!registration) {
@@ -425,16 +633,57 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
         res.status(400).json({ error: 'A non-empty allowed scope and encryption key are required' });
         return;
       }
-      const saved = await credentialRepo.updateCredentials(service, config => encryptCredentials({
-        ...decryptCredentials(config, encryptionKey), allowedScope: scope,
-      }, encryptionKey));
-      if (!saved) {
-        res.status(409).json({ error: 'Hãy lưu thông tin kết nối dịch vụ trước khi đổi phạm vi tài nguyên.' });
-        return;
+
+      if (mode === 'personal') {
+        const current = await credentialRepo.getPersonalCredentials(service, userId);
+        if (!current) {
+          res.status(409).json({ error: 'Hãy lưu thông tin kết nối dịch vụ trước khi đổi phạm vi tài nguyên.' });
+          return;
+        }
+        const dec = decryptCredentials(current.config, encryptionKey);
+        const newConfig = encryptCredentials({ ...dec, allowedScope: scope }, encryptionKey);
+        await credentialRepo.upsertPersonalCredentials({ service, userId, config: newConfig, status: current.status });
+        options.onCredentialsChanged?.(service, null, userId);
+      } else if (mode === 'organization') {
+        const saved = await credentialRepo.updateCredentials(
+          service,
+          (config) =>
+            encryptCredentials(
+              {
+                ...decryptCredentials(config, encryptionKey),
+                allowedScope: scope,
+              },
+              encryptionKey
+            ),
+          workspaceId
+        );
+        if (!saved) {
+          res.status(409).json({ error: 'Hãy lưu thông tin kết nối dịch vụ trước khi đổi phạm vi tài nguyên.' });
+          return;
+        }
+        options.onCredentialsChanged?.(service, workspaceId);
+      } else {
+        const saved = await credentialRepo.updateCredentials(
+          service,
+          (config) =>
+            encryptCredentials(
+              {
+                ...decryptCredentials(config, encryptionKey),
+                allowedScope: scope,
+              },
+              encryptionKey
+            ),
+          null
+        );
+        if (!saved) {
+          res.status(409).json({ error: 'Hãy lưu thông tin kết nối dịch vụ trước khi đổi phạm vi tài nguyên.' });
+          return;
+        }
+        generations.set(service, (generations.get(service) ?? 0) + 1);
+        checks.delete(service);
+        options.onCredentialsChanged?.(service);
       }
-      generations.set(service, (generations.get(service) ?? 0) + 1);
-      checks.delete(service);
-      options.onCredentialsChanged?.(service);
+
       res.status(200).json({ success: true, message: `Allowed scope saved for ${service}` });
     } catch {
       res.status(500).json({ error: 'Không thể lưu phạm vi tài nguyên. Hãy thử lại.' });

@@ -1,7 +1,7 @@
 import type pg from 'pg';
 import type { ScheduleProposalMetadata, ScheduleResponse, ScheduleRunView, ScheduleStateMetadata, ScheduleView } from '@wap/tool-schemas';
 import { MessageRepo } from '../../db/repositories/message-repo.js';
-import { ScheduleRepo, type Queryable, type ScheduleRow } from '../../db/repositories/schedule-repo.js';
+import { ScheduleRepo, type Queryable, type ScheduleRow, type ScheduleScope } from '../../db/repositories/schedule-repo.js';
 import { isUuid } from '../../db/repositories/uuid.js';
 import { runState, runView } from './run-state.js';
 import { nextOccurrence } from './next-occurrence.js';
@@ -139,7 +139,7 @@ export class ScheduleService {
     if (!isUuid(convId) || !isUuid(messageId)) throw new ScheduleNotFound();
     return this.transaction(async (client) => {
       // The conversation row serializes confirmations, including the first one.
-      const owner = await client.query('SELECT user_id FROM conversations WHERE id=$1 FOR UPDATE', [convId]);
+      const owner = await client.query('SELECT user_id, workspace_id, workspace_mode FROM conversations WHERE id=$1 FOR UPDATE', [convId]);
       if (owner.rows[0]?.user_id !== userId) throw new ScheduleNotFound();
       const message = await client.query(
         "SELECT metadata FROM messages WHERE id=$1 AND conv_id=$2 AND metadata->>'type'='schedule_proposal'", [messageId, convId]);
@@ -157,10 +157,12 @@ export class ScheduleService {
         if (existing) throw new ScheduleConflict('CONVERSATION_HAS_SCHEDULE');
         await this.ensureRoom(client, userId);
         const next = this.next({ recurrence: proposal.recurrence! }, now);
+        const wsId = owner.rows[0].workspace_id ?? null;
+        const wsMode = owner.rows[0].workspace_mode ?? 'legacy';
         const created = await client.query(
-          `INSERT INTO schedules(user_id, conv_id, name, request, recurrence, services, status, next_run_at, last_proposal_id)
-           VALUES($1, $2, $3, $4, $5, $6, 'active', $7, $8) RETURNING *`,
-          [userId, convId, proposal.name, proposal.request, JSON.stringify(proposal.recurrence), metadata.services, next, messageId],
+          `INSERT INTO schedules(user_id, conv_id, name, request, recurrence, services, status, next_run_at, last_proposal_id, workspace_id, workspace_mode)
+           VALUES($1, $2, $3, $4, $5, $6, 'active', $7, $8, $9, $10) RETURNING *`,
+          [userId, convId, proposal.name, proposal.request, JSON.stringify(proposal.recurrence), metadata.services, next, messageId, wsId, wsMode],
         );
         return this.recordState(client, created.rows[0], now);
       }
@@ -187,8 +189,8 @@ export class ScheduleService {
     });
   }
 
-  list(userId: string, now: Date) {
-    return this.repo.listForUser(userId, now);
+  list(userId: string, now: Date, scope?: ScheduleScope) {
+    return this.repo.listForUser(userId, now, scope);
   }
 
   async listRuns(userId: string, scheduleId: string, limit: number, now: Date) {
@@ -196,8 +198,8 @@ export class ScheduleService {
     return this.repo.listRuns(scheduleId, limit, now);
   }
 
-  pendingCount(userId: string, now: Date) {
-    return this.repo.pendingCount(userId, now);
+  pendingCount(userId: string, now: Date, scope?: ScheduleScope) {
+    return this.repo.pendingCount(userId, now, scope);
   }
 
   /** Creates a run that plans now ("Chạy lượt này ngay", "Lập lại kế hoạch") and hands it to the scheduler. */

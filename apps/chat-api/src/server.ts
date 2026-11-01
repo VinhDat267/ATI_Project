@@ -410,6 +410,7 @@ async function bootstrap() {
     planRepo,
     stepRepo,
     convRepo,
+    workspaceRepo,
     adapterFactory,
     sseManager,
   });

@@ -9,6 +9,8 @@ import type { ScheduleChange } from './schedule-service.js';
 export interface RunToPlan {
   runId: string; scheduleId: string; scheduleVersion: number; userId: string;
   name: string; request: string; dueAt: Date; trigger: 'scheduled' | 'manual' | 'replan';
+  workspaceId?: string | null;
+  workspaceMode?: 'legacy' | 'personal' | 'organization';
 }
 export interface PreparedRun {
   /** Writes the result with the client of the transaction that holds the schedule row. */
@@ -164,15 +166,16 @@ export class ScheduleRunner {
       // Claim the conversation with the schedule, skipping both when either is held: a confirmation
       // holds the conversation while it waits for the schedule (lock order in ScheduleRepo.ownedSchedule).
       const due = await client.query(
-        `SELECT s.*, u.status AS owner_status FROM schedules s
+        `SELECT s.*, u.status AS owner_status, wm.status AS member_status FROM schedules s
          JOIN conversations c ON c.id = s.conv_id JOIN users u ON u.id = s.user_id
+         LEFT JOIN workspace_members wm ON wm.workspace_id = s.workspace_id AND wm.user_id = s.user_id
          WHERE s.status = 'active' AND s.next_run_at <= $1
          ORDER BY s.next_run_at, s.id FOR UPDATE OF c, s SKIP LOCKED LIMIT ${DUE_PER_TICK}`, [now]);
-      for (const row of due.rows as Array<ScheduleRow & { owner_status: string }>) {
+      for (const row of due.rows as Array<ScheduleRow & { owner_status: string; member_status?: string }>) {
         // A run started by hand is still planning; look again next tick.
         if ((await client.query("SELECT 1 FROM schedule_runs WHERE schedule_id=$1 AND status='planning'", [row.id])).rowCount) continue;
         const dueAt = new Date(row.next_run_at!);
-        if (row.owner_status !== 'active') {
+        if (row.owner_status !== 'active' || (row.workspace_mode === 'organization' && row.member_status !== 'active')) {
           await this.insertRun(client, row, dueAt, 'blocked', { error: BLOCKED });
           changes.push(await this.options.recordState(client, await this.pause(client, row.id, BLOCKED), now));
           continue;
@@ -216,19 +219,19 @@ export class ScheduleRunner {
     const { pool, timeZone } = this.options;
     const started = await inTransaction(pool, async (client) => {
       const res = await client.query(
-        `SELECT r.*, s.user_id, s.name, s.request FROM schedule_runs r JOIN schedules s ON s.id = r.schedule_id
+        `SELECT r.*, s.user_id, s.name, s.request, s.workspace_id, s.workspace_mode FROM schedule_runs r JOIN schedules s ON s.id = r.schedule_id
          WHERE r.id = $1 AND r.status = 'planning' FOR UPDATE OF r`, [runId]);
       const run = res.rows[0];
       if (!run) return null;
       const dueAt = new Date(run.due_at);
       const label = localLabel(dueAt, timeZone);
-      const convId = (await client.query("INSERT INTO conversations(user_id, status, title) VALUES($1, 'chatting', $2) RETURNING id",
-        [run.user_id, `Lịch: ${run.name} · ${label}`])).rows[0].id as string;
+      const convId = (await client.query("INSERT INTO conversations(user_id, status, title, workspace_id, workspace_mode) VALUES($1, 'chatting', $2, $3, $4) RETURNING id",
+        [run.user_id, `Lịch: ${run.name} · ${label}`, run.workspace_id ?? null, run.workspace_mode ?? 'legacy'])).rows[0].id as string;
       const metadata: ScheduleRunMessageMetadata = { type: 'schedule_run', scheduleId: run.schedule_id, runId: run.id, name: run.name, dueAt: dueAt.toISOString(), trigger: run.trigger };
       const first = await this.messages.createMessage(convId, 'user', runMessage({ name: run.name, request: run.request, dueAt }, timeZone), metadata, client);
       await client.query('UPDATE schedule_runs SET conv_id=$2, updated_at=now() WHERE id=$1', [runId, convId]);
       const toPlan: RunToPlan = { runId: run.id, scheduleId: run.schedule_id, scheduleVersion: run.schedule_version, userId: run.user_id,
-        name: run.name, request: run.request, dueAt, trigger: run.trigger };
+        name: run.name, request: run.request, dueAt, trigger: run.trigger, workspaceId: run.workspace_id ?? null, workspaceMode: run.workspace_mode ?? 'legacy' };
       return { toPlan, convId, messageId: first.id };
     });
     if (!started) return;

@@ -43,12 +43,14 @@ export function createScheduleRoutes(options: ScheduleRoutesOptions): Router {
     }
   };
 
-  router.get('/schedules', handle(async (_req, res, userId) => {
-    res.json({ schedules: await service.list(userId, now()) });
+  router.get('/schedules', handle(async (req, res, userId) => {
+    const scope = req.workspace ? { workspaceMode: req.workspace.mode, workspaceId: req.workspace.workspaceId } : undefined;
+    res.json({ schedules: await service.list(userId, now(), scope) });
   }));
 
-  router.get('/schedules/pending-count', handle(async (_req, res, userId) => {
-    res.json({ count: await service.pendingCount(userId, now()) });
+  router.get('/schedules/pending-count', handle(async (req, res, userId) => {
+    const scope = req.workspace ? { workspaceMode: req.workspace.mode, workspaceId: req.workspace.workspaceId } : undefined;
+    res.json({ count: await service.pendingCount(userId, now(), scope) });
   }));
 
   router.get('/schedules/:id/runs', handle(async (req, res, userId) => {

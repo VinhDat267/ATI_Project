@@ -6,6 +6,11 @@ import { isUuid } from './uuid.js';
 
 export type Queryable = Pick<pg.Pool | pg.PoolClient, 'query'>;
 
+export interface ScheduleScope {
+  workspaceMode?: 'legacy' | 'personal' | 'organization';
+  workspaceId?: string | null;
+}
+
 export interface ScheduleRow {
   id: string;
   user_id: string;
@@ -19,6 +24,8 @@ export interface ScheduleRow {
   version: number;
   next_run_at: Date | null;
   last_proposal_id: string | null;
+  workspace_id?: string | null;
+  workspace_mode?: 'legacy' | 'personal' | 'organization';
   created_at: Date;
   updated_at: Date;
 }
@@ -33,9 +40,15 @@ export class ScheduleRepo {
     const first = row.status === 'active' && row.next_run_at ? new Date(row.next_run_at) : null;
     const upcoming = first ? [first, ...nextRuns(row.recurrence, first, this.timeZone, 2)] : [];
     return {
-      id: row.id, convId: row.conv_id, version: row.version,
-      name: row.name, request: row.request, recurrence: row.recurrence, services: row.services,
-      status: row.status, pauseReason: row.pause_reason,
+      id: row.id,
+      convId: row.conv_id,
+      version: row.version,
+      name: row.name,
+      request: row.request,
+      recurrence: row.recurrence,
+      services: row.services,
+      status: row.status,
+      pauseReason: row.pause_reason,
       nextRuns: upcoming.map((d) => d.toISOString()),
       lastRun: lastRun ? runView(lastRun, now) : null,
     };
@@ -45,15 +58,22 @@ export class ScheduleRepo {
   stateText(view: ScheduleView): string {
     const name = `Lịch "${view.name}"`;
     switch (view.status) {
-      case 'active': return `${name} đang bật, phiên bản ${view.version}. Lần chạy tới: ${localLabel(new Date(view.nextRuns[0]!), this.timeZone)}.`;
-      case 'paused': return `${name} đã tạm dừng${view.pauseReason ? `: ${view.pauseReason}` : ''}.`;
-      case 'cancelled': return `${name} đã hủy.`;
-      case 'completed': return `${name} đã chạy xong.`;
+      case 'active':
+        return `${name} đang bật, phiên bản ${view.version}. Lần chạy tới: ${localLabel(new Date(view.nextRuns[0]!), this.timeZone)}.`;
+      case 'paused':
+        return `${name} đã tạm dừng${view.pauseReason ? `: ${view.pauseReason}` : ''}.`;
+      case 'cancelled':
+        return `${name} đã hủy.`;
+      case 'completed':
+        return `${name} đã chạy xong.`;
     }
   }
 
   async lastRun(scheduleId: string, db: Queryable = this.pool): Promise<RunRow | null> {
-    const res = await db.query(`${RUN_SELECT} WHERE r.schedule_id = $1 ORDER BY r.created_at DESC, r.id DESC LIMIT 1`, [scheduleId]);
+    const res = await db.query(
+      `${RUN_SELECT} WHERE r.schedule_id = $1 ORDER BY r.created_at DESC, r.id DESC LIMIT 1`,
+      [scheduleId]
+    );
     return res.rows[0] ?? null;
   }
 
@@ -65,12 +85,24 @@ export class ScheduleRepo {
   }
 
   /** Open schedules, and closed ones changed in the last 30 days. */
-  async listForUser(userId: string, now: Date): Promise<ScheduleView[]> {
+  async listForUser(userId: string, now: Date, scope?: ScheduleScope): Promise<ScheduleView[]> {
+    let scopeClause = '';
+    const args: any[] = [userId, now];
+    if (scope) {
+      if (scope.workspaceMode === 'personal') {
+        scopeClause = " AND s.workspace_mode IN ('personal', 'legacy') AND s.workspace_id IS NULL";
+      } else if (scope.workspaceMode === 'organization' && scope.workspaceId) {
+        args.push(scope.workspaceId);
+        scopeClause = ` AND s.workspace_mode = 'organization' AND s.workspace_id = $${args.length}`;
+      } else if (scope.workspaceMode === 'legacy') {
+        scopeClause = " AND s.workspace_id IS NULL";
+      }
+    }
     const res = await this.pool.query(
       `SELECT s.*, ${LAST_RUN} FROM schedules s
-       WHERE s.user_id = $1 AND (s.status IN ('active', 'paused') OR s.updated_at > $2::timestamptz - interval '30 days')
+       WHERE s.user_id = $1 AND (s.status IN ('active', 'paused') OR s.updated_at > $2::timestamptz - interval '30 days')${scopeClause}
        ORDER BY s.created_at DESC, s.id DESC`,
-      [userId, now],
+      args
     );
     return res.rows.map((row) => this.view(row, row.last_run, now));
   }
@@ -82,20 +114,44 @@ export class ScheduleRepo {
    * locks its conversation, so locking the schedule and then writing its state
    * message would deadlock with a confirmation.
    */
-  async ownedSchedule(id: string, userId: string, db: Queryable = this.pool, lock = false): Promise<ScheduleRow | null> {
+  async ownedSchedule(
+    id: string,
+    userId: string,
+    db: Queryable = this.pool,
+    lock = false,
+    scope?: ScheduleScope
+  ): Promise<ScheduleRow | null> {
     if (!isUuid(id)) return null;
+    let scopeClause = '';
+    const args: any[] = [id, userId];
+    if (scope) {
+      if (scope.workspaceMode === 'personal') {
+        scopeClause = " AND workspace_mode IN ('personal', 'legacy') AND workspace_id IS NULL";
+      } else if (scope.workspaceMode === 'organization' && scope.workspaceId) {
+        args.push(scope.workspaceId);
+        scopeClause = ` AND workspace_mode = 'organization' AND workspace_id = $${args.length}`;
+      } else if (scope.workspaceMode === 'legacy') {
+        scopeClause = " AND workspace_id IS NULL";
+      }
+    }
     if (lock) {
       // conv_id never changes, so it can be read before the locks.
-      const found = await db.query('SELECT conv_id FROM schedules WHERE id = $1 AND user_id = $2', [id, userId]);
+      const found = await db.query(`SELECT conv_id FROM schedules WHERE id = $1 AND user_id = $2${scopeClause}`, args);
       if (!found.rowCount) return null;
       await db.query('SELECT id FROM conversations WHERE id = $1 FOR UPDATE', [found.rows[0].conv_id]);
     }
-    const res = await db.query(`SELECT * FROM schedules WHERE id = $1 AND user_id = $2${lock ? ' FOR UPDATE' : ''}`, [id, userId]);
+    const res = await db.query(
+      `SELECT * FROM schedules WHERE id = $1 AND user_id = $2${scopeClause}${lock ? ' FOR UPDATE' : ''}`,
+      args
+    );
     return res.rows[0] ?? null;
   }
 
   async listRuns(scheduleId: string, limit: number, now: Date) {
-    const res = await this.pool.query(`${RUN_SELECT} WHERE r.schedule_id = $1 ORDER BY r.created_at DESC, r.id DESC LIMIT $2`, [scheduleId, limit]);
+    const res = await this.pool.query(
+      `${RUN_SELECT} WHERE r.schedule_id = $1 ORDER BY r.created_at DESC, r.id DESC LIMIT $2`,
+      [scheduleId, limit]
+    );
     return res.rows.map((row: RunRow) => runView(row, now));
   }
 
@@ -106,11 +162,23 @@ export class ScheduleRepo {
   }
 
   /** Runs of the member's schedules whose latest plan still waits for approval. */
-  async pendingCount(userId: string, now: Date): Promise<number> {
+  async pendingCount(userId: string, now: Date, scope?: ScheduleScope): Promise<number> {
+    let scopeClause = '';
+    const args: any[] = [userId, now];
+    if (scope) {
+      if (scope.workspaceMode === 'personal') {
+        scopeClause = " AND s.workspace_mode IN ('personal', 'legacy') AND s.workspace_id IS NULL";
+      } else if (scope.workspaceMode === 'organization' && scope.workspaceId) {
+        args.push(scope.workspaceId);
+        scopeClause = ` AND s.workspace_mode = 'organization' AND s.workspace_id = $${args.length}`;
+      } else if (scope.workspaceMode === 'legacy') {
+        scopeClause = " AND s.workspace_id IS NULL";
+      }
+    }
     const res = await this.pool.query(
       `SELECT count(*)::int AS n FROM (${RUN_SELECT}) runs JOIN schedules s ON s.id = runs.schedule_id
-       WHERE s.user_id = $1 AND runs.status = 'planned' AND runs.plan_status = 'pending' AND runs.plan_expires_at > $2`,
-      [userId, now],
+       WHERE s.user_id = $1 AND runs.status = 'planned' AND runs.plan_status = 'pending' AND runs.plan_expires_at > $2${scopeClause}`,
+      args
     );
     return res.rows[0].n;
   }

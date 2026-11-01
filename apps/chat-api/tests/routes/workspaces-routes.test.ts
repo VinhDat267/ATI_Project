@@ -157,9 +157,11 @@ describe('Task 3: Workspaces routes, X-Workspace-Id middleware, and organization
     expect(joinRes.body.workspace.status).toBe('pending');
 
     // Email outbox should have notification sent to Alice
-    const outbox = await pool.query('SELECT * FROM email_outbox');
-    expect(outbox.rows.length).toBeGreaterThan(0);
-    expect(outbox.rows[0].to_address).toBe(`${aliceId}@example.test`);
+    await vi.waitFor(async () => {
+      const outbox = await pool.query('SELECT * FROM email_outbox');
+      expect(outbox.rows.length).toBeGreaterThan(0);
+      expect(outbox.rows[0].to_address).toBe(`${aliceId}@example.test`);
+    });
 
     // Bob tries to access an endpoint with X-Workspace-Id: ws.id -> 403 WORKSPACE_MEMBER_PENDING
     const deniedRes = await request(app)
