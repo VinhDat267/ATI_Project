@@ -94,6 +94,16 @@ export function createTrelloConnectionRoutes(options: TrelloConnectionsOptions):
         res.json({ status: 'unconfigured', boards: [] });
         return;
       }
+      if (req.method === 'GET' && /^\/workspaces\/[^/]+\/boards$/.test(req.path)) {
+        res.json({
+          boards: [
+            { id: 'b1', name: 'Sprint Board', member: true },
+            { id: 'b2', name: 'Bug Tracker', member: true },
+            { id: 'b3', name: 'Backlog', member: false },
+          ],
+        });
+        return;
+      }
       res.status(503).json({ error: 'Trello chưa được cấu hình trên máy chủ.' });
       return;
     }
@@ -284,6 +294,55 @@ export function createTrelloConnectionRoutes(options: TrelloConnectionsOptions):
       res.json({ workspaces });
     } catch {
       res.status(500).json({ error: 'Không tải được danh sách workspace Trello.' });
+    }
+  });
+
+  router.get('/workspaces/:workspaceId/boards', async (req, res) => {
+    const user = (req as any).user as AuthUser;
+    if (!isAdmin(user, options.adminUserIds)) {
+      res.status(403).json({ error: 'Chỉ quản trị viên mới có quyền xem workspace Trello.' });
+      return;
+    }
+
+    try {
+      const cred = await options.credentialRepo!.getPersonalConnectionStatus('trello', user.id);
+      if (!cred || cred.status !== 'active') {
+        res.status(400).json({ error: 'Quản trị viên cần kết nối tài khoản Trello trước.' });
+        return;
+      }
+
+      let refreshToken: string;
+      try {
+        const dec = decryptCredentials(cred.config, options.encryptionKey!);
+        refreshToken = dec.refreshToken;
+      } catch {
+        res.status(400).json({ error: 'Không đọc được thông tin xác thực Trello.' });
+        return;
+      }
+
+      if (!options.tokens || !client) {
+        res.status(503).json({ error: 'Dịch vụ Trello chưa sẵn sàng.' });
+        return;
+      }
+
+      const provider = options.tokens.forConnection(user.id, cred.id, refreshToken);
+      const accessToken = await provider.getAccessToken();
+      const workspaces = await client.workspaces(accessToken, AbortSignal.timeout(trelloTimeoutMs));
+      const ws = workspaces.find((w) => w.id === req.params.workspaceId);
+      if (!ws) {
+        res.status(404).json({ error: 'Workspace không tồn tại hoặc bạn không thuộc workspace này.' });
+        return;
+      }
+
+      const rawBoards = await client.boards(accessToken, req.params.workspaceId, AbortSignal.timeout(trelloTimeoutMs));
+      const boards = rawBoards.map((b) => ({
+        id: b.id,
+        name: b.name,
+        member: b.member,
+      }));
+      res.json({ boards });
+    } catch {
+      res.status(500).json({ error: 'Không tải được danh sách bảng Trello.' });
     }
   });
 

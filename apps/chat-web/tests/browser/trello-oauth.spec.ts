@@ -61,17 +61,6 @@ test('TRELLO: admin selects workspace and two boards, member connects via fake O
     });
   });
 
-  await page.route('**/api/connections/trello/workspaces/*/boards', async (route) => {
-    return route.fulfill({
-      json: {
-        boards: [
-          { id: 'b1', name: 'Sprint Board', workspaceId: 'ws-1', member: true },
-          { id: 'b2', name: 'Bug Tracker', workspaceId: 'ws-1', member: true },
-          { id: 'b3', name: 'Backlog', workspaceId: 'ws-1', member: false },
-        ],
-      },
-    });
-  });
 
   await page.route('**/api/connections/trello/scope', async (route) => {
     if (route.request().method() === 'PUT') {

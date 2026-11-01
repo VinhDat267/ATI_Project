@@ -173,7 +173,7 @@ describe('Trello scope and workspace management routes', () => {
   });
 
   describe('role restrictions', () => {
-    it('returns 403 when a non-admin member calls PUT /scope or GET /workspaces', async () => {
+    it('returns 403 when a non-admin member calls PUT /scope, GET /workspaces, or GET /workspaces/:workspaceId/boards', async () => {
       const app = build();
 
       const putRes = await request(app)
@@ -186,9 +186,14 @@ describe('Trello scope and workspace management routes', () => {
         .get('/api/connections/trello/workspaces')
         .set('Authorization', bearer(memberAlice));
       expect(getWsRes.status).toBe(403);
+
+      const getBoardsRes = await request(app)
+        .get('/api/connections/trello/workspaces/ws-1/boards')
+        .set('Authorization', bearer(memberAlice));
+      expect(getBoardsRes.status).toBe(403);
     });
 
-    it('allows an admin to get workspaces', async () => {
+    it('allows an admin to get workspaces and candidate boards for an admin workspace', async () => {
       const app = build();
 
       const res = await request(app)
@@ -201,6 +206,31 @@ describe('Trello scope and workspace management routes', () => {
           { id: 'ws-2', name: 'Design Workspace' },
         ],
       });
+
+      const boardsRes = await request(app)
+        .get('/api/connections/trello/workspaces/ws-1/boards')
+        .set('Authorization', bearer(admin));
+      expect(boardsRes.status).toBe(200);
+      expect(boardsRes.body.boards).toBeDefined();
+      expect(boardsRes.body.boards).toEqual(
+        expect.arrayContaining([
+          { id: 'board-1', name: 'Sprint Board', member: true },
+          { id: 'board-2', name: 'Bug Tracker', member: true },
+          { id: 'board-nonmember', name: 'Readonly Board', member: false },
+        ])
+      );
+      // alien board belongs to ws-foreign, not ws-1
+      expect(boardsRes.body.boards.find((b: any) => b.id === 'board-alien')).toBeUndefined();
+    });
+
+    it('returns 404 when admin requests boards for a workspace that does not belong to the admin', async () => {
+      const app = build();
+
+      const res = await request(app)
+        .get('/api/connections/trello/workspaces/ws-foreign/boards')
+        .set('Authorization', bearer(admin));
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('Workspace không tồn tại hoặc bạn không thuộc workspace này.');
     });
   });
 
