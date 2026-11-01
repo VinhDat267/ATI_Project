@@ -26,6 +26,8 @@ Nếu identity-only không đáp ứng onboarding, cần chủ dự án quyết 
 
 ## Kết quả
 
+- Mới nhất 01/11, sau Accept site thứ hai: **hai Jira site đồng thời LIVE_OBSERVED** trong cùng process với site đầu tiên; `connected: true`, `siteCount: 2`, `adminSiteCount: 2`, identity/jiraAuthorization/permissionsRead true. Hai refresh mới đều đạt và account-match guard giữ nguyên danh tính. Đã lưu ba snapshot safe; refresh giữ resource snapshot từ consent, không tự gọi lại resources. Còn grant-model console, wrong-account/non-admin native và review/CI; chưa đóng task tổng thể. [Log hai site](../log/2026-11-01-codex-jira-01-native-two-sites.md).
+
 - Code commits: `7b4e2d4` client, `7a58219` session, `6a91183` runner, `b49334a` sửa review. Không thay runtime API/UI, migration, planner, executor hoặc bật cờ.
 - `npm test -w @wap/tool-adapters` với sandbox env: **443/443 Vitest +31/31 Node PASS, exit 0**. Các Node case dùng HTTP loopback, code dùng một lần, rotation stateful, cookie/Origin, process CLI và response barriers thật.
 - **12/12 mutation bị bắt**, trên các bản sao ignored; không sửa source để chạy mutation. Không đếm EPERM/missing-module như behavioral RED của guard.
