@@ -76,6 +76,17 @@ export class SlackLifecycleValidationRepo {
   /** Call only within the same transaction as the consumer's guarded outcome.
    * false means ownership was lost: caller must roll back ALL staged effects.
    */
+  async assertOwnedInTransaction(client:pg.PoolClient,input:ValidationLease):Promise<void> {
+    lease(input);
+    await client.query('SAVEPOINT slack_rotation_tx_guard');
+    await client.query('RELEASE SAVEPOINT slack_rotation_tx_guard');
+    await this.lockLease(client,input);
+    const owned=await client.query(`SELECT id FROM slack_lifecycle_intents WHERE id=$1 AND validation_lease_token=$2
+      AND validation_lease_owner=$3 AND validation_lease_until>clock_timestamp() AND status IN ('pending','failed')`,
+      [input.id,input.leaseToken,input.workerId]);
+    if(owned.rowCount!==1) throw new Error('SLACK_VALIDATION_LEASE_LOST');
+  }
+
   async completeInTransaction(client: pg.PoolClient, input: ValidationLease, outcome: ValidationOutcome, now = new Date()): Promise<boolean> {
     lease(input); clock(now);
     if (!['valid','invalid','superseded'].includes(outcome)) throw new TypeError('Invalid validation outcome');

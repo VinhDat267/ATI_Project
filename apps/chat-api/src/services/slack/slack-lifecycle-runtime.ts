@@ -3,7 +3,7 @@ import type pg from 'pg';
 import { slackIngressEnv } from '../../config/slack-ingress-env.js';
 import { slackLifecycleApiBaseUrl } from '../../config/slack-env.js';
 import { SlackLifecycleValidationRepo } from '../../db/repositories/slack-lifecycle-validation-repo.js';
-import { SlackIdentityClient } from './oauth-client.js';
+import { SlackIdentityClient, SlackRefreshClient } from './oauth-client.js';
 import { SlackInvalidationService } from './slack-invalidation-service.js';
 import { SlackLifecycleValidationWorker } from './slack-lifecycle-validation-worker.js';
 
@@ -60,8 +60,10 @@ export function createSlackLifecycleRuntime(options:RuntimeOptions):SlackLifecyc
   if(!options.pool || !options.encryptionKey || !slackIngressEnv(options.env,options.live)) return undefined;
   const apiBaseUrl=slackLifecycleApiBaseUrl(options.env,options.live);
   if(!apiBaseUrl) return undefined;
+  const clientId=options.env.MYSLACK_OAUTH_CLIENT_ID?.trim(),clientSecret=options.env.MYSLACK_OAUTH_CLIENT_SECRET?.trim();
   const worker=new SlackLifecycleValidationWorker({pool:options.pool,jobs:new SlackLifecycleValidationRepo(options.pool),
     oauth:new SlackIdentityClient(apiBaseUrl),invalidation:new SlackInvalidationService(options.pool),
+    ...(clientId && clientSecret?{rotation:{appId:options.env.MYSLACK_APP_ID!,client:new SlackRefreshClient(apiBaseUrl,clientId,clientSecret)}}:{}),
     encryptionKey:options.encryptionKey,workerId:options.workerId??`slack-validation-${randomUUID()}`});
   return new SlackLifecycleValidationRunner(worker,options);
 }

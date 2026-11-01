@@ -50,3 +50,8 @@ Card04B3 chỉ tạo intent metadata riêng theo binding, chưa đọc nội dun
 Nghiệm thu thật yêu cầu app/workspace của nhóm, người dùng tự cấp/thu hồi quyền và kiểm đúng actor/workspace. Bằng chứng fixture/browser không chứng minh Slack thật. Chưa phân phối rộng hoặc tuyên bố full Slack.
 
 Nguồn đối chiếu 29/10/2026: [OAuth](https://docs.slack.dev/authentication/installing-with-oauth/), [rotation](https://docs.slack.dev/authentication/using-token-rotation/), [auth.revoke](https://docs.slack.dev/reference/methods/auth.revoke/). Thiết kế chuẩn tắc vẫn là [Slack cá nhân](../superpowers/specs/2026-10-28-slack-personal-oauth-design.md).
+
+### Lifecycle rotation recovery (04B4)
+Retain MYSLACK_OAUTH_CLIENT_ID and MYSLACK_OAUTH_CLIENT_SECRET with the existing app ID, signing secret and pinned lifecycle endpoint during flags-off draining. These private credentials permit only that app's captured lifecycle rotation; no redirect or OAuth-start flag is required. If either is missing, expired rotating credentials remain blocked for manual reconnect.
+
+A durable refresh_in_flight checkpoint is committed before one single-use exchange. Confirmed fresh tokens are encrypted under exact owner/app/binding/config/lease fences; matching pending metadata jobs/barriers follow the new fingerprint without releasing any block. Fresh auth.test resolves one captured barrier. Transient identity probes retain confirmed credentials. Unknown exchange, crash checkpoint, expired lease or contradictory principal keeps reconnect_required and the block; never replay the old refresh token or infer grant revocation from event time. Manual reconnect/disconnect takes priority through the owner lock. No provider-wide revoke or content/model access is performed.
