@@ -1,3 +1,5 @@
+import type { JiraPlanConnection } from './myjira-context.js';
+
 /**
  * Input properties naming an external resource carry `x-resource` (the working
  * memory entity key filled by gather, e.g. 'list') and optionally
@@ -88,6 +90,7 @@ export interface PlanConnections {
   mycalendar?: { credentialId: string; email: string; allowedCalendars: string[] };
   mysheets?: { credentialId: string; email: string; allowedSpreadsheets: string[] };
   trello?: { credentialId: string; memberId: string; username: string; boardIds: string[] };
+  myjira?: JiraPlanConnection;
 }
 
 export interface PersonalCalendarItem {
