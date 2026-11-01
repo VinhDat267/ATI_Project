@@ -322,6 +322,7 @@ export class ExecutionService {
 
   private async continueStep(planId: string, stepId: string, userId: string, action: 'retry' | 'skip'): Promise<any> {
     let planRow = await this.getOwnedPlan(planId, userId);
+    if(isBoundSlackWritePlan(planRow.plan_json,userId))throw recoveryConflict('SLACK_POST_RECONCILE_REQUIRED');
     // Include the preceding run's plan-status write in the serialization boundary.
     const priorRun = this.activeRuns.get(planId);
     if (priorRun) {
@@ -388,7 +389,6 @@ export class ExecutionService {
 
   async stop(planId: string, userId: string): Promise<any> {
     const planRow = await this.getOwnedPlan(planId, userId);
-    if(isBoundSlackWritePlan(planRow.plan_json,userId))throw recoveryConflict('SLACK_POST_RECONCILE_REQUIRED');
     const status = this.executionOutcomes.get(planId)?.status || planRow.status;
     if (['completed', 'stopped', 'failed', 'pending', 'rejected', 'superseded', 'expired'].includes(status)) {
       throw Object.assign(new Error('Cannot stop a terminal execution'), { status: 409 });
@@ -471,7 +471,8 @@ export class ExecutionService {
     const rows=await this.stepRepo.listSteps(planId),row=rows.find(r=>r.step_id===stepId);
     if(rows.length!==1||!row||row.status!=='unknown')throw recoveryConflict('SLACK_POST_RECONCILE_UNAVAILABLE');
     let output;try{output=await this.slackWrite.reconcile({planId,planHash:plan.plan_hash,userId,steps:plan.plan_json.steps,bindings:plan.plan_json.connections.myslack},stepId);}catch{throw recoveryConflict('SLACK_WRITE_UNKNOWN');}
-    try{await this.stepRepo.completeSlackPostReconciliation(planId,stepId,userId,plan.plan_hash,output);}catch{throw recoveryConflict('SLACK_WRITE_UNKNOWN');}
+    try{await this.stepRepo.completeSlackPostReconciliation(planId,stepId,userId,plan.plan_hash,output,
+      c=>this.slackWrite!.assertCompletion({planId,planHash:plan.plan_hash,userId,steps:plan.plan_json.steps,bindings:plan.plan_json.connections.myslack},stepId,c));}catch{throw recoveryConflict('SLACK_WRITE_UNKNOWN');}
     this.activeControllers.delete(planId);this.executionOutcomes.set(planId,{status:'completed'});
     this.emitExecution(plan.conv_id,'exec_done',{planId,status:'completed'});return {status:'completed',output};
   }

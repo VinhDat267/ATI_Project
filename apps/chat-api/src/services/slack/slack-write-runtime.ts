@@ -60,4 +60,10 @@ export class SlackWriteRuntime {
  }
  async execute(s:SlackExecutionSnapshot,step:PlanStep,signal?:AbortSignal){if(canonicalSlackJson(s.steps[0])!==canonicalSlackJson(step))throw slackWriteDenied();return this.writer.execute(await this.input(s,step.id,signal));}
  async reconcile(s:SlackExecutionSnapshot,stepId:string,signal?:AbortSignal){return this.writer.reconcile(await this.input(s,stepId,signal));}
+ async assertCompletion(s:SlackExecutionSnapshot,stepId:string,c:pg.PoolClient){
+  const {binding,step,params}=validateSlackPostPlan(body(s),s.userId);if(step.id!==stepId)throw slackWriteDenied();
+  // Caller holds the owner transaction lock. No nested token/owner acquisition.
+  // This takes invalidation advisory locks before current authority rows.
+  await this.authorize({planId:s.planId,planHash:s.planHash,stepId,appId:this.o.appId,binding,params},c);
+ }
 }
