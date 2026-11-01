@@ -1,6 +1,6 @@
 # SLACK-03B3 · Binding bất biến & cổng phê duyệt trong Executor
 
-**Trạng thái:** PLAN_ONLY — kế hoạch đã hiệu chỉnh sau review độc lập; không có mã runtime nào được sửa trong task này.
+**Current status:** internal approved reads accepted on integration via PR #221; public integration 03B4 accepted via PR #222 as M2 internal/fixture. The plan-only material below is design history.
 **Nhánh công việc:** `docs/slack-03b3-executor-binding-plan` · **Nền tham chiếu:** integration `612ac427` (`origin/integration/slack-personal-20261029`); nhánh tài liệu tách từ `59f1aafc` trước khi 03B1/03C1 merge.
 **Vai trò sở hữu:** Backend Engineer (kế hoạch cho `packages/executor/`, `apps/chat-api/`, `packages/tool-schemas/` với điều kiện đồng ý chung).
 **Task cha:** [SLACK-03-tool-catalog-and-source-lifecycle](SLACK-03-tool-catalog-and-source-lifecycle.md).
@@ -132,7 +132,7 @@ Không đổi: `isWriteTool` cho Gmail/Calendar/Sheets, `AdapterFactory` persona
 - Chủ dự án yêu cầu hoàn tất M2. Nhánh `feat/slack-03b3-read-binding`, baseline `f5167983`; kế hoạch hiện hành [M2 read integration](../../superpowers/plans/2026-11-01-slack-m2-read-integration.md) thay các giả định triển khai cũ ở `612ac427`.
 - Đã có shared binding/dependency validators, immutable executor envelope, backend authority hook, writer cho binding-only read plan, transactional promotion của kết quả sang lineage toàn plan/step và SSE reload-only.
 - OAuth thêm `users:read`; grant thiếu quyền bị chặn trước transport. Plan đọc bền vững yêu cầu tổ chức cho phép storage1day; private retention0 không đổi.
-- Focused schema9, executor guard9 và PostgreSQL integration8 đạt; fullcheck3774 (3301v3+406eval+1launcher+66Node) exit0, typecheck/build/security đạt; browser OAuth4/4. Review độc lập tìm P2 per-member lineage và known retry defect, đã sửa RED→GREEN; writer text/hash cũng được khóa. [Log](../log/2026-11-01-slack-03b3-read-runtime.md). CI chờ đúng published head; chưa tuyên bố accepted staging/M2 hoặc public route/planner/UI/native.
+- Focused schema9, executor guard9 và PostgreSQL integration8 đạt; fullcheck3774 (3301v3+406eval+1launcher+66Node) exit0, typecheck/build/security đạt; browser OAuth4/4. Review độc lập tìm P2 per-member lineage và known retry defect, đã sửa RED→GREEN; writer text/hash cũng được khóa. [Log](../log/2026-11-01-slack-03b3-read-runtime.md). CI 41252016030 check/browser SUCCESS at head `c63a24f6e5f44d82f6e3dae550e452d44e50e4a6`; merge `3d90e862d7046ce00da3a80d38d33b40e5d2986f` tree equals head (diff exit 0). Internal 03B3 accepted; public03B4 and M2 internal/fixture subsequently accepted via PR #222, head294bbab3 / merge028e10e1, CI41254450922SUCCESS. Native remains open. [Integration record](../log/2026-11-01-slack-m2-review-integration.md).
 
 - Đã hiệu chỉnh 3 tài liệu 03B3 theo 6 khe hở review: envelope đầy đủ thay digest; dependency selector server-derived + resolver grammar + provenance per-entity; TOCTOU detach/freeze/abort/reauthorize; validator runtime Task 1 + lệnh test đúng; multi-workspace explicit; anchor `612ac427`/`390b1c54`/`23544be9`.
 - Hiệu chỉnh cuối: digest chỉ băm `slackDigestInput` (bỏ `digest`, Backend dùng cùng projection); phân biệt `transient`/`stored`/`persisted`, persisted/derived bị deny tới 03B2, stored qua `getSource`; provenance type đặt tại tool-schemas, executor không import tool-adapters.

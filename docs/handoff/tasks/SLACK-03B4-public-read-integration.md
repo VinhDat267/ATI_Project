@@ -1,6 +1,6 @@
 # SLACK-03B4 · Approved personal Slack reads in ATI
 
-**Status:** implementation and local integration complete01/11/2026; independent review findings fixed with regressions. Publication/exact-head CI and staging acceptance remain pending at commit.
+**Status:** ACCEPTED on Slack staging01/11/2026 via PR #222; M2 internal/HTTP-fixture acceptance complete. Native/live remains open.
 **Branch:** feat/slack-03b4-public-read, stacked on03B3 commit c63a24f6 (PR221); exact-head CI/integration of221 is required before staging acceptance.
 **Spec:** ../../superpowers/specs/2026-10-28-slack-personal-oauth-design.md
 **Plan:** ../../superpowers/plans/2026-11-01-slack-m2-read-integration.md
@@ -26,7 +26,7 @@ A signed-in member selects an owned Slack workspace, asks for a bounded core rea
 - [x] Guarded result reload/revocation and physical erasure use03B3 lineage, including empty and member collections.
 - [x] UI workspace selection/owner-switch, read preview/results and cleared stale data.
 - [x] Actual server bootstrap fixture browser at375/1440 light/dark; no native claims.
-- [ ] Fullcheck, relevant/full browser CI, independent review and exact-head CI before staging acceptance.
+- [x] Fullcheck, relevant/full browser CI, independent review findings fixed with regressions and exact-head CI before staging acceptance.
 
 ## Kết quả
 Đã nối planner→HTTP→preview→approval→private runtime→guarded result và giao diện chọn workspace. Model chỉ nhận yêu cầu người dùng và metadata; không có Slack transport trước duyệt. Chấp thuận lưu1ngày bắt buộc cho luồng có lịch sử này. Public planner chưa dùng dependency từ kết quả Slack; người dùng liệt kê rồi chọn mã cho lượt kế tiếp.
@@ -35,4 +35,4 @@ Review độc lập tìm ba lỗi frontend, đã tái hiện và sửa trong m�
 
 `npm run check` cuối: **exit0**,3327v3+406eval+1launcher+66Node=**3800**, typecheck/build/security đạt. `SCENARIO=slack_read npm run test:browser:v3`: **4/4**, exit0,375/1440 sáng/tối, gồm signed deletion và DOM cleared. Fullcheck SHA256:`8BC02A14844B3066FFD0766EE4B8F212AC975D851E26CC20A705573A141CF0FE`.
 
-PR221 dependency đã merge staging`3d90e862`, exact-head CI xanh, merge tree bằng publishedc63a. Publication/CI của03B4 cần được reviewer ghi sau merge; chưa bật cờ/main/live. Xem [log](../log/2026-11-01-slack-03b4-public-read.md) cho failed attempt, phạm vi và quyết định.
+PR221 dependency đã merge staging`3d90e862`, exact-head CI xanh, merge tree bằng publishedc63a. PR #222 published head `294bbab3b91d16e144bb83442ae7fcc05f67ddf5`, CI41254450922 check/browser SUCCESS (175cases/18scenarios), merge `028e10e10415f31118a100184545f66ee40e9066` tree identical (diffexit0). M2 accepted internal/HTTP fixture; chưa bật cờ/main/live. Xem [log](../log/2026-11-01-slack-03b4-public-read.md) cho failed attempt, phạm vi và quyết định.
