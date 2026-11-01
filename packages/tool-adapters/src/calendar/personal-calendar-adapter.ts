@@ -4,11 +4,15 @@ import type { GmailAccessTokenProvider } from '../gmail/token-provider.js';
 import {
   badResponse,
   CALENDAR_API_BASE,
+  type CalendarEventWithConflict,
+  detectCalendarConflicts,
+  eventsOverlap,
   invalid,
   limit,
   MAX_RETRY_AFTER_WAIT_MS,
   normalizedEvent,
   only,
+  parseCalendarEventQuery,
   plainDescription,
   retryAfterDelayMs,
   sharedLimiter,
@@ -198,6 +202,24 @@ export class PersonalCalendarAdapter extends BaseAdapter {
     return typeof value?.summary === 'string' && typeof value?.timeZone === 'string';
   }
 
+  async findConflicts(
+    slot: { calendarId: string; start: string; end: string },
+    signal?: AbortSignal,
+  ): Promise<CalendarEventWithConflict[]> {
+    const listed = await this.execute(
+      'mycalendar.list_events',
+      {
+        calendarId: slot.calendarId,
+        timeMin: slot.start,
+        timeMax: slot.end,
+        limit: 20,
+      },
+      { signal },
+    );
+    const items: CalendarEventWithConflict[] = Array.isArray(listed?.events) ? listed.events : [];
+    return items.filter((ev) => eventsOverlap(ev, { start: slot.start, end: slot.end }));
+  }
+
   async execute(toolName: string, args: Record<string, any>, context?: { signal?: AbortSignal }): Promise<any> {
     const signal = context?.signal;
     const isWrite = toolName === 'mycalendar.create_event';
@@ -224,6 +246,7 @@ export class PersonalCalendarAdapter extends BaseAdapter {
         const id = this.checkedId(args.calendarId);
         windowSize(args.timeMin, args.timeMax, 31);
         const maximum = limit(args.limit, 20);
+        const parsedQuery = parseCalendarEventQuery(args.query);
         const params = new URLSearchParams({
           timeMin: args.timeMin,
           timeMax: args.timeMax,
@@ -231,12 +254,20 @@ export class PersonalCalendarAdapter extends BaseAdapter {
           orderBy: 'startTime',
           maxResults: String(maximum),
         });
-        if (args.query !== undefined) params.set('q', text(args.query, 4000));
+        if (parsedQuery.textQuery !== undefined) params.set('q', parsedQuery.textQuery);
         const events: Array<ReturnType<typeof normalizedEvent>> = [];
         const seenPages = new Set<string>();
         const done = () => {
           const truncated = events.some((event) => event.clipped);
-          return { events: events.map(({ clipped: _clipped, ...event }) => event), ...(truncated ? { truncated: true } : {}) };
+          const baseEvents = events.map(({ clipped: _clipped, ...event }) => event);
+          const processed = parsedQuery.onlyConflicts
+            ? detectCalendarConflicts(baseEvents, {
+                onlyConflicts: true,
+                keywordFilter: parsedQuery.keywordFilter,
+                annotateConflicts: true,
+              })
+            : baseEvents;
+          return { events: processed, ...(truncated ? { truncated: true } : {}) };
         };
         for (let page = 0; page < 20; page++) {
           const value = await this.request(encodeURIComponent(id) + '/events?' + params, signal);

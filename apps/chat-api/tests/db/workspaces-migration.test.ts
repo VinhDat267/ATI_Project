@@ -196,7 +196,7 @@ describe('0015_workspaces.sql migration and schema invariants', () => {
       // Now run 0015_workspaces.sql
       await upgPool.query(await readFile(`${directory}/0015_workspaces.sql`, 'utf8'));
 
-      // Run subsequent migrations (e.g. 0017_jira_workspaces.sql)
+      // Run subsequent migrations (e.g. 0018_jira_workspaces.sql)
       for (const f of files.filter(f => parseInt(f.slice(0, 4), 10) > 15)) {
         await upgPool.query(await readFile(`${directory}/${f}`, 'utf8'));
       }

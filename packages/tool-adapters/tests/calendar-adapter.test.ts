@@ -154,3 +154,17 @@ it('uses two distinct cached scopes for Sheets and Calendar with the same real s
   await sheets.checkConnection(); await calendar.checkConnection(); await sheets.checkConnection(); await calendar.checkConnection();
   expect(scopes).toEqual([adapters.SHEETS_SCOPE, 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly']);
 });
+it('supports natural query filters (today, conflict) and combined keyword conflict filtering on calendar.list_events', async () => {
+  const evA = { ...event, id: 'ev_a', summary: 'Sprint Sync', start: { dateTime: '2026-10-09T09:00:00+07:00' }, end: { dateTime: '2026-10-09T10:00:00+07:00' } };
+  const evB = { ...event, id: 'ev_b', summary: 'Design Review', start: { dateTime: '2026-10-09T09:30:00+07:00' }, end: { dateTime: '2026-10-09T10:30:00+07:00' } };
+  const evC = { ...event, id: 'ev_c', summary: 'Lunch', start: { dateTime: '2026-10-09T12:00:00+07:00' }, end: { dateTime: '2026-10-09T13:00:00+07:00' } };
+  const { adapter, calls } = setup(() => json({ items: [evA, evB, evC] }));
+  const resToday = await adapter.execute('calendar.list_events', { calendarId: id, timeMin: start, timeMax: end, query: 'today' });
+  expect(calls[0]!.url.searchParams.has('q')).toBe(false);
+  expect(resToday.events).toHaveLength(3);
+
+  const resConflictSprint = await adapter.execute('calendar.list_events', { calendarId: id, timeMin: start, timeMax: end, query: 'conflict sprint' });
+  expect(resConflictSprint.events).toEqual([
+    { id: 'ev_a', title: 'Sprint Sync', start: '2026-10-09T09:00:00+07:00', end: '2026-10-09T10:00:00+07:00', url: event.htmlLink, conflict: true, conflictsWith: ['Design Review'] },
+  ]);
+});

@@ -7,7 +7,8 @@ import { describeRecurrence, formatRunTime, runLabel, scheduleLabel } from '../.
 import { ScheduleActions } from '../Cockpit/ScheduleActions';
 
 function RunLink({ run, navigate }: { run: ScheduleRunView; navigate: (path: string) => void }) {
-  return <><span>{formatRunTime(run.dueAt)} · </span>{run.convId ? <a className="underline text-[#FF5701]" href={`/c/${run.convId}`} onClick={event => { if (event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); navigate(`/c/${run.convId}`); }}>{runLabel(run)}</a> : <span>{runLabel(run)}</span>}{run.delivery && <span className="text-xs text-[#6B7280]"> ({run.delivery.spreadsheetTitle} → {run.delivery.targetLabel ?? run.delivery.targetId})</span>}{run.error && <p className="text-xs text-[#6B7280]">{run.error}</p>}</>;
+  const sheetsDelivery = run.delivery && 'spreadsheetTitle' in run.delivery ? run.delivery : null;
+  return <><span>{formatRunTime(run.dueAt)} · </span>{run.convId ? <a className="underline text-[#FF5701]" href={`/c/${run.convId}`} onClick={event => { if (event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); navigate(`/c/${run.convId}`); }}>{runLabel(run)}</a> : <span>{runLabel(run)}</span>}{sheetsDelivery && <span className="text-xs text-[#6B7280]"> ({sheetsDelivery.spreadsheetTitle} → {sheetsDelivery.targetLabel ?? sheetsDelivery.targetId})</span>}{run.error && <span className="block text-xs text-[#6B7280]">{run.error}</span>}</>;
 }
 function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: ScheduleView; navigate: (path: string) => void; reload: () => Promise<void>; onChanged: (schedule: ScheduleView) => void }) {
   const [open, setOpen] = useState(false), [runs, setRuns] = useState<ScheduleRunView[]>([]), [error, setError] = useState('');
@@ -18,7 +19,14 @@ function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: Sche
     return () => { current = false; };
   }, [open, schedule]);
   return <article className="bg-white rounded-2xl border border-[#E7E7E2] p-4 sm:p-5 v3-space-y-3 min-w-0">
-    <h3 className="text-base font-semibold text-[#111827] [overflow-wrap:anywhere]">{schedule.name}</h3>
+    <h3 className="text-base font-semibold text-[#111827] [overflow-wrap:anywhere] flex flex-wrap items-center gap-2">
+      <span>{schedule.name}</span>
+      {schedule.kind === 'calendar_digest' && (
+        <span data-schedule-kind="calendar_digest" className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          Tự gửi
+        </span>
+      )}
+    </h3>
     <p className="text-sm text-[#4B5563]">{describeRecurrence(schedule.recurrence)}</p><p className="text-xs text-[#6B7280]">{scheduleLabel(schedule)}</p>
     {schedule.lastRun && <p className="text-xs text-[#4B5563]">Lần trước: <RunLink run={schedule.lastRun} navigate={navigate} /></p>}
     <ScheduleActions schedule={schedule} navigate={navigate} onChanged={onChanged} onConflict={reload} />

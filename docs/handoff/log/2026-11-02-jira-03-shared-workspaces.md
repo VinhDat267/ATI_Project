@@ -14,7 +14,7 @@ Chi phí của các lựa chọn triển khai: người dùng phải được du
 
 ## Mã thay đổi
 
-- Migration `0017_jira_workspaces.sql`: phần chính sách cùng UUID, membership/invite, account/grant/site/project/audit, chỉ mục identity active, version và composite FK; cờ hội thoại và trigger bất biến. Giữ migration #237 chạy trước để backfill an toàn.
+- Migration `0018_jira_workspaces.sql`: phần chính sách cùng UUID, membership/invite, account/grant/site/project/audit, chỉ mục identity active, version và composite FK; cờ hội thoại và trigger bất biến. Giữ migration #237 chạy trước để backfill an toàn.
 - Repository `apps/chat-api/src/db/repositories/workspace/`: transaction/authority hiện tại, bootstrap/recovery, SQL CAS, last effective admin, token 256-bit lưu hash, DB clock sau mọi chờ khóa và so sánh timestamp trong PostgreSQL.
 - API, app/server và authority hội thoại: hai lớp quyền, rate limit, không fake capability khi thiếu native verifier; owner/scope trước history/plan/SSE/execution/schedule. Pool thất bại được đóng và bỏ khi chuyển sang memory sandbox.
 - Hồi quy PostgreSQL, HTTP và sandbox thật; fixture canonical typecheck; cập nhật fixture lịch sử và database test theo cấu hình. Không sửa frontend/catalog/planner trong phần chênh lệch so với main #237.
@@ -46,3 +46,9 @@ Sau khi tạo draft PR #240, GitHub báo xung đột với Sheets v2 vừa vào 
 Bằng chứng mới thay kết quả trước #238 ở trên: migrations **0001–0017**, typecheck API/web và **npm run check exit 0**; **3.278 v3 PASS** = schemas 341 + adapters 460 + planner 381 + executor 42 + API 1.143 (129 file, không skip) + web 911; 406 eval, 32 Node probe, 1 launcher + 66 Node/env, build/security đều đạt. Năm hồi quy mới xác nhận auto_digest thường hoạt động, quyền Jira bị gỡ trả 404 trước xác nhận/validation, user mất quyền tổ chức bị chặn và body sai không gọi service.
 
 Chạy lại toàn bộ guard trên base mới: **13/13 đột biến bị bắt**, mỗi ca control xanh → assertion lỗi → khôi phục byte/SHA → control xanh. Ca mới bỏ guard hội thoại trước xác nhận auto_digest bị bắt bằng kiểm tra PostgreSQL/HTTP thật. Không dùng bằng chứng trước #238 làm nghiệm thu cuối. SHA mới, review toàn nhánh và CI/browser được cập nhật trong PR #240; giữ PR cho chủ dự án review/merge.
+
+## Base cuối #239 (2d5f625)
+
+Calendar v2 tiếp tục vào main trước push bản giải quyết xung đột. Ghép tự động server, giữ guard đã kiểm tra; Jira đánh số **0018** sau Sheets0016/Calendar0017. Sửa cùng hợp đồng scopeArg của memory repository sau test RED (undefined title làm mất personal mode), rồi 6/6 hồi quy memory/lịch GREEN.
+
+Bằng chứng cuối thay các đợt trước: **npm run check exit 0**, **3.304 v3 PASS** = schemas341 + adapters464 + planner381 + executor42 + API1.159 (134 file, không skip) + web917; **406 eval**, 32 Node probe, 1 launcher +66 Node/env, build/security đạt. Migrations0001–0018 áp dụng thành công. Chạy lại 13 guard trên base cuối; control/mutant/khôi phục SHA/control được lưu trong bằng chứng riêng và cập nhật PR #240. Review toàn nhánh mới và CI/browser vẫn lấy theo head PR cuối, không tái dùng phán quyết trên base cũ.

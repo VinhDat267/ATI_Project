@@ -1,4 +1,4 @@
--- 0017_jira_workspaces.sql: JIRA-03 Workspaces policy extension, memberships, invites, accounts, grants, sites, projects, audit, and conversation immutability.
+-- 0018_jira_workspaces.sql: JIRA-03 Workspaces policy extension, memberships, invites, accounts, grants, sites, projects, audit, and conversation immutability.
 -- Every migration file runs again on each migrate, so each statement is idempotent.
 
 -- 1. ati_workspaces (Policy extension referencing unified general workspaces)

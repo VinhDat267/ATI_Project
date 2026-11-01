@@ -6,11 +6,12 @@ import type { PlanRepo } from '../db/repositories/plan-repo.js';
 import type { ScheduleRepo } from '../db/repositories/schedule-repo.js';
 import type { WorkspaceRepo } from '../db/repositories/workspace-repo.js';
 import { WorkingMemory, unroutable, type ChatMessage, type ProcessMessageInput, type RoutedIntent } from '@wap/planner';
-import type { PersonalSpreadsheetItem, PlanConnections, PlannerResponse, PlanResponse, PlanStep, ScheduleProposalMetadata, ScheduleResponse, ScheduleView } from '@wap/tool-schemas';
+import type { CalendarDigestCandidate, PersonalSpreadsheetItem, PlanConnections, PlannerResponse, PlanResponse, PlanStep, ScheduleProposalMetadata, ScheduleResponse, ScheduleView } from '@wap/tool-schemas';
 import { resourceLabels } from './resource-labels.js';
 import { nextRuns } from './schedules/next-occurrence.js';
 import { runMessage, type PreparedRun, type RunToPlan } from './schedules/schedule-runner.js';
 import { resolveRef } from '@wap/executor';
+import { eventsOverlap } from '@wap/tool-adapters';
 
 /** Only the server writes plan connections; the model's version is never kept or shown back to it. */
 function withoutConnections(plan: PlanResponse): PlanResponse {
@@ -148,6 +149,7 @@ export interface ChatServiceOptions {
     credentialRepo?: any;
     encryptionKey?: string;
     mysheetsEnabled?: boolean;
+    evaluateDigestCandidate?: (input: { userId: string; services: string[]; request: string }) => Promise<CalendarDigestCandidate | undefined>;
   };
   /** Optional adapter retriever or tool executor for live resource validation in planning. */
   getAdapter?: (serviceName: string, context?: any) => Promise<any> | any;
@@ -294,7 +296,69 @@ export class ChatService {
             unavailableServices: [{ id: 'mycalendar', name: 'Google Calendar của bạn' }],
           };
         }
-        mycalConn = mycal;
+        mycalConn = {
+          credentialId: mycal.credentialId,
+          email: mycal.email,
+          allowedCalendars: mycal.allowedCalendars,
+        };
+
+        const createEventSteps = bound.steps.filter(
+          (step) =>
+            step.tool === 'mycalendar.create_event' &&
+            typeof step.args?.calendarId === 'string' &&
+            typeof step.args?.start === 'string' &&
+            typeof step.args?.end === 'string'
+        );
+        if (createEventSteps.length > 0 && (this.lookupTool || this.getAdapter)) {
+          for (const createStep of createEventSteps) {
+            try {
+              const calId = String(createStep.args.calendarId);
+              const slotStart = String(createStep.args.start);
+              const slotEnd = String(createStep.args.end);
+              const conflictDeadline = AbortSignal.timeout(5_000);
+              const conflictSignal = signal ? AbortSignal.any([signal, conflictDeadline]) : conflictDeadline;
+              let rawResult: any;
+              if (this.lookupTool) {
+                rawResult = await this.lookupTool(
+                  userId,
+                  'mycalendar.list_events',
+                  { calendarId: calId, timeMin: slotStart, timeMax: slotEnd, limit: 20 },
+                  { signal: conflictSignal }
+                );
+              } else if (this.getAdapter) {
+                const adapter = await this.getAdapter('mycalendar', {
+                  actor: { userId },
+                  connections: { mycalendar: mycalConn },
+                });
+                if (adapter) {
+                  rawResult = await adapter.execute(
+                    'mycalendar.list_events',
+                    { calendarId: calId, timeMin: slotStart, timeMax: slotEnd, limit: 20 },
+                    { signal: conflictSignal }
+                  );
+                }
+              }
+              const existingEvents: Array<{ title: string; start: string; end: string }> = Array.isArray(rawResult?.events)
+                ? rawResult.events
+                : [];
+              const overlapping = existingEvents.filter((ev) =>
+                typeof ev?.start === 'string' &&
+                typeof ev?.end === 'string' &&
+                eventsOverlap({ start: ev.start, end: ev.end }, { start: slotStart, end: slotEnd })
+              );
+              if (overlapping.length > 0) {
+                const stepTitle = String(createStep.args.summary || createStep.description || 'Sự kiện mới');
+                const titles = overlapping.map((ev) => `"${ev.title}"`).join(', ');
+                bound.warnings = [
+                  ...(bound.warnings ?? []),
+                  `Cảnh báo trùng lịch: Sự kiện "${stepTitle}" (${slotStart} – ${slotEnd}) trùng giờ với ${overlapping.length} sự kiện hiện có trên lịch: ${titles}.`,
+                ];
+              }
+            } catch {
+              // Non-fatal: if conflict pre-check times out or fails, planning still proceeds.
+            }
+          }
+        }
       }
     }
 
@@ -568,6 +632,16 @@ export class ChatService {
         credentialRepo: this.schedules.credentialRepo,
         encryptionKey: this.schedules.encryptionKey,
         mysheetsEnabled: this.schedules.mysheetsEnabled,
+      });
+    } else if (
+      proposal.action === 'create' &&
+      proposal.request &&
+      this.schedules.evaluateDigestCandidate
+    ) {
+      digestCandidate = await this.schedules.evaluateDigestCandidate({
+        userId: actor.userId,
+        services,
+        request: proposal.request,
       });
     }
     return {

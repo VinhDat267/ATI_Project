@@ -1,5 +1,6 @@
 import type pg from 'pg';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
+import type { RunCalendarDigest } from '../services/schedules/calendar-digest-runner.js';
 import { ScheduleService } from '../services/schedules/schedule-service.js';
 import { ScheduleRunner, reconcileScheduleRuns, type PlanRun } from '../services/schedules/schedule-runner.js';
 import type { SheetsDigestRunner } from '../services/schedules/sheets-digest-runner.js';
@@ -9,12 +10,13 @@ export interface ScheduleRuntimeOptions {
   /** Null when running on memory storage: schedules need PostgreSQL. */
   pool: pg.Pool | null;
   timeZone: string;
+  encryptionKey?: string;
   /** Plans one run. Until SCHED-02 connects the planner, every run fails without calling a model. */
   planRun?: PlanRun;
+  runDigest?: RunCalendarDigest;
   emit?: (convId: string, event: string, payload: unknown) => unknown;
   now?: () => Date;
   credentialRepo?: CredentialRepo;
-  encryptionKey?: string;
   mysheetsEnabled?: boolean;
   sheetsDigestRunner?: SheetsDigestRunner;
 }
@@ -35,7 +37,12 @@ export function createScheduleRuntime(options: ScheduleRuntimeOptions) {
     mysheetsEnabled: options.mysheetsEnabled,
   });
   const runner: ScheduleRunner = new ScheduleRunner({
-    pool, timeZone, planRun: options.planRun ?? notConnected, emit: options.emit, now: options.now,
+    pool,
+    timeZone,
+    planRun: options.planRun ?? notConnected,
+    runDigest: options.runDigest,
+    emit: options.emit,
+    now: options.now,
     recordState: (client, row, now) => service.recordState(client, row, now),
     sheetsDigestRunner: options.sheetsDigestRunner,
   });

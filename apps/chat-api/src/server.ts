@@ -21,6 +21,8 @@ import { ChatService } from './services/chat-service.js';
 import { ExecutionService } from './services/execution-service.js';
 import { reconcileInterruptedExecutions } from './services/startup-reconciliation.js';
 import { createScheduleRuntime } from './config/schedules-runtime.js';
+import { evaluateCalendarDigestCandidate } from './services/schedules/calendar-digest-candidate.js';
+import { createCalendarDigestExecutor } from './services/schedules/calendar-digest-runner.js';
 import { AdapterFactory, type AdapterContext } from './services/adapter-factory.js';
 import { GmailConnectionRepo } from './db/repositories/gmail-connection-repo.js';
 import { GmailOAuthClient } from './services/gmail/oauth-client.js';
@@ -213,8 +215,20 @@ async function bootstrap() {
   // Schedules need the flag and PostgreSQL; with the flag off nothing below exists.
   // A run is planned by chatService, created below; the runner starts only after listen.
   const schedules = createScheduleRuntime({
-    enabled: env.SCHEDULES_ENABLED, pool: pool && userRepo ? pool : null, timeZone: env.APP_TIME_ZONE,
+    enabled: env.SCHEDULES_ENABLED,
+    pool: pool && userRepo ? pool : null,
+    timeZone: env.APP_TIME_ZONE,
+    encryptionKey: env.ENCRYPTION_KEY,
     planRun: (run, convId, signal) => chatService.planScheduledRun(run, convId, signal),
+    runDigest: pool
+      ? createCalendarDigestExecutor({
+          pool,
+          encryptionKey: env.ENCRYPTION_KEY,
+          timeZone: env.APP_TIME_ZONE,
+          getAdapter: (serviceName, context) =>
+            (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(serviceName, context),
+        })
+      : undefined,
     emit: (convId, event, payload) => sseManager.emitEvent(convId, event, payload),
   });
   if (env.SCHEDULES_ENABLED && !schedules) console.warn('\x1b[33m[chat-api] SCHEDULES_ENABLED=on nhưng không có PostgreSQL: lịch chạy tạm tắt.\x1b[0m');
@@ -378,7 +392,24 @@ async function bootstrap() {
       : undefined,
     trelloConnection,
     getAdapter: (serviceName, context) => (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(serviceName, context),
-    schedules: schedules ? { repo: schedules.service.repo, timeZone: env.APP_TIME_ZONE } : undefined,
+    schedules: schedules
+      ? {
+          repo: schedules.service.repo,
+          timeZone: env.APP_TIME_ZONE,
+          evaluateDigestCandidate: pool
+            ? async (input) =>
+                (
+                  await evaluateCalendarDigestCandidate({
+                    pool,
+                    encryptionKey: env.ENCRYPTION_KEY,
+                    userId: input.userId,
+                    request: input.request,
+                    services: input.services,
+                  })
+                ).candidate
+            : undefined,
+        }
+      : undefined,
   });
 
   // 5. Adapter Factory (Supports both real credentials & mock execution)

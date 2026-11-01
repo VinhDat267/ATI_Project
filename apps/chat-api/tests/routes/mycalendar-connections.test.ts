@@ -549,6 +549,48 @@ describe('MyCalendar connection routes over HTTP, PostgreSQL and the fake Google
       expect(r.status).toBe(409);
       expect(r.body.code).toBe('MYCALENDAR_NOT_CONNECTED');
     });
+
+    it('POST /callback with autoSelectPrimary: true automatically selects the primary writable calendar', async () => {
+      const app = build();
+      const s = await start(app, alice);
+      const grant = await authorize(s.url);
+      const r = await request(app)
+        .post('/api/connections/mycalendar/callback')
+        .set('Authorization', bearer(alice))
+        .set('Cookie', s.cookie)
+        .send({ ...grant, autoSelectPrimary: true });
+
+      expect(r.status).toBe(200);
+      expect(r.body.selectedCalendars).toEqual([
+        {
+          id: 'owner.calendar@example.test',
+          summary: 'Lịch chính',
+          timeZone: 'Asia/Ho_Chi_Minh',
+          primary: true,
+        },
+      ]);
+      expect(r.body.allowedScope).toEqual(['owner.calendar@example.test']);
+    });
+
+    it('POST /select-primary selects the primary writable calendar in 1 click', async () => {
+      const app = build();
+      await connect(app, alice);
+
+      const r = await request(app)
+        .post('/api/connections/mycalendar/select-primary')
+        .set('Authorization', bearer(alice));
+
+      expect(r.status).toBe(200);
+      expect(r.body.selectedCalendars).toEqual([
+        {
+          id: 'owner.calendar@example.test',
+          summary: 'Lịch chính',
+          timeZone: 'Asia/Ho_Chi_Minh',
+          primary: true,
+        },
+      ]);
+      expect(r.body.allowedScope).toEqual(['owner.calendar@example.test']);
+    });
   });
 
   describe('DELETE / and cross-service isolation with Gmail', () => {

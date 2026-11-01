@@ -55,6 +55,89 @@ export function normalizedEvent(value: any, writing = false) {
   return { id: value.id, title: title.text, start, end, url: value.htmlLink, ...(title.clipped ? { clipped: true } : {}) };
 }
 
+export interface CalendarEventWithConflict {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  url: string;
+  conflict?: boolean;
+  conflictsWith?: string[];
+}
+
+export interface ParsedCalendarEventQuery {
+  textQuery?: string;
+  onlyConflicts: boolean;
+  keywordFilter?: string;
+}
+
+const NATURAL_CALENDAR_QUERY_RE = /^(?:\*|all|tất\s+cả|tat\s+ca|today|hôm\s+nay|hom\s+nay|upcoming|sắp\s+tới|sap\s+toi|open|busy|bận|ban|free|trống|trong)$/iu;
+const CONFLICT_CALENDAR_QUERY_RE = /^(?:conflicts?|overlapping|overlap|trùng\s+lịch|trung\s+lich|xung\s+đột|xung\s+dot|trùng\s+giờ|trung\s+gio)(?:\s+(.+))?$/iu;
+
+export function parseCalendarEventQuery(rawQuery?: unknown): ParsedCalendarEventQuery {
+  if (rawQuery === undefined) return { onlyConflicts: false };
+  const checked = text(rawQuery, 4000);
+  const trimmed = checked.trim();
+  if (!trimmed || NATURAL_CALENDAR_QUERY_RE.test(trimmed)) {
+    return { onlyConflicts: false };
+  }
+  const conflictMatch = CONFLICT_CALENDAR_QUERY_RE.exec(trimmed);
+  if (conflictMatch) {
+    const keyword = conflictMatch[1]?.trim();
+    return {
+      onlyConflicts: true,
+      ...(keyword ? { keywordFilter: keyword } : {}),
+    };
+  }
+  return { textQuery: checked, onlyConflicts: false };
+}
+
+export function eventsOverlap(
+  a: Pick<CalendarEventWithConflict, 'start' | 'end'>,
+  b: Pick<CalendarEventWithConflict, 'start' | 'end'>,
+): boolean {
+  if (!a.start.includes('T') || !a.end.includes('T') || !b.start.includes('T') || !b.end.includes('T')) {
+    return false;
+  }
+  const startA = Date.parse(a.start);
+  const endA = Date.parse(a.end);
+  const startB = Date.parse(b.start);
+  const endB = Date.parse(b.end);
+  if (!Number.isFinite(startA) || !Number.isFinite(endA) || !Number.isFinite(startB) || !Number.isFinite(endB)) {
+    return false;
+  }
+  if (endA <= startA || endB <= startB) return false;
+  return startA < endB && startB < endA;
+}
+
+export function detectCalendarConflicts<T extends CalendarEventWithConflict>(
+  events: T[],
+  options?: { onlyConflicts?: boolean; keywordFilter?: string; annotateConflicts?: boolean },
+): Array<T & { conflict?: boolean; conflictsWith?: string[] }> {
+  const annotate = options?.annotateConflicts ?? true;
+  const annotated = events.map((ev, idx) => {
+    const overlappingTitles: string[] = [];
+    for (let j = 0; j < events.length; j++) {
+      if (idx === j) continue;
+      const other = events[j]!;
+      if (eventsOverlap(ev, other)) {
+        overlappingTitles.push(other.title);
+      }
+    }
+    if (overlappingTitles.length > 0 && annotate) {
+      return { ...ev, conflict: true, conflictsWith: overlappingTitles };
+    }
+    return { ...ev };
+  });
+
+  let filtered = options?.onlyConflicts ? annotated.filter((ev) => ev.conflict === true) : annotated;
+  if (options?.keywordFilter) {
+    const needle = options.keywordFilter.toLowerCase();
+    filtered = filtered.filter((ev) => ev.title.toLowerCase().includes(needle));
+  }
+  return filtered;
+}
+
 /** Calendar v3, explicit resource scope; indeterminate writes are never replayed. */
 export class CalendarAdapter extends BaseAdapter {
   readonly service = 'calendar';
@@ -141,12 +224,21 @@ export class CalendarAdapter extends BaseAdapter {
     if (toolName === 'calendar.list_events') {
       only(args, ['calendarId', 'timeMin', 'timeMax', 'query', 'limit']); const id = this.checkedId(args.calendarId);
       windowSize(args.timeMin, args.timeMax, 31); const maximum = limit(args.limit, 20);
+      const parsedQuery = parseCalendarEventQuery(args.query);
       const params = new URLSearchParams({ timeMin: args.timeMin, timeMax: args.timeMax, singleEvents: 'true', orderBy: 'startTime', maxResults: String(maximum) });
-      if (args.query !== undefined) params.set('q', text(args.query, 4000));
+      if (parsedQuery.textQuery !== undefined) params.set('q', parsedQuery.textQuery);
       const events: Array<ReturnType<typeof normalizedEvent>> = []; const seenPages = new Set<string>();
       const done = () => {
         const truncated = events.some(event => event.clipped);
-        return { events: events.map(({ clipped: _clipped, ...event }) => event), ...(truncated ? { truncated: true } : {}) };
+        const baseEvents = events.map(({ clipped: _clipped, ...event }) => event);
+        const processed = parsedQuery.onlyConflicts
+          ? detectCalendarConflicts(baseEvents, {
+              onlyConflicts: true,
+              keywordFilter: parsedQuery.keywordFilter,
+              annotateConflicts: true,
+            })
+          : baseEvents;
+        return { events: processed, ...(truncated ? { truncated: true } : {}) };
       };
       // Calendar can return an empty page with nextPageToken; empty is not necessarily complete.
       for (let page = 0; page < 20; page++) {
