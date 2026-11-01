@@ -9,7 +9,7 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   workers: 1,
   reporter: 'line',
-  outputDir: '../../node_modules/.cache/v3-browser-results',
+  outputDir: process.env.V3_BROWSER_OUTPUT_DIR || '../../node_modules/.cache/v3-browser-results',
   use: {
     baseURL: `http://127.0.0.1:${process.env.V3_WEB_PORT || 5174}`,
     browserName: 'chromium',

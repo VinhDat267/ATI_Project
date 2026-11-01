@@ -65,7 +65,7 @@ export class SlackFanoutRepo {
     AND status IN ('pending_fanout','failed')`,[input.id,input.leaseToken,input.workerId,code]);return result.rowCount===1;
   });
  }
- async complete(input:FanoutLease,authorizedUsers:string[],signal?:AbortSignal):Promise<{jobs:number;discarded?:string}>{
+ async complete(input:FanoutLease,authorizedUsers:string[],signal?:AbortSignal):Promise<{jobs:number;discarded?:string;backlogFull?:boolean}>{
   validLease(input);if(!Array.isArray(authorizedUsers)||authorizedUsers.length>10000||authorizedUsers.some(value=>!id(value)))throw new TypeError('Invalid authorization result');
   return this.transaction(async client=>{
    signal?.throwIfAborted();await this.assertLease(client,input);
@@ -89,7 +89,7 @@ export class SlackFanoutRepo {
    }
    const runtime=(await client.query('SELECT * FROM slack_fanout_runtime WHERE app_id=$1 FOR SHARE',[input.appId])).rows[0];
    if(!runtime?.enabled)reason='runtime_disabled';
-   let count=0;
+   let count=0,accepted=0,backlogFull=false;
    if(!reason)for(const context of contexts){
     signal?.throwIfAborted();
     const {binding}=context;
@@ -112,19 +112,28 @@ export class SlackFanoutRepo {
     const barrier=await checkSlackInvalidationBarriers(client,{binding,epoch:slackPolicyRefToEpoch(context.policy),workspaceId:binding.workspaceId,
      channelId:input.channelId!,resourceType:'message',resourceId,revision:input.messageTs!});
     if(barrier.blocked)continue;
+    if((await client.query('SELECT id FROM slack_triage_jobs WHERE receipt_id=$1 AND connection_id=$2 AND identity_version=$3',[input.id,binding.connectionId,binding.identityVersion])).rowCount){accepted++;continue;}
+    const cfg=(await client.query('SELECT config_json FROM slack_workspace_configs WHERE connection_id=$1 FOR UPDATE',[binding.connectionId])).rows[0];
+    const maximum=cfg?.config_json?.maxQueueLength??1000;
+    const expired=(await client.query("SELECT created_at+interval '24 hours'<=clock_timestamp() AS expired FROM slack_event_receipts WHERE id=$1",[input.id])).rows[0]?.expired===true;
+    const active=(await client.query("SELECT count(*)::int AS n FROM slack_triage_jobs WHERE connection_id=$1 AND status IN ('pending','running','held_budget')",[binding.connectionId])).rows[0].n;
+    if(!expired&&(!Number.isSafeInteger(maximum)||maximum<1||maximum>10000||active>=maximum)){
+      backlogFull=true;await client.query("UPDATE slack_workspace_configs SET paused_reason='backlog_full' WHERE connection_id=$1 AND paused_reason IS DISTINCT FROM 'budget_exceeded'",[binding.connectionId]);continue;
+    }
+    await client.query("UPDATE slack_workspace_configs SET paused_reason=NULL WHERE connection_id=$1 AND paused_reason='backlog_full'",[binding.connectionId]);
     await client.query(`INSERT INTO slack_triage_jobs(receipt_id,connection_id,user_id,workspace_id,slack_user_id,identity_version,policy_reference,processing_version,runtime_version)
      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(receipt_id,connection_id,identity_version) DO NOTHING`,
-    [input.id,binding.connectionId,binding.atiUserId,binding.workspaceId,binding.slackUserId,binding.identityVersion,JSON.stringify(context.policy),controls.version,runtime.version]);count++;
+    [input.id,binding.connectionId,binding.atiUserId,binding.workspaceId,binding.slackUserId,binding.identityVersion,JSON.stringify(context.policy),controls.version,runtime.version]);count++;accepted++;
    }
    signal?.throwIfAborted();
    await client.query('SELECT id FROM slack_event_receipts WHERE id=$1 FOR UPDATE',[input.id]);
    await this.assertLease(client,input);
-   if(!count&&!reason)reason='no_eligible_binding';
-   const finished=await client.query(`UPDATE slack_event_receipts SET status=$4,discard_reason=$5,processed_at=clock_timestamp(),
-    fanout_lease_token=NULL,fanout_lease_owner=NULL,fanout_lease_until=NULL,fanout_error_code=NULL
+   if(!accepted&&!reason&&!backlogFull)reason='no_eligible_binding';
+   const finished=await client.query(`UPDATE slack_event_receipts SET status=$4,discard_reason=$5,processed_at=CASE WHEN $6 THEN NULL ELSE clock_timestamp() END,fanout_next_attempt_at=CASE WHEN $6 THEN clock_timestamp()+interval '30 seconds' ELSE fanout_next_attempt_at END,
+    fanout_lease_token=NULL,fanout_lease_owner=NULL,fanout_lease_until=NULL,fanout_error_code=CASE WHEN $6 THEN 'backlog_full' ELSE NULL END
     WHERE id=$1 AND fanout_lease_token=$2 AND fanout_lease_owner=$3 AND fanout_lease_until>clock_timestamp()`,
-   [input.id,input.leaseToken,input.workerId,reason?'discarded':'processed',reason??null]);
-   if(finished.rowCount!==1)throw lost();signal?.throwIfAborted();return {jobs:count,...(reason?{discarded:reason}:{})};
+   [input.id,input.leaseToken,input.workerId,backlogFull?'failed':reason?'discarded':'processed',reason??null,backlogFull]);
+   if(finished.rowCount!==1)throw lost();signal?.throwIfAborted();return {jobs:count,...(reason?{discarded:reason}:{}),...(backlogFull?{backlogFull:true}:{})};
   },signal);
  }
  private async assertLease(client:pg.PoolClient,input:FanoutLease):Promise<void>{

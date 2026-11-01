@@ -329,6 +329,7 @@ export class SlackIngressService {
       sourceEventTimeIso: timestamp.kind === 'ok' ? timestamp.iso : null,
       channelId: this.receiptChannelId(event, eventType),
       messageTs: this.receiptMessageTs(event, eventType, eventSubtype),
+      threadTs:eventType==='message' && !eventSubtype && typeof event.thread_ts==='string' && /^[0-9]{1,10}(?:[.][0-9]{1,6})?$/.test(event.thread_ts)?event.thread_ts:null,
       payloadHash,
       discardReason: timestamp.kind === 'ok' ? null : 'malformed_timestamp',
       ...(eventType==='message' && !eventSubtype && safeId(event.user)?{echo:{slackUserId:safeId(event.user)!,

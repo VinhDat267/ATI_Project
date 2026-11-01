@@ -1,3 +1,4 @@
+import {createSlackAssistantRoutes,type SlackAssistantServices} from './routes/slack-assistant.js';
 import express, { type Express, type Request, type Response, type NextFunction } from 'express';
 import { createAuthRoutes } from './routes/auth/index.js';
 import { createSlackConnectionRoutes, type SlackConnectionsOptions } from './routes/connections/slack.js';
@@ -74,6 +75,7 @@ export interface MySheetsAppOptions {
 }
 
 export interface AppOptions extends AdminUsersOptions {
+  slackAssistant?:SlackAssistantServices;
   myslack?: Pick<SlackConnectionsOptions, 'oauth' | 'repo' | 'fetchFn' | 'timeoutMs'>;
   jwtSecret: string;
   runtimeMode?: 'sandbox' | 'live';
@@ -226,6 +228,7 @@ export function createApp(options: AppOptions): Express {
       mysheetsAvailable: Boolean(mysheetsRoutes && isMySheetsAvailable(mysheetsRoutes)) })
   );
 
+  if(options.slackAssistant&&sessionRepo)app.use(createSlackAssistantRoutes({...options.slackAssistant,jwtSecret:options.jwtSecret,sessionRepo}));
   if (gmailRoutes) app.use('/api/connections/gmail', createGmailConnectionRoutes(gmailRoutes));
   if (options.myslack && sessionRepo && options.encryptionKey) app.use('/api/connections/myslack', createSlackConnectionRoutes({
     ...options.myslack, jwtSecret: options.jwtSecret, sessionRepo, encryptionKey: options.encryptionKey, clock: options.authClock,

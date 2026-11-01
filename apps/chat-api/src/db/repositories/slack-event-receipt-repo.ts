@@ -158,6 +158,7 @@ export interface RecordOrdinaryEventInput extends SlackEventInputBase {
   discardReason: 'malformed_timestamp' | null;
   /** Optional signed-message metadata only, projected by the ingress boundary. */
   echo?: {slackUserId:string;clientMsgId:string|null};
+  threadTs?:string|null;
 }
 
 export interface RecordLifecycleEventInput extends SlackEventInputBase {
@@ -180,6 +181,7 @@ export interface SlackEventReceiptRepoOptions {
   /** Bounded lock wait, well inside Slack's 3s ACK budget. */
   lockTimeoutMs?: number;
   statementTimeoutMs?: number;
+  maxPendingReceipts?:number;
 }
 
 export function slackEventSourceKey(appId: string, eventId: string): string {
@@ -361,6 +363,7 @@ interface ConnectionCandidate {
 
 export class SlackEventReceiptRepo {
   private readonly lockTimeoutMs: number;
+  private readonly maxPendingReceipts:number;
   private readonly statementTimeoutMs: number;
 
   constructor(
@@ -368,6 +371,8 @@ export class SlackEventReceiptRepo {
     private readonly invalidationService: SlackInvalidationService,
     options: SlackEventReceiptRepoOptions = {}
   ) {
+    this.maxPendingReceipts=options.maxPendingReceipts??10000;
+    if(!Number.isSafeInteger(this.maxPendingReceipts)||this.maxPendingReceipts<1||this.maxPendingReceipts>10000)throw new TypeError('Invalid ingress capacity');
     this.lockTimeoutMs = options.lockTimeoutMs ?? 2000;
     this.statementTimeoutMs = options.statementTimeoutMs ?? 2500;
     if (!Number.isSafeInteger(this.lockTimeoutMs) || this.lockTimeoutMs <= 0 || this.lockTimeoutMs > 2500) {
@@ -380,6 +385,7 @@ export class SlackEventReceiptRepo {
 
   async recordOrdinary(input: RecordOrdinaryEventInput): Promise<OrdinaryRecordResult> {
     const base = normalizeBase(input, false);
+    if(input.threadTs!==undefined&&input.threadTs!==null&&!SLACK_TS.test(input.threadTs))throw new TypeError('Invalid threadTs');
     const discarded = input.discardReason === 'malformed_timestamp';
     if (discarded) {
       if (base.sourceEventTs !== null || base.sourceEventTimeIso !== null) {
@@ -401,13 +407,20 @@ export class SlackEventReceiptRepo {
           AND (($5::uuid IS NOT NULL AND client_msg_id=$5::uuid) OR provider_ts=$6)
           ORDER BY created_at LIMIT 1`,[base.appId,base.teamId,actor,base.channelId,id,base.messageTs])).rows[0];
       }
+      if(!discarded&&!echo){
+        await client.query("SELECT pg_advisory_xact_lock(hashtext('ati-slack-ingress-capacity'))");
+        const duplicate=await this.findReceipt(client,base.appId,base.eventId);
+        if(duplicate){if(duplicate.payload_hash!==base.payloadHash)throw new SlackEventIdConflictError();return {kind:'duplicate',receipt:duplicate};}
+        const size=(await client.query("SELECT count(*)::int AS n FROM slack_event_receipts WHERE status='pending_fanout' OR status='failed' AND fanout_attempts>0")).rows[0].n;
+        if(size>=this.maxPendingReceipts)throw new Error('SLACK_INGRESS_CAPACITY');
+      }
       const inserted = await client.query(
         `INSERT INTO slack_event_receipts (
            slack_app_id, event_id, team_id, event_type, event_subtype, source_event_ts,
            source_event_time, event_context, channel_id, message_ts, payload_hash, status,
-           discard_reason, processed_at
+           discard_reason, processed_at,thread_ts
          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-                   CASE WHEN $12 = 'discarded' THEN now() ELSE NULL END)
+                   CASE WHEN $12 = 'discarded' THEN now() ELSE NULL END,$14)
          ON CONFLICT (slack_app_id, event_id) DO NOTHING
          RETURNING *`,
         [
@@ -424,6 +437,7 @@ export class SlackEventReceiptRepo {
           base.payloadHash,
           discarded || echo ? 'discarded' : 'pending_fanout',
           discarded ? 'malformed_timestamp' : echo ? echo.status==='confirmed'?'ati_echo':'echo_pending' : null,
+          input.threadTs??null,
         ]
       );
 
