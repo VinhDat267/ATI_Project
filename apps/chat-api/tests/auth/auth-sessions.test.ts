@@ -128,7 +128,7 @@ describe('AUTH-01 server sessions with real PostgreSQL and HTTP', () => {
     const first = (await login()).body;
     const second = (await login()).body;
     const outsider = randomUUID();
-    await pool.query("INSERT INTO users(id,email,password,name,status) VALUES($1,$2,$3,'Other','active')", [outsider, `${outsider}@example.test`, storedPassword]);
+    await pool.query("INSERT INTO users(id,email,password,name,status,email_verified) VALUES($1,$2,$3,'Other','active',true)", [outsider, `${outsider}@example.test`, storedPassword]);
     const other = (await request(app).post('/api/auth/login').send({ email: `${outsider}@example.test`, password })).body;
     expect((await request(app).post('/api/auth/logout-all').set('Authorization', `Bearer ${first.accessToken}`)).status).toBe(200);
     for (const session of [first, second]) {

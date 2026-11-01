@@ -6,7 +6,7 @@ import { GOOGLE_ENDPOINTS, GoogleOIDC } from '../../auth/google-oidc.js';
 import { GoogleAccountError } from '../../db/repositories/google-auth-repo.js';
 import { toAuthUser, verifyPassword } from '../../db/repositories/user-repo.js';
 import { InvalidSessionUserError } from '../../db/repositories/session-repo.js';
-import { googleLinkedEmail, pendingApprovalEmail, sendEmailInBackground } from '../../services/email/index.js';
+import { googleLinkedEmail, sendEmailInBackground } from '../../services/email/index.js';
 import type { AuthRoutesOptions } from './index.js';
 import { SignupQuota, SignupRateLimitError } from '../../auth/signup-quota.js';
 const random = () => randomBytes(32).toString('base64url');
@@ -81,10 +81,6 @@ export function createGoogleRoutes(options: AuthRoutesOptions): Router {
       const result = await repo!.resolveAccount(profile, state, options.googleSignupEnabled ?? options.signupEnabled ?? false, clock(),
         () => signupQuota.take(req.ip ?? 'unknown'));
       if (result.linked) sendEmailInBackground(options.emailSender, googleLinkedEmail(result.user.email));
-      if (result.created && options.emailSender) {
-        const admins = await options.userRepo!.listActiveAdmins();
-        for (const admin of admins) sendEmailInBackground(options.emailSender, pendingApprovalEmail(admin.email, result.user.name, result.user.email));
-      }
       if (state.mode === 'link') { res.json({ success: true }); return; }
       if (result.user.status !== 'active') {
         res.status(403).json({ error: 'Tài khoản chưa được phép đăng nhập.', code: result.user.status === 'disabled' ? 'ACCOUNT_DISABLED' : 'ACCOUNT_PENDING' }); return;

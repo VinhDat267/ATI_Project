@@ -72,7 +72,8 @@ describe('AUTH-04 Google OAuth with real PostgreSQL', () => {
     expect(row.expires_at.getTime() - now).toBe(600000); expect(row.nonce).toBe(nonce);
     expect(s.url.searchParams.get('code_challenge')).toBe(createHash('sha256').update(row.code_verifier).digest('base64url'));
     const cookie = s.response.headers['set-cookie']![0]; expect(cookie).toMatch(/HttpOnly/); expect(cookie).toMatch(/SameSite=Lax/); expect(cookie).toMatch(/Max-Age=600/); expect(cookie).not.toMatch(/Domain=/);
-    expect((await post('callback', { state: s.state, code: 'private-code' }, s.cookie)).body.code).toBe('ACCOUNT_PENDING');
+    const callbackRes = await post('callback', { state: s.state, code: 'private-code' }, s.cookie);
+    expect(callbackRes.status).toBe(200); expect(callbackRes.body.user.status).toBe('active');
     expect(exchanges[0]!.get('code_verifier')).toBe(row.code_verifier); expect(exchanges[0]!.get('client_secret')).toBe(config.clientSecret);
   });
   it('migrates twice without reviving consumed states', async () => {
@@ -95,27 +96,15 @@ describe('AUTH-04 Google OAuth with real PostgreSQL', () => {
     const r = await Promise.all([post('callback', { state: s.state, code: 'code' }, s.cookie), post('callback', { state: s.state, code: 'code' }, s.cookie)]);
     expect(r.map(x => x.status).sort()).toEqual([200, 400]); expect(exchanges).toHaveLength(1);
   });
-  it('creates a verified pending Google-only account and notifies active admins; respects closed signup', async () => {
+  it('creates a verified active Google-only account without notifying admins; respects closed signup', async () => {
     const adminUser = await users.provisionAdmin({ email: `${randomUUID()}@example.test`, name: 'Admin', password: 'Admin!password123' });
-    let release!: () => void;
-    const gate = new Promise<void>(resolve => { release = resolve; });
-    const deliveries: Promise<void>[] = [];
-    const sender = new OutboxEmailSender(pool);
-    app = build({ emailSender: { send: (message: EmailMessage) => {
-      const delivery = gate.then(() => sender.send(message)); deliveries.push(delivery); return delivery;
-    } } });
-    try {
-      const r = await login(); expect(r.status).toBe(403); expect(r.body.code).toBe('ACCOUNT_PENDING');
-      const u = await users.findByEmail(email); expect(u).toMatchObject({ password: null, email_verified: true, status: 'pending', google_sub: subject });
-      expect(deliveries.length).toBeGreaterThan(0);
-      // The response intentionally precedes background delivery. Hold a real
-      // outbox INSERT to prove that boundary, then observe persisted delivery.
-      expect((await pool.query('SELECT count(*)::int AS n FROM email_outbox WHERE to_address=$1', [adminUser.email])).rows[0].n).toBe(0);
-      release();
-      await vi.waitFor(async () => {
-        expect((await pool.query('SELECT count(*)::int AS n FROM email_outbox WHERE to_address=$1', [adminUser.email])).rows[0].n).toBeGreaterThan(0);
-      }, { timeout: 3000 });
-    } finally { release(); await Promise.allSettled(deliveries); }
+    const r = await login();
+    expect(r.status).toBe(200);
+    expect(r.body.accessToken).toBeDefined();
+    expect(r.body.refreshToken).toBeDefined();
+    const u = await users.findByEmail(email);
+    expect(u).toMatchObject({ password: null, email_verified: true, status: 'active', google_sub: subject });
+    expect((await pool.query('SELECT count(*)::int AS n FROM email_outbox WHERE to_address=$1', [adminUser.email])).rows[0].n).toBe(0);
     email = `${randomUUID()}@example.test`; subject = randomUUID(); app = build({ googleSignupEnabled: false });
     expect((await login()).body.code).toBe('SIGNUP_DISABLED'); expect(await users.findByEmail(email)).toBeNull();
   });
@@ -135,9 +124,19 @@ describe('AUTH-04 Google OAuth with real PostgreSQL', () => {
     expect((await pool.query('SELECT used_at FROM auth_tokens WHERE token_hash=$1', [hash(authToken)])).rows[0].used_at).not.toBeNull();
     expect((await request(app).post('/api/auth/login').send({ email, password: 'Old!password123456' })).status).toBe(401);
   });
-  it.each(['pending', 'disabled'])('retains %s and refuses login', async status => {
-    await user(false, status); const r = await login(); expect(r.status).toBe(403); expect(r.body.code).toBe(status === 'pending' ? 'ACCOUNT_PENDING' : 'ACCOUNT_DISABLED');
-    expect((await users.findByEmail(email))!.status).toBe(status);
+  it('elevates pending unverified email to active upon Google login', async () => {
+    await user(false, 'pending');
+    const r = await login();
+    expect(r.status).toBe(200);
+    expect(r.body.accessToken).toBeDefined();
+    expect((await users.findByEmail(email))!.status).toBe('active');
+  });
+  it('retains disabled and refuses login with 403 ACCOUNT_DISABLED', async () => {
+    await user(false, 'disabled');
+    const r = await login();
+    expect(r.status).toBe(403);
+    expect(r.body.code).toBe('ACCOUNT_DISABLED');
+    expect((await users.findByEmail(email))!.status).toBe('disabled');
   });
   it('never overwrites a different Google sub already attached to the same email', async () => {
     const u = await user(); await pool.query('UPDATE users SET google_sub=$2 WHERE id=$1', [u.id, 'different-sub']);
@@ -210,19 +209,19 @@ describe('AUTH-04 Google OAuth with real PostgreSQL', () => {
   it('permits only ten new Google accounts per IP/hour and rejects attempt eleven before inserting its user', async () => {
     for (let i = 0; i < 10; i++) {
       email = `${randomUUID()}@example.test`; subject = randomUUID();
-      expect((await login()).body.code).toBe('ACCOUNT_PENDING');
+      expect((await login()).status).toBe(200);
     }
     email = `${randomUUID()}@example.test`; subject = randomUUID();
     const r = await login(); expect(r.status).toBe(429); expect(r.headers['retry-after']).toBe('3600');
     expect(await users.findByEmail(email)).toBeNull();
-    now += 3600000; expect((await login()).body.code).toBe('ACCOUNT_PENDING'); expect(await users.findByEmail(email)).not.toBeNull();
+    now += 3600000; expect((await login()).status).toBe(200); expect(await users.findByEmail(email)).not.toBeNull();
   });
   it('shares one creation budget across email signup and new Google accounts in both directions', async () => {
     app = build({ signupEnabled: true });
     for (let i = 0; i < 9; i++) {
       expect((await request(app).post('/api/auth/signup').send({ email: `${randomUUID()}@example.test`, name: 'Email signup', password: 'Email!password123' })).status).toBe(200);
     }
-    expect((await login()).body.code).toBe('ACCOUNT_PENDING');
+    expect((await login()).status).toBe(200);
     const blockedEmail = `${randomUUID()}@example.test`;
     const denied = await request(app).post('/api/auth/signup').send({ email: blockedEmail, name: 'Email signup', password: 'Email!password123' });
     expect(denied.status).toBe(429); expect(denied.headers['retry-after']).toBe('3600'); expect(await users.findByEmail(blockedEmail)).toBeNull();
@@ -230,8 +229,8 @@ describe('AUTH-04 Google OAuth with real PostgreSQL', () => {
     expect((await login()).status).toBe(429); expect(await users.findByEmail(email)).toBeNull();
   });
   it('keeps stable-sub login, verified email merge, recovery and explicit link available after signup quota is full', async () => {
-    for (let i = 0; i < 10; i++) { email = `${randomUUID()}@example.test`; subject = randomUUID(); expect((await login()).body.code).toBe('ACCOUNT_PENDING'); }
-    await pool.query("UPDATE users SET status='active' WHERE email=$1", [email]); expect((await login()).status).toBe(200);
+    for (let i = 0; i < 10; i++) { email = `${randomUUID()}@example.test`; subject = randomUUID(); expect((await login()).status).toBe(200); }
+    expect((await login()).status).toBe(200);
     email = `${randomUUID()}@example.test`; subject = randomUUID(); const verified = await user(true); expect((await login()).body.user.id).toBe(verified.id);
     email = `${randomUUID()}@example.test`; subject = randomUUID(); const unverified = await user(false); expect((await login()).body.user.id).toBe(unverified.id); expect((await users.findById(unverified.id))!.password).toBeNull();
     email = `${randomUUID()}@example.test`; subject = randomUUID(); const target = await user(true);
