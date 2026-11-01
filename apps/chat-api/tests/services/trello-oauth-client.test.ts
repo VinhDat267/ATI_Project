@@ -145,6 +145,7 @@ describe('TrelloOAuthClient', () => {
         { id: 'board-1', name: 'Board One', idOrganization: 'ws-target', member: true },
         { id: 'board-2', name: 'Board Two', idOrganization: 'ws-other', member: true },
         { id: 'board-3', name: 'Board Three', idOrganization: 'ws-target', member: false },
+        { id: 'board-private', name: 'Private Board', idOrganization: 'ws-target', member: true, prefs: { permissionLevel: 'private' } },
         { id: 'board-4', name: 'Personal Board', idOrganization: null, member: true },
       ]), { status: 200, headers: { 'Content-Type': 'application/json' } });
     });

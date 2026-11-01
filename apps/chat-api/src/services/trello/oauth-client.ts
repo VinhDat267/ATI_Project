@@ -130,7 +130,11 @@ export class TrelloOAuthClient {
     });
     const items = Array.isArray(body) ? body : [];
     return items
-      .filter((b: any) => b && b.idOrganization === workspaceId)
+      .filter((b: any) => {
+        if (!b || b.idOrganization !== workspaceId) return false;
+        const perm = b.prefs?.permissionLevel || b.permissionLevel;
+        return perm !== 'private';
+      })
       .map((b: any) => ({
         id: String(b.id),
         name: String(b.name || ''),

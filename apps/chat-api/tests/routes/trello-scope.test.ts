@@ -71,6 +71,7 @@ describe('Trello scope and workspace management routes', () => {
             { id: 'board-2', name: 'Bug Tracker', idOrganization: 'ws-1', member: true },
             { id: 'board-alien', name: 'Alien Board', idOrganization: 'ws-foreign', member: true },
             { id: 'board-nonmember', name: 'Readonly Board', idOrganization: 'ws-1', member: false },
+            { id: 'board-private', name: 'Private Board', idOrganization: 'ws-1', member: true, prefs: { permissionLevel: 'private' } },
             { id: 'board-3', name: 'Design System', idOrganization: 'ws-2', member: true },
             // Extra boards for 11-board test
             { id: 'board-4', name: 'Board 4', idOrganization: 'ws-1', member: true },
@@ -225,6 +226,8 @@ describe('Trello scope and workspace management routes', () => {
       );
       // alien board belongs to ws-foreign, not ws-1
       expect(boardsRes.body.boards.find((b: any) => b.id === 'board-alien')).toBeUndefined();
+      // private board is excluded from candidate list
+      expect(boardsRes.body.boards.find((b: any) => b.id === 'board-private')).toBeUndefined();
     });
 
     it('returns 404 when admin requests boards for a workspace that does not belong to the admin', async () => {
@@ -350,6 +353,18 @@ describe('Trello scope and workspace management routes', () => {
         .set('Authorization', bearer(admin))
         .send({ workspaceId: 'ws-1', boardIds: ['board-nonmember'] });
       expect(nonMemberRes.status).toBe(400);
+
+      // Try pinning private board
+      const privateBoardRes = await request(app)
+        .put('/api/connections/trello/scope')
+        .set('Authorization', bearer(admin))
+        .send({ workspaceId: 'ws-1', boardIds: ['board-private'] });
+      expect(privateBoardRes.status).toBe(400);
+      expect(privateBoardRes.body.error).toBe('Bảng không hợp lệ hoặc bạn không phải thành viên của bảng.');
+
+      // Verify private board was not written into database
+      const dbRow = await db.pool.query("SELECT * FROM trello_team_boards WHERE board_id = 'board-private'");
+      expect(dbRow.rows.length).toBe(0);
 
       // GET still sees initial scope unchanged
       const currentGet = await request(app)
