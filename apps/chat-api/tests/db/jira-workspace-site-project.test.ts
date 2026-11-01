@@ -157,16 +157,33 @@ async function seedWorkspace(
   creatorUserId: string,
   slugPrefix = 'ws-sp'
 ): Promise<{ workspaceId: string; slug: string; name: string }> {
+  const workspaceId = randomUUID();
   const slug = `${slugPrefix}-${randomUUID().slice(0, 8)}`;
   const name = `Workspace ${slug}`;
-  const wsRes = await pool.query(
-    `INSERT INTO ati_workspaces (slug, name, created_by, status, version)
-     VALUES ($1, $2, $3, 'active', 1)
-     RETURNING id`,
-    [slug, name, creatorUserId]
-  );
-  const workspaceId = wsRes.rows[0].id;
+  const inviteCode = `INV-${randomUUID().slice(0, 8).toUpperCase()}`;
 
+  // 1. Generic organization workspace (same UUID)
+  await pool.query(
+    `INSERT INTO workspaces (id, name, invite_code, require_approval, created_by)
+     VALUES ($1, $2, $3, true, $4)`,
+    [workspaceId, name, inviteCode, creatorUserId]
+  );
+
+  // 2. Generic organization membership for creator
+  await pool.query(
+    `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+     VALUES ($1, $2, 'admin', 'active')`,
+    [workspaceId, creatorUserId]
+  );
+
+  // 3. Jira workspace policy extension (name removed from ati_workspaces, same UUID)
+  await pool.query(
+    `INSERT INTO ati_workspaces (id, slug, created_by, status, version)
+     VALUES ($1, $2, $3, 'active', 1)`,
+    [workspaceId, slug, creatorUserId]
+  );
+
+  // 4. Jira workspace membership for creator
   await pool.query(
     `INSERT INTO ati_workspace_memberships (workspace_id, user_id, role, status, version)
      VALUES ($1, $2, 'admin', 'active', 1)`,
@@ -181,8 +198,29 @@ async function seedMembership(
   workspaceId: string,
   userId: string,
   role: 'admin' | 'member',
-  status: 'pending' | 'active' | 'rejected' | 'removed'
+  status: 'pending' | 'active' | 'rejected' | 'removed',
+  options?: {
+    generalStatus?: 'pending' | 'active' | 'disabled';
+    generalRole?: 'admin' | 'member';
+  }
 ): Promise<void> {
+  const defaultGenStatus =
+    status === 'active'
+      ? 'active'
+      : status === 'removed' || status === 'rejected'
+        ? 'disabled'
+        : 'pending';
+  const genStatus = options?.generalStatus ?? defaultGenStatus;
+  const genRole = options?.generalRole ?? role;
+
+  await pool.query(
+    `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (workspace_id, user_id)
+     DO UPDATE SET role = EXCLUDED.role, status = EXCLUDED.status, updated_at = clock_timestamp()`,
+    [workspaceId, userId, genRole, genStatus]
+  );
+
   await pool.query(
     `INSERT INTO ati_workspace_memberships (workspace_id, user_id, role, status, version)
      VALUES ($1, $2, $3, $4, 1)
@@ -2015,6 +2053,325 @@ describe('apps/chat-api — JIRA-03 Workspace Site & Project Repository & Fail-C
         statusCode: 503,
         code: 'CAPABILITIES_UNAVAILABLE',
       });
+    });
+  });
+
+  // ==========================================================================
+  // Suite 8: Shared Organization Workspace & Dual-Layer Authority (2026-11-02 Amendment)
+  // ==========================================================================
+  describe('8. Shared Organization Workspace & Dual-Layer Authority (2026-11-02 Amendment)', () => {
+    it('denies link, activate, config, deactivate, listSites, and getProjects when general org membership is disabled', async () => {
+      const { workspaceId } = await seedWorkspace(pool, sysAdminId);
+      const cloudId = `cloud-${randomUUID().slice(0, 8)}`;
+      await seedJiraGrantAndSite(pool, sysAdminId, cloudId);
+      const existingSite = await seedWorkspaceSite(pool, workspaceId, cloudId, sysAdminId, {
+        active: true,
+        policyVersion: 1,
+      });
+      await seedWorkspaceProject(
+        pool,
+        workspaceId,
+        existingSite.id,
+        cloudId,
+        '10001',
+        'PROJ',
+        'Project One',
+        { selected: true, policyVersion: 1 }
+      );
+
+      // Disable the caller in the general organization workspace (PR #237 layer)
+      await pool.query(
+        `UPDATE workspace_members
+         SET status = 'disabled', updated_at = clock_timestamp()
+         WHERE workspace_id = $1 AND user_id = $2`,
+        [workspaceId, sysAdminId]
+      );
+
+      const verifier = new FakeNativeAdminVerifier();
+      const repo = new WorkspaceRepo(pool, { verifier });
+
+      // Negative general membership hides behind 404 Hidden Pattern
+      await expect(
+        repo.linkSite(workspaceId, sysAdminId, { cloudId: `cloud-new-${randomUUID().slice(0, 8)}` })
+      ).rejects.toMatchObject({ statusCode: 404 });
+
+      await expect(
+        repo.updateSite(workspaceId, sysAdminId, existingSite.id, {
+          expectedPolicyVersion: 1,
+          active: false,
+        })
+      ).rejects.toMatchObject({ statusCode: 404 });
+
+      await expect(
+        repo.updateSite(workspaceId, sysAdminId, existingSite.id, {
+          expectedPolicyVersion: 1,
+          active: true,
+        })
+      ).rejects.toMatchObject({ statusCode: 404 });
+
+      await expect(
+        repo.configureProjects(workspaceId, sysAdminId, existingSite.id, {
+          expectedPolicyVersion: 1,
+          selectedProjectIds: ['10001'],
+        })
+      ).rejects.toMatchObject({ statusCode: 404 });
+
+      await expect(repo.listSites(workspaceId, sysAdminId)).rejects.toMatchObject({
+        statusCode: 404,
+      });
+
+      await expect(
+        repo.getProjects(workspaceId, sysAdminId, existingSite.id)
+      ).rejects.toMatchObject({ statusCode: 404 });
+
+      // Verifier must NEVER have been called
+      expect(verifier.recordedEvidences.length).toBe(0);
+    });
+
+    it('blocks mutation when general org membership is revoked mid-flight during native verifier call outside TX', async () => {
+      const { workspaceId } = await seedWorkspace(pool, sysAdminId);
+      const cloudId = `cloud-${randomUUID().slice(0, 8)}`;
+      await seedJiraGrantAndSite(pool, sysAdminId, cloudId);
+      const site = await seedWorkspaceSite(pool, workspaceId, cloudId, sysAdminId, {
+        active: false,
+        policyVersion: 1,
+      });
+
+      const barrierPool = ctx.createWorkerPool({
+        max: 1,
+        applicationName: 'barrier_gen_revoc_worker',
+      });
+      const enteredGate = createDeferredGate(5000, 'enteredGate');
+      const releaseGate = createDeferredGate(5000, 'releaseGate');
+
+      const verifier = new FakeNativeAdminVerifier();
+      verifier.handler = async () => {
+        enteredGate.resolve();
+        await releaseGate.promise;
+
+        return {
+          status: 'granted',
+          siteName: 'Verified Site',
+          siteUrl: 'https://verified.atlassian.net',
+          verifiedProjectIds: ['10001'],
+          verifiedProjects: [{ projectId: '10001', key: 'VER', name: 'Verified' }],
+        };
+      };
+
+      const repo = new WorkspaceRepo(pool, { verifier });
+      let opPromise: Promise<any> | null = null;
+      let allSettledPromise: Promise<[PromiseSettledResult<any>]> | null = null;
+
+      try {
+        opPromise = repo.updateSite(workspaceId, sysAdminId, site.id, {
+          expectedPolicyVersion: 1,
+          active: true,
+        });
+        allSettledPromise = Promise.allSettled([opPromise]);
+
+        await enteredGate.promise;
+
+        // Perform real SQL general membership revocation via independent worker pool with timeout
+        await barrierPool.query('SET statement_timeout = 4000');
+        await barrierPool.query(
+          `UPDATE workspace_members
+           SET status = 'disabled', updated_at = clock_timestamp()
+           WHERE workspace_id = $1 AND user_id = $2`,
+          [workspaceId, sysAdminId]
+        );
+
+        releaseGate.resolve();
+      } finally {
+        releaseGate.resolve();
+        if (allSettledPromise) {
+          await allSettledPromise;
+        }
+        await barrierPool.end().catch(() => {});
+      }
+
+      const [res] = await allSettledPromise!;
+      expect(res.status).toBe('rejected');
+      const err = (res as PromiseRejectedResult).reason;
+      expect(err.statusCode).toBe(404);
+
+      // Assert site row in DB was NOT activated
+      const dbRow = await pool.query(
+        `SELECT active, policy_version FROM ati_workspace_jira_sites WHERE id = $1`,
+        [site.id]
+      );
+      expect(dbRow.rows[0].active).toBe(false);
+      expect(dbRow.rows[0].policy_version).toBe(1);
+    });
+
+    it(
+      'denies mutation when general member row lock is held by barrier and committed revoked while SUT waits',
+      { timeout: 10000 },
+      async () => {
+        const { workspaceId } = await seedWorkspace(pool, sysAdminId);
+        const cloudId = `cloud-${randomUUID().slice(0, 8)}`;
+        await seedJiraGrantAndSite(pool, sysAdminId, cloudId);
+        const site = await seedWorkspaceSite(pool, workspaceId, cloudId, sysAdminId, {
+          active: false,
+          policyVersion: 1,
+        });
+
+        const schemaSuffix = ctx.schema.slice(-8);
+        const sutTag = `sut_gen_lock_${schemaSuffix}`;
+        const sutPool = ctx.createWorkerPool({ max: 1, applicationName: sutTag });
+
+        const verifier = new FakeNativeAdminVerifier();
+        const repo = new WorkspaceRepo(sutPool, { verifier });
+
+        const barrierClient = await pool.connect();
+        let allSettledPromise: Promise<[PromiseSettledResult<any>]> | null = null;
+
+        try {
+          await barrierClient.query('BEGIN');
+          // Barrier holds exclusive row lock on the general workspace_members record
+          await barrierClient.query(
+            `SELECT user_id FROM workspace_members
+             WHERE workspace_id = $1 AND user_id = $2
+             FOR UPDATE`,
+            [workspaceId, sysAdminId]
+          );
+
+          // Launch SUT operation on tagged worker pool
+          const opPromise = repo.updateSite(workspaceId, sysAdminId, site.id, {
+            expectedPolicyVersion: 1,
+            active: true,
+          });
+          allSettledPromise = Promise.allSettled([opPromise]);
+
+          // Observe SUT waiting on lock in PostgreSQL pg_locks
+          const blockedCount = await waitForBlockedQueries(pool, [sutTag], 5000);
+          expect(blockedCount).toBe(1);
+
+          // While SUT is waiting, barrier updates general membership to disabled and commits
+          await barrierClient.query(
+            `UPDATE workspace_members
+             SET status = 'disabled', updated_at = clock_timestamp()
+             WHERE workspace_id = $1 AND user_id = $2`,
+            [workspaceId, sysAdminId]
+          );
+          await barrierClient.query('COMMIT');
+        } finally {
+          try {
+            await barrierClient.query('ROLLBACK');
+          } catch {}
+          barrierClient.release();
+          if (allSettledPromise) {
+            await allSettledPromise;
+          }
+          await sutPool.end().catch(() => {});
+        }
+
+        const [res] = await allSettledPromise!;
+        expect(res.status).toBe('rejected');
+        const err = (res as PromiseRejectedResult).reason;
+        expect(err.statusCode).toBe(404);
+
+      // Verify site was NOT activated
+      const dbRow = await pool.query(
+        `SELECT active, policy_version FROM ati_workspace_jira_sites WHERE id = $1`,
+        [site.id]
+      );
+      expect(dbRow.rows[0].active).toBe(false);
+      expect(dbRow.rows[0].policy_version).toBe(1);
+    });
+
+    it('returns 404 when general membership is revoked immediately before reading site data via real query proxy', async () => {
+      const { workspaceId } = await seedWorkspace(pool, sysAdminId);
+      const cloudId = `cloud-${randomUUID().slice(0, 8)}`;
+      await seedMembership(pool, workspaceId, sysMemberId, 'member', 'active');
+      await seedWorkspaceSite(pool, workspaceId, cloudId, sysAdminId, {
+        siteName: 'General Member Snapshot Guard',
+        siteUrl: 'https://gen-snap.atlassian.net',
+        active: false,
+        policyVersion: 1,
+      });
+
+      const workerPool = ctx.createWorkerPool({
+        max: 1,
+        applicationName: 'toctou_gen_snap_worker',
+      });
+      let hookTriggered = false;
+
+      const hookedPool = createHookedPool(pool, async (sql) => {
+        if (sql.includes('ati_workspace_jira_sites') && !hookTriggered) {
+          hookTriggered = true;
+          // Revoke general organization membership on independent PG connection
+          await workerPool.query(
+            `UPDATE workspace_members
+             SET status = 'disabled', updated_at = clock_timestamp()
+             WHERE workspace_id = $1 AND user_id = $2`,
+            [workspaceId, sysMemberId]
+          );
+        }
+      });
+
+      const repo = new WorkspaceRepo(hookedPool);
+
+      try {
+        await expect(repo.listSites(workspaceId, sysMemberId)).rejects.toMatchObject({
+          statusCode: 404,
+          code: expect.stringMatching(/WORKSPACE_NOT_FOUND|NOT_FOUND/),
+        });
+        expect(hookTriggered).toBe(true);
+      } finally {
+        await workerPool.end().catch(() => {});
+      }
+    });
+
+    it('denies Jira admin mutation when caller is general org admin with autojoin enabled but lacks Jira admin role', async () => {
+      const { workspaceId } = await seedWorkspace(pool, sysAdminId);
+      const generalAdminId = await createSyntheticUser(pool, 'General Org Admin', 'genadmin', {
+        role: 'member',
+        status: 'active',
+      });
+
+      // 1. Enable autojoin on the organization workspace
+      await pool.query(
+        `UPDATE workspaces
+         SET require_approval = false, updated_at = clock_timestamp()
+         WHERE id = $1`,
+        [workspaceId]
+      );
+
+      // 2. Grant general organization admin role
+      await pool.query(
+        `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+         VALUES ($1, $2, 'admin', 'active')`,
+        [workspaceId, generalAdminId]
+      );
+
+      const cloudId = `cloud-${randomUUID().slice(0, 8)}`;
+      await seedJiraGrantAndSite(pool, generalAdminId, cloudId);
+
+      const verifier = new FakeNativeAdminVerifier();
+      const repo = new WorkspaceRepo(pool, { verifier });
+
+      // Case A: User has NO entry in ati_workspace_memberships -> 404 Hidden Pattern
+      await expect(
+        repo.linkSite(workspaceId, generalAdminId, { cloudId })
+      ).rejects.toMatchObject({
+        statusCode: 404,
+      });
+
+      // Case B: User has ordinary member role in ati_workspace_memberships -> 403 ADMIN_REQUIRED
+      await pool.query(
+        `INSERT INTO ati_workspace_memberships (workspace_id, user_id, role, status, version)
+         VALUES ($1, $2, 'member', 'active', 1)`,
+        [workspaceId, generalAdminId]
+      );
+
+      await expect(
+        repo.linkSite(workspaceId, generalAdminId, { cloudId })
+      ).rejects.toMatchObject({
+        statusCode: 403,
+        code: expect.stringMatching(/ADMIN_REQUIRED|FORBIDDEN/),
+      });
+
+      expect(verifier.recordedEvidences.length).toBe(0);
     });
   });
 });

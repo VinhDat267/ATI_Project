@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { User } from '../../types';
+import { getActiveWorkspaceSummary, subscribeWorkspace } from '../../services/workspace-storage';
 export interface UserNavMenuProps {
   pendingScheduleCount?: number;
   user: User | null; onOpenSettings: () => void; onLogout: () => void;
@@ -13,6 +14,8 @@ export function avatarInitials(user: User | null) {
 }
 export function UserNavMenu({ user, onOpenSettings, onLogout, onManageUsers, onOpenAccount, navigate, variant, triggerClassName, menuItemClassName, pendingScheduleCount = 0 }: UserNavMenuProps) {
   const [open, setOpen] = useState(false);
+  const [workspace, setWorkspace] = useState(getActiveWorkspaceSummary());
+  useEffect(() => subscribeWorkspace(() => setWorkspace(getActiveWorkspaceSummary())), []);
   const container = useRef<HTMLDivElement>(null), trigger = useRef<HTMLButtonElement>(null);
   const id = useId();
   const items = () => [...(container.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])];
@@ -24,9 +27,10 @@ export function UserNavMenu({ user, onOpenSettings, onLogout, onManageUsers, onO
     return () => document.removeEventListener('mousedown', outside);
   }, [open]);
   const select = (action?: () => void) => { setOpen(false); action?.(); };
+  const canManageUsers = (workspace.id !== 'personal' && workspace.role === 'admin') || (workspace.id === 'personal' && user?.role === 'admin');
   const entries: [string, (() => void) | undefined][] = [
     [pendingScheduleCount > 0 ? `Nhật ký điều phối, ${pendingScheduleCount} lượt chờ duyệt` : 'Nhật ký điều phối', () => navigate?.('/history')], ['Kết nối dịch vụ', onOpenSettings], ['Cẩm nang', () => navigate?.('/guide')], ['Tài khoản', onOpenAccount],
-    ...(user?.role === 'admin' ? [['Quản lý người dùng', onManageUsers] as [string, (() => void) | undefined]] : []),
+    ...(canManageUsers ? [['Quản lý người dùng', onManageUsers] as [string, (() => void) | undefined]] : []),
     ['Chính sách an toàn', () => navigate?.('/privacy')], ['Đăng xuất', onLogout],
   ];
   return <div ref={container} className="relative">
@@ -41,7 +45,22 @@ export function UserNavMenu({ user, onOpenSettings, onLogout, onManageUsers, onO
         } else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setOpen(false); trigger.current?.focus(); }
         else if (event.key === 'Tab') setOpen(false);
       }}>
-      <div className={variant === 'prototype' ? 'px-4 py-3 border-b border-brand-border select-none' : 'px-3 py-2 border-b border-border mb-1'}><p className="font-semibold truncate">{user?.name || user?.email || 'Người dùng'}</p>{variant === 'prototype' && <span className="text-[10px] text-brand-muted">{user?.role === 'admin' ? 'Quản trị viên' : 'Thành viên'}</span>}{user?.email && <p className="text-sm text-text-secondary truncate">{user.email}</p>}</div>
+      <div className={variant === 'prototype' ? 'px-4 py-3 border-b border-brand-border select-none' : 'px-3 py-2 border-b border-border mb-1'}>
+        <p className="font-semibold truncate">{user?.name || user?.email || 'Người dùng'}</p>
+        {variant === 'prototype' && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] text-brand-muted">
+              {workspace.id === 'personal'
+                ? (user?.role === 'admin' ? 'Quản trị viên' : 'Thành viên')
+                : (workspace.role === 'admin' ? 'Quản trị viên' : 'Thành viên')}
+            </span>
+            <span className="text-[10px] text-[#9CA3AF]">
+              · {workspace.id === 'personal' ? 'Cá nhân' : workspace.name}
+            </span>
+          </div>
+        )}
+        {user?.email && <p className="text-sm text-text-secondary truncate">{user.email}</p>}
+      </div>
       {entries.map(([label, action]) => <button key={label} type="button" role="menuitem" tabIndex={-1} className={menuItemClassName ? `${menuItemClassName} ${label === 'Đăng xuất' ? 'text-red-700 dark:text-red-400' : ''}` : variant === 'prototype' ? `user-menu-item ${label === 'Đăng xuất' ? 'text-red-700' : ''}` : `w-full min-h-10 px-3 py-2 text-left rounded-lg hover:bg-surface-raised ${label === 'Đăng xuất' ? 'text-danger-text' : 'text-text'}`} onClick={() => select(action)}>{label}</button>)}
     </div>}
   </div>;

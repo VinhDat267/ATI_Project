@@ -31,6 +31,8 @@ export async function runtimeToolCatalog(
   key: string,
   options: {
     userId?: string;
+    workspaceMode?: 'legacy' | 'personal' | 'organization';
+    workspaceId?: string | null;
     gmailEnabled: boolean;
     mycalendarEnabled?: boolean;
     mysheetsEnabled?: boolean;
@@ -38,7 +40,7 @@ export async function runtimeToolCatalog(
     trelloTeamRepo?: any;
     trelloOAuthClient?: any;
     trelloTokens?: any;
-    trelloConnection?: (userId: string) => Promise<any>;
+    trelloConnection?: (userId: string, scopeId?: string) => Promise<any>;
   },
 ) {
   const personal = await getToolCatalogFor(repo, key, options);

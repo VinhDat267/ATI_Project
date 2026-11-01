@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from 're
 import { usePrototypePage, type PageMeta } from '../../prototype/usePrototypePage';
 import css from './page.css?inline';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
-export type AuthActionMode = 'loading' | 'verify-success' | 'verify-expired' | 'verify-used' | 'reset-password' | 'reset-success' | 'google-pending' | 'google-ready' | 'google-error' | 'blocked-pending' | 'blocked-locked' | 'blocked-attempts';
+export type AuthActionMode = 'loading' | 'verify-success' | 'verify-expired' | 'verify-used' | 'reset-password' | 'reset-success' | 'google-pending' | 'google-ready' | 'google-error' | 'blocked-pending' | 'blocked-locked' | 'blocked-attempts' | 'email-not-verified';
 const BAR_EMPTY = 'h-full flex-1 rounded-full bg-[#E5E7EB] transition-colors';
 const BAR = (color: string) => `h-full flex-1 rounded-full transition-colors ${color}`;
 const spinner = <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>;
@@ -67,7 +67,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
   handleResetPasswordSubmit(event: FormEvent) { event.preventDefault(); if (!busy) void onReset?.(newPasswordRef.current?.value ?? '', confirmPasswordRef.current?.value ?? ''); },
  };
  const power = strength(newPassword), resendBusy = busy, resetBusy = busy;
- const resendSent = message && mode === 'verify-expired' ? message : null;
+ const resendSent = message && (mode === 'verify-expired' || mode === 'email-not-verified') ? message : null;
  const viewClass = (_mode: AuthActionMode) => 'v3-space-y-6';
  const blockedDone = blockedSeconds === 0;
  const blockedText = blockedSeconds === null ? 'Chưa có thời gian từ máy chủ' : `${String(Math.floor(blockedSeconds / 60)).padStart(2, '0')}:${String(blockedSeconds % 60).padStart(2, '0')}`;
@@ -151,7 +151,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                   {" đã được xác thực thành công. Yêu cầu của bạn đã sẵn sàng cho bước tiếp theo."}
                 </p>
               </div>
-              {/* Thẻ quy trình 3 bước (Sự thật sản phẩm) */}
+              {/* Thẻ quy trình 2 bước (Sự thật sản phẩm v3) */}
               <div className="bg-[#F8F8F6] border border-[#E7E7E2] rounded-2xl p-4 sm:p-5 v3-space-y-3">
                 <div className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
                   Tiến trình kích hoạt tài khoản
@@ -171,31 +171,17 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                       </div>
                     </div>
                   </div>
-                  {/* Bước 2: Đang chờ */}
+                  {/* Bước 2: Sẵn sàng sử dụng */}
                   <div className="flex items-start gap-3">
-                    <div className="w-5 h-5 rounded-full bg-[#FF5701] text-white flex items-center justify-center flex-shrink-0 mt-0.5 text-[11px] font-bold animate-pulse">
-                      2
+                    <div className="w-5 h-5 rounded-full bg-[#16A34A] text-white flex items-center justify-center flex-shrink-0 mt-0.5 text-[11px] font-bold">
+                      ✓
                     </div>
                     <div className="min-w-0">
-                      <div className="font-semibold text-[#FF5701]">
-                        Bước 2: Quản trị viên duyệt tài khoản (Hiện tại)
+                      <div className="font-semibold text-[#16A34A]">
+                        Bước 2: Sẵn sàng sử dụng Không gian Cá nhân
                       </div>
                       <div className="text-[#4B5563] text-xs leading-relaxed mt-0.5">
-                        Quản trị viên nhóm đã nhận được thông báo. Bạn sẽ nhận được email ngay khi tài khoản được phê duyệt và cấp quyền sử dụng các công cụ.
-                      </div>
-                    </div>
-                  </div>
-                  {/* Bước 3: Sắp tới */}
-                  <div className="flex items-start gap-3 opacity-60">
-                    <div className="w-5 h-5 rounded-full border border-[#D1D5DB] bg-white text-[#9CA3AF] flex items-center justify-center flex-shrink-0 mt-0.5 text-[11px] font-medium">
-                      3
-                    </div>
-                    <div className="min-w-0">
-                      <div className="font-medium text-[#6B7280]">
-                        Bước 3: Vào không gian làm việc
-                      </div>
-                      <div className="text-[#9CA3AF] text-xs">
-                        Mở sân khấu điều phối và bắt đầu giao việc bằng tiếng Việt.
+                        Tài khoản của bạn đã được kích hoạt. Bạn có thể kết nối công cụ và bắt đầu giao việc ngay lập tức.
                       </div>
                     </div>
                   </div>
@@ -267,6 +253,66 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                   <span>
                     ← Quay lại trang chủ
                   </span>
+                </a>
+              </div>
+            </section>}
+            {/* ========================================== */}
+            {/* MÀN: CHƯA XÁC MINH EMAIL (EMAIL_NOT_VERIFIED) */}
+            {/* ========================================== */}
+            {mode === 'email-not-verified' && <section id="view-email-not-verified" className={viewClass('email-not-verified')} aria-labelledby="title-email-not-verified">
+              <div className="text-center v3-space-y-3">
+                <div className="w-14 h-14 rounded-2xl bg-[#D97706]/10 text-[#D97706] flex items-center justify-center mx-auto shadow-sm">
+                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wider bg-[#D97706]/10 text-[#D97706] mb-2">
+                    {" Cần xác minh email "}
+                  </span>
+                  {' '}
+                  <h1 id="title-email-not-verified" className="font-display font-semibold text-2xl sm:text-[26px] text-[#111827] tracking-tight">
+                    Tài khoản đang chờ duyệt
+                  </h1>
+                  <p className="text-sm font-semibold text-[#D97706] mt-1">
+                    Bạn cần xác minh địa chỉ email
+                  </p>
+                </div>
+                <p className="text-sm text-[#4B5563] leading-relaxed max-w-md mx-auto">
+                  {error || `Địa chỉ email ${email || 'của bạn'} chưa được xác minh. Hãy kiểm tra hộp thư hoặc bấm gửi lại link xác minh mới bên dưới.`}
+                </p>
+              </div>
+              <div className="flex items-center justify-between text-xs text-[#16A34A] bg-white p-2.5 rounded-xl border border-[#E7E7E2]">
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-[#16A34A]/10 flex items-center justify-center font-bold text-[11px]">
+                    1
+                  </span>
+                  <span className="font-medium text-[#111827]">
+                    1. Đăng ký &amp; xác thực email
+                  </span>
+                </div>
+                <span className="text-[11px] font-semibold text-[#16A34A]">
+                  Nếu chưa hoàn tất
+                </span>
+              </div>
+              {/* Form yêu cầu gửi lại link */}
+              <form id="form-resend-verification" onSubmit={(event) => actions.handleResendVerification(event)} className="bg-[#F8F8F6] border border-[#E7E7E2] rounded-2xl p-5 v3-space-y-4">
+                <div>
+                  <label htmlFor="resend-email-input" className="block text-xs font-semibold text-[#111827] uppercase tracking-wider mb-1.5">
+                    Nhập email để nhận link xác minh mới
+                  </label>
+                  {' '}
+                  <input ref={resendInputRef} type="email" id="resend-email-input" required defaultValue={email} aria-label="Email" autoComplete="email" maxLength={254} className="w-full px-3.5 py-2.5 bg-white border border-[#E7E7E2] rounded-xl text-sm text-[#111827] placeholder-[#9CA3AF] focus:border-[#FF5701] focus:ring-1 focus:ring-[#FF5701] transition-all" />
+                </div>
+                <button type="submit" id="btn-submit-resend" className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#FF5701] hover:bg-[#E04C00] text-white font-medium text-sm transition-colors shadow-sm focus-visible:v3-outline-none" disabled={resendBusy}>
+                  {resendBusy ? <>{spinner}<span>Đang gửi lại…</span></> : <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg><span>Gửi lại link xác minh mới</span></>}
+                </button>
+              </form>
+              {/* Hộp kết quả sau khi gửi lại */}
+              {resendSent && <div id="resend-success-box" className="p-4 rounded-xl bg-[#16A34A]/10 border border-[#16A34A]/20 text-xs text-[#16A34A] leading-relaxed">{resendSent}</div>}
+              <div className="v3-space-y-2.5 pt-1">
+                <a onClick={followLink} href="/login" className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl border border-[#E7E7E2] hover:bg-neutral-50 text-[#4B5563] hover:text-[#111827] font-medium text-xs sm:text-sm transition-colors">
+                  Thử đăng nhập lại
                 </a>
               </div>
             </section>}

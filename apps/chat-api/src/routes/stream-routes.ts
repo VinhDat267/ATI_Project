@@ -2,18 +2,20 @@ import { Router, type Request, type Response } from 'express';
 import type pg from 'pg';
 import type { SSEManager } from '../sse/sse-manager.js';
 import type { ConversationRepo } from '../db/repositories/conversation-repo.js';
+import type { WorkspaceRepo } from '../db/repositories/workspace-repo.js';
 import { assertConversationAccessWithFallback, ConversationAccessDeniedError } from '../services/conversation-access.js';
 
 export interface StreamRoutesOptions {
   sseManager: SSEManager;
   convRepo?: ConversationRepo;
+  workspaceRepo?: WorkspaceRepo;
   pool?: pg.Pool;
 }
 
 export function createStreamRoutes(options: StreamRoutesOptions): Router {
   const router = Router();
-  const { sseManager, convRepo } = options;
-  const pool = options.pool ?? convRepo?.getPool?.();
+  const { sseManager, convRepo, workspaceRepo } = options;
+  const pool = options.pool ?? convRepo?.getPool?.() ?? (workspaceRepo as any)?.pool;
 
   // GET /api/conversations/:id/stream
   router.get('/:id/stream', async (req: Request, res: Response): Promise<void> => {
@@ -30,12 +32,18 @@ export function createStreamRoutes(options: StreamRoutesOptions): Router {
       return;
     }
 
+    const reqWorkspace = (req as any).workspace;
     try {
       await assertConversationAccessWithFallback(
         { pool, convRepo },
         convId,
         userId,
-        { legacyNonOwnerStatus: 403 }
+        {
+          legacyNonOwnerStatus: 403,
+          expectedWorkspaceId: reqWorkspace?.workspaceId ?? null,
+          expectedWorkspaceMode: reqWorkspace?.mode,
+          ordinaryOrgAccessDeniedAs403: true,
+        }
       );
     } catch (err: any) {
       if (err instanceof ConversationAccessDeniedError) {

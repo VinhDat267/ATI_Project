@@ -23,6 +23,8 @@ export function createScheduleRoutes(options: ScheduleRoutesOptions): Router {
   const router = Router();
   const { service } = options;
   const now = () => options.clock?.() ?? new Date();
+  const pool = options.pool ?? (options.convRepo as any)?.getPool?.() ?? (service as any)?.pool;
+  const convRepo = options.convRepo ?? (service as any)?.convRepo;
 
   const handle = (work: (req: Request, res: Response, userId: string) => Promise<void>) => async (req: Request, res: Response) => {
     const userId = (req as any).user?.id;
@@ -52,29 +54,39 @@ export function createScheduleRoutes(options: ScheduleRoutesOptions): Router {
     }
   };
 
-  router.get('/schedules', handle(async (_req, res, userId) => {
-    res.json({ schedules: await service.list(userId, now()) });
+  router.get('/schedules', handle(async (req, res, userId) => {
+    const scope = req.workspace ? { workspaceMode: req.workspace.mode, workspaceId: req.workspace.workspaceId } : undefined;
+    res.json({ schedules: await service.list(userId, now(), scope) });
   }));
 
-  router.get('/schedules/pending-count', handle(async (_req, res, userId) => {
-    res.json({ count: await service.pendingCount(userId, now()) });
+  router.get('/schedules/pending-count', handle(async (req, res, userId) => {
+    const scope = req.workspace ? { workspaceMode: req.workspace.mode, workspaceId: req.workspace.workspaceId } : undefined;
+    res.json({ count: await service.pendingCount(userId, now(), scope) });
   }));
 
   router.get('/schedules/:id/runs', handle(async (req, res, userId) => {
+    const scope = req.workspace ? { workspaceMode: req.workspace.mode, workspaceId: req.workspace.workspaceId } : undefined;
     const raw = req.query.limit;
     const limit = typeof raw === 'string' && /^\d+$/.test(raw) ? Math.min(50, Math.max(1, Number(raw))) : 20;
-    res.json({ runs: await service.listRuns(userId, String(req.params.id), limit, now()) });
+    res.json({ runs: await service.listRuns(userId, String(req.params.id), limit, now(), scope) });
   }));
 
   router.post('/conversations/:convId/schedule-proposals/:messageId/confirm', handle(async (req, res, userId) => {
     const convId = String(req.params.convId);
-    await assertConversationAccessWithFallback(
-      { pool: options.pool, convRepo: options.convRepo },
-      convId,
-      userId,
-      { legacyNonOwnerStatus: 404 }
-    );
-    const change = await service.confirmProposal({ userId, convId, messageId: String(req.params.messageId), now: now() });
+    if (pool || convRepo) {
+      await assertConversationAccessWithFallback(
+        { pool, convRepo: convRepo as any },
+        convId,
+        userId,
+        {
+          legacyNonOwnerStatus: 404,
+          expectedWorkspaceId: req.workspace?.workspaceId ?? null,
+          expectedWorkspaceMode: req.workspace?.mode,
+        }
+      );
+    }
+    const scope = req.workspace ? { workspaceMode: req.workspace.mode, workspaceId: req.workspace.workspaceId } : undefined;
+    const change = await service.confirmProposal({ userId, convId, messageId: String(req.params.messageId), now: now(), scope });
     await announce(change);
     res.json({ schedule: change.schedule });
   }));
@@ -86,18 +98,21 @@ export function createScheduleRoutes(options: ScheduleRoutesOptions): Router {
         res.status(400).json({ error: { code: 'BAD_REQUEST', message: 'Thiếu phiên bản của lịch.' } });
         return;
       }
-      const change = await service.setStatus({ userId, scheduleId: String(req.params.id), action, version, now: now() });
+      const scope = req.workspace ? { workspaceMode: req.workspace.mode, workspaceId: req.workspace.workspaceId } : undefined;
+      const change = await service.setStatus({ userId, scheduleId: String(req.params.id), action, version, now: now(), scope });
       await announce(change);
       res.json({ schedule: change.schedule });
     }));
   }
 
   router.post('/schedules/:id/run-now', handle(async (req, res, userId) => {
-    res.status(201).json({ run: await service.startRun({ userId, scheduleId: String(req.params.id), trigger: 'manual', now: now() }) });
+    const scope = req.workspace ? { workspaceMode: req.workspace.mode, workspaceId: req.workspace.workspaceId } : undefined;
+    res.status(201).json({ run: await service.startRun({ userId, scheduleId: String(req.params.id), trigger: 'manual', now: now(), scope }) });
   }));
 
   router.post('/schedule-runs/:id/replan', handle(async (req, res, userId) => {
-    res.status(201).json({ run: await service.startRun({ userId, runId: String(req.params.id), trigger: 'replan', now: now() }) });
+    const scope = req.workspace ? { workspaceMode: req.workspace.mode, workspaceId: req.workspace.workspaceId } : undefined;
+    res.status(201).json({ run: await service.startRun({ userId, runId: String(req.params.id), trigger: 'replan', now: now(), scope }) });
   }));
 
   return router;

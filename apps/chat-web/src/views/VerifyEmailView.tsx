@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { apiClient } from '../services/api-client';
+import { authStorage } from '../services/auth-storage';
+import { setActiveWorkspaceId } from '../services/workspace-storage';
 import { userErrorMessage } from '../services/user-error';
 import { AuthActionPage, type AuthActionMode } from '../pages/AuthAction/AuthActionPage';
 import type { AuthViewProps } from './AuthFormFrame';
@@ -14,11 +16,26 @@ export function VerifyEmailView({ navigate, token, resend = false }: AuthViewPro
     if (!token) { setBusy(false); setMode('verify-expired'); setError('Link xác minh không hợp lệ hoặc đã được mở. Hãy yêu cầu gửi lại email.'); return; }
     if (verification.current?.token !== token) verification.current = { token, request: apiClient.verifyEmail(token) };
     let current = true; setBusy(true);
-    verification.current.request.then(data => { if (current) { setMode('verify-success'); setMessage(data.message); } })
+    verification.current.request.then(data => {
+      if (current) {
+        if (data.accessToken && data.user) {
+          authStorage.setStoredTokens({
+            accessToken: data.accessToken,
+            refreshToken: data.refreshToken || null,
+            user: data.user,
+          });
+          setActiveWorkspaceId('personal');
+          navigate('/', true);
+          return;
+        }
+        setMode('verify-success');
+        setMessage(data.message);
+      }
+    })
       .catch(reason => { if (current) { setMode('verify-expired'); setError(userErrorMessage(reason)); } })
       .finally(() => { if (current) setBusy(false); });
     return () => { current = false; };
-  }, [token, resend]);
+  }, [token, resend, navigate]);
   const submit = async (email: string) => {
     if (pending.current) return; pending.current = true; setBusy(true); setError(null);
     try { const data = await apiClient.resendVerification(email); if (mounted.current) setMessage(data.message); }

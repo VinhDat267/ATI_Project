@@ -1,11 +1,10 @@
--- 0015_jira_workspaces.sql: JIRA-03 Workspaces, memberships, invites, accounts, grants, sites, projects, audit, and conversation immutability.
+-- 0016_jira_workspaces.sql: JIRA-03 Workspaces policy extension, memberships, invites, accounts, grants, sites, projects, audit, and conversation immutability.
 -- Every migration file runs again on each migrate, so each statement is idempotent.
 
--- 1. ati_workspaces
+-- 1. ati_workspaces (Policy extension referencing unified general workspaces)
 CREATE TABLE IF NOT EXISTS ati_workspaces (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id          UUID PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE,
   slug        TEXT UNIQUE NOT NULL,
-  name        TEXT NOT NULL,
   status      TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'archived')),
   version     INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
   created_by  UUID NOT NULL REFERENCES users(id),
@@ -138,10 +137,15 @@ CREATE TABLE IF NOT EXISTS jira_authorization_audit (
   created_at    TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
 );
 
--- 10. conversations workspace_id column and immutability trigger
-ALTER TABLE conversations ADD COLUMN IF NOT EXISTS workspace_id UUID REFERENCES ati_workspaces(id) ON DELETE RESTRICT;
+-- 10. conversations jira_context and immutability trigger
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS jira_context BOOLEAN NOT NULL DEFAULT false;
 
-CREATE INDEX IF NOT EXISTS idx_conversations_workspace_user ON conversations (workspace_id, user_id);
+ALTER TABLE conversations DROP CONSTRAINT IF EXISTS conversations_jira_context_check;
+ALTER TABLE conversations ADD CONSTRAINT conversations_jira_context_check CHECK (
+  jira_context = false OR (jira_context = true AND workspace_mode = 'organization' AND workspace_id IS NOT NULL)
+);
+
+CREATE INDEX IF NOT EXISTS idx_conversations_jira_context ON conversations (workspace_id, jira_context) WHERE jira_context = true;
 
 CREATE OR REPLACE FUNCTION trg_conversations_workspace_immutable()
 RETURNS TRIGGER AS $$
@@ -149,6 +153,16 @@ BEGIN
   IF TG_OP = 'UPDATE' THEN
     IF OLD.workspace_id IS NOT NULL AND NEW.workspace_id IS DISTINCT FROM OLD.workspace_id THEN
       RAISE EXCEPTION 'conversations.workspace_id is immutable once assigned'
+        USING ERRCODE = 'check_violation';
+    END IF;
+
+    IF OLD.workspace_mode IS NOT NULL AND NEW.workspace_mode IS DISTINCT FROM OLD.workspace_mode THEN
+      RAISE EXCEPTION 'conversations.workspace_mode is immutable once assigned'
+        USING ERRCODE = 'check_violation';
+    END IF;
+
+    IF OLD.jira_context IS NOT NULL AND NEW.jira_context IS DISTINCT FROM OLD.jira_context THEN
+      RAISE EXCEPTION 'conversations.jira_context is immutable once assigned'
         USING ERRCODE = 'check_violation';
     END IF;
 

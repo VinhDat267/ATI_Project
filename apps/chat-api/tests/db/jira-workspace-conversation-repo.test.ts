@@ -29,11 +29,17 @@ describe('apps/chat-api — JIRA-03 Conversation Repository Workspace Scope & In
   }
 
   async function seedWorkspace(name: string, slug: string, createdBy: string, status = 'active'): Promise<string> {
+    const wsId = randomUUID();
+    await pool.query(
+      `INSERT INTO workspaces (id, name, invite_code, require_approval, created_by, created_at, updated_at)
+       VALUES ($1, $2, $3, false, $4, clock_timestamp(), clock_timestamp())`,
+      [wsId, name, `INV-${wsId.slice(0, 8)}`.toUpperCase(), createdBy]
+    );
     const res = await pool.query<{ id: string }>(
-      `INSERT INTO ati_workspaces (id, slug, name, status, version, created_by)
-       VALUES ($1, $2, $3, $4, 1, $5)
+      `INSERT INTO ati_workspaces (id, slug, status, version, created_by)
+       VALUES ($1, $2, $3, 1, $4)
        RETURNING id`,
-      [randomUUID(), slug, name, status, createdBy]
+      [wsId, slug, status, createdBy]
     );
     return firstRow(res).id;
   }
@@ -44,6 +50,14 @@ describe('apps/chat-api — JIRA-03 Conversation Repository Workspace Scope & In
     role: 'admin' | 'member' = 'member',
     status: 'pending' | 'active' | 'rejected' | 'removed' = 'active'
   ): Promise<void> {
+    const genericStatus = status === 'active' ? 'active' : 'disabled';
+    await pool.query(
+      `INSERT INTO workspace_members (workspace_id, user_id, role, status, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, clock_timestamp(), clock_timestamp())
+       ON CONFLICT (workspace_id, user_id)
+       DO UPDATE SET status = EXCLUDED.status, role = EXCLUDED.role, updated_at = clock_timestamp()`,
+      [workspaceId, userId, role, genericStatus]
+    );
     await pool.query(
       `INSERT INTO ati_workspace_memberships (workspace_id, user_id, role, status, version)
        VALUES ($1, $2, $3, $4, 1)
@@ -101,7 +115,11 @@ describe('apps/chat-api — JIRA-03 Conversation Repository Workspace Scope & In
 
     it('creates scoped conversation with workspace_id when user is active member of active workspace', async () => {
       // Natural call to planned optional workspaceId parameter (no casts)
-      const conv = await convRepo.createConversation(user1Id, ws1Id);
+      const conv = await convRepo.createConversation(user1Id, {
+        workspaceMode: 'organization',
+        workspaceId: ws1Id,
+        jiraContext: true,
+      });
 
       expect(conv).toBeDefined();
       expect(conv.user_id).toBe(user1Id);
@@ -118,7 +136,11 @@ describe('apps/chat-api — JIRA-03 Conversation Repository Workspace Scope & In
     it('rejects scoped conversation creation if user is not a member of workspace', async () => {
       // User 3 has no membership in WS1
       await expect(
-        convRepo.createConversation(user3Id, ws1Id)
+        convRepo.createConversation(user3Id, {
+          workspaceMode: 'organization',
+          workspaceId: ws1Id,
+          jiraContext: true,
+        })
       ).rejects.toThrow();
     });
 
@@ -127,7 +149,11 @@ describe('apps/chat-api — JIRA-03 Conversation Repository Workspace Scope & In
       await seedMembership(testWsId, user3Id, 'member', 'pending');
 
       await expect(
-        convRepo.createConversation(user3Id, testWsId)
+        convRepo.createConversation(user3Id, {
+          workspaceMode: 'organization',
+          workspaceId: testWsId,
+          jiraContext: true,
+        })
       ).rejects.toThrow();
     });
 
@@ -136,7 +162,11 @@ describe('apps/chat-api — JIRA-03 Conversation Repository Workspace Scope & In
       await seedMembership(testWsId, user3Id, 'member', 'rejected');
 
       await expect(
-        convRepo.createConversation(user3Id, testWsId)
+        convRepo.createConversation(user3Id, {
+          workspaceMode: 'organization',
+          workspaceId: testWsId,
+          jiraContext: true,
+        })
       ).rejects.toThrow();
     });
 
@@ -145,13 +175,21 @@ describe('apps/chat-api — JIRA-03 Conversation Repository Workspace Scope & In
       await seedMembership(testWsId, user3Id, 'member', 'removed');
 
       await expect(
-        convRepo.createConversation(user3Id, testWsId)
+        convRepo.createConversation(user3Id, {
+          workspaceMode: 'organization',
+          workspaceId: testWsId,
+          jiraContext: true,
+        })
       ).rejects.toThrow();
     });
 
     it('rejects scoped conversation creation if workspace is archived', async () => {
       await expect(
-        convRepo.createConversation(user1Id, wsArchivedId)
+        convRepo.createConversation(user1Id, {
+          workspaceMode: 'organization',
+          workspaceId: wsArchivedId,
+          jiraContext: true,
+        })
       ).rejects.toThrow();
     });
   });
@@ -170,8 +208,8 @@ describe('apps/chat-api — JIRA-03 Conversation Repository Workspace Scope & In
 
     it('trigger blocks setting workspace_id to NULL on scoped conversation (workspaceId -> NULL)', async () => {
       const res = await pool.query<{ id: string }>(
-        `INSERT INTO conversations (user_id, status, title, workspace_id)
-         VALUES ($1, 'chatting', 'Direct Scoped', $2) RETURNING id`,
+        `INSERT INTO conversations (user_id, status, title, workspace_id, workspace_mode, jira_context)
+         VALUES ($1, 'chatting', 'Direct Scoped', $2, 'organization', true) RETURNING id`,
         [user1Id, ws1Id]
       );
       const scopedId = firstRow(res).id;
@@ -183,8 +221,8 @@ describe('apps/chat-api — JIRA-03 Conversation Repository Workspace Scope & In
 
     it('trigger blocks switching workspace_id across workspaces (workspace A -> workspace B)', async () => {
       const res = await pool.query<{ id: string }>(
-        `INSERT INTO conversations (user_id, status, title, workspace_id)
-         VALUES ($1, 'chatting', 'Direct Scoped A', $2) RETURNING id`,
+        `INSERT INTO conversations (user_id, status, title, workspace_id, workspace_mode, jira_context)
+         VALUES ($1, 'chatting', 'Direct Scoped A', $2, 'organization', true) RETURNING id`,
         [user1Id, ws1Id]
       );
       const scopedId = firstRow(res).id;
@@ -196,8 +234,8 @@ describe('apps/chat-api — JIRA-03 Conversation Repository Workspace Scope & In
 
     it('allows normal updates to other fields while workspace_id remains unchanged', async () => {
       const res = await pool.query<{ id: string }>(
-        `INSERT INTO conversations (user_id, status, title, workspace_id)
-         VALUES ($1, 'chatting', 'Initial Scoped Title', $2) RETURNING id`,
+        `INSERT INTO conversations (user_id, status, title, workspace_id, workspace_mode, jira_context)
+         VALUES ($1, 'chatting', 'Initial Scoped Title', $2, 'organization', true) RETURNING id`,
         [user1Id, ws1Id]
       );
       const scopedId = firstRow(res).id;
@@ -230,16 +268,16 @@ describe('apps/chat-api — JIRA-03 Conversation Repository Workspace Scope & In
     beforeEach(async () => {
       // 1. Legacy conversation for User 1
       const lRes = await pool.query<{ id: string }>(
-        `INSERT INTO conversations (user_id, status, title, workspace_id)
-         VALUES ($1, 'chatting', 'Legacy User1 Conv', NULL) RETURNING id`,
+        `INSERT INTO conversations (user_id, status, title, workspace_id, workspace_mode, jira_context)
+         VALUES ($1, 'chatting', 'Legacy User1 Conv', NULL, 'legacy', false) RETURNING id`,
         [user1Id]
       );
       convLegacy = firstRow(lRes).id;
 
       // 2. Active scoped conversation in WS1
       const aRes = await pool.query<{ id: string }>(
-        `INSERT INTO conversations (user_id, status, title, workspace_id)
-         VALUES ($1, 'chatting', 'Active Scoped WS1 Conv', $2) RETURNING id`,
+        `INSERT INTO conversations (user_id, status, title, workspace_id, workspace_mode, jira_context)
+         VALUES ($1, 'chatting', 'Active Scoped WS1 Conv', $2, 'organization', true) RETURNING id`,
         [user1Id, ws1Id]
       );
       convActiveWs = firstRow(aRes).id;
@@ -248,16 +286,16 @@ describe('apps/chat-api — JIRA-03 Conversation Repository Workspace Scope & In
       const removedWsId = await seedWorkspace('Removed WS Filter', `ws-rf-${randomUUID().slice(0, 8)}`, user1Id);
       await seedMembership(removedWsId, user1Id, 'member', 'removed');
       const rRes = await pool.query<{ id: string }>(
-        `INSERT INTO conversations (user_id, status, title, workspace_id)
-         VALUES ($1, 'chatting', 'Removed Scoped Conv', $2) RETURNING id`,
+        `INSERT INTO conversations (user_id, status, title, workspace_id, workspace_mode, jira_context)
+         VALUES ($1, 'chatting', 'Removed Scoped Conv', $2, 'organization', true) RETURNING id`,
         [user1Id, removedWsId]
       );
       convRemovedWs = firstRow(rRes).id;
 
       // 4. Scoped conversation in archived workspace
       const archRes = await pool.query<{ id: string }>(
-        `INSERT INTO conversations (user_id, status, title, workspace_id)
-         VALUES ($1, 'chatting', 'Archived Scoped Conv', $2) RETURNING id`,
+        `INSERT INTO conversations (user_id, status, title, workspace_id, workspace_mode, jira_context)
+         VALUES ($1, 'chatting', 'Archived Scoped Conv', $2, 'organization', true) RETURNING id`,
         [user1Id, wsArchivedId]
       );
       convArchivedWs = firstRow(archRes).id;
@@ -300,27 +338,27 @@ describe('apps/chat-api — JIRA-03 Conversation Repository Workspace Scope & In
 
       // Create 3 valid conversations (2 active scoped, 1 legacy)
       const conv1 = firstRow(await pool.query<{ id: string }>(
-        `INSERT INTO conversations (user_id, status, title, workspace_id, updated_at)
-         VALUES ($1, 'chatting', 'Page Conv 1', $2, now() - interval '3 minutes') RETURNING id`,
+        `INSERT INTO conversations (user_id, status, title, workspace_id, workspace_mode, jira_context, updated_at)
+         VALUES ($1, 'chatting', 'Page Conv 1', $2, 'organization', true, now() - interval '3 minutes') RETURNING id`,
         [targetUser, targetWs]
       )).id;
 
       // Hidden conversation in between timestamps
       const hiddenConv = firstRow(await pool.query<{ id: string }>(
-        `INSERT INTO conversations (user_id, status, title, workspace_id, updated_at)
-         VALUES ($1, 'chatting', 'Page Conv Hidden', $2, now() - interval '2 minutes') RETURNING id`,
+        `INSERT INTO conversations (user_id, status, title, workspace_id, workspace_mode, jira_context, updated_at)
+         VALUES ($1, 'chatting', 'Page Conv Hidden', $2, 'organization', true, now() - interval '2 minutes') RETURNING id`,
         [targetUser, deadWs]
       )).id;
 
       const conv2 = firstRow(await pool.query<{ id: string }>(
-        `INSERT INTO conversations (user_id, status, title, workspace_id, updated_at)
-         VALUES ($1, 'chatting', 'Page Conv 2', $2, now() - interval '1 minute') RETURNING id`,
+        `INSERT INTO conversations (user_id, status, title, workspace_id, workspace_mode, jira_context, updated_at)
+         VALUES ($1, 'chatting', 'Page Conv 2', $2, 'organization', true, now() - interval '1 minute') RETURNING id`,
         [targetUser, targetWs]
       )).id;
 
       const conv3 = firstRow(await pool.query<{ id: string }>(
-        `INSERT INTO conversations (user_id, status, title, workspace_id, updated_at)
-         VALUES ($1, 'chatting', 'Page Conv 3', NULL, now()) RETURNING id`,
+        `INSERT INTO conversations (user_id, status, title, workspace_id, workspace_mode, jira_context, updated_at)
+         VALUES ($1, 'chatting', 'Page Conv 3', NULL, 'legacy', false, now()) RETURNING id`,
         [targetUser]
       )).id;
 
@@ -349,14 +387,14 @@ describe('apps/chat-api — JIRA-03 Conversation Repository Workspace Scope & In
       await seedMembership(removedSearchWs, searchUser, 'member', 'removed');
 
       await pool.query(
-        `INSERT INTO conversations (user_id, status, title, workspace_id)
-         VALUES ($1, 'chatting', 'Unique Alpha Matching Keyword', $2)`,
+        `INSERT INTO conversations (user_id, status, title, workspace_id, workspace_mode, jira_context)
+         VALUES ($1, 'chatting', 'Unique Alpha Matching Keyword', $2, 'organization', true)`,
         [searchUser, searchWs]
       );
 
       await pool.query(
-        `INSERT INTO conversations (user_id, status, title, workspace_id)
-         VALUES ($1, 'chatting', 'Unique Alpha Matching Keyword But Removed', $2)`,
+        `INSERT INTO conversations (user_id, status, title, workspace_id, workspace_mode, jira_context)
+         VALUES ($1, 'chatting', 'Unique Alpha Matching Keyword But Removed', $2, 'organization', true)`,
         [searchUser, removedSearchWs]
       );
 
@@ -374,8 +412,8 @@ describe('apps/chat-api — JIRA-03 Conversation Repository Workspace Scope & In
   describe('renameConversation(id, userId, title)', () => {
     it('renames scoped conversation when caller is active member of active workspace', async () => {
       const convRes = await pool.query<{ id: string }>(
-        `INSERT INTO conversations (user_id, status, title, workspace_id)
-         VALUES ($1, 'chatting', 'Initial Title', $2) RETURNING id`,
+        `INSERT INTO conversations (user_id, status, title, workspace_id, workspace_mode, jira_context)
+         VALUES ($1, 'chatting', 'Initial Title', $2, 'organization', true) RETURNING id`,
         [user1Id, ws1Id]
       );
       const convId = firstRow(convRes).id;
@@ -390,8 +428,8 @@ describe('apps/chat-api — JIRA-03 Conversation Repository Workspace Scope & In
       await seedMembership(removedWs, user1Id, 'member', 'active');
 
       const convRes = await pool.query<{ id: string }>(
-        `INSERT INTO conversations (user_id, status, title, workspace_id)
-         VALUES ($1, 'chatting', 'Before Removal Title', $2) RETURNING id`,
+        `INSERT INTO conversations (user_id, status, title, workspace_id, workspace_mode, jira_context)
+         VALUES ($1, 'chatting', 'Before Removal Title', $2, 'organization', true) RETURNING id`,
         [user1Id, removedWs]
       );
       const convId = firstRow(convRes).id;
@@ -412,8 +450,8 @@ describe('apps/chat-api — JIRA-03 Conversation Repository Workspace Scope & In
 
     it('returns null and refuses rename if workspace is archived', async () => {
       const convRes = await pool.query<{ id: string }>(
-        `INSERT INTO conversations (user_id, status, title, workspace_id)
-         VALUES ($1, 'chatting', 'Archived WS Conv Title', $2) RETURNING id`,
+        `INSERT INTO conversations (user_id, status, title, workspace_id, workspace_mode, jira_context)
+         VALUES ($1, 'chatting', 'Archived WS Conv Title', $2, 'organization', true) RETURNING id`,
         [user1Id, wsArchivedId]
       );
       const convId = firstRow(convRes).id;
@@ -424,8 +462,8 @@ describe('apps/chat-api — JIRA-03 Conversation Repository Workspace Scope & In
 
     it('returns null when non-owner attempts to rename scoped conversation', async () => {
       const convRes = await pool.query<{ id: string }>(
-        `INSERT INTO conversations (user_id, status, title, workspace_id)
-         VALUES ($1, 'chatting', 'Alice Conv', $2) RETURNING id`,
+        `INSERT INTO conversations (user_id, status, title, workspace_id, workspace_mode, jira_context)
+         VALUES ($1, 'chatting', 'Alice Conv', $2, 'organization', true) RETURNING id`,
         [user1Id, ws1Id]
       );
       const convId = firstRow(convRes).id;
@@ -437,8 +475,8 @@ describe('apps/chat-api — JIRA-03 Conversation Repository Workspace Scope & In
 
     it('allows owner to rename legacy conversation (workspace_id IS NULL)', async () => {
       const convRes = await pool.query<{ id: string }>(
-        `INSERT INTO conversations (user_id, status, title, workspace_id)
-         VALUES ($1, 'chatting', 'Initial Legacy Title', NULL) RETURNING id`,
+        `INSERT INTO conversations (user_id, status, title, workspace_id, workspace_mode, jira_context)
+         VALUES ($1, 'chatting', 'Initial Legacy Title', NULL, 'legacy', false) RETURNING id`,
         [user1Id]
       );
       const convId = firstRow(convRes).id;
@@ -486,7 +524,11 @@ describe('apps/chat-api — JIRA-03 Conversation Repository Workspace Scope & In
         // Step 2: SUT initiates createConversation on the tagged pool (natural call, no casts)
         const createPromise = (async () => {
           try {
-            createResult = await sutRepo.createConversation(raceUser, raceWs);
+            createResult = await sutRepo.createConversation(raceUser, {
+              workspaceMode: 'organization',
+              workspaceId: raceWs,
+              jiraContext: true,
+            });
             return createResult;
           } catch (err) {
             createError = err;
@@ -501,9 +543,9 @@ describe('apps/chat-api — JIRA-03 Conversation Repository Workspace Scope & In
         // Race against createPromise with a bounded, cancellable waiter so leftover waiter is drained.
         const pollBlocked = async (): Promise<boolean> => {
           const start = Date.now();
-          while (Date.now() - start < 2000 && !cancelWaiter) {
+          while (Date.now() - start < 3000 && !cancelWaiter) {
             try {
-              const count = await waitForBlockedQueries(pool, ['sut-conv-repo-worker'], 100);
+              const count = await waitForBlockedQueries(ctx.adminPool, ['sut-conv-repo-worker'], 200);
               if (count >= 1) return true;
             } catch {
               // keep polling until timeout or cancelled

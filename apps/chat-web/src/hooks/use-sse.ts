@@ -3,6 +3,7 @@ import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { useChatStore } from '../store/chat-store';
 import type { GatherStep, StepState, PlanStatus } from '../types';
 import { authStorage } from '../services/auth-storage';
+import { getActiveWorkspaceId } from '../services/workspace-storage';
 import { apiClient } from '../services/api-client';
 import { refreshExecutionSnapshot } from '../services/execution-snapshot';
 import { scheduleLabel } from '../services/schedule-text';
@@ -343,6 +344,7 @@ export function useSSE(conversationId: string | null, token: string | null) {
       fetch: async (input, init) => {
         const headers = new Headers(init?.headers);
         headers.set('Authorization', `Bearer ${authStorage.getStoredTokens().accessToken || token}`);
+        headers.set('X-Workspace-Id', getActiveWorkspaceId());
         let response = await fetch(input, { ...init, headers });
         if (response.status === 401 && !budget.refreshed) {
           try {

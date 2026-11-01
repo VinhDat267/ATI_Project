@@ -63,17 +63,18 @@ export class WorkspaceMembershipRepo {
       if (actorUserId === targetUserId) {
         targetMem = actorMembership;
       } else {
-        const targetRes = await client.query(
+        const targetRes = await client.query<MembershipLockRow>(
           `SELECT role, status, version
            FROM ati_workspace_memberships
            WHERE workspace_id = $1 AND user_id = $2
            FOR UPDATE`,
           [workspaceId, targetUserId]
         );
-        if (targetRes.rowCount === 0) {
+        const targetRow = targetRes.rows[0];
+        if (!targetRow) {
           throw new WorkspaceRepoError(404, 'MEMBER_NOT_FOUND', 'Target member not found');
         }
-        targetMem = targetRes.rows[0];
+        targetMem = targetRow;
       }
 
       // 3. Stale version check must run BEFORE transition predicates
@@ -96,6 +97,36 @@ export class WorkspaceMembershipRepo {
             `Decision '${input.decision}' is only allowed for pending members`
           );
         }
+
+        if (input.decision === 'approve') {
+          // Target user must be active in users
+          const targetUserRes = await client.query<{ status: string }>(
+            `SELECT status FROM users WHERE id = $1 FOR SHARE`,
+            [targetUserId]
+          );
+          const targetUserRow = targetUserRes.rows[0];
+          if (!targetUserRow || targetUserRow.status !== 'active') {
+            throw new WorkspaceRepoError(
+              400,
+              'TARGET_USER_INACTIVE',
+              'Target user must be active'
+            );
+          }
+
+          // Target user must be active member in general organization
+          const targetOrgMem = await client.query<{ status: string }>(
+            `SELECT status FROM workspace_members WHERE workspace_id = $1 AND user_id = $2 FOR SHARE`,
+            [workspaceId, targetUserId]
+          );
+          const targetOrgMemRow = targetOrgMem.rows[0];
+          if (!targetOrgMemRow || targetOrgMemRow.status !== 'active') {
+            throw new WorkspaceRepoError(
+              400,
+              'ORGANIZATION_MEMBER_REQUIRED',
+              'Target user must be an active organization member'
+            );
+          }
+        }
       } else if (input.decision === 'remove') {
         if (targetMem.status !== 'active') {
           throw new WorkspaceRepoError(
@@ -108,13 +139,21 @@ export class WorkspaceMembershipRepo {
 
       // 5. Guard: Last Active Admin Protection (for active admins being removed)
       if (targetMem.role === 'admin' && input.decision === 'remove') {
-        const otherAdminRes = await client.query(
-          `SELECT count(*)::int AS count 
-           FROM ati_workspace_memberships 
-           WHERE workspace_id = $1 AND role = 'admin' AND status = 'active' AND user_id != $2`,
+        const otherAdminRes = await client.query<{ count: number }>(
+          `SELECT count(*)::int AS count
+           FROM ati_workspace_memberships m
+           JOIN users u ON u.id = m.user_id
+           JOIN workspace_members wm ON wm.workspace_id = m.workspace_id AND wm.user_id = m.user_id
+           WHERE m.workspace_id = $1
+             AND m.role = 'admin'
+             AND m.status = 'active'
+             AND m.user_id != $2
+             AND u.status = 'active'
+             AND wm.status = 'active'`,
           [workspaceId, targetUserId]
         );
-        if (otherAdminRes.rows[0].count < 1) {
+        const otherAdminRow = otherAdminRes.rows[0];
+        if (!otherAdminRow || otherAdminRow.count < 1) {
           throw new WorkspaceRepoError(
             409,
             'LAST_ACTIVE_ADMIN',
@@ -131,7 +170,7 @@ export class WorkspaceMembershipRepo {
             : 'removed';
 
       // 6. Atomic SQL CAS: predicates match BOTH expected version AND status
-      const updateRes = await client.query(
+      const updateRes = await client.query<{ status: string; version: number }>(
         `UPDATE ati_workspace_memberships
          SET status = $1, version = version + 1, decided_at = clock_timestamp(), decided_by = $2, updated_at = clock_timestamp()
          WHERE workspace_id = $3 AND user_id = $4 AND version = $5 AND status = $6
@@ -139,15 +178,14 @@ export class WorkspaceMembershipRepo {
         [newStatus, actorUserId, workspaceId, targetUserId, input.expectedVersion, targetMem.status]
       );
 
-      if (updateRes.rowCount === 0) {
+      const updatedMem = updateRes.rows[0];
+      if (!updatedMem || updateRes.rowCount === 0) {
         throw new WorkspaceRepoError(
           409,
           'STALE_VERSION',
           'Target membership version conflict'
         );
       }
-
-      const updatedMem = updateRes.rows[0];
 
       // 7. Log audit entry
       await this.auditRepo.log(client, {

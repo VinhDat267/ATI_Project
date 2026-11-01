@@ -50,13 +50,16 @@ export class WorkspaceInviteRepo {
       const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
 
       // 3. Insert invite storing hash ONLY and calculating expiry via PostgreSQL DB clock
-      const insertRes = await client.query(
+      const insertRes = await client.query<{ id: string; expires_at: Date | string }>(
         `INSERT INTO ati_workspace_invites (workspace_id, token_hash, inviter_user_id, expires_at)
          VALUES ($1, $2, $3, clock_timestamp() + ($4 || ' days')::interval)
          RETURNING id, expires_at`,
         [workspaceId, tokenHash, actorUserId, String(expiresInDays)]
       );
       const inv = insertRes.rows[0];
+      if (!inv) {
+        throw new WorkspaceRepoError(500, 'INSERT_FAILED', 'Failed to insert invite');
+      }
 
       // 4. Audit log entry without exposing raw token or hash
       await this.auditRepo.log(client, {
@@ -135,10 +138,14 @@ export class WorkspaceInviteRepo {
       }
 
       // 3. Revoke invite using DB clock
-      const updateRes = await client.query(
+      const updateRes = await client.query<{ revoked_at: Date | string }>(
         `UPDATE ati_workspace_invites SET revoked_at = clock_timestamp() WHERE id = $1 RETURNING revoked_at`,
         [inviteId]
       );
+      const updateRow = updateRes.rows[0];
+      if (!updateRow) {
+        throw new WorkspaceRepoError(404, 'INVITE_NOT_FOUND', 'Invite not found');
+      }
 
       // 4. Audit log
       await this.auditRepo.log(client, {
@@ -153,7 +160,7 @@ export class WorkspaceInviteRepo {
         },
       });
 
-      const revokedAt = updateRes.rows[0].revoked_at;
+      const revokedAt = updateRow.revoked_at;
       return {
         revoked: true,
         revokedAt:
@@ -176,25 +183,26 @@ export class WorkspaceInviteRepo {
     return withTransaction(this.pool, async (client) => {
       // 1. Hash token and lookup invite workspace
       const tokenHash = crypto.createHash('sha256').update(inviteToken).digest('hex');
-      const invRes = await client.query(
+      const invRes = await client.query<{ id: string; workspace_id: string }>(
         `SELECT id, workspace_id
          FROM ati_workspace_invites
          WHERE token_hash = $1`,
         [tokenHash]
       );
-      if (invRes.rowCount === 0) {
+      const initialInvite = invRes.rows[0];
+      if (!initialInvite || invRes.rowCount === 0) {
         throw new WorkspaceRepoError(404, 'INVITE_NOT_FOUND', 'Invite not found');
       }
 
-      const initialInvite = invRes.rows[0];
       const workspaceId = initialInvite.workspace_id;
 
       // 2. Lock workspace row common barrier
-      const wsRes = await client.query(
+      const wsRes = await client.query<{ id: string; status: string }>(
         `SELECT id, status FROM ati_workspaces WHERE id = $1 FOR UPDATE`,
         [workspaceId]
       );
-      if (wsRes.rowCount === 0 || wsRes.rows[0].status !== 'active') {
+      const wsRow = wsRes.rows[0];
+      if (!wsRow || wsRes.rowCount === 0 || wsRow.status !== 'active') {
         throw new WorkspaceRepoError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found or inactive');
       }
 
@@ -230,8 +238,22 @@ export class WorkspaceInviteRepo {
         );
       }
 
+      // 4b. Revalidate and lock general organization membership FOR SHARE
+      const orgMemRes = await client.query<{ status: string }>(
+        `SELECT status FROM workspace_members WHERE workspace_id = $1 AND user_id = $2 FOR SHARE`,
+        [workspaceId, actorUserId]
+      );
+      const orgMemRow = orgMemRes.rows[0];
+      if (!orgMemRow || orgMemRes.rowCount === 0 || orgMemRow.status !== 'active') {
+        throw new WorkspaceRepoError(
+          403,
+          'WORKSPACE_MEMBER_REQUIRED',
+          'Active organization membership required to join Jira'
+        );
+      }
+
       // 5. Check and lock current membership row
-      const memRes = await client.query(
+      const memRes = await client.query<{ role: string; status: string; version: number; decided_at: Date | string | null }>(
         `SELECT role, status, version, decided_at
          FROM ati_workspace_memberships
          WHERE workspace_id = $1 AND user_id = $2 FOR UPDATE`,
@@ -239,21 +261,21 @@ export class WorkspaceInviteRepo {
       );
 
       // 6. Re-check locked invite revoked_at/expiry with fresh clock_timestamp() AFTER ALL lock waits (account and membership)
-      const freshInvRes = await client.query(
+      const freshInvRes = await client.query<{ id: string }>(
         `SELECT id, workspace_id, created_at, expires_at, revoked_at
          FROM ati_workspace_invites
          WHERE id = $1 AND revoked_at IS NULL AND expires_at > clock_timestamp()
          FOR UPDATE`,
         [initialInvite.id]
       );
-      if (freshInvRes.rowCount === 0) {
+      const freshInvite = freshInvRes.rows[0];
+      if (!freshInvite || freshInvRes.rowCount === 0) {
         throw new WorkspaceRepoError(
           404,
           'INVITE_EXPIRED_OR_REVOKED',
           'Invite has expired or been revoked'
         );
       }
-      const freshInvite = freshInvRes.rows[0];
 
       // 7. Process membership outcome under verified locks
       const mem = memRes.rows[0];
@@ -295,20 +317,24 @@ export class WorkspaceInviteRepo {
           }
 
           // Valid rejoin: reset status to pending with version + 1, role stays 'member'
-          const updateRes = await client.query(
+          const updateRes = await client.query<{ version: number }>(
             `UPDATE ati_workspace_memberships
              SET status = 'pending', role = 'member', version = version + 1, requested_at = clock_timestamp(), updated_at = clock_timestamp()
              WHERE workspace_id = $1 AND user_id = $2
              RETURNING version`,
             [workspaceId, actorUserId]
           );
+          const updateRow = updateRes.rows[0];
+          if (!updateRow || updateRes.rowCount === 0) {
+            throw new WorkspaceRepoError(500, 'UPDATE_FAILED', 'Failed to update membership');
+          }
 
           await this.auditRepo.log(client, {
             actorId: actorUserId,
             workspaceId,
             action: 'join_workspace',
             decision: 'pending',
-            version: updateRes.rows[0].version,
+            version: updateRow.version,
             details: { inviteId: freshInvite.id },
           });
 
@@ -321,19 +347,23 @@ export class WorkspaceInviteRepo {
       }
 
       // 6. New member join: insert pending membership
-      const insertRes = await client.query(
+      const insertRes = await client.query<{ version: number }>(
         `INSERT INTO ati_workspace_memberships (workspace_id, user_id, role, status, version)
          VALUES ($1, $2, 'member', 'pending', 1)
          RETURNING version`,
         [workspaceId, actorUserId]
       );
+      const insertRow = insertRes.rows[0];
+      if (!insertRow || insertRes.rowCount === 0) {
+        throw new WorkspaceRepoError(500, 'INSERT_FAILED', 'Failed to insert membership');
+      }
 
       await this.auditRepo.log(client, {
         actorId: actorUserId,
         workspaceId,
         action: 'join_workspace',
         decision: 'pending',
-        version: insertRes.rows[0].version,
+        version: insertRow.version,
         details: { inviteId: freshInvite.id },
       });
 

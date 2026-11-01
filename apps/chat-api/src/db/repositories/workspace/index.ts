@@ -13,6 +13,7 @@ import type {
   CreateInviteResponse,
   CreateWorkspaceRequest,
   CreateWorkspaceResponse,
+  EnableExistingWorkspaceRequest,
   JoinWorkspaceInternalResponse,
   MemberDecisionRequest,
   MemberDecisionResponse,
@@ -60,6 +61,14 @@ export class WorkspaceRepo {
     input: CreateWorkspaceRequest
   ): Promise<CreateWorkspaceResponse> {
     return this.coreRepo.createWorkspaceWithBootstrapAdmin(actorUserId, input);
+  }
+
+  enableExistingWorkspace(
+    actorUserId: string,
+    workspaceId: string,
+    input: EnableExistingWorkspaceRequest
+  ): Promise<CreateWorkspaceResponse> {
+    return this.coreRepo.enableExistingWorkspace(actorUserId, workspaceId, input);
   }
 
   listWorkspacesForUser(actorUserId: string): Promise<WorkspaceSummary[]> {
@@ -183,6 +192,7 @@ export class WorkspaceRepo {
 }
 
 export default WorkspaceRepo;
+export { WorkspaceRepo as JiraWorkspaceRepo };
 export * from './types.js';
 export * from './errors.js';
 export * from './transaction.js';

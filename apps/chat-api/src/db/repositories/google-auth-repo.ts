@@ -55,6 +55,12 @@ export class GoogleAuthRepo {
         }
       } else {
         user = (await client.query<UserRow>('SELECT * FROM users WHERE google_sub=$1 FOR UPDATE', [profile.sub])).rows[0];
+        if (user && user.status === 'pending') {
+          user = (await client.query<UserRow>(
+            `UPDATE users SET status='active', email_verified=true, updated_at=$2 WHERE id=$1 RETURNING *`,
+            [user.id, new Date(now)]
+          )).rows[0]!;
+        }
         if (!user) {
           user = (await client.query<UserRow>('SELECT * FROM users WHERE email=$1 FOR UPDATE', [profile.email])).rows[0];
           if (!user) {
@@ -63,7 +69,7 @@ export class GoogleAuthRepo {
             // known absent, under the attachment lock, before any user INSERT.
             beforeCreate?.();
             user = (await client.query<UserRow>(`INSERT INTO users(email,name,password,status,email_verified,google_sub)
-              VALUES($1,$2,NULL,'pending',true,$3) ON CONFLICT(email) DO NOTHING RETURNING *`, [profile.email, profile.name, profile.sub])).rows[0];
+              VALUES($1,$2,NULL,'active',true,$3) ON CONFLICT(email) DO NOTHING RETURNING *`, [profile.email, profile.name, profile.sub])).rows[0];
             created = Boolean(user);
             // Email signup can insert concurrently without the Google lock.
             if (!user) user = (await client.query<UserRow>('SELECT * FROM users WHERE email=$1 FOR UPDATE', [profile.email])).rows[0];
@@ -78,7 +84,7 @@ export class GoogleAuthRepo {
               await client.query('UPDATE auth_tokens SET used_at=COALESCE(used_at,$2) WHERE user_id=$1', [user.id, new Date(now)]);
             }
             linked = user.google_sub === null;
-            user = (await client.query<UserRow>(`UPDATE users SET google_sub=$2,password=CASE WHEN email_verified THEN password ELSE NULL END,
+            user = (await client.query<UserRow>(`UPDATE users SET google_sub=$2,password=CASE WHEN email_verified THEN password ELSE NULL END,status=CASE WHEN status='pending' THEN 'active' ELSE status END,
               email_verified=true,updated_at=$3 WHERE id=$1 RETURNING *`, [user.id, profile.sub, new Date(now)])).rows[0]!;
           }
         }

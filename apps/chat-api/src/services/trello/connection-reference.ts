@@ -27,7 +27,7 @@ export interface TrelloConnectionLookupResult {
 
 export function createTrelloConnectionLookup(options: TrelloConnectionLookupOptions) {
   const timeoutMs = options.timeoutMs ?? 10_000;
-  return async (userId: string): Promise<TrelloConnectionLookupResult> => {
+  return async (userId: string, scopeId = 'default'): Promise<TrelloConnectionLookupResult> => {
     const credRepo = options.credentialRepo as any;
     const record = credRepo.getPersonalConnectionStatus
       ? await credRepo.getPersonalConnectionStatus('trello', userId)
@@ -57,7 +57,7 @@ export function createTrelloConnectionLookup(options: TrelloConnectionLookupOpti
       return { status: 'reconnect_required', teamBoards: [], memberBoards: [] };
     }
 
-    const scope = options.teamRepo ? await options.teamRepo.get() : null;
+    const scope = options.teamRepo ? await options.teamRepo.get(scopeId) : null;
     if (!scope || !scope.boards || scope.boards.length === 0) {
       return {
         status: 'needs_scope',

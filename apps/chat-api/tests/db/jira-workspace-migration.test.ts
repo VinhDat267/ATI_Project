@@ -112,6 +112,17 @@ describe('apps/chat-api — JIRA-03 Workspace Migration & Schema Constraints', (
       await ctx?.cleanup();
     });
 
+    async function seedTestOrg(name = 'Test Org'): Promise<string> {
+      const wsId = randomUUID();
+      const inviteCode = `ATI-${randomUUID().slice(0, 4).toUpperCase()}-${randomUUID().slice(0, 4).toUpperCase()}`;
+      await pool.query(
+        `INSERT INTO workspaces (id, name, invite_code, created_by)
+         VALUES ($1, $2, $3, $4)`,
+        [wsId, name, inviteCode, user1Id]
+      );
+      return wsId;
+    }
+
     it('verifies strict private schema isolation without public in search_path', async () => {
       const schemaRes = await pool.query('SELECT current_schema() AS cur_schema');
       expect(schemaRes.rows[0].cur_schema).toBe(ctx.schema);
@@ -150,28 +161,29 @@ describe('apps/chat-api — JIRA-03 Workspace Migration & Schema Constraints', (
 
     it('enforces positive integer version constraints (version > 0)', async () => {
       const wsSlug = `ws-ver-${randomUUID().slice(0, 8)}`;
+      const parentId1 = await seedTestOrg('Workspace Zero');
 
       // 1. ati_workspaces.version > 0
       await expect(
         pool.query(
-          `INSERT INTO ati_workspaces (slug, name, version, created_by)
-           VALUES ($1, 'Workspace Zero', 0, $2)`,
-          [wsSlug, user1Id]
+          `INSERT INTO ati_workspaces (id, slug, version, created_by)
+           VALUES ($1, $2, 0, $3)`,
+          [parentId1, wsSlug, user1Id]
         )
       ).rejects.toMatchObject({ code: '23514' });
 
       await expect(
         pool.query(
-          `INSERT INTO ati_workspaces (slug, name, version, created_by)
-           VALUES ($1, 'Workspace Neg', -1, $2)`,
-          [wsSlug, user1Id]
+          `INSERT INTO ati_workspaces (id, slug, version, created_by)
+           VALUES ($1, $2, -1, $3)`,
+          [parentId1, wsSlug, user1Id]
         )
       ).rejects.toMatchObject({ code: '23514' });
 
       const wsOk = await pool.query(
-        `INSERT INTO ati_workspaces (slug, name, version, created_by)
-         VALUES ($1, 'Workspace Ok', 1, $2) RETURNING id`,
-        [wsSlug, user1Id]
+        `INSERT INTO ati_workspaces (id, slug, version, created_by)
+         VALUES ($1, $2, 1, $3) RETURNING id`,
+        [parentId1, wsSlug, user1Id]
       );
       const wsId = wsOk.rows[0].id;
 
@@ -237,20 +249,21 @@ describe('apps/chat-api — JIRA-03 Workspace Migration & Schema Constraints', (
 
     it('enforces enumeration and status check constraints', async () => {
       const wsSlug = `ws-enum-${randomUUID().slice(0, 8)}`;
+      const parentId2 = await seedTestOrg('WS Enum Bad');
 
       // 1. ati_workspaces.status in ('active', 'archived')
       await expect(
         pool.query(
-          `INSERT INTO ati_workspaces (slug, name, status, created_by)
-           VALUES ($1, 'WS Enum Bad', 'disabled', $2)`,
-          [wsSlug, user1Id]
+          `INSERT INTO ati_workspaces (id, slug, status, created_by)
+           VALUES ($1, $2, 'disabled', $3)`,
+          [parentId2, wsSlug, user1Id]
         )
       ).rejects.toMatchObject({ code: '23514' });
 
       const wsOk = await pool.query(
-        `INSERT INTO ati_workspaces (slug, name, status, created_by)
-         VALUES ($1, 'WS Enum Ok', 'active', $2) RETURNING id`,
-        [wsSlug, user1Id]
+        `INSERT INTO ati_workspaces (id, slug, status, created_by)
+         VALUES ($1, $2, 'active', $3) RETURNING id`,
+        [parentId2, wsSlug, user1Id]
       );
       const wsId = wsOk.rows[0].id;
 
@@ -283,10 +296,11 @@ describe('apps/chat-api — JIRA-03 Workspace Migration & Schema Constraints', (
     });
 
     it('enforces canonical numeric_project_id regex constraint (^[1-9][0-9]*$)', async () => {
+      const parentId3 = await seedTestOrg('WS Project ID');
       const wsRes = await pool.query(
-        `INSERT INTO ati_workspaces (slug, name, created_by)
-         VALUES ($1, 'WS Project ID', $2) RETURNING id`,
-        [`ws-pid-${randomUUID().slice(0, 8)}`, user1Id]
+        `INSERT INTO ati_workspaces (id, slug, created_by)
+         VALUES ($1, $2, $3) RETURNING id`,
+        [parentId3, `ws-pid-${randomUUID().slice(0, 8)}`, user1Id]
       );
       const wsId = wsRes.rows[0].id;
 
@@ -401,10 +415,11 @@ describe('apps/chat-api — JIRA-03 Workspace Migration & Schema Constraints', (
       ).rejects.toMatchObject({ code: '23505' });
 
       // 2. ati_workspace_jira_sites: UNIQUE (workspace_id, cloud_id)
+      const parentId4 = await seedTestOrg('WS Site UQ');
       const ws = await pool.query(
-        `INSERT INTO ati_workspaces (slug, name, created_by)
-         VALUES ($1, 'WS Site UQ', $2) RETURNING id`,
-        [`ws-site-uq-${randomUUID().slice(0, 8)}`, user1Id]
+        `INSERT INTO ati_workspaces (id, slug, created_by)
+         VALUES ($1, $2, $3) RETURNING id`,
+        [parentId4, `ws-site-uq-${randomUUID().slice(0, 8)}`, user1Id]
       );
       const wsId = ws.rows[0].id;
 
@@ -446,17 +461,19 @@ describe('apps/chat-api — JIRA-03 Workspace Migration & Schema Constraints', (
     });
 
     it('enforces composite foreign key fk_workspace_site_cloud (cross-workspace and cross-cloud rejection)', async () => {
+      const parentComp1 = await seedTestOrg('WS Composite 1');
       const ws1 = await pool.query(
-        `INSERT INTO ati_workspaces (slug, name, created_by)
-         VALUES ($1, 'WS Composite 1', $2) RETURNING id`,
-        [`ws-comp-1-${randomUUID().slice(0, 8)}`, user1Id]
+        `INSERT INTO ati_workspaces (id, slug, created_by)
+         VALUES ($1, $2, $3) RETURNING id`,
+        [parentComp1, `ws-comp-1-${randomUUID().slice(0, 8)}`, user1Id]
       );
       const ws1Id = ws1.rows[0].id;
 
+      const parentComp2 = await seedTestOrg('WS Composite 2');
       const ws2 = await pool.query(
-        `INSERT INTO ati_workspaces (slug, name, created_by)
-         VALUES ($1, 'WS Composite 2', $2) RETURNING id`,
-        [`ws-comp-2-${randomUUID().slice(0, 8)}`, user1Id]
+        `INSERT INTO ati_workspaces (id, slug, created_by)
+         VALUES ($1, $2, $3) RETURNING id`,
+        [parentComp2, `ws-comp-2-${randomUUID().slice(0, 8)}`, user1Id]
       );
       const ws2Id = ws2.rows[0].id;
 
@@ -518,10 +535,11 @@ describe('apps/chat-api — JIRA-03 Workspace Migration & Schema Constraints', (
     });
 
     it('enforces foreign key cascading deletes and set null behaviors', async () => {
+      const parentCasc = await seedTestOrg('WS Cascade');
       const ws = await pool.query(
-        `INSERT INTO ati_workspaces (slug, name, created_by)
-         VALUES ($1, 'WS Cascade', $2) RETURNING id`,
-        [`ws-cascade-${randomUUID().slice(0, 8)}`, user1Id]
+        `INSERT INTO ati_workspaces (id, slug, created_by)
+         VALUES ($1, $2, $3) RETURNING id`,
+        [parentCasc, `ws-cascade-${randomUUID().slice(0, 8)}`, user1Id]
       );
       const wsId = ws.rows[0].id;
 
@@ -582,24 +600,26 @@ describe('apps/chat-api — JIRA-03 Workspace Migration & Schema Constraints', (
     });
 
     it('enforces immutable conversations.workspace_id via trigger (NULL->W, W->NULL, W1->W2 rejected; title updates allowed)', async () => {
+      const parentConv1 = await seedTestOrg('WS Conv 1');
       const ws1 = await pool.query(
-        `INSERT INTO ati_workspaces (slug, name, created_by)
-         VALUES ($1, 'WS Conv 1', $2) RETURNING id`,
-        [`ws-conv-1-${randomUUID().slice(0, 8)}`, user1Id]
+        `INSERT INTO ati_workspaces (id, slug, created_by)
+         VALUES ($1, $2, $3) RETURNING id`,
+        [parentConv1, `ws-conv-1-${randomUUID().slice(0, 8)}`, user1Id]
       );
       const ws1Id = ws1.rows[0].id;
 
+      const parentConv2 = await seedTestOrg('WS Conv 2');
       const ws2 = await pool.query(
-        `INSERT INTO ati_workspaces (slug, name, created_by)
-         VALUES ($1, 'WS Conv 2', $2) RETURNING id`,
-        [`ws-conv-2-${randomUUID().slice(0, 8)}`, user1Id]
+        `INSERT INTO ati_workspaces (id, slug, created_by)
+         VALUES ($1, $2, $3) RETURNING id`,
+        [parentConv2, `ws-conv-2-${randomUUID().slice(0, 8)}`, user1Id]
       );
       const ws2Id = ws2.rows[0].id;
 
       // 1. Scoped conversation with workspace_id = ws1Id
       const convScoped = await pool.query(
-        `INSERT INTO conversations (user_id, status, title, workspace_id)
-         VALUES ($1, 'chatting', 'Scoped Conv', $2) RETURNING id, workspace_id`,
+        `INSERT INTO conversations (user_id, status, title, workspace_id, workspace_mode)
+         VALUES ($1, 'chatting', 'Scoped Conv', $2, 'organization') RETURNING id, workspace_id`,
         [user1Id, ws1Id]
       );
       const scopedId = convScoped.rows[0].id;
@@ -654,30 +674,39 @@ describe('apps/chat-api — JIRA-03 Workspace Migration & Schema Constraints', (
       expect(legacyUpdated.rows[0].workspace_id).toBeNull();
     });
 
-    it('enforces ON DELETE RESTRICT on conversations.workspace_id foreign key', async () => {
+    it('enforces ON DELETE CASCADE from workspaces to conversations while deleting Jira policy leaves conversations intact', async () => {
+      const parentRest = await seedTestOrg('WS Cascade Conv');
       const ws = await pool.query(
-        `INSERT INTO ati_workspaces (slug, name, created_by)
-         VALUES ($1, 'WS Restrict', $2) RETURNING id`,
-        [`ws-restrict-${randomUUID().slice(0, 8)}`, user1Id]
+        `INSERT INTO ati_workspaces (id, slug, created_by)
+         VALUES ($1, $2, $3) RETURNING id`,
+        [parentRest, `ws-casc-conv-${randomUUID().slice(0, 8)}`, user1Id]
       );
       const wsId = ws.rows[0].id;
 
       const conv = await pool.query(
-        `INSERT INTO conversations (user_id, status, title, workspace_id)
-         VALUES ($1, 'chatting', 'Bound Conversation', $2) RETURNING id`,
+        `INSERT INTO conversations (user_id, status, title, workspace_id, workspace_mode)
+         VALUES ($1, 'chatting', 'Bound Conversation', $2, 'organization') RETURNING id`,
         [user1Id, wsId]
       );
       const convId = conv.rows[0].id;
 
-      // Attempting to delete workspace while a conversation references it fails with FK violation (23503)
-      await expect(
-        pool.query(`DELETE FROM ati_workspaces WHERE id = $1`, [wsId])
-      ).rejects.toMatchObject({ code: '23503' });
+      // 1. Deleting Jira policy (ati_workspaces) does NOT delete the conversation
+      await pool.query(`DELETE FROM ati_workspaces WHERE id = $1`, [wsId]);
+      const convAfterPolicyDel = await pool.query(
+        `SELECT id FROM conversations WHERE id = $1`,
+        [convId]
+      );
+      expect(convAfterPolicyDel.rows).toHaveLength(1);
 
-      // Once the conversation is deleted, deleting the workspace succeeds
-      await pool.query(`DELETE FROM conversations WHERE id = $1`, [convId]);
-      const delRes = await pool.query(`DELETE FROM ati_workspaces WHERE id = $1`, [wsId]);
-      expect(delRes.rowCount).toBe(1);
+      // 2. Deleting generic workspace (workspaces) cascades to conversations (PR #237)
+      const delWsRes = await pool.query(`DELETE FROM workspaces WHERE id = $1`, [wsId]);
+      expect(delWsRes.rowCount).toBe(1);
+
+      const convAfterWsDel = await pool.query(
+        `SELECT id FROM conversations WHERE id = $1`,
+        [convId]
+      );
+      expect(convAfterWsDel.rows).toHaveLength(0);
     });
   });
 });

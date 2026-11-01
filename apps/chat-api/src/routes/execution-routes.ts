@@ -32,8 +32,14 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
 
   const accessContext = { pool, convRepo, planRepo };
 
-  const guardPlan = async (planId: string, userId: string): Promise<void> => {
-    await resolveAndAssertPlanAccess(accessContext, planId, userId, { legacyNonOwnerStatus: 403 });
+  const guardPlan = async (planId: string, userId: string, req?: Request): Promise<void> => {
+    const reqWorkspace = (req as any)?.workspace;
+    await resolveAndAssertPlanAccess(accessContext, planId, userId, {
+      legacyNonOwnerStatus: 403,
+      expectedWorkspaceId: reqWorkspace?.workspaceId ?? null,
+      expectedWorkspaceMode: reqWorkspace?.mode,
+      ordinaryOrgAccessDeniedAs403: true,
+    });
   };
 
   router.post('/executions/:planId/continue', async (req: Request, res: Response): Promise<void> => {
@@ -41,7 +47,7 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
       const userId = (req as any).user?.id;
       if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
       const planId = req.params.planId as string;
-      await guardPlan(planId, userId);
+      await guardPlan(planId, userId, req);
       res.status(200).json(await executionService.continueExecution(planId, userId));
     } catch (error: any) {
       if (error instanceof ConversationAccessDeniedError) {
@@ -58,7 +64,13 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
       const userId = (req as any).user?.id;
       if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
       const convId = req.params.convId as string;
-      await assertConversationAccessWithFallback(accessContext, convId, userId, { legacyNonOwnerStatus: 403 });
+      const reqWorkspace = (req as any).workspace;
+      await assertConversationAccessWithFallback(accessContext, convId, userId, {
+        legacyNonOwnerStatus: 403,
+        expectedWorkspaceId: reqWorkspace?.workspaceId ?? null,
+        expectedWorkspaceMode: reqWorkspace?.mode,
+        ordinaryOrgAccessDeniedAs403: true,
+      });
       const snapshot = await executionService.getLatestExecutionSnapshot(convId, userId);
       res.status(200).json(snapshot);
     } catch (error: any) {
@@ -79,7 +91,7 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
         res.status(401).json({ error: 'Unauthorized' });
         return;
       }
-      await guardPlan(planId, userId);
+      await guardPlan(planId, userId, req);
       const result = await executionService.approveAndStart(planId, userId);
       res.status(result.status).json(result);
     } catch (err: any) {
@@ -100,7 +112,7 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
         res.status(401).json({ error: 'Unauthorized' });
         return;
       }
-      await guardPlan(planId, userId);
+      await guardPlan(planId, userId, req);
       await executionService.getOwnedPlan(planId, userId);
       const rejected = await executionService.getPlanRepo().rejectPlan(planId, userId);
       if (!rejected) {
@@ -128,7 +140,7 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
           return;
         }
         const { planId, stepId } = req.params;
-        await guardPlan(planId as string, userId);
+        await guardPlan(planId as string, userId, req);
         const result = await executionService.retryStep(planId as string, stepId as string, userId);
         res.status(200).json(result);
       } catch (err: any) {
@@ -163,7 +175,7 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
           return;
         }
         const { planId, stepId } = req.params;
-        await guardPlan(planId as string, userId);
+        await guardPlan(planId as string, userId, req);
         const result = await executionService.skipStep(planId as string, stepId as string, userId);
         res.status(200).json(result);
       } catch (err: any) {
@@ -198,7 +210,7 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
           return;
         }
         const { planId } = req.params;
-        await guardPlan(planId as string, userId);
+        await guardPlan(planId as string, userId, req);
         const result = await executionService.stop(planId as string, userId);
         res.status(200).json(result);
       } catch (err: any) {
@@ -231,7 +243,7 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
           res.status(401).json({ error: 'Unauthorized' });
           return;
         }
-        await guardPlan(planId as string, userId);
+        await guardPlan(planId as string, userId, req);
         await executionService.getOwnedPlan(planId as string, userId);
         const result = await executionService.getExecutionStatusDurable(planId as string);
         if (!result) {

@@ -9,6 +9,7 @@ import { generateAccessToken } from '../../src/auth/jwt.js';
 import { UserRepo } from '../../src/db/repositories/user-repo.js';
 import { SessionRepo } from '../../src/db/repositories/session-repo.js';
 import { ConversationRepo } from '../../src/db/repositories/conversation-repo.js';
+import { WorkspaceRepo as OrganizationRepo } from '../../src/db/repositories/workspace-repo.js';
 import { MessageRepo } from '../../src/db/repositories/message-repo.js';
 import { PlanRepo } from '../../src/db/repositories/plan-repo.js';
 import { SSEManager } from '../../src/sse/sse-manager.js';
@@ -175,11 +176,17 @@ describe('apps/chat-api — JIRA-03 Workspace Authority Unavailable Fail-Closed 
   }
 
   async function seedWorkspace(name: string, slug: string, createdBy: string, status = 'active'): Promise<string> {
+    const wsId = randomUUID();
+    await pool.query(
+      `INSERT INTO workspaces (id, name, invite_code, require_approval, created_by, created_at, updated_at)
+       VALUES ($1, $2, $3, false, $4, clock_timestamp(), clock_timestamp())`,
+      [wsId, name, `INV-${wsId.slice(0, 8)}`.toUpperCase(), createdBy]
+    );
     const res = await pool.query<{ id: string }>(
-      `INSERT INTO ati_workspaces (id, slug, name, status, version, created_by)
-       VALUES ($1, $2, $3, $4, 1, $5)
+      `INSERT INTO ati_workspaces (id, slug, status, version, created_by)
+       VALUES ($1, $2, $3, 1, $4)
        RETURNING id`,
-      [randomUUID(), slug, name, status, createdBy]
+      [wsId, slug, status, createdBy]
     );
     return firstRow(res).id;
   }
@@ -190,6 +197,14 @@ describe('apps/chat-api — JIRA-03 Workspace Authority Unavailable Fail-Closed 
     role: 'admin' | 'member' = 'member',
     status: 'pending' | 'active' | 'rejected' | 'removed' = 'active'
   ): Promise<void> {
+    const genericStatus = status === 'active' ? 'active' : 'disabled';
+    await pool.query(
+      `INSERT INTO workspace_members (workspace_id, user_id, role, status, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, clock_timestamp(), clock_timestamp())
+       ON CONFLICT (workspace_id, user_id)
+       DO UPDATE SET status = EXCLUDED.status, role = EXCLUDED.role, updated_at = clock_timestamp()`,
+      [workspaceId, userId, role, genericStatus]
+    );
     await pool.query(
       `INSERT INTO ati_workspace_memberships (workspace_id, user_id, role, status, version)
        VALUES ($1, $2, $3, $4, 1)
@@ -205,10 +220,17 @@ describe('apps/chat-api — JIRA-03 Workspace Authority Unavailable Fail-Closed 
     title = 'Test Conversation'
   ): Promise<string> {
     const res = await pool.query<{ id: string }>(
-      `INSERT INTO conversations (id, user_id, status, title, workspace_id)
-       VALUES ($1, $2, 'chatting', $3, $4)
+      `INSERT INTO conversations (id, user_id, status, title, workspace_id, workspace_mode, jira_context)
+       VALUES ($1, $2, 'chatting', $3, $4, $5, $6)
        RETURNING id`,
-      [randomUUID(), userId, title, workspaceId]
+      [
+        randomUUID(),
+        userId,
+        title,
+        workspaceId,
+        workspaceId ? 'organization' : 'legacy',
+        workspaceId ? true : false,
+      ]
     );
     return firstRow(res).id;
   }
@@ -332,6 +354,7 @@ describe('apps/chat-api — JIRA-03 Workspace Authority Unavailable Fail-Closed 
     // Deliberately withhold options.pool and supply pool-hidden repository facades
     const appOptions: AppOptions = {
       jwtSecret,
+      workspaceRepo: hidePool(new OrganizationRepo(pool)),
       userRepo: hiddenUserRepo,
       sessionRepo: hiddenSessionRepo,
       convRepo: hiddenConvRepo,
@@ -519,19 +542,23 @@ describe('apps/chat-api — JIRA-03 Workspace Authority Unavailable Fail-Closed 
       expect(scheduleServiceSpy.confirmProposal).not.toHaveBeenCalled();
     });
 
-    it('POST /api/conversations with workspaceId returns 503 by default when authority checker is unavailable', async () => {
+    it('POST /api/conversations with a valid organization header and Jira opt-in returns 503 by default without authority', async () => {
+      await pool.query("UPDATE workspace_members SET status='active' WHERE workspace_id=$1 AND user_id=$2", [wsId, alice.id]);
       const res = await request(unavailApp)
         .post('/api/conversations')
         .set('Authorization', `Bearer ${alice.token}`)
-        .send({ workspaceId: wsId });
+        .set('X-Workspace-Id', wsId)
+        .send({ jiraContext: true });
 
       expect(res.status).toBe(503);
       expect(res.body.code).toBe('WORKSPACE_CONVERSATIONS_UNAVAILABLE');
     });
 
-    it('POST /api/conversations with workspaceId returns 503 when enableWorkspaceConversations is true but authority checker is unavailable', async () => {
+    it('POST /api/conversations with Jira opt-in returns 503 with the internal flag when authority is unavailable', async () => {
+      await pool.query("UPDATE workspace_members SET status='active' WHERE workspace_id=$1 AND user_id=$2", [wsId, alice.id]);
       const fixtureWithFlagApp = createApp({
         jwtSecret,
+        workspaceRepo: hidePool(new OrganizationRepo(pool)),
         userRepo: hiddenUserRepo,
         sessionRepo: hiddenSessionRepo,
         convRepo: hiddenConvRepo,
@@ -545,7 +572,8 @@ describe('apps/chat-api — JIRA-03 Workspace Authority Unavailable Fail-Closed 
       const res = await request(fixtureWithFlagApp)
         .post('/api/conversations')
         .set('Authorization', `Bearer ${alice.token}`)
-        .send({ workspaceId: wsId });
+        .set('X-Workspace-Id', wsId)
+        .send({ jiraContext: true });
 
       expect(res.status).toBe(503);
       expect(res.body.code).toBe('WORKSPACE_CONVERSATIONS_UNAVAILABLE');

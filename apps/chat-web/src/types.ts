@@ -1,6 +1,28 @@
 import type { AnswerLookup, ScheduleResponse, ScheduleView, ScheduleProposalMetadata } from '@wap/tool-schemas';
 export type MessageRole = 'user' | 'assistant' | 'system';
-export interface AuthMessageResponse { message: string }
+export interface AuthMessageResponse {
+  message: string;
+  accessToken?: string;
+  refreshToken?: string;
+  tokenType?: string;
+  user?: User;
+}
+
+export interface WorkspaceSummary {
+  id: string;
+  name: string;
+  role: 'admin' | 'member';
+  status: 'pending' | 'active' | 'disabled';
+  inviteCode?: string;
+  requireApproval?: boolean;
+  pendingCount?: number;
+  createdAt?: string;
+}
+
+export interface WorkspacesListResponse {
+  personal: WorkspaceSummary;
+  organizations: WorkspaceSummary[];
+}
 export type MessageStatus = 'sending' | 'sent' | 'failed';
 
 export interface ChatMessage {
@@ -110,7 +132,16 @@ export interface AdminUser extends User {
   emailVerified: boolean; hasPassword: boolean; hasGoogle: boolean;
   createdAt: string; openSessions: number;
 }
-export interface AdminUserPage { users: AdminUser[]; total: number; pendingCount: number; page: number; limit: number }
+export interface AdminUserPage {
+  users: AdminUser[];
+  total: number;
+  pendingCount: number;
+  page: number;
+  limit: number;
+  inviteCode?: string;
+  requireApproval?: boolean;
+  workspaceName?: string;
+}
 
 export interface AccountProfile {
   id: string; email: string; name: string; role: 'member' | 'admin'; createdAt: string;

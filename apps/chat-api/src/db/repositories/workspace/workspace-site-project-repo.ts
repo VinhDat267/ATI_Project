@@ -150,8 +150,10 @@ async function assertActiveMember(
   }
 
   const res = await poolOrClient.query(
-    `SELECT m.role, m.status, w.status AS ws_status, u.status AS user_status
+    `SELECT m.role, m.status, w.status AS ws_status, u.status AS user_status, wm.status AS gen_mem_status
      FROM ati_workspaces w
+     LEFT JOIN workspace_members wm
+       ON wm.workspace_id = w.id AND wm.user_id = $2
      LEFT JOIN ati_workspace_memberships m
        ON m.workspace_id = w.id AND m.user_id = $2
      LEFT JOIN users u
@@ -165,8 +167,13 @@ async function assertActiveMember(
   }
 
   const row = res.rows[0];
-  if (!row.role || row.status !== 'active' || row.user_status !== 'active') {
-    // Outsider, pending, rejected, removed, or disabled user -> 404 Hidden Pattern
+  if (
+    !row.role ||
+    row.status !== 'active' ||
+    row.user_status !== 'active' ||
+    row.gen_mem_status !== 'active'
+  ) {
+    // Outsider, pending, rejected, removed, disabled user, or disabled general member -> 404 Hidden Pattern
     throw new WorkspaceRepoError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
   }
 
@@ -380,7 +387,16 @@ export class WorkspaceSiteProjectRepo {
         throw new WorkspaceRepoError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
       }
 
-      // 2. Lock actor membership
+      // 2. Lock actor general workspace membership FOR SHARE
+      const genMemRes = await client.query(
+        `SELECT role, status FROM workspace_members WHERE workspace_id = $1 AND user_id = $2 FOR SHARE`,
+        [workspaceId, actorId]
+      );
+      if (genMemRes.rowCount === 0 || genMemRes.rows[0].status !== 'active') {
+        throw new WorkspaceRepoError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
+      }
+
+      // 3. Lock actor membership
       const memRes = await client.query(
         `SELECT role, status, version FROM ati_workspace_memberships WHERE workspace_id = $1 AND user_id = $2 FOR UPDATE`,
         [workspaceId, actorId]
@@ -547,7 +563,16 @@ export class WorkspaceSiteProjectRepo {
         throw new WorkspaceRepoError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
       }
 
-      // 2. Lock actor membership
+      // 2. Lock actor general workspace membership FOR SHARE
+      const genMemRes = await client.query(
+        `SELECT role, status FROM workspace_members WHERE workspace_id = $1 AND user_id = $2 FOR SHARE`,
+        [workspaceId, actorId]
+      );
+      if (genMemRes.rowCount === 0 || genMemRes.rows[0].status !== 'active') {
+        throw new WorkspaceRepoError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
+      }
+
+      // 3. Lock actor membership
       const memRes = await client.query(
         `SELECT role, status, version FROM ati_workspace_memberships WHERE workspace_id = $1 AND user_id = $2 FOR UPDATE`,
         [workspaceId, actorId]
@@ -754,7 +779,16 @@ export class WorkspaceSiteProjectRepo {
         throw new WorkspaceRepoError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
       }
 
-      // 2. Lock actor membership
+      // 2. Lock actor general workspace membership FOR SHARE
+      const genMemRes = await client.query(
+        `SELECT role, status FROM workspace_members WHERE workspace_id = $1 AND user_id = $2 FOR SHARE`,
+        [workspaceId, actorId]
+      );
+      if (genMemRes.rowCount === 0 || genMemRes.rows[0].status !== 'active') {
+        throw new WorkspaceRepoError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
+      }
+
+      // 3. Lock actor membership
       const memRes = await client.query(
         `SELECT role, status, version FROM ati_workspace_memberships WHERE workspace_id = $1 AND user_id = $2 FOR UPDATE`,
         [workspaceId, actorId]
@@ -958,6 +992,8 @@ export class WorkspaceSiteProjectRepo {
          s.active,
          s.policy_version
        FROM ati_workspaces w
+       JOIN workspace_members wm
+         ON wm.workspace_id = w.id AND wm.user_id = $2 AND wm.status = 'active'
        JOIN ati_workspace_memberships m
          ON m.workspace_id = w.id AND m.user_id = $2 AND m.status = 'active'
        JOIN users u
@@ -1013,6 +1049,8 @@ export class WorkspaceSiteProjectRepo {
          p.project_name,
          p.selected
        FROM ati_workspaces w
+       JOIN workspace_members wm
+         ON wm.workspace_id = w.id AND wm.user_id = $2 AND wm.status = 'active'
        JOIN ati_workspace_memberships m
          ON m.workspace_id = w.id AND m.user_id = $2 AND m.status = 'active'
        JOIN users u

@@ -7,12 +7,14 @@ import {
 } from '@wap/tool-adapters';
 import type { AllowedScope, PlanConnections } from '@wap/tool-schemas';
 import type { AdapterExecutor } from '@wap/executor';
-import { getRegisteredService } from './registered-services.js';
+import { getRegisteredService, isServiceAccountService } from './registered-services.js';
 import type { GmailTokenManager } from './gmail/token-manager.js';
 
 /** Who an adapter is for. Shared services ignore it; Gmail & MyCalendar require it. */
 export interface AdapterContext {
   userId?: string;
+  workspaceId?: string | null;
+  workspaceMode?: 'legacy' | 'personal' | 'organization';
   phase: 'planning' | 'execution';
   /** Required when phase is 'execution' and the service is personal: the connection the plan was previewed with. */
   connections?: PlanConnections;
@@ -57,8 +59,21 @@ export class AdapterFactory {
     this.encryptionKey = options.encryptionKey;
   }
 
-  clearCache(serviceName: string): void {
+  clearCache(serviceName: string, workspaceId?: string | null, userId?: string): void {
+    if (userId) {
+      this.adapterCache.delete(`personal-shared:${userId}:${serviceName}`);
+      return;
+    }
+    if (workspaceId) {
+      this.adapterCache.delete(`org:${workspaceId}:${serviceName}`);
+      return;
+    }
     this.adapterCache.delete(serviceName);
+    for (const key of Array.from(this.adapterCache.keys())) {
+      if (key.endsWith(`:${serviceName}`)) {
+        this.adapterCache.delete(key);
+      }
+    }
   }
 
   /** Forget the Gmail, MyCalendar, MySheets & Trello adapters and access tokens of one member (connect, disconnect, reconnect_required). */
@@ -67,6 +82,11 @@ export class AdapterFactory {
     this.personalCache.delete(`mycalendar:${userId}`);
     this.personalCache.delete(`mysheets:${userId}`);
     this.personalCache.delete(`trello:${userId}`);
+    for (const key of Array.from(this.adapterCache.keys())) {
+      if (key.startsWith(`personal-shared:${userId}:`)) {
+        this.adapterCache.delete(key);
+      }
+    }
     this.options.gmailTokens?.clear(userId);
     this.options.mycalendarTokens?.clear(userId);
     this.options.mysheetsTokens?.clear(userId);
@@ -78,13 +98,35 @@ export class AdapterFactory {
     if (serviceName === 'mycalendar') return this.mycalendarAdapter(context);
     if (serviceName === 'mysheets') return this.mysheetsAdapter(context);
     if (serviceName === 'trello') return this.trelloAdapter(context);
-    const cached = this.adapterCache.get(serviceName);
+
+    let cacheKey = serviceName;
+    if (context?.workspaceMode === 'personal' && context.userId) {
+      cacheKey = `personal-shared:${context.userId}:${serviceName}`;
+    } else if (context?.workspaceMode === 'organization' && context.workspaceId) {
+      cacheKey = `org:${context.workspaceId}:${serviceName}`;
+    }
+
+    const cached = this.adapterCache.get(cacheKey);
     if (cached) return cached;
 
     const registration = getRegisteredService(serviceName);
     if (!registration) throw new Error(`Unsupported service '${serviceName}'`);
 
-    const record = await this.credentialRepo.getCredentials(serviceName);
+    let record: any = null;
+    if (context?.workspaceMode === 'personal') {
+      if (isServiceAccountService(serviceName)) {
+        throw new Error(`Dịch vụ ${serviceName} không khả dụng ở không gian cá nhân; hãy dùng mycalendar/mysheets.`);
+      }
+      if (!context.userId) {
+        throw new Error(`Personal credentials require user id for service '${serviceName}'`);
+      }
+      record = await this.credentialRepo.getPersonalCredentials(serviceName, context.userId);
+    } else if (context?.workspaceMode === 'organization') {
+      record = await this.credentialRepo.getCredentials(serviceName, context.workspaceId ?? null);
+    } else {
+      record = await this.credentialRepo.getCredentials(serviceName);
+    }
+
     if (!record) {
       throw new Error(`No credentials configured for service '${serviceName}'`);
     }
@@ -101,7 +143,7 @@ export class AdapterFactory {
     }
     const adapter = registration.transport.createAdapter(decrypted, allowedScope);
 
-    this.adapterCache.set(serviceName, adapter);
+    this.adapterCache.set(cacheKey, adapter);
     return adapter;
   }
 
@@ -259,7 +301,13 @@ export class AdapterFactory {
       }
     }
 
-    const scope = this.options.trelloTeamRepo ? await this.options.trelloTeamRepo.get() : null;
+    const scopeId =
+      context?.workspaceMode === 'personal' && context.userId
+        ? `personal:${context.userId}`
+        : context?.workspaceMode === 'organization' && context.workspaceId
+          ? context.workspaceId
+          : 'default';
+    const scope = this.options.trelloTeamRepo ? await this.options.trelloTeamRepo.get(scopeId) : null;
     if (!scope || !scope.boards || scope.boards.length === 0) {
       throw trelloError('AUTH_ERROR', 'Quản trị chưa chọn bảng Trello.');
     }

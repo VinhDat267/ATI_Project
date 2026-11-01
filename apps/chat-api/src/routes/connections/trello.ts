@@ -7,6 +7,8 @@ import type { CredentialRepo } from '../../db/repositories/credential-repo.js';
 import type { GoogleAuthRepo } from '../../db/repositories/google-auth-repo.js';
 import type { SessionRepo } from '../../db/repositories/session-repo.js';
 import type { TrelloTeamRepo } from '../../db/repositories/trello-team-repo.js';
+import type { WorkspaceRepo } from '../../db/repositories/workspace-repo.js';
+import { createWorkspaceContextMiddleware } from '../../middleware/workspace-context.js';
 import { TrelloOAuthClient, type TrelloBoardSummary } from '../../services/trello/oauth-client.js';
 import type { TrelloTokenManager } from '../../services/trello/token-manager.js';
 
@@ -41,6 +43,27 @@ export interface TrelloConnectionsOptions {
   conversationOwner?: (conversationId: string) => Promise<string | null>;
   tokens?: Pick<TrelloTokenManager, 'forConnection'>;
   adminUserIds?: string[];
+  workspaceRepo?: WorkspaceRepo;
+}
+
+function trelloScopeId(req: Request): string {
+  if (req.workspace?.mode === 'personal' && (req as any).user?.id) {
+    return `personal:${(req as any).user.id}`;
+  }
+  if (req.workspace?.mode === 'organization' && req.workspace.workspaceId) {
+    return req.workspace.workspaceId;
+  }
+  return 'default';
+}
+
+function canSelectBoards(req: Request, adminUserIds?: string[]): boolean {
+  if (req.workspace?.mode === 'personal') {
+    return true;
+  }
+  if (req.workspace?.mode === 'organization') {
+    return req.workspace.role === 'admin';
+  }
+  return isAdmin((req as any).user, adminUserIds);
 }
 
 export function isTrelloConnectAvailable(
@@ -80,6 +103,9 @@ export function createTrelloConnectionRoutes(options: TrelloConnectionsOptions):
   });
 
   router.use(auth);
+  if (options.workspaceRepo) {
+    router.use(createWorkspaceContextMiddleware(options.workspaceRepo));
+  }
   router.use((req, res, next) => {
     if (!(req as any).user?.sid) {
       res.status(401).json({ error: 'Phiên đăng nhập không còn hợp lệ.', code: 'INVALID_SESSION' });
@@ -242,7 +268,11 @@ export function createTrelloConnectionRoutes(options: TrelloConnectionsOptions):
   router.delete('/', async (req, res) => {
     const user = (req as any).user as AuthUser;
     try {
-      await options.credentialRepo!.deleteCredentials('trello', user.id);
+      if (typeof options.credentialRepo!.deletePersonalCredentials === 'function') {
+        await options.credentialRepo!.deletePersonalCredentials('trello', user.id);
+      } else {
+        await options.credentialRepo!.deleteCredentials('trello', user.id);
+      }
       options.onConnectionChanged?.(user.id);
       res.json({ success: true });
     } catch {
@@ -252,7 +282,7 @@ export function createTrelloConnectionRoutes(options: TrelloConnectionsOptions):
 
   router.get('/workspaces', async (req, res) => {
     const user = (req as any).user as AuthUser;
-    if (!isAdmin(user, options.adminUserIds)) {
+    if (!canSelectBoards(req, options.adminUserIds)) {
       res.status(403).json({ error: 'Chỉ quản trị viên mới có quyền xem workspace Trello.' });
       return;
     }
@@ -289,7 +319,7 @@ export function createTrelloConnectionRoutes(options: TrelloConnectionsOptions):
 
   router.get('/workspaces/:workspaceId/boards', async (req, res) => {
     const user = (req as any).user as AuthUser;
-    if (!isAdmin(user, options.adminUserIds)) {
+    if (!canSelectBoards(req, options.adminUserIds)) {
       res.status(403).json({ error: 'Chỉ quản trị viên mới có quyền xem workspace Trello.' });
       return;
     }
@@ -336,9 +366,9 @@ export function createTrelloConnectionRoutes(options: TrelloConnectionsOptions):
     }
   });
 
-  router.put('/scope', async (req, res) => {
+  const handleSaveScope = async (req: Request, res: Response) => {
     const user = (req as any).user as AuthUser;
-    if (!isAdmin(user, options.adminUserIds)) {
+    if (!canSelectBoards(req, options.adminUserIds)) {
       res.status(403).json({ error: 'Chỉ quản trị viên mới có quyền chọn bảng Trello cho nhóm.' });
       return;
     }
@@ -401,7 +431,9 @@ export function createTrelloConnectionRoutes(options: TrelloConnectionsOptions):
         selectedBoards.push({ boardId: found.id, boardName: found.name });
       }
 
+      const scopeId = trelloScopeId(req);
       const saved = await options.teamRepo.replace({
+        scopeId,
         chosenBy: user.id,
         workspaceId,
         workspaceName: ws.name,
@@ -412,7 +444,10 @@ export function createTrelloConnectionRoutes(options: TrelloConnectionsOptions):
     } catch {
       res.status(500).json({ error: 'Không lưu được danh sách bảng Trello.' });
     }
-  });
+  };
+
+  router.put('/scope', handleSaveScope);
+  router.put('/team-scope', handleSaveScope);
 
   router.get('/', async (req, res) => {
     const user = (req as any).user as AuthUser;
@@ -446,7 +481,8 @@ export function createTrelloConnectionRoutes(options: TrelloConnectionsOptions):
         return;
       }
 
-      const scope = options.teamRepo ? await options.teamRepo.get() : null;
+      const scopeId = trelloScopeId(req);
+      const scope = options.teamRepo ? await options.teamRepo.get(scopeId) : null;
       if (!scope || !scope.boards || scope.boards.length === 0) {
         res.json({
           status: 'needs_scope',

@@ -65,6 +65,11 @@ export type JoinWorkspaceInternalResponse =
   | { outcome: 'already_active'; workspaceId: string };
 
 // Backend-local system administration DTOs (Phase 2 local)
+export interface EnableExistingWorkspaceRequest {
+  slug: string;
+  bootstrapAdminUserId: string;
+}
+
 export interface ArchiveWorkspaceResponse {
   workspaceVersion: number;
   status: 'archived';

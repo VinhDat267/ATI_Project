@@ -22,7 +22,6 @@ async function login(page: Page, email: string, value: string) {
 test('AUTH-02: signup, outbox verification, pending approval and password recovery revoke old sessions', async ({ page }, testInfo) => {
   const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
   const email = `auth02-browser-${randomUUID()}@example.test`;
-  const adminEmail = process.env.CHAT_ADMIN_EMAIL!;
   try {
     await page.goto('/login');
     await page.getByRole('tab', { name: 'Đăng ký', exact: true }).click();
@@ -35,29 +34,15 @@ test('AUTH-02: signup, outbox verification, pending approval and password recove
     expect(user).toMatchObject({ status: 'pending', email_verified: false });
     const verifyLink = await mailLink(db, email, 'verify-email');
     await page.goto(verifyLink);
-    await expect(page.getByRole('status')).toContainText('chờ quản trị viên duyệt');
+    await expect(page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeVisible();
     expect(page.url()).not.toContain('token=');
     const [healthRequest] = await Promise.all([
       page.waitForRequest(request => request.url().endsWith('/api/health')),
       page.evaluate(() => fetch('/api/health').then(response => response.json())),
     ]);
     expect(healthRequest.headers().referer || '').toBe('');
-    expect((await db.query('SELECT status,email_verified FROM users WHERE id=$1', [user.id])).rows[0]).toEqual({ status: 'pending', email_verified: true });
-    await page.screenshot({ path: testInfo.outputPath('AUTH02-verified-pending.png'), fullPage: true });
-    await login(page, email, password);
-    await expect(page.getByRole('alert')).toContainText('chờ quản trị viên duyệt');
-
-    // This task can run before AUTH-03 is present. Prefer its real approval
-    // route once integrated; the task card explicitly permits DB approval in
-    // the isolated AUTH-02 branch where that route does not exist yet.
-    const admin = await page.request.post('/api/auth/login', { data: { email: adminEmail, password: process.env.CHAT_ADMIN_PASSWORD } });
-    expect(admin.status()).toBe(200);
-    const adminToken = (await admin.json()).accessToken;
-    const approval = await page.request.post(`/api/admin/users/${user.id}/approve`, { headers: { Authorization: `Bearer ${adminToken}` } });
-    if (approval.status() === 404) await db.query("UPDATE users SET status='active',updated_at=now() WHERE id=$1 AND status='pending' AND email_verified=true", [user.id]);
-    else expect(approval.status()).toBe(200);
-    await login(page, email, password);
-    await expect(page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ })).toBeVisible();
+    expect((await db.query('SELECT status,email_verified FROM users WHERE id=$1', [user.id])).rows[0]).toEqual({ status: 'active', email_verified: true });
+    await page.screenshot({ path: testInfo.outputPath('AUTH02-verified-active.png'), fullPage: true });
     const oldTokens = await page.evaluate(() => ({ access: localStorage.getItem('wap_access_token')!, refresh: localStorage.getItem('wap_refresh_token')! }));
     await page.getByRole('button', { name: /Menu người dùng/ }).click();
     await page.getByRole('menuitem', { name: /Đăng xuất/ }).click();

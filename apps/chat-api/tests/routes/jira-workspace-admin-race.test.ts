@@ -58,7 +58,7 @@ describe('apps/chat-api — JIRA-03 Workspace Admin Cross-Layer Race Conditions'
       sessionRepo,
       authClock: () => Date.now(),
       runtimeMode: 'sandbox',
-      workspaceRepo,
+      jiraWorkspaceRepo: workspaceRepo,
     });
   });
 
@@ -82,11 +82,23 @@ describe('apps/chat-api — JIRA-03 Workspace Admin Cross-Layer Race Conditions'
   }
 
   async function seedWorkspace(name: string, slug: string, createdBy: string): Promise<string> {
+    const wsId = randomUUID();
+    const inviteCode = `ATI-${randomUUID().slice(0, 4).toUpperCase()}-${randomUUID().slice(0, 4).toUpperCase()}`;
+    await ctx.pool.query(
+      `INSERT INTO workspaces (id, name, invite_code, created_by)
+       VALUES ($1, $2, $3, $4)`,
+      [wsId, name, inviteCode, createdBy]
+    );
+    await ctx.pool.query(
+      `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+       VALUES ($1, $2, 'admin', 'active')`,
+      [wsId, createdBy]
+    );
     const res = await ctx.pool.query<{ id: string }>(
-      `INSERT INTO ati_workspaces (id, slug, name, status, version, created_by)
-       VALUES ($1, $2, $3, 'active', 1, $4)
+      `INSERT INTO ati_workspaces (id, slug, status, version, created_by)
+       VALUES ($1, $2, 'active', 1, $3)
        RETURNING id`,
-      [randomUUID(), slug, name, createdBy]
+      [wsId, slug, createdBy]
     );
     return firstRow(res).id;
   }
@@ -111,19 +123,24 @@ describe('apps/chat-api — JIRA-03 Workspace Admin Cross-Layer Race Conditions'
     await seedMembership(workspaceId, adminActor.id, 'admin', 'active', 1);
 
     const targetActor = await createActor('Target User', 'ctrl_target');
+    await ctx.pool.query(
+      `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+       VALUES ($1, $2, 'member', 'active')`,
+      [workspaceId, targetActor.id]
+    );
     await seedMembership(workspaceId, targetActor.id, 'member', 'pending', 1);
 
-    // 1. Create invite (POST /api/workspaces/:id/invites)
+    // 1. Create invite (POST /api/jira-workspaces/:id/invites)
     const inviteRes = await request(app)
-      .post(`/api/workspaces/${workspaceId}/invites`)
+      .post(`/api/jira-workspaces/${workspaceId}/invites`)
       .set('Authorization', `Bearer ${adminActor.token}`)
       .send({ expiresInDays: 7 });
     expect(inviteRes.status).toBe(201);
     expect(inviteRes.body).toHaveProperty('inviteToken');
 
-    // 2. Decide member (POST /api/workspaces/:id/members/:userId/decision)
+    // 2. Decide member (POST /api/jira-workspaces/:id/members/:userId/decision)
     const decisionRes = await request(app)
-      .post(`/api/workspaces/${workspaceId}/members/${targetActor.id}/decision`)
+      .post(`/api/jira-workspaces/${workspaceId}/members/${targetActor.id}/decision`)
       .set('Authorization', `Bearer ${adminActor.token}`)
       .send({ expectedVersion: 1, decision: 'approve' });
     expect(decisionRes.status).toBe(200);
@@ -144,9 +161,9 @@ describe('apps/chat-api — JIRA-03 Workspace Admin Cross-Layer Race Conditions'
       version: 2,
     });
 
-    // 3. List members (GET /api/workspaces/:id/members)
+    // 3. List members (GET /api/jira-workspaces/:id/members)
     const listRes = await request(app)
-      .get(`/api/workspaces/${workspaceId}/members`)
+      .get(`/api/jira-workspaces/${workspaceId}/members`)
       .set('Authorization', `Bearer ${adminActor.token}`);
     expect(listRes.status).toBe(200);
     expect(listRes.body.members).toHaveLength(2);
@@ -168,7 +185,7 @@ describe('apps/chat-api — JIRA-03 Workspace Admin Cross-Layer Race Conditions'
 
       // Launch actual HTTP request; attach Promise.allSettled immediately so Supertest starts
       requestPromise = request(app)
-        .post(`/api/workspaces/${workspaceId}/invites`)
+        .post(`/api/jira-workspaces/${workspaceId}/invites`)
         .set('Authorization', `Bearer ${adminActor.token}`)
         .send({ expiresInDays: 7 });
       allSettledPromise = Promise.allSettled([requestPromise]);
@@ -238,6 +255,11 @@ describe('apps/chat-api — JIRA-03 Workspace Admin Cross-Layer Race Conditions'
     await seedMembership(workspaceId, adminActor.id, 'admin', 'active', 1);
 
     const targetActor = await createActor('Pending Member', 'race_target');
+    await ctx.pool.query(
+      `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+       VALUES ($1, $2, 'member', 'active')`,
+      [workspaceId, targetActor.id]
+    );
     await seedMembership(workspaceId, targetActor.id, 'member', 'pending', 1);
 
     // Read full target membership baseline before race
@@ -265,7 +287,7 @@ describe('apps/chat-api — JIRA-03 Workspace Admin Cross-Layer Race Conditions'
 
       // Launch actual HTTP request; attach Promise.allSettled immediately so Supertest starts
       requestPromise = request(app)
-        .post(`/api/workspaces/${workspaceId}/members/${targetActor.id}/decision`)
+        .post(`/api/jira-workspaces/${workspaceId}/members/${targetActor.id}/decision`)
         .set('Authorization', `Bearer ${adminActor.token}`)
         .send({ expectedVersion: 1, decision: 'approve' });
       allSettledPromise = Promise.allSettled([requestPromise]);
@@ -344,6 +366,11 @@ describe('apps/chat-api — JIRA-03 Workspace Admin Cross-Layer Race Conditions'
     await seedMembership(workspaceId, adminActor.id, 'admin', 'active', 1);
 
     const otherMember = await createActor('Existing Member', 'race_lst_other');
+    await ctx.pool.query(
+      `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+       VALUES ($1, $2, 'member', 'active')`,
+      [workspaceId, otherMember.id]
+    );
     await seedMembership(workspaceId, otherMember.id, 'member', 'active', 1);
 
     const barrierClient = await ctx.pool.connect();
@@ -357,7 +384,7 @@ describe('apps/chat-api — JIRA-03 Workspace Admin Cross-Layer Race Conditions'
 
       // Launch actual HTTP request; attach Promise.allSettled immediately so Supertest starts
       requestPromise = request(app)
-        .get(`/api/workspaces/${workspaceId}/members`)
+        .get(`/api/jira-workspaces/${workspaceId}/members`)
         .set('Authorization', `Bearer ${adminActor.token}`);
       allSettledPromise = Promise.allSettled([requestPromise]);
 

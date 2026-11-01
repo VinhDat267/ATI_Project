@@ -6,5 +6,6 @@ export * from './credential-repo.js';
 export * from './user-repo.js';
 export * from './session-repo.js';
 export * from './auth-token-repo.js';
-export * from './workspace/index.js';
-export { default as WorkspaceRepo } from './workspace/index.js';
+export * from './workspace-repo.js';
+export { WorkspaceRepo as JiraWorkspaceRepo } from './workspace/index.js';
+export * from './admin-user-repo.js';

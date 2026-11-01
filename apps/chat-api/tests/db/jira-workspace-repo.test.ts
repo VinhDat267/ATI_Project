@@ -10,6 +10,14 @@ import {
   type IsolatedTestContext,
 } from '../helpers/jira-test-db.js';
 
+async function addOrganizationMember(pool: pg.Pool, workspaceId: string, userId: string): Promise<void> {
+  await pool.query(
+    `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+     VALUES ($1, $2, 'member', 'active') ON CONFLICT (workspace_id, user_id) DO NOTHING`,
+    [workspaceId, userId]
+  );
+}
+
 describe('apps/chat-api — JIRA-03 Workspace Repository Core, Invites & CAS Membership', () => {
   let ctx: IsolatedTestContext;
   let pool: pg.Pool;
@@ -190,6 +198,7 @@ describe('apps/chat-api — JIRA-03 Workspace Repository Core, Invites & CAS Mem
       });
 
       // Add userAlpha as member to Workspace 2
+      await addOrganizationMember(pool, ws2.workspace.id, userAlphaId);
       await pool.query(
         `INSERT INTO ati_workspace_memberships (workspace_id, user_id, role, status, version)
          VALUES ($1, $2, 'member', 'active', 3)`,
@@ -281,6 +290,9 @@ describe('apps/chat-api — JIRA-03 Workspace Repository Core, Invites & CAS Mem
       });
       await pool.query(`UPDATE ati_workspaces SET status = 'archived' WHERE id = $1`, [wsArchived.workspace.id]);
 
+      for (const workspace of [wsPending, wsRejected, wsRemoved]) {
+        await addOrganizationMember(pool, workspace.workspace.id, targetUser);
+      }
       const list = await repoMain.listWorkspacesForUser(targetUser);
 
       // All 4 own related active workspaces must appear
@@ -353,6 +365,7 @@ describe('apps/chat-api — JIRA-03 Workspace Repository Core, Invites & CAS Mem
       wsId = created.workspace.id;
 
       // Seed userBeta as an active member in wsId so non-admin tests test active members legitimately
+      await addOrganizationMember(pool, wsId, userBetaId);
       await pool.query(
         `INSERT INTO ati_workspace_memberships (workspace_id, user_id, role, status, version)
          VALUES ($1, $2, 'member', 'active', 1)`,
@@ -458,6 +471,11 @@ describe('apps/chat-api — JIRA-03 Workspace Repository Core, Invites & CAS Mem
       const inv = await repoMain.createInvite(ws.workspace.id, userAlphaId);
       const joiner = await createSyntheticUser(pool, 'Fresh Joiner', 'fresh', { status: 'active' });
       await connectSyntheticJiraAccount(pool, joiner);
+      await pool.query(
+        `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+         VALUES ($1, $2, 'member', 'active')`,
+        [ws.workspace.id, joiner]
+      );
 
       const res = await repoMain.joinWorkspaceWithInvite(joiner, inv.inviteToken);
       expect(res.outcome).toBe('pending');
@@ -487,6 +505,11 @@ describe('apps/chat-api — JIRA-03 Workspace Repository Core, Invites & CAS Mem
       const inv = await repoMain.createInvite(ws.workspace.id, userAlphaId);
       const joiner = await createSyntheticUser(pool, 'Dup Pend Joiner', 'duppend', { status: 'active' });
       await connectSyntheticJiraAccount(pool, joiner);
+      await pool.query(
+        `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+         VALUES ($1, $2, 'member', 'active')`,
+        [ws.workspace.id, joiner]
+      );
 
       // Pre-existing pending membership
       await pool.query(
@@ -518,6 +541,11 @@ describe('apps/chat-api — JIRA-03 Workspace Repository Core, Invites & CAS Mem
       const inv = await repoMain.createInvite(ws.workspace.id, userAlphaId);
       const joiner = await createSyntheticUser(pool, 'Dup Active Joiner', 'dupact', { status: 'active' });
       await connectSyntheticJiraAccount(pool, joiner);
+      await pool.query(
+        `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+         VALUES ($1, $2, 'member', 'active')`,
+        [ws.workspace.id, joiner]
+      );
 
       // Pre-existing active membership
       await pool.query(
@@ -550,6 +578,11 @@ describe('apps/chat-api — JIRA-03 Workspace Repository Core, Invites & CAS Mem
       const oldInv = await repoMain.createInvite(ws.workspace.id, userAlphaId);
       const joiner = await createSyntheticUser(pool, 'Monotonic Joiner', 'monojoin', { status: 'active' });
       await connectSyntheticJiraAccount(pool, joiner);
+      await pool.query(
+        `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+         VALUES ($1, $2, 'member', 'active')`,
+        [ws.workspace.id, joiner]
+      );
 
       // User rejected AFTER old invite was created
       await pool.query(
@@ -592,6 +625,11 @@ describe('apps/chat-api — JIRA-03 Workspace Repository Core, Invites & CAS Mem
 
       const joiner = await createSyntheticUser(pool, 'Joiner Revoked', 'revjoin', { status: 'active' });
       await connectSyntheticJiraAccount(pool, joiner);
+      await pool.query(
+        `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+         VALUES ($1, $2, 'member', 'active')`,
+        [ws.workspace.id, joiner]
+      );
 
       await expect(repoMain.joinWorkspaceWithInvite(joiner, inv.inviteToken)).rejects.toMatchObject({
         statusCode: 404,
@@ -607,6 +645,11 @@ describe('apps/chat-api — JIRA-03 Workspace Repository Core, Invites & CAS Mem
       const inv = await repoMain.createInvite(ws.workspace.id, userAlphaId);
       const joiner = await createSyntheticUser(pool, 'Joiner Disc', 'joindisc', { status: 'active' });
       await connectSyntheticJiraAccount(pool, joiner);
+      await pool.query(
+        `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+         VALUES ($1, $2, 'member', 'active')`,
+        [ws.workspace.id, joiner]
+      );
 
       const barrierClient = await pool.connect();
       let allSettledPromise: Promise<[PromiseSettledResult<any>]> | null = null;
@@ -663,6 +706,11 @@ describe('apps/chat-api — JIRA-03 Workspace Repository Core, Invites & CAS Mem
       const inv = await repoMain.createInvite(ws.workspace.id, userAlphaId);
       const joiner = await createSyntheticUser(pool, 'Clock Joiner', 'clkjoin', { status: 'active' });
       await connectSyntheticJiraAccount(pool, joiner);
+      await pool.query(
+        `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+         VALUES ($1, $2, 'member', 'active')`,
+        [ws.workspace.id, joiner]
+      );
 
       // Set invite expires_at to 1 second in the past according to PostgreSQL clock
       const updateRes = await pool.query(
@@ -692,6 +740,11 @@ describe('apps/chat-api — JIRA-03 Workspace Repository Core, Invites & CAS Mem
       const newInv = await repoMain.createInvite(ws.workspace.id, userAlphaId);
       const joiner = await createSyntheticUser(pool, 'Sub-MS Joiner', 'subms', { status: 'active' });
       await connectSyntheticJiraAccount(pool, joiner);
+      await pool.query(
+        `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+         VALUES ($1, $2, 'member', 'active')`,
+        [ws.workspace.id, joiner]
+      );
 
       // Member rejected at .123100Z
       await pool.query(
@@ -702,7 +755,7 @@ describe('apps/chat-api — JIRA-03 Workspace Repository Core, Invites & CAS Mem
 
       // New invite created at .123900Z (same millisecond 123, but 800 microseconds later)
       const submsUpdate = await pool.query(
-        `UPDATE ati_workspace_invites 
+        `UPDATE ati_workspace_invites
          SET created_at = '2026-11-01T12:00:00.123900Z', expires_at = clock_timestamp() + interval '1 day'
          WHERE id = $1`,
         [newInv.inviteId]
@@ -732,6 +785,11 @@ describe('apps/chat-api — JIRA-03 Workspace Repository Core, Invites & CAS Mem
       const inv = await repoMain.createInvite(ws.workspace.id, userAlphaId);
       const joiner = await createSyntheticUser(pool, 'Expiry Waiter', 'expwait', { status: 'active' });
       await connectSyntheticJiraAccount(pool, joiner);
+      await pool.query(
+        `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+         VALUES ($1, $2, 'member', 'active')`,
+        [ws.workspace.id, joiner]
+      );
 
       // Set expiry to 2 seconds in the future according to PostgreSQL DB clock
       const updateRes = await pool.query(
@@ -827,14 +885,24 @@ describe('apps/chat-api — JIRA-03 Workspace Repository Core, Invites & CAS Mem
       });
       wsId = created.workspace.id;
 
-      // Add admin2 as active admin
+      // Add admin2 as active admin in generic org and jira
+      await pool.query(
+        `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+         VALUES ($1, $2, 'admin', 'active')`,
+        [wsId, admin2Id]
+      );
       await pool.query(
         `INSERT INTO ati_workspace_memberships (workspace_id, user_id, role, status, version)
          VALUES ($1, $2, 'admin', 'active', 1)`,
         [wsId, admin2Id]
       );
 
-      // Add pending user
+      // Add pending user in generic org and jira
+      await pool.query(
+        `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+         VALUES ($1, $2, 'member', 'active')`,
+        [wsId, pendingUserId]
+      );
       await pool.query(
         `INSERT INTO ati_workspace_memberships (workspace_id, user_id, role, status, version)
          VALUES ($1, $2, 'member', 'pending', 1)`,
@@ -1002,6 +1070,11 @@ describe('apps/chat-api — JIRA-03 Workspace Repository Core, Invites & CAS Mem
       const inv = await repoMain.createInvite(wsId, admin1Id);
       const joinerUserId = await createSyntheticUser(pool, 'Joiner Race', 'joinrace', { status: 'active' });
       await connectSyntheticJiraAccount(pool, joinerUserId);
+      await pool.query(
+        `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+         VALUES ($1, $2, 'member', 'active')`,
+        [wsId, joinerUserId]
+      );
 
       const barrierClient = await pool.connect();
       let allSettledPromise: Promise<[PromiseSettledResult<any>, PromiseSettledResult<any>]> | null = null;
@@ -1042,6 +1115,11 @@ describe('apps/chat-api — JIRA-03 Workspace Repository Core, Invites & CAS Mem
       // After revocation commits, any subsequent join with that token MUST fail with 404
       const secondJoiner = await createSyntheticUser(pool, 'Second Joiner Race', 'secjoinrace', { status: 'active' });
       await connectSyntheticJiraAccount(pool, secondJoiner);
+      await pool.query(
+        `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+         VALUES ($1, $2, 'member', 'active')`,
+        [wsId, secondJoiner]
+      );
 
       await expect(
         repoMain.joinWorkspaceWithInvite(secondJoiner, inv.inviteToken)
@@ -1271,6 +1349,13 @@ describe('apps/chat-api — JIRA-03 Workspace Repository Core, Invites & CAS Mem
     });
 
     it('allows system admin to recover workspace admin with version increment', async () => {
+      await pool.query(
+        `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+         VALUES ($1, $2, 'admin', 'active')
+         ON CONFLICT (workspace_id, user_id) DO UPDATE SET role = 'admin', status = 'active'`,
+        [wsId, userGammaId]
+      );
+
       const res = await repoMain.recoverWorkspaceAdmin(sysAdminId, wsId, {
         expectedVersion: 1,
         userId: userGammaId,
@@ -1413,6 +1498,25 @@ describe('apps/chat-api — JIRA-03 Workspace Repository Core, Invites & CAS Mem
         name: 'Ver Val WS',
         bootstrapAdminUserId: userAlphaId,
       });
+
+      await pool.query(
+        `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+         VALUES ($1, $2, 'admin', 'active')
+         ON CONFLICT (workspace_id, user_id) DO UPDATE SET role = 'admin', status = 'active'`,
+        [ws.workspace.id, userGammaId]
+      );
+      await pool.query(
+        `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+         VALUES ($1, $2, 'member', 'active')
+         ON CONFLICT (workspace_id, user_id) DO UPDATE SET role = 'member', status = 'active'`,
+        [ws.workspace.id, userBetaId]
+      );
+      await pool.query(
+        `INSERT INTO ati_workspace_memberships (workspace_id, user_id, role, status, version)
+         VALUES ($1, $2, 'member', 'pending', 1)
+         ON CONFLICT (workspace_id, user_id) DO UPDATE SET status = 'pending', version = 1`,
+        [ws.workspace.id, userBetaId]
+      );
 
       const invalidVersions = [0, -1, 1.5, NaN, Infinity, '1' as any, null as any, undefined as any];
 

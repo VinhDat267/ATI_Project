@@ -9,6 +9,7 @@ import { generateAccessToken } from '../../src/auth/jwt.js';
 import { UserRepo } from '../../src/db/repositories/user-repo.js';
 import { SessionRepo } from '../../src/db/repositories/session-repo.js';
 import { ConversationRepo } from '../../src/db/repositories/conversation-repo.js';
+import { WorkspaceRepo } from '../../src/db/repositories/workspace-repo.js';
 import { MessageRepo } from '../../src/db/repositories/message-repo.js';
 import { PlanRepo } from '../../src/db/repositories/plan-repo.js';
 import { SSEManager } from '../../src/sse/sse-manager.js';
@@ -157,11 +158,17 @@ describe('apps/chat-api — JIRA-03 Conversation Scoped Access & Route Guards', 
 
   // Database seed helpers
   async function seedWorkspace(name: string, slug: string, createdBy: string, status = 'active'): Promise<string> {
+    const wsId = randomUUID();
+    await pool.query(
+      `INSERT INTO workspaces (id, name, invite_code, require_approval, created_by, created_at, updated_at)
+       VALUES ($1, $2, $3, false, $4, clock_timestamp(), clock_timestamp())`,
+      [wsId, name, `INV-${wsId.slice(0, 8)}`.toUpperCase(), createdBy]
+    );
     const res = await pool.query<{ id: string }>(
-      `INSERT INTO ati_workspaces (id, slug, name, status, version, created_by)
-       VALUES ($1, $2, $3, $4, 1, $5)
+      `INSERT INTO ati_workspaces (id, slug, status, version, created_by)
+       VALUES ($1, $2, $3, 1, $4)
        RETURNING id`,
-      [randomUUID(), slug, name, status, createdBy]
+      [wsId, slug, status, createdBy]
     );
     return firstRow(res).id;
   }
@@ -172,6 +179,13 @@ describe('apps/chat-api — JIRA-03 Conversation Scoped Access & Route Guards', 
     role: 'admin' | 'member' = 'member',
     status: 'pending' | 'active' | 'rejected' | 'removed' = 'active'
   ): Promise<void> {
+    await pool.query(
+      `INSERT INTO workspace_members (workspace_id, user_id, role, status, created_at, updated_at)
+       VALUES ($1, $2, $3, 'active', clock_timestamp(), clock_timestamp())
+       ON CONFLICT (workspace_id, user_id)
+       DO UPDATE SET status = 'active', role = EXCLUDED.role, updated_at = clock_timestamp()`,
+      [workspaceId, userId, role]
+    );
     await pool.query(
       `INSERT INTO ati_workspace_memberships (workspace_id, user_id, role, status, version)
        VALUES ($1, $2, $3, $4, 1)
@@ -187,10 +201,17 @@ describe('apps/chat-api — JIRA-03 Conversation Scoped Access & Route Guards', 
     title = 'Test Conversation'
   ): Promise<string> {
     const res = await pool.query<{ id: string }>(
-      `INSERT INTO conversations (id, user_id, status, title, workspace_id)
-       VALUES ($1, $2, 'chatting', $3, $4)
+      `INSERT INTO conversations (id, user_id, status, title, workspace_id, workspace_mode, jira_context)
+       VALUES ($1, $2, 'chatting', $3, $4, $5, $6)
        RETURNING id`,
-      [randomUUID(), userId, title, workspaceId]
+      [
+        randomUUID(),
+        userId,
+        title,
+        workspaceId,
+        workspaceId ? 'organization' : 'legacy',
+        workspaceId ? true : false,
+      ]
     );
     return firstRow(res).id;
   }
@@ -312,6 +333,8 @@ describe('apps/chat-api — JIRA-03 Conversation Scoped Access & Route Guards', 
       userRepo,
       sessionRepo,
       convRepo,
+      workspaceRepo: new WorkspaceRepo(pool),
+      pool,
       msgRepo,
       planRepo,
       sseManager,
@@ -345,7 +368,8 @@ describe('apps/chat-api — JIRA-03 Conversation Scoped Access & Route Guards', 
       const res = await request(prodApp)
         .post('/api/conversations')
         .set('Authorization', `Bearer ${alice.token}`)
-        .send({ workspaceId: wsId });
+        .set('X-Workspace-Id', wsId)
+        .send({ jiraContext: true });
 
       expect(res.status).toBe(503);
       expect(res.body.code).toBe('WORKSPACE_CONVERSATIONS_UNAVAILABLE');
@@ -375,7 +399,8 @@ describe('apps/chat-api — JIRA-03 Conversation Scoped Access & Route Guards', 
       const res = await request(fixtureApp)
         .post('/api/conversations')
         .set('Authorization', `Bearer ${alice.token}`)
-        .send({ workspaceId: wsId });
+        .set('X-Workspace-Id', wsId)
+        .send({ jiraContext: true });
 
       expect(res.status).toBe(201);
       expect(res.body.conversation).toBeDefined();
@@ -391,11 +416,16 @@ describe('apps/chat-api — JIRA-03 Conversation Scoped Access & Route Guards', 
     it('returns HTTP 404 when outsider attempts to create conversation in workspace where they are not a member', async () => {
       const wsId = await seedWorkspace('WS Private Alpha', `ws-priv-${randomUUID().slice(0, 8)}`, alice.id);
       await seedMembership(wsId, alice.id, 'member', 'active');
+      await pool.query(
+        `INSERT INTO workspace_members (workspace_id, user_id, role, status) VALUES ($1, $2, 'member', 'active')`,
+        [wsId, bob.id]
+      );
 
       const res = await request(fixtureApp)
         .post('/api/conversations')
         .set('Authorization', `Bearer ${bob.token}`)
-        .send({ workspaceId: wsId });
+        .set('X-Workspace-Id', wsId)
+        .send({ jiraContext: true });
 
       expect(res.status).toBe(404);
     });
@@ -407,7 +437,8 @@ describe('apps/chat-api — JIRA-03 Conversation Scoped Access & Route Guards', 
       const res = await request(fixtureApp)
         .post('/api/conversations')
         .set('Authorization', `Bearer ${bob.token}`)
-        .send({ workspaceId: wsId });
+        .set('X-Workspace-Id', wsId)
+        .send({ jiraContext: true });
 
       expect(res.status).toBe(404);
     });
@@ -419,7 +450,8 @@ describe('apps/chat-api — JIRA-03 Conversation Scoped Access & Route Guards', 
       const res = await request(fixtureApp)
         .post('/api/conversations')
         .set('Authorization', `Bearer ${bob.token}`)
-        .send({ workspaceId: wsId });
+        .set('X-Workspace-Id', wsId)
+        .send({ jiraContext: true });
 
       expect(res.status).toBe(404);
     });
@@ -431,7 +463,8 @@ describe('apps/chat-api — JIRA-03 Conversation Scoped Access & Route Guards', 
       const res = await request(fixtureApp)
         .post('/api/conversations')
         .set('Authorization', `Bearer ${bob.token}`)
-        .send({ workspaceId: wsId });
+        .set('X-Workspace-Id', wsId)
+        .send({ jiraContext: true });
 
       expect(res.status).toBe(404);
     });
@@ -443,7 +476,8 @@ describe('apps/chat-api — JIRA-03 Conversation Scoped Access & Route Guards', 
       const res = await request(fixtureApp)
         .post('/api/conversations')
         .set('Authorization', `Bearer ${alice.token}`)
-        .send({ workspaceId: wsId });
+        .set('X-Workspace-Id', wsId)
+        .send({ jiraContext: true });
 
       expect(res.status).toBe(404);
     });
@@ -471,7 +505,8 @@ describe('apps/chat-api — JIRA-03 Conversation Scoped Access & Route Guards', 
     it('GET /api/conversations returns listing containing the scoped conversation', async () => {
       const res = await request(fixtureApp)
         .get('/api/conversations')
-        .set('Authorization', `Bearer ${alice.token}`);
+        .set('Authorization', `Bearer ${alice.token}`)
+        .set('X-Workspace-Id', wsId);
 
       expect(res.status).toBe(200);
       expect(Array.isArray(res.body.conversations)).toBe(true);

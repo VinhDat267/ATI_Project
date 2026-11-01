@@ -68,10 +68,10 @@ export function createWorkspaceRoutes(options: WorkspaceRoutesOptions): Workspac
   const joinRouter = Router();
 
   // ============================================================================
-  // 1. Admin Workspace Lifecycle Routes (/api/admin/workspaces)
+  // 1. Admin Workspace Lifecycle Routes (/api/admin/jira-workspaces)
   // ============================================================================
 
-  // POST /api/admin/workspaces
+  // POST /api/admin/jira-workspaces
   adminRouter.post('/', async (req: Request, res: Response): Promise<void> => {
     const user = (req as any).user;
     if (!user || user.role !== 'admin') {
@@ -106,7 +106,7 @@ export function createWorkspaceRoutes(options: WorkspaceRoutesOptions): Workspac
     }
   });
 
-  // POST /api/admin/workspaces/:id/archive
+  // POST /api/admin/jira-workspaces/:id/archive
   adminRouter.post('/:id/archive', async (req: Request, res: Response): Promise<void> => {
     const user = (req as any).user;
     if (!user || user.role !== 'admin') {
@@ -134,7 +134,7 @@ export function createWorkspaceRoutes(options: WorkspaceRoutesOptions): Workspac
     }
   });
 
-  // POST /api/admin/workspaces/:id/recover-admin
+  // POST /api/admin/jira-workspaces/:id/recover-admin
   adminRouter.post('/:id/recover-admin', async (req: Request, res: Response): Promise<void> => {
     const user = (req as any).user;
     if (!user || user.role !== 'admin') {
@@ -169,11 +169,46 @@ export function createWorkspaceRoutes(options: WorkspaceRoutesOptions): Workspac
     }
   });
 
+  // POST /api/admin/jira-workspaces/:id/enable
+  adminRouter.post('/:id/enable', async (req: Request, res: Response): Promise<void> => {
+    const user = (req as any).user;
+    if (!user || user.role !== 'admin') {
+      res.status(403).json({ code: 'ADMIN_REQUIRED', error: 'Only system administrators can enable workspaces' });
+      return;
+    }
+
+    const workspaceId = getScalarParam(req.params.id);
+    if (!workspaceId || !isUuid(workspaceId)) {
+      res.status(404).json({ code: 'WORKSPACE_NOT_FOUND', error: 'Workspace not found' });
+      return;
+    }
+
+    const { slug, bootstrapAdminUserId } = (req.body || {}) as { slug?: unknown; bootstrapAdminUserId?: unknown };
+    if (!slug || typeof slug !== 'string' || !slug.trim() || slug.length > 100) {
+      res.status(400).json({ code: 'INVALID_SLUG', error: 'Valid slug is required' });
+      return;
+    }
+    if (!bootstrapAdminUserId || typeof bootstrapAdminUserId !== 'string' || !isUuid(bootstrapAdminUserId)) {
+      res.status(400).json({ code: 'INVALID_BOOTSTRAP_ADMIN', error: 'Valid bootstrapAdminUserId is required' });
+      return;
+    }
+
+    try {
+      const result = await workspaceRepo.enableExistingWorkspace(user.id, workspaceId, {
+        slug: slug.trim(),
+        bootstrapAdminUserId,
+      });
+      res.status(200).json(result);
+    } catch (err) {
+      handleRouteError(res, err);
+    }
+  });
+
   // ============================================================================
-  // 2. Personal Workspace Listing Routes (/api/workspaces)
+  // 2. Personal Workspace Listing Routes (/api/jira-workspaces)
   // ============================================================================
 
-  // GET /api/workspaces
+  // GET /api/jira-workspaces
   workspaceRouter.get('/', async (req: Request, res: Response): Promise<void> => {
     const user = (req as any).user;
     if (!user?.id) {
@@ -190,10 +225,10 @@ export function createWorkspaceRoutes(options: WorkspaceRoutesOptions): Workspac
   });
 
   // ============================================================================
-  // 3. Workspace Join Requests (/api/workspace-join-requests)
+  // 3. Workspace Join Requests (/api/jira-workspace-join-requests)
   // ============================================================================
 
-  // POST /api/workspace-join-requests
+  // POST /api/jira-workspace-join-requests
   joinRouter.post(
     '/',
     createWorkspaceRateLimitMiddleware(limiter, 'join'),
@@ -232,10 +267,10 @@ export function createWorkspaceRoutes(options: WorkspaceRoutesOptions): Workspac
   );
 
   // ============================================================================
-  // 4. Workspace Members & Decisions (/api/workspaces/:id/members)
+  // 4. Workspace Members & Decisions (/api/jira-workspaces/:id/members)
   // ============================================================================
 
-  // GET /api/workspaces/:id/members
+  // GET /api/jira-workspaces/:id/members
   workspaceRouter.get('/:id/members', async (req: Request, res: Response): Promise<void> => {
     const user = (req as any).user;
     if (!user?.id) {
@@ -257,7 +292,7 @@ export function createWorkspaceRoutes(options: WorkspaceRoutesOptions): Workspac
     }
   });
 
-  // POST /api/workspaces/:id/members/:userId/decision
+  // POST /api/jira-workspaces/:id/members/:userId/decision
   workspaceRouter.post(
     '/:id/members/:userId/decision',
     createWorkspaceRateLimitMiddleware(limiter, 'decision'),
@@ -304,10 +339,10 @@ export function createWorkspaceRoutes(options: WorkspaceRoutesOptions): Workspac
   );
 
   // ============================================================================
-  // 5. Workspace Invites (/api/workspaces/:id/invites)
+  // 5. Workspace Invites (/api/jira-workspaces/:id/invites)
   // ============================================================================
 
-  // POST /api/workspaces/:id/invites
+  // POST /api/jira-workspaces/:id/invites
   workspaceRouter.post(
     '/:id/invites',
     createWorkspaceRateLimitMiddleware(limiter, 'invite'),
@@ -343,7 +378,7 @@ export function createWorkspaceRoutes(options: WorkspaceRoutesOptions): Workspac
     }
   );
 
-  // GET /api/workspaces/:id/invites
+  // GET /api/jira-workspaces/:id/invites
   workspaceRouter.get('/:id/invites', async (req: Request, res: Response): Promise<void> => {
     const user = (req as any).user;
     if (!user?.id) {
@@ -365,7 +400,7 @@ export function createWorkspaceRoutes(options: WorkspaceRoutesOptions): Workspac
     }
   });
 
-  // DELETE /api/workspaces/:id/invites/:inviteId
+  // DELETE /api/jira-workspaces/:id/invites/:inviteId
   workspaceRouter.delete('/:id/invites/:inviteId', async (req: Request, res: Response): Promise<void> => {
     const user = (req as any).user;
     if (!user?.id) {
@@ -394,10 +429,10 @@ export function createWorkspaceRoutes(options: WorkspaceRoutesOptions): Workspac
   });
 
   // ============================================================================
-  // 6. Jira Sites & Projects (/api/workspaces/:id/jira-sites)
+  // 6. Jira Sites & Projects (/api/jira-workspaces/:id/jira-sites)
   // ============================================================================
 
-  // GET /api/workspaces/:id/jira-sites
+  // GET /api/jira-workspaces/:id/jira-sites
   workspaceRouter.get('/:id/jira-sites', async (req: Request, res: Response): Promise<void> => {
     const user = (req as any).user;
     if (!user?.id) {
@@ -419,7 +454,7 @@ export function createWorkspaceRoutes(options: WorkspaceRoutesOptions): Workspac
     }
   });
 
-  // POST /api/workspaces/:id/jira-sites
+  // POST /api/jira-workspaces/:id/jira-sites
   workspaceRouter.post('/:id/jira-sites', async (req: Request, res: Response): Promise<void> => {
     const user = (req as any).user;
     if (!user?.id) {
@@ -447,7 +482,7 @@ export function createWorkspaceRoutes(options: WorkspaceRoutesOptions): Workspac
     }
   });
 
-  // PATCH /api/workspaces/:id/jira-sites/:siteId
+  // PATCH /api/jira-workspaces/:id/jira-sites/:siteId
   workspaceRouter.patch('/:id/jira-sites/:siteId', async (req: Request, res: Response): Promise<void> => {
     const user = (req as any).user;
     if (!user?.id) {
@@ -484,7 +519,7 @@ export function createWorkspaceRoutes(options: WorkspaceRoutesOptions): Workspac
     }
   });
 
-  // GET /api/workspaces/:id/jira-sites/:siteId/projects
+  // GET /api/jira-workspaces/:id/jira-sites/:siteId/projects
   workspaceRouter.get('/:id/jira-sites/:siteId/projects', async (req: Request, res: Response): Promise<void> => {
     const user = (req as any).user;
     if (!user?.id) {
@@ -507,7 +542,7 @@ export function createWorkspaceRoutes(options: WorkspaceRoutesOptions): Workspac
     }
   });
 
-  // PUT /api/workspaces/:id/jira-sites/:siteId/projects
+  // PUT /api/jira-workspaces/:id/jira-sites/:siteId/projects
   workspaceRouter.put('/:id/jira-sites/:siteId/projects', async (req: Request, res: Response): Promise<void> => {
     const user = (req as any).user;
     if (!user?.id) {
@@ -550,7 +585,7 @@ export function createWorkspaceRoutes(options: WorkspaceRoutesOptions): Workspac
     }
   });
 
-  // GET /api/workspaces/:id/jira-capabilities
+  // GET /api/jira-workspaces/:id/jira-capabilities
   workspaceRouter.get('/:id/jira-capabilities', async (req: Request, res: Response): Promise<void> => {
     const user = (req as any).user;
     if (!user?.id) {

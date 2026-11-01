@@ -10,6 +10,12 @@ import { createExecutionRoutes } from './routes/execution-routes.js';
 import { createServicesRoutes } from './routes/services-routes.js';
 import { createScheduleRoutes, isSchedulePath, type ScheduleRoutesOptions } from './routes/schedule-routes.js';
 import { createAuthMiddleware } from './auth/jwt.js';
+import { createWorkspaceContextMiddleware } from './middleware/workspace-context.js';
+import { createWorkspacesRouter } from './routes/workspaces-routes.js';
+import { createWorkspaceRoutes } from './routes/workspace-routes.js';
+import type { WorkspaceRateLimitConfig } from './routes/workspace-rate-limiter.js';
+import type { WorkspaceRepo } from './db/repositories/workspace-repo.js';
+import type { JiraWorkspaceRepo } from './db/repositories/index.js';
 import type { ConversationRepo } from './db/repositories/conversation-repo.js';
 import type { MessageRepo } from './db/repositories/message-repo.js';
 import type { PlanRepo } from './db/repositories/plan-repo.js';
@@ -34,8 +40,6 @@ import type { GlobalRateLimiter } from '@wap/tool-adapters';
 import type { GoogleAuthRepo } from './db/repositories/google-auth-repo.js';
 import type { GmailTokenManager } from './services/gmail/token-manager.js';
 import type { TrelloTokenManager } from './services/trello/token-manager.js';
-import type WorkspaceRepo from './db/repositories/workspace/index.js';
-import { createWorkspaceRoutes } from './routes/workspace-routes.js';
 
 /** Gmail as each member's own connection (GMAIL_ENABLED). Absent or disabled: the routes do not exist. */
 export interface GmailAppOptions {
@@ -104,7 +108,7 @@ export interface AppOptions extends AdminUsersOptions {
   credentialRepo?: CredentialRepo;
   encryptionKey?: string;
   serviceFetchFn?: typeof fetch;
-  onCredentialsChanged?: (service: string) => void;
+  onCredentialsChanged?: (service: string, workspaceId?: string | null, userId?: string) => void;
   serviceAdminUserIds?: string[];
   chatService?: ChatService;
   sseManager?: SSEManager;
@@ -117,27 +121,18 @@ export interface AppOptions extends AdminUsersOptions {
   trello?: TrelloAppOptions;
   trelloTokens?: Pick<TrelloTokenManager, 'forConnection'>;
   trelloTeamRepo?: TrelloTeamRepo;
+  workspaceRepo?: WorkspaceRepo;
+  jiraWorkspaceRepo?: JiraWorkspaceRepo;
+  jiraWorkspaceRateLimit?: WorkspaceRateLimitConfig;
+  workspaceRateLimit?: WorkspaceRateLimitConfig;
+  pool?: pg.Pool;
+  enableWorkspaceConversations?: boolean;
   /** Scheduled workflows; present only when SCHEDULES_ENABLED is on and PostgreSQL is available. */
   schedules?: ScheduleRoutesOptions;
-  /** Internal test fixture flag allowing scoped workspace conversation creation before JIRA-05/08. */
-  enableWorkspaceConversations?: boolean;
-  pool?: pg.Pool;
-  workspaceRepo?: WorkspaceRepo;
-  workspaceRateLimit?: {
-    limit: number;
-    windowMs: number;
-    clock?: () => number;
-  };
 }
 
 export function createApp(options: AppOptions): Express {
   const app = express();
-  const pool =
-    options.pool ??
-    options.convRepo?.getPool?.() ??
-    (options.planRepo as any)?.pool ??
-    (options.userRepo as any)?.pool ??
-    (options.sessionRepo as any)?.pool;
   const sessionRepo = options.sessionRepo ?? options.userRepo?.sessions;
   const states = options.states ?? options.userRepo?.googleAuth;
   const gmailRoutes = options.gmail?.enabled ? {
@@ -176,6 +171,7 @@ export function createApp(options: AppOptions): Express {
     onConnectionChanged: options.trello?.onConnectionChanged,
     conversationOwner: options.convRepo ? async (id: string) => (await options.convRepo!.getConversation(id))?.user_id ?? null : undefined,
     tokens: trelloTokens, adminUserIds: options.serviceAdminUserIds,
+    workspaceRepo: options.workspaceRepo,
   };
 
   app.use(express.json());
@@ -203,7 +199,7 @@ export function createApp(options: AppOptions): Express {
       }
     } else res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Last-Event-ID');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Last-Event-ID, X-Workspace-Id');
     if (req.method === 'OPTIONS') {
       res.sendStatus(204);
       return;
@@ -235,17 +231,50 @@ export function createApp(options: AppOptions): Express {
     sessionRepo: options.sessionRepo, clock: options.authClock, loginFailures }));
 
   const authMiddleware = createAuthMiddleware(options.jwtSecret, { sessionRepo: options.sessionRepo ?? options.userRepo?.sessions, clock: options.authClock });
+  const workspaceContextMiddleware = createWorkspaceContextMiddleware(options.workspaceRepo);
+  const withAuthAndWorkspace = (req: Request, res: Response, next: NextFunction) => {
+    authMiddleware(req, res, (err?: any) => {
+      if (err) return next(err);
+      workspaceContextMiddleware(req, res, next);
+    });
+  };
 
   // Memory storage cannot manage persistent accounts, even with a legacy JWT.
   app.use('/api/admin/users', (req, res, next) => {
     if (!options.adminUserRepo) { res.status(503).json({ error: 'Quản trị người dùng cần PostgreSQL.' }); return; }
-    authMiddleware(req, res, next);
+    withAuthAndWorkspace(req, res, next);
   }, createAdminUsersRoutes(options));
+
+  const dbPool = options.pool ?? options.convRepo?.getPool?.();
+
+  if (options.workspaceRepo) {
+    app.use('/api/workspaces', authMiddleware, createWorkspacesRouter({
+      workspaceRepo: options.workspaceRepo,
+      emailSender: options.emailSender,
+    }));
+  }
+
+  if (options.jiraWorkspaceRepo) {
+    const { adminRouter, workspaceRouter, joinRouter } = createWorkspaceRoutes({
+      workspaceRepo: options.jiraWorkspaceRepo,
+      rateLimit: options.jiraWorkspaceRateLimit ?? options.workspaceRateLimit,
+    });
+    app.use('/api/admin/jira-workspaces', authMiddleware, adminRouter);
+    app.use('/api/jira-workspaces', authMiddleware, workspaceRouter);
+    app.use('/api/jira-workspace-join-requests', authMiddleware, joinRouter);
+  } else {
+    const unavailableHandler = (_req: Request, res: Response) => {
+      res.status(503).json({ error: 'Jira workspace service is unavailable' });
+    };
+    app.use('/api/admin/jira-workspaces', authMiddleware, unavailableHandler);
+    app.use('/api/jira-workspaces', authMiddleware, unavailableHandler);
+    app.use('/api/jira-workspace-join-requests', authMiddleware, unavailableHandler);
+  }
 
   // Services routes (protected via Bearer header)
   app.use(
     '/api/services',
-    authMiddleware,
+    withAuthAndWorkspace,
     createServicesRoutes({ credentialRepo: options.credentialRepo, encryptionKey: options.encryptionKey, fetchFn: options.serviceFetchFn, onCredentialsChanged: options.onCredentialsChanged, adminUserIds: options.serviceAdminUserIds,
       gmailAvailable: Boolean(gmailRoutes && isGmailAvailable(gmailRoutes)),
       mycalendarAvailable: Boolean(mycalendarRoutes && isMyCalendarAvailable(mycalendarRoutes)),
@@ -259,15 +288,14 @@ export function createApp(options: AppOptions): Express {
 
   // Only schedule paths pass through this auth check, so other /api requests are not checked twice.
   if (options.schedules) {
-    const schedulesOptions = {
-      ...options.schedules,
-      pool: options.schedules.pool ?? pool,
-      convRepo: options.schedules.convRepo ?? options.convRepo,
-    };
     app.use(
       '/api',
-      (req, res, next) => isSchedulePath(req.path) ? authMiddleware(req, res, next) : next(),
-      createScheduleRoutes(schedulesOptions)
+      (req, res, next) => (isSchedulePath(req.path) ? withAuthAndWorkspace(req, res, next) : next()),
+      createScheduleRoutes({
+        ...options.schedules,
+        pool: dbPool,
+        convRepo: options.convRepo,
+      })
     );
   }
 
@@ -275,8 +303,13 @@ export function createApp(options: AppOptions): Express {
   if (options.sseManager) {
     app.use(
       '/api/conversations',
-      authMiddleware,
-      createStreamRoutes({ sseManager: options.sseManager, convRepo: options.convRepo, pool })
+      withAuthAndWorkspace,
+      createStreamRoutes({
+        sseManager: options.sseManager,
+        convRepo: options.convRepo,
+        workspaceRepo: options.workspaceRepo,
+        pool: dbPool,
+      })
     );
   }
 
@@ -284,13 +317,13 @@ export function createApp(options: AppOptions): Express {
   if (options.convRepo && options.msgRepo && options.chatService) {
     app.use(
       '/api/conversations',
-      authMiddleware,
+      withAuthAndWorkspace,
       createConversationRoutes({
         convRepo: options.convRepo,
         msgRepo: options.msgRepo,
         chatService: options.chatService,
         planRepo: options.planRepo,
-        pool,
+        pool: dbPool,
         enableWorkspaceConversations: options.enableWorkspaceConversations,
       })
     );
@@ -300,32 +333,14 @@ export function createApp(options: AppOptions): Express {
   if (options.executionService) {
     app.use(
       '/api',
-      authMiddleware,
+      withAuthAndWorkspace,
       createExecutionRoutes({
         executionService: options.executionService,
-        pool,
+        pool: dbPool,
         convRepo: options.convRepo,
         planRepo: options.planRepo,
       })
     );
-  }
-
-  // Workspace routes (protected via Bearer header with exact prefix mounting)
-  if (options.workspaceRepo) {
-    const { adminRouter, workspaceRouter, joinRouter } = createWorkspaceRoutes({
-      workspaceRepo: options.workspaceRepo,
-      rateLimit: options.workspaceRateLimit,
-    });
-    app.use('/api/admin/workspaces', authMiddleware, adminRouter);
-    app.use('/api/workspaces', authMiddleware, workspaceRouter);
-    app.use('/api/workspace-join-requests', authMiddleware, joinRouter);
-  } else {
-    const unavailable = (_req: Request, res: Response) => {
-      res.status(503).json({ code: 'POSTGRESQL_REQUIRED', error: 'PostgreSQL is required for workspace management' });
-    };
-    app.use('/api/admin/workspaces', authMiddleware, unavailable);
-    app.use('/api/workspaces', authMiddleware, unavailable);
-    app.use('/api/workspace-join-requests', authMiddleware, unavailable);
   }
 
   // Global error handling middleware

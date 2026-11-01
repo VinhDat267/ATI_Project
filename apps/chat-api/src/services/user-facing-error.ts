@@ -33,5 +33,6 @@ export function userFacingError(value: unknown): string {
   for (const [pattern, translation] of rules) if (pattern.test(text)) return translation;
   // Existing Vietnamese errors and newly added account routes keep their wording.
   if (/[À-ỹ]/u.test(text)) return text;
+  if (/^[A-Z][A-Z0-9_]{2,}$/.test(text)) return text;
   return 'Không thể hoàn tất yêu cầu. Hãy thử lại.';
 }

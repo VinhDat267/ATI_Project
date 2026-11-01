@@ -16,6 +16,9 @@ export class ConversationAccessDeniedError extends Error {
 
 export interface ConversationAccessOptions {
   legacyNonOwnerStatus?: 403 | 404;
+  expectedWorkspaceId?: string | null;
+  expectedWorkspaceMode?: 'legacy' | 'personal' | 'organization';
+  ordinaryOrgAccessDeniedAs403?: boolean;
 }
 
 export interface ConversationAccessContext {
@@ -30,8 +33,11 @@ export interface PlanAccessContext extends ConversationAccessContext {
 /**
  * Asserts that the caller has access to the specified conversation.
  * - Scoped conversation (workspace_id IS NOT NULL):
- *   Requires caller to be the conversation owner AND an active member of an active workspace.
- *   Returns private HTTP 404 for any unauthorized or revoked caller (Hidden pattern).
+ *   - Requires caller to be the conversation owner.
+ *   - Binds to expected workspace header/context (mismatches return 404 Hidden pattern).
+ *   - Generic Layer: Requires caller to be an active member of an active organization workspace.
+ *   - Jira Layer: If jira_context is true, ALSO requires caller to be an active Jira member of an active Jira policy.
+ *   - Returns private HTTP 404 for any unauthorized or revoked caller (Hidden pattern).
  * - Legacy conversation (workspace_id IS NULL):
  *   Requires caller to be the conversation owner, preserving legacy denial status (default 404, or 403 where configured).
  */
@@ -54,24 +60,89 @@ export async function assertConversationAccess(
     throw new ConversationAccessDeniedError(404, 'Conversation not found', 'CONVERSATION_NOT_FOUND');
   }
 
-  // Scoped conversation
+  const actualWsId = conv.workspace_id ?? null;
+  const isNullScope = actualWsId === null;
+
+  // Header / context binding checks
+  if (options?.expectedWorkspaceMode !== undefined) {
+    const expectedMode = options.expectedWorkspaceMode;
+    if (expectedMode === 'organization') {
+      // Organization contexts never see NULL-scoped (personal/legacy) history
+      if (isNullScope) {
+        throw new ConversationAccessDeniedError(404, 'Conversation not found', 'CONVERSATION_NOT_FOUND');
+      }
+    } else if (expectedMode === 'personal') {
+      // Personal context can only see NULL-scoped history
+      if (!isNullScope) {
+        if (options?.ordinaryOrgAccessDeniedAs403 && !conv.jira_context) {
+          throw new ConversationAccessDeniedError(403, 'WORKSPACE_ACCESS_DENIED', 'WORKSPACE_ACCESS_DENIED');
+        }
+        throw new ConversationAccessDeniedError(404, 'Conversation not found', 'CONVERSATION_NOT_FOUND');
+      }
+    } else if (expectedMode === 'legacy') {
+      // Legacy context (no header sent):
+      if (!isNullScope && !conv.jira_context) {
+        // Standard endpoints (GET /:id, POST /:id/messages) reject omitted header on ordinary org conversations with 404
+        if (!options?.ordinaryOrgAccessDeniedAs403) {
+          throw new ConversationAccessDeniedError(404, 'Conversation not found', 'CONVERSATION_NOT_FOUND');
+        }
+      }
+    }
+  }
+
+  if (options?.expectedWorkspaceId !== undefined) {
+    const expectedWsId = options.expectedWorkspaceId ?? null;
+    if (expectedWsId !== null) {
+      if (actualWsId !== expectedWsId) {
+        if (options?.ordinaryOrgAccessDeniedAs403 && !conv.jira_context && actualWsId !== null) {
+          throw new ConversationAccessDeniedError(403, 'WORKSPACE_ACCESS_DENIED', 'WORKSPACE_ACCESS_DENIED');
+        }
+        throw new ConversationAccessDeniedError(404, 'Conversation not found', 'CONVERSATION_NOT_FOUND');
+      }
+    } else if (options.expectedWorkspaceMode === 'organization') {
+      if (isNullScope) {
+        throw new ConversationAccessDeniedError(404, 'Conversation not found', 'CONVERSATION_NOT_FOUND');
+      }
+    }
+  }
+
+  // Scoped organization conversation
   if (conv.workspace_id) {
     // Hidden 404: unauthorized caller cannot know the conversation exists
     if (conv.user_id !== userId) {
       throw new ConversationAccessDeniedError(404, 'Conversation not found', 'CONVERSATION_NOT_FOUND');
     }
 
-    // Must be active member of an active workspace
+    // Layer 1: Generic organization workspace membership & active user
     const memberRes = await poolOrClient.query<{ active: boolean }>(
-      `SELECT (m.status = 'active' AND w.status = 'active') AS active
-       FROM ati_workspace_memberships m
-       JOIN ati_workspaces w ON w.id = m.workspace_id
-       WHERE m.workspace_id = $1 AND m.user_id = $2`,
+      `SELECT (wm.status = 'active' AND u.status = 'active') AS active
+       FROM workspace_members wm
+       JOIN users u ON u.id = wm.user_id
+       JOIN workspaces w ON w.id = wm.workspace_id
+       WHERE wm.workspace_id = $1 AND wm.user_id = $2`,
       [conv.workspace_id, userId]
     );
 
     if (!memberRes.rows[0] || !memberRes.rows[0].active) {
+      if (options?.ordinaryOrgAccessDeniedAs403 && !conv.jira_context) {
+        throw new ConversationAccessDeniedError(403, 'WORKSPACE_ACCESS_DENIED', 'WORKSPACE_ACCESS_DENIED');
+      }
       throw new ConversationAccessDeniedError(404, 'Conversation not found', 'CONVERSATION_NOT_FOUND');
+    }
+
+    // Layer 2: Jira policy extension & membership (required ONLY when jira_context is true)
+    if (conv.jira_context) {
+      const jiraMemberRes = await poolOrClient.query<{ active: boolean }>(
+        `SELECT (jm.status = 'active' AND jw.status = 'active') AS active
+         FROM ati_workspace_memberships jm
+         JOIN ati_workspaces jw ON jw.id = jm.workspace_id
+         WHERE jm.workspace_id = $1 AND jm.user_id = $2`,
+        [conv.workspace_id, userId]
+      );
+
+      if (!jiraMemberRes.rows[0] || !jiraMemberRes.rows[0].active) {
+        throw new ConversationAccessDeniedError(404, 'Conversation not found', 'CONVERSATION_NOT_FOUND');
+      }
     }
 
     return conv;
@@ -117,9 +188,54 @@ export async function assertConversationAccessWithFallback(
     throw new ConversationAccessDeniedError(404, 'Conversation not found', 'CONVERSATION_NOT_FOUND');
   }
 
+  const actualWsId = conv.workspace_id ?? null;
+  const isNullScope = actualWsId === null;
+
+  // Header / context binding checks
+  if (options?.expectedWorkspaceMode !== undefined) {
+    const expectedMode = options.expectedWorkspaceMode;
+    if (expectedMode === 'organization') {
+      if (isNullScope) {
+        throw new ConversationAccessDeniedError(404, 'Conversation not found', 'CONVERSATION_NOT_FOUND');
+      }
+    } else if (expectedMode === 'personal') {
+      if (!isNullScope) {
+        if (options?.ordinaryOrgAccessDeniedAs403 && !conv.jira_context) {
+          throw new ConversationAccessDeniedError(403, 'WORKSPACE_ACCESS_DENIED', 'WORKSPACE_ACCESS_DENIED');
+        }
+        throw new ConversationAccessDeniedError(404, 'Conversation not found', 'CONVERSATION_NOT_FOUND');
+      }
+    } else if (expectedMode === 'legacy') {
+      if (!isNullScope) {
+        if (!options?.ordinaryOrgAccessDeniedAs403) {
+          throw new ConversationAccessDeniedError(404, 'Conversation not found', 'CONVERSATION_NOT_FOUND');
+        }
+      }
+    }
+  }
+
+  if (options?.expectedWorkspaceId !== undefined) {
+    const expectedWsId = options.expectedWorkspaceId ?? null;
+    if (expectedWsId !== null) {
+      if (actualWsId !== expectedWsId) {
+        if (options?.ordinaryOrgAccessDeniedAs403 && !conv.jira_context && actualWsId !== null) {
+          throw new ConversationAccessDeniedError(403, 'WORKSPACE_ACCESS_DENIED', 'WORKSPACE_ACCESS_DENIED');
+        }
+        throw new ConversationAccessDeniedError(404, 'Conversation not found', 'CONVERSATION_NOT_FOUND');
+      }
+    } else if (options.expectedWorkspaceMode === 'organization') {
+      if (isNullScope) {
+        throw new ConversationAccessDeniedError(404, 'Conversation not found', 'CONVERSATION_NOT_FOUND');
+      }
+    }
+  }
+
   // Scoped conversation: requires PostgreSQL authority pool to verify membership & workspace status.
-  // When pool is unavailable, fail closed with 404 (hidden pattern).
+  // When pool is unavailable, fail closed with 404 (hidden pattern) or 403 where configured for ordinary org.
   if (conv.workspace_id) {
+    if (options?.ordinaryOrgAccessDeniedAs403 && !conv.jira_context) {
+      throw new ConversationAccessDeniedError(403, 'WORKSPACE_ACCESS_DENIED', 'WORKSPACE_ACCESS_DENIED');
+    }
     throw new ConversationAccessDeniedError(404, 'Conversation not found', 'CONVERSATION_NOT_FOUND');
   }
 

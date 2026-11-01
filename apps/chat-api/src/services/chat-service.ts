@@ -4,6 +4,7 @@ import type { MessageRepo } from '../db/repositories/message-repo.js';
 import type { ConversationRepo } from '../db/repositories/conversation-repo.js';
 import type { PlanRepo } from '../db/repositories/plan-repo.js';
 import type { ScheduleRepo } from '../db/repositories/schedule-repo.js';
+import type { WorkspaceRepo } from '../db/repositories/workspace-repo.js';
 import { WorkingMemory, unroutable, type ChatMessage, type ProcessMessageInput, type RoutedIntent } from '@wap/planner';
 import type { PersonalSpreadsheetItem, PlanConnections, PlannerResponse, PlanResponse, PlanStep, ScheduleProposalMetadata, ScheduleResponse, ScheduleView } from '@wap/tool-schemas';
 import { resourceLabels } from './resource-labels.js';
@@ -122,6 +123,7 @@ export interface ChatServiceOptions {
   msgRepo: MessageRepo;
   convRepo?: ConversationRepo;
   planRepo?: PlanRepo;
+  workspaceRepo?: WorkspaceRepo;
   planner: ChatPlanner;
   eventEmitter: {
     emit: (event: string, payload: any) => void;
@@ -137,7 +139,7 @@ export interface ChatServiceOptions {
     getAdapter?: () => Promise<any> | any;
   }) | null>;
   /** The caller's active Trello connection lookup; absent when Trello is off or not connected. */
-  trelloConnection?: (userId: string) => Promise<any>;
+  trelloConnection?: (userId: string, scopeId?: string) => Promise<any>;
   /** Scheduled workflows (SCHEDULES_ENABLED); absent, conversations have no schedule. */
   schedules?: { repo: ScheduleRepo; timeZone: string; now?: () => Date };
   /** Optional adapter retriever or tool executor for live resource validation in planning. */
@@ -161,6 +163,7 @@ export class ChatService {
   private msgRepo: MessageRepo;
   private convRepo?: ConversationRepo;
   private planRepo?: PlanRepo;
+  private workspaceRepo?: WorkspaceRepo;
   private planner: ChatPlanner;
   private eventEmitter: { emit: (event: string, payload: any) => void };
   private gmailConnection?: ChatServiceOptions['gmailConnection'];
@@ -183,6 +186,7 @@ export class ChatService {
     this.msgRepo = options.msgRepo;
     this.convRepo = options.convRepo;
     this.planRepo = options.planRepo;
+    this.workspaceRepo = options.workspaceRepo;
     this.planner = options.planner;
     this.eventEmitter = options.eventEmitter;
     this.schedules = options.schedules;
@@ -190,6 +194,15 @@ export class ChatService {
 
   async handleUserMessage(input: HandleUserMessageInput): Promise<IngestionResult> {
     const { conversationId, userId, content, requestId } = input;
+    if (this.convRepo && this.workspaceRepo) {
+      const conv = await this.convRepo.getConversation(conversationId);
+      if (conv?.workspace_mode === 'organization' && conv.workspace_id) {
+        const member = await this.workspaceRepo.findMember(conv.workspace_id, userId);
+        if (!member || member.status !== 'active') {
+          throw Object.assign(new Error('WORKSPACE_ACCESS_DENIED'), { status: 403 });
+        }
+      }
+    }
 
     // 1. Save user message immediately to DB
     const message = requestId
@@ -225,6 +238,7 @@ export class ChatService {
     signal?: AbortSignal,
     memory?: WorkingMemory,
     onTrelloTeamBoards?: (boards: Array<{ boardId: string; boardName: string }>) => void,
+    scopeId = 'default',
   ): Promise<PlannerResponse> {
     signal?.throwIfAborted();
     const bound = withoutConnections(plan);
@@ -371,7 +385,7 @@ export class ChatService {
     }
 
     if (usesTrello) {
-      const trello = await this.trelloConnection?.(userId);
+      const trello = await this.trelloConnection?.(userId, scopeId);
       if (!trello || trello.status === 'not_connected' || trello.status === 'reconnect_required') {
         unavailableServices.push({ id: 'trello', name: 'Trello' });
         reasons.push('Tài khoản của bạn chưa Kết nối Trello hoặc cần kết nối lại.');
@@ -512,11 +526,15 @@ export class ChatService {
    * Design 5.4: a new or changed schedule takes its services from the router,
    * never from the model, and is refused when one of them is not configured.
    */
-  private async prepareProposal(proposal: ScheduleResponse, userId: string, schedule: ScheduleView | null): Promise<PlannerResponse | ScheduleProposalMetadata> {
+  private async prepareProposal(
+    proposal: ScheduleResponse,
+    actor: { userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization' },
+    schedule: ScheduleView | null
+  ): Promise<PlannerResponse | ScheduleProposalMetadata> {
     if (!this.schedules) throw new Error('Schedules are off');
     let services: string[];
     if (proposal.action === 'create' || proposal.action === 'update') {
-      const route = await this.planner.routeSchedule(proposal.request!, { userId });
+      const route = await this.planner.routeSchedule(proposal.request!, actor);
       if (route.unavailable.length > 0 || route.services.length === 0) return unroutable(route.unavailable);
       services = route.services;
     } else {
@@ -531,6 +549,27 @@ export class ChatService {
       previous: current ? { name: current.name, request: current.request, recurrence: current.recurrence, status: current.status } : null };
   }
 
+  private async actorForConversation(
+    conversationId: string,
+    userId: string
+  ): Promise<{ userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization' }> {
+    const fallbackMode = this.workspaceRepo ? ('personal' as const) : undefined;
+    if (!this.convRepo) return { userId, ...(fallbackMode ? { workspaceMode: fallbackMode } : {}) };
+    try {
+      const conv = await this.convRepo.getConversation(conversationId);
+      if (conv?.workspace_mode && conv.workspace_mode !== 'legacy') {
+        return {
+          userId,
+          workspaceId: conv.workspace_id ?? null,
+          workspaceMode: conv.workspace_mode,
+        };
+      }
+    } catch {
+      // ignore
+    }
+    return { userId, ...(fallbackMode ? { workspaceMode: fallbackMode } : {}) };
+  }
+
   /**
    * Shared by the chat and by scheduled runs: binds connections, labels and
    * hashes a plan, or turns a schedule into its proposal, without writing.
@@ -542,13 +581,20 @@ export class ChatService {
   ): Promise<PreparedResponse> {
     const { conversationId, correlation } = target;
     let trelloTeamBoards: Array<{ boardId: string; boardName: string }> | undefined;
+    const actor = await this.actorForConversation(conversationId, target.userId);
+    let scopeId = 'default';
+    if (actor.workspaceMode === 'organization' && actor.workspaceId) {
+      scopeId = actor.workspaceId;
+    } else if (actor.workspaceMode === 'personal' && target.userId) {
+      scopeId = `personal:${target.userId}`;
+    }
     let response = planned.kind === 'plan'
-      ? await this.bindConnections(planned, target.userId, signal, memory, (boards) => { trelloTeamBoards = boards; })
+      ? await this.bindConnections(planned, target.userId, signal, memory, (boards) => { trelloTeamBoards = boards; }, scopeId)
       : planned;
     signal?.throwIfAborted();
     let proposal: ScheduleProposalMetadata | null = null;
     if (response.kind === 'schedule') {
-      const prepared = await this.prepareProposal(response, target.userId, target.schedule ?? null);
+      const prepared = await this.prepareProposal(response, actor, target.schedule ?? null);
       if ('type' in prepared) proposal = prepared; else response = prepared;
     }
     const emit = (event: string, payload: Record<string, unknown>) => this.eventEmitter.emit(event, { conversationId, ...payload, ...correlation });
@@ -652,11 +698,12 @@ export class ChatService {
     if (lastMemory?.metadata?.state && typeof lastMemory.metadata.state === 'object') {
       memory.fromJSON(lastMemory.metadata.state);
     }
+    const actor = await this.actorForConversation(conversationId, userId);
     const plannerResponse: PlannerResponse = await this.planner.processMessage({
       userMessage: content,
       history,
       memory,
-      actor: { userId },
+      actor,
       onGatherEvent: (event) => this.eventEmitter.emit('gather_progress', { conversationId, ...event }),
       ...(schedule ? { schedule: { services: schedule.services } } : {}),
     });
@@ -680,8 +727,11 @@ export class ChatService {
     const correlation: Correlation = first ? { replyToMessageId: first.id } : {};
     this.eventEmitter.emit('agent_state', { conversationId: convId, state: 'planning', ...correlation });
     const memory = new WorkingMemory();
+    const actor = run.workspaceMode && run.workspaceMode !== 'legacy'
+      ? { userId: run.userId, workspaceId: run.workspaceId ?? null, workspaceMode: run.workspaceMode }
+      : await this.actorForConversation(convId, run.userId);
     const response = await this.planner.processMessage({
-      userMessage, history: [], memory, signal, actor: { userId: run.userId }, scheduledRun: true,
+      userMessage, history: [], memory, signal, actor, scheduledRun: true,
       onGatherEvent: (event) => this.eventEmitter.emit('gather_progress', { conversationId: convId, ...event }),
     });
     signal.throwIfAborted();

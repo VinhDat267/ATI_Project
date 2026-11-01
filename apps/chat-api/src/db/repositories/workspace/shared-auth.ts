@@ -45,41 +45,58 @@ export async function authorizeWorkspaceAdmin(
   const wsQuery = lockWorkspace
     ? `SELECT id, status, version FROM ati_workspaces WHERE id = $1 FOR UPDATE`
     : `SELECT id, status, version FROM ati_workspaces WHERE id = $1 FOR SHARE`;
-  const wsRes = await client.query(wsQuery, [workspaceId]);
+  const wsRes = await client.query<{ id: string; status: string; version: number }>(wsQuery, [workspaceId]);
+  const wsRow = wsRes.rows[0];
 
-  if (wsRes.rowCount === 0 || wsRes.rows[0].status !== 'active') {
+  if (!wsRow || wsRow.status !== 'active') {
     throw new WorkspaceRepoError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
   }
 
-  // 2. Lock/read actor membership
-  const memQuery = lockWorkspace
-    ? `SELECT role, status, version FROM ati_workspace_memberships WHERE workspace_id = $1 AND user_id = $2 FOR UPDATE`
-    : `SELECT role, status, version FROM ati_workspace_memberships WHERE workspace_id = $1 AND user_id = $2 FOR SHARE`;
-  const memRes = await client.query(memQuery, [workspaceId, actorUserId]);
-
-  if (memRes.rowCount === 0 || memRes.rows[0].status !== 'active') {
-    // Authenticated outsider or removed/inactive member gets 404
-    throw new WorkspaceRepoError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
-  }
-
-  if (memRes.rows[0].role !== 'admin') {
-    // Authenticated active non-admin member gets 403
-    throw new WorkspaceRepoError(403, 'ADMIN_REQUIRED', 'Admin role required');
-  }
-
-  // 3. Verify actor user status under lock
+  // 2. Verify actor user status under lock
   const userRes = await client.query<{ status: string }>(
     `SELECT status FROM users WHERE id = $1 FOR SHARE`,
     [actorUserId]
   );
+  const userRow = userRes.rows[0];
 
-  if (userRes.rowCount === 0 || userRes.rows[0]?.status !== 'active') {
+  if (!userRow || userRow.status !== 'active') {
     throw new WorkspaceRepoError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
+  }
+
+  // 3. Verify actor generic organization membership under lock
+  const orgMemRes = await client.query<{ status: string }>(
+    `SELECT status FROM workspace_members WHERE workspace_id = $1 AND user_id = $2 FOR SHARE`,
+    [workspaceId, actorUserId]
+  );
+  const orgMemRow = orgMemRes.rows[0];
+
+  if (!orgMemRow || orgMemRow.status !== 'active') {
+    throw new WorkspaceRepoError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
+  }
+
+  // 4. Lock/read actor Jira membership
+  const memQuery = lockWorkspace
+    ? `SELECT role, status, version FROM ati_workspace_memberships WHERE workspace_id = $1 AND user_id = $2 FOR UPDATE`
+    : `SELECT role, status, version FROM ati_workspace_memberships WHERE workspace_id = $1 AND user_id = $2 FOR SHARE`;
+  const memRes = await client.query<{ role: WorkspaceRole; status: MembershipStatus; version: number }>(
+    memQuery,
+    [workspaceId, actorUserId]
+  );
+  const memRow = memRes.rows[0];
+
+  if (!memRow || memRow.status !== 'active') {
+    // Authenticated outsider or removed/inactive member gets private 404
+    throw new WorkspaceRepoError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
+  }
+
+  if (memRow.role !== 'admin') {
+    // Authenticated active non-admin member gets 403
+    throw new WorkspaceRepoError(403, 'ADMIN_REQUIRED', 'Admin role required');
   }
 
   return {
     client,
-    workspace: wsRes.rows[0],
-    actorMembership: memRes.rows[0],
+    workspace: wsRow,
+    actorMembership: memRow,
   };
 }

@@ -1,11 +1,12 @@
 // Source: AppStagePage.tsx moments 1–2. Content comes from the registered catalog and gatherState.
-import type { KeyboardEvent, RefObject, ReactNode } from 'react';
+import { useState, useEffect, type KeyboardEvent, type RefObject, type ReactNode } from 'react';
 import { getServiceDefinition } from '@wap/tool-schemas';
 import { toolDefinition } from '../../services/tool-definitions';
 import { ServiceLogo } from '../../components/ServiceLogo';
 import presentation from '../../assets/cockpit-services.json';
 import type { ServiceInfo, GatherState } from '../../types';
 import { RequestEcho, useScheduledOrigin } from './RequestEcho';
+import { getActiveWorkspaceSummary, setActiveWorkspaceId, subscribeWorkspace } from '../../services/workspace-storage';
 interface Props {
   services: ServiceInfo[];
   loading: boolean;
@@ -55,6 +56,9 @@ export function RequestMoment({
   navigate,
   servicePrompt,
 }: Props) {
+  const [workspace, setWorkspace] = useState(getActiveWorkspaceSummary());
+  useEffect(() => subscribeWorkspace(() => setWorkspace(getActiveWorkspaceSummary())), []);
+
   return (
     <section
       id="moment-1"
@@ -62,6 +66,38 @@ export function RequestMoment({
       data-moment="1"
       aria-label="Cockpit"
     >
+      {/* Context Pill & Guidance Card */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-3.5 rounded-xl border border-[#E7E7E2] bg-white shadow-sm">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="text-xl flex-shrink-0">{workspace.id === 'personal' ? '👤' : '🏢'}</span>
+          <div className="text-xs leading-relaxed min-w-0">
+            <div className="font-semibold text-[#111827] flex items-center gap-1.5 flex-wrap">
+              <span>Đang làm việc tại:</span>
+              <span className="text-[#FF5701]">{workspace.name}</span>
+            </div>
+            <p className="text-[#6B7280] text-[11px] truncate">
+              {workspace.id === 'personal'
+                ? '(Lịch, Trang tính, Trello & công cụ riêng của bạn)'
+                : '(Sử dụng kết nối chung của nhóm & dịch vụ đã cấp quyền)'}
+            </p>
+          </div>
+        </div>
+        {workspace.id === 'personal' && (
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveWorkspaceId('personal');
+                navigate('/settings');
+              }}
+              className="px-2.5 py-1 rounded-lg text-xs font-medium border border-[#E7E7E2] bg-[#F8F8F6] text-[#4B5563] hover:text-[#111827] hover:bg-neutral-100 transition-colors"
+            >
+              Kết nối công cụ cá nhân
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className="v3-space-y-3 text-center sm:text-left">
         <h1
           id="heading-moment-1"
