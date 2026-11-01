@@ -12,7 +12,7 @@ test('GMAIL-03 off: existing surfaces contain no Gmail when disabled', async ({ 
   await page.goto('/'); await expect(page.getByText(/Gmail/)).toHaveCount(0);
   await page.goto('/guide'); await expect(page.getByRole('heading', { level: 1 })).toBeVisible(); await expect(page.getByText(/Gmail/)).toHaveCount(0);
   await login(page); await expect(page.getByText(/Gmail/)).toHaveCount(0);
-  await page.goto('/settings'); await expect(page.getByRole('button', { name: /Trello —/ })).toBeVisible();
+  await page.goto('/settings'); await expect(page.getByRole('button', { name: 'Kết nối Trello', exact: true })).toBeVisible();
   await expect(page.getByText(/Gmail/)).toHaveCount(0);
 });
 for (const width of [1440, 375]) for (const theme of ['light', 'dark']) {

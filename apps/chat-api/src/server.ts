@@ -230,19 +230,21 @@ async function bootstrap() {
       })
     : undefined;
   // The canned sandbox plan still creates a Trello card when PostgreSQL or the
-  // OAuth client is absent. A real lookup replaces this as soon as both exist.
+  // OAuth client is absent. board_frontend is the board the browser grounding
+  // fixture stores list_frontend_todo on. A real lookup replaces this stand-in.
   const sandboxTrelloConnection = env.RUNTIME_MODE === 'sandbox' && !trelloLookup
     ? async () => ({
         status: 'connected' as const,
         teamBoards: [
           { boardId: 'b1', boardName: 'Sprint Board' },
           { boardId: 'b2', boardName: 'Bug Tracker' },
+          { boardId: 'board_frontend', boardName: 'Frontend' },
         ],
         connection: {
           credentialId: 'sandbox-trello',
           memberId: 'sandbox-member',
           username: 'sandbox',
-          boardIds: ['b1', 'b2'],
+          boardIds: ['b1', 'b2', 'board_frontend'],
         },
       })
     : undefined;
