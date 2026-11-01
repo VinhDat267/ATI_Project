@@ -136,6 +136,8 @@ export interface ChatServiceOptions {
     lookupSpreadsheets?: (query?: string, limit?: number, context?: { signal?: AbortSignal }) => Promise<Array<{ id: string; title: string; url?: string }>>;
     getAdapter?: () => Promise<any> | any;
   }) | null>;
+  /** The caller's active Trello connection lookup; absent when Trello is off or not connected. */
+  trelloConnection?: (userId: string) => Promise<any>;
   /** Scheduled workflows (SCHEDULES_ENABLED); absent, conversations have no schedule. */
   schedules?: { repo: ScheduleRepo; timeZone: string; now?: () => Date };
   /** Optional adapter retriever or tool executor for live resource validation in planning. */
@@ -164,6 +166,8 @@ export class ChatService {
   private gmailConnection?: ChatServiceOptions['gmailConnection'];
   private mycalendarConnection?: ChatServiceOptions['mycalendarConnection'];
   private mysheetsConnection?: ChatServiceOptions['mysheetsConnection'];
+  private trelloConnection?: ChatServiceOptions['trelloConnection'];
+  private trelloTeamBoards?: Array<{ boardId: string; boardName: string }>;
   private schedules?: ChatServiceOptions['schedules'];
   private getAdapter?: ChatServiceOptions['getAdapter'];
   private lookupTool?: ChatServiceOptions['lookupTool'];
@@ -173,6 +177,7 @@ export class ChatService {
     this.gmailConnection = options.gmailConnection;
     this.mycalendarConnection = options.mycalendarConnection;
     this.mysheetsConnection = options.mysheetsConnection;
+    this.trelloConnection = options.trelloConnection;
     this.getAdapter = options.getAdapter;
     this.lookupTool = options.lookupTool;
     this.mysheetsLookupTimeoutMs = options.mysheetsLookupTimeoutMs ?? 10_000;
@@ -212,23 +217,25 @@ export class ChatService {
 
   /**
    * After validation, before labels, hash and storage: drop any connections
-   * the model wrote and record the connection a Gmail, MyCalendar or MySheets step will use,
+   * the model wrote and record the connection a Gmail, MyCalendar, MySheets or Trello step will use,
    * so the integrity check covers it. Without one the plan is refused, not saved.
    */
-  private async bindConnections(plan: PlanResponse, userId: string, signal?: AbortSignal): Promise<PlannerResponse> {
+  private async bindConnections(plan: PlanResponse, userId: string, signal?: AbortSignal, memory?: WorkingMemory): Promise<PlannerResponse> {
     signal?.throwIfAborted();
     const bound = withoutConnections(plan);
     const usesGmail = bound.steps.some((step) => step.tool.startsWith('gmail.'));
     const usesMyCalendar = bound.steps.some((step) => step.tool.startsWith('mycalendar.'));
     const usesMySheets = bound.steps.some((step) => step.tool.startsWith('mysheets.'));
+    const usesTrello = bound.steps.some((step) => step.tool.startsWith('trello.'));
 
-    if (!usesGmail && !usesMyCalendar && !usesMySheets) return bound;
+    if (!usesGmail && !usesMyCalendar && !usesMySheets && !usesTrello) return bound;
 
     const unavailableServices: Array<{ id: string; name: string }> = [];
     const reasons: string[] = [];
     let gmailConn: NonNullable<PlanConnections['gmail']> | undefined;
     let mycalConn: NonNullable<PlanConnections['mycalendar']> | undefined;
     let mysheetsConn: NonNullable<PlanConnections['mysheets']> | undefined;
+    let trelloConn: NonNullable<PlanConnections['trello']> | undefined;
 
     if (usesGmail) {
       const gmail = await this.gmailConnection?.(userId);
@@ -358,6 +365,109 @@ export class ChatService {
       }
     }
 
+    if (usesTrello) {
+      const trello = await this.trelloConnection?.(userId);
+      if (!trello || trello.status === 'not_connected' || trello.status === 'reconnect_required') {
+        unavailableServices.push({ id: 'trello', name: 'Trello' });
+        reasons.push('Tài khoản của bạn chưa Kết nối Trello hoặc cần kết nối lại.');
+      } else if (trello.status === 'needs_scope') {
+        return {
+          kind: 'refusal',
+          reason: 'Quản trị chưa chọn bảng Trello.',
+          suggestion: 'Hãy nhờ quản trị viên chọn bảng Trello trong trang Kết nối dịch vụ.',
+        };
+      } else if (trello.status === 'needs_membership' || !trello.connection) {
+        return {
+          kind: 'refusal',
+          reason: 'Bạn chưa là thành viên của bảng Trello nào được chọn.',
+          suggestion: 'Hãy nhờ quản trị viên thêm bạn vào ít nhất một bảng Trello của nhóm.',
+        };
+      } else {
+        if (trello.teamBoards) {
+          this.trelloTeamBoards = trello.teamBoards;
+        }
+        const allowedBoardSet = new Set(trello.connection.boardIds);
+        const teamBoardMap = new Map<string, string>(
+          (trello.teamBoards ?? []).map((b: any) => [b.boardId, b.boardName])
+        );
+        const allEntities = memory ? memory.getAll() : {};
+        const observedLists = [
+          ...(Array.isArray(allEntities.list) ? allEntities.list : allEntities.list ? [allEntities.list] : []),
+          ...(Array.isArray((allEntities.__observed as any)?.list) ? (allEntities.__observed as any).list : []),
+        ];
+        const observedCards = [
+          ...(Array.isArray(allEntities.card) ? allEntities.card : allEntities.card ? [allEntities.card] : []),
+          ...(Array.isArray((allEntities.__observed as any)?.card) ? (allEntities.__observed as any).card : []),
+        ];
+        const stepBoardMap = new Map<string, string>();
+
+        let forbiddenBoardName: string | null = null;
+        for (const step of bound.steps) {
+          if (!step.tool.startsWith('trello.')) continue;
+          let targetBoardId: string | undefined = typeof step.args?.boardId === 'string' ? step.args.boardId : undefined;
+          if (!targetBoardId && typeof step.args?.listId === 'string') {
+            const foundList = observedLists.find((l: any) => l.id === step.args.listId);
+            if (foundList && (foundList.boardId || foundList.idBoard)) {
+              targetBoardId = foundList.boardId || foundList.idBoard;
+            } else if (teamBoardMap.has(step.args.listId)) {
+              targetBoardId = step.args.listId;
+            }
+          }
+          if (!targetBoardId && step.args?.cardId) {
+            if (typeof step.args.cardId === 'string') {
+              const foundCard = observedCards.find((c: any) => c.id === step.args.cardId);
+              if (foundCard) {
+                targetBoardId = foundCard.boardId || foundCard.idBoard;
+                if (!targetBoardId && (foundCard.listId || foundCard.idList)) {
+                  const cardListId = foundCard.listId || foundCard.idList;
+                  const foundList = observedLists.find((l: any) => l.id === cardListId);
+                  if (foundList) targetBoardId = foundList.boardId || foundList.idBoard;
+                }
+              }
+            } else if (typeof step.args.cardId === 'object' && step.args.cardId && '$ref' in step.args.cardId) {
+              const ref = (step.args.cardId as any).$ref;
+              const refStepId = typeof ref === 'string' ? ref.split('.')[0] : undefined;
+              if (refStepId && stepBoardMap.has(refStepId)) {
+                targetBoardId = stepBoardMap.get(refStepId);
+              }
+            }
+          }
+          if (!targetBoardId && typeof step.args?.idList === 'string') {
+            const foundList = observedLists.find((l: any) => l.id === step.args.idList);
+            if (foundList && (foundList.boardId || foundList.idBoard)) {
+              targetBoardId = foundList.boardId || foundList.idBoard;
+            }
+          }
+
+          if (targetBoardId) {
+            step.boardId = targetBoardId;
+            stepBoardMap.set(step.id, targetBoardId);
+          }
+
+          if (targetBoardId && !allowedBoardSet.has(targetBoardId)) {
+            const name = teamBoardMap.get(targetBoardId) || targetBoardId;
+            forbiddenBoardName = name;
+            break;
+          }
+        }
+
+        if (forbiddenBoardName) {
+          return {
+            kind: 'refusal',
+            reason: `Bạn cần được thêm vào bảng ${forbiddenBoardName} trên Trello.`,
+            suggestion: `Hãy nhờ quản trị viên thêm bạn vào bảng ${forbiddenBoardName} trên Trello, rồi thử lại.`,
+          };
+        }
+
+        trelloConn = {
+          credentialId: trello.connection.credentialId,
+          memberId: trello.connection.memberId,
+          username: trello.connection.username,
+          boardIds: [...trello.connection.boardIds].sort(),
+        };
+      }
+    }
+
     if (unavailableServices.length > 0) {
       return {
         kind: 'refusal',
@@ -372,6 +482,7 @@ export class ChatService {
     if (gmailConn) connections.gmail = gmailConn;
     if (mycalConn) connections.mycalendar = mycalConn;
     if (mysheetsConn) connections.mysheets = mysheetsConn;
+    if (trelloConn) connections.trello = trelloConn;
 
     return { ...bound, connections };
   }
@@ -409,7 +520,7 @@ export class ChatService {
     planned: PlannerResponse, memory: WorkingMemory, userTexts: string[], signal?: AbortSignal,
   ): Promise<PreparedResponse> {
     const { conversationId, correlation } = target;
-    let response = planned.kind === 'plan' ? await this.bindConnections(planned, target.userId, signal) : planned;
+    let response = planned.kind === 'plan' ? await this.bindConnections(planned, target.userId, signal, memory) : planned;
     signal?.throwIfAborted();
     let proposal: ScheduleProposalMetadata | null = null;
     if (response.kind === 'schedule') {
@@ -418,7 +529,7 @@ export class ChatService {
     }
     const emit = (event: string, payload: Record<string, unknown>) => this.eventEmitter.emit(event, { conversationId, ...payload, ...correlation });
     let planId: string | null = null, messageId = '', labels: Record<string, string> = {};
-    if (response.kind === 'plan') labels = resourceLabels(response, memory, userTexts);
+    if (response.kind === 'plan') labels = resourceLabels(response, memory, userTexts, this.trelloTeamBoards);
 
     const write = async (client?: pg.PoolClient) => {
       // Without a client the repositories keep their own transactions, called exactly as before.

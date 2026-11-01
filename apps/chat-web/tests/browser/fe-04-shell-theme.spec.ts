@@ -61,7 +61,7 @@ for (const theme of ['light', 'dark'] as const) {
     // Cockpit uses prototype typography under spec 1.2. Other pages retain FE-04.
     await page.keyboard.press('Escape');
     await page.getByRole('button', { name: /Menu người dùng/ }).click(); await page.getByRole('menuitem', { name: 'Kết nối dịch vụ' }).click();
-    await page.getByRole('button', { name: /Trello —/ }).click();
+    await page.getByRole('button', { name: /Slack —/ }).click();
     const save = page.getByRole('button', { name: 'Lưu thay đổi', exact: true });
     await expect(save).toBeVisible(); expect(await save.evaluate(el => getComputedStyle(el).fontWeight)).toBe('600');
   });
@@ -100,8 +100,8 @@ test('FE-04: mobile prototype drawers preserve scope editing with source-sized t
   await page.getByRole('button', { name: /Menu người dùng/ }).click(); await page.getByRole('menuitem', { name: 'Kết nối dịch vụ' }).click();
   // Spec 1.1.4/1.2.6: Settings now uses the React prototype's sizes;
   // retire only the 40x40 dimension assertion, retain scope add/remove behavior.
-  await page.getByRole('button', { name: /Trello —/ }).click();
-  await page.getByLabel('Thêm Board ID').fill('fe04-touch-target'); await page.getByRole('button', { name: 'Thêm', exact: true }).click();
+  await page.getByRole('button', { name: /Slack —/ }).click();
+  await page.getByLabel('Thêm Channel ID').fill('fe04-touch-target'); await page.getByRole('button', { name: 'Thêm', exact: true }).click();
   const remove = page.getByRole('button', { name: 'Xoá mục fe04-touch-target', exact: true });
   await expect(remove).toBeVisible(); await remove.click(); await expect(remove).toHaveCount(0);
 });

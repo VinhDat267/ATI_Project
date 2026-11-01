@@ -87,7 +87,8 @@ it('unconnected B is refused with Gmail in unavailableServices and receives no a
 it('sandbox does not hide Gmail planner failures behind a shared write plan', () => {
   expect(mayFallbackToShared({ userMessage: 'Trả lời email', memory: {} as any }, true)).toBe(false);
   expect(mayFallbackToShared({ userMessage: 'Tiếp tục', history: [{ role: 'user', content: 'Gmail' }], memory: {} as any }, true)).toBe(false);
-  expect(mayFallbackToShared({ userMessage: 'Tạo card Trello', memory: {} as any }, true)).toBe(true);
+  expect(mayFallbackToShared({ userMessage: 'Tạo card Trello', memory: {} as any }, true)).toBe(false);
+  expect(mayFallbackToShared({ userMessage: 'Gửi tin Slack vào kênh', memory: {} as any }, true)).toBe(true);
   expect(gmailServiceRegistry(false)).toHaveLength(8);
 });
 it('real PostgreSQL token manager refresh 503 fails a write before any Gmail API dispatch', async () => {

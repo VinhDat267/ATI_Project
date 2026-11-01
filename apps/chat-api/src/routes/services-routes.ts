@@ -257,16 +257,25 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
     next();
   });
 
+  // Shared token administration is gone for Trello (HTTP 410 Gone).
+  router.all('/trello/credentials', (_req, res) => {
+    res.status(410).json({ error: 'Trello dùng đăng nhập OAuth.' });
+  });
+  router.all('/trello/scope', (_req, res) => {
+    res.status(410).json({ error: 'Trello dùng đăng nhập OAuth.' });
+  });
+
   // GET /api/services
   router.get('/', async (req: Request, res: Response): Promise<void> => {
     try {
       const services: Array<Record<string, unknown>> = await Promise.all(getRegisteredServices().map(async definition => {
         const { id, name, description, scopes, scopeKey, scopeLabel, credentialFields } = definition;
-        const record = await credentialRepo?.getCredentials(id);
+        const isTrello = id === 'trello';
+        const record = isTrello ? null : await credentialRepo?.getCredentials(id);
         const config = record && encryptionKey ? decryptCredentials(record.config, encryptionKey) : null;
         const scope = config?.allowedScope as Record<string, unknown> | undefined;
         const entries = scope?.[scopeKey];
-        const configured = Boolean(config && hasValidCredentials(credentialFields, config) && normalizeAllowedScope(definition, scope));
+        const configured = !isTrello && Boolean(config && hasValidCredentials(credentialFields, config) && normalizeAllowedScope(definition, scope));
         const savedCheck = checks.get(id);
         const check = savedCheck?.credentialVersion === (record ? versionOf(record.config) : null) ? savedCheck : undefined;
         return {

@@ -13,12 +13,10 @@ export class TrelloWriteTools extends TrelloReadTools {
       due?: string;
       idMembers?: string[];
     },
-    options?: { signal?: AbortSignal }
+    options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<{ id: string; name: string; url: string; listId: string }> {
-    if (this.allowedScope?.boards && this.allowedScope.boards.length > 0) {
-      const listInfo = await this.request<any>(`/lists/${args.listId}`, { signal: options?.signal });
-      this.assertParentBoard(listInfo);
-    }
+    const listInfo = await this.request<any>(`/lists/${args.listId}`, { signal: options?.signal });
+    this.assertParentBoard(listInfo, options?.boardId);
 
     const body: Record<string, any> = {
       idList: args.listId,
@@ -55,15 +53,13 @@ export class TrelloWriteTools extends TrelloReadTools {
       closed?: boolean;
       idList?: string;
     },
-    options?: { signal?: AbortSignal }
+    options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<{ id: string; name: string; url: string; listId: string }> {
-    if (this.allowedScope?.boards && this.allowedScope.boards.length > 0) {
-      const cardInfo = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
-      this.assertParentBoard(cardInfo);
-      if (args.idList) {
-        const listInfo = await this.request<any>(`/lists/${args.idList}`, { signal: options?.signal });
-        this.assertParentBoard(listInfo);
-      }
+    const cardInfo = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
+    this.assertParentBoard(cardInfo, options?.boardId);
+    if (args.idList) {
+      const listInfo = await this.request<any>(`/lists/${args.idList}`, { signal: options?.signal });
+      this.assertParentBoard(listInfo, options?.boardId);
     }
 
     const body: Record<string, any> = {};
@@ -96,11 +92,20 @@ export class TrelloWriteTools extends TrelloReadTools {
       cardId: string;
       memberId: string;
     },
-    options?: { signal?: AbortSignal }
+    options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<{ id: string; idMembers: string[] }> {
-    if (this.allowedScope?.boards && this.allowedScope.boards.length > 0) {
-      const cardInfo = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
-      this.assertParentBoard(cardInfo);
+    const cardInfo = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
+    this.assertParentBoard(cardInfo, options?.boardId);
+
+    const boardMembers = await this.request<any[]>(`/boards/${cardInfo.idBoard}/members`, { signal: options?.signal });
+    const isBoardMember = Array.isArray(boardMembers) && boardMembers.some((m) => m.id === args.memberId);
+    if (!isBoardMember) {
+      throw new StepError({
+        message: `Member '${args.memberId}' is not a member of board '${cardInfo.idBoard}'`,
+        category: 'AUTH_ERROR',
+        statusCode: 403,
+        retryable: false,
+      });
     }
 
     const res = await this.request<any>(`/cards/${args.cardId}/idMembers`, {
@@ -129,16 +134,14 @@ export class TrelloWriteTools extends TrelloReadTools {
       title: string;
       items?: string[];
     },
-    options?: { signal?: AbortSignal }
+    options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<{
     id: string;
     name: string;
     items: Array<{ id: string; name: string; state: string }>;
   }> {
-    if (this.allowedScope?.boards && this.allowedScope.boards.length > 0) {
-      const cardInfo = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
-      this.assertParentBoard(cardInfo);
-    }
+    const cardInfo = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
+    this.assertParentBoard(cardInfo, options?.boardId);
 
     const chkRes = await this.request<any>(`/cards/${args.cardId}/checklists`, {
       method: 'POST',

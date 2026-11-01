@@ -30,6 +30,17 @@ const scenarios = [
   { name: 'schedule', grep: 'SCHED-03:' },
 ];
 
+const passArgs = process.argv.slice(2);
+if (passArgs.length > 0) {
+  process.stdout.write(`Running v3 browser targeting: ${passArgs.join(' ')}\n`);
+  const env = { ...process.env, JWT_SECRET: process.env.JWT_SECRET || randomBytes(32).toString('hex') };
+  const result = spawnSync(process.execPath, [cli, 'test', '--config', 'apps/chat-web/playwright.config.ts', ...passArgs], {
+    env, stdio: 'inherit',
+  });
+  if (result.error) throw result.error;
+  process.exit(result.status ?? 0);
+}
+
 const selectedScenario = process.env.SCENARIO;
 const runScenarios = selectedScenario ? scenarios.filter(s => s.name === selectedScenario) : scenarios;
 

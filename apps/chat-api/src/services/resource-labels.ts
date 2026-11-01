@@ -2,7 +2,13 @@ import { getToolDefinition, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, type 
 import { groundingMemory, normalizedRecipient, observedThreads, userEmailAddresses, type WorkingMemory } from '@wap/planner';
 
 /** Display-only projection of actual lookups; never part of the approved payload. */
-export function resourceLabels(plan: PlanResponse, memory: WorkingMemory, userTexts: string[] = []): Record<string, string> {
+export function resourceLabels(
+  plan: PlanResponse,
+  memory: WorkingMemory,
+  userTexts: string[] = [],
+  options?: Array<{ boardId: string; boardName: string }> | { teamBoards?: Array<{ boardId: string; boardName: string }> },
+): Record<string, string> {
+  const teamBoards = Array.isArray(options) ? options : options?.teamBoards;
   const known = groundingMemory(memory.getAll(), memory.getEntity('__observed'));
   const entries = (key: string): Array<Record<string, any>> => {
     const value = known[key];
@@ -47,11 +53,22 @@ export function resourceLabels(plan: PlanResponse, memory: WorkingMemory, userTe
         const identities = new Set(candidates.map(item => JSON.stringify([
           item.id, name(item), item.boardId, item.repo, ...parents.map(([parent]) => item[parent]),
         ])));
+        const id = String(value);
+        if (key === 'board' && teamBoards) {
+          const tb = teamBoards.find((b) => b.boardId === id);
+          if (tb) {
+            labels[id] = tb.boardName;
+            continue;
+          }
+        }
         const entity = identities.size === 1 ? candidates[0] : undefined;
         if (!entity || !name(entity)) continue;
-        const board = typeof entity.boardId === 'string' ? entries('board').find(item => item.id === entity.boardId) : undefined;
-        const id = String(value);
-        const label = `${name(entity)}${board && name(board) ? ` (board ${name(board)})` : ''}`;
+        let boardTitle = typeof entity.boardId === 'string' ? name(entries('board').find(item => item.id === entity.boardId) ?? {}) : undefined;
+        if (typeof entity.boardId === 'string' && teamBoards) {
+          const tb = teamBoards.find((b) => b.boardId === entity.boardId);
+          if (tb) boardTitle = tb.boardName;
+        }
+        const label = `${name(entity)}${boardTitle ? ` (board ${boardTitle})` : ''}`;
         if (ambiguous.has(id)) continue;
         if (Object.hasOwn(labels, id) && labels[id] !== label) { delete labels[id]; ambiguous.add(id); }
         else labels[id] = label;

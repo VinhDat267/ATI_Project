@@ -2,10 +2,12 @@ import { describe, it, expect, vi } from 'vitest';
 import { TrelloBaseAdapter, StepError } from '../src/index.js';
 
 describe('packages/tool-adapters (Task 4a: Trello Base Adapter & Error Normalization)', () => {
-  it('injects apiKey and token query params and executes successful request', async () => {
+  it('sets Authorization Bearer header and executes successful request without key/token query params', async () => {
     let capturedUrl = '';
-    const mockFetch = vi.fn().mockImplementation(async (url: string | URL) => {
+    let capturedHeaders: any = {};
+    const mockFetch = vi.fn().mockImplementation(async (url: string | URL, init: RequestInit = {}) => {
       capturedUrl = url.toString();
+      capturedHeaders = Object.fromEntries(new Headers(init.headers as any).entries());
       return {
         ok: true,
         status: 200,
@@ -14,14 +16,15 @@ describe('packages/tool-adapters (Task 4a: Trello Base Adapter & Error Normaliza
     });
 
     const adapter = new TrelloBaseAdapter({
-      credentials: { apiKey: 'my-api-key', token: 'my-token' },
+      credentials: { accessToken: 'my-token' },
       fetchFn: mockFetch as any,
     });
 
     const data = await adapter.request('/members/me');
     expect(data).toEqual({ id: 'mem1', fullName: 'Test Member' });
-    expect(capturedUrl).toContain('key=my-api-key');
-    expect(capturedUrl).toContain('token=my-token');
+    expect(capturedHeaders['authorization']).toBe('Bearer my-token');
+    expect(capturedUrl).not.toContain('key=');
+    expect(capturedUrl).not.toContain('token=');
   });
 
   it('normalizes HTTP 401 and 403 to AUTH_ERROR with retryable=false', async () => {
@@ -33,7 +36,7 @@ describe('packages/tool-adapters (Task 4a: Trello Base Adapter & Error Normaliza
     });
 
     const adapter401 = new TrelloBaseAdapter({
-      credentials: { apiKey: 'bad-key', token: 'bad-token' },
+      credentials: { accessToken: 'bad-token' },
       fetchFn: mockFetch401 as any,
     });
 
@@ -51,7 +54,7 @@ describe('packages/tool-adapters (Task 4a: Trello Base Adapter & Error Normaliza
     });
 
     const adapter403 = new TrelloBaseAdapter({
-      credentials: { apiKey: 'key', token: 'token' },
+      credentials: { accessToken: 'token' },
       fetchFn: mockFetch403 as any,
     });
 
@@ -71,7 +74,7 @@ describe('packages/tool-adapters (Task 4a: Trello Base Adapter & Error Normaliza
     });
 
     const adapter = new TrelloBaseAdapter({
-      credentials: { apiKey: 'key', token: 'token' },
+      credentials: { accessToken: 'token' },
       fetchFn: mockFetch as any,
     });
 
@@ -91,7 +94,7 @@ describe('packages/tool-adapters (Task 4a: Trello Base Adapter & Error Normaliza
     });
 
     const adapter = new TrelloBaseAdapter({
-      credentials: { apiKey: 'key', token: 'token' },
+      credentials: { accessToken: 'token' },
       fetchFn: mockFetch as any,
     });
 
@@ -111,7 +114,7 @@ describe('packages/tool-adapters (Task 4a: Trello Base Adapter & Error Normaliza
     });
 
     const adapter500 = new TrelloBaseAdapter({
-      credentials: { apiKey: 'key', token: 'token' },
+      credentials: { accessToken: 'token' },
       fetchFn: mockFetch500 as any,
     });
 
@@ -122,7 +125,7 @@ describe('packages/tool-adapters (Task 4a: Trello Base Adapter & Error Normaliza
 
     const mockFetchNetwork = vi.fn().mockRejectedValue(new Error('fetch failed: ECONNRESET'));
     const adapterNetwork = new TrelloBaseAdapter({
-      credentials: { apiKey: 'key', token: 'token' },
+      credentials: { accessToken: 'token' },
       fetchFn: mockFetchNetwork as any,
     });
 

@@ -79,7 +79,6 @@ it('extends registry + transport data without core changes, through real SQL cre
     await expect(adapter.execute('demo.create_thing', { thingId: 'T1' })).resolves.toEqual({ id: 'T1' });
     // Old JSON shapes inserted directly in SQL stay readable, with no rewrite/migration.
     const old = [
-      { service: 'trello', config: { apiKey: 'old-key', token: 'old-token', allowedScope: { boards: ['B1'] } } },
       { service: 'slack', config: { botToken: 'old-token', allowedScope: { channels: ['C1'] } } },
       { service: 'github', config: { token: 'old-token', allowedScope: { repos: ['owner/repo'] } } },
     ];
@@ -90,7 +89,7 @@ it('extends registry + transport data without core changes, through real SQL cre
       expect((await factory.getAdapterForService(fixture.service)).service).toBe(fixture.service);
       expect((await repo.getCredentials(fixture.service))!.config).toBe(encrypted);
     }
-    expect((await registration.getConfiguredToolCatalog(repo, key)).length).toBe(18);
+    expect((await registration.getConfiguredToolCatalog(repo, key)).length).toBe(9);
   } finally {
     SERVICE_REGISTRY.splice(SERVICE_REGISTRY.indexOf(demo), 1);
     for (const tool of tools) ALL_TOOLS.splice(ALL_TOOLS.indexOf(tool), 1);

@@ -15,6 +15,17 @@ const exceptions = [
   { file: 'apps/chat-web/src/components/LoginPage.tsx', pattern: /^(trello|slack|github)$/, reason: 'Login display strings, permitted by task.' },
   { file: 'apps/chat-web/src/pages/Guide/data.tsx', pattern: /^(?:trello|slack|github|sheets|calendar|notion|telegram|jira)(?:\.[A-Za-z_][\w]*)?$/, reason: 'FE-10 presentation content; every declared tool is checked against the live catalog.' },
   { file: 'apps/chat-web/src/pages/Guide/mysheets-data.tsx', pattern: /^(?:trello|slack|github|sheets|calendar|notion|telegram|jira)(?:\.[A-Za-z_][\w]*)?$/, reason: 'OAUTH-03 presentation content; sample prompts for personal sheets workflows.' },
+  { file: 'apps/chat-api/src/routes/connections/trello.ts', pattern: /^trello(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal Trello OAuth names that service.' },
+  { file: 'apps/chat-api/src/routes/services-routes.ts', pattern: /^trello(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal Trello OAuth names that service.' },
+  { file: 'apps/chat-api/src/services/adapter-factory.ts', pattern: /^trello(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal Trello OAuth names that service.' },
+  { file: 'apps/chat-api/src/services/chat-service.ts', pattern: /^trello(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal Trello OAuth names that service.' },
+  { file: 'apps/chat-api/src/services/registered-services.ts', pattern: /^trello(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal Trello OAuth names that service.' },
+  { file: 'apps/chat-api/src/services/trello/connection-reference.ts', pattern: /^trello(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal Trello OAuth names that service.' },
+  { file: 'apps/chat-api/src/services/trello/token-manager.ts', pattern: /^trello(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal Trello OAuth names that service.' },
+  { file: 'apps/chat-web/src/pages/Cockpit/ReceiptMoment.tsx', pattern: /^trello(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal Trello OAuth names that service.' },
+  { file: 'apps/chat-web/src/pages/Responses/ResponseMoment.tsx', pattern: /^trello(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal Trello OAuth names that service.' },
+  { file: 'apps/chat-web/src/pages/Settings/TrelloConnection.tsx', pattern: /^trello(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal Trello OAuth names that service.' },
+  { file: 'apps/chat-web/src/pages/Settings/useSettings.ts', pattern: /^trello(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal Trello OAuth names that service.' },
 ];
 
 function literals(source: string, ids: string[]) {

@@ -24,6 +24,11 @@ import { GmailConnectionRepo } from './db/repositories/gmail-connection-repo.js'
 import { GmailOAuthClient } from './services/gmail/oauth-client.js';
 import { GmailTokenManager } from './services/gmail/token-manager.js';
 import { createGmailConnectionLookup, createMyCalendarConnectionLookup, createMySheetsConnectionLookup } from './services/gmail/connection-reference.js';
+import { TrelloTokenManager } from './services/trello/token-manager.js';
+import { TrelloOAuthClient } from './services/trello/oauth-client.js';
+import { TrelloTeamRepo } from './db/repositories/trello-team-repo.js';
+import { StepError } from '@wap/tool-adapters';
+import { createTrelloConnectionLookup } from './services/trello/connection-reference.js';
 import {
   AIPlanner,
   createProviderFromEnv,
@@ -207,6 +212,43 @@ async function bootstrap() {
   const gmailAvailable = Boolean(env.GMAIL_ENABLED && env.GMAIL_OAUTH && pool && userRepo);
   const mycalendarAvailable = Boolean(env.MYCALENDAR_ENABLED && env.MYCALENDAR_OAUTH && pool && userRepo);
   const mysheetsAvailable = Boolean(env.MYSHEETS_ENABLED && env.MYSHEETS_OAUTH && pool && userRepo);
+  const trelloAvailable = Boolean(env.TRELLO_OAUTH && pool);
+  const trelloOAuthClient = trelloAvailable ? new TrelloOAuthClient(env.TRELLO_OAUTH!) : undefined;
+  const trelloTeamRepo = pool ? new TrelloTeamRepo(pool) : undefined;
+  const trelloTokens = trelloAvailable ? new TrelloTokenManager({
+    client: trelloOAuthClient!,
+    credentials: credRepo,
+    onReconnectRequired: (userId) => realAdapterFactory.clearPersonal(userId),
+  }) : undefined;
+  const trelloLookup = trelloAvailable && trelloTeamRepo && trelloTokens && trelloOAuthClient
+    ? createTrelloConnectionLookup({
+        credentialRepo: credRepo,
+        teamRepo: trelloTeamRepo,
+        encryptionKey: env.ENCRYPTION_KEY,
+        tokens: trelloTokens,
+        client: trelloOAuthClient,
+      })
+    : undefined;
+  // The canned sandbox plan still creates a Trello card when PostgreSQL or the
+  // OAuth client is absent. board_frontend is the board the browser grounding
+  // fixture stores list_frontend_todo on. A real lookup replaces this stand-in.
+  const sandboxTrelloConnection = env.RUNTIME_MODE === 'sandbox' && !trelloLookup
+    ? async () => ({
+        status: 'connected' as const,
+        teamBoards: [
+          { boardId: 'b1', boardName: 'Sprint Board' },
+          { boardId: 'b2', boardName: 'Bug Tracker' },
+          { boardId: 'board_frontend', boardName: 'Frontend' },
+        ],
+        connection: {
+          credentialId: 'sandbox-trello',
+          memberId: 'sandbox-member',
+          username: 'sandbox',
+          boardIds: ['b1', 'b2', 'board_frontend'],
+        },
+      })
+    : undefined;
+  const trelloConnection = trelloLookup ?? sandboxTrelloConnection;
 
   // 2. Initialize LLM Provider
   let provider: any;
@@ -248,6 +290,11 @@ async function bootstrap() {
       gmailEnabled: gmailAvailable,
       mycalendarEnabled: mycalendarAvailable,
       mysheetsEnabled: mysheetsAvailable,
+      trelloEnabled: trelloAvailable,
+      trelloTeamRepo,
+      trelloOAuthClient,
+      trelloTokens,
+      trelloConnection,
     }),
     serviceRegistry: serviceRegistryForRuntime(gmailAvailable, mycalendarAvailable, mysheetsAvailable),
     gatherSearch,
@@ -291,6 +338,7 @@ async function bootstrap() {
           (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService('mysheets', { userId, phase: 'planning' })
         )
       : undefined,
+    trelloConnection,
     getAdapter: (serviceName, context) => (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(serviceName, context),
     schedules: schedules ? { repo: schedules.service.repo, timeZone: env.APP_TIME_ZONE } : undefined,
   });
@@ -329,10 +377,27 @@ async function bootstrap() {
     createMyCalendarAdapter: mycalendarAvailable ? (input) => runtimeMyCalendarAdapter(env.RUNTIME_MODE, input, env.MYCALENDAR_OAUTH!.apiBaseUrl) : undefined,
     mysheetsTokens,
     createMySheetsAdapter: mysheetsAvailable ? (input) => runtimeMySheetsAdapter(env.RUNTIME_MODE, input, env.MYSHEETS_OAUTH!.apiBaseUrl) : undefined,
+    trelloTokens,
+    trelloTeamRepo,
+    trelloOAuthClient,
+    trelloApiBaseUrl: env.TRELLO_OAUTH?.apiBaseUrl,
+    createTrelloAdapter: env.RUNTIME_MODE === 'sandbox' ? ({ allowedBoardIds }) => {
+      const sandbox = createSandboxAdapter('trello');
+      return {
+        execute: async (tool, args, ctx) => {
+          if (args?.boardId && !allowedBoardIds.includes(String(args.boardId))) {
+            throw new StepError({ category: 'AUTH_ERROR', message: 'Bảng không nằm trong phạm vi được phép.' });
+          }
+          return sandbox.execute(tool, args, ctx);
+        },
+      };
+    } : undefined,
   });
 
   const adapterFactory = createToolRuntimeFactory(env.RUNTIME_MODE,
-    (serviceName, context) => realAdapterFactory.getAdapterForService(serviceName, context),
+    (serviceName, context) => sandboxTrelloConnection && serviceName === 'trello'
+      ? Promise.resolve(createSandboxAdapter('trello'))
+      : realAdapterFactory.getAdapterForService(serviceName, context),
     (serviceName) => createSandboxAdapter(serviceName));
   gatherAdapterFactory = adapterFactory;
 
@@ -391,6 +456,17 @@ async function bootstrap() {
       onConnectionChanged: (userId: string) => realAdapterFactory.clearPersonal(userId),
     } : undefined,
     mysheetsTokens,
+    trello: {
+      oauth: trelloAvailable ? env.TRELLO_OAUTH : undefined,
+      onConnectionChanged: (userId: string) => {
+        realAdapterFactory.clearPersonal(userId);
+        trelloTokens?.clear(userId);
+      },
+      tokens: trelloTokens,
+      teamRepo: trelloTeamRepo,
+    },
+    trelloTokens,
+    trelloTeamRepo,
     chatService,
     sseManager,
     executionService,

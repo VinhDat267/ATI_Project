@@ -12,28 +12,28 @@ const token = generateTokens({ id: 'user-a', email: 'a@example.test', name: 'A' 
 
 describe('service credential and health boundary', () => {
   it('returns the saved allowlist when listing services', async () => {
-    const config = encryptCredentials({ apiKey: 'k', token: 't', allowedScope: { boards: ['board-1', 'board-2'] } }, key);
+    const config = encryptCredentials({ botToken: 'xoxb-k', allowedScope: { channels: ['C1', 'C2'] } }, key);
     const app = createApp({ jwtSecret: secret, credentialRepo: {
-      getCredentials: async (service: string) => service === 'trello' ? { config } : null,
+      getCredentials: async (service: string) => service === 'slack' ? { config } : null,
     } as any, encryptionKey: key });
     const response = await request(app).get('/api/services').set('Authorization', `Bearer ${token}`);
     expect(response.status).toBe(200);
-    expect(response.body.services.find((service: any) => service.id === 'trello').allowedScope).toEqual(['board-1', 'board-2']);
+    expect(response.body.services.find((service: any) => service.id === 'slack').allowedScope).toEqual(['C1', 'C2']);
   });
   it('encrypts credentials and stores allowed scope inside encrypted team config', async () => {
-    const query = vi.fn().mockResolvedValue({ rows: [{ id: 'cred', service: 'trello' }], rowCount: 1 });
+    const query = vi.fn().mockResolvedValue({ rows: [{ id: 'cred', service: 'slack' }], rowCount: 1 });
     const repo = new CredentialRepo({ query, connect: async () => ({ query, release: () => undefined }) } as any);
     const app = createApp({ jwtSecret: secret, credentialRepo: repo, encryptionKey: key, serviceAdminUserIds: ['user-a'] });
-    const response = await request(app).post('/api/services/trello/credentials')
+    const response = await request(app).post('/api/services/slack/credentials')
       .set('Authorization', `Bearer ${token}`)
-      .send({ credentials: { apiKey: 'api-secret', token: 'token-secret' }, allowedScope: ['board-1'] });
+      .send({ credentials: { botToken: 'xoxb-secret' }, allowedScope: ['C1'] });
     expect(response.status).toBe(200);
     const insert = query.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO service_credentials'));
     expect(insert).toBeDefined();
     expect(insert![1][1]).toBeNull();
     expect(insert![1][2]).toMatch(/^v1:/);
-    expect(JSON.stringify(insert![1])).not.toContain('api-secret');
-    expect(decryptCredentials(insert![1][2], key)).toEqual({ apiKey: 'api-secret', token: 'token-secret', allowedScope: { boards: ['board-1'] } });
+    expect(JSON.stringify(insert![1])).not.toContain('xoxb-secret');
+    expect(decryptCredentials(insert![1][2], key)).toEqual({ botToken: 'xoxb-secret', allowedScope: { channels: ['C1'] } });
   });
 
   it('does not let any authenticated team member overwrite shared credentials', async () => {

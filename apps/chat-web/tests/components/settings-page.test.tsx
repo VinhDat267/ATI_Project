@@ -12,12 +12,13 @@ describe('Settings page and drawer semantics (former page/modal cases)', () => {
     const response = new Promise<Response>(resolve => { finish = resolve; });
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
       if (url === '/api/services') return new Response(JSON.stringify({ services: [slack], canConfigure: true }));
+      if (url === '/api/connections/trello') return new Response(JSON.stringify({ status: 'not_connected', boards: [] }));
       expect(url).toBe('/api/services/slack/credentials'); expect(init?.method).toBe('POST');
       expect(JSON.parse(init?.body as string)).toEqual({ credentials: { botToken: 'submitted' }, allowedScope: ['C01'] }); return response;
     });
     vi.stubGlobal('fetch', fetchMock); render(<SettingsPage {...props} />); await open();
     const credential = screen.getByLabelText('Bot Token'); fireEvent.change(credential, { target: { value: 'submitted' } }); fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2)); fireEvent.change(credential, { target: { value: 'newer draft' } });
+    await waitFor(() => expect(fetchMock.mock.calls.some((call) => call[0] === '/api/services/slack/credentials')).toBe(true)); fireEvent.change(credential, { target: { value: 'newer draft' } });
     await act(async () => { finish(new Response(JSON.stringify(success ? { success: true, message: 'Saved' } : { error: 'Save denied' }), { status: success ? 200 : 403 })); });
     expect(await screen.findByText(success ? /Saved/ : 'Save denied')).toBeInTheDocument(); expect(credential).toHaveValue('newer draft');
   });
@@ -44,6 +45,7 @@ describe('Settings page and drawer semantics (former page/modal cases)', () => {
     let configured = false;
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       if (url === '/api/services') return new Response(JSON.stringify({ services: [{ ...slack, configured }], canConfigure: true }));
+      if (url === '/api/connections/trello') return new Response(JSON.stringify({ status: 'not_connected', boards: [] }));
       configured = true; return new Response(JSON.stringify({ success: true, message: 'Saved' }));
     }));
     render(<SettingsPage {...props} />); const old = await screen.findByRole('button', { name: /Slack —/ }); fireEvent.click(old);

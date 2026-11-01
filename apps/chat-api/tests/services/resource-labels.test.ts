@@ -46,11 +46,17 @@ it('emits and saves only grounded x-resource labels outside the executable JSON 
   const stored: any[] = [];
   const plans: any[] = [];
   const plan = { kind: 'plan', thinking: '', summary: 'Tạo thẻ', warnings: [], steps: [{ id: 's1', tool: 'trello.create_card', description: 'Tạo thẻ', dependsOn: [], args: { listId: 'L1', title: 'B1' } }, { id: 's2', tool: 'slack.send_message', description: 'Gửi', dependsOn: [], args: { channel: 'not-observed', text: 'B1' } }] };
+  const bound = { ...plan, connections: { trello: { credentialId: 'cred-trello', memberId: 'member-1', username: 'owner', boardIds: ['B1'] } } };
   const service = new ChatService({
     msgRepo: { createMessage: async (_c: string, role: string, content: string, metadata: any) => { const row = { id: String(stored.length), role, content, metadata }; stored.push(row); return row; }, listMessages: async () => stored } as any,
     planRepo: { createPlan: async (data: any) => { plans.push(data); return { id: 'p1' }; } } as any,
     planner: { processMessage: async ({ memory }: any) => { memory.setEntity('__observed', { board: [{ id: 'B1', name: 'Frontend' }], list: [{ id: 'L1', name: 'Cần làm', boardId: 'B1' }], channel: [{ id: 'C1', name: 'general' }] }); return plan; } } as any,
     eventEmitter: { emit: (event, payload) => events.emit(event, payload) },
+    trelloConnection: async () => ({
+      status: 'connected',
+      teamBoards: [{ boardId: 'B1', boardName: 'Frontend' }],
+      connection: { credentialId: 'cred-trello', memberId: 'member-1', username: 'owner', boardIds: ['B1'] },
+    }),
   });
   const preview = new Promise<any>(resolve => events.once('plan_preview', resolve));
   await service.handleUserMessage({ conversationId: 'c1', userId: 'u1', content: 'Tạo thẻ', requestId: 'request-fe03' });
@@ -61,7 +67,7 @@ it('emits and saves only grounded x-resource labels outside the executable JSON 
   expect(stored[0].metadata).toEqual({ requestId: 'request-fe03' });
   expect(stored.find(row => row.metadata?.type === 'plan').metadata).toMatchObject({ replyToMessageId: stored[0].id, requestId: 'request-fe03' });
   expect(event).toMatchObject({ replyToMessageId: stored[0].id, requestId: 'request-fe03' });
-  expect(plans[0].planJson).toEqual(plan);
-  expect(plans[0].planText).toBe(JSON.stringify(plan));
-  expect(plans[0].planHash).toBe(createHash('sha256').update(JSON.stringify(plan)).digest('hex'));
+  expect(plans[0].planJson).toEqual(bound);
+  expect(plans[0].planText).toBe(JSON.stringify(bound));
+  expect(plans[0].planHash).toBe(createHash('sha256').update(JSON.stringify(bound)).digest('hex'));
 });

@@ -60,6 +60,12 @@ export interface ActivePlan {
       email: string;
       allowedSpreadsheets: string[] | PersonalSpreadsheetItem[];
     };
+    trello?: {
+      credentialId: string;
+      memberId: string;
+      username: string;
+      boardIds: string[];
+    };
   };
   resourceLabels?: Record<string, string>;
   id?: string;
@@ -153,6 +159,7 @@ export interface ServiceInfo {
   connection?: 'shared' | 'personal';
   personalStatus?: PersonalStatus;
   email?: string;
+  username?: string;
   connectedAt?: string;
   selectedCalendars?: PersonalCalendarSummary[];
   selectedSpreadsheets?: PersonalSpreadsheetItem[];

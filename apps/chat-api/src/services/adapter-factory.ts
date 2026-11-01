@@ -2,6 +2,7 @@ import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import {
   decryptCredentials,
   StepError,
+  TrelloAdapter,
   type GmailAccessTokenProvider,
 } from '@wap/tool-adapters';
 import type { AllowedScope, PlanConnections } from '@wap/tool-schemas';
@@ -29,6 +30,11 @@ export interface AdapterFactoryOptions {
   /** Builds the MySheets adapter of one member with explicit scope allowlist. */
   createMySheetsAdapter?: (input: { userId: string; tokens: GmailAccessTokenProvider; allowedScope: AllowedScope }) => AdapterExecutor;
   mysheetsTokens?: GmailTokenManager;
+  createTrelloAdapter?: (input: { userId: string; accessToken: string; allowedBoardIds: string[] }) => AdapterExecutor;
+  trelloTokens?: any;
+  trelloTeamRepo?: any;
+  trelloOAuthClient?: any;
+  trelloApiBaseUrl?: string;
 }
 
 const gmailError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
@@ -36,6 +42,8 @@ const gmailError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
 const mycalendarError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
   new StepError({ category, message, retryable: false });
 const mysheetsError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
+  new StepError({ category, message, retryable: false });
+const trelloError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
   new StepError({ category, message, retryable: false });
 
 export class AdapterFactory {
@@ -53,20 +61,23 @@ export class AdapterFactory {
     this.adapterCache.delete(serviceName);
   }
 
-  /** Forget the Gmail, MyCalendar & MySheets adapters and access tokens of one member (connect, disconnect, reconnect_required). */
+  /** Forget the Gmail, MyCalendar, MySheets & Trello adapters and access tokens of one member (connect, disconnect, reconnect_required). */
   clearPersonal(userId: string): void {
     this.personalCache.delete(`gmail:${userId}`);
     this.personalCache.delete(`mycalendar:${userId}`);
     this.personalCache.delete(`mysheets:${userId}`);
+    this.personalCache.delete(`trello:${userId}`);
     this.options.gmailTokens?.clear(userId);
     this.options.mycalendarTokens?.clear(userId);
     this.options.mysheetsTokens?.clear(userId);
+    this.options.trelloTokens?.clear?.(userId);
   }
 
   async getAdapterForService(serviceName: string, context?: AdapterContext): Promise<any> {
     if (serviceName === 'gmail') return this.gmailAdapter(context);
     if (serviceName === 'mycalendar') return this.mycalendarAdapter(context);
     if (serviceName === 'mysheets') return this.mysheetsAdapter(context);
+    if (serviceName === 'trello') return this.trelloAdapter(context);
     const cached = this.adapterCache.get(serviceName);
     if (cached) return cached;
 
@@ -232,5 +243,92 @@ export class AdapterFactory {
     });
     this.personalCache.set(key, { credentialId: record.id, adapter, scopeKey });
     return adapter;
+  }
+
+  /** Only the member's own active connection; at execution, credentialId match, team scope match and live membership match. */
+  private async trelloAdapter(context?: AdapterContext): Promise<AdapterExecutor> {
+    const userId = context?.userId;
+    if (!userId) throw trelloError('AUTH_ERROR', 'Trello cá nhân chỉ dùng được với kết nối của chính người dùng.');
+    const record = await this.credentialRepo.getPersonalCredentials('trello', userId);
+    if (!record || record.status !== 'active') throw trelloError('AUTH_ERROR', 'Trello chưa được kết nối hoặc cần kết nối lại.');
+
+    if (context?.phase === 'execution') {
+      const previewed = context.connections?.trello;
+      if (!previewed || record.id !== previewed.credentialId) {
+        throw trelloError('AUTH_ERROR', 'Kết nối Trello đã thay đổi, hãy lập lại kế hoạch.');
+      }
+    }
+
+    const scope = this.options.trelloTeamRepo ? await this.options.trelloTeamRepo.get() : null;
+    if (!scope || !scope.boards || scope.boards.length === 0) {
+      throw trelloError('AUTH_ERROR', 'Quản trị chưa chọn bảng Trello.');
+    }
+
+    const currentTeamBoardIds = new Set<string>(scope.boards.map((b: any) => String(b.boardId)));
+    if (context?.phase === 'execution') {
+      const previewed = context.connections?.trello;
+      if (previewed) {
+        const inTeamScope = previewed.boardIds.filter((id: string) => currentTeamBoardIds.has(id));
+        if (inTeamScope.length === 0) {
+          throw trelloError('AUTH_ERROR', 'Bảng Trello trong kế hoạch đã bị bỏ khỏi phạm vi nhóm.');
+        }
+      }
+    }
+
+    let refreshToken: string | undefined;
+    try {
+      const config = decryptCredentials(record.config, this.encryptionKey);
+      refreshToken = config.refreshToken;
+    } catch {
+      try {
+        const parsed = JSON.parse(record.config);
+        refreshToken = parsed.refreshToken;
+      } catch {
+        throw trelloError('AUTH_ERROR', 'Trello cần được kết nối lại.');
+      }
+    }
+
+    if (!refreshToken) {
+      throw trelloError('AUTH_ERROR', 'Trello cần được kết nối lại.');
+    }
+
+    if (!this.options.trelloTokens) {
+      throw trelloError('VALIDATION', 'Trello chưa sẵn sàng trên máy chủ này.');
+    }
+
+    const provider = this.options.trelloTokens.forConnection(userId, record.id, refreshToken);
+    const accessToken = await provider.getAccessToken();
+
+    let liveMemberBoardIds: Set<string> = currentTeamBoardIds;
+    if (this.options.trelloOAuthClient) {
+      const callerBoards = await this.options.trelloOAuthClient.boards(
+        accessToken,
+        scope.workspaceId,
+        AbortSignal.timeout(10_000)
+      );
+      liveMemberBoardIds = new Set<string>(callerBoards.filter((b: any) => b.member === true).map((b: any) => String(b.id)));
+    }
+
+    const previewedBoardIds: string[] = (context?.connections?.trello?.boardIds ?? Array.from(currentTeamBoardIds)) as string[];
+    const allowedBoardIds: string[] = previewedBoardIds.filter(
+      (id: string) => currentTeamBoardIds.has(id) && liveMemberBoardIds.has(id)
+    );
+
+    if (allowedBoardIds.length === 0) {
+      if (context?.phase === 'execution') {
+        throw trelloError('AUTH_ERROR', 'Bạn không còn là thành viên của bảng Trello trong kế hoạch.');
+      }
+      throw trelloError('AUTH_ERROR', 'Không có bảng Trello nào hợp lệ để thực thi.');
+    }
+
+    if (this.options.createTrelloAdapter) {
+      return this.options.createTrelloAdapter({ userId, accessToken, allowedBoardIds });
+    }
+
+    return new TrelloAdapter({
+      credentials: { accessToken },
+      allowedBoardIds,
+      baseUrl: this.options.trelloApiBaseUrl,
+    });
   }
 }

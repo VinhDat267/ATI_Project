@@ -23,7 +23,7 @@ export function useSettings(user: User | null) {
   const personal = services.find(s => s.id === 'gmail' && s.connection === 'personal');
   const personalMyCalendar = services.find(s => s.id === 'mycalendar' && s.connection === 'personal');
   const personalMySheets = services.find(s => s.id === 'mysheets' && s.connection === 'personal');
-  const list = services.filter(s => s.connection !== 'personal').map(serviceView);
+  const list = services.filter(s => s.connection !== 'personal' && s.id !== 'trello').map(serviceView);
   const active = list.find(s => s.id === selected);
   const draft = active ? drafts[active.id] ?? { credentials: {}, scopes: active.allowedScope ?? [], newScope: '' } : null;
   const updateDraft = (id: string, update: (current: Draft) => Draft) => setDrafts(current => ({ ...current, [id]: update(current[id] ?? { credentials: {}, scopes: services.find(s => s.id === id)?.allowedScope ?? [], newScope: '' }) }));
