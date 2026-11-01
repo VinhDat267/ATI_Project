@@ -10,8 +10,8 @@ describe('ANS-01 persisted answer and history boundary', () => {
   let db: Awaited<ReturnType<typeof createMigratedSchema>>;
   beforeAll(async () => { db = await createMigratedSchema('ans01'); });
   afterAll(async () => { await db?.close(); });
-  it('validates the on/off flag, defaulting to off', () => {
-    expect((validateEnv({}) as any).PLANNER_READ_ANSWERS).toBe(false);
+  it('validates the on/off flag and preserves explicit off', () => {
+    expect((validateEnv({ PLANNER_READ_ANSWERS: 'off' }) as any).PLANNER_READ_ANSWERS).toBe(false);
     expect((validateEnv({ PLANNER_READ_ANSWERS: 'on' }) as any).PLANNER_READ_ANSWERS).toBe(true);
     expect(() => validateEnv({ PLANNER_READ_ANSWERS: 'maybe' })).toThrow(/PLANNER_READ_ANSWERS/);
   });

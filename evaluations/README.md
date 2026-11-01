@@ -405,6 +405,43 @@ source `91cd5c1`. Requested `ag/gemini-3.8-flash`, served
 
 ### GMAIL-04: Gmail and answer sets
 
+#### Gmail setup for live acceptance
+
+Use a separate Google Cloud project for Gmail, different from sign-in, personal
+Calendar and personal Sheets. Enable Gmail API; add `gmail.modify` to the Testing
+consent screen and add the test Google account as a test user. Create a Web OAuth
+client with the web origin's exact `/connections/gmail/callback` redirect URI.
+Set `GMAIL_OAUTH_CLIENT_ID`, `GMAIL_OAUTH_CLIENT_SECRET`,
+`GMAIL_OAUTH_REDIRECT_URI` and `GMAIL_OAUTH_PROJECT_ID` in the ignored `.env`.
+Never put client secrets, tokens or real message contents in reports or commits.
+
+`GMAIL_ENABLED` unset (or blank) enables Gmail only when the three OAuth client
+settings are present. In sandbox, all four fake endpoint overrides must also be
+present; the browser runner supplies them. Explicit `off` disables Gmail even
+with complete settings. Explicit `on` fails live startup when a client setting
+is missing. Without Gmail configuration, live still starts with Gmail disabled.
+Malformed complete configuration is a startup error rather than being ignored.
+The app also requires PostgreSQL and each member's own completed connection.
+
+`PLANNER_READ_ANSWERS` defaults to `on` independently of Gmail. Set it to `off`
+to retain the read-only clarification policy. The browser runner and existing
+measurement campaigns explicitly choose their intended flags.
+
+Follow GMAIL-04 step 5 for acceptance: connection/revocation/reconnection and
+Google sign-in; each Gmail write tool with a reviewed plan and readback; then a
+read-only request for each connected service. Include OAUTH-01's connect-from-chat
+and return-to-conversation flow. The operator approves every real write in the
+app; only send to the group's test addresses. Keep raw evidence under ignored
+`docs/ai-evidence/GMAIL-LIVE/` and commit only a redacted manifest and aggregate
+results. Test Google projects may require reconnection before the defense;
+reconnect within seven days of the demo, as required by the task card.
+
+These defaults are prepared for rollout. Merge the enabling PR only after the
+task's real-provider acceptance and the leader's flag decision are recorded;
+offline scores and fake Google tests do not establish live acceptance.
+
+#### Measurement sets
+
 Two sets measure Gmail and the `answer` response kind on their own (Gmail spec
 4.6 and 5.5). The four older sets keep `ALL_TOOLS` and their catalog hash.
 

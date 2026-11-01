@@ -652,14 +652,35 @@ export class ChatService {
     if (lastMemory?.metadata?.state && typeof lastMemory.metadata.state === 'object') {
       memory.fromJSON(lastMemory.metadata.state);
     }
-    const plannerResponse: PlannerResponse = await this.planner.processMessage({
-      userMessage: content,
-      history,
-      memory,
-      actor: { userId },
-      onGatherEvent: (event) => this.eventEmitter.emit('gather_progress', { conversationId, ...event }),
-      ...(schedule ? { schedule: { services: schedule.services } } : {}),
-    });
+    let gmailLookupAttempted = false;
+    let plannerResponse: PlannerResponse | undefined;
+    let plannerFailure: unknown;
+    try {
+      plannerResponse = await this.planner.processMessage({
+        userMessage: content,
+        history,
+        memory,
+        actor: { userId },
+        onGatherEvent: (event) => {
+          if (event.status === 'started' && event.tool.startsWith('gmail.')) gmailLookupAttempted = true;
+          this.eventEmitter.emit('gather_progress', { conversationId, ...event });
+        },
+        ...(schedule ? { schedule: { services: schedule.services } } : {}),
+      });
+    } catch (error) {
+      plannerFailure = error;
+    }
+    // A lookup can revoke this connection while the model is still responding.
+    // Read the member's current connection instead of trusting the model's next
+    // answer/error. A DB lookup failure does not prove that Gmail was revoked.
+    if (gmailLookupAttempted && this.gmailConnection && await this.gmailConnection(userId).catch(() => undefined) === null) {
+      plannerResponse = {
+        kind: 'refusal', reason: 'Gmail chưa được kết nối hoặc cần kết nối lại.',
+        suggestion: 'Hãy kết nối lại Gmail ở mục "Của riêng bạn", rồi gửi lại yêu cầu.',
+        unavailableServices: [{ id: 'gmail', name: 'Gmail' }],
+      };
+    }
+    if (!plannerResponse) throw plannerFailure;
     await this.msgRepo.createMessage(conversationId, 'system', '', { type: 'working_memory', state: memory.toJSON() });
     const prepared = await this.prepareResponse({ conversationId, userId, correlation, schedule }, plannerResponse, memory,
       [...history.filter(m => m.role === 'user').map(m => m.content), content]);
