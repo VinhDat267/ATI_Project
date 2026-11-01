@@ -102,7 +102,7 @@ export function Cockpit(props: Props) {
       const stored = sessionStorage.getItem('ati_prefill_prompt');
       if (stored) {
         sessionStorage.removeItem('ati_prefill_prompt');
-        setDraft(stored);
+        setDraft(current => current || stored);
         input.current?.focus();
       }
     } catch {

@@ -8,6 +8,9 @@ import { apiClient } from '../../services/api-client';
 import { userErrorMessage } from '../../services/user-error';
 import css from './page.css?inline';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
+import { WorkflowFlowCanvas } from '../../components/WorkflowFlowCanvas';
+import landingPlaybooks from '../../assets/landing-playbooks.json';
+import type { PlanStep, StepState } from '../../types';
 type AuthMode = 'login' | 'signup';
 type AuthView = 'form' | 'google' | 'success' | 'forgot';
 type Success = { title: string; desc: ReactNode; isLogin: boolean };
@@ -93,12 +96,17 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
   usePrototypePage(meta);
   const model = useRef({ moment: 1, isTyping: false });
   const [moment, setMoment] = useState(1), [switched, setSwitched] = useState(false);
+  const [activePlaybookIdx, setActivePlaybookIdx] = useState(0);
+  const activePlaybook = landingPlaybooks.playbooks[activePlaybookIdx] ?? landingPlaybooks.playbooks[0];
   const [k2Found, setK2Found] = useState([false, false, false, false]);
   const [typed, setTyped] = useState(SAMPLE_SENTENCE);
-  const authModeView = initialMode === 'signup' ? 'signup' : 'login';
+  const [localAuthMode, setLocalAuthMode] = useState<AuthMode | null>(null);
+  useEffect(() => { setLocalAuthMode(null); }, [initialMode]);
+  const effectiveMode = initialMode ?? localAuthMode;
+  const authModeView = effectiveMode === 'signup' ? 'signup' : 'login';
   const [authView, setAuthView] = useState<AuthView>(initialMode === 'forgot' ? 'forgot' : 'form');
   const [googleModalOpen, setGoogleModalOpen] = useState(false);
-  const authOpen = Boolean(initialMode) || googleModalOpen;
+  const authOpen = Boolean(effectiveMode) || googleModalOpen;
   const authOverlay = authOpen ? OPEN : CLOSED;
   const [forgotSent, setForgotSent] = useState(false), [success, setSuccess] = useState<Success | null>(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
@@ -124,10 +132,10 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
     if (authOpen && !editingField) {
       if (authView === 'google') authCardRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
       else if (authView === 'success') successCloseRef.current?.focus();
-      else (authView === 'forgot' ? forgotEmailRef.current : initialMode === 'signup' ? signupNameRef.current : loginEmailRef.current)?.focus();
+      else (authView === 'forgot' ? forgotEmailRef.current : effectiveMode === 'signup' ? signupNameRef.current : loginEmailRef.current)?.focus();
     }
     return () => { lockScroll(false); };
-  }, [authOpen, initialMode, authView, authConfig?.signupEnabled]);
+  }, [authOpen, effectiveMode, authView, authConfig?.signupEnabled]);
   const clearK2Timers = () => {
     k2Timers.current.forEach(window.clearTimeout);
     k2Timers.current = [];
@@ -195,10 +203,10 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
   }, []);
 
 
-  const changeMode = (mode: AuthMode) => { navigate(mode === 'signup' ? '/signup' : '/login'); };
+  const changeMode = (mode: AuthMode) => { setLocalAuthMode(mode); setAuthView('form'); navigate(mode === 'signup' ? '/signup' : '/login'); };
   const closeAuthModal = () => {
     generation.current++; requestModalFocusReturn();
-    setGoogleModalOpen(false); setAuthView('form'); setBusy(false); navigate('/');
+    setLocalAuthMode(null); setGoogleModalOpen(false); setAuthView('form'); setBusy(false); navigate('/');
   };
   const triggerGoogleAuthFlow = async () => {
     if (pending.current || !authConfig?.googleEnabled) return;
@@ -234,6 +242,16 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
     event.preventDefault();
     if (!authOpen && event.currentTarget instanceof HTMLElement) rememberModalOpener(event.currentTarget);
     if (mode === 'google') void triggerGoogleAuthFlow(); else changeMode(mode);
+  };
+  const tryPlaybookPrompt = (promptText: string) => (event: ReactMouseEvent<HTMLElement>) => {
+    event.preventDefault();
+    try {
+      sessionStorage.setItem('ati_prefill_prompt', promptText);
+    } catch {
+      // ignore storage errors
+    }
+    if (!authOpen) rememberModalOpener(event.currentTarget);
+    changeMode('signup');
   };
   const backdrop = (ref: React.RefObject<HTMLDivElement | null>, close: () => void) => (event: ReactMouseEvent) => { if (event.target === ref.current) close(); };
   useEffect(() => {
@@ -334,16 +352,93 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                 {" Đăng nhập "}
               </a>
             </div>
-            {/* Ghi chú nhỏ dưới nút */}
-            <p className="text-xs text-[#9CA3AF] font-normal mb-12 flex items-center justify-center gap-1.5 flex-wrap">
+            {/* Ghi chú nhỏ dưới nút + Dải huy hiệu tín nhiệm */}
+            <p className="text-xs text-[#6B7280] font-normal mb-3 flex items-center justify-center gap-1.5 flex-wrap">
               <span>
-                Tài khoản mới cần quản trị viên duyệt.
+                Tài khoản mới được quản trị viên phê duyệt để bảo vệ không gian làm việc của nhóm.
               </span>
-              <span className="text-[#D1D5DB]">
-                ·
-              </span>
-
             </p>
+            <div
+              data-testid="landing-hero-trust-pills"
+              className="inline-flex flex-wrap items-center justify-center gap-2 sm:gap-3 px-4 py-1.5 rounded-full bg-white border border-[#E7E7E2] text-[11px] sm:text-xs font-medium text-[#111827] shadow-sm mb-10"
+            >
+              <span className="inline-flex items-center gap-1 text-[#16A34A] font-semibold">✓ Kết nối OAuth 1-Click</span>
+              <span className="text-[#D1D5DB]">·</span>
+              <span className="inline-flex items-center gap-1 text-[#111827]">✓ Khóa phạm vi an toàn</span>
+              <span className="text-[#D1D5DB]">·</span>
+              <span className="inline-flex items-center gap-1 text-[#FF5701] font-semibold">✓ Duyệt trước khi ghi</span>
+            </div>
+            {/* Khung trình diễn Make.com Orbital Flow trực tiếp trên Hero */}
+            <div
+              data-testid="landing-hero-orbital-preview"
+              className="max-w-4xl mx-auto mb-10 text-left bg-white rounded-3xl border border-[#E7E7E2] shadow-soft-card p-4 sm:p-6 overflow-hidden"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#F0F0EB]">
+                <div>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[#FF5701]">
+                    Sơ đồ luồng liên dịch vụ trực quan
+                  </span>
+                  <h2 className="font-display text-lg sm:text-xl font-semibold text-[#111827]">
+                    Chọn kịch bản mẫu để xem cách ATI chia luồng &amp; truyền dữ liệu
+                  </h2>
+                </div>
+                <div
+                  data-testid="landing-hero-playbook-tabs"
+                  role="tablist"
+                  aria-label="Kịch bản mẫu liên dịch vụ"
+                  className="flex flex-wrap gap-1.5"
+                >
+                  {landingPlaybooks.playbooks.map((pb, idx) => {
+                    const isSelected = idx === activePlaybookIdx;
+                    return (
+                      <button
+                        key={pb.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={isSelected ? 'true' : 'false'}
+                        data-testid={`landing-playbook-tab-${idx}`}
+                        onClick={() => setActivePlaybookIdx(idx)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border ${
+                          isSelected
+                            ? 'bg-[#111827] text-white border-[#111827] shadow-sm'
+                            : 'bg-[#F8F8F6] text-[#4B5563] border-[#E7E7E2] hover:text-[#111827] hover:bg-white'
+                        }`}
+                      >
+                        {pb.tabTitle}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="py-3.5 px-4 my-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider">
+                      Câu lệnh tiếng Việt:
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-white border border-[#E7E7E2] text-[11px] font-medium text-[#111827]">
+                      {activePlaybook.flowSummary}
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-[#111827] font-medium leading-relaxed">
+                    “{activePlaybook.prompt}”
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  data-testid="landing-try-playbook-btn"
+                  onClick={tryPlaybookPrompt(activePlaybook.prompt)}
+                  className="flex-shrink-0 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#FF5701] hover:bg-[#E04C00] text-white text-xs font-semibold shadow-sm transition-all"
+                >
+                  <span>Dùng thử kịch bản này →</span>
+                </button>
+              </div>
+              <WorkflowFlowCanvas
+                steps={activePlaybook.steps as unknown as PlanStep[]}
+                resourceLabels={activePlaybook.resourceLabels as unknown as Record<string, string>}
+                mode="preview"
+              />
+            </div>
             {' '}
             {/* Gợi ý cuộn xuống tinh tế */}
             {' '}
@@ -527,9 +622,9 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                           </div>
                         </div>
                         {/* Dải dịch vụ đã kết nối */}
-                        <div className="v3-space-y-2">
+                        <div className="v3-space-y-3">
                           <p className="text-xs text-[#6B7280] font-medium">
-                            Đã kết nối với không gian của nhóm:
+                            Đã kết nối (OAuth 1-Click cá nhân &amp; Không gian nhóm):
                           </p>
                           <div className="flex flex-wrap gap-2">
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#F8F8F6] border border-[#E7E7E2] text-xs font-medium text-[#111827]">
@@ -548,6 +643,24 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                               <span className="w-2 h-2 rounded-full bg-[#0F9D58]" />
                               {" Google Sheets"}
                             </span>
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#F8F8F6] border border-[#E7E7E2] text-xs font-medium text-[#111827]">
+                              <span className="w-2 h-2 rounded-full bg-[#1A73E8]" />
+                              {" Google Calendar"}
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#F8F8F6] border border-[#E7E7E2] text-xs font-medium text-[#111827]">
+                              <span className="w-2 h-2 rounded-full bg-[#229ED9]" />
+                              {" Telegram"}
+                            </span>
+                            {gmailEnabled && (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#F8F8F6] border border-[#E7E7E2] text-xs font-medium text-[#111827]">
+                                <span className="w-2 h-2 rounded-full bg-[#EA4335]" />
+                                {" Gmail"}
+                              </span>
+                            )}
+                          </div>
+                          <div className="p-2.5 rounded-xl bg-[#FFF9F6] border border-[#FF5701]/20 text-[11px] text-[#4B5563]">
+                            <span className="font-semibold text-[#FF5701]">Gợi ý kịch bản liên dịch vụ (A → B → C): </span>
+                            <span>Trello → GitHub → Google Sheets → Slack · Google Calendar → Google Sheets → Telegram</span>
                           </div>
                         </div>
                       </div>
@@ -697,6 +810,9 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                             Khoảnh khắc 3 / 5
                           </span>
                         </div>
+                        <div data-testid="landing-stage3-orbital-canvas" className="mb-3">
+                          <WorkflowFlowCanvas steps={landingPlaybooks.stage3Steps as unknown as PlanStep[]} mode="preview" compact />
+                        </div>
                         {/* 4 thẻ việc xem trước */}
                         <div className="v3-space-y-2.5 mb-4">
                           {/* Thẻ 1: Trello */}
@@ -722,7 +838,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                           </div>
                           {/* Thẻ 2: GitHub */}
                           <div className="p-2.5 rounded-xl border border-[#E7E7E2] bg-[#FAFAF8] text-xs flex items-center justify-between">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className="px-2 py-0.5 rounded bg-[#24292E]/10 text-[#24292E] font-semibold">
                                 GitHub
                               </span>
@@ -733,27 +849,49 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                                 </strong>
                                 {" có link card"}
                               </span>
+                              <span className="px-2 py-0.5 rounded-full bg-[#FFF6EE] border border-[#FFDFC6] text-[10px] font-semibold text-[#FF5701]">
+                                Dữ liệu từ Việc 1 → Việc 2
+                              </span>
                             </div>
                             <span className="text-[11px] text-[#6B7280]">
                               Xem trước
                             </span>
                           </div>
-                          {/* Thẻ 3: Google Sheets */}
-                          <div className="p-2.5 rounded-xl border border-[#E7E7E2] bg-[#FAFAF8] text-xs flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="px-2 py-0.5 rounded bg-[#0F9D58]/10 text-[#0F9D58] font-semibold">
-                                Sheets
-                              </span>
-                              <span className="text-[#111827]">
-                                {"Thêm một dòng vào trang "}
-                                <strong className="font-medium">
-                                  Tasks
-                                </strong>
+                          {/* Thẻ 3: Google Sheets + Lưới bảng tính nằm ngang */}
+                          <div className="p-3 rounded-xl border border-[#0F9D58]/30 bg-[#F0FDF4]/50 text-xs v3-space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="px-2 py-0.5 rounded bg-[#0F9D58]/10 text-[#0F9D58] font-semibold">
+                                  Sheets
+                                </span>
+                                <span className="text-[#111827]">
+                                  {"Thêm một dòng vào trang "}
+                                  <strong className="font-medium">
+                                    Tasks
+                                  </strong>
+                                </span>
+                              </div>
+                              <span className="text-[11px] font-medium text-[#0F9D58]">
+                                Xem trước lưới dòng
                               </span>
                             </div>
-                            <span className="text-[11px] text-[#6B7280]">
-                              Xem trước
-                            </span>
+                            <div
+                              data-testid="landing-stage3-sheets-grid"
+                              className="rounded-lg border border-emerald-200 bg-white overflow-hidden"
+                            >
+                              <div className="grid grid-cols-4 bg-emerald-50/80 border-b border-emerald-200 text-[10px] font-semibold text-emerald-900">
+                                <div className="px-2 py-1 border-r border-emerald-100">Cột A</div>
+                                <div className="px-2 py-1 border-r border-emerald-100">Cột B</div>
+                                <div className="px-2 py-1 border-r border-emerald-100">Cột C</div>
+                                <div className="px-2 py-1">Cột D</div>
+                              </div>
+                              <div className="grid grid-cols-4 text-[11px] text-[#111827]">
+                                <div className="px-2 py-1.5 border-r border-neutral-100 truncate">29/09/2026</div>
+                                <div className="px-2 py-1.5 border-r border-neutral-100 truncate font-medium">Lỗi thanh toán #42</div>
+                                <div className="px-2 py-1.5 border-r border-neutral-100 truncate text-[#DC2626] font-semibold">Cao</div>
+                                <div className="px-2 py-1.5 truncate text-[#0F9D58]">Đã mở Issue #42</div>
+                              </div>
+                            </div>
                           </div>
                           {/* Thẻ 4: Slack (mở phần xem trước nguyên văn tin) */}
                           <div className="p-3 rounded-xl border border-[#FF5701]/30 bg-[#FFF9F6] text-xs">
@@ -813,6 +951,14 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                           <span className="text-xs text-[#9CA3AF]">
                             Khoảnh khắc 4 / 5
                           </span>
+                        </div>
+                        <div data-testid="landing-stage4-orbital-canvas" className="mb-3">
+                          <WorkflowFlowCanvas
+                            steps={landingPlaybooks.stage4Steps as unknown as PlanStep[]}
+                            stepStatuses={landingPlaybooks.stage4Statuses as unknown as Record<string, StepState>}
+                            mode="executing"
+                            compact
+                          />
                         </div>
                         {/* Hành trình 4 việc: việc xong có check và link, việc đang làm sáng cam */}
                         <div className="v3-space-y-3">
@@ -924,6 +1070,14 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                             Khoảnh khắc 5 / 5
                           </span>
                         </div>
+                        <div data-testid="landing-stage5-orbital-canvas" className="mb-3">
+                          <WorkflowFlowCanvas
+                            steps={landingPlaybooks.stage5Steps as unknown as PlanStep[]}
+                            stepStatuses={landingPlaybooks.stage5Statuses as unknown as Record<string, StepState>}
+                            mode="receipt"
+                            compact
+                          />
+                        </div>
                         {/* 4 biên nhận nối với nhau */}
                         <div className="grid grid-cols-2 gap-3 relative pt-2 pb-2">
                           {/* Biên nhận 1: Trello */}
@@ -1033,10 +1187,15 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                         </div>
                       </div>
                       {/* Chân panel 5 */}
-                      <div className="pt-3 border-t border-[#F0F0EB] flex items-center justify-between text-xs">
-                        <span className="text-[#6B7280]">
-                          Mở từng đường dẫn để kiểm tra trên công cụ đó.
-                        </span>
+                      <div className="pt-3 border-t border-[#F0F0EB] flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <button
+                          type="button"
+                          data-testid="landing-stage5-schedule-cta"
+                          onClick={tryPlaybookPrompt(landingPlaybooks.stage5SchedulePrompt)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FFF6EE] hover:bg-orange-100/70 border border-[#FFDFC6] text-[#FF5701] text-xs font-semibold transition-all"
+                        >
+                          <span>⏰ Đặt lịch chạy định kỳ quy trình này</span>
+                        </button>
                         <a href="#signup" onClick={authLink('signup')} className="text-xs font-semibold text-[#FF5701] hover:underline">
                           Thử với yêu cầu của bạn →
                         </a>
@@ -1197,6 +1356,17 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                 <p className="text-sm text-[#4B5563] mb-4">
                   Xem rõ từng thẻ việc và nguyên văn nội dung sẽ gửi đi. Chỉ thực thi khi bạn bấm duyệt.
                 </p>
+                <div className="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/40 text-xs mb-3">
+                  <p className="font-medium text-emerald-900 mb-1">
+                    Xem trước dòng Google Sheets (Trang Tasks):
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[11px] bg-white p-2 rounded-lg border border-emerald-200 text-[#111827]">
+                    <span><strong>Cột A:</strong> 29/09/2026</span>
+                    <span><strong>Cột B:</strong> Lỗi thanh toán #42</span>
+                    <span><strong>Cột C:</strong> Cao</span>
+                    <span><strong>Cột D:</strong> Đã mở Issue #42</span>
+                  </div>
+                </div>
                 <div className="p-3 rounded-xl border border-[#FF5701]/30 bg-[#FFF9F6] text-xs mb-3">
                   <p className="font-medium text-[#111827] mb-1.5">
                     Xem trước tin Slack:
@@ -1322,7 +1492,83 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                 <p className="text-xs text-[#6B7280] mt-3">
                   Mở từng đường dẫn để kiểm tra trên công cụ đó.
                 </p>
+                <div className="mt-3 pt-2.5 border-t border-[#F0F0EB]">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#FFF6EE] border border-[#FFDFC6] text-[#FF5701] text-[11px] font-semibold">
+                    ⏰ Đặt lịch chạy định kỳ quy trình này
+                  </span>
+                </div>
               </div>
+            </div>
+          </div>
+        </section>
+        {/* ========================================== */}
+        {/* 3B. LỊCH CHẠY ĐỊNH KỲ & AUTO-DIGEST MỖI SÁNG */}
+        {/* ========================================== */}
+        <section
+          data-testid="landing-schedule-digest-section"
+          className="py-16 sm:py-24 border-b border-[#E7E7E2] bg-white"
+        >
+          <div className="max-w-5xl mx-auto px-4 sm:px-6">
+            <div className="text-center max-w-2xl mx-auto mb-12">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#FF5701] mb-2">
+                Tự động hóa theo lịch hẹn
+              </p>
+              <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl text-[#111827] font-semibold tracking-tight">
+                Lịch Chạy Định Kỳ &amp; Auto-Digest Mỗi Sáng
+              </h2>
+              <p className="text-sm sm:text-base text-[#6B7280] mt-3">
+                Chọn chế độ phù hợp với mức độ kiểm soát của bạn: chờ duyệt từng lượt hoặc tự gửi bản tin sáng theo phạm vi đã khóa.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              <div className="p-6 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] v3-space-y-2.5">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-[#E7E7E2] text-xs font-semibold text-[#111827]">
+                  <span>🛡️ Chế độ 1 · Mặc định</span>
+                </div>
+                <h3 className="font-display text-xl font-semibold text-[#111827]">
+                  Chờ duyệt từng lượt (Human-in-the-Loop)
+                </h3>
+                <p className="text-sm text-[#4B5563] leading-relaxed">
+                  Hệ thống tự soạn bản xem trước đúng giờ hẹn và chờ bạn bấm duyệt trước khi ghi dữ liệu lên bất kỳ công cụ nào.
+                </p>
+              </div>
+              <div className="p-6 rounded-2xl bg-emerald-50/50 border border-emerald-200 v3-space-y-2.5">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold">
+                  <span>⚡ Chế độ 2 · Zero-Click An Toàn</span>
+                </div>
+                <h3 className="font-display text-xl font-semibold text-[#111827]">
+                  Tự gửi bản tin Auto-Digest mỗi sáng
+                </h3>
+                <p className="text-sm text-[#4B5563] leading-relaxed">
+                  Đúng 08:00 sáng Thứ 2 – Thứ 6, tự động tổng hợp dữ liệu chỉ đọc từ Google Calendar, Google Sheets, GitHub, Trello và gửi bản tin tóm tắt sang kênh Slack hoặc Telegram đã khóa.
+                </p>
+              </div>
+            </div>
+            <div className="p-5 sm:p-6 rounded-3xl bg-[#F8F8F6] border border-[#E7E7E2] v3-space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="v3-space-y-1">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
+                    Phạm vi Auto-Digest Đã Khóa
+                  </span>
+                  <p className="text-sm sm:text-base font-semibold text-[#111827]">
+                    Lịch họp nhóm · Bảng Sprint Q4 → Kênh #bao-cao-sang
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  data-testid="landing-try-digest-btn"
+                  onClick={tryPlaybookPrompt(landingPlaybooks.digestPrompt)}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#FF5701] hover:bg-[#E04C00] text-white text-xs sm:text-sm font-semibold shadow-sm transition-all"
+                >
+                  <span>Dùng thử lịch Auto-Digest 8:00 sáng →</span>
+                </button>
+              </div>
+              <WorkflowFlowCanvas
+                steps={landingPlaybooks.digestSteps as unknown as PlanStep[]}
+                mode="schedule"
+                isAutoDigest
+                compact
+              />
             </div>
           </div>
         </section>
@@ -1405,7 +1651,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
               </div>
             </div>
             {/* Dòng làm nổi bật đặc biệt theo yêu cầu */}
-            <div className="p-5 sm:p-6 rounded-2xl bg-white border border-[#E7E7E2] shadow-sm flex items-center gap-4 text-center sm:text-left justify-center">
+            <div className="p-5 sm:p-6 rounded-2xl bg-white border border-[#E7E7E2] shadow-sm flex items-center gap-4 text-center sm:text-left justify-center mb-8">
               <div className="hidden sm:flex w-10 h-10 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] items-center justify-center text-[#4B5563] flex-shrink-0">
                 <svg className="w-5 h-5 text-[#FF5701]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   {' '}
@@ -1416,6 +1662,36 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
               <p className="text-sm sm:text-base font-medium text-[#111827]">
                 Chỉ làm trên những bảng, kênh, kho mã mà quản trị viên đã cho phép.
               </p>
+            </div>
+            {/* Dải Kiến Trúc Bảo Vệ 3 Lớp */}
+            <div
+              data-testid="landing-scope-lock-proof"
+              className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5"
+            >
+              <div className="p-5 rounded-2xl bg-white border border-[#E7E7E2] v3-space-y-1.5">
+                <span className="inline-block px-2.5 py-0.5 rounded-full bg-[#FFF3ED] text-[#FF5701] text-[11px] font-semibold">
+                  Lớp 1: Khóa phạm vi tài nguyên
+                </span>
+                <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
+                  Chọn đích danh Bảng Trello, File Google Sheets, Lịch Google Calendar, Kho GitHub, Kênh Slack/Telegram từ danh sách trực quan.
+                </p>
+              </div>
+              <div className="p-5 rounded-2xl bg-white border border-[#E7E7E2] v3-space-y-1.5">
+                <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-semibold">
+                  Lớp 2: Xem trước nguyên văn &amp; lưới dữ liệu
+                </span>
+                <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
+                  Hiển thị từng cột bảng tính (Cột A | Cột B | Cột C) và nguyên văn nội dung tin nhắn trước khi ghi.
+                </p>
+              </div>
+              <div className="p-5 rounded-2xl bg-white border border-[#E7E7E2] v3-space-y-1.5">
+                <span className="inline-block px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[11px] font-semibold">
+                  Lớp 3: Biên nhận đối chiếu &amp; Khôi phục an toàn
+                </span>
+                <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
+                  Lưu biên nhận kèm liên kết mở trực tiếp trên từng dịch vụ, không tự ý chạy lại gây trùng lặp.
+                </p>
+              </div>
             </div>
           </div>
         </section>
@@ -1452,11 +1728,16 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                       {' '}
                     </svg>
                   </div>
-                  <h3 className="font-display text-lg font-semibold text-[#111827] mb-2">
-                    Trello
-                  </h3>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <h3 className="font-display text-lg font-semibold text-[#111827]">
+                      Trello
+                    </h3>
+                    <span data-testid="integration-oauth-badge" className="px-2 py-0.5 rounded-full bg-blue-50 text-[#0079BF] border border-blue-200 text-[10px] font-semibold">
+                      OAuth 1-Click · Chọn Bảng
+                    </span>
+                  </div>
                   <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
-                    Tạo, cập nhật card, gán người, thêm checklist.
+                    Tạo, cập nhật card, gán người, thêm checklist. Chọn bảng trực tiếp từ danh sách.
                   </p>
                 </div>
               </div>
@@ -1477,11 +1758,16 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                       {' '}
                     </svg>
                   </div>
-                  <h3 className="font-display text-lg font-semibold text-[#111827] mb-2">
-                    Slack
-                  </h3>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <h3 className="font-display text-lg font-semibold text-[#111827]">
+                      Slack
+                    </h3>
+                    <span data-testid="integration-oauth-badge" className="px-2 py-0.5 rounded-full bg-purple-50 text-[#4A154B] border border-purple-200 text-[10px] font-semibold">
+                      Chọn Kênh trực quan
+                    </span>
+                  </div>
                   <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
-                    Gửi tin vào kênh.
+                    Gửi tin và bản tin định kỳ vào đúng kênh nhóm đã khóa phạm vi.
                   </p>
                 </div>
               </div>
@@ -1496,11 +1782,16 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                       {' '}
                     </svg>
                   </div>
-                  <h3 className="font-display text-lg font-semibold text-[#111827] mb-2">
-                    GitHub
-                  </h3>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <h3 className="font-display text-lg font-semibold text-[#111827]">
+                      GitHub
+                    </h3>
+                    <span data-testid="integration-oauth-badge" className="px-2 py-0.5 rounded-full bg-neutral-200/80 text-[#24292E] border border-neutral-300 text-[10px] font-semibold">
+                      OAuth 1-Click · Chọn Repo
+                    </span>
+                  </div>
                   <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
-                    Tạo issue, gắn nhãn.
+                    Tạo issue, gắn nhãn và chọn kho mã được phép truy cập từ danh sách.
                   </p>
                 </div>
               </div>
@@ -1523,11 +1814,16 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                       {' '}
                     </svg>
                   </div>
-                  <h3 className="font-display text-lg font-semibold text-[#111827] mb-2">
-                    Google Sheets
-                  </h3>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <h3 className="font-display text-lg font-semibold text-[#111827]">
+                      Google Sheets
+                    </h3>
+                    <span data-testid="integration-oauth-badge" className="px-2 py-0.5 rounded-full bg-emerald-50 text-[#0F9D58] border border-emerald-200 text-[10px] font-semibold">
+                      OAuth 1-Click · Google Picker
+                    </span>
+                  </div>
                   <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
-                    Đọc và thêm dòng.
+                    Đọc và thêm dòng kèm xem trước lưới cột. Chọn trực tiếp file trên Google Picker.
                   </p>
                 </div>
               </div>
@@ -1552,11 +1848,16 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                       {' '}
                     </svg>
                   </div>
-                  <h3 className="font-display text-lg font-semibold text-[#111827] mb-2">
-                    Google Calendar
-                  </h3>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <h3 className="font-display text-lg font-semibold text-[#111827]">
+                      Google Calendar
+                    </h3>
+                    <span data-testid="integration-oauth-badge" className="px-2 py-0.5 rounded-full bg-blue-50 text-[#1967D2] border border-blue-200 text-[10px] font-semibold">
+                      OAuth 1-Click · Chọn Lịch
+                    </span>
+                  </div>
                   <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
-                    Xem lịch, tạo sự kiện.
+                    Xem lịch, tạo sự kiện và phát hiện trùng lịch từ danh sách lịch đã chọn.
                   </p>
                 </div>
               </div>
@@ -1571,11 +1872,16 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                       {' '}
                     </svg>
                   </div>
-                  <h3 className="font-display text-lg font-semibold text-[#111827] mb-2">
-                    Notion
-                  </h3>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <h3 className="font-display text-lg font-semibold text-[#111827]">
+                      Notion
+                    </h3>
+                    <span data-testid="integration-oauth-badge" className="px-2 py-0.5 rounded-full bg-neutral-200/80 text-[#111827] border border-neutral-300 text-[10px] font-semibold">
+                      Chọn Trang trực quan
+                    </span>
+                  </div>
                   <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
-                    Tạo trang, thêm nội dung.
+                    Tạo trang, thêm nội dung trong đúng trang đích đã cấp quyền.
                   </p>
                 </div>
               </div>
@@ -1592,11 +1898,16 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                       {' '}
                     </svg>
                   </div>
-                  <h3 className="font-display text-lg font-semibold text-[#111827] mb-2">
-                    Telegram
-                  </h3>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <h3 className="font-display text-lg font-semibold text-[#111827]">
+                      Telegram
+                    </h3>
+                    <span data-testid="integration-oauth-badge" className="px-2 py-0.5 rounded-full bg-sky-50 text-[#229ED9] border border-sky-200 text-[10px] font-semibold">
+                      Ghép nối 1-Click · Chọn Nhóm
+                    </span>
+                  </div>
                   <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
-                    Gửi tin vào nhóm.
+                    Gửi tin và bản tin Auto-Digest vào đúng cuộc trò chuyện hoặc nhóm đã chọn.
                   </p>
                 </div>
               </div>
@@ -1613,22 +1924,47 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                       {' '}
                     </svg>
                   </div>
-                  <h3 className="font-display text-lg font-semibold text-[#111827] mb-2">
-                    Jira
-                  </h3>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <h3 className="font-display text-lg font-semibold text-[#111827]">
+                      Jira
+                    </h3>
+                    <span data-testid="integration-oauth-badge" className="px-2 py-0.5 rounded-full bg-blue-50 text-[#0052CC] border border-blue-200 text-[10px] font-semibold">
+                      Chọn Dự án trực quan
+                    </span>
+                  </div>
                   <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
-                    Tạo issue, bình luận.
+                    Tạo issue, bình luận trên đúng mã dự án đã khóa phạm vi.
                   </p>
                 </div>
               </div>
               {/* 9. Gmail, của riêng từng người */}
               {gmailEnabled && <div className="bg-[#F8F8F6] hover:bg-white rounded-2xl p-6 border border-[#E7E7E2] transition-all hover:shadow-soft-card flex flex-col justify-between group v3-space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="w-11 h-11 rounded-xl bg-red-50 flex items-center justify-center">
+                    <svg className="w-6 h-6 text-[#EA4335]" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z" />
+                    </svg>
+                  </div>
+                  <span data-testid="integration-oauth-badge" className="px-2 py-0.5 rounded-full bg-red-50 text-[#EA4335] border border-red-200 text-[10px] font-semibold">
+                    OAuth 1-Click · Cá nhân
+                  </span>
+                </div>
                 <h3 className="font-display text-lg font-semibold text-[#111827]">Gmail · Của riêng bạn</h3>
                 <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">Tự kết nối hộp thư, đọc và trả lời email. Xem trước người nhận rồi duyệt; không xoá vĩnh viễn.</p>
                 <a href="/guide?service=gmail" className="text-xs text-[#FF5701] underline">Cách kết nối và mẫu câu Gmail</a>
               </div>}
               {/* 10. Google Sheets, của riêng từng người */}
               {mysheetsEnabled && <div className="bg-[#F8F8F6] hover:bg-white rounded-2xl p-6 border border-[#E7E7E2] transition-all hover:shadow-soft-card flex flex-col justify-between group v3-space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="w-11 h-11 rounded-xl bg-emerald-50 flex items-center justify-center">
+                    <svg className="w-6 h-6 text-[#0F9D58]" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M5 2h10l4 4v16H5zm2 8v9h10v-9zm2 2h6v2H9zm0 4h6v1H9z" />
+                    </svg>
+                  </div>
+                  <span data-testid="integration-oauth-badge" className="px-2 py-0.5 rounded-full bg-emerald-50 text-[#0F9D58] border border-emerald-200 text-[10px] font-semibold">
+                    OAuth 1-Click · Cá nhân
+                  </span>
+                </div>
                 <h3 className="font-display text-lg font-semibold text-[#111827]">Google Sheets · Của riêng bạn</h3>
                 <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">Chọn bảng tính trong cửa sổ của Google, ATI chỉ thêm dòng sau khi bạn duyệt.</p>
                 <a href="/guide?service=mysheets" className="text-xs text-[#FF5701] underline">Cách kết nối và mẫu câu Google Sheets</a>
@@ -1680,10 +2016,12 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                   </p>
                 </div>
                 <div className="mt-5 pt-4 border-t border-[#F0F0EB] flex items-center justify-between">
-                  <span className="text-xs text-[#6B7280]">
-                    Hộp thư đến
+                  <span
+                    data-testid="onboarding-step2-oauth-badge"
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-[#16A34A] bg-[#F0FDF4] px-2.5 py-1 rounded-lg border border-[#16A34A]/20"
+                  >
+                    ✓ Kết nối OAuth 1-Click · ✓ Chọn bảng &amp; kênh trực tiếp từ danh sách
                   </span>
-
                 </div>
               </div>
               {/* Bước 3 */}
