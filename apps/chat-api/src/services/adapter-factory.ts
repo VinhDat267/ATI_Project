@@ -280,12 +280,7 @@ export class AdapterFactory {
       const config = decryptCredentials(record.config, this.encryptionKey);
       refreshToken = config.refreshToken;
     } catch {
-      try {
-        const parsed = JSON.parse(record.config);
-        refreshToken = parsed.refreshToken;
-      } catch {
-        throw trelloError('AUTH_ERROR', 'Trello cần được kết nối lại.');
-      }
+      throw trelloError('AUTH_ERROR', 'Trello cần được kết nối lại.');
     }
 
     if (!refreshToken) {

@@ -94,4 +94,27 @@ describe('Task 9: Shared Trello credentials removal', () => {
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ success: true });
   });
+
+  it('populates personal trello status and username in GET /api/services for caller with active personal credential', async () => {
+    await credentials.saveCredentials(
+      'trello',
+      encryptCredentials(
+        { refreshToken: 'rt-1', memberId: 'm1', username: 'alice_trello' },
+        key
+      ),
+      member.id
+    );
+
+    const app = build();
+    const res = await request(app).get('/api/services').set('Authorization', bearer(member));
+    expect(res.status).toBe(200);
+
+    const trello = (res.body.services as any[]).find((s) => s.id === 'trello');
+    expect(trello).toBeDefined();
+    expect(trello.configured).toBe(false);
+    expect(trello.credentialFields).toEqual([]);
+    expect(trello.personalStatus).toBe('connected');
+    expect(trello.username).toBe('alice_trello');
+    expect(typeof trello.connectedAt).toBe('string');
+  });
 });

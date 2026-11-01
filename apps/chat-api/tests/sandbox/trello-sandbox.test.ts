@@ -102,7 +102,8 @@ describe('Task 11: Trello sandbox and personal connection enforcement', () => {
         const sandbox = createSandboxAdapter('trello');
         return {
           execute: async (tool, args, ctx) => {
-            if (args?.boardId && !allowedBoardIds.includes(String(args.boardId))) {
+            const targetBoardId = ctx?.boardId ?? args?.boardId;
+            if (targetBoardId && !allowedBoardIds.includes(String(targetBoardId))) {
               throw new StepError({
                 category: 'AUTH_ERROR',
                 message: 'Bảng không nằm trong phạm vi được phép.',
@@ -149,6 +150,12 @@ describe('Task 11: Trello sandbox and personal connection enforcement', () => {
       const url = String(call[0]);
       expect(url).not.toContain('api.trello.com');
     }
+
+    await expect(
+      adapter.execute('trello.create_card', { listId: 'list-1', title: 'X' }, { boardId: 'board-forbidden' })
+    ).rejects.toMatchObject({
+      category: 'AUTH_ERROR',
+    });
   });
 
   it('in sandbox mode, execution without connection fails with AUTH_ERROR and does not fall back to shared token', async () => {

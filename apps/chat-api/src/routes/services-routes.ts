@@ -278,6 +278,41 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
         const configured = !isTrello && Boolean(config && hasValidCredentials(credentialFields, config) && normalizeAllowedScope(definition, scope));
         const savedCheck = checks.get(id);
         const check = savedCheck?.credentialVersion === (record ? versionOf(record.config) : null) ? savedCheck : undefined;
+
+        let personalStatus: 'connected' | 'reconnect_required' | undefined;
+        let username: string | undefined;
+        let connectedAt: string | undefined;
+        if (isTrello && credentialRepo && typeof credentialRepo.getPersonalConnectionStatus === 'function') {
+          const userId = (req as any).user?.id;
+          let personalRecord: Awaited<ReturnType<typeof credentialRepo.getPersonalConnectionStatus>> = null;
+          if (userId) {
+            try {
+              personalRecord = await credentialRepo.getPersonalConnectionStatus('trello', userId);
+            } catch {
+              personalRecord = null;
+            }
+          }
+          if (personalRecord) {
+            const dateVal = (personalRecord as any).updated_at ?? personalRecord.created_at;
+            connectedAt = dateVal instanceof Date ? dateVal.toISOString() : (dateVal ? new Date(dateVal).toISOString() : undefined);
+            if (personalRecord.status === 'reconnect_required') {
+              personalStatus = 'reconnect_required';
+            } else if (personalRecord.status === 'active') {
+              personalStatus = 'connected';
+            }
+            if (encryptionKey) {
+              try {
+                const dec = decryptCredentials(personalRecord.config, encryptionKey);
+                if (typeof dec.username === 'string') username = dec.username;
+              } catch {
+                if (personalRecord.status === 'active') {
+                  personalStatus = 'reconnect_required';
+                }
+              }
+            }
+          }
+        }
+
         return {
           id, name, description, scopes, scopeKey, scopeLabel, credentialFields, connection: definition.connection ?? 'shared',
           tools: ALL_TOOLS.filter(tool => tool.service === id).map(tool => tool.name),
@@ -286,6 +321,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
           connectionStatus: configured ? (check?.connectionStatus ?? 'unchecked') : 'unconfigured',
           lastCheckedAt: check?.lastCheckedAt ?? null,
           allowedScope: Array.isArray(entries) ? entries : [],
+          ...(isTrello && personalStatus ? { personalStatus, ...(username ? { username } : {}), ...(connectedAt ? { connectedAt } : {}) } : {}),
         };
       }));
       if (options.gmailAvailable && credentialRepo && encryptionKey) services.push(await personalGmail((req as any).user.id));

@@ -259,6 +259,19 @@ export function TrelloConnection({
               </div>
             ))}
           </div>
+          {isAdmin && !editingScope && (
+            <button
+              id="trello-edit-scope"
+              type="button"
+              className={secondary}
+              onClick={() => {
+                setSelectedBoardIds((data.boards ?? []).filter((b) => b.member).map((b) => b.boardId));
+                setEditingScope(true);
+              }}
+            >
+              Đổi bảng
+            </button>
+          )}
         </div>
       )}
 
@@ -291,9 +304,13 @@ export function TrelloConnection({
           </div>
           {isAdmin && !editingScope && (
             <button
+              id="trello-edit-scope"
               type="button"
               className={secondary}
-              onClick={() => setEditingScope(true)}
+              onClick={() => {
+                setSelectedBoardIds((data.boards ?? []).filter((b) => b.member).map((b) => b.boardId));
+                setEditingScope(true);
+              }}
             >
               Đổi bảng
             </button>
@@ -372,7 +389,7 @@ export function TrelloConnection({
                   <label
                     key={b.id}
                     className={`flex items-center gap-2 p-2 rounded-lg text-xs cursor-pointer ${
-                      checked ? 'bg-orange-50 border border-orange-200' : 'bg-white border border-[#E7E7E2]'
+                      checked ? 'bg-[#F8F8F6] border border-[#111827]/30' : 'bg-white border border-[#E7E7E2]'
                     }`}
                   >
                     <input
@@ -380,7 +397,7 @@ export function TrelloConnection({
                       checked={checked}
                       disabled={disabled}
                       onChange={() => toggleBoard(b.id)}
-                      className="rounded text-[#FF5701] focus:ring-[#FF5701]"
+                      className="rounded text-[#111827] focus:ring-[#111827]"
                     />
                     <span className="font-medium text-[#111827]">{b.name}</span>
                   </label>

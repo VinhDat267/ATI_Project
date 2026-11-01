@@ -72,7 +72,7 @@ async function bootstrap() {
     msgRepo = new MessageRepo(pool);
     planRepo = new PlanRepo(pool);
     stepRepo = new StepRepo(pool);
-    credRepo = new CredentialRepo(pool);
+    credRepo = new CredentialRepo(pool, env.ENCRYPTION_KEY);
 
     if (env.RUNTIME_MODE === 'live') {
       const seededAdmin = await userRepo.findByEmail('admin@wap.local');
@@ -385,7 +385,8 @@ async function bootstrap() {
       const sandbox = createSandboxAdapter('trello');
       return {
         execute: async (tool, args, ctx) => {
-          if (args?.boardId && !allowedBoardIds.includes(String(args.boardId))) {
+          const targetBoardId = ctx?.boardId ?? args?.boardId;
+          if (targetBoardId && !allowedBoardIds.includes(String(targetBoardId))) {
             throw new StepError({ category: 'AUTH_ERROR', message: 'Bảng không nằm trong phạm vi được phép.' });
           }
           return sandbox.execute(tool, args, ctx);

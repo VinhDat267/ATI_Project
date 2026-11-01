@@ -5,7 +5,7 @@ import { createApp } from '../../src/app.js';
 import { generateAccessToken } from '../../src/auth/jwt.js';
 import { CredentialRepo } from '../../src/db/repositories/credential-repo.js';
 import { TrelloTeamRepo } from '../../src/db/repositories/trello-team-repo.js';
-import { TRELLO_OAUTH_SCOPE } from '../../src/services/trello/oauth-client.js';
+import { TRELLO_OAUTH_SCOPE, TrelloOAuthError } from '../../src/services/trello/oauth-client.js';
 import { TrelloTokenManager } from '../../src/services/trello/token-manager.js';
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
 
@@ -135,11 +135,16 @@ describe('Trello scope and workspace management routes', () => {
     teamRepo = new TrelloTeamRepo(db.pool);
     tokenManager = new TrelloTokenManager({
       client: {
-        refresh: async (token) => ({
-          accessToken: `access-token-for-${token}`,
-          refreshToken: `next-${token}`,
-          expiresInSeconds: 3600,
-        }),
+        refresh: async (token) => {
+          if (token.includes('invalid_grant') || token.includes('revoked')) {
+            throw new TrelloOAuthError('invalid_grant', 400);
+          }
+          return {
+            accessToken: `access-token-for-${token}`,
+            refreshToken: `next-${token}`,
+            expiresInSeconds: 3600,
+          };
+        },
       },
       credentials,
     });
@@ -404,6 +409,52 @@ describe('Trello scope and workspace management routes', () => {
       expect(afterGet.body.boards).toEqual([
         { boardId: 'board-3', boardName: 'Design System', member: true },
       ]);
+    });
+
+    it('returns status reconnect_required and empty boards when token refresh yields invalid_grant', async () => {
+      const app = build();
+
+      // Pin a scope so team scope exists
+      await request(app)
+        .put('/api/connections/trello/scope')
+        .set('Authorization', bearer(admin))
+        .send({ workspaceId: 'ws-1', boardIds: ['board-1'] });
+
+      // Save a credential for memberAlice that triggers invalid_grant on refresh
+      await credentials.saveCredentials(
+        'trello',
+        encryptCredentials({ refreshToken: 'revoked-token', username: 'alice_trello' }, key),
+        memberAlice.id
+      );
+
+      const res = await request(app)
+        .get('/api/connections/trello')
+        .set('Authorization', bearer(memberAlice));
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        status: 'reconnect_required',
+        username: 'alice_trello',
+        boards: [],
+      });
+    });
+
+    it('deduplicates boardIds in PUT /api/connections/trello/scope cleanly without database constraint error', async () => {
+      const app = build();
+
+      const res = await request(app)
+        .put('/api/connections/trello/scope')
+        .set('Authorization', bearer(admin))
+        .send({ workspaceId: 'ws-1', boardIds: ['board-1', 'board-1'] });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        workspaceId: 'ws-1',
+        workspaceName: 'Engineering Workspace',
+        boards: [
+          { boardId: 'board-1', boardName: 'Sprint Board' },
+        ],
+      });
     });
   });
 });

@@ -345,4 +345,49 @@ describe('Trello OAuth & Scope Whitelisting (Task 7)', () => {
       category: 'NETWORK',
     });
   });
+
+  it('rejects get_card, create_card, update_card, add_member, and add_checklist before making any HTTP call when options.boardId is not in allowedBoardIds', async () => {
+    const calls: Array<{ url: string; method: string; headers: any }> = [];
+    const adapter = createAdapter(calls);
+
+    await expect(
+      adapter.execute('trello.get_card', { cardId: 'card-allowed-1' }, { boardId: unallowedBoardId })
+    ).rejects.toMatchObject({
+      category: 'AUTH_ERROR',
+      statusCode: 403,
+    });
+    expect(calls).toHaveLength(0);
+
+    await expect(
+      adapter.execute('trello.create_card', { listId: 'list-allowed-1', title: 'X' }, { boardId: unallowedBoardId })
+    ).rejects.toMatchObject({
+      category: 'AUTH_ERROR',
+      statusCode: 403,
+    });
+    expect(calls).toHaveLength(0);
+
+    await expect(
+      adapter.execute('trello.update_card', { cardId: 'card-allowed-1', title: 'X' }, { boardId: unallowedBoardId })
+    ).rejects.toMatchObject({
+      category: 'AUTH_ERROR',
+      statusCode: 403,
+    });
+    expect(calls).toHaveLength(0);
+
+    await expect(
+      adapter.execute('trello.add_member', { cardId: 'card-allowed-1', memberId: 'member-allowed-1' }, { boardId: unallowedBoardId })
+    ).rejects.toMatchObject({
+      category: 'AUTH_ERROR',
+      statusCode: 403,
+    });
+    expect(calls).toHaveLength(0);
+
+    await expect(
+      adapter.execute('trello.add_checklist', { cardId: 'card-allowed-1', title: 'Chk' }, { boardId: unallowedBoardId })
+    ).rejects.toMatchObject({
+      category: 'AUTH_ERROR',
+      statusCode: 403,
+    });
+    expect(calls).toHaveLength(0);
+  });
 });

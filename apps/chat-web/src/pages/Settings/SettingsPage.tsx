@@ -11,6 +11,7 @@ import { PersonalMyCalendar } from './PersonalMyCalendar';
 import { PersonalMySheets } from './PersonalMySheets';
 import { TrelloConnection } from './TrelloConnection';
 import { gmailConnectionNotice } from '../../services/gmail-connection';
+import { trelloConnectionNotice } from '../../services/trello-connection';
 import { meta } from './meta';
 
 const SAVED_PLACEHOLDER = 'Đã lưu · nhập lại nếu muốn thay';
@@ -93,7 +94,12 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
   usePrototypePage(meta);
   const { list, personal, personalMyCalendar, personalMySheets, active, draft, selected, loading, loadError, refresh, canEdit, errors, results, busy, keyHelpOpen, actions } = useSettings(user);
   const [connectedEmail, setConnectedEmail] = useState<string>();
-  useEffect(() => { const email = gmailConnectionNotice.take(user?.id); if (email) setConnectedEmail(email); }, [user?.id]);
+  useEffect(() => {
+    const email = gmailConnectionNotice.take(user?.id);
+    const trelloUser = trelloConnectionNotice.take(user?.id);
+    if (email) setConnectedEmail(email);
+    else if (trelloUser) setConnectedEmail(`@${trelloUser}`);
+  }, [user?.id]);
   const backgroundRef = useRef<HTMLDivElement>(null), containerRef = useRef<HTMLDivElement>(null), closeButtonRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef(actions.closeServiceDrawer); closeRef.current = actions.closeServiceDrawer;
   useLayoutEffect(() => {

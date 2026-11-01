@@ -94,16 +94,6 @@ export function createTrelloConnectionRoutes(options: TrelloConnectionsOptions):
         res.json({ status: 'unconfigured', boards: [] });
         return;
       }
-      if (req.method === 'GET' && /^\/workspaces\/[^/]+\/boards$/.test(req.path)) {
-        res.json({
-          boards: [
-            { id: 'b1', name: 'Sprint Board', member: true },
-            { id: 'b2', name: 'Bug Tracker', member: true },
-            { id: 'b3', name: 'Backlog', member: false },
-          ],
-        });
-        return;
-      }
       res.status(503).json({ error: 'Trello chưa được cấu hình trên máy chủ.' });
       return;
     }
@@ -400,8 +390,9 @@ export function createTrelloConnectionRoutes(options: TrelloConnectionsOptions):
       }
 
       const liveBoards = await client.boards(accessToken, workspaceId, AbortSignal.timeout(trelloTimeoutMs));
+      const uniqueBoardIds = [...new Set(boardIds.map((id: string) => id.trim()))];
       const selectedBoards: { boardId: string; boardName: string }[] = [];
-      for (const id of boardIds) {
+      for (const id of uniqueBoardIds) {
         const found = liveBoards.find((b) => b.id === id && b.member === true);
         if (!found) {
           res.status(400).json({ error: 'Bảng không hợp lệ hoặc bạn không phải thành viên của bảng.' });
@@ -476,7 +467,11 @@ export function createTrelloConnectionRoutes(options: TrelloConnectionsOptions):
             AbortSignal.timeout(trelloTimeoutMs)
           );
         } catch {
-          // ignore error fetching live boards
+          const updated = await options.credentialRepo!.getPersonalConnectionStatus('trello', user.id);
+          if (updated?.status === 'reconnect_required') {
+            res.json({ status: 'reconnect_required', username, boards: [] });
+            return;
+          }
         }
       }
 

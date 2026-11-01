@@ -15,6 +15,9 @@ export class TrelloWriteTools extends TrelloReadTools {
     },
     options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<{ id: string; name: string; url: string; listId: string }> {
+    if (options?.boardId) {
+      this.assertBoardInScope(options.boardId);
+    }
     const listInfo = await this.request<any>(`/lists/${args.listId}`, { signal: options?.signal });
     this.assertParentBoard(listInfo, options?.boardId);
 
@@ -55,6 +58,9 @@ export class TrelloWriteTools extends TrelloReadTools {
     },
     options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<{ id: string; name: string; url: string; listId: string }> {
+    if (options?.boardId) {
+      this.assertBoardInScope(options.boardId);
+    }
     const cardInfo = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
     this.assertParentBoard(cardInfo, options?.boardId);
     if (args.idList) {
@@ -94,6 +100,9 @@ export class TrelloWriteTools extends TrelloReadTools {
     },
     options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<{ id: string; idMembers: string[] }> {
+    if (options?.boardId) {
+      this.assertBoardInScope(options.boardId);
+    }
     const cardInfo = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
     this.assertParentBoard(cardInfo, options?.boardId);
 
@@ -140,6 +149,9 @@ export class TrelloWriteTools extends TrelloReadTools {
     name: string;
     items: Array<{ id: string; name: string; state: string }>;
   }> {
+    if (options?.boardId) {
+      this.assertBoardInScope(options.boardId);
+    }
     const cardInfo = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
     this.assertParentBoard(cardInfo, options?.boardId);
 

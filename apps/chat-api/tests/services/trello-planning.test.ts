@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
-import { StepError } from '@wap/tool-adapters';
+import { StepError, encryptCredentials } from '@wap/tool-adapters';
 import { ALL_TOOLS, TRELLO_TOOLS, type PlanResponse } from '@wap/tool-schemas';
 import { getToolCatalogFor } from '../../src/services/registered-services.js';
 import { runtimeToolCatalog } from '../../src/config/gmail-tools-runtime.js';
@@ -241,6 +241,94 @@ describe('Task 8: Trello planning, catalog, refusal, and execution guards', () =
       const hashB = createHash('sha256').update(JSON.stringify(planB)).digest('hex');
       expect(hashA).not.toBe(hashB);
     });
+
+    it('binds boardId on trello.create_card step when listId is a $ref to a search_lists step', async () => {
+      const chatService = new ChatService({
+        msgRepo: {} as any,
+        planner: {} as any,
+        eventEmitter: { emit: () => {} },
+        trelloConnection: async () => ({
+          status: 'connected',
+          connection: {
+            credentialId: 'cred-1',
+            memberId: 'mem-1',
+            username: 'alice',
+            boardIds: ['b1', 'b2'],
+          },
+          teamBoards: [
+            { boardId: 'b1', boardName: 'Board 1' },
+            { boardId: 'b2', boardName: 'Board 2' },
+          ],
+          memberBoards: [
+            { boardId: 'b1', boardName: 'Board 1' },
+            { boardId: 'b2', boardName: 'Board 2' },
+          ],
+        }),
+      });
+
+      const plan: PlanResponse = {
+        kind: 'plan',
+        thinking: 'Tìm danh sách rồi tạo thẻ',
+        summary: 'Tìm danh sách và tạo thẻ trên b1',
+        steps: [
+          {
+            id: 's1',
+            tool: 'trello.search_lists',
+            description: 'Tìm danh sách trên b1',
+            args: { boardId: 'b1' },
+            dependsOn: [],
+          },
+          {
+            id: 's2',
+            tool: 'trello.create_card',
+            description: 'Tạo thẻ trong danh sách tìm được',
+            args: { listId: { $ref: 's1.output[0].id' }, title: 'New' },
+            dependsOn: ['s1'],
+          },
+        ],
+        warnings: [],
+      };
+
+      const result = await (chatService as any).bindConnections(plan, userId);
+      expect(result.kind).toBe('plan');
+      expect((result as any).steps[0].boardId).toBe('b1');
+      expect((result as any).steps[1].boardId).toBe('b1');
+    });
+
+    it('does not store trelloTeamBoards on ChatService instance across calls', async () => {
+      let capturedBoards: any;
+      const chatService = new ChatService({
+        msgRepo: {} as any,
+        planner: {} as any,
+        eventEmitter: { emit: () => {} },
+        trelloConnection: async () => ({
+          status: 'connected',
+          connection: {
+            credentialId: 'cred-1',
+            memberId: 'mem-1',
+            username: 'alice',
+            boardIds: ['b1'],
+          },
+          teamBoards: [{ boardId: 'b1', boardName: 'Board 1' }],
+          memberBoards: [{ boardId: 'b1', boardName: 'Board 1' }],
+        }),
+      });
+
+      const plan: PlanResponse = {
+        kind: 'plan',
+        thinking: '',
+        summary: '',
+        steps: [{ id: 's1', tool: 'trello.search_lists', description: '', args: { boardId: 'b1' }, dependsOn: [] }],
+        warnings: [],
+      };
+
+      await (chatService as any).bindConnections(plan, userId, undefined, undefined, (boards: any) => {
+        capturedBoards = boards;
+      });
+
+      expect(capturedBoards).toEqual([{ boardId: 'b1', boardName: 'Board 1' }]);
+      expect((chatService as any).trelloTeamBoards).toBeUndefined();
+    });
   });
 
   describe('3. resourceLabels: map boardId and listId to board name from team scope', () => {
@@ -336,7 +424,7 @@ describe('Task 8: Trello planning, catalog, refusal, and execution guards', () =
         getPersonalCredentials: vi.fn().mockResolvedValue({
           id: 'cred-1',
           status: 'active',
-          config: JSON.stringify({ refreshToken: 'ref-1', username: 'alice' }),
+          config: encryptCredentials({ refreshToken: 'ref-1', username: 'alice' }, encryptionKey),
         }),
       };
       const mockTeamRepo = {
@@ -379,7 +467,7 @@ describe('Task 8: Trello planning, catalog, refusal, and execution guards', () =
         getPersonalCredentials: vi.fn().mockResolvedValue({
           id: 'cred-1',
           status: 'active',
-          config: JSON.stringify({ refreshToken: 'ref-1', username: 'alice' }),
+          config: encryptCredentials({ refreshToken: 'ref-1', username: 'alice' }, encryptionKey),
         }),
       };
       const mockTeamRepo = {
@@ -424,7 +512,7 @@ describe('Task 8: Trello planning, catalog, refusal, and execution guards', () =
         getPersonalCredentials: vi.fn().mockResolvedValue({
           id: 'cred-1',
           status: 'active',
-          config: JSON.stringify({ refreshToken: 'ref-1', username: 'alice' }),
+          config: encryptCredentials({ refreshToken: 'ref-1', username: 'alice' }, encryptionKey),
         }),
       };
       const mockTeamRepo = {
@@ -482,7 +570,7 @@ describe('Task 8: Trello planning, catalog, refusal, and execution guards', () =
         getPersonalCredentials: vi.fn().mockResolvedValue({
           id: 'cred-1',
           status: 'active',
-          config: JSON.stringify({ refreshToken: 'ref-1', username: 'alice' }),
+          config: encryptCredentials({ refreshToken: 'ref-1', username: 'alice' }, encryptionKey),
         }),
       };
       const mockTeamRepo = {
@@ -536,7 +624,7 @@ describe('Task 8: Trello planning, catalog, refusal, and execution guards', () =
         getPersonalCredentials: vi.fn().mockResolvedValue({
           id: 'cred-1',
           status: 'active',
-          config: JSON.stringify({ refreshToken: 'ref-1', username: 'alice' }),
+          config: encryptCredentials({ refreshToken: 'ref-1', username: 'alice' }, encryptionKey),
         }),
       };
       const mockTeamRepo = {
@@ -586,6 +674,52 @@ describe('Task 8: Trello planning, catalog, refusal, and execution guards', () =
         userId,
         accessToken: 'live-access-token',
         allowedBoardIds: ['b1'],
+      });
+    });
+
+    it('rejects with AUTH_ERROR when record.config is unencrypted plaintext JSON', async () => {
+      const mockCredRepo = {
+        getPersonalCredentials: vi.fn().mockResolvedValue({
+          id: 'cred-1',
+          status: 'active',
+          config: JSON.stringify({ refreshToken: 'ref-1' }),
+        }),
+      };
+      const mockTeamRepo = {
+        get: vi.fn().mockResolvedValue({
+          workspaceId: 'ws-1',
+          workspaceName: 'Work',
+          boards: [{ boardId: 'b1', boardName: 'Frontend' }],
+        }),
+      };
+      mockOAuthClient.boards.mockResolvedValueOnce([
+        { id: 'b1', name: 'Frontend', member: true },
+      ]);
+
+      const factory = new AdapterFactory({
+        credentialRepo: mockCredRepo as any,
+        encryptionKey,
+        trelloTokens: mockTokens as any,
+        trelloOAuthClient: mockOAuthClient as any,
+        trelloTeamRepo: mockTeamRepo as any,
+      });
+
+      const context = {
+        userId,
+        phase: 'execution' as const,
+        connections: {
+          trello: {
+            credentialId: 'cred-1',
+            memberId: 'm1',
+            username: 'alice',
+            boardIds: ['b1'],
+          },
+        },
+      };
+
+      await expect(factory.getAdapterForService('trello', context)).rejects.toMatchObject({
+        category: 'AUTH_ERROR',
+        message: 'Trello cần được kết nối lại.',
       });
     });
   });

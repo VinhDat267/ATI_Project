@@ -61,6 +61,17 @@ test('TRELLO: admin selects workspace and two boards, member connects via fake O
     });
   });
 
+  await page.route('**/api/connections/trello/workspaces/*/boards', async (route) => {
+    return route.fulfill({
+      json: {
+        boards: [
+          { id: 'b1', name: 'Sprint Board', member: true },
+          { id: 'b2', name: 'Bug Tracker', member: true },
+          { id: 'b3', name: 'Backlog', member: false },
+        ],
+      },
+    });
+  });
 
   await page.route('**/api/connections/trello/scope', async (route) => {
     if (route.request().method() === 'PUT') {
@@ -105,6 +116,7 @@ test('TRELLO: admin selects workspace and two boards, member connects via fake O
   const saveScopeBtn = page.getByRole('button', { name: 'Lưu bảng được dùng', exact: true });
   await expect(saveScopeBtn).toBeEnabled();
   await saveScopeBtn.click();
+  await expect(page.locator('#trello-edit-scope')).toBeVisible();
 
   // 2. Member logs in and connects via fake OAuth
   await page.evaluate(() => localStorage.clear());
@@ -168,6 +180,7 @@ test('TRELLO: admin selects workspace and two boards, member connects via fake O
   // Redirects to callback then back to /settings#trello
   await page.waitForURL(/.*\/settings.*#trello/);
   await expect(memberTrelloRow).toContainText('bob_member_trello');
+  await expect(page.getByText('Đã kết nối @bob_member_trello')).toBeVisible();
 
   // 3. Member sends request to create a card
   await page.goto('/');
