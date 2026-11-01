@@ -23,10 +23,16 @@ export * from './mycalendar.js';
 export * from './mysheets.js';
 export * from './myslack-context.js';
 export * from './myslack-policy.js';
+// Jira OAuth cá nhân and workspace contracts (opt-in personal connection, stays out of ALL_TOOLS and SERVICE_REGISTRY)
+export * from './myjira.js';
+export * from './myjira-context.js';
+export * from './myjira-policy.js';
+export * from './myjira-dto.js';
 export * from './registry/index.js';
 export * from './registry/gmail.js';
 export * from './registry/mycalendar.js';
 export * from './registry/mysheets.js';
+export * from './registry/myjira.js';
 
 export const ALL_TOOLS: ToolDefinition[] = [...TRELLO_TOOLS, ...SLACK_TOOLS, ...GITHUB_TOOLS, ...SHEETS_TOOLS, ...CALENDAR_TOOLS, ...NOTION_TOOLS, ...TELEGRAM_TOOLS, ...JIRA_TOOLS];
 
