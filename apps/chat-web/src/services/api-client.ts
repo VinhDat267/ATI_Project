@@ -1,6 +1,6 @@
 import { authStorage } from './auth-storage';
 import { getActiveWorkspaceId, getExplicitWorkspaceId, setActiveWorkspaceId } from './workspace-storage';
-import type { ScheduleView, ScheduleRunView } from '@wap/tool-schemas';
+import type { ScheduleApprovalMode, ScheduleView, ScheduleRunView } from '@wap/tool-schemas';
 import type {
   ActivePlan,
   ChatMessage,
@@ -480,7 +480,15 @@ export class ApiClient {
   getSchedules() { return this.request<{ schedules: ScheduleView[] }>('/api/schedules'); }
   getScheduleRuns(id: string, limit = 10) { return this.request<{ runs: ScheduleRunView[] }>(`/api/schedules/${encodeURIComponent(id)}/runs?limit=${limit}`); }
   getSchedulePendingCount() { return this.request<{ count: number }>('/api/schedules/pending-count'); }
-  confirmSchedule(convId: string, messageId: string) { return this.request<{ schedule: ScheduleView }>(`/api/conversations/${encodeURIComponent(convId)}/schedule-proposals/${encodeURIComponent(messageId)}/confirm`, { method: 'POST' }); }
+  confirmSchedule(convId: string, messageId: string, approvalMode?: ScheduleApprovalMode) {
+    return this.request<{ schedule: ScheduleView }>(
+      `/api/conversations/${encodeURIComponent(convId)}/schedule-proposals/${encodeURIComponent(messageId)}/confirm`,
+      {
+        method: 'POST',
+        ...(approvalMode ? { body: JSON.stringify({ approvalMode }) } : {}),
+      }
+    );
+  }
   changeSchedule(id: string, action: 'pause' | 'resume' | 'cancel', version: number) { return this.request<{ schedule: ScheduleView }>(`/api/schedules/${encodeURIComponent(id)}/${action}`, { method: 'POST', body: JSON.stringify({ version }) }); }
   runScheduleNow(id: string) { return this.request<{ run: ScheduleRunView }>(`/api/schedules/${encodeURIComponent(id)}/run-now`, { method: 'POST' }); }
   replanScheduleRun(id: string) { return this.request<{ run: ScheduleRunView }>(`/api/schedule-runs/${encodeURIComponent(id)}/replan`, { method: 'POST' }); }

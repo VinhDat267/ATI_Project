@@ -1,10 +1,19 @@
 import type pg from 'pg';
-import type { ScheduleProposalMetadata, ScheduleResponse, ScheduleRunView, ScheduleStateMetadata, ScheduleView } from '@wap/tool-schemas';
+import type {
+  ScheduleApprovalMode,
+  ScheduleProposalMetadata,
+  ScheduleResponse,
+  ScheduleRunView,
+  ScheduleStateMetadata,
+  ScheduleView,
+} from '@wap/tool-schemas';
+import type { CredentialRepo } from '../../db/repositories/credential-repo.js';
 import { MessageRepo } from '../../db/repositories/message-repo.js';
 import { ScheduleRepo, type Queryable, type ScheduleRow, type ScheduleScope } from '../../db/repositories/schedule-repo.js';
 import { isUuid } from '../../db/repositories/uuid.js';
 import { runState, runView } from './run-state.js';
 import { nextOccurrence } from './next-occurrence.js';
+import { analyzeSheetsDigestCandidate, computeSheetsDigestHash } from './sheets-digest-candidate.js';
 
 export const SCHEDULE_CONFLICTS = {
   STALE_PROPOSAL: 'Đề xuất này đã cũ. Hãy xem đề xuất mới nhất.',
@@ -15,6 +24,7 @@ export const SCHEDULE_CONFLICTS = {
   STALE_VERSION: 'Lịch vừa thay đổi ở nơi khác. Đã tải lại.',
   RUN_IN_PROGRESS: 'Lịch đang lập kế hoạch cho một lượt. Hãy chờ lượt đó xong.',
   RUN_NOT_REPLANNABLE: 'Lượt này không cần lập lại kế hoạch.',
+  DIGEST_NOT_ELIGIBLE: 'Lịch này không đủ điều kiện tự gửi báo cáo. Hãy chọn chế độ chờ duyệt mỗi lượt.',
 } as const;
 export type ScheduleConflictCode = keyof typeof SCHEDULE_CONFLICTS;
 
@@ -42,9 +52,12 @@ export interface ScheduleServiceOptions {
   /** Plans a run in the background; the scheduler (SCHED-01) or nothing in tests. */
   runner?: { planNow(runId: string): Promise<void> };
   maxSchedules?: number;
+  credentialRepo?: CredentialRepo;
+  encryptionKey?: string;
+  mysheetsEnabled?: boolean;
 }
 
-const REPLANNABLE = new Set(['expired', 'planning_failed', 'interrupted', 'missed']);
+const REPLANNABLE = new Set(['expired', 'planning_failed', 'interrupted', 'missed', 'digest_failed']);
 /** Schedules that count toward the limit. */
 const OPEN = new Set(['active', 'paused']);
 
@@ -147,8 +160,15 @@ export class ScheduleService {
     if (open.rows[0].n >= this.maxSchedules) throw new ScheduleConflict('LIMIT_REACHED');
   }
 
-  async confirmProposal(input: { userId: string; convId: string; messageId: string; now: Date; scope?: ScheduleScope }): Promise<ScheduleChange> {
-    const { userId, convId, messageId, now, scope } = input;
+  async confirmProposal(input: {
+    userId: string;
+    convId: string;
+    messageId: string;
+    now: Date;
+    scope?: ScheduleScope;
+    approvalMode?: ScheduleApprovalMode;
+  }): Promise<ScheduleChange> {
+    const { userId, convId, messageId, now, scope, approvalMode } = input;
     if (!isUuid(convId) || !isUuid(messageId)) throw new ScheduleNotFound();
     return this.transaction(async (client) => {
       // The conversation row serializes confirmations, including the first one.
@@ -170,14 +190,74 @@ export class ScheduleService {
       const proposal = metadata.proposal;
       const wsId = owner.rows[0].workspace_id ?? null;
       const wsMode = owner.rows[0].workspace_mode ?? 'legacy';
+      const wantAutoDigest = approvalMode === 'auto_digest';
+      let digestFields: {
+        kind: 'plan' | 'sheets_digest';
+        digestConfig: unknown | null;
+        digestConfigHash: string | null;
+        digestApprovedAt: Date | null;
+      } = {
+        kind: 'plan',
+        digestConfig: null,
+        digestConfigHash: null,
+        digestApprovedAt: null,
+      };
+
+      if (wantAutoDigest && (proposal.action === 'create' || proposal.action === 'update')) {
+        if (!metadata.digestCandidate?.canAutoDigest || !metadata.digestCandidate.config) {
+          throw new ScheduleConflict('DIGEST_NOT_ELIGIBLE');
+        }
+        // Re-verify TOCTOU scope at confirmation time if credentialRepo is wired
+        if (this.options.credentialRepo && this.options.encryptionKey) {
+          const recheck = await analyzeSheetsDigestCandidate({
+            userId,
+            request: proposal.request!,
+            services: metadata.services,
+            credentialRepo: this.options.credentialRepo,
+            encryptionKey: this.options.encryptionKey,
+            mysheetsEnabled: this.options.mysheetsEnabled,
+          });
+          if (!recheck.canAutoDigest || !recheck.config) {
+            throw new ScheduleConflict('DIGEST_NOT_ELIGIBLE');
+          }
+        }
+        const config = metadata.digestCandidate.config;
+        const hash = computeSheetsDigestHash({
+          userId,
+          recurrence: proposal.recurrence!,
+          config,
+        });
+        digestFields = {
+          kind: 'sheets_digest',
+          digestConfig: JSON.stringify(config),
+          digestConfigHash: hash,
+          digestApprovedAt: now,
+        };
+      }
+
       if (proposal.action === 'create') {
         if (existing) throw new ScheduleConflict('CONVERSATION_HAS_SCHEDULE');
         await this.ensureRoom(client, userId, { workspaceMode: wsMode, workspaceId: wsId });
         const next = this.next({ recurrence: proposal.recurrence! }, now);
         const created = await client.query(
-          `INSERT INTO schedules(user_id, conv_id, name, request, recurrence, services, status, next_run_at, last_proposal_id, workspace_id, workspace_mode)
-           VALUES($1, $2, $3, $4, $5, $6, 'active', $7, $8, $9, $10) RETURNING *`,
-          [userId, convId, proposal.name, proposal.request, JSON.stringify(proposal.recurrence), metadata.services, next, messageId, wsId, wsMode],
+          `INSERT INTO schedules(user_id, conv_id, name, request, recurrence, services, status, next_run_at, last_proposal_id, workspace_id, workspace_mode, kind, digest_config, digest_config_hash, digest_approved_at)
+           VALUES($1, $2, $3, $4, $5, $6, 'active', $7, $8, $9, $10, $11, $12::jsonb, $13, $14) RETURNING *`,
+          [
+            userId,
+            convId,
+            proposal.name,
+            proposal.request,
+            JSON.stringify(proposal.recurrence),
+            metadata.services,
+            next,
+            messageId,
+            wsId,
+            wsMode,
+            digestFields.kind,
+            digestFields.digestConfig,
+            digestFields.digestConfigHash,
+            digestFields.digestApprovedAt,
+          ],
         );
         return this.recordState(client, created.rows[0], now);
       }
@@ -189,7 +269,21 @@ export class ScheduleService {
       }
       // Turning a finished schedule back on takes a place again.
       if (!OPEN.has(existing.status) && OPEN.has(fields.status)) await this.ensureRoom(client, userId, { workspaceMode: wsMode, workspaceId: wsId });
-      return this.recordState(client, await this.saveFields(client, existing.id, fields, messageId), now);
+      let saved = await this.saveFields(client, existing.id, fields, messageId);
+      if (proposal.action === 'update') {
+        const updatedDigest = await client.query(
+          `UPDATE schedules SET kind=$2, digest_config=$3::jsonb, digest_config_hash=$4, digest_approved_at=$5 WHERE id=$1 RETURNING *`,
+          [
+            existing.id,
+            digestFields.kind,
+            digestFields.digestConfig,
+            digestFields.digestConfigHash,
+            digestFields.digestApprovedAt,
+          ],
+        );
+        saved = updatedDigest.rows[0];
+      }
+      return this.recordState(client, saved, now);
     });
   }
 
