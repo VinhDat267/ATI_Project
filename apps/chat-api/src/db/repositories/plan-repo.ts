@@ -8,7 +8,8 @@ import { guardPlanInTransaction,guardStepRowsInTransaction,planSelectors,type Sl
 import { hasSlackMarker } from '../../services/slack/slack-message-selectors.js';
 import { sealPlanOrigin } from '../../services/slack/slack-plan-origin.js';
 import { isBoundSlackReadPlan } from '../../services/slack/slack-read-plan.js';
-import {isBoundSlackManualPlan,isBoundSlackWritePlan} from '../../services/slack/slack-write-plan.js';
+import {isBoundSlackManualPlan,isBoundSlackSourceReplyPlan,isBoundSlackWritePlan} from '../../services/slack/slack-write-plan.js';
+import {sameSlackBinding,validateSlackSourceReplyPlan} from '@wap/tool-schemas';
 
 export interface PlanRow {
   id: string;
@@ -35,10 +36,17 @@ export class PlanRepo {
 
   async createSlackPlan(data:Parameters<PlanRepo['createPlan']>[0],context:SlackPlanWriteContext,held?:pg.PoolClient,signal?:AbortSignal):Promise<PlanRow>{
     const snapshot=structuredClone({data,context});
-    if(snapshot.data.planJson.steps?.some((s:any)=>/^(myslack|slack)\./.test(s.tool)))throw new Error('SLACK_DISPATCH_BINDING_REQUIRED');
+    const planOwner=snapshot.context.segments[0]?.sourceRef.binding.atiUserId??'';
+    const hasSlackStep=snapshot.data.planJson.steps?.some((s:any)=>/^(myslack|slack)\./.test(s.tool));
+    if(hasSlackStep&&!isBoundSlackSourceReplyPlan(snapshot.data.planJson,planOwner))throw new Error('SLACK_DISPATCH_BINDING_REQUIRED');
     const save=async(client:pg.PoolClient)=>{
       signal?.throwIfAborted();const owner=snapshot.context.segments[0]?.sourceRef.binding.atiUserId;
       if(!owner)throw new Error('SLACK_PROVENANCE_REQUIRED');
+      if(hasSlackStep){
+        const reply=validateSlackSourceReplyPlan(snapshot.data.planJson,owner);
+        const matchesSource=snapshot.context.segments.some(seg=>sameSlackBinding(seg.sourceRef.binding,reply.binding)&&(seg.channelId===reply.params.channel||(seg.sourceRef.resourceType==='message'&&seg.sourceRef.resourceId.startsWith(JSON.stringify([reply.params.channel]).slice(0,-1)+','))));
+        if(!matchesSource)throw new Error('SLACK_DISPATCH_BINDING_REQUIRED');
+      }
       await this.slack.prepareConversationWriteInTransaction(client,snapshot.data.convId,owner,snapshot.context.segments,'planning');
       const selectors=snapshot.context.selectors??planSelectors(snapshot.data);
       if(!['plan_json','plan_text','plan_hash'].every(s=>selectors.includes(s))||new Set(selectors).size!==selectors.length||selectors.length>256)throw new Error('SLACK_PLAN_MANIFEST_INVALID');
@@ -150,7 +158,9 @@ export class PlanRepo {
       "UPDATE plans SET status = 'approved', decided_at = now() WHERE id = $1 AND plan_hash = $2 AND status = 'pending' AND expires_at > now() AND EXISTS (SELECT 1 FROM conversations WHERE conversations.id = plans.conv_id AND conversations.user_id = $3) RETURNING id",
       [planId, expectedHash, userId]
     );
-    return (res.rowCount ?? 0) > 0;
+    const ok=(res.rowCount ?? 0) > 0;
+    if(ok)await client.query("UPDATE slack_assistant_artifacts SET status='approved',revision=revision+1,updated_at=clock_timestamp() WHERE active_plan_id=$1 AND user_id=$2 AND status IN ('pending','needs_info')",[planId,userId]);
+    return ok;
     });
   }
 
@@ -168,12 +178,14 @@ export class PlanRepo {
   async updatePlanStatus(planId: string, status: string): Promise<void> {
     await this.pool.query(`UPDATE plans SET status=$2 WHERE id=$1 AND
       (slack_lineage_manifest IS NULL OR status NOT IN ('failed','superseded'))`, [planId, status]);
+    const mapped=status==='executing'?'running':status==='completed'?'completed':['failed','stopped','partial','reconciliation_required'].includes(status)?'failed':null;
+    if(mapped)await this.pool.query("UPDATE slack_assistant_artifacts SET status=$2,revision=revision+1,updated_at=clock_timestamp() WHERE active_plan_id=$1 AND status NOT IN ('rejected','stale')",[planId,mapped]);
   }
 
   async assertSourceDispatchAllowed(planId:string,userId:string,expectedHash:string,stepId:string,tool:string,signal?:AbortSignal):Promise<void>{
     signal?.throwIfAborted();await this.transaction(async client=>{
       const checked=await guardPlanInTransaction(client,this.slack,planId,'planning');
-      if(checked.source&&/^(myslack|slack)\./.test(tool)&&!isBoundSlackManualPlan(checked.row.plan_json,userId))throw Object.assign(new Error('SLACK_DISPATCH_BINDING_REQUIRED'),{category:'AUTH_ERROR',details:{requestSent:false}});
+      if(checked.source&&/^(myslack|slack)\./.test(tool)&&!isBoundSlackManualPlan(checked.row.plan_json,userId)&&!isBoundSlackSourceReplyPlan(checked.row.plan_json,userId))throw Object.assign(new Error('SLACK_DISPATCH_BINDING_REQUIRED'),{category:'AUTH_ERROR',details:{requestSent:false}});
       const owner=(await client.query('SELECT user_id FROM conversations WHERE id=$1',[checked.row.conv_id])).rows[0]?.user_id;
       if(!checked.allowed||owner!==userId||checked.row.plan_hash!==expectedHash||!['approved','executing'].includes(checked.row.status)||
         !checked.row.plan_json.steps?.some((s:any)=>s.id===stepId&&s.tool===tool))throw Object.assign(new Error('SLACK_SOURCE_UNAVAILABLE'),{category:'AUTH_ERROR',details:{requestSent:false}});

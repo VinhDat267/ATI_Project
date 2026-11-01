@@ -1,3 +1,5 @@
+import {applyV3Migrations} from '../helpers/gmail-test-db.js';
+import {defaultSlackAssistantConfig} from '@wap/tool-schemas';
 import {randomUUID} from 'node:crypto';
 import {afterAll,beforeAll,expect,it,vi} from 'vitest';
 import {SlackFanoutRepo} from '../../src/db/repositories/slack-fanout-repo.js';
@@ -158,4 +160,45 @@ it.each([false,true])('cancels the captured old owner job when connection owners
  const f=await setup(),r=await receipt(f.workspace),newOwner=await env.db.person('replacement-owner');await repo.complete(await claim(r.id),['U_A','U_B']);
  await env.db.pool.query(`UPDATE slack_connections SET user_id=$2${disconnect?",identity_version=identity_version+1,status='disconnected',config=NULL":''} WHERE id=$1`,[f.a.row.id,newOwner.id]);
  const rows=await jobs(r.id);expect(rows.find(row=>row.user_id===f.a.person.id).status).toBe('cancelled');expect(rows.find(row=>row.user_id===f.b.person.id).status).toBe('pending');
+});
+
+it('a full owner queue preserves its parent receipt, commits other owners and resumes idempotently',async()=>{
+ const f=await setup(),cfg={...defaultSlackAssistantConfig(),enabled:true,maxQueueLength:1};
+ await env.db.pool.query('INSERT INTO slack_workspace_configs(connection_id,user_id,identity_version,config_json) VALUES($1,$2,1,$3)',[f.a.row.id,f.a.person.id,JSON.stringify(cfg)]);
+ const first=await receipt(f.workspace);await repo.complete(await claim(first.id),['U_A']);const r=await receipt(f.workspace);
+ expect(await repo.complete(await claim(r.id),['U_A','U_B'])).toMatchObject({jobs:1,backlogFull:true});
+ expect((await env.db.pool.query('SELECT status,fanout_error_code FROM slack_event_receipts WHERE id=$1',[r.id])).rows[0]).toEqual({status:'failed',fanout_error_code:'backlog_full'});
+ expect((await jobs(r.id)).map(j=>j.user_id)).toEqual([f.b.person.id]);
+ await env.db.pool.query("UPDATE slack_event_receipts SET fanout_next_attempt_at=clock_timestamp()-interval '1 second' WHERE id=$1",[r.id]);
+ expect(await repo.complete(await claim(r.id),['U_A','U_B'])).toMatchObject({jobs:0,backlogFull:true});expect(await jobs(r.id)).toHaveLength(1);
+ await env.db.pool.query("UPDATE slack_triage_jobs SET status='decided' WHERE receipt_id=$1",[first.id]);await env.db.pool.query("UPDATE slack_event_receipts SET fanout_next_attempt_at=clock_timestamp()-interval '1 second' WHERE id=$1",[r.id]);
+ expect(await repo.complete(await claim(r.id),['U_A','U_B'])).toMatchObject({jobs:1});expect(await jobs(r.id)).toHaveLength(2);
+ expect((await env.db.pool.query('SELECT status FROM slack_event_receipts WHERE id=$1',[r.id])).rows[0].status).toBe('processed');
+});
+it('global ingress capacity rejects before durable ACK and still recognizes exact duplicate receipts',async()=>{
+ await env.db.pool.query('DELETE FROM slack_event_receipts');const bounded=new SlackEventReceiptRepo(env.db.pool,env.invalidationService,{maxPendingReceipts:2});
+ const input={appId:'A_TEST',eventId:'Ev_CAP_1',teamId:'T_CAP',eventType:'message',eventSubtype:null,eventContext:'ctx',sourceEventTs:'978307200.123456',sourceEventTimeIso:source,channelId:'C_CAP',messageTs:'978307200.123456',payloadHash:'a'.repeat(64),discardReason:null};
+ await bounded.recordOrdinary(input);await bounded.recordOrdinary({...input,eventId:'Ev_CAP_2'});
+ await expect(bounded.recordOrdinary({...input,eventId:'Ev_CAP_3'})).rejects.toThrow('SLACK_INGRESS_CAPACITY');
+ expect((await bounded.recordOrdinary(input)).kind).toBe('duplicate');expect((await env.db.pool.query('SELECT count(*)::int AS n FROM slack_event_receipts')).rows[0].n).toBe(2);
+ // A malformed event is a fixed metadata discard and does not occupy the queue.
+ expect((await bounded.recordOrdinary({...input,eventId:'Ev_BAD',discardReason:'malformed_timestamp',sourceEventTs:null,sourceEventTimeIso:null})).kind).toBe('discarded');
+});
+it('persists only validated thread metadata for coalescing, never an event body',async()=>{
+ const r=await receipts.recordOrdinary({appId:'A_TEST',eventId:'Ev_THREAD',teamId:'T_THREAD',eventType:'message',eventSubtype:null,eventContext:'ctx',sourceEventTs:'978307200.123456',sourceEventTimeIso:source,channelId:'C_THREAD',messageTs:'978307200.123456',threadTs:'978307199.000001',payloadHash:'a'.repeat(64),discardReason:null});
+ expect((await env.db.pool.query('SELECT thread_ts FROM slack_event_receipts WHERE id=$1',[r.receipt.id])).rows[0].thread_ts).toBe('978307199.000001');
+});
+
+it('a parent receipt older than24hours becomes attention without resetting its age behind a full queue',async()=>{
+ const f=await setup(),cfg={...defaultSlackAssistantConfig(),enabled:true,maxQueueLength:1};await env.db.pool.query('INSERT INTO slack_workspace_configs(connection_id,user_id,identity_version,config_json) VALUES($1,$2,1,$3)',[f.a.row.id,f.a.person.id,JSON.stringify(cfg)]);
+ const first=await receipt(f.workspace);await repo.complete(await claim(first.id),['U_A']);const old=await receipt(f.workspace);await env.db.pool.query("UPDATE slack_event_receipts SET created_at=clock_timestamp()-interval '25 hours' WHERE id=$1",[old.id]);
+ expect(await repo.complete(await claim(old.id),['U_A'])).toMatchObject({jobs:1});
+ const row=(await env.db.pool.query("SELECT j.status,j.attention_code,j.expires_at=r.created_at+interval '24 hours' AS original_deadline,j.available_at=r.created_at+interval '30 seconds' AS original_window FROM slack_triage_jobs j JOIN slack_event_receipts r ON r.id=j.receipt_id WHERE r.id=$1",[old.id])).rows[0];
+ expect(row).toEqual({status:'needs_attention',attention_code:'expired',original_deadline:true,original_window:true});expect((await env.db.pool.query('SELECT status FROM slack_event_receipts WHERE id=$1',[old.id])).rows[0].status).toBe('processed');
+});
+
+it('migration clamps legacy queued deadlines to the original receipt without refreshing processing age',async()=>{
+ const f=await setup(),r=await receipt(f.workspace);await repo.complete(await claim(r.id),['U_A']);await env.db.pool.query("UPDATE slack_event_receipts SET created_at=clock_timestamp()-interval '25 hours' WHERE id=$1",[r.id]);
+ await applyV3Migrations(env.db.pool);
+ expect((await env.db.pool.query("SELECT j.status,j.expires_at=r.created_at+interval '24 hours' AS original_deadline FROM slack_triage_jobs j JOIN slack_event_receipts r ON r.id=j.receipt_id WHERE r.id=$1",[r.id])).rows[0]).toEqual({status:'needs_attention',original_deadline:true});
 });

@@ -51,9 +51,13 @@ export async function guardPlanInTransaction(client:pg.PoolClient,registry:Slack
       if(!c||(await registry.assertDerivedCopyAllowedInTransaction(client,{callerAtiUserId:first.user_id,consumerPurpose:purpose,targetKind:'plan_step_arg',targetId:id,targetSubId:selector,expectedTargetVersion:c.target_version})).status!=='allowed')throw new Error('SLACK_PLAN_UNAVAILABLE');
     }
     delete row.slack_lineage_manifest;tagSlackSourceArtifact(row);
+    const refreshedCopies=(await client.query(`SELECT * FROM slack_derived_copies WHERE
+      (target_kind='plan_step_arg' AND target_id=$1 AND target_sub_id<>'args_json') OR
+      (target_kind IN ('plan_step_arg','audit_log_entry') AND target_id IN(SELECT id::text FROM execution_steps WHERE plan_id=$1::uuid))
+      ORDER BY id`,[id])).rows;
     const sourceSegments:DerivedSegmentInput[]=[];
     for(const c of planCopies.filter(c=>c.status==='active'))sourceSegments.push(...await registry.segmentsInTransaction(client,c.id));
-    return {row,source:true,allowed:true,segments:uniqueSegments(sourceSegments),copies};
+    return {row,source:true,allowed:true,segments:uniqueSegments(sourceSegments),copies:refreshedCopies};
   }catch(error){
     // SQL failures abort the outer transaction. Authorization/TTL failures only
     // produce a tombstone snapshot, never the raw source row.

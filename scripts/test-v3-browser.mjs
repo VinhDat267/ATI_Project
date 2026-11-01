@@ -13,6 +13,7 @@ if (!process.env.DATABASE_URL || !process.env.CHAT_ADMIN_EMAIL || !process.env.C
 
 const cli = resolve('node_modules/playwright/cli.js');
 const scenarios = [
+  {name:'slack_assistant',grep:'SLACK-M4:'},
   {name:'slack_write',grep:'SLACK-M3:'},
   { name: 'slack_read', grep: 'SLACK-M2:' },
   { name: 'slack_oauth', grep: 'SLACK-02:' },
@@ -50,14 +51,15 @@ for (const scenario of runScenarios) {
   env.MYCALENDAR_ENABLED = scenario.name === 'mycalendar' ? 'on' : 'off';
   env.MYSHEETS_ENABLED = scenario.name === 'mysheets' ? 'on' : 'off';
   env.SCHEDULES_ENABLED = scenario.name === 'schedule' ? 'on' : 'off';
-  env.MYSLACK_ENABLED = ['slack_oauth','slack_read','slack_write'].includes(scenario.name) ? 'on' : 'off';
+  env.MYSLACK_ENABLED = ['slack_oauth','slack_read','slack_write','slack_assistant'].includes(scenario.name) ? 'on' : 'off';
+  env.MYSLACK_AUTOMATION_ENABLED='off';
   env.MYSLACK_WRITES_ENABLED=scenario.name==='slack_write'?'on':'off';
   if (scenario.name === 'answer') env.PLANNER_SEARCH_MODE = 'llm';
   if (scenario.name === 'auth02') env.AUTH_SIGNUP_ENABLED = 'true';
   let stopFixture;
   try {
-    if (['slack_oauth','slack_read','slack_write'].includes(scenario.name)) {
-      if(scenario.name==='slack_oauth')delete env.SANDBOX_SCENARIO;
+    if (['slack_oauth','slack_read','slack_write','slack_assistant'].includes(scenario.name)) {
+      if(['slack_oauth','slack_assistant'].includes(scenario.name))delete env.SANDBOX_SCENARIO;
       const redirectUri = `http://127.0.0.1:${env.V3_WEB_PORT || 5174}/connections/myslack/callback`;
       const fixture = await startSlackOAuthFixture({ redirectUri,readFixtures:scenario.name==='slack_read',writeFixtures:scenario.name==='slack_write' }); stopFixture = fixture.stop;
       Object.assign(env, { MYSLACK_APP_ID: 'A_FIXTURE', MYSLACK_OAUTH_CLIENT_ID: 'slack-fixture-client', MYSLACK_OAUTH_CLIENT_SECRET: 'slack-fixture-secret', MYSLACK_OAUTH_REDIRECT_URI: redirectUri,

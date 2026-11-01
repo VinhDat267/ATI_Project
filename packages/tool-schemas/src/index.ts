@@ -1,3 +1,4 @@
+export * from './myslack-assistant.js';
 import type { ToolDefinition } from './types.js';
 import { TRELLO_TOOLS } from './trello.js';
 import { SLACK_TOOLS } from './slack.js';

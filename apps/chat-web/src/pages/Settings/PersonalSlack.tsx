@@ -1,3 +1,4 @@
+import {SlackAutomationSettings} from '../../components/slack/SlackAutomationSettings';
 import { useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -189,6 +190,7 @@ export function PersonalSlack() {
                   Ngắt kết nối
                 </button>
               </div>
+              <SlackAutomationSettings connectionId={row.id} workspaceName={row.workspaceName} active={row.status==='active'}/>
             </li>
           ))}
         </ul>

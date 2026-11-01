@@ -12,3 +12,5 @@ export * from './search.js';
 export * from './recipients.js';
 export * from './prompts/tool-listing.js';
 export * from './slack-read-plan.js';
+export * from './slack-triage.js';
+export * from './slack-proposal-plan.js';

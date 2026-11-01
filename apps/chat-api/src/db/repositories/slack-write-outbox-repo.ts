@@ -1,19 +1,41 @@
 import {createHash} from 'node:crypto';
 import type pg from 'pg';
-import {canonicalSlackJson} from '@wap/executor';
-import {validateSlackBinding,type SlackBinding} from '@wap/tool-schemas';
+import {canonicalSlackJson,resolveArgs} from '@wap/executor';
+import {validateSlackBinding,validateSlackSourceReplyPlan,type SlackBinding} from '@wap/tool-schemas';
 import {isUuid} from './uuid.js';
-export interface SlackWriteInput {planId:string;stepId:string;planHash:string;appId:string;binding:SlackBinding;params:{channel:string;text:string};signal?:AbortSignal}
+export interface SlackWriteInput {planId:string;stepId:string;planHash:string;appId:string;binding:SlackBinding;params:{channel:string;text:string;thread_ts?:string};signal?:AbortSignal}
 export const slackWriteHash=(value:unknown)=>createHash('sha256').update(canonicalSlackJson(value)).digest('hex');
 export function slackWriteDenied(){return Object.assign(new Error('SLACK_WRITE_DENIED'),{category:'AUTH_ERROR',details:{requestSent:false}});}
 export function slackWriteUnknown(){return Object.assign(new Error('SLACK_WRITE_UNKNOWN'),{category:'UNKNOWN',details:{requestSent:true}});}
+const CERTIFIED_OUTPUT_KEYS=['url','id','key','title','name','updatedRange'] as const;
+export async function resolveCertifiedSourceReplyParams(c:pg.PoolClient,planId:string,body:unknown,owner:string){
+ const validated=validateSlackSourceReplyPlan(body,owner);
+ const rows=(await c.query('SELECT step_id,status,output_json FROM execution_steps WHERE plan_id=$1 ORDER BY step_id FOR SHARE',[planId])).rows;
+ const outputs=new Map<string,any>();
+ for(const depId of validated.step.dependsOn??[]){
+  const row=rows.find((r:any)=>r.step_id===depId&&r.status==='succeeded');
+  if(!row||!row.output_json||typeof row.output_json!=='object'||Array.isArray(row.output_json))throw slackWriteDenied();
+  const clean:Record<string,string|number>={};
+  for(const key of CERTIFIED_OUTPUT_KEYS){
+   const val=(row.output_json as Record<string,unknown>)[key];
+   if((typeof val==='string'||typeof val==='number')&&!String(val).includes('\u0000'))clean[key]=val;
+  }
+  outputs.set(depId,clean);
+ }
+ const resolved=resolveArgs(validated.step.args as Record<string,any>,outputs);
+ if(typeof resolved.channel!=='string'||typeof resolved.text!=='string'||typeof resolved.thread_ts!=='string')throw slackWriteDenied();
+ return {...validated,resolvedParams:{channel:resolved.channel,text:resolved.text,thread_ts:resolved.thread_ts}};
+}
 export function normalizeSlackWrite(value:SlackWriteInput):SlackWriteInput {
  try {
-  const binding=validateSlackBinding(value.binding),p=value.params;
+  const binding=validateSlackBinding(value.binding),p=value.params,hasThread=p?.thread_ts!==undefined;
+  const allowedKeys=hasThread?['channel','text','thread_ts']:['channel','text'];
+  const channelPattern=hasThread?/^[CGD][A-Za-z0-9_-]{1,63}$/:/^[CG][A-Za-z0-9_-]{1,63}$/;
   if(!isUuid(value.planId)||typeof value.stepId!=='string'||!value.stepId||value.stepId.length>128||!/^[a-f0-9]{64}$/.test(value.planHash)||
-    !/^[A-Za-z0-9_-]{1,64}$/.test(value.appId)||!p||Object.keys(p).some(k=>!['channel','text'].includes(k))||
-    !/^[CG][A-Za-z0-9_-]{1,63}$/.test(p.channel)||typeof p.text!=='string'||!p.text.trim()||p.text.length>4000)throw new Error();
-  return {...value,binding,params:{channel:p.channel,text:p.text}};
+    !/^[A-Za-z0-9_-]{1,64}$/.test(value.appId)||!p||Object.keys(p).some(k=>!allowedKeys.includes(k))||
+    !channelPattern.test(p.channel)||typeof p.text!=='string'||!p.text.trim()||p.text.length>4000||
+    (hasThread&&(typeof p.thread_ts!=='string'||!/^[0-9]{1,10}\.[0-9]{6}$/.test(p.thread_ts))))throw new Error();
+  return {...value,binding,params:hasThread?{channel:p.channel,text:p.text,thread_ts:p.thread_ts}:{channel:p.channel,text:p.text}};
  }catch{throw slackWriteDenied();}
 }
 /** Only SQL ownership/current identity and the exact approved step authorize a durable attempt.
@@ -38,8 +60,12 @@ export class SlackWriteOutboxRepo {
   if(owner?.status!=='active'||!conn||conn.status!=='active'||conn.refresh_in_flight||conn.user_id!==b.atiUserId||conn.app_id!==input.appId||
     conn.workspace_id!==b.workspaceId||conn.actor_id!==b.slackUserId||conn.identity_version!==b.identityVersion||!conn.scopes.includes('chat:write')||
     !integrity||(!readOnly&&!fresh)||plan?.user_id!==b.atiUserId||plan.plan_hash!==input.planHash||!['approved','executing','partial','reconciliation_required','completed'].includes(plan.status)||
-    step?.tool!=='myslack.chat_postMessage'||canonicalSlackJson(step.args)!==canonicalSlackJson(input.params)||
+    step?.tool!=='myslack.chat_postMessage'||
     canonicalSlackJson(bindings?.bindings?.[b.connectionId])!==canonicalSlackJson(b)||bindings?.steps?.[input.stepId]?.connectionId!==b.connectionId)throw slackWriteDenied();
+  if(input.params.thread_ts!==undefined){
+   const certified=await resolveCertifiedSourceReplyParams(c,input.planId,body,b.atiUserId);
+   if(certified.step.id!==input.stepId||canonicalSlackJson(certified.resolvedParams)!==canonicalSlackJson(input.params))throw slackWriteDenied();
+  }else if(canonicalSlackJson(step.args)!==canonicalSlackJson(input.params))throw slackWriteDenied();
  }
  async transaction<T>(c:pg.PoolClient,work:()=>Promise<T>):Promise<T>{
   await c.query('BEGIN');try{await c.query("SET LOCAL statement_timeout='2s'");const result=await work();await c.query('COMMIT');return result;}catch(e){await c.query('ROLLBACK');throw e;}
@@ -47,12 +73,13 @@ export class SlackWriteOutboxRepo {
  async lookup(c:pg.PoolClient,i:SlackWriteInput):Promise<any>{
   const row=(await c.query('SELECT * FROM slack_write_outbox WHERE plan_id=$1 AND step_id=$2',[i.planId,i.stepId])).rows[0];
   if(row&&(row.plan_hash!==i.planHash||row.user_id!==i.binding.atiUserId||row.connection_id!==i.binding.connectionId||row.app_id!==i.appId||
-    row.workspace_id!==i.binding.workspaceId||row.slack_user_id!==i.binding.slackUserId||row.identity_version!==i.binding.identityVersion||row.request_hash!==slackWriteHash(i.params)))throw slackWriteDenied();return row;
+    row.workspace_id!==i.binding.workspaceId||row.slack_user_id!==i.binding.slackUserId||row.identity_version!==i.binding.identityVersion||
+    (row.thread_ts??undefined)!==i.params.thread_ts||row.request_hash!==slackWriteHash(i.params)))throw slackWriteDenied();return row;
  }
  async prepare(c:pg.PoolClient,i:SlackWriteInput):Promise<any>{
   if(!(await c.query("SELECT id FROM plans WHERE id=$1 AND expires_at>clock_timestamp() AND status IN ('approved','executing','partial')",[i.planId])).rowCount)throw slackWriteDenied();
-  const b=i.binding;await c.query(`INSERT INTO slack_write_outbox(plan_id,step_id,plan_hash,user_id,connection_id,app_id,workspace_id,slack_user_id,identity_version,request_hash,channel_id)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(plan_id,step_id) DO NOTHING`,[i.planId,i.stepId,i.planHash,b.atiUserId,b.connectionId,i.appId,b.workspaceId,b.slackUserId,b.identityVersion,slackWriteHash(i.params),i.params.channel]);
+  const b=i.binding;await c.query(`INSERT INTO slack_write_outbox(plan_id,step_id,plan_hash,user_id,connection_id,app_id,workspace_id,slack_user_id,identity_version,request_hash,channel_id,thread_ts)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(plan_id,step_id) DO NOTHING`,[i.planId,i.stepId,i.planHash,b.atiUserId,b.connectionId,i.appId,b.workspaceId,b.slackUserId,b.identityVersion,slackWriteHash(i.params),i.params.channel,i.params.thread_ts??null]);
   // A crash before the durable dispatch checkpoint is safe to reclaim. Never
   // renew/reclaim dispatching or UNKNOWN: the provider may already have committed.
   await c.query(`UPDATE slack_write_outbox SET lease_token=gen_random_uuid(),lease_until=clock_timestamp()+interval '30 seconds'

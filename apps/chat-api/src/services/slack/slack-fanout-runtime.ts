@@ -20,7 +20,7 @@ export class SlackFanoutWorker {
     try{actors=await this.options.resolver.resolve(lease.eventContext,lease.workspaceId,signal);}
     catch{if(await this.options.repo.retry(lease,signal?.aborted?'aborted':'authorization_failed'))stats.retried++;continue;}
    }
-   try{await this.options.repo.complete(lease,actors,signal);stats.applied++;}
+   try{const result=await this.options.repo.complete(lease,actors,signal);if(result.backlogFull)stats.retried++;else stats.applied++;}
    catch{if(await this.options.repo.retry(lease,signal?.aborted?'aborted':'fanout_failed'))stats.retried++;}
   }
   return stats;

@@ -1,5 +1,5 @@
 import type { PlanStep, ToolDefinition } from '@wap/tool-schemas';
-import { ALL_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS } from '@wap/tool-schemas';
+import { ALL_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, SLACK_PROPOSAL_WORKFLOW_TOOLS } from '@wap/tool-schemas';
 import { resolveArgs } from './resolver.js';
 import { executeSlackRead } from './slack/read-guard.js';
 import { isSlackReadTool } from '@wap/tool-schemas';
@@ -87,7 +87,8 @@ export class StepRunner {
 
     try {
       if(step.tool==='myslack.chat_postMessage'&&this.options.slackWrite){
-        const output=await this.options.slackWrite(structuredClone(step),combinedSignal);
+        const resolvedStep={...structuredClone(step),args:resolveArgs(step.args||{},stepOutputs)};
+        const output=await this.options.slackWrite(resolvedStep,combinedSignal);
         return {stepId:step.id,status:'success',output,error:null,durationMs:Date.now()-startTime};
       }
       if (step.tool.startsWith('myslack.')) {
@@ -96,6 +97,24 @@ export class StepRunner {
       }
       // 1. Resolve arguments ($ref, $template)
       const resolvedArgs = resolveArgs(step.args || {}, stepOutputs);
+
+      if (step.tool === SLACK_PROPOSAL_WORKFLOW_TOOLS.bugCreateTool && Array.isArray(step.dependsOn) && step.dependsOn.length > 0 && typeof resolvedArgs.summary === 'string') {
+        const wanted = resolvedArgs.summary.trim().toLowerCase();
+        for (const depId of step.dependsOn) {
+          const depOut = stepOutputs.get(depId) as any;
+          const issues = Array.isArray(depOut?.issues) ? depOut.issues : Array.isArray(depOut?.output?.issues) ? depOut.output.issues : null;
+          const match = issues?.find((item: any) => typeof item?.title === 'string' && item.title.trim().toLowerCase() === wanted && typeof item.id === 'string' && typeof item.key === 'string' && typeof item.url === 'string');
+          if (match) {
+            return {
+              stepId: step.id,
+              status: 'success',
+              output: { id: match.id, key: match.key, url: match.url },
+              error: null,
+              durationMs: Date.now() - startTime,
+            };
+          }
+        }
+      }
 
       // 2. Extract service name (e.g. 'trello' from 'trello.create_card')
       const dotIndex = step.tool.indexOf('.');

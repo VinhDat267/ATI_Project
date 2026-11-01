@@ -33,6 +33,7 @@ export const routes = [
   { kind: 'account', pattern: /^\/account\/?$/ },
   { kind: 'settings', pattern: /^\/settings\/?$/ },
   { kind: 'history', pattern: /^\/history\/?$/ },
+  { kind: 'inbox', pattern: /^\/inbox\/?$/ },
   { kind: 'guide', pattern: /^\/guide\/?$/, publicView: (props: PublicViewProps) => createElement(GuidePage, { navigate: props.navigate }) },
   { kind: 'privacy', pattern: /^\/privacy\/?$/, publicView: (props: PublicViewProps) => createElement(PrivacyPage, { navigate: props.navigate }) },
 ] as const;

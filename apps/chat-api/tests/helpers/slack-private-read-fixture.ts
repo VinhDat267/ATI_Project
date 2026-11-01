@@ -246,15 +246,16 @@ export interface TokenCall {
 
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
 
-export async function createSlackReadEnvironment(prefix: string) {
+export async function createSlackReadEnvironment(prefix: string,configure?:(fixture:SlackHttpFixture)=>Record<string,string>) {
   const db = await createMigratedSchema(prefix);
   const fixture = new SlackHttpFixture();
   await fixture.start();
+  const runtimeEnv=configure?configure(fixture):TEST_ENV;
 
   const consentRepo = new SlackConsentRepo(db.pool);
   const invalidationService = new SlackInvalidationService(db.pool);
   const connectionRepo = new SlackConnectionRepo(db.pool, invalidationService);
-  const policyService = new SlackPolicyService(db.pool, { env: TEST_ENV });
+  const policyService = new SlackPolicyService(db.pool, { env: runtimeEnv });
   const oauth = new SlackOAuthClient({
     appId: 'A_TEST',
     clientId: 'CLIENT_TEST',
@@ -264,7 +265,7 @@ export async function createSlackReadEnvironment(prefix: string) {
     apiBaseUrl: fixture.url,
   });
   const tokenManager = new SlackTokenManager(connectionRepo, oauth, TEST_KEY);
-  const runtimeIdentity = resolveRuntimeProviderIdentity(TEST_ENV);
+  const runtimeIdentity = resolveRuntimeProviderIdentity(runtimeEnv);
   const consentedWorkspaces = new Set<string>();
 
   await consentRepo.attestProvider({
@@ -407,7 +408,7 @@ export async function createSlackReadEnvironment(prefix: string) {
       binding,
       purpose,
       requestedRetentionDays: 0,
-      env: TEST_ENV,
+      env: runtimeEnv,
     });
     if (!decision.allowed) throw new Error(`fixture policy denied: ${decision.reason}`);
     return validateSlackPolicyReference(decision.policyReference);
@@ -425,7 +426,7 @@ export async function createSlackReadEnvironment(prefix: string) {
       },
       invalidationService,
       ownerGate: connectionRepo,
-      runtimeConfig: { env: { ...TEST_ENV, MYSLACK_ENABLED: 'on' } },
+      runtimeConfig: { env: { ...runtimeEnv, MYSLACK_ENABLED: 'on' } },
       apiBaseUrl: fixture.url,
       requestTimeoutMs: 4_000,
       deadlineMs: 4_000,
@@ -448,6 +449,7 @@ export async function createSlackReadEnvironment(prefix: string) {
     policyService,
     tokenManager,
     runtimeIdentity,
+    runtimeEnv,
     addUser,
     reconnect,
     stageBarriers,

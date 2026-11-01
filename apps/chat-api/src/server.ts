@@ -1,3 +1,4 @@
+import {createPersonalSlackAssistantRuntime} from './config/slack-assistant-runtime.js';
 import {SlackDerivedExpiryFanout} from './services/slack/slack-derived-expiry.js';
 import { EventEmitter } from 'node:events';
 import { createMemoryConversationRepositories } from './db/repositories/memory-conversations.js';
@@ -382,7 +383,7 @@ async function bootstrap() {
         messagePurgeConsumer: pool ? new SlackMessagePurgeConsumer(pool) : undefined,
         derivedExpiryFanout:pool?new SlackDerivedExpiryFanout(pool):undefined,
         memoryPurgeConsumer: pool ? new SlackMessagePurgeConsumer(pool,{targetKind:'working_memory_entity'}) : undefined,
-        artifactPurgeConsumers: pool ? [new SlackMessagePurgeConsumer(pool,{targetKind:'plan_step_arg'}),new SlackMessagePurgeConsumer(pool,{targetKind:'audit_log_entry'}),new SlackMessagePurgeConsumer(pool,{targetKind:'scheduled_workflow_arg'})] : [],
+        artifactPurgeConsumers: pool ? [new SlackMessagePurgeConsumer(pool,{targetKind:'plan_step_arg'}),new SlackMessagePurgeConsumer(pool,{targetKind:'audit_log_entry'}),new SlackMessagePurgeConsumer(pool,{targetKind:'scheduled_workflow_arg'}),new SlackMessagePurgeConsumer(pool,{targetKind:'proposal_excerpt'}),new SlackMessagePurgeConsumer(pool,{targetKind:'daily_digest_entry'})] : [],
       })
     : undefined;
 
@@ -407,8 +408,10 @@ async function bootstrap() {
     console.warn('\x1b[33m[chat-api] MYSLACK_ENABLED=on nhưng chưa có PostgreSQL: Slack signed ingress tạm tắt.\x1b[0m');
   }
 
+  const slackAssistant=createPersonalSlackAssistantRuntime({pool:pool??undefined,oauth:env.MYSLACK_OAUTH,encryptionKey:env.ENCRYPTION_KEY,env:process.env,live:env.RUNTIME_MODE==='live'});
   // 8. Express App
   const app = createApp({
+    slackAssistant,
     myslack: env.MYSLACK_OAUTH && pool && userRepo ? { oauth: env.MYSLACK_OAUTH, repo: new SlackConnectionRepo(pool, slackInvalidationService) } : undefined,
     jwtSecret: env.JWT_SECRET,
     runtimeMode: env.RUNTIME_MODE,
@@ -482,12 +485,13 @@ async function bootstrap() {
     slackInvalidationRunner?.start();
     slackLifecycleRuntime?.start();
     slackFanoutRuntime?.start();
+    slackAssistant?.runner?.start();
   });
 
   const shutdown = async () => {
     schedules?.runner.stop();
     if (slackReceiptCleanupTimer) clearInterval(slackReceiptCleanupTimer);
-    await Promise.all([slackInvalidationRunner?.stop(), slackLifecycleRuntime?.stop(), slackFanoutRuntime?.stop()]);
+    await Promise.all([slackInvalidationRunner?.stop(), slackLifecycleRuntime?.stop(), slackFanoutRuntime?.stop(),slackAssistant?.runner?.stop()]);
     process.exit(0);
   };
   process.once('SIGINT', shutdown);

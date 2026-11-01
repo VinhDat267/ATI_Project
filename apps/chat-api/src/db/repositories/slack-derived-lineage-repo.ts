@@ -196,6 +196,13 @@ export class SlackDerivedLineageRepo {
     await this.lockSources(client, inputs.map(s => cleanSegment(s, owner)));
   }
 
+  /** Already acquired as part of the caller's complete source-lock union before any row locks. */
+  async assertSegmentsAllowedInTransaction(client:pg.PoolClient,inputs:DerivedSegmentInput[],owner:string,purpose:AssertDerivedCopyAllowedInput['consumerPurpose']):Promise<void>{
+    await this.requireTransaction(client);
+    if(inputs.length===0||inputs.length>256)deny('empty_segments');
+    const segments=inputs.map(s=>cleanSegment(s,owner));await this.authorize(client,segments,purpose);
+  }
+
   async segmentsInTransaction(client: pg.PoolClient, copyId: string): Promise<DerivedSegmentInput[]> {
     return (await client.query('SELECT * FROM slack_derived_provenance_segments WHERE derived_copy_id=$1 ORDER BY segment_index', [copyId])).rows.map(fromRow);
   }

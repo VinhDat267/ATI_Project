@@ -11,6 +11,7 @@ export const JSON_TOMBSTONE = {__slack_purged:true};
 export const PLAN_TOMBSTONE_TEXT = JSON.stringify(PLAN_TOMBSTONE);
 export const PLAN_TOMBSTONE_HASH = createHash('sha256').update(PLAN_TOMBSTONE_TEXT).digest('hex');
 export function validateSlackArtifactTarget(kind:string,selector:string):void {
+  if(['proposal_excerpt','daily_digest_entry'].includes(kind)&&selector==='body_json')return;
   if(kind==='scheduled_workflow_arg' && ['name','request','recurrence','title','error'].includes(selector))return;
   if(kind==='plan_step_arg') {
     if(['plan_json','plan_text','plan_hash','args_json'].includes(selector))return;
@@ -22,8 +23,9 @@ export function validateSlackArtifactTarget(kind:string,selector:string):void {
   else if(['chat_history_message','working_memory_entity'].includes(kind))return validateMessageSelector(kind,selector);
   throw new Error('unsupported_target');
 }
-export function artifactTable(kind:string,selector:string):'messages'|'plans'|'execution_steps'|'schedules'|'schedule_runs'|'conversations' {
+export function artifactTable(kind:string,selector:string):'messages'|'plans'|'execution_steps'|'schedules'|'schedule_runs'|'conversations'|'slack_assistant_artifacts' {
   validateSlackArtifactTarget(kind,selector);
+  if(['proposal_excerpt','daily_digest_entry'].includes(kind))return 'slack_assistant_artifacts';
   if(kind==='scheduled_workflow_arg')return selector==='title'?'conversations':selector==='error'?'schedule_runs':'schedules';
   return ['chat_history_message','working_memory_entity'].includes(kind)?'messages':kind==='audit_log_entry'||selector==='args_json'?'execution_steps':'plans';
 }
@@ -39,10 +41,17 @@ export async function lockSlackArtifact(client:pg.PoolClient,target:SlackArtifac
   if(location.table==='schedule_runs')await client.query(`SELECT id FROM schedules WHERE id=$1 FOR ${mode}`,[location.scheduleId]);
   const row=(await client.query(`SELECT * FROM ${location.table} WHERE id=$1 FOR ${mode}`,[target.targetId])).rows[0];
   if(!row || (location.table==='conversations'?row.id!==location.convId:location.table==='schedule_runs'?row.schedule_id!==location.scheduleId:location.table==='execution_steps'?row.plan_id!==location.planId:row.conv_id!==location.convId))throw new Error('stale_lineage');
+  if(location.table==='slack_assistant_artifacts'&&(row.kind!==target.targetKind||row.user_id!==target.atiUserId))throw new Error('stale_lineage');
   return {row,...location};
 }
 export function slackArtifactValue(row:any,kind:string,selector:string):unknown {
   validateSlackArtifactTarget(kind,selector);
+  if(['proposal_excerpt','daily_digest_entry'].includes(kind)){
+    if(slackArtifactIsErased(row.body_json,kind,selector))return row.body_json;
+    const b=row.body_json?.binding;
+    if(row.kind!==kind||row.body_json?.artifactId!==row.id||b?.atiUserId!==row.user_id||b.connectionId!==row.connection_id||b.workspaceId!==row.workspace_id||b.slackUserId!==row.slack_user_id||b.identityVersion!==row.identity_version||row.body_json.configVersion!==row.config_version||row.body_json.payloadRevision!==row.payload_revision)throw new Error('stale_lineage');
+    return row.body_json;
+  }
   if(['chat_history_message','working_memory_entity'].includes(kind))return messageSelectorValue(row,kind,selector);
   if(selector.startsWith('resource_labels/'))return row.resource_labels?.[decodeURIComponent(selector.slice(16))];
   return row[selector];
@@ -79,6 +88,9 @@ export async function eraseSlackArtifact(client:pg.PoolClient,target:SlackArtifa
   if(artifact.table==='messages') {
     eraseMessageSelector(artifact.row,target.targetKind,target.targetSubId);
     await client.query('UPDATE messages SET content=$2,metadata=$3 WHERE id=$1',[target.targetId,artifact.row.content,JSON.stringify(artifact.row.metadata)]);await reseal();return;
+  }
+  if(artifact.table==='slack_assistant_artifacts'){
+    await client.query("UPDATE slack_assistant_artifacts SET body_json=$2,status='stale',revision=revision+1,updated_at=clock_timestamp() WHERE id=$1",[target.targetId,JSON.stringify(JSON_TOMBSTONE)]);return;
   }
   const selector=target.targetSubId;
   if(target.targetKind==='scheduled_workflow_arg'){

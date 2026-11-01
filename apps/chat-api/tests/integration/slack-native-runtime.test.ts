@@ -191,7 +191,7 @@ it('actual server drains signed revocation through validation and purge with fla
   }
 }, 65_000);
 
-it.each(['disconnect','derived expiry'])('actual server erases durable core artifacts without Slack config, unsupported kinds pending (%s)', async (mode) => {
+it.each(['disconnect','derived expiry'])('actual server erases durable core artifacts and completes empty assistant domains without Slack config (%s)', async (mode) => {
   const env = await createSlackReadEnvironment('slack_native_no_config');
   let native: Awaited<ReturnType<typeof startNative>> | undefined;
   try {
@@ -263,18 +263,21 @@ it.each(['disconnect','derived expiry'])('actual server erases durable core arti
     await native.until(async()=>!(JSON.stringify((await env.db.pool.query('SELECT title FROM conversations WHERE id=$1',[runConvId])).rows[0]).includes('Private native')),'run title erasure without Slack config');
     await native.until(async()=>!(JSON.stringify((await env.db.pool.query('SELECT error FROM schedule_runs WHERE id=$1',[runId])).rows[0]).includes('Private native')),'run error erasure without Slack config');
     if(mode==='disconnect'){
-    const jobs = (await env.db.pool.query('SELECT target_kind,status FROM slack_invalidation_intents WHERE source_event_key=$1', [key])).rows;
-    expect(jobs.filter(row => row.status === 'completed').map(row => row.target_kind).sort()).toEqual(['audit_log_entry','chat_history_message','plan_step_arg','scheduled_workflow_arg','slack_source_raw','working_memory_entity']);
-    expect(jobs.filter(row => row.status === 'pending')).toHaveLength(2);
+      // This fixture has no assistant payloads. Empty supported domains can complete;
+      // it does not certify a daily-digest writer or seventh-kind lifecycle acceptance.
+      await native.until(async()=>{
+        const jobs=(await env.db.pool.query('SELECT target_kind,status FROM slack_invalidation_intents WHERE source_event_key=$1',[key])).rows;
+        return jobs.length===SLACK_DERIVED_TARGET_KINDS.length+1&&jobs.every(row=>row.status==='completed');
+      },'all registered and empty supported domains completed');
+      const jobs=(await env.db.pool.query('SELECT target_kind,status FROM slack_invalidation_intents WHERE source_event_key=$1',[key])).rows;
+      expect(jobs.map(row=>row.target_kind).sort()).toEqual([...SLACK_DERIVED_TARGET_KINDS,'slack_source_raw'].sort());
     }else{
       await native.until(async()=>{
-        const pending=await env.db.pool.query("SELECT 1 FROM slack_invalidation_intents WHERE source_event_key LIKE 'derived-expiry:%' AND target_kind IN ('chat_history_message','working_memory_entity','plan_step_arg','audit_log_entry','scheduled_workflow_arg') AND status<>'completed'");
+        const pending=await env.db.pool.query("SELECT 1 FROM slack_invalidation_intents WHERE source_event_key LIKE 'derived-expiry:%' AND status<>'completed'");
         return pending.rowCount===0;
       },'derived expiry intent completion');
       const jobs=(await env.db.pool.query("SELECT target_kind,status FROM slack_invalidation_intents WHERE source_event_key LIKE 'derived-expiry:%'")).rows;
-      for(const kind of ['chat_history_message','working_memory_entity','plan_step_arg','audit_log_entry','scheduled_workflow_arg'])expect(jobs.filter(j=>j.target_kind===kind).every(j=>j.status==='completed')&&jobs.some(j=>j.target_kind===kind)).toBe(true);
-      expect(jobs.some(j=>j.target_kind==='proposal_excerpt'&&j.status==='pending')).toBe(true);
-      expect(jobs.some(j=>j.target_kind==='daily_digest_entry'&&j.status==='pending')).toBe(true);
+      for(const kind of SLACK_DERIVED_TARGET_KINDS)expect(jobs.filter(j=>j.target_kind===kind).every(j=>j.status==='completed')&&jobs.some(j=>j.target_kind===kind)).toBe(true);
       expect((await env.db.pool.query('SELECT content FROM messages WHERE id=$1',[freshId])).rows[0].content).toBe('Fresh same-source capture');
       expect((await env.db.pool.query('SELECT content FROM messages WHERE id=$1',[otherId])).rows[0].content).toBe('Keep other ATI owner');
       expect((await env.db.pool.query("SELECT count(*)::int AS n FROM slack_invalidation_barriers")).rows[0].n).toBe(0);

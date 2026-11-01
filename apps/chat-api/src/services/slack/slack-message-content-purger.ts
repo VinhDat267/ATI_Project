@@ -81,7 +81,7 @@ export class SlackMessageContentPurger {
     await client.query('RELEASE SAVEPOINT slack_message_purge_tx_guard');
     const intent=(await client.query('SELECT id,source_event_key,effect_key,target_kind,purge_target,created_at::text AS cutoff,status FROM slack_invalidation_intents WHERE id=$1',[input.intentId])).rows[0];
     if(!intent || intent.status==='completed') return {status:'skipped'};
-    if(!['chat_history_message','working_memory_entity','plan_step_arg','audit_log_entry','scheduled_workflow_arg'].includes(intent.target_kind)) return {status:'missing_handler'};
+    if(!['chat_history_message','working_memory_entity','plan_step_arg','audit_log_entry','scheduled_workflow_arg','proposal_excerpt','daily_digest_entry'].includes(intent.target_kind)) return {status:'missing_handler'};
     let target:SlackPurgeTarget;
     try {target=validateSlackPurgeTarget(intent.purge_target);} catch {return {status:'stale_lineage'};}
     const expiry=await derivedExpiryProof(client,intent);

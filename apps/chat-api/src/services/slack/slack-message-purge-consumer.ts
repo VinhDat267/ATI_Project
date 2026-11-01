@@ -10,7 +10,7 @@ export interface MessagePurgeLease {id:string;workerNonce:string;leaseUntil:stri
 const replaceableHistory=(row:any)=>row.status==='purged'||(row.status==='retired'&&row.retired_reason==='manual');
 type Outcome='completed'|'retried'|'lost';
 type Code='STALE_LINEAGE'|'MISSING_HANDLER'|'INVALID_PROVENANCE'|'PARTIAL_PURGE'|'RETRY_SCAN'|'ABORTED'|'PURGE_FAILED';
-type SupportedKind='chat_history_message'|'working_memory_entity'|'plan_step_arg'|'audit_log_entry'|'scheduled_workflow_arg';
+type SupportedKind='chat_history_message'|'working_memory_entity'|'plan_step_arg'|'audit_log_entry'|'scheduled_workflow_arg'|'proposal_excerpt'|'daily_digest_entry';
 interface Options {batchSize?:number;leaseSeconds?:number;targetKind?:SupportedKind;purger?:Pick<SlackMessageContentPurger,'purgeInTransaction'|'sourceLockKeysInTransaction'>}
 class Failure extends Error {constructor(readonly safeCode:Code){super(safeCode);}}
 class LostLease extends Error {}
@@ -74,7 +74,7 @@ export class SlackMessagePurgeConsumer {
   constructor(private readonly pool:pg.Pool,options:Options={}) {
     this.size=options.batchSize??20;this.seconds=options.leaseSeconds??60;bound(this.size,100);bound(this.seconds,600);this.purger=options.purger??new SlackMessageContentPurger();
     this.kind=options.targetKind??'chat_history_message';
-    if(!['chat_history_message','working_memory_entity','plan_step_arg','audit_log_entry','scheduled_workflow_arg'].includes(this.kind))throw new TypeError('INVALID_PURGE_KIND');
+    if(!['chat_history_message','working_memory_entity','plan_step_arg','audit_log_entry','scheduled_workflow_arg','proposal_excerpt','daily_digest_entry'].includes(this.kind))throw new TypeError('INVALID_PURGE_KIND');
   }
   async claim(limit=5):Promise<MessagePurgeLease[]> {
     bound(limit,50);

@@ -9,7 +9,7 @@ import { readableRecoveryPlan, recoveryConflict, restoredProgress, validateRecov
 import type { AdapterContext } from './adapter-factory.js';
 import { isSlackSourceArtifact } from './slack/slack-plan-lineage.js';
 import type {SlackWriteRuntime} from './slack/slack-write-runtime.js';
-import {isBoundSlackWritePlan} from './slack/slack-write-plan.js';
+import {isBoundSlackWritePlan,isBoundSlackExecutableWritePlan} from './slack/slack-write-plan.js';
 import type { SlackReadRuntime } from './slack/slack-read-runtime.js';
 import type { SlackExecutionSnapshot } from '@wap/executor';
 
@@ -144,7 +144,7 @@ export class ExecutionService {
     // Everything that can fail is done before the approval CAS commits.
     const context = this.executionContext(userId, planJson?.connections);
     if(planJson?.connections?.myslack){
-      const runtime=isBoundSlackWritePlan(planJson,userId)?this.slackWrite:this.slackRead;
+      const runtime=isBoundSlackExecutableWritePlan(planJson,userId)?this.slackWrite:this.slackRead;
       if(!runtime||!this.stepRepo)return {success:false,status:409,error:'SLACK_READ_UNAVAILABLE'};
       try{await runtime.assertApproval({planId,planHash:planRow.plan_hash,userId,steps:planJson.steps,bindings:planJson.connections.myslack});}
       catch{return {success:false,status:409,error:'SLACK_READ_POLICY_DENIED'};}
@@ -191,7 +191,7 @@ export class ExecutionService {
   }
 
   private buildController(convId: string, planId: string, steps: PlanStep[], dbIds: Map<string, string>, context: AdapterContext, initialStates?: Record<string, StepState>, dispatch?: {userId: string; planHash: string}) {
-    const writePlan=dispatch&&isBoundSlackWritePlan({kind:'plan',thinking:'',summary:'',warnings:[],steps,connections:context.connections},dispatch.userId);
+    const writePlan=dispatch&&isBoundSlackExecutableWritePlan({kind:'plan',thinking:'',summary:'',warnings:[],steps,connections:context.connections},dispatch.userId);
     const writeSnapshot:SlackExecutionSnapshot|undefined=writePlan&&dispatch?{planId,planHash:dispatch.planHash,userId:dispatch.userId,steps,bindings:context.connections!.myslack!}:undefined;
     const slackSnapshot:SlackExecutionSnapshot|undefined=!writePlan&&context.connections?.myslack&&dispatch?{planId,planHash:dispatch.planHash,userId:dispatch.userId,steps,bindings:context.connections.myslack,
       outputOrigins:Object.fromEntries(Object.entries(initialStates??{}).filter(([,s])=>s.status==='succeeded').map(([id])=>[id,'persisted' as const]))}:undefined;
@@ -296,7 +296,7 @@ export class ExecutionService {
 
   async continueExecution(planId: string, userId: string): Promise<any> {
     const plan = await this.getOwnedPlan(planId, userId);
-    if(isBoundSlackWritePlan(plan.plan_json,userId))throw recoveryConflict('SLACK_POST_RECONCILE_REQUIRED');
+    if(isBoundSlackExecutableWritePlan(plan.plan_json,userId))throw recoveryConflict('SLACK_POST_RECONCILE_REQUIRED');
     if (this.activeRuns.has(planId) || this.activeControllers.get(planId)?.isExecuting()) {
       throw recoveryConflict('Execution is already running');
     }
@@ -322,7 +322,7 @@ export class ExecutionService {
 
   private async continueStep(planId: string, stepId: string, userId: string, action: 'retry' | 'skip'): Promise<any> {
     let planRow = await this.getOwnedPlan(planId, userId);
-    if(isBoundSlackWritePlan(planRow.plan_json,userId))throw recoveryConflict('SLACK_POST_RECONCILE_REQUIRED');
+    if(isBoundSlackExecutableWritePlan(planRow.plan_json,userId))throw recoveryConflict('SLACK_POST_RECONCILE_REQUIRED');
     // Include the preceding run's plan-status write in the serialization boundary.
     const priorRun = this.activeRuns.get(planId);
     if (priorRun) {
@@ -467,9 +467,10 @@ export class ExecutionService {
 
   async reconcileSlackPost(planId:string,stepId:string,userId:string){
     const plan=await this.getOwnedPlan(planId,userId);
-    if(!this.slackWrite||!this.stepRepo||!isBoundSlackWritePlan(plan.plan_json,userId)||this.activeRuns.has(planId)||this.activeControllers.get(planId)?.isExecuting())throw recoveryConflict('SLACK_POST_RECONCILE_UNAVAILABLE');
+    if(!this.slackWrite||!this.stepRepo||!isBoundSlackExecutableWritePlan(plan.plan_json,userId)||this.activeRuns.has(planId)||this.activeControllers.get(planId)?.isExecuting())throw recoveryConflict('SLACK_POST_RECONCILE_UNAVAILABLE');
     const rows=await this.stepRepo.listSteps(planId),row=rows.find(r=>r.step_id===stepId);
-    if(rows.length!==1||!row||row.status!=='unknown')throw recoveryConflict('SLACK_POST_RECONCILE_UNAVAILABLE');
+    const validRows=isBoundSlackWritePlan(plan.plan_json,userId)?rows.length===1:rows.length===plan.plan_json.steps.length&&rows.every(r=>r.step_id===stepId?r.status==='unknown':r.status==='succeeded');
+    if(!validRows||!row||row.status!=='unknown'||row.tool!=='myslack.chat_postMessage')throw recoveryConflict('SLACK_POST_RECONCILE_UNAVAILABLE');
     let output;try{output=await this.slackWrite.reconcile({planId,planHash:plan.plan_hash,userId,steps:plan.plan_json.steps,bindings:plan.plan_json.connections.myslack},stepId);}catch{throw recoveryConflict('SLACK_WRITE_UNKNOWN');}
     try{await this.stepRepo.completeSlackPostReconciliation(planId,stepId,userId,plan.plan_hash,output,
       c=>this.slackWrite!.assertCompletion({planId,planHash:plan.plan_hash,userId,steps:plan.plan_json.steps,bindings:plan.plan_json.connections.myslack},stepId,c));}catch{throw recoveryConflict('SLACK_WRITE_UNKNOWN');}
@@ -504,7 +505,7 @@ export class ExecutionService {
         }
       } catch { /* Invalid or unstarted progress can still be stopped. */ }
     }
-    if(isBoundSlackWritePlan(parsed,userId)&&rows.some(r=>r.status==='unknown'))recoveryActions=this.slackWrite?['slack-reconcile','stop']:['stop'];
+    if(isBoundSlackExecutableWritePlan(parsed,userId)&&rows.some(r=>r.status==='unknown'&&r.tool==='myslack.chat_postMessage'))recoveryActions=this.slackWrite?['slack-reconcile','stop']:['stop'];
     return {
       plan: { ...parsed, id: plan.id, convId: plan.conv_id, status: plan.status, resourceLabels: plan.resource_labels ?? {} },
       execution,
