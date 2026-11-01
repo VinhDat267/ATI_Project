@@ -97,4 +97,254 @@ export class AdminUserRepo {
     } catch (error) { await client.query('ROLLBACK'); throw error; }
     finally { client.release(); }
   }
+
+  async listForWorkspace(
+    actorId: string,
+    workspaceId: string,
+    filter: AdminUserFilter
+  ): Promise<AdminUserPage & { inviteCode: string; requireApproval: boolean; workspaceName: string }> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ');
+      const wsRes = await client.query<{ name: string; invite_code: string; require_approval: boolean }>(
+        'SELECT name, invite_code, require_approval FROM workspaces WHERE id = $1',
+        [workspaceId]
+      );
+      if (!wsRes.rows[0]) throw new AdminUserError(404, 'WORKSPACE_NOT_FOUND', 'Không tìm thấy tổ chức.');
+      const ws = wsRes.rows[0];
+
+      const actor = await client.query(
+        "SELECT user_id FROM workspace_members WHERE workspace_id = $1 AND user_id = $2 AND role = 'admin' AND status = 'active'",
+        [workspaceId, actorId]
+      );
+      if (!actor.rows[0]) throw forbidden();
+
+      const search = filter.search ? `%${filter.search.replace(/[\\%_]/g, '\\$&')}%` : null;
+      const args = [workspaceId, filter.status ?? null, search];
+      const where = "wm.workspace_id = $1 AND ($2::text IS NULL OR wm.status = $2) AND ($3::text IS NULL OR u.email ILIKE $3 ESCAPE '\\' OR u.name ILIKE $3 ESCAPE '\\')";
+
+      const counts = await client.query<{ total: number }>(
+        `SELECT count(*)::int AS total FROM workspace_members wm JOIN users u ON u.id = wm.user_id WHERE ${where}`,
+        args
+      );
+      const pending = await client.query<{ count: number }>(
+        "SELECT count(*)::int AS count FROM workspace_members WHERE workspace_id = $1 AND status = 'pending'",
+        [workspaceId]
+      );
+
+      const result = await client.query<AccountRow>(
+        `SELECT u.id, u.email, u.name, wm.status, wm.role, u.email_verified,
+           (u.password IS NOT NULL) AS has_password, (u.google_sub IS NOT NULL) AS has_google, wm.created_at,
+           (SELECT count(*)::int FROM auth_sessions s WHERE s.user_id = u.id AND s.revoked_at IS NULL AND s.expires_at > now()) AS open_sessions
+         FROM workspace_members wm
+         JOIN users u ON u.id = wm.user_id
+         WHERE ${where}
+         ORDER BY wm.created_at DESC, u.id DESC
+         LIMIT $4 OFFSET $5`,
+        [...args, filter.limit, (filter.page - 1) * filter.limit]
+      );
+      await client.query('COMMIT');
+      return {
+        users: result.rows.map(safeUser),
+        total: counts.rows[0].total,
+        pendingCount: pending.rows[0].count,
+        page: filter.page,
+        limit: filter.limit,
+        inviteCode: ws.invite_code,
+        requireApproval: ws.require_approval,
+        workspaceName: ws.name,
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async mutateForWorkspace(
+    actorId: string,
+    sessionId: string,
+    workspaceId: string,
+    targetId: string,
+    action: AdminAction | 'reject',
+    role?: AccountRole,
+    now = Date.now()
+  ): Promise<{ user?: AdminUser; rejectedId?: string; at: Date }> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock(hashtext(current_schema()), hashtext($1))', [workspaceId]);
+
+      const session = await client.query(
+        'SELECT id FROM auth_sessions WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL AND expires_at > now() FOR UPDATE',
+        [sessionId, actorId]
+      );
+      if (!session.rows[0]) {
+        throw new AdminUserError(401, 'SESSION_REVOKED', 'Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.');
+      }
+
+      const members = await client.query<{
+        workspace_id: string;
+        user_id: string;
+        role: AccountRole;
+        status: AccountStatus;
+        email: string;
+        name: string;
+        email_verified: boolean;
+        has_password: boolean;
+        has_google: boolean;
+        created_at: Date;
+      }>(
+        `SELECT wm.workspace_id, wm.user_id, wm.role, wm.status, u.email, u.name, u.email_verified,
+           (u.password IS NOT NULL) AS has_password, (u.google_sub IS NOT NULL) AS has_google, wm.created_at
+         FROM workspace_members wm
+         JOIN users u ON u.id = wm.user_id
+         WHERE wm.workspace_id = $1 AND wm.user_id = ANY($2::uuid[])
+         ORDER BY wm.user_id FOR UPDATE`,
+        [workspaceId, [actorId, targetId]]
+      );
+
+      const actor = members.rows.find(m => m.user_id === actorId);
+      if (!actor || actor.role !== 'admin' || actor.status !== 'active') throw forbidden();
+
+      const target = members.rows.find(m => m.user_id === targetId);
+      if (!target) throw new AdminUserError(404, 'USER_NOT_FOUND', 'Không tìm thấy thành viên trong tổ chức.');
+
+      if (actorId === targetId && (action === 'disable' || (action === 'role' && role === 'member'))) {
+        throw new AdminUserError(409, 'ADMIN_SELF_CHANGE', 'Bạn không thể tự khóa tài khoản hoặc bỏ quyền quản trị của mình trong tổ chức.');
+      }
+
+      if (action === 'reject') {
+        if (target.status !== 'pending') {
+          throw new AdminUserError(409, 'ACCOUNT_NOT_REJECTABLE', 'Chỉ từ chối được yêu cầu tham gia đang chờ duyệt.');
+        }
+        await client.query('DELETE FROM workspace_members WHERE workspace_id = $1 AND user_id = $2', [workspaceId, targetId]);
+        await client.query('COMMIT');
+        return { rejectedId: targetId, at: new Date(now) };
+      }
+
+      if (action === 'approve') {
+        if (target.status !== 'pending') {
+          throw new AdminUserError(409, 'ACCOUNT_NOT_APPROVABLE', 'Chỉ duyệt được thành viên đang chờ duyệt.');
+        }
+      }
+      if (action === 'enable') {
+        if (target.status !== 'disabled') {
+          throw new AdminUserError(409, 'ACCOUNT_NOT_ENABLEABLE', 'Chỉ mở khóa được thành viên đã bị khóa.');
+        }
+      }
+      if (action === 'disable') {
+        if (target.status === 'disabled') {
+          throw new AdminUserError(409, 'ACCOUNT_ALREADY_DISABLED', 'Thành viên đã bị khóa.');
+        }
+        if (target.status !== 'active') {
+          throw new AdminUserError(409, 'ACCOUNT_NOT_DISABLEABLE', 'Chỉ khóa được thành viên đang hoạt động.');
+        }
+      }
+      if (action === 'role') {
+        if (!role || target.role === role) {
+          throw new AdminUserError(409, 'ROLE_UNCHANGED', 'Vai trò thành viên chưa thay đổi.');
+        }
+      }
+
+      const nextStatus = action === 'approve' || action === 'enable' ? 'active' : action === 'disable' ? 'disabled' : target.status;
+      const nextRole = action === 'role' ? role! : target.role;
+
+      await client.query(
+        'UPDATE workspace_members SET status = $3, role = $4, updated_at = $5 WHERE workspace_id = $1 AND user_id = $2',
+        [workspaceId, targetId, nextStatus, nextRole, new Date(now)]
+      );
+
+      if (action === 'disable' || (action === 'role' && role === 'member')) {
+        const admins = await client.query<{ count: number }>(
+          "SELECT count(*)::int AS count FROM workspace_members WHERE workspace_id = $1 AND role = 'admin' AND status = 'active'",
+          [workspaceId]
+        );
+        if (admins.rows[0].count < 1) {
+          throw new AdminUserError(409, 'LAST_ACTIVE_ADMIN', 'Phải giữ lại ít nhất một quản trị viên đang hoạt động trong tổ chức.');
+        }
+      }
+
+      const result = await client.query<AccountRow & { at: Date }>(
+        `SELECT u.id, u.email, u.name, wm.status, wm.role, u.email_verified,
+           (u.password IS NOT NULL) AS has_password, (u.google_sub IS NOT NULL) AS has_google,
+           wm.created_at, wm.updated_at AS at,
+           (SELECT count(*)::int FROM auth_sessions s WHERE s.user_id = u.id AND s.revoked_at IS NULL AND s.expires_at > now()) AS open_sessions
+         FROM workspace_members wm
+         JOIN users u ON u.id = wm.user_id
+         WHERE wm.workspace_id = $1 AND wm.user_id = $2`,
+        [workspaceId, targetId]
+      );
+      await client.query('COMMIT');
+      return { user: safeUser(result.rows[0]!), at: result.rows[0]!.at };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async approveAllForWorkspace(
+    actorId: string,
+    sessionId: string,
+    workspaceId: string,
+    now = Date.now()
+  ): Promise<{ approvedUsers: AdminUser[]; approvedCount: number; at: Date }> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock(hashtext(current_schema()), hashtext($1))', [workspaceId]);
+
+      if (sessionId) {
+        const session = await client.query(
+          'SELECT id FROM auth_sessions WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL AND expires_at > now() FOR UPDATE',
+          [sessionId, actorId]
+        );
+        if (!session.rows[0]) {
+          throw new AdminUserError(401, 'SESSION_REVOKED', 'Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.');
+        }
+      }
+
+      const actor = await client.query(
+        "SELECT user_id FROM workspace_members WHERE workspace_id = $1 AND user_id = $2 AND role = 'admin' AND status = 'active' FOR UPDATE",
+        [workspaceId, actorId]
+      );
+      if (!actor.rows[0]) throw forbidden();
+
+      const updated = await client.query<{ user_id: string }>(
+        "UPDATE workspace_members SET status = 'active', updated_at = $2 WHERE workspace_id = $1 AND status = 'pending' RETURNING user_id",
+        [workspaceId, new Date(now)]
+      );
+
+      const userIds = updated.rows.map(r => r.user_id);
+      let approvedUsers: AdminUser[] = [];
+      if (userIds.length > 0) {
+        const rows = await client.query<AccountRow>(
+          `SELECT u.id, u.email, u.name, wm.status, wm.role, u.email_verified,
+             (u.password IS NOT NULL) AS has_password, (u.google_sub IS NOT NULL) AS has_google,
+             wm.created_at,
+             (SELECT count(*)::int FROM auth_sessions s WHERE s.user_id = u.id AND s.revoked_at IS NULL AND s.expires_at > now()) AS open_sessions
+           FROM workspace_members wm
+           JOIN users u ON u.id = wm.user_id
+           WHERE wm.workspace_id = $1 AND wm.user_id = ANY($2::uuid[])`,
+          [workspaceId, userIds]
+        );
+        approvedUsers = rows.rows.map(safeUser);
+      }
+
+      await client.query('COMMIT');
+      return {
+        approvedUsers,
+        approvedCount: userIds.length,
+        at: new Date(now),
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
 }
