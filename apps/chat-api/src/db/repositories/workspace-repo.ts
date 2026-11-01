@@ -336,7 +336,7 @@ export class WorkspaceRepo {
       );
 
       await client.query('COMMIT');
-      return { requireApproval: res.rows[0].require_approval };
+      return { requireApproval: res.rows[0]?.require_approval ?? settings.requireApproval };
     } catch (err) {
       await client.query('ROLLBACK');
       throw err;

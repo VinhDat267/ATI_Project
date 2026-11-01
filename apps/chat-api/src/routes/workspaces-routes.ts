@@ -89,7 +89,8 @@ export function createWorkspacesRouter(options: WorkspacesRouterOptions): Router
   // POST /:id/invite-code/regenerate - Regenerate invite code
   router.post('/:id/invite-code/regenerate', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const inviteCode = await options.workspaceRepo.regenerateInviteCode(req.user!.id, req.params.id);
+      const workspaceId = typeof req.params.id === 'string' ? req.params.id : '';
+      const inviteCode = await options.workspaceRepo.regenerateInviteCode(req.user!.id, workspaceId);
       res.status(200).json({ inviteCode });
     } catch (err) {
       handleWorkspaceError(err, res, next);
@@ -105,7 +106,8 @@ export function createWorkspacesRouter(options: WorkspacesRouterOptions): Router
         return;
       }
 
-      const updated = await options.workspaceRepo.updateSettings(req.user!.id, req.params.id, { requireApproval });
+      const workspaceId = typeof req.params.id === 'string' ? req.params.id : '';
+      const updated = await options.workspaceRepo.updateSettings(req.user!.id, workspaceId, { requireApproval });
       res.status(200).json({ requireApproval: updated.requireApproval });
     } catch (err) {
       handleWorkspaceError(err, res, next);

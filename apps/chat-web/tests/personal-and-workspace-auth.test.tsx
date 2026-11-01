@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { VerifyEmailView } from '../src/views/VerifyEmailView';
 import { AuthGate } from '../src/components/AuthGate';
 import { MainNav } from '../src/components/layout/MainNav';
@@ -361,6 +361,31 @@ describe('Personal and Workspace Auth (Task 5)', () => {
       );
 
       expect(screen.getByText(/Đội Alpha/i)).toBeInTheDocument();
+    });
+
+    it('shows context pill in SettingsPage and updates via subscribeWorkspace', () => {
+      let listenerCalled = false;
+      const unsubscribe = subscribeWorkspace(() => {
+        listenerCalled = true;
+      });
+
+      setActiveWorkspaceId('personal');
+      expect(listenerCalled).toBe(true);
+
+      const { rerender } = render(<SettingsPage user={testUser} navigate={vi.fn()} onLogout={vi.fn()} />);
+      expect(screen.getByText(/Không gian Cá nhân/i)).toBeInTheDocument();
+
+      setActiveWorkspaceId('ws-team-alpha');
+      setCachedOrganizations([sampleOrg]);
+      rerender(<SettingsPage user={testUser} navigate={vi.fn()} onLogout={vi.fn()} />);
+      expect(screen.getByText(/Đội Alpha/i)).toBeInTheDocument();
+
+      unsubscribe();
+    });
+
+    it('stores pending invite code via savePendingInviteCode', () => {
+      savePendingInviteCode('ATI-TEST-1234');
+      expect(window.localStorage.getItem('wap_pending_invite_code')).toBe('ATI-TEST-1234');
     });
   });
 });

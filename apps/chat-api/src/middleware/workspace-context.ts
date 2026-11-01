@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { WorkspaceRepo } from '../db/repositories/workspace-repo.js';
+import type { AuthUser } from '../auth/jwt.js';
 
 export interface WorkspaceContext {
   mode: 'legacy' | 'personal' | 'organization';
@@ -11,6 +12,7 @@ export interface WorkspaceContext {
 declare global {
   namespace Express {
     interface Request {
+      user?: AuthUser;
       workspace?: WorkspaceContext;
     }
   }

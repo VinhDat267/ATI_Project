@@ -146,8 +146,8 @@ export class AdminUserRepo {
       await client.query('COMMIT');
       return {
         users: result.rows.map(safeUser),
-        total: counts.rows[0].total,
-        pendingCount: pending.rows[0].count,
+        total: counts.rows[0]?.total ?? 0,
+        pendingCount: pending.rows[0]?.count ?? 0,
         page: filter.page,
         limit: filter.limit,
         inviteCode: ws.invite_code,
@@ -261,7 +261,7 @@ export class AdminUserRepo {
           "SELECT count(*)::int AS count FROM workspace_members WHERE workspace_id = $1 AND role = 'admin' AND status = 'active'",
           [workspaceId]
         );
-        if (admins.rows[0].count < 1) {
+        if ((admins.rows[0]?.count ?? 0) < 1) {
           throw new AdminUserError(409, 'LAST_ACTIVE_ADMIN', 'Phải giữ lại ít nhất một quản trị viên đang hoạt động trong tổ chức.');
         }
       }

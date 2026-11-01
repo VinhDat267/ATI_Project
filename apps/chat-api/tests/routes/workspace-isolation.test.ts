@@ -95,7 +95,7 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
 
     tokenManager = new TrelloTokenManager({
       client: {
-        refresh: async (token) => ({
+        refresh: async (token: string) => ({
           accessToken: `access-token-for-${token}`,
           refreshToken: `refreshed-for-${token}`,
           expiresIn: 3600,

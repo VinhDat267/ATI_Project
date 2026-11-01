@@ -131,7 +131,7 @@ describe('WorkspaceRepo & Workspace-Scoped AdminUserRepo with real PostgreSQL', 
       expect(join1.workspace.status).toBe('pending');
       expect(join1.workspace.role).toBe('member');
       expect(join1.admins).toHaveLength(1);
-      expect(join1.admins[0].id).toBe(adminUser.id);
+      expect(join1.admins[0]!.id).toBe(adminUser.id);
 
       // Idempotent join returns existing membership
       const joinAgain = await wsRepo.joinByInviteCode(user1.id, ws.inviteCode!);

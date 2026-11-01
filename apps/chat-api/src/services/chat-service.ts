@@ -137,7 +137,7 @@ export interface ChatServiceOptions {
     getAdapter?: () => Promise<any> | any;
   }) | null>;
   /** The caller's active Trello connection lookup; absent when Trello is off or not connected. */
-  trelloConnection?: (userId: string) => Promise<any>;
+  trelloConnection?: (userId: string, scopeId?: string) => Promise<any>;
   /** Scheduled workflows (SCHEDULES_ENABLED); absent, conversations have no schedule. */
   schedules?: { repo: ScheduleRepo; timeZone: string; now?: () => Date };
   /** Optional adapter retriever or tool executor for live resource validation in planning. */
