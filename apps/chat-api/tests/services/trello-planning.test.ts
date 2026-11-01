@@ -225,12 +225,14 @@ describe('Task 8: Trello planning, catalog, refusal, and execution guards', () =
 
       const result = await (chatService as any).bindConnections(plan, userId, undefined, memory);
       expect(result.kind).toBe('plan');
+      expect((result as any).steps[0].boardId).toBe('board_frontend');
       expect((result as any).connections?.trello).toEqual({
         credentialId: 'cred-1',
         memberId: 'mem-1',
         username: 'alice',
         boardIds: ['board_frontend'],
       });
+      expect((result as any).connections?.trello?.refreshToken).toBeUndefined();
 
       // Hash changes if boardIds change
       const planA = { ...result, connections: { trello: { credentialId: 'cred-1', memberId: 'm1', username: 'alice', boardIds: ['b1'] } } };

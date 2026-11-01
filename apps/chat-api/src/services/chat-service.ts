@@ -390,8 +390,16 @@ export class ChatService {
         const teamBoardMap = new Map<string, string>(
           (trello.teamBoards ?? []).map((b: any) => [b.boardId, b.boardName])
         );
-        const listed = memory?.getEntity('__observed')?.list ?? memory?.getEntity('list') ?? [];
-        const observedLists = (Array.isArray(listed) ? listed : [listed]) as any[];
+        const allEntities = memory ? memory.getAll() : {};
+        const observedLists = [
+          ...(Array.isArray(allEntities.list) ? allEntities.list : allEntities.list ? [allEntities.list] : []),
+          ...(Array.isArray((allEntities.__observed as any)?.list) ? (allEntities.__observed as any).list : []),
+        ];
+        const observedCards = [
+          ...(Array.isArray(allEntities.card) ? allEntities.card : allEntities.card ? [allEntities.card] : []),
+          ...(Array.isArray((allEntities.__observed as any)?.card) ? (allEntities.__observed as any).card : []),
+        ];
+        const stepBoardMap = new Map<string, string>();
 
         let forbiddenBoardName: string | null = null;
         for (const step of bound.steps) {
@@ -405,6 +413,37 @@ export class ChatService {
               targetBoardId = step.args.listId;
             }
           }
+          if (!targetBoardId && step.args?.cardId) {
+            if (typeof step.args.cardId === 'string') {
+              const foundCard = observedCards.find((c: any) => c.id === step.args.cardId);
+              if (foundCard) {
+                targetBoardId = foundCard.boardId || foundCard.idBoard;
+                if (!targetBoardId && (foundCard.listId || foundCard.idList)) {
+                  const cardListId = foundCard.listId || foundCard.idList;
+                  const foundList = observedLists.find((l: any) => l.id === cardListId);
+                  if (foundList) targetBoardId = foundList.boardId || foundList.idBoard;
+                }
+              }
+            } else if (typeof step.args.cardId === 'object' && step.args.cardId && '$ref' in step.args.cardId) {
+              const ref = (step.args.cardId as any).$ref;
+              const refStepId = typeof ref === 'string' ? ref.split('.')[0] : undefined;
+              if (refStepId && stepBoardMap.has(refStepId)) {
+                targetBoardId = stepBoardMap.get(refStepId);
+              }
+            }
+          }
+          if (!targetBoardId && typeof step.args?.idList === 'string') {
+            const foundList = observedLists.find((l: any) => l.id === step.args.idList);
+            if (foundList && (foundList.boardId || foundList.idBoard)) {
+              targetBoardId = foundList.boardId || foundList.idBoard;
+            }
+          }
+
+          if (targetBoardId) {
+            step.boardId = targetBoardId;
+            stepBoardMap.set(step.id, targetBoardId);
+          }
+
           if (targetBoardId && !allowedBoardSet.has(targetBoardId)) {
             const name = teamBoardMap.get(targetBoardId) || targetBoardId;
             forbiddenBoardName = name;

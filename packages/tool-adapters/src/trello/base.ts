@@ -34,11 +34,19 @@ export class TrelloBaseAdapter extends BaseAdapter {
     super.assertAllowedScope(scopeKey, targetIdOrName);
   }
 
-  protected assertParentBoard(parent: unknown): void {
+  protected assertParentBoard(parent: unknown, boundBoardId?: string): void {
     const boardId = (parent as { idBoard?: unknown } | null)?.idBoard;
     if (typeof boardId !== 'string' || !boardId.trim()) {
       throw new StepError({
         message: 'Allowed scope restriction: parent board could not be verified',
+        category: 'AUTH_ERROR',
+        statusCode: 403,
+        retryable: false,
+      });
+    }
+    if (boundBoardId && boardId !== boundBoardId) {
+      throw new StepError({
+        message: `Step bound to board '${boundBoardId}', but parent resource belongs to board '${boardId}'`,
         category: 'AUTH_ERROR',
         statusCode: 403,
         retryable: false,

@@ -79,6 +79,7 @@ export interface PlanStep {
   description: string;
   args: Record<string, ArgValue>;
   dependsOn: string[];
+  boardId?: string;
 }
 
 /** The personal connections a plan was previewed with. */

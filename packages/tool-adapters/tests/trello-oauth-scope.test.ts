@@ -209,6 +209,54 @@ describe('Trello OAuth & Scope Whitelisting (Task 7)', () => {
     expect(putCall).toBeUndefined();
   });
 
+  it('probe: previewed on A, fixture moves card to B (both A and B allowed), execution rejects step and does not send PUT to B', async () => {
+    const calls: Array<{ url: string; method: string; headers: any }> = [];
+    const boardA = 'board-A';
+    const boardB = 'board-B';
+    const fakeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      const method = init?.method || 'GET';
+      calls.push({ url, method, headers: (init?.headers as any) || {} });
+
+      // Fixture: card-1 has been moved to board B
+      if (url.includes('/cards/card-1') && method === 'GET') {
+        return new Response(JSON.stringify({
+          id: 'card-1',
+          name: 'Task 1',
+          idBoard: boardB,
+          idList: 'list-B',
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      if (url.includes('/cards/card-1') && method === 'PUT') {
+        return new Response(JSON.stringify({
+          id: 'card-1',
+          name: 'Updated Task',
+          idBoard: boardB,
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      return new Response(JSON.stringify({ error: 'not found' }), { status: 404 });
+    };
+
+    const adapter = new TrelloAdapter({
+      credentials: { accessToken: 'token-abc' },
+      allowedBoardIds: [boardA, boardB],
+      allowedScope: { boards: [boardA, boardB] },
+      fetchFn: fakeFetch as any,
+    });
+
+    await expect(
+      adapter.execute('trello.update_card', { cardId: 'card-1', title: 'Updated Task' }, { boardId: boardA })
+    ).rejects.toMatchObject({
+      category: 'AUTH_ERROR',
+      statusCode: 403,
+    });
+
+    const putCall = calls.find((c) => c.method === 'PUT');
+    expect(putCall).toBeUndefined();
+  });
+
   it('rejects get_card when card belongs to an unallowed board with 403 AUTH_ERROR', async () => {
     const calls: Array<{ url: string; method: string; headers: any }> = [];
     const adapter = createAdapter(calls);

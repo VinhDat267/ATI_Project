@@ -13,10 +13,10 @@ export class TrelloWriteTools extends TrelloReadTools {
       due?: string;
       idMembers?: string[];
     },
-    options?: { signal?: AbortSignal }
+    options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<{ id: string; name: string; url: string; listId: string }> {
     const listInfo = await this.request<any>(`/lists/${args.listId}`, { signal: options?.signal });
-    this.assertParentBoard(listInfo);
+    this.assertParentBoard(listInfo, options?.boardId);
 
     const body: Record<string, any> = {
       idList: args.listId,
@@ -53,13 +53,13 @@ export class TrelloWriteTools extends TrelloReadTools {
       closed?: boolean;
       idList?: string;
     },
-    options?: { signal?: AbortSignal }
+    options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<{ id: string; name: string; url: string; listId: string }> {
     const cardInfo = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
-    this.assertParentBoard(cardInfo);
+    this.assertParentBoard(cardInfo, options?.boardId);
     if (args.idList) {
       const listInfo = await this.request<any>(`/lists/${args.idList}`, { signal: options?.signal });
-      this.assertParentBoard(listInfo);
+      this.assertParentBoard(listInfo, options?.boardId);
     }
 
     const body: Record<string, any> = {};
@@ -92,10 +92,10 @@ export class TrelloWriteTools extends TrelloReadTools {
       cardId: string;
       memberId: string;
     },
-    options?: { signal?: AbortSignal }
+    options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<{ id: string; idMembers: string[] }> {
     const cardInfo = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
-    this.assertParentBoard(cardInfo);
+    this.assertParentBoard(cardInfo, options?.boardId);
 
     const boardMembers = await this.request<any[]>(`/boards/${cardInfo.idBoard}/members`, { signal: options?.signal });
     const isBoardMember = Array.isArray(boardMembers) && boardMembers.some((m) => m.id === args.memberId);
@@ -134,14 +134,14 @@ export class TrelloWriteTools extends TrelloReadTools {
       title: string;
       items?: string[];
     },
-    options?: { signal?: AbortSignal }
+    options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<{
     id: string;
     name: string;
     items: Array<{ id: string; name: string; state: string }>;
   }> {
     const cardInfo = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
-    this.assertParentBoard(cardInfo);
+    this.assertParentBoard(cardInfo, options?.boardId);
 
     const chkRes = await this.request<any>(`/cards/${args.cardId}/checklists`, {
       method: 'POST',
