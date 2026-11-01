@@ -90,6 +90,12 @@ export interface ActivePlan {
       username: string;
       boardIds: string[];
     };
+    github?: {
+      credentialId: string;
+      githubUserId: string;
+      login: string;
+      repos: string[];
+    };
   };
   resourceLabels?: Record<string, string>;
   id?: string;
@@ -193,6 +199,7 @@ export interface ServiceInfo {
   personalStatus?: PersonalStatus;
   email?: string;
   username?: string;
+  login?: string;
   connectedAt?: string;
   selectedCalendars?: PersonalCalendarSummary[];
   selectedSpreadsheets?: PersonalSpreadsheetItem[];

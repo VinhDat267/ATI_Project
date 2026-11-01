@@ -51,5 +51,5 @@ export function ScheduleRunRecovery({ message, navigate }: { message: ChatMessag
     catch (reason: any) { if (!controller.signal.aborted) setError(reason.message || 'Không thể lập lại kế hoạch.'); }
     finally { locked.current = false; setBusy(false); }
   };
-  return <div className="mb-5 v3-space-y-2">{run && ['expired', 'planning_failed', 'interrupted', 'digest_failed'].includes(run.state) && <><p className="text-sm text-[#6B7280]">{runLabel(run)}</p><button type="button" className={primaryScheduleButton} disabled={busy} onClick={() => void replan()}>Lập lại kế hoạch</button></>}{error && <p role="alert" className="text-sm text-red-700">{error}</p>}</div>;
+  return <div className="mb-5 v3-space-y-2">{run && run.state === 'digest_sent' && <p role="status" className="text-sm font-medium text-[#111827]">{runLabel(run)}</p>}{run && ['expired', 'planning_failed', 'interrupted', 'digest_failed'].includes(run.state) && <><p className="text-sm text-[#6B7280]">{runLabel(run)}</p><button type="button" className={primaryScheduleButton} disabled={busy} onClick={() => void replan()}>Lập lại kế hoạch</button></>}{error && <p role="alert" className="text-sm text-red-700">{error}</p>}</div>;
 }

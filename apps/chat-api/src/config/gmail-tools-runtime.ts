@@ -41,12 +41,16 @@ export async function runtimeToolCatalog(
     trelloOAuthClient?: any;
     trelloTokens?: any;
     trelloConnection?: (userId: string, scopeId?: string) => Promise<any>;
+    githubEnabled?: boolean;
+    githubTeamRepo?: any;
+    githubOAuthClient?: any;
+    githubTokens?: any;
+    githubConnection?: (userId: string) => Promise<any>;
   },
 ) {
   const personal = await getToolCatalogFor(repo, key, options);
   if (mode === 'live') return personal;
-  const hasTrello = personal.some((t) => t.service === 'trello');
-  const baseTools = ALL_TOOLS.filter((t) => t.service !== 'trello');
+  const baseTools = ALL_TOOLS.filter((t) => t.service !== 'trello' && t.service !== 'github');
   const tools = [
     ...baseTools,
     ...personal.filter(
@@ -54,7 +58,8 @@ export async function runtimeToolCatalog(
         t.service === 'gmail' ||
         t.service === 'mycalendar' ||
         t.service === 'mysheets' ||
-        t.service === 'trello'
+        t.service === 'trello' ||
+        t.service === 'github'
     ),
   ];
   return Array.from(new Map(tools.map((t) => [t.name, t])).values());
@@ -110,10 +115,10 @@ export function createToolRuntimeFactory(
   sandbox = createSandboxAdapter,
 ) {
   return createRuntimeAdapterFactory<AdapterContext>(mode, personal,
-    (name, context) => (name === 'gmail' || name === 'mycalendar' || name === 'mysheets' || name === 'trello') ? personal(name, context) : sandbox(name));
+    (name, context) => (name === 'gmail' || name === 'mycalendar' || name === 'mysheets' || name === 'trello' || name === 'github') ? personal(name, context) : sandbox(name));
 }
 
-/** A failed Gmail, MyCalendar, MySheets or Trello request must not become a canned shared-service write. */
+/** A failed Gmail, MyCalendar, MySheets, Trello or GitHub request must not become a canned shared-service write. */
 export function mayFallbackToShared(
   input: ProcessMessageInput,
   gmailEnabled: boolean,
@@ -129,7 +134,7 @@ export function mayFallbackToShared(
   ];
   const registry = serviceRegistryForRuntime(gmailEnabled, mycalendarEnabled, mysheetsEnabled);
   const routed = routeIntent(texts.join('\n'), catalog, registry).services;
-  if (routed.includes('trello')) return false;
+  if (routed.includes('trello') || routed.includes('github')) return false;
   if (gmailEnabled && routed.includes('gmail')) return false;
   if (mycalendarEnabled && routed.includes('mycalendar')) return false;
   if (mysheetsEnabled && routed.includes('mysheets')) return false;

@@ -327,12 +327,18 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
     next();
   });
 
-  // Shared token administration is gone for Trello (HTTP 410 Gone).
+  // Shared token administration is gone for Trello and GitHub (HTTP 410 Gone).
   router.all('/trello/credentials', (_req, res) => {
     res.status(410).json({ error: 'Trello dùng đăng nhập OAuth.' });
   });
   router.all('/trello/scope', (_req, res) => {
     res.status(410).json({ error: 'Trello dùng đăng nhập OAuth.' });
+  });
+  router.all('/github/credentials', (_req, res) => {
+    res.status(410).json({ error: 'GitHub dùng đăng nhập OAuth.' });
+  });
+  router.all('/github/scope', (_req, res) => {
+    res.status(410).json({ error: 'GitHub dùng đăng nhập OAuth.' });
   });
 
   // GET /api/services
@@ -350,10 +356,10 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
       const services: Array<Record<string, unknown>> = await Promise.all(
         registered.map(async (definition) => {
           const { id, name, description, scopes, scopeKey, scopeLabel, credentialFields } = definition;
-          const isTrello = id === 'trello';
+          const isPersonalOAuth = id === 'trello' || id === 'github';
 
           let record: any = null;
-          if (!isTrello) {
+          if (!isPersonalOAuth) {
             if (mode === 'personal' && userId) {
               record = await credentialRepo?.getPersonalCredentials(id, userId);
             } else if (mode === 'organization') {
@@ -367,7 +373,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
           const scope = config?.allowedScope as Record<string, unknown> | undefined;
           const entries = scope?.[scopeKey];
           const configured =
-            !isTrello &&
+            !isPersonalOAuth &&
             Boolean(config && hasValidCredentials(credentialFields, config) && normalizeAllowedScope(definition, scope));
           const savedCheck = checks.get(checkKey(id, mode, workspaceId, userId));
           const check =
@@ -377,11 +383,11 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
           let username: string | undefined;
           let connectedAt: string | undefined;
 
-          if (isTrello && credentialRepo && typeof credentialRepo.getPersonalConnectionStatus === 'function') {
+          if (isPersonalOAuth && credentialRepo && typeof credentialRepo.getPersonalConnectionStatus === 'function') {
             let personalRecord: any = null;
             if (userId) {
               try {
-                personalRecord = await credentialRepo.getPersonalConnectionStatus('trello', userId);
+                personalRecord = await credentialRepo.getPersonalConnectionStatus(id, userId);
               } catch {
                 personalRecord = null;
               }
@@ -399,6 +405,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
                 try {
                   const dec = decryptCredentials(personalRecord.config, encryptionKey);
                   if (typeof dec.username === 'string') username = dec.username;
+                  else if (typeof dec.login === 'string') username = dec.login;
                 } catch {
                   if (personalRecord.status === 'active') {
                     personalStatus = 'reconnect_required';
@@ -423,7 +430,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
             connectionStatus: configured ? check?.connectionStatus ?? 'unchecked' : 'unconfigured',
             lastCheckedAt: check?.lastCheckedAt ?? null,
             allowedScope: Array.isArray(entries) ? entries : [],
-            ...(isTrello && personalStatus
+            ...(isPersonalOAuth && personalStatus
               ? { personalStatus, ...(username ? { username } : {}), ...(connectedAt ? { connectedAt } : {}) }
               : {}),
           };

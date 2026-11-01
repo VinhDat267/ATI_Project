@@ -80,7 +80,6 @@ it('extends registry + transport data without core changes, through real SQL cre
     // Old JSON shapes inserted directly in SQL stay readable, with no rewrite/migration.
     const old = [
       { service: 'slack', config: { botToken: 'old-token', allowedScope: { channels: ['C1'] } } },
-      { service: 'github', config: { token: 'old-token', allowedScope: { repos: ['owner/repo'] } } },
     ];
     for (const fixture of old) {
       const encrypted = encryptCredentials(fixture.config, key);
@@ -89,7 +88,7 @@ it('extends registry + transport data without core changes, through real SQL cre
       expect((await factory.getAdapterForService(fixture.service)).service).toBe(fixture.service);
       expect((await repo.getCredentials(fixture.service))!.config).toBe(encrypted);
     }
-    expect((await registration.getConfiguredToolCatalog(repo, key)).length).toBe(9);
+    expect((await registration.getConfiguredToolCatalog(repo, key)).length).toBe(4);
   } finally {
     SERVICE_REGISTRY.splice(SERVICE_REGISTRY.indexOf(demo), 1);
     for (const tool of tools) ALL_TOOLS.splice(ALL_TOOLS.indexOf(tool), 1);

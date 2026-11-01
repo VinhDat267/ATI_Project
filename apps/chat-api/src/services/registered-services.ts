@@ -1,5 +1,5 @@
 import { decryptCredentials } from '@wap/tool-adapters';
-import { ALL_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, TRELLO_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
+import { ALL_TOOLS, GITHUB_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, TRELLO_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import type { ServiceTransport } from './transports/types.js';
 import { TRELLO_TRANSPORT } from './transports/trello.js';
@@ -68,7 +68,7 @@ export async function getConfiguredToolCatalog(
   const available = new Set<string>();
   const mode = scope?.workspaceMode ?? 'legacy';
   for (const definition of getRegisteredServices()) {
-    if (definition.id === 'trello') continue;
+    if (definition.id === 'trello' || definition.id === 'github') continue;
     if (mode === 'personal' && isServiceAccountService(definition)) continue;
     let record;
     if (mode === 'personal') {
@@ -114,6 +114,11 @@ export async function getToolCatalogFor(
     trelloOAuthClient?: any;
     trelloTokens?: any;
     trelloConnection?: (userId: string, scopeId?: string) => Promise<any>;
+    githubEnabled?: boolean;
+    githubTeamRepo?: any;
+    githubOAuthClient?: any;
+    githubTokens?: any;
+    githubConnection?: (userId: string) => Promise<any>;
   },
 ): Promise<ToolDefinition[]> {
   let catalog = (
@@ -122,7 +127,7 @@ export async function getToolCatalogFor(
       workspaceId: options.workspaceId,
       userId: options.userId,
     })
-  ).filter((tool) => tool.service !== 'trello');
+  ).filter((tool) => tool.service !== 'trello' && tool.service !== 'github');
   if (!options.userId) return catalog;
   if (options.gmailEnabled) {
     const gmail = await credentialRepo.getPersonalCredentials('gmail', options.userId);
@@ -200,6 +205,39 @@ export async function getToolCatalogFor(
             );
             if (scope.boards.some((b: any) => callerBoards.some((cb: any) => cb.id === b.boardId && cb.member === true))) {
               catalog = [...catalog, ...TRELLO_TOOLS];
+            }
+          }
+        }
+      } catch {
+        // stale or unreadable connection does not add tools
+      }
+    }
+  }
+  if (options.githubConnection) {
+    try {
+      const github = await options.githubConnection(options.userId);
+      if (github?.status === 'connected' && github.connection?.repos?.length > 0) {
+        catalog = [...catalog, ...GITHUB_TOOLS];
+      }
+    } catch {
+      // ignore
+    }
+  } else if (options.githubTeamRepo && options.githubOAuthClient && options.githubTokens) {
+    const cred = await credentialRepo.getPersonalCredentials('github', options.userId);
+    if (cred && cred.status === 'active') {
+      try {
+        const scope = await options.githubTeamRepo.get();
+        if (scope && scope.repos && scope.repos.length > 0) {
+          const dec = decryptCredentials(cred.config, encryptionKey);
+          if (dec.accessToken) {
+            const provider = options.githubTokens.forConnection(options.userId, cred.id, dec.accessToken, dec.refreshToken);
+            const accessToken = await provider.getAccessToken();
+            const callerRepos = await options.githubOAuthClient.repositories(
+              accessToken,
+              AbortSignal.timeout(10_000)
+            );
+            if (scope.repos.some((r: any) => callerRepos.some((cr: any) => (cr.fullName.toLowerCase() === r.fullName.toLowerCase() || String(cr.id) === String(r.repoId)) && cr.member === true))) {
+              catalog = [...catalog, ...GITHUB_TOOLS];
             }
           }
         }

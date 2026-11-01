@@ -50,9 +50,9 @@ describe('SettingsPage (migrated SettingsModal behavior)', () => {
     fireEvent.change(screen.getByLabelText('Bot Token'),{target:{value:'xoxb-example'}}); add('Channel ID','C1'); fireEvent.click(screen.getByRole('button',{name:'Lưu thay đổi'})); await screen.findByText(/Saved/);
     expect(fetchMock).toHaveBeenCalledWith('/api/services/slack/credentials',expect.objectContaining({body:JSON.stringify({credentials:{botToken:'xoxb-example'},allowedScope:['C1']})}));
   });
-  it('renders GitHub API fields and saves repository scope', async () => {
-    const fetchMock=install([{...service,id:'github',name:'GitHub',scopeLabel:'Repository',credentialFields:[{key:'token',label:'Personal Access Token'}]}],'GitHub saved'); render(<SettingsPage {...settingsProps}/>); await open('GitHub');
-    fireEvent.change(screen.getByLabelText('Personal Access Token'),{target:{value:'ghp-example'}}); add('Repository','owner/repo'); fireEvent.click(screen.getByRole('button',{name:'Lưu thay đổi'})); await screen.findByText(/GitHub saved/);
-    expect(fetchMock).toHaveBeenCalledWith('/api/services/github/credentials',expect.objectContaining({body:JSON.stringify({credentials:{token:'ghp-example'},allowedScope:['owner/repo']})}));
+  it('renders Telegram API fields and saves chat scope', async () => {
+    const fetchMock=install([{...service,id:'telegram',name:'Telegram',scopeLabel:'Chat ID',credentialFields:[{key:'botToken',label:'Bot Token'}]}],'Telegram saved'); render(<SettingsPage {...settingsProps}/>); await open('Telegram');
+    fireEvent.change(screen.getByLabelText('Bot Token'),{target:{value:'tg-bot-example'}}); add('Chat ID','-100123'); fireEvent.click(screen.getByRole('button',{name:'Lưu thay đổi'})); await screen.findByText(/Telegram saved/);
+    expect(fetchMock).toHaveBeenCalledWith('/api/services/telegram/credentials',expect.objectContaining({body:JSON.stringify({credentials:{botToken:'tg-bot-example'},allowedScope:['-100123']})}));
   });
 });

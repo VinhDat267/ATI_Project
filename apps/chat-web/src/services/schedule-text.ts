@@ -37,6 +37,11 @@ export function runLabel(run: ScheduleRunView): string {
       const conflictNote = run.delivery.conflictCount > 0 ? ` (${run.delivery.conflictCount} trùng lịch)` : '';
       return `Đã tự gửi bản tin · ${run.delivery.totalEvents} sự kiện${conflictNote}`;
     }
+    if (run.delivery && 'counts' in run.delivery && run.delivery.counts) {
+      const counts = run.delivery.counts;
+      const total = counts.newIssues + counts.stalePrs + counts.unassignedIssues;
+      return `Đã gửi · ${total} mục`;
+    }
     return 'Đã tự gửi báo cáo';
   }
   if (run.state === 'digest_failed') return 'Gửi báo cáo thất bại';

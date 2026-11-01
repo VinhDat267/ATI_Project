@@ -10,6 +10,7 @@ import type { CalendarDigestCandidate, PersonalSpreadsheetItem, PlanConnections,
 import { resourceLabels } from './resource-labels.js';
 import { nextRuns } from './schedules/next-occurrence.js';
 import { runMessage, type PreparedRun, type RunToPlan } from './schedules/schedule-runner.js';
+import { evaluateGithubDigestCandidate } from './schedules/github-digest-candidate.js';
 import { resolveRef } from '@wap/executor';
 import { eventsOverlap } from '@wap/tool-adapters';
 
@@ -141,6 +142,8 @@ export interface ChatServiceOptions {
   }) | null>;
   /** The caller's active Trello connection lookup; absent when Trello is off or not connected. */
   trelloConnection?: (userId: string, scopeId?: string) => Promise<any>;
+  /** The caller's active GitHub connection lookup; absent when GitHub is off or not connected. */
+  githubConnection?: (userId: string) => Promise<any>;
   /** Scheduled workflows (SCHEDULES_ENABLED); absent, conversations have no schedule. */
   schedules?: {
     repo: ScheduleRepo;
@@ -179,6 +182,7 @@ export class ChatService {
   private mycalendarConnection?: ChatServiceOptions['mycalendarConnection'];
   private mysheetsConnection?: ChatServiceOptions['mysheetsConnection'];
   private trelloConnection?: ChatServiceOptions['trelloConnection'];
+  private githubConnection?: ChatServiceOptions['githubConnection'];
   private schedules?: ChatServiceOptions['schedules'];
   private getAdapter?: ChatServiceOptions['getAdapter'];
   private lookupTool?: ChatServiceOptions['lookupTool'];
@@ -189,6 +193,7 @@ export class ChatService {
     this.mycalendarConnection = options.mycalendarConnection;
     this.mysheetsConnection = options.mysheetsConnection;
     this.trelloConnection = options.trelloConnection;
+    this.githubConnection = options.githubConnection;
     this.getAdapter = options.getAdapter;
     this.lookupTool = options.lookupTool;
     this.mysheetsLookupTimeoutMs = options.mysheetsLookupTimeoutMs ?? 10_000;
@@ -248,6 +253,7 @@ export class ChatService {
     memory?: WorkingMemory,
     onTrelloTeamBoards?: (boards: Array<{ boardId: string; boardName: string }>) => void,
     scopeId = 'default',
+    onGitHubTeamRepos?: (repos: Array<{ repoId: string; fullName: string; name: string }>) => void,
   ): Promise<PlannerResponse> {
     signal?.throwIfAborted();
     const bound = withoutConnections(plan);
@@ -255,8 +261,9 @@ export class ChatService {
     const usesMyCalendar = bound.steps.some((step) => step.tool.startsWith('mycalendar.'));
     const usesMySheets = bound.steps.some((step) => step.tool.startsWith('mysheets.'));
     const usesTrello = bound.steps.some((step) => step.tool.startsWith('trello.'));
+    const usesGitHub = bound.steps.some((step) => step.tool.startsWith('github.'));
 
-    if (!usesGmail && !usesMyCalendar && !usesMySheets && !usesTrello) return bound;
+    if (!usesGmail && !usesMyCalendar && !usesMySheets && !usesTrello && !usesGitHub) return bound;
 
     const unavailableServices: Array<{ id: string; name: string }> = [];
     const reasons: string[] = [];
@@ -264,6 +271,7 @@ export class ChatService {
     let mycalConn: NonNullable<PlanConnections['mycalendar']> | undefined;
     let mysheetsConn: NonNullable<PlanConnections['mysheets']> | undefined;
     let trelloConn: NonNullable<PlanConnections['trello']> | undefined;
+    let githubConn: NonNullable<PlanConnections['github']> | undefined;
 
     if (usesGmail) {
       const gmail = await this.gmailConnection?.(userId);
@@ -574,6 +582,116 @@ export class ChatService {
       }
     }
 
+    if (usesGitHub) {
+      const github = await this.githubConnection?.(userId);
+      if (!github || github.status === 'not_connected' || github.status === 'reconnect_required') {
+        unavailableServices.push({ id: 'github', name: 'GitHub' });
+        reasons.push('Tài khoản của bạn chưa Kết nối GitHub hoặc cần kết nối lại.');
+      } else if (github.status === 'needs_scope') {
+        return {
+          kind: 'refusal',
+          reason: 'Quản trị chưa chọn repository GitHub.',
+          suggestion: 'Hãy nhờ quản trị viên chọn repository GitHub trong trang Kết nối dịch vụ.',
+        };
+      } else if (github.status === 'needs_membership' || !github.connection) {
+        return {
+          kind: 'refusal',
+          reason: 'Bạn chưa có quyền truy cập repository GitHub nào của nhóm.',
+          suggestion: 'Hãy nhờ quản trị viên cấp quyền vào ít nhất một repository GitHub của nhóm.',
+        };
+      } else {
+        if (github.teamRepos) {
+          onGitHubTeamRepos?.(github.teamRepos);
+        }
+        const allowedRepoSet = new Set<string>(
+          (github.connection.repos as string[]).map((r: string) => r.toLowerCase()),
+        );
+        const canonicalRepoMap = new Map<string, string>(
+          (github.connection.repos as string[]).map((r: string) => [r.toLowerCase(), r]),
+        );
+        const teamRepoMap = new Map<string, string>(
+          (github.teamRepos ?? []).map((r: any) => [String(r.fullName).toLowerCase(), String(r.fullName)]),
+        );
+        const allEntities = memory ? memory.getAll() : {};
+        const observedRepos = [
+          ...(Array.isArray(allEntities.repository) ? allEntities.repository : allEntities.repository ? [allEntities.repository] : []),
+          ...(Array.isArray((allEntities.__observed as any)?.repository) ? (allEntities.__observed as any).repository : []),
+        ];
+        const stepRepoMap = new Map<string, string>();
+
+        let forbiddenRepoName: string | null = null;
+        for (const step of bound.steps) {
+          if (!step.tool.startsWith('github.')) continue;
+          if (step.tool === 'github.search_repos') {
+            const q = typeof step.args?.query === 'string' ? step.args.query.trim().toLowerCase() : '';
+            const foundObs = observedRepos.find((r: any) => {
+              const fn = String(r.fullName ?? '').toLowerCase();
+              const nm = String(r.name ?? '').toLowerCase();
+              return !q || fn.includes(q) || nm.includes(q);
+            });
+            if (foundObs && typeof foundObs.fullName === 'string') {
+              stepRepoMap.set(step.id, foundObs.fullName);
+            } else {
+              const foundMember = (github.memberRepos ?? []).find((r: any) => {
+                const fn = String(r.fullName ?? '').toLowerCase();
+                const nm = String(r.name ?? '').toLowerCase();
+                return !q || fn.includes(q) || nm.includes(q);
+              });
+              if (foundMember && typeof foundMember.fullName === 'string') {
+                stepRepoMap.set(step.id, foundMember.fullName);
+              } else if (github.connection.repos.length === 1) {
+                stepRepoMap.set(step.id, github.connection.repos[0]);
+              }
+            }
+            continue;
+          }
+
+          let targetRepo: string | undefined = typeof step.args?.repo === 'string' ? step.args.repo : undefined;
+          if (targetRepo && targetRepo.startsWith('$')) {
+            const refStepId = targetRepo.slice(1).split('.')[0]?.replace(/\[\d+\]$/, '');
+            targetRepo = refStepId && stepRepoMap.has(refStepId) ? stepRepoMap.get(refStepId) : undefined;
+          } else if (!targetRepo && typeof step.args?.repo === 'object' && step.args?.repo && '$ref' in step.args.repo) {
+            const ref = (step.args.repo as any).$ref;
+            const refStepId = typeof ref === 'string' ? ref.replace(/^\$/, '').split('.')[0]?.replace(/\[\d+\]$/, '') : undefined;
+            if (refStepId && stepRepoMap.has(refStepId)) {
+              targetRepo = stepRepoMap.get(refStepId);
+            }
+          }
+          if (!targetRepo && github.connection.repos.length === 1) {
+            targetRepo = github.connection.repos[0];
+          }
+
+          if (targetRepo) {
+            const canonical =
+              canonicalRepoMap.get(targetRepo.toLowerCase()) ??
+              teamRepoMap.get(targetRepo.toLowerCase()) ??
+              targetRepo;
+            step.repo = canonical;
+            stepRepoMap.set(step.id, canonical);
+            if (!allowedRepoSet.has(targetRepo.toLowerCase())) {
+              forbiddenRepoName = canonical;
+              break;
+            }
+          }
+        }
+
+        if (forbiddenRepoName) {
+          return {
+            kind: 'refusal',
+            reason: `Bạn cần được cấp quyền vào repository ${forbiddenRepoName} trên GitHub.`,
+            suggestion: `Hãy nhờ quản trị viên cấp quyền cho bạn vào repository ${forbiddenRepoName} trên GitHub, rồi thử lại.`,
+          };
+        }
+
+        githubConn = {
+          credentialId: github.connection.credentialId,
+          githubUserId: github.connection.githubUserId,
+          login: github.connection.login,
+          repos: [...github.connection.repos].sort(),
+        };
+      }
+    }
+
     if (unavailableServices.length > 0) {
       return {
         kind: 'refusal',
@@ -589,6 +707,7 @@ export class ChatService {
     if (mycalConn) connections.mycalendar = mycalConn;
     if (mysheetsConn) connections.mysheets = mysheetsConn;
     if (trelloConn) connections.trello = trelloConn;
+    if (githubConn) connections.github = githubConn;
 
     return { ...bound, connections };
   }
@@ -632,6 +751,20 @@ export class ChatService {
         credentialRepo: this.schedules.credentialRepo,
         encryptionKey: this.schedules.encryptionKey,
         mysheetsEnabled: this.schedules.mysheetsEnabled,
+      });
+    } else if (
+      (proposal.action === 'create' || proposal.action === 'update') &&
+      proposal.request &&
+      recurrence &&
+      (services.includes('github') || (!this.schedules.evaluateDigestCandidate && Boolean(this.githubConnection)))
+    ) {
+      digestCandidate = await evaluateGithubDigestCandidate({
+        userId: actor.userId,
+        request: proposal.request,
+        services,
+        recurrence,
+        githubConnection: this.githubConnection,
+        getAdapter: this.getAdapter,
       });
     } else if (
       proposal.action === 'create' &&
@@ -688,6 +821,7 @@ export class ChatService {
   ): Promise<PreparedResponse> {
     const { conversationId, correlation } = target;
     let trelloTeamBoards: Array<{ boardId: string; boardName: string }> | undefined;
+    let githubTeamRepos: Array<{ repoId: string; fullName: string; name: string }> | undefined;
     const actor = await this.actorForConversation(conversationId, target.userId);
     let scopeId = 'default';
     if (actor.workspaceMode === 'organization' && actor.workspaceId) {
@@ -696,7 +830,15 @@ export class ChatService {
       scopeId = `personal:${target.userId}`;
     }
     let response = planned.kind === 'plan'
-      ? await this.bindConnections(planned, target.userId, signal, memory, (boards) => { trelloTeamBoards = boards; }, scopeId)
+      ? await this.bindConnections(
+          planned,
+          target.userId,
+          signal,
+          memory,
+          (boards) => { trelloTeamBoards = boards; },
+          scopeId,
+          (repos) => { githubTeamRepos = repos; },
+        )
       : planned;
     signal?.throwIfAborted();
     let proposal: ScheduleProposalMetadata | null = null;
@@ -706,7 +848,16 @@ export class ChatService {
     }
     const emit = (event: string, payload: Record<string, unknown>) => this.eventEmitter.emit(event, { conversationId, ...payload, ...correlation });
     let planId: string | null = null, messageId = '', labels: Record<string, string> = {};
-    if (response.kind === 'plan') labels = resourceLabels(response, memory, userTexts, trelloTeamBoards);
+    if (response.kind === 'plan') {
+      const labelOptions =
+        trelloTeamBoards || githubTeamRepos
+          ? {
+              ...(trelloTeamBoards ? { teamBoards: trelloTeamBoards } : {}),
+              ...(githubTeamRepos ? { teamRepos: githubTeamRepos } : {}),
+            }
+          : undefined;
+      labels = resourceLabels(response, memory, userTexts, labelOptions);
+    }
 
     const write = async (client?: pg.PoolClient) => {
       // Without a client the repositories keep their own transactions, called exactly as before.

@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import type { CalendarDigestConfig, ScheduleKind, ScheduleRecurrence, ScheduleStatus, ScheduleView, SheetsDigestConfig } from '@wap/tool-schemas';
+import type { CalendarDigestConfig, GithubDigestConfig, ScheduleKind, ScheduleRecurrence, ScheduleStatus, ScheduleView, SheetsDigestConfig } from '@wap/tool-schemas';
 import { RUN_SELECT, runView, type RunRow } from '../../services/schedules/run-state.js';
 import { localLabel, nextRuns } from '../../services/schedules/next-occurrence.js';
 import { isUuid } from './uuid.js';
@@ -27,7 +27,7 @@ export interface ScheduleRow {
   workspace_id?: string | null;
   workspace_mode?: 'legacy' | 'personal' | 'organization';
   kind?: ScheduleKind;
-  digest_config?: SheetsDigestConfig | CalendarDigestConfig | null;
+  digest_config?: SheetsDigestConfig | CalendarDigestConfig | GithubDigestConfig | null;
   digest_config_hash?: string | null;
   digest_approved_at?: Date | null;
   created_at: Date;
@@ -48,8 +48,10 @@ export class ScheduleRepo {
         ? 'sheets_digest'
         : row.kind === 'calendar_digest'
           ? 'calendar_digest'
-          : 'plan';
-    return {
+          : row.kind === 'github_digest'
+            ? 'github_digest'
+            : 'plan';
+    const base: ScheduleView = {
       id: row.id,
       convId: row.conv_id,
       version: row.version,
@@ -65,6 +67,13 @@ export class ScheduleRepo {
       approvalMode: kind === 'plan' ? 'manual' : 'auto_digest',
       digestConfig: row.digest_config ?? null,
     };
+    if (row.kind === 'github_digest' && row.digest_config && row.digest_approved_at) {
+      base.digest = {
+        config: row.digest_config as GithubDigestConfig,
+        approvedAt: new Date(row.digest_approved_at).toISOString(),
+      };
+    }
+    return base;
   }
 
   /** Vietnamese text of the state message written after each change. */
