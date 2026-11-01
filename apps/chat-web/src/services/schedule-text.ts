@@ -37,11 +37,8 @@ export function runLabel(run: ScheduleRunView): string {
       const conflictNote = run.delivery.conflictCount > 0 ? ` (${run.delivery.conflictCount} trùng lịch)` : '';
       return `Đã tự gửi bản tin · ${run.delivery.totalEvents} sự kiện${conflictNote}`;
     }
-    if (run.delivery && 'spreadsheetTitle' in run.delivery) {
-      return 'Đã tự gửi báo cáo';
-    }
-    return 'Đã tự gửi bản tin';
+    return 'Đã tự gửi báo cáo';
   }
-  if (run.state === 'digest_failed') return 'Gửi bản tin thất bại';
+  if (run.state === 'digest_failed') return 'Gửi báo cáo thất bại';
   return ({ planning: 'Đang lập kế hoạch', awaiting_approval: 'Chờ bạn duyệt', expired: 'Hết hạn duyệt', rejected: 'Bạn đã hủy kế hoạch', needs_attention: 'Cần bạn xem', planning_failed: 'Không lập được kế hoạch', interrupted: 'Bị gián đoạn', discarded: 'Đã bỏ vì lịch thay đổi', blocked: 'Bị chặn' } as Record<string, string>)[run.state];
 }

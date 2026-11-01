@@ -177,7 +177,7 @@ describe('ScheduleSection, ScheduleRunRecovery & runLabel for digest_sent / dige
     expect(runLabel(sentRun)).toContain('Đã tự gửi bản tin');
     expect(runLabel(sentRun)).toContain('3 sự kiện');
     expect(runLabel(sentRun)).toContain('2 trùng lịch');
-    expect(runLabel(failedRun)).toBe('Gửi bản tin thất bại');
+    expect(runLabel(failedRun)).toBe('Gửi báo cáo thất bại');
   });
 
   it('renders Tự gửi badge on calendar_digest schedules in ScheduleSection and allows replanning digest_failed runs', async () => {
@@ -207,7 +207,7 @@ describe('ScheduleSection, ScheduleRunRecovery & runLabel for digest_sent / dige
 
     const badge = await screen.findByText('Tự gửi');
     expect(badge).toHaveAttribute('data-schedule-kind', 'calendar_digest');
-    expect(screen.getByText(/Gửi bản tin thất bại/i)).toBeInTheDocument();
+    expect(screen.getByText(/Gửi báo cáo thất bại/i)).toBeInTheDocument();
 
     const runMsg: ChatMessage = {
       id: 'msg-run-1',
