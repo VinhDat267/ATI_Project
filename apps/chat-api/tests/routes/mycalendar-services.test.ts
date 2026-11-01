@@ -539,7 +539,8 @@ describe('GET /api/services, AdapterFactory, ChatService, and health check for M
     it('mayFallbackToShared prevents shared fallback when mycalendar intent is routed', () => {
       expect(mayFallbackToShared({ userMessage: 'Thêm vào lịch việc riêng', memory: {} as any }, false, true)).toBe(false);
       expect(mayFallbackToShared({ userMessage: 'Tạo sự kiện trong lịch cá nhân của tôi', memory: {} as any }, false, true)).toBe(false);
-      expect(mayFallbackToShared({ userMessage: 'Tạo thẻ Trello', memory: {} as any }, false, true)).toBe(true);
+      expect(mayFallbackToShared({ userMessage: 'Tạo thẻ Trello', memory: {} as any }, false, true)).toBe(false);
+      expect(mayFallbackToShared({ userMessage: 'Gửi tin Slack vào kênh', memory: {} as any }, false, true)).toBe(true);
     });
 
     it('refuses mycalendar on shared-key routes even for an administrator', async () => {
