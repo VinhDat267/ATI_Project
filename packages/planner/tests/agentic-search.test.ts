@@ -350,4 +350,88 @@ describe('member board scoping', () => {
     expect(lastUserMessage(inputs[2]!)).toMatch(/member_be[\s\S]*board_fe/);
     expect(response.kind).toBe('clarification');
   });
+
+  it('preserves listId, due, dueComplete, idMembers, labels, and checklists on observed Trello cards and username on members', async () => {
+    const { recordObserved } = await import('../src/search.js');
+    let observed = recordObserved(undefined, 'card', [
+      {
+        id: 'c1',
+        name: 'Fix homepage UI bug',
+        boardId: 'board_fe',
+        listId: 'list_1',
+        due: '2026-11-01T10:00:00.000Z',
+        dueComplete: false,
+        idMembers: ['m1'],
+        labels: ['Bug', 'Urgent'],
+        checklists: [
+          {
+            id: 'chk_1',
+            name: 'Definition of Done',
+            items: [{ id: 'item_1', name: 'Viết unit test', state: 'complete' }],
+          },
+        ],
+        desc: 'Should be dropped from compact observed memory',
+      },
+    ]);
+    observed = recordObserved(observed, 'member', [
+      {
+        id: 'm1',
+        fullName: 'Minh Nguyen',
+        username: 'minhn',
+        boardId: 'board_fe',
+      },
+    ]);
+    expect(observed.card).toEqual([
+      {
+        id: 'c1',
+        name: 'Fix homepage UI bug',
+        boardId: 'board_fe',
+        listId: 'list_1',
+        due: '2026-11-01T10:00:00.000Z',
+        dueComplete: false,
+        idMembers: ['m1'],
+        labels: ['Bug', 'Urgent'],
+        checklists: [
+          {
+            id: 'chk_1',
+            name: 'Definition of Done',
+            items: [{ id: 'item_1', name: 'Viết unit test', state: 'complete' }],
+          },
+        ],
+      },
+    ]);
+    expect(observed.member).toEqual([
+      {
+        id: 'm1',
+        fullName: 'Minh Nguyen',
+        username: 'minhn',
+        boardId: 'board_fe',
+      },
+    ]);
+  });
+
+  it('preserves properties, content, schema, and lastEditedTime on observed Notion pages and databases', async () => {
+    const { recordObserved } = await import('../src/search.js');
+    const observed = recordObserved(undefined, 'page', [
+      {
+        id: '22222222-3333-4444-5555-666666666666',
+        title: 'Biên bản họp Sprint 14',
+        url: 'https://www.notion.so/22222222333344445555666666666666',
+        properties: { Status: 'In progress', Priority: 'High' },
+        content: '## Hành động cần làm\n- [ ] Tạo card Trello cho đội Frontend',
+        lastEditedTime: '2026-11-02T10:00:00.000Z',
+        blocks: [{ id: 'b1', type: 'heading_2', text: 'Hành động cần làm' }],
+      },
+    ]);
+    expect(observed.page).toEqual([
+      {
+        id: '22222222-3333-4444-5555-666666666666',
+        title: 'Biên bản họp Sprint 14',
+        url: 'https://www.notion.so/22222222333344445555666666666666',
+        properties: { Status: 'In progress', Priority: 'High' },
+        content: '## Hành động cần làm\n- [ ] Tạo card Trello cho đội Frontend',
+        lastEditedTime: '2026-11-02T10:00:00.000Z',
+      },
+    ]);
+  });
 });

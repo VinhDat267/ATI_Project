@@ -34,7 +34,7 @@ const passArgs = process.argv.slice(2);
 if (passArgs.length > 0) {
   process.stdout.write(`Running v3 browser targeting: ${passArgs.join(' ')}\n`);
   const env = { ...process.env, JWT_SECRET: process.env.JWT_SECRET || randomBytes(32).toString('hex') };
-  if (passArgs.some(arg => /sched-03|github-oauth-and-digest/.test(arg))) {
+  if (passArgs.some(arg => /sched-03|github-oauth-and-digest|telegram-oauth-and-digest|trello-oauth/.test(arg))) {
     env.SANDBOX_SCENARIO = env.SANDBOX_SCENARIO || 'schedule';
     env.SCHEDULES_ENABLED = env.SCHEDULES_ENABLED || 'on';
   }

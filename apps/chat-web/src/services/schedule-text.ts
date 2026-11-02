@@ -39,7 +39,12 @@ export function runLabel(run: ScheduleRunView): string {
     }
     if (run.delivery && 'counts' in run.delivery && run.delivery.counts) {
       const counts = run.delivery.counts;
-      const total = counts.newIssues + counts.stalePrs + counts.unassignedIssues;
+      const total =
+        'totalPages' in counts
+          ? counts.totalPages
+          : 'overdueCards' in counts
+            ? counts.overdueCards + counts.dueSoonCards + counts.unassignedCards
+            : counts.newIssues + counts.stalePrs + counts.unassignedIssues;
       return `Đã gửi · ${total} mục`;
     }
     if (run.delivery && ('chatId' in run.delivery || 'sources' in run.delivery)) {

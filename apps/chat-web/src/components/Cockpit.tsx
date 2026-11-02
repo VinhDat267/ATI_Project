@@ -43,19 +43,60 @@ interface Props {
 const prompts: Record<string,string> = Object.fromEntries(Object.entries(presentation.services).map(([id, asset]) => [id, asset.prompt]));
 export function resourceDestination(step: PlanStep, labels: Record<string, string> = {}): string {
   if (step.chatId && Object.hasOwn(labels, String(step.chatId))) return labels[String(step.chatId)];
+  if (step.databaseId && Object.hasOwn(labels, String(step.databaseId))) return labels[String(step.databaseId)];
   const definition = toolDefinition(step.tool);
   const resourceNames = presentation.resourceNames as Record<string,string>;
   // A Gmail label is what a step applies to a thread, not where it writes.
   const destinationResource = (key: string) => { const resource = definition?.inputSchema.properties?.[key]?.['x-resource']; return resource && resource !== 'label'; };
-  return Object.entries(step.args).filter(([key]) => destinationResource(key)).map(([key, value]) => {
+  const mergedArgs: Record<string, unknown> = {
+    ...(step.repo && !step.args?.repo ? { repo: step.repo } : {}),
+    ...(step.boardId && !step.args?.boardId ? { boardId: step.boardId } : {}),
+    ...(step.databaseId && !step.args?.databaseId ? { databaseId: step.databaseId } : {}),
+    ...step.args,
+  };
+  const rawBoardId = mergedArgs.boardId;
+  const boardLabel =
+    (typeof rawBoardId === 'string' || typeof rawBoardId === 'number') &&
+    Object.hasOwn(labels, String(rawBoardId))
+      ? labels[String(rawBoardId)]
+      : null;
+  const resolved = Object.entries(mergedArgs).filter(([key]) => destinationResource(key)).map(([key, value]) => {
     if ((typeof value === 'string' || typeof value === 'number') && Object.hasOwn(labels, String(value))) return labels[String(value)];
-    const reference = value && typeof value === 'object' && '$ref' in value ? String(value.$ref) : typeof value === 'string' && value.startsWith('$step_') ? value : null;
+    if (Array.isArray(value)) {
+      const names = value
+        .filter((item): item is string | number => typeof item === 'string' || typeof item === 'number')
+        .map(item => String(item))
+        .filter(id => Object.hasOwn(labels, id))
+        .map(id => labels[id]);
+      if (names.length > 0) return names.join(', ');
+    }
+    const reference = value && typeof value === 'object' && !Array.isArray(value) && '$ref' in value ? String((value as Record<string, unknown>).$ref) : typeof value === 'string' && value.startsWith('$step_') ? value : null;
     const number = reference?.match(/step_(\d+)/)?.[1];
     if (number) return `Kết quả của bước ${number}`;
+    if (key === 'issueNumber' && (typeof value === 'number' || (typeof value === 'string' && /^\d+$/.test(value)))) return `#${value}`;
     if (typeof value === 'string' && (value.startsWith('#') || (key === 'repo' && value.includes('/')))) return value;
     const resource = definition?.inputSchema.properties?.[key]?.['x-resource'];
+    const resourceField = definition?.inputSchema.properties?.[key]?.['x-resource-field'];
+    if ((resource === 'sheet' || resource === 'mysheet' || resourceField === 'title') && typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
     return `${resourceNames[String(resource)] ?? 'Nơi được chọn'} · chưa có tên trong dữ liệu`;
-  }).join(' · ') || 'Trong phạm vi dịch vụ đã thiết lập';
+  }).join(' · ');
+  if (resolved) {
+    if ((step.tool === 'mysheets.create_sheet' || step.tool === 'sheets.create_sheet') && typeof mergedArgs?.title === 'string' && mergedArgs.title.trim().length > 0) {
+      return `${resolved} · Tab mới: ${mergedArgs.title.trim()}`;
+    }
+    if (boardLabel && !resolved.includes(boardLabel)) {
+      return `${boardLabel} · ${resolved}`;
+    }
+    return resolved;
+  }
+  if (boardLabel) return boardLabel;
+  if (step.tool.startsWith('gmail.') && Array.isArray(mergedArgs?.to)) {
+    const recipients = mergedArgs.to.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+    if (recipients.length > 0) return recipients.join(', ');
+  }
+  return 'Trong phạm vi dịch vụ đã thiết lập';
 }
 function servicePrompt(service: ServiceInfo): string { return (prompts[service.id] ?? 'Mô tả công việc với {service}').replace('{service}',service.name); }
 export function Cockpit(props: Props) {
@@ -120,8 +161,8 @@ export function Cockpit(props: Props) {
   const onKeyDown = (event: import('react').KeyboardEvent<HTMLTextAreaElement>, text = draft) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send(text); } };
   const navigate = props.navigate ?? ((path: string) => { window.location.href = path; });
   const composerProps = {draft,planning:state.isPlanning,input,onDraft:setDraft,onSend:send,onKeyDown};
-  const editPlan = () => {
-    setDraft(current => current || 'Điều chỉnh kế hoạch: ');
+  const editPlan = (prefillText?: string) => {
+    setDraft(current => (typeof prefillText === 'string' && prefillText.trim() ? prefillText : current || 'Điều chỉnh kế hoạch: '));
     setEditOpen(true);
   };
   // Recovery owns its durable execution. Ordinary progress belongs to the current active plan.
@@ -170,7 +211,7 @@ export function Cockpit(props: Props) {
         {state.isPlanning && <span role="status" className="sr-only">Đang lập kế hoạch…</span>}
         {schedulesEnabled && runMessage && <ScheduleRunRecovery key={`${state.conversationId}:${runMessage.id}`} message={runMessage} navigate={navigate} />}
         {moment === 6 && <span role="status" className="sr-only">Quy trình đã hoàn thành.</span>}
-        {props.contentOverride ?? response ?? (moment === 1 ? <RequestMoment feedback={dismissedWait === waitingKey && waitingKey ? <p role="status" className="text-sm text-brand-muted">{latePlanNotice}</p> : terminalError?.metadata?.type !== 'planning_error' && terminalError && <p role="alert" className="text-danger-text mb-4">{terminalError.content}</p>} services={props.services} loading={props.servicesLoading} error={props.servicesError} draft={draft} planning={state.isPlanning} input={input} inputHidden={drawer === 'conversation'} onDraft={setDraft} onSend={send} onKeyDown={onKeyDown} onSettings={props.onSettings} navigate={navigate} servicePrompt={servicePrompt} /> : moment === 2 ? <DiscoveryMoment request={request ?? ''} gather={state.gatherState} services={props.services} /> : moment === 3 && state.activeClarification ? <ClarificationMoment request={request} question={state.activeClarification.question} context={state.activeClarification.context} options={state.activeClarification.options} selected={selected} onSelect={setSelected} draft={draft} onDraft={setDraft} planning={state.isPlanning} input={input} inputHidden={drawer === 'conversation'} onSend={send} onKeyDown={event => onKeyDown(event, selected ?? draft)} onBack={() => { setDraft(request ?? ''); state.setClarification(null); }} /> : moment === 4 && state.activePlan ? <PlanMoment request={request} runtimeMode={runtimeMode} key={state.activePlan.id} plan={state.activePlan} services={props.services} destination={resourceDestination} onPreview={setPreview} onApprove={props.onApprove} onCancel={props.onCancel} onEdit={editPlan} inlineComposer={editOpen && drawer !== 'conversation' ? <ChatComposer variant="inline" {...composerProps} onClose={()=>{setEditOpen(false);document.getElementById('btn-edit-plan')?.focus();}}/> : null}/> : moment === 5 ? <ExecutionMoment request={request} steps={executionSteps} planSteps={plan?.steps ?? []} labels={plan?.resourceLabels} destination={resourceDestination}/> : moment === 6 || moment === 'unsuccessful' ? <ReceiptMoment request={request} terminalStatus={moment === 'unsuccessful' ? state.planStatus : undefined} steps={executionSteps} planSteps={plan?.steps ?? []} labels={plan?.resourceLabels} mycalendarConnection={plan?.connections?.mycalendar} mysheetsConnection={plan?.connections?.mysheets} trelloConnection={plan?.connections?.trello} githubConnection={plan?.connections?.github} telegramConnection={plan?.connections?.telegram} services={props.services} destination={resourceDestination} totalDuration={total===null ? undefined : formatDuration(total*1000)} onNewConversation={props.onNewConversation} onFollowup={text=>{setDraft(text);input.current?.focus();}} servicePrompt={servicePrompt} onSettings={props.onSettings} servicesLoading={props.servicesLoading} servicesError={props.servicesError}/> : [7,8,9].includes(moment as number) ? <RecoveryMoment request={request} key={`${state.conversationId}:${snapshot?.plan.id}:${moment}`} moment={moment as 7|8|9} snapshot={snapshot} steps={executionSteps} services={props.services} controls={props.recovery}/> : <section id={`moment-${String(moment)}`} aria-label="Cockpit" data-moment={String(moment)} className="max-w-3xl mx-auto min-w-0">
+        {props.contentOverride ?? response ?? (moment === 1 ? <RequestMoment feedback={dismissedWait === waitingKey && waitingKey ? <p role="status" className="text-sm text-brand-muted">{latePlanNotice}</p> : terminalError?.metadata?.type !== 'planning_error' && terminalError && <p role="alert" className="text-danger-text mb-4">{terminalError.content}</p>} services={props.services} loading={props.servicesLoading} error={props.servicesError} draft={draft} planning={state.isPlanning} input={input} inputHidden={drawer === 'conversation'} onDraft={setDraft} onSend={send} onKeyDown={onKeyDown} onSettings={props.onSettings} navigate={navigate} servicePrompt={servicePrompt} /> : moment === 2 ? <DiscoveryMoment request={request ?? ''} gather={state.gatherState} services={props.services} /> : moment === 3 && state.activeClarification ? <ClarificationMoment request={request} question={state.activeClarification.question} context={state.activeClarification.context} options={state.activeClarification.options} selected={selected} onSelect={setSelected} draft={draft} onDraft={setDraft} planning={state.isPlanning} input={input} inputHidden={drawer === 'conversation'} onSend={send} onKeyDown={event => onKeyDown(event, selected ?? draft)} onBack={() => { setDraft(request ?? ''); state.setClarification(null); }} /> : moment === 4 && state.activePlan ? <PlanMoment request={request} runtimeMode={runtimeMode} key={state.activePlan.id} plan={state.activePlan} services={props.services} destination={resourceDestination} onPreview={setPreview} onApprove={props.onApprove} onCancel={props.onCancel} onEdit={editPlan} inlineComposer={editOpen && drawer !== 'conversation' ? <ChatComposer variant="inline" {...composerProps} onClose={()=>{setEditOpen(false);document.getElementById('btn-edit-plan')?.focus();}}/> : null}/> : moment === 5 ? <ExecutionMoment request={request} steps={executionSteps} planSteps={plan?.steps ?? []} labels={plan?.resourceLabels} destination={resourceDestination}/> : moment === 6 || moment === 'unsuccessful' ? <ReceiptMoment request={request} terminalStatus={moment === 'unsuccessful' ? state.planStatus : undefined} steps={executionSteps} planSteps={plan?.steps ?? []} labels={plan?.resourceLabels} gmailConnection={plan?.connections?.gmail} mycalendarConnection={plan?.connections?.mycalendar} mysheetsConnection={plan?.connections?.mysheets} trelloConnection={plan?.connections?.trello} githubConnection={plan?.connections?.github} notionConnection={plan?.connections?.notion} telegramConnection={plan?.connections?.telegram} services={props.services} destination={resourceDestination} totalDuration={total===null ? undefined : formatDuration(total*1000)} onNewConversation={props.onNewConversation} onFollowup={text=>{setDraft(text);input.current?.focus();}} servicePrompt={servicePrompt} onSettings={props.onSettings} servicesLoading={props.servicesLoading} servicesError={props.servicesError}/> : [7,8,9].includes(moment as number) ? <RecoveryMoment request={request} key={`${state.conversationId}:${snapshot?.plan.id}:${moment}`} moment={moment as 7|8|9} snapshot={snapshot} steps={executionSteps} services={props.services} controls={props.recovery}/> : <section id={`moment-${String(moment)}`} aria-label="Cockpit" data-moment={String(moment)} className="max-w-3xl mx-auto min-w-0">
           <p className="text-sm uppercase tracking-widest text-text-secondary mb-3">ATI · Điều phối công việc</p>
           <h1 id={`heading-moment-${String(moment)}`} tabIndex={-1} className="text-3xl sm:text-4xl mb-6">{title}</h1>
           {terminalError && <p role="alert" className="text-danger-text mb-4">{terminalError.content}</p>}

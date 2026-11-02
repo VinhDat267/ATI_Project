@@ -52,6 +52,37 @@ describe('packages/tool-adapters (Task 4b: Trello Read Tools & Allowed Scope Val
       };
     }
 
+    if (urlStr.includes('/boards/b1/cards')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => [
+          {
+            id: 'c1',
+            name: 'Fix homepage UI bug',
+            url: 'https://trello.com/c/c1',
+            idList: 'l1',
+            idBoard: 'b1',
+            due: '2026-11-01T10:00:00.000Z',
+            dueComplete: false,
+            idMembers: ['m1'],
+            labels: [{ name: 'Bug', color: 'red' }],
+          },
+          {
+            id: 'c2',
+            name: 'Unassigned backlog task',
+            url: 'https://trello.com/c/c2',
+            idList: 'l2',
+            idBoard: 'b1',
+            due: null,
+            dueComplete: false,
+            idMembers: [],
+            labels: [],
+          },
+        ],
+      };
+    }
+
     if (urlStr.includes('/cards/c1')) {
       return {
         ok: true,
@@ -64,6 +95,19 @@ describe('packages/tool-adapters (Task 4b: Trello Read Tools & Allowed Scope Val
           idList: 'l1',
           idBoard: 'b1',
           idMembers: ['m1'],
+          due: '2026-11-01T10:00:00.000Z',
+          dueComplete: false,
+          labels: [{ name: 'Bug', color: 'red' }],
+          checklists: [
+            {
+              id: 'chk_1',
+              name: 'Việc cần làm',
+              checkItems: [
+                { id: 'item_1', name: 'Viết unit test', state: 'complete' },
+                { id: 'item_2', name: 'Deploy staging', state: 'incomplete' },
+              ],
+            },
+          ],
         }),
       };
     }
@@ -141,9 +185,56 @@ describe('packages/tool-adapters (Task 4b: Trello Read Tools & Allowed Scope Val
     expect(cards[0]?.listId).toBe('l1');
 
     const card = await adapter.getCard({ cardId: 'c1' });
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/cards/c1?checklists=all'),
+      expect.anything()
+    );
     expect(card.id).toBe('c1');
     expect(card.name).toBe('Fix homepage UI bug');
     expect(card.listId).toBe('l1');
     expect(card.idMembers).toContain('m1');
+    expect(card.due).toBe('2026-11-01T10:00:00.000Z');
+    expect(card.dueComplete).toBe(false);
+    expect(card.labels).toEqual(['Bug']);
+    expect(card.checklists).toEqual([
+      {
+        id: 'chk_1',
+        name: 'Việc cần làm',
+        items: [
+          { id: 'item_1', name: 'Viết unit test', state: 'complete' },
+          { id: 'item_2', name: 'Deploy staging', state: 'incomplete' },
+        ],
+      },
+    ]);
+  });
+
+  it('lists cards across allowed boards when query is empty and returns due, dueComplete, idMembers, and labels', async () => {
+    const adapter = new TrelloReadTools({
+      credentials: { accessToken: 't' },
+      allowedBoardIds: ['b1'],
+      allowedScope: { boards: ['b1'] },
+      fetchFn: mockFetch as any,
+    });
+
+    const cards = await adapter.searchCards({ query: '' });
+    expect(cards).toHaveLength(2);
+    expect(cards[0]).toMatchObject({
+      id: 'c1',
+      name: 'Fix homepage UI bug',
+      listId: 'l1',
+      boardId: 'b1',
+      due: '2026-11-01T10:00:00.000Z',
+      dueComplete: false,
+      idMembers: ['m1'],
+      labels: ['Bug'],
+    });
+    expect(cards[1]).toMatchObject({
+      id: 'c2',
+      name: 'Unassigned backlog task',
+      listId: 'l2',
+      boardId: 'b1',
+      dueComplete: false,
+      idMembers: [],
+    });
   });
 });

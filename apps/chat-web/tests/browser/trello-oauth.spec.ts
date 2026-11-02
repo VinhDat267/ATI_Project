@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import pg from 'pg';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { hashPassword } from '../../../chat-api/src/db/repositories/user-repo.js';
 
 async function loginUser(page: Page, email: string, password: string) {
@@ -11,7 +11,7 @@ async function loginUser(page: Page, email: string, password: string) {
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Hôm nay bạn muốn nhờ việc gì?');
 }
 
-test('TRELLO: admin selects workspace and two boards, member connects via fake OAuth, plan displays board name and username', async ({ page }) => {
+test('TRELLO: admin selects workspace and two boards, member connects via fake OAuth, plan displays board name and username', async ({ page }, testInfo) => {
   const externalRequests: string[] = [];
 
   // Strictly block and record any attempt to reach external Atlassian/Trello hosts
@@ -68,6 +68,8 @@ test('TRELLO: admin selects workspace and two boards, member connects via fake O
           { id: 'b1', name: 'Sprint Board', member: true },
           { id: 'b2', name: 'Bug Tracker', member: true },
           { id: 'b3', name: 'Backlog', member: false },
+          { id: 'b4', name: 'Design System', member: true },
+          { id: 'b5', name: 'Release Ops', member: true },
         ],
       },
     });
@@ -103,15 +105,27 @@ test('TRELLO: admin selects workspace and two boards, member connects via fake O
   const adminTrelloRow = page.locator('#service-row-trello');
   await expect(adminTrelloRow).toBeVisible();
 
-  // Admin sees #trello-scope and selects workspace and two boards
+  // Admin sees #trello-scope, scope counter, and quick filter input
   const scopeSection = page.locator('#trello-scope');
   await expect(scopeSection).toBeVisible();
+
+  const scopeCounter = scopeSection.getByTestId('trello-scope-counter');
+  await expect(scopeCounter).toHaveText('Đã chọn 0/10');
+
+  const filterInput = scopeSection.getByLabel('Tìm nhanh bảng Trello');
+  await expect(filterInput).toBeVisible();
+  await filterInput.fill('Release');
+  await expect(scopeSection.getByRole('checkbox', { name: /Release Ops/i })).toBeVisible();
+  await expect(scopeSection.getByRole('checkbox', { name: /Sprint Board/i })).toHaveCount(0);
+  await filterInput.fill('');
 
   const sprintCheckbox = page.getByRole('checkbox', { name: /Sprint Board/i });
   const bugCheckbox = page.getByRole('checkbox', { name: /Bug Tracker/i });
 
   await sprintCheckbox.check();
   await bugCheckbox.check();
+  await expect(scopeCounter).toHaveText('Đã chọn 2/10');
+  await page.screenshot({ path: testInfo.outputPath('trello-scope-selector.png'), fullPage: true });
 
   const saveScopeBtn = page.getByRole('button', { name: 'Lưu bảng được dùng', exact: true });
   await expect(saveScopeBtn).toBeEnabled();
@@ -242,4 +256,326 @@ test('TRELLO: admin selects workspace and two boards, member connects via fake O
 
   // Verify that absolutely no external requests reached Atlassian or Trello
   expect(externalRequests).toEqual([]);
+});
+
+test('TRELLO-E2E: extended Trello tools plan, guardrail warnings callout, Kanban preview modal, real backend execution, ReceiptMoment, and trello_digest proposal', async ({ page }, testInfo) => {
+  const externalRequests: string[] = [];
+  await page.route(/auth\.atlassian\.com|api\.trello\.com/, (route) => {
+    externalRequests.push(route.request().url());
+    return route.abort('blockedbyclient');
+  });
+
+  const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+  try {
+    await loginUser(page, process.env.CHAT_ADMIN_EMAIL!, process.env.CHAT_ADMIN_PASSWORD!);
+    const adminId = (
+      await db.query('SELECT id FROM users WHERE email = $1', [process.env.CHAT_ADMIN_EMAIL!])
+    ).rows[0].id;
+
+    // 1. Seed a conversation with a 6-step Trello plan exercising create_list, create_card, add_checklist, update_checklist_item, add_comment, and set_card_due_complete + Pre-Execution Guardrail warnings
+    const planConvId = (
+      await db.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [adminId])
+    ).rows[0].id;
+    await db.query(
+      "INSERT INTO messages(conv_id, role, content) VALUES($1, 'user', 'Tạo cột QA Review, tạo thẻ Triển khai Trello OAuth, thêm checklist nghiệm thu, tích mục Kiểm tra unit test, bình luận xác nhận và đánh dấu hoàn thành hạn chót')",
+      [planConvId]
+    );
+
+    const plan = {
+      kind: 'plan',
+      summary: 'Quản lý trọn vòng đời công việc trên bảng Sprint Board Trello',
+      thinking:
+        'Tạo cột QA Review mới, tạo thẻ kèm người phụ trách và hạn chót, thêm checklist nghiệm thu, tích hoàn thành mục đầu tiên, bình luận cập nhật và đánh dấu hoàn thành hạn chót.',
+      warnings: [
+        'Cảnh báo trùng thẻ: Trên bảng đã có thẻ đang mở cùng tên "Triển khai Trello OAuth".',
+        'Cảnh báo tải công việc: Thành viên Nguyễn Văn A (@vana) đang phụ trách 5 thẻ mở trên bảng này.',
+      ],
+      connections: {
+        trello: {
+          credentialId: 'sandbox-trello',
+          memberId: 'sandbox-member',
+          username: 'admin_trello',
+          boardIds: ['b1', 'b2'],
+        },
+      },
+      resourceLabels: {
+        b1: 'Sprint Board',
+        l1: 'Đang làm',
+        card_1: 'Thẻ OAuth',
+        member_minh_dev: 'Nguyễn Văn A (@vana)',
+      },
+      steps: [
+        {
+          id: 'step_1',
+          tool: 'trello.create_list',
+          description: 'Tạo cột QA Review trên bảng Sprint Board',
+          boardId: 'b1',
+          args: {
+            boardId: 'b1',
+            name: 'QA Review',
+          },
+          dependsOn: [],
+        },
+        {
+          id: 'step_2',
+          tool: 'trello.create_card',
+          description: 'Tạo thẻ Triển khai Trello OAuth và gán Nguyễn Văn A',
+          boardId: 'b1',
+          args: {
+            boardId: 'b1',
+            listId: 'l1',
+            title: 'Triển khai Trello OAuth',
+            desc: 'Hoàn thiện luồng bảo mật OAuth 1.0a',
+            due: '2026-12-15T10:00:00.000Z',
+            dueComplete: true,
+            idMembers: ['member_minh_dev'],
+          },
+          dependsOn: ['step_1'],
+        },
+        {
+          id: 'step_3',
+          tool: 'trello.add_checklist',
+          description: 'Thêm Checklist Nghiệm Thu vào thẻ',
+          boardId: 'b1',
+          args: {
+            boardId: 'b1',
+            cardId: 'card_1',
+            title: 'Checklist Nghiệm Thu',
+            items: ['Kiểm tra unit test', 'Kiểm tra giao diện'],
+          },
+          dependsOn: ['step_2'],
+        },
+        {
+          id: 'step_4',
+          tool: 'trello.update_checklist_item',
+          description: 'Đánh dấu hoàn thành mục Kiểm tra unit test',
+          boardId: 'b1',
+          args: {
+            boardId: 'b1',
+            cardId: 'card_1',
+            itemName: 'Kiểm tra unit test',
+            state: 'complete',
+          },
+          dependsOn: ['step_3'],
+        },
+        {
+          id: 'step_5',
+          tool: 'trello.add_comment',
+          description: 'Bình luận cập nhật tiến độ vào thẻ',
+          boardId: 'b1',
+          args: {
+            boardId: 'b1',
+            cardId: 'card_1',
+            text: 'Đã hoàn tất kiểm thử unit test và UI/UX.',
+          },
+          dependsOn: ['step_4'],
+        },
+        {
+          id: 'step_6',
+          tool: 'trello.set_card_due_complete',
+          description: 'Đánh dấu hoàn thành hạn chót cho thẻ',
+          boardId: 'b1',
+          args: {
+            boardId: 'b1',
+            cardId: 'card_1',
+            dueComplete: true,
+          },
+          dependsOn: ['step_5'],
+        },
+      ],
+    };
+
+    const planText = JSON.stringify(plan);
+    const planId = (
+      await db.query(
+        `INSERT INTO plans(conv_id, plan_json, plan_text, plan_hash, status, expires_at, resource_labels)
+         VALUES($1, $2::jsonb, $3, $4, 'pending', now() + interval '30 minutes', $5::jsonb) RETURNING id`,
+        [
+          planConvId,
+          planText,
+          planText,
+          createHash('sha256').update(planText).digest('hex'),
+          JSON.stringify(plan.resourceLabels),
+        ]
+      )
+    ).rows[0].id;
+
+    await db.query(
+      "INSERT INTO messages(conv_id, role, content, metadata) VALUES($1, 'assistant', $2, $3)",
+      [
+        planConvId,
+        plan.summary,
+        {
+          type: 'plan',
+          planId,
+          plan: { ...plan, id: planId, status: 'pending' },
+          resourceLabels: plan.resourceLabels,
+        },
+      ]
+    );
+
+    await page.goto(`/c/${planConvId}`);
+    const planMoment = page.locator('#moment-4');
+    await expect(planMoment).toBeVisible();
+
+    // Verify Trello account label, board destination, and Vietnamese operation badges
+    await expect(planMoment).toContainText('Tài khoản: @admin_trello (Trello của bạn)');
+    await expect(planMoment.getByText(/Sprint Board · Đang làm/).first()).toBeVisible();
+    await expect(planMoment.getByText(/Sprint Board · Thẻ OAuth/).first()).toBeVisible();
+    await expect(planMoment.getByText(/chưa có tên trong dữ liệu/)).toHaveCount(0);
+    await expect(planMoment.getByText('Tạo cột mới', { exact: true })).toBeVisible();
+    await expect(planMoment.getByText('Tạo mới', { exact: true })).toBeVisible();
+    await expect(planMoment.getByText('Thêm checklist', { exact: true })).toBeVisible();
+    await expect(planMoment.getByText('Cập nhật mục checklist', { exact: true })).toBeVisible();
+    await expect(planMoment.getByText('Bình luận thẻ', { exact: true })).toBeVisible();
+    await expect(planMoment.getByText('Đánh dấu hạn chót', { exact: true })).toBeVisible();
+
+    // Verify Pre-Execution Guardrail Warning Callout
+    const warningsCallout = planMoment.getByTestId('plan-warnings-callout');
+    await expect(warningsCallout).toBeVisible();
+    await expect(warningsCallout).toContainText('Lưu ý kiểm tra trước khi thực thi');
+    await expect(warningsCallout).toContainText('Cảnh báo trùng thẻ');
+    await expect(warningsCallout).toContainText('Cảnh báo tải công việc');
+
+    // Verify Trello quick step pills on PlanMoment
+    await expect(planMoment.getByTestId('trello-step-pills').first()).toBeVisible();
+    await expect(planMoment).toContainText('👤 1 thành viên');
+    await expect(planMoment).toContainText('☑️ 2 mục checklist');
+    await expect(planMoment).toContainText('💬 Có bình luận');
+
+    // Open PreviewModal on step_2 (trello.create_card) and verify Kanban Card Preview
+    await planMoment.locator('#preview-step_2').click();
+    const cardPreview = page.getByTestId('trello-card-preview');
+    await expect(cardPreview).toBeVisible();
+    await expect(cardPreview).toContainText('Triển khai Trello OAuth');
+    await expect(cardPreview).toContainText('👤 Nguyễn Văn A (@vana)');
+    await expect(cardPreview).toContainText('✓ Đã hoàn thành hạn');
+    await page.screenshot({ path: testInfo.outputPath('trello-preview-modal-card.png'), fullPage: true });
+    await page.keyboard.press('Escape');
+    await expect(cardPreview).toHaveCount(0);
+
+    // Open PreviewModal on step_3 (trello.add_checklist) and verify "Tên checklist:" with schema-standard args.title
+    await planMoment.locator('#preview-step_3').click();
+    const addChkPreview = page.getByTestId('trello-card-preview');
+    await expect(addChkPreview).toBeVisible();
+    await expect(addChkPreview).toContainText('Tên checklist:');
+    await expect(addChkPreview).toContainText('Checklist Nghiệm Thu');
+    await page.keyboard.press('Escape');
+    await expect(addChkPreview).toHaveCount(0);
+
+    // Open PreviewModal on step_4 (trello.update_checklist_item) and verify checklist state badge
+    await planMoment.locator('#preview-step_4').click();
+    const chkPreview = page.getByTestId('trello-card-preview');
+    await expect(chkPreview).toBeVisible();
+    await expect(chkPreview).toContainText('Kiểm tra unit test');
+    await expect(chkPreview).toContainText('☑ Đã hoàn thành (complete)');
+    await page.keyboard.press('Escape');
+    await expect(chkPreview).toHaveCount(0);
+
+    // Approve plan and execute through real Backend StepRunner + TRELLO_FAKE + PostgreSQL
+    await page.getByRole('button', { name: /Duyệt kế hoạch/ }).click();
+    await expect
+      .poll(async () => (await db.query('SELECT status FROM plans WHERE id = $1', [planId])).rows[0]?.status)
+      .toBe('completed');
+
+    // Verify ReceiptMoment (#moment-6) and TrelloReceiptMetrics
+    await expect(page.getByRole('heading', { level: 1, name: /^Đã xong 6 việc trên/ })).toBeVisible();
+    await expect(page.getByText('✓ Đã tạo cột', { exact: true })).toBeVisible();
+    await expect(page.getByText('✓ Đã tạo thẻ', { exact: true })).toBeVisible();
+    await expect(page.getByText('✓ Đã thêm checklist', { exact: true })).toBeVisible();
+    await expect(page.getByText('✓ Đã cập nhật checklist', { exact: true })).toBeVisible();
+    await expect(page.getByText('✓ Đã bình luận', { exact: true })).toBeVisible();
+    await expect(page.getByText('✓ Đã cập nhật hạn chót', { exact: true })).toBeVisible();
+    await expect(page.getByText('QA Review', { exact: true })).toBeVisible();
+    await expect(page.getByText('Checklist Nghiệm Thu', { exact: true })).toBeVisible();
+    await expect(page.getByText('Kiểm tra unit test', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('trello-receipt-metrics').first()).toBeVisible();
+    await expect(page.getByText('👤 Đã gán 1 thành viên')).toBeVisible();
+    await expect(page.getByText('☑️ Đã tạo 2 mục checklist')).toBeVisible();
+    await expect(page.getByText('☑ Đã đánh dấu hoàn thành')).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('trello-receipt-moment.png'), fullPage: true });
+
+    // Verify PostgreSQL execution_steps outputs
+    const stepRows = (
+      await db.query(
+        'SELECT step_id, tool, status, output_json FROM execution_steps WHERE plan_id = $1 ORDER BY step_id',
+        [planId]
+      )
+    ).rows;
+    expect(stepRows.map((r) => r.status)).toEqual([
+      'succeeded',
+      'succeeded',
+      'succeeded',
+      'succeeded',
+      'succeeded',
+      'succeeded',
+    ]);
+    expect(stepRows[0].output_json.name).toBe('QA Review');
+    expect(stepRows[1].output_json.name).toBe('Triển khai Trello OAuth');
+    expect(stepRows[2].output_json.name).toBe('Checklist Nghiệm Thu');
+    expect(stepRows[3].output_json.state).toBe('complete');
+    expect(stepRows[4].output_json.text).toBe('Đã hoàn tất kiểm thử unit test và UI/UX.');
+    expect(stepRows[5].output_json.dueComplete).toBe(true);
+
+    // 2. Verify trello_digest proposal with Telegram destination on ScheduleMoment
+    if (process.env.SCHEDULES_ENABLED === 'on') {
+      const tgConvId = (
+        await db.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [adminId])
+      ).rows[0].id;
+      await db.query(
+        "INSERT INTO messages(conv_id, role, content) VALUES($1, 'user', 'Mỗi sáng 8 giờ gửi bản tin Trello bảng Sprint Board vào nhóm Telegram Kỹ Thuật ATI')",
+        [tgConvId]
+      );
+      await db.query(
+        "INSERT INTO messages(conv_id, role, content, metadata) VALUES($1, 'assistant', 'Đề xuất lịch chạy tự động gửi bản tin Trello qua Telegram', $2)",
+        [
+          tgConvId,
+          {
+            type: 'schedule_proposal',
+            services: ['trello', 'telegram'],
+            nextRuns: ['2026-11-03T01:00:00.000Z'],
+            proposal: {
+              kind: 'schedule',
+              action: 'create',
+              name: 'Bản tin Trello Telegram',
+              request: 'Mỗi sáng 8 giờ gửi bản tin Trello bảng Sprint Board vào nhóm Telegram Kỹ Thuật ATI',
+              recurrence: { type: 'daily', time: '08:00' },
+              summary: 'Mỗi sáng 8 giờ, gửi bản tin Trello vào nhóm Telegram Kỹ Thuật ATI.',
+            },
+            digestCandidate: {
+              canAutoDigest: true,
+              config: {
+                credentialId: 'sandbox-trello',
+                trelloMemberId: 'sandbox-member',
+                username: 'admin_trello',
+                boards: [{ id: 'b1', name: 'Sprint Board' }],
+                channelId: '',
+                channelName: '',
+                telegramChatId: '-100999888',
+                telegramChatTitle: 'Nhóm Kỹ Thuật ATI',
+                dueSoonHours: 24,
+              },
+              configHash: 'hash-trello-e2e-1',
+            },
+          },
+        ]
+      );
+
+      await page.goto(`/c/${tgConvId}`);
+      await expect(page.locator('[data-moment="schedule"]')).toBeVisible();
+      const tgAutoRadio = page.locator('#schedule-mode-auto-digest');
+      await expect(tgAutoRadio).toBeVisible();
+      await tgAutoRadio.click();
+      await expect(
+        page.getByText(
+          /Bảng Trello: Sprint Board · Telegram: Nhóm Kỹ Thuật ATI · Nội dung: Thẻ quá hạn, sắp đến hạn trong 24 giờ, thẻ chưa gán người/
+        )
+      ).toBeVisible();
+      await page.screenshot({ path: testInfo.outputPath('trello-digest-telegram-proposal.png'), fullPage: true });
+    }
+
+    expect(externalRequests).toEqual([]);
+  } finally {
+    await db.end();
+  }
 });

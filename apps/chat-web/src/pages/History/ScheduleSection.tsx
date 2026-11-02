@@ -9,7 +9,25 @@ import { WorkflowFlowCanvas } from '../../components/WorkflowFlowCanvas';
 
 function RunLink({ run, navigate }: { run: ScheduleRunView; navigate: (path: string) => void }) {
   const sheetsDelivery = run.delivery && 'spreadsheetTitle' in run.delivery ? run.delivery : null;
-  return <><span>{formatRunTime(run.dueAt)} · </span>{run.convId ? <a className="underline text-[#FF5701]" href={`/c/${run.convId}`} onClick={event => { if (event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); navigate(`/c/${run.convId}`); }}>{runLabel(run)}</a> : <span>{runLabel(run)}</span>}{sheetsDelivery && <span className="text-xs text-[#6B7280]"> ({sheetsDelivery.spreadsheetTitle} → {sheetsDelivery.targetLabel ?? sheetsDelivery.targetId})</span>}{run.error && <span className="block text-xs text-[#6B7280]">{run.error}</span>}</>;
+  const githubDest = run.delivery && 'counts' in run.delivery
+    ? (run.delivery.telegramChatTitle || run.delivery.telegramChatId
+        ? `Telegram: ${run.delivery.telegramChatTitle ?? run.delivery.telegramChatId}`
+        : run.delivery.channelName
+          ? `#${run.delivery.channelName.replace(/^#/, '')}`
+          : null)
+    : null;
+  const telegramDest =
+    run.delivery &&
+    'chatTitle' in run.delivery &&
+    !('spreadsheetTitle' in run.delivery) &&
+    !('counts' in run.delivery)
+      ? `Telegram: ${run.delivery.chatTitle}${
+          Array.isArray(run.delivery.sources) && run.delivery.sources.length > 0
+            ? ` · ${run.delivery.sources.length} nguồn`
+            : ''
+        }`
+      : null;
+  return <><span>{formatRunTime(run.dueAt)} · </span>{run.convId ? <a className="underline text-[#FF5701]" href={`/c/${run.convId}`} onClick={event => { if (event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); navigate(`/c/${run.convId}`); }}>{runLabel(run)}</a> : <span>{runLabel(run)}</span>}{sheetsDelivery && <span className="text-xs text-[#6B7280]"> ({sheetsDelivery.spreadsheetTitle} → {sheetsDelivery.targetLabel ?? sheetsDelivery.targetId})</span>}{githubDest && <span className="text-xs text-[#6B7280]"> ({githubDest})</span>}{telegramDest && <span className="text-xs text-[#6B7280]"> ({telegramDest})</span>}{run.error && <span className="block text-xs text-[#6B7280]">{run.error}</span>}</>;
 }
 function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: ScheduleView; navigate: (path: string) => void; reload: () => Promise<void>; onChanged: (schedule: ScheduleView) => void }) {
   const [open, setOpen] = useState(false), [runs, setRuns] = useState<ScheduleRunView[]>([]), [error, setError] = useState('');
@@ -22,7 +40,7 @@ function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: Sche
   return <article className="bg-white rounded-2xl border border-[#E7E7E2] p-4 sm:p-5 v3-space-y-3 min-w-0">
     <h3 className="text-base font-semibold text-[#111827] [overflow-wrap:anywhere] flex flex-wrap items-center gap-2">
       <span>{schedule.name}</span>
-      {(schedule.kind === 'calendar_digest' || schedule.kind === 'github_digest' || schedule.kind === 'sheets_digest') && (
+      {(schedule.kind === 'calendar_digest' || schedule.kind === 'github_digest' || schedule.kind === 'trello_digest' || schedule.kind === 'sheets_digest') && (
         <span data-schedule-kind={schedule.kind} className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
           Tự gửi
         </span>

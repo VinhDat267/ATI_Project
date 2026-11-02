@@ -43,7 +43,36 @@ export function searchEntities(raw: unknown, schema: JSONSchema): unknown[] {
 }
 
 /** Entity fields worth remembering; anything else (descriptions, tokens) is dropped. */
-const KEPT_FIELDS = ['id', 'name', 'fullName', 'number', 'title', 'boardId', 'boardIds', 'url', 'key'];
+const KEPT_FIELDS = [
+  'id',
+  'name',
+  'fullName',
+  'username',
+  'number',
+  'title',
+  'boardId',
+  'boardIds',
+  'spreadsheetId',
+  'headers',
+  'url',
+  'key',
+  'listId',
+  'due',
+  'dueComplete',
+  'idMembers',
+  'labels',
+  'checklists',
+  'start',
+  'end',
+  'location',
+  'meetLink',
+  'recurrence',
+  'calendarId',
+  'schema',
+  'properties',
+  'content',
+  'lastEditedTime',
+];
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);

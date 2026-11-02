@@ -84,6 +84,7 @@ export interface PlanStep {
   boardId?: string;
   repo?: string;
   chatId?: string;
+  databaseId?: string;
 }
 
 /** The personal connections a plan was previewed with. */
@@ -94,6 +95,15 @@ export interface PlanConnections {
   trello?: { credentialId: string; memberId: string; username: string; boardIds: string[] };
   github?: { credentialId: string; githubUserId: string; login: string; repos: string[] };
   telegram?: { credentialId: string; telegramUserId: string; username: string; chatIds: string[] };
+  notion?: {
+    credentialId: string;
+    workspaceId: string;
+    workspaceName: string;
+    botId: string;
+    identityVersion: number;
+    databaseIds: string[];
+    databases?: Array<{ id: string; title: string; url?: string }>;
+  };
   myjira?: JiraPlanConnection;
 }
 
@@ -162,7 +172,7 @@ export interface ScheduleResponse {
 export type PlannerResponse = PlanResponse | ClarificationResponse | RefusalResponse | AnswerResponse | ScheduleResponse;
 
 export type ScheduleStatus = 'active' | 'paused' | 'cancelled' | 'completed';
-export type ScheduleKind = 'plan' | 'plan_approval' | 'sheets_digest' | 'calendar_digest' | 'github_digest' | 'telegram_digest';
+export type ScheduleKind = 'plan' | 'plan_approval' | 'sheets_digest' | 'calendar_digest' | 'github_digest' | 'telegram_digest' | 'trello_digest' | 'notion_digest';
 export type ScheduleApprovalMode = 'manual' | 'auto_digest';
 
 export interface SheetsDigestConfig {
@@ -179,7 +189,8 @@ export interface SheetsDigestConfig {
   };
   destination:
     | { service: 'slack'; channelId: string; channelLabel?: string }
-    | { service: 'telegram'; chatId: string; chatLabel?: string };
+    | { service: 'telegram'; chatId: string; chatLabel?: string }
+    | { service: 'gmail'; recipientEmail: string; credentialId?: string };
   focus?: string;
   includeAiSummary: boolean;
 }
@@ -191,7 +202,7 @@ export interface SheetsDigestCandidate {
 }
 
 export interface SheetsDigestDelivery {
-  destination: 'slack' | 'telegram';
+  destination: 'slack' | 'telegram' | 'gmail';
   targetId: string;
   targetLabel?: string;
   spreadsheetId: string;
@@ -250,6 +261,8 @@ export interface GithubDigestConfig {
   channelId: string;
   channelName: string;
   staleDays: number;
+  telegramChatId?: string;
+  telegramChatTitle?: string;
 }
 
 export interface GithubDigestDelivery {
@@ -257,6 +270,9 @@ export interface GithubDigestDelivery {
   channelName: string;
   ts: string | null;
   counts: { newIssues: number; stalePrs: number; unassignedIssues: number };
+  telegramChatId?: string;
+  telegramChatTitle?: string;
+  messageId?: number | null;
 }
 
 export interface ScheduleDigestCandidate {
@@ -305,6 +321,67 @@ export interface TelegramDigestCandidate {
   configHash?: string;
 }
 
+export interface TrelloDigestConfig {
+  credentialId: string;
+  trelloMemberId: string;
+  username: string;
+  boards: Array<{ id: string; name: string }>;
+  channelId: string;
+  channelName: string;
+  dueSoonHours: number;
+  telegramChatId?: string;
+  telegramChatTitle?: string;
+  includeAiSummary?: boolean;
+}
+
+export interface TrelloDigestDelivery {
+  channelId: string;
+  channelName: string;
+  ts: string | null;
+  counts: { overdueCards: number; dueSoonCards: number; unassignedCards: number };
+  telegramChatId?: string;
+  telegramChatTitle?: string;
+  messageId?: number | null;
+}
+
+export interface TrelloDigestCandidate {
+  canAutoDigest: boolean;
+  disabledReason?: string;
+  config?: TrelloDigestConfig;
+  configHash?: string;
+}
+
+export interface NotionDigestConfig {
+  credentialId: string;
+  workspaceId: string;
+  workspaceName: string;
+  botId: string;
+  identityVersion: number;
+  databases: Array<{ id: string; title: string; url?: string }>;
+  channelId: string;
+  channelName: string;
+  telegramChatId?: string;
+  telegramChatTitle?: string;
+  includeAiSummary?: boolean;
+}
+
+export interface NotionDigestDelivery {
+  channelId: string;
+  channelName: string;
+  ts: string | null;
+  counts: { databasesChecked: number; totalPages: number };
+  telegramChatId?: string;
+  telegramChatTitle?: string;
+  messageId?: number | null;
+}
+
+export interface NotionDigestCandidate {
+  canAutoDigest: boolean;
+  disabledReason?: string;
+  config?: NotionDigestConfig;
+  configHash?: string;
+}
+
 export interface ScheduleView {
   id: string; convId: string; version: number;
   name: string; request: string; recurrence: ScheduleRecurrence;
@@ -317,9 +394,12 @@ export interface ScheduleView {
   lastRun: ScheduleRunView | null;
   kind?: ScheduleKind;
   approvalMode?: ScheduleApprovalMode;
-  digestConfig?: SheetsDigestConfig | CalendarDigestConfig | GithubDigestConfig | TelegramDigestConfig | null;
+  digestConfig?: SheetsDigestConfig | CalendarDigestConfig | GithubDigestConfig | TelegramDigestConfig | TrelloDigestConfig | NotionDigestConfig | null;
   digest?:
     | { config: GithubDigestConfig; approvedAt: string }
+    | { config: TrelloDigestConfig; approvedAt: string }
+    | { config: NotionDigestConfig; approvedAt: string }
+    | { config: Record<string, unknown>; approvedAt: string }
     | {
         chatId: string;
         chatTitle: string;
@@ -347,7 +427,7 @@ export interface ScheduleRunView {
   planStatus: string | null;
   /** A Vietnamese sentence for the user. */
   error: string | null;
-  delivery?: SheetsDigestDelivery | CalendarDigestDelivery | GithubDigestDelivery | TelegramDigestDelivery | null;
+  delivery?: SheetsDigestDelivery | CalendarDigestDelivery | GithubDigestDelivery | TelegramDigestDelivery | TrelloDigestDelivery | NotionDigestDelivery | null;
 }
 
 /** Metadata of the assistant message that carries a schedule proposal. */
@@ -359,7 +439,14 @@ export interface ScheduleProposalMetadata {
   services: string[];
   nextRuns: string[];             // computed by the backend when the proposal is saved
   previous: Pick<ScheduleView, 'name' | 'request' | 'recurrence' | 'status'> | null;
-  digestCandidate?: SheetsDigestCandidate | CalendarDigestCandidate | ScheduleDigestCandidate | TelegramDigestCandidate;
+  digestCandidate?:
+    | SheetsDigestCandidate
+    | CalendarDigestCandidate
+    | ScheduleDigestCandidate
+    | TelegramDigestCandidate
+    | TrelloDigestCandidate
+    | NotionDigestCandidate
+    | { canAutoDigest: boolean; disabledReason?: string; config?: Record<string, unknown>; configHash?: string };
 }
 
 /** Metadata of the assistant message recording the schedule after each change. */

@@ -17,6 +17,18 @@
       "title": "Theo dõi bảng số liệu & nhắc việc",
       "services": ["sheets", "trello", "telegram"],
       "prompt": "Đọc bảng tiến độ tuần trên Google Sheets, tạo thẻ việc cần xử lý trên bảng Trello và gửi cảnh báo nhanh qua Telegram."
+    },
+    {
+      "id": "playbook-gmail-sheets-followup",
+      "title": "Đọc bảng tính & gửi email báo giá",
+      "services": ["sheets", "gmail", "slack"],
+      "prompt": "Đọc danh sách khách hàng trên bảng tính Google Sheets, soạn thư báo giá qua Gmail và báo tiến độ vào kênh Slack."
+    },
+    {
+      "id": "playbook-notion-trello-slack",
+      "title": "Biên bản họp Notion & giao việc",
+      "services": ["notion", "trello", "slack"],
+      "prompt": "Đọc trang biên bản họp mới nhất trên Notion, bóc tách các đầu việc cần làm để tạo thẻ trên bảng Trello và gửi tóm tắt vào kênh Slack của nhóm."
     }
   ],
   "services": {
@@ -156,10 +168,13 @@
       "color": "#229ed9",
       "prompt": "Gửi thông báo qua {service}",
       "suggestion": {
-        "icon": "bg-blue-50 border-blue-100",
-        "decoration": "bg-blue-500/5 group-hover:bg-blue-500/10",
-        "name": "text-blue-600"
+        "icon": "bg-sky-50 border-sky-100",
+        "decoration": "bg-sky-500/5 group-hover:bg-sky-500/10",
+        "name": "text-sky-600"
       },
+      "badge": "bg-sky-50 text-sky-700",
+      "receiptHover": "hover:border-sky-300",
+      "previewBadge": "bg-sky-100 text-sky-800",
       "orbital": {
         "label": "Telegram",
         "ringClass": "ring-[#229ED9]/25 border-[#229ED9]",
@@ -190,7 +205,10 @@
       "suggestion": {
         "icon": "bg-red-50 border-red-100",
         "decoration": "bg-red-500/5 group-hover:bg-red-500/10",
-        "name": "text-red-600"
+        "name": "text-red-600",
+        "badge": "bg-red-50 text-red-700",
+        "receiptHover": "hover:border-red-300",
+        "previewBadge": "bg-red-100 text-red-800"
       },
       "orbital": {
         "label": "Gmail",
@@ -270,6 +288,77 @@
       "titlePrefix": "Issue #",
       "previewStyle": "issue"
     },
+    "github.add_label": {
+      "action": "Gắn nhãn",
+      "done": "Đã gắn nhãn",
+      "receipt": "Đã gắn nhãn",
+      "kind": "Issue",
+      "link": "Mở issue",
+      "titleField": "number",
+      "titlePrefix": "Issue #",
+      "previewStyle": "issue"
+    },
+    "github.update_issue": {
+      "action": "Cập nhật issue",
+      "done": "Đã cập nhật",
+      "receipt": "Đã cập nhật issue",
+      "kind": "Issue",
+      "link": "Mở issue",
+      "titleField": "number",
+      "titlePrefix": "Issue #",
+      "previewStyle": "issue"
+    },
+    "github.add_comment": {
+      "action": "Bình luận issue",
+      "done": "Đã bình luận",
+      "receipt": "Đã bình luận",
+      "kind": "Bình luận",
+      "link": "Mở bình luận",
+      "titleField": "issueNumber",
+      "titlePrefix": "Issue #",
+      "previewStyle": "issue"
+    },
+    "github.get_issue": {
+      "action": "Đọc issue",
+      "done": "Đã đọc",
+      "receipt": "Đã đọc issue",
+      "kind": "Issue",
+      "link": "Mở issue",
+      "titleField": "number",
+      "titlePrefix": "Issue #",
+      "previewStyle": "issue"
+    },
+    "github.get_pull_request": {
+      "action": "Đọc PR",
+      "done": "Đã đọc",
+      "receipt": "Đã đọc PR",
+      "kind": "Pull Request",
+      "link": "Mở PR",
+      "titleField": "number",
+      "titlePrefix": "PR #",
+      "previewStyle": "issue"
+    },
+    "github.search_issues": {
+      "action": "Tìm issue & PR",
+      "done": "Đã tìm",
+      "receipt": "Đã tìm issue & PR",
+      "kind": "Danh sách issue",
+      "link": "Mở trên GitHub"
+    },
+    "github.list_issues": {
+      "action": "Liệt kê issue & PR",
+      "done": "Đã liệt kê",
+      "receipt": "Đã liệt kê issue & PR",
+      "kind": "Danh sách issue",
+      "link": "Mở trên GitHub"
+    },
+    "github.search_repos": {
+      "action": "Tìm kho mã",
+      "done": "Đã tìm",
+      "receipt": "Đã tìm kho mã",
+      "kind": "Repository",
+      "link": "Mở kho mã"
+    },
     "trello.create_card": {
       "action": "Tạo mới",
       "done": "Đã tạo",
@@ -278,6 +367,156 @@
       "link": "Mở card",
       "titleField": "name",
       "previewStyle": "card"
+    },
+    "trello.update_card": {
+      "action": "Cập nhật thẻ",
+      "done": "Đã cập nhật",
+      "receipt": "Đã cập nhật thẻ",
+      "kind": "Card",
+      "link": "Mở thẻ trên Trello",
+      "titleField": "name",
+      "previewStyle": "card"
+    },
+    "trello.add_member": {
+      "action": "Gán thành viên",
+      "done": "Đã gán",
+      "receipt": "Đã gán thành viên",
+      "kind": "Member",
+      "link": "Mở thẻ trên Trello",
+      "titleField": "id",
+      "previewStyle": "card"
+    },
+    "trello.remove_member": {
+      "action": "Gỡ thành viên",
+      "done": "Đã gỡ",
+      "receipt": "Đã gỡ thành viên",
+      "kind": "Member",
+      "link": "Mở thẻ trên Trello",
+      "titleField": "id",
+      "previewStyle": "card"
+    },
+    "trello.add_checklist": {
+      "action": "Thêm checklist",
+      "done": "Đã thêm",
+      "receipt": "Đã thêm checklist",
+      "kind": "Checklist",
+      "link": "Mở thẻ trên Trello",
+      "titleField": "name",
+      "previewStyle": "card"
+    },
+    "trello.update_checklist_item": {
+      "action": "Cập nhật mục checklist",
+      "done": "Đã cập nhật",
+      "receipt": "Đã cập nhật checklist",
+      "kind": "Checklist Item",
+      "link": "Mở thẻ trên Trello",
+      "titleField": "name",
+      "previewStyle": "card"
+    },
+    "trello.add_comment": {
+      "action": "Bình luận thẻ",
+      "done": "Đã bình luận",
+      "receipt": "Đã bình luận",
+      "kind": "Comment",
+      "link": "Mở bình luận",
+      "titleField": "text",
+      "previewStyle": "card"
+    },
+    "trello.create_list": {
+      "action": "Tạo cột mới",
+      "done": "Đã tạo cột",
+      "receipt": "Đã tạo cột",
+      "kind": "List",
+      "link": "Mở bảng Trello",
+      "titleField": "name",
+      "previewStyle": "card"
+    },
+    "trello.set_card_due_complete": {
+      "action": "Đánh dấu hạn chót",
+      "done": "Đã cập nhật",
+      "receipt": "Đã cập nhật hạn chót",
+      "kind": "Card",
+      "link": "Mở thẻ trên Trello",
+      "titleField": "name",
+      "previewStyle": "card"
+    },
+    "trello.get_card": {
+      "action": "Đọc thẻ",
+      "done": "Đã đọc",
+      "receipt": "Đã đọc thẻ",
+      "kind": "Card",
+      "link": "Mở thẻ trên Trello",
+      "titleField": "name",
+      "previewStyle": "card"
+    },
+    "trello.search_cards": {
+      "action": "Tìm kiếm thẻ",
+      "done": "Đã tìm",
+      "receipt": "Đã tìm thẻ",
+      "kind": "Danh sách thẻ",
+      "link": "Mở kết quả",
+      "previewStyle": "card"
+    },
+    "trello.search_lists": {
+      "action": "Liệt kê cột",
+      "done": "Đã liệt kê",
+      "receipt": "Đã liệt kê cột",
+      "kind": "Danh sách cột",
+      "link": "Mở kết quả",
+      "previewStyle": "card"
+    },
+    "trello.search_boards": {
+      "action": "Tìm bảng Trello",
+      "done": "Đã tìm",
+      "receipt": "Đã tìm bảng",
+      "kind": "Danh sách bảng",
+      "link": "Mở kết quả",
+      "previewStyle": "card"
+    },
+    "trello.search_members": {
+      "action": "Tìm thành viên",
+      "done": "Đã tìm",
+      "receipt": "Đã tìm thành viên",
+      "kind": "Danh sách thành viên",
+      "link": "Mở kết quả",
+      "previewStyle": "card"
+    },
+    "sheets.list_spreadsheets": {
+      "action": "Xem danh sách bảng tính",
+      "done": "Đã xem",
+      "receipt": "Đã xem danh sách bảng tính",
+      "kind": "Danh sách bảng tính",
+      "link": "Mở kết quả"
+    },
+    "sheets.list_sheets": {
+      "action": "Xem danh sách trang tính",
+      "done": "Đã xem",
+      "receipt": "Đã xem danh sách trang tính",
+      "kind": "Danh sách trang tính",
+      "link": "Mở kết quả"
+    },
+    "sheets.read_range": {
+      "action": "Đọc bảng tính",
+      "done": "Đã đọc",
+      "receipt": "Đã đọc dữ liệu",
+      "kind": "Bảng tính",
+      "link": "Mở bảng tính"
+    },
+    "sheets.search_rows": {
+      "action": "Tìm dòng trong bảng tính",
+      "done": "Đã tìm dòng",
+      "receipt": "Đã tìm dòng",
+      "kind": "Bảng tính",
+      "link": "Mở bảng tính",
+      "previewStyle": "sheet_search"
+    },
+    "sheets.aggregate_rows": {
+      "action": "Thống kê số liệu bảng tính",
+      "done": "Đã thống kê",
+      "receipt": "Đã thống kê số liệu",
+      "kind": "Bảng tính",
+      "link": "Mở bảng tính",
+      "previewStyle": "sheet_aggregate"
     },
     "sheets.append_rows": {
       "action": "Thêm dòng",
@@ -288,6 +527,33 @@
       "titleField": "updatedRange",
       "titlePrefix": "Phạm vi ",
       "previewStyle": "rows"
+    },
+    "sheets.update_rows": {
+      "action": "Cập nhật cột trong bảng tính",
+      "done": "Đã cập nhật cột",
+      "receipt": "Đã cập nhật cột",
+      "kind": "Bảng tính",
+      "link": "Mở bảng tính",
+      "titleField": "updatedRange",
+      "titlePrefix": "Phạm vi ",
+      "previewStyle": "sheet_update"
+    },
+    "sheets.delete_rows": {
+      "action": "Xoá dòng trong bảng tính",
+      "done": "Đã xoá dòng",
+      "receipt": "Đã xoá dòng",
+      "kind": "Bảng tính",
+      "link": "Mở bảng tính",
+      "previewStyle": "sheet_delete"
+    },
+    "sheets.create_sheet": {
+      "action": "Tạo trang tính (tab) mới",
+      "done": "Đã tạo trang tính",
+      "receipt": "Đã tạo trang tính",
+      "kind": "Trang tính",
+      "link": "Mở bảng tính",
+      "titleField": "title",
+      "previewStyle": "sheet_create"
     },
     "slack.send_message": {
       "action": "Gửi tin",
@@ -305,21 +571,93 @@
       "link": "Xem tin",
       "previewStyle": "message"
     },
+    "telegram.read_messages": {
+      "action": "Đọc tin nhắn",
+      "done": "Đã đọc",
+      "receipt": "Đã đọc tin nhắn",
+      "kind": "Tin nhắn nhóm",
+      "link": "Xem kết quả"
+    },
+    "telegram.list_chats": {
+      "action": "Tìm cuộc trò chuyện",
+      "done": "Đã tìm",
+      "receipt": "Đã tìm chat",
+      "kind": "Danh sách chat",
+      "link": "Xem kết quả"
+    },
     "calendar.create_event": {
       "action": "Tạo mới",
       "done": "Đã tạo",
       "receipt": "Đã tạo lịch",
       "kind": "Lịch",
       "link": "Mở lịch",
-      "titleField": "summary"
+      "titleField": "summary",
+      "previewStyle": "calendar_event"
     },
     "notion.create_page": {
-      "action": "Tạo mới",
-      "done": "Đã tạo",
+      "action": "Tạo trang mới",
+      "done": "Đã tạo trang",
       "receipt": "Đã tạo trang",
       "kind": "Trang",
       "link": "Mở trang",
-      "titleField": "title"
+      "titleField": "title",
+      "previewStyle": "notion_page"
+    },
+    "notion.update_page": {
+      "action": "Cập nhật trang",
+      "done": "Đã cập nhật",
+      "receipt": "Đã cập nhật trang",
+      "kind": "Trang",
+      "link": "Mở trang",
+      "titleField": "title",
+      "previewStyle": "notion_page"
+    },
+    "notion.append_text": {
+      "action": "Nối thêm nội dung",
+      "done": "Đã nối nội dung",
+      "receipt": "Đã nối nội dung trang",
+      "kind": "Trang",
+      "link": "Mở trang",
+      "previewStyle": "notion_page"
+    },
+    "notion.append_blocks": {
+      "action": "Thêm nội dung trang",
+      "done": "Đã thêm nội dung",
+      "receipt": "Đã thêm nội dung trang",
+      "kind": "Trang",
+      "link": "Mở trang",
+      "previewStyle": "notion_page"
+    },
+    "notion.get_page": {
+      "action": "Đọc nội dung trang",
+      "done": "Đã đọc trang",
+      "receipt": "Đã đọc trang",
+      "kind": "Trang",
+      "link": "Mở trang",
+      "titleField": "title",
+      "previewStyle": "notion_page"
+    },
+    "notion.query_database": {
+      "action": "Truy vấn database",
+      "done": "Đã truy vấn",
+      "receipt": "Đã truy vấn database",
+      "kind": "Database",
+      "link": "Mở trên Notion",
+      "previewStyle": "notion_page"
+    },
+    "notion.search_pages": {
+      "action": "Tìm trang",
+      "done": "Đã tìm",
+      "receipt": "Đã tìm trang",
+      "kind": "Trang",
+      "link": "Mở trên Notion"
+    },
+    "notion.search_databases": {
+      "action": "Tìm database",
+      "done": "Đã tìm",
+      "receipt": "Đã tìm database",
+      "kind": "Database",
+      "link": "Mở trên Notion"
     },
     "jira.create_issue": {
       "action": "Tạo mới",
@@ -364,6 +702,34 @@
       "kind": "Nhãn",
       "link": "Mở kết quả"
     },
+    "gmail.batch_modify_threads": {
+      "action": "Đổi nhãn hàng loạt",
+      "done": "Đã đổi nhãn hàng loạt",
+      "receipt": "Đã đổi nhãn các luồng thư",
+      "kind": "Nhãn",
+      "link": "Mở trên Gmail"
+    },
+    "gmail.search_threads": {
+      "action": "Tìm luồng thư",
+      "done": "Đã tìm",
+      "receipt": "Đã tìm luồng thư",
+      "kind": "Luồng thư",
+      "link": "Mở trên Gmail"
+    },
+    "gmail.get_thread": {
+      "action": "Đọc luồng thư",
+      "done": "Đã đọc",
+      "receipt": "Đã đọc luồng thư",
+      "kind": "Luồng thư",
+      "link": "Mở trên Gmail"
+    },
+    "gmail.list_labels": {
+      "action": "Xem danh sách nhãn",
+      "done": "Đã xem",
+      "receipt": "Đã xem nhãn Gmail",
+      "kind": "Nhãn",
+      "link": "Mở trên Gmail"
+    },
     "gmail.trash_thread": {
       "action": "Chuyển vào thùng rác",
       "done": "Đã chuyển vào thùng rác",
@@ -392,13 +758,46 @@
       "kind": "Sự kiện",
       "link": "Mở kết quả"
     },
+    "mycalendar.get_event": {
+      "action": "Xem chi tiết sự kiện",
+      "done": "Đã xem",
+      "receipt": "Đã xem chi tiết sự kiện",
+      "kind": "Sự kiện",
+      "link": "Mở sự kiện trên Google Calendar",
+      "titleField": "title"
+    },
+    "mycalendar.find_free_slots": {
+      "action": "Tìm khung giờ trống",
+      "done": "Đã tìm",
+      "receipt": "Đã tìm khung giờ trống",
+      "kind": "Khung giờ trống",
+      "link": "Mở kết quả"
+    },
     "mycalendar.create_event": {
       "action": "Tạo sự kiện",
       "done": "Đã tạo",
       "receipt": "Đã tạo sự kiện",
       "kind": "Sự kiện",
       "link": "Mở sự kiện trên Google Calendar",
-      "titleField": "title"
+      "titleField": "title",
+      "previewStyle": "calendar_event"
+    },
+    "mycalendar.update_event": {
+      "action": "Dời / cập nhật sự kiện",
+      "done": "Đã cập nhật",
+      "receipt": "Đã cập nhật sự kiện",
+      "kind": "Sự kiện",
+      "link": "Mở sự kiện trên Google Calendar",
+      "titleField": "title",
+      "previewStyle": "calendar_event"
+    },
+    "mycalendar.delete_event": {
+      "action": "Huỷ sự kiện",
+      "done": "Đã huỷ",
+      "receipt": "Đã huỷ sự kiện",
+      "kind": "Sự kiện",
+      "link": "Mở kết quả",
+      "previewStyle": "calendar_event"
     },
     "mysheets.list_spreadsheets": {
       "action": "Xem danh sách bảng tính",
@@ -421,6 +820,22 @@
       "kind": "Bảng tính",
       "link": "Mở bảng tính"
     },
+    "mysheets.search_rows": {
+      "action": "Tìm dòng trong bảng tính",
+      "done": "Đã tìm dòng",
+      "receipt": "Đã tìm dòng",
+      "kind": "Bảng tính",
+      "link": "Mở bảng tính",
+      "previewStyle": "sheet_search"
+    },
+    "mysheets.aggregate_rows": {
+      "action": "Thống kê số liệu bảng tính",
+      "done": "Đã thống kê",
+      "receipt": "Đã thống kê số liệu",
+      "kind": "Bảng tính",
+      "link": "Mở bảng tính",
+      "previewStyle": "sheet_aggregate"
+    },
     "mysheets.append_rows": {
       "action": "Thêm dòng vào bảng tính của bạn",
       "done": "Đã thêm dòng",
@@ -428,6 +843,33 @@
       "kind": "Bảng tính",
       "link": "Mở bảng tính",
       "previewStyle": "rows"
+    },
+    "mysheets.update_rows": {
+      "action": "Cập nhật cột trong bảng tính",
+      "done": "Đã cập nhật cột",
+      "receipt": "Đã cập nhật cột",
+      "kind": "Bảng tính",
+      "link": "Mở bảng tính",
+      "titleField": "updatedRange",
+      "titlePrefix": "Phạm vi ",
+      "previewStyle": "sheet_update"
+    },
+    "mysheets.delete_rows": {
+      "action": "Xoá dòng trong bảng tính",
+      "done": "Đã xoá dòng",
+      "receipt": "Đã xoá dòng",
+      "kind": "Bảng tính",
+      "link": "Mở bảng tính",
+      "previewStyle": "sheet_delete"
+    },
+    "mysheets.create_sheet": {
+      "action": "Tạo trang tính (tab) mới",
+      "done": "Đã tạo trang tính",
+      "receipt": "Đã tạo trang tính",
+      "kind": "Trang tính",
+      "link": "Mở bảng tính",
+      "titleField": "title",
+      "previewStyle": "sheet_create"
     }
   }
 }

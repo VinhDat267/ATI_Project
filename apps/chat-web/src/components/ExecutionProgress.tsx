@@ -21,17 +21,61 @@ export interface ExecutionProgressProps {
   status?: PlanStatus;
 }
 
-const resultNames: Record<string, string> = { name: 'Tên', title: 'Tiêu đề', fullName: 'Tên đầy đủ', url: 'Liên kết', html_url: 'Liên kết', id: 'Mã', key: 'Mã', number: 'Số', messageId: 'Mã tin nhắn', createdAt: 'Thời gian', updatedAt: 'Cập nhật', start: 'Bắt đầu', end: 'Kết thúc' };
-const timeFields = new Set(['createdAt', 'updatedAt', 'start', 'end']);
+const resultNames: Record<string, string> = { name: 'Tên', title: 'Tiêu đề', fullName: 'Tên đầy đủ', repo: 'Kho mã', state: 'Trạng thái', body: 'Nội dung', desc: 'Mô tả', description: 'Mô tả / Agenda', text: 'Nội dung', content: 'Nội dung trang', due: 'Hạn chót', idList: 'Mã cột', idBoard: 'Mã bảng', senderName: 'Người gửi', chatTitle: 'Cuộc trò chuyện', chatId: 'Mã chat', issueNumber: 'Số issue', url: 'Liên kết', html_url: 'Liên kết', meetLink: 'Phòng họp Meet', location: 'Địa điểm', attendeesCount: 'Số người tham dự', recurrence: 'Lặp lại', busyCount: 'Số sự kiện bận', durationMinutes: 'Thời lượng (phút)', label: 'Khung giờ', id: 'Mã', key: 'Mã', number: 'Số', messageId: 'Mã tin nhắn', createdAt: 'Thời gian', updatedAt: 'Cập nhật', lastEditedTime: 'Cập nhật lần cuối', date: 'Thời gian', start: 'Bắt đầu', end: 'Kết thúc', sheet: 'Trang tính', range: 'Vùng đọc', updatedRange: 'Phạm vi cập nhật', updatedRows: 'Số dòng cập nhật', updatedCells: 'Số ô cập nhật', skippedDuplicates: 'Số dòng trùng bỏ qua', totalMatched: 'Số dòng khớp', totalDataRows: 'Tổng số dòng dữ liệu', rowNumber: 'Dòng số' };
+const timeFields = new Set(['createdAt', 'updatedAt', 'lastEditedTime', 'start', 'end', 'date', 'due']);
 const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 const safeURL = (text: string) => { try { const url = new URL(text); return url.protocol === 'https:' && !url.username && !url.password; } catch { return false; } };
 
 function FieldList({ value }: { value: Record<string, unknown> }) {
+  const recordEntries = isRecord(value.record)
+    ? Object.entries(value.record).filter(([, v]) => (typeof v === 'string' || typeof v === 'number') && String(v).trim().length > 0)
+    : [];
+  const notionPropEntries = isRecord(value.properties)
+    ? Object.entries(value.properties).filter(([k, v]) => k !== value.title && (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || (Array.isArray(v) && v.length > 0)) && String(v).trim().length > 0)
+    : [];
+  const schemaEntries = Array.isArray(value.schema)
+    ? value.schema.filter(isRecord).map((col) => `${String(col.name ?? '')} (${String(col.type ?? '')})`).filter((s) => !s.startsWith(' ('))
+    : [];
+  const checklistSummaries = Array.isArray(value.checklists)
+    ? value.checklists
+        .filter(isRecord)
+        .map((chk) => {
+          const chkName = typeof chk.name === 'string' && chk.name.trim() ? chk.name.trim() : 'Checklist';
+          const items = Array.isArray(chk.items) ? chk.items.filter(isRecord) : [];
+          const done = items.filter((item) => item.state === 'complete').length;
+          return `${chkName} (${done}/${items.length})`;
+        })
+    : [];
   return <dl>{Object.entries(value).filter(([key, field]) => Object.hasOwn(resultNames, key) && (typeof field === 'string' || typeof field === 'number')).map(([key, field]) =>
     <div key={key} className="flex gap-2 min-w-0"><dt className="shrink-0">{resultNames[key]}:</dt><dd className="min-w-0 flex-1 [overflow-wrap:anywhere]">{typeof field === 'string' && safeURL(field)
       ? <a href={field} target="_blank" rel="noopener noreferrer" className="text-primary-text underline">{field}</a>
       : typeof field === 'string' && timeFields.has(key) && Number.isFinite(Date.parse(field))
-        ? <time dateTime={field}>{new Date(field).toLocaleString('vi-VN', { hour12: false })}</time> : String(field)}</dd></div>)}</dl>;
+        ? <time dateTime={field}>{new Date(field).toLocaleString('vi-VN', { hour12: false })}</time>
+        : typeof field === 'number' && timeFields.has(key) && field > 1_000_000_000 && field < 10_000_000_000
+          ? <time dateTime={new Date(field * 1000).toISOString()}>{new Date(field * 1000).toLocaleString('vi-VN', { hour12: false })}</time>
+          : String(field)}</dd></div>)}
+    {typeof value.dueComplete === 'boolean' && (
+      <div className="flex gap-2 min-w-0"><dt className="shrink-0">Hoàn thành hạn:</dt><dd className="min-w-0 flex-1">{value.dueComplete ? 'Đã xong' : 'Chưa xong'}</dd></div>
+    )}
+    {checklistSummaries.length > 0 && (
+      <div className="flex gap-2 min-w-0"><dt className="shrink-0">Checklist:</dt><dd className="min-w-0 flex-1 [overflow-wrap:anywhere]">{checklistSummaries.join(', ')}</dd></div>
+    )}
+    {recordEntries.map(([colKey, colVal]) => (
+      <div key={`rec-${colKey}`} className="flex gap-2 min-w-0"><dt className="shrink-0 font-medium">{colKey}:</dt><dd className="min-w-0 flex-1 [overflow-wrap:anywhere]">{String(colVal)}</dd></div>
+    ))}
+    {notionPropEntries.length > 0 && (
+      <div data-testid="notion-result-properties" className="flex flex-wrap items-center gap-1.5 pt-1">
+        {notionPropEntries.map(([propKey, propVal]) => (
+          <span key={`nprop-${propKey}`} className="px-2 py-0.5 rounded bg-neutral-100 text-neutral-800 border border-neutral-200 text-[11px]">
+            <strong className="font-semibold">{propKey}:</strong> {Array.isArray(propVal) ? propVal.join(', ') : String(propVal)}
+          </span>
+        ))}
+      </div>
+    )}
+    {schemaEntries.length > 0 && (
+      <div className="flex gap-2 min-w-0 pt-1"><dt className="shrink-0 font-medium">Schema cột:</dt><dd className="min-w-0 flex-1 [overflow-wrap:anywhere]">{schemaEntries.join(', ')}</dd></div>
+    )}
+  </dl>;
 }
 
 /** Read collections are taken only from the tool's declared output shape. */
@@ -50,8 +94,26 @@ export function ResultFields({ output, tool }: { output: unknown; tool: string }
   let value = output;
   if (typeof output === 'string') { try { value = JSON.parse(output); } catch { /* Plain text remains visible. */ } }
   const rows = collectionRows(value, tool);
+  const matrixRows = isRecord(value) && Array.isArray(value.values)
+    ? (value.values.filter(Array.isArray) as unknown[][])
+    : undefined;
   return <div className="mt-2 text-xs text-text-secondary break-words">
     {isRecord(value) && <FieldList value={value} />}
+    {matrixRows && matrixRows.length > 0 && (
+      <div data-testid="sheets-read-preview-table" className="mt-2 border border-neutral-200 rounded-lg overflow-x-auto bg-neutral-50">
+        <table className="w-full text-left text-[11px]">
+          <tbody className="divide-y divide-neutral-200">
+            {matrixRows.slice(0, 5).map((r, rIdx) => (
+              <tr key={rIdx} className={rIdx === 0 ? 'font-semibold bg-neutral-100 text-neutral-800' : 'bg-white text-neutral-700'}>
+                {r.map((cell, cIdx) => (
+                  <td key={cIdx} className="px-2 py-1 border-r last:border-r-0 border-neutral-200">{String(cell ?? '')}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
     {rows ? <><p>{rows.length} kết quả</p><ol aria-label="Kết quả đọc" className="space-y-2 mt-1">{rows.filter(isRecord).map((row, index) => <li key={index}><FieldList value={row} /></li>)}</ol></>
       : !isRecord(value) && <p>{typeof value === 'object' ? `${Array.isArray(value) ? value.length : 0} kết quả` : String(value)}</p>}
     <details className="mt-2"><summary className="cursor-pointer">Chi tiết</summary><pre className="whitespace-pre-wrap break-all mt-1">{JSON.stringify(value, null, 2)}</pre></details>

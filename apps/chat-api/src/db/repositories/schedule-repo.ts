@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import type { CalendarDigestConfig, GithubDigestConfig, ScheduleKind, ScheduleRecurrence, ScheduleStatus, ScheduleView, SheetsDigestConfig, TelegramDigestConfig } from '@wap/tool-schemas';
+import type { CalendarDigestConfig, GithubDigestConfig, NotionDigestConfig, ScheduleKind, ScheduleRecurrence, ScheduleStatus, ScheduleView, SheetsDigestConfig, TelegramDigestConfig, TrelloDigestConfig } from '@wap/tool-schemas';
 import { RUN_SELECT, runView, type RunRow } from '../../services/schedules/run-state.js';
 import { localLabel, nextRuns } from '../../services/schedules/next-occurrence.js';
 import { isUuid } from './uuid.js';
@@ -27,7 +27,7 @@ export interface ScheduleRow {
   workspace_id?: string | null;
   workspace_mode?: 'legacy' | 'personal' | 'organization';
   kind?: ScheduleKind;
-  digest_config?: SheetsDigestConfig | CalendarDigestConfig | GithubDigestConfig | TelegramDigestConfig | null;
+  digest_config?: SheetsDigestConfig | CalendarDigestConfig | GithubDigestConfig | TelegramDigestConfig | TrelloDigestConfig | NotionDigestConfig | null;
   digest_config_hash?: string | null;
   digest_approved_at?: Date | string | null;
   created_at: Date;
@@ -52,7 +52,11 @@ export class ScheduleRepo {
             ? 'github_digest'
             : row.kind === 'telegram_digest'
               ? 'telegram_digest'
-              : 'plan';
+              : row.kind === 'trello_digest'
+                ? 'trello_digest'
+                : row.kind === 'notion_digest'
+                  ? 'notion_digest'
+                  : 'plan';
     const base: ScheduleView = {
       id: row.id,
       convId: row.conv_id,
@@ -72,6 +76,16 @@ export class ScheduleRepo {
     if (row.kind === 'github_digest' && row.digest_config && row.digest_approved_at) {
       base.digest = {
         config: row.digest_config as GithubDigestConfig,
+        approvedAt: new Date(row.digest_approved_at).toISOString(),
+      };
+    } else if (row.kind === 'trello_digest' && row.digest_config && row.digest_approved_at) {
+      base.digest = {
+        config: row.digest_config as TrelloDigestConfig,
+        approvedAt: new Date(row.digest_approved_at).toISOString(),
+      };
+    } else if (row.kind === 'notion_digest' && row.digest_config && row.digest_approved_at) {
+      base.digest = {
+        config: row.digest_config as NotionDigestConfig,
         approvedAt: new Date(row.digest_approved_at).toISOString(),
       };
     } else if (row.kind === 'telegram_digest' && row.digest_config) {

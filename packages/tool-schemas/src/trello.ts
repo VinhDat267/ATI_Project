@@ -168,6 +168,17 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
           name: { type: 'string' },
           url: { type: 'string' },
           listId: { type: 'string' },
+          boardId: { type: 'string' },
+          due: { type: ['string', 'null'] },
+          dueComplete: { type: 'boolean' },
+          idMembers: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+          labels: {
+            type: 'array',
+            items: { type: 'string' },
+          },
         },
         required: ['id', 'name'],
       },
@@ -198,9 +209,37 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
         desc: { type: 'string' },
         url: { type: 'string' },
         listId: { type: 'string' },
+        boardId: { type: 'string' },
+        due: { type: ['string', 'null'] },
+        dueComplete: { type: 'boolean' },
         idMembers: {
           type: 'array',
           items: { type: 'string' },
+        },
+        labels: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+        checklists: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              name: { type: 'string' },
+              items: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    name: { type: 'string' },
+                    state: { type: 'string' },
+                  },
+                },
+              },
+            },
+          },
         },
       },
       required: ['id', 'name'],
@@ -232,6 +271,10 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
           type: 'string',
           description: 'Hạn chót hoàn thành (định dạng ISO-8601)',
         },
+        dueComplete: {
+          type: 'boolean',
+          description: 'Đánh dấu đã hoàn thành hạn chót (true) hoặc chưa hoàn thành (false)',
+        },
         idMembers: {
           type: 'array',
           items: { type: 'string' },
@@ -249,6 +292,7 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
         name: { type: 'string' },
         url: { type: 'string' },
         listId: { type: 'string' },
+        dueComplete: { type: 'boolean' },
       },
       required: ['id', 'name'],
     },
@@ -279,6 +323,10 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
           type: 'string',
           description: 'Hạn chót hoàn thành mới (ISO-8601, tùy chọn)',
         },
+        dueComplete: {
+          type: 'boolean',
+          description: 'Đánh dấu đã hoàn thành hạn chót (true) hoặc chưa hoàn thành (false)',
+        },
         closed: {
           type: 'boolean',
           description: 'Trạng thái lưu trữ/đóng thẻ (true nếu muốn archive)',
@@ -299,6 +347,7 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
         name: { type: 'string' },
         url: { type: 'string' },
         listId: { type: 'string' },
+        dueComplete: { type: 'boolean' },
       },
       required: ['id', 'name'],
     },
@@ -386,3 +435,185 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
     },
   },
 ];
+
+export const TRELLO_OAUTH_TOOLS: ToolDefinition[] = [
+  {
+    name: 'trello.add_comment',
+    service: 'trello',
+    description: 'Thêm bình luận (comment) ghi chú hoặc cập nhật tiến độ vào thẻ Trello.',
+    sideEffect: 'write',
+    riskLevel: 'low',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        cardId: {
+          type: 'string',
+          description: 'ID của thẻ Trello cần bình luận',
+          'x-resource': 'card',
+        },
+        text: {
+          type: 'string',
+          description: 'Nội dung bình luận',
+        },
+      },
+      required: ['cardId', 'text'],
+      additionalProperties: false,
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        cardId: { type: 'string' },
+        text: { type: 'string' },
+      },
+      required: ['id', 'cardId', 'text'],
+    },
+  },
+  {
+    name: 'trello.create_list',
+    service: 'trello',
+    description: 'Tạo danh sách/cột (list) mới trên một bảng Trello.',
+    sideEffect: 'write',
+    riskLevel: 'low',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        boardId: {
+          type: 'string',
+          description: 'ID của bảng Trello nơi cần tạo danh sách mới',
+          'x-resource': 'board',
+        },
+        name: {
+          type: 'string',
+          description: 'Tên của danh sách/cột mới (ví dụ: Sprint 15 - Cần làm)',
+        },
+        pos: {
+          type: 'string',
+          enum: ['top', 'bottom'],
+          description: 'Vị trí cột mới trên bảng (top hoặc bottom, tùy chọn)',
+        },
+      },
+      required: ['boardId', 'name'],
+      additionalProperties: false,
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        name: { type: 'string' },
+        boardId: { type: 'string' },
+      },
+      required: ['id', 'name', 'boardId'],
+    },
+  },
+  {
+    name: 'trello.remove_member',
+    service: 'trello',
+    description: 'Gỡ một thành viên khỏi thẻ Trello để điều phối lại người phụ trách.',
+    sideEffect: 'write',
+    riskLevel: 'low',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        cardId: {
+          type: 'string',
+          description: 'ID của thẻ Trello',
+          'x-resource': 'card',
+        },
+        memberId: {
+          type: 'string',
+          description: 'ID của thành viên Trello cần gỡ khỏi thẻ',
+          'x-resource': 'member',
+        },
+      },
+      required: ['cardId', 'memberId'],
+      additionalProperties: false,
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        idMembers: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+      },
+      required: ['id', 'idMembers'],
+    },
+  },
+  {
+    name: 'trello.update_checklist_item',
+    service: 'trello',
+    description: 'Đánh dấu hoàn thành (complete) hoặc chưa hoàn thành (incomplete) một mục con trong checklist của thẻ Trello theo tên mục.',
+    sideEffect: 'write',
+    riskLevel: 'low',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        cardId: {
+          type: 'string',
+          description: 'ID của thẻ Trello chứa checklist',
+          'x-resource': 'card',
+        },
+        itemName: {
+          type: 'string',
+          description: 'Tên mục công việc con trong checklist cần cập nhật trạng thái',
+        },
+        state: {
+          type: 'string',
+          enum: ['complete', 'incomplete'],
+          description: 'Trạng thái mới của mục checklist: complete (đã xong) hoặc incomplete (chưa xong)',
+        },
+        checkItemId: {
+          type: 'string',
+          description: 'ID của mục checklist (tùy chọn nếu đã biết)',
+        },
+      },
+      required: ['cardId', 'itemName', 'state'],
+      additionalProperties: false,
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        cardId: { type: 'string' },
+        name: { type: 'string' },
+        state: { type: 'string' },
+      },
+      required: ['id', 'cardId', 'name', 'state'],
+    },
+  },
+  {
+    name: 'trello.set_card_due_complete',
+    service: 'trello',
+    description: 'Đánh dấu hoàn thành (dueComplete = true) hoặc mở lại (dueComplete = false) hạn chót của một thẻ Trello mà không làm ẩn/lưu trữ thẻ.',
+    sideEffect: 'write',
+    riskLevel: 'low',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        cardId: {
+          type: 'string',
+          description: 'ID của thẻ Trello cần đánh dấu hoàn thành hạn chót',
+          'x-resource': 'card',
+        },
+        dueComplete: {
+          type: 'boolean',
+          description: 'true nếu đã hoàn thành đúng hạn, false nếu mở lại chưa hoàn thành',
+        },
+      },
+      required: ['cardId', 'dueComplete'],
+      additionalProperties: false,
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        name: { type: 'string' },
+        dueComplete: { type: 'boolean' },
+      },
+      required: ['id', 'name', 'dueComplete'],
+    },
+  },
+];
+

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import { StepError, encryptCredentials } from '@wap/tool-adapters';
-import { ALL_TOOLS, TRELLO_TOOLS, type PlanResponse } from '@wap/tool-schemas';
+import { ALL_TOOLS, TRELLO_TOOLS, TRELLO_OAUTH_TOOLS, type PlanResponse } from '@wap/tool-schemas';
 import { getToolCatalogFor } from '../../src/services/registered-services.js';
 import { runtimeToolCatalog } from '../../src/config/gmail-tools-runtime.js';
 import { ChatService } from '../../src/services/chat-service.js';
@@ -60,7 +60,7 @@ describe('Task 8: Trello planning, catalog, refusal, and execution guards', () =
       expect(catalog.some((t) => t.service === 'trello')).toBe(false);
     });
 
-    it('includes all 9 trello.* tools when caller is connected and is a member of at least one board', async () => {
+    it('includes all 14 trello.* tools (TRELLO_TOOLS + TRELLO_OAUTH_TOOLS) when caller is connected and is a member of at least one board', async () => {
       const repo = mockCredRepo({ id: 'cred-1', status: 'active', config: 'dummy' });
       const catalog = await getToolCatalogFor(repo, encryptionKey, {
         userId,
@@ -73,8 +73,10 @@ describe('Task 8: Trello planning, catalog, refusal, and execution guards', () =
         }),
       });
       const trelloTools = catalog.filter((t) => t.service === 'trello');
-      expect(trelloTools.length).toBe(9);
-      expect(trelloTools.map((t) => t.name).sort()).toEqual(TRELLO_TOOLS.map((t) => t.name).sort());
+      expect(trelloTools.length).toBe(14);
+      expect(trelloTools.map((t) => t.name).sort()).toEqual(
+        [...TRELLO_TOOLS, ...TRELLO_OAUTH_TOOLS].map((t) => t.name).sort()
+      );
     });
 
     it('runtimeToolCatalog in sandbox mode omits trello.* when caller is ineligible and includes them when eligible', async () => {
@@ -97,7 +99,7 @@ describe('Task 8: Trello planning, catalog, refusal, and execution guards', () =
           memberBoards: [{ boardId: 'b1', boardName: 'Bugs' }],
         }),
       });
-      expect(catalogEligible.filter((t) => t.service === 'trello').length).toBe(9);
+      expect(catalogEligible.filter((t) => t.service === 'trello').length).toBe(14);
     });
   });
 
@@ -721,6 +723,164 @@ describe('Task 8: Trello planning, catalog, refusal, and execution guards', () =
         category: 'AUTH_ERROR',
         message: 'Trello cần được kết nối lại.',
       });
+    });
+  });
+
+  describe('5. Pre-Execution Intelligence & Guardrails (duplicate card, past deadline, member workload)', () => {
+    it('adds warnings for duplicate card title, past deadline, and overloaded/overdue member in bindConnections', async () => {
+      const memory = new WorkingMemory();
+      memory.setEntity('__observed', {
+        list: [{ id: 'L_frontend', name: 'Đang làm', boardId: 'board_frontend' }],
+        member: [{ id: 'mem_minh', fullName: 'Minh Nguyễn', boardId: 'board_frontend' }],
+        card: [
+          {
+            id: 'c_dup',
+            name: 'Sửa lỗi đăng nhập OAuth',
+            boardId: 'board_frontend',
+            listId: 'L_frontend',
+            due: '2026-01-01T10:00:00.000Z',
+            dueComplete: false,
+            idMembers: ['mem_minh'],
+          },
+          {
+            id: 'c_2',
+            name: 'Tối ưu truy vấn DB',
+            boardId: 'board_frontend',
+            listId: 'L_frontend',
+            dueComplete: false,
+            idMembers: ['mem_minh'],
+          },
+          {
+            id: 'c_3',
+            name: 'Viết tài liệu API',
+            boardId: 'board_frontend',
+            listId: 'L_frontend',
+            dueComplete: false,
+            idMembers: ['mem_minh'],
+          },
+        ],
+      });
+
+      const chatService = new ChatService({
+        msgRepo: {} as any,
+        planner: {} as any,
+        eventEmitter: { emit: () => {} },
+        trelloConnection: async () => ({
+          status: 'connected',
+          connection: {
+            credentialId: 'cred-1',
+            memberId: 'mem-1',
+            username: 'alice',
+            boardIds: ['board_frontend'],
+          },
+          teamBoards: [{ boardId: 'board_frontend', boardName: 'Frontend' }],
+          memberBoards: [{ boardId: 'board_frontend', boardName: 'Frontend' }],
+        }),
+      });
+
+      const plan: PlanResponse = {
+        kind: 'plan',
+        thinking: 'Tạo thẻ',
+        summary: 'Tạo thẻ Sửa lỗi đăng nhập OAuth cho Minh',
+        steps: [
+          {
+            id: 'step_1',
+            tool: 'trello.create_card',
+            description: 'Tạo thẻ mới',
+            args: {
+              listId: 'L_frontend',
+              title: 'Sửa lỗi đăng nhập OAuth',
+              due: '2025-05-01T09:00:00.000Z',
+              idMembers: ['mem_minh'],
+            },
+            dependsOn: [],
+          },
+        ],
+        warnings: [],
+      };
+
+      const result = await (chatService as any).bindConnections(plan, userId, undefined, memory);
+      expect(result.kind).toBe('plan');
+      expect(result.warnings).toEqual(
+        expect.arrayContaining([
+          expect.stringMatching(/Cảnh báo trùng thẻ.*Sửa lỗi đăng nhập OAuth/i),
+          expect.stringMatching(/Cảnh báo hạn chót.*quá khứ/i),
+          expect.stringMatching(/Cảnh báo tải công việc.*Minh Nguyễn.*3 thẻ chưa hoàn thành/i),
+        ])
+      );
+    });
+
+    it('actively fetches open cards via getAdapter when memory has no observed cards (1-turn planning)', async () => {
+      const memory = new WorkingMemory();
+      memory.setEntity('__observed', {
+        list: [{ id: 'L_frontend', name: 'Đang làm', boardId: 'board_frontend' }],
+        member: [{ id: 'mem_minh', fullName: 'Minh Nguyễn', boardId: 'board_frontend' }],
+        // Notice: NO card array in __observed (simulates 1-turn planning after listDirectory prefetch)
+      });
+
+      const executeMock = vi.fn().mockResolvedValue([
+        {
+          id: 'c_dup',
+          name: 'Tối ưu trang chủ',
+          boardId: 'board_frontend',
+          listId: 'L_frontend',
+          due: '2026-01-01T10:00:00.000Z',
+          dueComplete: false,
+          idMembers: ['mem_minh'],
+        },
+      ]);
+
+      const chatService = new ChatService({
+        msgRepo: {} as any,
+        planner: {} as any,
+        eventEmitter: { emit: () => {} },
+        getAdapter: vi.fn().mockResolvedValue({ execute: executeMock }),
+        trelloConnection: async () => ({
+          status: 'connected',
+          connection: {
+            credentialId: 'cred-1',
+            memberId: 'mem-1',
+            username: 'alice',
+            boardIds: ['board_frontend'],
+          },
+          teamBoards: [{ boardId: 'board_frontend', boardName: 'Frontend' }],
+          memberBoards: [{ boardId: 'board_frontend', boardName: 'Frontend' }],
+        }),
+      });
+
+      const plan: PlanResponse = {
+        kind: 'plan',
+        thinking: 'Tạo thẻ 1 lượt',
+        summary: 'Tạo thẻ Tối ưu trang chủ cho Minh',
+        steps: [
+          {
+            id: 'step_1',
+            tool: 'trello.create_card',
+            description: 'Tạo thẻ mới',
+            args: {
+              listId: 'L_frontend',
+              title: 'Tối ưu trang chủ',
+              idMembers: ['mem_minh'],
+            },
+            dependsOn: [],
+          },
+        ],
+        warnings: [],
+      };
+
+      const result = await (chatService as any).bindConnections(plan, userId, undefined, memory);
+      expect(executeMock).toHaveBeenCalledWith(
+        'trello.search_cards',
+        { boardId: 'board_frontend', query: '', limit: 50 },
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      );
+      expect(result.kind).toBe('plan');
+      expect(result.warnings).toEqual(
+        expect.arrayContaining([
+          expect.stringMatching(/Cảnh báo trùng thẻ.*Tối ưu trang chủ/i),
+          expect.stringMatching(/Cảnh báo tải công việc.*Minh Nguyễn.*1 thẻ quá hạn/i),
+        ])
+      );
     });
   });
 });

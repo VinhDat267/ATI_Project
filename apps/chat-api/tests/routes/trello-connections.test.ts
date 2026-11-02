@@ -3,7 +3,7 @@ import request from 'supertest';
 import { createHash } from 'node:crypto';
 import { decryptCredentials, encryptCredentials } from '@wap/tool-adapters';
 import { createApp } from '../../src/app.js';
-import { generateAccessToken } from '../../src/auth/jwt.js';
+import { generateAccessToken, generateTokens } from '../../src/auth/jwt.js';
 import { ConversationRepo } from '../../src/db/repositories/conversation-repo.js';
 import { CredentialRepo } from '../../src/db/repositories/credential-repo.js';
 import { TrelloTeamRepo } from '../../src/db/repositories/trello-team-repo.js';
@@ -338,6 +338,17 @@ describe('Trello connection routes', () => {
       const res = await request(app)
         .get('/api/connections/trello')
         .set('Authorization', bearer(alice));
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ status: 'unconfigured', boards: [] });
+    });
+
+    it('returns unconfigured without 401 when OAuth is not configured and server runs in in-memory mode without sid', async () => {
+      const app = build({ oauth: undefined }, { userRepo: undefined });
+      const statelessToken = generateTokens(alice, secret).accessToken;
+      const res = await request(app)
+        .get('/api/connections/trello')
+        .set('Authorization', `Bearer ${statelessToken}`);
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual({ status: 'unconfigured', boards: [] });

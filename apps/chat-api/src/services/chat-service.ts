@@ -12,8 +12,11 @@ import { nextRuns } from './schedules/next-occurrence.js';
 import { runMessage, type PreparedRun, type RunToPlan } from './schedules/schedule-runner.js';
 import { evaluateGithubDigestCandidate } from './schedules/github-digest-candidate.js';
 import { evaluateTelegramDigestCandidate } from './schedules/telegram-digest-candidate.js';
+import { evaluateTrelloDigestCandidate } from './schedules/trello-digest-candidate.js';
+import { evaluateNotionDigestCandidate } from './schedules/notion-digest-candidate.js';
 import { resolveRef } from '@wap/executor';
 import { eventsOverlap } from '@wap/tool-adapters';
+import { extractNotionDatabaseId } from './notion/oauth-client.js';
 
 /** Only the server writes plan connections; the model's version is never kept or shown back to it. */
 function withoutConnections(plan: PlanResponse): PlanResponse {
@@ -147,6 +150,8 @@ export interface ChatServiceOptions {
   githubConnection?: (userId: string) => Promise<any>;
   /** The caller's active Telegram connection lookup; absent when Telegram is off or not connected. */
   telegramConnection?: (userId: string) => Promise<any>;
+  /** The caller's active Notion connection lookup; absent when Notion OAuth is off or not connected. */
+  notionConnection?: (userId: string) => Promise<any>;
   /** Scheduled workflows (SCHEDULES_ENABLED); absent, conversations have no schedule. */
   schedules?: {
     repo: ScheduleRepo;
@@ -187,6 +192,7 @@ export class ChatService {
   private trelloConnection?: ChatServiceOptions['trelloConnection'];
   private githubConnection?: ChatServiceOptions['githubConnection'];
   private telegramConnection?: ChatServiceOptions['telegramConnection'];
+  private notionConnection?: ChatServiceOptions['notionConnection'];
   private schedules?: ChatServiceOptions['schedules'];
   private getAdapter?: ChatServiceOptions['getAdapter'];
   private lookupTool?: ChatServiceOptions['lookupTool'];
@@ -199,6 +205,7 @@ export class ChatService {
     this.trelloConnection = options.trelloConnection;
     this.githubConnection = options.githubConnection;
     this.telegramConnection = options.telegramConnection;
+    this.notionConnection = options.notionConnection;
     this.getAdapter = options.getAdapter;
     this.lookupTool = options.lookupTool;
     this.mysheetsLookupTimeoutMs = options.mysheetsLookupTimeoutMs ?? 10_000;
@@ -260,6 +267,7 @@ export class ChatService {
     scopeId = 'default',
     onGitHubTeamRepos?: (repos: Array<{ repoId: string; fullName: string; name: string }>) => void,
     onTelegramChats?: (chats: Array<{ chatId: string; title: string }>) => void,
+    onNotionDatabases?: (databases: Array<{ id: string; title: string }>) => void,
   ): Promise<PlannerResponse> {
     signal?.throwIfAborted();
     const bound = withoutConnections(plan);
@@ -269,8 +277,9 @@ export class ChatService {
     const usesTrello = bound.steps.some((step) => step.tool.startsWith('trello.'));
     const usesGitHub = bound.steps.some((step) => step.tool.startsWith('github.'));
     const usesTelegram = bound.steps.some((step) => step.tool.startsWith('telegram.'));
+    const usesNotion = Boolean(this.notionConnection) && bound.steps.some((step) => step.tool.startsWith('notion.'));
 
-    if (!usesGmail && !usesMyCalendar && !usesMySheets && !usesTrello && !usesGitHub && !usesTelegram) return bound;
+    if (!usesGmail && !usesMyCalendar && !usesMySheets && !usesTrello && !usesGitHub && !usesTelegram && !usesNotion) return bound;
 
     const unavailableServices: Array<{ id: string; name: string }> = [];
     const reasons: string[] = [];
@@ -280,6 +289,7 @@ export class ChatService {
     let trelloConn: NonNullable<PlanConnections['trello']> | undefined;
     let githubConn: NonNullable<PlanConnections['github']> | undefined;
     let telegramConn: NonNullable<PlanConnections['telegram']> | undefined;
+    let notionConn: NonNullable<PlanConnections['notion']> | undefined;
 
     if (usesGmail) {
       const gmail = await this.gmailConnection?.(userId);
@@ -320,7 +330,7 @@ export class ChatService {
 
         const createEventSteps = bound.steps.filter(
           (step) =>
-            step.tool === 'mycalendar.create_event' &&
+            (step.tool === 'mycalendar.create_event' || step.tool === 'mycalendar.update_event') &&
             typeof step.args?.calendarId === 'string' &&
             typeof step.args?.start === 'string' &&
             typeof step.args?.end === 'string'
@@ -343,6 +353,8 @@ export class ChatService {
                 );
               } else if (this.getAdapter) {
                 const adapter = await this.getAdapter('mycalendar', {
+                  userId,
+                  phase: 'planning',
                   actor: { userId },
                   connections: { mycalendar: mycalConn },
                 });
@@ -365,9 +377,48 @@ export class ChatService {
               if (overlapping.length > 0) {
                 const stepTitle = String(createStep.args.summary || createStep.description || 'Sự kiện mới');
                 const titles = overlapping.map((ev) => `"${ev.title}"`).join(', ');
+                const freeSlots: string[] = [];
+                const startMs = Date.parse(slotStart);
+                const endMs = Date.parse(slotEnd);
+                const durationMs = endMs > startMs ? endMs - startMs : 3_600_000;
+                const datePrefix = slotStart.slice(0, 10);
+                const tzSuffix = slotStart.slice(19) || 'Z';
+                const workdayStartMs = Date.parse(`${datePrefix}T08:00:00${tzSuffix}`);
+                const workdayEndMs = Date.parse(`${datePrefix}T18:00:00${tzSuffix}`);
+                if (Number.isFinite(workdayStartMs) && Number.isFinite(workdayEndMs)) {
+                  const latestConflictEnd = Math.max(
+                    endMs,
+                    ...overlapping.map((ev) => Date.parse(ev.end)).filter(Number.isFinite),
+                  );
+                  const formatHm = (ms: number) => {
+                    const totalMin = 480 + Math.round((ms - workdayStartMs) / 60_000);
+                    const hh = String(Math.floor(totalMin / 60)).padStart(2, '0');
+                    const mm = String(((totalMin % 60) + 60) % 60).padStart(2, '0');
+                    return `${hh}:${mm}`;
+                  };
+                  for (
+                    let candStart = Math.max(workdayStartMs, latestConflictEnd);
+                    candStart + durationMs <= workdayEndMs && freeSlots.length < 3;
+                    candStart += durationMs
+                  ) {
+                    const candStartIso = new Date(candStart).toISOString();
+                    const candEndIso = new Date(candStart + durationMs).toISOString();
+                    const hasClash = existingEvents.some(
+                      (ev) =>
+                        typeof ev?.start === 'string' &&
+                        typeof ev?.end === 'string' &&
+                        eventsOverlap({ start: ev.start, end: ev.end }, { start: candStartIso, end: candEndIso }),
+                    );
+                    if (!hasClash) {
+                      freeSlots.push(`${formatHm(candStart)}–${formatHm(candStart + durationMs)}`);
+                    }
+                  }
+                }
+                const suggestionSuffix =
+                  freeSlots.length > 0 ? ` Gợi ý khung giờ trống trong ngày: ${freeSlots.join(', ')}.` : '';
                 bound.warnings = [
                   ...(bound.warnings ?? []),
-                  `Cảnh báo trùng lịch: Sự kiện "${stepTitle}" (${slotStart} – ${slotEnd}) trùng giờ với ${overlapping.length} sự kiện hiện có trên lịch: ${titles}.`,
+                  `Cảnh báo trùng lịch: Sự kiện "${stepTitle}" (${slotStart} – ${slotEnd}) trùng giờ với ${overlapping.length} sự kiện hiện có trên lịch: ${titles}.${suggestionSuffix}`,
                 ];
               }
             } catch {
@@ -440,7 +491,14 @@ export class ChatService {
 
         let readOnlyAppendInfo: { step: PlanStep; sheet: PersonalSpreadsheetItem } | null = null;
         for (const step of bound.steps) {
-          if (step.tool !== 'mysheets.append_rows') continue;
+          if (
+            step.tool !== 'mysheets.append_rows' &&
+            step.tool !== 'mysheets.update_rows' &&
+            step.tool !== 'mysheets.delete_rows' &&
+            step.tool !== 'mysheets.create_sheet'
+          ) {
+            continue;
+          }
           const target = await resolveTargetSpreadsheetAsync(
             step.args?.spreadsheetId,
             bound.steps,
@@ -581,6 +639,151 @@ export class ChatService {
           };
         }
 
+        const observedMembers = [
+          ...(Array.isArray(allEntities.member) ? allEntities.member : allEntities.member ? [allEntities.member] : []),
+          ...(Array.isArray((allEntities.__observed as any)?.member) ? (allEntities.__observed as any).member : []),
+        ];
+        const cardMap = new Map<string, any>(
+          observedCards
+            .filter((c: any) => c && typeof c.id === 'string')
+            .map((c: any) => [String(c.id), c])
+        );
+
+        const createCardBoards = Array.from(
+          new Set(
+            bound.steps
+              .filter((step) => step.tool === 'trello.create_card' && typeof step.boardId === 'string')
+              .map((step) => String(step.boardId))
+          )
+        );
+        if (createCardBoards.length > 0 && (this.lookupTool || this.getAdapter)) {
+          for (const bId of createCardBoards) {
+            const hasObservedForBoard = Array.from(cardMap.values()).some(
+              (c: any) => (c.boardId || c.idBoard) === bId
+            );
+            if (hasObservedForBoard) continue;
+            try {
+              const precheckDeadline = AbortSignal.timeout(5_000);
+              const precheckSignal = signal ? AbortSignal.any([signal, precheckDeadline]) : precheckDeadline;
+              let rawCards: any;
+              if (this.lookupTool) {
+                rawCards = await this.lookupTool(
+                  userId,
+                  'trello.search_cards',
+                  { boardId: bId, query: '', limit: 50 },
+                  { signal: precheckSignal }
+                );
+              } else if (this.getAdapter) {
+                const adapter = await this.getAdapter('trello', {
+                  userId,
+                  phase: 'planning',
+                  actor: { userId },
+                  connections: { trello: trello.connection },
+                });
+                if (adapter && typeof adapter.execute === 'function') {
+                  rawCards = await adapter.execute(
+                    'trello.search_cards',
+                    { boardId: bId, query: '', limit: 50 },
+                    { signal: precheckSignal, boardId: bId }
+                  );
+                }
+              }
+              if (Array.isArray(rawCards)) {
+                for (const c of rawCards) {
+                  if (c && typeof c.id === 'string' && !cardMap.has(String(c.id))) {
+                    cardMap.set(String(c.id), { ...c, boardId: c.boardId || c.idBoard || bId });
+                  }
+                }
+              }
+            } catch {
+              // Non-fatal: if active card pre-check times out or fails, planning still proceeds.
+            }
+          }
+        }
+
+        const uniqueObservedCards = Array.from(cardMap.values());
+        const nowMs = (this.schedules?.now?.() ?? new Date()).getTime();
+        const trelloWarnings: string[] = [];
+
+        for (const step of bound.steps) {
+          if (!step.tool.startsWith('trello.')) continue;
+
+          // 1. Duplicate Card Warning
+          if (step.tool === 'trello.create_card' && typeof step.args?.title === 'string') {
+            const normalizedTitle = step.args.title.trim().toLowerCase();
+            if (normalizedTitle.length >= 3) {
+              const dupCard = uniqueObservedCards.find((c: any) => {
+                const cName = String(c.name || c.title || '').trim().toLowerCase();
+                if (cName !== normalizedTitle) return false;
+                const cBoard = c.boardId || c.idBoard;
+                if (step.boardId && cBoard && cBoard !== step.boardId) return false;
+                return true;
+              });
+              if (dupCard) {
+                trelloWarnings.push(
+                  `Cảnh báo trùng thẻ: Đã có thẻ "${dupCard.name || step.args.title}" trên bảng này. Bạn hãy kiểm tra để tránh tạo trùng công việc.`
+                );
+              }
+            }
+          }
+
+          // 2. Past Deadline Warning
+          if (
+            (step.tool === 'trello.create_card' || step.tool === 'trello.update_card') &&
+            typeof step.args?.due === 'string' &&
+            step.args.due.trim() !== ''
+          ) {
+            const dueMs = Date.parse(step.args.due);
+            if (!Number.isNaN(dueMs) && dueMs < nowMs) {
+              trelloWarnings.push(
+                `Cảnh báo hạn chót: Thời hạn hoàn thành (${step.args.due}) đang nằm trong quá khứ. Thẻ sẽ bị đánh dấu quá hạn ngay khi lưu.`
+              );
+            }
+          }
+
+          // 3. Member Workload Warning
+          const assignedMemberIds: string[] =
+            step.tool === 'trello.create_card' && Array.isArray(step.args?.idMembers)
+              ? step.args.idMembers.filter((m): m is string => typeof m === 'string')
+              : step.tool === 'trello.add_member' && typeof step.args?.memberId === 'string'
+                ? [step.args.memberId]
+                : [];
+
+          for (const memberId of assignedMemberIds) {
+            const memberCards = uniqueObservedCards.filter((c: any) => {
+              if (c.dueComplete === true) return false;
+              const members = Array.isArray(c.idMembers) ? c.idMembers.map(String) : [];
+              return members.includes(memberId);
+            });
+            const activeCount = memberCards.length;
+            const overdueCount = memberCards.filter((c: any) => {
+              if (typeof c.due !== 'string' || !c.due) return false;
+              const dMs = Date.parse(c.due);
+              return !Number.isNaN(dMs) && dMs < nowMs;
+            }).length;
+
+            if (activeCount >= 3 || overdueCount >= 1) {
+              const memberEntity = observedMembers.find((m: any) => String(m.id) === memberId);
+              const memberName = String(
+                memberEntity?.fullName || memberEntity?.name || memberEntity?.username || memberId
+              );
+              if (overdueCount >= 1) {
+                trelloWarnings.push(
+                  `Cảnh báo tải công việc: Thành viên ${memberName} đang có ${activeCount} thẻ chưa hoàn thành (trong đó có ${overdueCount} thẻ quá hạn).`
+                );
+              } else {
+                trelloWarnings.push(
+                  `Cảnh báo tải công việc: Thành viên ${memberName} đang phụ trách ${activeCount} thẻ chưa hoàn thành trên bảng này.`
+                );
+              }
+            }
+          }
+        }
+
+        if (trelloWarnings.length > 0) {
+          bound.warnings = Array.from(new Set([...(bound.warnings ?? []), ...trelloWarnings]));
+        }
+
         trelloConn = {
           credentialId: trello.connection.credentialId,
           memberId: trello.connection.memberId,
@@ -665,6 +868,24 @@ export class ChatService {
               targetRepo = stepRepoMap.get(refStepId);
             }
           }
+          if (targetRepo && !targetRepo.includes('/')) {
+            const shortLower = targetRepo.toLowerCase();
+            const matchingAllowed = (github.connection.repos as string[]).filter(
+              (r) => r.split('/')[1]?.toLowerCase() === shortLower,
+            );
+            if (matchingAllowed.length === 1) {
+              targetRepo = matchingAllowed[0];
+            } else {
+              const matchingTeam = (github.teamRepos ?? []).filter(
+                (r: any) =>
+                  String(r.name ?? '').toLowerCase() === shortLower ||
+                  String(r.fullName ?? '').split('/')[1]?.toLowerCase() === shortLower,
+              );
+              if (matchingTeam.length === 1 && typeof matchingTeam[0].fullName === 'string') {
+                targetRepo = matchingTeam[0].fullName;
+              }
+            }
+          }
           if (!targetRepo && github.connection.repos.length === 1) {
             targetRepo = github.connection.repos[0];
           }
@@ -676,7 +897,14 @@ export class ChatService {
               targetRepo;
             step.repo = canonical;
             stepRepoMap.set(step.id, canonical);
-            if (!allowedRepoSet.has(targetRepo.toLowerCase())) {
+            const rawRepoArg = step.args?.repo;
+            const isRefArg =
+              (typeof rawRepoArg === 'string' && rawRepoArg.startsWith('$')) ||
+              (typeof rawRepoArg === 'object' && rawRepoArg !== null && '$ref' in rawRepoArg);
+            if (!isRefArg) {
+              step.args = { ...(step.args ?? {}), repo: canonical };
+            }
+            if (!allowedRepoSet.has(canonical.toLowerCase())) {
               forbiddenRepoName = canonical;
               break;
             }
@@ -710,24 +938,119 @@ export class ChatService {
           kind: 'refusal',
           reason: 'Bạn chưa chọn cuộc trò chuyện hoặc nhóm Telegram nào được phép sử dụng.',
           suggestion: 'Hãy chọn ít nhất một cuộc trò chuyện hoặc nhóm Telegram trong trang Kết nối dịch vụ.',
+          unavailableServices: [{ id: 'telegram', name: 'Telegram' }],
         };
       } else {
         if (telegram.selectedChats) {
           onTelegramChats?.(telegram.selectedChats);
         }
         const allowedChatSet = new Set(telegram.connection.chatIds);
+        const normTg = (s: string) =>
+          s
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[đĐ]/g, 'd')
+            .toLowerCase()
+            .trim();
+        const isPersonalQuery = (qNorm: string) =>
+          qNorm === 'telegram cua toi' ||
+          qNorm === 'chat ca nhan' ||
+          qNorm === 'tin nhan ca nhan' ||
+          qNorm === 'ca nhan' ||
+          qNorm === 'toi' ||
+          qNorm === 'me';
+        const allEntities = memory ? memory.getAll() : {};
+        const observedChats = [
+          ...(Array.isArray(allEntities.chat) ? allEntities.chat : allEntities.chat ? [allEntities.chat] : []),
+          ...(Array.isArray((allEntities.__observed as any)?.chat) ? (allEntities.__observed as any).chat : []),
+        ];
+        const selectedChatList: Array<{ chatId: string; title: string; type?: string; username?: string }> =
+          Array.isArray(telegram.selectedChats) ? telegram.selectedChats : [];
+        const matchSelectedChat = (rawQuery: string): string | undefined => {
+          const trimmed = rawQuery.trim();
+          if (!trimmed) {
+            return telegram.connection.chatIds.length === 1 ? telegram.connection.chatIds[0] : undefined;
+          }
+          const exactId = selectedChatList.find((c) => c.chatId === trimmed);
+          if (exactId) return exactId.chatId;
+          const qNorm = normTg(trimmed.replace(/^@/, ''));
+          if (isPersonalQuery(qNorm)) {
+            const priv = selectedChatList.find(
+              (c) => c.type === 'private' || c.chatId === telegram.connection.telegramUserId,
+            );
+            if (priv) return priv.chatId;
+          }
+          const byTitle = selectedChatList.find((c) => {
+            const tNorm = normTg(c.title || '');
+            const uNorm = normTg((c.username || '').replace(/^@/, ''));
+            return (tNorm && (tNorm.includes(qNorm) || qNorm.includes(tNorm))) || (uNorm && uNorm === qNorm);
+          });
+          if (byTitle) return byTitle.chatId;
+          const byObs = observedChats.find((c: any) => {
+            const cid = String(c?.id ?? c?.chatId ?? '').trim();
+            if (!cid) return false;
+            if (cid === trimmed) return true;
+            const tNorm = normTg(String(c?.title ?? c?.name ?? ''));
+            return Boolean(tNorm && (tNorm.includes(qNorm) || qNorm.includes(tNorm)));
+          });
+          if (byObs) return String(byObs.id ?? byObs.chatId).trim();
+          return undefined;
+        };
+
+        const stepChatMap = new Map<string, string>();
         let forbiddenChatId: string | null = null;
         for (const step of bound.steps) {
           if (!step.tool.startsWith('telegram.')) continue;
-          const targetChatId = typeof step.args?.chatId === 'string' ? step.args.chatId.trim() : undefined;
+          if (step.tool === 'telegram.list_chats') {
+            const q = typeof step.args?.query === 'string' ? step.args.query : '';
+            const matched = matchSelectedChat(q);
+            if (matched) {
+              step.chatId = matched;
+              stepChatMap.set(step.id, matched);
+            }
+            continue;
+          }
+
+          let targetChatId: string | undefined;
+          const rawChatArg = step.args?.chatId;
+          let isRefArg = false;
+          if (typeof rawChatArg === 'string') {
+            const trimmed = rawChatArg.trim();
+            if (trimmed.startsWith('$')) {
+              isRefArg = true;
+              const refStepId = trimmed.slice(1).split('.')[0]?.replace(/\[\d+\]$/, '');
+              targetChatId = refStepId && stepChatMap.has(refStepId) ? stepChatMap.get(refStepId) : undefined;
+            } else if (trimmed) {
+              targetChatId = matchSelectedChat(trimmed) ?? trimmed;
+            }
+          } else if (typeof rawChatArg === 'object' && rawChatArg !== null && '$ref' in rawChatArg) {
+            isRefArg = true;
+            const ref = (rawChatArg as any).$ref;
+            const refStepId =
+              typeof ref === 'string' ? ref.replace(/^\$/, '').split('.')[0]?.replace(/\[\d+\]$/, '') : undefined;
+            if (refStepId && stepChatMap.has(refStepId)) {
+              targetChatId = stepChatMap.get(refStepId);
+            }
+          }
+
+          if (!targetChatId && observedChats.length === 1) {
+            const obsId = String(observedChats[0]?.id ?? observedChats[0]?.chatId ?? '').trim();
+            if (obsId) targetChatId = obsId;
+          }
+          if (!targetChatId && telegram.connection.chatIds.length === 1) {
+            targetChatId = telegram.connection.chatIds[0];
+          }
+
           if (targetChatId) {
             step.chatId = targetChatId;
+            stepChatMap.set(step.id, targetChatId);
+            if (!isRefArg) {
+              step.args = { ...(step.args ?? {}), chatId: targetChatId };
+            }
             if (!allowedChatSet.has(targetChatId)) {
               forbiddenChatId = targetChatId;
               break;
             }
-          } else if (step.tool === 'telegram.send_message' && telegram.connection.chatIds.length === 1) {
-            step.chatId = telegram.connection.chatIds[0];
           }
         }
         if (forbiddenChatId) {
@@ -735,6 +1058,7 @@ export class ChatService {
             kind: 'refusal',
             reason: `Cuộc trò chuyện Telegram (${forbiddenChatId}) không nằm trong phạm vi bạn đã chọn.`,
             suggestion: 'Hãy chọn thêm cuộc trò chuyện hoặc nhóm này trong trang Kết nối dịch vụ, rồi thử lại.',
+            unavailableServices: [{ id: 'telegram', name: 'Telegram' }],
           };
         }
         telegramConn = {
@@ -742,6 +1066,154 @@ export class ChatService {
           telegramUserId: telegram.connection.telegramUserId,
           username: telegram.connection.username,
           chatIds: [...telegram.connection.chatIds].sort(),
+        };
+      }
+    }
+
+    if (usesNotion) {
+      const notion = await this.notionConnection?.(userId);
+      if (!notion || notion.status === 'not_connected' || notion.status === 'reconnect_required') {
+        unavailableServices.push({ id: 'notion', name: 'Notion' });
+        reasons.push('Tài khoản của bạn chưa Kết nối Notion hoặc cần kết nối lại.');
+      } else if (notion.status === 'needs_scope' || !notion.connection) {
+        return {
+          kind: 'refusal',
+          reason: 'Bạn chưa chọn database Notion nào được phép sử dụng.',
+          suggestion: 'Hãy chọn ít nhất một database Notion trong trang Kết nối dịch vụ.',
+          unavailableServices: [{ id: 'notion', name: 'Notion' }],
+        };
+      } else {
+        const selectedDbs: Array<{ id: string; title: string; url?: string }> = Array.isArray(notion.selectedDatabases)
+          ? notion.selectedDatabases
+          : Array.isArray(notion.connection.databases)
+            ? notion.connection.databases
+            : [];
+        onNotionDatabases?.(selectedDbs);
+
+        const allowedDbSet = new Set<string>(
+          (notion.connection.databaseIds as string[]).map((id: string) => id.toLowerCase()),
+        );
+        const normNotion = (s: string) =>
+          s
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[đĐ]/g, 'd')
+            .toLowerCase()
+            .trim();
+        const allEntities = memory ? memory.getAll() : {};
+        const observedDbs = [
+          ...(Array.isArray(allEntities.database)
+            ? allEntities.database
+            : allEntities.database
+              ? [allEntities.database]
+              : []),
+          ...(Array.isArray((allEntities.__observed as any)?.database)
+            ? (allEntities.__observed as any).database
+            : []),
+        ];
+
+        const matchSelectedDatabase = (rawQuery: string): string | undefined => {
+          const trimmed = rawQuery.trim();
+          if (!trimmed) {
+            return notion.connection.databaseIds.length === 1
+              ? notion.connection.databaseIds[0]
+              : undefined;
+          }
+          const extracted = extractNotionDatabaseId(trimmed);
+          if (extracted) return extracted;
+          const qNorm = normNotion(trimmed);
+          const byTitle = selectedDbs.find((d) => {
+            const tNorm = normNotion(d.title || '');
+            return Boolean(tNorm && (tNorm.includes(qNorm) || qNorm.includes(tNorm)));
+          });
+          if (byTitle) return byTitle.id;
+          const byObs = observedDbs.find((d: any) => {
+            const did = extractNotionDatabaseId(d?.id);
+            if (!did) return false;
+            const tNorm = normNotion(String(d?.title ?? d?.name ?? ''));
+            return Boolean(tNorm && (tNorm.includes(qNorm) || qNorm.includes(tNorm)));
+          });
+          if (byObs) return extractNotionDatabaseId(byObs.id) ?? undefined;
+          return undefined;
+        };
+
+        const stepDbMap = new Map<string, string>();
+        let forbiddenDbId: string | null = null;
+        for (const step of bound.steps) {
+          if (!step.tool.startsWith('notion.')) continue;
+          if (step.tool === 'notion.search_databases') {
+            const q = typeof step.args?.query === 'string' ? step.args.query : '';
+            const matched = matchSelectedDatabase(q);
+            if (matched) {
+              step.databaseId = matched;
+              stepDbMap.set(step.id, matched);
+            }
+            continue;
+          }
+          if (step.tool !== 'notion.query_database' && step.tool !== 'notion.create_page') {
+            continue;
+          }
+
+          let targetDbId: string | undefined;
+          const rawDbArg = step.args?.databaseId;
+          let isRefArg = false;
+          if (typeof rawDbArg === 'string') {
+            const trimmed = rawDbArg.trim();
+            if (trimmed.startsWith('$')) {
+              isRefArg = true;
+              const refStepId = trimmed.slice(1).split('.')[0]?.replace(/\[\d+\]$/, '');
+              targetDbId = refStepId && stepDbMap.has(refStepId) ? stepDbMap.get(refStepId) : undefined;
+            } else if (trimmed) {
+              targetDbId = matchSelectedDatabase(trimmed) ?? trimmed;
+            }
+          } else if (typeof rawDbArg === 'object' && rawDbArg !== null && '$ref' in rawDbArg) {
+            isRefArg = true;
+            const ref = (rawDbArg as any).$ref;
+            const refStepId =
+              typeof ref === 'string' ? ref.replace(/^\$/, '').split('.')[0]?.replace(/\[\d+\]$/, '') : undefined;
+            if (refStepId && stepDbMap.has(refStepId)) {
+              targetDbId = stepDbMap.get(refStepId);
+            }
+          }
+
+          if (!targetDbId && observedDbs.length === 1) {
+            const obsId = extractNotionDatabaseId(observedDbs[0]?.id);
+            if (obsId) targetDbId = obsId;
+          }
+          if (!targetDbId && notion.connection.databaseIds.length === 1) {
+            targetDbId = notion.connection.databaseIds[0];
+          }
+
+          if (targetDbId) {
+            step.databaseId = targetDbId;
+            stepDbMap.set(step.id, targetDbId);
+            if (!isRefArg) {
+              step.args = { ...(step.args ?? {}), databaseId: targetDbId };
+            }
+            if (!allowedDbSet.has(targetDbId.toLowerCase())) {
+              forbiddenDbId = targetDbId;
+              break;
+            }
+          }
+        }
+
+        if (forbiddenDbId) {
+          return {
+            kind: 'refusal',
+            reason: `Database Notion (${forbiddenDbId}) không nằm trong phạm vi bạn đã chọn.`,
+            suggestion: 'Hãy chọn thêm database này trong trang Kết nối dịch vụ, rồi thử lại.',
+            unavailableServices: [{ id: 'notion', name: 'Notion' }],
+          };
+        }
+
+        notionConn = {
+          credentialId: notion.connection.credentialId,
+          workspaceId: notion.connection.workspaceId,
+          workspaceName: notion.connection.workspaceName,
+          botId: notion.connection.botId,
+          identityVersion: notion.connection.identityVersion,
+          databaseIds: [...notion.connection.databaseIds].sort(),
+          ...(selectedDbs.length > 0 ? { databases: selectedDbs } : {}),
         };
       }
     }
@@ -763,6 +1235,7 @@ export class ChatService {
     if (trelloConn) connections.trello = trelloConn;
     if (githubConn) connections.github = githubConn;
     if (telegramConn) connections.telegram = telegramConn;
+    if (notionConn) connections.notion = notionConn;
 
     return { ...bound, connections };
   }
@@ -791,13 +1264,21 @@ export class ChatService {
       ? nextRuns(recurrence, this.schedules.now?.() ?? new Date(), this.schedules.timeZone).map((date) => date.toISOString()) : [];
     const current = proposal.action === 'create' ? null : schedule;
     let digestCandidate: ScheduleProposalMetadata['digestCandidate'] | undefined;
-    if ((proposal.action === 'create' || proposal.action === 'update') && services.includes('telegram') && this.telegramConnection) {
-      const tgLookup = await this.telegramConnection(actor.userId).catch(() => null);
-      digestCandidate = evaluateTelegramDigestCandidate({
-        proposal,
+    const uniqueServices = [...new Set(services)];
+    const isCalendarDigestProposal =
+      (uniqueServices.includes('mycalendar') || uniqueServices.includes('calendar')) &&
+      uniqueServices.length === 2 &&
+      Boolean(this.schedules.evaluateDigestCandidate);
+    if (
+      (proposal.action === 'create' || proposal.action === 'update') &&
+      proposal.request &&
+      isCalendarDigestProposal &&
+      this.schedules.evaluateDigestCandidate
+    ) {
+      digestCandidate = await this.schedules.evaluateDigestCandidate({
+        userId: actor.userId,
         services,
-        timeZone: this.schedules.timeZone,
-        telegramLookup: tgLookup,
+        request: proposal.request,
       });
     } else if (
       (proposal.action === 'create' || proposal.action === 'update') &&
@@ -815,6 +1296,21 @@ export class ChatService {
         encryptionKey: this.schedules.encryptionKey,
         mysheetsEnabled: this.schedules.mysheetsEnabled,
       });
+      if (
+        digestCandidate.canAutoDigest &&
+        digestCandidate.config?.source.service === 'mysheets' &&
+        services.includes('sheets')
+      ) {
+        services = services.map((s) => (s === 'sheets' ? 'mysheets' : s));
+      }
+    } else if ((proposal.action === 'create' || proposal.action === 'update') && services.includes('telegram') && this.telegramConnection) {
+      const tgLookup = await this.telegramConnection(actor.userId).catch(() => null);
+      digestCandidate = evaluateTelegramDigestCandidate({
+        proposal,
+        services,
+        timeZone: this.schedules.timeZone,
+        telegramLookup: tgLookup,
+      });
     } else if (
       (proposal.action === 'create' || proposal.action === 'update') &&
       proposal.request &&
@@ -830,7 +1326,39 @@ export class ChatService {
         getAdapter: this.getAdapter,
       });
     } else if (
-      proposal.action === 'create' &&
+      (proposal.action === 'create' || proposal.action === 'update') &&
+      proposal.request &&
+      recurrence &&
+      services.includes('trello') &&
+      this.trelloConnection
+    ) {
+      digestCandidate = await evaluateTrelloDigestCandidate({
+        userId: actor.userId,
+        request: proposal.request,
+        services,
+        recurrence,
+        trelloConnection: this.trelloConnection,
+        telegramConnection: this.telegramConnection,
+        getAdapter: this.getAdapter,
+      });
+    } else if (
+      (proposal.action === 'create' || proposal.action === 'update') &&
+      proposal.request &&
+      recurrence &&
+      services.includes('notion') &&
+      this.notionConnection
+    ) {
+      digestCandidate = await evaluateNotionDigestCandidate({
+        userId: actor.userId,
+        request: proposal.request,
+        services,
+        recurrence,
+        notionConnection: this.notionConnection,
+        telegramConnection: this.telegramConnection,
+        getAdapter: this.getAdapter,
+      });
+    } else if (
+      (proposal.action === 'create' || proposal.action === 'update') &&
       proposal.request &&
       this.schedules.evaluateDigestCandidate
     ) {
@@ -893,6 +1421,7 @@ export class ChatService {
     let trelloTeamBoards: Array<{ boardId: string; boardName: string }> | undefined;
     let githubTeamRepos: Array<{ repoId: string; fullName: string; name: string }> | undefined;
     let telegramChats: Array<{ chatId: string; title: string }> | undefined;
+    let notionDatabases: Array<{ id: string; title: string }> | undefined;
     const actor = await this.actorForConversation(conversationId, target.userId);
     let scopeId = 'default';
     if (actor.workspaceMode === 'organization' && actor.workspaceId) {
@@ -910,6 +1439,7 @@ export class ChatService {
           scopeId,
           (repos) => { githubTeamRepos = repos; },
           (chats) => { telegramChats = chats; },
+          (databases) => { notionDatabases = databases; },
         )
       : planned;
     signal?.throwIfAborted();
@@ -922,11 +1452,12 @@ export class ChatService {
     let planId: string | null = null, messageId = '', labels: Record<string, string> = {};
     if (response.kind === 'plan') {
       const labelOptions =
-        trelloTeamBoards || githubTeamRepos || telegramChats
+        trelloTeamBoards || githubTeamRepos || telegramChats || notionDatabases
           ? {
               ...(trelloTeamBoards ? { teamBoards: trelloTeamBoards } : {}),
               ...(githubTeamRepos ? { teamRepos: githubTeamRepos } : {}),
               ...(telegramChats ? { telegramChats } : {}),
+              ...(notionDatabases ? { notionDatabases } : {}),
             }
           : undefined;
       labels = resourceLabels(response, memory, userTexts, labelOptions);
