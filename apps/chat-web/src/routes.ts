@@ -14,6 +14,7 @@ export interface MyCalendarCallbackInput { code?: string; state?: string; error?
 export interface MySheetsCallbackInput { code?: string; state?: string; error?: string; mode?: 'select'; returnTo?: string }
 export interface TrelloCallbackInput { code?: string; state?: string; error?: string }
 export interface GitHubCallbackInput { code?: string; state?: string; error?: string }
+export interface JiraCallbackInput { code?: string; state?: string; error?: string }
 export interface TelegramCallbackInput { state?: string; botUsername?: string; deepLinkUrl?: string; groupDeepLinkUrl?: string; error?: string }
 type PublicViewProps = ComponentProps<typeof LoginPage> & { navigate: (path: string, replace?: boolean) => void; token?: string; googleCallback?: GoogleCallbackInput };
 
@@ -32,6 +33,7 @@ export const routes = [
   { kind: 'mysheets-callback', pattern: /^\/connections\/mysheets\/callback\/?$/ },
   { kind: 'trello-callback', pattern: /^\/connections\/trello\/callback\/?$/ },
   { kind: 'github-callback', pattern: /^\/connections\/github\/callback\/?$/ },
+  { kind: 'jira-callback', pattern: /^\/connections\/myjira\/callback\/?$/ },
   { kind: 'telegram-callback', pattern: /^\/connections\/telegram\/callback\/?$/ },
   { kind: 'conversation', pattern: /^\/c\/([^/]+)\/?$/ },
   { kind: 'admin-users', pattern: /^\/admin\/users\/?$/ },
@@ -41,7 +43,7 @@ export const routes = [
   { kind: 'guide', pattern: /^\/guide\/?$/, publicView: (props: PublicViewProps) => createElement(GuidePage, { navigate: props.navigate }) },
   { kind: 'privacy', pattern: /^\/privacy\/?$/, publicView: (props: PublicViewProps) => createElement(PrivacyPage, { navigate: props.navigate }) },
 ] as const;
-export type AppRoute = { kind: Exclude<typeof routes[number]['kind'], 'conversation'> | 'not-found'; token?: string; googleCallback?: GoogleCallbackInput; mycalendarCallback?: MyCalendarCallbackInput; mysheetsCallback?: MySheetsCallbackInput; trelloCallback?: TrelloCallbackInput; githubCallback?: GitHubCallbackInput; telegramCallback?: TelegramCallbackInput } | { kind: 'conversation'; conversationId: string };
+export type AppRoute = { kind: Exclude<typeof routes[number]['kind'], 'conversation'> | 'not-found'; token?: string; googleCallback?: GoogleCallbackInput; mycalendarCallback?: MyCalendarCallbackInput; mysheetsCallback?: MySheetsCallbackInput; trelloCallback?: TrelloCallbackInput; githubCallback?: GitHubCallbackInput; jiraCallback?: JiraCallbackInput; telegramCallback?: TelegramCallbackInput } | { kind: 'conversation'; conversationId: string };
 
 export function readRoute(): AppRoute {
   const query = new URLSearchParams(window.location.search);
@@ -95,11 +97,11 @@ export function readRoute(): AppRoute {
         },
       };
     }
-    if (route.kind === 'github-callback') {
+    if (route.kind === 'github-callback' || route.kind === 'jira-callback') {
       const single = (key: string) => query.getAll(key).length === 1 ? query.get(key) || undefined : undefined;
       return {
         kind: route.kind,
-        githubCallback: {
+        [route.kind === 'jira-callback' ? 'jiraCallback' : 'githubCallback']: {
           code: single('code'),
           state: single('state'),
           error: query.has('error') ? 'denied' : undefined,
