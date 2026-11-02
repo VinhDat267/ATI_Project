@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import pg from 'pg';
 import { randomUUID } from 'node:crypto';
 import { hashPassword } from '../../../chat-api/src/db/repositories/user-repo.js';
+import { fixtureConversation, fixtureMessage } from './persisted-artifacts.fixture.js';
 
 const enabled = process.env.SANDBOX_SCENARIO === 'schedule';
 
@@ -33,23 +34,18 @@ test('GITHUB-DIGEST: admin selects team repos, member connects from refusal card
       "INSERT INTO users(id, email, password, name, status, role, email_verified) VALUES($1, $2, $3, 'GitHub Member', 'active', 'member', true)",
       [memberId, memberEmail, hashPassword(memberPassword)]
     );
-    refusalConvId = (
-      await db.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [memberId])
-    ).rows[0].id;
-    await db.query(
-      "INSERT INTO messages(conv_id, role, content) VALUES($1, 'user', 'Tạo issue trên repo acme/ati')",
-      [refusalConvId]
-    );
-    await db.query(
-      "INSERT INTO messages(conv_id, role, content, metadata) VALUES($1, 'assistant', 'Từ chối yêu cầu: Bạn cần kết nối GitHub cá nhân trước khi tạo hoặc tra cứu issue trên GitHub.', $2)",
-      [
-        refusalConvId,
-        {
-          type: 'refusal',
-          reason: 'Bạn cần kết nối GitHub cá nhân trước khi tạo hoặc tra cứu issue trên GitHub.',
-          unavailableServices: [{ id: 'github', name: 'GitHub' }],
-        },
-      ]
+    refusalConvId = await fixtureConversation(db, memberId);
+    await fixtureMessage(db, refusalConvId, 'user', 'Tạo issue trên repo acme/ati');
+    await fixtureMessage(
+      db,
+      refusalConvId,
+      'assistant',
+      'Từ chối yêu cầu: Bạn cần kết nối GitHub cá nhân trước khi tạo hoặc tra cứu issue trên GitHub.',
+      {
+        type: 'refusal',
+        reason: 'Bạn cần kết nối GitHub cá nhân trước khi tạo hoặc tra cứu issue trên GitHub.',
+        unavailableServices: [{ id: 'github', name: 'GitHub' }],
+      },
     );
 
     // 1. Admin logs in and selects two repositories for the team
