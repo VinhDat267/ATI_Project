@@ -82,6 +82,12 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
     return () => document.removeEventListener('mousedown', handleOutside);
   }, [open]);
 
+  // PBI-04: a conversation belongs to exactly one workspace, so only /c/:id leaves for "/".
+  // Every other page (settings, history, users…) subscribes to the workspace and reloads in place.
+  const leaveWorkspaceBoundPage = () => {
+    if (/^\/c\//.test(window.location.pathname)) navigate?.('/');
+  };
+
   const handleSelectWorkspace = (id: string) => {
     const prev = getActiveWorkspaceId();
     setActiveWorkspaceId(id);
@@ -90,7 +96,7 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
       return;
     }
     useChatStore.getState().reset();
-    navigate?.('/');
+    leaveWorkspaceBoundPage();
     setOpen(false);
   };
 
