@@ -135,7 +135,8 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
   const hasMySheets = missing.some(row => row.id === 'mysheets');
   const hasTrello = missing.some(row => row.id === 'trello');
   const hasGitHub = missing.some(row => row.id === 'github');
-  const isNotionPersonal = Boolean(conversationId || current('notion')?.personalStatus);
+  const notionSvc = current('notion');
+  const isNotionPersonal = notionSvc ? Boolean(notionSvc.personalStatus) : Boolean(conversationId);
   const hasNotion = isNotionPersonal && missing.some(row => row.id === 'notion');
   const hasTelegram = missing.some(row => row.id === 'telegram');
   const shared = missing.filter(row => row.id !== 'gmail' && row.id !== 'mycalendar' && row.id !== 'mysheets' && row.id !== 'trello' && row.id !== 'github' && (!isNotionPersonal || row.id !== 'notion') && row.id !== 'telegram');

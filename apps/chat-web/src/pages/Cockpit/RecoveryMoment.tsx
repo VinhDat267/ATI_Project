@@ -74,7 +74,7 @@ export function RecoveryMoment({request,moment,snapshot,steps,services,controls}
   const notionCheckUrl = paused?.status === 'unknown' && ['notion.create_page', 'notion.update_page', 'notion.append_text', 'notion.append_blocks'].includes(planStep?.tool ?? '')
     ? 'https://www.notion.so' : undefined;
   const trelloUsername = snapshot?.plan.connections?.trello?.username;
-  const trelloCheckUrl = paused?.status === 'unknown' && ['trello.create_card', 'trello.update_card', 'trello.add_member', 'trello.remove_member', 'trello.add_checklist', 'trello.update_checklist_item', 'trello.add_comment', 'trello.create_list', 'trello.set_card_due_complete'].includes(planStep?.tool ?? '')
+  const trelloCheckUrl = moment === 8 && paused?.status === 'unknown' && Boolean(trelloUsername) && ['trello.create_card', 'trello.update_card', 'trello.add_member', 'trello.remove_member', 'trello.add_checklist', 'trello.update_checklist_item', 'trello.add_comment', 'trello.create_list', 'trello.set_card_due_complete'].includes(planStep?.tool ?? '')
     ? (typeof planStep?.args.boardId === 'string' && planStep.args.boardId ? `https://trello.com/b/${encodeURIComponent(planStep.args.boardId)}` : 'https://trello.com') : undefined;
   const canRetry=moment===7 && !hasUnknown && paused?.status==='failed' && actions.includes('retry');
   const canContinue=moment===9 && !hasUnknown && !steps.some(step=>['failed','running'].includes(step.status)) && actions.includes('continue');
