@@ -142,4 +142,8 @@ describe('migration 0017 (calendar automation digest) on PostgreSQL 16', () => {
       )
     ).rejects.toMatchObject({ code: '23514', constraint: 'schedule_runs_delivery_check' });
   });
+
+  it('is idempotent when re-running all migrations with existing calendar_digest schedules', async () => {
+    await expect(runAll()).resolves.toBeUndefined();
+  });
 });

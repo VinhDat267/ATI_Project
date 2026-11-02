@@ -3,18 +3,20 @@
 
 -- 1. A sixth OAuth flow: connect_trello always belongs to one user and one live session.
 ALTER TABLE oauth_states DROP CONSTRAINT IF EXISTS oauth_states_mode_check;
-ALTER TABLE oauth_states ADD CONSTRAINT oauth_states_mode_check CHECK (mode IN ('login', 'link', 'connect_gmail', 'connect_mycalendar', 'connect_mysheets', 'connect_trello'));
+ALTER TABLE oauth_states ADD CONSTRAINT oauth_states_mode_check CHECK (
+  mode IN ('login', 'link', 'connect_gmail', 'connect_mycalendar', 'connect_mysheets', 'connect_trello', 'connect_github', 'connect_telegram')
+);
 
 ALTER TABLE oauth_states DROP CONSTRAINT IF EXISTS oauth_states_mode_owner_check;
 ALTER TABLE oauth_states ADD CONSTRAINT oauth_states_mode_owner_check CHECK (
   (mode = 'login' AND user_id IS NULL AND session_id IS NULL)
-  OR (mode IN ('link', 'connect_gmail', 'connect_mycalendar', 'connect_mysheets', 'connect_trello') AND user_id IS NOT NULL AND session_id IS NOT NULL));
+  OR (mode IN ('link', 'connect_gmail', 'connect_mycalendar', 'connect_mysheets', 'connect_trello', 'connect_github', 'connect_telegram') AND user_id IS NOT NULL AND session_id IS NOT NULL));
 
 -- 2. Return path support for connect_trello initiated from conversation view.
 ALTER TABLE oauth_states DROP CONSTRAINT IF EXISTS oauth_states_return_to_check;
 ALTER TABLE oauth_states ADD CONSTRAINT oauth_states_return_to_check CHECK (
   return_to IS NULL
-  OR (mode IN ('connect_gmail', 'connect_mycalendar', 'connect_mysheets', 'connect_trello') AND return_to ~ '^/c/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'));
+  OR (mode IN ('connect_gmail', 'connect_mycalendar', 'connect_mysheets', 'connect_trello', 'connect_github', 'connect_telegram') AND return_to ~ '^/c/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'));
 
 -- 3. Xoá credential Trello dùng chung (user_id IS NULL)
 DELETE FROM service_credentials WHERE service = 'trello' AND user_id IS NULL;
