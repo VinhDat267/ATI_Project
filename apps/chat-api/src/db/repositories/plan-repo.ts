@@ -15,6 +15,14 @@ export interface PlanRow {
   resource_labels?: Record<string, string>;
 }
 
+export interface PlanJiraGuard {
+  workspaceId: string;
+  workspaceVersion: number;
+  membershipVersion: number;
+  identityVersion: number;
+  grantId: string;
+}
+
 export class PlanRepo {
   constructor(private pool: pg.Pool) {}
 
@@ -77,11 +85,54 @@ export class PlanRepo {
   /**
    * Optimistic locking: only transitions to approved if currently pending AND not expired.
    */
-  async approvePlan(planId: string, expectedHash: string, userId: string): Promise<boolean> {
-    const res = await this.pool.query(
-      "UPDATE plans SET status = 'approved', decided_at = now() WHERE id = $1 AND plan_hash = $2 AND status = 'pending' AND expires_at > now() AND EXISTS (SELECT 1 FROM conversations WHERE conversations.id = plans.conv_id AND conversations.user_id = $3) RETURNING id",
-      [planId, expectedHash, userId]
-    );
+  async approvePlan(
+    planId: string,
+    expectedHash: string,
+    userId: string,
+    jiraGuard?: PlanJiraGuard
+  ): Promise<boolean> {
+    if (!jiraGuard) {
+      const res = await this.pool.query(
+        "UPDATE plans SET status = 'approved', decided_at = now() WHERE id = $1 AND plan_hash = $2 AND status = 'pending' AND expires_at > now() AND EXISTS (SELECT 1 FROM conversations WHERE conversations.id = plans.conv_id AND conversations.user_id = $3) RETURNING id",
+        [planId, expectedHash, userId]
+      );
+      return (res.rowCount ?? 0) > 0;
+    }
+
+    const query = `
+      UPDATE plans SET status = 'approved', decided_at = now()
+      WHERE id = $1 AND plan_hash = $2 AND status = 'pending' AND expires_at > now()
+        AND EXISTS (SELECT 1 FROM conversations WHERE conversations.id = plans.conv_id AND conversations.user_id = $3)
+        AND EXISTS (
+          SELECT 1 FROM ati_workspaces w
+          WHERE w.id = $4 AND w.status = 'active' AND w.version = $5
+        )
+        AND EXISTS (
+          SELECT 1 FROM ati_workspace_memberships m
+          JOIN workspace_members wm ON wm.workspace_id = m.workspace_id AND wm.user_id = m.user_id
+          JOIN users u ON u.id = m.user_id
+          WHERE m.workspace_id = $4 AND m.user_id = $3
+            AND m.status = 'active' AND wm.status = 'active' AND u.status = 'active'
+            AND m.version = $6
+        )
+        AND EXISTS (
+          SELECT 1 FROM jira_oauth_grants g
+          JOIN jira_accounts a ON a.id = g.account_id
+          WHERE g.id = $7 AND g.status = 'active'
+            AND a.user_id = $3 AND a.status = 'connected' AND a.identity_version = $8
+        )
+      RETURNING id
+    `;
+    const res = await this.pool.query(query, [
+      planId,
+      expectedHash,
+      userId,
+      jiraGuard.workspaceId,
+      jiraGuard.workspaceVersion,
+      jiraGuard.membershipVersion,
+      jiraGuard.grantId,
+      jiraGuard.identityVersion,
+    ]);
     return (res.rowCount ?? 0) > 0;
   }
 

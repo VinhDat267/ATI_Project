@@ -8,6 +8,9 @@ import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { readableRecoveryPlan, recoveryConflict, restoredProgress, validateRecoveryAction, verifiedRecoveryPlan, verifiedRecoverySteps } from './execution-recovery.js';
 import type { AdapterContext } from './adapter-factory.js';
+import { validateJiraApprovalBinding } from './jira/jira-approval-guard.js';
+import type { PlanJiraGuard } from '../db/repositories/plan-repo.js';
+import type pg from 'pg';
 
 export interface ApproveResult {
   success: boolean;
@@ -24,6 +27,7 @@ export interface ExecutionServiceOptions {
   };
   credentialRepo?: CredentialRepo;
   workspaceRepo?: WorkspaceRepo;
+  pool?: pg.Pool;
   adapterFactory: {
     getAdapterForService: (serviceName: string, context?: AdapterContext) => Promise<any> | any;
   };
@@ -40,6 +44,7 @@ export class ExecutionService {
   private workspaceRepo?: WorkspaceRepo;
   private adapterFactory: ExecutionServiceOptions['adapterFactory'];
   private sseManager?: ExecutionServiceOptions['sseManager'];
+  private pool?: pg.Pool;
   private activeControllers = new Map<string, ExecutionController>();
   private activeRuns = new Map<string, Promise<unknown>>();
   private queuedStarts = new Set<string>();
@@ -53,6 +58,7 @@ export class ExecutionService {
     this.workspaceRepo = options.workspaceRepo;
     this.adapterFactory = options.adapterFactory;
     this.sseManager = options.sseManager;
+    this.pool = options.pool ?? (options.planRepo as any).pool;
   }
 
   getPlanRepo(): PlanRepo {
@@ -142,13 +148,38 @@ export class ExecutionService {
     // Everything that can fail is done before the approval CAS commits.
     const context = this.executionContext(userId, planJson?.connections, planRow.conversation);
 
+    // Recheck Jira connection authority if present
+    let jiraGuard: PlanJiraGuard | undefined;
+    if (planJson?.connections?.myjira) {
+      const pool = this.pool ?? (this.planRepo as any).pool;
+      if (!pool) {
+        return { success: false, status: 503, error: 'Database authority unavailable' };
+      }
+      const jiraCheck = await validateJiraApprovalBinding(pool, planJson.connections.myjira);
+      if (!jiraCheck.valid) {
+        return {
+          success: false,
+          status: jiraCheck.status,
+          error: jiraCheck.reason,
+        };
+      }
+      const myjira = planJson.connections.myjira;
+      jiraGuard = {
+        workspaceId: myjira.workspaceId,
+        workspaceVersion: myjira.workspaceVersion,
+        membershipVersion: myjira.membershipVersion,
+        identityVersion: myjira.identityVersion,
+        grantId: myjira.grantId,
+      };
+    }
+
     // 1. Optimistic Locking: only succeeds if current status is 'pending' and not expired
-    const approved = await this.planRepo.approvePlan(planId, planRow.plan_hash, userId);
+    const approved = await this.planRepo.approvePlan(planId, planRow.plan_hash, userId, jiraGuard);
     if (!approved) {
       return {
         success: false,
         status: 409,
-        error: 'Plan is already approved, rejected, or expired',
+        error: 'Plan is already approved, rejected, expired, or Jira authority conflict',
       };
     }
 
@@ -162,7 +193,19 @@ export class ExecutionService {
 
     // Launch background execution
     this.queuedStarts.add(planId);
-    setImmediate(() => {
+    setImmediate(async () => {
+      if (context.connections?.myjira) {
+        const pool = this.pool ?? (this.planRepo as any).pool;
+        if (pool) {
+          const startCheck = await validateJiraApprovalBinding(pool, context.connections.myjira);
+          if (!startCheck.valid) {
+            this.queuedStarts.delete(planId);
+            await this.markExecutionFailed(planId, convId, new Error(`Queued execution aborted: ${startCheck.reason}`));
+            return;
+          }
+        }
+      }
+
       const run = this.executePlan(convId, planId, steps, userId, context);
       this.activeRuns.set(planId, run);
       this.queuedStarts.delete(planId);
@@ -204,6 +247,15 @@ export class ExecutionService {
       throw recoveryConflict('Reconciliation required: execution controller is unavailable');
     }
     const { steps, connections } = verifiedRecoveryPlan(plan);
+    if (connections?.myjira) {
+      const pool = this.pool ?? (this.planRepo as any).pool;
+      if (pool) {
+        const recoveryCheck = await validateJiraApprovalBinding(pool, connections.myjira);
+        if (!recoveryCheck.valid) {
+          throw recoveryConflict(`Recovery denied: ${recoveryCheck.reason}`);
+        }
+      }
+    }
     // Callers checked ownership with getOwnedPlan; claimRecovery checks it again in SQL.
     const context = this.executionContext(userId, connections, (plan as any).conversation);
     const before = restoredProgress(steps, await this.stepRepo.listSteps(plan.id));
