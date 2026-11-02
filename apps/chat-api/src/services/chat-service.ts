@@ -15,6 +15,9 @@ import { evaluateTelegramDigestCandidate } from './schedules/telegram-digest-can
 import { resolveRef } from '@wap/executor';
 import { eventsOverlap } from '@wap/tool-adapters';
 import { JiraPlanBinder, JiraBindingError } from './jira/jira-plan-binding.js';
+import type { JiraHistorySanitizer } from './jira/jira-history-sanitizer.js';
+import type { JiraPolicyService } from './jira/jira-policy-service.js';
+import { validateJiraApprovalBinding } from './jira/jira-approval-guard.js';
 
 /** Only the server writes plan connections; the model's version is never kept or shown back to it. */
 function withoutConnections(plan: PlanResponse): PlanResponse {
@@ -150,6 +153,10 @@ export interface ChatServiceOptions {
   telegramConnection?: (userId: string) => Promise<any>;
   /** Server-side binder for Jira plans (JIRA-08); absent, personal Jira plans are refused. */
   jiraBinder?: JiraPlanBinder;
+  /** Sanitizer for Jira conversation history messages (JIRA-05/08). */
+  jiraHistorySanitizer?: JiraHistorySanitizer;
+  /** Policy service for Jira source revalidation (JIRA-05/08). */
+  jiraPolicyService?: JiraPolicyService;
   /** Scheduled workflows (SCHEDULES_ENABLED); absent, conversations have no schedule. */
   schedules?: {
     repo: ScheduleRepo;
@@ -191,6 +198,8 @@ export class ChatService {
   private githubConnection?: ChatServiceOptions['githubConnection'];
   private telegramConnection?: ChatServiceOptions['telegramConnection'];
   private jiraBinder?: JiraPlanBinder;
+  private jiraHistorySanitizer?: JiraHistorySanitizer;
+  private jiraPolicyService?: JiraPolicyService;
   private schedules?: ChatServiceOptions['schedules'];
   private getAdapter?: ChatServiceOptions['getAdapter'];
   private lookupTool?: ChatServiceOptions['lookupTool'];
@@ -204,6 +213,8 @@ export class ChatService {
     this.githubConnection = options.githubConnection;
     this.telegramConnection = options.telegramConnection;
     this.jiraBinder = options.jiraBinder;
+    this.jiraHistorySanitizer = options.jiraHistorySanitizer;
+    this.jiraPolicyService = options.jiraPolicyService;
     this.getAdapter = options.getAdapter;
     this.lookupTool = options.lookupTool;
     this.mysheetsLookupTimeoutMs = options.mysheetsLookupTimeoutMs ?? 10_000;
@@ -961,6 +972,35 @@ export class ChatService {
         )
       : planned;
     signal?.throwIfAborted();
+    let maskedMetadata: Record<string, unknown> | null = null;
+    if (Array.isArray((response as any).sourceRefs) && (response as any).sourceRefs.length > 0 && this.jiraPolicyService) {
+      for (const ref of (response as any).sourceRefs) {
+        const decision = await this.jiraPolicyService.revalidateSource(target.userId, ref, { signal });
+        if (!decision.allowed) {
+          const maskText = `[Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi: ${decision.reason}]`;
+          maskedMetadata = { masked: true, maskReason: decision.reason, sourceRefs: (response as any).sourceRefs };
+          response = {
+            kind: 'answer',
+            text: maskText,
+            lookups: [],
+            usedDirectory: [],
+          };
+          break;
+        }
+      }
+    }
+    if (response.kind === 'plan' && response.connections?.myjira) {
+      const pool = (this.planRepo as any)?.pool ?? (this.convRepo as any)?.pool;
+      if (pool) {
+        const check = await validateJiraApprovalBinding(pool, response.connections.myjira);
+        if (!check.valid) {
+          response = {
+            kind: 'refusal',
+            reason: `Kế hoạch Jira không hợp lệ do quyền truy cập bị thay đổi hoặc thu hồi: ${check.reason}`,
+          };
+        }
+      }
+    }
     let proposal: ScheduleProposalMetadata | null = null;
     if (response.kind === 'schedule') {
       const prepared = await this.prepareProposal(response, actor, target.schedule ?? null);
@@ -986,6 +1026,10 @@ export class ChatService {
         ? this.msgRepo.createMessage(conversationId, role, content, metadata, client)
         : this.msgRepo.createMessage(conversationId, role, content, metadata);
       if (target.memoryState !== undefined) await save('system', '', { type: 'working_memory', state: target.memoryState });
+      if (maskedMetadata) {
+        await save('assistant', (response as any).text, { ...maskedMetadata, ...correlation });
+        return { planId: null };
+      }
       if (response.kind === 'plan') {
         const planHash = createHash('sha256')
           .update(JSON.stringify(response))
@@ -1024,6 +1068,11 @@ export class ChatService {
     };
 
     const announce = () => {
+      if (maskedMetadata) {
+        emit('answer', { text: (response as any).text, metadata: maskedMetadata });
+        emit('agent_state', { state: 'idle' });
+        return;
+      }
       if (response.kind === 'plan') {
         emit('plan_preview', { planId, plan: response, resourceLabels: labels });
         emit('agent_state', { state: 'waiting_for_approval' });
@@ -1056,7 +1105,10 @@ export class ChatService {
     });
 
     // Retrieve previous messages for conversation context
-    const previousMessages = await this.msgRepo.listMessages(conversationId);
+    const rawPreviousMessages = await this.msgRepo.listMessages(conversationId);
+    const previousMessages = this.jiraHistorySanitizer
+      ? await this.jiraHistorySanitizer.sanitizeMessages(userId, rawPreviousMessages)
+      : rawPreviousMessages;
     const lastMemory = [...previousMessages].reverse().find((m: any) => m.metadata?.type === 'working_memory');
     const history: ChatMessage[] = previousMessages
       .filter((m: any) => m.id !== currentMessageId && m.metadata?.type !== 'working_memory' &&
@@ -1083,7 +1135,12 @@ export class ChatService {
       history,
       memory,
       actor,
-      onGatherEvent: (event) => this.eventEmitter.emit('gather_progress', { conversationId, ...event }),
+      onGatherEvent: (event) => {
+        const safeEvent = (event.tool.startsWith('myjira.') || event.tool.startsWith('jira.'))
+          ? { tool: event.tool, status: event.status }
+          : event;
+        this.eventEmitter.emit('gather_progress', { conversationId, ...safeEvent });
+      },
       ...(schedule ? { schedule: { services: schedule.services } } : {}),
     });
     await this.msgRepo.createMessage(conversationId, 'system', '', { type: 'working_memory', state: memory.toJSON() });
@@ -1111,7 +1168,12 @@ export class ChatService {
       : await this.actorForConversation(convId, run.userId);
     const response = await this.planner.processMessage({
       userMessage, history: [], memory, signal, actor, scheduledRun: true,
-      onGatherEvent: (event) => this.eventEmitter.emit('gather_progress', { conversationId: convId, ...event }),
+      onGatherEvent: (event) => {
+        const safeEvent = (event.tool.startsWith('myjira.') || event.tool.startsWith('jira.'))
+          ? { tool: event.tool, status: event.status }
+          : event;
+        this.eventEmitter.emit('gather_progress', { conversationId: convId, ...safeEvent });
+      },
     });
     signal.throwIfAborted();
     if (response.kind === 'schedule') throw new Error('A scheduled run must be planned, not scheduled again');

@@ -389,8 +389,11 @@ async function bootstrap() {
   if (pool && jiraNativeVerifier) {
     jiraWorkspaceRepo = new JiraWorkspaceRepo(pool, { verifier: jiraNativeVerifier });
   }
-  const jiraHistorySanitizer = pool && jiraNativeVerifier
-    ? new JiraHistorySanitizer(new JiraPolicyService({ pool, verifier: jiraNativeVerifier }))
+  const jiraPolicyService = pool && jiraNativeVerifier
+    ? new JiraPolicyService({ pool, verifier: jiraNativeVerifier })
+    : undefined;
+  const jiraHistorySanitizer = jiraPolicyService
+    ? new JiraHistorySanitizer(jiraPolicyService)
     : undefined;
   const jiraBinder = jiraAvailable && pool
     ? new JiraPlanBinder({ pool })
@@ -527,6 +530,8 @@ async function bootstrap() {
     githubConnection,
     telegramConnection,
     jiraBinder,
+    jiraHistorySanitizer,
+    jiraPolicyService,
     getAdapter: (serviceName, context) => (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(serviceName, context),
     schedules: schedules
       ? {
