@@ -435,7 +435,7 @@ describe('Task 9: GitHub OAuth connection UI and chat moments', () => {
 
       const { unmount } = render(<GitHubConnection user={adminUser} />);
       expect(await screen.findByTestId('github-scope-counter')).toHaveTextContent('Đã chọn 0/10');
-      expect(screen.getAllByText('Private')).toHaveLength(2);
+      expect(await screen.findAllByText('Private')).toHaveLength(2);
       expect(screen.getAllByText('Public')).toHaveLength(3);
 
       const filterInput = screen.getByLabelText('Tìm nhanh repository');

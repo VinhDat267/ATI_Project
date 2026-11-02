@@ -59,6 +59,9 @@ export function GitHubConnection({
     try {
       const res = await apiClient.getGitHubConnection();
       if (mounted.current) {
+        if (isAdmin && res.status === 'needs_scope') {
+          setLoadingCandidates(true);
+        }
         setData(res);
       }
     } catch {
