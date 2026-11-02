@@ -15,5 +15,7 @@ export * from './calendar/personal-calendar-adapter.js';
 export * from './notion/notion-adapter.js';
 export * from './telegram/telegram-adapter.js';
 export * from './jira/jira-adapter.js';
+export * from './jira/personal-jira-adapter.js';
+export * from './jira/personal-jira-http.js';
 export * from './gmail/token-provider.js';
 export * from './gmail/gmail-adapter.js';
