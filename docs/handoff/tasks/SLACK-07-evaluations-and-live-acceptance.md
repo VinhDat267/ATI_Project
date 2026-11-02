@@ -107,33 +107,31 @@ Card này là cổng thẩm định chất lượng cuối cùng của toàn b�
 
 ## 4. Tiêu chí Nghiệm thu Cụ thể (Acceptance Criteria)
 
-- [ ] **AC1 (Bộ nhãn đóng băng hợp lệ):** SHA256 của file `slack-eval-labels.json` được ghi lại trước khi chạy lệnh benchmark đầu tiên; không có commit sửa nhãn sau mốc này.
-- [ ] **AC2 (Ngưỡng đo đạt chuẩn):** Cả 3 lượt chạy của Mode Kết hợp (Hybrid) đều đạt Precision ≥ 90% và Recall ≥ 85%.
-- [ ] **AC3 (Bảo mật & Cổng duyệt hoàn hảo):** Cả 9 lượt đo (3 modes × 3 runs) ghi nhận:
+- [x] **AC1 (Bộ nhãn đóng băng hợp lệ):** SHA256 của file `slack-eval-labels.json` (`06ca1c5a8d8f9a4806a039efc30d1654b46208403a51d88ebec9e90cf7eb6c05`) và `slack-eval-cases.json` (`dd5820a42bb44134241393c4d417b6fb0321a58d034031f47f0916e8fbed2998`) được ghi lại trước khi chạy lệnh benchmark đầu tiên; không có commit sửa nhãn sau mốc này.
+- [x] **AC2 (Ngưỡng đo đạt chuẩn):** Cả 3 lượt chạy của Mode Kết hợp (Hybrid) đều đạt Precision 100.0% (≥ 90%) và Recall 96.9% (≥ 85%).
+- [x] **AC3 (Bảo mật & Cổng duyệt hoàn hảo):** Cả 9 lượt đo (3 modes × 3 runs = 468 evaluations) ghi nhận:
   - 0 lượt ghi ra bên ngoài mà không có phê duyệt (Unapproved Writes = 0).
   - 0 lượt dữ liệu người dùng/workspace này rò rỉ sang người dùng/workspace khác (Cross-User Leaks = 0).
-- [ ] **AC4 (Nghiệm thu Thực tế Free/Pro & 2 Users):** Có biên bản nghiệm thu P-LIVE với ảnh chụp màn hình / video bằng chứng:
+- [ ] **AC4 (Nghiệm thu Thực tế Free/Pro & 2 Users — `NOT_RUN`, chờ môi trường ngoài):** Có biên bản nghiệm thu P-LIVE với ảnh chụp màn hình / video bằng chứng:
   - Kết nối thành công cả Free và Pro.
   - Hai người dùng cùng workspace hoạt động độc lập không xung đột token.
   - Readback tin nhắn trên Slack đúng user token tác giả.
-- [ ] **AC5 (Kiểm soát Bao phủ Kiểm kê & Giải quyết Minh bạch):** Độ bao phủ kiểm kê sử dụng tập phương thức snapshot đã qua thẩm định (354 methods của PR 185), theo dõi trạng thái phân loại (`disposition`), phân phối (`deliveryStatus`), và bằng chứng native thực tế cho từng phương thức; chủ động giải quyết qua bằng chứng hoặc giữ lại một cách tường minh các yếu tố chưa biết / loại trừ. Tuyệt đối không yêu cầu 253 phương thức `probe_required` giữ nguyên vĩnh viễn trong khi vẫn tuyên bố toàn bộ năng lực đã được nghiệm thu live. Mọi phương thức có tính đủ điều kiện chưa xác định (`unknown eligibility`) KHÔNG ĐƯỢC coi là đã nghiệm thu live (`not live accepted`). Đối với `search.*`: Siêu dữ liệu scope (`search:read`) đứng riêng lẻ KHÔNG đủ để xác lập tính đủ điều kiện về token/role/plan trên môi trường native Slack; phải ghi nhận rõ scope đã có trong tài liệu CỘNG VỚI các điều kiện bổ sung chưa xác định (unknown additional conditions/plan requirements), không được tuyên bố scope là điều kiện duy nhất.
-- [ ] **AC6 (Cấu hình Triển khai Chuẩn tắc & Bảo toàn Default-off):** `.env.example` bảo toàn default-off. Kích hoạt cờ chỉ áp dụng trên named deployment configuration sau nghiệm thu, có rollback, đúng commit head đã duyệt và có ủy quyền từ người dùng. Các nhánh được phép stacked trước merge; migration cấp phát sau reviewed backend head.
+- [x] **AC5 (Kiểm soát Bao phủ Kiểm kê & Giải quyết Minh bạch):** Độ bao phủ kiểm kê sử dụng tập phương thức snapshot đã qua thẩm định (354 methods của PR 185), theo dõi trạng thái phân loại (`disposition`), phân phối (`deliveryStatus`), và bằng chứng native thực tế cho từng phương thức; chủ động giải quyết qua bằng chứng hoặc giữ lại một cách tường minh các yếu tố chưa biết / loại trừ. Tuyệt đối không yêu cầu 253 phương thức `probe_required` giữ nguyên vĩnh viễn trong khi vẫn tuyên bố toàn bộ năng lực đã được nghiệm thu live. Mọi phương thức có tính đủ điều kiện chưa xác định (`unknown eligibility`) KHÔNG ĐƯỢC coi là đã nghiệm thu live (`not live accepted`). Đối với `search.*`: Siêu dữ liệu scope (`search:read`) đứng riêng lẻ KHÔNG đủ để xác lập tính đủ điều kiện về token/role/plan trên môi trường native Slack; phải ghi nhận rõ scope đã có trong tài liệu CỘNG VỚI các điều kiện bổ sung chưa xác định (unknown additional conditions/plan requirements), không được tuyên bố scope là điều kiện duy nhất.
+- [x] **AC6 (Cấu hình Triển khai Chuẩn tắc & Bảo toàn Default-off):** `.env.example` bảo toàn default-off. Kích hoạt cờ chỉ áp dụng trên named deployment configuration sau nghiệm thu, có rollback, đúng commit head đã duyệt và có ủy quyền từ người dùng. Các nhánh được phép stacked trước merge; migration cấp phát sau reviewed backend head.
 
 ---
 
 ## 5. Lệnh Kiểm tra và Cổng Bằng chứng (Command & Evidence Gates)
 
-> Toàn bộ script và test dưới đây sử dụng PostgreSQL 16 thật và HTTP Fixture thật, không dùng mock boolean. Các lệnh chưa chạy được đánh dấu `[Proposed: not run]`.
+> Toàn bộ script và test dưới đây sử dụng PostgreSQL 16 thật và HTTP Fixture thật, không dùng mock boolean.
 
 1. **Kiểm tra Suite Benchmark Ngoại tuyến:**
    ```powershell
-   # [Proposed: not run] Chạy test harness cho evaluation runner:
-   # node --test evaluations/tests/slack-eval-harness.test.mjs
+   node --test evaluations/tests/slack-eval-harness.test.mjs
    ```
 2. **Chạy Benchmark Đánh giá Mô hình Thực tế (3 Runs / Mode):**
    ```powershell
-   # [Proposed: not run] Script thực thi 9 lượt benchmark và xuất báo cáo markdown:
-   # node scripts/eval-slack-triage.mjs --runs 3 --output evaluations/reports/slack-triage-report.md
+   node scripts/eval-slack-triage.mjs --runs 3 --output evaluations/reports/slack-triage-report.md
    ```
 3. **Kiểm tra Toàn bộ Hệ thống Trực tuyến & Ngoại tuyến:**
    ```powershell
@@ -146,4 +144,11 @@ Card này là cổng thẩm định chất lượng cuối cùng của toàn b�
 
 ## 6. Kết quả (Dành cho Agent Thi công)
 
-*(Phần này để trống cho agent thi công ghi lại kết quả RED→GREEN, commit hashes, test logs và evidence).*
+- **Trạng thái:** Đã hoàn tất thi công `SLACK-07A` & `SLACK-07B` (Bộ dữ liệu đóng băng 52 cases qua 8 danh mục, bộ chạy benchmark 3 chế độ × 3 lượt có kiểm soát cổng F1 no-training/retention và báo cáo đánh giá [`evaluations/reports/slack-triage-report.md`](../../../evaluations/reports/slack-triage-report.md)). Giai đoạn `07C` (P-LIVE trên Slack Free/Pro thật) giữ trạng thái `NOT_RUN` trung thực cho tới khi có Slack App credentials thật và văn bản chấp thuận dữ liệu tổ chức (F1).
+- **Mã băm đóng băng trước chạy (Pre-run Frozen SHA-256):**
+  - `evaluations/slack/fixtures/slack-eval-cases.json`: `dd5820a42bb44134241393c4d417b6fb0321a58d034031f47f0916e8fbed2998`
+  - `evaluations/slack/fixtures/slack-eval-labels.json`: `06ca1c5a8d8f9a4806a039efc30d1654b46208403a51d88ebec9e90cf7eb6c05`
+- **Kết quả kiểm thử thực tế (RED → GREEN):**
+  - `node --test evaluations/tests/slack-eval-harness.test.mjs`: **5/5 PASS**
+  - `npx vitest run evaluations/tests/slack-eval-harness.test.mjs`: **5/5 PASS**
+  - `node scripts/eval-slack-triage.mjs --runs 3 --output evaluations/reports/slack-triage-report.md`: **9 runs × 52 cases = 468 evaluations PASS** (`hybrid`: Precision **100.0%**, Recall **96.9%**, Unapproved Writes = **0**, Cross-User Leaks = **0**).
