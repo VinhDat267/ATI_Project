@@ -1,0 +1,317 @@
+{
+  "playbooks": [
+    {
+      "id": "playbook-bug-sync",
+      "tabTitle": "Đồng bộ lỗi liên công cụ",
+      "flowSummary": "Trello → GitHub → Router → [Google Sheets, Slack]",
+      "prompt": "Tạo card trên bảng Trello cho lỗi đăng nhập Google, tạo issue trên kho GitHub kèm nhãn bug, ghi một dòng vào bảng tính Google Sheets và gửi thông báo vào kênh Slack của nhóm.",
+      "resourceLabels": {
+        "list-doing": "Danh sách Doing",
+        "org/ati-test": "Kho ati-test",
+        "sheet-tracker": "ATI Test Tracker",
+        "C123456": "Kênh #ati-test"
+      },
+      "steps": [
+        {
+          "id": "step_1",
+          "tool": "trello.create_card",
+          "description": "Tạo card \"Sửa lỗi đăng nhập Google\" trong danh sách Doing",
+          "args": {
+            "idList": "list-doing",
+            "name": "Sửa lỗi đăng nhập Google"
+          }
+        },
+        {
+          "id": "step_2",
+          "tool": "github.create_issue",
+          "description": "Tạo issue trong kho ati-test kèm đường dẫn card",
+          "dependsOn": ["step_1"],
+          "args": {
+            "repo": "org/ati-test",
+            "title": "Lỗi đăng nhập Google",
+            "body": { "$ref": "step_1.output.url" }
+          }
+        },
+        {
+          "id": "step_3",
+          "tool": "sheets.append_rows",
+          "description": "Thêm dòng theo dõi vào bảng tính ATI Test Tracker",
+          "dependsOn": ["step_2"],
+          "args": {
+            "spreadsheetId": "sheet-tracker",
+            "range": "Tasks!A:D",
+            "values": [["29/09/2026", "Lỗi thanh toán #42", "Cao", "$step_2.url"]]
+          }
+        },
+        {
+          "id": "step_4",
+          "tool": "slack.send_message",
+          "description": "Gửi thông báo tổng hợp vào kênh #ati-test",
+          "dependsOn": ["step_2"],
+          "args": {
+            "channel": "C123456",
+            "text": "Đã tạo card và mở issue: $step_2.url"
+          }
+        }
+      ]
+    },
+    {
+      "id": "playbook-morning-digest",
+      "tabTitle": "Báo cáo lịch họp & Auto-Digest mỗi sáng",
+      "flowSummary": "Google Calendar → Google Sheets → Router → [Slack, Telegram]",
+      "prompt": "Mỗi sáng 08:00, đọc lịch họp hôm nay trên Google Calendar, cập nhật bảng theo dõi trên Google Sheets và gửi bản tin tóm tắt đồng thời qua kênh Slack và nhóm Telegram.",
+      "resourceLabels": {
+        "cal-team": "Lịch họp nhóm",
+        "sheet-sprint": "Bảng Sprint Q4",
+        "C998877": "Kênh #bao-cao-sang",
+        "chat-ops": "Nhóm Vận hành"
+      },
+      "steps": [
+        {
+          "id": "step_1",
+          "tool": "calendar.create_event",
+          "description": "Đồng bộ các cuộc họp trong ngày trên Lịch họp nhóm",
+          "args": {
+            "calendarId": "cal-team",
+            "summary": "Tổng hợp lịch họp sáng"
+          }
+        },
+        {
+          "id": "step_2",
+          "tool": "sheets.append_rows",
+          "description": "Ghi danh sách cuộc họp vào Bảng Sprint Q4",
+          "dependsOn": ["step_1"],
+          "args": {
+            "spreadsheetId": "sheet-sprint",
+            "range": "Digest!A:C",
+            "values": [["08:00", { "$ref": "step_1.output.summary" }, "Đã đồng bộ"]]
+          }
+        },
+        {
+          "id": "step_3",
+          "tool": "slack.send_message",
+          "description": "Gửi bản tin lịch họp sáng vào kênh #bao-cao-sang",
+          "dependsOn": ["step_2"],
+          "args": {
+            "channel": "C998877",
+            "text": "Bản tin lịch họp sáng: $step_1.summary"
+          }
+        },
+        {
+          "id": "step_4",
+          "tool": "telegram.send_message",
+          "description": "Gửi thông báo nhắc lịch họp qua Telegram Nhóm Vận hành",
+          "dependsOn": ["step_2"],
+          "args": {
+            "chatId": "chat-ops",
+            "text": "Nhắc lịch họp sáng: $step_1.summary"
+          }
+        }
+      ]
+    },
+    {
+      "id": "playbook-sprint-coord",
+      "tabTitle": "Điều phối công việc & lịch biểu",
+      "flowSummary": "Trello → Google Calendar → Router → [Google Sheets, Slack]",
+      "prompt": "Tạo thẻ việc mới trên bảng Trello cho buổi nghiệm thu Sprint, đặt lịch họp trên Google Calendar, ghi vào bảng tiến độ Google Sheets và báo tin vào kênh Slack.",
+      "resourceLabels": {
+        "list-sprint": "Bảng Sprint Review",
+        "cal-team": "Lịch họp nhóm",
+        "sheet-sprint": "Bảng Sprint Q4",
+        "C123456": "Kênh #ati-test"
+      },
+      "steps": [
+        {
+          "id": "step_1",
+          "tool": "trello.create_card",
+          "description": "Tạo thẻ chuẩn bị nghiệm thu trên Bảng Sprint Review",
+          "args": {
+            "idList": "list-sprint",
+            "name": "Nghiệm thu Sprint Q4"
+          }
+        },
+        {
+          "id": "step_2",
+          "tool": "calendar.create_event",
+          "description": "Tạo lịch họp nghiệm thu kèm link thẻ công việc",
+          "dependsOn": ["step_1"],
+          "args": {
+            "calendarId": "cal-team",
+            "summary": { "$ref": "step_1.output.url" }
+          }
+        },
+        {
+          "id": "step_3",
+          "tool": "sheets.append_rows",
+          "description": "Cập nhật dòng lịch nghiệm thu vào Bảng Sprint Q4",
+          "dependsOn": ["step_2"],
+          "args": {
+            "spreadsheetId": "sheet-sprint",
+            "range": "Sprint!A:D",
+            "values": [["30/09/2026", "Nghiệm thu Sprint Q4", "$step_1.url", "Đã lên lịch"]]
+          }
+        },
+        {
+          "id": "step_4",
+          "tool": "slack.send_message",
+          "description": "Thông báo lịch nghiệm thu vào kênh #ati-test",
+          "dependsOn": ["step_2"],
+          "args": {
+            "channel": "C123456",
+            "text": "Đã lên lịch nghiệm thu Sprint Q4: $step_2.htmlLink"
+          }
+        }
+      ]
+    }
+  ],
+  "stage3Steps": [
+    {
+      "id": "step_1",
+      "tool": "trello.create_card",
+      "description": "Tạo card \"Sửa lỗi đăng nhập Google\" trong danh sách Doing",
+      "args": {
+        "idList": "list-doing",
+        "name": "Sửa lỗi đăng nhập Google"
+      }
+    },
+    {
+      "id": "step_2",
+      "tool": "github.create_issue",
+      "description": "Tạo issue trong kho ati-test có link card",
+      "dependsOn": ["step_1"],
+      "args": {
+        "repo": "org/ati-test",
+        "title": "Lỗi thanh toán #42",
+        "body": { "$ref": "step_1.output.url" }
+      }
+    },
+    {
+      "id": "step_3",
+      "tool": "sheets.append_rows",
+      "description": "Thêm một dòng vào trang Tasks",
+      "dependsOn": ["step_2"],
+      "args": {
+        "spreadsheetId": "sheet-tracker",
+        "range": "Tasks!A:D",
+        "values": [["29/09/2026", "Lỗi thanh toán #42", "Cao", "$step_2.url"]]
+      }
+    },
+    {
+      "id": "step_4",
+      "tool": "slack.send_message",
+      "description": "Gửi tin vào kênh #ati-test",
+      "dependsOn": ["step_2"],
+      "args": {
+        "channel": "C123456",
+        "text": "Đã tạo card và issue: $step_2.url"
+      }
+    }
+  ],
+  "stage4Steps": [
+    {
+      "id": "step_1",
+      "tool": "trello.create_card",
+      "description": "1. Tạo card \"Sửa lỗi đăng nhập Google\"",
+      "args": {}
+    },
+    {
+      "id": "step_2",
+      "tool": "github.create_issue",
+      "description": "2. Tạo issue trong kho ati-test",
+      "dependsOn": ["step_1"],
+      "args": {
+        "body": { "$ref": "step_1.output.url" }
+      }
+    },
+    {
+      "id": "step_3",
+      "tool": "sheets.append_rows",
+      "description": "3. Ghi vào bảng tính Tasks",
+      "dependsOn": ["step_2"],
+      "args": {}
+    },
+    {
+      "id": "step_4",
+      "tool": "slack.send_message",
+      "description": "4. Gửi tin vào kênh #ati-test",
+      "dependsOn": ["step_2"],
+      "args": {}
+    }
+  ],
+  "stage4Statuses": {
+    "step_1": "succeeded",
+    "step_2": "succeeded",
+    "step_3": "running",
+    "step_4": "pending"
+  },
+  "stage5Steps": [
+    {
+      "id": "step_1",
+      "tool": "trello.create_card",
+      "description": "Đã tạo card \"Sửa lỗi đăng nhập Google\"",
+      "args": {}
+    },
+    {
+      "id": "step_2",
+      "tool": "github.create_issue",
+      "description": "Đã tạo Issue #42 trong ati-test",
+      "dependsOn": ["step_1"],
+      "args": {
+        "body": { "$ref": "step_1.output.url" }
+      }
+    },
+    {
+      "id": "step_3",
+      "tool": "sheets.append_rows",
+      "description": "Đã ghi Dòng 104 trang Tasks",
+      "dependsOn": ["step_2"],
+      "args": {}
+    },
+    {
+      "id": "step_4",
+      "tool": "slack.send_message",
+      "description": "Đã gửi tin nhắn vào #ati-test",
+      "dependsOn": ["step_2"],
+      "args": {}
+    }
+  ],
+  "stage5Statuses": {
+    "step_1": "succeeded",
+    "step_2": "succeeded",
+    "step_3": "succeeded",
+    "step_4": "succeeded"
+  },
+  "stage5SchedulePrompt": "Mỗi sáng 08:00, tự động thực hiện: Tạo card trên bảng Trello cho lỗi đăng nhập Google, tạo issue trên kho GitHub, ghi vào bảng tính Google Sheets và báo kênh Slack.",
+  "digestSteps": [
+    {
+      "id": "step_1",
+      "tool": "mycalendar.list_events",
+      "description": "Đọc lịch họp hôm nay từ Lịch họp nhóm",
+      "args": {}
+    },
+    {
+      "id": "step_2",
+      "tool": "mysheets.read_range",
+      "description": "Đọc tiến độ từ Bảng Sprint Q4",
+      "dependsOn": ["step_1"],
+      "args": {
+        "range": { "$ref": "step_1.output.summary" }
+      }
+    },
+    {
+      "id": "step_3",
+      "tool": "slack.send_message",
+      "description": "Tự gửi bản tin sáng vào #bao-cao-sang",
+      "dependsOn": ["step_2"],
+      "args": {}
+    },
+    {
+      "id": "step_4",
+      "tool": "telegram.send_message",
+      "description": "Tự gửi bản tin sáng vào Nhóm Vận hành",
+      "dependsOn": ["step_2"],
+      "args": {}
+    }
+  ],
+  "digestPrompt": "Mỗi sáng 08:00 từ Thứ 2 đến Thứ 6, tự động đọc lịch họp nhóm trên Google Calendar và bảng Sprint Q4 trên Google Sheets, tổng hợp báo cáo gửi vào kênh #bao-cao-sang trên Slack và nhóm Telegram."
+}
