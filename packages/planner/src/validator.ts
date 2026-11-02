@@ -279,8 +279,9 @@ function findAmbiguousSites(steps: PlanStep[], grounding: GroundingContext): Ung
 
     for (const token of distinctiveTokens) {
       if (typedLower.has(token)) return true;
-      for (const lowerText of userTextsLower) {
-        if (lowerText.includes(token)) return true;
+      for (const text of grounding.userTexts) {
+        const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (new RegExp(`(?<![\\p{L}\\p{N}_])${escaped}(?![\\p{L}\\p{N}_])`, 'iu').test(text)) return true;
       }
     }
     return false;
@@ -329,11 +330,13 @@ function findUngrounded(steps: PlanStep[], catalog: Map<string, ToolDefinition>,
           const sites = (Array.isArray(siteEntries) ? siteEntries : siteEntries ? [siteEntries] : [])
             .filter((s): s is Record<string, unknown> => isObject(s));
           const verifiedSiteIds = new Set(
-            sites.flatMap((s) => [
-              typeof s.siteId === 'string' ? s.siteId : undefined,
-              typeof s.id === 'string' ? String(s.id) : undefined,
-              typeof s.cloudId === 'string' ? s.cloudId : undefined,
-            ]).filter((id): id is string => typeof id === 'string')
+            sites
+              .filter((s) => typeof s.cloudId === 'string' && Boolean(s.cloudId.trim()) && typeof s.workspaceId === 'string' && Boolean(s.workspaceId.trim()))
+              .flatMap((s) => [
+                typeof s.siteId === 'string' ? s.siteId : undefined,
+                typeof s.id === 'string' ? String(s.id) : undefined,
+                typeof s.cloudId === 'string' ? s.cloudId : undefined,
+              ]).filter((id): id is string => typeof id === 'string')
           );
           if (!verifiedSiteIds.has(String(value))) {
             ungrounded.push({ stepId: step.id, argument, resource, value });
@@ -347,22 +350,30 @@ function findUngrounded(steps: PlanStep[], catalog: Map<string, ToolDefinition>,
             .filter((s): s is Record<string, unknown> => isObject(s));
           const targetSite = sites.find((s) => s.siteId === step.args.siteId || s.id === step.args.siteId);
 
+          if (!targetSite ||
+              typeof targetSite.cloudId !== 'string' || !targetSite.cloudId.trim() ||
+              typeof targetSite.workspaceId !== 'string' || !targetSite.workspaceId.trim()) {
+            ungrounded.push({ stepId: step.id, argument, resource, value });
+            continue;
+          }
+
           const entries = grounding.memory[resource];
           const observed = (Array.isArray(entries) ? entries : [entries]).filter((entry): entry is Record<string, unknown> =>
             isObject(entry) && String(entry[schema['x-resource-field'] ?? 'id']) === String(value));
           if (observed.length > 0) {
             const matchesSite = observed.some((entry) => {
-              if (entry.siteId && entry.siteId !== step.args.siteId) return false;
-              if (targetSite) {
-                if (entry.cloudId && targetSite.cloudId && entry.cloudId !== targetSite.cloudId) return false;
-                if (entry.workspaceId && targetSite.workspaceId && entry.workspaceId !== targetSite.workspaceId) return false;
-              }
+              if (entry.siteId !== step.args.siteId) return false;
+              if (typeof entry.cloudId !== 'string' || !entry.cloudId.trim() || entry.cloudId !== targetSite.cloudId) return false;
+              if (typeof entry.workspaceId !== 'string' || !entry.workspaceId.trim() || entry.workspaceId !== targetSite.workspaceId) return false;
               return true;
             });
             if (!matchesSite) {
               ungrounded.push({ stepId: step.id, argument, resource, value });
               continue;
             }
+          } else {
+            ungrounded.push({ stepId: step.id, argument, resource, value });
+            continue;
           }
         }
         if (known.has(String(value)) || typed.has(String(value))) continue;

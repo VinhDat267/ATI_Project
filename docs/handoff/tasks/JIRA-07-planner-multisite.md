@@ -52,7 +52,7 @@ Hoàn thành triển khai và kiểm thử các chức năng của JIRA-07 trong
 ### Bằng chứng kiểm thử thực tế
 
 - `npm run test -w @wap/planner`:
-  - 31 test files, 439 tests PASS (exit 0)
+  - 31 test files, 443 tests PASS (exit 0)
 - `npx vitest run evaluations/generic-plumbing/static-guard.test.ts evaluations/golden-v2/run-myjira.test.ts`:
   - 2 test files, 8 tests PASS (exit 0)
 - `npx vitest run evaluations/golden-v2/`:

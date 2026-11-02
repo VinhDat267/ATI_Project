@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { MYJIRA_TOOLS } from '@wap/tool-schemas';
+import { MYJIRA_TOOLS, ALL_TOOLS, SERVICE_REGISTRY, MYJIRA_SERVICE } from '@wap/tool-schemas';
 import { validatePlan } from '../src/validator.js';
-import { recordObserved } from '../src/search.js';
+import { recordObserved, groundingMemory } from '../src/search.js';
+import { AIPlanner, WorkingMemory } from '../src/index.js';
 
 const plan = (steps: unknown[]) => JSON.stringify({
   kind: 'plan', thinking: 'Use Jira tools', summary: 'Update Jira', warnings: [], steps,
@@ -17,14 +18,14 @@ const createIssue = (siteId: string, projectKey: string, id = 'step_1', summary 
 
 const memory = {
   jira_site: [
-    { id: 'site-a', siteId: 'site-a', cloudId: 'cloud-a', name: 'Acme Jira', url: 'https://acme.atlassian.net' },
-    { id: 'site-b', siteId: 'site-b', cloudId: 'cloud-b', name: 'Beta Jira', url: 'https://beta.atlassian.net' },
+    { id: 'site-a', siteId: 'site-a', cloudId: 'cloud-a', workspaceId: 'ws-1', name: 'Acme Jira', url: 'https://acme.atlassian.net' },
+    { id: 'site-b', siteId: 'site-b', cloudId: 'cloud-b', workspaceId: 'ws-1', name: 'Beta Jira', url: 'https://beta.atlassian.net' },
   ],
   jira_issue: [
-    { id: '100', key: 'ATI-12', siteId: 'site-a' },
+    { id: '100', key: 'ATI-12', siteId: 'site-a', cloudId: 'cloud-a', workspaceId: 'ws-1' },
   ],
   jira_project: [
-    { id: '1001', key: 'PROJ', siteId: 'site-a', name: 'Acme Project' },
+    { id: '1001', key: 'PROJ', siteId: 'site-a', cloudId: 'cloud-a', workspaceId: 'ws-1', name: 'Acme Project' },
   ],
 };
 
@@ -125,6 +126,136 @@ describe('Jira site grounding', () => {
     expect(result.valid).toBe(true);
   });
 
+  it('rejects partial word match like "Acme2" from selecting site "Acme"', () => {
+    const result = validatePlan(plan([comment('site-a', 'ATI-12')]), MYJIRA_TOOLS, {
+      grounding: { memory, userTexts: ['Cập nhật ticket ATI-12 trên Acme2'] },
+    });
+    expect(result.valid).toBe(false);
+    expect(result.error).toMatch(/ambiguous.*site/i);
+  });
+
+  it('rejects Jira resource when observed entity lacks mandatory cloudId or workspaceId', () => {
+    const missingCloudMemory = {
+      ...memory,
+      jira_issue: [{ id: '100', key: 'ATI-12', siteId: 'site-a', workspaceId: 'ws-1' }],
+    };
+    const result = validatePlan(plan([comment('site-a', 'ATI-12')]), MYJIRA_TOOLS, {
+      grounding: { memory: missingCloudMemory, userTexts: ['site-a'] },
+    });
+    expect(result.valid).toBe(false);
+    expect(result.layer).toBe('grounding');
+  });
+
+  it('rejects plan when target site lacks mandatory cloudId or workspaceId', () => {
+    const missingSiteScopeMemory = {
+      ...memory,
+      jira_site: [
+        { id: 'site-a', siteId: 'site-a', name: 'Acme Jira' },
+      ],
+    };
+    const result = validatePlan(plan([comment('site-a', 'ATI-12')]), MYJIRA_TOOLS, {
+      grounding: { memory: missingSiteScopeMemory, userTexts: ['site-a'] },
+    });
+    expect(result.valid).toBe(false);
+    expect(result.layer).toBe('grounding');
+  });
+
+  it('executes full flow: list_sites -> search_projects/search_issues -> attaches scope info from __observed.jira_site -> validatePlan', async () => {
+    const mem = new WorkingMemory();
+    const actor = { userId: 'u-1', workspaceId: 'ws-ati-corp' };
+
+    const searchResults: Record<string, unknown> = {
+      'myjira.list_sites': [
+        { id: 'site-acme', siteId: 'site-acme', cloudId: 'cloud-acme-123', name: 'Acme Jira', url: 'https://acme.atlassian.net' },
+        { id: 'site-beta', siteId: 'site-beta', cloudId: 'cloud-beta-456', name: 'Beta Jira', url: 'https://beta.atlassian.net' },
+      ],
+      'myjira.search_projects': [
+        { id: '1001', key: 'PROJ', name: 'Project Acme', siteId: 'site-acme' },
+      ],
+      'myjira.search_issues': [
+        { id: '10042', key: 'ATI-42', title: 'Login Bug', status: 'Open', url: 'https://acme.atlassian.net/browse/ATI-42', siteId: 'site-acme' },
+      ],
+    };
+
+    const scriptedOutputs = [
+      { kind: 'search', thinking: 'find sites', calls: [{ tool: 'myjira.list_sites', args: { query: '' } }] },
+      {
+        kind: 'search',
+        thinking: 'find project and issue',
+        calls: [
+          { tool: 'myjira.search_projects', args: { siteId: 'site-acme', query: 'PROJ' } },
+          { tool: 'myjira.search_issues', args: { siteId: 'site-acme', projectKey: 'PROJ' } },
+        ],
+      },
+      {
+        kind: 'plan',
+        thinking: 'create issue and comment on site-acme',
+        summary: 'Work on Acme Jira',
+        warnings: [],
+        steps: [
+          { id: 'step_1', tool: 'myjira.create_issue', description: 'Create task', args: { siteId: 'site-acme', projectKey: 'PROJ', summary: 'New task' }, dependsOn: [] },
+          { id: 'step_2', tool: 'myjira.add_comment', description: 'Add comment', args: { siteId: 'site-acme', issueKey: 'ATI-42', body: 'Reviewed' }, dependsOn: ['step_1'] },
+        ],
+      },
+    ];
+
+    const inputs: any[] = [];
+    const provider = {
+      name: 'mock-llm',
+      async generatePlan(input: any) {
+        inputs.push(structuredClone(input));
+        return JSON.stringify(scriptedOutputs[inputs.length - 1]);
+      },
+    };
+
+    const planner = new AIPlanner({
+      provider,
+      toolCatalog: [...ALL_TOOLS.filter(t => t.service !== 'jira'), ...MYJIRA_TOOLS],
+      serviceRegistry: [...SERVICE_REGISTRY, MYJIRA_SERVICE],
+      searchMode: 'llm',
+      prefetchDirectory: false,
+      requireGroundedResources: true,
+      gatherSearch: async ({ tool }: any) => {
+        return searchResults[tool] ?? [];
+      },
+    });
+
+    const response = await planner.processMessage({
+      userMessage: 'Tạo ticket trong project PROJ và bình luận vào ATI-42 trên Acme',
+      memory: mem,
+      actor,
+    });
+
+    expect(response.kind).toBe('plan');
+    if (response.kind === 'plan') {
+      expect(response.steps).toHaveLength(2);
+    }
+
+    const observed = mem.getEntity<Record<string, Array<Record<string, unknown>>>>('__observed')!;
+    expect(observed.jira_site).toHaveLength(2);
+    expect(observed.jira_site[0].workspaceId).toBe('ws-ati-corp');
+    expect(observed.jira_site[0].cloudId).toBe('cloud-acme-123');
+
+    expect(observed.jira_project).toHaveLength(1);
+    expect(observed.jira_project[0].siteId).toBe('site-acme');
+    expect(observed.jira_project[0].cloudId).toBe('cloud-acme-123');
+    expect(observed.jira_project[0].workspaceId).toBe('ws-ati-corp');
+
+    expect(observed.jira_issue).toHaveLength(1);
+    expect(observed.jira_issue[0].siteId).toBe('site-acme');
+    expect(observed.jira_issue[0].cloudId).toBe('cloud-acme-123');
+    expect(observed.jira_issue[0].workspaceId).toBe('ws-ati-corp');
+
+    const planStr = JSON.stringify(scriptedOutputs[2]);
+    const validated = validatePlan(planStr, MYJIRA_TOOLS, {
+      grounding: {
+        memory: groundingMemory(mem.getAll(), observed),
+        userTexts: ['Tạo ticket trong project PROJ và bình luận vào ATI-42 trên Acme'],
+      },
+    });
+    expect(validated.valid).toBe(true);
+  });
+
   it('accepts subdomain from site URL when multiple sites exist', () => {
     const result = validatePlan(plan([comment('site-a', 'ATI-12')]), MYJIRA_TOOLS, {
       grounding: { memory, userTexts: ['xem ticket ATI-12 bên acme'] },
@@ -150,8 +281,8 @@ describe('Jira site grounding', () => {
 
   it('accepts single site from context when only one site is connected', () => {
     const singleSiteMemory = {
-      jira_site: [{ id: 'site-a', siteId: 'site-a', cloudId: 'cloud-a', name: 'Acme Jira' }],
-      jira_issue: [{ id: '100', key: 'ATI-12', siteId: 'site-a' }],
+      jira_site: [{ id: 'site-a', siteId: 'site-a', cloudId: 'cloud-a', workspaceId: 'ws-1', name: 'Acme Jira' }],
+      jira_issue: [{ id: '100', key: 'ATI-12', siteId: 'site-a', cloudId: 'cloud-a', workspaceId: 'ws-1' }],
     };
     const result = validatePlan(plan([comment('site-a', 'ATI-12')]), MYJIRA_TOOLS, {
       grounding: { memory: singleSiteMemory, userTexts: ['Cập nhật ticket ATI-12'] },

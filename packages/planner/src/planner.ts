@@ -356,14 +356,22 @@ export class AIPlanner {
         if (input.actor?.workspaceId && !enrichedStamp.workspaceId) {
           enrichedStamp.workspaceId = input.actor.workspaceId;
         }
-        if (tool.service === 'myjira' && typeof args.siteId === 'string') {
-          const siteEntries = memory.getEntity<Array<Record<string, unknown>>>('jira_site') ?? [];
-          const matchedSite = siteEntries.find((s) => s.siteId === args.siteId || s.id === args.siteId);
-          if (matchedSite?.cloudId && !enrichedStamp.cloudId) {
-            enrichedStamp.cloudId = matchedSite.cloudId;
-          }
-          if (matchedSite?.workspaceId && !enrichedStamp.workspaceId) {
-            enrichedStamp.workspaceId = matchedSite.workspaceId;
+        if (tool.service === 'myjira') {
+          const siteId = typeof args.siteId === 'string'
+            ? args.siteId
+            : (typeof enrichedStamp.siteId === 'string' ? (enrichedStamp.siteId as string) : undefined);
+          if (siteId) {
+            const observedMap = memory.getEntity<Record<string, Array<Record<string, unknown>>>>('__observed');
+            const observedSites = observedMap?.jira_site ?? [];
+            const explicitSites = memory.getEntity<Array<Record<string, unknown>>>('jira_site') ?? [];
+            const allSites = [...observedSites, ...explicitSites];
+            const matchedSite = allSites.find((s) => s.siteId === siteId || s.id === siteId);
+            if (matchedSite?.cloudId && !enrichedStamp.cloudId) {
+              enrichedStamp.cloudId = matchedSite.cloudId;
+            }
+            if (matchedSite?.workspaceId && !enrichedStamp.workspaceId) {
+              enrichedStamp.workspaceId = matchedSite.workspaceId;
+            }
           }
         }
         // `stamp` records the parent a result was found under, e.g. the board of a member.

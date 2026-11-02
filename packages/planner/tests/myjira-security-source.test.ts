@@ -168,7 +168,7 @@ describe('Jira prompt injection prevention', () => {
     });
 
     const memory = new WorkingMemory();
-    memory.setEntity('jira_site', [{ id: 'site-a', siteId: 'site-a', name: 'Acme Jira' }]);
+    memory.setEntity('jira_site', [{ id: 'site-a', siteId: 'site-a', cloudId: 'cloud-a', workspaceId: 'ws-1', name: 'Acme Jira' }]);
 
     await planner.processMessage({
       userMessage: 'Tìm ticket Jira trên site-a',
