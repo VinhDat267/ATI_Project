@@ -119,7 +119,7 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
         res.status(409).json({ error: 'Plan is already decided or expired' });
         return;
       }
-      executionService.clearPlanEvents(plan.conv_id, planId);
+      executionService.clearPlanEvents?.(plan.conv_id, planId);
       res.status(200).json({ success: true, status: 'rejected' });
     } catch (err: any) {
       if (err instanceof ConversationAccessDeniedError) {

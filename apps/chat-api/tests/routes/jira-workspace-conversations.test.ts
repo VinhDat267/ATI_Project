@@ -120,6 +120,7 @@ describe('apps/chat-api — JIRA-03 Conversation Scoped Access & Route Guards', 
     getLatestExecutionSnapshot: ReturnType<typeof vi.fn>;
     getOwnedPlan: ReturnType<typeof vi.fn>;
     getPlanRepo: ReturnType<typeof vi.fn>;
+    clearPlanEvents: ReturnType<typeof vi.fn>;
     continueExecution: ReturnType<typeof vi.fn>;
     retryStep: ReturnType<typeof vi.fn>;
     skipStep: ReturnType<typeof vi.fn>;
@@ -312,6 +313,7 @@ describe('apps/chat-api — JIRA-03 Conversation Scoped Access & Route Guards', 
       getPlanRepo: vi.fn().mockReturnValue({
         rejectPlan: vi.fn().mockResolvedValue(true),
       }),
+      clearPlanEvents: vi.fn(),
       continueExecution: vi.fn().mockResolvedValue({ success: true }),
       retryStep: vi.fn().mockResolvedValue({ success: true, stepId: 's1' }),
       skipStep: vi.fn().mockResolvedValue({ success: true, stepId: 's1' }),

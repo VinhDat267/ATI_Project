@@ -19,7 +19,8 @@
 |---|---|---|
 | `apps/chat-api/src/app.ts` | Cập nhật | Truyền `trelloTeamRepo` và `githubTeamRepo` vào `createServicesRoutes` để kiểm tra phạm vi tài nguyên OAuth |
 | `apps/chat-api/src/routes/services-routes.ts` | Cập nhật | Bọc `decryptCredentials` trong `try/catch` cho mỗi dịch vụ dùng chung; tính toán `personalStatus = 'scope_required'` cho `trello`, `github`, `telegram` khi chưa chọn board/repo/chat; bọc `teamRepo.get()` trong `try/catch` |
-| `apps/chat-api/src/routes/execution-routes.ts` | Cập nhật | Khi `POST /api/plans/:id/reject` thành công, gọi `executionService.clearPlanEvents(plan.conv_id, planId)` để xóa sự kiện `plan` khỏi bộ đệm SSE |
+| `apps/chat-api/src/routes/execution-routes.ts` | Cập nhật | Khi `POST /api/plans/:id/reject` thành công, gọi `executionService.clearPlanEvents?.(plan.conv_id, planId)` để xóa sự kiện `plan` khỏi bộ đệm SSE và tương thích an toàn với các partial test spy |
+| `apps/chat-api/tests/routes/jira-workspace-conversations.test.ts` | Cập nhật | Bổ sung `clearPlanEvents: vi.fn()` vào `executionServiceSpy` để khớp hoàn toàn với contract `ExecutionService` |
 | `apps/chat-api/src/services/execution-service.ts` | Cập nhật | Thêm phương thức `clearPlanEvents(convId, planId)` ủy quyền xuống `sseManager` |
 | `apps/chat-api/src/sse/sse-manager.ts` | Cập nhật | Thêm `clearPlanEvents(convId, planId)` lọc bỏ các sự kiện `plan` khớp `planId` (kể cả payload object lẫn chuỗi JSON) trong bộ đệm SSE |
 | `packages/planner/src/planner.ts` | Cập nhật | Bổ sung `EXCLUDED_GATHER_SERVICE_NAMES` và kiểm tra ngữ cảnh `bảng tính` trước khi khớp mẫu gather `trello.search_boards` |
