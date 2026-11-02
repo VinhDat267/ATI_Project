@@ -616,6 +616,13 @@ export class JiraOAuthRepo {
         [account.id]
       );
 
+      await client.query(
+        `UPDATE jira_authorization_leases
+         SET status = 'revoked', released_at = clock_timestamp()
+         WHERE jira_account_id = $1 AND status = 'active'`,
+        [account.id]
+      );
+
       // Audit logging for active workspaces the user is a member of
       const wsRes = await client.query<{ workspace_id: string }>(
         `SELECT workspace_id FROM ati_workspace_memberships

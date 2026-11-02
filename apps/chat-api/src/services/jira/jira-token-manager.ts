@@ -270,7 +270,7 @@ export class JiraTokenManager {
          FROM jira_oauth_grants g
          JOIN jira_accounts a ON a.id = g.account_id
          WHERE a.user_id = $1 AND g.id = $2
-         FOR UPDATE`,
+         FOR UPDATE OF g`,
         [userId, grantId]
       );
 

@@ -1043,12 +1043,12 @@ describe('apps/chat-api — JIRA-03 Workspace HTTP API Routes & DTOs', () => {
       expect(resLink.status).toBe(503);
       expect(resLink.body.code).toBe('NATIVE_VERIFIER_UNAVAILABLE');
 
-      // Capabilities -> 503 CAPABILITIES_UNAVAILABLE
+      // No linked site intersects the grant, so the safe directory is empty.
       const resCaps = await request(unverifiedApp)
         .get(`/api/jira-workspaces/${wsId}/jira-capabilities`)
         .set('Authorization', `Bearer ${admin.token}`);
-      expect(resCaps.status).toBe(503);
-      expect(JSON.stringify(resCaps.body)).toMatch(/CAPABILITIES_UNAVAILABLE/i);
+      expect(resCaps.status).toBe(200);
+      expect(resCaps.body).toEqual({ workspaceId: wsId, sites: [] });
     });
 
     it('allows deactivation safely under admin authority without native verifier', async () => {

@@ -187,6 +187,13 @@ export class WorkspaceMembershipRepo {
         );
       }
 
+      await client.query(
+        `UPDATE jira_authorization_leases
+         SET status = 'revoked', released_at = clock_timestamp()
+         WHERE workspace_id = $1 AND ati_user_id = $2 AND status = 'active'`,
+        [workspaceId, targetUserId]
+      );
+
       // 7. Log audit entry
       await this.auditRepo.log(client, {
         actorId: actorUserId,

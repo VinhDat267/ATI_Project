@@ -402,6 +402,13 @@ export class WorkspaceCoreRepo {
       }
       const newVersion = updateRow.version;
 
+      await client.query(
+        `UPDATE jira_authorization_leases
+         SET status = 'revoked', released_at = clock_timestamp()
+         WHERE workspace_id = $1 AND status = 'active'`,
+        [workspaceId]
+      );
+
       // 4. Log audit
       await this.auditRepo.log(client, {
         actorId: actorUserId,

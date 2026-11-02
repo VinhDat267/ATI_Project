@@ -8,6 +8,7 @@ import {
 import type { MessageRepo } from '../db/repositories/message-repo.js';
 import type { PlanRepo } from '../db/repositories/plan-repo.js';
 import type { ChatService } from '../services/chat-service.js';
+import type { JiraHistorySanitizer } from '../services/jira/jira-history-sanitizer.js';
 import { HistoryValidationError, validateConversationTitle } from '../db/repositories/conversation-history.js';
 import {
   assertConversationAccessWithFallback,
@@ -21,6 +22,7 @@ export interface ConversationRoutesOptions {
   planRepo?: PlanRepo;
   pool?: pg.Pool;
   enableWorkspaceConversations?: boolean;
+  jiraHistorySanitizer?: JiraHistorySanitizer;
 }
 
 export function createConversationRoutes(options: ConversationRoutesOptions): Router {
@@ -211,8 +213,9 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
         return;
       }
       const conversationId = req.params.id as string;
+      let conversation: any;
       try {
-        await assertConversationAccessWithFallback(
+        conversation = await assertConversationAccessWithFallback(
           { pool, convRepo },
           conversationId,
           userId,
@@ -235,7 +238,16 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
         res.status(404).json({ error: 'No messages found in conversation' });
         return;
       }
-      const latest = messages[messages.length - 1];
+      const rawLatest = messages[messages.length - 1];
+      const latest = conversation?.jira_context && rawLatest
+        ? options.jiraHistorySanitizer
+          ? await options.jiraHistorySanitizer.sanitizeMessage(userId, rawLatest)
+          : rawLatest.role === 'user' ? rawLatest : {
+              ...rawLatest,
+              content: '[Nội dung Jira đã bị ẩn do quyền truy cập không khả dụng]',
+              metadata: { masked: true, maskReason: 'provider_unavailable' },
+            }
+        : rawLatest;
       res.status(200).json(latest);
     } catch (err: any) {
       res.status(500).json({ error: err?.message || 'Failed to fetch latest message' });
@@ -271,7 +283,16 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
         throw err;
       }
 
-      const messages = await msgRepo.listMessages(conversationId);
+      const rawMessages = await msgRepo.listMessages(conversationId);
+      const messages = conversation?.jira_context
+        ? options.jiraHistorySanitizer
+          ? await options.jiraHistorySanitizer.sanitizeMessages(userId, rawMessages)
+          : rawMessages.map((message) => message.role === 'user' ? message : {
+              ...message,
+              content: '[Nội dung Jira đã bị ẩn do quyền truy cập không khả dụng]',
+              metadata: { masked: true, maskReason: 'provider_unavailable' },
+            })
+        : rawMessages;
       res.status(200).json({ conversation, messages });
     } catch (err: any) {
       res.status(500).json({ error: err?.message || 'Failed to fetch conversation' });
