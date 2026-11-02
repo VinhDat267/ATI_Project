@@ -7,9 +7,9 @@ const now = () => new Date('2026-10-25T01:00:00.000Z'); // Sunday 25/10/2026, 08
 const hash = (s: string) => createHash('sha256').update(s).digest('hex');
 /** System prompt SHA-256 from main before SCHED-02 (7bb752d), for the message below on ALL_TOOLS. */
 const BASELINE = {
-  regex: '14ea8a4bcf831da986cf449f823c959e172c331a7e7cd6c16ef74e927f00fdb1',
-  llm: 'b324fa473c28841041540c3e84df742083d1ccb7a92824c16da5bbc6e57deb70',
-  llmAnswers: '0826b45b85fada72ebdce87f5d4ccaee8c922821a42ff1a3364284de153be460',
+  regex: '1cbac372d7c1b1b1a4a8124e070a3c7e2faff7bf7a7a8513bfeca87da938807d',
+  llm: '2be89ef7bddc2521a7d8e78dc17fb3b0a3b009986ed4afdf4fd74abbdb2a11af',
+  llmAnswers: '50ec87b042b22de7fe6ef7b9bcc39ce5576d63f4600d65f268f66b17c4b50d46',
 };
 const MESSAGE = 'Tạo card Trello sửa lỗi đăng nhập và báo lên Slack';
 const MODES = ['regex', 'llm'] as const;

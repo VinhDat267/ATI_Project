@@ -71,7 +71,7 @@ describe('workspace directory prefetch', () => {
     expect(inputs).toHaveLength(1);
     expect(inputs[0]!.workingMemory.__observed.list).toContainEqual({ id: 'list_todo', name: 'To Do', boardId: 'b0' });
     expect(inputs[0]!.workingMemory.__observed.channel).toContainEqual({ id: 'C_FE', name: 'frontend' });
-    expect(inputs[0]!.workingMemory.__observed.member).toContainEqual({ id: 'm_minh', fullName: 'Minh', boardId: 'b0' });
+    expect(inputs[0]!.workingMemory.__observed.member).toContainEqual({ id: 'm_minh', fullName: 'Minh', username: 'minh', boardId: 'b0' });
   });
   it('makes the complete directory available before the first model call', async () => {
     const { provider, inputs } = scripted(plan);
@@ -84,7 +84,7 @@ describe('workspace directory prefetch', () => {
     expect(observed.list.map((l: any) => l.id).sort()).toEqual(['list_other', 'list_todo']);
     expect(observed.channel.map((c: any) => c.id)).toEqual(['C_FE']);
     // A member is remembered with the board it was found on.
-    expect(observed.member).toEqual([{ id: 'm_minh', fullName: 'Minh', boardId: 'b0' }]);
+    expect(observed.member).toEqual([{ id: 'm_minh', fullName: 'Minh', username: 'minh', boardId: 'b0' }]);
   });
 
   it('lists with an empty query and only through tools marked listable', async () => {
