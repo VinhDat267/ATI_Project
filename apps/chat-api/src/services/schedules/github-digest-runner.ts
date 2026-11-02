@@ -72,20 +72,13 @@ function formatSectionItems(
 
 function isDefiniteWriteRejection(err: any): boolean {
   if (!err || typeof err !== 'object') return false;
-  if (
+  if (err.details && typeof err.details === 'object' && err.details.requestSent === false) {
+    return true;
+  }
+  return (
     typeof err.category === 'string' &&
     ['AUTH_ERROR', 'NOT_FOUND', 'VALIDATION', 'RATE_LIMIT'].includes(err.category)
-  ) {
-    return true;
-  }
-  if (
-    err.details &&
-    typeof err.details === 'object' &&
-    (err.details.requestSent === false || err.details.ok === false)
-  ) {
-    return true;
-  }
-  return false;
+  );
 }
 
 async function claimGithubDigestDelivery(

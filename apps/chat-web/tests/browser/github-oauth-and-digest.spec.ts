@@ -224,7 +224,7 @@ test('GITHUB-DIGEST: admin selects team repos, member connects from refusal card
     await expect(scheduleRegion.getByText('Tự gửi')).toBeVisible();
 
     await scheduleRegion.getByRole('button', { name: 'Xem 10 lượt gần nhất' }).click();
-    await expect(scheduleRegion.getByText(/^Đã gửi/)).toBeVisible();
+    await expect(scheduleRegion.getByText(/^Đã gửi/).first()).toBeVisible();
     await expect(scheduleRegion.getByText('(#general)').first()).toBeVisible();
 
     expect(externalRequests).toEqual([]);

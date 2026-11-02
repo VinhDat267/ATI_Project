@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createServer } from 'node:http';
 import pg from 'pg';
-import { encryptCredentials, SlackAdapter, StepError, TelegramAdapter } from '@wap/tool-adapters';
+import { encryptCredentials, GlobalRateLimiter, SlackAdapter, StepError, TelegramAdapter } from '@wap/tool-adapters';
 import type { GithubDigestConfig, ScheduleRecurrence } from '@wap/tool-schemas';
 import { AdapterFactory } from '../../../src/services/adapter-factory.js';
 import { ScheduleRunner } from '../../../src/services/schedules/schedule-runner.js';
@@ -779,7 +779,7 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
     }
   });
 
-  it('10. (R2) preserves delivery_started_at and transitions to needs_attention (blocking replan) when SlackAdapter chat.postMessage fails with NETWORK', async () => {
+  it('10. (R2 + C1) preserves delivery_started_at and transitions to needs_attention (blocking replan) for Slack NETWORK, internal_error, fatal_error, HTTP 500, and malformed JSON while allowing replan on definite rejections', async () => {
     const gh = {
       status: 'connected',
       connection: {
@@ -790,71 +790,104 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
       },
     };
 
-    let slackWrites = 0;
-    const slackServer = createServer(async (req, res) => {
-      for await (const _ of req) {
-        // consume request
-      }
-      if (req.url?.startsWith('/conversations.list')) {
+    const modes = [
+      { mode: 'lost_ack', ambiguous: true },
+      { mode: 'internal_error', ambiguous: true },
+      { mode: 'fatal_error', ambiguous: true },
+      { mode: 'http_500', ambiguous: true },
+      { mode: 'malformed_json', ambiguous: true },
+      { mode: 'invalid_auth', ambiguous: false },
+      { mode: 'channel_not_found', ambiguous: false },
+      { mode: 'ratelimited', ambiguous: false },
+    ] as const;
+
+    for (const { mode, ambiguous } of modes) {
+      let slackWrites = 0;
+      const slackServer = createServer(async (req, res) => {
+        for await (const _ of req) {
+          // consume request
+        }
         res.setHeader('Content-Type', 'application/json');
-        res.end(
-          JSON.stringify({
-            ok: true,
-            channels: [{ id: 'C0123456789', name: 'team', is_private: false }],
-          }),
-        );
-      } else if (req.url === '/chat.postMessage') {
-        slackWrites++;
-        req.socket.destroy();
-      } else {
-        res.writeHead(404).end();
+        if (req.url?.startsWith('/conversations.list')) {
+          res.end(
+            JSON.stringify({
+              ok: true,
+              channels: [{ id: 'C0123456789', name: 'team', is_private: false }],
+            }),
+          );
+        } else if (req.url === '/chat.postMessage') {
+          slackWrites++;
+          if (mode === 'lost_ack') {
+            req.socket.destroy();
+          } else if (mode === 'http_500') {
+            res.writeHead(500).end(JSON.stringify({ ok: false, error: 'server_error' }));
+          } else if (mode === 'malformed_json') {
+            res.end('{');
+          } else {
+            res.end(JSON.stringify({ ok: false, error: mode }));
+          }
+        } else {
+          res.writeHead(404).end();
+        }
+      });
+      await new Promise<void>((resolve) => slackServer.listen(0, '127.0.0.1', resolve));
+      const port = (slackServer.address() as any).port;
+
+      try {
+        const slack = new SlackAdapter({
+          credentials: { botToken: 'fixture' },
+          allowedScope: { channels: ['C0123456789'] },
+          baseUrl: `http://127.0.0.1:${port}`,
+          rateLimiter: new GlobalRateLimiter({ maxRequests: 100, windowMs: 1000 }),
+        });
+        const schedule = await insertDigestSchedule();
+        const runner = createGithubDigestRunner({
+          pool: db.pool,
+          githubConnection: async () => gh,
+          getAdapter: (serviceName) =>
+            serviceName === 'github' ? { execute: async () => [] } : slack,
+        });
+        const scheduler = new ScheduleRunner({
+          pool: db.pool,
+          timeZone: VN,
+          now: () => now,
+          planRun: async () => ({ persist: async () => ({ state: 'needs_attention' }), afterCommit() {} }),
+          runGithubDigest: runner,
+          recordState: (client, row, at) => service.recordState(client, row, at),
+        });
+
+        await scheduler.tick();
+        await scheduler.stop();
+
+        const saved = (
+          await db.pool.query(
+            'SELECT id, status, delivery_started_at FROM schedule_runs WHERE schedule_id = $1',
+            [schedule.id],
+          )
+        ).rows[0];
+
+        expect(slackWrites).toBe(1);
+        if (ambiguous) {
+          expect(saved.delivery_started_at).not.toBeNull();
+          expect(saved.status).toBe('needs_attention');
+          await expect(
+            service.startRun({ userId: owner.id, runId: saved.id, trigger: 'replan', now }),
+          ).rejects.toMatchObject({ code: 'RUN_NOT_REPLANNABLE' });
+          expect(slackWrites).toBe(1);
+        } else {
+          expect(saved.delivery_started_at).toBeNull();
+          expect(saved.status).toBe('digest_failed');
+          const replanned = await service.startRun({
+            userId: owner.id,
+            runId: saved.id,
+            trigger: 'replan',
+            now,
+          });
+          expect(replanned.state).toBe('planning');
+        }
+      } finally {
+        await new Promise<void>((resolve) => slackServer.close(() => resolve()));
       }
-    });
-    await new Promise<void>((resolve) => slackServer.listen(0, '127.0.0.1', resolve));
-    const port = (slackServer.address() as any).port;
-
-    try {
-      const slack = new SlackAdapter({
-        credentials: { botToken: 'fixture' },
-        allowedScope: { channels: ['C0123456789'] },
-        baseUrl: `http://127.0.0.1:${port}`,
-      });
-      const schedule = await insertDigestSchedule();
-      const runner = createGithubDigestRunner({
-        pool: db.pool,
-        githubConnection: async () => gh,
-        getAdapter: (serviceName) =>
-          serviceName === 'github' ? { execute: async () => [] } : slack,
-      });
-      const scheduler = new ScheduleRunner({
-        pool: db.pool,
-        timeZone: VN,
-        now: () => now,
-        planRun: async () => ({ persist: async () => ({ state: 'needs_attention' }), afterCommit() {} }),
-        runGithubDigest: runner,
-        recordState: (client, row, at) => service.recordState(client, row, at),
-      });
-
-      await scheduler.tick();
-      await scheduler.stop();
-
-      const saved = (
-        await db.pool.query(
-          'SELECT id, status, delivery_started_at FROM schedule_runs WHERE schedule_id = $1',
-          [schedule.id],
-        )
-      ).rows[0];
-
-      expect(slackWrites).toBe(1);
-      expect(saved.delivery_started_at).not.toBeNull();
-      expect(saved.status).toBe('needs_attention');
-
-      await expect(
-        service.startRun({ userId: owner.id, runId: saved.id, trigger: 'replan', now }),
-      ).rejects.toMatchObject({ code: 'RUN_NOT_REPLANNABLE' });
-      expect(slackWrites).toBe(1);
-    } finally {
-      await new Promise<void>((resolve) => slackServer.close(() => resolve()));
     }
   });
 
