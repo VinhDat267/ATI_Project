@@ -88,6 +88,9 @@ export async function getConfiguredToolCatalog(
       available.add(definition.id);
     } catch {
       // Corrupt or stale credentials do not authorize a service.
+      console.warn(
+        `[registered-services] Cannot decrypt stored credentials for '${definition.id}'; skipping service.`,
+      );
     }
   }
   return ALL_TOOLS.filter((tool) => available.has(tool.service));
@@ -133,7 +136,19 @@ export async function getToolCatalogFor(
   if (!options.userId) return catalog;
   if (options.gmailEnabled) {
     const gmail = await credentialRepo.getPersonalCredentials('gmail', options.userId);
-    if (gmail && gmail.status === 'active') catalog = [...catalog, ...GMAIL_TOOLS];
+    if (gmail && gmail.status === 'active') {
+      try {
+        if (typeof gmail.config === 'string' && encryptionKey) {
+          decryptCredentials(gmail.config, encryptionKey);
+        }
+        catalog = [...catalog, ...GMAIL_TOOLS];
+      } catch {
+        // stale or unreadable connection does not add tools
+        console.warn(
+          "[registered-services] Cannot decrypt stored credentials for 'gmail'; skipping service.",
+        );
+      }
+    }
   }
   if (options.mycalendarEnabled) {
     const mycal = await credentialRepo.getPersonalCredentials('mycalendar', options.userId);
@@ -150,6 +165,9 @@ export async function getToolCatalogFor(
         }
       } catch {
         // stale or unreadable connection does not add tools
+        console.warn(
+          "[registered-services] Cannot decrypt stored credentials for 'mycalendar'; skipping service.",
+        );
       }
     }
   }
@@ -168,6 +186,9 @@ export async function getToolCatalogFor(
         }
       } catch {
         // stale or unreadable connection does not add tools
+        console.warn(
+          "[registered-services] Cannot decrypt stored credentials for 'mysheets'; skipping service.",
+        );
       }
     }
   }
