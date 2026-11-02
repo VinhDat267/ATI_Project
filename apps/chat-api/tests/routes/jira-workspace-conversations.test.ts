@@ -116,6 +116,7 @@ describe('apps/chat-api — JIRA-03 Conversation Scoped Access & Route Guards', 
   let chatServiceSpy: { handleUserMessage: ReturnType<typeof vi.fn> };
   let executionServiceSpy: {
     approveAndStart: ReturnType<typeof vi.fn>;
+    clearPlanEvents: ReturnType<typeof vi.fn>;
     getLatestExecutionSnapshot: ReturnType<typeof vi.fn>;
     getOwnedPlan: ReturnType<typeof vi.fn>;
     getPlanRepo: ReturnType<typeof vi.fn>;
