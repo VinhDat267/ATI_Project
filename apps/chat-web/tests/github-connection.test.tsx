@@ -7,6 +7,9 @@ import { apiClient } from '../src/services/api-client';
 import { PlanMoment } from '../src/pages/Cockpit/PlanMoment';
 import { ResponseMoment } from '../src/pages/Responses/ResponseMoment';
 import { ReceiptMoment } from '../src/pages/Cockpit/ReceiptMoment';
+import { PreviewContents } from '../src/pages/Cockpit/PreviewContents';
+import { resourceDestination } from '../src/components/Cockpit';
+import { operation } from '../src/pages/Cockpit/presentation';
 import { SettingsPage } from '../src/pages/Settings/SettingsPage';
 import { githubConnectionNotice } from '../src/services/github-connection';
 import { authStorage } from '../src/services/auth-storage';
@@ -333,6 +336,142 @@ describe('Task 9: GitHub OAuth connection UI and chat moments', () => {
 
       expect(screen.getByText(/Tài khoản: @octocat \(GitHub của bạn\)/)).toBeInTheDocument();
       expect(screen.getByText('acme/ati')).toBeInTheDocument();
+    });
+
+    it('FE-GH-1 & FE-GH-2: resourceDestination formats issueNumber as #N and operation metadata covers all 9 GitHub tools', () => {
+      expect(
+        resourceDestination(
+          {
+            id: 's1',
+            tool: 'github.update_issue',
+            description: 'Đóng issue',
+            args: { repo: 'acme/ati', issueNumber: 42, state: 'closed' },
+          },
+          { 'acme/ati': 'acme/ati' }
+        )
+      ).toBe('acme/ati · #42');
+
+      expect(
+        resourceDestination(
+          {
+            id: 's2',
+            tool: 'github.get_pull_request',
+            description: 'Đọc PR',
+            repo: 'acme/ati',
+            args: { issueNumber: 18 },
+          },
+          {}
+        )
+      ).toBe('acme/ati · #18');
+
+      expect(operation('github.get_pull_request')).toMatchObject({
+        action: 'Đọc PR',
+        receipt: 'Đã đọc PR',
+        titleField: 'number',
+        titlePrefix: 'PR #',
+      });
+      expect(operation('github.update_issue')).toMatchObject({
+        action: 'Cập nhật issue',
+        receipt: 'Đã cập nhật issue',
+        titleField: 'number',
+        titlePrefix: 'Issue #',
+      });
+      expect(operation('github.add_comment')).toMatchObject({
+        action: 'Bình luận issue',
+        receipt: 'Đã bình luận',
+        titleField: 'issueNumber',
+        titlePrefix: 'Issue #',
+      });
+      expect(operation('github.list_issues')).toMatchObject({
+        action: 'Liệt kê issue & PR',
+        receipt: 'Đã liệt kê issue & PR',
+      });
+    });
+
+    it('FE-GH-3: PreviewContents renders Vietnamese badges for state, labels, and assignees', () => {
+      render(
+        <PreviewContents
+          step={{
+            id: 's-upd',
+            tool: 'github.update_issue',
+            description: 'Cập nhật issue #42',
+            args: {
+              repo: 'acme/ati',
+              issueNumber: 42,
+              title: 'Sửa lỗi OAuth',
+              state: 'closed',
+              labels: ['bug', 'urgent'],
+              assignees: ['alice', '@bob'],
+            },
+          }}
+          destination="acme/ati · #42"
+        />
+      );
+
+      expect(screen.getByText('acme/ati · #42')).toBeInTheDocument();
+      expect(screen.getByText('Sửa lỗi OAuth')).toBeInTheDocument();
+      expect(screen.getByText('Đã đóng (closed)')).toBeInTheDocument();
+      expect(screen.getByText('#bug')).toBeInTheDocument();
+      expect(screen.getByText('#urgent')).toBeInTheDocument();
+      expect(screen.getByText('@alice')).toBeInTheDocument();
+      expect(screen.getByText('@bob')).toBeInTheDocument();
+    });
+
+    it('FE-GH-5 & FE-GH-6: GitHubConnection renders counter, Private/Public badge, and search filter; ResponseMoment navigates to scope on needs_scope', async () => {
+      vi.spyOn(apiClient, 'getGitHubConnection').mockResolvedValue({
+        status: 'needs_scope',
+        login: 'octocat',
+        repos: [],
+      });
+      vi.spyOn(apiClient, 'getGitHubCandidateRepos').mockResolvedValue({
+        repos: [
+          { repoId: '1', fullName: 'acme/alpha', name: 'alpha', private: true },
+          { repoId: '2', fullName: 'acme/beta', name: 'beta', private: false },
+          { repoId: '3', fullName: 'acme/gamma', name: 'gamma', private: false },
+          { repoId: '4', fullName: 'acme/delta', name: 'delta', private: true },
+          { repoId: '5', fullName: 'acme/epsilon', name: 'epsilon', private: false },
+        ],
+      });
+
+      const { unmount } = render(<GitHubConnection user={adminUser} />);
+      expect(await screen.findByTestId('github-scope-counter')).toHaveTextContent('Đã chọn 0/10');
+      expect(screen.getAllByText('Private')).toHaveLength(2);
+      expect(screen.getAllByText('Public')).toHaveLength(3);
+
+      const filterInput = screen.getByLabelText('Tìm nhanh repository');
+      fireEvent.change(filterInput, { target: { value: 'epsilon' } });
+      expect(screen.getByLabelText('acme/epsilon')).toBeInTheDocument();
+      expect(screen.queryByLabelText('acme/alpha')).not.toBeInTheDocument();
+
+      unmount();
+
+      const navSpy = vi.fn();
+      render(
+        <ResponseMoment
+          request="Tạo issue"
+          conversationId="11111111-2222-3333-4444-555555555555"
+          unavailableServices={[{ id: 'github', name: 'GitHub' }]}
+          reason="Chưa chọn phạm vi repository GitHub."
+          services={[
+            {
+              id: 'github',
+              name: 'GitHub',
+              configured: false,
+              connected: false,
+              tools: [],
+              personalStatus: 'needs_scope',
+              username: 'octocat',
+            } as any,
+          ]}
+          connectFromChat={false}
+          navigate={navSpy}
+        />
+      );
+
+      expect(await screen.findByText(/Đã kết nối · Chưa chọn repo · @octocat/)).toBeInTheDocument();
+      const scopeBtn = screen.getByRole('link', { name: /Chọn repository GitHub/i });
+      fireEvent.click(scopeBtn);
+      expect(navSpy).toHaveBeenCalledWith('/settings#github-scope');
     });
   });
 });

@@ -21,7 +21,7 @@ export interface ExecutionProgressProps {
   status?: PlanStatus;
 }
 
-const resultNames: Record<string, string> = { name: 'Tên', title: 'Tiêu đề', fullName: 'Tên đầy đủ', url: 'Liên kết', html_url: 'Liên kết', id: 'Mã', key: 'Mã', number: 'Số', messageId: 'Mã tin nhắn', createdAt: 'Thời gian', updatedAt: 'Cập nhật', start: 'Bắt đầu', end: 'Kết thúc' };
+const resultNames: Record<string, string> = { name: 'Tên', title: 'Tiêu đề', fullName: 'Tên đầy đủ', repo: 'Kho mã', state: 'Trạng thái', body: 'Nội dung', issueNumber: 'Số issue', url: 'Liên kết', html_url: 'Liên kết', id: 'Mã', key: 'Mã', number: 'Số', messageId: 'Mã tin nhắn', createdAt: 'Thời gian', updatedAt: 'Cập nhật', start: 'Bắt đầu', end: 'Kết thúc' };
 const timeFields = new Set(['createdAt', 'updatedAt', 'start', 'end']);
 const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 const safeURL = (text: string) => { try { const url = new URL(text); return url.protocol === 'https:' && !url.username && !url.password; } catch { return false; } };

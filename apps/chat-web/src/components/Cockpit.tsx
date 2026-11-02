@@ -48,11 +48,13 @@ export function resourceDestination(step: PlanStep, labels: Record<string, strin
   const resourceNames = presentation.resourceNames as Record<string,string>;
   // A Gmail label is what a step applies to a thread, not where it writes.
   const destinationResource = (key: string) => { const resource = definition?.inputSchema.properties?.[key]?.['x-resource']; return resource && resource !== 'label'; };
-  return Object.entries(step.args).filter(([key]) => destinationResource(key)).map(([key, value]) => {
+  const mergedArgs = step.repo && !step.args?.repo ? { repo: step.repo, ...step.args } : step.args;
+  return Object.entries(mergedArgs).filter(([key]) => destinationResource(key)).map(([key, value]) => {
     if ((typeof value === 'string' || typeof value === 'number') && Object.hasOwn(labels, String(value))) return labels[String(value)];
     const reference = value && typeof value === 'object' && '$ref' in value ? String(value.$ref) : typeof value === 'string' && value.startsWith('$step_') ? value : null;
     const number = reference?.match(/step_(\d+)/)?.[1];
     if (number) return `Kết quả của bước ${number}`;
+    if (key === 'issueNumber' && (typeof value === 'number' || (typeof value === 'string' && /^\d+$/.test(value)))) return `#${value}`;
     if (typeof value === 'string' && (value.startsWith('#') || (key === 'repo' && value.includes('/')))) return value;
     const resource = definition?.inputSchema.properties?.[key]?.['x-resource'];
     return `${resourceNames[String(resource)] ?? 'Nơi được chọn'} · chưa có tên trong dữ liệu`;

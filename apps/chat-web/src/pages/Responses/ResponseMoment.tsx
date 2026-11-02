@@ -238,8 +238,10 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
                   ? 'Cần kết nối lại'
                   : githubConnected
                   ? `Đã kết nối${githubHandle ? ` · @${githubHandle}` : ''}`
-                  : service.id === 'github' && githubStatus === 'scope_required'
-                  ? `Đã kết nối · Chưa chọn kho${githubHandle ? ` · @${githubHandle}` : ''}`
+                  : service.id === 'github' && (githubStatus === 'scope_required' || githubStatus === 'needs_scope')
+                  ? `Đã kết nối · Chưa chọn repo${githubHandle ? ` · @${githubHandle}` : ''}`
+                  : service.id === 'github' && githubStatus === 'needs_membership'
+                  ? `Đã kết nối · Cần cấp quyền repo${githubHandle ? ` · @${githubHandle}` : ''}`
                   : service.id === 'github' && githubStatus === 'reconnect_required'
                   ? 'Cần kết nối lại'
                   : telegramConnected
@@ -319,19 +321,24 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
           <a
             id="github-connect"
             role="link"
-            href="/settings#github"
+            href={githubStatus === 'needs_scope' ? '/settings#github-scope' : '/settings#github'}
             aria-disabled={starting || undefined}
             onClick={event => {
               if (back && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)) return;
               event.preventDefault();
-              if (githubStatus === 'scope_required') navigate('/settings#github');
+              if (githubStatus === 'needs_scope') navigate('/settings#github-scope');
+              else if (githubStatus === 'scope_required' || githubStatus === 'needs_membership') navigate('/settings#github');
               else if (back) void connectGitHub(back);
               else navigate('/settings#github');
             }}
             className={`${primary} flex items-center gap-1.5`}
           >
-            {githubStatus === 'scope_required'
+            {githubStatus === 'needs_scope'
+              ? 'Chọn repository GitHub'
+              : githubStatus === 'scope_required'
               ? 'Chọn kho GitHub'
+              : githubStatus === 'needs_membership'
+              ? 'Kiểm tra quyền GitHub'
               : githubStatus === 'reconnect_required'
               ? 'Kết nối lại GitHub'
               : 'Kết nối GitHub'}

@@ -8,6 +8,8 @@ import { GmailPreview } from './GmailPreview';
 const names: Record<string,string> = {
   title:'Tiêu đề', name:'Tên', summary:'Tiêu đề', body:'Nội dung', text:'Nội dung',
   desc:'Mô tả ngắn', description:'Mô tả', range:'Vùng dữ liệu yêu cầu', values:'Giá trị', rows:'Các dòng',
+  repo:'Kho mã', issueNumber:'Số issue / PR', label:'Nhãn', labels:'Nhãn',
+  assignees:'Người phụ trách', state:'Trạng thái', query:'Từ khóa tìm kiếm',
 };
 const text = (value:unknown) => formatArgValue(value).text;
 
@@ -93,6 +95,22 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
     </div>;
   }
   // The issue frame is also the catalog fallback for tools without a prototype-specific preview.
+  const ghLabels = Array.isArray(step.args.labels)
+    ? step.args.labels.filter((l): l is string => typeof l === 'string' && l.trim().length > 0)
+    : typeof step.args.label === 'string' && step.args.label.trim().length > 0
+      ? [step.args.label.trim()]
+      : [];
+  const ghAssignees = Array.isArray(step.args.assignees)
+    ? step.args.assignees.filter((a): a is string => typeof a === 'string' && a.trim().length > 0)
+    : [];
+  const ghState = step.tool.startsWith('github.') && (step.args.state === 'open' || step.args.state === 'closed')
+    ? step.args.state
+    : null;
+  const badgeExcluded = [
+    ...(ghLabels.length > 0 ? ['labels', 'label'] : []),
+    ...(ghAssignees.length > 0 ? ['assignees'] : []),
+    ...(ghState ? ['state'] : []),
+  ];
   return <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 v3-space-y-3">
     <div>
       <span className="text-[11px] text-neutral-400 uppercase font-semibold">Đích:</span>
@@ -102,6 +120,25 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
       <span className="text-[11px] text-neutral-400 uppercase font-semibold">{names[key]}:</span>
       <div className="text-sm font-bold text-neutral-900 mt-0.5">{text(value)}</div>
     </div>)}
-    <OtherArguments step={step} except={['title','name','summary']}/>
+    {(ghState || ghLabels.length > 0 || ghAssignees.length > 0) && (
+      <div className="flex flex-wrap items-center gap-1.5" data-testid="github-preview-badges">
+        {ghState && (
+          <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${ghState === 'open' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-purple-50 text-purple-700 border-purple-200'}`}>
+            {ghState === 'open' ? 'Đang mở (open)' : 'Đã đóng (closed)'}
+          </span>
+        )}
+        {ghLabels.map((lbl) => (
+          <span key={`lbl-${lbl}`} className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-800 border border-amber-200">
+            #{lbl}
+          </span>
+        ))}
+        {ghAssignees.map((assignee) => (
+          <span key={`asg-${assignee}`} className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
+            @{assignee.replace(/^@/, '')}
+          </span>
+        ))}
+      </div>
+    )}
+    <OtherArguments step={step} except={['title','name','summary', ...badgeExcluded]}/>
   </div>;
 }
