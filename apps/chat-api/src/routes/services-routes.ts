@@ -446,16 +446,26 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
                       : mode === 'personal' && userId
                         ? 'personal:' + userId
                         : undefined;
-                  const teamScope = await (trelloScopeId
-                    ? options.trelloTeamRepo.get(trelloScopeId)
-                    : options.trelloTeamRepo.get());
+                  let teamScope: { boards?: Array<{ boardId: string; boardName?: string }> } | null = null;
+                  try {
+                    teamScope = await (trelloScopeId
+                      ? options.trelloTeamRepo.get(trelloScopeId)
+                      : options.trelloTeamRepo.get());
+                  } catch {
+                    teamScope = null;
+                  }
                   if (!teamScope?.boards?.length) {
                     personalStatus = 'scope_required';
                   } else {
                     personalAllowedScope = teamScope.boards.map((b) => b.boardId);
                   }
                 } else if (id === 'github' && options.githubTeamRepo) {
-                  const teamScope = await options.githubTeamRepo.get();
+                  let teamScope: { repos?: Array<{ repoId: string; fullName: string }> } | null = null;
+                  try {
+                    teamScope = await options.githubTeamRepo.get();
+                  } catch {
+                    teamScope = null;
+                  }
                   if (!teamScope?.repos?.length) {
                     personalStatus = 'scope_required';
                   } else {

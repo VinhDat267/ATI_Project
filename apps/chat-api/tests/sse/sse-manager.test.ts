@@ -85,5 +85,11 @@ describe('apps/chat-api (Task 17: SSE Stream Manager & Sequence Tracking)', () =
     // Explicit clearPlanEvents removes the rejected plan_preview
     manager.clearPlanEvents(convId, 'plan-2');
     expect(manager.getMissedEventsForCursor(convId, undefined).map((e) => e.event)).toEqual(['thinking']);
+
+    // Also handles stringified event data when clearing by planId
+    manager.emitEvent(convId, 'plan_preview', JSON.stringify({ planId: 'plan-str-3', plan: { id: 'plan-str-3', steps: [] } }));
+    expect(manager.getMissedEventsForCursor(convId, undefined).map((e) => e.event)).toEqual(['thinking', 'plan_preview']);
+    manager.clearPlanEvents(convId, 'plan-str-3');
+    expect(manager.getMissedEventsForCursor(convId, undefined).map((e) => e.event)).toEqual(['thinking']);
   });
 });

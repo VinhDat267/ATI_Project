@@ -192,4 +192,40 @@ describe('service credential and health boundary', () => {
     expect(githubScoped).toMatchObject({ personalStatus: 'connected', username: 'vinhgh', allowedScope: ['ati/wap-v3'] });
     expect(telegramScoped).toMatchObject({ personalStatus: 'connected', username: 'vinhtg', allowedScope: ['111'] });
   });
+
+  it('still returns 200 on GET /api/services when trelloTeamRepo.get or githubTeamRepo.get rejects with a DB error', async () => {
+    const trelloConfig = encryptCredentials({ refreshToken: 'rt-1', username: 'vinhnguyndt1' }, key);
+    const githubConfig = encryptCredentials({ accessToken: 'gho-1', login: 'vinhgh' }, key);
+
+    const app = createApp({
+      jwtSecret: secret,
+      credentialRepo: {
+        getCredentials: async () => null,
+        getPersonalCredentials: async () => null,
+        getPersonalConnectionStatus: async (service: string) => {
+          if (service === 'trello') return { id: 'c-trello', status: 'active', config: trelloConfig, updated_at: new Date() };
+          if (service === 'github') return { id: 'c-github', status: 'active', config: githubConfig, updated_at: new Date() };
+          return null;
+        },
+      } as any,
+      encryptionKey: key,
+      trelloTeamRepo: {
+        get: async () => {
+          throw new Error('DB connection error reading trello_team_scope');
+        },
+      } as any,
+      githubTeamRepo: {
+        get: async () => {
+          throw new Error('DB connection error reading github_team_scope');
+        },
+      } as any,
+    });
+
+    const res = await request(app).get('/api/services').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    const trello = res.body.services.find((s: any) => s.id === 'trello');
+    const github = res.body.services.find((s: any) => s.id === 'github');
+    expect(trello).toMatchObject({ personalStatus: 'scope_required', username: 'vinhnguyndt1', allowedScope: [] });
+    expect(github).toMatchObject({ personalStatus: 'scope_required', username: 'vinhgh', allowedScope: [] });
+  });
 });

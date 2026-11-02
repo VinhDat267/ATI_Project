@@ -78,10 +78,18 @@ export class SSEManager {
         if (!planId) {
           return false;
         }
+        let payload = e.data;
+        if (typeof payload === 'string') {
+          try {
+            payload = JSON.parse(payload);
+          } catch {
+            payload = null;
+          }
+        }
         return !(
-          e.data?.planId === planId ||
-          e.data?.plan?.id === planId ||
-          e.data?.id === planId
+          payload?.planId === planId ||
+          payload?.plan?.id === planId ||
+          payload?.id === planId
         );
       })
     );
