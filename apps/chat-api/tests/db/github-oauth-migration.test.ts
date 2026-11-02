@@ -182,4 +182,8 @@ describe('migration 0018 (github oauth, team repo scope, and digest schedules) o
       )
     ).rejects.toMatchObject({ code: '23514' });
   });
+
+  it('is idempotent when re-running all migrations with existing github_digest schedules and oauth states', async () => {
+    await expect(runAll()).resolves.toBeUndefined();
+  });
 });

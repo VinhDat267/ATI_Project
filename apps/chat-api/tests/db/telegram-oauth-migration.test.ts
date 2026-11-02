@@ -196,4 +196,8 @@ describe('migration 0019 (telegram 1-click pairing and auto-digest) on PostgreSQ
       ),
     ).resolves.toBeTruthy();
   });
+
+  it('is idempotent when re-running all migrations with existing digest schedules and oauth states', async () => {
+    await expect(runAll()).resolves.toBeUndefined();
+  });
 });
