@@ -1,0 +1,28 @@
+# JIRA-06 personal Jira HTTP review fixes — 2026-11-02
+
+- **Task:** `docs/handoff/tasks/JIRA-06-http-adapter.md`
+- **Branch:** `longnguyen005/jira-06-adapter` (PR #255); cờ `MYJIRA_ENABLED` giữ nguyên tắt mặc định.
+- **Sửa theo phản hồi review PR #255:**
+  - `packages/tool-adapters/src/jira/personal-jira-http.ts`:
+    - Chặn gửi lại lệnh ghi (`create_issue`, `add_comment`) khi gặp HTTP 429: bổ sung kiểm tra `if (!writing)` trước khối chờ `waitWithSignal` và `continue`. Khi gặp 429 trên lệnh ghi, ném ngay `createJiraStepError('RATE_LIMIT', 429, 'Rate limit exceeded', false)`, triệt tiêu nguy cơ duplicate issue/comment hoặc replay ghi khi kết quả chưa chắc chắn.
+    - Sửa `createJiraStepError`: loại bỏ ép buộc `retryable: category === 'RATE_LIMIT' ? true : retryable`, truyền đúng `retryable` (mặc định `false` cho write, `true` cho read rate limit).
+    - Tự động áp dụng thời hạn riêng (`AbortSignal.timeout(deadlineMs)`) nếu caller không truyền `AbortSignal`: mặc định 30s cho write, 15s cho read (hoặc cấu hình qua `timeoutMs` ở adapter config / execute context). Khi hết hạn, ngắt kết nối fetch và ném `UNKNOWN` (đối với write in-flight) hoặc `NETWORK` (đối với read / pre-dispatch).
+  - `packages/tool-adapters/src/jira/personal-jira-adapter.ts`:
+    - Thêm `timeoutMs?: number` vào `PersonalJiraAdapterConfig` và chuyển tiếp vào `PersonalJiraHttpTransport`.
+    - Hỗ trợ `context?.timeoutMs` trong `execute`, chuyển tiếp `callOpts` (`{ signal, timeoutMs }`) xuống `transport.request`, `issueByKey` và `issueTypes`.
+  - `packages/tool-adapters/tests/personal-jira-adapter.test.ts`:
+    - Bổ sung 4 test cases mới: không retry `create_issue` sau 429 (1 POST /issue duy nhất, `retryable: false`), không retry `add_comment` sau 429 (1 POST /comment duy nhất, `retryable: false`), tự động timeout ném `NETWORK` cho read tool khi caller không truyền AbortSignal, và tự động timeout ném `UNKNOWN` cho write tool in-flight khi caller không truyền AbortSignal.
+    - Cập nhật assertion kiểm tra `tokenCalls[0].signal` nhận `AbortSignal` thật thay vì `undefined`.
+- **Bằng chứng kiểm thử:**
+  - `npm run test -w @wap/tool-adapters`: 20 test files PASS (518/518 tests PASS, gồm 50 test `personal-jira-adapter` và 58 test hồi quy `jira-adapter`; 32 probe tests PASS, exit 0).
+  - `npm run test -w @wap/tool-schemas`: 18 test files PASS (347/347 tests PASS, exit 0).
+  - `npm run test -w @wap/planner`: 28 test files PASS (405/405 tests PASS, exit 0).
+  - `npm run test -w @wap/executor`: 5 test files PASS (42/42 tests PASS, exit 0).
+  - `npm run typecheck:v3`: PASS (exit code 0).
+  - `npm run build:v3`: PASS (exit code 0).
+  - `node scripts/test-v3-web-build-security.mjs`: PASS (`production build excludes credential sentinels and 7 forbidden UI claims`, exit 0).
+  - `npm run test:launcher:v3`: 1 test PASS (exit code 0).
+  - Scripts node tests (fake OIDC, slack personal fixture, inventory probe): 66 tests PASS (exit code 0).
+- **Giới hạn và bước sau:**
+  - Giữ cờ `MYJIRA_ENABLED` tắt. Không gọi Atlassian Cloud live.
+  - Sẵn sàng để reviewer độc lập kiểm tra lại PR #255 trước khi chuyển sang JIRA-07 / JIRA-08.

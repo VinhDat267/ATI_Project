@@ -1,0 +1,27 @@
+# JIRA-06 personal Jira HTTP adapters — 2026-11-02
+
+- **Task:** `docs/handoff/tasks/JIRA-06-http-adapter.md`
+- **Branch:** `longnguyen005/jira-06-adapter`; PR chờ reviewer độc lập, không tự merge. Cờ `MYJIRA_ENABLED` giữ nguyên tắt mặc định.
+- **Triển khai:**
+  - `PersonalJiraAdapter` (`packages/tool-adapters/src/jira/personal-jira-adapter.ts`) và `PersonalJiraHttpTransport` (`packages/tool-adapters/src/jira/personal-jira-http.ts`): Triển khai đầy đủ 5 tool Jira cá nhân (`myjira.list_sites`, `myjira.search_projects`, `myjira.search_issues`, `myjira.create_issue`, `myjira.add_comment`).
+  - Phân giải opaque `siteId` chỉ qua snapshot `WorkspaceJiraCapabilitiesResponse` từ caller; kiểm tra `workspaceId` khớp tuyệt đối với cấu hình adapter (`AUTH_ERROR` 403 nếu sai lệch); hỗ trợ whitelist `allowedScope.sites` và `allowedScope.projects`.
+  - Transport chuẩn REST API v3 Atlassian Cloud: `${apiBase}/ex/jira/${cloudId}/rest/api/3` với header `Authorization: Bearer <token>`. Áp dụng `redirect: 'error'` để triệt tiêu nguy cơ rò rỉ Bearer token sang host khác.
+  - Xây dựng JQL an toàn cố định theo project, escape ký tự Lucene và dấu nháy kép ngăn injection; từ chối dòng issue chéo project (`SERVER_ERROR`); hỗ trợ tra cứu issue key trực tiếp và bỏ qua kết quả 404 khi issue không tồn tại.
+  - Chuyển đổi văn bản thuần sang Atlassian Document Format (ADF) qua `plainTextToAdf`, tự động gán paragraph rỗng cho dòng trắng. Lấy metadata createmeta có phân trang, lọc bỏ subtask và ưu tiên loại Task hoặc loại chuẩn đầu tiên.
+  - Kiểm tra project hiện tại của issue trước khi thêm comment; cho phép comment khi issue chuyển project trong snapshot scope và cập nhật key/url tương ứng; từ chối với `AUTH_ERROR` 403 trước khi gọi ghi nếu issue chuyển ra ngoài snapshot scope.
+  - Bọc AbortSignal cho mọi lượt gọi; xử lý HTTP 429 Retry-After trong giới hạn (tối đa 30s) và giới hạn pacing slot qua `GlobalRateLimiter`; tự động refresh token với `forceRefresh: true` khi gặp HTTP 401. Hỗ trợ chữ ký token manager 1 tham số (`options`) và 2 tham số (`userId, options`) theo JIRA-04.
+  - Phân loại kết quả ghi gián đoạn (network drop / socket error, HTTP 5xx, JSON hỏng, hoặc ID không hợp lệ trên write request) thành `UNKNOWN` không retry (`retryable: false`), ngăn chặn triệt để replay write không an toàn.
+- **Bằng chứng kiểm thử:**
+  - `npm run test -w @wap/tool-adapters`: 20 test files PASS (514/514 tests PASS), gồm 46 test loopback HTTP `personal-jira-adapter` và 58 test hồi quy `jira-adapter`; 32 probe tests PASS (exit 0).
+  - `npm run test -w @wap/tool-schemas`: 18 test files PASS (347/347 tests PASS, exit 0).
+  - `npm run test -w @wap/planner`: 28 test files PASS (405/405 tests PASS, exit 0).
+  - `npm run test -w @wap/executor`: 5 test files PASS (42/42 tests PASS, exit 0).
+  - `npm run typecheck:v3`: PASS (exit code 0).
+  - `npm run build:v3`: PASS (exit code 0).
+  - `node scripts/test-v3-web-build-security.mjs`: PASS (`production build excludes credential sentinels and 7 forbidden UI claims`, exit 0).
+  - `npm run test:launcher:v3`: 1 test PASS (exit code 0).
+  - Node test suite (`scripts/v3-local-env.test.mjs`, `scripts/fake-oidc.test.mjs`, `scripts/google-oidc-fixture.test.mjs`, `scripts/slack/inventory.test.mjs`, `scripts/fake-slack-personal.test.mjs`, `scripts/slack/contract-probe.test.mjs`): 66 tests PASS (exit code 0).
+- **Giới hạn và bước sau:**
+  - Không có lời gọi Atlassian live trong task này; tất cả test sử dụng HTTP loopback fixture có state.
+  - Giữ cờ `MYJIRA_ENABLED` tắt. Không sửa schemas, planner, executor, backend routes hay chat-web.
+  - Bước kế tiếp: JIRA-07 (planner nhiều site Jira) và JIRA-08 (gắn binding, lease và executor).
