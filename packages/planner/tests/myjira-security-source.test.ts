@@ -30,6 +30,17 @@ describe('Jira source hygiene and revoked sources', () => {
     expect(safeGrounding.jira_issue[0].key).toBe('ATI-1');
   });
 
+  it('does not leak status into observed entity when not part of requested fields', () => {
+    let observed: Record<string, Array<Record<string, unknown>>> = {};
+    observed = recordObserved(observed, 'jira_issue', [
+      { id: '10042', key: 'ATI-42', title: 'Login bug', status: 'Open', url: 'https://ati.atlassian.net/browse/ATI-42' },
+    ]);
+    expect(observed.jira_issue).toEqual([
+      { id: '10042', key: 'ATI-42', title: 'Login bug', url: 'https://ati.atlassian.net/browse/ATI-42' },
+    ]);
+    expect(observed.jira_issue[0].status).toBeUndefined();
+  });
+
   it('invalidates all working memory entities and observations for a revoked site', () => {
     const memory = new WorkingMemory();
     memory.setEntity('jira_site', [

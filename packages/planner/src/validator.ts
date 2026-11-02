@@ -222,7 +222,7 @@ function findAmbiguousSites(steps: PlanStep[], grounding: GroundingContext): Ung
   for (const step of steps) {
     if (!step.tool.startsWith('myjira.') || typeof step.args?.siteId !== 'string') continue;
     const targeted = availableSites.find((s) => String(s.siteId ?? s.id) === step.args.siteId);
-    if (targeted && !userSpecifiedSite(targeted)) {
+    if (!targeted || !userSpecifiedSite(targeted)) {
       ambiguous.push({
         stepId: step.id,
         argument: 'siteId',
@@ -256,6 +256,22 @@ function findUngrounded(steps: PlanStep[], catalog: Map<string, ToolDefinition>,
       for (const value of values) {
         // $ref/$template values come from an earlier step's real output.
         if (typeof value !== 'string' && typeof value !== 'number') continue;
+        if (resource === 'jira_site') {
+          const siteEntries = grounding.memory.jira_site;
+          const sites = (Array.isArray(siteEntries) ? siteEntries : siteEntries ? [siteEntries] : [])
+            .filter((s): s is Record<string, unknown> => isObject(s));
+          const verifiedSiteIds = new Set(
+            sites.flatMap((s) => [
+              typeof s.siteId === 'string' ? s.siteId : undefined,
+              typeof s.id === 'string' ? String(s.id) : undefined,
+              typeof s.cloudId === 'string' ? s.cloudId : undefined,
+            ]).filter((id): id is string => typeof id === 'string')
+          );
+          if (!verifiedSiteIds.has(String(value))) {
+            ungrounded.push({ stepId: step.id, argument, resource, value });
+          }
+          continue;
+        }
         if (step.tool.startsWith('myjira.') && (resource === 'jira_project' || resource === 'jira_issue') &&
           typeof step.args.siteId === 'string') {
           const entries = grounding.memory[resource];
@@ -576,15 +592,6 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
 
   // Layer 5: Grounding — resource IDs must come from lookups, the user or earlier steps
   if (options.grounding) {
-    const ambiguousSites = findAmbiguousSites(steps, options.grounding);
-    if (ambiguousSites.length > 0) {
-      return {
-        valid: false,
-        layer: 'grounding',
-        error: `Ambiguous site destination: multiple Jira sites exist in workspace, but target site was not specified by user: ${ambiguousSites.map(u => `${u.stepId}.siteId=${JSON.stringify(u.value)}`).join(', ')}. Clarify with the user to select the destination site.`,
-        ungrounded: ambiguousSites,
-      };
-    }
     const ungrounded = findUngrounded(steps, catalogMap, options.grounding);
     if (ungrounded.length > 0) {
       const listed = ungrounded.map((u) => `${u.stepId}.${u.argument}=${JSON.stringify(u.value)} (${u.resource})`).join(', ');
@@ -593,6 +600,15 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
         layer: 'grounding',
         error: `Unverified resource arguments: ${listed}. Use values from Working Memory, a $ref to an earlier step, or return a clarification asking the user for the resource.`,
         ungrounded,
+      };
+    }
+    const ambiguousSites = findAmbiguousSites(steps, options.grounding);
+    if (ambiguousSites.length > 0) {
+      return {
+        valid: false,
+        layer: 'grounding',
+        error: `Ambiguous site destination: multiple Jira sites exist in workspace, but target site was not specified by user: ${ambiguousSites.map(u => `${u.stepId}.siteId=${JSON.stringify(u.value)}`).join(', ')}. Clarify with the user to select the destination site.`,
+        ungrounded: ambiguousSites,
       };
     }
     const offBoard = findMembersOffBoard(steps, options.grounding.memory);

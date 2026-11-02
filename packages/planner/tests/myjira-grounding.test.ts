@@ -83,6 +83,32 @@ describe('Jira site grounding', () => {
     expect(observed.jira_issue.some(e => e.siteId === 'site-b' && e.id === '100')).toBe(true);
   });
 
+  it('keeps entities with same siteId and id distinct when workspace or cloud differs', () => {
+    let observed: Record<string, Array<Record<string, unknown>>> = {};
+    observed = recordObserved(observed, 'jira_issue', [
+      { id: '100', key: 'ATI-12', siteId: 'site-a', cloudId: 'cloud-1', workspaceId: 'ws-1', title: 'Task in WS1 Cloud1' },
+    ]);
+
+    observed = recordObserved(observed, 'jira_issue', [
+      { id: '100', key: 'ATI-12', siteId: 'site-a', cloudId: 'cloud-2', workspaceId: 'ws-1', title: 'Task in WS1 Cloud2' },
+    ]);
+
+    observed = recordObserved(observed, 'jira_issue', [
+      { id: '100', key: 'ATI-12', siteId: 'site-a', cloudId: 'cloud-1', workspaceId: 'ws-2', title: 'Task in WS2 Cloud1' },
+    ]);
+
+    expect(observed.jira_issue).toHaveLength(3);
+  });
+
+  it('rejects user-typed siteId when not present in verified site catalog', () => {
+    const result = validatePlan(plan([createIssue('site-unverified', 'PROJ')]), MYJIRA_TOOLS, {
+      grounding: { memory, userTexts: ['tạo ticket trong project PROJ trên site-unverified'] },
+    });
+    expect(result.valid).toBe(false);
+    expect(result.layer).toBe('grounding');
+    expect(result.ungrounded?.some(u => u.argument === 'siteId' && u.value === 'site-unverified')).toBe(true);
+  });
+
   it('rejects ambiguous site destination when multiple sites exist and user did not specify target site', () => {
     // Both site-a and site-b exist in memory, but user just asked "Cập nhật ticket ATI-12" without naming a site
     const result = validatePlan(plan([comment('site-a', 'ATI-12')]), MYJIRA_TOOLS, {

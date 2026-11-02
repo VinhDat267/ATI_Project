@@ -43,17 +43,37 @@ export function searchEntities(raw: unknown, schema: JSONSchema): unknown[] {
 }
 
 /** Entity fields worth remembering; anything else (descriptions, tokens) is dropped. */
-const KEPT_FIELDS = ['id', 'name', 'fullName', 'number', 'title', 'boardId', 'boardIds', 'url', 'key', 'siteId', 'cloudId'];
-
-function entityIdentity(entity: Record<string, unknown>): string {
-  if (typeof entity.siteId === 'string') {
-    return `${entity.siteId}:${entity.id}`;
-  }
-  return String(entity.id);
-}
+const KEPT_FIELDS = ['id', 'name', 'fullName', 'number', 'title', 'boardId', 'boardIds', 'url', 'key', 'siteId', 'cloudId', 'workspaceId'];
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
+
+function isEntityRevoked(entity: unknown): boolean {
+  if (!isObject(entity)) return false;
+  return (
+    entity.revoked === true ||
+    entity.masked === true ||
+    entity.status === 'revoked' ||
+    entity.status === 'disabled'
+  );
+}
+
+function entityIdentity(entity: Record<string, unknown>): string {
+  const scope: string[] = [];
+  if (typeof entity.workspaceId === 'string' && entity.workspaceId.trim()) {
+    scope.push(`ws:${entity.workspaceId.trim()}`);
+  }
+  if (typeof entity.cloudId === 'string' && entity.cloudId.trim()) {
+    scope.push(`cloud:${entity.cloudId.trim()}`);
+  }
+  if (typeof entity.siteId === 'string' && entity.siteId.trim()) {
+    scope.push(`site:${entity.siteId.trim()}`);
+  }
+  if (scope.length > 0) {
+    return `${scope.join('/')}:${entity.id}`;
+  }
+  return String(entity.id);
+}
 
 /** Returns undefined when the model output is not a search request at all. */
 export function parseSearchRequest(raw: string): SearchRequest | undefined {
@@ -101,8 +121,8 @@ export function prepareSearchCall(call: SearchCall, catalog: ToolDefinition[]): 
 
 function compact(entity: unknown, fields = KEPT_FIELDS): Record<string, unknown> | undefined {
   if (!isObject(entity) || (typeof entity.id !== 'string' && typeof entity.id !== 'number')) return undefined;
-  const allowed = new Set([...fields, 'revoked', 'status', 'masked']);
-  return Object.fromEntries([...allowed].filter((field) => entity[field] !== undefined).map((field) => [field, entity[field]]));
+  if (isEntityRevoked(entity)) return undefined;
+  return Object.fromEntries(fields.filter((field) => entity[field] !== undefined).map((field) => [field, entity[field]]));
 }
 
 /**
@@ -138,16 +158,6 @@ export function recordThreadLabels(labels: Record<string, string> | undefined, r
     entries.delete(result.id); entries.set(result.id, Array.from(result.subject).slice(0, 250).join(''));
   }
   return Object.fromEntries([...entries].slice(-MAX_OBSERVED_PER_RESOURCE));
-}
-
-function isEntityRevoked(entity: unknown): boolean {
-  if (!isObject(entity)) return false;
-  return (
-    entity.revoked === true ||
-    entity.masked === true ||
-    entity.status === 'revoked' ||
-    entity.status === 'disabled'
-  );
 }
 
 function sanitizeEntities(val: unknown): unknown {
