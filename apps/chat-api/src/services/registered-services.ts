@@ -1,5 +1,5 @@
 import { decryptCredentials } from '@wap/tool-adapters';
-import { ALL_TOOLS, GITHUB_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, TELEGRAM_TOOLS, TRELLO_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
+import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, GITHUB_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, TELEGRAM_TOOLS, TRELLO_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import type { ServiceTransport } from './transports/types.js';
 import { TRELLO_TRANSPORT } from './transports/trello.js';
@@ -240,7 +240,7 @@ export async function getToolCatalogFor(
     try {
       const github = await options.githubConnection(options.userId);
       if (github?.status === 'connected' && github.connection?.repos?.length > 0) {
-        catalog = [...catalog, ...GITHUB_TOOLS];
+        catalog = [...catalog, ...GITHUB_TOOLS, ...GITHUB_OAUTH_TOOLS];
       }
     } catch {
       // ignore
@@ -249,18 +249,37 @@ export async function getToolCatalogFor(
     const cred = await credentialRepo.getPersonalCredentials('github', options.userId);
     if (cred && cred.status === 'active') {
       try {
-        const scope = await options.githubTeamRepo.get();
-        if (scope && scope.repos && scope.repos.length > 0) {
+        const teamRepos = typeof options.githubTeamRepo.repos === 'function'
+          ? await options.githubTeamRepo.repos()
+          : (await options.githubTeamRepo.get?.())?.repos ?? [];
+        if (Array.isArray(teamRepos) && teamRepos.length > 0) {
           const dec = decryptCredentials(cred.config, encryptionKey);
           if (dec.accessToken) {
-            const provider = options.githubTokens.forConnection(options.userId, cred.id, dec.accessToken, dec.refreshToken);
+            const provider = options.githubTokens.forConnection(options.userId, cred.id, {
+              accessToken: dec.accessToken,
+              refreshToken: dec.refreshToken,
+            });
             const accessToken = await provider.getAccessToken();
-            const callerRepos = await options.githubOAuthClient.repositories(
+            const fetchRepos =
+              typeof options.githubOAuthClient.repos === 'function'
+                ? options.githubOAuthClient.repos
+                : options.githubOAuthClient.repositories;
+            const callerRepos = await fetchRepos.call(
+              options.githubOAuthClient,
               accessToken,
               AbortSignal.timeout(10_000)
             );
-            if (scope.repos.some((r: any) => callerRepos.some((cr: any) => (cr.fullName.toLowerCase() === r.fullName.toLowerCase() || String(cr.id) === String(r.repoId)) && cr.member === true))) {
-              catalog = [...catalog, ...GITHUB_TOOLS];
+            if (
+              teamRepos.some((r: any) =>
+                callerRepos.some(
+                  (cr: any) =>
+                    (String(cr.fullName || '').toLowerCase() === String(r.fullName || '').toLowerCase() ||
+                      String(cr.id) === String(r.repoId ?? r.id)) &&
+                    cr.member !== false
+                )
+              )
+            ) {
+              catalog = [...catalog, ...GITHUB_TOOLS, ...GITHUB_OAUTH_TOOLS];
             }
           }
         }

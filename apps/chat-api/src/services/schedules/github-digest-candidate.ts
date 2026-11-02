@@ -10,6 +10,11 @@ export function canonicalizeDigestConfig(config: GithubDigestConfig): GithubDige
     channelId: config.channelId,
     channelName: config.channelName,
     staleDays: config.staleDays,
+    ...(config.telegramChatId ? { telegramChatId: config.telegramChatId } : {}),
+    ...(config.telegramChatTitle ? { telegramChatTitle: config.telegramChatTitle } : {}),
+    ...(config.telegramCredentialId ? { telegramCredentialId: config.telegramCredentialId } : {}),
+    ...(config.telegramUserId ? { telegramUserId: config.telegramUserId } : {}),
+    ...(config.telegramUsername ? { telegramUsername: config.telegramUsername } : {}),
   };
 }
 
@@ -46,20 +51,30 @@ const WRITE_INTENT_REGEX =
 
 export interface EvaluateGithubDigestInput {
   userId: string;
-  request: string;
+  request?: string;
+  proposal?: { request: string; recurrence: ScheduleRecurrence; [key: string]: any };
   services: string[];
-  recurrence: ScheduleRecurrence;
+  recurrence?: ScheduleRecurrence;
   githubConnection?: (userId: string) => Promise<any>;
+  telegramConnection?: (userId: string) => Promise<any>;
   getAdapter?: (serviceName: string, context?: any) => Promise<any> | any;
 }
 
 export async function evaluateGithubDigestCandidate(
   input: EvaluateGithubDigestInput,
 ): Promise<ScheduleDigestCandidate> {
-  const { userId, request, services, recurrence } = input;
+  const { userId, services } = input;
+  const request = input.request ?? input.proposal?.request ?? '';
+  const recurrence = (input.recurrence ?? input.proposal?.recurrence)!;
   const serviceSet = new Set(services);
+  const isTelegramDest =
+    serviceSet.size === 2 &&
+    serviceSet.has('github') &&
+    serviceSet.has('telegram') &&
+    typeof input.telegramConnection === 'function';
+  const isSlackDest = serviceSet.size === 2 && serviceSet.has('github') && serviceSet.has('slack');
 
-  if (serviceSet.size !== 2 || !serviceSet.has('github') || !serviceSet.has('slack')) {
+  if (!isSlackDest && !isTelegramDest) {
     return {
       canAutoDigest: false,
       disabledReason:
@@ -135,6 +150,72 @@ export async function evaluateGithubDigestCandidate(
     };
   }
 
+  const staleMatch = request.match(/(?:quá|trên|hơn)\s*(\d{1,2})\s*ngày/i);
+  const parsedStale = staleMatch ? Number.parseInt(staleMatch[1]!, 10) : 2;
+  const staleDays = Number.isInteger(parsedStale) ? Math.min(14, Math.max(1, parsedStale)) : 2;
+
+  if (isTelegramDest) {
+    let tg: any;
+    try {
+      tg = await input.telegramConnection?.(userId);
+    } catch {
+      tg = null;
+    }
+    const selectedChats: Array<{ chatId: string; title: string }> = Array.isArray(tg?.selectedChats)
+      ? tg.selectedChats
+      : [];
+    if (!tg || tg.status !== 'connected' || selectedChats.length === 0) {
+      return {
+        canAutoDigest: false,
+        disabledReason: 'Cần kết nối Telegram cá nhân và chọn ít nhất 1 cuộc trò chuyện nhận bản tin.',
+      };
+    }
+
+    let matchedChat: { chatId: string; title: string } | null = null;
+    const byTitle = selectedChats.filter(
+      (c) => c.title && lowerReq.includes(String(c.title).toLowerCase()),
+    );
+    if (byTitle.length === 1) {
+      matchedChat = byTitle[0]!;
+    } else if (selectedChats.length === 1) {
+      matchedChat = selectedChats[0]!;
+    }
+
+    if (!matchedChat) {
+      return {
+        canAutoDigest: false,
+        disabledReason: 'Cần chỉ rõ 1 cuộc trò chuyện Telegram hợp lệ thuộc phạm vi được phép nhận bản tin.',
+      };
+    }
+
+    const config = canonicalizeDigestConfig({
+      credentialId: gh.connection.credentialId,
+      githubUserId: gh.connection.githubUserId,
+      login: gh.connection.login,
+      repos: [...matchedRepos],
+      channelId: '',
+      channelName: '',
+      staleDays,
+      telegramChatId: String(matchedChat.chatId),
+      telegramChatTitle: String(matchedChat.title),
+      ...(tg.connection?.credentialId ? { telegramCredentialId: String(tg.connection.credentialId) } : {}),
+      ...(tg.connection?.telegramUserId ? { telegramUserId: String(tg.connection.telegramUserId) } : {}),
+      ...(tg.connection?.username ? { telegramUsername: String(tg.connection.username) } : {}),
+    });
+
+    const configHash = computeDigestConfigHash({
+      config,
+      recurrence,
+      userId,
+    });
+
+    return {
+      canAutoDigest: true,
+      config,
+      configHash,
+    };
+  }
+
   // Extract Slack channel from request
   const hashMatch = request.match(/#([a-z0-9._-]+)/i) ?? request.match(/(?:kênh|slack)\s+#?([a-z0-9._-]+)/i);
   const channelQuery = hashMatch?.[1]?.trim() ?? '';
@@ -172,10 +253,6 @@ export async function evaluateGithubDigestCandidate(
         'Cần chỉ rõ 1 kênh Slack hợp lệ thuộc phạm vi được phép nhận bản tin.',
     };
   }
-
-  const staleMatch = request.match(/(?:quá|trên|hơn)\s*(\d{1,2})\s*ngày/i);
-  const parsedStale = staleMatch ? Number.parseInt(staleMatch[1]!, 10) : 2;
-  const staleDays = Number.isInteger(parsedStale) ? Math.min(14, Math.max(1, parsedStale)) : 2;
 
   const config = canonicalizeDigestConfig({
     credentialId: gh.connection.credentialId,

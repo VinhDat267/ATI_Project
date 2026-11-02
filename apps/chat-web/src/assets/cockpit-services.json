@@ -304,6 +304,77 @@
       "titlePrefix": "Issue #",
       "previewStyle": "issue"
     },
+    "github.add_label": {
+      "action": "Gắn nhãn",
+      "done": "Đã gắn nhãn",
+      "receipt": "Đã gắn nhãn",
+      "kind": "Issue",
+      "link": "Mở issue",
+      "titleField": "number",
+      "titlePrefix": "Issue #",
+      "previewStyle": "issue"
+    },
+    "github.update_issue": {
+      "action": "Cập nhật issue",
+      "done": "Đã cập nhật",
+      "receipt": "Đã cập nhật issue",
+      "kind": "Issue",
+      "link": "Mở issue",
+      "titleField": "number",
+      "titlePrefix": "Issue #",
+      "previewStyle": "issue"
+    },
+    "github.add_comment": {
+      "action": "Bình luận issue",
+      "done": "Đã bình luận",
+      "receipt": "Đã bình luận",
+      "kind": "Bình luận",
+      "link": "Mở bình luận",
+      "titleField": "issueNumber",
+      "titlePrefix": "Issue #",
+      "previewStyle": "issue"
+    },
+    "github.get_issue": {
+      "action": "Đọc issue",
+      "done": "Đã đọc",
+      "receipt": "Đã đọc issue",
+      "kind": "Issue",
+      "link": "Mở issue",
+      "titleField": "number",
+      "titlePrefix": "Issue #",
+      "previewStyle": "issue"
+    },
+    "github.get_pull_request": {
+      "action": "Đọc PR",
+      "done": "Đã đọc",
+      "receipt": "Đã đọc PR",
+      "kind": "Pull Request",
+      "link": "Mở PR",
+      "titleField": "number",
+      "titlePrefix": "PR #",
+      "previewStyle": "issue"
+    },
+    "github.search_issues": {
+      "action": "Tìm issue & PR",
+      "done": "Đã tìm",
+      "receipt": "Đã tìm issue & PR",
+      "kind": "Danh sách issue",
+      "link": "Mở trên GitHub"
+    },
+    "github.list_issues": {
+      "action": "Liệt kê issue & PR",
+      "done": "Đã liệt kê",
+      "receipt": "Đã liệt kê issue & PR",
+      "kind": "Danh sách issue",
+      "link": "Mở trên GitHub"
+    },
+    "github.search_repos": {
+      "action": "Tìm kho mã",
+      "done": "Đã tìm",
+      "receipt": "Đã tìm kho mã",
+      "kind": "Repository",
+      "link": "Mở kho mã"
+    },
     "trello.create_card": {
       "action": "Tạo mới",
       "done": "Đã tạo",

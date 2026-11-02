@@ -118,6 +118,29 @@ describe('packages/executor (Task 13: StepRunner with AbortSignal Timeout & UNKN
     expect(result.status).toBe('unknown');
     expect(result.error?.category).toBe('UNKNOWN');
   });
+
+  it('forwards bound step.repo into adapter execution context', async () => {
+    let receivedContext: Record<string, any> | undefined;
+    const runner = new StepRunner({
+      getAdapter: () => ({
+        execute: async (_tool: string, _args: any, context?: Record<string, any>) => {
+          receivedContext = context;
+          return { id: '1', number: 1, title: 'Release', url: 'https://github.com/owner/repo/issues/1', repo: 'owner/repo' };
+        },
+      }),
+    });
+    const step = {
+      id: 'issue',
+      tool: 'github.create_issue',
+      description: 'Create issue',
+      args: { repo: 'owner/repo', title: 'Release' },
+      repo: 'owner/repo',
+      dependsOn: [],
+    } as PlanStep;
+    const result = await runner.executeStep(step, new Map());
+    expect(result.status).toBe('success');
+    expect(receivedContext?.repo).toBe('owner/repo');
+  });
 });
 
 describe('Gmail tools are classified from the Gmail catalog, not the name heuristic', () => {

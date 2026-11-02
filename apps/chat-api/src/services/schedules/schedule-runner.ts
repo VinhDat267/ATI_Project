@@ -10,6 +10,7 @@ import { localLabel, nextOccurrence } from './next-occurrence.js';
 import type { ScheduleChange } from './schedule-service.js';
 import type { SheetsDigestRunner } from './sheets-digest-runner.js';
 import type { DigestRunOutcome as GithubDigestRunOutcome, RunGithubDigest } from './github-digest-runner.js';
+import { GITHUB_DELIVERY_UNKNOWN } from './github-digest-runner.js';
 import type { DigestRunInput, DigestRunOutcome } from './telegram-digest-runner.js';
 
 export interface RunToPlan {
@@ -772,11 +773,18 @@ export class ScheduleRunner {
         [started.toPlan.scheduleId],
       );
       const schedule = schedRes.rows[0] as ScheduleRow | undefined;
-      const run = (await client.query('SELECT status FROM schedule_runs WHERE id = $1 FOR UPDATE', [runId])).rows[0];
+      const run = (await client.query('SELECT status, delivery_started_at FROM schedule_runs WHERE id = $1 FOR UPDATE', [runId])).rows[0];
       if (!schedule || run?.status !== 'planning') return null;
 
       const replyTo = { replyToMessageId: started.messageId };
       const changes: ScheduleChange[] = [];
+
+      if (outcome?.state === 'delivery_unknown' || (run.delivery_started_at && outcome?.state !== 'digest_sent')) {
+        const unknownErr = outcome?.state === 'delivery_unknown' ? outcome.error : GITHUB_DELIVERY_UNKNOWN;
+        await this.messages.createMessage(started.convId, 'system', `Lỗi: ${unknownErr}`, { type: 'planning_error', ...replyTo }, client);
+        await client.query("UPDATE schedule_runs SET status='needs_attention', error=$2, updated_at=now() WHERE id=$1", [runId, unknownErr]);
+        return { kind: 'error' as const, error: unknownErr, changes };
+      }
 
       if (failure && this.stopping) {
         await this.messages.createMessage(started.convId, 'system', `Lỗi: ${STOPPED}`, { type: 'planning_error', ...replyTo }, client);

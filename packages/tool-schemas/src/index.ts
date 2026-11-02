@@ -2,7 +2,7 @@ export * from './myslack-assistant.js';
 import type { ToolDefinition } from './types.js';
 import { TRELLO_TOOLS } from './trello.js';
 import { SLACK_TOOLS } from './slack.js';
-import { GITHUB_TOOLS } from './github.js';
+import { GITHUB_TOOLS, GITHUB_OAUTH_TOOLS } from './github.js';
 import { SHEETS_TOOLS } from './sheets.js';
 import { CALENDAR_TOOLS } from './calendar.js';
 import { NOTION_TOOLS } from './notion.js';
@@ -46,6 +46,10 @@ export const TOOL_MAP: Record<string, ToolDefinition> = Object.fromEntries(
   ALL_TOOLS.map((tool) => [tool.name, tool])
 );
 
+const GITHUB_OAUTH_TOOL_MAP: Record<string, ToolDefinition> = Object.fromEntries(
+  GITHUB_OAUTH_TOOLS.map((tool) => [tool.name, tool])
+);
+
 export function getToolDefinition(name: string): ToolDefinition | undefined {
-  return TOOL_MAP[name];
+  return TOOL_MAP[name] ?? GITHUB_OAUTH_TOOL_MAP[name];
 }

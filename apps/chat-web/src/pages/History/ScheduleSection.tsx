@@ -10,7 +10,14 @@ import { WorkflowFlowCanvas } from '../../components/WorkflowFlowCanvas';
 
 function RunLink({ run, navigate }: { run: ScheduleRunView; navigate: (path: string) => void }) {
   const sheetsDelivery = run.delivery && 'spreadsheetTitle' in run.delivery ? run.delivery : null;
-  return <><span>{formatRunTime(run.dueAt)} · </span>{run.convId ? <a className="underline text-[#FF5701]" href={`/c/${run.convId}`} onClick={event => { if (event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); navigate(`/c/${run.convId}`); }}>{runLabel(run)}</a> : <span>{runLabel(run)}</span>}{sheetsDelivery && <span className="text-xs text-[#6B7280]"> ({sheetsDelivery.spreadsheetTitle} → {sheetsDelivery.targetLabel ?? sheetsDelivery.targetId})</span>}{run.error && <span className="block text-xs text-[#6B7280]">{run.error}</span>}</>;
+  const githubDest = run.delivery && 'counts' in run.delivery
+    ? (run.delivery.telegramChatTitle || run.delivery.telegramChatId
+        ? `Telegram: ${run.delivery.telegramChatTitle ?? run.delivery.telegramChatId}`
+        : run.delivery.channelName
+          ? `#${run.delivery.channelName.replace(/^#/, '')}`
+          : null)
+    : null;
+  return <><span>{formatRunTime(run.dueAt)} · </span>{run.convId ? <a className="underline text-[#FF5701]" href={`/c/${run.convId}`} onClick={event => { if (event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); navigate(`/c/${run.convId}`); }}>{runLabel(run)}</a> : <span>{runLabel(run)}</span>}{sheetsDelivery && <span className="text-xs text-[#6B7280]"> ({sheetsDelivery.spreadsheetTitle} → {sheetsDelivery.targetLabel ?? sheetsDelivery.targetId})</span>}{githubDest && <span className="text-xs text-[#6B7280]"> ({githubDest})</span>}{run.error && <span className="block text-xs text-[#6B7280]">{run.error}</span>}</>;
 }
 function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: ScheduleView; navigate: (path: string) => void; reload: () => Promise<void>; onChanged: (schedule: ScheduleView) => void }) {
   const [open, setOpen] = useState(false), [runs, setRuns] = useState<ScheduleRunView[]>([]), [error, setError] = useState('');
