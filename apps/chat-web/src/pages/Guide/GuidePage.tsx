@@ -416,7 +416,7 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
                 Cẩm nang kết nối &amp; Mẫu câu lệnh ATI
               </h1>
               <p className="text-sm sm:text-base text-[#4B5563] leading-relaxed">
-                Dành cho quản lý dự án, vận hành và người dùng phi kỹ thuật. Kết nối nhanh bằng OAuth 2.0 1-Click, trực quan hoá luồng dữ liệu đa dịch vụ kiểu Make.com và sử dụng ngay thư viện mẫu câu lệnh tiếng Việt hiệu quả cao.
+                Dành cho quản lý dự án, vận hành và người dùng phi kỹ thuật. Kết nối nhanh bằng Đăng nhập trực tiếp · 1 chạm, trực quan hoá luồng dữ liệu đa dịch vụ kiểu Make.com và sử dụng ngay thư viện mẫu câu lệnh tiếng Việt hiệu quả cao.
               </p>
               <div className="flex flex-wrap items-center gap-2.5 pt-2">
                 <a href="/settings" onClick={appLink(navigate, '/settings')} className="px-4 py-2 rounded-xl bg-[#FF5701] hover:bg-[#E04D00] text-white text-xs sm:text-sm font-semibold shadow-sm transition-all inline-flex items-center gap-1.5">
@@ -461,7 +461,7 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
                 </p>
               </div>
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 self-start sm:self-center">
-                OAuth 2.0 · 1-Click
+                Đăng nhập trực tiếp · 1 chạm
               </span>
             </div>
             <WorkflowFlowCanvas services={GUIDE_HERO_FLOW_SERVICES} mode="preview" />
@@ -558,7 +558,7 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
             </summary>
             <div className="mt-4 pt-4 border-t border-[#E7E7E2] text-xs sm:text-sm text-[#4B5563] v3-space-y-2 leading-relaxed">
               <p>
-                Các công cụ cá nhân (Google Calendar, Google Sheets, Trello cá nhân) ưu tiên kết nối trực tiếp qua <strong>OAuth 2.0 1-Click</strong> trong trang <a href="/settings" onClick={appLink(navigate, '/settings')} className="text-[#FF5701] font-semibold underline">Cài đặt dịch vụ</a> mà không cần tạo hay dán khoá thủ công.
+                Các công cụ cá nhân (Google Calendar, Google Sheets, Trello cá nhân) ưu tiên <strong>Kết nối trực tiếp bằng tài khoản</strong> trong trang <a href="/settings" onClick={appLink(navigate, '/settings')} className="text-[#FF5701] font-semibold underline">Cài đặt dịch vụ</a> mà không cần tạo hay dán khoá thủ công.
               </p>
               <p>
                 Đối với các tích hợp dùng chung toàn nhóm (Slack Bot Token <code>xoxb-</code>, GitHub Personal Access Token, Notion Integration Secret, Google Drive Service Account, Telegram Bot Token), Quản trị viên Workspace có thể làm theo hướng dẫn từng bước ở trên và giới hạn phạm vi kênh/kho mã được phép truy cập.

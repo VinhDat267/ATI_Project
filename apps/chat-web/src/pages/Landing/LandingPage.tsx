@@ -362,7 +362,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
               data-testid="landing-hero-trust-pills"
               className="inline-flex flex-wrap items-center justify-center gap-2 sm:gap-3 px-4 py-1.5 rounded-full bg-white border border-[#E7E7E2] text-[11px] sm:text-xs font-medium text-[#111827] shadow-sm mb-10"
             >
-              <span className="inline-flex items-center gap-1 text-[#16A34A] font-semibold">✓ Kết nối OAuth 1-Click</span>
+              <span className="inline-flex items-center gap-1 text-[#16A34A] font-semibold">✓ Kết nối trực tiếp bằng tài khoản</span>
               <span className="text-[#D1D5DB]">·</span>
               <span className="inline-flex items-center gap-1 text-[#111827]">✓ Khóa phạm vi an toàn</span>
               <span className="text-[#D1D5DB]">·</span>
@@ -624,7 +624,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                         {/* Dải dịch vụ đã kết nối */}
                         <div className="v3-space-y-3">
                           <p className="text-xs text-[#6B7280] font-medium">
-                            Đã kết nối (OAuth 1-Click cá nhân &amp; Không gian nhóm):
+                            Đã kết nối (Tài khoản cá nhân &amp; Không gian nhóm):
                           </p>
                           <div className="flex flex-wrap gap-2">
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#F8F8F6] border border-[#E7E7E2] text-xs font-medium text-[#111827]">
@@ -1733,7 +1733,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                       Trello
                     </h3>
                     <span data-testid="integration-oauth-badge" className="px-2 py-0.5 rounded-full bg-blue-50 text-[#0079BF] border border-blue-200 text-[10px] font-semibold">
-                      OAuth 1-Click · Chọn Bảng
+                      Đăng nhập trực tiếp · Chọn Bảng
                     </span>
                   </div>
                   <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
@@ -1787,7 +1787,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                       GitHub
                     </h3>
                     <span data-testid="integration-oauth-badge" className="px-2 py-0.5 rounded-full bg-neutral-200/80 text-[#24292E] border border-neutral-300 text-[10px] font-semibold">
-                      OAuth 1-Click · Chọn Repo
+                      Đăng nhập trực tiếp · Chọn Kho
                     </span>
                   </div>
                   <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
@@ -1819,7 +1819,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                       Google Sheets
                     </h3>
                     <span data-testid="integration-oauth-badge" className="px-2 py-0.5 rounded-full bg-emerald-50 text-[#0F9D58] border border-emerald-200 text-[10px] font-semibold">
-                      OAuth 1-Click · Google Picker
+                      Đăng nhập trực tiếp · Chọn Bảng tính
                     </span>
                   </div>
                   <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
@@ -1853,7 +1853,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                       Google Calendar
                     </h3>
                     <span data-testid="integration-oauth-badge" className="px-2 py-0.5 rounded-full bg-blue-50 text-[#1967D2] border border-blue-200 text-[10px] font-semibold">
-                      OAuth 1-Click · Chọn Lịch
+                      Đăng nhập trực tiếp · Chọn Lịch
                     </span>
                   </div>
                   <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
@@ -1946,7 +1946,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                     </svg>
                   </div>
                   <span data-testid="integration-oauth-badge" className="px-2 py-0.5 rounded-full bg-red-50 text-[#EA4335] border border-red-200 text-[10px] font-semibold">
-                    OAuth 1-Click · Cá nhân
+                    Đăng nhập trực tiếp · Cá nhân
                   </span>
                 </div>
                 <h3 className="font-display text-lg font-semibold text-[#111827]">Gmail · Của riêng bạn</h3>
@@ -1962,7 +1962,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                     </svg>
                   </div>
                   <span data-testid="integration-oauth-badge" className="px-2 py-0.5 rounded-full bg-emerald-50 text-[#0F9D58] border border-emerald-200 text-[10px] font-semibold">
-                    OAuth 1-Click · Cá nhân
+                    Đăng nhập trực tiếp · Cá nhân
                   </span>
                 </div>
                 <h3 className="font-display text-lg font-semibold text-[#111827]">Google Sheets · Của riêng bạn</h3>
@@ -2020,7 +2020,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                     data-testid="onboarding-step2-oauth-badge"
                     className="inline-flex items-center gap-1.5 text-xs font-medium text-[#16A34A] bg-[#F0FDF4] px-2.5 py-1 rounded-lg border border-[#16A34A]/20"
                   >
-                    ✓ Kết nối OAuth 1-Click · ✓ Chọn bảng &amp; kênh trực tiếp từ danh sách
+                    ✓ Kết nối trực tiếp bằng tài khoản · ✓ Chọn bảng &amp; kênh trực tiếp từ danh sách
                   </span>
                 </div>
               </div>

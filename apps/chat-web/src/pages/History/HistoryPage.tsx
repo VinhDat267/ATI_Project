@@ -232,7 +232,7 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
           })}
         </div>
         {/* NÚT TẢI THÊM CUỐI DANH SÁCH */}
-        <div id="load-more-container" className={`pt-2 flex flex-col items-center justify-center gap-2${!!cursor ? '' : ' hidden'}`}>
+        <div id="load-more-container" className={`pt-2 flex flex-col items-center justify-center gap-2${!!cursor && displayed.length > 0 ? '' : ' hidden'}`}>
           <button type="button" id="btn-load-more" disabled={loading} onClick={() => actions.loadMoreRequests()} className="inline-flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-semibold rounded-xl bg-white border border-[#E7E7E2] hover:border-[#FF5701] text-[#374151] hover:text-[#FF5701] shadow-soft transition-all">
             <span>
               Tải thêm
@@ -245,6 +245,20 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
             Đã hiển thị toàn bộ lịch sử hội thoại
           </div>
         </div>
+        {!loading && rows.length > 0 && displayed.length === 0 && (
+          <div data-testid="history-filter-empty-state" className="p-10 text-center bg-white rounded-2xl border border-[#E7E7E2] shadow-soft v3-space-y-3">
+            <p className="font-display text-base font-bold text-[#111827]">
+              Chưa có hội thoại nào ở trạng thái này.
+            </p>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('all')}
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-neutral-100 hover:bg-neutral-200 text-[#111827] transition-colors"
+            >
+              Xem tất cả hội thoại
+            </button>
+          </div>
+        )}
         {/* TRẠNG THÁI RỖNG (EMPTY STATE KHI TÌM KHÔNG THẤY) */}
         <div id="empty-state" className={`${!loading && rows.length === 0 ? '' : 'hidden '}p-12 text-center bg-white rounded-2xl border border-[#E7E7E2] shadow-soft v3-space-y-3`}>
           <div className="w-12 h-12 rounded-full bg-neutral-100 flex items-center justify-center mx-auto text-[#6B7280]">
