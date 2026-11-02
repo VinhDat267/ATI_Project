@@ -330,14 +330,14 @@ function normalizeDescriptor(value: unknown): SlackLifecycleDescriptor {
           }
         }
       }
-      if (ids.length === 0) {
-        throw new TypeError('channel_membership_lost requires at least one slackUserId');
+      if (ids.length !== 1) {
+        throw new TypeError('channel_membership_lost requires exactly one slackUserId');
       }
       return {
         intentType: 'channel_membership_lost',
         channelId,
         slackUserId: ids[0]!,
-        slackUserIds: ids,
+        slackUserIds: [ids[0]!],
       };
     }
     default:
@@ -649,16 +649,16 @@ export class SlackEventReceiptRepo {
             : descriptor.slackUserId
               ? [descriptor.slackUserId]
               : [];
-        if (actorIds.length === 0) {
-          throw new TypeError('channel_membership_lost requires at least one slackUserId');
+        if (actorIds.length !== 1) {
+          throw new TypeError('channel_membership_lost requires exactly one slackUserId');
         }
         const rows = (
           await client.query<ConnectionCandidate>(
             `SELECT id, user_id, app_id, workspace_id, actor_id, identity_version, status, config
              FROM slack_connections
-             WHERE app_id = $1 AND workspace_id = $2 AND status <> 'disconnected' AND actor_id = ANY($3::text[])
+             WHERE app_id = $1 AND workspace_id = $2 AND status <> 'disconnected' AND actor_id = $3
              ORDER BY user_id, id`,
-            [base.appId!, base.teamId!, actorIds]
+            [base.appId!, base.teamId!, actorIds[0]!]
           )
         ).rows;
         for (const row of rows) {

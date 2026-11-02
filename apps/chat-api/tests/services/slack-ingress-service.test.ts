@@ -575,4 +575,51 @@ describe('SlackIngressService on PostgreSQL (SLACK-04A)', () => {
     expect(leavingBarriers.rows[0]?.n).toBe(1);
     expect(stayingBarriers.rows[0]?.n).toBe(0);
   });
+
+  it('T3.12: member_left_channel uses only event.user and never merges envelope.authorizations visibility users', async () => {
+    const leaving = await seedConnection({ actorId: 'U_LEAVING' });
+    const staying = await seedConnection({ actorId: 'U_STAYING' });
+    const svc = service();
+
+    const memberLeftBody = eventCallback(
+      { type: 'member_left_channel', user: 'U_LEAVING', channel: 'C_SHARED_R3', event_ts: '1730000000.000001' },
+      {
+        authorizations: [
+          {
+            enterprise_id: null,
+            team_id: TEAM_ID,
+            user_id: 'U_STAYING',
+            is_bot: false,
+            is_enterprise_install: false,
+          },
+        ],
+      }
+    );
+    const res = await svc.handleRequest(sign(memberLeftBody));
+    expect(res.status).toBe(200);
+
+    const leavingBarriers = await db.pool.query(
+      "SELECT count(*)::int AS n FROM slack_invalidation_barriers WHERE active AND barrier_type = 'channel' AND connection_id = $1 AND channel_id = 'C_SHARED_R3'",
+      [leaving.connectionId]
+    );
+    const stayingBarriers = await db.pool.query(
+      "SELECT count(*)::int AS n FROM slack_invalidation_barriers WHERE active AND barrier_type = 'channel' AND connection_id = $1 AND channel_id = 'C_SHARED_R3'",
+      [staying.connectionId]
+    );
+    expect(leavingBarriers.rows[0]?.n).toBe(1);
+    expect(stayingBarriers.rows[0]?.n).toBe(0);
+
+    const ambiguousGroupLeft = eventCallback(
+      { type: 'group_left', channel: 'G_AMBIGUOUS' },
+      {
+        authorizations: [
+          { team_id: TEAM_ID, user_id: 'U_LEAVING', is_bot: false },
+          { team_id: TEAM_ID, user_id: 'U_STAYING', is_bot: false },
+        ],
+      }
+    );
+    const ambRes = await svc.handleRequest(sign(ambiguousGroupLeft));
+    expect(ambRes.status).toBe(400);
+    expect(ambRes.body.code).toBe('MALFORMED_EVENT');
+  });
 });

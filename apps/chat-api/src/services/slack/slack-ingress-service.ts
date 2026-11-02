@@ -182,11 +182,37 @@ function classifyLifecycle(
     };
   }
 
-  if (eventType === 'member_left_channel' || eventType === 'group_left') {
+  if (eventType === 'member_left_channel') {
     const channelId = safeId(event.channel);
-    const hasUser = event.user !== undefined && event.user !== null;
-    const eventUserId = hasUser ? safeId(event.user) : null;
-    if (!channelId || (hasUser && !eventUserId)) return { kind: 'malformed' };
+    const eventUserId = safeId(event.user);
+    if (!channelId || !eventUserId) return { kind: 'malformed' };
+    return {
+      kind: 'lifecycle',
+      descriptor: {
+        intentType: 'channel_membership_lost',
+        channelId,
+        slackUserId: eventUserId,
+        slackUserIds: [eventUserId],
+      },
+    };
+  }
+
+  if (eventType === 'group_left') {
+    const channelId = safeId(event.channel);
+    if (!channelId) return { kind: 'malformed' };
+    if (event.user !== undefined && event.user !== null) {
+      const eventUserId = safeId(event.user);
+      if (!eventUserId) return { kind: 'malformed' };
+      return {
+        kind: 'lifecycle',
+        descriptor: {
+          intentType: 'channel_membership_lost',
+          channelId,
+          slackUserId: eventUserId,
+          slackUserIds: [eventUserId],
+        },
+      };
+    }
 
     const slackUserIds: string[] = [];
     const seen = new Set<string>();
@@ -196,12 +222,12 @@ function classifyLifecycle(
         slackUserIds.push(id);
       }
     };
-    addUser(eventUserId);
 
     if (envelope && envelope.authorizations !== undefined && envelope.authorizations !== null) {
       if (!Array.isArray(envelope.authorizations)) return { kind: 'malformed' };
       for (const entry of envelope.authorizations) {
         if (!isRecord(entry)) return { kind: 'malformed' };
+        if (entry.is_bot === true) continue;
         if (entry.team_id !== undefined && entry.team_id !== null) {
           const authTeamId = safeId(entry.team_id);
           if (!authTeamId) return { kind: 'malformed' };
@@ -213,9 +239,7 @@ function classifyLifecycle(
           addUser(authUserId);
         }
       }
-    }
-
-    if (envelope && envelope.authed_users !== undefined && envelope.authed_users !== null) {
+    } else if (envelope && envelope.authed_users !== undefined && envelope.authed_users !== null) {
       if (!Array.isArray(envelope.authed_users)) return { kind: 'malformed' };
       for (const entry of envelope.authed_users) {
         const authUserId = safeId(entry);
@@ -224,14 +248,14 @@ function classifyLifecycle(
       }
     }
 
-    if (slackUserIds.length === 0) return { kind: 'malformed' };
+    if (slackUserIds.length !== 1) return { kind: 'malformed' };
     return {
       kind: 'lifecycle',
       descriptor: {
         intentType: 'channel_membership_lost',
         channelId,
         slackUserId: slackUserIds[0]!,
-        slackUserIds,
+        slackUserIds: [slackUserIds[0]!],
       },
     };
   }
