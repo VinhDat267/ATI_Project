@@ -232,10 +232,14 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
                   ? 'Cần kết nối lại'
                   : trelloConnected
                   ? `Đã kết nối${current('trello')?.username ? ` · @${current('trello')!.username}` : ''}`
+                  : service.id === 'trello' && trelloStatus === 'scope_required'
+                  ? `Đã kết nối · Chưa chọn bảng${current('trello')?.username ? ` · @${current('trello')!.username}` : ''}`
                   : service.id === 'trello' && trelloStatus === 'reconnect_required'
                   ? 'Cần kết nối lại'
                   : githubConnected
                   ? `Đã kết nối${githubHandle ? ` · @${githubHandle}` : ''}`
+                  : service.id === 'github' && githubStatus === 'scope_required'
+                  ? `Đã kết nối · Chưa chọn kho${githubHandle ? ` · @${githubHandle}` : ''}`
                   : service.id === 'github' && githubStatus === 'reconnect_required'
                   ? 'Cần kết nối lại'
                   : telegramConnected
@@ -297,11 +301,17 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
             onClick={event => {
               if (back && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)) return;
               event.preventDefault();
-              if (back) void connectTrello(back); else navigate('/settings#trello');
+              if (trelloStatus === 'scope_required') navigate('/settings#trello');
+              else if (back) void connectTrello(back);
+              else navigate('/settings#trello');
             }}
             className={`${primary} flex items-center gap-1.5`}
           >
-            {trelloStatus === 'reconnect_required' ? 'Kết nối lại Trello' : 'Kết nối Trello'}
+            {trelloStatus === 'scope_required'
+              ? 'Chọn bảng Trello'
+              : trelloStatus === 'reconnect_required'
+              ? 'Kết nối lại Trello'
+              : 'Kết nối Trello'}
             <span aria-hidden="true">→</span>
           </a>
         )}
@@ -314,11 +324,17 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
             onClick={event => {
               if (back && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)) return;
               event.preventDefault();
-              if (back) void connectGitHub(back); else navigate('/settings#github');
+              if (githubStatus === 'scope_required') navigate('/settings#github');
+              else if (back) void connectGitHub(back);
+              else navigate('/settings#github');
             }}
             className={`${primary} flex items-center gap-1.5`}
           >
-            {githubStatus === 'reconnect_required' ? 'Kết nối lại GitHub' : 'Kết nối GitHub'}
+            {githubStatus === 'scope_required'
+              ? 'Chọn kho GitHub'
+              : githubStatus === 'reconnect_required'
+              ? 'Kết nối lại GitHub'
+              : 'Kết nối GitHub'}
             <span aria-hidden="true">→</span>
           </a>
         )}

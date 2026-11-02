@@ -4,13 +4,17 @@
 // trên trình duyệt thật; các lời gọi hội thoại/kế hoạch/thực thi/dịch vụ đi qua ApiClient thật
 // tới fetch giả, để nhánh 404 → null và 500 → lỗi là mã thật của ứng dụng.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { App } from '../src/App';
 import { apiClient } from '../src/services/api-client';
 import { authStorage } from '../src/services/auth-storage';
 import { useChatStore } from '../src/store/chat-store';
+import { handleSSEEvent, resetSSEState } from '../src/hooks/use-sse';
 
-vi.mock('../src/hooks/use-sse', () => ({ useSSE: vi.fn(() => ({ disconnected: false })) }));
+vi.mock('../src/hooks/use-sse', async importOriginal => {
+  const actual = await importOriginal<typeof import('../src/hooks/use-sse')>();
+  return { ...actual, useSSE: vi.fn(() => ({ disconnected: false })) };
+});
 
 const CONV_ID = '8a2a71c5-0000-4000-8000-000000000001';
 const REQUEST = 'Tạo card Trello cho lỗi đăng nhập rồi báo kênh Slack #ati-test';
@@ -49,12 +53,12 @@ function mockNetwork(servicesStatus: 200 | 500) {
 beforeEach(() => {
   window.history.replaceState({}, '', `/c/${CONV_ID}`);
   authStorage.clearStoredTokens(); authStorage.setStoredTokens({ accessToken: 'access', user });
-  useChatStore.getState().reset(); useChatStore.getState().setConversations([]);
+  useChatStore.getState().reset(); useChatStore.getState().setConversations([]); resetSSEState();
   vi.spyOn(apiClient, 'getRuntime').mockResolvedValue({ runtimeMode: 'sandbox' });
   vi.spyOn(apiClient, 'getMe').mockResolvedValue({ user });
   vi.spyOn(apiClient, 'getConversations').mockResolvedValue({ conversations: [{ id: CONV_ID, title: REQUEST }] });
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); authStorage.clearStoredTokens(); useChatStore.getState().reset(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); authStorage.clearStoredTokens(); useChatStore.getState().reset(); resetSSEState(); });
 
 describe.each([200, 500] as const)('PBI-03: mở lại hội thoại có kế hoạch không còn chờ duyệt (GET /api/services → %i)', servicesStatus => {
   it('hiện lại yêu cầu và kế hoạch đã lưu thay vì màn hình bắt đầu trống', async () => {
@@ -210,3 +214,94 @@ describe('PBI-03: luồng lùi về Moment 1 giữ yêu cầu đã lưu và ô n
     expect(screen.getByRole('textbox', { name: 'Mô tả công việc bạn muốn thực hiện' })).toHaveValue(scheduleRequest);
   });
 });
+
+it('PBI-03: SSE replay of plan_preview for an already-inactive or rejected plan does not resurrect Moment 4 over SavedConversation', async () => {
+  const expiredMessages = [
+    savedMessages[0],
+    {
+      ...savedMessages[1],
+      metadata: {
+        ...savedMessages[1].metadata,
+        planId: 'p-expired',
+      },
+    },
+  ];
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    const path = url.replace(/^https?:\/\/[^/]+/, '').split('?')[0];
+    if (path === `/api/conversations/${CONV_ID}`) return json(200, { conversation: { id: CONV_ID, title: REQUEST }, messages: expiredMessages });
+    if (path === `/api/conversations/${CONV_ID}/plans/active`) return json(404, { error: 'No active pending plan found' });
+    if (path === `/api/conversations/${CONV_ID}/executions/latest`) return json(404, { error: 'No execution found' });
+    if (path === '/api/services') return json(200, { services: [{ id: 'slack', name: 'Slack', configured: true, connected: true, connectionStatus: 'healthy' }], canConfigure: false });
+    return json(404, { error: 'not mocked' });
+  });
+
+  render(<App />);
+  const main = await screen.findByRole('main');
+  const saved = await within(main).findByRole('region', { name: 'Hội thoại đã lưu' });
+  expect(within(saved).getByText(REQUEST)).toBeInTheDocument();
+  expect(useChatStore.getState().activePlan).toBeNull();
+
+  act(() => {
+    handleSSEEvent(
+      'plan_preview',
+      JSON.stringify({
+        planId: 'p-expired',
+        plan: {
+          id: 'p-expired',
+          summary: PLAN_SUMMARY,
+          steps: savedMessages[1].metadata.plan!.steps,
+        },
+      }),
+      'epoch:1',
+      CONV_ID
+    );
+  });
+
+  expect(useChatStore.getState().activePlan).toBeNull();
+  expect(within(main).getByRole('region', { name: 'Hội thoại đã lưu' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /Duyệt kế hoạch/ })).toBeNull();
+});
+
+it('PBI-03: cancelling an active plan marks it settled so an SSE replay of that planId does not resurrect Moment 4', async () => {
+  const activePlanBody = {
+    id: 'plan-active-1',
+    summary: PLAN_SUMMARY,
+    status: 'pending',
+    steps: savedMessages[1].metadata.plan!.steps,
+  };
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    const path = url.replace(/^https?:\/\/[^/]+/, '').split('?')[0];
+    if (path === `/api/conversations/${CONV_ID}`) return json(200, { conversation: { id: CONV_ID, title: REQUEST }, messages: savedMessages });
+    if (path === `/api/conversations/${CONV_ID}/plans/active`) return json(200, activePlanBody);
+    if (path === `/api/conversations/${CONV_ID}/executions/latest`) return json(404, { error: 'No execution found' });
+    if (path === `/api/plans/plan-active-1/reject` && init?.method === 'POST') return json(200, { status: 'rejected' });
+    if (path === '/api/services') return json(200, { services: [{ id: 'slack', name: 'Slack', configured: true, connected: true, connectionStatus: 'healthy' }], canConfigure: false });
+    return json(404, { error: 'not mocked' });
+  });
+
+  render(<App />);
+  const cancelBtn = await screen.findByRole('button', { name: 'Hủy' });
+  fireEvent.click(cancelBtn);
+
+  await waitFor(() => expect(useChatStore.getState().activePlan).toBeNull());
+  expect(useChatStore.getState().settledPlanIds['plan-active-1']).toBe(true);
+
+  act(() => {
+    handleSSEEvent(
+      'plan_preview',
+      JSON.stringify({
+        planId: 'plan-active-1',
+        plan: activePlanBody,
+      }),
+      'epoch:2',
+      CONV_ID
+    );
+  });
+
+  expect(useChatStore.getState().activePlan).toBeNull();
+  expect(screen.queryByRole('button', { name: /Duyệt kế hoạch/ })).toBeNull();
+});
+
+

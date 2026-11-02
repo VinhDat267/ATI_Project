@@ -55,6 +55,24 @@ export async function loadConversationHistory(id: string, isCurrent: () => boole
       if (!isCurrent()) return;
       const current = useChatStore.getState();
       if (current.planRevision === revision) store.setPlanLoadError(null);
+      if (!activePlan) {
+        const settledIds = (data.messages || []).flatMap(message =>
+          message.metadata?.type === 'plan' && typeof message.metadata.planId === 'string' && message.metadata.planId
+            ? [message.metadata.planId]
+            : []
+        );
+        for (const planId of settledIds) store.markPlanSettled(planId);
+        if (
+          current.activePlan?.id &&
+          settledIds.includes(current.activePlan.id) &&
+          current.executionSnapshot?.plan.id !== current.activePlan.id &&
+          current.planStatus === 'preview' &&
+          !current.isPlanning
+        ) {
+          store.setActivePlan(null);
+          store.setPlanStatus('idle');
+        }
+      }
       const alreadyExecuted = activePlan?.id && (current.executionSnapshot?.plan.id === activePlan.id ||
         (current.activePlan?.id === activePlan.id && ['executing', 'partial', 'reconciliation_required', 'completed', 'stopped', 'failed'].includes(current.planStatus)));
       if (activePlan && !['answer', 'schedule_proposal', 'schedule_state', 'schedule_discarded'].includes(latest?.metadata?.type ?? '') && current.planRevision === revision && !alreadyExecuted && !current.isPlanning) {
