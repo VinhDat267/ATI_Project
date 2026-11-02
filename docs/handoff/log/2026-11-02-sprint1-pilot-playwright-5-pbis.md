@@ -1,0 +1,24 @@
+# 2026-11-02 · antigravity · Sprint 1 Pilot — Sửa 5 lỗi Playwright trên luồng Landing → Cockpit → Settings → History
+
+- **Đã làm:**
+  - **(1) PBI-01 — Chống lỗi 500 trên `GET /api/services` & Bổ sung trạng thái `scope_required` (`apps/chat-api`):** Bọc `decryptCredentials` trong `try/catch` khi duyệt các dòng credential dùng chung trong `apps/chat-api/src/routes/services-routes.ts` để một dòng hỏng khóa mã hóa không làm sập toàn bộ danh sách dịch vụ. Đồng thời truyền `trelloTeamRepo` và `githubTeamRepo` từ `apps/chat-api/src/app.ts` vào `createServicesRoutes`, kiểm tra phạm vi bảng/repo/chat của `trello`, `github`, `telegram` (có `try/catch` bảo vệ khi đọc DB) và trả về `personalStatus: 'scope_required'` khi người dùng đã liên kết OAuth nhưng chưa chọn phạm vi tài nguyên.
+  - **(2) PBI-02 — Loại trừ tên dịch vụ & `bảng tính` khỏi Regex Gather của Trello & Hoàn thiện UX từ chối thiếu phạm vi (`packages/planner`, `packages/tool-schemas`, `apps/chat-web`):** Cập nhật `packages/planner/src/planner.ts` và `packages/tool-schemas/src/registry/trello.ts` để không thu thập nhầm tên các dịch vụ (`Trello`, `Google Sheets`, `Slack`, `GitHub`, `Jira`, `Notion`, `Calendar`, `Gmail`, `Telegram`) hoặc cụm `bảng tính` thành lệnh tìm bảng Trello (`trello.search_boards`), đồng thời hỗ trợ tên bảng có dấu gạch nối bắt đầu bằng `tinh-` (như `tinh-nang`). Cập nhật `ResponseMoment.tsx` và `TrelloConnection.tsx` hiển thị rõ cảnh báo thiếu phạm vi tài nguyên (`scope_required`) kèm nút điều hướng tới `/settings`.
+  - **(3) PBI-03 — Phục hồi cuộc trò chuyện đã lưu & Chặn phát lại Plan đã từ chối qua SSE (`apps/chat-api`, `apps/chat-web`):** Bổ sung `SSEManager.clearPlanEvents(convId, planId)` và gọi từ `POST /api/plans/:id/reject` để xóa sự kiện `plan` khỏi bộ đệm SSE ngay khi người dùng từ chối kế hoạch. Tạo component `SavedConversation.tsx` và cập nhật `use-conversation-history.ts`, `use-sse.ts`, `chat-store.ts` để hiển thị đầy đủ nội dung cuộc trò chuyện đã lưu (`phase: 'saved'`) và chặn phát lại thẻ `PlanMoment` cho các plan đã kết thúc (`settledPlanIds`).
+  - **(4) PBI-04 — Giữ nguyên ngữ cảnh trang khi chuyển đổi Workspace (`apps/chat-web`):** Cập nhật `WorkspaceSwitcher.tsx`, `Workspace.tsx`, `SidebarHistory.tsx` và `useUsers.ts` để giữ nguyên trang hiện tại (`/settings`, `/history`, `/users`) khi chuyển đổi giữa Không gian cá nhân và Không gian tổ chức (chỉ điều hướng về `/` khi đang mở `/c/:id` hoặc khi rời trang quản trị `/users` sang không gian không có quyền admin), đồng thời tự động tải lại danh sách dịch vụ, lịch sử và lịch trình theo không gian mới.
+  - **(5) PBI-05 — Hiển thị mục Lịch định kỳ và trạng thái trống trên `/history` (`apps/chat-web`):** Cập nhật `ScheduleSection.tsx` luôn render vùng `#history-schedules` cùng thông báo trạng thái trống (`#history-schedules-empty`) khi chưa có lịch chạy định kỳ nào, và tự động tải lại khi chuyển đổi không gian làm việc.
+
+- **PR / commit:** Nhánh `fix/sprint1-integration` (tích hợp từ `fix/sprint1-api-services`, `fix/sprint1-planner-gather`, `fix/sprint1-web-ux`). Các commit: `7d19df57`, `1a6cde22`, `ca7a40e4`, `6f75f855`, `eab44d80`, `7f6a1664`, `1a81d23e`, `ba78c22f`, `9d702c2f`, `9463e9c6`, `f44045f1`, `537c01d3` và commit nhật ký bàn giao này. Không sửa `CURRENT-STATE.md` hay `ROADMAP.md` trên nhánh PR.
+
+- **Kiểm tra đã chạy (lệnh và kết quả):**
+  - `npx vitest run apps/chat-api/tests/routes/execution-routes.test.ts apps/chat-api/tests/routes/services-security.test.ts apps/chat-api/tests/sse/sse-manager.test.ts` — 3 test files passed, 18 tests passed.
+  - `npm test -w @wap/tool-schemas` — 18 test files passed, 347 tests passed.
+  - `npm test -w @wap/planner` — 28 test files passed, 405 tests passed.
+  - `Push-Location apps/chat-web; npx vitest run tests/fe-06b-responses.test.tsx tests/sprint1-history-schedules-empty.test.tsx tests/sprint1-reopen-conversation.test.tsx tests/sprint1-workspace-switch.test.tsx; Pop-Location` — 4 test files passed, 50 tests passed.
+  - `npm run test:eval:v3` — 25 test files passed, 406 tests passed (bao gồm `evaluations/generic-plumbing/static-guard.test.ts`).
+  - `npm run typecheck:v3` — exit code 0.
+  - `npm run build:v3 && node scripts/test-v3-web-build-security.mjs` — exit code 0 (`PASS: production build excludes credential sentinels and 7 forbidden UI claims`).
+  - Kiểm thử trình duyệt thực tế (`demanding-customer-v2-playwright` Round 2 trên `http://127.0.0.1:5175` + PostgreSQL 16): **5/5 PBIs PASS**, `0 console.error`, `0 pageerror`, `0 HTTP 500`.
+
+- **Chưa làm / vấn đề phát hiện:** Không còn lỗi tồn đọng trong phạm vi 5 PBIs của Sprint 1.
+
+- **Việc tiếp theo đề xuất:** Mở PR từ `fix/sprint1-integration` vào `main`, hoàn tất merge theo yêu cầu của Chủ dự án và cập nhật `CURRENT-STATE.md` / `ROADMAP.md` sau khi merge.
