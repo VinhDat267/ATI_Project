@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { createMemoryConversationRepositories } from './db/repositories/memory-conversations.js';
-import { validateEnv } from './config/env.js';
+import { validateEnv, JIRA_ENDPOINTS } from './config/env.js';
 import { getPool } from './db/pool.js';
 import {
   ConversationRepo,
@@ -49,6 +49,9 @@ import { JiraTokenManager } from './services/jira/jira-token-manager.js';
 import { JiraNativeVerifier } from './services/jira/jira-native-verifier.js';
 import { JiraPolicyService } from './services/jira/jira-policy-service.js';
 import { JiraHistorySanitizer } from './services/jira/jira-history-sanitizer.js';
+import { JiraPlanBinder } from './services/jira/jira-plan-binding.js';
+import { JiraLeaseManager } from './services/jira/jira-lease-manager.js';
+import { JiraDispatchGuard } from './services/jira/jira-dispatch-guard.js';
 import {
   AIPlanner,
   createProviderFromEnv,
@@ -386,8 +389,20 @@ async function bootstrap() {
   if (pool && jiraNativeVerifier) {
     jiraWorkspaceRepo = new JiraWorkspaceRepo(pool, { verifier: jiraNativeVerifier });
   }
-  const jiraHistorySanitizer = pool && jiraNativeVerifier
-    ? new JiraHistorySanitizer(new JiraPolicyService({ pool, verifier: jiraNativeVerifier }))
+  const jiraPolicyService = pool && jiraNativeVerifier
+    ? new JiraPolicyService({ pool, verifier: jiraNativeVerifier })
+    : undefined;
+  const jiraHistorySanitizer = jiraPolicyService
+    ? new JiraHistorySanitizer(jiraPolicyService)
+    : undefined;
+  const jiraBinder = jiraAvailable && pool
+    ? new JiraPlanBinder({ pool })
+    : undefined;
+  const jiraLeaseManager = jiraAvailable && pool && jiraTokens
+    ? new JiraLeaseManager({ pool, tokenManager: jiraTokens })
+    : undefined;
+  const jiraDispatchGuard = jiraAvailable && pool && jiraTokens && jiraLeaseManager
+    ? new JiraDispatchGuard(pool, jiraLeaseManager, jiraTokens)
     : undefined;
 
   // 2. Initialize LLM Provider
@@ -514,6 +529,9 @@ async function bootstrap() {
     trelloConnection,
     githubConnection,
     telegramConnection,
+    jiraBinder,
+    jiraHistorySanitizer,
+    jiraPolicyService,
     getAdapter: (serviceName, context) => (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(serviceName, context),
     schedules: schedules
       ? {
@@ -576,6 +594,10 @@ async function bootstrap() {
     trelloApiBaseUrl: env.TRELLO_OAUTH?.apiBaseUrl,
     telegramBot: env.TELEGRAM_BOT,
     telegramBotClient,
+    jiraTokens,
+    jiraWorkspaceRepo: jiraWorkspaceRepo ?? undefined,
+    jiraDispatchGuard,
+    jiraApiBaseUrl: env.JIRA_OAUTH?.fixtureBaseUrl ?? JIRA_ENDPOINTS.apiBaseUrl,
     createTrelloAdapter: env.RUNTIME_MODE === 'sandbox' ? ({ allowedBoardIds }) => {
       const sandbox = createSandboxAdapter('trello');
       return {
@@ -679,6 +701,7 @@ async function bootstrap() {
     convRepo,
     msgRepo,
     planRepo,
+    enableWorkspaceConversations: Boolean(env.MYJIRA_ENABLED && jiraAvailable),
     credentialRepo: credRepo,
     encryptionKey: env.ENCRYPTION_KEY,
     serviceAdminUserIds: (process.env.SERVICE_ADMIN_USER_IDS || '').split(',').map((id) => id.trim()).filter(Boolean),

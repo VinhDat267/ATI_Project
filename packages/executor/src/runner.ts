@@ -1,5 +1,5 @@
 import type { PlanStep, ToolDefinition } from '@wap/tool-schemas';
-import { ALL_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS } from '@wap/tool-schemas';
+import { ALL_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, MYJIRA_TOOLS } from '@wap/tool-schemas';
 import { resolveArgs } from './resolver.js';
 import type {
   StepOutputs,
@@ -9,10 +9,10 @@ import type {
   ErrorCategory,
 } from './types.js';
 
-// Personal tools (Gmail, MyCalendar, MySheets) are opt-in and outside ALL_TOOLS, but their writes must never fall to the name heuristic
+// Personal tools (Gmail, MyCalendar, MySheets, MyJira) are opt-in and outside ALL_TOOLS, but their writes must never fall to the name heuristic
 // (e.g. reply/forward/trash would read as reads: shorter timeout and no UNKNOWN, so a mail could be resent).
 const catalog = new Map<string, ToolDefinition>(
-  [...ALL_TOOLS, ...GMAIL_TOOLS, ...MYCALENDAR_TOOLS, ...MYSHEETS_TOOLS].map((t) => [t.name, t])
+  [...ALL_TOOLS, ...GMAIL_TOOLS, ...MYCALENDAR_TOOLS, ...MYSHEETS_TOOLS, ...MYJIRA_TOOLS].map((t) => [t.name, t])
 );
 
 export function isWriteTool(toolName: string): boolean {
@@ -97,6 +97,7 @@ export class StepRunner {
       // 3. Execute adapter tool with combined signal
       const output = await adapter.execute(step.tool, resolvedArgs, {
         signal: combinedSignal,
+        stepId: step.id,
         boardId: (step as any).boardId,
         ...((step as any).chatId ? { chatId: (step as any).chatId } : {}),
       });
