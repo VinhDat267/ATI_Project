@@ -238,7 +238,9 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
                   ? 'Cần kết nối lại'
                   : githubConnected
                   ? `Đã kết nối${githubHandle ? ` · @${githubHandle}` : ''}`
-                  : service.id === 'github' && (githubStatus === 'scope_required' || githubStatus === 'needs_scope')
+                  : service.id === 'github' && githubStatus === 'scope_required'
+                  ? `Đã kết nối · Chưa chọn kho${githubHandle ? ` · @${githubHandle}` : ''}`
+                  : service.id === 'github' && githubStatus === 'needs_scope'
                   ? `Đã kết nối · Chưa chọn repo${githubHandle ? ` · @${githubHandle}` : ''}`
                   : service.id === 'github' && githubStatus === 'needs_membership'
                   ? `Đã kết nối · Cần cấp quyền repo${githubHandle ? ` · @${githubHandle}` : ''}`
