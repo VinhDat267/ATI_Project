@@ -206,16 +206,84 @@ function findAmbiguousSites(steps: PlanStep[], grounding: GroundingContext): Ung
   if (availableSites.length <= 1) return [];
 
   const typed = userTokens(grounding.userTexts);
+  const typedLower = new Set(Array.from(typed).map((t) => t.toLowerCase()));
+  const userTextsLower = grounding.userTexts.map((t) => t.toLowerCase());
+
+  const JIRA_GENERIC_WORDS = new Set([
+    ['j', 'i', 'r', 'a'].join(''),
+    'atlassian', 'net', 'com', 'site', 'cloud', 'workspace', 'http', 'https', 'www', 'app', 'instance', 'org', 'io',
+  ]);
+
+  const extractTokens = (s: Record<string, unknown>): Set<string> => {
+    const tokens = new Set<string>();
+    const siteId = typeof s.siteId === 'string' ? s.siteId.trim().toLowerCase() : '';
+    const id = typeof s.id === 'string' ? s.id.trim().toLowerCase() : '';
+    const cloudId = typeof s.cloudId === 'string' ? s.cloudId.trim().toLowerCase() : '';
+    if (siteId) tokens.add(siteId);
+    if (id) tokens.add(id);
+    if (cloudId) tokens.add(cloudId);
+
+    if (typeof s.name === 'string') {
+      const name = s.name.trim().toLowerCase();
+      if (name) tokens.add(name);
+      for (const word of name.split(/[^\p{L}\p{N}]+/u)) {
+        if (word.length >= 2 && !JIRA_GENERIC_WORDS.has(word)) {
+          tokens.add(word);
+        }
+      }
+    }
+
+    if (typeof s.url === 'string') {
+      const rawUrl = s.url.trim().toLowerCase();
+      tokens.add(rawUrl);
+      try {
+        const parsed = new URL(rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`);
+        tokens.add(parsed.hostname);
+        const parts = parsed.hostname.split('.');
+        if (parts.length > 2 && parts[0] && parts[0].length >= 2 && !JIRA_GENERIC_WORDS.has(parts[0])) {
+          tokens.add(parts[0]);
+        }
+      } catch {
+        const match = rawUrl.match(/(?:https?:\/\/)?([a-z0-9_-]+)(?:\.[a-z0-9_.-]+)?/i);
+        if (match?.[1] && match[1].length >= 2 && !JIRA_GENERIC_WORDS.has(match[1].toLowerCase())) {
+          tokens.add(match[1].toLowerCase());
+        }
+      }
+    }
+    return tokens;
+  };
+
+  const siteTokenMaps = availableSites.map((s) => ({
+    site: s,
+    tokens: extractTokens(s),
+  }));
+
+  const tokenFrequencies = new Map<string, number>();
+  for (const { tokens } of siteTokenMaps) {
+    for (const token of tokens) {
+      tokenFrequencies.set(token, (tokenFrequencies.get(token) ?? 0) + 1);
+    }
+  }
+
   const userSpecifiedSite = (s: Record<string, unknown>): boolean => {
     const siteId = String(s.siteId ?? s.id ?? '');
-    const name = typeof s.name === 'string' ? s.name.toLowerCase() : '';
-    const url = typeof s.url === 'string' ? s.url.toLowerCase() : '';
-    if (siteId && typed.has(siteId)) return true;
-    if (s.id && typed.has(String(s.id))) return true;
-    return grounding.userTexts.some((text) => {
-      const lower = text.toLowerCase();
-      return (Boolean(name) && lower.includes(name)) || (Boolean(url) && lower.includes(url)) || (Boolean(siteId) && lower.includes(siteId.toLowerCase()));
-    });
+    if (siteId && (typed.has(siteId) || typedLower.has(siteId.toLowerCase()))) return true;
+    if (s.id && (typed.has(String(s.id)) || typedLower.has(String(s.id).toLowerCase()))) return true;
+    if (s.cloudId && (typed.has(String(s.cloudId)) || typedLower.has(String(s.cloudId).toLowerCase()))) return true;
+
+    const entry = siteTokenMaps.find((item) => String(item.site.siteId ?? item.site.id) === String(s.siteId ?? s.id));
+    if (!entry) return false;
+
+    // Distinctive tokens are those that appear in ONLY this site among availableSites
+    const distinctiveTokens = Array.from(entry.tokens).filter((token) => tokenFrequencies.get(token) === 1);
+
+    for (const token of distinctiveTokens) {
+      if (typedLower.has(token)) return true;
+      for (const lowerText of userTextsLower) {
+        if (lowerText.includes(token)) return true;
+      }
+    }
+    return false;
   };
 
   const ambiguous: UngroundedArgument[] = [];
@@ -274,12 +342,27 @@ function findUngrounded(steps: PlanStep[], catalog: Map<string, ToolDefinition>,
         }
         if (step.tool.startsWith('myjira.') && (resource === 'jira_project' || resource === 'jira_issue') &&
           typeof step.args.siteId === 'string') {
+          const siteEntries = grounding.memory.jira_site;
+          const sites = (Array.isArray(siteEntries) ? siteEntries : siteEntries ? [siteEntries] : [])
+            .filter((s): s is Record<string, unknown> => isObject(s));
+          const targetSite = sites.find((s) => s.siteId === step.args.siteId || s.id === step.args.siteId);
+
           const entries = grounding.memory[resource];
           const observed = (Array.isArray(entries) ? entries : [entries]).filter((entry): entry is Record<string, unknown> =>
             isObject(entry) && String(entry[schema['x-resource-field'] ?? 'id']) === String(value));
-          if (observed.length > 0 && !observed.some((entry) => entry.siteId === step.args.siteId)) {
-            ungrounded.push({ stepId: step.id, argument, resource, value });
-            continue;
+          if (observed.length > 0) {
+            const matchesSite = observed.some((entry) => {
+              if (entry.siteId && entry.siteId !== step.args.siteId) return false;
+              if (targetSite) {
+                if (entry.cloudId && targetSite.cloudId && entry.cloudId !== targetSite.cloudId) return false;
+                if (entry.workspaceId && targetSite.workspaceId && entry.workspaceId !== targetSite.workspaceId) return false;
+              }
+              return true;
+            });
+            if (!matchesSite) {
+              ungrounded.push({ stepId: step.id, argument, resource, value });
+              continue;
+            }
           }
         }
         if (known.has(String(value)) || typed.has(String(value))) continue;
@@ -520,14 +603,26 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
         step.tool.startsWith('myjira.') &&
         targetStep.tool.startsWith('myjira.') &&
         typeof step.args?.siteId === 'string' &&
-        typeof targetStep.args?.siteId === 'string' &&
-        step.args.siteId !== targetStep.args.siteId
+        typeof targetStep.args?.siteId === 'string'
       ) {
-        return {
-          valid: false,
-          layer: 'semantic',
-          error: `Cross-site reference: step '${step.id}' on site '${step.args.siteId}' cannot reference output of step '${targetStepId}' on site '${targetStep.args.siteId}'`,
-        };
+        let isCross = step.args.siteId !== targetStep.args.siteId;
+        if (!isCross && options.grounding?.memory?.jira_site) {
+          const siteEntries = options.grounding.memory.jira_site;
+          const sites = (Array.isArray(siteEntries) ? siteEntries : [siteEntries]).filter(isObject);
+          const siteA = sites.find((s) => String(s.siteId ?? s.id) === step.args.siteId);
+          const siteB = sites.find((s) => String(s.siteId ?? s.id) === targetStep.args.siteId);
+          if (siteA && siteB) {
+            if (siteA.cloudId && siteB.cloudId && siteA.cloudId !== siteB.cloudId) isCross = true;
+            if (siteA.workspaceId && siteB.workspaceId && siteA.workspaceId !== siteB.workspaceId) isCross = true;
+          }
+        }
+        if (isCross) {
+          return {
+            valid: false,
+            layer: 'semantic',
+            error: `Cross-site reference: step '${step.id}' on site '${step.args.siteId}' cannot reference output of step '${targetStepId}' on site '${targetStep.args.siteId}'`,
+          };
+        }
       }
 
       // If referencing targetStepId.output.<prop>, verify prop exists in outputSchema

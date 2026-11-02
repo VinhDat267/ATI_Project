@@ -6,7 +6,7 @@ import { validatePlan, validateAnswer, type ValidationResult } from './validator
 import { validateSchedule } from './schedule-validator.js';
 import { buildSystemPrompt } from './prompts/system-prompt.js';
 import {
-  MAX_DIRECTORY_CALLS, MAX_DIRECTORY_PARENTS, MAX_RESULTS_PER_CALL, formatSearchResults, groundingMemory, parseSearchRequest, prepareSearchCall, recordObserved, recordThreadLabels, providerMemory, searchEntities,
+  MAX_DIRECTORY_CALLS, MAX_DIRECTORY_PARENTS, MAX_RESULTS_PER_CALL, formatSearchResults, groundingMemory, parseSearchRequest, prepareSearchCall, recordObserved, recordThreadLabels, providerMemory, sanitizeEntities, searchEntities,
   type SearchOutcome,
 } from './search.js';
 
@@ -349,10 +349,25 @@ export class AIPlanner {
       const raw = await this.gatherSearch({ tool: tool.name, args, signal, actor: input.actor });
       const list = searchEntities(raw, tool.outputSchema);
       if (signal?.aborted) throw signal.reason ?? new Error('Lookup was aborted');
-      const result = list.slice(0, MAX_RESULTS_PER_CALL);
+      const sanitized = (sanitizeEntities(list) as unknown[]) ?? [];
+      const result = sanitized.slice(0, MAX_RESULTS_PER_CALL);
       if (tool.discovers) {
+        const enrichedStamp: Record<string, unknown> = { ...stamp };
+        if (input.actor?.workspaceId && !enrichedStamp.workspaceId) {
+          enrichedStamp.workspaceId = input.actor.workspaceId;
+        }
+        if (tool.service === 'myjira' && typeof args.siteId === 'string') {
+          const siteEntries = memory.getEntity<Array<Record<string, unknown>>>('jira_site') ?? [];
+          const matchedSite = siteEntries.find((s) => s.siteId === args.siteId || s.id === args.siteId);
+          if (matchedSite?.cloudId && !enrichedStamp.cloudId) {
+            enrichedStamp.cloudId = matchedSite.cloudId;
+          }
+          if (matchedSite?.workspaceId && !enrichedStamp.workspaceId) {
+            enrichedStamp.workspaceId = matchedSite.workspaceId;
+          }
+        }
         // `stamp` records the parent a result was found under, e.g. the board of a member.
-        const stamped = result.map((entity) => (entity && typeof entity === 'object' ? { ...stamp, ...entity } : entity));
+        const stamped = result.map((entity) => (entity && typeof entity === 'object' ? { ...enrichedStamp, ...entity } : entity));
         memory.setEntity('__observed', recordObserved(memory.getEntity('__observed'), tool.discovers, stamped, tool.observedFields));
         if (tool.service === 'gmail' && tool.discovers === 'thread') {
           const labels = memory.getEntity('__labels') ?? {};

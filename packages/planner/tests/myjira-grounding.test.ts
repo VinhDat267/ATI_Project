@@ -17,8 +17,8 @@ const createIssue = (siteId: string, projectKey: string, id = 'step_1', summary 
 
 const memory = {
   jira_site: [
-    { id: 'site-a', siteId: 'site-a', cloudId: 'cloud-a', name: 'Acme Jira' },
-    { id: 'site-b', siteId: 'site-b', cloudId: 'cloud-b', name: 'Beta Jira' },
+    { id: 'site-a', siteId: 'site-a', cloudId: 'cloud-a', name: 'Acme Jira', url: 'https://acme.atlassian.net' },
+    { id: 'site-b', siteId: 'site-b', cloudId: 'cloud-b', name: 'Beta Jira', url: 'https://beta.atlassian.net' },
   ],
   jira_issue: [
     { id: '100', key: 'ATI-12', siteId: 'site-a' },
@@ -116,6 +116,36 @@ describe('Jira site grounding', () => {
     });
     expect(result.valid).toBe(false);
     expect(result.error).toMatch(/ambiguous.*site/i);
+  });
+
+  it('accepts short site name like "Acme" when multiple sites exist', () => {
+    const result = validatePlan(plan([comment('site-a', 'ATI-12')]), MYJIRA_TOOLS, {
+      grounding: { memory, userTexts: ['Cập nhật ticket ATI-12 trên Acme'] },
+    });
+    expect(result.valid).toBe(true);
+  });
+
+  it('accepts subdomain from site URL when multiple sites exist', () => {
+    const result = validatePlan(plan([comment('site-a', 'ATI-12')]), MYJIRA_TOOLS, {
+      grounding: { memory, userTexts: ['xem ticket ATI-12 bên acme'] },
+    });
+    expect(result.valid).toBe(true);
+  });
+
+  it('preserves workspaceId and cloudId in observed entities even with custom observedFields', () => {
+    let observed: Record<string, Array<Record<string, unknown>>> = {};
+    observed = recordObserved(
+      observed,
+      'jira_issue',
+      [
+        { id: '100', key: 'ATI-12', siteId: 'site-a', cloudId: 'cloud-1', workspaceId: 'ws-1', title: 'Task in WS1' },
+      ],
+      ['id', 'key', 'title', 'url', 'status', 'siteId']
+    );
+
+    expect(observed.jira_issue[0].cloudId).toBe('cloud-1');
+    expect(observed.jira_issue[0].workspaceId).toBe('ws-1');
+    expect(observed.jira_issue[0].siteId).toBe('site-a');
   });
 
   it('accepts single site from context when only one site is connected', () => {
