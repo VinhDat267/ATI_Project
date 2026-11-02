@@ -14,6 +14,7 @@ export interface PersonalJiraHttpConfig {
   tokens: JiraAccessTokenProvider;
   fetchFn?: typeof fetch;
   rateLimiter?: GlobalRateLimiter;
+  timeoutMs?: number;
 }
 
 export function createJiraStepError(
@@ -30,7 +31,7 @@ export function createJiraStepError(
   return new StepError({
     category,
     statusCode,
-    retryable: category === 'RATE_LIMIT' ? true : retryable,
+    retryable,
     message,
   });
 }
@@ -41,6 +42,7 @@ export class PersonalJiraHttpTransport {
   private readonly tokens: JiraAccessTokenProvider;
   private readonly fetchFn: typeof fetch;
   private readonly rateLimiter?: GlobalRateLimiter;
+  private readonly defaultTimeoutMs?: number;
 
   constructor(config: PersonalJiraHttpConfig) {
     this.apiBase = (config.apiBaseUrl ?? 'https://api.atlassian.com').trim().replace(/\/+$/, '');
@@ -48,15 +50,17 @@ export class PersonalJiraHttpTransport {
     this.tokens = config.tokens;
     this.fetchFn = config.fetchFn ?? globalThis.fetch;
     this.rateLimiter = config.rateLimiter;
+    this.defaultTimeoutMs = config.timeoutMs;
   }
 
   async request(
     cloudId: string,
     path: string,
     writing: boolean,
-    options?: { signal?: AbortSignal; method?: string; body?: unknown }
+    options?: { signal?: AbortSignal; method?: string; body?: unknown; timeoutMs?: number }
   ): Promise<any> {
-    const signal = options?.signal;
+    const deadlineMs = options?.timeoutMs ?? this.defaultTimeoutMs ?? (writing ? 30_000 : 15_000);
+    const signal = options?.signal ?? AbortSignal.timeout(deadlineMs);
     if (signal?.aborted) {
       throw createJiraStepError('NETWORK', undefined, 'Jira request cancelled before dispatch');
     }
@@ -66,14 +70,14 @@ export class PersonalJiraHttpTransport {
       try {
         const acquired = await this.rateLimiter.waitForSlot(limiterKey, 30_000, 50, signal);
         if (!acquired) {
-          throw createJiraStepError('RATE_LIMIT', 429, 'Rate limiter slot timeout', true);
+          throw createJiraStepError('RATE_LIMIT', 429, 'Rate limiter slot timeout', !writing);
         }
       } catch (error) {
         if (signal?.aborted) {
           throw createJiraStepError('NETWORK', undefined, 'Jira request stopped before dispatch');
         }
         if (error instanceof StepError) throw error;
-        throw createJiraStepError('RATE_LIMIT', 429, 'Rate limiter wait failed', true);
+        throw createJiraStepError('RATE_LIMIT', 429, 'Rate limiter wait failed', !writing);
       }
     }
 
@@ -178,19 +182,21 @@ export class PersonalJiraHttpTransport {
       }
 
       if (response.status === 429) {
-        const raw = response.headers.get('Retry-After')?.trim();
-        const delay = raw && /^\d+(?:\.\d+)?$/.test(raw)
-          ? Number(raw) * 1000
-          : raw ? Date.parse(raw) - Date.now() : NaN;
-        if (rateRetries++ < 1 && Number.isFinite(delay) && delay >= 0 && delay <= 30000) {
-          try {
-            await waitWithSignal(delay, signal);
-            continue;
-          } catch {
-            throw createJiraStepError('RATE_LIMIT', 429, 'Rate limit wait cancelled', true);
+        if (!writing) {
+          const raw = response.headers.get('Retry-After')?.trim();
+          const delay = raw && /^\d+(?:\.\d+)?$/.test(raw)
+            ? Number(raw) * 1000
+            : raw ? Date.parse(raw) - Date.now() : NaN;
+          if (rateRetries++ < 1 && Number.isFinite(delay) && delay >= 0 && delay <= 30000) {
+            try {
+              await waitWithSignal(delay, signal);
+              continue;
+            } catch {
+              throw createJiraStepError('RATE_LIMIT', 429, 'Rate limit wait cancelled', false);
+            }
           }
         }
-        throw createJiraStepError('RATE_LIMIT', 429, 'Rate limit exceeded', true);
+        throw createJiraStepError('RATE_LIMIT', 429, 'Rate limit exceeded', !writing);
       }
 
       if (response.status === 404) {

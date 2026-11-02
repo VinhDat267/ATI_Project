@@ -51,6 +51,7 @@ let reply: (request: RequestSeen) => {
   body?: any;
   rawBody?: string;
   dropConnection?: boolean;
+  hang?: boolean;
 };
 
 const project = { id: '10000', key: 'ATI', name: 'ATI Project' };
@@ -102,6 +103,10 @@ beforeEach(async () => {
       return;
     }
 
+    if (result.hang) {
+      return;
+    }
+
     res.writeHead(result.status ?? 200, {
       'content-type': 'application/json',
       ...result.headers,
@@ -114,6 +119,9 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  if (typeof (server as any).closeAllConnections === 'function') {
+    (server as any).closeAllConnections();
+  }
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
@@ -596,6 +604,70 @@ describe('PersonalJiraAdapter', () => {
       expect(callCount).toBe(2);
     });
 
+    it('does not retry create_issue after HTTP 429 and returns non-retryable RATE_LIMIT', async () => {
+      let createAttempts = 0;
+      reply = ({ url }) => {
+        if (url.endsWith('/issue')) {
+          createAttempts++;
+          return { status: 429, headers: { 'retry-after': '0.05' }, body: { errorMessages: ['Rate limit exceeded'] } };
+        }
+        return { body: { startAt: 0, total: 1, issueTypes: [{ id: '2', name: 'Task', subtask: false }] } };
+      };
+      await expect(
+        make().execute('myjira.create_issue', { siteId: 'opaque_1', projectKey: 'ATI', summary: 'Bug' })
+      ).rejects.toMatchObject({
+        category: 'RATE_LIMIT',
+        statusCode: 429,
+        retryable: false,
+      });
+      expect(createAttempts).toBe(1);
+    });
+
+    it('does not retry add_comment after HTTP 429 and returns non-retryable RATE_LIMIT', async () => {
+      let commentAttempts = 0;
+      reply = ({ url }) => {
+        if (url.endsWith('/comment')) {
+          commentAttempts++;
+          return { status: 429, headers: { 'retry-after': '0.05' }, body: { errorMessages: ['Rate limit exceeded'] } };
+        }
+        return { body: issue };
+      };
+      await expect(
+        make().execute('myjira.add_comment', { siteId: 'opaque_1', issueKey: 'ATI-42', body: 'Comment' })
+      ).rejects.toMatchObject({
+        category: 'RATE_LIMIT',
+        statusCode: 429,
+        retryable: false,
+      });
+      expect(commentAttempts).toBe(1);
+    });
+
+    it('enforces transport own deadline when caller does not pass AbortSignal (read tool times out as NETWORK)', async () => {
+      reply = () => ({ hang: true });
+      const adapter = make({ timeoutMs: 50 });
+      await expect(
+        adapter.execute('myjira.search_issues', { siteId: 'opaque_1', projectKey: 'ATI' })
+      ).rejects.toMatchObject({
+        category: 'NETWORK',
+      });
+    });
+
+    it('enforces transport own deadline when caller does not pass AbortSignal (write tool times out in-flight as UNKNOWN)', async () => {
+      reply = ({ url }) => {
+        if (url.endsWith('/issue')) {
+          return { hang: true };
+        }
+        return { body: { startAt: 0, total: 1, issueTypes: [{ id: '2', name: 'Task', subtask: false }] } };
+      };
+      const adapter = make({ timeoutMs: 50 });
+      await expect(
+        adapter.execute('myjira.create_issue', { siteId: 'opaque_1', projectKey: 'ATI', summary: 'Bug' })
+      ).rejects.toMatchObject({
+        category: 'UNKNOWN',
+        retryable: false,
+      });
+    });
+
     it('refreshes token on 401 with forceRefresh: true and retries; fails if second attempt also 401', async () => {
       let tokenCalls: Array<{ forceRefresh?: boolean }> = [];
       let token = 'initial-token';
@@ -619,10 +691,12 @@ describe('PersonalJiraAdapter', () => {
       const adapter = make({ tokens: tokenProvider });
       const res = await adapter.execute('myjira.search_issues', { siteId: 'opaque_1', projectKey: 'ATI' });
       expect(res.issues).toHaveLength(1);
-      expect(tokenCalls).toEqual([
-        { forceRefresh: false, signal: undefined },
-        { forceRefresh: true, signal: undefined },
+      expect(tokenCalls).toMatchObject([
+        { forceRefresh: false },
+        { forceRefresh: true },
       ]);
+      expect(tokenCalls[0].signal).toBeInstanceOf(AbortSignal);
+      expect(tokenCalls[1].signal).toBeInstanceOf(AbortSignal);
       expect(seen[0]!.auth).toBe('Bearer initial-token');
       expect(seen[1]!.auth).toBe('Bearer refreshed-token');
 

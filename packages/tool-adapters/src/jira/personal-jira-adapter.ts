@@ -21,6 +21,7 @@ export interface PersonalJiraAdapterConfig extends BaseAdapterConfig {
   apiBaseUrl?: string;
   fetchFn?: typeof fetch;
   rateLimiter?: GlobalRateLimiter;
+  timeoutMs?: number;
 }
 
 interface ScopedProject {
@@ -105,6 +106,7 @@ export class PersonalJiraAdapter extends BaseAdapter {
       tokens: config.tokens,
       fetchFn: config.fetchFn,
       rateLimiter: this.rateLimiter,
+      timeoutMs: config.timeoutMs,
     });
 
     for (const site of config.capabilities.sites) {
@@ -224,14 +226,20 @@ export class PersonalJiraAdapter extends BaseAdapter {
     };
   }
 
-  private async issueByKey(site: ScopedSite, issueKey: string, projectKey: string, signal?: AbortSignal) {
+  private async issueByKey(
+    site: ScopedSite,
+    issueKey: string,
+    projectKey: string,
+    options?: { signal?: AbortSignal; timeoutMs?: number } | AbortSignal
+  ) {
+    const opts = options instanceof AbortSignal ? { signal: options } : options;
     let value: any;
     try {
       value = await this.transport.request(
         site.cloudId,
         '/issue/' + issueKey + '?fields=summary,status,project',
         false,
-        { signal }
+        opts
       );
     } catch (error) {
       if (error instanceof StepError && error.category === 'NOT_FOUND') return null;
@@ -244,8 +252,9 @@ export class PersonalJiraAdapter extends BaseAdapter {
   private async issueTypes(
     cloudId: string,
     projectKey: string,
-    signal?: AbortSignal
+    options?: { signal?: AbortSignal; timeoutMs?: number } | AbortSignal
   ): Promise<Array<{ id: string; name: string; subtask: boolean }>> {
+    const opts = options instanceof AbortSignal ? { signal: options } : options;
     const types: Array<{ id: string; name: string; subtask: boolean }> = [];
     let start = 0;
     for (let page = 0; page < 10; page++) {
@@ -253,7 +262,7 @@ export class PersonalJiraAdapter extends BaseAdapter {
         cloudId,
         '/issue/createmeta/' + projectKey + '/issuetypes?startAt=' + start + '&maxResults=50',
         false,
-        { signal }
+        opts
       );
       if (
         !record(value) ||
@@ -292,8 +301,14 @@ export class PersonalJiraAdapter extends BaseAdapter {
     return true;
   }
 
-  async execute(tool: string, args: Record<string, any>, context?: { signal?: AbortSignal }): Promise<any> {
+  async execute(
+    tool: string,
+    args: Record<string, any>,
+    context?: { signal?: AbortSignal; timeoutMs?: number }
+  ): Promise<any> {
     const signal = context?.signal;
+    const timeoutMs = context?.timeoutMs;
+    const callOpts = { signal, ...(timeoutMs !== undefined ? { timeoutMs } : {}) };
 
     if (tool === 'myjira.list_sites') {
       this.input(args, ['query'], ['limit']);
@@ -357,11 +372,11 @@ export class PersonalJiraAdapter extends BaseAdapter {
       const escaped = lucene.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
       const directKey = query.toUpperCase();
       const isDirectKey = JIRA_ISSUE_PATTERN.test(directKey) && directKey.split('-')[0] === proj.key;
-      const direct = isDirectKey ? await this.issueByKey(site, directKey, proj.key, signal) : null;
+      const direct = isDirectKey ? await this.issueByKey(site, directKey, proj.key, callOpts) : null;
 
       const jql = 'project = "' + proj.key + '"' + (query ? ' AND text ~ "' + escaped + '"' : '') + ' ORDER BY updated DESC';
       const value = await this.transport.request(site.cloudId, '/search/jql', false, {
-        signal,
+        ...callOpts,
         method: 'POST',
         body: { jql, maxResults: limit, fields: ['summary', 'status', 'project'] },
       });
@@ -391,7 +406,7 @@ export class PersonalJiraAdapter extends BaseAdapter {
         throw fail('VALIDATION');
       }
 
-      const types = await this.issueTypes(site.cloudId, proj.key, signal);
+      const types = await this.issueTypes(site.cloudId, proj.key, callOpts);
       const standard = types.filter((type) => type.subtask === false);
       const selected =
         args.issueType !== undefined
@@ -408,7 +423,7 @@ export class PersonalJiraAdapter extends BaseAdapter {
       }
 
       const value = await this.transport.request(site.cloudId, '/issue', true, {
-        signal,
+        ...callOpts,
         method: 'POST',
         body: {
           fields: {
@@ -448,7 +463,7 @@ export class PersonalJiraAdapter extends BaseAdapter {
         site.cloudId,
         '/issue/' + args.issueKey + '?fields=project',
         false,
-        { signal }
+        callOpts
       );
 
       if (!record(issue) || !record(issue.fields?.project) || typeof issue.fields.project.key !== 'string') {
@@ -460,7 +475,7 @@ export class PersonalJiraAdapter extends BaseAdapter {
       const idn = this.identity(issue, site, currentProjectKey);
 
       const value = await this.transport.request(site.cloudId, '/issue/' + idn.key + '/comment', true, {
-        signal,
+        ...callOpts,
         method: 'POST',
         body: { body: plainTextToAdf(args.body) },
       });
