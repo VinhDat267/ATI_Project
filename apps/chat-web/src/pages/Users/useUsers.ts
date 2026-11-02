@@ -55,19 +55,29 @@ export function useUsers(user: User | null) {
 
   useEffect(() => {
     if (canManage) void load();
+    else {
+      generation.current++;
+      setRows([]); setTotal(0); setPendingCount(0); setCounts({ active: 0, locked: 0 });
+      setModal(null); setSelected(null); setError(null); setNotice(null); setLoading(false);
+    }
     return () => { generation.current++; };
-  }, [user?.id, user?.role, canManage, load]);
+  }, [user?.id, user?.role, canManage, workspace.id, load]);
 
   useEffect(() => {
     return subscribeWorkspace(() => {
       const next = getActiveWorkspaceSummary();
-      setWorkspace(next);
+      setWorkspace(prev => {
+        if (prev.id !== next.id) {
+          setRows([]); setTotal(0); setPendingCount(0); setCounts({ active: 0, locked: 0 });
+          setModal(null); setSelected(null); setError(null); setNotice(null);
+        }
+        return next;
+      });
       setInviteCode(next.inviteCode);
       setRequireApproval(next.requireApproval ?? true);
       setWorkspaceName(next.name);
-      void load();
     });
-  }, [load]);
+  }, []);
 
   const closeModal = (_id?: string) => { if (!active.current) { setModal(null); setSelected(null); } };
   usePageDialog(modal, closeModal, busy);

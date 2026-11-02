@@ -86,12 +86,19 @@ interface GatherCandidate { id: string; name: string; [key: string]: unknown }
 interface PendingGather { key: string; query: string; candidates: GatherCandidate[] }
 interface GatherRequest { key: string; query: string; rule: GatherRule }
 
-/** The first message naming a resource wins, so a clarification reply can name resources the original request left out. */
-function entityNames(messages: string[], rules: GatherRule[]): GatherRequest[] {
+/**
+ * The first message naming a resource wins, so a clarification reply can name resources the original request left out.
+ * A registered service's id or name is never a resource name: "kênh Slack" or "bảng Trello" names where the
+ * resource lives, so that match is skipped and the next one in the message is tried.
+ */
+function entityNames(messages: string[], rules: GatherRule[], serviceNames: Set<string>): Array<GatherRequest & { fromMessage: number }> {
   return rules.flatMap((rule) => {
-    for (const message of messages) {
-      const query = rule.pattern.exec(message)?.[1]?.trim();
-      if (query) return [{ key: rule.entityKey, query, rule }];
+    const pattern = new RegExp(rule.pattern.source, rule.pattern.flags.replace(/[gy]/g, '') + 'g');
+    for (const [fromMessage, message] of messages.entries()) {
+      for (const match of message.matchAll(pattern)) {
+        const query = match[1]?.trim();
+        if (query && !serviceNames.has(query.toLocaleLowerCase())) return [{ key: rule.entityKey, query, rule, fromMessage }];
+      }
     }
     return [];
   });
@@ -246,9 +253,10 @@ export class AIPlanner {
     const missing = memory.getEntity<{ key: string }>('__gatherMissing');
     const rules = this.serviceRegistry.flatMap((service) => service.gatherRules ?? [])
       .filter((rule) => this.toolCatalog.some((tool) => tool.name === rule.tool && tool.sideEffect === 'read'));
-    const requests = entityNames(intent === userMessage ? [intent] : [userMessage, intent], rules).map((request) =>
-      missing?.key === request.key ? { ...request, query: userMessage.trim() } : request
-    );
+    const serviceNames = new Set(this.serviceRegistry.flatMap((service) => [service.id, service.name].map((name) => name.toLocaleLowerCase())));
+    // A reply that names the missing resource itself ("kênh general") is searched by that name, not as a whole.
+    const requests: GatherRequest[] = entityNames(intent === userMessage ? [intent] : [userMessage, intent], rules, serviceNames)
+      .map(({ fromMessage, ...request }) => missing?.key === request.key && fromMessage > 0 ? { ...request, query: userMessage.trim() } : request);
     if (missing && !requests.some((request) => request.key === missing.key)) {
       const rule = rules.find((candidate) => candidate.entityKey === missing.key);
       if (rule) requests.unshift({ key: missing.key, query: userMessage.trim(), rule });
