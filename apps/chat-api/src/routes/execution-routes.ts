@@ -56,12 +56,13 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
         res.status(401).json({ error: 'Unauthorized' });
         return;
       }
-      await executionService.getOwnedPlan(planId, userId);
+      const plan = await executionService.getOwnedPlan(planId, userId);
       const rejected = await executionService.getPlanRepo().rejectPlan(planId, userId);
       if (!rejected) {
         res.status(409).json({ error: 'Plan is already decided or expired' });
         return;
       }
+      executionService.clearPlanEvents(plan.conv_id, planId);
       res.status(200).json({ success: true, status: 'rejected' });
     } catch (err: any) {
       res.status(err?.status || 500).json({ error: err?.message || 'Failed to reject plan' });
