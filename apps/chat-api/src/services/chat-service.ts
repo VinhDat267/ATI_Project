@@ -793,11 +793,15 @@ export class ChatService {
     let digestCandidate: ScheduleProposalMetadata['digestCandidate'] | undefined;
     if ((proposal.action === 'create' || proposal.action === 'update') && services.includes('telegram') && this.telegramConnection) {
       const tgLookup = await this.telegramConnection(actor.userId).catch(() => null);
+      const ghLookup = services.includes('github') && this.githubConnection
+        ? await this.githubConnection(actor.userId).catch(() => null)
+        : null;
       digestCandidate = evaluateTelegramDigestCandidate({
         proposal,
         services,
         timeZone: this.schedules.timeZone,
         telegramLookup: tgLookup,
+        githubLookup: ghLookup,
       });
     } else if (
       (proposal.action === 'create' || proposal.action === 'update') &&

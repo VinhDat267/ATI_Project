@@ -102,6 +102,7 @@ export interface GitHubAppOptions {
 /** Telegram as each member's own 1-click connection and selected chats/groups. */
 export interface TelegramAppOptions {
   bot?: TelegramBotConfig;
+  botClient?: TelegramConnectionsOptions['botClient'];
   fetchFn?: typeof fetch;
   telegramTimeoutMs?: number;
   onConnectionChanged?: (userId: string) => void;
@@ -207,6 +208,7 @@ export function createApp(options: AppOptions): Express {
   const telegramRoutes: TelegramConnectionsOptions = {
     jwtSecret: options.jwtSecret, sessionRepo, states, credentialRepo: options.credentialRepo,
     teamRepo: telegramTeamRepo, bot: options.telegram?.bot, encryptionKey: options.encryptionKey, fetchFn: options.telegram?.fetchFn,
+    botClient: options.telegram?.botClient,
     clock: options.authClock, telegramTimeoutMs: options.telegram?.telegramTimeoutMs,
     onConnectionChanged: options.telegram?.onConnectionChanged,
     conversationOwner: options.convRepo ? async (id: string) => (await options.convRepo!.getConversation(id))?.user_id ?? null : undefined,

@@ -807,7 +807,12 @@ export class ScheduleRunner {
       const run = (await client.query('SELECT status FROM schedule_runs WHERE id=$1 FOR UPDATE', [runId])).rows[0];
       if (!schedule || run?.status !== 'planning') return;
 
-      if (schedule.version !== started.toPlan.scheduleVersion || schedule.status === 'cancelled') {
+      // A confirmed send remains a delivery even if the member changes the schedule
+      // after dispatch. Only results that did not send may be discarded.
+      if (outcome.status === 'discarded' || (outcome.status !== 'digest_sent' && (
+        schedule.version !== started.toPlan.scheduleVersion ||
+        schedule.status === 'cancelled' || schedule.status === 'paused'
+      ))) {
         await this.messages.createMessage(
           started.convId,
           'system',

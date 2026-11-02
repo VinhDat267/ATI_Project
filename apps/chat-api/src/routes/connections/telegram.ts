@@ -29,6 +29,7 @@ export interface TelegramConnectionsOptions {
   bot?: TelegramBotConfig;
   encryptionKey?: string;
   fetchFn?: typeof fetch;
+  botClient?: TelegramBotClient;
   clock?: () => number;
   telegramTimeoutMs?: number;
   onConnectionChanged?: (userId: string) => void;
@@ -74,7 +75,7 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
   const router = Router();
   const clock = options.clock ?? Date.now;
   const timeoutMs = options.telegramTimeoutMs ?? 10_000;
-  const botClient = options.bot ? new TelegramBotClient(options.bot, options.fetchFn) : undefined;
+  const botClient = options.botClient ?? (options.bot ? new TelegramBotClient(options.bot, options.fetchFn) : undefined);
   const auth = createAuthMiddleware(options.jwtSecret, { sessionRepo: options.sessionRepo, clock });
 
   router.use((_req, res, next) => {
