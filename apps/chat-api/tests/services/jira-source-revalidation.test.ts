@@ -81,6 +81,10 @@ describe('JIRA-05 source revalidation against real PostgreSQL', () => {
     verifierResult = { canBrowse: false, canCreateIssue: false, canAddComment: false, status: 'unavailable' };
     expect(await service.revalidateSource(userId, source)).toEqual({ allowed: false, reason: 'provider_unavailable' });
   });
+  it('treats an unknown native status as provider unavailable even if canBrowse is true', async () => {
+    verifierResult = { canBrowse: true, canCreateIssue: true, canAddComment: true, status: 'unexpected' as 'granted' };
+    expect(await service.revalidateSource(userId, source)).toEqual({ allowed: false, reason: 'provider_unavailable' });
+  });
   it('rejects invalid evidence', async () => {
     expect(await service.revalidateSource(userId, {} as JiraSourceRef)).toEqual({ allowed: false, reason: 'invalid_evidence' });
   });

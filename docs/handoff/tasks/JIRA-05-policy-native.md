@@ -181,6 +181,8 @@ DATABASE_URL="$TEST_DATABASE_URL" npm run check
 
 ## 5. Kết quả
 
-- **Trạng thái:** Chưa thi công code (Planning Phase).
-- **Commit kế hoạch:** Sẽ ghi nhận sau khi tạo task card và plan.
-- **Bằng chứng chạy thử:** Sẽ được điền sau khi thực hiện TDD RED/GREEN theo kế hoạch.
+- **Trạng thái:** Đã triển khai trên nhánh `longnguyen005/jira-05-policy`; chờ PR, CI và review của chủ dự án.
+- **Commit kế hoạch:** `01c0be6`; các commit code: `c6f2da1`, `e8a75fe`, `30e4a2e`, `686e903` và commit hoàn thiện trong PR.
+- **Kết quả:** Thêm migration lease 0022, verifier quyền native Atlassian, cache phân vùng theo danh tính/ngữ cảnh, cấp và thu hồi lease qua transaction PostgreSQL, capability directory, revalidation nguồn Jira và che lịch sử khi mất quyền. Giữ `MYJIRA_ENABLED=off` và HTTP 503 tạo hội thoại Jira ở production. Bộ đệm SSE độc lập dành cho JIRA-08.
+- **Bằng chứng chạy thử:** PostgreSQL synthetic riêng; migration 0001–0022 thành công. `npm run check` exit 0 (schemas 341, adapters 468, planner 381, executor 42, API 1.567, web 960, evaluation 406; build/security/launcher/node suites đạt). `SCENARIO=jira_slack npm run test:browser:v3` đạt 1/1 trên Chromium và PostgreSQL riêng. Reviewer Antigravity Gemini 3.8 Flash High kết luận ĐẠT sau khi sửa lỗi khóa grant và phân loại quyền native; reviewer không tự chạy test.
+- **Giới hạn:** Chưa nối bộ đệm SSE vào producer hay mở tạo hội thoại Jira production; thuộc JIRA-08. Chưa gọi Jira live; native API được kiểm tra bằng loopback fixture.

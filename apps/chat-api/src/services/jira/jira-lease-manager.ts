@@ -77,7 +77,7 @@ export class JiraLeaseManager {
         `SELECT g.id FROM jira_oauth_grants g
          JOIN jira_grant_sites s ON s.grant_id = g.id
          WHERE g.account_id = $1 AND g.status = 'active' AND s.cloud_id = $2 AND s.product_type = 'jira'
-         ORDER BY g.created_at DESC LIMIT 1`,
+         ORDER BY g.created_at DESC LIMIT 1 FOR SHARE OF g, s`,
         [account.id, params.cloudId]
       );
       if (grants.rowCount !== 1) fail('active site grant unavailable');

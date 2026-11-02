@@ -324,6 +324,7 @@ export class JiraNativeVerifier implements ExtendedNativeVerifier {
       canBrowse: resolvePerm('BROWSE_PROJECTS', 'canBrowse'),
       canCreateIssue: resolvePerm('CREATE_ISSUES', 'canCreateIssue'),
       canAddComment: resolvePerm('ADD_COMMENTS', 'canAddComment'),
+      status: 'granted',
     };
     if (res.ok) this.putCached(cacheKey, result);
     return result;

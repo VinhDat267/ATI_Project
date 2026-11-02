@@ -651,6 +651,26 @@ describe('JiraLeaseManager (JIRA-05 Task 3 Real PostgreSQL Tests)', () => {
       const row = await ctx.pool.query<{ status: string }>('SELECT status FROM jira_authorization_leases WHERE lease_id = $1', [lease.leaseId]);
       expect(row.rows[0]!.status).toBe('revoked');
     });
+    it('cannot acquire a lease from an OAuth grant revoked by a concurrent transaction', async () => {
+      const fixture = await seedJiraWorkspaceFixture(ctx.pool, 'grant_race');
+      const holder = await ctx.pool.connect();
+      try {
+        await holder.query('BEGIN');
+        await holder.query("UPDATE jira_oauth_grants SET status = 'revoked' WHERE id = $1", [fixture.grantId]);
+        const leaseManager = new JiraLeaseManager({ pool: ctx.pool, tokenManager: createStubTokenManager() });
+        const acquisition = leaseManager.acquireLease({ userId: fixture.userId, workspaceId: fixture.workspaceId, cloudId: fixture.cloudId });
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        await holder.query('COMMIT');
+        await expect(acquisition).rejects.toThrow();
+        const rows = await ctx.pool.query<{ count: string }>(
+          'SELECT count(*)::text AS count FROM jira_authorization_leases WHERE grant_id = $1', [fixture.grantId]
+        );
+        expect(rows.rows[0]!.count).toBe('0');
+      } finally {
+        await holder.query('ROLLBACK').catch(() => {});
+        holder.release();
+      }
+    });
     it('marks active leases as revoked by workspaceId and records released_at timestamp', async () => {
       const fixtureA = await seedJiraWorkspaceFixture(ctx.pool, 'rev_ws_a');
       const fixtureB = await seedJiraWorkspaceFixture(ctx.pool, 'rev_ws_b');

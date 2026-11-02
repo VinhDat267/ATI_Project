@@ -217,6 +217,7 @@ describe('JiraNativeVerifier (Task 2 Tests)', () => {
         canBrowse: true,
         canCreateIssue: true,
         canAddComment: true,
+        status: 'granted',
       });
 
       // Verify query params sent to /mypermissions
@@ -258,6 +259,7 @@ describe('JiraNativeVerifier (Task 2 Tests)', () => {
         canBrowse: true,
         canCreateIssue: false,
         canAddComment: true,
+        status: 'granted',
       });
     });
 
@@ -290,6 +292,7 @@ describe('JiraNativeVerifier (Task 2 Tests)', () => {
         canBrowse: true,
         canCreateIssue: true,
         canAddComment: false,
+        status: 'granted',
       });
 
       const req = fixture.requests.find((r) => r.path.includes('/mypermissions'));

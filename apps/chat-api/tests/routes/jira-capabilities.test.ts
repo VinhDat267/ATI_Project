@@ -55,7 +55,7 @@ class MockExtendedNativeVerifier implements ExtendedNativeVerifier {
     permission: NativeUserPermissionsResult
   ): void {
     const key = `${userId}:${cloudId}:${projectId ?? 'global'}`;
-    this.permissionsMap.set(key, permission);
+    this.permissionsMap.set(key, { ...permission, status: permission.status ?? 'granted' });
   }
 
   clear(): void {
@@ -483,6 +483,23 @@ describe('apps/chat-api — JIRA-05 Task 4 Capabilities Route (GET /api/jira-wor
   // Suite 2: Disconnected User Safe Empty
   // ============================================================================
   describe('2. Disconnected User Safe Empty Handling', () => {
+    it('fails closed when native verifier returns an unknown status with canBrowse true', async () => {
+      const user = await createActor('Unknown Native', 'unknown_native');
+      const workspaceId = await seedWorkspace('Unknown Native Workspace', `native-${randomUUID()}`, user.id);
+      await seedMembership(workspaceId, user.id, 'admin', 'active');
+      const cloudId = `cloud-native-${randomUUID()}`;
+      await seedWorkspaceSite(workspaceId, cloudId);
+      const accountId = await seedJiraAccount(user.id);
+      await seedGrant(accountId, cloudId);
+      mockVerifier.setUserPermission(user.id, cloudId, undefined, {
+        canBrowse: true, canCreateIssue: true, canAddComment: true, status: 'unexpected' as 'granted',
+      });
+      const response = await request(buildApp(workspaceRepoWithVerifier))
+        .get(`/api/jira-workspaces/${workspaceId}/jira-capabilities`)
+        .set('Authorization', `Bearer ${user.token}`);
+      expect(response.status).toBe(503);
+      expect(JSON.stringify(response.body)).not.toContain(cloudId);
+    });
     it('hides capabilities when membership is revoked while native verification is in flight', async () => {
       const user = await createActor('Racing Member', 'race_member');
       const workspaceId = await seedWorkspace('Race Workspace', `race-${randomUUID()}`, user.id);

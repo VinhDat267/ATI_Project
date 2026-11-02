@@ -76,7 +76,10 @@ export class JiraPolicyService {
             workspaceId: source.workspaceId, cloudId: source.cloudId,
             ...(source.projectId ? { projectId: source.projectId } : {}),
           }, options);
-          nativePermission = native.status === 'unavailable' ? 'unavailable' : native.status === 'denied' || !native.canBrowse ? 'denied' : 'granted';
+          nativePermission = native.status === 'unavailable' ? 'unavailable'
+            : native.status === 'denied' ? 'denied'
+            : native.status === 'granted' ? (native.canBrowse ? 'granted' : 'denied')
+            : 'unavailable';
         } catch { nativePermission = 'unavailable'; }
       }
       const policy: JiraModelPolicy = {

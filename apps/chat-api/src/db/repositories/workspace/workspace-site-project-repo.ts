@@ -1144,14 +1144,18 @@ export class WorkspaceSiteProjectRepo {
         if (!site) {
           const nativeSite = await verifier.verifyUserPermissions({ actorId, workspaceId, cloudId: row.cloud_id, localAccountId: account.rows[0].id, identityVersion: account.rows[0].identity_version });
           if (nativeSite.status === 'unavailable') throw new Error('Native site permission unavailable');
-          if (nativeSite.status === 'denied' || !nativeSite.canBrowse) continue;
+          if (nativeSite.status === 'denied') continue;
+          if (nativeSite.status !== 'granted') throw new Error('Unknown native site permission status');
+          if (!nativeSite.canBrowse) continue;
           site = { siteId: row.site_id, cloudId: row.cloud_id, name: row.site_name, url: row.site_url, projects: [] };
           sites.set(row.site_id, site);
         }
         if (!row.project_id) continue;
         const nativeProject = await verifier.verifyUserPermissions({ actorId, workspaceId, cloudId: row.cloud_id, projectId: row.project_id, localAccountId: account.rows[0].id, identityVersion: account.rows[0].identity_version });
         if (nativeProject.status === 'unavailable') throw new Error('Native project permission unavailable');
-        if (nativeProject.status !== 'denied' && nativeProject.canBrowse) site.projects.push({ id: row.project_id, key: row.project_key ?? '', name: row.project_name ?? '' });
+        if (nativeProject.status === 'denied') continue;
+        if (nativeProject.status !== 'granted') throw new Error('Unknown native project permission status');
+        if (nativeProject.canBrowse) site.projects.push({ id: row.project_id, key: row.project_key ?? '', name: row.project_name ?? '' });
       }
     } catch {
       throw new WorkspaceRepoError(503, 'NATIVE_VERIFIER_UNAVAILABLE', 'Jira native permission verifier unavailable');
