@@ -40,9 +40,11 @@ export interface ValidatePlanOptions {
 export const INJECTION_PATTERNS = [
   /<\|im_start\|>/i,
   /<\|im_end\|>/i,
-  /ignore previous instructions/i,
+  /ignore (?:all |any )?(?:previous|prior|above) instructions/i,
+  /bỏ qua (?:mọi |tất cả )?(?:chỉ dẫn|hướng dẫn)(?: trước)?/i,
   /system prompt override/i,
   /you are now in developer mode/i,
+  /disregard (?:all |any )?(?:previous|prior|above) instructions/i,
 ];
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -199,6 +201,116 @@ function findMembersOffBoard(steps: PlanStep[], memory: Record<string, any>): Un
   return offBoard;
 }
 
+function matchesWordExact(text: string, token: string): boolean {
+  if (!token) return false;
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/gu, (m) => '\\' + m);
+  return new RegExp(`(?<![\\p{L}\\p{N}_-]|(?:[\\p{L}\\p{N}]\\.))${escaped}(?![\\p{L}\\p{N}_-]|(?:\\.[\\p{L}\\p{N}]))`, 'iu').test(text);
+}
+
+function findAmbiguousSites(steps: PlanStep[], grounding: GroundingContext): UngroundedArgument[] {
+  const sites = grounding.memory.jira_site;
+  const availableSites = (Array.isArray(sites) ? sites : sites ? [sites] : [])
+    .filter((s): s is Record<string, unknown> => isObject(s) && (typeof s.siteId === 'string' || typeof s.id === 'string'));
+  if (availableSites.length <= 1) return [];
+
+  const JIRA_GENERIC_WORDS = new Set([
+    ['j', 'i', 'r', 'a'].join(''),
+    'atlassian', 'net', 'com', 'site', 'cloud', 'workspace', 'http', 'https', 'www', 'app', 'instance', 'org', 'io',
+  ]);
+
+  const extractTokens = (s: Record<string, unknown>): Set<string> => {
+    const tokens = new Set<string>();
+    const siteId = typeof s.siteId === 'string' ? s.siteId.trim().toLowerCase() : '';
+    const id = typeof s.id === 'string' ? s.id.trim().toLowerCase() : '';
+    const cloudId = typeof s.cloudId === 'string' ? s.cloudId.trim().toLowerCase() : '';
+    if (siteId) tokens.add(siteId);
+    if (id) tokens.add(id);
+    if (cloudId) tokens.add(cloudId);
+
+    if (typeof s.name === 'string') {
+      const name = s.name.trim().toLowerCase();
+      if (name) tokens.add(name);
+      for (const word of name.split(/[^\p{L}\p{N}]+/u)) {
+        if (word.length >= 2 && !JIRA_GENERIC_WORDS.has(word)) {
+          tokens.add(word);
+        }
+      }
+    }
+
+    if (typeof s.url === 'string') {
+      const rawUrl = s.url.trim().toLowerCase();
+      tokens.add(rawUrl);
+      try {
+        const parsed = new URL(rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`);
+        tokens.add(parsed.hostname);
+        const parts = parsed.hostname.split('.');
+        if (parts.length > 2 && parts[0] && parts[0].length >= 2 && !JIRA_GENERIC_WORDS.has(parts[0])) {
+          tokens.add(parts[0]);
+        }
+      } catch {
+        const match = rawUrl.match(/(?:https?:\/\/)?([a-z0-9_-]+)(?:\.[a-z0-9_.-]+)?/i);
+        if (match?.[1] && match[1].length >= 2 && !JIRA_GENERIC_WORDS.has(match[1].toLowerCase())) {
+          tokens.add(match[1].toLowerCase());
+        }
+      }
+    }
+    return tokens;
+  };
+
+  const siteTokenMaps = availableSites.map((s) => ({
+    site: s,
+    tokens: extractTokens(s),
+  }));
+
+  const tokenFrequencies = new Map<string, number>();
+  for (const { tokens } of siteTokenMaps) {
+    for (const token of tokens) {
+      tokenFrequencies.set(token, (tokenFrequencies.get(token) ?? 0) + 1);
+    }
+  }
+
+  const sitesMatchingText = (text: string): Record<string, unknown>[] => {
+    const matched: Record<string, unknown>[] = [];
+    for (const item of siteTokenMaps) {
+      const s = item.site;
+      // Distinctive tokens are those that appear in ONLY this site among availableSites
+      const distinctiveTokens = Array.from(item.tokens).filter((token) => tokenFrequencies.get(token) === 1);
+      const matches = distinctiveTokens.some((token) => matchesWordExact(text, token));
+      if (matches) {
+        matched.push(s);
+      }
+    }
+    return matched;
+  };
+
+  let targetSites: Record<string, unknown>[] = [];
+  const userTexts = grounding.userTexts ?? [];
+  for (let i = userTexts.length - 1; i >= 0; i--) {
+    const text = userTexts[i];
+    if (!text) continue;
+    const matched = sitesMatchingText(text);
+    if (matched.length > 0) {
+      targetSites = matched;
+      break;
+    }
+  }
+
+  const ambiguous: UngroundedArgument[] = [];
+  for (const step of steps) {
+    if (!step.tool.startsWith('myjira.') || typeof step.args?.siteId !== 'string') continue;
+    const matchesTarget = targetSites.some((s) => String(s.siteId ?? s.id) === step.args.siteId);
+    if (!matchesTarget) {
+      ambiguous.push({
+        stepId: step.id,
+        argument: 'siteId',
+        resource: 'jira_site',
+        value: step.args.siteId,
+      });
+    }
+  }
+  return ambiguous;
+}
+
 function findUngrounded(steps: PlanStep[], catalog: Map<string, ToolDefinition>, grounding: GroundingContext): UngroundedArgument[] {
   const typed = userTokens(grounding.userTexts);
   const typedEmails = userEmailAddresses(grounding.userTexts);
@@ -221,6 +333,57 @@ function findUngrounded(steps: PlanStep[], catalog: Map<string, ToolDefinition>,
       for (const value of values) {
         // $ref/$template values come from an earlier step's real output.
         if (typeof value !== 'string' && typeof value !== 'number') continue;
+        if (resource === 'jira_site') {
+          const siteEntries = grounding.memory.jira_site;
+          const sites = (Array.isArray(siteEntries) ? siteEntries : siteEntries ? [siteEntries] : [])
+            .filter((s): s is Record<string, unknown> => isObject(s));
+          const verifiedSiteIds = new Set(
+            sites
+              .filter((s) => typeof s.cloudId === 'string' && Boolean(s.cloudId.trim()) && typeof s.workspaceId === 'string' && Boolean(s.workspaceId.trim()))
+              .flatMap((s) => [
+                typeof s.siteId === 'string' ? s.siteId : undefined,
+                typeof s.id === 'string' ? String(s.id) : undefined,
+                typeof s.cloudId === 'string' ? s.cloudId : undefined,
+              ]).filter((id): id is string => typeof id === 'string')
+          );
+          if (!verifiedSiteIds.has(String(value))) {
+            ungrounded.push({ stepId: step.id, argument, resource, value });
+          }
+          continue;
+        }
+        if (step.tool.startsWith('myjira.') && (resource === 'jira_project' || resource === 'jira_issue') &&
+          typeof step.args.siteId === 'string') {
+          const siteEntries = grounding.memory.jira_site;
+          const sites = (Array.isArray(siteEntries) ? siteEntries : siteEntries ? [siteEntries] : [])
+            .filter((s): s is Record<string, unknown> => isObject(s));
+          const targetSite = sites.find((s) => s.siteId === step.args.siteId || s.id === step.args.siteId);
+
+          if (!targetSite ||
+              typeof targetSite.cloudId !== 'string' || !targetSite.cloudId.trim() ||
+              typeof targetSite.workspaceId !== 'string' || !targetSite.workspaceId.trim()) {
+            ungrounded.push({ stepId: step.id, argument, resource, value });
+            continue;
+          }
+
+          const entries = grounding.memory[resource];
+          const observed = (Array.isArray(entries) ? entries : [entries]).filter((entry): entry is Record<string, unknown> =>
+            isObject(entry) && String(entry[schema['x-resource-field'] ?? 'id']) === String(value));
+          if (observed.length > 0) {
+            const matchesSite = observed.some((entry) => {
+              if (entry.siteId !== step.args.siteId) return false;
+              if (typeof entry.cloudId !== 'string' || !entry.cloudId.trim() || entry.cloudId !== targetSite.cloudId) return false;
+              if (typeof entry.workspaceId !== 'string' || !entry.workspaceId.trim() || entry.workspaceId !== targetSite.workspaceId) return false;
+              return true;
+            });
+            if (!matchesSite) {
+              ungrounded.push({ stepId: step.id, argument, resource, value });
+              continue;
+            }
+          } else {
+            ungrounded.push({ stepId: step.id, argument, resource, value });
+            continue;
+          }
+        }
         if (known.has(String(value)) || typed.has(String(value))) continue;
         ungrounded.push({ stepId: step.id, argument, resource, value });
       }
@@ -453,10 +616,37 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
         };
       }
 
+      const targetStep = stepMap.get(targetStepId);
+      if (
+        targetStep &&
+        step.tool.startsWith('myjira.') &&
+        targetStep.tool.startsWith('myjira.') &&
+        typeof step.args?.siteId === 'string' &&
+        typeof targetStep.args?.siteId === 'string'
+      ) {
+        let isCross = step.args.siteId !== targetStep.args.siteId;
+        if (!isCross && options.grounding?.memory?.jira_site) {
+          const siteEntries = options.grounding.memory.jira_site;
+          const sites = (Array.isArray(siteEntries) ? siteEntries : [siteEntries]).filter(isObject);
+          const siteA = sites.find((s) => String(s.siteId ?? s.id) === step.args.siteId);
+          const siteB = sites.find((s) => String(s.siteId ?? s.id) === targetStep.args.siteId);
+          if (siteA && siteB) {
+            if (siteA.cloudId && siteB.cloudId && siteA.cloudId !== siteB.cloudId) isCross = true;
+            if (siteA.workspaceId && siteB.workspaceId && siteA.workspaceId !== siteB.workspaceId) isCross = true;
+          }
+        }
+        if (isCross) {
+          return {
+            valid: false,
+            layer: 'semantic',
+            error: `Cross-site reference: step '${step.id}' on site '${step.args.siteId}' cannot reference output of step '${targetStepId}' on site '${targetStep.args.siteId}'`,
+          };
+        }
+      }
+
       // If referencing targetStepId.output.<prop>, verify prop exists in outputSchema
       if (parts[1] === 'output' && parts[2]) {
         const propName = parts[2];
-        const targetStep = stepMap.get(targetStepId);
         if (targetStep) {
           const targetToolDef = catalogMap.get(targetStep.tool);
           const outSchema = targetToolDef?.outputSchema;
@@ -525,6 +715,15 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
         layer: 'grounding',
         error: `Unverified resource arguments: ${listed}. Use values from Working Memory, a $ref to an earlier step, or return a clarification asking the user for the resource.`,
         ungrounded,
+      };
+    }
+    const ambiguousSites = findAmbiguousSites(steps, options.grounding);
+    if (ambiguousSites.length > 0) {
+      return {
+        valid: false,
+        layer: 'grounding',
+        error: `Ambiguous site destination: multiple Jira sites exist in workspace, but target site was not specified by user: ${ambiguousSites.map(u => `${u.stepId}.siteId=${JSON.stringify(u.value)}`).join(', ')}. Clarify with the user to select the destination site.`,
+        ungrounded: ambiguousSites,
       };
     }
     const offBoard = findMembersOffBoard(steps, options.grounding.memory);

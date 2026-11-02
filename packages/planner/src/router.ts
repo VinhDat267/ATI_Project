@@ -53,6 +53,16 @@ export function routeIntent(
     service.intentKeywords.some((keyword) => mentionsKeyword(intent, keyword)) ||
     service.intentPatterns?.some((pattern) => pattern.test(intent))
   );
+  // The personal Jira service replaces the legacy Jira route whenever it is
+  // registered. Availability is checked below so a disconnected personal
+  // service cannot fall back to the shared Basic-token connection.
+  const personalJira = services.find((service) => service.id === 'myjira');
+  if (personalJira && matched.some((service) => service.id === personalJira.id || (service.name === personalJira.name && service.connection !== 'personal'))) {
+    matched = matched.filter((service) => !(service.name === personalJira.name && service.connection !== 'personal'));
+    if (!matched.some((service) => service.id === personalJira.id)) {
+      matched.push(personalJira);
+    }
+  }
   const hasPersonalCalendar = matched.some((s) => s.connection === 'personal' && s.scopeKey === 'calendars');
   const hasSharedCalendar = matched.some((s) => s.connection !== 'personal' && s.scopeKey === 'calendars');
   if (hasPersonalCalendar && hasSharedCalendar) {
