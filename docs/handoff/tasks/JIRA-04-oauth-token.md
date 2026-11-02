@@ -1,6 +1,6 @@
 # JIRA-04 · OAuth Danh tính & Token Transport Đa Process Jira
 
-**Trạng thái:** Chưa thi công; task card và kế hoạch chi tiết được lập sau khi JIRA-03 (PR #240) và Telegram (PR #247) đã tích hợp vào `main`. Không bật runtime Jira.
+**Trạng thái:** Đã thi công trên nhánh `longnguyen005/jira-04-oauth`; chờ review và merge PR. Runtime Jira mặc định tắt.
 **Nhiệm vụ:** Xây dựng additive migration `0021_jira_oauth_token.sql` (nối tiếp sau `0020_telegram_update_inbox.sql` và `0019_jira_workspaces.sql`), client HTTP Atlassian 3LO OAuth bảo mật (chống rò rỉ secret, chặn redirect, giới hạn body 64KB, cấm override URL ở live, lọc container Jira và fail-closed khi cloudId xung đột), repository OAuth Jira chuyên biệt quản lý danh tính (`jira_accounts`), grant mã hóa AES-256-GCM (`jira_oauth_grants`), snapshot site kèm scopes (`jira_grant_sites`), bảo vệ `findGrantEvidence` của JIRA-03 chỉ chấp nhận grant active, state một lần 10 phút gắn phiên/browser/owner với băm SHA-256 256-bit, quản lý token đa process qua PostgreSQL với ghi nhận ý định refresh bền vững trước HTTP (`refresh_state = 'refreshing'`) không giữ khóa dòng cơ sở dữ liệu qua mạng, worker thứ hai chờ/poll có giới hạn thời gian (không ghi đè intent của worker thứ nhất), cập nhật CAS sau phản hồi bảo đảm Disconnect Wins, chính sách xử lý sự cố crash/timeout chuyển `reconnect_required` chống replay token xoay vòng, ngữ nghĩa tín hiệu hủy `AbortSignal` của caller không làm gián đoạn tiến trình lưu trữ nền, và các endpoint Express `/api/connections/myjira/*` có xác thực chủ sở hữu hội thoại `conversationOwner` theo đúng chuẩn DTO đã duyệt.
 **Quyền lực chuẩn tắc:**
 - Bổ sung thiết kế tích hợp: [Jira dùng workspace tổ chức chung](../../superpowers/specs/2026-11-02-jira-shared-workspace-amendment.md).
@@ -133,24 +133,24 @@ Triển khai cơ chế xác thực Atlassian OAuth 2.0 (3LO) hai pha theo chuẩ
 
 ## 3. Tiêu chí nghiệm thu (Checklist)
 
-- [ ] **Migration Idempotence & Sequential Schema:** Migration `0021_jira_oauth_token.sql` chạy thành công sau `0020_telegram_update_inbox.sql` và `0019_jira_workspaces.sql`. Chạy lặp lại toàn bộ chuỗi migration 0001–0021 nhiều lần trong cùng transaction không phát sinh lỗi.
-- [ ] **Dual-Phase OAuth Flow:**
+- [x] **Migration Idempotence & Sequential Schema:** Migration `0021_jira_oauth_token.sql` chạy thành công sau `0020_telegram_update_inbox.sql` và `0019_jira_workspaces.sql`. Chạy lặp lại toàn bộ chuỗi migration 0001–0021 nhiều lần trong cùng transaction không phát sinh lỗi.
+- [x] **Dual-Phase OAuth Flow:**
   - Pha 1 (`mode = 'identity'`): Khởi tạo và callback thành công chỉ với scope `read:me` và `offline_access`. Trạng thái kết nối chuyển thành `'identity_connected'`.
   - Pha 2 (`mode = 'authorize_sites'`): Cho phép người dùng đã kết nối danh tính cấp bổ sung quyền truy cập Jira sites với các scope Jira. Snapshot các site hợp lệ kèm scopes được lưu bền vững vào `jira_grant_sites`. Trạng thái chuyển thành `'connected'` (nếu có >= 1 site) hoặc `'scope_required'` (nếu 0 site).
-- [ ] **Strict Identity Binding & Anti-Swap:**
+- [x] **Strict Identity Binding & Anti-Swap:**
   - Một tài khoản ATI chỉ được gắn tối đa 1 Atlassian identity active. Cố gắng kết nối tài khoản Atlassian khác khi đang active bị từ chối với lỗi rõ ràng `ACCOUNT_CHANGED`.
   - Một tài khoản Atlassian active không thể bị chiếm dụng bởi người dùng ATI khác (`ATLASSIAN_ACCOUNT_IN_USE`), bảo vệ bằng chỉ mục unique và transaction lock.
   - Trong luồng cấp quyền site (`authorize_sites`), nếu tài khoản Atlassian trả về khác với tài khoản đã liên kết ở Pha 1, yêu cầu bị từ chối ngay lập tức.
-- [ ] **State & Session Security:** State ngẫu nhiên 256-bit băm SHA-256, liên kết chặt chẽ với owner ATI, session ID đang hoạt động, và cookie `ati_jira_browser`. Hạn sử dụng đúng 10 phút. Tiêu thụ một lần duy nhất; callback lặp lại (replay) hoặc dùng sai phiên/browser bị từ chối mã lỗi `JIRA_STATE_INVALID`.
-- [ ] **Return-To Authorization:** Tham số `returnTo` kiểm tra quyền sở hữu qua `conversationOwner`; chỉ chấp nhận định dạng `/c/<uuid>` của chính người gọi tạo ra; nếu chỉ định hội thoại của người khác hoặc URL tùy ý, từ chối với mã lỗi `RETURN_TO_INVALID`.
-- [ ] **Encrypted Storage:** Access token và refresh token lưu trong cơ sở dữ liệu luôn được bọc trong object payload `{ token: string }` và mã hóa bằng AES-256-GCM qua hàm chuẩn của hệ thống; không bao giờ lưu trữ plaintext token.
-- [ ] **Multi-Process Concurrency & Non-Blocking Refresh:** Khi 2 tiến trình worker cùng yêu cầu access token cho một grant đã hết hạn trên PostgreSQL thật, Worker 1 ghi nhận intent và nhả lock DB; Worker 2 thấy intent đang active thì nhả lock và poll chờ Worker 1 (không ghi đè intent hay gọi HTTP lặp lại); đúng 1 cuộc gọi HTTP được thực hiện tới Atlassian.
-- [ ] **Durable Refresh Intent & Crash-Unknown Recovery:** Trước khi phát HTTP refresh, tiến trình ghi nhận trạng thái `refreshing` kèm ID và thời gian bắt đầu vào DB. Nếu xảy ra sự cố sập tiến trình hoặc lỗi mạng không xác định kết quả, grant tự động được đánh dấu chuyển sang `reconnect_required` với lý do rõ ràng, ngăn chặn việc sử dụng lại refresh token đã bị vô hiệu hóa.
-- [ ] **Disconnect Wins:** Khi người dùng gửi yêu cầu `DELETE /api/connections/myjira`, hệ thống tăng `identity_version`, thu hồi grant, và xóa token. Nếu có một tiến trình refresh đang bay hoặc phản hồi về muộn sau khi ngắt kết nối, kết quả refresh mới bị hủy bỏ ngay lập tức và grant vẫn giữ trạng thái bị thu hồi.
-- [ ] **AbortSignal Resilience:** Khi caller hủy request (ngắt kết nối client hoặc timeout caller), tín hiệu hủy ngắt caller nhưng không làm gián đoạn hoặc làm hỏng tiến trình refresh nền đang ghi dữ liệu vào PostgreSQL; caller thứ hai gọi vào vẫn nhận được token mới thành công.
-- [ ] **Zero Secret Leakage:** Toàn bộ thông điệp lỗi, log hệ thống, response trả về client, và stack trace tuyệt đối không chứa client secret, access token, refresh token, hoặc authorization code. Query parameters chứa code/state trên callback URL được xóa sau khi xử lý.
-- [ ] **JIRA-03 Fail-Closed Site/Project Protection:** Khi grant chuyển sang `reconnect_required` hoặc `revoked`, `findGrantEvidence` từ chối với `GRANT_NOT_FOUND`, bảo đảm không cho phép link site hoặc cấu hình project trên grant degraded.
-- [ ] **Flag-Off & Catalog Invariant:** Giữ nguyên cờ tắt `MYJIRA_ENABLED=off` mặc định; không thực hiện bất kỳ cuộc gọi HTTP nào tới API Jira thật trong quá trình kiểm thử; catalog và registry của main giữ nguyên không đổi.
+- [x] **State & Session Security:** State ngẫu nhiên 256-bit băm SHA-256, liên kết chặt chẽ với owner ATI, session ID đang hoạt động, và cookie `ati_jira_browser`. Hạn sử dụng đúng 10 phút. Tiêu thụ một lần duy nhất; callback lặp lại (replay) hoặc dùng sai phiên/browser bị từ chối mã lỗi `JIRA_STATE_INVALID`.
+- [x] **Return-To Authorization:** Tham số `returnTo` kiểm tra quyền sở hữu qua `conversationOwner`; chỉ chấp nhận định dạng `/c/<uuid>` của chính người gọi tạo ra; nếu chỉ định hội thoại của người khác hoặc URL tùy ý, từ chối với mã lỗi `RETURN_TO_INVALID`.
+- [x] **Encrypted Storage:** Access token và refresh token lưu trong cơ sở dữ liệu luôn được bọc trong object payload `{ token: string }` và mã hóa bằng AES-256-GCM qua hàm chuẩn của hệ thống; không bao giờ lưu trữ plaintext token.
+- [x] **Multi-Process Concurrency & Non-Blocking Refresh:** Khi 2 tiến trình worker cùng yêu cầu access token cho một grant đã hết hạn trên PostgreSQL thật, Worker 1 ghi nhận intent và nhả lock DB; Worker 2 thấy intent đang active thì nhả lock và poll chờ Worker 1 (không ghi đè intent hay gọi HTTP lặp lại); đúng 1 cuộc gọi HTTP được thực hiện tới Atlassian.
+- [x] **Durable Refresh Intent & Crash-Unknown Recovery:** Trước khi phát HTTP refresh, tiến trình ghi nhận trạng thái `refreshing` kèm ID và thời gian bắt đầu vào DB. Nếu xảy ra sự cố sập tiến trình hoặc lỗi mạng không xác định kết quả, grant tự động được đánh dấu chuyển sang `reconnect_required` với lý do rõ ràng, ngăn chặn việc sử dụng lại refresh token đã bị vô hiệu hóa.
+- [x] **Disconnect Wins:** Khi người dùng gửi yêu cầu `DELETE /api/connections/myjira`, hệ thống tăng `identity_version`, thu hồi grant, và xóa token. Nếu có một tiến trình refresh đang bay hoặc phản hồi về muộn sau khi ngắt kết nối, kết quả refresh mới bị hủy bỏ ngay lập tức và grant vẫn giữ trạng thái bị thu hồi.
+- [x] **AbortSignal Resilience:** Khi caller hủy request (ngắt kết nối client hoặc timeout caller), tín hiệu hủy ngắt caller nhưng không làm gián đoạn hoặc làm hỏng tiến trình refresh nền đang ghi dữ liệu vào PostgreSQL; caller thứ hai gọi vào vẫn nhận được token mới thành công.
+- [x] **Zero Secret Leakage:** Toàn bộ thông điệp lỗi, log hệ thống, response trả về client, và stack trace tuyệt đối không chứa client secret, access token, refresh token, hoặc authorization code. Query parameters chứa code/state trên callback URL được xóa sau khi xử lý.
+- [x] **JIRA-03 Fail-Closed Site/Project Protection:** Khi grant chuyển sang `reconnect_required` hoặc `revoked`, `findGrantEvidence` từ chối với `GRANT_NOT_FOUND`, bảo đảm không cho phép link site hoặc cấu hình project trên grant degraded.
+- [x] **Flag-Off & Catalog Invariant:** Giữ nguyên cờ tắt `MYJIRA_ENABLED=off` mặc định; không thực hiện bất kỳ cuộc gọi HTTP nào tới API Jira thật trong quá trình kiểm thử; catalog và registry của main giữ nguyên không đổi.
 
 ---
 
@@ -194,4 +194,10 @@ DATABASE_URL="$TEST_DATABASE_URL" npm run check
 
 ## 5. Kết quả
 
-*(Phần này được để trống theo quy định. Agent thi công sẽ điền đầy đủ kết quả thực tế, bằng chứng chạy kiểm thử, tỷ lệ bắt đột biến và commit SHA sau khi hoàn thành).*
+- **Commit triển khai:** `61a9e44` (`feat(jira): add OAuth identity and durable token transport`). Commit kế hoạch: `f5d9340`.
+- **Schema:** Thêm `0021_jira_oauth_token.sql`; cập nhật allowlist mode Jira trong 7 migration cũ vì runner chạy lặp lại toàn bộ SQL. Test PostgreSQL thật kiểm tra chuỗi 0001–0021 chạy hai lần trong transaction và ràng buộc dữ liệu: 13/13 xanh.
+- **OAuth:** Client Atlassian 3LO hai pha, lọc Jira scopes, từ chối site URL/cloud ID không an toàn và cloud ID xung đột; repository mã hóa token; state dùng một lần gắn browser, session và owner; router start/callback/status/sync/disconnect. Cờ `MYJIRA_ENABLED` mặc định `off`.
+- **Token transport:** Refresh intent bền vững trên PostgreSQL, chờ giữa hai worker, CAS sau HTTP, crash-unknown và Disconnect Wins. Test sử dụng hai DB pools và `FOR UPDATE NOWAIT` thật; 14/14 xanh.
+- **TDD và kiểm tra:** Test âm tính URL/cloud ID đỏ 4/39 trước sửa, xanh 39/39 sau sửa. Test cookie xóa khi disconnect đỏ 1/24 trước sửa, xanh 24/24 sau sửa. `npm run typecheck:v3`: exit 0. `npm run check` với PostgreSQL chuyên dụng `ati_jira04`, `RUNTIME_MODE=sandbox`: exit 0; schemas 341, adapters 468, planner 381, executor 42, API 1422, web 960, evaluation 406 test xanh; build, security, launcher và node suites cũng xanh. Không gọi Jira thật.
+- **Review:** Các reviewer Antigravity độc lập duyệt từng phần; review tổng thể ghi SPEC PASS. Các góp ý về cửa sổ refresh 60 giây, xóa cookie và static guard đã xử lý trước full check. Reviewer cuối cùng trên PR và CI vẫn là cổng nghiệm thu trước merge.
+- **Khác kế hoạch:** Thêm một ngoại lệ chính xác cho `jira-oauth-client.ts` trong static guard để service-specific OAuth client được gọi tên Jira, không nới quy tắc chung. Cập nhật một test JIRA-03 từ đổi `product_type` sang xóa grant-site giữa request vì DB mới cấm product type khác Jira. Chưa chạy mutation testing; không ghi tỷ lệ bắt đột biến.
