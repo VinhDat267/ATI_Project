@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { JiraConnection } from '../src/pages/Settings/JiraConnection';
 import { jiraApi } from '../src/services/jira-api';
 import * as jiraConn from '../src/services/jira-connection';
@@ -664,5 +664,103 @@ describe('JiraConnection component', () => {
       expect(screen.queryByText(/user-alpha-only/i)).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /tạo mã mời/i })).not.toBeInTheDocument();
     });
+  });
+
+  it('displays connection error on 403, 429, and 500 instead of "Chưa kết nối"', async () => {
+    for (const { status, code, textPattern } of [
+      { status: 403, code: 'FORBIDDEN', textPattern: /không có quyền/i },
+      { status: 429, code: 'upstream_rate_limited', textPattern: /giới hạn tần suất/i },
+      { status: 500, code: 'INTERNAL_ERROR', textPattern: /máy chủ jira/i },
+    ]) {
+      const err: any = new Error(`Error ${status}`);
+      err.status = status;
+      err.code = code;
+      vi.spyOn(jiraApi, 'connection').mockRejectedValueOnce(err);
+      vi.spyOn(jiraApi, 'workspaces').mockResolvedValue({ workspaces: [] });
+
+      const { unmount } = render(<JiraConnection user={user} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Lỗi kết nối')).toBeInTheDocument();
+        expect(screen.queryByText('Chưa kết nối')).not.toBeInTheDocument();
+        expect(screen.getByText(textPattern)).toBeInTheDocument();
+      });
+
+      unmount();
+    }
+  });
+
+  it('ignores late-arriving createInvite response from workspace A after switching to workspace B', async () => {
+    vi.spyOn(jiraApi, 'connection').mockResolvedValue({
+      connected: true,
+      connectionState: 'connected',
+      jiraAccountId: 'jira-123',
+      atlassianAccountId: 'atl-123',
+      sites: [],
+    });
+
+    vi.spyOn(jiraApi, 'workspaces').mockResolvedValue({
+      workspaces: [
+        {
+          id: 'ws-alpha-1',
+          name: 'Workspace Alpha',
+          slug: 'ws-alpha',
+          role: 'admin',
+          membershipStatus: 'active',
+          workspaceVersion: 1,
+          membershipVersion: 1,
+        },
+        {
+          id: 'ws-beta-2',
+          name: 'Workspace Beta',
+          slug: 'ws-beta',
+          role: 'admin',
+          membershipStatus: 'active',
+          workspaceVersion: 1,
+          membershipVersion: 1,
+        },
+      ],
+    });
+
+    vi.spyOn(jiraApi, 'members').mockResolvedValue({ members: [] });
+    vi.spyOn(jiraApi, 'invites').mockResolvedValue({ invites: [] });
+    vi.spyOn(jiraApi, 'sites').mockResolvedValue({ sites: [] });
+    vi.spyOn(jiraApi, 'capabilities').mockImplementation(async (wsId) => ({
+      workspaceId: wsId,
+      sites: [],
+    }));
+
+    let resolveCreateInvite: (val: any) => void;
+    const createInvitePromise = new Promise((resolve) => {
+      resolveCreateInvite = resolve;
+    });
+    vi.spyOn(jiraApi, 'createInvite').mockImplementation(() => createInvitePromise as any);
+
+    render(<JiraConnection user={user} />);
+
+    // Initially on Workspace Alpha
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /tạo mã mời/i })).toBeInTheDocument();
+    });
+
+    // Click "Tạo mã mời" on Workspace Alpha -> request is in-flight
+    fireEvent.click(screen.getByRole('button', { name: /tạo mã mời/i }));
+
+    // Before response arrives, user switches to Workspace Beta
+    const select = screen.getByLabelText(/chọn jira workspace/i);
+    fireEvent.change(select, { target: { value: 'ws-beta-2' } });
+
+    // Now resolve the late createInvite response for Workspace Alpha inside act
+    await act(async () => {
+      resolveCreateInvite!({
+        inviteId: 'inv-late-alpha',
+        inviteToken: 'ALPHA_LATE_INVITE_TOKEN_SHOULD_BE_IGNORED',
+        expiresAt: '2026-11-10T00:00:00Z',
+      });
+      await new Promise((r) => setTimeout(r, 20));
+    });
+
+    // Wait and verify: the late token from Alpha must NOT appear on Beta
+    expect(screen.queryByText('ALPHA_LATE_INVITE_TOKEN_SHOULD_BE_IGNORED')).not.toBeInTheDocument();
   });
 });

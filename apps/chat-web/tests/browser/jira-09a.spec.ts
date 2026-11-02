@@ -86,6 +86,24 @@ test.describe('JIRA-09A: Jira UI Foundation Browser Tests', () => {
             json: { error: 'Dịch vụ Jira tạm thời không khả dụng. Vui lòng thử lại sau.', code: 'upstream_unavailable' },
           });
         }
+        if (jiraConnectionStatus === 500) {
+          return route.fulfill({
+            status: 500,
+            json: { error: 'Không thể đọc trạng thái kết nối Jira.' },
+          });
+        }
+        if (jiraConnectionStatus === 429) {
+          return route.fulfill({
+            status: 429,
+            json: { error: 'Atlassian đang giới hạn tần suất yêu cầu. Vui lòng thử lại sau.', code: 'upstream_rate_limited' },
+          });
+        }
+        if (jiraConnectionStatus === 403) {
+          return route.fulfill({
+            status: 403,
+            json: { error: 'Bạn không có quyền thực hiện thao tác hoặc truy cập kết nối Jira này.', code: 'FORBIDDEN' },
+          });
+        }
         if (jiraConnectionStatus === 401) {
           return route.fulfill({
             status: 401,
@@ -239,13 +257,35 @@ test.describe('JIRA-09A: Jira UI Foundation Browser Tests', () => {
       return route.fulfill({ json: { services: [] } });
     });
 
-    // --- STEP 1: Verify 503 error state (shows "Lỗi kết nối", NOT "Chưa kết nối") ---
-    jiraConnectionStatus = 503;
+    // --- STEP 1: Verify 500, 429, 403, 503 error states (show "Lỗi kết nối", NOT "Chưa kết nối") ---
+    jiraConnectionStatus = 500;
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/settings#jira');
 
     const jiraCard = page.locator('#jira');
     await expect(jiraCard).toBeVisible();
+    await expect(jiraCard.getByText('Lỗi kết nối')).toBeVisible();
+    await expect(jiraCard.getByText('Chưa kết nối')).not.toBeVisible();
+    await expect(jiraCard.getByText(/Không thể đọc trạng thái kết nối Jira/i)).toBeVisible();
+    await expect(jiraCard.locator('#jira-retry-connection')).toBeVisible();
+
+    // Verify 429 rate limit
+    jiraConnectionStatus = 429;
+    await jiraCard.locator('#jira-retry-connection').click();
+    await expect(jiraCard.getByText('Lỗi kết nối')).toBeVisible();
+    await expect(jiraCard.getByText('Chưa kết nối')).not.toBeVisible();
+    await expect(jiraCard.getByText(/Atlassian đang giới hạn tần suất yêu cầu/i)).toBeVisible();
+
+    // Verify 403 forbidden
+    jiraConnectionStatus = 403;
+    await jiraCard.locator('#jira-retry-connection').click();
+    await expect(jiraCard.getByText('Lỗi kết nối')).toBeVisible();
+    await expect(jiraCard.getByText('Chưa kết nối')).not.toBeVisible();
+    await expect(jiraCard.getByText(/Bạn không có quyền/i)).toBeVisible();
+
+    // Verify 503 service unavailable
+    jiraConnectionStatus = 503;
+    await jiraCard.locator('#jira-retry-connection').click();
     await expect(jiraCard.getByText('Lỗi kết nối')).toBeVisible();
     await expect(jiraCard.getByText('Chưa kết nối')).not.toBeVisible();
     await expect(jiraCard.getByText(/Dịch vụ Jira tạm thời không khả dụng/i)).toBeVisible();

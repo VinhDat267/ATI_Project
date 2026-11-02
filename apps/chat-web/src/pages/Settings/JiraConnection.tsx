@@ -80,6 +80,8 @@ export function JiraConnection({
   const mapErrorMessage = (err: any): string => {
     const status = err?.status ?? err?.statusCode;
     const code = err?.data?.code || err?.code;
+    const serverError = typeof err?.data?.error === 'string' ? err.data.error : null;
+
     if (code === 'NATIVE_ADMINISTER_REQUIRED' || code === 'native_permission_denied') {
       return 'Tài khoản của bạn thiếu quyền quản trị (ADMINISTER) trên Jira Cloud site này.';
     }
@@ -101,11 +103,29 @@ export function JiraConnection({
     if (code === 'membership_required') {
       return 'Bạn chưa phải là thành viên hoạt động của Jira workspace này.';
     }
+    if (code === 'FORBIDDEN' || status === 403) {
+      return (
+        serverError ||
+        'Bạn không có quyền thực hiện thao tác hoặc truy cập kết nối Jira này.'
+      );
+    }
     if (code === 'upstream_rate_limited' || status === 429) {
-      return 'Atlassian đang giới hạn tần suất yêu cầu. Vui lòng thử lại sau.';
+      return (
+        serverError ||
+        'Atlassian đang giới hạn tần suất yêu cầu. Vui lòng thử lại sau.'
+      );
     }
     if (code === 'upstream_unavailable' || status === 503) {
-      return 'Dịch vụ Jira tạm thời không khả dụng. Vui lòng thử lại sau.';
+      return (
+        serverError ||
+        'Dịch vụ Jira tạm thời không khả dụng. Vui lòng thử lại sau.'
+      );
+    }
+    if (status >= 500) {
+      return (
+        serverError ||
+        'Có lỗi xảy ra từ máy chủ Jira. Vui lòng thử lại sau.'
+      );
     }
     if (
       err?.name === 'TypeError' ||
@@ -115,7 +135,7 @@ export function JiraConnection({
     ) {
       return 'Không thể kết nối đến máy chủ Jira. Vui lòng kiểm tra mạng và thử lại.';
     }
-    return err?.data?.error || err?.message || 'Có lỗi xảy ra khi thực hiện thao tác với Jira.';
+    return serverError || err?.message || 'Có lỗi xảy ra khi thực hiện thao tác với Jira.';
   };
 
   const fetchConnection = async () => {
@@ -129,23 +149,7 @@ export function JiraConnection({
     } catch (err: any) {
       if (mounted.current) {
         const status = err?.status ?? err?.statusCode;
-        const code = err?.data?.code || err?.code;
-        const isNetwork =
-          err?.name === 'TypeError' ||
-          err?.message?.includes('fetch') ||
-          err?.message?.includes('NetworkError') ||
-          err?.message?.includes('network');
-
-        if (
-          status === 401 ||
-          status === 503 ||
-          code === 'upstream_unavailable' ||
-          code === 'INVALID_SESSION' ||
-          isNetwork
-        ) {
-          setData(null);
-          setConnectionError(mapErrorMessage(err));
-        } else {
+        if (status === 404) {
           setData({
             connected: false,
             connectionState: 'disconnected',
@@ -154,6 +158,9 @@ export function JiraConnection({
             sites: [],
           });
           setConnectionError('');
+        } else {
+          setData(null);
+          setConnectionError(mapErrorMessage(err));
         }
       }
     }
@@ -399,17 +406,18 @@ export function JiraConnection({
     decision: 'approve' | 'reject' | 'remove'
   ) => {
     if (!activeWorkspaceId || busy) return;
+    const targetWsId = activeWorkspaceId;
     setBusy(true);
     setError('');
     try {
-      await jiraApi.decision(activeWorkspaceId, targetUserId, expectedVersion, decision);
-      if (mounted.current) {
-        await fetchWorkspaceDetails(activeWorkspaceId);
+      await jiraApi.decision(targetWsId, targetUserId, expectedVersion, decision);
+      if (mounted.current && activeWorkspaceIdRef.current === targetWsId) {
+        await fetchWorkspaceDetails(targetWsId);
       }
     } catch (err) {
-      if (mounted.current) {
+      if (mounted.current && activeWorkspaceIdRef.current === targetWsId) {
         setError(mapErrorMessage(err));
-        await fetchWorkspaceDetails(activeWorkspaceId);
+        await fetchWorkspaceDetails(targetWsId);
       }
     } finally {
       if (mounted.current) setBusy(false);
@@ -419,16 +427,19 @@ export function JiraConnection({
   // Create invite
   const handleCreateInvite = async () => {
     if (!activeWorkspaceId || busy) return;
+    const targetWsId = activeWorkspaceId;
     setBusy(true);
     setError('');
     try {
-      const res = await jiraApi.createInvite(activeWorkspaceId, 7);
-      if (mounted.current) {
+      const res = await jiraApi.createInvite(targetWsId, 7);
+      if (mounted.current && activeWorkspaceIdRef.current === targetWsId) {
         setCreatedInviteToken(res.inviteToken);
-        await fetchWorkspaceDetails(activeWorkspaceId);
+        await fetchWorkspaceDetails(targetWsId);
       }
     } catch (err) {
-      if (mounted.current) setError(mapErrorMessage(err));
+      if (mounted.current && activeWorkspaceIdRef.current === targetWsId) {
+        setError(mapErrorMessage(err));
+      }
     } finally {
       if (mounted.current) setBusy(false);
     }
@@ -437,15 +448,18 @@ export function JiraConnection({
   // Revoke invite
   const handleRevokeInvite = async (inviteId: string) => {
     if (!activeWorkspaceId || busy) return;
+    const targetWsId = activeWorkspaceId;
     setBusy(true);
     setError('');
     try {
-      await jiraApi.revokeInvite(activeWorkspaceId, inviteId);
-      if (mounted.current) {
-        await fetchWorkspaceDetails(activeWorkspaceId);
+      await jiraApi.revokeInvite(targetWsId, inviteId);
+      if (mounted.current && activeWorkspaceIdRef.current === targetWsId) {
+        await fetchWorkspaceDetails(targetWsId);
       }
     } catch (err) {
-      if (mounted.current) setError(mapErrorMessage(err));
+      if (mounted.current && activeWorkspaceIdRef.current === targetWsId) {
+        setError(mapErrorMessage(err));
+      }
     } finally {
       if (mounted.current) setBusy(false);
     }
@@ -454,15 +468,18 @@ export function JiraConnection({
   // Link site
   const handleLinkSite = async (cloudId: string) => {
     if (!activeWorkspaceId || !cloudId || busy) return;
+    const targetWsId = activeWorkspaceId;
     setBusy(true);
     setError('');
     try {
-      await jiraApi.linkSite(activeWorkspaceId, cloudId);
-      if (mounted.current) {
-        await fetchWorkspaceDetails(activeWorkspaceId);
+      await jiraApi.linkSite(targetWsId, cloudId);
+      if (mounted.current && activeWorkspaceIdRef.current === targetWsId) {
+        await fetchWorkspaceDetails(targetWsId);
       }
     } catch (err) {
-      if (mounted.current) setError(mapErrorMessage(err));
+      if (mounted.current && activeWorkspaceIdRef.current === targetWsId) {
+        setError(mapErrorMessage(err));
+      }
     } finally {
       if (mounted.current) setBusy(false);
     }
@@ -471,22 +488,23 @@ export function JiraConnection({
   // Toggle site active
   const handleToggleSiteActive = async (site: WorkspaceSiteItem) => {
     if (!activeWorkspaceId || busy) return;
+    const targetWsId = activeWorkspaceId;
     setBusy(true);
     setError('');
     try {
       await jiraApi.updateSite(
-        activeWorkspaceId,
+        targetWsId,
         site.siteId,
         site.policyVersion,
         !site.active
       );
-      if (mounted.current) {
-        await fetchWorkspaceDetails(activeWorkspaceId);
+      if (mounted.current && activeWorkspaceIdRef.current === targetWsId) {
+        await fetchWorkspaceDetails(targetWsId);
       }
     } catch (err) {
-      if (mounted.current) {
+      if (mounted.current && activeWorkspaceIdRef.current === targetWsId) {
         setError(mapErrorMessage(err));
-        await fetchWorkspaceDetails(activeWorkspaceId);
+        await fetchWorkspaceDetails(targetWsId);
       }
     } finally {
       if (mounted.current) setBusy(false);
@@ -496,11 +514,12 @@ export function JiraConnection({
   // Open project configuration
   const handleOpenProjectConfig = async (site: WorkspaceSiteItem) => {
     if (!activeWorkspaceId) return;
+    const targetWsId = activeWorkspaceId;
     setConfiguringSite(site);
     setError('');
     try {
-      const res = await jiraApi.projects(activeWorkspaceId, site.siteId);
-      if (mounted.current) {
+      const res = await jiraApi.projects(targetWsId, site.siteId);
+      if (mounted.current && activeWorkspaceIdRef.current === targetWsId) {
         setCandidateProjects(res.projects ?? []);
         setSitePolicyVersion(res.sitePolicyVersion ?? 1);
         setSelectedProjectIds(
@@ -508,30 +527,33 @@ export function JiraConnection({
         );
       }
     } catch (err) {
-      if (mounted.current) setError(mapErrorMessage(err));
+      if (mounted.current && activeWorkspaceIdRef.current === targetWsId) {
+        setError(mapErrorMessage(err));
+      }
     }
   };
 
   // Save configured projects
   const handleSaveProjects = async () => {
     if (!activeWorkspaceId || !configuringSite || busy) return;
+    const targetWsId = activeWorkspaceId;
     setBusy(true);
     setError('');
     try {
       await jiraApi.configureProjects(
-        activeWorkspaceId,
+        targetWsId,
         configuringSite.siteId,
         sitePolicyVersion,
         selectedProjectIds
       );
-      if (mounted.current) {
+      if (mounted.current && activeWorkspaceIdRef.current === targetWsId) {
         setConfiguringSite(null);
-        await fetchWorkspaceDetails(activeWorkspaceId);
+        await fetchWorkspaceDetails(targetWsId);
       }
     } catch (err) {
-      if (mounted.current) {
+      if (mounted.current && activeWorkspaceIdRef.current === targetWsId) {
         setError(mapErrorMessage(err));
-        await fetchWorkspaceDetails(activeWorkspaceId);
+        await fetchWorkspaceDetails(targetWsId);
       }
     } finally {
       if (mounted.current) setBusy(false);

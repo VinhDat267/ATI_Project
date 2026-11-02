@@ -28,8 +28,8 @@ Build the Jira connection and workspace administration UI against merged JIRA-02
    - Never triggers automatic plan approval or message resend; displays explicit user action button to return.
 3. **Connection & Workspace Settings UI (`apps/chat-web/src/pages/Settings/JiraConnection.tsx`)**:
    - Personal connection card displaying connection states: `disconnected`, `identity_connected`, `scope_required`, `reconnect_required`, `connected`.
-   - Honest error representation: 401, 503, and network errors display "Lỗi kết nối" badge and dedicated error banner with retry button (`#jira-retry-connection`), never falsely displaying "Chưa kết nối" (which is reserved exclusively for unconfigured state on successful 200).
-   - Workspace isolation & race prevention: switching workspaces immediately clears transient state (`createdInviteToken`, `members`, `invites`, `sites`, `capabilities`), drops in-flight fetch requests via sequence tracking (`workspaceFetchSeqRef`), and clears admin data for non-admin roles.
+   - Honest error representation: 401, 403, 429, 500, 503, and network errors display "Lỗi kết nối" badge and dedicated error banner with retry button (`#jira-retry-connection`), never falsely displaying "Chưa kết nối" (which is reserved exclusively for unconfigured state on successful 200 or 404).
+   - Workspace isolation & race prevention: switching workspaces immediately clears transient state (`createdInviteToken`, `members`, `invites`, `sites`, `capabilities`), drops in-flight fetch requests via sequence tracking (`workspaceFetchSeqRef`), and clears admin data for non-admin roles. All asynchronous workspace actions (`createInvite`, `decision`, `revokeInvite`, `linkSite`, `updateSite`, `projects`, `configureProjects`) verify `activeWorkspaceIdRef.current === targetWsId` before setting state or reloading workspace details, preventing late-arriving responses (e.g. invite token generation) from bleeding into a different workspace.
    - Workspace join form and workspace switcher displaying role (`admin` vs `member`), status, and distinct CAS version tracking.
    - Admin actions: member review with approve/reject/remove, invite creation with copy button and revocation.
    - Workspace site and project policy controls with atomic versioning.
@@ -42,13 +42,13 @@ Build the Jira connection and workspace administration UI against merged JIRA-02
 ### Verification Evidence
 - **Focused Jira Test Suites**:
   `npm test -w @wap/chat-web -- tests/jira-api.test.ts tests/jira-callback.test.tsx tests/jira-connection.test.tsx tests/jira-connection-responsive.test.tsx`
-  - Output: 4 test files passed, 44 tests passed (100% PASS), exit code 0.
+  - Output: 4 test files passed, 46 tests passed (100% PASS), exit code 0.
 - **Settings Page Integration Test**:
   `npm test -w @wap/chat-web -- tests/components/settings-page.test.tsx`
   - Output: 1 test file passed, 7 tests passed (100% PASS), exit code 0.
 - **Full Chat Web Test Suite**:
   `npm test -w @wap/chat-web`
-  - Output: 96 test files passed, 1030 tests passed (100% PASS), exit code 0.
+  - Output: 96 test files passed, 1032 tests passed (100% PASS), exit code 0.
 - **Typecheck**:
   `npm run typecheck:v3`
   - Output: `tsc -p apps/chat-api/tsconfig.json --noEmit && tsc -p apps/chat-web/tsconfig.json --noEmit` exit code 0.
@@ -58,9 +58,9 @@ Build the Jira connection and workspace administration UI against merged JIRA-02
 - **Production Web Build & Security Sentinel**:
   `npm run build:v3; node scripts/test-v3-web-build-security.mjs`
   - Output: `PASS: production build excludes credential sentinels and 7 forbidden UI claims`, exit code 0.
-- **Playwright Browser Test Suite (Connect, Reload, Switch, Error 503)**:
+- **Playwright Browser Test Suite (Connect, Reload, Switch, Errors 500/429/403/503)**:
   `npx playwright test apps/chat-web/tests/browser/jira-09a.spec.ts`
-  - Output: 1 passed (8.3s), exit code 0 against local Vite preview. Verified Connect flow, reload handling, workspace switch isolation, 503 error display/retry, stale session 401 handling, and cross-account rejection.
+  - Output: 1 passed (6.9s), exit code 0 against local Vite preview. Verified Connect flow, reload handling, workspace switch isolation, late invite token avoidance, 500/429/403/503 error display/retry, stale session 401 handling, and cross-account rejection.
 
 ### Limitations
 - Live Jira Cockpit conversation execution remains disabled in the UI (button clearly marked as pending JIRA-08) until backend and planner integration PBIs (JIRA-06, JIRA-07, JIRA-08) land.
