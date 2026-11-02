@@ -1,5 +1,21 @@
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 const text = (value: unknown) => typeof value === 'string' || typeof value === 'number' ? String(value) : '';
+function formatReadTs(raw: unknown): string {
+  if (typeof raw !== 'string' && typeof raw !== 'number') return '';
+  const seconds = Number(String(raw).split('.')[0]);
+  if (!Number.isFinite(seconds) || seconds <= 0) return '';
+  try {
+    return new Date(seconds * 1000).toLocaleString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  } catch {
+    return '';
+  }
+}
 /** Project display fields explicitly: observation/policy records belong to the server guards. */
 export function SlackReadResult({ value }: { value: unknown }) {
   if (!record(value)) return <p>Không có kết quả trong phạm vi đã duyệt.</p>;
@@ -9,7 +25,7 @@ export function SlackReadResult({ value }: { value: unknown }) {
   if (typeof value.permalink === 'string') try { const url = new URL(value.permalink); if (url.protocol === 'https:' && !url.username && !url.password) permalink = url.href; } catch { /* Invalid output links are not navigable. */ }
   return <div className="mt-3 text-sm text-text-secondary [overflow-wrap:anywhere]">
     {rows.length ? <ol aria-label="Kết quả đọc Slack" className="space-y-3">{rows.map((row, index) => <li key={index} className="rounded-lg border border-border p-3">
-      {record(row) ? <>{(row.name || row.realName || row.displayName || row.id) && <p className="font-medium">{text(row.name || row.realName || row.displayName || row.id)}</p>}{typeof row.text === 'string' && <p className="whitespace-pre-wrap">{row.text}</p>}{(row.user || row.ts) && <p className="mt-1 text-xs">{[text(row.user), text(row.ts)].filter(Boolean).join(' · ')}</p>}</> : <p>{text(row)}</p>}
+      {record(row) ? <>{(row.name || row.realName || row.displayName || row.id) && <p className="font-medium">{text(row.name || row.realName || row.displayName || row.id)}</p>}{typeof row.text === 'string' && <p className="whitespace-pre-wrap">{row.text}</p>}{(row.user || row.ts) && <p className="mt-1 text-xs">{[text(row.user), text(row.ts), formatReadTs(row.ts)].filter(Boolean).join(' · ')}</p>}</> : <p>{text(row)}</p>}
     </li>)}</ol> : !permalink && <p>Không có kết quả trong phạm vi đã duyệt.</p>}
     {permalink && <a href={permalink} target="_blank" rel="noopener noreferrer" className="underline">Mở tin nhắn trên Slack</a>}
   </div>;

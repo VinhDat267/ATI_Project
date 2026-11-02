@@ -13,6 +13,7 @@ beforeEach(async()=>{
   let raw='';for await(const part of req)raw+=part;const body=raw?JSON.parse(raw):undefined;requests.push({method:req.method,url:req.url,body});if(delay)await new Promise(r=>setTimeout(r,delay));res.setHeader('content-type','application/json');
   if(req.method==='PUT'&&conflict){res.statusCode=409;res.end(JSON.stringify({code:'SLACK_ASSISTANT_VERSION_CONFLICT',error:'Cấu hình đã thay đổi.'}));return;}
   if(req.url?.endsWith('/followed-threads')){res.end(JSON.stringify({success:true}));return;}
+  if(req.url?.endsWith('/directory')){res.end(JSON.stringify({channels:[{id:'C_RELEASE',name:'release-room',isPrivate:false}],users:[{id:'U_DEV_1',name:'dev1',displayName:'Nguyễn Văn A'}]}));return;}
   res.end(JSON.stringify({config:body?.config??defaultSlackAssistantConfig(),configVersion:version,available,pausedReason:null,queue:{pending:2,running:0,held:0,needsAttention:1}}));
  });await new Promise<void>(r=>server.listen(0,'127.0.0.1',r));const url='http://127.0.0.1:'+(server.address() as any).port;vi.stubGlobal('fetch',(path:string,init?:RequestInit)=>nativeFetch(new URL(path,url),init));
 });
@@ -48,4 +49,33 @@ it('configures daily digest toggle and local time and links to the proposal inbo
  await waitFor(()=>expect(requests.some(r=>r.method==='PUT')).toBe(true));
  const put=requests.find(r=>r.method==='PUT');
  expect(put.body.config.digest).toEqual({enabled:true,time:'08:30'});
+});
+it('configures multi-service default targets, parses pasted Slack thread URL, and loads directory on demand',async()=>{
+ await opened();
+ fireEvent.change(screen.getByLabelText('ID danh sách Trello (List ID)'),{target:{value:'list-release-99'}});
+ fireEvent.change(screen.getByLabelText('Kho mã nguồn GitHub (owner/repo)'),{target:{value:'acme/platform'}});
+ fireEvent.change(screen.getByLabelText('Email người nhận Gmail mặc định'),{target:{value:'ops@acme.vn'}});
+ fireEvent.click(screen.getByLabelText('Mặc định phản hồi kết quả vào thread Slack nguồn'));
+ fireEvent.click(screen.getByRole('button',{name:'Lưu tự động hóa'}));
+ await waitFor(()=>expect(requests.some(r=>r.method==='PUT')).toBe(true));
+ const put=requests.find(r=>r.method==='PUT');
+ expect(put.body.config.targets).toEqual({
+  trello:{boardId:'default',listId:'list-release-99'},
+  github:{repo:'acme/platform'},
+  gmail:{to:'ops@acme.vn'},
+  replyToSource:true,
+ });
+
+ // Paste Slack message link to auto-fill channel and thread timestamp
+ fireEvent.change(screen.getByLabelText('Dán liên kết tin nhắn Slack'),{
+  target:{value:'https://acme.slack.com/archives/C0123ABC/p1730000000000100'},
+ });
+ expect(screen.getByLabelText('ID kênh')).toHaveValue('C0123ABC');
+ expect(screen.getByLabelText('Timestamp gốc của thread')).toHaveValue('1730000000.000100');
+
+ // On-demand directory loading
+ fireEvent.click(screen.getByRole('button',{name:'Tải danh bạ kênh & thành viên Slack'}));
+ expect(await screen.findByText(/Đã tải 1 kênh · 1 thành viên/)).toBeInTheDocument();
+ fireEvent.change(screen.getByLabelText('Chọn kênh từ danh bạ Slack'),{target:{value:'C_RELEASE'}});
+ expect(screen.getByLabelText('ID kênh')).toHaveValue('C_RELEASE');
 });

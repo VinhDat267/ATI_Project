@@ -54,6 +54,32 @@ export function PersonalSlack() {
     return start(row.workspaceId);
   };
 
+  const checkConnection = async (target: SlackConnectionPublicInfo) => {
+    const owns = slackSessionOwner();
+    setBusy(`check-${target.id}`);
+    setError('');
+    setNotice('');
+    try {
+      const updated = await slackConnectionApi.check(target.id);
+      if (!owns()) return;
+      if (!updated) {
+        setRows((prev) => prev.filter((r) => r.id !== target.id));
+        setNotice(`Workspace ${target.workspaceName} không còn kết nối.`);
+        return;
+      }
+      setRows((prev) => prev.map((r) => (r.id === target.id ? updated : r)));
+      setNotice(
+        updated.processingReady
+          ? `Kết nối ${updated.workspaceName} hoạt động tốt và đã sẵn sàng xử lý dữ liệu.`
+          : `Kết nối ${updated.workspaceName} đang hoạt động nhưng vẫn chờ cấp quyền xử lý dữ liệu.`
+      );
+    } catch {
+      if (owns()) setError('Chưa kiểm tra được trạng thái kết nối Slack. Hãy thử lại.');
+    } finally {
+      if (owns()) setBusy('');
+    }
+  };
+
   const executeDisconnect = async (target: SlackConnectionPublicInfo) => {
     const owns = slackSessionOwner();
     setBusy(target.id);
@@ -167,7 +193,13 @@ export function PersonalSlack() {
                 </p>
               )}
 
-              <div className="flex items-center gap-3 mt-3 pt-2 border-t border-[#E7E7E2] dark:border-[#333333]">
+              {!row.processingReady && row.status === 'active' && (
+                <div className="mt-2 rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50/70 dark:bg-amber-950/30 p-2.5 text-xs text-amber-800 dark:text-amber-300">
+                  Workspace này đã kết nối OAuth nhưng chưa có xác nhận cho phép xử lý dữ liệu (F1 Consent). Quản trị viên workspace cần cấp quyền xử lý cho nhà cung cấp mô hình AI trước khi bật tự động hóa hoặc tra cứu Slack.
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-3 mt-3 pt-2 border-t border-[#E7E7E2] dark:border-[#333333]">
                 {row.status === 'reconnect_required' && (
                   <button
                     type="button"
@@ -179,6 +211,21 @@ export function PersonalSlack() {
                     Kết nối lại
                   </button>
                 )}
+                <button
+                  type="button"
+                  disabled={!!busy}
+                  aria-label={`Kiểm tra kết nối ${row.workspaceName}`}
+                  onClick={() => void checkConnection(row)}
+                  className="text-xs font-medium text-[#111827] dark:text-white underline hover:text-[#FF5701] transition-colors disabled:opacity-50"
+                >
+                  {busy === `check-${row.id}` ? 'Đang kiểm tra…' : 'Kiểm tra kết nối'}
+                </button>
+                <a
+                  href="/inbox"
+                  className="text-xs font-medium text-[#111827] dark:text-white underline hover:text-[#FF5701] transition-colors"
+                >
+                  Mở hộp thư đề xuất
+                </a>
                 <button
                   type="button"
                   id={`disconnect-btn-${row.id}`}

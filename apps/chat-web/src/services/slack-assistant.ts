@@ -5,8 +5,26 @@ import {
   validateSlackProposalPrepareInput,
   validateSlackProposalRevisionInput,
   type SlackAssistantConfig,
+  type SlackProposalTargetOverride,
 } from '@wap/tool-schemas';
 import { apiClient } from './api-client';
+
+export interface SlackDirectoryChannelDto {
+  id: string;
+  name: string;
+  isPrivate: boolean;
+}
+
+export interface SlackDirectoryUserDto {
+  id: string;
+  name: string;
+  displayName: string;
+}
+
+export interface SlackDirectoryResponseDto {
+  channels: SlackDirectoryChannelDto[];
+  users: SlackDirectoryUserDto[];
+}
 
 export interface SlackProposalViewDto {
   id: string;
@@ -90,6 +108,11 @@ const path = (id: string) => '/api/connections/myslack/' + encodeURIComponent(id
 export const slackAssistantApi = {
   get: async (id: string, signal?: AbortSignal) =>
     validateSlackAssistantSettingsView(await apiClient.request<unknown>(path(id), { signal, cache: 'no-store' })),
+  getDirectory: (id: string, signal?: AbortSignal) =>
+    apiClient.request<SlackDirectoryResponseDto>(
+      '/api/connections/myslack/' + encodeURIComponent(id) + '/directory',
+      { signal, cache: 'no-store' },
+    ),
   update: async (id: string, expectedVersion: string, config: SlackAssistantConfig) => {
     validateSlackAssistantVersion(expectedVersion);
     const valid = validateSlackAssistantConfig(config);
@@ -125,7 +148,12 @@ export const slackAssistantApi = {
   },
   prepareProposal: (
     id: string,
-    input: { expectedRevision: string | number; instruction?: string; replyInThread?: boolean },
+    input: {
+      expectedRevision: string | number;
+      instruction?: string;
+      replyInThread?: boolean;
+      targetOverride?: SlackProposalTargetOverride;
+    },
   ) => {
     const valid = validateSlackProposalPrepareInput(input);
     return apiClient.request<{

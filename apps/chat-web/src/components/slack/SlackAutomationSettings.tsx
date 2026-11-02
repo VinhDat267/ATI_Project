@@ -1,27 +1,110 @@
 import {useEffect,useRef,useState,useId} from 'react';
-import {SLACK_ASSISTANT_INTENT_SERVICES,defaultSlackAssistantConfig,validateSlackAssistantConfig,type SlackAssistantConfig,type SlackAssistantSettingsView,type SlackAssistantRule,type SlackConversationKind} from '@wap/tool-schemas';
-import {slackAssistantApi} from '../../services/slack-assistant';
+import {
+ SLACK_ASSISTANT_INTENT_SERVICES,
+ defaultSlackAssistantConfig,
+ parseSlackThreadInput,
+ validateSlackAssistantConfig,
+ type SlackAssistantConfig,
+ type SlackAssistantSettingsView,
+ type SlackAssistantRule,
+ type SlackConversationKind,
+} from '@wap/tool-schemas';
+import {slackAssistantApi,type SlackDirectoryChannelDto,type SlackDirectoryUserDto} from '../../services/slack-assistant';
 import {slackSessionOwner} from '../../services/slack-connection';
 import {authStorage} from '../../services/auth-storage';
+
 const field='w-full min-w-0 rounded-lg border border-[#D1D5DB] dark:border-[#4B5563] bg-white dark:bg-[#1E1E1E] px-3 py-2 text-sm text-[#111827] dark:text-white';
 const button='rounded-lg border border-[#D1D5DB] dark:border-[#4B5563] px-3 py-2 text-sm disabled:opacity-50';
+
+const SERVICE_LABELS: Record<string, string> = {
+ trello: 'Trello (Thẻ công việc)',
+ jira: 'Jira (Issue / Bug)',
+ mysheets: 'Google Sheets (Bảng tính)',
+ mycalendar: 'Google Calendar (Lịch biểu)',
+ github: 'GitHub (Issue mã nguồn)',
+ gmail: 'Gmail (Thư điện tử)',
+ myslack: 'Slack (Phản hồi trực tiếp)',
+};
+
+function sanitizeTargets(raw: SlackAssistantConfig['targets']): SlackAssistantConfig['targets'] {
+ const next: SlackAssistantConfig['targets'] = {};
+ if (raw?.trello?.listId?.trim()) {
+  next.trello = {
+   boardId: raw.trello.boardId?.trim() || 'default',
+   listId: raw.trello.listId.trim(),
+  };
+ }
+ if (raw?.jira?.projectKey?.trim()) {
+  next.jira = {
+   projectKey: raw.jira.projectKey.trim(),
+  };
+ }
+ if (raw?.mysheets?.spreadsheetId?.trim()) {
+  next.mysheets = {
+   spreadsheetId: raw.mysheets.spreadsheetId.trim(),
+   range: raw.mysheets.range?.trim() || 'Sheet1!A:D',
+  };
+ }
+ if (raw?.mycalendar?.calendarId?.trim()) {
+  next.mycalendar = { calendarId: raw.mycalendar.calendarId.trim() };
+ }
+ if (raw?.github?.repo?.trim()) {
+  next.github = { repo: raw.github.repo.trim() };
+ }
+ if (raw?.gmail?.to?.trim()) {
+  next.gmail = { to: raw.gmail.to.trim() };
+ }
+ if (typeof raw?.replyToSource === 'boolean') {
+  next.replyToSource = raw.replyToSource;
+ }
+ return next;
+}
+
 export function SlackAutomationSettings({connectionId,workspaceName,active}:{connectionId:string;workspaceName:string;active:boolean}){
- const id=useId(),[open,setOpen]=useState(false),[view,setView]=useState<SlackAssistantSettingsView|null>(null),[draft,setDraft]=useState<SlackAssistantConfig|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[reload,setReload]=useState(0),[channel,setChannel]=useState(''),[thread,setThread]=useState('');
+ const id=useId(),[open,setOpen]=useState(false),[view,setView]=useState<SlackAssistantSettingsView|null>(null),[draft,setDraft]=useState<SlackAssistantConfig|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[reload,setReload]=useState(0),[channel,setChannel]=useState(''),[thread,setThread]=useState(''),[threadLink,setThreadLink]=useState('');
+ const [channels,setChannels]=useState<SlackDirectoryChannelDto[]>([]),[users,setUsers]=useState<SlackDirectoryUserDto[]>([]),[loadingDirectory,setLoadingDirectory]=useState(false);
  const generation=useRef(0);
- useEffect(()=>{const owns=slackSessionOwner();return authStorage.subscribeAuthTokens(()=>{if(!owns()){generation.current++;setOpen(false);setView(null);setDraft(null);setError('');setNotice('');setChannel('');setThread('');setBusy(false);}});},[connectionId]);
+ useEffect(()=>{const owns=slackSessionOwner();return authStorage.subscribeAuthTokens(()=>{if(!owns()){generation.current++;setOpen(false);setView(null);setDraft(null);setError('');setNotice('');setChannel('');setThread('');setThreadLink('');setChannels([]);setUsers([]);setBusy(false);}});},[connectionId]);
  useEffect(()=>{
   if(!open)return;const epoch=++generation.current,owns=slackSessionOwner(),controller=new AbortController();setView(null);setDraft(null);setError('');setNotice('');setBusy(true);
   void slackAssistantApi.get(connectionId,AbortSignal.any([controller.signal,AbortSignal.timeout(15000)])).then(data=>{if(owns()&&epoch===generation.current){setView(data);setDraft(data.config);}},()=>{if(owns()&&epoch===generation.current&&!controller.signal.aborted)setError('Không tải được cấu hình tự động hóa. Hãy thử tải lại.');}).finally(()=>{if(owns()&&epoch===generation.current)setBusy(false);});
   return ()=>{generation.current++;controller.abort();};
  },[open,connectionId,reload]);
  const patch=(value:Partial<SlackAssistantConfig>)=>setDraft(current=>current?{...current,...value}:null);
+ const patchTargets=(value:Partial<SlackAssistantConfig['targets']>)=>setDraft(current=>current?{...current,targets:{...current.targets,...value}}:null);
  const rule=(index:number,value:Partial<SlackAssistantRule>)=>draft&&patch({rules:draft.rules.map((r,n)=>n===index?{...r,...value}:r)});
+ const loadDirectory=async()=>{
+  if(loadingDirectory)return;
+  const owns=slackSessionOwner(),epoch=generation.current;
+  setLoadingDirectory(true);setError('');
+  try{
+   const dir=await slackAssistantApi.getDirectory(connectionId,AbortSignal.timeout(15000));
+   if(owns()&&epoch===generation.current){
+    setChannels(Array.isArray(dir.channels)?dir.channels:[]);
+    setUsers(Array.isArray(dir.users)?dir.users:[]);
+    setNotice('Đã tải danh bạ kênh và thành viên từ Slack.');
+   }
+  }catch{
+   if(owns()&&epoch===generation.current)setError('Chưa tải được danh bạ Slack. Kiểm tra quyền xử lý dữ liệu của workspace.');
+  }finally{
+   if(owns()&&epoch===generation.current)setLoadingDirectory(false);
+  }
+ };
  const save=async()=>{
   if(!draft||!view||busy)return;const owns=slackSessionOwner(),epoch=generation.current;setError('');setNotice('');
-  let config:SlackAssistantConfig;try{config=validateSlackAssistantConfig({...draft,rules:draft.rules.map(r=>({...r,keywords:r.keywords.map(x=>x.trim()).filter(Boolean),authorIds:r.authorIds.map(x=>x.trim()).filter(Boolean)}))});}catch{setError('Kiểm tra luật, múi giờ và các giới hạn dương. Giới hạn tháng phải đủ cho giới hạn ngày.');return;}
+  let config:SlackAssistantConfig;try{config=validateSlackAssistantConfig({...draft,targets:sanitizeTargets(draft.targets),rules:draft.rules.map(r=>({...r,keywords:r.keywords.map(x=>x.trim()).filter(Boolean),authorIds:r.authorIds.map(x=>x.trim()).filter(Boolean)}))});}catch{setError('Kiểm tra luật, đích dịch vụ, múi giờ và các giới hạn dương. Giới hạn tháng phải đủ cho giới hạn ngày.');return;}
   setBusy(true);try{const result=await slackAssistantApi.update(connectionId,view.configVersion,config);if(owns()&&epoch===generation.current){setView(result);setDraft(result.config);setNotice('Đã lưu tự động hóa cho workspace này.');}}
   catch(e){if(owns()&&epoch===generation.current)setError((e as any)?.status===409?'Cấu hình đã thay đổi ở nơi khác. Tải lại trước khi lưu.':'Chưa lưu được cấu hình. Kiểm tra quyền xử lý hoặc tải lại cấu hình.');}
   finally{if(owns()&&epoch===generation.current)setBusy(false);}
+ };
+ const handleThreadLinkChange=(raw:string)=>{
+  setThreadLink(raw);
+  const parsed=parseSlackThreadInput(raw);
+  if(parsed){
+   setChannel(parsed.channelId);
+   setThread(parsed.threadTs);
+   setError('');
+  }
  };
  const follow=async(value:boolean)=>{const owns=slackSessionOwner(),epoch=generation.current;if(!/^[A-Za-z0-9_-]{1,64}$/.test(channel)||!/^\d{1,10}(?:\.\d{1,6})?$/.test(thread)){setError('Nhập ID kênh và timestamp gốc hợp lệ.');return;}setBusy(true);setError('');setNotice('');try{await slackAssistantApi.follow(connectionId,channel,thread,value);if(owns()&&epoch===generation.current)setNotice(value?'Đã theo dõi các sự kiện mới trong thread.':'Đã dừng theo dõi các sự kiện mới trong thread.');}catch{if(owns()&&epoch===generation.current)setError('Chưa cập nhật được thread.');}finally{if(owns()&&epoch===generation.current)setBusy(false);}};
  return <div className="mt-4 border-t border-[#E7E7E2] dark:border-[#333333] pt-3 text-[#111827] dark:text-white">
@@ -38,6 +121,12 @@ export function SlackAutomationSettings({connectionId,workspaceName,active}:{con
     <p className="text-sm text-[#4B5563] dark:text-[#9CA3AF]">Chỉ xử lý sự kiện mới sau khi bật. Đề xuất luôn cần bạn xem và phê duyệt trước khi ghi sang dịch vụ.</p>
     <label className="block text-sm space-y-1"><span>Chế độ</span><select className={field} value={draft.mode} disabled={busy} onChange={e=>patch({mode:e.target.value as SlackAssistantConfig['mode']})}><option value="rules">Rules — dùng luật</option><option value="ai">AI — phân loại mọi sự kiện hợp lệ</option><option value="hybrid">Hybrid — luật lọc rồi AI phân loại</option></select></label>
     <p className="text-sm text-[#4B5563] dark:text-[#9CA3AF]">{draft.mode==='rules'?'Rules tạo đề xuất theo luật, không gọi AI.':draft.mode==='ai'?'AI xem mọi sự kiện đủ điều kiện. Chỉ đề xuất khi có bằng chứng liên quan trực tiếp đến bạn.':'Hybrid chỉ gọi AI khi sự kiện khớp luật cá nhân.'}</p>
+    <div className="flex flex-wrap items-center gap-2">
+     <button type="button" className={button} disabled={busy||loadingDirectory} onClick={()=>void loadDirectory()}>
+      {loadingDirectory?'Đang tải danh bạ Slack…':channels.length>0||users.length>0?'Làm mới danh bạ Slack':'Tải danh bạ kênh & thành viên Slack'}
+     </button>
+     {(channels.length>0||users.length>0)&&<span className="text-xs text-[#4B5563] dark:text-[#9CA3AF]">Đã tải {channels.length} kênh · {users.length} thành viên</span>}
+    </div>
     <details><summary className="cursor-pointer text-sm font-semibold">Luật dùng cho Rules và Hybrid</summary><div className="mt-3 space-y-4">
      {draft.rules.map((r,index)=><fieldset key={r.id} className="rounded-lg border border-[#D1D5DB] dark:border-[#4B5563] p-3 space-y-3 min-w-0"><legend className="px-1 text-sm">Luật {index+1}</legend>
       <label className="flex gap-2 text-sm"><input type="checkbox" checked={r.enabled} onChange={e=>rule(index,{enabled:e.target.checked})}/>Bật luật {index+1}</label>
@@ -45,14 +134,46 @@ export function SlackAutomationSettings({connectionId,workspaceName,active}:{con
       <label className="block text-sm">Từ khóa (mỗi dòng một từ khóa)<textarea className={field} value={r.keywords.join('\n')} rows={3} onChange={e=>rule(index,{keywords:e.target.value.split('\n')})}/></label>
       <label className="block text-sm">Cách khớp từ khóa<select className={field} value={r.keywordMode} onChange={e=>rule(index,{keywordMode:e.target.value as 'any'|'all'})}><option value="any">Một từ khóa</option><option value="all">Tất cả từ khóa</option></select></label>
       <label className="block text-sm">ID người gửi (cách nhau bởi dấu phẩy)<input className={field} value={r.authorIds.join(',')} onChange={e=>rule(index,{authorIds:e.target.value.split(',')})}/></label>
+      {users.length>0&&(
+       <label className="block text-xs text-[#4B5563] dark:text-[#9CA3AF]">
+        Thêm nhanh người gửi từ danh bạ Slack
+        <select
+         className={field+' mt-1'}
+         value=""
+         onChange={e=>{
+          const uid=e.target.value;
+          if(uid&&!r.authorIds.includes(uid))rule(index,{authorIds:[...r.authorIds.filter(Boolean),uid]});
+         }}
+        >
+         <option value="">Chọn thành viên để thêm (@user)…</option>
+         {users.map(u=><option key={u.id} value={u.id}>{u.displayName} (@{u.name} · {u.id})</option>)}
+        </select>
+       </label>
+      )}
       <div className="flex flex-wrap gap-3">{(['public','private','im','mpim'] as SlackConversationKind[]).map(kind=><label key={kind} className="flex gap-1 text-sm"><input type="checkbox" checked={r.conversationTypes.includes(kind)} onChange={e=>rule(index,{conversationTypes:e.target.checked?[...r.conversationTypes,kind]:r.conversationTypes.filter(v=>v!==kind)})}/>{({public:'Kênh công khai',private:'Kênh riêng tư',im:'Tin nhắn riêng',mpim:'Nhóm nhắn tin'})[kind]}</label>)}</div>
       <label className="flex gap-2 text-sm"><input type="checkbox" checked={r.requireMention} onChange={e=>rule(index,{requireMention:e.target.checked})}/>Yêu cầu nhắc trực tiếp tài khoản Slack của tôi</label>
       <label className="block text-sm">Loại đề xuất<select className={field} value={r.intent.action} onChange={e=>rule(index,{intent:{...r.intent,action:e.target.value as SlackAssistantRule['intent']['action']}})}>{(['task','issue','progress','question'] as const).map(action=><option key={action} value={action}>{({task:'Công việc',issue:'Sự cố',progress:'Tiến độ',question:'Câu hỏi'})[action]}</option>)}</select></label>
-      <label className="block text-sm">Dịch vụ gợi ý<select className={field} value={r.intent.service} onChange={e=>rule(index,{intent:{...r.intent,service:e.target.value as SlackAssistantRule['intent']['service']}})}>{SLACK_ASSISTANT_INTENT_SERVICES.map(service=><option key={service} value={service}>{service}</option>)}</select></label>
+      <label className="block text-sm">Dịch vụ gợi ý<select className={field} value={r.intent.service} onChange={e=>rule(index,{intent:{...r.intent,service:e.target.value as SlackAssistantRule['intent']['service']}})}>{SLACK_ASSISTANT_INTENT_SERVICES.map(service=><option key={service} value={service}>{SERVICE_LABELS[service]??service}</option>)}</select></label>
       <label className="block text-sm">Nội dung mẫu (để trống dùng yêu cầu gốc)<input className={field} value={r.intent.template} maxLength={512} onChange={e=>rule(index,{intent:{...r.intent,template:e.target.value}})}/></label>
       <button type="button" className={button} onClick={()=>patch({rules:draft.rules.filter((_,n)=>n!==index)})}>Xóa luật {index+1}</button>
      </fieldset>)}
      <button type="button" className={button} disabled={draft.rules.length>=20} onClick={()=>{const r=defaultSlackAssistantConfig().rules[0]!;patch({rules:[...draft.rules,{...r,id:crypto.randomUUID(),name:'Luật mới',keywords:[]}]});}}>Thêm luật</button>
+    </div></details>
+    <details><summary className="cursor-pointer text-sm font-semibold">Đích dịch vụ mặc định cho đề xuất</summary><div className="mt-3 space-y-3 rounded-lg border border-[#D1D5DB] dark:border-[#4B5563] p-3 min-w-0">
+     <p className="text-xs text-[#4B5563] dark:text-[#9CA3AF]">Cấu hình nơi ghi mặc định khi bạn bấm &ldquo;Xem trước kế hoạch&rdquo; trong Hộp thư đề xuất. Bạn vẫn có thể đổi đích ngay trên từng thẻ đề xuất.</p>
+     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <label className="block text-sm">ID danh sách Trello (List ID)<input className={field} placeholder="Ví dụ: list-backlog-123" value={draft.targets.trello?.listId??''} onChange={e=>patchTargets({trello:{boardId:draft.targets.trello?.boardId||'default',listId:e.target.value}})}/></label>
+      <label className="block text-sm">Mã dự án Jira (Project Key)<input className={field} placeholder="Ví dụ: OPS, ENG" value={draft.targets.jira?.projectKey??''} onChange={e=>patchTargets({jira:{projectKey:e.target.value}})}/></label>
+      <label className="block text-sm">ID bảng tính Google Sheets<input className={field} placeholder="Ví dụ: 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms" value={draft.targets.mysheets?.spreadsheetId??''} onChange={e=>patchTargets({mysheets:{spreadsheetId:e.target.value,range:draft.targets.mysheets?.range||'Sheet1!A:D'}})}/></label>
+      <label className="block text-sm">Vùng ghi Google Sheets (Range)<input className={field} placeholder="Sheet1!A:D" value={draft.targets.mysheets?.range??''} onChange={e=>patchTargets({mysheets:{spreadsheetId:draft.targets.mysheets?.spreadsheetId??'',range:e.target.value}})}/></label>
+      <label className="block text-sm">ID lịch Google Calendar<input className={field} placeholder="primary" value={draft.targets.mycalendar?.calendarId??''} onChange={e=>patchTargets({mycalendar:{calendarId:e.target.value}})}/></label>
+      <label className="block text-sm">Kho mã nguồn GitHub (owner/repo)<input className={field} placeholder="Ví dụ: acme/platform" value={draft.targets.github?.repo??''} onChange={e=>patchTargets({github:{repo:e.target.value}})}/></label>
+      <label className="block text-sm sm:col-span-2">Email người nhận Gmail mặc định<input className={field} placeholder="Ví dụ: team-lead@company.com" value={draft.targets.gmail?.to??''} onChange={e=>patchTargets({gmail:{to:e.target.value}})}/></label>
+     </div>
+     <label className="flex gap-2 items-start text-sm">
+      <input type="checkbox" checked={draft.targets.replyToSource===true} onChange={e=>patchTargets({replyToSource:e.target.checked})}/>
+      Mặc định phản hồi kết quả vào thread Slack nguồn
+     </label>
     </div></details>
     <fieldset className="space-y-3"><legend className="font-semibold text-sm">Giới hạn xử lý</legend><p className="text-sm text-[#4B5563] dark:text-[#9CA3AF]">Ngân sách đặt lại theo ngày/tháng UTC. Mỗi lần thử lại AI cũng tính một lượt. Token được giữ trước theo giới hạn đầu vào/đầu ra; lần gọi chưa rõ kết quả không được hoàn ngân sách.</p>
      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{([{key:'dailyCalls',label:'Số lượt AI mỗi ngày',max:1000000},{key:'monthlyCalls',label:'Số lượt AI mỗi tháng',max:10000000},{key:'dailyTokens',label:'Ngân sách token mỗi ngày',max:1000000000},{key:'monthlyTokens',label:'Ngân sách token mỗi tháng',max:10000000000},{key:'maxOutputTokens',label:'Token đầu ra tối đa mỗi lượt',max:4096}] as const).map(item=><label key={item.key} className="block text-sm">{item.label}<input type="number" className={field} min={item.key==='maxOutputTokens'?256:1} max={item.max} step={1} value={Number.isFinite(draft.budget[item.key])?draft.budget[item.key]:''} onChange={e=>patch({budget:{...draft.budget,[item.key]:e.target.valueAsNumber}})}/></label>)}
@@ -66,7 +187,31 @@ export function SlackAutomationSettings({connectionId,workspaceName,active}:{con
      <label className="block text-sm">Giờ gửi bản tóm tắt (HH:MM)<input className={field} value={draft.digest.time} maxLength={5} onChange={e=>patch({digest:{...draft.digest,time:e.target.value}})}/></label>
     </fieldset>
     <div className="flex flex-wrap items-center gap-2"><button type="button" className="rounded-lg bg-[#FF5701] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={busy} onClick={()=>void save()}>Lưu tự động hóa</button><a href="/inbox" className={button}>Mở hộp thư đề xuất</a></div>
-    <fieldset className="space-y-3 border-t border-[#E7E7E2] dark:border-[#333333] pt-3"><legend className="text-sm font-semibold">Theo dõi một thread</legend><p className="text-sm text-[#4B5563] dark:text-[#9CA3AF]">Chỉ nhận các sự kiện mới sau khi theo dõi; không quét lại lịch sử.</p><label className="block text-sm">ID kênh<input className={field} value={channel} maxLength={64} onChange={e=>setChannel(e.target.value)}/></label><label className="block text-sm">Timestamp gốc của thread<input className={field} value={thread} maxLength={17} onChange={e=>setThread(e.target.value)}/></label><div className="flex flex-wrap gap-2"><button type="button" className={button} disabled={busy} onClick={()=>void follow(true)}>Theo dõi thread</button><button type="button" className={button} disabled={busy} onClick={()=>void follow(false)}>Dừng theo dõi thread</button></div></fieldset>
+    <fieldset className="space-y-3 border-t border-[#E7E7E2] dark:border-[#333333] pt-3">
+     <legend className="text-sm font-semibold">Theo dõi một thread</legend>
+     <p className="text-sm text-[#4B5563] dark:text-[#9CA3AF]">Chỉ nhận các sự kiện mới sau khi theo dõi; không quét lại lịch sử. Bạn có thể dán trực tiếp liên kết tin nhắn Slack để tự động điền kênh và timestamp.</p>
+     <label className="block text-sm">
+      Dán liên kết tin nhắn Slack
+      <input
+       className={field}
+       placeholder="https://workspace.slack.com/archives/C0123ABC/p1730000000000100"
+       value={threadLink}
+       onChange={e=>handleThreadLinkChange(e.target.value)}
+      />
+     </label>
+     {channels.length>0&&(
+      <label className="block text-sm">
+       Chọn kênh từ danh bạ Slack
+       <select className={field} value={channel} onChange={e=>setChannel(e.target.value)}>
+        <option value="">Chọn kênh (#channel)…</option>
+        {channels.map(ch=><option key={ch.id} value={ch.id}>{ch.isPrivate?'🔒 ':'#'}{ch.name} ({ch.id})</option>)}
+       </select>
+      </label>
+     )}
+     <label className="block text-sm">ID kênh<input className={field} value={channel} maxLength={64} onChange={e=>setChannel(e.target.value)}/></label>
+     <label className="block text-sm">Timestamp gốc của thread<input className={field} value={thread} maxLength={17} onChange={e=>setThread(e.target.value)}/></label>
+     <div className="flex flex-wrap gap-2"><button type="button" className={button} disabled={busy} onClick={()=>void follow(true)}>Theo dõi thread</button><button type="button" className={button} disabled={busy} onClick={()=>void follow(false)}>Dừng theo dõi thread</button></div>
+    </fieldset>
    </fieldset>}
    <button type="button" className={button} disabled={busy} onClick={()=>setReload(v=>v+1)}>Tải lại cấu hình</button>
   </div>}

@@ -2,7 +2,7 @@
 export type SlackAssistantMode = 'rules' | 'ai' | 'hybrid';
 export type SlackConversationKind = 'public' | 'private' | 'im' | 'mpim';
 export type SlackIntentAction = 'task' | 'issue' | 'progress' | 'question';
-export const SLACK_ASSISTANT_INTENT_SERVICES=['trello','jira','mysheets','myslack'] as const;
+export const SLACK_ASSISTANT_INTENT_SERVICES=['trello','jira','mysheets','myslack','mycalendar','github','gmail'] as const;
 export type SlackIntentService=(typeof SLACK_ASSISTANT_INTENT_SERVICES)[number];
 export interface SlackAssistantBudget {dailyCalls:number;monthlyCalls:number;dailyTokens:number;monthlyTokens:number;maxOutputTokens:number}
 export interface SlackAssistantRule {
@@ -12,7 +12,15 @@ export interface SlackAssistantRule {
 export interface SlackAssistantConfig {
  enabled:boolean;mode:SlackAssistantMode;rules:SlackAssistantRule[];budget:SlackAssistantBudget;maxQueueLength:number;retentionDays:number;timezone:string;
  digest:{enabled:boolean;time:string};
- targets:{trello?:{boardId:string;listId:string};jira?:{projectKey:string};mysheets?:{spreadsheetId:string;range:string};replyToSource?:boolean};
+ targets:{
+  trello?:{boardId:string;listId:string};
+  jira?:{projectKey:string};
+  mysheets?:{spreadsheetId:string;range:string};
+  mycalendar?:{calendarId:string};
+  github?:{repo:string};
+  gmail?:{to:string};
+  replyToSource?:boolean;
+ };
 }
 export interface SlackAssistantIntent {action:SlackIntentAction;service:SlackIntentService;summary:string;deadlineText?:string}
 export interface SlackRelevanceEvidence {kind:'mention'|'direct_message'|'self_commitment'|'followed_thread';sourceIndex:number;evidence:string}
@@ -54,10 +62,13 @@ export function validateSlackAssistantConfig(value:unknown):SlackAssistantConfig
    intent:{action:oneOf(intent.action,actions),service:oneOf(intent.service,services),template:string(intent.template,512,0)}};
  });
  unique(rules.map(r=>r.id));
- const t=object(c.targets,['trello','jira','mysheets','replyToSource']);const targets:SlackAssistantConfig['targets']={};
+ const t=object(c.targets,['trello','jira','mysheets','mycalendar','github','gmail','replyToSource']);const targets:SlackAssistantConfig['targets']={};
  if(t.trello!==undefined){const x=object(t.trello,['boardId','listId']);targets.trello={boardId:string(x.boardId,256),listId:string(x.listId,256)};}
  if(t.jira!==undefined){const x=object(t.jira,['projectKey']);targets.jira={projectKey:string(x.projectKey,128)};}
  if(t.mysheets!==undefined){const x=object(t.mysheets,['spreadsheetId','range']);targets.mysheets={spreadsheetId:string(x.spreadsheetId,256),range:string(x.range,256)};}
+ if(t.mycalendar!==undefined){const x=object(t.mycalendar,['calendarId']);targets.mycalendar={calendarId:string(x.calendarId,256)};}
+ if(t.github!==undefined){const x=object(t.github,['repo']);targets.github={repo:string(x.repo,256)};}
+ if(t.gmail!==undefined){const x=object(t.gmail,['to']);targets.gmail={to:string(x.to,320)};}
  if(t.replyToSource!==undefined)targets.replyToSource=boolean(t.replyToSource);
  return {enabled:boolean(c.enabled),mode:oneOf(c.mode,modes),rules,budget:b,maxQueueLength:integer(c.maxQueueLength,1,10000),retentionDays:integer(c.retentionDays,1,7),timezone,digest:{enabled:boolean(d.enabled),time},targets};
 }
@@ -88,6 +99,13 @@ export const SLACK_PROPOSAL_WORKFLOW_TOOLS={
  bugCreateTool:'jira.create_issue' as const,
  progressService:'mysheets' as const,
  progressAppendTool:'mysheets.append_rows' as const,
+ calendarService:'mycalendar' as const,
+ calendarCreateTool:'mycalendar.create_event' as const,
+ githubService:'github' as const,
+ githubSearchTool:'github.search_issues' as const,
+ githubCreateTool:'github.create_issue' as const,
+ gmailService:'gmail' as const,
+ gmailDraftTool:'gmail.create_draft' as const,
  replyService:'myslack' as const,
  replyPostTool:'myslack.chat_postMessage' as const,
 } as const;
@@ -95,15 +113,70 @@ function revisionNumber(value:unknown):number{
  if(typeof value==='string')return integer(Number(validateSlackAssistantVersion(value)),1,2147483647);
  return integer(value,1,2147483647);
 }
+export interface SlackProposalTargetOverride {
+ service?:SlackIntentService;
+ listId?:string;
+ projectKey?:string;
+ spreadsheetId?:string;
+ sheet?:string;
+ calendarId?:string;
+ startIso?:string;
+ endIso?:string;
+ repo?:string;
+ toEmail?:string;
+}
 export interface SlackProposalRevisionInput {expectedRevision:number}
-export interface SlackProposalPrepareInput {expectedRevision:number;instruction?:string;replyInThread?:boolean}
+export interface SlackProposalPrepareInput {expectedRevision:number;instruction?:string;replyInThread?:boolean;targetOverride?:SlackProposalTargetOverride}
 export function validateSlackProposalRevisionInput(value:unknown):SlackProposalRevisionInput{
  const v=object(value,['expectedRevision']);return {expectedRevision:revisionNumber(v.expectedRevision)};
 }
 export function validateSlackProposalPrepareInput(value:unknown):SlackProposalPrepareInput{
- const v=object(value,['expectedRevision','instruction','replyInThread']);
+ const v=object(value,['expectedRevision','instruction','replyInThread','targetOverride']);
  const out:SlackProposalPrepareInput={expectedRevision:revisionNumber(v.expectedRevision)};
  if(v.instruction!==undefined)out.instruction=string(v.instruction,2000,1);
  if(v.replyInThread!==undefined)out.replyInThread=boolean(v.replyInThread);
+ if(v.targetOverride!==undefined){
+  const o=object(v.targetOverride,['service','listId','projectKey','spreadsheetId','sheet','calendarId','startIso','endIso','repo','toEmail']);
+  const targetOverride:SlackProposalTargetOverride={};
+  if(o.service!==undefined)targetOverride.service=oneOf<SlackIntentService>(o.service,services);
+  if(o.listId!==undefined)targetOverride.listId=string(o.listId,256,1);
+  if(o.projectKey!==undefined)targetOverride.projectKey=string(o.projectKey,128,1);
+  if(o.spreadsheetId!==undefined)targetOverride.spreadsheetId=string(o.spreadsheetId,256,1);
+  if(o.sheet!==undefined)targetOverride.sheet=string(o.sheet,256,1);
+  if(o.calendarId!==undefined)targetOverride.calendarId=string(o.calendarId,256,1);
+  if(o.startIso!==undefined)targetOverride.startIso=string(o.startIso,64,1);
+  if(o.endIso!==undefined)targetOverride.endIso=string(o.endIso,64,1);
+  if(o.repo!==undefined)targetOverride.repo=string(o.repo,256,1);
+  if(o.toEmail!==undefined)targetOverride.toEmail=string(o.toEmail,320,1);
+  out.targetOverride=targetOverride;
+ }
  return out;
+}
+/** Parses a Slack message/thread permalink or compact `C0123:1730000000.000100` into `{ channelId, threadTs }`. */
+export function parseSlackThreadInput(raw:unknown):{channelId:string;threadTs:string}|null{
+ if(typeof raw!=='string')return null;
+ const trimmed=raw.trim();
+ if(!trimmed||trimmed.length>1024)return null;
+ const compact=/^([CGD][A-Za-z0-9_-]{1,63})[\s:]+(\d{1,10}\.\d{1,6})$/.exec(trimmed);
+ if(compact)return {channelId:compact[1]!,threadTs:compact[2]!};
+ try{
+  const url=new URL(trimmed);
+  const queryThreadTs=url.searchParams.get('thread_ts');
+  const queryChannel=url.searchParams.get('cid');
+  const archiveMatch=/\/archives\/([CGD][A-Za-z0-9_-]{1,63})\/p(\d{11,16})(?:\/|$)/.exec(url.pathname);
+  const channelId=archiveMatch?.[1]??(queryChannel&&/^[CGD][A-Za-z0-9_-]{1,63}$/.test(queryChannel)?queryChannel:null);
+  if(!channelId)return null;
+  if(queryThreadTs&&/^\d{1,10}\.\d{1,6}$/.test(queryThreadTs)){
+   return {channelId,threadTs:queryThreadTs};
+  }
+  if(archiveMatch?.[2]){
+   const digits=archiveMatch[2];
+   const sec=digits.slice(0,digits.length-6);
+   const micro=digits.slice(digits.length-6);
+   if(/^\d{1,10}$/.test(sec)&&/^\d{6}$/.test(micro)){
+    return {channelId,threadTs:`${sec}.${micro}`};
+   }
+  }
+ }catch{/* Not a URL */}
+ return null;
 }

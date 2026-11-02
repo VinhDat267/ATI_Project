@@ -39,8 +39,24 @@ it('follow updates accept only owned bounded metadata, with no Slack content req
  const payload={channelId:'C_TEST',threadTs:'1793549000.000001',follow:true};expect((await request(app()).put(path()+'/followed-threads').set('Authorization',bearer()).send(payload)).status).toBe(200);
  expect((await request(app()).put(path()+'/followed-threads').set('Authorization',bearer()).send({...payload,slackUserId:'U_OTHER'})).status).toBe(400);expect(env.fixture.requests).toEqual([]);
 });
+it('lists workspace directory (channels & users) for owner via SlackPrivateReadWrapper',async()=>{
+ const dirPath='/api/connections/myslack/'+seed.row.id+'/directory';
+ const foreign=await env.db.person('foreign_dir');
+ expect((await request(app()).get(dirPath).set('Authorization',bearer(foreign))).status).toBe(404);
+ const res=await request(app()).get(dirPath).set('Authorization',bearer());
+ expect(res.status).toBe(200);
+ expect(res.body).toEqual({
+  channels:[{id:'C_GENERAL',name:'general',isPrivate:false}],
+  users:[
+   {id:'U_ALICE_SLACK',name:'alice',displayName:'alice'},
+   {id:'U_BOB',name:'bob',displayName:'bob'},
+  ],
+ });
+ env.fixture.reset();
+});
 it('revoked processing consent blocks enable through the real route',async()=>{
  const current=(await request(app()).get(path()).set('Authorization',bearer())).body,consent=(await env.consentRepo.getConsent(seed.binding.workspaceId,env.runtimeIdentity.providerId))!;
  await env.consentRepo.revokeConsent({workspaceId:seed.binding.workspaceId,providerId:env.runtimeIdentity.providerId,expectedRevision:consent.revision,recordedBy:'fixture',reason:'fixture'});
  expect((await request(app()).put(path()).set('Authorization',bearer()).send({expectedVersion:current.configVersion,config:{...current.config,enabled:true}})).status).toBe(403);expect(env.fixture.requests).toEqual([]);
+ expect((await request(app()).get('/api/connections/myslack/'+seed.row.id+'/directory').set('Authorization',bearer())).status).toBe(403);
 });

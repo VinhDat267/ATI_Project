@@ -203,6 +203,11 @@ export const slackConnectionApi = {
       '/api/connections/myslack/' + encodeURIComponent(id),
       { method: 'DELETE', credentials: 'include' }
     ),
+
+  check: async (id: string): Promise<SlackConnectionPublicInfo | null> => {
+    const res = await slackConnectionApi.list();
+    return res.connections.find((item) => item.id === id) ?? null;
+  },
 };
 
 export const slackSessionOwner = gmailSessionOwner;

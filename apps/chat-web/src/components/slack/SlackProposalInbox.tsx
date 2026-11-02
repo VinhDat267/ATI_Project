@@ -20,6 +20,18 @@ export interface SlackProposalInboxProps {
   onLogout: () => void;
 }
 
+type StatusFilter = 'all' | 'action_needed' | 'awaiting_approval' | 'resolved';
+
+const digestStatusLabels: Record<string, string> = {
+  pending: 'Đang chờ xem xét',
+  needs_info: 'Cần bổ sung thông tin',
+  awaiting_approval: 'Chờ phê duyệt',
+  approved: 'Đã phê duyệt',
+  completed: 'Đã hoàn thành',
+  rejected: 'Đã từ chối',
+  stale: 'Hết hiệu lực',
+};
+
 export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalInboxProps) {
   const [connections, setConnections] = useState<SlackConnectionPublicInfo[]>([]);
   const [selectedConnectionId, setSelectedConnectionId] = useState('');
@@ -28,6 +40,9 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [refreshingDigestId, setRefreshingDigestId] = useState('');
+  const [reloadTick, setReloadTick] = useState(0);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const generation = useRef(0);
 
   useEffect(() => {
@@ -94,7 +109,7 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
     return () => {
       controller.abort();
     };
-  }, [selectedConnectionId]);
+  }, [selectedConnectionId, reloadTick]);
 
   const handleRefreshDigest = async (digestId: string) => {
     if (refreshingDigestId) return;
@@ -112,9 +127,40 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
     }
   };
 
+  const totalCount = proposals.length;
+  const actionNeededCount = proposals.filter((p) => p.status === 'pending' || p.status === 'needs_info').length;
+  const awaitingApprovalCount = proposals.filter((p) => p.status === 'awaiting_approval').length;
+  const resolvedCount = proposals.filter((p) => p.status === 'approved' || p.status === 'rejected').length;
+  const badgeCount = actionNeededCount + awaitingApprovalCount;
+
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filteredProposals = proposals.filter((proposal) => {
+    if (statusFilter === 'action_needed' && !['pending', 'needs_info'].includes(proposal.status)) return false;
+    if (statusFilter === 'awaiting_approval' && proposal.status !== 'awaiting_approval') return false;
+    if (statusFilter === 'resolved' && !['approved', 'rejected'].includes(proposal.status)) return false;
+    if (!normalizedQuery) return true;
+    const title = proposal.body?.decision.title?.toLowerCase() ?? '';
+    const rationale = proposal.body?.decision.rationale?.toLowerCase() ?? '';
+    const channel = (proposal.channelId ?? proposal.body?.context?.[0]?.channelId ?? '').toLowerCase();
+    const contextText = (proposal.body?.context ?? []).map((m) => `${m.user} ${m.text}`).join(' ').toLowerCase();
+    return (
+      title.includes(normalizedQuery) ||
+      rationale.includes(normalizedQuery) ||
+      channel.includes(normalizedQuery) ||
+      contextText.includes(normalizedQuery)
+    );
+  });
+
   return (
     <div className="min-h-screen bg-[#F8F8F6] dark:bg-[#121212] text-[#111827] dark:text-white">
-      <MainNav user={user} current={null} pageName="Hộp thư đề xuất" navigate={navigate} onLogout={onLogout} />
+      <MainNav
+        user={user}
+        current={null}
+        pageName="Hộp thư đề xuất"
+        inboxBadgeCount={badgeCount}
+        navigate={navigate}
+        onLogout={onLogout}
+      />
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -124,23 +170,54 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
             </p>
           </div>
           {connections.length > 0 && (
-            <label className="text-sm flex items-center gap-2">
-              <span>Workspace</span>
-              <select
-                aria-label="Chọn workspace"
-                className="rounded-lg border border-[#D1D5DB] dark:border-[#4B5563] bg-white dark:bg-[#1E1E1E] px-3 py-1.5 text-sm"
-                value={selectedConnectionId}
-                onChange={(e) => setSelectedConnectionId(e.target.value)}
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="text-sm flex items-center gap-2">
+                <span>Workspace</span>
+                <select
+                  aria-label="Chọn workspace"
+                  className="rounded-lg border border-[#D1D5DB] dark:border-[#4B5563] bg-white dark:bg-[#1E1E1E] px-3 py-1.5 text-sm"
+                  value={selectedConnectionId}
+                  onChange={(e) => setSelectedConnectionId(e.target.value)}
+                >
+                  {connections.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.workspaceName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => setReloadTick((v) => v + 1)}
+                className="rounded-lg border border-[#D1D5DB] dark:border-[#4B5563] bg-white dark:bg-[#1E1E1E] px-3 py-1.5 text-xs font-medium hover:bg-neutral-50 dark:hover:bg-[#2A2A2A] disabled:opacity-50"
               >
-                {connections.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.workspaceName}
-                  </option>
-                ))}
-              </select>
-            </label>
+                Tải lại hộp thư
+              </button>
+            </div>
           )}
         </div>
+
+        {connections.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" aria-label="Thống kê đề xuất">
+            <div className="rounded-xl border border-[#E7E7E2] dark:border-[#333333] bg-white dark:bg-[#1E1E1E] p-3">
+              <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">Tổng đề xuất</p>
+              <p className="mt-1 font-display text-xl font-bold">{totalCount}</p>
+            </div>
+            <div className="rounded-xl border border-[#E7E7E2] dark:border-[#333333] bg-white dark:bg-[#1E1E1E] p-3">
+              <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">Cần xử lý</p>
+              <p className="mt-1 font-display text-xl font-bold text-[#FF5701]">{actionNeededCount}</p>
+            </div>
+            <div className="rounded-xl border border-[#E7E7E2] dark:border-[#333333] bg-white dark:bg-[#1E1E1E] p-3">
+              <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">Chờ phê duyệt</p>
+              <p className="mt-1 font-display text-xl font-bold text-amber-600 dark:text-amber-400">{awaitingApprovalCount}</p>
+            </div>
+            <div className="rounded-xl border border-[#E7E7E2] dark:border-[#333333] bg-white dark:bg-[#1E1E1E] p-3">
+              <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">Đã xử lý</p>
+              <p className="mt-1 font-display text-xl font-bold text-emerald-600 dark:text-emerald-400">{resolvedCount}</p>
+            </div>
+          </div>
+        )}
 
         {error && (
           <p role="alert" className="text-sm text-red-700 dark:text-red-300">
@@ -156,14 +233,55 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
         )}
 
         <section aria-labelledby="proposals-heading" className="space-y-3">
-          <h2 id="proposals-heading" className="font-display text-lg font-semibold">
-            Đề xuất từ tin nhắn
-          </h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <h2 id="proposals-heading" className="font-display text-lg font-semibold">
+              Đề xuất từ tin nhắn
+            </h2>
+            {proposals.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex rounded-lg border border-[#D1D5DB] dark:border-[#4B5563] bg-white dark:bg-[#1E1E1E] p-0.5 text-xs">
+                  {(
+                    [
+                      ['all', 'Tất cả'],
+                      ['action_needed', 'Cần xử lý'],
+                      ['awaiting_approval', 'Chờ phê duyệt'],
+                      ['resolved', 'Đã xử lý'],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setStatusFilter(key)}
+                      className={`rounded-md px-2.5 py-1 font-medium transition-colors ${
+                        statusFilter === key
+                          ? 'bg-[#FF5701] text-white'
+                          : 'text-[#4B5563] dark:text-[#9CA3AF] hover:text-[#111827] dark:hover:text-white'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="search"
+                  aria-label="Tìm kiếm đề xuất"
+                  placeholder="Tìm theo tiêu đề, kênh, nội dung…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="rounded-lg border border-[#D1D5DB] dark:border-[#4B5563] bg-white dark:bg-[#1E1E1E] px-3 py-1.5 text-xs"
+                />
+              </div>
+            )}
+          </div>
           {proposals.length === 0 && !loading ? (
             <p className="text-sm text-[#6B7280] dark:text-[#9CA3AF]">Chưa có đề xuất nào cho workspace này.</p>
+          ) : filteredProposals.length === 0 && !loading ? (
+            <p className="text-sm text-[#6B7280] dark:text-[#9CA3AF]">
+              Không có đề xuất nào khớp với bộ lọc hiện tại.
+            </p>
           ) : (
             <div className="space-y-3">
-              {proposals.map((proposal) => (
+              {filteredProposals.map((proposal) => (
                 <SlackProposalCard
                   key={proposal.id}
                   proposal={proposal}
@@ -231,8 +349,15 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
                           </p>
                           <ul className="space-y-1">
                             {entries.map((item) => (
-                              <li key={item.proposalId}>
-                                • {item.title} ({item.status})
+                              <li key={item.proposalId} className="flex flex-wrap items-center gap-1.5">
+                                <span>
+                                  • {item.title} ({item.status})
+                                </span>
+                                {digestStatusLabels[item.status] && (
+                                  <span className="rounded bg-[#F3F4F6] dark:bg-[#2A2A2A] px-1.5 py-0.5 text-[11px] font-medium text-[#374151] dark:text-[#D1D5DB]">
+                                    {digestStatusLabels[item.status]}
+                                  </span>
+                                )}
                               </li>
                             ))}
                           </ul>

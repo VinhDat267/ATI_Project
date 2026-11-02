@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { SlackIntentService, SlackProposalTargetOverride } from '@wap/tool-schemas';
 import { slackAssistantApi, type SlackProposalViewDto } from '../../services/slack-assistant';
 import { apiClient } from '../../services/api-client';
 import { conversationPath } from '../../routes';
@@ -8,6 +9,8 @@ const buttonClass =
   'rounded-lg border border-[#D1D5DB] dark:border-[#4B5563] px-3 py-1.5 text-xs font-medium text-[#111827] dark:text-white disabled:opacity-50';
 const primaryClass =
   'rounded-lg bg-[#FF5701] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50';
+const inputClass =
+  'w-full rounded-lg border border-[#D1D5DB] dark:border-[#4B5563] bg-white dark:bg-[#1E1E1E] px-2.5 py-1.5 text-xs text-[#111827] dark:text-white';
 
 const statusLabels: Record<string, string> = {
   pending: 'Đang chờ xem xét',
@@ -26,6 +29,33 @@ const relevanceLabels: Record<string, string> = {
   keyword_match: 'Khớp từ khóa',
 };
 
+const serviceLabels: Record<string, string> = {
+  trello: 'Trello',
+  jira: 'Jira',
+  mysheets: 'Google Sheets',
+  mycalendar: 'Google Calendar',
+  github: 'GitHub',
+  gmail: 'Gmail',
+  myslack: 'Slack Thread',
+};
+
+function formatSlackTs(ts?: string): string {
+  if (!ts) return '';
+  const seconds = Number(ts.split('.')[0]);
+  if (!Number.isFinite(seconds) || seconds <= 0) return '';
+  try {
+    return new Date(seconds * 1000).toLocaleString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  } catch {
+    return '';
+  }
+}
+
 export interface SlackProposalCardProps {
   proposal: SlackProposalViewDto;
   navigate: (path: string) => void;
@@ -35,6 +65,16 @@ export interface SlackProposalCardProps {
 export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackProposalCardProps) {
   const [replyInThread, setReplyInThread] = useState(true);
   const [instruction, setInstruction] = useState('');
+  const [overrideService, setOverrideService] = useState<SlackIntentService | ''>('');
+  const [overrideListId, setOverrideListId] = useState('');
+  const [overrideProjectKey, setOverrideProjectKey] = useState('');
+  const [overrideSpreadsheetId, setOverrideSpreadsheetId] = useState('');
+  const [overrideSheet, setOverrideSheet] = useState('');
+  const [overrideCalendarId, setOverrideCalendarId] = useState('');
+  const [overrideStartIso, setOverrideStartIso] = useState('');
+  const [overrideEndIso, setOverrideEndIso] = useState('');
+  const [overrideRepo, setOverrideRepo] = useState('');
+  const [overrideToEmail, setOverrideToEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -49,6 +89,28 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
   const isStaleOrRedacted = proposal.status === 'stale' || proposal.body === null;
   const actionable = ['pending', 'needs_info', 'awaiting_approval'].includes(proposal.status) && !isStaleOrRedacted;
   const channelLabel = proposal.channelId ?? proposal.body?.context?.[0]?.channelId ?? 'Slack';
+  const rawTs = proposal.triggerMessageTs ?? proposal.body?.context?.[0]?.ts;
+  const formattedTs = formatSlackTs(rawTs);
+  const primaryIntent = proposal.body?.decision.intents?.[0];
+  const effectiveService = overrideService || primaryIntent?.service || '';
+  const isQuestionProposal =
+    effectiveService === 'myslack' ||
+    (overrideService === '' && primaryIntent?.action === 'question');
+
+  const buildTargetOverride = (): SlackProposalTargetOverride | undefined => {
+    const out: SlackProposalTargetOverride = {};
+    if (overrideService) out.service = overrideService;
+    if (overrideListId.trim()) out.listId = overrideListId.trim();
+    if (overrideProjectKey.trim()) out.projectKey = overrideProjectKey.trim();
+    if (overrideSpreadsheetId.trim()) out.spreadsheetId = overrideSpreadsheetId.trim();
+    if (overrideSheet.trim()) out.sheet = overrideSheet.trim();
+    if (overrideCalendarId.trim()) out.calendarId = overrideCalendarId.trim();
+    if (overrideStartIso.trim()) out.startIso = overrideStartIso.trim();
+    if (overrideEndIso.trim()) out.endIso = overrideEndIso.trim();
+    if (overrideRepo.trim()) out.repo = overrideRepo.trim();
+    if (overrideToEmail.trim()) out.toEmail = overrideToEmail.trim();
+    return Object.keys(out).length > 0 ? out : undefined;
+  };
 
   const handleRefine = async () => {
     if (busy) return;
@@ -83,10 +145,12 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
     setNotice('');
     setQuestion('');
     try {
+      const targetOverride = buildTargetOverride();
       const res = await slackAssistantApi.prepareProposal(proposal.id, {
         expectedRevision: proposal.revision,
         instruction: instruction.trim() || undefined,
         replyInThread,
+        ...(targetOverride ? { targetOverride } : {}),
       });
       if (owns()) {
         onUpdated(res.proposal);
@@ -171,6 +235,7 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
         </span>
         <span className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
           Kênh {channelLabel} · Phiên bản {proposal.revision}
+          {formattedTs ? ` · ${formattedTs}` : ''}
         </span>
       </div>
 
@@ -194,19 +259,31 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
               </p>
             )}
             {proposal.body.context.length > 0 && (
-              <blockquote className="rounded-lg border-l-2 border-[#FF5701] bg-[#F8F8F6] dark:bg-[#262626] p-2.5 text-xs text-[#374151] dark:text-[#D1D5DB]">
-                {proposal.body.context.map((msg) => (
-                  <p key={msg.ts}>
-                    <span className="font-semibold">{msg.user}:</span> {msg.text}
-                  </p>
-                ))}
+              <blockquote className="rounded-lg border-l-2 border-[#FF5701] bg-[#F8F8F6] dark:bg-[#262626] p-2.5 text-xs text-[#374151] dark:text-[#D1D5DB] space-y-1">
+                {proposal.body.context.map((msg) => {
+                  const msgTime = formatSlackTs(msg.ts);
+                  return (
+                    <p key={msg.ts}>
+                      <span className="font-semibold">{msg.user}</span>
+                      {msgTime ? <span className="text-[11px] text-[#6B7280] dark:text-[#9CA3AF]"> ({msgTime})</span> : null}
+                      <span>:</span> {msg.text}
+                    </p>
+                  );
+                })}
               </blockquote>
             )}
             {(proposal.body.decision.intents ?? []).length > 0 && (
               <ul className="space-y-1 text-xs text-[#374151] dark:text-[#D1D5DB]">
                 {(proposal.body.decision.intents ?? []).map((intent, idx) => (
-                  <li key={idx}>
-                    • [{intent.service}] {intent.summary}
+                  <li key={idx} className="flex flex-wrap items-center gap-1.5">
+                    <span>
+                      • [{intent.service}] {intent.summary}
+                    </span>
+                    {serviceLabels[intent.service] && (
+                      <span className="rounded bg-[#F3F4F6] dark:bg-[#2D2D2D] px-1.5 py-0.5 text-[11px] font-medium text-[#4B5563] dark:text-[#D1D5DB]">
+                        {serviceLabels[intent.service]}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -244,16 +321,158 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
 
       {actionable && (
         <div className="space-y-2 pt-2 border-t border-[#E7E7E2] dark:border-[#333333]">
+          {isQuestionProposal && (
+            <p className="text-xs text-[#FF5701] font-medium">
+              Đề xuất phản hồi câu hỏi Slack: nhập câu trả lời vào ô bên dưới để lên kế hoạch gửi trực tiếp vào thread nguồn.
+            </p>
+          )}
           <label className="block text-xs space-y-1">
             <span>Ghi chú điều chỉnh (tùy chọn, ví dụ hạn chót cụ thể)</span>
             <input
-              className="w-full rounded-lg border border-[#D1D5DB] dark:border-[#4B5563] bg-white dark:bg-[#1E1E1E] px-2.5 py-1.5 text-xs"
+              className={inputClass}
+              placeholder={
+                isQuestionProposal
+                  ? 'Nhập nội dung câu trả lời gửi vào thread Slack…'
+                  : 'Ví dụ: Hạn chót 2026-11-15 hoặc bổ sung người phụ trách…'
+              }
               value={instruction}
               maxLength={1000}
               disabled={busy}
               onChange={(e) => setInstruction(e.target.value)}
             />
           </label>
+          <details className="rounded-lg border border-[#E7E7E2] dark:border-[#333333] bg-[#FAFAFA] dark:bg-[#242424] p-2.5 text-xs">
+            <summary className="cursor-pointer font-medium text-[#374151] dark:text-[#D1D5DB]">
+              Đổi dịch vụ đích hoặc điền tham số đích cho đề xuất này
+            </summary>
+            <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <label className="block space-y-1 sm:col-span-2">
+                <span>Dịch vụ đích ghi đè</span>
+                <select
+                  aria-label="Dịch vụ đích ghi đè"
+                  className={inputClass}
+                  value={overrideService}
+                  disabled={busy}
+                  onChange={(e) => setOverrideService(e.target.value as SlackIntentService | '')}
+                >
+                  <option value="">Theo gợi ý mặc định ({serviceLabels[primaryIntent?.service ?? ''] ?? (primaryIntent?.service || 'Tự động')})</option>
+                  <option value="trello">Trello — Tạo thẻ công việc</option>
+                  <option value="jira">Jira — Tạo Issue / Bug</option>
+                  <option value="mysheets">Google Sheets — Ghi dòng tiến độ</option>
+                  <option value="mycalendar">Google Calendar — Đặt lịch họp</option>
+                  <option value="github">GitHub — Tạo Issue mã nguồn</option>
+                  <option value="gmail">Gmail — Gửi email thông báo</option>
+                  <option value="myslack">Slack — Phản hồi trực tiếp vào thread</option>
+                </select>
+              </label>
+              {effectiveService === 'trello' && (
+                <label className="block space-y-1 sm:col-span-2">
+                  <span>ID danh sách Trello (List ID)</span>
+                  <input
+                    className={inputClass}
+                    placeholder="Ví dụ: list-sprint-1"
+                    value={overrideListId}
+                    disabled={busy}
+                    onChange={(e) => setOverrideListId(e.target.value)}
+                  />
+                </label>
+              )}
+              {effectiveService === 'jira' && (
+                <label className="block space-y-1 sm:col-span-2">
+                  <span>Mã dự án Jira (Project Key)</span>
+                  <input
+                    className={inputClass}
+                    placeholder="Ví dụ: OPS"
+                    value={overrideProjectKey}
+                    disabled={busy}
+                    onChange={(e) => setOverrideProjectKey(e.target.value)}
+                  />
+                </label>
+              )}
+              {effectiveService === 'mysheets' && (
+                <>
+                  <label className="block space-y-1">
+                    <span>ID bảng tính Google Sheets</span>
+                    <input
+                      className={inputClass}
+                      placeholder="Spreadsheet ID"
+                      value={overrideSpreadsheetId}
+                      disabled={busy}
+                      onChange={(e) => setOverrideSpreadsheetId(e.target.value)}
+                    />
+                  </label>
+                  <label className="block space-y-1">
+                    <span>Tên trang tính (Sheet)</span>
+                    <input
+                      className={inputClass}
+                      placeholder="Sheet1"
+                      value={overrideSheet}
+                      disabled={busy}
+                      onChange={(e) => setOverrideSheet(e.target.value)}
+                    />
+                  </label>
+                </>
+              )}
+              {effectiveService === 'mycalendar' && (
+                <>
+                  <label className="block space-y-1 sm:col-span-2">
+                    <span>ID lịch Google Calendar</span>
+                    <input
+                      className={inputClass}
+                      placeholder="primary"
+                      value={overrideCalendarId}
+                      disabled={busy}
+                      onChange={(e) => setOverrideCalendarId(e.target.value)}
+                    />
+                  </label>
+                  <label className="block space-y-1">
+                    <span>Thời gian bắt đầu (ISO 8601)</span>
+                    <input
+                      className={inputClass}
+                      placeholder="2026-11-12T09:00:00+07:00"
+                      value={overrideStartIso}
+                      disabled={busy}
+                      onChange={(e) => setOverrideStartIso(e.target.value)}
+                    />
+                  </label>
+                  <label className="block space-y-1">
+                    <span>Thời gian kết thúc (ISO 8601)</span>
+                    <input
+                      className={inputClass}
+                      placeholder="2026-11-12T09:30:00+07:00"
+                      value={overrideEndIso}
+                      disabled={busy}
+                      onChange={(e) => setOverrideEndIso(e.target.value)}
+                    />
+                  </label>
+                </>
+              )}
+              {effectiveService === 'github' && (
+                <label className="block space-y-1 sm:col-span-2">
+                  <span>Kho mã nguồn GitHub (owner/repo)</span>
+                  <input
+                    className={inputClass}
+                    placeholder="Ví dụ: acme/platform"
+                    value={overrideRepo}
+                    disabled={busy}
+                    onChange={(e) => setOverrideRepo(e.target.value)}
+                  />
+                </label>
+              )}
+              {effectiveService === 'gmail' && (
+                <label className="block space-y-1 sm:col-span-2">
+                  <span>Email người nhận (To)</span>
+                  <input
+                    className={inputClass}
+                    placeholder="Ví dụ: ops@acme.vn"
+                    value={overrideToEmail}
+                    disabled={busy}
+                    onChange={(e) => setOverrideToEmail(e.target.value)}
+                  />
+                </label>
+              )}
+            </div>
+          </details>
           <label className="flex items-center gap-2 text-xs">
             <input
               type="checkbox"

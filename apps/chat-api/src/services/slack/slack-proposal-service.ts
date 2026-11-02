@@ -134,12 +134,25 @@ export class SlackProposalService {
       if (!policyDecision.allowed) throw new Error('SLACK_POLICY_DENIED');
       const policyReference = validateSlackPolicyReference(policyDecision.policyReference);
       const rawTargets = ((row.current_config_json ?? {}) as Record<string, any>).targets ?? {};
+      const override = input.targetOverride ?? {};
       const taskTarget = rawTargets[SLACK_PROPOSAL_WORKFLOW_TOOLS.taskService];
       const bugTarget = rawTargets[SLACK_PROPOSAL_WORKFLOW_TOOLS.bugService];
       const progressTarget = rawTargets.mysheets;
+      const calendarTarget = rawTargets.mycalendar;
+      const githubTarget = rawTargets.github;
+      const gmailTarget = rawTargets.gmail;
       const triggerIndex = body.decision?.relevance?.sourceIndex ?? body.decision?.sourceIndices?.[0] ?? 0;
       const triggerMsg = body.context?.[triggerIndex] ?? body.context?.[0];
       if (!triggerMsg) throw new Error('SLACK_PROPOSAL_STALE');
+      const taskListId = override.listId ?? taskTarget?.listId;
+      const bugProjectKey = override.projectKey ?? bugTarget?.projectKey;
+      const spreadsheetId = override.spreadsheetId ?? progressTarget?.spreadsheetId;
+      const sheetName =
+        override.sheet ??
+        (progressTarget?.range ? String(progressTarget.range).split('!')[0] || 'Sheet1' : 'Sheet1');
+      const calendarId = override.calendarId ?? calendarTarget?.calendarId;
+      const githubRepo = override.repo ?? githubTarget?.repo;
+      const toEmail = override.toEmail ?? gmailTarget?.to ?? gmailTarget?.toEmail;
       const planInput: SlackProposalPlanInput = {
         ownerId: owner,
         binding: body.binding,
@@ -156,15 +169,26 @@ export class SlackProposalService {
           sourceTexts: Array.isArray(body.context) ? body.context.map((m: any) => String(m.text ?? '')) : [],
         },
         targets: {
-          task: taskTarget?.listId ? { listId: taskTarget.listId } : undefined,
-          bug: bugTarget?.projectKey ? { projectKey: bugTarget.projectKey } : undefined,
-          progress: progressTarget?.spreadsheetId
+          overrideService: override.service,
+          task: taskListId ? { listId: taskListId } : undefined,
+          bug: bugProjectKey ? { projectKey: bugProjectKey } : undefined,
+          progress: spreadsheetId
             ? {
-                spreadsheetId: progressTarget.spreadsheetId,
-                sheet: String(progressTarget.range ?? 'Sheet1').split('!')[0] || 'Sheet1',
-                allowedSpreadsheetIds: [progressTarget.spreadsheetId],
+                spreadsheetId,
+                sheet: sheetName,
+                allowedSpreadsheetIds: [spreadsheetId],
               }
             : undefined,
+          calendar:
+            calendarId || override.startIso || override.endIso
+              ? {
+                  ...(calendarId ? { calendarId } : {}),
+                  ...(override.startIso ? { startIso: override.startIso } : {}),
+                  ...(override.endIso ? { endIso: override.endIso } : {}),
+                }
+              : undefined,
+          github: githubRepo ? { repo: githubRepo } : undefined,
+          gmail: toEmail ? { toEmail } : undefined,
           replyInThread: input.replyInThread ?? (rawTargets.replyToSource === true),
         },
         instruction: input.instruction,

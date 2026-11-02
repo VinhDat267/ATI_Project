@@ -358,4 +358,40 @@ describe('SLACK-06A & SLACK-06B SlackProposalInbox UI and /inbox route', () => {
     );
     expect(screen.queryByText('Tạo thẻ theo dõi bản phát hành')).not.toBeInTheDocument();
   });
+
+  it('supports KPI summary, status filtering, search, and inline multi-service targetOverride on proposal cards', async () => {
+    render(<SlackProposalInbox user={user} navigate={vi.fn()} onLogout={vi.fn()} />);
+    expect(await screen.findByText('Tạo thẻ theo dõi bản phát hành')).toBeInTheDocument();
+
+    // KPI Summary cards are rendered
+    expect(screen.getByLabelText('Thống kê đề xuất')).toBeInTheDocument();
+
+    // Search filters proposals in real time
+    const searchInput = screen.getByLabelText('Tìm kiếm đề xuất');
+    fireEvent.change(searchInput, { target: { value: 'chiến dịch' } });
+    expect(screen.queryByText('Tạo thẻ theo dõi bản phát hành')).not.toBeInTheDocument();
+    expect(screen.getByText('Báo cáo chiến dịch')).toBeInTheDocument();
+
+    // Reset search
+    fireEvent.change(searchInput, { target: { value: '' } });
+    expect(screen.getByText('Tạo thẻ theo dõi bản phát hành')).toBeInTheDocument();
+
+    // Override destination service to GitHub on prop-1
+    const overrideSelect = screen.getAllByLabelText('Dịch vụ đích ghi đè')[0];
+    fireEvent.change(overrideSelect, { target: { value: 'github' } });
+    const repoInput = screen.getByPlaceholderText('Ví dụ: acme/platform');
+    fireEvent.change(repoInput, { target: { value: 'acme/platform' } });
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Xem trước kế hoạch' })[0]);
+    await waitFor(() =>
+      expect(
+        requests.some(
+          (r) =>
+            r.url === '/api/slack/proposals/prop-1/prepare' &&
+            r.body?.targetOverride?.service === 'github' &&
+            r.body?.targetOverride?.repo === 'acme/platform',
+        ),
+      ).toBe(true),
+    );
+  });
 });

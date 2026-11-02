@@ -419,4 +419,62 @@ describe('SLACK-06A protected inbox, refine/prepare/reject CAS, and cross-servic
   await vi.waitFor(async()=>expect((await f.plans.getPlan(progPrep.body.planId))?.status).toBe('completed'),{timeout:15000});
   expect(f.sheetsAppendCalls).toHaveLength(1);
  },30000);
+
+ it('supports targetOverride for MyCalendar, GitHub, Gmail and direct Slack reply for question proposals',async()=>{
+  const f=await setupFixture();
+
+  // Question proposal answered directly in Slack thread
+  const qSeed=await f.seedProposal({
+   title:'Hỏi lịch release',
+   intents:[{action:'question',service:'myslack',summary:'Khi nào release bản v3?'}],
+   text:'<@U_OWNER> khi nào release bản v3 nhỉ?',
+  });
+  const qPrep=await request(f.app).post(`/api/slack/proposals/${qSeed.id}/prepare`).set('Authorization',f.ownerToken).send({
+   expectedRevision:1,
+   instruction:'Chúng ta sẽ release lúc 20:00 tối nay nhé!',
+   replyInThread:true,
+  });
+  expect(qPrep.status).toBe(200);
+  expect(qPrep.body.status).toBe('awaiting_approval');
+  expect(qPrep.body.plan.steps).toHaveLength(1);
+  expect(qPrep.body.plan.steps[0].tool).toBe('myslack.chat_postMessage');
+
+  // Target override to MyCalendar on a task proposal
+  const calSeed=await f.seedProposal({
+   title:'Họp thiết kế giao diện Slack',
+   intents:[{action:'task',service:'trello',summary:'Họp review UI/UX Slack'}],
+   text:'<@U_OWNER> chiều mai họp review UI/UX Slack nhé',
+  });
+  const calPrep=await request(f.app).post(`/api/slack/proposals/${calSeed.id}/prepare`).set('Authorization',f.ownerToken).send({
+   expectedRevision:1,
+   replyInThread:true,
+   targetOverride:{
+    service:'mycalendar',
+    calendarId:'primary',
+    startIso:'2026-11-05T14:00:00+07:00',
+    endIso:'2026-11-05T15:00:00+07:00',
+   },
+  });
+  expect(calPrep.status).toBe(200);
+  expect(calPrep.body.status).toBe('awaiting_approval');
+  expect(calPrep.body.plan.steps.map((s:any)=>s.tool)).toEqual(['mycalendar.create_event','myslack.chat_postMessage']);
+
+  // Target override to GitHub Issue
+  const ghSeed=await f.seedProposal({
+   title:'Sửa lỗi hiển thị bộ chọn kênh',
+   intents:[{action:'issue',service:'jira',summary:'Thêm dropdown chọn kênh Slack'}],
+   text:'<@U_OWNER> tạo issue sửa bộ chọn kênh Slack nhé',
+  });
+  const ghPrep=await request(f.app).post(`/api/slack/proposals/${ghSeed.id}/prepare`).set('Authorization',f.ownerToken).send({
+   expectedRevision:1,
+   replyInThread:false,
+   targetOverride:{
+    service:'github',
+    repo:'wap/platform',
+   },
+  });
+  expect(ghPrep.status).toBe(200);
+  expect(ghPrep.body.status).toBe('awaiting_approval');
+  expect(ghPrep.body.plan.steps.map((s:any)=>s.tool)).toEqual(['github.search_issues','github.create_issue']);
+ },30000);
 });

@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {defaultSlackAssistantConfig,validateSlackAssistantConfig,validateSlackAssistantVersion,validateSlackTriageDecision,validateSlackProposalRevisionInput,validateSlackProposalPrepareInput,SLACK_PROPOSAL_WORKFLOW_TOOLS} from '../src/myslack-assistant.js';
+import {defaultSlackAssistantConfig,validateSlackAssistantConfig,validateSlackAssistantVersion,validateSlackTriageDecision,validateSlackProposalRevisionInput,validateSlackProposalPrepareInput,parseSlackThreadInput,SLACK_PROPOSAL_WORKFLOW_TOOLS} from '../src/myslack-assistant.js';
 
 describe('Slack assistant owned configuration and untrusted model output',()=>{
  it('defaults to disabled hybrid with finite budgets and independent configuration objects',()=>{
@@ -47,7 +47,55 @@ describe('Slack assistant owned configuration and untrusted model output',()=>{
    taskService:'trello',taskCreateTool:'trello.create_card',
    bugService:'jira',bugSearchTool:'jira.search_issues',bugCreateTool:'jira.create_issue',
    progressService:'mysheets',progressAppendTool:'mysheets.append_rows',
+   calendarService:'mycalendar',calendarCreateTool:'mycalendar.create_event',
+   githubService:'github',githubSearchTool:'github.search_issues',githubCreateTool:'github.create_issue',
+   gmailService:'gmail',gmailDraftTool:'gmail.create_draft',
    replyService:'myslack',replyPostTool:'myslack.chat_postMessage',
+  });
+ });
+ it('parses Slack permalinks, thread query URLs and compact channel:threadTs pairs',()=>{
+  expect(parseSlackThreadInput('https://myteam.slack.com/archives/C07ABC123/p1730000000000100')).toEqual({
+   channelId:'C07ABC123',
+   threadTs:'1730000000.000100',
+  });
+  expect(parseSlackThreadInput('https://myteam.slack.com/archives/C07ABC123/p1730000099000200?thread_ts=1730000000.000050&cid=C07ABC123')).toEqual({
+   channelId:'C07ABC123',
+   threadTs:'1730000000.000050',
+  });
+  expect(parseSlackThreadInput('C07ABC123:1730000000.000100')).toEqual({
+   channelId:'C07ABC123',
+   threadTs:'1730000000.000100',
+  });
+  expect(parseSlackThreadInput('invalid-link')).toBeNull();
+ });
+ it('validates extended multi-service targets and inline proposal targetOverride',()=>{
+  const cfg=defaultSlackAssistantConfig();
+  cfg.targets={
+   trello:{boardId:'B1',listId:'L1'},
+   jira:{projectKey:'ATI'},
+   mysheets:{spreadsheetId:'S1',range:'Sheet1!A:C'},
+   mycalendar:{calendarId:'primary'},
+   github:{repo:'wap/platform'},
+   gmail:{to:'client@example.com'},
+   replyToSource:true,
+  };
+  expect(validateSlackAssistantConfig(cfg).targets).toEqual(cfg.targets);
+  const prepared=validateSlackProposalPrepareInput({
+   expectedRevision:4,
+   instruction:'Họp chốt giải pháp',
+   replyInThread:true,
+   targetOverride:{
+    service:'mycalendar',
+    calendarId:'primary',
+    startIso:'2026-11-05T09:00:00+07:00',
+    endIso:'2026-11-05T10:00:00+07:00',
+   },
+  });
+  expect(prepared.targetOverride).toEqual({
+   service:'mycalendar',
+   calendarId:'primary',
+   startIso:'2026-11-05T09:00:00+07:00',
+   endIso:'2026-11-05T10:00:00+07:00',
   });
  });
 });
