@@ -163,7 +163,7 @@ describe('0015_workspaces.sql migration and schema invariants', () => {
 
     try {
       const files = (await readdir(directory)).filter(f => /^\d{4}_.*\.sql$/.test(f)).sort();
-      for (const f of files.filter(f => !f.startsWith('0015_'))) {
+      for (const f of files.filter(f => parseInt(f.slice(0, 4), 10) < 15)) {
         await upgPool.query(await readFile(`${directory}/${f}`, 'utf8'));
       }
 
@@ -195,6 +195,11 @@ describe('0015_workspaces.sql migration and schema invariants', () => {
 
       // Now run 0015_workspaces.sql
       await upgPool.query(await readFile(`${directory}/0015_workspaces.sql`, 'utf8'));
+
+      // Run subsequent migrations (e.g. 0019_jira_workspaces.sql)
+      for (const f of files.filter(f => parseInt(f.slice(0, 4), 10) > 15)) {
+        await upgPool.query(await readFile(`${directory}/${f}`, 'utf8'));
+      }
 
       // Verify "Không gian Chung" was created
       const wsRes = await upgPool.query("SELECT * FROM workspaces WHERE name = 'Không gian Chung'");

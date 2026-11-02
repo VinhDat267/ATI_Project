@@ -10,6 +10,7 @@ import {
   CredentialRepo,
   UserRepo,
   WorkspaceRepo,
+  JiraWorkspaceRepo,
 } from './db/repositories/index.js';
 import { DEMO_ADMIN_ID } from './routes/auth-routes.js';
 import { verifyPassword } from './db/repositories/user-repo.js';
@@ -42,6 +43,9 @@ import { GitHubTokenManager } from './services/github/token-manager.js';
 import { GitHubOAuthClient } from './services/github/oauth-client.js';
 import { GitHubTeamRepo } from './db/repositories/github-team-repo.js';
 import { createGitHubConnectionLookup } from './services/github/connection-reference.js';
+import { JiraOAuthClient } from './services/jira/jira-oauth-client.js';
+import { JiraOAuthRepo } from './db/repositories/jira-oauth-repo.js';
+import { JiraTokenManager } from './services/jira/jira-token-manager.js';
 import {
   AIPlanner,
   createProviderFromEnv,
@@ -73,6 +77,7 @@ async function bootstrap() {
   let stepRepo: any = null;
   let credRepo: any = null;
   let workspaceRepo: any = null;
+  let jiraWorkspaceRepo: JiraWorkspaceRepo | null = null;
 
   try {
     const dbUrl = env.DATABASE_URL;
@@ -88,6 +93,7 @@ async function bootstrap() {
     stepRepo = new StepRepo(pool);
     credRepo = new CredentialRepo(pool, env.ENCRYPTION_KEY);
     workspaceRepo = new WorkspaceRepo(pool);
+    jiraWorkspaceRepo = new JiraWorkspaceRepo(pool);
 
     if (env.RUNTIME_MODE === 'live') {
       const seededAdmin = await userRepo.findByEmail('admin@wap.local');
@@ -97,6 +103,12 @@ async function bootstrap() {
     }
   } catch (err: any) {
     if (!mayUseMemoryStorage(env.RUNTIME_MODE)) throw err;
+    const unavailablePool = pool;
+    pool = null;
+    userRepo = null;
+    workspaceRepo = null;
+    jiraWorkspaceRepo = null;
+    await unavailablePool?.end();
     console.warn(
       `\x1b[33m[chat-api]\x1b[0m PostgreSQL không khả dụng (${err?.message || 'offline'}). Tự động chuyển sang chế độ Lưu trữ In-Memory phát triển.`
     );
@@ -354,6 +366,18 @@ async function bootstrap() {
     : undefined;
   const telegramConnection = telegramLookup ?? sandboxTelegramConnection;
 
+  const jiraAvailable = Boolean(env.MYJIRA_ENABLED && env.JIRA_OAUTH && pool);
+  const jiraOAuthClient = jiraAvailable ? new JiraOAuthClient(env.JIRA_OAUTH!) : undefined;
+  const jiraOAuthRepo = jiraAvailable && pool ? new JiraOAuthRepo(pool, env.ENCRYPTION_KEY) : undefined;
+  const jiraTokens = jiraAvailable && pool && jiraOAuthClient && jiraOAuthRepo
+    ? new JiraTokenManager({
+        pool,
+        client: jiraOAuthClient,
+        repo: jiraOAuthRepo,
+        encryptionKey: env.ENCRYPTION_KEY,
+      })
+    : undefined;
+
   // 2. Initialize LLM Provider
   let provider: any;
   if (env.RUNTIME_MODE === 'live') {
@@ -503,6 +527,7 @@ async function bootstrap() {
   if (env.GMAIL_ENABLED && !gmailAvailable) console.warn('\x1b[33m[chat-api] GMAIL_ENABLED=on nhưng thiếu cấu hình Gmail hoặc PostgreSQL: kết nối Gmail tạm tắt (503).\x1b[0m');
   if (env.MYCALENDAR_ENABLED && !mycalendarAvailable) console.warn('\x1b[33m[chat-api] MYCALENDAR_ENABLED=on nhưng thiếu cấu hình MyCalendar hoặc PostgreSQL: kết nối MyCalendar tạm tắt (503).\x1b[0m');
   if (env.MYSHEETS_ENABLED && !mysheetsAvailable) console.warn('\x1b[33m[chat-api] MYSHEETS_ENABLED=on nhưng thiếu cấu hình MySheets hoặc PostgreSQL: kết nối MySheets tạm tắt (503).\x1b[0m');
+  if (env.MYJIRA_ENABLED && !jiraAvailable) console.warn('\x1b[33m[chat-api] MYJIRA_ENABLED=on nhưng thiếu cấu hình Jira OAuth hoặc PostgreSQL: kết nối Jira tạm tắt (503).\x1b[0m');
 
   let realAdapterFactory: AdapterFactory;
   const gmailTokens = gmailAvailable ? new GmailTokenManager({
@@ -627,6 +652,8 @@ async function bootstrap() {
     userRepo,
     adminUserRepo: pool && userRepo ? new AdminUserRepo(pool) : undefined,
     workspaceRepo,
+    jiraWorkspaceRepo: jiraWorkspaceRepo ?? undefined,
+    pool: pool ?? undefined,
     signupEnabled: env.AUTH_SIGNUP_ENABLED,
     googleSignupEnabled: env.GOOGLE_SIGNUP_ENABLED,
     googleOAuth: env.GOOGLE_OAUTH,
@@ -696,6 +723,17 @@ async function bootstrap() {
       },
     },
     telegramTeamRepo,
+    jira: env.MYJIRA_ENABLED ? {
+      enabled: jiraAvailable,
+      oauth: env.JIRA_OAUTH,
+      repo: jiraOAuthRepo,
+      tokens: jiraTokens,
+      client: jiraOAuthClient,
+      onConnectionChanged: (userId: string) => {
+        realAdapterFactory.clearPersonal(userId);
+        jiraTokens?.clear(userId);
+      },
+    } : undefined,
     chatService,
     sseManager,
     executionService,
