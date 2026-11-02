@@ -38,7 +38,7 @@ describe('service configuration capability with real PostgreSQL sessions and HTT
       const session = await users.sessions.create(user.id, 'FE07 permissions');
       tokens.set(user.id, generateAccessToken({ id: user.id, email, name: 'FE07 Fixture' }, secret, session.sessionId).accessToken);
     }
-    await credentials.saveCredentials('github', encryptCredentials({ token: 'synthetic-fe07-token', allowedScope: { repos: ['fixture/repo'] } }, key));
+    await credentials.saveCredentials('notion', encryptCredentials({ token: 'synthetic-fe07-token', allowedScope: { databases: ['00000000-0000-0000-0000-000000000001'] } }, key));
   });
   afterAll(async () => {
     await pool.end();
@@ -54,11 +54,11 @@ describe('service configuration capability with real PostgreSQL sessions and HTT
     expect(listed.body.canConfigure).toBe(user.canConfigure);
     expect(listed.body.services).toHaveLength(8);
     expect(listed.text).not.toContain('synthetic-fe07-token');
-    const saved = await request(app).post('/api/services/github/credentials').set('Authorization', authorization)
-      .send({ credentials: { token: 'synthetic-fe07-token' }, allowedScope: ['fixture/repo'] });
+    const saved = await request(app).post('/api/services/notion/credentials').set('Authorization', authorization)
+      .send({ credentials: { token: 'synthetic-fe07-token' }, allowedScope: ['00000000-0000-0000-0000-000000000001'] });
     expect(saved.status).toBe(user.canConfigure ? 200 : 403);
-    const scope = await request(app).put('/api/services/github/scope').set('Authorization', authorization)
-      .send({ allowedScope: ['fixture/second'] });
+    const scope = await request(app).put('/api/services/notion/scope').set('Authorization', authorization)
+      .send({ allowedScope: ['00000000-0000-0000-0000-000000000002'] });
     expect(scope.status).toBe(user.canConfigure ? 200 : 403);
   });
   it('refreshes the capability from the current database role without issuing a new access token', async () => {
@@ -67,7 +67,7 @@ describe('service configuration capability with real PostgreSQL sessions and HTT
     try {
       const listed = await request(app).get('/api/services').set('Authorization', authorization);
       expect(listed.status).toBe(200); expect(listed.body.canConfigure).toBe(false);
-      const saved = await request(app).put('/api/services/github/scope').set('Authorization', authorization).send({ allowedScope: ['fixture/third'] });
+      const saved = await request(app).put('/api/services/notion/scope').set('Authorization', authorization).send({ allowedScope: ['00000000-0000-0000-0000-000000000003'] });
       expect(saved.status).toBe(403);
     } finally { await pool.query("UPDATE users SET role='admin' WHERE id=$1", [user.id]); }
   });

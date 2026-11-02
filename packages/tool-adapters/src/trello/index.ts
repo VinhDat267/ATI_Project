@@ -10,9 +10,9 @@ export class TrelloAdapter extends TrelloWriteTools {
   override async execute(
     toolName: string,
     args: Record<string, any>,
-    context?: { signal?: AbortSignal }
+    context?: { signal?: AbortSignal; boardId?: string }
   ): Promise<any> {
-    const opts = context?.signal ? { signal: context.signal } : undefined;
+    const opts = { signal: context?.signal, boardId: context?.boardId };
     switch (toolName) {
       // 5 Read tools
       case 'trello.search_boards':

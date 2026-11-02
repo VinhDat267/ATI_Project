@@ -226,3 +226,97 @@ it('does not dispatch a pre-cancelled request and uses a rate bucket per account
   await one.execute('sheets.list_spreadsheets', { query: '', limit: 10 });
   expect(wait.mock.calls[0]![0]).toBe('sheets:' + credentials.clientEmail);
 });
+
+it('supports smart read_range by tab name, column range, tail:N and headerAware records', async () => {
+  const rows = [
+    ['Task', 'Owner', 'Status'],
+    ['Task 1', 'An', 'Done'],
+    ['Task 2', 'Bình', 'In Progress'],
+    ['Task 3', 'Chi', 'Todo'],
+    ['', '', ''],
+  ];
+  const { adapter, apiCalls } = setup(() => json({ range: 'Tasks!A1:Z500', values: rows }));
+
+  // 1. Tab-only range -> normalizes to Tasks!A1:Z50
+  const tabRead = await adapter.execute('sheets.read_range', { spreadsheetId: id, range: 'Tasks' });
+  expect(decodeURIComponent(apiCalls[0]!.url.pathname)).toBe('/v4/spreadsheets/' + id + '/values/Tasks!A1:Z50');
+  expect(tabRead.values).toHaveLength(5);
+
+  // 2. Column-only range -> normalizes to Tasks!A1:C50
+  await adapter.execute('sheets.read_range', { spreadsheetId: id, range: 'Tasks!A:C' });
+  expect(decodeURIComponent(apiCalls[1]!.url.pathname)).toBe('/v4/spreadsheets/' + id + '/values/Tasks!A1:C50');
+
+  // 3. Tail syntax Tasks!tail:2 -> fetches Tasks!A1:Z500, drops trailing blank row, keeps header + last 2 data rows + records
+  const tailRead = await adapter.execute('sheets.read_range', { spreadsheetId: id, range: 'Tasks!tail:2' });
+  expect(decodeURIComponent(apiCalls[2]!.url.pathname)).toBe('/v4/spreadsheets/' + id + '/values/Tasks!A1:Z500');
+  expect(tailRead).toEqual({
+    range: 'Tasks!A1:Z500',
+    values: [
+      ['Task', 'Owner', 'Status'],
+      ['Task 2', 'Bình', 'In Progress'],
+      ['Task 3', 'Chi', 'Todo'],
+    ],
+    headers: ['Task', 'Owner', 'Status'],
+    records: [
+      { Task: 'Task 2', Owner: 'Bình', Status: 'In Progress' },
+      { Task: 'Task 3', Owner: 'Chi', Status: 'Todo' },
+    ],
+    totalDataRows: 3,
+  });
+});
+
+it('deduplicates append_rows idempotently on external sync keys or explicit deduplicate while preserving formula injection escaping', async () => {
+  const existingValues = [
+    ['Key', 'Title', 'Phone'],
+    ['GH#101', 'Existing issue', "'+84901234567"],
+  ];
+  const { adapter, apiCalls } = setup((url, init) => {
+    if (init.method === 'POST') {
+      return json({ spreadsheetId: id, updates: { updatedRange: 'Tasks!A3:C3', updatedRows: 1 } });
+    }
+    if (url.pathname.includes('/values/')) {
+      return json({ range: 'Tasks!A1:Z500', values: existingValues });
+    }
+    return json(metadata);
+  });
+
+  // Auto-detects GH# sync keys in col 0, skips GH#101 (already in sheet) and duplicate GH#102 within same batch, escapes =SUM(A1) on GH#102
+  const res = await adapter.execute('sheets.append_rows', {
+    spreadsheetId: id,
+    sheet: 'Tasks',
+    rows: [
+      ['GH#101', 'Existing issue', '+84901234567'],
+      ['GH#102', '=SUM(A1)', '+84988888888'],
+      ['GH#102', 'Duplicate in batch', '+84988888888'],
+    ],
+  });
+  expect(res).toEqual({
+    spreadsheetId: id,
+    updatedRange: 'Tasks!A3:C3',
+    updatedRows: 1,
+    skippedDuplicates: 2,
+    url: 'https://docs.google.com/spreadsheets/d/' + id + '/edit',
+  });
+  const postCalls = apiCalls.filter((c) => c.init.method === 'POST');
+  expect(postCalls).toHaveLength(1);
+  expect(JSON.parse(String(postCalls[0]!.init.body))).toEqual({
+    majorDimension: 'ROWS',
+    values: [['GH#102', "'=SUM(A1)", "'+84988888888"]],
+  });
+
+  // When all rows are duplicates, skips POST :append completely
+  const skipRes = await adapter.execute('sheets.append_rows', {
+    spreadsheetId: id,
+    sheet: 'Tasks',
+    deduplicate: true,
+    rows: [['GH#101', 'Existing issue', '+84901234567']],
+  });
+  expect(skipRes).toEqual({
+    spreadsheetId: id,
+    updatedRange: 'Tasks!A1',
+    updatedRows: 0,
+    skippedDuplicates: 1,
+    url: 'https://docs.google.com/spreadsheets/d/' + id + '/edit',
+  });
+  expect(apiCalls.filter((c) => c.init.method === 'POST')).toHaveLength(1);
+});

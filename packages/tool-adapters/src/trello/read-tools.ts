@@ -2,6 +2,10 @@ import { TrelloBaseAdapter } from './base.js';
 import { StepError } from '../base-adapter.js';
 
 export class TrelloReadTools extends TrelloBaseAdapter {
+  protected assertBoardInScope(boardId: string): void {
+    this.assertAllowedScope('boards', boardId);
+  }
+
   /**
    * Search boards by query, filtered by AllowedScope.
    */
@@ -13,14 +17,8 @@ export class TrelloReadTools extends TrelloBaseAdapter {
     const queryLower = (args.query || '').toLowerCase();
     const limit = Math.min(Math.max(args.limit ?? 10, 1), 10);
 
-    let filtered = rawBoards.filter((b) =>
-      (b.name || '').toLowerCase().includes(queryLower)
-    );
-
-    // Apply AllowedScope board whitelist if configured
-    if (this.allowedScope?.boards && this.allowedScope.boards.length > 0) {
-      filtered = filtered.filter((b) => this.allowedScope!.boards!.includes(b.id));
-    }
+    let filtered = rawBoards.filter((b) => this.allowedBoardIds.includes(b.id));
+    filtered = filtered.filter((b) => (b.name || '').toLowerCase().includes(queryLower));
 
     return filtered.slice(0, limit).map((b) => ({
       id: String(b.id),
@@ -34,8 +32,19 @@ export class TrelloReadTools extends TrelloBaseAdapter {
    */
   async searchLists(
     args: { boardId: string; query?: string; limit?: number },
-    options?: { signal?: AbortSignal }
+    options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<Array<{ id: string; name: string; boardId: string }>> {
+    if (options?.boardId) {
+      this.assertBoardInScope(options.boardId);
+      if (options.boardId !== args.boardId) {
+        throw new StepError({
+          message: `Board '${args.boardId}' does not match expected step board '${options.boardId}'`,
+          category: 'AUTH_ERROR',
+          statusCode: 403,
+          retryable: false,
+        });
+      }
+    }
     this.assertAllowedScope('boards', args.boardId);
 
     const rawLists = await this.request<any[]>(`/boards/${args.boardId}/lists`, { signal: options?.signal });
@@ -61,8 +70,19 @@ export class TrelloReadTools extends TrelloBaseAdapter {
    */
   async searchMembers(
     args: { query: string; boardId?: string; limit?: number },
-    options?: { signal?: AbortSignal }
+    options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<Array<{ id: string; fullName: string; username: string }>> {
+    if (options?.boardId) {
+      this.assertBoardInScope(options.boardId);
+      if (options.boardId !== args.boardId) {
+        throw new StepError({
+          message: `Board '${args.boardId}' does not match expected step board '${options.boardId}'`,
+          category: 'AUTH_ERROR',
+          statusCode: 403,
+          retryable: false,
+        });
+      }
+    }
     if (!args.boardId) {
       throw new StepError({
         message: 'A board ID is required to search members within an allowed board',
@@ -112,12 +132,9 @@ export class TrelloReadTools extends TrelloBaseAdapter {
     const rawCards: any[] = Array.isArray(res?.cards) ? res.cards : Array.isArray(res) ? res : [];
     const limit = Math.min(Math.max(args.limit ?? 10, 1), 10);
 
-    let filtered = rawCards;
+    let filtered = rawCards.filter((c) => typeof c.idBoard === 'string' && this.allowedBoardIds.includes(c.idBoard));
     if (args.boardId) {
       filtered = filtered.filter((c) => c.idBoard === args.boardId);
-    }
-    if (this.allowedScope?.boards && this.allowedScope.boards.length > 0) {
-      filtered = filtered.filter((c) => typeof c.idBoard === 'string' && this.allowedScope!.boards!.includes(c.idBoard));
     }
     if (args.listId) {
       filtered = filtered.filter((c) => c.idList === args.listId);
@@ -136,7 +153,7 @@ export class TrelloReadTools extends TrelloBaseAdapter {
    */
   async getCard(
     args: { cardId: string },
-    options?: { signal?: AbortSignal }
+    options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<{
     id: string;
     name: string;
@@ -145,10 +162,11 @@ export class TrelloReadTools extends TrelloBaseAdapter {
     listId: string;
     idMembers: string[];
   }> {
-    const card = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
-    if (this.allowedScope?.boards && this.allowedScope.boards.length > 0) {
-      this.assertParentBoard(card);
+    if (options?.boardId) {
+      this.assertBoardInScope(options.boardId);
     }
+    const card = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
+    this.assertParentBoard(card, options?.boardId);
 
     return {
       id: String(card.id),
@@ -163,9 +181,9 @@ export class TrelloReadTools extends TrelloBaseAdapter {
   override async execute(
     toolName: string,
     args: Record<string, any>,
-    context?: { signal?: AbortSignal }
+    context?: { signal?: AbortSignal; boardId?: string }
   ): Promise<any> {
-    const opts = context?.signal ? { signal: context.signal } : undefined;
+    const opts = { signal: context?.signal, boardId: context?.boardId };
     switch (toolName) {
       case 'trello.search_boards':
         return this.searchBoards(args as any, opts);

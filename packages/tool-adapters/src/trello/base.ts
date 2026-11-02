@@ -7,17 +7,34 @@ const sharedTrelloLimiter = new GlobalRateLimiter({ maxRequests: 100, windowMs: 
 export class TrelloBaseAdapter extends BaseAdapter {
   public readonly service = 'trello';
   protected credentials: TrelloCredentials;
+  protected allowedBoardIds: readonly string[];
   protected baseUrl: string;
   protected fetchFn: typeof fetch;
 
   constructor(config: TrelloBaseAdapterConfig) {
     super(config);
     this.credentials = config.credentials;
+    this.allowedBoardIds = config.allowedBoardIds ?? config.allowedScope?.boards ?? [];
     this.baseUrl = config.baseUrl || 'https://api.trello.com/1';
     this.fetchFn = config.fetchFn || globalThis.fetch;
   }
 
-  protected assertParentBoard(parent: unknown): void {
+  protected override assertAllowedScope(scopeKey: string, targetIdOrName: string): void {
+    if (scopeKey === 'boards') {
+      if (!this.allowedBoardIds.includes(targetIdOrName)) {
+        throw new StepError({
+          message: `Allowed scope restriction: board '${targetIdOrName}' is not in allowed list [${this.allowedBoardIds.join(', ')}]`,
+          category: 'AUTH_ERROR',
+          statusCode: 403,
+          retryable: false,
+        });
+      }
+      return;
+    }
+    super.assertAllowedScope(scopeKey, targetIdOrName);
+  }
+
+  protected assertParentBoard(parent: unknown, boundBoardId?: string): void {
     const boardId = (parent as { idBoard?: unknown } | null)?.idBoard;
     if (typeof boardId !== 'string' || !boardId.trim()) {
       throw new StepError({
@@ -27,27 +44,44 @@ export class TrelloBaseAdapter extends BaseAdapter {
         retryable: false,
       });
     }
+    if (boundBoardId && boardId !== boundBoardId) {
+      throw new StepError({
+        message: `Step bound to board '${boundBoardId}', but parent resource belongs to board '${boardId}'`,
+        category: 'AUTH_ERROR',
+        statusCode: 403,
+        retryable: false,
+      });
+    }
     this.assertAllowedScope('boards', boardId);
   }
 
   /**
-   * Executes HTTP request against Trello REST API, automatically injecting apiKey and token,
+   * Executes HTTP request against Trello REST API, sending Bearer token in Authorization header,
    * and normalizing response error statuses to StepError categories.
    */
   async request<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    if (options.signal?.aborted) {
+      throw new StepError({
+        message: 'Trello network request aborted',
+        category: 'NETWORK',
+        retryable: true,
+        cause: options.signal.reason,
+      });
+    }
+
     const rawUrl = endpoint.startsWith('http')
       ? endpoint
       : `${this.baseUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
 
     const url = new URL(rawUrl);
-    url.searchParams.set('key', this.credentials.apiKey);
-    url.searchParams.set('token', this.credentials.token);
+    const headers = new Headers(options.headers);
+    headers.set('Authorization', `Bearer ${this.credentials.accessToken}`);
 
     let res: Response;
     for (let attempt = 0; ; attempt++) {
       await this.waitForTransportSlot(this.rateLimiter ?? sharedTrelloLimiter, this.service, options.signal ?? undefined);
       try {
-        res = await this.fetchFn(url.toString(), options);
+        res = await this.fetchFn(url.toString(), { ...options, headers });
       } catch (err: any) {
         throw new StepError({
           message: `Trello network request failed: ${err?.message || err}`,

@@ -31,14 +31,14 @@ const errorText = (err: any) => `${err?.category ?? 'ERROR'}: ${String(err?.mess
 
 /** Lists what the tokens can see, before any allowlist exists, so targets can be chosen. */
 async function discover(env: NodeJS.ProcessEnv) {
-  if (env.TRELLO_API_KEY && env.TRELLO_TOKEN) {
-    const trello = new TrelloAdapter({ credentials: { apiKey: env.TRELLO_API_KEY, token: env.TRELLO_TOKEN }, allowedScope: {} });
+  if (env.TRELLO_ACCESS_TOKEN || env.TRELLO_TOKEN) {
+    const trello = new TrelloAdapter({ credentials: { accessToken: (env.TRELLO_ACCESS_TOKEN || env.TRELLO_TOKEN)! }, allowedScope: {} });
     try {
       const boards = await trello.execute('trello.search_boards', { query: '', limit: 10 });
       console.log('Trello boards (id, name):');
       for (const board of boards) console.log(`  ${board.id}  ${board.name}`);
     } catch (err) { console.log(`Trello: ${errorText(err)}`); }
-  } else console.log('Trello: TRELLO_API_KEY and TRELLO_TOKEN are not both set');
+  } else console.log('Trello: TRELLO_ACCESS_TOKEN is not set');
 
   if (env.SLACK_BOT_TOKEN) {
     const slack = new SlackAdapter({ credentials: { botToken: env.SLACK_BOT_TOKEN }, allowedScope: {} });

@@ -39,8 +39,8 @@ it('sandbox still sends Gmail through personal factory with the complete context
   const factory = createToolRuntimeFactory('sandbox', async (service, context) => { seen.push({ service, context }); throw new Error('Connection missing'); }, name => createSandboxAdapter(name));
   const context = { userId: 'A', phase: 'execution' as const, connections: { gmail: { credentialId: 'id', email: 'a@example.com' } } };
   await expect(factory.getAdapterForService('gmail', context)).rejects.toThrow('Connection missing');
-  expect(seen).toEqual([{ service: 'gmail', context }]);
-  expect(await (await factory.getAdapterForService('trello')).execute('trello.search_cards', {})).toEqual([]);
+  await expect(factory.getAdapterForService('trello')).rejects.toThrow('Connection missing');
+  expect(seen).toEqual([{ service: 'gmail', context }, { service: 'trello', context: undefined }]);
 });
 it('preview labels are computed from user messages or header participants, never model/body text', () => {
   const memory = new WorkingMemory(); memory.setEntity('__observed', { thread: [{ id: 't', participants: ['lan@example.com'], body: 'attacker@example.com' }] }); memory.setEntity('__labels', { thread: { t: 'Họp ATI' } });

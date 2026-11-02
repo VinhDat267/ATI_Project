@@ -27,7 +27,7 @@ describe('migration 0009 on PostgreSQL with 0001-0008 data', () => {
     await run(files.filter((f) => f < '0009'));
     userId = (await pool.query("INSERT INTO users(email,password,name) VALUES('owner@example.test','hash','Owner') RETURNING id")).rows[0].id;
     sessionId = (await pool.query("INSERT INTO auth_sessions(user_id,refresh_token_hash,expires_at) VALUES($1,$2,now()+interval '1 day') RETURNING id", [userId, hex()])).rows[0].id;
-    sharedId = (await pool.query("INSERT INTO service_credentials(service,user_id,config) VALUES('trello',NULL,'v1:shared') RETURNING id")).rows[0].id;
+    sharedId = (await pool.query("INSERT INTO service_credentials(service,user_id,config) VALUES('slack',NULL,'v1:shared') RETURNING id")).rows[0].id;
     loginStateId = (await state('login', null, null)).rows[0].id;
     linkStateId = (await state('link', userId, sessionId)).rows[0].id;
     await run(files.filter((f) => f >= '0009'));
@@ -36,7 +36,7 @@ describe('migration 0009 on PostgreSQL with 0001-0008 data', () => {
 
   it('keeps existing rows and marks existing credentials active', async () => {
     expect((await pool.query('SELECT service,user_id,config,status,status_changed_at FROM service_credentials WHERE id=$1', [sharedId])).rows[0])
-      .toEqual({ service: 'trello', user_id: null, config: 'v1:shared', status: 'active', status_changed_at: null });
+      .toEqual({ service: 'slack', user_id: null, config: 'v1:shared', status: 'active', status_changed_at: null });
     expect((await pool.query('SELECT mode FROM oauth_states WHERE id = ANY($1) ORDER BY mode', [[loginStateId, linkStateId]])).rows.map((r) => r.mode)).toEqual(['link', 'login']);
   });
 

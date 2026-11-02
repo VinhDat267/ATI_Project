@@ -231,13 +231,27 @@ export function createMyCalendarConnectionRoutes(options: MyCalendarConnectionsO
         return;
       }
       const now = clock();
+      const autoSelectPrimary = req.body?.autoSelectPrimary === true;
+      const primaryCal = autoSelectPrimary
+        ? live.calendars.find((c) => c.primary) ?? (live.calendars.length === 1 ? live.calendars[0] : undefined)
+        : undefined;
+      const initialSelected = primaryCal
+        ? [
+            {
+              id: primaryCal.id,
+              summary: primaryCal.summary,
+              timeZone: primaryCal.timeZone,
+              ...(primaryCal.primary ? { primary: true } : {}),
+            },
+          ]
+        : [];
       const config = encryptCredentials(
         {
           refreshToken: tokens.refreshToken,
           email: live.email,
           scopes: tokens.scopes,
-          selectedCalendars: [],
-          allowedScope: { calendars: [] },
+          selectedCalendars: initialSelected,
+          allowedScope: { calendars: initialSelected.map((c) => c.id) },
           connectedAt: new Date(now).toISOString(),
         },
         options.encryptionKey!
@@ -249,7 +263,17 @@ export function createMyCalendarConnectionRoutes(options: MyCalendarConnectionsO
         return;
       }
       options.onConnectionChanged?.(user.id);
-      res.json({ email: live.email, calendars: live.calendars, ...(consumed.return_to ? { returnTo: consumed.return_to } : {}) });
+      res.json({
+        email: live.email,
+        calendars: live.calendars,
+        ...(autoSelectPrimary
+          ? {
+              selectedCalendars: initialSelected,
+              allowedScope: initialSelected.map((c) => c.id),
+            }
+          : {}),
+        ...(consumed.return_to ? { returnTo: consumed.return_to } : {}),
+      });
     } catch {
       fail(res, 'MYCALENDAR_CONNECT_FAILED');
     }
@@ -424,6 +448,119 @@ export function createMyCalendarConnectionRoutes(options: MyCalendarConnectionsO
           ...(cal.primary ? { primary: true } : {}),
         };
       });
+
+      const updated = await options.repo!.updateConfigIfActive(user.id, record.id, (oldConfig) => {
+        const prev = decryptCredentials(oldConfig, options.encryptionKey!);
+        return encryptCredentials(
+          {
+            ...prev,
+            selectedCalendars,
+            allowedScope: { calendars: selectedCalendars.map((c) => c.id) },
+          },
+          options.encryptionKey!
+        );
+      });
+
+      if (!updated) {
+        res.status(409).json({
+          error: 'Kết nối Google Calendar đã thay đổi. Hãy thử lại.',
+          code: 'MYCALENDAR_NOT_CONNECTED',
+        });
+        return;
+      }
+
+      options.onConnectionChanged?.(user.id);
+      res.json({
+        email: decrypted.email || live.email,
+        selectedCalendars,
+        allowedScope: selectedCalendars.map((c) => c.id),
+      });
+    } catch {
+      res.status(500).json({ error: 'Không cập nhật được phạm vi Google Calendar. Vui lòng thử lại.' });
+    }
+  });
+
+  router.post('/select-primary', async (req, res) => {
+    const user = (req as any).user as AuthUser;
+    try {
+      const record = await options.credentialRepo!.getPersonalCredentials('mycalendar', user.id);
+      if (!record) {
+        res.status(409).json({
+          error: 'Google Calendar của bạn chưa được kết nối hoặc cần kết nối lại.',
+          code: 'MYCALENDAR_NOT_CONNECTED',
+        });
+        return;
+      }
+      let decrypted: any;
+      try {
+        decrypted = decryptCredentials(record.config, options.encryptionKey!);
+      } catch {
+        res.status(409).json({
+          error: 'Google Calendar của bạn chưa được kết nối hoặc cần kết nối lại.',
+          code: 'MYCALENDAR_NOT_CONNECTED',
+        });
+        return;
+      }
+      let accessToken: string;
+      try {
+        accessToken = await getAccessToken(user.id, record.id, decrypted.refreshToken);
+      } catch (error: any) {
+        if ((error instanceof GmailOAuthError && error.kind === 'invalid_grant') || error?.category === 'AUTH_ERROR') {
+          try {
+            await options.credentialRepo!.markReconnectRequired('mycalendar', user.id, record.id);
+          } catch {}
+          options.onConnectionChanged?.(user.id);
+          res.status(409).json({
+            error: 'Google Calendar của bạn chưa được kết nối hoặc cần kết nối lại.',
+            code: 'MYCALENDAR_NOT_CONNECTED',
+          });
+          return;
+        }
+        res.status(502).json({
+          error: 'Không tải được danh sách lịch từ Google Calendar. Hãy thử lại.',
+          code: 'MYCALENDAR_FETCH_FAILED',
+        });
+        return;
+      }
+      let live;
+      try {
+        live = await client!.writableCalendars(accessToken, AbortSignal.timeout(googleTimeoutMs));
+      } catch (error: any) {
+        if (error instanceof GmailOAuthError && error.kind === 'invalid_grant') {
+          try {
+            await options.credentialRepo!.markReconnectRequired('mycalendar', user.id, record.id);
+          } catch {}
+          options.onConnectionChanged?.(user.id);
+          res.status(409).json({
+            error: 'Google Calendar của bạn chưa được kết nối hoặc cần kết nối lại.',
+            code: 'MYCALENDAR_NOT_CONNECTED',
+          });
+          return;
+        }
+        res.status(502).json({
+          error: 'Không tải được danh sách lịch từ Google Calendar. Hãy thử lại.',
+          code: 'MYCALENDAR_FETCH_FAILED',
+        });
+        return;
+      }
+
+      const primary = live.calendars.find((c) => c.primary) ?? live.calendars[0];
+      if (!primary) {
+        res.status(400).json({
+          error: 'Không tìm thấy lịch chính có quyền ghi trên tài khoản Google Calendar của bạn.',
+          code: 'MYCALENDAR_SCOPE_INVALID',
+        });
+        return;
+      }
+
+      const selectedCalendars = [
+        {
+          id: primary.id,
+          summary: primary.summary,
+          timeZone: primary.timeZone,
+          ...(primary.primary ? { primary: true } : {}),
+        },
+      ];
 
       const updated = await options.repo!.updateConfigIfActive(user.id, record.id, (oldConfig) => {
         const prev = decryptCredentials(oldConfig, options.encryptionKey!);

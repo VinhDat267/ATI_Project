@@ -53,11 +53,11 @@ export const LIVE_SERVICES: LiveServiceDefinition[] = [
     createAdapter: ({ credentials, allowedScope }) => new SheetsAdapter({ credentials: { clientEmail: credentials.clientEmail!, privateKey: credentials.privateKey! }, allowedScope }),
   },
   {
-    id: 'trello', credentials: { apiKey: 'TRELLO_API_KEY', token: 'TRELLO_TOKEN' },
+    id: 'trello', credentials: { accessToken: 'TRELLO_ACCESS_TOKEN' },
     scopeKey: 'boards', scopeEnv: 'LIVE_TRELLO_BOARD_IDS',
-    missingCredentials: 'TRELLO_API_KEY and TRELLO_TOKEN are required',
+    missingCredentials: 'TRELLO_ACCESS_TOKEN is required',
     missingScope: 'LIVE_TRELLO_BOARD_IDS must list the board ids a run may use',
-    createAdapter: ({ credentials, allowedScope }) => new TrelloAdapter({ credentials: credentials as any, allowedScope }),
+    createAdapter: ({ credentials, allowedScope }) => new TrelloAdapter({ credentials: { accessToken: credentials.accessToken || '' }, allowedScope, allowedBoardIds: allowedScope?.boards }),
   },
   {
     id: 'slack', credentials: { botToken: 'SLACK_BOT_TOKEN' }, scopeKey: 'channels', scopeEnv: 'LIVE_SLACK_CHANNELS',

@@ -9,6 +9,7 @@ export * from './github/github-adapter.js';
 export * from './google/service-account.js';
 export * from './sheets/sheets-adapter.js';
 export * from './sheets/personal-sheets-adapter.js';
+export { normalizeSpreadsheetIdInput } from './sheets/sheets-shared.js';
 export * from './calendar/calendar-adapter.js';
 export * from './calendar/personal-calendar-adapter.js';
 export * from './notion/notion-adapter.js';

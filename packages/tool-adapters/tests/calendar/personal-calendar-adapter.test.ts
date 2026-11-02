@@ -375,4 +375,113 @@ describe('PersonalCalendarAdapter', () => {
     expect(result.events[1].id).toBe('evt_2');
     expect(calls).toHaveLength(2);
   });
+
+  it('mycalendar.list_events strips natural filter tokens (today, upcoming, open, busy, *) from Google API q parameter', async () => {
+    for (const naturalQuery of ['today', 'hôm nay', 'upcoming', 'sắp tới', 'open', 'busy', 'bận', '*', 'all']) {
+      const { adapter, calls } = setup({
+        handler: () => json({ items: [fixtureEvent] }),
+      });
+      const result = await adapter.execute('mycalendar.list_events', {
+        calendarId,
+        timeMin: start,
+        timeMax: end,
+        query: naturalQuery,
+      });
+      expect(result.events).toHaveLength(1);
+      expect(calls).toHaveLength(1);
+      expect(calls[0]!.url.searchParams.has('q')).toBe(false);
+    }
+  });
+
+  it('mycalendar.list_events detects overlapping events and filters only conflicting events when query asks for conflict/trùng lịch', async () => {
+    const evtMorningA = {
+      id: 'evt_a',
+      summary: 'Sprint Planning',
+      htmlLink: 'https://calendar.google.com/event?eid=a',
+      start: { dateTime: '2026-10-09T09:00:00+07:00' },
+      end: { dateTime: '2026-10-09T10:00:00+07:00' },
+    };
+    const evtMorningB = {
+      id: 'evt_b',
+      summary: 'Client Sync',
+      htmlLink: 'https://calendar.google.com/event?eid=b',
+      start: { dateTime: '2026-10-09T09:30:00+07:00' },
+      end: { dateTime: '2026-10-09T10:30:00+07:00' },
+    };
+    const evtAfternoon = {
+      id: 'evt_c',
+      summary: '1:1 Check-in',
+      htmlLink: 'https://calendar.google.com/event?eid=c',
+      start: { dateTime: '2026-10-09T14:00:00+07:00' },
+      end: { dateTime: '2026-10-09T15:00:00+07:00' },
+    };
+
+    const { adapter, calls } = setup({
+      handler: () => json({ items: [evtMorningA, evtMorningB, evtAfternoon] }),
+    });
+
+    const conflictOnly = await adapter.execute('mycalendar.list_events', {
+      calendarId,
+      timeMin: '2026-10-09T00:00:00+07:00',
+      timeMax: '2026-10-09T23:59:59+07:00',
+      query: 'trùng lịch',
+    });
+
+    expect(calls[0]!.url.searchParams.has('q')).toBe(false);
+    expect(conflictOnly.events).toEqual([
+      {
+        id: 'evt_a',
+        title: 'Sprint Planning',
+        start: '2026-10-09T09:00:00+07:00',
+        end: '2026-10-09T10:00:00+07:00',
+        url: 'https://calendar.google.com/event?eid=a',
+        conflict: true,
+        conflictsWith: ['Client Sync'],
+      },
+      {
+        id: 'evt_b',
+        title: 'Client Sync',
+        start: '2026-10-09T09:30:00+07:00',
+        end: '2026-10-09T10:30:00+07:00',
+        url: 'https://calendar.google.com/event?eid=b',
+        conflict: true,
+        conflictsWith: ['Sprint Planning'],
+      },
+    ]);
+  });
+
+  it('findConflicts returns overlapping events for a candidate [start, end] slot and ignores touching boundary events', async () => {
+    const evtBefore = {
+      id: 'evt_before',
+      summary: 'Standup',
+      htmlLink: 'https://calendar.google.com/event?eid=before',
+      start: { dateTime: '2026-10-09T08:30:00+07:00' },
+      end: { dateTime: '2026-10-09T09:00:00+07:00' },
+    };
+    const evtOverlap = {
+      id: 'evt_overlap',
+      summary: 'Architecture Review',
+      htmlLink: 'https://calendar.google.com/event?eid=overlap',
+      start: { dateTime: '2026-10-09T09:30:00+07:00' },
+      end: { dateTime: '2026-10-09T10:30:00+07:00' },
+    };
+
+    const { adapter } = setup({
+      handler: () => json({ items: [evtBefore, evtOverlap] }),
+    });
+
+    const conflicts = await adapter.findConflicts({
+      calendarId,
+      start: '2026-10-09T09:00:00+07:00',
+      end: '2026-10-09T10:00:00+07:00',
+    });
+
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0]).toMatchObject({
+      id: 'evt_overlap',
+      title: 'Architecture Review',
+      start: '2026-10-09T09:30:00+07:00',
+      end: '2026-10-09T10:30:00+07:00',
+    });
+  });
 });

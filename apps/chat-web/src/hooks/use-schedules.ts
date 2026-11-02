@@ -1,6 +1,7 @@
 import { createContext, createElement, useContext, useEffect, useState, type ReactNode } from 'react';
 import { apiClient } from '../services/api-client';
 import { subscribeAuthTokens } from '../services/auth-storage';
+import { subscribeWorkspace } from '../services/workspace-storage';
 import type { User } from '../types';
 
 /** Only the server capability enables schedule requests. Missing health fields mean off. */
@@ -32,7 +33,8 @@ export function useSchedulePendingCount(user: User | null) {
     const timer = window.setInterval(refresh, 30_000);
     window.addEventListener('focus', refresh); window.addEventListener('schedules:changed', refresh);
     const unsubscribe = subscribeAuthTokens(tokens => { if (!tokens.accessToken || tokens.user?.id !== user.id) { current = false; setCount(0); window.clearInterval(timer); } });
-    return () => { current = false; window.clearInterval(timer); unsubscribe(); window.removeEventListener('focus', refresh); window.removeEventListener('schedules:changed', refresh); };
+    const unsubscribeWorkspace = subscribeWorkspace(refresh);
+    return () => { current = false; window.clearInterval(timer); unsubscribe(); unsubscribeWorkspace(); window.removeEventListener('focus', refresh); window.removeEventListener('schedules:changed', refresh); };
   }, [enabled, user?.id]);
   return enabled && user ? count : 0;
 }

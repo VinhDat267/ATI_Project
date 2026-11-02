@@ -10,6 +10,7 @@
     "@wap/tool-schemas": "*"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run && npm run test:probe",
+    "test:probe": "node --test tests/jira-oauth-probe.check.mjs"
   }
 }

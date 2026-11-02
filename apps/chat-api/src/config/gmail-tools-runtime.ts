@@ -29,10 +29,43 @@ export async function runtimeToolCatalog(
   mode: RuntimeMode,
   repo: CredentialRepo,
   key: string,
-  options: { userId?: string; gmailEnabled: boolean; mycalendarEnabled?: boolean; mysheetsEnabled?: boolean },
+  options: {
+    userId?: string;
+    workspaceMode?: 'legacy' | 'personal' | 'organization';
+    workspaceId?: string | null;
+    gmailEnabled: boolean;
+    mycalendarEnabled?: boolean;
+    mysheetsEnabled?: boolean;
+    trelloEnabled?: boolean;
+    trelloTeamRepo?: any;
+    trelloOAuthClient?: any;
+    trelloTokens?: any;
+    trelloConnection?: (userId: string, scopeId?: string) => Promise<any>;
+    githubEnabled?: boolean;
+    githubTeamRepo?: any;
+    githubOAuthClient?: any;
+    githubTokens?: any;
+    githubConnection?: (userId: string) => Promise<any>;
+    telegramEnabled?: boolean;
+    telegramConnection?: (userId: string) => Promise<any>;
+  },
 ) {
   const personal = await getToolCatalogFor(repo, key, options);
-  return mode === 'live' ? personal : [...ALL_TOOLS, ...personal.filter((t) => t.service === 'gmail' || t.service === 'mycalendar' || t.service === 'mysheets')];
+  if (mode === 'live') return personal;
+  const baseTools = ALL_TOOLS.filter((t) => t.service !== 'trello' && t.service !== 'github' && t.service !== 'telegram');
+  const tools = [
+    ...baseTools,
+    ...personal.filter(
+      (t) =>
+        t.service === 'gmail' ||
+        t.service === 'mycalendar' ||
+        t.service === 'mysheets' ||
+        t.service === 'trello' ||
+        t.service === 'github' ||
+        t.service === 'telegram'
+    ),
+  ];
+  return Array.from(new Map(tools.map((t) => [t.name, t])).values());
 }
 
 export function runtimeGmailAdapter(mode: RuntimeMode, tokens: GmailAccessTokenProvider, baseUrl?: string) {
@@ -85,17 +118,16 @@ export function createToolRuntimeFactory(
   sandbox = createSandboxAdapter,
 ) {
   return createRuntimeAdapterFactory<AdapterContext>(mode, personal,
-    (name, context) => (name === 'gmail' || name === 'mycalendar' || name === 'mysheets' || name === 'myslack') ? personal(name, context) : sandbox(name));
+    (name, context) => (name === 'gmail' || name === 'mycalendar' || name === 'mysheets' || name === 'myslack' || name === 'trello' || name === 'github' || name === 'telegram') ? personal(name, context) : sandbox(name));
 }
 
-/** A failed Gmail, MyCalendar or MySheets request must not become a canned shared-service write. */
+/** A failed Gmail, MyCalendar, MySheets, Trello, GitHub or Telegram request must not become a canned shared-service write. */
 export function mayFallbackToShared(
   input: ProcessMessageInput,
   gmailEnabled: boolean,
   mycalendarEnabled: boolean = false,
   mysheetsEnabled: boolean = false,
 ): boolean {
-  if (!gmailEnabled && !mycalendarEnabled && !mysheetsEnabled) return true;
   const texts = [...(input.history ?? []).filter((m) => m.role === 'user').map((m) => m.content), input.userMessage];
   const catalog = [
     ...ALL_TOOLS,
@@ -105,6 +137,7 @@ export function mayFallbackToShared(
   ];
   const registry = serviceRegistryForRuntime(gmailEnabled, mycalendarEnabled, mysheetsEnabled);
   const routed = routeIntent(texts.join('\n'), catalog, registry).services;
+  if (routed.includes('trello') || routed.includes('github') || routed.includes('telegram')) return false;
   if (gmailEnabled && routed.includes('gmail')) return false;
   if (mycalendarEnabled && routed.includes('mycalendar')) return false;
   if (mysheetsEnabled && routed.includes('mysheets')) return false;

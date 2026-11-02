@@ -26,10 +26,12 @@ it.each(['not_connected', 'connected', 'reconnect_required'])('shows the persona
   if (status === 'reconnect_required') expect(personal.textContent).toContain('7 ngày');
   if (status === 'connected') expect(personal.textContent).toContain('own@gmail.test');
 });
-it('keeps the personal group absent when Gmail is absent from the server catalogue', async () => {
+it('keeps Gmail out of the personal group when Gmail is absent from the server catalogue', async () => {
   catalogue([{ id: 'slack', name: 'Slack', connected: true }]); settings();
   await screen.findByRole('button', { name: /Slack —/ });
-  expect(screen.queryByText('Gmail')).toBeNull(); expect(screen.queryByRole('region', { name: 'Của riêng bạn' })).toBeNull();
+  const personal = await screen.findByRole('region', { name: 'Của riêng bạn' });
+  expect(within(personal).queryByText('Gmail')).toBeNull();
+  expect(within(personal).getByText('Trello')).toBeTruthy();
 });
 it('disables duplicate starts, shows redirect pending and handles a connection error without changing shared services', async () => {
   authStorage.setStoredTokens({ accessToken: 'a', refreshToken: 'ar', user: member });

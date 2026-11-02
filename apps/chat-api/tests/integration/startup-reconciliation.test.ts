@@ -3,7 +3,7 @@ import pg from 'pg';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import { createHash, randomUUID } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { createServer, type AddressInfo } from 'node:net';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -92,11 +92,11 @@ describe('startup execution reconciliation on real PostgreSQL', () => {
     convRepo = new ConversationRepo(pool);
     const users = new UserRepo(pool);
     const user = await users.createUser({ email: 'reconciliation@localhost.test', name: 'Fixture', password: 'Fixture-test-password' });
-    await pool.query("UPDATE users SET status='active',email_verified=true WHERE id=$1",[user.id]);
-    await pool.query(await readFile(resolve(root, 'db/v3/0003_auth_sessions.sql'), 'utf8'));
+    await pool.query("UPDATE users SET status='active',email_verified=true WHERE id=$1", [user.id]);
+    const activeUser = { ...user, status: 'active' as const };
     userId = user.id;
     const session = await users.sessions.create(user.id, 'Startup reconciliation fixture');
-    token = generateAccessToken(user, secret, session.sessionId).accessToken;
+    token = generateAccessToken(activeUser, secret, session.sessionId).accessToken;
   });
 
   afterEach(async () => {

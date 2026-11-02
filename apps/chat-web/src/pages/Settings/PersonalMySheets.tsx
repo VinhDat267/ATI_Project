@@ -151,6 +151,9 @@ export function PersonalMySheets({
                 className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200"
               >
                 <span>{sheet.title}</span>
+                {sheet.sheets && sheet.sheets.length > 0 && (
+                  <span className="text-[10px] text-emerald-700">({sheet.sheets.join(', ')})</span>
+                )}
                 {!sheet.canEdit && (
                   <span className="text-[10px] text-amber-600 font-semibold">(chỉ xem)</span>
                 )}

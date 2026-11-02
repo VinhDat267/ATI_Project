@@ -80,6 +80,30 @@ describe('packages/tool-adapters (Task 4c: Trello Write Tools & Unified Adapter)
       };
     }
 
+    if (method === 'GET' && urlStr.includes('/lists/l1')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ id: 'l1', idBoard: 'b1' }),
+      };
+    }
+
+    if (method === 'GET' && urlStr.includes('/cards/card_created_1')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ id: 'card_created_1', idBoard: 'b1', idList: 'l1' }),
+      };
+    }
+
+    if (method === 'GET' && urlStr.includes('/boards/b1/members')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => [{ id: 'member_1' }, { id: 'member_2' }],
+      };
+    }
+
     return {
       ok: false,
       status: 404,
@@ -90,7 +114,9 @@ describe('packages/tool-adapters (Task 4c: Trello Write Tools & Unified Adapter)
 
   it('creates card, updates card, adds member, and creates checklist with items', async () => {
     const adapter = new TrelloAdapter({
-      credentials: { apiKey: 'k', token: 't' },
+      credentials: { accessToken: 't' },
+      allowedBoardIds: ['b1'],
+      allowedScope: { boards: ['b1'] },
       fetchFn: mockFetch as any,
     });
 
@@ -133,7 +159,9 @@ describe('packages/tool-adapters (Task 4c: Trello Write Tools & Unified Adapter)
 
   it('dispatches unified execute across all 9 Trello tools', async () => {
     const adapter = new TrelloAdapter({
-      credentials: { apiKey: 'k', token: 't' },
+      credentials: { accessToken: 't' },
+      allowedBoardIds: ['b1'],
+      allowedScope: { boards: ['b1'] },
       fetchFn: mockFetch as any,
     });
 

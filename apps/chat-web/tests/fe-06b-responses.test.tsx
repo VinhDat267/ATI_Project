@@ -14,6 +14,8 @@ vi.mock('../src/services/api-client', () => ({ apiClient: {
   getRuntime: async () => ({ runtimeMode: 'sandbox' }),
   getConversations: async () => ({ conversations: [] }),
   getConversation: vi.fn(), getActivePlan: vi.fn().mockResolvedValue(null), getLatestExecutionSnapshot: vi.fn().mockResolvedValue(null),
+  startTrelloConnection: vi.fn(),
+  startGitHubConnection: vi.fn(),
 } }));
 const prompt = 'Tạo page Notion và issue Jira rồi báo lên Slack #ati-test';
 const services = [
@@ -253,3 +255,49 @@ it('old refusal from conversation A cannot add a settings action to conversation
   act(() => handleSSEEvent('refusal', JSON.stringify({ reason: 'Late A', unavailableServices: [{ id: 'notion', name: 'Notion' }] }), undefined, 'A'));
   expect(screen.queryByText('Late A')).toBeNull(); expect(screen.queryByRole('link', { name: 'Kết nối Notion' })).toBeNull();
 });
+
+it('PBI-02: refusal when Trello and GitHub have personalStatus scope_required shows scope-required badges and navigates to settings instead of restarting OAuth', async () => {
+  refusal([{ id: 'trello', name: 'Trello' }, { id: 'github', name: 'GitHub' }]);
+  const navigate = vi.fn();
+  const scopedServices = [
+    ...services,
+    { id: 'trello', name: 'Trello', configured: false, connected: false, connectionStatus: 'unconfigured' as const, personalStatus: 'scope_required' as const, username: 'vinhnguyndt1' },
+    { id: 'github', name: 'GitHub', configured: false, connected: false, connectionStatus: 'unconfigured' as const, personalStatus: 'scope_required' as const, login: 'vinhnguyndt1-gh' },
+  ];
+  render(
+    <Cockpit
+      user={user('admin')}
+      navigate={navigate}
+      services={scopedServices}
+      servicesLoading={false}
+      servicesError={null}
+      onSendMessage={vi.fn()}
+      onNewConversation={() => {}}
+      onSelectConversation={() => {}}
+      onSettings={() => {}}
+      onApprove={() => {}}
+      onCancel={() => {}}
+      recovery={null}
+    />
+  );
+
+  const list = await screen.findByLabelText('Trạng thái các dịch vụ trong yêu cầu này');
+  const trelloPill = within(list).getByText('Đã kết nối · Chưa chọn bảng · @vinhnguyndt1');
+  const githubPill = within(list).getByText('Đã kết nối · Chưa chọn kho · @vinhnguyndt1-gh');
+  expect(trelloPill.parentElement?.className).not.toMatch(/bg-emerald-50/);
+  expect(githubPill.parentElement?.className).not.toMatch(/bg-emerald-50/);
+
+  const trelloBtn = screen.getByRole('link', { name: /Chọn bảng Trello/ });
+  const githubBtn = screen.getByRole('link', { name: /Chọn kho GitHub/ });
+  expect(trelloBtn).toHaveAttribute('id', 'trello-connect');
+  expect(githubBtn).toHaveAttribute('id', 'github-connect');
+
+  fireEvent.click(trelloBtn);
+  expect(navigate).toHaveBeenCalledWith('/settings#trello');
+  expect(apiClient.startTrelloConnection).not.toHaveBeenCalled();
+
+  fireEvent.click(githubBtn);
+  expect(navigate).toHaveBeenCalledWith('/settings#github');
+  expect(apiClient.startGitHubConnection).not.toHaveBeenCalled();
+});
+

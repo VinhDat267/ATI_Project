@@ -13,6 +13,7 @@ import { conversationPath, type AppRoute } from '../routes';
 import { NotFoundView } from '../views/NotFoundView';
 import { useNetworkStatus } from '../hooks/use-network-status';
 import { OfflineBanner } from '../pages/Errors/PlanningErrors';
+import { getActiveWorkspaceId, subscribeWorkspace } from '../services/workspace-storage';
 
 interface WorkspaceProps {
   authToken: string; user: User | null; authError: string | null;
@@ -71,6 +72,33 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
     else { serviceRequest.current++; setServices([]); }
     return () => { serviceRequest.current++; };
   }, [authToken, loadServices]);
+  const lastWorkspaceId = useRef(getActiveWorkspaceId());
+  const convListRequest = useRef(0);
+  useEffect(() => {
+    lastWorkspaceId.current = getActiveWorkspaceId();
+    return subscribeWorkspace(() => {
+      const nextWorkspaceId = getActiveWorkspaceId();
+      const switched = nextWorkspaceId !== lastWorkspaceId.current;
+      lastWorkspaceId.current = nextWorkspaceId;
+      if (switched) {
+        reset();
+        setConversationId(null);
+        if (currentRoute.current.kind === 'conversation') {
+          navigate('/', true);
+        }
+      }
+      if (authToken) {
+        void loadServices();
+        const reqId = ++convListRequest.current;
+        apiClient.getConversations().then(data => {
+          if (reqId === convListRequest.current && Array.isArray(data?.conversations)) {
+            useChatStore.getState().setConversations(data.conversations);
+          }
+        }).catch(() => {});
+        apiClient.getSchedulePendingCount().catch(() => {});
+      }
+    });
+  }, [authToken, loadServices, navigate, reset, setConversationId]);
   const { recover, recoveryBusy, recoveryError } = useExecutionRecovery();
   const history = useConversationHistory(route.kind === 'conversation' ? route.conversationId : null);
 
@@ -115,7 +143,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
           activeClarification: previous.activeClarification, gatherState: previous.gatherState,
           stepStatuses: previous.stepStatuses, stepErrors: previous.stepErrors,
           executionSnapshot: previous.executionSnapshot, executionLoadError: previous.executionLoadError,
-          retiredExecutionPlanId: previous.retiredExecutionPlanId,
+          retiredExecutionPlanId: previous.retiredExecutionPlanId, settledPlanIds: previous.settledPlanIds,
         });
         setConversationId(previous.conversationId);
         if (previousRoute.kind === 'conversation') {
@@ -220,6 +248,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
     const revision = useChatStore.getState().planRevision;
     try {
       await apiClient.rejectPlan(planId);
+      useChatStore.getState().markPlanSettled(planId);
       const current = useChatStore.getState();
       if (!workspaceMounted.current || current.conversationId !== owner || current.activePlan?.id !== planId || current.planRevision !== revision) return;
       setActivePlan(null); setPlanStatus('rejected');

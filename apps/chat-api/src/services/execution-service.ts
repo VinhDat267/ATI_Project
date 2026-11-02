@@ -1,7 +1,8 @@
 import type { PlanRepo, PlanRow } from '../db/repositories/plan-repo.js';
 import type { StepRepo } from '../db/repositories/step-repo.js';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
-import { StepRunner, ExecutionController, type StepState,type StepOutputs,type ExecuteStepOptions } from '@wap/executor';
+import type { WorkspaceRepo } from '../db/repositories/workspace-repo.js';
+import { StepRunner, ExecutionController, type StepState, type StepOutputs, type ExecuteStepOptions } from '@wap/executor';
 import type { PlanStep } from '@wap/tool-schemas';
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
@@ -29,11 +30,13 @@ export interface ExecutionServiceOptions {
     getConversation: (id: string) => Promise<any>;
   };
   credentialRepo?: CredentialRepo;
+  workspaceRepo?: WorkspaceRepo;
   adapterFactory: {
     getAdapterForService: (serviceName: string, context?: AdapterContext) => Promise<any> | any;
   };
   sseManager?: {
     emitEvent: (convId: string, eventName: string, data: any) => void;
+    clearPlanEvents?: (convId: string, planId?: string) => void;
   };
 }
 
@@ -41,6 +44,7 @@ export class ExecutionService {
   private planRepo: PlanRepo;
   private stepRepo?: StepRepo;
   private convRepo?: ExecutionServiceOptions['convRepo'];
+  private workspaceRepo?: WorkspaceRepo;
   private adapterFactory: ExecutionServiceOptions['adapterFactory'];
   private sseManager?: ExecutionServiceOptions['sseManager'];
   private activeControllers = new Map<string, ExecutionController>();
@@ -57,6 +61,7 @@ export class ExecutionService {
     this.planRepo = options.planRepo;
     this.stepRepo = options.stepRepo;
     this.convRepo = options.convRepo;
+    this.workspaceRepo = options.workspaceRepo;
     this.adapterFactory = options.adapterFactory;
     this.sseManager = options.sseManager;
   }
@@ -73,20 +78,32 @@ export class ExecutionService {
     return this.planRepo;
   }
 
+  clearPlanEvents(convId: string, planId?: string): void {
+    this.sseManager?.clearPlanEvents?.(convId, planId);
+  }
+
   /**
    * Steps always run as the owner of the plan's conversation: callers pass the
    * user that getOwnedPlan just matched against conversations.user_id in the
    * database, so no further read is needed (and none can fail after approval).
    * Connections come from the integrity-checked plan.
    */
-  private executionContext(ownerId: string, connections: AdapterContext['connections']): AdapterContext {
-    return { userId: ownerId, phase: 'execution', connections };
+  private executionContext(ownerId: string, connections: AdapterContext['connections'], conversation?: any): AdapterContext {
+    return {
+      userId: ownerId,
+      phase: 'execution',
+      connections,
+      workspaceId: conversation?.workspace_id ?? null,
+      workspaceMode: conversation?.workspace_mode ?? (this.workspaceRepo ? 'personal' : 'legacy'),
+    };
   }
 
   private async markExecutionFailed(planId: string, convId: string, err: unknown): Promise<void> {
     this.executionOutcomes.set(planId, { status: 'failed' });
     try {
-      await this.planRepo.updatePlanStatus(planId, 'failed');
+      if (typeof this.planRepo.updatePlanStatus === 'function') {
+        await this.planRepo.updatePlanStatus(planId, 'failed');
+      }
     } catch (persistError) {
       console.error('Failed to persist failed plan status:', persistError);
     }
@@ -95,21 +112,27 @@ export class ExecutionService {
     });
   }
 
-  async getOwnedPlan(planId: string, userId: string) {
-    const plan = await this.planRepo.getPlan(planId,'planning');
+  async getOwnedPlan(planId: string, userId: string): Promise<PlanRow & { conversation?: any }> {
+    const plan = await this.planRepo.getPlan(planId, 'planning');
     if (!plan) throw Object.assign(new Error('Plan not found'), { status: 404 });
     if (!userId || !this.convRepo) throw Object.assign(new Error('Ownership verification unavailable'), { status: 403 });
     const conversation = await this.convRepo.getConversation(plan.conv_id);
     if (!conversation || conversation.user_id !== userId) {
       throw Object.assign(new Error('Forbidden: you do not own this plan'), { status: 403 });
     }
-    if(isSlackSourceArtifact(plan)||plan.plan_json?.connections?.myslack){
-      if(!this.stepRepo)throw Object.assign(new Error('SLACK_EXECUTION_STORAGE_REQUIRED'),{status:409});
-      const old=this.sourceSnapshots.get(planId);
-      if(old&&old.hash!==plan.plan_hash)throw Object.assign(new Error('SLACK_SOURCE_UNAVAILABLE'),{status:409});
-      this.sourceSnapshots.set(planId,{hash:plan.plan_hash,userId});
+    if (conversation.workspace_mode === 'organization' && conversation.workspace_id && this.workspaceRepo) {
+      const member = await this.workspaceRepo.findMember(conversation.workspace_id, userId);
+      if (!member || member.status !== 'active') {
+        throw Object.assign(new Error('WORKSPACE_ACCESS_DENIED'), { status: 403 });
+      }
     }
-    return plan;
+    if (isSlackSourceArtifact(plan) || plan.plan_json?.connections?.myslack) {
+      if (!this.stepRepo) throw Object.assign(new Error('SLACK_EXECUTION_STORAGE_REQUIRED'), { status: 409 });
+      const old = this.sourceSnapshots.get(planId);
+      if (old && old.hash !== plan.plan_hash) throw Object.assign(new Error('SLACK_SOURCE_UNAVAILABLE'), { status: 409 });
+      this.sourceSnapshots.set(planId, { hash: plan.plan_hash, userId });
+    }
+    return { ...plan, conversation };
   }
 
   async approveAndStart(planId: string, userId: string): Promise<ApproveResult> {
@@ -142,12 +165,15 @@ export class ExecutionService {
     }
 
     // Everything that can fail is done before the approval CAS commits.
-    const context = this.executionContext(userId, planJson?.connections);
-    if(planJson?.connections?.myslack){
-      const runtime=isBoundSlackExecutableWritePlan(planJson,userId)?this.slackWrite:this.slackRead;
-      if(!runtime||!this.stepRepo)return {success:false,status:409,error:'SLACK_READ_UNAVAILABLE'};
-      try{await runtime.assertApproval({planId,planHash:planRow.plan_hash,userId,steps:planJson.steps,bindings:planJson.connections.myslack});}
-      catch{return {success:false,status:409,error:'SLACK_READ_POLICY_DENIED'};}
+    const context = this.executionContext(userId, planJson?.connections, planRow.conversation);
+    if (planJson?.connections?.myslack) {
+      const runtime = isBoundSlackExecutableWritePlan(planJson, userId) ? this.slackWrite : this.slackRead;
+      if (!runtime || !this.stepRepo) return { success: false, status: 409, error: 'SLACK_READ_UNAVAILABLE' };
+      try {
+        await runtime.assertApproval({ planId, planHash: planRow.plan_hash, userId, steps: planJson.steps, bindings: planJson.connections.myslack });
+      } catch {
+        return { success: false, status: 409, error: 'SLACK_READ_POLICY_DENIED' };
+      }
     }
 
     // 1. Optimistic Locking: only succeeds if current status is 'pending' and not expired
@@ -162,6 +188,8 @@ export class ExecutionService {
 
     const convId = planRow.conv_id;
     const steps: PlanStep[] = planJson?.steps || [];
+
+    this.clearPlanEvents(convId, planId);
 
     // Emit exec_start
     this.emitExecution(convId, 'exec_start', { planId });
@@ -234,8 +262,8 @@ export class ExecutionService {
     }
     const { steps, connections } = verifiedRecoveryPlan(plan);
     // Callers checked ownership with getOwnedPlan; claimRecovery checks it again in SQL.
-    const context = this.executionContext(userId, connections);
-    const before = restoredProgress(steps, await this.stepRepo.listSteps(plan.id,'planning'));
+    const context = this.executionContext(userId, connections, (plan as any).conversation);
+    const before = restoredProgress(steps, await this.stepRepo.listSteps(plan.id, 'planning'));
     validateRecoveryAction(plan.status, before.states, stepId, action);
     if (!await this.planRepo.claimRecovery(plan, userId, 'executing')) {
       throw recoveryConflict('Execution changed or recovery is already running');
@@ -482,6 +510,12 @@ export class ExecutionService {
     const conversation = await this.convRepo?.getConversation(convId);
     if (!conversation) throw Object.assign(new Error('Conversation not found'), { status: 404 });
     if (conversation.user_id !== userId) throw Object.assign(new Error('Forbidden'), { status: 403 });
+    if (conversation.workspace_mode === 'organization' && conversation.workspace_id && this.workspaceRepo) {
+      const member = await this.workspaceRepo.findMember(conversation.workspace_id, userId);
+      if (!member || member.status !== 'active') {
+        throw Object.assign(new Error('WORKSPACE_ACCESS_DENIED'), { status: 403 });
+      }
+    }
     let plan = await this.planRepo.getLatestExecutedPlan(convId);
     if (!plan) throw Object.assign(new Error('No execution found'), { status: 404 });
     const sourceSnapshot=isSlackSourceArtifact(plan)?await this.planRepo.getSourceExecutionSnapshot(plan.id):undefined;

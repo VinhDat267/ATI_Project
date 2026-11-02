@@ -31,11 +31,17 @@ export interface ChatStoreState {
   stepErrors: Record<string, string>;
   executionSnapshot: ExecutionSnapshot | null;
   retiredExecutionPlanId: string | null;
+  settledPlanIds: Record<string, true>;
   executionRevision: number;
   planRevision: number;
   executionLoadError: string | null;
+  planLoadError: string | null;
+  historyHydrating: boolean;
   setExecutionSnapshot: (snapshot: ExecutionSnapshot | null) => void;
+  markPlanSettled: (planId: string) => void;
   setExecutionLoadError: (error: string | null) => void;
+  setPlanLoadError: (error: string | null) => void;
+  setHistoryHydrating: (hydrating: boolean) => void;
 
   // Actions
   setConversationId: (id: string | null) => void;
@@ -76,9 +82,12 @@ const initialState = {
   stepErrors: {},
   executionSnapshot: null,
   retiredExecutionPlanId: null,
+  settledPlanIds: {},
   executionRevision: 0,
   planRevision: 0,
   executionLoadError: null,
+  planLoadError: null,
+  historyHydrating: false,
 };
 
 const planningKey = (id: string | null) => id ?? '__draft__';
@@ -172,11 +181,15 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   }),
 
   // A read-only execution snapshot may hydrate activePlan, but cannot supersede a pending-plan read.
-  setActivePlan: (plan) => set(state => ({ activePlan: plan, planRevision: state.planRevision + 1, executionRevision: state.executionRevision + 1 })),
+  setActivePlan: (plan) => set(state => ({ activePlan: plan, ...(plan ? { planLoadError: null } : {}), planRevision: state.planRevision + 1, executionRevision: state.executionRevision + 1 })),
 
   setPlanStatus: (status) => set(state => ({ planStatus: status, executionRevision: state.executionRevision + 1 })),
 
   setExecutionLoadError: (error) => set({ executionLoadError: error }),
+  setPlanLoadError: (error) => set({ planLoadError: error }),
+  setHistoryHydrating: (hydrating) => set({ historyHydrating: hydrating }),
+  markPlanSettled: (planId) =>
+    set((state) => (planId ? { settledPlanIds: { ...state.settledPlanIds, [planId]: true } } : {})),
   setExecutionSnapshot: (snapshot) => set(state => {
     if (!snapshot) return { executionSnapshot: null, stepStatuses: {}, stepErrors: {}, executionRevision: state.executionRevision + 1 };
     const hasNewPreview = state.activePlan?.id !== snapshot.plan.id && ['preview', 'approving'].includes(state.planStatus);
@@ -245,7 +258,10 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       stepErrors: {},
       executionSnapshot: null,
       retiredExecutionPlanId: null,
+      settledPlanIds: {},
       executionLoadError: null,
+      planLoadError: null,
+      historyHydrating: false,
       executionRevision: state.executionRevision + 1,
       planRevision: state.planRevision + 1,
       conversations: state.conversations,

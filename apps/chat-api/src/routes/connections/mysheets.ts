@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { createHash, randomBytes } from 'node:crypto';
-import { decryptCredentials, encryptCredentials, GlobalRateLimiter } from '@wap/tool-adapters';
+import { decryptCredentials, encryptCredentials, GlobalRateLimiter, normalizeSpreadsheetIdInput } from '@wap/tool-adapters';
 import { MYSHEETS_SCOPE, type PersonalSpreadsheetItem } from '@wap/tool-schemas';
 import { createAuthMiddleware, type AuthUser } from '../../auth/jwt.js';
 import type { GmailOAuthConfig } from '../../config/env.js';
@@ -394,11 +394,16 @@ export function createMySheetsConnectionRoutes(options: MySheetsConnectionsOptio
         res.status(400).json({ error: 'Vui lòng chọn 1 đến 10 bảng tính hợp lệ.', code: 'MYSHEETS_SCOPE_INVALID' });
         return;
       }
-      const deduplicated = [...new Set(requested)];
-      if (deduplicated.some((id) => typeof id !== 'string' || !SPREADSHEET_ID_PATTERN.test(id))) {
+      const hasUrlInput = requested.some(
+        (entry) => typeof entry === 'string' && entry.trim().startsWith('https://docs.google.com/spreadsheets/')
+      );
+      const shouldIncludeSheets = req.body?.includeSheets === true || hasUrlInput;
+      const normalized = requested.map((entry) => normalizeSpreadsheetIdInput(entry));
+      if (normalized.some((id) => !id || !SPREADSHEET_ID_PATTERN.test(id))) {
         res.status(400).json({ error: 'Mã bảng tính không đúng định dạng.', code: 'MYSHEETS_SCOPE_INVALID' });
         return;
       }
+      const deduplicated = [...new Set(normalized as string[])];
       const record = await options.credentialRepo!.getPersonalCredentials('mysheets', user.id);
       if (!record) {
         res.status(409).json({
@@ -500,10 +505,39 @@ export function createMySheetsConnectionRoutes(options: MySheetsConnectionsOptio
           return;
         }
 
+        let discoveredSheets: string[] | undefined;
+        if (shouldIncludeSheets) {
+          try {
+            const sheetsRes = await fetchFn(
+              `${driveBase}/v4/spreadsheets/${encodeURIComponent(id)}?fields=sheets.properties(sheetId,title)`,
+              {
+                headers: { Authorization: `Bearer ${accessToken}` },
+                signal: AbortSignal.timeout(googleTimeoutMs),
+                redirect: 'manual',
+              }
+            );
+            if (sheetsRes.ok) {
+              const sheetsData = (await sheetsRes.json()) as any;
+              if (Array.isArray(sheetsData?.sheets)) {
+                const titles = sheetsData.sheets
+                  .map((s: any) => s?.properties?.title)
+                  .filter((t: unknown): t is string => typeof t === 'string' && t.trim().length > 0)
+                  .slice(0, 20);
+                if (titles.length > 0) {
+                  discoveredSheets = titles;
+                }
+              }
+            }
+          } catch {
+            // Best-effort tab discovery
+          }
+        }
+
         items.push({
           id: fileData.id,
           title: fileData.name,
           canEdit: Boolean(fileData.capabilities?.canEdit),
+          ...(discoveredSheets ? { sheets: discoveredSheets } : {}),
         });
       }
 

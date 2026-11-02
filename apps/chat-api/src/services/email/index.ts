@@ -64,3 +64,19 @@ export function approvalEmail(to: string, name: string): EmailMessage {
 export function googleLinkedEmail(to: string): EmailMessage {
   return email(to, 'Tài khoản ATI đã liên kết Google', 'Tài khoản ATI của bạn vừa được liên kết với Google. Nếu bạn không yêu cầu việc này, hãy liên hệ quản trị viên.');
 }
+
+export function workspaceJoinRequestEmail(to: string, adminName: string, requesterName: string, requesterEmail: string, workspaceName: string): EmailMessage {
+  return email(
+    to,
+    `Yêu cầu tham gia tổ chức ${workspaceName}`,
+    `Chào ${adminName},\n${requesterName} (${requesterEmail}) đã yêu cầu tham gia tổ chức ${workspaceName} và đang chờ bạn phê duyệt.`
+  );
+}
+
+export function workspaceApprovedEmail(to: string, userName: string, workspaceName: string): EmailMessage {
+  return email(
+    to,
+    `Bạn đã được duyệt vào tổ chức ${workspaceName}`,
+    `Chào ${userName},\nYêu cầu tham gia tổ chức ${workspaceName} của bạn đã được quản trị viên phê duyệt.`
+  );
+}

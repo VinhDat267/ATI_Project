@@ -25,14 +25,14 @@ let catalogueStatus: number;
 let canConfigure: boolean | undefined;
 let releaseCatalogue: () => void;
 const service = (id: string, configured = false): ServiceInfo => ({
-  id, name: id === 'github' ? 'GitHub' : id === 'notion' ? 'Notion' : id,
+  id, name: id === 'telegram' ? 'Telegram' : id === 'notion' ? 'Notion' : id,
   connected: false, configured, connectionStatus: configured ? 'unchecked' : 'unconfigured', lastCheckedAt: null,
-  tools: [`${id}.create_item`], allowedScope: configured ? ['owner/repo'] : [],
-  credentialFields: [{ key: 'token', label: 'Token', type: 'password' }], scopeLabel: 'Repository', scopeKey: 'repos',
+  tools: [`${id}.create_item`], allowedScope: configured ? ['chat-1'] : [],
+  credentialFields: [{ key: 'token', label: 'Token', type: 'password' }], scopeLabel: 'Chat ID', scopeKey: 'chatIds',
 });
 beforeEach(async () => {
   window.history.replaceState({}, '', '/settings'); localStorage.clear();
-  services = [service('github'), service('notion', true)]; calls = [];
+  services = [service('telegram'), service('notion', true)]; calls = [];
   holdSave = false; holdTest = false; flushTestHeaders = false; requestSignal = undefined; saveStatus = 200; testStatus = 'healthy'; testMessage = 'Sandbox verified';
   holdCatalogue = false; catalogueStatus = 200; canConfigure = true;
   const gate = new Promise<void>(resolve => { releaseSave = resolve; });
@@ -71,7 +71,7 @@ beforeEach(async () => {
 });
 afterEach(async () => { releaseSave(); releaseCatalogue(); cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); });
 const mount = (user = admin) => render(<SettingsPage user={user} navigate={() => {}} onLogout={() => {}} />);
-const open = async (name = 'GitHub') => { fireEvent.click(await screen.findByRole('button', { name: new RegExp(`${name} —`) })); return screen.findByRole('dialog', { name }); };
+const open = async (name = 'Telegram') => { fireEvent.click(await screen.findByRole('button', { name: new RegExp(`${name} —`) })); return screen.findByRole('dialog', { name }); };
 // FE-12: the role pill left the bar; the avatar menu still names the role.
 const roleInMenu = async () => {
   fireEvent.click(await screen.findByRole('button', { name: /Menu người dùng/ }));
@@ -80,7 +80,7 @@ const roleInMenu = async () => {
   fireEvent.keyDown(menu, { key: 'Escape' });
   return role;
 };
-const addScope = (value = 'owner/repo') => { fireEvent.change(screen.getByLabelText('Thêm Repository'), { target: { value } }); fireEvent.click(screen.getByRole('button', { name: /Thêm/ })); };
+const addScope = (value = 'chat-1') => { fireEvent.change(screen.getByLabelText('Thêm Chat ID'), { target: { value } }); fireEvent.click(screen.getByRole('button', { name: /Thêm/ })); };
 
 it('uses field placeholders for Jira site and email without suggesting a secret', async () => {
   services = [{ ...service('jira'), name: 'Jira', credentialFields: [
@@ -130,16 +130,16 @@ it('does not claim catalogue counts or empty groups after the first catalogue re
 });
 
 it('groups by configured, summarizes eight services and presents four textual states and checked time', async () => {
-  services = [service('github', true), service('notion', true), service('slack', true), service('trello')];
+  services = [service('telegram', true), service('notion', true), service('slack', true), service('jira')];
   services[0].connectionStatus = 'healthy'; services[0].lastCheckedAt = '2026-10-08T07:05:00Z'; services[1].connectionStatus = 'unhealthy';
   mount(); expect(await screen.findByText('3 / 8 dịch vụ đã thiết lập · 1 kết nối tốt')).toBeInTheDocument();
   expect(screen.getByText(/Kết nối tốt · kiểm tra lúc/)).toBeInTheDocument();
-  expect(screen.getByText('Không kết nối được')).toBeInTheDocument(); expect(screen.getByText('Chưa kiểm tra')).toBeInTheDocument(); expect(screen.getByText('Chưa kết nối')).toBeInTheDocument();
+  expect(screen.getByText('Không kết nối được')).toBeInTheDocument(); expect(screen.getByText('Chưa kiểm tra')).toBeInTheDocument(); expect(screen.getAllByText('Chưa kết nối').length).toBeGreaterThanOrEqual(1);
   expect(within(document.getElementById('list-connected-services')!).getAllByRole('button')).toHaveLength(3);
   expect(document.body.textContent).not.toMatch(/Allowed Scope|Write Safety|Least Privilege|AES|Kịch bản demo|320 ms/);
 });
 it('places service buttons inside direct listitems in both configured groups without changing row classes', async () => {
-  mount(); await screen.findByRole('button', { name: /GitHub —/ });
+  mount(); await screen.findByRole('button', { name: /Telegram —/ });
   for (const id of ['list-connected-services', 'list-unconnected-services']) {
     const list = document.getElementById(id)!;
     expect(list).toHaveAttribute('role', 'list');
@@ -164,15 +164,15 @@ it.each(['admin', 'member'] as const)('blocks checks for unconfigured services f
 it('posts all credentials, moves the saved row and resets verification without exposing saved keys', async () => {
   mount(); await open(); fireEvent.change(screen.getByLabelText('Token'), { target: { value: 'synthetic' } }); addScope();
   fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' })); expect(await screen.findByText(/Saved via HTTP/)).toBeInTheDocument();
-  expect(calls.find(c => c.url.endsWith('/credentials'))?.body).toEqual({ credentials: { token: 'synthetic' }, allowedScope: ['owner/repo'] });
+  expect(calls.find(c => c.url.endsWith('/credentials'))?.body).toEqual({ credentials: { token: 'synthetic' }, allowedScope: ['chat-1'] });
   expect(screen.getByLabelText('Token')).toHaveValue(''); expect(screen.getByLabelText('Token')).toHaveAttribute('placeholder', 'Đã lưu · nhập lại nếu muốn thay');
   expect(within(screen.getByRole('dialog')).getByText('Chưa kiểm tra')).toBeInTheDocument();
-  expect(document.getElementById('list-connected-services')).toContainElement(document.getElementById('service-row-github'));
+  expect(document.getElementById('list-connected-services')).toContainElement(document.getElementById('service-row-telegram'));
 });
 it('saves scope alone with PUT, preserving blank stored credentials', async () => {
-  services[0] = service('github', true); mount(); await open(); addScope('owner/second'); fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+  services[0] = service('telegram', true); mount(); await open(); addScope('chat-2'); fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
   expect(await screen.findByText(/Saved via HTTP/)).toBeInTheDocument();
-  expect(calls.find(c => c.url.endsWith('/scope'))).toEqual({ url: '/api/services/github/scope', method: 'PUT', body: { allowedScope: ['owner/repo', 'owner/second'] } });
+  expect(calls.find(c => c.url.endsWith('/scope'))).toEqual({ url: '/api/services/telegram/scope', method: 'PUT', body: { allowedScope: ['chat-1', 'chat-2'] } });
   expect(calls.some(c => c.url.endsWith('/credentials'))).toBe(false);
 });
 it('requires every credential when changing keys and at least one scope', async () => {
@@ -182,9 +182,11 @@ it('requires every credential when changing keys and at least one scope', async 
   addScope(); fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' })); expect(await screen.findByRole('alert')).toHaveTextContent('nhập lại đủ');
   expect(calls.filter(c => c.method !== 'GET')).toHaveLength(0);
 });
-it('rejects malformed GitHub scope before adding or saving', async () => {
-  mount(); await open(); addScope('invalid/repo/path'); expect(document.getElementById('new-scope-format-hint')).toBeVisible();
-  expect(document.getElementById('scope-chips-container')).not.toHaveTextContent('invalid/repo/path');
+it('rejects malformed Jira scope before adding or saving', async () => {
+  services = [{ ...service('jira'), name: 'Jira', scopeLabel: 'Project key' }];
+  mount(); await open('Jira'); fireEvent.change(screen.getByLabelText('Thêm Project key'), { target: { value: 'invalid/project/path' } }); fireEvent.click(screen.getByRole('button', { name: /Thêm/ }));
+  expect(document.getElementById('new-scope-format-hint')).toBeVisible();
+  expect(document.getElementById('scope-chips-container')).not.toHaveTextContent('invalid/project/path');
 });
 it('rejects a Jira site outside https atlassian.net', async () => {
   services = [{ ...service('jira'), name: 'Jira', credentialFields: [{ key: 'siteUrl', label: 'Site URL', type: 'text' }, { key: 'email', label: 'Email' }, { key: 'apiToken', label: 'API token' }], scopeLabel: 'Project key' }];
@@ -207,11 +209,11 @@ it('allows an allowlisted member to configure using the API capability while ret
   expect(await roleInMenu()).toBe('Thành viên');
   const dialog = await open();
   expect(within(dialog).getByLabelText('Token')).toBeEnabled();
-  expect(within(dialog).getByLabelText('Thêm Repository')).toBeEnabled();
+  expect(within(dialog).getByLabelText('Thêm Chat ID')).toBeEnabled();
   fireEvent.change(screen.getByLabelText('Token'), { target: { value: 'synthetic-allowlisted-token' } }); addScope();
   fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
   expect(await screen.findByText(/Saved via HTTP/)).toBeInTheDocument();
-  expect(calls.find(c => c.url.endsWith('/credentials'))?.body).toEqual({ credentials: { token: 'synthetic-allowlisted-token' }, allowedScope: ['owner/repo'] });
+  expect(calls.find(c => c.url.endsWith('/credentials'))?.body).toEqual({ credentials: { token: 'synthetic-allowlisted-token' }, allowedScope: ['chat-1'] });
   expect(screen.queryByText('Chỉ quản trị viên thay đổi được khoá dùng chung của nhóm.')).not.toBeInTheDocument();
 });
 it.each([false, undefined])('uses the API capability instead of the admin role and fails closed when it is %s', async capability => {
@@ -219,7 +221,7 @@ it.each([false, undefined])('uses the API capability instead of the admin role a
   expect(await roleInMenu()).toBe('Quản trị viên');
   const dialog = await open('Notion');
   expect(within(dialog).getByLabelText('Token')).toBeDisabled();
-  expect(within(dialog).getByLabelText('Thêm Repository')).toBeDisabled();
+  expect(within(dialog).getByLabelText('Thêm Chat ID')).toBeDisabled();
   expect(within(dialog).getByRole('button', { name: 'Lưu thay đổi' })).toBeDisabled();
   expect(within(dialog).getByRole('button', { name: 'Kiểm tra kết nối' })).toBeEnabled();
 });
@@ -242,14 +244,14 @@ it('deep links, traps both Tab directions, blocks outside focus, and restores th
   window.history.replaceState({}, '', '/settings#notion'); mount(); const dialog = await screen.findByRole('dialog', { name: 'Notion' });
   const first = within(dialog).getByRole('button', { name: 'Đóng ngăn chi tiết' }); const last = within(dialog).getByRole('button', { name: 'Kiểm tra kết nối' });
   expect(first).toHaveFocus(); fireEvent.keyDown(first, { key: 'Tab', shiftKey: true }); expect(last).toHaveFocus(); fireEvent.keyDown(last, { key: 'Tab' }); expect(first).toHaveFocus();
-  document.getElementById('service-row-github')!.focus(); expect(first).toHaveFocus();
+  document.getElementById('service-row-telegram')!.focus(); expect(first).toHaveFocus();
   // Saving re-groups the row, replacing its DOM node. Restoration uses its stable id.
   fireEvent.click(last); await screen.findByText(/Sandbox verified/);
   fireEvent.keyDown(window, { key: 'Escape' }); expect(screen.queryByRole('dialog')).not.toBeInTheDocument(); expect(document.getElementById('service-row-notion')).toHaveFocus();
 });
 it('ignores unknown hashes and keeps page focus and Escape alone without a drawer', async () => {
   window.history.replaceState({}, '', '/settings#missing'); mount(); await screen.findByRole('button', { name: /Notion —/ });
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument(); const row = screen.getByRole('button', { name: /GitHub —/ }); row.focus(); fireEvent.keyDown(window, { key: 'Escape' }); expect(row).toHaveFocus();
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument(); const row = screen.getByRole('button', { name: /Telegram —/ }); row.focus(); fireEvent.keyDown(window, { key: 'Escape' }); expect(row).toHaveFocus();
   expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
 });
 it('supports in-page hash changes and backdrop close without closing on content clicks', async () => {
@@ -281,7 +283,7 @@ it('preserves in-progress credentials when the same user receives a refreshed ac
 it('uses the prototype metadata, raw page CSS, layout and brand parts without demo controls', async () => {
   const source = readFileSync('../../docs/design/prototypes/react/src/pages/Settings/page.css', 'utf8');
   const port = readFileSync('src/pages/Settings/page.css', 'utf8');
-  expect(port).toBe(source); mount(); await screen.findByRole('button', { name: /GitHub —/ });
+  expect(port).toBe(source); mount(); await screen.findByRole('button', { name: /Telegram —/ });
   expect(document.documentElement).toHaveAttribute('data-proto-page', 'settings'); expect(document.title).toBe('Kết nối dịch vụ — ATI');
   expect(screen.getByRole('main')).toHaveClass('flex-1', 'max-w-5xl', 'px-4', 'sm:px-6', 'py-8', 'sm:py-10');
   expect(screen.getByRole('banner')).toHaveClass('sticky', 'top-0', 'z-30', 'bg-[#F8F8F6]/90', 'backdrop-blur-md');
@@ -301,7 +303,7 @@ it('renders provider verification and scope-save messages in Vietnamese without 
   expect(await screen.findByText(/Khoá truy cập bị từ chối/)).toBeInTheDocument(); expect(screen.queryByText('Provider rejected notion credentials')).not.toBeInTheDocument();
 });
 it('shows the source empty-scope guidance before saving an unconfigured service', async () => {
-  mount(); await open(); expect(document.getElementById('scope-empty-error')).toBeVisible(); expect(document.getElementById('scope-empty-error')).toHaveTextContent('Cần ít nhất một Repository.');
+  mount(); await open(); expect(document.getElementById('scope-empty-error')).toBeVisible(); expect(document.getElementById('scope-empty-error')).toHaveTextContent('Cần ít nhất một Chat ID.');
 });
 it('announces timeout when HTTP headers arrive but the response body hangs', async () => {
   holdTest = true; flushTestHeaders = true; mount(); await open('Notion'); fireEvent.click(screen.getByRole('button', { name: 'Kiểm tra kết nối' }));

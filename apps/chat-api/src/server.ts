@@ -11,6 +11,8 @@ import {
   StepRepo,
   CredentialRepo,
   UserRepo,
+  WorkspaceRepo,
+  JiraWorkspaceRepo,
 } from './db/repositories/index.js';
 import { DEMO_ADMIN_ID } from './routes/auth-routes.js';
 import { verifyPassword } from './db/repositories/user-repo.js';
@@ -21,6 +23,9 @@ import { ChatService } from './services/chat-service.js';
 import { ExecutionService } from './services/execution-service.js';
 import { reconcileInterruptedExecutions } from './services/startup-reconciliation.js';
 import { createScheduleRuntime } from './config/schedules-runtime.js';
+import { evaluateCalendarDigestCandidate } from './services/schedules/calendar-digest-candidate.js';
+import { createCalendarDigestExecutor } from './services/schedules/calendar-digest-runner.js';
+import { createGithubDigestRunner, type RunGithubDigest } from './services/schedules/github-digest-runner.js';
 import { AdapterFactory, type AdapterContext } from './services/adapter-factory.js';
 import { GmailConnectionRepo } from './db/repositories/gmail-connection-repo.js';
 import { SlackConnectionRepo } from './db/repositories/slack-connection-repo.js';
@@ -40,6 +45,26 @@ import { createPersonalSlackReadRuntime } from './config/slack-read-runtime.js';
 import { GmailOAuthClient } from './services/gmail/oauth-client.js';
 import { GmailTokenManager } from './services/gmail/token-manager.js';
 import { createGmailConnectionLookup, createMyCalendarConnectionLookup, createMySheetsConnectionLookup } from './services/gmail/connection-reference.js';
+import { TrelloTokenManager } from './services/trello/token-manager.js';
+import { TrelloOAuthClient } from './services/trello/oauth-client.js';
+import { TrelloTeamRepo } from './db/repositories/trello-team-repo.js';
+import { TelegramTeamRepo } from './db/repositories/telegram-team-repo.js';
+import { TelegramUpdateRepo } from './db/repositories/telegram-update-repo.js';
+import { TelegramBotClient } from './services/telegram/bot-client.js';
+import { createTelegramConnectionLookup } from './services/telegram/connection-reference.js';
+import { TelegramDigestRunner } from './services/schedules/telegram-digest-runner.js';
+import { StepError } from '@wap/tool-adapters';
+import { createTrelloConnectionLookup } from './services/trello/connection-reference.js';
+import { GitHubTokenManager } from './services/github/token-manager.js';
+import { GitHubOAuthClient } from './services/github/oauth-client.js';
+import { GitHubTeamRepo } from './db/repositories/github-team-repo.js';
+import { createGitHubConnectionLookup } from './services/github/connection-reference.js';
+import { JiraOAuthClient } from './services/jira/jira-oauth-client.js';
+import { JiraOAuthRepo } from './db/repositories/jira-oauth-repo.js';
+import { JiraTokenManager } from './services/jira/jira-token-manager.js';
+import { JiraNativeVerifier } from './services/jira/jira-native-verifier.js';
+import { JiraPolicyService } from './services/jira/jira-policy-service.js';
+import { JiraHistorySanitizer } from './services/jira/jira-history-sanitizer.js';
 import {
   AIPlanner,
   createProviderFromEnv,
@@ -70,6 +95,8 @@ async function bootstrap() {
   let planRepo: any = null;
   let stepRepo: any = null;
   let credRepo: any = null;
+  let workspaceRepo: any = null;
+  let jiraWorkspaceRepo: JiraWorkspaceRepo | null = null;
 
   try {
     const dbUrl = env.DATABASE_URL;
@@ -83,7 +110,9 @@ async function bootstrap() {
     msgRepo = new MessageRepo(pool);
     planRepo = new PlanRepo(pool);
     stepRepo = new StepRepo(pool);
-    credRepo = new CredentialRepo(pool);
+    credRepo = new CredentialRepo(pool, env.ENCRYPTION_KEY);
+    workspaceRepo = new WorkspaceRepo(pool);
+    jiraWorkspaceRepo = new JiraWorkspaceRepo(pool);
 
     if (env.RUNTIME_MODE === 'live') {
       const seededAdmin = await userRepo.findByEmail('admin@wap.local');
@@ -93,6 +122,12 @@ async function bootstrap() {
     }
   } catch (err: any) {
     if (!mayUseMemoryStorage(env.RUNTIME_MODE)) throw err;
+    const unavailablePool = pool;
+    pool = null;
+    userRepo = null;
+    workspaceRepo = null;
+    jiraWorkspaceRepo = null;
+    await unavailablePool?.end();
     console.warn(
       `\x1b[33m[chat-api]\x1b[0m PostgreSQL không khả dụng (${err?.message || 'offline'}). Tự động chuyển sang chế độ Lưu trữ In-Memory phát triển.`
     );
@@ -211,9 +246,27 @@ async function bootstrap() {
 
   // Schedules need the flag and PostgreSQL; with the flag off nothing below exists.
   // A run is planned by chatService, created below; the runner starts only after listen.
+  let digestRunnerImpl: RunGithubDigest | undefined;
   const schedules = createScheduleRuntime({
-    enabled: env.SCHEDULES_ENABLED, pool: pool && userRepo ? pool : null, timeZone: env.APP_TIME_ZONE,
+    enabled: env.SCHEDULES_ENABLED,
+    pool: pool && userRepo ? pool : null,
+    timeZone: env.APP_TIME_ZONE,
+    encryptionKey: env.ENCRYPTION_KEY,
     planRun: (run, convId, signal) => chatService.planScheduledRun(run, convId, signal),
+    runDigest: pool
+      ? createCalendarDigestExecutor({
+          pool,
+          encryptionKey: env.ENCRYPTION_KEY,
+          timeZone: env.APP_TIME_ZONE,
+          getAdapter: (serviceName, context) =>
+            (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(serviceName, context),
+        })
+      : undefined,
+    runGithubDigest: (run, convId, signal) => {
+      if (!digestRunnerImpl) throw new Error('Digest runner is not ready');
+      return digestRunnerImpl(run, convId, signal);
+    },
+    executeDigestRun: (run, signal) => telegramDigestRunner.execute(run, signal),
     emit: (convId, event, payload) => sseManager.emitEvent(convId, event, payload),
   });
   if (env.SCHEDULES_ENABLED && !schedules) console.warn('\x1b[33m[chat-api] SCHEDULES_ENABLED=on nhưng không có PostgreSQL: lịch chạy tạm tắt.\x1b[0m');
@@ -223,6 +276,135 @@ async function bootstrap() {
   const gmailAvailable = Boolean(env.GMAIL_ENABLED && env.GMAIL_OAUTH && pool && userRepo);
   const mycalendarAvailable = Boolean(env.MYCALENDAR_ENABLED && env.MYCALENDAR_OAUTH && pool && userRepo);
   const mysheetsAvailable = Boolean(env.MYSHEETS_ENABLED && env.MYSHEETS_OAUTH && pool && userRepo);
+  const trelloAvailable = Boolean(env.TRELLO_OAUTH && pool);
+  const trelloOAuthClient = trelloAvailable ? new TrelloOAuthClient(env.TRELLO_OAUTH!) : undefined;
+  const trelloTeamRepo = pool ? new TrelloTeamRepo(pool) : undefined;
+  const trelloTokens = trelloAvailable ? new TrelloTokenManager({
+    client: trelloOAuthClient!,
+    credentials: credRepo,
+    onReconnectRequired: (userId) => realAdapterFactory.clearPersonal(userId),
+  }) : undefined;
+  const trelloLookup = trelloAvailable && trelloTeamRepo && trelloTokens && trelloOAuthClient
+    ? createTrelloConnectionLookup({
+        credentialRepo: credRepo,
+        teamRepo: trelloTeamRepo,
+        encryptionKey: env.ENCRYPTION_KEY,
+        tokens: trelloTokens,
+        client: trelloOAuthClient,
+      })
+    : undefined;
+  // The canned sandbox plan still creates a Trello card when PostgreSQL or the
+  // OAuth client is absent. board_frontend is the board the browser grounding
+  // fixture stores list_frontend_todo on. A real lookup replaces this stand-in.
+  const sandboxTrelloConnection = env.RUNTIME_MODE === 'sandbox' && !trelloLookup
+    ? async () => ({
+        status: 'connected' as const,
+        teamBoards: [
+          { boardId: 'b1', boardName: 'Sprint Board' },
+          { boardId: 'b2', boardName: 'Bug Tracker' },
+          { boardId: 'board_frontend', boardName: 'Frontend' },
+        ],
+        connection: {
+          credentialId: 'sandbox-trello',
+          memberId: 'sandbox-member',
+          username: 'sandbox',
+          boardIds: ['b1', 'b2', 'board_frontend'],
+        },
+      })
+    : undefined;
+  const trelloConnection = trelloLookup ?? sandboxTrelloConnection;
+
+  const githubAvailable = Boolean(env.GITHUB_OAUTH && pool);
+  const githubOAuthClient = githubAvailable ? new GitHubOAuthClient(env.GITHUB_OAUTH!) : undefined;
+  const githubTeamRepo = pool ? new GitHubTeamRepo(pool) : undefined;
+  const githubTokens = githubAvailable ? new GitHubTokenManager({
+    client: githubOAuthClient!,
+    credentials: credRepo,
+    onReconnectRequired: (userId) => realAdapterFactory.clearPersonal(userId),
+  }) : undefined;
+  const githubLookup = githubAvailable && githubTeamRepo && githubTokens && githubOAuthClient
+    ? createGitHubConnectionLookup({
+        credentialRepo: credRepo,
+        teamRepo: githubTeamRepo,
+        encryptionKey: env.ENCRYPTION_KEY,
+        tokens: githubTokens,
+        client: githubOAuthClient,
+      })
+    : undefined;
+  const sandboxGitHubConnection = env.RUNTIME_MODE === 'sandbox' && !githubLookup
+    ? async () => ({
+        status: 'connected' as const,
+        teamRepos: [
+          { repoId: '100', fullName: 'owner/repo', name: 'repo' },
+          { repoId: '101', fullName: 'nhom/ati', name: 'ati' },
+          { repoId: '102', fullName: 'octo/repo', name: 'repo' },
+          { repoId: '103', fullName: 'wap/platform', name: 'platform' },
+        ],
+        memberRepos: [
+          { repoId: '100', fullName: 'owner/repo', name: 'repo' },
+          { repoId: '101', fullName: 'nhom/ati', name: 'ati' },
+          { repoId: '102', fullName: 'octo/repo', name: 'repo' },
+          { repoId: '103', fullName: 'wap/platform', name: 'platform' },
+        ],
+        connection: {
+          credentialId: 'sandbox-github',
+          githubUserId: 'sandbox-gh-user',
+          login: 'sandbox-octo',
+          repos: ['owner/repo', 'nhom/ati', 'octo/repo', 'wap/platform'],
+        },
+      })
+    : undefined;
+  const githubConnection = githubLookup ?? sandboxGitHubConnection;
+
+  const telegramAvailable = Boolean(env.TELEGRAM_BOT && pool);
+  const telegramBotClient = telegramAvailable && pool
+    ? new TelegramBotClient(env.TELEGRAM_BOT!, fetch, new TelegramUpdateRepo(pool))
+    : undefined;
+  const telegramTeamRepo = pool ? new TelegramTeamRepo(pool) : undefined;
+  const telegramLookup = telegramAvailable && telegramBotClient
+    ? createTelegramConnectionLookup({
+        credentialRepo: credRepo,
+        encryptionKey: env.ENCRYPTION_KEY,
+        botClient: telegramBotClient,
+      })
+    : undefined;
+  const sandboxTelegramConnection = env.RUNTIME_MODE === 'sandbox' && !telegramLookup
+    ? async () => ({
+        status: 'connected' as const,
+        selectedChats: [
+          { chatId: '100000001', title: 'Telegram của tôi (Sandbox)', type: 'private' as const },
+          { chatId: '-1001234567890', title: 'ATI Test', type: 'supergroup' as const },
+        ],
+        connection: {
+          credentialId: 'sandbox-telegram',
+          telegramUserId: '100000001',
+          username: 'sandbox',
+          chatIds: ['-1001234567890', '100000001'],
+        },
+      })
+    : undefined;
+  const telegramConnection = telegramLookup ?? sandboxTelegramConnection;
+
+  const jiraAvailable = Boolean(env.MYJIRA_ENABLED && env.JIRA_OAUTH && pool);
+  const jiraOAuthClient = jiraAvailable ? new JiraOAuthClient(env.JIRA_OAUTH!) : undefined;
+  const jiraOAuthRepo = jiraAvailable && pool ? new JiraOAuthRepo(pool, env.ENCRYPTION_KEY) : undefined;
+  const jiraTokens = jiraAvailable && pool && jiraOAuthClient && jiraOAuthRepo
+    ? new JiraTokenManager({
+        pool,
+        client: jiraOAuthClient,
+        repo: jiraOAuthRepo,
+        encryptionKey: env.ENCRYPTION_KEY,
+      })
+    : undefined;
+  const jiraNativeVerifier = jiraAvailable && jiraTokens
+    ? new JiraNativeVerifier({ tokenManager: jiraTokens })
+    : undefined;
+  if (pool && jiraNativeVerifier) {
+    jiraWorkspaceRepo = new JiraWorkspaceRepo(pool, { verifier: jiraNativeVerifier });
+  }
+  const jiraHistorySanitizer = pool && jiraNativeVerifier
+    ? new JiraHistorySanitizer(new JiraPolicyService({ pool, verifier: jiraNativeVerifier }))
+    : undefined;
 
   // 2. Initialize LLM Provider
   let provider: any;
@@ -240,11 +422,27 @@ async function bootstrap() {
   const backupMockProvider = createBackupSandboxProvider();
 
   let gatherAdapterFactory: { getAdapterForService: (serviceName: string, context?: AdapterContext) => Promise<any> | any } | null = null;
-  const gatherSearch = async ({ tool, args, signal, actor }: { tool: string; args: Record<string, unknown>; signal?: AbortSignal; actor?: { userId: string } }) => {
+  const gatherSearch = async ({
+    tool,
+    args,
+    signal,
+    actor,
+  }: {
+    tool: string;
+    args: Record<string, unknown>;
+    signal?: AbortSignal;
+    actor?: { userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization' };
+  }) => {
     if (!gatherAdapterFactory) throw new Error('Gather adapter factory is not ready');
     const serviceName = tool.split('.')[0]!;
-    // Lookups during planning use the planning member's own connection for personal services.
-    const adapter = await gatherAdapterFactory.getAdapterForService(serviceName, { userId: actor?.userId, phase: 'planning' });
+    // Lookups during planning use the planning member's own connection and active workspace context.
+    const defaultMode = workspaceRepo ? ('personal' as const) : undefined;
+    const adapter = await gatherAdapterFactory.getAdapterForService(serviceName, {
+      userId: actor?.userId,
+      phase: 'planning',
+      workspaceMode: actor?.workspaceMode ?? defaultMode,
+      ...(actor?.workspaceId !== undefined ? { workspaceId: actor.workspaceId } : {}),
+    });
     return adapter.execute(tool, args, { signal });
   };
   // Sandbox providers return canned plans without reading working memory, so
@@ -257,13 +455,31 @@ async function bootstrap() {
   });
 
   // One planner per call: the member's own catalog decides which services are configured.
-  const plannerFor = async (actor?: { userId: string }) => new AIPlanner({
+  const plannerFor = async (actor?: {
+    userId: string;
+    workspaceId?: string | null;
+    workspaceMode?: 'legacy' | 'personal' | 'organization';
+  }) => new AIPlanner({
     provider: env.RUNTIME_MODE === 'sandbox' && (process.env.SANDBOX_SCENARIO === 'gmail' || process.env.SANDBOX_SCENARIO === 'mycalendar' || process.env.SANDBOX_SCENARIO === 'mysheets') ? createSandboxProvider(process.env.SANDBOX_SCENARIO) : provider,
     toolCatalog: await runtimeToolCatalog(env.RUNTIME_MODE, credRepo, env.ENCRYPTION_KEY, {
       userId: actor?.userId,
+      workspaceMode: actor?.workspaceMode ?? (workspaceRepo ? 'personal' : undefined),
+      workspaceId: actor?.workspaceId,
       gmailEnabled: gmailAvailable,
       mycalendarEnabled: mycalendarAvailable,
       mysheetsEnabled: mysheetsAvailable,
+      trelloEnabled: trelloAvailable,
+      trelloTeamRepo,
+      trelloOAuthClient,
+      trelloTokens,
+      trelloConnection,
+      githubEnabled: githubAvailable,
+      githubTeamRepo,
+      githubOAuthClient,
+      githubTokens,
+      githubConnection,
+      telegramEnabled: telegramAvailable,
+      telegramConnection,
     }),
     serviceRegistry: serviceRegistryForRuntime(gmailAvailable, mycalendarAvailable, mysheetsAvailable),
     gatherSearch,
@@ -280,7 +496,10 @@ async function bootstrap() {
         if (!mayFallbackToShared(input, gmailAvailable, mycalendarAvailable, mysheetsAvailable)) throw new Error('Personal service planning failed');
         return backupPlanner.processMessage(input);
       }),
-    routeSchedule: async (request: string, actor: { userId: string }) => (await plannerFor(actor)).routeSchedule(request),
+    routeSchedule: async (
+      request: string,
+      actor: { userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization' }
+    ) => (await plannerFor(actor)).routeSchedule(request),
   };
 
   // 4. ChatService Event Bridge to SSE
@@ -302,6 +521,7 @@ async function bootstrap() {
     msgRepo,
     convRepo,
     planRepo,
+    workspaceRepo,
     planner: planner as any,
     eventEmitter: chatEventEmitter,
     gmailConnection: gmailAvailable ? createGmailConnectionLookup(credRepo, env.ENCRYPTION_KEY) : undefined,
@@ -311,14 +531,35 @@ async function bootstrap() {
           (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService('mysheets', { userId, phase: 'planning' })
         )
       : undefined,
+    trelloConnection,
+    githubConnection,
+    telegramConnection,
     getAdapter: (serviceName, context) => (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(serviceName, context),
-    schedules: schedules ? { repo: schedules.service.repo, timeZone: env.APP_TIME_ZONE } : undefined,
+    schedules: schedules
+      ? {
+          repo: schedules.service.repo,
+          timeZone: env.APP_TIME_ZONE,
+          evaluateDigestCandidate: pool
+            ? async (input) =>
+                (
+                  await evaluateCalendarDigestCandidate({
+                    pool,
+                    encryptionKey: env.ENCRYPTION_KEY,
+                    userId: input.userId,
+                    request: input.request,
+                    services: input.services,
+                  })
+                ).candidate
+            : undefined,
+        }
+      : undefined,
   });
 
   // 5. Adapter Factory (Supports both real credentials & mock execution)
   if (env.GMAIL_ENABLED && !gmailAvailable) console.warn('\x1b[33m[chat-api] GMAIL_ENABLED=on nhưng thiếu cấu hình Gmail hoặc PostgreSQL: kết nối Gmail tạm tắt (503).\x1b[0m');
   if (env.MYCALENDAR_ENABLED && !mycalendarAvailable) console.warn('\x1b[33m[chat-api] MYCALENDAR_ENABLED=on nhưng thiếu cấu hình MyCalendar hoặc PostgreSQL: kết nối MyCalendar tạm tắt (503).\x1b[0m');
   if (env.MYSHEETS_ENABLED && !mysheetsAvailable) console.warn('\x1b[33m[chat-api] MYSHEETS_ENABLED=on nhưng thiếu cấu hình MySheets hoặc PostgreSQL: kết nối MySheets tạm tắt (503).\x1b[0m');
+  if (env.MYJIRA_ENABLED && !jiraAvailable) console.warn('\x1b[33m[chat-api] MYJIRA_ENABLED=on nhưng thiếu cấu hình Jira OAuth hoặc PostgreSQL: kết nối Jira tạm tắt (503).\x1b[0m');
 
   let realAdapterFactory: AdapterFactory;
   const gmailTokens = gmailAvailable ? new GmailTokenManager({
@@ -349,12 +590,80 @@ async function bootstrap() {
     createMyCalendarAdapter: mycalendarAvailable ? (input) => runtimeMyCalendarAdapter(env.RUNTIME_MODE, input, env.MYCALENDAR_OAUTH!.apiBaseUrl) : undefined,
     mysheetsTokens,
     createMySheetsAdapter: mysheetsAvailable ? (input) => runtimeMySheetsAdapter(env.RUNTIME_MODE, input, env.MYSHEETS_OAUTH!.apiBaseUrl) : undefined,
+    trelloTokens,
+    trelloTeamRepo,
+    trelloOAuthClient,
+    trelloApiBaseUrl: env.TRELLO_OAUTH?.apiBaseUrl,
+    telegramBot: env.TELEGRAM_BOT,
+    telegramBotClient,
+    createTrelloAdapter: env.RUNTIME_MODE === 'sandbox' ? ({ allowedBoardIds }) => {
+      const sandbox = createSandboxAdapter('trello');
+      return {
+        execute: async (tool, args, ctx) => {
+          const targetBoardId = ctx?.boardId ?? args?.boardId;
+          if (targetBoardId && !allowedBoardIds.includes(String(targetBoardId))) {
+            throw new StepError({ category: 'AUTH_ERROR', message: 'Bảng không nằm trong phạm vi được phép.' });
+          }
+          return sandbox.execute(tool, args, ctx);
+        },
+      };
+    } : undefined,
+    githubTokens,
+    githubTeamRepo,
+    githubOAuthClient,
+    githubApiBaseUrl: env.GITHUB_OAUTH?.apiBaseUrl,
+    createGitHubAdapter: env.RUNTIME_MODE === 'sandbox' ? ({ allowedRepos }) => {
+      const sandbox = createSandboxAdapter('github');
+      const allowedLower = new Set(allowedRepos.map((r) => r.toLowerCase()));
+      return {
+        execute: async (tool, args, ctx) => {
+          const targetRepo = ctx?.repo ?? args?.repo;
+          if (targetRepo && !allowedLower.has(String(targetRepo).toLowerCase())) {
+            throw new StepError({ category: 'AUTH_ERROR', message: 'Repository không nằm trong phạm vi được phép.' });
+          }
+          return sandbox.execute(tool, args, ctx);
+        },
+      };
+    } : undefined,
+    createTelegramAdapter: env.RUNTIME_MODE === 'sandbox' ? ({ allowedChats }) => {
+      const sandbox = createSandboxAdapter('telegram');
+      return {
+        execute: async (tool, args, ctx) => {
+          const targetChatId = ctx?.chatId ?? args?.chatId;
+          if (targetChatId && !allowedChats.includes(String(targetChatId))) {
+            throw new StepError({ category: 'AUTH_ERROR', message: 'Cuộc trò chuyện không nằm trong phạm vi được phép.' });
+          }
+          return sandbox.execute(tool, args, ctx);
+        },
+      };
+    } : undefined,
   });
 
   const adapterFactory = createToolRuntimeFactory(env.RUNTIME_MODE,
-    (serviceName, context) => realAdapterFactory.getAdapterForService(serviceName, context),
+    (serviceName, context) => {
+      if (sandboxTrelloConnection && serviceName === 'trello') return Promise.resolve(createSandboxAdapter('trello'));
+      if (sandboxGitHubConnection && serviceName === 'github') return Promise.resolve(createSandboxAdapter('github'));
+      if (sandboxTelegramConnection && serviceName === 'telegram') return Promise.resolve(createSandboxAdapter('telegram'));
+      return realAdapterFactory.getAdapterForService(serviceName, context);
+    },
     (serviceName) => createSandboxAdapter(serviceName));
   gatherAdapterFactory = adapterFactory;
+  if (pool) {
+    digestRunnerImpl = createGithubDigestRunner({
+      pool,
+      githubConnection,
+      getAdapter: (serviceName, context) => adapterFactory.getAdapterForService(serviceName, context),
+    });
+  }
+
+  const telegramDigestRunner = new TelegramDigestRunner({
+    pool,
+    credentialRepo: credRepo,
+    encryptionKey: env.ENCRYPTION_KEY,
+    adapterFactory,
+    botClient: telegramBotClient,
+    timeZone: env.APP_TIME_ZONE,
+  });
 
   // 6. ExecutionService
   const executionService = new ExecutionService({
@@ -363,6 +672,7 @@ async function bootstrap() {
     planRepo,
     stepRepo,
     convRepo,
+    workspaceRepo,
     adapterFactory,
     sseManager,
   });
@@ -417,6 +727,10 @@ async function bootstrap() {
     runtimeMode: env.RUNTIME_MODE,
     userRepo,
     adminUserRepo: pool && userRepo ? new AdminUserRepo(pool) : undefined,
+    workspaceRepo,
+    jiraWorkspaceRepo: jiraWorkspaceRepo ?? undefined,
+    jiraHistorySanitizer,
+    pool: pool ?? undefined,
     signupEnabled: env.AUTH_SIGNUP_ENABLED,
     googleSignupEnabled: env.GOOGLE_SIGNUP_ENABLED,
     googleOAuth: env.GOOGLE_OAUTH,
@@ -432,7 +746,7 @@ async function bootstrap() {
     credentialRepo: credRepo,
     encryptionKey: env.ENCRYPTION_KEY,
     serviceAdminUserIds: (process.env.SERVICE_ADMIN_USER_IDS || '').split(',').map((id) => id.trim()).filter(Boolean),
-    onCredentialsChanged: (service) => realAdapterFactory.clearCache(service),
+    onCredentialsChanged: (service, workspaceId, userId) => realAdapterFactory.clearCache(service, workspaceId, userId),
     gmail: env.GMAIL_ENABLED ? {
       enabled: true,
       oauth: gmailAvailable ? env.GMAIL_OAUTH : undefined,
@@ -455,6 +769,49 @@ async function bootstrap() {
       onConnectionChanged: (userId: string) => realAdapterFactory.clearPersonal(userId),
     } : undefined,
     mysheetsTokens,
+    trello: {
+      oauth: trelloAvailable ? env.TRELLO_OAUTH : undefined,
+      onConnectionChanged: (userId: string) => {
+        realAdapterFactory.clearPersonal(userId);
+        trelloTokens?.clear(userId);
+      },
+      tokens: trelloTokens,
+      teamRepo: trelloTeamRepo,
+    },
+    trelloTokens,
+    trelloTeamRepo,
+    github: {
+      oauth: githubAvailable ? env.GITHUB_OAUTH : undefined,
+      onConnectionChanged: (userId: string) => {
+        realAdapterFactory.clearPersonal(userId);
+        githubTokens?.clear(userId);
+      },
+      tokens: githubTokens,
+      teamRepo: githubTeamRepo,
+    },
+    githubTokens,
+    githubTeamRepo,
+    telegram: {
+      bot: telegramAvailable ? env.TELEGRAM_BOT : undefined,
+      botClient: telegramBotClient,
+      teamRepo: telegramTeamRepo,
+      onConnectionChanged: (userId: string) => {
+        realAdapterFactory.clearPersonal(userId);
+      },
+    },
+    telegramTeamRepo,
+    jira: env.MYJIRA_ENABLED ? {
+      enabled: jiraAvailable,
+      oauth: env.JIRA_OAUTH,
+      repo: jiraOAuthRepo,
+      tokens: jiraTokens,
+      client: jiraOAuthClient,
+      onConnectionChanged: (userId: string) => {
+        realAdapterFactory.clearPersonal(userId);
+        jiraTokens?.clear(userId);
+        jiraNativeVerifier?.clearCache();
+      },
+    } : undefined,
     chatService,
     sseManager,
     executionService,

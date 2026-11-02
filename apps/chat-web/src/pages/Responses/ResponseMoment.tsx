@@ -3,6 +3,9 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ServiceLogo } from '../../components/ServiceLogo';
 import { apiClient } from '../../services/api-client';
 import { conversationReturnPath, gmailSessionOwner, redirectToGmail, mycalendarSessionOwner, redirectToMyCalendar, mysheetsSessionOwner, redirectToMySheets } from '../../services/gmail-connection';
+import { trelloSessionOwner, redirectToTrello } from '../../services/trello-connection';
+import { githubSessionOwner, redirectToGitHub } from '../../services/github-connection';
+import { telegramSessionOwner, buildTelegramCallbackPath } from '../../services/telegram-connection';
 import type { ChatMessage, ClarificationState, ServiceInfo } from '../../types';
 import { RequestEcho, useScheduledOrigin } from '../Cockpit/RequestEcho';
 
@@ -91,7 +94,11 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
 }) {
   const refresh = useRef(onRefreshServices);
   refresh.current = onRefreshServices;
-  useEffect(() => { if (connectFromChat) refresh.current?.(); }, [message.id, connectFromChat]);
+  useEffect(() => {
+    if (connectFromChat || (message.metadata?.unavailableServices ?? []).some(row => row.id === 'trello' || row.id === 'github' || row.id === 'telegram')) {
+      refresh.current?.();
+    }
+  }, [message.id, connectFromChat]);
   const metadata = message.metadata;
   const legacy = message.content.replace(/^Từ chối yêu cầu:\s*/, '').split(/\nGợi ý:\s*/);
   const reason = metadata?.reason || legacy[0];
@@ -102,20 +109,30 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
   const rows = [...relevant, ...unavailable.filter(row => !relevant.some(service => service.id === row.id)).map(row => ({ ...row, connected: false, configured: false, connectionStatus: 'unconfigured' as const }))];
   // What the refusal named may be usable by now: Gmail/MyCalendar/MySheets once this person connected it, a shared service once configured.
   const current = (id: string) => services.find(service => service.id === id);
-  const usable = (id: string) => connectFromChat && (
-    id === 'gmail' || id === 'mycalendar' || id === 'mysheets'
+  const usable = (id: string) =>
+    id === 'trello' || id === 'github' || id === 'telegram'
       ? current(id)?.personalStatus === 'connected'
-      : current(id)?.configured === true
-  );
+      : Boolean(
+          connectFromChat &&
+            (id === 'gmail' || id === 'mycalendar' || id === 'mysheets'
+              ? current(id)?.personalStatus === 'connected'
+              : current(id)?.configured === true)
+        );
   const reconnect = connectFromChat && current('gmail')?.personalStatus === 'reconnect_required';
   const mycalStatus = current('mycalendar')?.personalStatus;
   const mysheetsStatus = current('mysheets')?.personalStatus;
+  const trelloStatus = current('trello')?.personalStatus;
+  const githubStatus = current('github')?.personalStatus;
+  const telegramStatus = current('telegram')?.personalStatus;
   const missing = unavailable.filter(row => !usable(row.id));
   const resend = unavailable.length > 0 && missing.length === 0 && !servicesLoading && onResend;
   const hasGmail = missing.some(row => row.id === 'gmail');
   const hasMyCalendar = missing.some(row => row.id === 'mycalendar');
   const hasMySheets = missing.some(row => row.id === 'mysheets');
-  const shared = missing.filter(row => row.id !== 'gmail' && row.id !== 'mycalendar' && row.id !== 'mysheets');
+  const hasTrello = missing.some(row => row.id === 'trello');
+  const hasGitHub = missing.some(row => row.id === 'github');
+  const hasTelegram = missing.some(row => row.id === 'telegram');
+  const shared = missing.filter(row => row.id !== 'gmail' && row.id !== 'mycalendar' && row.id !== 'mysheets' && row.id !== 'trello' && row.id !== 'github' && row.id !== 'telegram');
   const path = shared.length === 1 ? `/settings#${encodeURIComponent(shared[0].id)}` : '/settings';
   const back = conversationId ? conversationReturnPath(`/c/${conversationId}`) : null;
   const [starting, setStarting] = useState(false), [startError, setStartError] = useState('');
@@ -148,6 +165,33 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
     } catch { if (mounted.current && owns()) setStartError('Không thể bắt đầu kết nối Google Sheets. Hãy kiểm tra mạng và thử lại.'); }
     finally { pending.current = false; if (mounted.current) setStarting(false); }
   };
+  const connectTrello = async (returnTo?: string | null) => {
+    if (pending.current) return;
+    const owns = trelloSessionOwner(); pending.current = true; setStarting(true); setStartError('');
+    try {
+      const { url } = await apiClient.startTrelloConnection(returnTo ? { returnTo } : {});
+      if (mounted.current && owns()) redirectToTrello(url);
+    } catch { if (mounted.current && owns()) setStartError('Không thể bắt đầu kết nối Trello. Hãy kiểm tra mạng và thử lại.'); }
+    finally { pending.current = false; if (mounted.current) setStarting(false); }
+  };
+  const connectGitHub = async (returnTo?: string | null) => {
+    if (pending.current) return;
+    const owns = githubSessionOwner(); pending.current = true; setStarting(true); setStartError('');
+    try {
+      const { url } = await apiClient.startGitHubConnection(returnTo ? { returnTo } : {});
+      if (mounted.current && owns()) redirectToGitHub(url);
+    } catch { if (mounted.current && owns()) setStartError('Không thể bắt đầu kết nối GitHub. Hãy kiểm tra mạng và thử lại.'); }
+    finally { pending.current = false; if (mounted.current) setStarting(false); }
+  };
+  const connectTelegram = async (returnTo?: string | null) => {
+    if (pending.current) return;
+    const owns = telegramSessionOwner(); pending.current = true; setStarting(true); setStartError('');
+    try {
+      const result = await apiClient.startTelegramConnection(returnTo ? { returnTo } : {});
+      if (mounted.current && owns()) navigate(buildTelegramCallbackPath(result));
+    } catch { if (mounted.current && owns()) setStartError('Không thể bắt đầu kết nối Telegram. Hãy kiểm tra mạng và thử lại.'); }
+    finally { pending.current = false; if (mounted.current) setStarting(false); }
+  };
   return <ResponseCard request={request} title={unavailable.length ? 'Tôi chưa làm được yêu cầu này' : 'Việc này tôi chưa làm được'} moment="refusal">
     <div id={`scenario-content-${unavailable.length ? 1 : 2}`} className="scenario-panel v3-space-y-5">
       <div className="p-3.5 sm:p-4 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] text-sm text-[#111827] font-medium flex items-start gap-3">
@@ -162,7 +206,11 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
             const gmailConnected = service.id === 'gmail' && usable('gmail');
             const mycalConnected = service.id === 'mycalendar' && usable('mycalendar');
             const mysheetsConnected = service.id === 'mysheets' && usable('mysheets');
-            const good = gmailConnected || mycalConnected || mysheetsConnected || status === 'healthy';
+            const trelloConnected = service.id === 'trello' && usable('trello');
+            const githubConnected = service.id === 'github' && usable('github');
+            const githubHandle = current('github')?.login ?? current('github')?.username;
+            const telegramConnected = service.id === 'telegram' && usable('telegram');
+            const good = gmailConnected || mycalConnected || mysheetsConnected || trelloConnected || githubConnected || telegramConnected || status === 'healthy';
             return <div key={service.id} className="flex items-center justify-between p-3 rounded-xl bg-white border border-[#E7E7E2] shadow-sm gap-2 flex-wrap">
               <div className="flex items-center gap-3 min-w-0"><div className="w-8 h-8 rounded-lg bg-neutral-50 border border-neutral-100 flex items-center justify-center flex-shrink-0"><ServiceLogo service={service.id} className="w-5 h-5 flex-shrink-0" /></div><span className="text-xs sm:text-sm font-semibold text-[#111827] break-words">{service.name}</span></div>
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium min-w-0 break-all ${good ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-neutral-100 text-neutral-600 border border-neutral-200'}`}><span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${good ? 'bg-emerald-500' : 'bg-neutral-400'}`} /><span>
@@ -181,6 +229,24 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
                   : service.id === 'mysheets' && mysheetsStatus === 'scope_required'
                   ? `Đã cấp quyền · Chưa chọn bảng tính${current('mysheets')?.email ? ` · ${current('mysheets')!.email}` : ''}`
                   : service.id === 'mysheets' && mysheetsStatus === 'reconnect_required'
+                  ? 'Cần kết nối lại'
+                  : trelloConnected
+                  ? `Đã kết nối${current('trello')?.username ? ` · @${current('trello')!.username}` : ''}`
+                  : service.id === 'trello' && trelloStatus === 'scope_required'
+                  ? `Đã kết nối · Chưa chọn bảng${current('trello')?.username ? ` · @${current('trello')!.username}` : ''}`
+                  : service.id === 'trello' && trelloStatus === 'reconnect_required'
+                  ? 'Cần kết nối lại'
+                  : githubConnected
+                  ? `Đã kết nối${githubHandle ? ` · @${githubHandle}` : ''}`
+                  : service.id === 'github' && githubStatus === 'scope_required'
+                  ? `Đã kết nối · Chưa chọn kho${githubHandle ? ` · @${githubHandle}` : ''}`
+                  : service.id === 'github' && githubStatus === 'reconnect_required'
+                  ? 'Cần kết nối lại'
+                  : telegramConnected
+                  ? `Đã kết nối${current('telegram')?.username ? ` · @${current('telegram')!.username}` : ''}`
+                  : service.id === 'telegram' && telegramStatus === 'scope_required'
+                  ? `Đã kết nối · Chưa chọn chat${current('telegram')?.username ? ` · @${current('telegram')!.username}` : ''}`
+                  : service.id === 'telegram' && telegramStatus === 'reconnect_required'
                   ? 'Cần kết nối lại'
                   : labels[status]}
               </span></span>
@@ -226,12 +292,118 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
             if (connectFromChat && back) void connectMySheets(back); else navigate('/settings#mysheets');
           }} className={`${primary} flex items-center gap-1.5`}>{mysheetsStatus === 'reconnect_required' ? 'Kết nối lại Google Sheets' : 'Kết nối Google Sheets'}<span aria-hidden="true">→</span></a>
         ))}
+        {hasTrello && (
+          <a
+            id="trello-connect"
+            role="link"
+            href="/settings#trello"
+            aria-disabled={starting || undefined}
+            onClick={event => {
+              if (back && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)) return;
+              event.preventDefault();
+              if (trelloStatus === 'scope_required') navigate('/settings#trello');
+              else if (back) void connectTrello(back);
+              else navigate('/settings#trello');
+            }}
+            className={`${primary} flex items-center gap-1.5`}
+          >
+            {trelloStatus === 'scope_required'
+              ? 'Chọn bảng Trello'
+              : trelloStatus === 'reconnect_required'
+              ? 'Kết nối lại Trello'
+              : 'Kết nối Trello'}
+            <span aria-hidden="true">→</span>
+          </a>
+        )}
+        {hasGitHub && (
+          <a
+            id="github-connect"
+            role="link"
+            href="/settings#github"
+            aria-disabled={starting || undefined}
+            onClick={event => {
+              if (back && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)) return;
+              event.preventDefault();
+              if (githubStatus === 'scope_required') navigate('/settings#github');
+              else if (back) void connectGitHub(back);
+              else navigate('/settings#github');
+            }}
+            className={`${primary} flex items-center gap-1.5`}
+          >
+            {githubStatus === 'scope_required'
+              ? 'Chọn kho GitHub'
+              : githubStatus === 'reconnect_required'
+              ? 'Kết nối lại GitHub'
+              : 'Kết nối GitHub'}
+            <span aria-hidden="true">→</span>
+          </a>
+        )}
+        {hasTelegram && (
+          <a
+            id="telegram-connect"
+            role="link"
+            href="/settings#telegram"
+            aria-disabled={starting || undefined}
+            onClick={event => {
+              if (back && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)) return;
+              event.preventDefault();
+              if (telegramStatus === 'scope_required') navigate('/settings#telegram');
+              else if (back) void connectTelegram(back);
+              else navigate('/settings#telegram');
+            }}
+            className={`${primary} flex items-center gap-1.5`}
+          >
+            {telegramStatus === 'scope_required'
+              ? 'Chọn chat Telegram'
+              : telegramStatus === 'reconnect_required'
+              ? 'Kết nối lại Telegram'
+              : 'Kết nối Telegram'}
+            <span aria-hidden="true">→</span>
+          </a>
+        )}
         {shared.length > 0 && (canConfigure ? <a href={path} onClick={event => { event.preventDefault(); navigate(path); }} className={`${primary} flex items-center gap-1.5`}>{shared.length === 1 ? `Kết nối ${shared[0].name}` : 'Kết nối dịch vụ'}<span aria-hidden="true">→</span></a> : <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">Chỉ quản trị viên kết nối được dịch vụ mới. Bạn hãy báo quản trị viên của nhóm.</p>)}
         {!unavailable.length && suggestion && <button type="button" onClick={() => onEdit(suggestion)} className={primary}>Thử: {suggestion}</button>}
         <button type="button" onClick={() => onEdit(request)} className={secondary}>Sửa yêu cầu</button>
       </div>
     </div>
   </ResponseCard>;
+}
+
+export function ResponseMoment(props: {
+  request: string;
+  conversationId?: string | null;
+  unavailableServices?: Array<{ id: string; name: string }>;
+  reason?: string;
+  services?: ServiceInfo[];
+  connectFromChat?: boolean;
+  navigate?: (path: string) => void;
+  canConfigure?: boolean;
+  onEdit?: (text: string) => void;
+  onResend?: (text: string) => void;
+}) {
+  const message: ChatMessage = {
+    id: 'refusal',
+    role: 'assistant',
+    content: props.reason ?? 'Từ chối yêu cầu',
+    metadata: {
+      type: 'refusal',
+      reason: props.reason,
+      unavailableServices: props.unavailableServices,
+    },
+  };
+  return (
+    <RefusalMoment
+      message={message}
+      request={props.request}
+      services={props.services ?? []}
+      canConfigure={props.canConfigure ?? false}
+      navigate={props.navigate ?? (() => {})}
+      onEdit={props.onEdit ?? (() => {})}
+      connectFromChat={props.connectFromChat ?? true}
+      conversationId={props.conversationId}
+      onResend={props.onResend}
+    />
+  );
 }
 export function ExpandedClarificationMoment({ clarification, variant, request, services, canConfigure, selected, onSelect, onSend, onEdit, navigate, planning }: {
   clarification: ClarificationState; variant: 'read-only' | 'destination'; request: string; services: ServiceInfo[];

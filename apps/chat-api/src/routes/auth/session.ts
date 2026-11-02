@@ -48,6 +48,10 @@ export function createSessionRoutes(options: AuthRoutesOptions): Router {
         return;
       }
       failures.clear(key);
+      if (options.userRepo && !user.emailVerified && user.status !== 'disabled') {
+        res.status(403).json({ error: 'Vui lòng xác minh email trước khi đăng nhập.', code: 'EMAIL_NOT_VERIFIED' });
+        return;
+      }
       if (options.userRepo && user.status !== 'active') {
         const code = user.status === 'disabled' ? 'ACCOUNT_DISABLED' : 'ACCOUNT_PENDING';
         res.status(403).json({ error: 'Account is not active', code });

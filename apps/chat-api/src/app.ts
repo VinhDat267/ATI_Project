@@ -1,5 +1,6 @@
 import {createSlackAssistantRoutes,type SlackAssistantServices} from './routes/slack-assistant.js';
 import express, { type Express, type Request, type Response, type NextFunction } from 'express';
+import type pg from 'pg';
 import { createAuthRoutes } from './routes/auth/index.js';
 import { createSlackConnectionRoutes, type SlackConnectionsOptions } from './routes/connections/slack.js';
 import { createAccountRoutes } from './routes/auth/account.js';
@@ -11,8 +12,15 @@ import { createExecutionRoutes } from './routes/execution-routes.js';
 import { createServicesRoutes } from './routes/services-routes.js';
 import { createScheduleRoutes, isSchedulePath, type ScheduleRoutesOptions } from './routes/schedule-routes.js';
 import { createAuthMiddleware } from './auth/jwt.js';
+import { createWorkspaceContextMiddleware } from './middleware/workspace-context.js';
+import { createWorkspacesRouter } from './routes/workspaces-routes.js';
+import { createWorkspaceRoutes } from './routes/workspace-routes.js';
+import type { WorkspaceRateLimitConfig } from './routes/workspace-rate-limiter.js';
+import type { WorkspaceRepo } from './db/repositories/workspace-repo.js';
+import type { JiraWorkspaceRepo } from './db/repositories/index.js';
 import type { ConversationRepo } from './db/repositories/conversation-repo.js';
 import type { MessageRepo } from './db/repositories/message-repo.js';
+import type { JiraHistorySanitizer } from './services/jira/jira-history-sanitizer.js';
 import type { PlanRepo } from './db/repositories/plan-repo.js';
 import type { UserRepo } from './db/repositories/user-repo.js';
 import type { SessionRepo } from './db/repositories/session-repo.js';
@@ -24,11 +32,18 @@ import type { ExecutionService } from './services/execution-service.js';
 import { userFacingError } from './services/user-facing-error.js';
 import type { EmailSender } from './services/email/index.js';
 import type { GoogleOAuthConfig } from './auth/google-oidc.js';
-import type { GmailOAuthConfig } from './config/env.js';
+import type { GmailOAuthConfig, GitHubOAuthConfig, TelegramBotConfig, TrelloOAuthConfig, JiraOAuthConfig } from './config/env.js';
 import type { GmailConnectionRepo } from './db/repositories/gmail-connection-repo.js';
+import { TrelloTeamRepo } from './db/repositories/trello-team-repo.js';
+import { GitHubTeamRepo } from './db/repositories/github-team-repo.js';
+import { TelegramTeamRepo } from './db/repositories/telegram-team-repo.js';
 import { createGmailConnectionRoutes, isGmailAvailable } from './routes/connections/gmail.js';
 import { createMyCalendarConnectionRoutes, isMyCalendarAvailable } from './routes/connections/mycalendar.js';
 import { createMySheetsConnectionRoutes, isMySheetsAvailable } from './routes/connections/mysheets.js';
+import { createTrelloConnectionRoutes, isTrelloConnectAvailable, type TrelloConnectionsOptions } from './routes/connections/trello.js';
+import { createGitHubConnectionRoutes, type GitHubConnectionsOptions } from './routes/connections/github.js';
+import { createTelegramConnectionRoutes, type TelegramConnectionsOptions } from './routes/connections/telegram.js';
+import { createMyJiraConnectionRoutes, isMyJiraAvailable, type MyJiraConnectionsOptions } from './routes/connections/myjira.js';
 import type { GlobalRateLimiter } from '@wap/tool-adapters';
 import type { GoogleAuthRepo } from './db/repositories/google-auth-repo.js';
 import type { GmailTokenManager } from './services/gmail/token-manager.js';
@@ -36,6 +51,11 @@ import type { SlackSourceRepo } from './db/repositories/slack-source-repo.js';
 import type { SlackInvalidationService } from './services/slack/slack-invalidation-service.js';
 import type { SlackInvalidationRunner } from './services/slack/slack-invalidation-runner.js';
 import { createSlackEventsRouter, type SlackEventsRouterOptions } from './routes/slack-events.js';
+import type { TrelloTokenManager } from './services/trello/token-manager.js';
+import type { GitHubTokenManager } from './services/github/token-manager.js';
+import type { JiraTokenManager } from './services/jira/jira-token-manager.js';
+import { JiraOAuthClient } from './services/jira/jira-oauth-client.js';
+import type { JiraOAuthRepo } from './db/repositories/jira-oauth-repo.js';
 
 /** Gmail as each member's own connection (GMAIL_ENABLED). Absent or disabled: the routes do not exist. */
 export interface GmailAppOptions {
@@ -74,6 +94,48 @@ export interface MySheetsAppOptions {
   pickerLimiter?: GlobalRateLimiter;
 }
 
+/** Trello as each member's own OAuth connection and team workspace boards. */
+export interface TrelloAppOptions {
+  oauth?: TrelloOAuthConfig;
+  fetchFn?: typeof fetch;
+  trelloTimeoutMs?: number;
+  onConnectionChanged?: (userId: string) => void;
+  tokens?: Pick<TrelloTokenManager, 'forConnection'>;
+  teamRepo?: TrelloTeamRepo;
+}
+
+/** GitHub as each member's own OAuth connection and team repositories. */
+export interface GitHubAppOptions {
+  oauth?: GitHubOAuthConfig;
+  fetchFn?: typeof fetch;
+  githubTimeoutMs?: number;
+  onConnectionChanged?: (userId: string) => void;
+  tokens?: Pick<GitHubTokenManager, 'forConnection'>;
+  teamRepo?: GitHubTeamRepo;
+}
+
+/** Telegram as each member's own 1-click connection and selected chats/groups. */
+export interface TelegramAppOptions {
+  bot?: TelegramBotConfig;
+  botClient?: TelegramConnectionsOptions['botClient'];
+  fetchFn?: typeof fetch;
+  telegramTimeoutMs?: number;
+  onConnectionChanged?: (userId: string) => void;
+  teamRepo?: TelegramTeamRepo;
+}
+
+/** Jira as each member's own OAuth connection and workspace sites (MYJIRA_ENABLED). */
+export interface JiraAppOptions {
+  enabled: boolean;
+  oauth?: JiraOAuthConfig;
+  repo?: JiraOAuthRepo;
+  tokens?: JiraTokenManager;
+  client?: JiraOAuthClient;
+  fetchFn?: typeof fetch;
+  jiraTimeoutMs?: number;
+  onConnectionChanged?: (userId: string) => void;
+}
+
 export interface AppOptions extends AdminUsersOptions {
   slackAssistant?:SlackAssistantServices;
   myslack?: Pick<SlackConnectionsOptions, 'oauth' | 'repo' | 'fetchFn' | 'timeoutMs'>;
@@ -96,7 +158,7 @@ export interface AppOptions extends AdminUsersOptions {
   credentialRepo?: CredentialRepo;
   encryptionKey?: string;
   serviceFetchFn?: typeof fetch;
-  onCredentialsChanged?: (service: string) => void;
+  onCredentialsChanged?: (service: string, workspaceId?: string | null, userId?: string) => void;
   serviceAdminUserIds?: string[];
   chatService?: ChatService;
   sseManager?: SSEManager;
@@ -106,6 +168,22 @@ export interface AppOptions extends AdminUsersOptions {
   mycalendarTokens?: Pick<GmailTokenManager, 'forConnection'>;
   mysheets?: MySheetsAppOptions;
   mysheetsTokens?: Pick<GmailTokenManager, 'forConnection'>;
+  trello?: TrelloAppOptions;
+  trelloTokens?: Pick<TrelloTokenManager, 'forConnection'>;
+  trelloTeamRepo?: TrelloTeamRepo;
+  workspaceRepo?: WorkspaceRepo;
+  jiraWorkspaceRepo?: JiraWorkspaceRepo;
+  jiraHistorySanitizer?: JiraHistorySanitizer;
+  jiraWorkspaceRateLimit?: WorkspaceRateLimitConfig;
+  workspaceRateLimit?: WorkspaceRateLimitConfig;
+  pool?: pg.Pool;
+  enableWorkspaceConversations?: boolean;
+  github?: GitHubAppOptions;
+  githubTokens?: Pick<GitHubTokenManager, 'forConnection'>;
+  githubTeamRepo?: GitHubTeamRepo;
+  telegram?: TelegramAppOptions;
+  telegramTeamRepo?: TelegramTeamRepo;
+  jira?: JiraAppOptions;
   /** Scheduled workflows; present only when SCHEDULES_ENABLED is on and PostgreSQL is available. */
   schedules?: ScheduleRoutesOptions;
   slackSourceRepo?: SlackSourceRepo;
@@ -146,6 +224,50 @@ export function createApp(options: AppOptions): Express {
     driveApiBaseUrl: options.mysheets.driveApiBaseUrl,
     pickerLimiter: options.mysheets.pickerLimiter,
   } : undefined;
+  const trelloTeamRepo = options.trelloTeamRepo ?? options.trello?.teamRepo ?? (options.credentialRepo ? new TrelloTeamRepo((options.credentialRepo as any).pool) : undefined);
+  const trelloTokens = options.trelloTokens ?? options.trello?.tokens;
+  const trelloRoutes: TrelloConnectionsOptions = {
+    jwtSecret: options.jwtSecret, sessionRepo, states, credentialRepo: options.credentialRepo,
+    teamRepo: trelloTeamRepo, oauth: options.trello?.oauth, encryptionKey: options.encryptionKey, fetchFn: options.trello?.fetchFn,
+    clock: options.authClock, trelloTimeoutMs: options.trello?.trelloTimeoutMs,
+    onConnectionChanged: options.trello?.onConnectionChanged,
+    conversationOwner: options.convRepo ? async (id: string) => (await options.convRepo!.getConversation(id))?.user_id ?? null : undefined,
+    tokens: trelloTokens, adminUserIds: options.serviceAdminUserIds,
+    workspaceRepo: options.workspaceRepo,
+  };
+  const githubTeamRepo = options.githubTeamRepo ?? options.github?.teamRepo ?? (options.credentialRepo ? new GitHubTeamRepo((options.credentialRepo as any).pool) : undefined);
+  const githubTokens = options.githubTokens ?? options.github?.tokens;
+  const githubRoutes: GitHubConnectionsOptions = {
+    jwtSecret: options.jwtSecret, sessionRepo, states, credentialRepo: options.credentialRepo,
+    teamRepo: githubTeamRepo, oauth: options.github?.oauth, encryptionKey: options.encryptionKey, fetchFn: options.github?.fetchFn,
+    clock: options.authClock, githubTimeoutMs: options.github?.githubTimeoutMs,
+    onConnectionChanged: options.github?.onConnectionChanged,
+    conversationOwner: options.convRepo ? async (id: string) => (await options.convRepo!.getConversation(id))?.user_id ?? null : undefined,
+    tokens: githubTokens, adminUserIds: options.serviceAdminUserIds,
+  };
+  const telegramTeamRepo = options.telegramTeamRepo ?? options.telegram?.teamRepo ?? (options.credentialRepo ? new TelegramTeamRepo((options.credentialRepo as any).pool) : undefined);
+  const telegramRoutes: TelegramConnectionsOptions = {
+    jwtSecret: options.jwtSecret, sessionRepo, states, credentialRepo: options.credentialRepo,
+    teamRepo: telegramTeamRepo, bot: options.telegram?.bot, encryptionKey: options.encryptionKey, fetchFn: options.telegram?.fetchFn,
+    botClient: options.telegram?.botClient,
+    clock: options.authClock, telegramTimeoutMs: options.telegram?.telegramTimeoutMs,
+    onConnectionChanged: options.telegram?.onConnectionChanged,
+    conversationOwner: options.convRepo ? async (id: string) => (await options.convRepo!.getConversation(id))?.user_id ?? null : undefined,
+    adminUserIds: options.serviceAdminUserIds,
+  };
+  const jiraRoutes: MyJiraConnectionsOptions | undefined = options.jira?.enabled ? {
+    jwtSecret: options.jwtSecret,
+    sessionRepo,
+    states,
+    repo: options.jira.repo,
+    client: options.jira.client ?? (options.jira.oauth ? new JiraOAuthClient({ ...options.jira.oauth, fetchFn: options.jira.fetchFn }) : undefined),
+    tokens: options.jira.tokens,
+    clock: options.authClock,
+    jiraTimeoutMs: options.jira.jiraTimeoutMs,
+    onConnectionChanged: options.jira.onConnectionChanged,
+    conversationOwner: options.convRepo ? async (id: string) => (await options.convRepo!.getConversation(id))?.user_id ?? null : undefined,
+    enabled: true,
+  } : undefined;
 
   // Slack signs the exact bytes it sends, so this router must see the raw stream before
   // express.json() parses it and before the user-facing error rewrite can alter a response.
@@ -166,8 +288,32 @@ export function createApp(options: AppOptions): Express {
 
   // CORS middleware
   app.use((req, res, next) => {
-    if (req.path.startsWith('/api/auth/google/') || (gmailRoutes && req.path.startsWith('/api/connections/gmail')) || (mycalendarRoutes && req.path.startsWith('/api/connections/mycalendar')) || (mysheetsRoutes && req.path.startsWith('/api/connections/mysheets'))) {
-      const origins = [options.appBaseUrl, options.googleOAuth?.redirectUri, options.gmail?.oauth?.redirectUri, options.mycalendar?.oauth?.redirectUri, options.mysheets?.oauth?.redirectUri].filter(Boolean).map(url => new URL(url!).origin);
+    if (
+      req.path.startsWith('/api/auth/google/') ||
+      (gmailRoutes && req.path.startsWith('/api/connections/gmail')) ||
+      (mycalendarRoutes && req.path.startsWith('/api/connections/mycalendar')) ||
+      (mysheetsRoutes && req.path.startsWith('/api/connections/mysheets')) ||
+      req.path.startsWith('/api/connections/myslack') ||
+      req.path.startsWith('/api/connections/trello') ||
+      req.path.startsWith('/api/connections/github') ||
+      req.path.startsWith('/api/connections/telegram') ||
+      req.path.startsWith('/api/connections/myjira')
+    ) {
+      const origins = [
+        options.appBaseUrl,
+        options.googleOAuth?.redirectUri,
+        options.gmail?.oauth?.redirectUri,
+        options.mycalendar?.oauth?.redirectUri,
+        options.mysheets?.oauth?.redirectUri,
+        options.myslack?.oauth?.redirectUri,
+        options.trello?.oauth?.redirectUri,
+        options.github?.oauth?.redirectUri,
+        options.telegram?.bot?.callbackUrl,
+        options.jira?.oauth?.redirectUri,
+        options.jira?.oauth?.fixtureBaseUrl,
+      ]
+        .filter(Boolean)
+        .map((url) => new URL(url!).origin);
       const origin = req.get('Origin');
       res.vary('Origin');
       if (origin && origins.includes(origin)) {
@@ -176,7 +322,7 @@ export function createApp(options: AppOptions): Express {
       }
     } else res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Last-Event-ID');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Last-Event-ID, X-Workspace-Id');
     if (req.method === 'OPTIONS') {
       res.sendStatus(204);
       return;
@@ -192,7 +338,8 @@ export function createApp(options: AppOptions): Express {
       ...(mycalendarRoutes ? { mycalendarEnabled: isMyCalendarAvailable(mycalendarRoutes) } : {}),
       ...(mysheetsRoutes ? { mysheetsEnabled: isMySheetsAvailable(mysheetsRoutes) } : {}),
       ...(options.chatService?.hasSlackReads?.() ? { myslackEnabled: true } : {}),
-      ...(options.chatService?.hasSlackWrites?.() ? {myslackWritesEnabled:true}:{}),
+      ...(options.chatService?.hasSlackWrites?.() ? { myslackWritesEnabled: true } : {}),
+      ...(jiraRoutes ? { jiraEnabled: isMyJiraAvailable(jiraRoutes) } : {}),
       ...(options.schedules ? { schedulesEnabled: true } : {}) });
   });
 
@@ -210,22 +357,57 @@ export function createApp(options: AppOptions): Express {
     sessionRepo: options.sessionRepo, clock: options.authClock, loginFailures }));
 
   const authMiddleware = createAuthMiddleware(options.jwtSecret, { sessionRepo: options.sessionRepo ?? options.userRepo?.sessions, clock: options.authClock });
+  const workspaceContextMiddleware = createWorkspaceContextMiddleware(options.workspaceRepo);
+  const withAuthAndWorkspace = (req: Request, res: Response, next: NextFunction) => {
+    authMiddleware(req, res, (err?: any) => {
+      if (err) return next(err);
+      workspaceContextMiddleware(req, res, next);
+    });
+  };
 
   // Memory storage cannot manage persistent accounts, even with a legacy JWT.
   app.use('/api/admin/users', (req, res, next) => {
     if (!options.adminUserRepo) { res.status(503).json({ error: 'Quản trị người dùng cần PostgreSQL.' }); return; }
-    authMiddleware(req, res, next);
+    withAuthAndWorkspace(req, res, next);
   }, createAdminUsersRoutes(options));
+
+  const dbPool = options.pool ?? options.convRepo?.getPool?.();
+
+  if (options.workspaceRepo) {
+    app.use('/api/workspaces', authMiddleware, createWorkspacesRouter({
+      workspaceRepo: options.workspaceRepo,
+      emailSender: options.emailSender,
+    }));
+  }
+
+  if (options.jiraWorkspaceRepo) {
+    const { adminRouter, workspaceRouter, joinRouter } = createWorkspaceRoutes({
+      workspaceRepo: options.jiraWorkspaceRepo,
+      rateLimit: options.jiraWorkspaceRateLimit ?? options.workspaceRateLimit,
+    });
+    app.use('/api/admin/jira-workspaces', authMiddleware, adminRouter);
+    app.use('/api/jira-workspaces', authMiddleware, workspaceRouter);
+    app.use('/api/jira-workspace-join-requests', authMiddleware, joinRouter);
+  } else {
+    const unavailableHandler = (_req: Request, res: Response) => {
+      res.status(503).json({ error: 'Jira workspace service is unavailable' });
+    };
+    app.use('/api/admin/jira-workspaces', authMiddleware, unavailableHandler);
+    app.use('/api/jira-workspaces', authMiddleware, unavailableHandler);
+    app.use('/api/jira-workspace-join-requests', authMiddleware, unavailableHandler);
+  }
 
   // Services routes (protected via Bearer header)
   app.use(
     '/api/services',
-    authMiddleware,
+    withAuthAndWorkspace,
     createServicesRoutes({ credentialRepo: options.credentialRepo, encryptionKey: options.encryptionKey, fetchFn: options.serviceFetchFn, onCredentialsChanged: options.onCredentialsChanged, adminUserIds: options.serviceAdminUserIds,
       slackOAuthAvailable: Boolean(options.myslack && sessionRepo && options.encryptionKey),
       gmailAvailable: Boolean(gmailRoutes && isGmailAvailable(gmailRoutes)),
       mycalendarAvailable: Boolean(mycalendarRoutes && isMyCalendarAvailable(mycalendarRoutes)),
-      mysheetsAvailable: Boolean(mysheetsRoutes && isMySheetsAvailable(mysheetsRoutes)) })
+      mysheetsAvailable: Boolean(mysheetsRoutes && isMySheetsAvailable(mysheetsRoutes)),
+      trelloTeamRepo: options.trelloTeamRepo ?? options.trello?.teamRepo,
+      githubTeamRepo: options.githubTeamRepo ?? options.github?.teamRepo })
   );
 
   if(options.slackAssistant&&sessionRepo)app.use(createSlackAssistantRoutes({...options.slackAssistant,jwtSecret:options.jwtSecret,sessionRepo}));
@@ -236,17 +418,41 @@ export function createApp(options: AppOptions): Express {
   }));
   if (mycalendarRoutes) app.use('/api/connections/mycalendar', createMyCalendarConnectionRoutes(mycalendarRoutes));
   if (mysheetsRoutes) app.use('/api/connections/mysheets', createMySheetsConnectionRoutes(mysheetsRoutes));
+  app.use('/api/connections/trello', createTrelloConnectionRoutes(trelloRoutes));
+  app.use('/api/connections/github', createGitHubConnectionRoutes(githubRoutes));
+  app.use('/api/connections/telegram', createTelegramConnectionRoutes(telegramRoutes));
+  if (jiraRoutes) {
+    app.use('/api/connections/myjira', createMyJiraConnectionRoutes(jiraRoutes));
+  } else {
+    app.use('/api/connections/myjira', (_req: Request, res: Response) => {
+      res.status(503).json({ error: 'Kết nối Jira chưa sẵn sàng.' });
+    });
+  }
 
   // Only schedule paths pass through this auth check, so other /api requests are not checked twice.
-  if (options.schedules) app.use('/api', (req, res, next) => isSchedulePath(req.path) ? authMiddleware(req, res, next) : next(),
-    createScheduleRoutes(options.schedules));
+  if (options.schedules) {
+    app.use(
+      '/api',
+      (req, res, next) => (isSchedulePath(req.path) ? withAuthAndWorkspace(req, res, next) : next()),
+      createScheduleRoutes({
+        ...options.schedules,
+        pool: dbPool,
+        convRepo: options.convRepo,
+      })
+    );
+  }
 
   // Stream routes require the Authorization header and a conversation owner check.
   if (options.sseManager) {
     app.use(
       '/api/conversations',
-      authMiddleware,
-      createStreamRoutes({ sseManager: options.sseManager, convRepo: options.convRepo })
+      withAuthAndWorkspace,
+      createStreamRoutes({
+        sseManager: options.sseManager,
+        convRepo: options.convRepo,
+        workspaceRepo: options.workspaceRepo,
+        pool: dbPool,
+      })
     );
   }
 
@@ -254,12 +460,15 @@ export function createApp(options: AppOptions): Express {
   if (options.convRepo && options.msgRepo && options.chatService) {
     app.use(
       '/api/conversations',
-      authMiddleware,
+      withAuthAndWorkspace,
       createConversationRoutes({
         convRepo: options.convRepo,
         msgRepo: options.msgRepo,
         chatService: options.chatService,
         planRepo: options.planRepo,
+        pool: dbPool,
+        enableWorkspaceConversations: options.enableWorkspaceConversations,
+        jiraHistorySanitizer: options.jiraHistorySanitizer,
       })
     );
   }
@@ -268,8 +477,13 @@ export function createApp(options: AppOptions): Express {
   if (options.executionService) {
     app.use(
       '/api',
-      authMiddleware,
-      createExecutionRoutes({ executionService: options.executionService })
+      withAuthAndWorkspace,
+      createExecutionRoutes({
+        executionService: options.executionService,
+        pool: dbPool,
+        convRepo: options.convRepo,
+        planRepo: options.planRepo,
+      })
     );
   }
 

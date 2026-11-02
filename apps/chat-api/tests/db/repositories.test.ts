@@ -68,11 +68,13 @@ describe('apps/chat-api (Task 7: Database Repositories with Optimistic Locking)'
   });
 
   describe('ConversationRepo', () => {
+    const validUserId = '11111111-1111-4111-8111-111111111111';
+
     it('treats malformed PostgreSQL UUID conversation ids as not found without querying', async () => {
       const query = vi.fn();
       const repo = new ConversationRepo({ query } as any);
       await expect(repo.getConversation('khong-ton-tai')).resolves.toBeNull();
-      await expect(repo.renameConversation('khong-ton-tai', 'u1', 'Tên hợp lệ')).resolves.toBeNull();
+      await expect(repo.renameConversation('khong-ton-tai', validUserId, 'Tên hợp lệ')).resolves.toBeNull();
       expect(query).not.toHaveBeenCalled();
     });
     it('creates and lists conversations for user', async () => {
@@ -82,7 +84,6 @@ describe('apps/chat-api (Task 7: Database Repositories with Optimistic Locking)'
       const list=await repo.listConversations(owner.id);
       expect(list).toHaveLength(1);expect(list[0]).toMatchObject({id:created.id,user_id:owner.id,title:'Human title'});
       expect(await repo.renameConversation(created.id,other.id,'Wrong owner')).toBeNull();
-
     });
   });
 

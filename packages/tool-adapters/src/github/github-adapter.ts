@@ -4,12 +4,51 @@ import type { BaseAdapterConfig } from '../base-adapter.js';
 
 export interface GitHubAdapterConfig extends BaseAdapterConfig {
   credentials: { token: string };
+  baseUrl?: string;
   fetchFn?: typeof fetch;
 }
 
-const apiBase = 'https://api.github.com';
+const defaultApiBase = 'https://api.github.com';
 const sharedGitHubLimiter = new GlobalRateLimiter({ maxRequests: 5000, windowMs: 60 * 60 * 1000 });
 const repositoryPattern = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+const SAFE_QUALIFIER_RE = /^(?:is:(?:open|closed|issue|pr)|no:assignee|review:(?:none|required)|draft:false|label:[A-Za-z0-9_.-]+|(?:created|updated):(?:>=|<=|>|<)\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}Z)?)$/i;
+
+export function buildIssueSearchQuery(repo: string, rawQuery: string): { q: string; allowPullRequests: boolean } {
+  const trimmed = rawQuery.trim();
+  const lower = trimmed.toLowerCase();
+  if (lower === '*' || lower === 'open') {
+    return { q: `repo:${repo} is:issue is:open`, allowPullRequests: false };
+  }
+  if (lower === 'unassigned') {
+    return { q: `repo:${repo} is:issue is:open no:assignee`, allowPullRequests: false };
+  }
+  if (lower === 'pr' || lower === 'pull request') {
+    return { q: `repo:${repo} is:pr is:open`, allowPullRequests: true };
+  }
+
+  const tokens = trimmed.split(/\s+/).filter(Boolean);
+  const qualifiers: string[] = [];
+  const keywords: string[] = [];
+
+  for (const token of tokens) {
+    if (SAFE_QUALIFIER_RE.test(token)) {
+      qualifiers.push(token);
+    } else {
+      const cleaned = token.replace(/["\\]/g, ' ').trim();
+      if (cleaned) keywords.push(cleaned);
+    }
+  }
+
+  const hasIsPr = qualifiers.some((q) => q.toLowerCase() === 'is:pr');
+  const hasIsIssue = qualifiers.some((q) => q.toLowerCase() === 'is:issue');
+  const typePrefix = hasIsPr || hasIsIssue ? [] : ['is:issue'];
+  const keywordPart = keywords.length > 0 ? [`"${keywords.join(' ')}"`] : [];
+  const parts = [`repo:${repo}`, ...typePrefix, ...qualifiers, ...keywordPart];
+  return {
+    q: parts.join(' '),
+    allowPullRequests: hasIsPr,
+  };
+}
 
 function validRepository(value: unknown): value is string {
   if (typeof value !== 'string' || !repositoryPattern.test(value)) return false;
@@ -41,7 +80,7 @@ function limit(value: unknown): number {
   return value;
 }
 
-function githubIssue(value: any, repo: string, writing: boolean) {
+function githubIssue(value: any, repo: string, writing: boolean, allowPullRequests = false) {
   if (!value || typeof value !== 'object' || !Number.isSafeInteger(value.id) ||
       !Number.isSafeInteger(value.number) || typeof value.title !== 'string' ||
       typeof value.html_url !== 'string') {
@@ -51,7 +90,7 @@ function githubIssue(value: any, repo: string, writing: boolean) {
       retryable: false,
     });
   }
-  if (value.pull_request) validation('GitHub returned a pull request where an issue was required');
+  if (value.pull_request && !allowPullRequests) validation('GitHub returned a pull request where an issue was required');
   return { id: String(value.id), number: value.number as number, title: value.title as string, url: value.html_url as string, repo };
 }
 
@@ -59,11 +98,13 @@ function githubIssue(value: any, repo: string, writing: boolean) {
 export class GitHubAdapter extends BaseAdapter {
   public readonly service = 'github';
   private readonly token: string;
+  private readonly apiBase: string;
   private readonly fetchFn: typeof fetch;
 
   constructor(config: GitHubAdapterConfig) {
     super(config);
     this.token = text(config.credentials?.token, 'token');
+    this.apiBase = (config.baseUrl?.trim() || defaultApiBase).replace(/\/+$/, '');
     this.fetchFn = config.fetchFn ?? globalThis.fetch;
   }
 
@@ -75,7 +116,16 @@ export class GitHubAdapter extends BaseAdapter {
     return repos;
   }
 
-  private checkedRepo(value: unknown): string {
+  private checkedRepo(value: unknown, contextRepo?: unknown): string {
+    if (contextRepo !== undefined && contextRepo !== null) {
+      if (!validRepository(contextRepo)) validation('GitHub repo must be owner/repo');
+      this.allowedRepositories();
+      try {
+        this.assertAllowedScope('repos', contextRepo);
+      } catch {
+        throw new StepError({ message: `GitHub repository '${contextRepo}' is outside allowed scope`, category: 'AUTH_ERROR', statusCode: 403, retryable: false });
+      }
+    }
     if (!validRepository(value)) validation('GitHub repo must be owner/repo');
     this.allowedRepositories();
     try {
@@ -108,7 +158,7 @@ export class GitHubAdapter extends BaseAdapter {
     let response: Response;
     for (let attempt = 0; ; attempt++) {
       try {
-        response = await this.fetchFn(`${apiBase}${path}`, init);
+        response = await this.fetchFn(`${this.apiBase}${path}`, init);
       } catch (cause) {
         throw new StepError({
           message: writing ? 'GitHub write result is unknown after transport failure' : 'GitHub read request failed',
@@ -171,24 +221,25 @@ export class GitHubAdapter extends BaseAdapter {
     return matches;
   }
 
-  async searchIssues(args: { repo: string; query: string; limit?: number }, options?: { signal?: AbortSignal }) {
-    const repo = this.checkedRepo(args.repo);
-    const query = text(args.query, 'query').replace(/["\\]/g, ' ');
+  async searchIssues(args: { repo: string; query: string; limit?: number }, options?: { signal?: AbortSignal; repo?: string }) {
+    const repo = this.checkedRepo(args.repo, options?.repo);
+    const rawQuery = text(args.query, 'query');
     const max = limit(args.limit);
-    const params = new URLSearchParams({ q: `repo:${repo} is:issue "${query}"`, per_page: String(max) });
+    const { q, allowPullRequests } = buildIssueSearchQuery(repo, rawQuery);
+    const params = new URLSearchParams({ q, per_page: String(max) });
     const value = await this.request<any>(`/search/issues?${params}`, options?.signal);
-    const expectedUrl = `${apiBase}/repos/${repo}`;
+    const expectedUrl = `${this.apiBase}/repos/${repo}`;
     if (!Array.isArray(value?.items)) {
       throw new StepError({ message: 'GitHub returned an invalid search response', category: 'SERVER_ERROR', retryable: false });
     }
     return value.items
-      .filter((item: any) => item?.repository_url === expectedUrl && !item.pull_request)
+      .filter((item: any) => item?.repository_url === expectedUrl && (allowPullRequests || !item.pull_request))
       .slice(0, max)
-      .map((item: any) => githubIssue(item, repo, false));
+      .map((item: any) => githubIssue(item, repo, false, allowPullRequests));
   }
 
-  async getIssue(args: { repo: string; issueNumber: number }, options?: { signal?: AbortSignal }) {
-    const repo = this.checkedRepo(args.repo);
+  async getIssue(args: { repo: string; issueNumber: number }, options?: { signal?: AbortSignal; repo?: string }) {
+    const repo = this.checkedRepo(args.repo, options?.repo);
     const number = issueNumber(args.issueNumber);
     const value = await this.request<any>(`/repos/${repo}/issues/${number}`, options?.signal);
     const normalized = githubIssue(value, repo, false);
@@ -199,8 +250,8 @@ export class GitHubAdapter extends BaseAdapter {
     };
   }
 
-  async createIssue(args: { repo: string; title: string; body?: string; labels?: string[] }, options?: { signal?: AbortSignal }) {
-    const repo = this.checkedRepo(args.repo);
+  async createIssue(args: { repo: string; title: string; body?: string; labels?: string[] }, options?: { signal?: AbortSignal; repo?: string }) {
+    const repo = this.checkedRepo(args.repo, options?.repo);
     const title = text(args.title, 'title');
     if (args.body !== undefined && typeof args.body !== 'string') validation('GitHub body must be a string');
     if (args.labels !== undefined && (!Array.isArray(args.labels) || args.labels.some((label) => typeof label !== 'string' || !label.trim()))) {
@@ -214,8 +265,8 @@ export class GitHubAdapter extends BaseAdapter {
     return githubIssue(value, repo, true);
   }
 
-  async addLabel(args: { repo: string; issueNumber: number; label: string }, options?: { signal?: AbortSignal }) {
-    const repo = this.checkedRepo(args.repo);
+  async addLabel(args: { repo: string; issueNumber: number; label: string }, options?: { signal?: AbortSignal; repo?: string }) {
+    const repo = this.checkedRepo(args.repo, options?.repo);
     const number = issueNumber(args.issueNumber);
     const label = text(args.label, 'label');
     const value = await this.request<any>(`/repos/${repo}/issues/${number}/labels`, options?.signal, { labels: [label] });
@@ -229,7 +280,7 @@ export class GitHubAdapter extends BaseAdapter {
     return { number, labels, repo, url: `https://github.com/${repo}/issues/${number}` };
   }
 
-  override async execute(toolName: string, args: Record<string, any>, context?: { signal?: AbortSignal }): Promise<any> {
+  override async execute(toolName: string, args: Record<string, any>, context?: { signal?: AbortSignal; repo?: string }): Promise<any> {
     switch (toolName) {
       case 'github.search_repos': return this.searchRepos(args as any, context);
       case 'github.search_issues': return this.searchIssues(args as any, context);

@@ -37,6 +37,66 @@ export const MYSHEETS_ENDPOINTS = {
 };
 const MYSHEETS_ENDPOINT_OVERRIDES = { authorizationUrl: 'MYSHEETS_OAUTH_AUTH_URL', tokenUrl: 'MYSHEETS_OAUTH_TOKEN_URL', revokeUrl: 'MYSHEETS_OAUTH_REVOKE_URL', apiBaseUrl: 'MYSHEETS_API_BASE_URL' } as const;
 
+export interface TrelloOAuthConfig {
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+  authorizationUrl: string;
+  tokenUrl: string;
+  apiBaseUrl: string;
+}
+export const TRELLO_ENDPOINTS = {
+  authorizationUrl: 'https://auth.atlassian.com/authorize',
+  tokenUrl: 'https://auth.atlassian.com/oauth/token',
+  apiBaseUrl: 'https://api.trello.com/1',
+};
+const TRELLO_ENDPOINT_OVERRIDES = { authorizationUrl: 'TRELLO_OAUTH_AUTH_URL', tokenUrl: 'TRELLO_OAUTH_TOKEN_URL', apiBaseUrl: 'TRELLO_API_BASE_URL' } as const;
+
+export interface GitHubOAuthConfig {
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+  authorizationUrl: string;
+  tokenUrl: string;
+  apiBaseUrl: string;
+  scope: string;
+}
+export const GITHUB_ENDPOINTS = {
+  authorizationUrl: 'https://github.com/login/oauth/authorize',
+  tokenUrl: 'https://github.com/login/oauth/access_token',
+  apiBaseUrl: 'https://api.github.com',
+};
+export const GITHUB_OAUTH_DEFAULT_SCOPE = 'repo read:user';
+const GITHUB_ENDPOINT_OVERRIDES = { authorizationUrl: 'GITHUB_OAUTH_AUTH_URL', tokenUrl: 'GITHUB_OAUTH_TOKEN_URL', apiBaseUrl: 'GITHUB_API_BASE_URL' } as const;
+
+export interface TelegramBotConfig {
+  botToken: string;
+  botUsername: string;
+  callbackUrl: string;
+  apiBaseUrl: string;
+  deepLinkBaseUrl: string;
+}
+export const TELEGRAM_ENDPOINTS = {
+  apiBaseUrl: 'https://api.telegram.org',
+  deepLinkBaseUrl: 'https://t.me',
+};
+
+export interface JiraOAuthConfig {
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+  mode?: 'live' | 'fixture';
+  fixtureBaseUrl?: string;
+  timeoutMs?: number;
+}
+export const JIRA_ENDPOINTS = {
+  authorizationUrl: 'https://auth.atlassian.com/authorize',
+  tokenUrl: 'https://auth.atlassian.com/oauth/token',
+  apiBaseUrl: 'https://api.atlassian.com',
+  meUrl: 'https://api.atlassian.com/me',
+  accessibleResourcesUrl: 'https://api.atlassian.com/oauth/token/accessible-resources',
+};
+
 export interface EnvConfig {
   MYSLACK_OAUTH?: SlackOAuthConfig;
   DATABASE_URL: string;
@@ -68,6 +128,12 @@ export interface EnvConfig {
   /** Complete only when the flag is on; sandbox also needs every fake endpoint. Missing in sandbox means 503. */
   MYSHEETS_OAUTH?: GmailOAuthConfig;
   MYSHEETS_PICKER?: { apiKey: string; appId: string };
+  TRELLO_OAUTH?: TrelloOAuthConfig;
+  GITHUB_OAUTH?: GitHubOAuthConfig;
+  TELEGRAM_BOT?: TelegramBotConfig;
+  /** The MYJIRA_ENABLED flag (default off). */
+  MYJIRA_ENABLED: boolean;
+  JIRA_OAUTH?: JiraOAuthConfig;
   /** The SCHEDULES_ENABLED flag (default off). Schedules also need PostgreSQL. */
   SCHEDULES_ENABLED: boolean;
   /** False only in live without SMTP: signup and every email route answer 503 (AUTH-02b). Sandbox uses the outbox. */
@@ -204,6 +270,19 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
   if (isLive && (MYCALENDAR_ENABLED || MYSHEETS_ENABLED)) validatePersonalGoogleProjects(env);
   if (env.SCHEDULES_ENABLED && !['on', 'off'].includes(env.SCHEDULES_ENABLED)) throw new Error('SCHEDULES_ENABLED must be on or off');
   const SCHEDULES_ENABLED = env.SCHEDULES_ENABLED === 'on';
+  const TRELLO_OAUTH = trelloOAuth(env, isLive);
+  const GITHUB_OAUTH = githubOAuth(env, isLive);
+  const TELEGRAM_BOT = telegramBotConfig(env, isLive);
+  if (env.MYJIRA_ENABLED && !['on', 'off'].includes(env.MYJIRA_ENABLED)) throw new Error('MYJIRA_ENABLED must be on or off');
+  const MYJIRA_ENABLED = env.MYJIRA_ENABLED === 'on';
+  if (isLive && MYJIRA_ENABLED) {
+    const required = ['JIRA_OAUTH_CLIENT_ID', 'JIRA_OAUTH_CLIENT_SECRET', 'JIRA_OAUTH_REDIRECT_URI'];
+    const missing = required.find((f) => !env[f]?.trim());
+    if (missing) {
+      throw new Error(`${missing} is required when MYJIRA_ENABLED=on in live mode`);
+    }
+  }
+  const JIRA_OAUTH = jiraOAuth(env, isLive);
 
   return {
     MYSLACK_OAUTH: slackOAuthEnv(env, isLive),
@@ -227,6 +306,11 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
     MYSHEETS_ENABLED,
     MYSHEETS_OAUTH,
     MYSHEETS_PICKER,
+    TRELLO_OAUTH,
+    GITHUB_OAUTH,
+    TELEGRAM_BOT,
+    MYJIRA_ENABLED,
+    JIRA_OAUTH,
     SCHEDULES_ENABLED,
     EMAIL_ENABLED,
     APP_BASE_URL,
@@ -395,4 +479,232 @@ function mysheetsPicker(env: Record<string, string | undefined>, isLive: boolean
     return { apiKey: apiKey || 'fake-picker-api-key', appId: appId && /^\d+$/.test(appId) ? appId : '1234567890' };
   }
   return undefined;
+}
+
+function trelloOAuth(env: Record<string, string | undefined>, isLive: boolean): TrelloOAuthConfig | undefined {
+  const clientId = env.TRELLO_OAUTH_CLIENT_ID?.trim();
+  const clientSecret = env.TRELLO_OAUTH_CLIENT_SECRET?.trim();
+  const rawRedirect = env.TRELLO_OAUTH_REDIRECT_URI?.trim();
+
+  if (!clientId || !clientSecret || !rawRedirect) {
+    return undefined;
+  }
+
+  let redirectUri: string;
+  try {
+    const url = new URL(rawRedirect);
+    const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname);
+    if (
+      !['http:', 'https:'].includes(url.protocol) ||
+      (url.protocol === 'http:' && !loopback) ||
+      url.username ||
+      url.password ||
+      url.pathname !== '/connections/trello/callback' ||
+      url.search ||
+      url.hash
+    ) {
+      throw new Error();
+    }
+    redirectUri = url.href;
+  } catch {
+    throw new Error('TRELLO_OAUTH_REDIRECT_URI must be the web /connections/trello/callback URL without query, fragment or credentials (HTTPS, or loopback HTTP)');
+  }
+
+  const endpoints = { ...TRELLO_ENDPOINTS };
+  if (!isLive) {
+    let missingOverride = false;
+    for (const [key, field] of Object.entries(TRELLO_ENDPOINT_OVERRIDES)) {
+      const val = env[field]?.trim();
+      if (!val) {
+        missingOverride = true;
+        continue;
+      }
+      try {
+        const url = new URL(val);
+        if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.hash) throw new Error();
+        endpoints[key as keyof typeof endpoints] = url.href.replace(/\/$/, '');
+      } catch {
+        throw new Error(`${field} must be an HTTP(S) endpoint without credentials or fragment`);
+      }
+    }
+    if (missingOverride) return undefined;
+  }
+
+  return {
+    clientId,
+    clientSecret,
+    redirectUri,
+    ...endpoints,
+  };
+}
+
+function githubOAuth(env: Record<string, string | undefined>, isLive: boolean): GitHubOAuthConfig | undefined {
+  const clientId = env.GITHUB_OAUTH_CLIENT_ID?.trim();
+  const clientSecret = env.GITHUB_OAUTH_CLIENT_SECRET?.trim();
+  const rawRedirect = env.GITHUB_OAUTH_REDIRECT_URI?.trim();
+
+  if (!clientId || !clientSecret || !rawRedirect) {
+    return undefined;
+  }
+
+  let redirectUri: string;
+  try {
+    const url = new URL(rawRedirect);
+    const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname);
+    if (
+      !['http:', 'https:'].includes(url.protocol) ||
+      (url.protocol === 'http:' && !loopback) ||
+      url.username ||
+      url.password ||
+      url.pathname !== '/connections/github/callback' ||
+      url.search ||
+      url.hash
+    ) {
+      throw new Error();
+    }
+    redirectUri = url.href;
+  } catch {
+    throw new Error('GITHUB_OAUTH_REDIRECT_URI must be the web /connections/github/callback URL without query, fragment or credentials (HTTPS, or loopback HTTP)');
+  }
+
+  const endpoints = { ...GITHUB_ENDPOINTS };
+  if (!isLive) {
+    let missingOverride = false;
+    for (const [key, field] of Object.entries(GITHUB_ENDPOINT_OVERRIDES)) {
+      const val = env[field]?.trim();
+      if (!val) {
+        missingOverride = true;
+        continue;
+      }
+      try {
+        const url = new URL(val);
+        if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.hash) throw new Error();
+        endpoints[key as keyof typeof endpoints] = url.href.replace(/\/$/, '');
+      } catch {
+        throw new Error(`${field} must be an HTTP(S) endpoint without credentials or fragment`);
+      }
+    }
+    if (missingOverride) return undefined;
+  }
+
+  const scope = env.GITHUB_OAUTH_SCOPE?.trim() || GITHUB_OAUTH_DEFAULT_SCOPE;
+
+  return {
+    clientId,
+    clientSecret,
+    redirectUri,
+    ...endpoints,
+    scope,
+  };
+}
+
+function telegramBotConfig(env: Record<string, string | undefined>, isLive: boolean): TelegramBotConfig | undefined {
+  const botToken = env.TELEGRAM_BOT_TOKEN?.trim();
+  const rawUsername = env.TELEGRAM_BOT_USERNAME?.trim().replace(/^@/, '');
+  const rawCallback = env.TELEGRAM_WEB_CALLBACK_URL?.trim();
+
+  if (!botToken || !rawUsername || !rawCallback) {
+    return undefined;
+  }
+
+  if (!/^\d{1,20}:[A-Za-z0-9_-]{10,200}$/.test(botToken)) {
+    return undefined;
+  }
+
+  if (!/^[A-Za-z][A-Za-z0-9_]{2,31}$/.test(rawUsername)) {
+    return undefined;
+  }
+
+  let callbackUrl: string;
+  try {
+    const url = new URL(rawCallback);
+    const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname);
+    if (
+      !['http:', 'https:'].includes(url.protocol) ||
+      (url.protocol === 'http:' && !loopback) ||
+      url.username ||
+      url.password ||
+      url.pathname !== '/connections/telegram/callback' ||
+      url.search ||
+      url.hash
+    ) {
+      throw new Error();
+    }
+    callbackUrl = url.href;
+  } catch {
+    throw new Error('TELEGRAM_WEB_CALLBACK_URL must be the web /connections/telegram/callback URL without query, fragment or credentials (HTTPS, or loopback HTTP)');
+  }
+
+  const endpoints = { ...TELEGRAM_ENDPOINTS };
+  if (!isLive) {
+    const rawApiBase = env.TELEGRAM_API_BASE_URL?.trim();
+    if (!rawApiBase) {
+      return undefined;
+    }
+    try {
+      const url = new URL(rawApiBase);
+      if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.hash) throw new Error();
+      endpoints.apiBaseUrl = url.href.replace(/\/$/, '');
+    } catch {
+      throw new Error('TELEGRAM_API_BASE_URL must be an HTTP(S) endpoint without credentials or fragment');
+    }
+
+    const rawDeepLinkBase = env.TELEGRAM_DEEPLINK_BASE_URL?.trim();
+    if (rawDeepLinkBase) {
+      try {
+        const url = new URL(rawDeepLinkBase);
+        if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.hash) throw new Error();
+        endpoints.deepLinkBaseUrl = url.href.replace(/\/$/, '');
+      } catch {
+        throw new Error('TELEGRAM_DEEPLINK_BASE_URL must be an HTTP(S) endpoint without credentials or fragment');
+      }
+    }
+  }
+
+  return {
+    botToken,
+    botUsername: rawUsername,
+    callbackUrl,
+    ...endpoints,
+  };
+}
+
+function jiraOAuth(env: Record<string, string | undefined>, isLive: boolean): JiraOAuthConfig | undefined {
+  const clientId = env.JIRA_OAUTH_CLIENT_ID?.trim();
+  const clientSecret = env.JIRA_OAUTH_CLIENT_SECRET?.trim();
+  const rawRedirect = env.JIRA_OAUTH_REDIRECT_URI?.trim();
+
+  if (!clientId || !clientSecret || !rawRedirect) {
+    return undefined;
+  }
+
+  let redirectUri: string;
+  try {
+    const url = new URL(rawRedirect);
+    const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname);
+    if (
+      !['http:', 'https:'].includes(url.protocol) ||
+      (url.protocol === 'http:' && !loopback) ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash
+    ) {
+      throw new Error();
+    }
+    redirectUri = url.href;
+  } catch {
+    throw new Error('JIRA_OAUTH_REDIRECT_URI must be an HTTP(S) URL without query, fragment or credentials (HTTPS, or loopback HTTP)');
+  }
+
+  const mode = isLive ? 'live' : (env.JIRA_OAUTH_MODE === 'fixture' ? 'fixture' : 'live');
+  const fixtureBaseUrl = env.JIRA_OAUTH_FIXTURE_BASE_URL?.trim();
+
+  return {
+    clientId,
+    clientSecret,
+    redirectUri,
+    mode,
+    fixtureBaseUrl: mode === 'fixture' ? fixtureBaseUrl : undefined,
+  };
 }

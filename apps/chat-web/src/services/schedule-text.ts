@@ -30,7 +30,28 @@ export function scheduleLabel(s: ScheduleView): string {
     : s.status === 'paused' ? `Đã tạm dừng${s.pauseReason ? `: ${s.pauseReason}` : ''}` : s.status === 'cancelled' ? 'Đã hủy' : 'Đã chạy xong';
 }
 export function runLabel(run: ScheduleRunView): string {
+  if (run.state === 'needs_attention' && run.error) return run.error;
   if (run.state === 'approved') return ({ executing: 'Đang chạy', approved: 'Đang chạy', completed: 'Đã xong', partial: 'Xong một phần', failed: 'Có lỗi', stopped: 'Đã dừng', reconciliation_required: 'Cần đối soát' } as Record<string, string>)[run.planStatus ?? ''] ?? 'Đang chạy';
   if (run.state === 'missed') return run.missedCount > 1 ? `Đã lỡ ${run.missedCount} lượt` : 'Đã lỡ';
+  if (run.state === 'digest_sent') {
+    if (run.delivery && 'totalEvents' in run.delivery) {
+      const conflictNote = run.delivery.conflictCount > 0 ? ` (${run.delivery.conflictCount} trùng lịch)` : '';
+      return `Đã tự gửi bản tin · ${run.delivery.totalEvents} sự kiện${conflictNote}`;
+    }
+    if (run.delivery && 'counts' in run.delivery && run.delivery.counts) {
+      const counts = run.delivery.counts;
+      const total = counts.newIssues + counts.stalePrs + counts.unassignedIssues;
+      return `Đã gửi · ${total} mục`;
+    }
+    if (run.delivery && ('chatId' in run.delivery || 'sources' in run.delivery)) {
+      return 'Đã gửi';
+    }
+    return 'Đã tự gửi báo cáo';
+  }
+  if (run.state === 'digest_failed') {
+    return /telegram/i.test(run.error ?? '') || (run.delivery && 'chatId' in run.delivery)
+      ? 'Gửi thất bại'
+      : 'Gửi báo cáo thất bại';
+  }
   return ({ planning: 'Đang lập kế hoạch', awaiting_approval: 'Chờ bạn duyệt', expired: 'Hết hạn duyệt', rejected: 'Bạn đã hủy kế hoạch', needs_attention: 'Cần bạn xem', planning_failed: 'Không lập được kế hoạch', interrupted: 'Bị gián đoạn', discarded: 'Đã bỏ vì lịch thay đổi', blocked: 'Bị chặn' } as Record<string, string>)[run.state];
 }

@@ -2,11 +2,23 @@ import { usePrototypePage, type PageMeta } from '../../prototype/usePrototypePag
 import { MainNav } from '../../components/layout/MainNav';
 import type { User } from '../../types';
 import css from './page.css?inline';
-import type { MouseEvent as ReactMouseEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useState, type MouseEvent as ReactMouseEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { Conversation } from '../../types';
 import { formatConversationTime } from '../../services/conversation-time';
 import { useHistory } from './useHistory';
 import { ScheduleSection } from './ScheduleSection';
+
+function statusBadgeClass(status?: string): string {
+  if (status === 'completed') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+  if (status === 'partial' || status === 'failed' || status === 'reconciliation_required') {
+    return 'bg-amber-50 text-amber-800 border-amber-200';
+  }
+  if (status === 'executing' || status === 'planning') {
+    return 'bg-orange-50 text-[#FF5701] border-orange-200';
+  }
+  return 'bg-neutral-100 text-neutral-700 border-neutral-200';
+}
+
 function RequestCard({ req, isEditing, actions, title, saving }: { req: HistoryRow; isEditing: boolean; actions: CardActions; title: string; saving: boolean }) {
   const rawTitle = req.title || 'Hội thoại mới';
   const displayTitle = rawTitle.length > 60 ? rawTitle.slice(0, 60) + '…' : rawTitle;
@@ -15,7 +27,7 @@ function RequestCard({ req, isEditing, actions, title, saving }: { req: HistoryR
       {/* Cụm trái: Trạng thái, Thời gian, Tiêu đề hội thoại, Kết quả */}
       <div className="v3-space-y-2 flex-1 min-w-0">
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border bg-neutral-100 text-neutral-700 border-neutral-200`}>{req.statusLabel}</span>
+          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${statusBadgeClass(req.status)}`}>{req.statusLabel}</span>
           <span className="text-[#9CA3AF]">·</span>
           <span className="text-[#6B7280] font-medium">{req.timeStr}</span>
         </div>
@@ -87,9 +99,16 @@ export interface HistoryPageProps { user: User | null; navigate: (path: string) 
 export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
   usePrototypePage(meta);
   const { rows, search, setSearch, cursor, loading, error, notice, editing, title, setTitle, saving, edit, cancel, rename, loadMore } = useHistory(user);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'needs_action' | 'chatting'>('all');
   const role = user?.role ?? 'member';
   const day = new Date(); day.setHours(0,0,0,0); const yesterday = new Date(day); yesterday.setDate(yesterday.getDate() - 1);
-  const displayed: HistoryRow[] = rows.map(row => { const value = row.updatedAt ?? row.updated_at ?? row.created_at; const time = value ? new Date(value).getTime() : NaN; return { ...row, timeStr: formatConversationTime(value), dateGroup: time >= day.getTime() ? 'today' : time >= yesterday.getTime() ? 'yesterday' : 'older', statusLabel: STATUS_LABEL[row.status ?? ''] ?? 'Hội thoại' }; });
+  const allDisplayed: HistoryRow[] = rows.map(row => { const value = row.updatedAt ?? row.updated_at ?? row.created_at; const time = value ? new Date(value).getTime() : NaN; return { ...row, timeStr: formatConversationTime(value), dateGroup: time >= day.getTime() ? 'today' : time >= yesterday.getTime() ? 'yesterday' : 'older', statusLabel: STATUS_LABEL[row.status ?? ''] ?? 'Hội thoại' }; });
+  const displayed = allDisplayed.filter(row => {
+    if (statusFilter === 'completed') return row.status === 'completed';
+    if (statusFilter === 'needs_action') return row.status === 'partial' || row.status === 'failed' || row.status === 'reconciliation_required';
+    if (statusFilter === 'chatting') return !row.status || row.status === 'chatting' || row.status === 'planning' || row.status === 'executing';
+    return true;
+  });
   const actions: CardActions & { loadMoreRequests: () => void } = {
     startInlineRename(id, event) { event.stopPropagation(); edit(id); },
     handleRenameKey(event, id) { if (event.nativeEvent.isComposing) return; if (event.key === 'Enter') { event.preventDefault(); void rename(id); } if (event.key === 'Escape') { event.preventDefault(); cancel(); } },
@@ -167,6 +186,29 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
               </div>
               {' '}
               <input value={search} onChange={event => setSearch(event.target.value)} type="search" id="search-input" placeholder="Tìm theo tiêu đề hội thoại…" className="w-full text-xs sm:text-sm pl-10 pr-4 py-2.5 bg-[#F8F8F6] border border-[#E7E7E2] rounded-xl text-[#111827] focus:bg-white focus:v3-outline-none focus:border-[#FF5701] transition-all" />
+            </div>
+            {/* Bộ lọc nhanh theo nhóm kết quả */}
+            <div role="group" aria-label="Bộ lọc trạng thái hội thoại" className="flex flex-wrap items-center gap-1.5">
+              {([
+                { key: 'all', label: 'Tất cả' },
+                { key: 'completed', label: 'Hoàn thành' },
+                { key: 'needs_action', label: 'Cần xử lý' },
+                { key: 'chatting', label: 'Đang trao đổi' },
+              ] as const).map(pill => (
+                <button
+                  key={pill.key}
+                  type="button"
+                  aria-pressed={statusFilter === pill.key}
+                  onClick={() => setStatusFilter(pill.key)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border ${
+                    statusFilter === pill.key
+                      ? 'bg-[#111827] text-white border-[#111827]'
+                      : 'bg-[#F8F8F6] text-[#4B5563] border-[#E7E7E2] hover:bg-neutral-200/70'
+                  }`}
+                >
+                  {pill.label}
+                </button>
+              ))}
             </div>
           </div>
         </div>

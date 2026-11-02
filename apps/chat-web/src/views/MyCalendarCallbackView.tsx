@@ -169,6 +169,28 @@ export function MyCalendarCallbackView({
     }
   };
 
+  const handleQuickSelectPrimary = async () => {
+    if (!mounted.current || invalidated.current || !owns.current() || saving) return;
+    setSaving(true);
+    setSaveError('');
+    try {
+      const res = await apiClient.selectPrimaryMyCalendar();
+      if (!mounted.current || invalidated.current || !owns.current()) return;
+      mycalendarConnectionNotice.set(res.email || email);
+      const target = returnToRef.current ?? '/settings#mycalendar';
+      navigate(target, true);
+    } catch (err: any) {
+      if (mounted.current && !invalidated.current && owns.current()) {
+        setSaveError(
+          err?.data?.error ||
+            err?.message ||
+            'Không thể chọn nhanh Lịch chính. Vui lòng thử lại.'
+        );
+        setSaving(false);
+      }
+    }
+  };
+
   const handleLater = () => {
     navigate('/settings#mycalendar', true);
   };
@@ -271,7 +293,18 @@ export function MyCalendarCallbackView({
             </p>
           )}
 
-          <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+          <div className="pt-2 flex flex-col sm:flex-row items-center gap-3 flex-wrap">
+            {calendars.length > 0 && (
+              <button
+                id="mycalendar-quick-primary"
+                type="button"
+                disabled={saving}
+                onClick={() => void handleQuickSelectPrimary()}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
+              >
+                Dùng ngay Lịch chính (1 chạm)
+              </button>
+            )}
             <button
               type="button"
               disabled={selectedIds.length === 0 || saving}

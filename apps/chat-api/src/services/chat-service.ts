@@ -6,14 +6,18 @@ import { messageOutputSelectors, memoryOutputSelectors, messageSelectorValue, me
 import type { ConversationRepo } from '../db/repositories/conversation-repo.js';
 import type { PlanRepo } from '../db/repositories/plan-repo.js';
 import type { ScheduleRepo } from '../db/repositories/schedule-repo.js';
+import type { WorkspaceRepo } from '../db/repositories/workspace-repo.js';
 import { WorkingMemory, unroutable, type ChatMessage, type ProcessMessageInput, type RoutedIntent } from '@wap/planner';
-import type { PersonalSpreadsheetItem, PlanConnections, PlannerResponse, PlanResponse, PlanStep, ScheduleProposalMetadata, ScheduleResponse, ScheduleView } from '@wap/tool-schemas';
+import type { CalendarDigestCandidate, PersonalSpreadsheetItem, PlanConnections, PlannerResponse, PlanResponse, PlanStep, ScheduleProposalMetadata, ScheduleResponse, ScheduleView } from '@wap/tool-schemas';
 import { resourceLabels } from './resource-labels.js';
 import { nextRuns } from './schedules/next-occurrence.js';
 import { runMessage, type PreparedRun, type RunToPlan } from './schedules/schedule-runner.js';
+import { evaluateGithubDigestCandidate } from './schedules/github-digest-candidate.js';
+import { evaluateTelegramDigestCandidate } from './schedules/telegram-digest-candidate.js';
 import { resolveRef } from '@wap/executor';
-import type {SlackWriteRuntime} from './slack/slack-write-runtime.js';
+import type { SlackWriteRuntime } from './slack/slack-write-runtime.js';
 import type { SlackReadProposalService } from './slack/slack-read-proposals.js';
+import { eventsOverlap } from '@wap/tool-adapters';
 
 /** Only the server writes plan connections; the model's version is never kept or shown back to it. */
 function withoutConnections(plan: PlanResponse): PlanResponse {
@@ -128,6 +132,7 @@ export interface ChatServiceOptions {
   msgRepo: MessageRepo;
   convRepo?: ConversationRepo;
   planRepo?: PlanRepo;
+  workspaceRepo?: WorkspaceRepo;
   planner: ChatPlanner;
   eventEmitter: {
     emit: (event: string, payload: any) => void;
@@ -142,8 +147,22 @@ export interface ChatServiceOptions {
     lookupSpreadsheets?: (query?: string, limit?: number, context?: { signal?: AbortSignal }) => Promise<Array<{ id: string; title: string; url?: string }>>;
     getAdapter?: () => Promise<any> | any;
   }) | null>;
+  /** The caller's active Trello connection lookup; absent when Trello is off or not connected. */
+  trelloConnection?: (userId: string, scopeId?: string) => Promise<any>;
+  /** The caller's active GitHub connection lookup; absent when GitHub is off or not connected. */
+  githubConnection?: (userId: string) => Promise<any>;
+  /** The caller's active Telegram connection lookup; absent when Telegram is off or not connected. */
+  telegramConnection?: (userId: string) => Promise<any>;
   /** Scheduled workflows (SCHEDULES_ENABLED); absent, conversations have no schedule. */
-  schedules?: { repo: ScheduleRepo; timeZone: string; now?: () => Date };
+  schedules?: {
+    repo: ScheduleRepo;
+    timeZone: string;
+    now?: () => Date;
+    credentialRepo?: any;
+    encryptionKey?: string;
+    mysheetsEnabled?: boolean;
+    evaluateDigestCandidate?: (input: { userId: string; services: string[]; request: string }) => Promise<CalendarDigestCandidate | undefined>;
+  };
   /** Optional adapter retriever or tool executor for live resource validation in planning. */
   getAdapter?: (serviceName: string, context?: any) => Promise<any> | any;
   lookupTool?: (userId: string, tool: string, args: Record<string, unknown>, context?: { signal?: AbortSignal }) => Promise<unknown>;
@@ -165,11 +184,15 @@ export class ChatService {
   private msgRepo: MessageRepo;
   private convRepo?: ConversationRepo;
   private planRepo?: PlanRepo;
+  private workspaceRepo?: WorkspaceRepo;
   private planner: ChatPlanner;
   private eventEmitter: { emit: (event: string, payload: any) => void };
   private gmailConnection?: ChatServiceOptions['gmailConnection'];
   private mycalendarConnection?: ChatServiceOptions['mycalendarConnection'];
   private mysheetsConnection?: ChatServiceOptions['mysheetsConnection'];
+  private trelloConnection?: ChatServiceOptions['trelloConnection'];
+  private githubConnection?: ChatServiceOptions['githubConnection'];
+  private telegramConnection?: ChatServiceOptions['telegramConnection'];
   private schedules?: ChatServiceOptions['schedules'];
   private getAdapter?: ChatServiceOptions['getAdapter'];
   private lookupTool?: ChatServiceOptions['lookupTool'];
@@ -182,12 +205,16 @@ export class ChatService {
     this.gmailConnection = options.gmailConnection;
     this.mycalendarConnection = options.mycalendarConnection;
     this.mysheetsConnection = options.mysheetsConnection;
+    this.trelloConnection = options.trelloConnection;
+    this.githubConnection = options.githubConnection;
+    this.telegramConnection = options.telegramConnection;
     this.getAdapter = options.getAdapter;
     this.lookupTool = options.lookupTool;
     this.mysheetsLookupTimeoutMs = options.mysheetsLookupTimeoutMs ?? 10_000;
     this.msgRepo = options.msgRepo;
     this.convRepo = options.convRepo;
     this.planRepo = options.planRepo;
+    this.workspaceRepo = options.workspaceRepo;
     this.planner = options.planner;
     this.eventEmitter = options.eventEmitter;
     this.schedules = options.schedules;
@@ -195,6 +222,15 @@ export class ChatService {
 
   async handleUserMessage(input: HandleUserMessageInput): Promise<IngestionResult> {
     const { conversationId, userId, content, requestId } = input;
+    if (this.convRepo && this.workspaceRepo) {
+      const conv = await this.convRepo.getConversation(conversationId);
+      if (conv?.workspace_mode === 'organization' && conv.workspace_id) {
+        const member = await this.workspaceRepo.findMember(conv.workspace_id, userId);
+        if (!member || member.status !== 'active') {
+          throw Object.assign(new Error('WORKSPACE_ACCESS_DENIED'), { status: 403 });
+        }
+      }
+    }
 
     // 1. Save user message immediately to DB
     const message = requestId
@@ -263,23 +299,38 @@ export class ChatService {
 
   /**
    * After validation, before labels, hash and storage: drop any connections
-   * the model wrote and record the connection a Gmail, MyCalendar or MySheets step will use,
+   * the model wrote and record the connection a Gmail, MyCalendar, MySheets or Trello step will use,
    * so the integrity check covers it. Without one the plan is refused, not saved.
    */
-  private async bindConnections(plan: PlanResponse, userId: string, signal?: AbortSignal): Promise<PlannerResponse> {
+  private async bindConnections(
+    plan: PlanResponse,
+    userId: string,
+    signal?: AbortSignal,
+    memory?: WorkingMemory,
+    onTrelloTeamBoards?: (boards: Array<{ boardId: string; boardName: string }>) => void,
+    scopeId = 'default',
+    onGitHubTeamRepos?: (repos: Array<{ repoId: string; fullName: string; name: string }>) => void,
+    onTelegramChats?: (chats: Array<{ chatId: string; title: string }>) => void,
+  ): Promise<PlannerResponse> {
     signal?.throwIfAborted();
     const bound = withoutConnections(plan);
     const usesGmail = bound.steps.some((step) => step.tool.startsWith('gmail.'));
     const usesMyCalendar = bound.steps.some((step) => step.tool.startsWith('mycalendar.'));
     const usesMySheets = bound.steps.some((step) => step.tool.startsWith('mysheets.'));
+    const usesTrello = bound.steps.some((step) => step.tool.startsWith('trello.'));
+    const usesGitHub = bound.steps.some((step) => step.tool.startsWith('github.'));
+    const usesTelegram = bound.steps.some((step) => step.tool.startsWith('telegram.'));
 
-    if (!usesGmail && !usesMyCalendar && !usesMySheets) return bound;
+    if (!usesGmail && !usesMyCalendar && !usesMySheets && !usesTrello && !usesGitHub && !usesTelegram) return bound;
 
     const unavailableServices: Array<{ id: string; name: string }> = [];
     const reasons: string[] = [];
     let gmailConn: NonNullable<PlanConnections['gmail']> | undefined;
     let mycalConn: NonNullable<PlanConnections['mycalendar']> | undefined;
     let mysheetsConn: NonNullable<PlanConnections['mysheets']> | undefined;
+    let trelloConn: NonNullable<PlanConnections['trello']> | undefined;
+    let githubConn: NonNullable<PlanConnections['github']> | undefined;
+    let telegramConn: NonNullable<PlanConnections['telegram']> | undefined;
 
     if (usesGmail) {
       const gmail = await this.gmailConnection?.(userId);
@@ -312,7 +363,69 @@ export class ChatService {
             unavailableServices: [{ id: 'mycalendar', name: 'Google Calendar của bạn' }],
           };
         }
-        mycalConn = mycal;
+        mycalConn = {
+          credentialId: mycal.credentialId,
+          email: mycal.email,
+          allowedCalendars: mycal.allowedCalendars,
+        };
+
+        const createEventSteps = bound.steps.filter(
+          (step) =>
+            step.tool === 'mycalendar.create_event' &&
+            typeof step.args?.calendarId === 'string' &&
+            typeof step.args?.start === 'string' &&
+            typeof step.args?.end === 'string'
+        );
+        if (createEventSteps.length > 0 && (this.lookupTool || this.getAdapter)) {
+          for (const createStep of createEventSteps) {
+            try {
+              const calId = String(createStep.args.calendarId);
+              const slotStart = String(createStep.args.start);
+              const slotEnd = String(createStep.args.end);
+              const conflictDeadline = AbortSignal.timeout(5_000);
+              const conflictSignal = signal ? AbortSignal.any([signal, conflictDeadline]) : conflictDeadline;
+              let rawResult: any;
+              if (this.lookupTool) {
+                rawResult = await this.lookupTool(
+                  userId,
+                  'mycalendar.list_events',
+                  { calendarId: calId, timeMin: slotStart, timeMax: slotEnd, limit: 20 },
+                  { signal: conflictSignal }
+                );
+              } else if (this.getAdapter) {
+                const adapter = await this.getAdapter('mycalendar', {
+                  actor: { userId },
+                  connections: { mycalendar: mycalConn },
+                });
+                if (adapter) {
+                  rawResult = await adapter.execute(
+                    'mycalendar.list_events',
+                    { calendarId: calId, timeMin: slotStart, timeMax: slotEnd, limit: 20 },
+                    { signal: conflictSignal }
+                  );
+                }
+              }
+              const existingEvents: Array<{ title: string; start: string; end: string }> = Array.isArray(rawResult?.events)
+                ? rawResult.events
+                : [];
+              const overlapping = existingEvents.filter((ev) =>
+                typeof ev?.start === 'string' &&
+                typeof ev?.end === 'string' &&
+                eventsOverlap({ start: ev.start, end: ev.end }, { start: slotStart, end: slotEnd })
+              );
+              if (overlapping.length > 0) {
+                const stepTitle = String(createStep.args.summary || createStep.description || 'Sự kiện mới');
+                const titles = overlapping.map((ev) => `"${ev.title}"`).join(', ');
+                bound.warnings = [
+                  ...(bound.warnings ?? []),
+                  `Cảnh báo trùng lịch: Sự kiện "${stepTitle}" (${slotStart} – ${slotEnd}) trùng giờ với ${overlapping.length} sự kiện hiện có trên lịch: ${titles}.`,
+                ];
+              }
+            } catch {
+              // Non-fatal: if conflict pre-check times out or fails, planning still proceeds.
+            }
+          }
+        }
       }
     }
 
@@ -409,6 +522,281 @@ export class ChatService {
       }
     }
 
+    if (usesTrello && this.trelloConnection) {
+      const trello = await this.trelloConnection(userId, scopeId);
+      if (!trello || trello.status === 'not_connected' || trello.status === 'reconnect_required') {
+        unavailableServices.push({ id: 'trello', name: 'Trello' });
+        reasons.push('Tài khoản của bạn chưa Kết nối Trello hoặc cần kết nối lại.');
+      } else if (trello.status === 'needs_scope') {
+        return {
+          kind: 'refusal',
+          reason: 'Quản trị chưa chọn bảng Trello.',
+          suggestion: 'Hãy nhờ quản trị viên chọn bảng Trello trong trang Kết nối dịch vụ.',
+        };
+      } else if (trello.status === 'needs_membership' || !trello.connection) {
+        return {
+          kind: 'refusal',
+          reason: 'Bạn chưa là thành viên của bảng Trello nào được chọn.',
+          suggestion: 'Hãy nhờ quản trị viên thêm bạn vào ít nhất một bảng Trello của nhóm.',
+        };
+      } else {
+        if (trello.teamBoards) {
+          onTrelloTeamBoards?.(trello.teamBoards);
+        }
+        const allowedBoardSet = new Set(trello.connection.boardIds);
+        const teamBoardMap = new Map<string, string>(
+          (trello.teamBoards ?? []).map((b: any) => [b.boardId, b.boardName])
+        );
+        const allEntities = memory ? memory.getAll() : {};
+        const observedLists = [
+          ...(Array.isArray(allEntities.list) ? allEntities.list : allEntities.list ? [allEntities.list] : []),
+          ...(Array.isArray((allEntities.__observed as any)?.list) ? (allEntities.__observed as any).list : []),
+        ];
+        const observedCards = [
+          ...(Array.isArray(allEntities.card) ? allEntities.card : allEntities.card ? [allEntities.card] : []),
+          ...(Array.isArray((allEntities.__observed as any)?.card) ? (allEntities.__observed as any).card : []),
+        ];
+        const stepBoardMap = new Map<string, string>();
+
+        let forbiddenBoardName: string | null = null;
+        for (const step of bound.steps) {
+          if (!step.tool.startsWith('trello.')) continue;
+          let targetBoardId: string | undefined = typeof step.args?.boardId === 'string' ? step.args.boardId : undefined;
+          if (!targetBoardId && typeof step.args?.listId === 'string') {
+            if (step.args.listId.startsWith('$')) {
+              const refStepId = step.args.listId.slice(1).split('.')[0];
+              if (refStepId && stepBoardMap.has(refStepId)) {
+                targetBoardId = stepBoardMap.get(refStepId);
+              }
+            } else {
+              const foundList = observedLists.find((l: any) => l.id === step.args.listId);
+              if (foundList && (foundList.boardId || foundList.idBoard)) {
+                targetBoardId = foundList.boardId || foundList.idBoard;
+              } else if (teamBoardMap.has(step.args.listId)) {
+                targetBoardId = step.args.listId;
+              }
+            }
+          } else if (!targetBoardId && typeof step.args?.listId === 'object' && step.args?.listId && '$ref' in step.args.listId) {
+            const ref = (step.args.listId as any).$ref;
+            const refStepId = typeof ref === 'string' ? ref.replace(/^\$/, '').split('.')[0] : undefined;
+            if (refStepId && stepBoardMap.has(refStepId)) {
+              targetBoardId = stepBoardMap.get(refStepId);
+            }
+          }
+          if (!targetBoardId && step.args?.cardId) {
+            if (typeof step.args.cardId === 'string') {
+              const foundCard = observedCards.find((c: any) => c.id === step.args.cardId);
+              if (foundCard) {
+                targetBoardId = foundCard.boardId || foundCard.idBoard;
+                if (!targetBoardId && (foundCard.listId || foundCard.idList)) {
+                  const cardListId = foundCard.listId || foundCard.idList;
+                  const foundList = observedLists.find((l: any) => l.id === cardListId);
+                  if (foundList) targetBoardId = foundList.boardId || foundList.idBoard;
+                }
+              }
+            } else if (typeof step.args.cardId === 'object' && step.args.cardId && '$ref' in step.args.cardId) {
+              const ref = (step.args.cardId as any).$ref;
+              const refStepId = typeof ref === 'string' ? ref.replace(/^\$/, '').split('.')[0] : undefined;
+              if (refStepId && stepBoardMap.has(refStepId)) {
+                targetBoardId = stepBoardMap.get(refStepId);
+              }
+            }
+          }
+          if (!targetBoardId && typeof step.args?.idList === 'string') {
+            const foundList = observedLists.find((l: any) => l.id === step.args.idList);
+            if (foundList && (foundList.boardId || foundList.idBoard)) {
+              targetBoardId = foundList.boardId || foundList.idBoard;
+            }
+          }
+          if (!targetBoardId && trello.connection.boardIds.length === 1) {
+            targetBoardId = trello.connection.boardIds[0];
+          }
+
+          if (targetBoardId) {
+            step.boardId = targetBoardId;
+            stepBoardMap.set(step.id, targetBoardId);
+          }
+
+          if (targetBoardId && !allowedBoardSet.has(targetBoardId)) {
+            const name = teamBoardMap.get(targetBoardId) || targetBoardId;
+            forbiddenBoardName = name;
+            break;
+          }
+        }
+
+        if (forbiddenBoardName) {
+          return {
+            kind: 'refusal',
+            reason: `Bạn cần được thêm vào bảng ${forbiddenBoardName} trên Trello.`,
+            suggestion: `Hãy nhờ quản trị viên thêm bạn vào bảng ${forbiddenBoardName} trên Trello, rồi thử lại.`,
+          };
+        }
+
+        trelloConn = {
+          credentialId: trello.connection.credentialId,
+          memberId: trello.connection.memberId,
+          username: trello.connection.username,
+          boardIds: [...trello.connection.boardIds].sort(),
+        };
+      }
+    }
+
+    if (usesGitHub) {
+      const github = await this.githubConnection?.(userId);
+      if (!github || github.status === 'not_connected' || github.status === 'reconnect_required') {
+        unavailableServices.push({ id: 'github', name: 'GitHub' });
+        reasons.push('Tài khoản của bạn chưa Kết nối GitHub hoặc cần kết nối lại.');
+      } else if (github.status === 'needs_scope') {
+        return {
+          kind: 'refusal',
+          reason: 'Quản trị chưa chọn repository GitHub.',
+          suggestion: 'Hãy nhờ quản trị viên chọn repository GitHub trong trang Kết nối dịch vụ.',
+        };
+      } else if (github.status === 'needs_membership' || !github.connection) {
+        return {
+          kind: 'refusal',
+          reason: 'Bạn chưa có quyền truy cập repository GitHub nào của nhóm.',
+          suggestion: 'Hãy nhờ quản trị viên cấp quyền vào ít nhất một repository GitHub của nhóm.',
+        };
+      } else {
+        if (github.teamRepos) {
+          onGitHubTeamRepos?.(github.teamRepos);
+        }
+        const allowedRepoSet = new Set<string>(
+          (github.connection.repos as string[]).map((r: string) => r.toLowerCase()),
+        );
+        const canonicalRepoMap = new Map<string, string>(
+          (github.connection.repos as string[]).map((r: string) => [r.toLowerCase(), r]),
+        );
+        const teamRepoMap = new Map<string, string>(
+          (github.teamRepos ?? []).map((r: any) => [String(r.fullName).toLowerCase(), String(r.fullName)]),
+        );
+        const allEntities = memory ? memory.getAll() : {};
+        const observedRepos = [
+          ...(Array.isArray(allEntities.repository) ? allEntities.repository : allEntities.repository ? [allEntities.repository] : []),
+          ...(Array.isArray((allEntities.__observed as any)?.repository) ? (allEntities.__observed as any).repository : []),
+        ];
+        const stepRepoMap = new Map<string, string>();
+
+        let forbiddenRepoName: string | null = null;
+        for (const step of bound.steps) {
+          if (!step.tool.startsWith('github.')) continue;
+          if (step.tool === 'github.search_repos') {
+            const q = typeof step.args?.query === 'string' ? step.args.query.trim().toLowerCase() : '';
+            const foundObs = observedRepos.find((r: any) => {
+              const fn = String(r.fullName ?? '').toLowerCase();
+              const nm = String(r.name ?? '').toLowerCase();
+              return !q || fn.includes(q) || nm.includes(q);
+            });
+            if (foundObs && typeof foundObs.fullName === 'string') {
+              stepRepoMap.set(step.id, foundObs.fullName);
+            } else {
+              const foundMember = (github.memberRepos ?? []).find((r: any) => {
+                const fn = String(r.fullName ?? '').toLowerCase();
+                const nm = String(r.name ?? '').toLowerCase();
+                return !q || fn.includes(q) || nm.includes(q);
+              });
+              if (foundMember && typeof foundMember.fullName === 'string') {
+                stepRepoMap.set(step.id, foundMember.fullName);
+              } else if (github.connection.repos.length === 1) {
+                stepRepoMap.set(step.id, github.connection.repos[0]);
+              }
+            }
+            continue;
+          }
+
+          let targetRepo: string | undefined = typeof step.args?.repo === 'string' ? step.args.repo : undefined;
+          if (targetRepo && targetRepo.startsWith('$')) {
+            const refStepId = targetRepo.slice(1).split('.')[0]?.replace(/\[\d+\]$/, '');
+            targetRepo = refStepId && stepRepoMap.has(refStepId) ? stepRepoMap.get(refStepId) : undefined;
+          } else if (!targetRepo && typeof step.args?.repo === 'object' && step.args?.repo && '$ref' in step.args.repo) {
+            const ref = (step.args.repo as any).$ref;
+            const refStepId = typeof ref === 'string' ? ref.replace(/^\$/, '').split('.')[0]?.replace(/\[\d+\]$/, '') : undefined;
+            if (refStepId && stepRepoMap.has(refStepId)) {
+              targetRepo = stepRepoMap.get(refStepId);
+            }
+          }
+          if (!targetRepo && github.connection.repos.length === 1) {
+            targetRepo = github.connection.repos[0];
+          }
+
+          if (targetRepo) {
+            const canonical =
+              canonicalRepoMap.get(targetRepo.toLowerCase()) ??
+              teamRepoMap.get(targetRepo.toLowerCase()) ??
+              targetRepo;
+            step.repo = canonical;
+            stepRepoMap.set(step.id, canonical);
+            if (!allowedRepoSet.has(targetRepo.toLowerCase())) {
+              forbiddenRepoName = canonical;
+              break;
+            }
+          }
+        }
+
+        if (forbiddenRepoName) {
+          return {
+            kind: 'refusal',
+            reason: `Bạn cần được cấp quyền vào repository ${forbiddenRepoName} trên GitHub.`,
+            suggestion: `Hãy nhờ quản trị viên cấp quyền cho bạn vào repository ${forbiddenRepoName} trên GitHub, rồi thử lại.`,
+          };
+        }
+
+        githubConn = {
+          credentialId: github.connection.credentialId,
+          githubUserId: github.connection.githubUserId,
+          login: github.connection.login,
+          repos: [...github.connection.repos].sort(),
+        };
+      }
+    }
+
+    if (usesTelegram) {
+      const telegram = await this.telegramConnection?.(userId);
+      if (!telegram || telegram.status === 'not_connected' || telegram.status === 'reconnect_required') {
+        unavailableServices.push({ id: 'telegram', name: 'Telegram' });
+        reasons.push('Tài khoản của bạn chưa Kết nối Telegram hoặc cần kết nối lại.');
+      } else if (telegram.status === 'needs_scope' || !telegram.connection) {
+        return {
+          kind: 'refusal',
+          reason: 'Bạn chưa chọn cuộc trò chuyện hoặc nhóm Telegram nào được phép sử dụng.',
+          suggestion: 'Hãy chọn ít nhất một cuộc trò chuyện hoặc nhóm Telegram trong trang Kết nối dịch vụ.',
+        };
+      } else {
+        if (telegram.selectedChats) {
+          onTelegramChats?.(telegram.selectedChats);
+        }
+        const allowedChatSet = new Set(telegram.connection.chatIds);
+        let forbiddenChatId: string | null = null;
+        for (const step of bound.steps) {
+          if (!step.tool.startsWith('telegram.')) continue;
+          const targetChatId = typeof step.args?.chatId === 'string' ? step.args.chatId.trim() : undefined;
+          if (targetChatId) {
+            step.chatId = targetChatId;
+            if (!allowedChatSet.has(targetChatId)) {
+              forbiddenChatId = targetChatId;
+              break;
+            }
+          } else if (step.tool === 'telegram.send_message' && telegram.connection.chatIds.length === 1) {
+            step.chatId = telegram.connection.chatIds[0];
+          }
+        }
+        if (forbiddenChatId) {
+          return {
+            kind: 'refusal',
+            reason: `Cuộc trò chuyện Telegram (${forbiddenChatId}) không nằm trong phạm vi bạn đã chọn.`,
+            suggestion: 'Hãy chọn thêm cuộc trò chuyện hoặc nhóm này trong trang Kết nối dịch vụ, rồi thử lại.',
+          };
+        }
+        telegramConn = {
+          credentialId: telegram.connection.credentialId,
+          telegramUserId: telegram.connection.telegramUserId,
+          username: telegram.connection.username,
+          chatIds: [...telegram.connection.chatIds].sort(),
+        };
+      }
+    }
+
     if (unavailableServices.length > 0) {
       return {
         kind: 'refusal',
@@ -423,6 +811,9 @@ export class ChatService {
     if (gmailConn) connections.gmail = gmailConn;
     if (mycalConn) connections.mycalendar = mycalConn;
     if (mysheetsConn) connections.mysheets = mysheetsConn;
+    if (trelloConn) connections.trello = trelloConn;
+    if (githubConn) connections.github = githubConn;
+    if (telegramConn) connections.telegram = telegramConn;
 
     return { ...bound, connections };
   }
@@ -431,11 +822,15 @@ export class ChatService {
    * Design 5.4: a new or changed schedule takes its services from the router,
    * never from the model, and is refused when one of them is not configured.
    */
-  private async prepareProposal(proposal: ScheduleResponse, userId: string, schedule: ScheduleView | null): Promise<PlannerResponse | ScheduleProposalMetadata> {
+  private async prepareProposal(
+    proposal: ScheduleResponse,
+    actor: { userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization' },
+    schedule: ScheduleView | null
+  ): Promise<PlannerResponse | ScheduleProposalMetadata> {
     if (!this.schedules) throw new Error('Schedules are off');
     let services: string[];
     if (proposal.action === 'create' || proposal.action === 'update') {
-      const route = await this.planner.routeSchedule(proposal.request!, { userId });
+      const route = await this.planner.routeSchedule(proposal.request!, actor);
       if (route.unavailable.length > 0 || route.services.length === 0) return unroutable(route.unavailable);
       services = route.services;
     } else {
@@ -446,8 +841,98 @@ export class ChatService {
     const runs = recurrence && proposal.action !== 'pause' && proposal.action !== 'cancel'
       ? nextRuns(recurrence, this.schedules.now?.() ?? new Date(), this.schedules.timeZone).map((date) => date.toISOString()) : [];
     const current = proposal.action === 'create' ? null : schedule;
-    return { type: 'schedule_proposal', proposal, services, nextRuns: runs, scheduleId: current?.id ?? null, baseVersion: current?.version ?? null,
-      previous: current ? { name: current.name, request: current.request, recurrence: current.recurrence, status: current.status } : null };
+    let digestCandidate: ScheduleProposalMetadata['digestCandidate'] | undefined;
+    if ((proposal.action === 'create' || proposal.action === 'update') && services.includes('telegram') && this.telegramConnection) {
+      const tgLookup = await this.telegramConnection(actor.userId).catch(() => null);
+      const ghLookup = services.includes('github') && this.githubConnection
+        ? await this.githubConnection(actor.userId).catch(() => null)
+        : null;
+      digestCandidate = evaluateTelegramDigestCandidate({
+        proposal,
+        services,
+        timeZone: this.schedules.timeZone,
+        telegramLookup: tgLookup,
+        githubLookup: ghLookup,
+      });
+    } else if (
+      (proposal.action === 'create' || proposal.action === 'update') &&
+      proposal.request &&
+      (services.includes('mysheets') || services.includes('sheets')) &&
+      this.schedules.credentialRepo &&
+      this.schedules.encryptionKey
+    ) {
+      const { analyzeSheetsDigestCandidate } = await import('./schedules/sheets-digest-candidate.js');
+      digestCandidate = await analyzeSheetsDigestCandidate({
+        userId: actor.userId,
+        request: proposal.request,
+        services,
+        credentialRepo: this.schedules.credentialRepo,
+        encryptionKey: this.schedules.encryptionKey,
+        mysheetsEnabled: this.schedules.mysheetsEnabled,
+      });
+    } else if (
+      (proposal.action === 'create' || proposal.action === 'update') &&
+      proposal.request &&
+      recurrence &&
+      (services.includes('github') || (!this.schedules.evaluateDigestCandidate && Boolean(this.githubConnection)))
+    ) {
+      digestCandidate = await evaluateGithubDigestCandidate({
+        userId: actor.userId,
+        request: proposal.request,
+        services,
+        recurrence,
+        githubConnection: this.githubConnection,
+        getAdapter: this.getAdapter,
+      });
+    } else if (
+      proposal.action === 'create' &&
+      proposal.request &&
+      this.schedules.evaluateDigestCandidate
+    ) {
+      digestCandidate = await this.schedules.evaluateDigestCandidate({
+        userId: actor.userId,
+        services,
+        request: proposal.request,
+      });
+    } else if ((proposal.action === 'create' || proposal.action === 'update') && services.includes('telegram')) {
+      digestCandidate = evaluateTelegramDigestCandidate({
+        proposal,
+        services,
+        timeZone: this.schedules.timeZone,
+        telegramLookup: null,
+      });
+    }
+    return {
+      type: 'schedule_proposal',
+      proposal,
+      services,
+      nextRuns: runs,
+      scheduleId: current?.id ?? null,
+      baseVersion: current?.version ?? null,
+      previous: current ? { name: current.name, request: current.request, recurrence: current.recurrence, status: current.status } : null,
+      ...(digestCandidate ? { digestCandidate } : {}),
+    };
+  }
+
+  private async actorForConversation(
+    conversationId: string,
+    userId: string
+  ): Promise<{ userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization' }> {
+    const fallbackMode = this.workspaceRepo ? ('personal' as const) : undefined;
+    if (!this.convRepo) return { userId, ...(fallbackMode ? { workspaceMode: fallbackMode } : {}) };
+    try {
+      const conv = await this.convRepo.getConversation(conversationId);
+      if (conv?.workspace_mode && conv.workspace_mode !== 'legacy') {
+        return {
+          userId,
+          workspaceId: conv.workspace_id ?? null,
+          workspaceMode: conv.workspace_mode,
+        };
+      }
+    } catch {
+      // ignore
+    }
+    return { userId, ...(fallbackMode ? { workspaceMode: fallbackMode } : {}) };
   }
 
   /**
@@ -460,17 +945,50 @@ export class ChatService {
     planned: PlannerResponse, memory: WorkingMemory, userTexts: string[], signal?: AbortSignal,
   ): Promise<PreparedResponse> {
     const { conversationId, correlation } = target;
-    if (target.slackContext && planned.kind === 'plan' && (!this.planRepo || planned.steps.some(s=>/^(myslack|slack)\./.test(s.tool)))) throw new Error('SLACK_DISPATCH_BINDING_REQUIRED');
-    let response = planned.kind === 'plan' && !target.slackReadPlan && !target.slackWritePlan ? await this.bindConnections(planned, target.userId, signal) : planned;
+    if (target.slackContext && planned.kind === 'plan' && (!this.planRepo || planned.steps.some(s => /^(myslack|slack)\./.test(s.tool)))) {
+      throw new Error('SLACK_DISPATCH_BINDING_REQUIRED');
+    }
+    let trelloTeamBoards: Array<{ boardId: string; boardName: string }> | undefined;
+    let githubTeamRepos: Array<{ repoId: string; fullName: string; name: string }> | undefined;
+    let telegramChats: Array<{ chatId: string; title: string }> | undefined;
+    const actor = await this.actorForConversation(conversationId, target.userId);
+    let scopeId = 'default';
+    if (actor.workspaceMode === 'organization' && actor.workspaceId) {
+      scopeId = actor.workspaceId;
+    } else if (actor.workspaceMode === 'personal' && target.userId) {
+      scopeId = `personal:${target.userId}`;
+    }
+    let response = planned.kind === 'plan' && !target.slackReadPlan && !target.slackWritePlan
+      ? await this.bindConnections(
+          planned,
+          target.userId,
+          signal,
+          memory,
+          (boards) => { trelloTeamBoards = boards; },
+          scopeId,
+          (repos) => { githubTeamRepos = repos; },
+          (chats) => { telegramChats = chats; },
+        )
+      : planned;
     signal?.throwIfAborted();
     let proposal: ScheduleProposalMetadata | null = null;
     if (response.kind === 'schedule') {
-      const prepared = await this.prepareProposal(response, target.userId, target.schedule ?? null);
+      const prepared = await this.prepareProposal(response, actor, target.schedule ?? null);
       if ('type' in prepared) proposal = prepared; else response = prepared;
     }
     const emit = (event: string, payload: Record<string, unknown>) => this.eventEmitter.emit(event, { conversationId, ...payload, ...correlation });
     let planId: string | null = null, messageId = '', labels: Record<string, string> = {};
-    if (response.kind === 'plan') labels = target.readLabels??resourceLabels(response, memory, userTexts);
+    if (response.kind === 'plan') {
+      const labelOptions =
+        trelloTeamBoards || githubTeamRepos || telegramChats
+          ? {
+              ...(trelloTeamBoards ? { teamBoards: trelloTeamBoards } : {}),
+              ...(githubTeamRepos ? { teamRepos: githubTeamRepos } : {}),
+              ...(telegramChats ? { telegramChats } : {}),
+            }
+          : undefined;
+      labels = target.readLabels ?? resourceLabels(response, memory, userTexts, labelOptions);
+    }
 
     const write = async (client?: pg.PoolClient): Promise<{planId: string | null}> => {
       if (target.slackContext && !client) return this.msgRepo.inSlackTransaction(conversationId, target.slackContext, held => write(held), signal);
@@ -582,11 +1100,12 @@ export class ChatService {
     }
     const previousState = structuredClone(memory.toJSON());
     if (slackContext) await this.msgRepo.inSlackTransaction(conversationId, slackContext, async () => undefined, undefined, 'planning');
+    const actor = await this.actorForConversation(conversationId, userId);
     const plannerResponse: PlannerResponse = await this.planner.processMessage({
       userMessage: content,
       history,
       memory,
-      actor: { userId },
+      actor,
       // Gather callbacks may contain a query, labels or model-derived source text.
       // Keep those payloads out of live SSE and its replay cache on source-bound turns.
       onGatherEvent: (event) => { if (!slackContext) this.eventEmitter.emit('gather_progress', { conversationId, ...event }); },
@@ -621,9 +1140,12 @@ export class ChatService {
     const correlation: Correlation = first ? { replyToMessageId: first.id } : {};
     this.eventEmitter.emit('agent_state', { conversationId: convId, state: 'planning', ...correlation });
     const memory = new WorkingMemory();
+    const actor = run.workspaceMode && run.workspaceMode !== 'legacy'
+      ? { userId: run.userId, workspaceId: run.workspaceId ?? null, workspaceMode: run.workspaceMode }
+      : await this.actorForConversation(convId, run.userId);
     const response = await this.planner.processMessage({
-      userMessage, history: [], memory, signal, actor: { userId: run.userId }, scheduledRun: true,
-      onGatherEvent: (event) => {if(!slackContext)this.eventEmitter.emit('gather_progress', { conversationId: convId, ...event });},
+      userMessage, history: [], memory, signal, actor, scheduledRun: true,
+      onGatherEvent: (event) => { if (!slackContext) this.eventEmitter.emit('gather_progress', { conversationId: convId, ...event }); },
     });
     signal.throwIfAborted();
     if (response.kind === 'schedule') throw new Error('A scheduled run must be planned, not scheduled again');

@@ -1,11 +1,13 @@
 // Source: AppStagePage.tsx moments 1–2. Content comes from the registered catalog and gatherState.
-import type { KeyboardEvent, RefObject, ReactNode } from 'react';
+import { useState, useEffect, type KeyboardEvent, type RefObject, type ReactNode } from 'react';
 import { getServiceDefinition } from '@wap/tool-schemas';
 import { toolDefinition } from '../../services/tool-definitions';
 import { ServiceLogo } from '../../components/ServiceLogo';
 import presentation from '../../assets/cockpit-services.json';
 import type { ServiceInfo, GatherState } from '../../types';
 import { RequestEcho, useScheduledOrigin } from './RequestEcho';
+import { multiServicePlaybooks } from './presentation';
+import { getActiveWorkspaceSummary, setActiveWorkspaceId, subscribeWorkspace } from '../../services/workspace-storage';
 interface Props {
   services: ServiceInfo[];
   loading: boolean;
@@ -15,6 +17,8 @@ interface Props {
   input: RefObject<HTMLTextAreaElement | null>;
   inputHidden?: boolean;
   feedback?: ReactNode;
+  /** PBI-03: thẻ hội thoại đã lưu; khi có, tiêu đề mời tiếp tục thay vì bắt đầu mới. */
+  resume?: ReactNode;
   onDraft: (value: string) => void;
   onSend: (value: string) => void;
   onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
@@ -48,6 +52,7 @@ export function RequestMoment({
   input,
   inputHidden,
   feedback,
+  resume,
   onDraft,
   onSend,
   onKeyDown,
@@ -55,6 +60,21 @@ export function RequestMoment({
   navigate,
   servicePrompt,
 }: Props) {
+  const [workspace, setWorkspace] = useState(getActiveWorkspaceSummary());
+  useEffect(() => subscribeWorkspace(() => setWorkspace(getActiveWorkspaceSummary())), []);
+  useEffect(() => {
+    try {
+      const prefill = sessionStorage.getItem('ati_prefill_prompt');
+      if (prefill) {
+        sessionStorage.removeItem('ati_prefill_prompt');
+        onDraft(prefill);
+        input.current?.focus();
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }, [onDraft, input]);
+
   return (
     <section
       id="moment-1"
@@ -62,19 +82,53 @@ export function RequestMoment({
       data-moment="1"
       aria-label="Cockpit"
     >
+      {/* Context Pill & Guidance Card */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-3.5 rounded-xl border border-[#E7E7E2] bg-white shadow-sm">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="text-xl flex-shrink-0">{workspace.id === 'personal' ? '👤' : '🏢'}</span>
+          <div className="text-xs leading-relaxed min-w-0">
+            <div className="font-semibold text-[#111827] flex items-center gap-1.5 flex-wrap">
+              <span>Đang làm việc tại:</span>
+              <span className="text-[#FF5701]">{workspace.name}</span>
+            </div>
+            <p className="text-[#6B7280] text-[11px] truncate">
+              {workspace.id === 'personal'
+                ? '(Lịch, Trang tính, Trello & công cụ riêng của bạn)'
+                : '(Sử dụng kết nối chung của nhóm & dịch vụ đã cấp quyền)'}
+            </p>
+          </div>
+        </div>
+        {workspace.id === 'personal' && (
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveWorkspaceId('personal');
+                navigate('/settings');
+              }}
+              className="px-2.5 py-1 rounded-lg text-xs font-medium border border-[#E7E7E2] bg-[#F8F8F6] text-[#4B5563] hover:text-[#111827] hover:bg-neutral-100 transition-colors"
+            >
+              Kết nối công cụ cá nhân
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className="v3-space-y-3 text-center sm:text-left">
         <h1
           id="heading-moment-1"
           className="font-display text-4xl sm:text-5xl lg:text-[52px] text-brand-text font-normal tracking-tight leading-[1.12]"
           tabIndex={-1}
         >
-          Hôm nay bạn muốn nhờ việc gì?
+          {resume ? 'Tiếp tục hội thoại này' : 'Hôm nay bạn muốn nhờ việc gì?'}
         </h1>
         <p className="text-base sm:text-lg text-brand-muted max-w-2xl leading-relaxed">
-          Mô tả bằng lời thường điều bạn cần. Tôi sẽ tự chia việc, lên kế hoạch
-          và thao tác trên các công cụ của nhóm.
+          {resume
+            ? 'Xem lại yêu cầu trước bên dưới, rồi gửi tiếp hoặc mô tả việc mới.'
+            : 'Mô tả bằng lời thường điều bạn cần. Tôi sẽ tự chia việc, lên kế hoạch và thao tác trên các công cụ của nhóm.'}
         </p>
       </div>
+      {resume}
       {feedback}
       {/* Large Input Area */}
       <form
@@ -134,49 +188,100 @@ export function RequestMoment({
       </form>
 
       {services.some((service) => service.configured) ? (
-        <div className="v3-space-y-3">
-          <div className="text-xs font-semibold uppercase tracking-wider text-brand-muted">
-            Gợi ý việc phổ biến theo công cụ của bạn
+        <>
+          <div className="v3-space-y-3">
+            <div className="text-xs font-semibold uppercase tracking-wider text-brand-muted">
+              Gợi ý việc phổ biến theo công cụ của bạn
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {services
+                .filter((service) => service.configured)
+                .slice(0, 4)
+                .map((service) => {
+                  const colors = cardColors[service.id] ?? neutralCard;
+                  return (
+                  <button
+                    key={service.id}
+                    type="button"
+                    aria-label={servicePrompt(service)}
+                    disabled={planning}
+                    onClick={() => {
+                      onDraft(servicePrompt(service));
+                      input.current?.focus();
+                    }}
+                    className="relative overflow-hidden text-left p-4 bg-white hover:bg-neutral-50 rounded-2xl border border-brand-border shadow-soft-card transition-all duration-200 group hover:-translate-y-0.5 hover:shadow-md flex items-start gap-3.5"
+                  >
+                    <div className={`absolute -right-6 -bottom-6 w-20 h-20 rounded-full ${colors.decoration} transition-colors pointer-events-none`} />
+                    <div className="flex items-center -v3-space-x-1.5 flex-shrink-0 mt-0.5">
+                      <div title={service.name} className={`w-8 h-8 rounded-xl ${colors.icon} border flex items-center justify-center p-1.5 shadow-sm group-hover:scale-105 transition-transform`}>
+                        <ServiceLogo
+                          service={service.id}
+                          className={`w-4 h-4 ${colors.logo ?? ''}`}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-brand-text group-hover:text-brand-primary transition-colors leading-snug">
+                        {servicePrompt(service)}
+                      </div>
+                      <div className="text-xs text-brand-muted mt-1 flex items-center gap-1.5 font-sans">
+                        <span className={`${colors.name} font-medium`}>{service.name}</span>
+                      </div>
+                    </div>
+                  </button>
+                ); })}
+            </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {services
-              .filter((service) => service.configured)
-              .slice(0, 4)
-              .map((service) => {
-                const colors = cardColors[service.id] ?? neutralCard;
-                return (
-                <button
-                  key={service.id}
-                  type="button"
-                  aria-label={servicePrompt(service)}
-                  disabled={planning}
-                  onClick={() => {
-                    onDraft(servicePrompt(service));
-                    input.current?.focus();
-                  }}
-                  className="relative overflow-hidden text-left p-4 bg-white hover:bg-neutral-50 rounded-2xl border border-brand-border shadow-soft-card transition-all duration-200 group hover:-translate-y-0.5 hover:shadow-md flex items-start gap-3.5"
-                >
-                  <div className={`absolute -right-6 -bottom-6 w-20 h-20 rounded-full ${colors.decoration} transition-colors pointer-events-none`} />
-                  <div className="flex items-center -v3-space-x-1.5 flex-shrink-0 mt-0.5">
-                    <div title={service.name} className={`w-8 h-8 rounded-xl ${colors.icon} border flex items-center justify-center p-1.5 shadow-sm group-hover:scale-105 transition-transform`}>
-                      <ServiceLogo
-                        service={service.id}
-                        className={`w-4 h-4 ${colors.logo ?? ''}`}
-                      />
+
+          {services.filter((service) => service.configured).length >= 2 && multiServicePlaybooks.length > 0 && (
+            <div className="v3-space-y-3" data-testid="multi-service-playbooks">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs font-semibold uppercase tracking-wider text-brand-muted">
+                  Kịch bản tự động hoá liên dịch vụ
+                </div>
+                <span className="text-[11px] font-medium text-brand-primary bg-[#FFF6EE] border border-[#FFDFC6] px-2 py-0.5 rounded-full">
+                  Make.com Orbital Flow
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {multiServicePlaybooks.map((playbook) => (
+                  <button
+                    key={playbook.id}
+                    type="button"
+                    aria-label={`Kịch bản liên dịch vụ: ${playbook.title}`}
+                    disabled={planning}
+                    onClick={() => {
+                      onDraft(playbook.prompt);
+                      input.current?.focus();
+                    }}
+                    className="text-left p-3.5 bg-white hover:bg-neutral-50 rounded-2xl border border-brand-border hover:border-brand-primary/50 shadow-soft-card transition-all group flex flex-col justify-between gap-2.5"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      {playbook.services.map((svcId, idx) => (
+                        <span key={svcId} className="inline-flex items-center gap-1">
+                          <span className="w-7 h-7 rounded-full bg-white border border-brand-border shadow-2xs flex items-center justify-center">
+                            <ServiceLogo service={svcId} className="w-3.5 h-3.5" />
+                          </span>
+                          {idx < playbook.services.length - 1 && (
+                            <span className="text-[10px] font-mono text-neutral-400">→</span>
+                          )}
+                        </span>
+                      ))}
                     </div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-brand-text group-hover:text-brand-primary transition-colors leading-snug">
-                      {servicePrompt(service)}
+                    <div>
+                      <div className="text-xs font-bold text-brand-text group-hover:text-brand-primary transition-colors">
+                        {playbook.title}
+                      </div>
+                      <p className="text-[11px] text-brand-muted line-clamp-2 mt-1 leading-relaxed">
+                        {playbook.prompt}
+                      </p>
                     </div>
-                    <div className="text-xs text-brand-muted mt-1 flex items-center gap-1.5 font-sans">
-                      <span className={`${colors.name} font-medium`}>{service.name}</span>
-                    </div>
-                  </div>
-                </button>
-              ); })}
-          </div>
-        </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       ) : !loading && !error ? (
         <div className="v3-space-y-3">
           <p className="text-sm text-brand-muted">

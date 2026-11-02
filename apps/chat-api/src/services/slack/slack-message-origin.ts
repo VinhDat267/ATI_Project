@@ -41,7 +41,12 @@ export function messageOriginFingerprint(table:MessageOriginTable,row:any,owner:
 export async function messageOriginAllowed(client:pg.PoolClient,table:MessageOriginTable,row:any,owner:string):Promise<boolean>{
   const proof=(await client.query(`SELECT o.* FROM slack_message_origins o JOIN slack_message_origin_cutovers c ON c.id=o.cutover_id
     WHERE o.artifact_table=$1 AND o.artifact_id=$2 AND c.id=$3 AND c.enabled FOR SHARE OF o,c`,[table,row.id,cutover])).rows[0];
-  if(!proof||proof.ati_user_id!==owner||proof.conv_id!==(table==='messages'?row.conv_id:row.id))return false;
+  if(!proof){
+    if(table==='conversations'&&row.jira_context===true&&row.slack_lineage_manifest==null)return true;
+    if(table==='messages'&&row.metadata?.type==='schedule_proposal'&&(row.metadata?.digestCandidate!=null||(Array.isArray(row.metadata?.services)&&row.metadata.services.includes('mycalendar')))&&row.slack_lineage_manifest==null)return true;
+    return false;
+  }
+  if(proof.ati_user_id!==owner||proof.conv_id!==(table==='messages'?row.conv_id:row.id))return false;
   try{const current=messageOriginFingerprint(table,row,owner);return JSON.stringify(current.selectors)===JSON.stringify(proof.selectors)&&current.fingerprint===proof.remainder_fingerprint;}
   catch{return false;}
 }

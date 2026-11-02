@@ -46,8 +46,8 @@ export class AuthTokenRepo {
       const claimed = await client.query('UPDATE auth_tokens SET used_at=$3 WHERE token_hash=$1 AND purpose=$2 AND used_at IS NULL AND expires_at>$3 RETURNING id', [hash(token), purpose, new Date(now)]);
       if (!claimed.rowCount) { await client.query('ROLLBACK'); return null; }
       const updated = await client.query<UserRow>(passwordHash
-        ? 'UPDATE users SET email_verified=true,password=$2,updated_at=$3 WHERE id=$1 RETURNING *'
-        : 'UPDATE users SET email_verified=true,updated_at=$2 WHERE id=$1 RETURNING *',
+        ? "UPDATE users SET email_verified=true,status=CASE WHEN status='pending' THEN 'active' ELSE status END,password=$2,updated_at=$3 WHERE id=$1 RETURNING *"
+        : "UPDATE users SET email_verified=true,status=CASE WHEN status='pending' THEN 'active' ELSE status END,updated_at=$2 WHERE id=$1 RETURNING *",
       passwordHash ? [userId, passwordHash, new Date(now)] : [userId, new Date(now)]);
       if (passwordHash) {
         await client.query('UPDATE auth_sessions SET revoked_at=COALESCE(revoked_at,$2) WHERE user_id=$1', [userId, new Date(now)]);

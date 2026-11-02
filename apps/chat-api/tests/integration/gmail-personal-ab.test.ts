@@ -133,7 +133,7 @@ describe('personal Gmail for two members A and B (spec 6.2)', () => {
       expect(calls).toEqual([{ owner: a.id, tool: 'gmail.send_message', args: { to: ['a@example.com'], subject: 'S', body: 'B' } }]);
       const gmail = contexts.filter((c) => c.service === 'gmail');
       expect(gmail.length).toBeGreaterThan(0);
-      for (const { context } of gmail) expect(context).toEqual({ userId: a.id, phase: 'execution', connections: { gmail: { credentialId: own.id, email: 'a@example.test' } } });
+      for (const { context } of gmail) expect(context).toMatchObject({ userId: a.id, phase: 'execution', connections: { gmail: { credentialId: own.id, email: 'a@example.test' } } });
     });
 
     it.each([['another Google account', 'other@example.test'], ['the same address again', 'a@example.test']])(

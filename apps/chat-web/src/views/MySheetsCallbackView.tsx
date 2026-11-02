@@ -42,6 +42,7 @@ export function MySheetsCallbackView({
   const [saveError, setSaveError] = useState('');
   const [email, setEmail] = useState('');
   const [spreadsheets, setSpreadsheets] = useState<PersonalSpreadsheetItem[]>([]);
+  const [urlInput, setUrlInput] = useState('');
   const [fakePickerSession, setFakePickerSession] = useState<{
     accessToken: string;
     fakePickerBaseUrl: string;
@@ -198,6 +199,13 @@ export function MySheetsCallbackView({
     }
   };
 
+  const handleAddFromUrl = async () => {
+    const raw = urlInput.trim();
+    if (!raw || saving || spreadsheets.length >= 10) return;
+    await handleSavePickedIds([raw]);
+    if (mounted.current) setUrlInput('');
+  };
+
   const handleRemoveSpreadsheet = async (id: string) => {
     if (spreadsheets.length <= 1) {
       setSaveError('Cần giữ lại ít nhất 1 bảng tính. Để huỷ toàn bộ quyền truy cập, hãy ngắt kết nối tại Cài đặt.');
@@ -300,6 +308,26 @@ export function MySheetsCallbackView({
                 Trình duyệt cần đang đăng nhập đúng tài khoản <strong>{email}</strong>.
               </p>
             )}
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+              <input
+                type="text"
+                aria-label="Dán liên kết hoặc ID Google Sheets"
+                placeholder="Dán liên kết hoặc ID Google Sheets..."
+                value={urlInput}
+                disabled={saving || spreadsheets.length >= 10}
+                onChange={(e) => setUrlInput(e.target.value)}
+                className="flex-1 px-3 py-2 rounded-xl text-xs sm:text-sm bg-white border border-[#E7E7E2] text-[#111827] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#FF5701]"
+              />
+              <button
+                type="button"
+                disabled={!urlInput.trim() || saving || spreadsheets.length >= 10}
+                onClick={() => void handleAddFromUrl()}
+                className="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium bg-white text-[#111827] border border-[#E7E7E2] hover:bg-neutral-50 disabled:opacity-50 transition-colors"
+              >
+                Thêm từ liên kết
+              </button>
+            </div>
           </div>
 
           {spreadsheets.length > 0 && (
@@ -330,6 +358,11 @@ export function MySheetsCallbackView({
                     <p className="text-xs text-[#6B7280] font-mono mt-0.5 break-all">
                       {sheet.id}
                     </p>
+                    {sheet.sheets && sheet.sheets.length > 0 && (
+                      <p className="text-xs text-[#4B5563] mt-1">
+                        Tabs: {sheet.sheets.join(', ')}
+                      </p>
+                    )}
                   </div>
                   <button
                     type="button"

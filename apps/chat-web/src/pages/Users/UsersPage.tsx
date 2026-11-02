@@ -1,8 +1,9 @@
+import { useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { usePrototypePage, type PageMeta } from '../../prototype/usePrototypePage';
 import { MainNav } from '../../components/layout/MainNav';
 import type { User } from '../../types';
 import css from './page.css?inline';
-import type { MouseEvent as ReactMouseEvent } from 'react';
+
 import type { Member, PendingUser } from './data';
 import { useUsers } from './useUsers';
 type Role = 'admin' | 'member';
@@ -10,7 +11,7 @@ const TABLE_WRAPPER = 'overflow-hidden rounded-2xl bg-white border border-[#E7E7
 const TAB_ON = 'flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-[#FF5701] text-white shadow-sm';
 const TAB_OFF = 'flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all text-[#6B7280] hover:text-[#111827]';
 // Thẻ yêu cầu chờ duyệt (renderPendingList).
-function PendingCard({ u, isAdmin, onApprove }: { u: PendingUser; isAdmin: boolean; onApprove: (id: string) => void }) {
+function PendingCard({ u, isAdmin, onApprove, onReject }: { u: PendingUser; isAdmin: boolean; onApprove: (id: string) => void; onReject?: (id: string) => void }) {
   const isVerified = !!u.emailVerified;
   return <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E7E7E2] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:border-neutral-300">
     <div className="flex items-start gap-3.5 min-w-0">
@@ -46,7 +47,7 @@ function PendingCard({ u, isAdmin, onApprove }: { u: PendingUser; isAdmin: boole
           <span>Duyệt &amp; kích hoạt</span>
           <span>✓</span>
         </button>
-        <span className="text-[11px] text-[#6B7280]">Chưa duyệt thì tài khoản không đăng nhập được.</span>
+        {onReject && <button type="button" onClick={() => onReject(u.id)} className="w-full sm:w-auto px-3 py-1.5 rounded-lg text-xs font-semibold text-red-600 border border-red-200 hover:bg-red-50 transition-colors shadow-sm">Từ chối</button>}<span className="text-[11px] text-[#6B7280]">Chưa duyệt thì tài khoản không đăng nhập được.</span>
       </> : <>
         <button type="button" disabled className="w-full sm:w-auto px-3.5 py-1.5 rounded-lg bg-neutral-100 text-neutral-400 border border-neutral-200 text-xs font-semibold cursor-not-allowed flex items-center justify-center gap-1.5" title="Người này cần bấm link xác minh trong email trước.">
           <span>Duyệt &amp; kích hoạt</span>
@@ -169,12 +170,14 @@ export const meta: PageMeta = {
 export interface UsersPageProps { user: User | null; navigate: (path: string) => void; onLogout: () => void }
 export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
   usePrototypePage(meta);
-  const { tab, search, setSearch, page, setPage, total, loading, busy, error, notice, modal, selected, newRole, setNewRole, newRoleRef, pendingView, membersView, stats, actions, closeModal } = useUsers(user);
+  const { tab, search, setSearch, page, setPage, total, loading, busy, error, notice, modal, selected, newRole, setNewRole, newRoleRef, pendingView, membersView, stats, actions, closeModal, inviteCode, requireApproval, canManage } = useUsers(user);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const role = user?.role ?? 'member', membersEmpty = membersView.rows.length === 0;
   const approveUser = modal === 'modal-approve' ? selected : null, lockUser = selected ? { name: selected.name, locked: selected.status === 'disabled' } : null, roleUserName = selected?.name;
   const modalClass = (_id: string) => 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm';
   const backdrop = (_id: string) => (event: ReactMouseEvent) => { if (event.target === event.currentTarget) closeModal(); };
-  if (!user || user.role !== 'admin') return <main className="p-6"><p role="alert">Bạn không có quyền quản trị người dùng.</p><button onClick={() => navigate('/')}>Về trang chính</button></main>;
+  if (!canManage) return <main className="p-6"><p role="alert">Bạn không có quyền quản trị người dùng.</p><button onClick={() => navigate('/')}>Về trang chính</button></main>;
   return (
     <>
       {/* FE-12: thanh điều hướng chung thay thanh trên của bản mẫu. */}
@@ -231,6 +234,72 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
             </p>
           </div>
         </section>
+        {inviteCode && (
+          <section aria-label="Mã mời tổ chức" className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E7E7E2] shadow-sm v3-space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E7E7E2] pb-3.5">
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wider text-[#6B7280]">
+                  Mã mời tham gia tổ chức
+                </div>
+                <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                  <span className="font-mono text-xl sm:text-2xl font-bold text-[#FF5701] tracking-wider bg-orange-50 px-3 py-1 rounded-xl border border-orange-200">
+                    {inviteCode}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try { navigator.clipboard?.writeText(inviteCode); } catch {}
+                        setCopiedCode(true);
+                        setTimeout(() => setCopiedCode(false), 2000);
+                      }}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#E7E7E2] bg-white hover:bg-neutral-50 text-[#111827] transition-colors shadow-sm"
+                    >
+                      {copiedCode ? '✓ Đã chép' : 'Sao chép mã'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const link = typeof window !== 'undefined' ? `${window.location.origin}/?invite=${inviteCode}` : `/?invite=${inviteCode}`;
+                        try { navigator.clipboard?.writeText(link); } catch {}
+                        setCopiedLink(true);
+                        setTimeout(() => setCopiedLink(false), 2000);
+                      }}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#FF5701] text-white hover:bg-[#E04C00] transition-colors shadow-sm"
+                    >
+                      {copiedLink ? '✓ Đã chép' : 'Sao chép Link mời'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void actions.regenerateInviteCode()}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-[#4B5563] hover:text-[#111827] hover:bg-neutral-100 transition-colors"
+                    >
+                      Đổi mã mới
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Toggle Require Approval */}
+              <div className="flex items-center gap-2 pt-2 sm:pt-0">
+                <input
+                  id="toggle-require-approval"
+                  type="checkbox"
+                  aria-label="Cần Quản trị viên duyệt thành viên mới"
+                  checked={requireApproval}
+                  onChange={(e) => void actions.toggleRequireApproval(e.target.checked)}
+                  className="rounded border-[#E7E7E2] text-[#FF5701] focus:ring-[#FF5701]"
+                />
+                <label htmlFor="toggle-require-approval" className="text-xs font-medium text-[#111827] cursor-pointer">
+                  Cần Quản trị viên duyệt thành viên mới
+                </label>
+              </div>
+            </div>
+            <p className="text-xs text-[#6B7280] leading-relaxed">
+              Gửi mã mời hoặc link mời cho thành viên. {requireApproval ? 'Thành viên dùng mã mời sẽ ở trạng thái Chờ duyệt cho tới khi Quản trị viên phê duyệt.' : 'Thành viên dùng mã mời sẽ được tham gia và kích hoạt ngay lập tức.'}
+            </p>
+          </section>
+        )}
         {/* THẺ THỐNG KÊ TỔNG QUAN (4 METRIC CARDS) */}
         <section className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4" aria-label="Thống kê tổng quan thành viên">
           {/* Thẻ 1: Tổng thành viên */}
@@ -343,7 +412,7 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
           {/* VIEW 1: DANH SÁCH CHỜ DUYỆT (PENDING APPROVALS) */}
           <div id="view-pending" hidden={tab !== "pending"} role="tabpanel" aria-labelledby="tab-btn-pending" className={`${tab === 'pending' ? '' : 'hidden '}v3-space-y-3`}>
             <div id="pending-list-container" className={`v3-space-y-3${pendingView.users.length === 0 ? ' hidden' : ''}`}>
-              {pendingView.users.map(u => <PendingCard key={u.id} u={u} isAdmin={pendingView.isAdmin} onApprove={actions.openApproveModal} />)}
+              {pendingView.isAdmin && pendingView.users.length > 0 && (<div className="flex items-center justify-end pb-1"><button type="button" onClick={() => void actions.approveAllPending()} className="px-3.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-colors shadow-sm flex items-center gap-1.5"><span>Chấp thuận tất cả</span><span>✓</span></button></div>)}{pendingView.users.map(u => <PendingCard key={u.id} u={u} isAdmin={pendingView.isAdmin} onApprove={actions.openApproveModal} onReject={actions.rejectPendingUser} />)}
             </div>
             {/* Trạng thái trống khi đã duyệt hết */}
             <div id="pending-empty-state" hidden={loading || pendingView.users.length > 0} className={`${pendingView.users.length === 0 ? '' : 'hidden '}p-8 sm:p-12 text-center rounded-2xl bg-white border border-[#E7E7E2] shadow-sm v3-space-y-3`}>

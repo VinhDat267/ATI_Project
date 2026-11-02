@@ -152,3 +152,10 @@ Card này là cổng thẩm định chất lượng cuối cùng của toàn b�
   - `node --test evaluations/tests/slack-eval-harness.test.mjs`: **5/5 PASS**
   - `npx vitest run evaluations/tests/slack-eval-harness.test.mjs`: **5/5 PASS**
   - `node scripts/eval-slack-triage.mjs --runs 3 --output evaluations/reports/slack-triage-report.md`: **9 runs × 52 cases = 468 evaluations PASS** (`hybrid`: Precision **100.0%**, Recall **96.9%**, Unapproved Writes = **0**, Cross-User Leaks = **0**).
+  - **Hợp nhất `origin/main` (`2b78f4b6`) vào `feat/slack-complete-integration`:**
+    - `npm run typecheck:v3`: **0 errors** (`apps/chat-api` & `apps/chat-web`)
+    - `npm run test:slack:foundation`: **56 node tests + 81 vitest tests PASS**
+    - `npm run test:eval:v3`: **PASS**
+    - `npm test -w @wap/tool-schemas`, `@wap/tool-adapters`, `@wap/planner` (**431/431 PASS**), `@wap/executor` (**53/53 PASS**)
+    - `npm test -w @wap/chat-web`: **98/98 test files, 1028/1028 tests PASS**
+    - `apps/chat-api` unit, DB, route, service & integration suites (bao gồm Slack M1–M4, Jira 21/21 suites, Calendar/Sheets/GitHub/Telegram digest runners): **PASS**

@@ -32,7 +32,7 @@ export interface StepExecutionResult {
 }
 
 export interface AdapterExecutor {
-  execute(tool: string, args: any, options?: { signal?: AbortSignal }): Promise<any>;
+  execute(tool: string, args: any, options?: { signal?: AbortSignal; boardId?: string; [key: string]: any }): Promise<any>;
 }
 
 export interface StepRunnerOptions {

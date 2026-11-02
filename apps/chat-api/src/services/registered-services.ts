@@ -1,5 +1,5 @@
 import { decryptCredentials } from '@wap/tool-adapters';
-import { ALL_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
+import { ALL_TOOLS, GITHUB_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, TELEGRAM_TOOLS, TRELLO_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import type { ServiceTransport } from './transports/types.js';
 import { TRELLO_TRANSPORT } from './transports/trello.js';
@@ -24,6 +24,17 @@ export function getRegisteredService(id: string) {
   return definition ? { definition, transport: SERVICE_TRANSPORTS[id]! } : undefined;
 }
 
+export function isServiceAccountService(definitionOrId: ServiceDefinition | string): boolean {
+  const def = typeof definitionOrId === 'string' ? getRegisteredService(definitionOrId)?.definition : definitionOrId;
+  if (def) {
+    return def.credentialFields.some(field => field.key === 'privateKey');
+  }
+  return (
+    typeof definitionOrId === 'string' &&
+    (definitionOrId === 'google-calendar' || definitionOrId === 'google-sheets')
+  );
+}
+
 export function normalizeAllowedScope(definition: ServiceDefinition, value: unknown): AllowedScope | null {
   const { scopeKey, scopePattern } = definition;
   const raw = Array.isArray(value)
@@ -45,10 +56,30 @@ export function hasValidCredentials(fields: readonly { key: string; pattern?: st
 }
 
 /** Only scoped, configured services may be described to the live planner. */
-export async function getConfiguredToolCatalog(credentialRepo: CredentialRepo, encryptionKey: string) {
+export async function getConfiguredToolCatalog(
+  credentialRepo: CredentialRepo,
+  encryptionKey: string,
+  scope?: {
+    workspaceMode?: 'legacy' | 'personal' | 'organization';
+    workspaceId?: string | null;
+    userId?: string;
+  }
+) {
   const available = new Set<string>();
+  const mode = scope?.workspaceMode ?? 'legacy';
   for (const definition of getRegisteredServices()) {
-    const record = await credentialRepo.getCredentials(definition.id);
+    if (definition.id === 'trello' || definition.id === 'github' || definition.id === 'telegram') continue;
+    if (mode === 'personal' && isServiceAccountService(definition)) continue;
+    let record;
+    if (mode === 'personal') {
+      if (!scope?.userId) continue;
+      record = await credentialRepo.getPersonalCredentials(definition.id, scope.userId);
+    } else if (mode === 'organization') {
+      if (!scope?.workspaceId) continue;
+      record = await credentialRepo.getCredentials(definition.id, scope.workspaceId);
+    } else {
+      record = await credentialRepo.getCredentials(definition.id);
+    }
     if (!record) continue;
     try {
       const config = decryptCredentials(record.config, encryptionKey);
@@ -57,6 +88,9 @@ export async function getConfiguredToolCatalog(credentialRepo: CredentialRepo, e
       available.add(definition.id);
     } catch {
       // Corrupt or stale credentials do not authorize a service.
+      console.warn(
+        `[registered-services] Cannot decrypt stored credentials for '${definition.id}'; skipping service.`,
+      );
     }
   }
   return ALL_TOOLS.filter((tool) => available.has(tool.service));
@@ -71,13 +105,50 @@ export async function getConfiguredToolCatalog(credentialRepo: CredentialRepo, e
 export async function getToolCatalogFor(
   credentialRepo: CredentialRepo,
   encryptionKey: string,
-  options: { userId?: string; gmailEnabled: boolean; mycalendarEnabled?: boolean; mysheetsEnabled?: boolean },
+  options: {
+    userId?: string;
+    workspaceMode?: 'legacy' | 'personal' | 'organization';
+    workspaceId?: string | null;
+    gmailEnabled: boolean;
+    mycalendarEnabled?: boolean;
+    mysheetsEnabled?: boolean;
+    trelloEnabled?: boolean;
+    trelloTeamRepo?: any;
+    trelloOAuthClient?: any;
+    trelloTokens?: any;
+    trelloConnection?: (userId: string, scopeId?: string) => Promise<any>;
+    githubEnabled?: boolean;
+    githubTeamRepo?: any;
+    githubOAuthClient?: any;
+    githubTokens?: any;
+    githubConnection?: (userId: string) => Promise<any>;
+    telegramEnabled?: boolean;
+    telegramConnection?: (userId: string) => Promise<any>;
+  },
 ): Promise<ToolDefinition[]> {
-  let catalog = await getConfiguredToolCatalog(credentialRepo, encryptionKey);
+  let catalog = (
+    await getConfiguredToolCatalog(credentialRepo, encryptionKey, {
+      workspaceMode: options.workspaceMode,
+      workspaceId: options.workspaceId,
+      userId: options.userId,
+    })
+  ).filter((tool) => tool.service !== 'trello' && tool.service !== 'github' && tool.service !== 'telegram');
   if (!options.userId) return catalog;
   if (options.gmailEnabled) {
     const gmail = await credentialRepo.getPersonalCredentials('gmail', options.userId);
-    if (gmail && gmail.status === 'active') catalog = [...catalog, ...GMAIL_TOOLS];
+    if (gmail && gmail.status === 'active') {
+      try {
+        if (typeof gmail.config === 'string' && encryptionKey) {
+          decryptCredentials(gmail.config, encryptionKey);
+        }
+        catalog = [...catalog, ...GMAIL_TOOLS];
+      } catch {
+        // stale or unreadable connection does not add tools
+        console.warn(
+          "[registered-services] Cannot decrypt stored credentials for 'gmail'; skipping service.",
+        );
+      }
+    }
   }
   if (options.mycalendarEnabled) {
     const mycal = await credentialRepo.getPersonalCredentials('mycalendar', options.userId);
@@ -94,6 +165,9 @@ export async function getToolCatalogFor(
         }
       } catch {
         // stale or unreadable connection does not add tools
+        console.warn(
+          "[registered-services] Cannot decrypt stored credentials for 'mycalendar'; skipping service.",
+        );
       }
     }
   }
@@ -109,6 +183,113 @@ export async function getToolCatalogFor(
             : [];
         if (spreadsheets.length > 0) {
           catalog = [...catalog, ...MYSHEETS_TOOLS];
+        }
+      } catch {
+        // stale or unreadable connection does not add tools
+        console.warn(
+          "[registered-services] Cannot decrypt stored credentials for 'mysheets'; skipping service.",
+        );
+      }
+    }
+  }
+  const trelloScopeId =
+    options.workspaceMode === 'organization' && options.workspaceId
+      ? options.workspaceId
+      : options.workspaceMode === 'personal' && options.userId
+        ? `personal:${options.userId}`
+        : undefined;
+  if (options.trelloConnection) {
+    try {
+      const trello = trelloScopeId
+        ? await options.trelloConnection(options.userId, trelloScopeId)
+        : await options.trelloConnection(options.userId);
+      if (trello?.status === 'connected' && trello.connection?.boardIds?.length > 0) {
+        catalog = [...catalog, ...TRELLO_TOOLS];
+      }
+    } catch {
+      // ignore
+    }
+  } else if (options.trelloTeamRepo && options.trelloOAuthClient && options.trelloTokens) {
+    const cred = await credentialRepo.getPersonalCredentials('trello', options.userId);
+    if (cred && cred.status === 'active') {
+      try {
+        const scope = trelloScopeId
+          ? await options.trelloTeamRepo.get(trelloScopeId)
+          : await options.trelloTeamRepo.get();
+        if (scope && scope.boards && scope.boards.length > 0) {
+          const dec = decryptCredentials(cred.config, encryptionKey);
+          if (dec.refreshToken) {
+            const provider = options.trelloTokens.forConnection(options.userId, cred.id, dec.refreshToken);
+            const accessToken = await provider.getAccessToken();
+            const callerBoards = await options.trelloOAuthClient.boards(
+              accessToken,
+              scope.workspaceId,
+              AbortSignal.timeout(10_000)
+            );
+            if (scope.boards.some((b: any) => callerBoards.some((cb: any) => cb.id === b.boardId && cb.member === true))) {
+              catalog = [...catalog, ...TRELLO_TOOLS];
+            }
+          }
+        }
+      } catch {
+        // stale or unreadable connection does not add tools
+      }
+    }
+  }
+  if (options.githubConnection) {
+    try {
+      const github = await options.githubConnection(options.userId);
+      if (github?.status === 'connected' && github.connection?.repos?.length > 0) {
+        catalog = [...catalog, ...GITHUB_TOOLS];
+      }
+    } catch {
+      // ignore
+    }
+  } else if (options.githubTeamRepo && options.githubOAuthClient && options.githubTokens) {
+    const cred = await credentialRepo.getPersonalCredentials('github', options.userId);
+    if (cred && cred.status === 'active') {
+      try {
+        const scope = await options.githubTeamRepo.get();
+        if (scope && scope.repos && scope.repos.length > 0) {
+          const dec = decryptCredentials(cred.config, encryptionKey);
+          if (dec.accessToken) {
+            const provider = options.githubTokens.forConnection(options.userId, cred.id, dec.accessToken, dec.refreshToken);
+            const accessToken = await provider.getAccessToken();
+            const callerRepos = await options.githubOAuthClient.repositories(
+              accessToken,
+              AbortSignal.timeout(10_000)
+            );
+            if (scope.repos.some((r: any) => callerRepos.some((cr: any) => (cr.fullName.toLowerCase() === r.fullName.toLowerCase() || String(cr.id) === String(r.repoId)) && cr.member === true))) {
+              catalog = [...catalog, ...GITHUB_TOOLS];
+            }
+          }
+        }
+      } catch {
+        // stale or unreadable connection does not add tools
+      }
+    }
+  }
+  if (options.telegramConnection) {
+    try {
+      const tg = await options.telegramConnection(options.userId);
+      if (tg?.status === 'connected' && tg.connection?.chatIds?.length > 0) {
+        catalog = [...catalog, ...TELEGRAM_TOOLS];
+      }
+    } catch {
+      // ignore
+    }
+  } else if (options.telegramEnabled !== false) {
+    const cred = await credentialRepo.getPersonalCredentials('telegram', options.userId);
+    if (cred && cred.status === 'active') {
+      try {
+        const config = decryptCredentials(cred.config, encryptionKey);
+        const chats = Array.isArray(config.selectedChats)
+          ? config.selectedChats
+          : Array.isArray(config.allowedScope?.chats)
+            ? config.allowedScope.chats
+            : [];
+        if (chats.length > 0) {
+          catalog = [...catalog, ...TELEGRAM_TOOLS];
         }
       } catch {
         // stale or unreadable connection does not add tools

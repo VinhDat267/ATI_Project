@@ -7,7 +7,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "tsc --noEmit -p tsconfig.contracts.json && vitest run"
   },
   "devDependencies": {
     "ajv": "^8.20.0"

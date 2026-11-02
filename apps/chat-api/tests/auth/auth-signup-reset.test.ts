@@ -87,16 +87,19 @@ describe('AUTH-02 signup and password recovery with PostgreSQL and HTTP', () => 
     expect(await users.findByEmail(email)).toBeNull();
   });
 
-  it('verifies email once under a real PostgreSQL race and notifies only active admins while retaining pending', async () => {
+  it('verifies email once under a real PostgreSQL race, activates user and issues session without notifying admins', async () => {
     const adminEmail = `${randomUUID()}@example.test`;
     await pool.query("INSERT INTO users(email,password,name,role,status,email_verified) VALUES($1,$2,'Quản trị','admin','active',true),($3,$2,'Tắt','admin','disabled',true)", [adminEmail, storedPassword, `disabled-${adminEmail}`]);
     expect((await signup()).status).toBe(200);
     const { token } = await tokenFromMail();
     const results = await Promise.all(Array.from({ length: 4 }, () => post('verify-email', { token })));
     expect(results.map(result => result.status).sort()).toEqual([200, 400, 400, 400]);
-    expect(results.find(result => result.status === 200)!.body.message).toContain('chờ quản trị viên duyệt');
-    expect(await users.findByEmail(email)).toMatchObject({ status: 'pending', email_verified: true });
-    expect((await pool.query('SELECT subject FROM email_outbox WHERE to_address=$1', [adminEmail])).rows).toHaveLength(1);
+    const winner = results.find(result => result.status === 200)!;
+    expect(winner.body.message).toContain('Email đã xác minh');
+    expect(winner.body.accessToken).toBeDefined();
+    expect(winner.body.refreshToken).toBeDefined();
+    expect(await users.findByEmail(email)).toMatchObject({ status: 'active', email_verified: true });
+    expect((await pool.query('SELECT subject FROM email_outbox WHERE to_address=$1', [adminEmail])).rows).toHaveLength(0);
     expect((await pool.query('SELECT id FROM email_outbox WHERE to_address=$1', [`disabled-${adminEmail}`])).rows).toHaveLength(0);
   });
 

@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import type { AuthRoutesOptions } from './index.js';
 import { duplicateSignupEmail, sendEmailInBackground, sendEmailSafely, verificationEmail } from '../../services/email/index.js';
-import { emailResponse, normalizedEmail, notifyAdmins, rateLimit, requirePostgres, signupResponse, validPassword, validToken } from './public-helpers.js';
+import { emailResponse, normalizedEmail, rateLimit, requirePostgres, signupResponse, validPassword, validToken } from './public-helpers.js';
 import { SignupQuota, SignupRateLimitError } from '../../auth/signup-quota.js';
+import { toAuthUser } from '../../db/repositories/user-repo.js';
+import { generateAccessToken } from '../../auth/jwt.js';
 
 export function createSignupRoutes(options: AuthRoutesOptions): Router {
   const router = Router();
@@ -34,8 +36,23 @@ export function createSignupRoutes(options: AuthRoutesOptions): Router {
     const token = req.body?.token;
     const user = validToken(token) ? await options.userRepo!.authTokens.verifyEmail(token, clock()) : null;
     if (!user) { res.status(400).json({ error: 'Link xác minh không hợp lệ, đã dùng hoặc đã hết hạn.' }); return; }
-    await notifyAdmins(options, user);
-    res.json({ message: 'Email đã xác minh, chờ quản trị viên duyệt.' });
+    if (user.status === 'active') {
+      const sessions = options.sessionRepo ?? options.userRepo?.sessions;
+      if (sessions) {
+        const now = clock();
+        const authUser = toAuthUser(user);
+        const session = await sessions.create(user.id, req.get('User-Agent'), now);
+        res.json({
+          message: 'Email đã xác minh. Đang đưa bạn vào không gian làm việc...',
+          user: authUser,
+          tokenType: 'Bearer',
+          ...generateAccessToken(authUser, options.jwtSecret, session.sessionId, now),
+          refreshToken: session.refreshToken,
+        });
+        return;
+      }
+    }
+    res.json({ message: 'Email đã xác minh.' });
   });
   router.post('/resend-verification', async (req, res) => {
     if (!requirePostgres(options, res)) return;

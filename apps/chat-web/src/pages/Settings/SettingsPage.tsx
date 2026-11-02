@@ -3,6 +3,7 @@ import { useEffect, useState, useLayoutEffect, useRef } from 'react';
 import { MainNav } from '../../components/layout/MainNav';
 import { usePrototypePage } from '../../prototype/usePrototypePage';
 import { ServiceLogo } from '../../components/ServiceLogo';
+import { getActiveWorkspaceSummary, subscribeWorkspace } from '../../services/workspace-storage';
 import type { User } from '../../types';
 import { type Service } from './data';
 import { useSettings } from './useSettings';
@@ -10,7 +11,13 @@ import { PersonalGmail } from './PersonalGmail';
 import { PersonalMyCalendar } from './PersonalMyCalendar';
 import { PersonalMySheets } from './PersonalMySheets';
 import { PersonalSlack } from './PersonalSlack';
+import { TrelloConnection } from './TrelloConnection';
+import { GitHubConnection } from './GitHubConnection';
+import { TelegramConnection } from './TelegramConnection';
 import { gmailConnectionNotice } from '../../services/gmail-connection';
+import { trelloConnectionNotice } from '../../services/trello-connection';
+import { githubConnectionNotice } from '../../services/github-connection';
+import { telegramConnectionNotice } from '../../services/telegram-connection';
 import { meta } from './meta';
 
 const SAVED_PLACEHOLDER = 'Đã lưu · nhập lại nếu muốn thay';
@@ -91,9 +98,20 @@ function ServiceRow({ service, onOpen }: { service: Service; onOpen: (id: string
 export interface SettingsPageProps { user: User | null; navigate: (path: string) => void; onLogout: () => void; authToken?: string | null }
 export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
   usePrototypePage(meta);
+  const [workspace, setWorkspace] = useState(getActiveWorkspaceSummary());
+  useEffect(() => subscribeWorkspace(() => setWorkspace(getActiveWorkspaceSummary())), []);
   const { slackOAuthEnabled, list, personal, personalMyCalendar, personalMySheets, active, draft, selected, loading, loadError, refresh, canEdit, errors, results, busy, keyHelpOpen, actions } = useSettings(user);
   const [connectedEmail, setConnectedEmail] = useState<string>();
-  useEffect(() => { const email = gmailConnectionNotice.take(user?.id); if (email) setConnectedEmail(email); }, [user?.id]);
+  useEffect(() => {
+    const email = gmailConnectionNotice.take(user?.id);
+    const trelloUser = trelloConnectionNotice.take(user?.id);
+    const githubUser = githubConnectionNotice.take(user?.id);
+    const telegramUser = telegramConnectionNotice.take(user?.id);
+    if (email) setConnectedEmail(email);
+    else if (trelloUser) setConnectedEmail(`@${trelloUser}`);
+    else if (githubUser) setConnectedEmail(`@${githubUser}`);
+    else if (telegramUser) setConnectedEmail(`@${telegramUser}`);
+  }, [user?.id]);
   const backgroundRef = useRef<HTMLDivElement>(null), containerRef = useRef<HTMLDivElement>(null), closeButtonRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef(actions.closeServiceDrawer); closeRef.current = actions.closeServiceDrawer;
   useLayoutEffect(() => {
@@ -141,14 +159,28 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-8 sm:py-10">
         {/* Tiêu đề trang & Nguyên tắc */}
         <div className="mb-8 sm:mb-10">
+          {/* Context Pill */}
+          <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#E7E7E2] bg-white text-xs text-[#111827] shadow-sm">
+            <span>{workspace.id === 'personal' ? '👤' : '🏢'}</span>
+            <span className="font-semibold text-[#4B5563]">
+              {workspace.id === 'personal'
+                ? 'Đang cấu hình kết nối cho: Không gian Cá nhân'
+                : `Đang cấu hình kết nối cho: ${workspace.name}`}
+            </span>
+          </div>
           <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 mb-3">
             <h1 className="font-display text-3xl sm:text-4xl font-bold text-[#111827] tracking-tight">
               Kết nối dịch vụ
             </h1>
-            {hasCatalogue && <div className="inline-flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#16A34A]" />
-              <span id="summary-connected-count" className="text-sm sm:text-base font-semibold text-[#111827]">
-                {`${configured.length} / 8 dịch vụ đã thiết lập · ${okCount} kết nối tốt`}
+            {hasCatalogue && <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#16A34A]" />
+                <span id="summary-connected-count" className="text-sm sm:text-base font-semibold text-[#111827]">
+                  {`${configured.length} / 8 dịch vụ đã thiết lập · ${okCount} kết nối tốt`}
+                </span>
+              </div>
+              <span data-testid="settings-oauth-summary" className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                OAuth 1-Click cá nhân &amp; Tích hợp Workspace
               </span>
             </div>}
           </div>
@@ -171,23 +203,20 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
         {loading && <p role="status" className="text-xs text-[#6B7280]">Đang tải dịch vụ...</p>}
         {loadError && <div role="alert" className="text-xs text-[#DC2626] mb-4">{loadError} <button type="button" onClick={() => void refresh()} className="underline">Thử lại</button></div>}
         {connectedEmail && <p role="status" className="text-sm text-[#111827] mb-4">Đã kết nối {connectedEmail}</p>}
-        {((personal ? 1 : 0) + (personalMyCalendar ? 1 : 0) + (personalMySheets ? 1 : 0)) === 1 && (
-          <>
-            {personal && <PersonalGmail key={user?.id} selected={selected} service={personal} refresh={refresh} />}
-            {personalMyCalendar && <PersonalMyCalendar key={user?.id} selected={selected} service={personalMyCalendar} refresh={refresh} navigate={navigate} />}
-            {personalMySheets && <PersonalMySheets key={user?.id} selected={selected} service={personalMySheets} refresh={refresh} navigate={navigate} />}
-          </>
-        )}
-        {((personal ? 1 : 0) + (personalMyCalendar ? 1 : 0) + (personalMySheets ? 1 : 0)) > 1 && (
-          <section aria-labelledby="heading-personal-services" className="mb-8">
-            <h2 id="heading-personal-services" className="text-xs font-bold uppercase tracking-wider text-[#6B7280] mb-3.5">Của riêng bạn</h2>
-            <div className="v3-space-y-4">
-              {personal && <PersonalGmail key={`gmail-${user?.id}`} selected={selected} service={personal} refresh={refresh} standalone={false} />}
-              {personalMyCalendar && <PersonalMyCalendar key={`mycalendar-${user?.id}`} selected={selected} service={personalMyCalendar} refresh={refresh} navigate={navigate} standalone={false} />}
-              {personalMySheets && <PersonalMySheets key={`mysheets-${user?.id}`} selected={selected} service={personalMySheets} refresh={refresh} navigate={navigate} standalone={false} />}
-            </div>
-          </section>
-        )}
+        <section aria-labelledby="heading-personal-services" className="mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-3.5">
+            <h2 id="heading-personal-services" className="text-xs font-bold uppercase tracking-wider text-[#6B7280]">Của riêng bạn</h2>
+            <span className="text-xs text-[#6B7280]">Tài khoản Cá nhân (OAuth 1-Click) · Chọn tài nguyên trực quan</span>
+          </div>
+          <div className="v3-space-y-4">
+            {personal && <PersonalGmail key={`gmail-${user?.id}`} selected={selected} service={personal} refresh={refresh} standalone={false} />}
+            {personalMyCalendar && <PersonalMyCalendar key={`mycalendar-${user?.id}`} selected={selected} service={personalMyCalendar} refresh={refresh} navigate={navigate} standalone={false} />}
+            {personalMySheets && <PersonalMySheets key={`mysheets-${user?.id}`} selected={selected} service={personalMySheets} refresh={refresh} navigate={navigate} standalone={false} />}
+            <TrelloConnection key={`trello-${user?.id}`} user={user} selected={selected} refresh={refresh} standalone={false} />
+            <GitHubConnection key={`github-${user?.id}`} user={user} selected={selected} refresh={refresh} standalone={false} />
+            <TelegramConnection key={`telegram-${user?.id}`} user={user} selected={selected} refresh={refresh} navigate={navigate} standalone={false} />
+          </div>
+        </section>
         {/* DANH SÁCH 2 NHÓM DỊCH VỤ */}
         {hasCatalogue && <div className="v3-space-y-8 sm:v3-space-y-10">
           {/* Nhóm 1: Đã thiết lập */}
@@ -240,7 +269,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
               ATI — Nền tảng điều phối công việc liên dịch vụ · 2026
             </p>
             <p className="text-[11px] text-[#9CA3AF] mt-0.5">
-              {personal ? 'Dịch vụ dùng chung: chỉ quản trị viên cập nhật khoá. Gmail riêng do mỗi người tự kết nối.' : 'Khoá dịch vụ là tài nguyên dùng chung của cả nhóm · Chỉ quản trị viên có quyền cập nhật'}
+              {personal ? 'Dịch vụ dùng chung: chỉ quản trị viên cập nhật khoá. OAuth 1-Click cá nhân (Gmail, Calendar, Sheets, Trello, GitHub, Telegram) do mỗi người tự kết nối.' : 'Khoá dịch vụ là tài nguyên dùng chung của cả nhóm · Chỉ quản trị viên có quyền cập nhật'}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-4 text-xs">

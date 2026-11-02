@@ -46,8 +46,36 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
   if(style==='rows') {
     const values=step.args.values ?? step.args.rows;
     const rows=Array.isArray(values) ? values.filter(Array.isArray) as unknown[][] : [];
+    const maxCols=Math.max(1, ...rows.map(r => r.length));
+    const colLetters=Array.from({length:maxCols}, (_, idx) => String.fromCharCode(65 + (idx % 26)));
     return <div className="v3-space-y-3">
       <div className="text-xs text-neutral-600">{'Đích: '}<strong>{destination}</strong></div>
+      {rows.length > 0 && (
+        <div data-testid="spreadsheet-grid-preview" className="border border-emerald-200 rounded-xl overflow-x-auto bg-white shadow-2xs">
+          <div className="px-3 py-1.5 bg-emerald-50/80 border-b border-emerald-200 text-[11px] font-semibold text-emerald-900 flex items-center justify-between">
+            <span>Xem trước dòng bảng tính (Spreadsheet Grid)</span>
+            <span className="font-mono text-[10px] text-emerald-700">{rows.length} dòng × {maxCols} cột</span>
+          </div>
+          <div className="min-w-full">
+            <div className="grid border-b border-neutral-200 bg-neutral-50 text-[11px] font-semibold text-neutral-600" style={{ gridTemplateColumns: `repeat(${maxCols}, minmax(96px, 1fr))` }}>
+              {colLetters.map((letter) => (
+                <div key={letter} className="px-2.5 py-1.5 border-r last:border-r-0 border-neutral-200 font-mono">
+                  Cột {letter}
+                </div>
+              ))}
+            </div>
+            {rows.map((row, rIdx) => (
+              <div key={rIdx} className="grid border-b last:border-b-0 border-neutral-200 text-xs text-neutral-900 bg-white" style={{ gridTemplateColumns: `repeat(${maxCols}, minmax(96px, 1fr))` }}>
+                {colLetters.map((letter, cIdx) => (
+                  <div key={`${rIdx}-${letter}`} className="px-2.5 py-2 border-r last:border-r-0 border-neutral-100 break-words">
+                    {row[cIdx] !== undefined ? text(row[cIdx]) : ''}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="border border-neutral-200 rounded-xl overflow-hidden">
         <table className="w-full text-left text-xs">
           <thead className="bg-neutral-100 text-neutral-600 font-semibold border-b border-neutral-200">

@@ -1,13 +1,32 @@
 import type pg from 'pg';
-import type { ScheduleProposalMetadata, ScheduleResponse, ScheduleRunView, ScheduleStateMetadata, ScheduleView } from '@wap/tool-schemas';
+import type {
+  CalendarDigestCandidate,
+  GithubDigestConfig,
+  ScheduleApprovalMode,
+  ScheduleDigestCandidate,
+  ScheduleKind,
+  ScheduleProposalMetadata,
+  ScheduleResponse,
+  ScheduleRunView,
+  ScheduleStateMetadata,
+  ScheduleView,
+  SheetsDigestCandidate,
+  TelegramDigestConfig,
+  TelegramDigestCandidate,
+} from '@wap/tool-schemas';
+import type { CredentialRepo } from '../../db/repositories/credential-repo.js';
 import { MessageRepo } from '../../db/repositories/message-repo.js';
-import { ScheduleRepo, type Queryable, type ScheduleRow } from '../../db/repositories/schedule-repo.js';
+import { ScheduleRepo, type Queryable, type ScheduleRow, type ScheduleScope } from '../../db/repositories/schedule-repo.js';
 import { isUuid } from '../../db/repositories/uuid.js';
+import { calendarDigestCandidateMatches, computeCalendarDigestHash, evaluateCalendarDigestCandidate } from './calendar-digest-candidate.js';
 import { runState, runView } from './run-state.js';
 import { nextOccurrence } from './next-occurrence.js';
-import { captureScheduleArtifact,guardScheduleArtifact,prelockScheduleArtifacts,registerScheduleFields,scheduleRegistry,scheduleSourceContext,tagScheduleContext } from '../slack/slack-schedule-lineage.js';
+import { captureScheduleArtifact, guardScheduleArtifact, prelockScheduleArtifacts, registerScheduleFields, scheduleRegistry, scheduleSourceContext, tagScheduleContext } from '../slack/slack-schedule-lineage.js';
 import { messageOutputSelectors } from '../slack/slack-message-selectors.js';
 import type { DerivedSegmentInput } from '../../db/repositories/slack-derived-lineage-repo.js';
+import { analyzeSheetsDigestCandidate, computeSheetsDigestHash } from './sheets-digest-candidate.js';
+import { canonicalizeDigestConfig, computeDigestConfigHash } from './github-digest-candidate.js';
+import { computeTelegramDigestConfigHash } from './telegram-digest-candidate.js';
 
 export const SCHEDULE_CONFLICTS = {
   STALE_PROPOSAL: 'Đề xuất này đã cũ. Hãy xem đề xuất mới nhất.',
@@ -19,11 +38,17 @@ export const SCHEDULE_CONFLICTS = {
   RUN_IN_PROGRESS: 'Lịch đang lập kế hoạch cho một lượt. Hãy chờ lượt đó xong.',
   RUN_NOT_REPLANNABLE: 'Lượt này không cần lập lại kế hoạch.',
   SCHEDULE_SOURCE_PURGED: 'Nguồn Slack của đề xuất này chưa thể dùng để tạo lịch. Hãy tạo đề xuất mới.',
+  DIGEST_NOT_ELIGIBLE: 'Lịch này không đủ điều kiện tự gửi báo cáo. Hãy chọn chế độ chờ duyệt mỗi lượt.',
+  AUTO_DIGEST_NOT_ELIGIBLE: 'Lịch này không đủ điều kiện gửi tự động hoặc kết nối Google Calendar/kênh nhận đã thay đổi. Hãy chọn chế độ duyệt thủ công hoặc kiểm tra lại kết nối.',
+  AUTO_DIGEST_NOT_ALLOWED: 'Lịch này cần duyệt từng lượt.',
+  DIGEST_PREVIEW_CHANGED: 'Kết nối, phạm vi lịch hoặc kênh nhận khác bản xem trước. Hãy yêu cầu đề xuất mới và xác nhận lại.',
 } as const;
 export type ScheduleConflictCode = keyof typeof SCHEDULE_CONFLICTS;
 
 export class ScheduleConflict extends Error {
-  constructor(readonly code: ScheduleConflictCode) { super(SCHEDULE_CONFLICTS[code]); }
+  constructor(readonly code: ScheduleConflictCode, customMessage?: string) {
+    super(customMessage || SCHEDULE_CONFLICTS[code]);
+  }
 }
 export class ScheduleNotFound extends Error {
   constructor() { super('Không tìm thấy lịch.'); }
@@ -39,7 +64,12 @@ export interface ScheduleChange {
 }
 
 type Action = ScheduleResponse['action'];
-type Fields = Pick<ScheduleRow, 'name' | 'request' | 'recurrence' | 'services' | 'status' | 'pause_reason' | 'next_run_at'>;
+type Fields = Pick<ScheduleRow, 'name' | 'request' | 'recurrence' | 'services' | 'status' | 'pause_reason' | 'next_run_at'> & {
+  kind?: ScheduleKind;
+  digest_config?: ScheduleRow['digest_config'];
+  digest_config_hash?: string | null;
+  digest_approved_at?: Date | string | null;
+};
 
 export interface ScheduleServiceOptions {
   pool: pg.Pool;
@@ -47,9 +77,12 @@ export interface ScheduleServiceOptions {
   /** Plans a run in the background; the scheduler (SCHED-01) or nothing in tests. */
   runner?: { planNow(runId: string): Promise<void> };
   maxSchedules?: number;
+  credentialRepo?: CredentialRepo;
+  encryptionKey?: string;
+  mysheetsEnabled?: boolean;
 }
 
-const REPLANNABLE = new Set(['expired', 'planning_failed', 'interrupted', 'missed']);
+const REPLANNABLE = new Set(['expired', 'planning_failed', 'interrupted', 'missed', 'digest_failed']);
 /** Schedules that count toward the limit. */
 const OPEN = new Set(['active', 'paused']);
 
@@ -113,15 +146,79 @@ export class ScheduleService {
     }
   }
 
-  private async saveFields(client: pg.PoolClient, id: string, fields: Fields, proposalId: string | null, segments: DerivedSegmentInput[] = []): Promise<ScheduleRow> {
-    const res = await client.query(
-      `UPDATE schedules SET name=$2, request=$3, recurrence=$4, services=$5, status=$6, pause_reason=$7, next_run_at=$8,
-         version=version+1, updated_at=now(), last_proposal_id=COALESCE($9, last_proposal_id)
-       WHERE id=$1 RETURNING *`,
-      [id, fields.name, fields.request, JSON.stringify(fields.recurrence), fields.services, fields.status, fields.pause_reason, fields.next_run_at, proposalId],
-    );
-    await registerScheduleFields(client,this.registry,'schedules',id,res.rows[0].user_id,segments,['name','request','recurrence']);
-    return tagScheduleContext(res.rows[0],segments);
+  private async saveFields(
+    client: pg.PoolClient,
+    id: string,
+    fields: Fields,
+    proposalId: string | null,
+    segments: DerivedSegmentInput[] = [],
+    digestUpdate?:
+      | { kind: 'plan' }
+      | { kind: 'github_digest'; config: GithubDigestConfig; configHash: string; approvedAt: Date },
+  ): Promise<ScheduleRow> {
+    let res: pg.QueryResult<ScheduleRow>;
+    if (digestUpdate?.kind === 'plan') {
+      res = await client.query(
+        `UPDATE schedules SET name=$2, request=$3, recurrence=$4, services=$5, status=$6, pause_reason=$7, next_run_at=$8,
+           kind='plan', digest_config=NULL, digest_config_hash=NULL, digest_approved_at=NULL,
+           version=version+1, updated_at=now(), last_proposal_id=COALESCE($9, last_proposal_id)
+         WHERE id=$1 RETURNING *`,
+        [id, fields.name, fields.request, JSON.stringify(fields.recurrence), fields.services, fields.status, fields.pause_reason, fields.next_run_at, proposalId],
+      );
+    } else if (digestUpdate?.kind === 'github_digest') {
+      res = await client.query(
+        `UPDATE schedules SET name=$2, request=$3, recurrence=$4, services=$5, status=$6, pause_reason=$7, next_run_at=$8,
+           kind='github_digest', digest_config=$10, digest_config_hash=$11, digest_approved_at=$12,
+           version=version+1, updated_at=now(), last_proposal_id=COALESCE($9, last_proposal_id)
+         WHERE id=$1 RETURNING *`,
+        [
+          id,
+          fields.name,
+          fields.request,
+          JSON.stringify(fields.recurrence),
+          fields.services,
+          fields.status,
+          fields.pause_reason,
+          fields.next_run_at,
+          proposalId,
+          JSON.stringify(digestUpdate.config),
+          digestUpdate.configHash,
+          digestUpdate.approvedAt,
+        ],
+      );
+    } else if (fields.kind !== undefined) {
+      res = await client.query(
+        `UPDATE schedules SET name=$2, request=$3, recurrence=$4, services=$5, status=$6, pause_reason=$7, next_run_at=$8,
+           version=version+1, updated_at=now(), last_proposal_id=COALESCE($9, last_proposal_id),
+           kind=$10, digest_config=$11, digest_config_hash=$12, digest_approved_at=$13
+         WHERE id=$1 RETURNING *`,
+        [
+          id,
+          fields.name,
+          fields.request,
+          JSON.stringify(fields.recurrence),
+          fields.services,
+          fields.status,
+          fields.pause_reason,
+          fields.next_run_at,
+          proposalId,
+          fields.kind,
+          fields.digest_config ? JSON.stringify(fields.digest_config) : null,
+          fields.digest_config_hash ?? null,
+          fields.digest_approved_at ?? null,
+        ],
+      );
+    } else {
+      res = await client.query(
+        `UPDATE schedules SET name=$2, request=$3, recurrence=$4, services=$5, status=$6, pause_reason=$7, next_run_at=$8,
+           version=version+1, updated_at=now(), last_proposal_id=COALESCE($9, last_proposal_id)
+         WHERE id=$1 RETURNING *`,
+        [id, fields.name, fields.request, JSON.stringify(fields.recurrence), fields.services, fields.status, fields.pause_reason, fields.next_run_at, proposalId],
+      );
+    }
+    const row = res.rows[0]!;
+    await registerScheduleFields(client, this.registry, 'schedules', id, row.user_id, segments, ['name', 'request', 'recurrence']);
+    return tagScheduleContext(row, segments);
   }
 
   /** Writes the state message in the same transaction as the change. */
@@ -138,43 +235,68 @@ export class ScheduleService {
   }
 
   /** The owner row serializes the count across the member's conversations; it comes after the conversation and schedule locks. */
-  private async ensureRoom(client: pg.PoolClient, userId: string): Promise<void> {
+  private async ensureRoom(client: pg.PoolClient, userId: string, scope?: ScheduleScope): Promise<void> {
     await client.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [userId]);
-    const open = await client.query("SELECT count(*)::int AS n FROM schedules WHERE user_id=$1 AND status IN ('active', 'paused')", [userId]);
+    let scopeClause = '';
+    const args: unknown[] = [userId];
+    if (scope?.workspaceMode === 'organization' && scope.workspaceId) {
+      args.push(scope.workspaceId);
+      scopeClause = ` AND workspace_mode='organization' AND workspace_id=$${args.length}`;
+    } else if (scope?.workspaceMode === 'personal') {
+      scopeClause = " AND workspace_mode IN ('personal', 'legacy') AND workspace_id IS NULL";
+    } else if (scope?.workspaceMode === 'legacy') {
+      scopeClause = ' AND workspace_id IS NULL';
+    }
+    const open = await client.query(
+      `SELECT count(*)::int AS n FROM schedules WHERE user_id=$1 AND status IN ('active', 'paused')${scopeClause}`,
+      args
+    );
     if (open.rows[0].n >= this.maxSchedules) throw new ScheduleConflict('LIMIT_REACHED');
   }
 
-  async confirmProposal(input: { userId: string; convId: string; messageId: string; now: Date }): Promise<ScheduleChange> {
-    const { userId, convId, messageId, now } = input;
+  async confirmProposal(input: {
+    userId: string;
+    convId: string;
+    messageId: string;
+    now: Date;
+    scope?: ScheduleScope;
+    approvalMode?: ScheduleApprovalMode;
+  }): Promise<ScheduleChange> {
+    const { userId, convId, messageId, now, scope, approvalMode } = input;
     if (!isUuid(convId) || !isUuid(messageId)) throw new ScheduleNotFound();
     return this.transaction(async (client) => {
-      const proposed=await captureScheduleArtifact(client,this.registry,'messages',messageId);
-      const existingId=(await client.query('SELECT id FROM schedules WHERE conv_id=$1',[convId])).rows[0]?.id;
-      let saved=existingId?await captureScheduleArtifact(client,this.registry,'schedules',existingId):null;
-      if(!proposed||proposed.convId!==convId||proposed.owner!==userId)throw new ScheduleNotFound();
-      await prelockScheduleArtifacts(client,this.registry,[proposed,saved]);
+      const proposed = await captureScheduleArtifact(client, this.registry, 'messages', messageId);
+      const existingId = (await client.query('SELECT id FROM schedules WHERE conv_id=$1', [convId])).rows[0]?.id;
+      let saved = existingId ? await captureScheduleArtifact(client, this.registry, 'schedules', existingId) : null;
+      if (!proposed || proposed.convId !== convId || proposed.owner !== userId) throw new ScheduleNotFound();
+      await prelockScheduleArtifacts(client, this.registry, [proposed, saved]);
       // Capacity is exclusive before any registry authority FOR SHARE. Two
       // workspaces of one ATI owner have disjoint source keys; upgrading two
       // shared user locks later in ensureRoom would deadlock. Preserve global
       // source -> conversation -> schedule -> owner -> artifact ordering.
-      await client.query('SELECT id FROM conversations WHERE id=$1 AND user_id=$2 FOR UPDATE',[convId,userId]);
-      if(saved)await client.query('SELECT id FROM schedules WHERE id=$1 FOR UPDATE',[saved.id]);
-      await client.query('SELECT id FROM users WHERE id=$1 FOR UPDATE',[userId]);
-      const guarded=await guardScheduleArtifact(client,this.registry,proposed,'planning','UPDATE');
-      if(!guarded.allowed)throw new ScheduleConflict('SCHEDULE_SOURCE_PURGED');
-      const metadata=guarded.row.metadata as ScheduleProposalMetadata;
-      if(metadata?.type!=='schedule_proposal')throw new ScheduleNotFound();
-      if(!saved){
-        const arrived=(await client.query('SELECT id FROM schedules WHERE conv_id=$1',[convId])).rows[0];
-        if(arrived){
-          saved=await captureScheduleArtifact(client,this.registry,'schedules',arrived.id);
-          if(saved?.segments.some(s=>!proposed.segments.some(p=>JSON.stringify(p)===JSON.stringify(s))))throw new ScheduleConflict('STALE_PROPOSAL');
+      const owner = await client.query('SELECT id, user_id, workspace_id, workspace_mode FROM conversations WHERE id=$1 AND user_id=$2 FOR UPDATE', [convId, userId]);
+      if (!owner.rows[0]) throw new ScheduleNotFound();
+      if (scope?.workspaceMode === 'organization' && owner.rows[0]?.workspace_id !== scope.workspaceId) throw new ScheduleNotFound();
+      if (scope?.workspaceMode === 'personal' && owner.rows[0]?.workspace_id) throw new ScheduleNotFound();
+      if (saved) await client.query('SELECT id FROM schedules WHERE id=$1 FOR UPDATE', [saved.id]);
+      await client.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [userId]);
+      const guarded = await guardScheduleArtifact(client, this.registry, proposed, 'planning', 'UPDATE');
+      if (!guarded.allowed) throw new ScheduleConflict('SCHEDULE_SOURCE_PURGED');
+      const metadata = guarded.row.metadata as ScheduleProposalMetadata;
+      if (metadata?.type !== 'schedule_proposal') throw new ScheduleNotFound();
+      if (!saved) {
+        const arrived = (await client.query('SELECT id FROM schedules WHERE conv_id=$1', [convId])).rows[0];
+        if (arrived) {
+          saved = await captureScheduleArtifact(client, this.registry, 'schedules', arrived.id);
+          if (saved?.segments.some((s) => !proposed.segments.some((p) => JSON.stringify(p) === JSON.stringify(s)))) {
+            throw new ScheduleConflict('STALE_PROPOSAL');
+          }
         }
       }
-      const checked=saved?await guardScheduleArtifact(client,this.registry,saved,'planning','UPDATE'):null;
-      if(checked&&!checked.allowed)throw new ScheduleConflict('SCHEDULE_SOURCE_PURGED');
-      const existing:ScheduleRow|undefined=checked?.row;
-      const segments=[...guarded.segments,...(checked?.segments??[])];
+      const checked = saved ? await guardScheduleArtifact(client, this.registry, saved, 'planning', 'UPDATE') : null;
+      if (checked && !checked.allowed) throw new ScheduleConflict('SCHEDULE_SOURCE_PURGED');
+      const existing: ScheduleRow | undefined = checked?.row;
+      const segments = [...guarded.segments, ...(checked?.segments ?? [])];
       // Confirming an applied proposal again changes nothing.
       if (existing?.last_proposal_id === messageId) return this.unchanged(client, existing, now);
       const latest = await client.query(
@@ -182,14 +304,162 @@ export class ScheduleService {
       if (latest.rows[0].id !== messageId) throw new ScheduleConflict('STALE_PROPOSAL');
 
       const proposal = metadata.proposal;
+      const wsId = owner.rows[0].workspace_id ?? null;
+      const wsMode = owner.rows[0].workspace_mode ?? 'legacy';
+      const wantAutoDigest = approvalMode === 'auto_digest';
+      const isTelegramSchedule =
+        metadata.services.includes('telegram') || existing?.kind === 'telegram_digest';
+      const isGithubSchedule =
+        !isTelegramSchedule && (metadata.services.includes('github') || existing?.kind === 'github_digest');
+      const isCalendarSchedule =
+        !isTelegramSchedule && !isGithubSchedule && (metadata.services.includes('mycalendar') || metadata.services.includes('calendar') || existing?.kind === 'calendar_digest');
+      let digestFields: {
+        kind: 'plan' | 'sheets_digest' | 'calendar_digest' | 'github_digest' | 'telegram_digest';
+        digestConfig: unknown | null;
+        digestConfigHash: string | null;
+        digestApprovedAt: Date | null;
+      } = {
+        kind: 'plan',
+        digestConfig: null,
+        digestConfigHash: null,
+        digestApprovedAt: null,
+      };
+      let telegramDigestConfig: TelegramDigestConfig | null = null;
+      let telegramDigestHash: string | null = null;
+
+      if (wantAutoDigest && (proposal.action === 'create' || proposal.action === 'update') && !isGithubSchedule) {
+        if (isTelegramSchedule) {
+          const candidate = metadata.digestCandidate as TelegramDigestCandidate | undefined;
+          if (!candidate || candidate.canAutoDigest !== true || !candidate.config || !candidate.configHash) {
+            throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
+          }
+          const computedHash = computeTelegramDigestConfigHash(candidate.config);
+          if (computedHash !== candidate.configHash) {
+            throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
+          }
+          telegramDigestConfig = candidate.config;
+          telegramDigestHash = computedHash;
+          digestFields = {
+            kind: 'telegram_digest',
+            digestConfig: JSON.stringify(telegramDigestConfig),
+            digestConfigHash: telegramDigestHash,
+            digestApprovedAt: now,
+          };
+        } else if (isCalendarSchedule) {
+          const evaluated = await evaluateCalendarDigestCandidate({
+            pool: client,
+            encryptionKey: this.options.encryptionKey,
+            userId,
+            services: metadata.services,
+            request: proposal.request!,
+          });
+          if (!evaluated.candidate.canAutoDigest || !evaluated.config || !evaluated.configHash) {
+            throw new ScheduleConflict('AUTO_DIGEST_NOT_ELIGIBLE');
+          }
+          const candidate = metadata.digestCandidate as CalendarDigestCandidate | undefined;
+          if (!calendarDigestCandidateMatches(candidate, evaluated)) {
+            throw new ScheduleConflict('DIGEST_PREVIEW_CHANGED');
+          }
+          digestFields = {
+            kind: 'calendar_digest',
+            digestConfig: JSON.stringify(candidate.config),
+            digestConfigHash: computeCalendarDigestHash(candidate.config),
+            digestApprovedAt: now,
+          };
+        } else {
+          const sheetsCandidate = metadata.digestCandidate as SheetsDigestCandidate | undefined;
+          if (!sheetsCandidate?.canAutoDigest || !sheetsCandidate.config) {
+            throw new ScheduleConflict('DIGEST_NOT_ELIGIBLE');
+          }
+          if (this.options.credentialRepo && this.options.encryptionKey) {
+            const recheck = await analyzeSheetsDigestCandidate({
+              userId,
+              request: proposal.request!,
+              services: metadata.services,
+              credentialRepo: this.options.credentialRepo,
+              encryptionKey: this.options.encryptionKey,
+              mysheetsEnabled: this.options.mysheetsEnabled,
+            });
+            if (!recheck.canAutoDigest || !recheck.config) {
+              throw new ScheduleConflict('DIGEST_NOT_ELIGIBLE');
+            }
+          }
+          const config = sheetsCandidate.config;
+          const hash = computeSheetsDigestHash({
+            userId,
+            recurrence: proposal.recurrence!,
+            config,
+          });
+          digestFields = {
+            kind: 'sheets_digest',
+            digestConfig: JSON.stringify(config),
+            digestConfigHash: hash,
+            digestApprovedAt: now,
+          };
+        }
+      }
+
       if (proposal.action === 'create') {
         if (existing) throw new ScheduleConflict('CONVERSATION_HAS_SCHEDULE');
-        await this.ensureRoom(client, userId);
+        if (isGithubSchedule && approvalMode === 'auto_digest') {
+          const githubCandidate = metadata.digestCandidate as ScheduleDigestCandidate | undefined;
+          if (!githubCandidate?.canAutoDigest || !githubCandidate.config) {
+            throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED', githubCandidate?.disabledReason);
+          }
+          await this.ensureRoom(client, userId, { workspaceMode: wsMode, workspaceId: wsId });
+          const next = this.next({ recurrence: proposal.recurrence! }, now);
+          const config = canonicalizeDigestConfig(githubCandidate.config);
+          const configHash = computeDigestConfigHash({
+            config,
+            recurrence: proposal.recurrence!,
+            userId,
+          });
+          const created = await client.query(
+            `INSERT INTO schedules(
+               user_id, conv_id, name, request, recurrence, services, status, next_run_at, last_proposal_id,
+               workspace_id, workspace_mode, kind, digest_config, digest_config_hash, digest_approved_at
+             )
+             VALUES($1, $2, $3, $4, $5, $6, 'active', $7, $8, $9, $10, 'github_digest', $11, $12, $13) RETURNING *`,
+            [
+              userId,
+              convId,
+              proposal.name,
+              proposal.request,
+              JSON.stringify(proposal.recurrence),
+              metadata.services,
+              next,
+              messageId,
+              wsId,
+              wsMode,
+              JSON.stringify(config),
+              configHash,
+              now,
+            ],
+          );
+          await registerScheduleFields(client, this.registry, 'schedules', created.rows[0].id, userId, segments, ['name', 'request', 'recurrence']);
+          return this.recordState(client, tagScheduleContext(created.rows[0], segments), now);
+        }
+        await this.ensureRoom(client, userId, { workspaceMode: wsMode, workspaceId: wsId });
         const next = this.next({ recurrence: proposal.recurrence! }, now);
         const created = await client.query(
-          `INSERT INTO schedules(user_id, conv_id, name, request, recurrence, services, status, next_run_at, last_proposal_id)
-           VALUES($1, $2, $3, $4, $5, $6, 'active', $7, $8) RETURNING *`,
-          [userId, convId, proposal.name, proposal.request, JSON.stringify(proposal.recurrence), metadata.services, next, messageId],
+          `INSERT INTO schedules(user_id, conv_id, name, request, recurrence, services, status, next_run_at, last_proposal_id, workspace_id, workspace_mode, kind, digest_config, digest_config_hash, digest_approved_at)
+           VALUES($1, $2, $3, $4, $5, $6, 'active', $7, $8, $9, $10, $11, $12::jsonb, $13, $14) RETURNING *`,
+          [
+            userId,
+            convId,
+            proposal.name,
+            proposal.request,
+            JSON.stringify(proposal.recurrence),
+            metadata.services,
+            next,
+            messageId,
+            wsId,
+            wsMode,
+            digestFields.kind,
+            digestFields.digestConfig,
+            digestFields.digestConfigHash,
+            digestFields.digestApprovedAt,
+          ],
         );
         await registerScheduleFields(client,this.registry,'schedules',created.rows[0].id,userId,segments,['name','request','recurrence']);
         return this.recordState(client, tagScheduleContext(created.rows[0],segments), now);
@@ -201,59 +471,184 @@ export class ScheduleService {
         return this.unchanged(client, existing, now);
       }
       // Turning a finished schedule back on takes a place again.
-      if (!OPEN.has(existing.status) && OPEN.has(fields.status)) await this.ensureRoom(client, userId);
-      return this.recordState(client, await this.saveFields(client, existing.id, fields, messageId,segments), now);
-    },'STALE_PROPOSAL');
+      if (!OPEN.has(existing.status) && OPEN.has(fields.status)) await this.ensureRoom(client, userId, { workspaceMode: wsMode, workspaceId: wsId });
+      if (proposal.action === 'update' && isTelegramSchedule) {
+        if (wantAutoDigest && telegramDigestConfig && telegramDigestHash) {
+          fields.kind = 'telegram_digest';
+          fields.digest_config = telegramDigestConfig;
+          fields.digest_config_hash = telegramDigestHash;
+          fields.digest_approved_at = now;
+        } else if (approvalMode === 'manual') {
+          fields.kind = 'plan';
+          fields.digest_config = null;
+          fields.digest_config_hash = null;
+          fields.digest_approved_at = null;
+        } else if (existing.kind === 'telegram_digest' && existing.digest_config) {
+          const tgCandidate = metadata.digestCandidate as TelegramDigestCandidate | undefined;
+          if (tgCandidate?.canAutoDigest === false) {
+            fields.kind = 'plan';
+            fields.digest_config = null;
+            fields.digest_config_hash = null;
+            fields.digest_approved_at = null;
+          } else {
+            const updatedConfig: TelegramDigestConfig =
+              tgCandidate?.canAutoDigest && tgCandidate.config
+                ? tgCandidate.config
+                : { ...(existing.digest_config as TelegramDigestConfig), recurrence: fields.recurrence };
+            fields.kind = 'telegram_digest';
+            fields.digest_config = updatedConfig;
+            fields.digest_config_hash = computeTelegramDigestConfigHash(updatedConfig);
+            fields.digest_approved_at = existing.digest_approved_at ?? now;
+          }
+        }
+        return this.recordState(client, await this.saveFields(client, existing.id, fields, messageId, segments), now);
+      }
+      if (proposal.action === 'update' && existing.kind === 'calendar_digest' && approvalMode !== 'manual') {
+        const evaluated = await evaluateCalendarDigestCandidate({
+          pool: client,
+          encryptionKey: this.options.encryptionKey,
+          userId,
+          services: fields.services,
+          request: fields.request,
+        });
+        if (!evaluated.candidate.canAutoDigest || !evaluated.config || !evaluated.configHash) {
+          if ((metadata.digestCandidate as CalendarDigestCandidate | undefined)?.canAutoDigest) {
+            throw new ScheduleConflict('DIGEST_PREVIEW_CHANGED');
+          }
+          const downgraded = await client.query(
+            `UPDATE schedules SET name=$2, request=$3, recurrence=$4, services=$5, status=$6, pause_reason=$7, next_run_at=$8,
+               kind='plan', digest_config=NULL, digest_config_hash=NULL, digest_approved_at=NULL,
+               version=version+1, updated_at=now(), last_proposal_id=COALESCE($9, last_proposal_id)
+             WHERE id=$1 RETURNING *`,
+            [existing.id, fields.name, fields.request, JSON.stringify(fields.recurrence), fields.services, fields.status, fields.pause_reason, fields.next_run_at, messageId],
+          );
+          await registerScheduleFields(client, this.registry, 'schedules', existing.id, userId, segments, ['name', 'request', 'recurrence']);
+          return this.recordState(client, tagScheduleContext(downgraded.rows[0], segments), now);
+        }
+        const candidate = metadata.digestCandidate as CalendarDigestCandidate | undefined;
+        if (!calendarDigestCandidateMatches(candidate, evaluated)) {
+          throw new ScheduleConflict('DIGEST_PREVIEW_CHANGED');
+        }
+        const updatedDigest = await client.query(
+          `UPDATE schedules SET name=$2, request=$3, recurrence=$4, services=$5, status=$6, pause_reason=$7, next_run_at=$8,
+             digest_config=$10::jsonb, digest_config_hash=$11, digest_approved_at=$12,
+             version=version+1, updated_at=now(), last_proposal_id=COALESCE($9, last_proposal_id)
+           WHERE id=$1 RETURNING *`,
+          [existing.id, fields.name, fields.request, JSON.stringify(fields.recurrence), fields.services, fields.status, fields.pause_reason, fields.next_run_at, messageId, JSON.stringify(candidate.config), computeCalendarDigestHash(candidate.config), now],
+        );
+        await registerScheduleFields(client, this.registry, 'schedules', existing.id, userId, segments, ['name', 'request', 'recurrence']);
+        return this.recordState(client, tagScheduleContext(updatedDigest.rows[0], segments), now);
+      }
+      if (proposal.action === 'update' && isGithubSchedule) {
+        let digestUpdate:
+          | { kind: 'plan' }
+          | { kind: 'github_digest'; config: GithubDigestConfig; configHash: string; approvedAt: Date }
+          | undefined;
+        if (approvalMode === 'manual') {
+          if (existing.kind === 'github_digest') {
+            digestUpdate = { kind: 'plan' };
+          }
+        } else if (approvalMode === 'auto_digest' || existing.kind === 'github_digest') {
+          const githubCandidate = metadata.digestCandidate as ScheduleDigestCandidate | undefined;
+          const candidateConfig = githubCandidate?.canAutoDigest && githubCandidate.config
+            ? githubCandidate.config
+            : existing.kind === 'github_digest' && proposal.request === existing.request
+              ? (existing.digest_config as GithubDigestConfig | undefined)
+              : undefined;
+          if (!candidateConfig) {
+            if (approvalMode === 'auto_digest') {
+              throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED', githubCandidate?.disabledReason);
+            }
+            digestUpdate = { kind: 'plan' };
+          } else {
+            const config = canonicalizeDigestConfig(candidateConfig);
+            const configHash = computeDigestConfigHash({
+              config,
+              recurrence: fields.recurrence,
+              userId,
+            });
+            digestUpdate = {
+              kind: 'github_digest',
+              config,
+              configHash,
+              approvedAt: now,
+            };
+          }
+        }
+        return this.recordState(client, await this.saveFields(client, existing.id, fields, messageId, segments, digestUpdate), now);
+      }
+      let savedRow = await this.saveFields(client, existing.id, fields, messageId, segments);
+      if (proposal.action === 'update') {
+        const updatedDigest = await client.query(
+          `UPDATE schedules SET kind=$2, digest_config=$3::jsonb, digest_config_hash=$4, digest_approved_at=$5 WHERE id=$1 RETURNING *`,
+          [
+            existing.id,
+            digestFields.kind,
+            digestFields.digestConfig,
+            digestFields.digestConfigHash,
+            digestFields.digestApprovedAt,
+          ],
+        );
+        savedRow = tagScheduleContext(updatedDigest.rows[0]!, segments);
+      }
+      return this.recordState(client, savedRow, now);
+    }, 'STALE_PROPOSAL');
   }
 
-  private async lockSchedule(client:pg.PoolClient,id:string,owner:string):Promise<ScheduleRow|null> {
-    if(!isUuid(id))return null;
-    const state=await captureScheduleArtifact(client,this.registry,'schedules',id);
-    if(!state||state.owner!==owner)return null;
-    await prelockScheduleArtifacts(client,this.registry,[state]);
-    const guarded=await guardScheduleArtifact(client,this.registry,state,'planning','UPDATE');
-    if(!guarded.allowed)throw new ScheduleConflict('SCHEDULE_SOURCE_PURGED');
+  private async lockSchedule(client: pg.PoolClient, id: string, owner: string, scope?: ScheduleScope): Promise<ScheduleRow | null> {
+    if (!isUuid(id)) return null;
+    const state = await captureScheduleArtifact(client, this.registry, 'schedules', id);
+    if (!state || state.owner !== owner) return null;
+    if (scope) {
+      const row = state.row;
+      if (scope.workspaceMode === 'personal' && (row.workspace_id != null || !['personal', 'legacy', undefined].includes(row.workspace_mode))) return null;
+      if (scope.workspaceMode === 'organization' && scope.workspaceId && (row.workspace_mode !== 'organization' || row.workspace_id !== scope.workspaceId)) return null;
+      if (scope.workspaceMode === 'legacy' && row.workspace_id != null) return null;
+    }
+    await prelockScheduleArtifacts(client, this.registry, [state]);
+    const guarded = await guardScheduleArtifact(client, this.registry, state, 'planning', 'UPDATE');
+    if (!guarded.allowed) throw new ScheduleConflict('SCHEDULE_SOURCE_PURGED');
     return guarded.row;
   }
 
-  async setStatus(input: { userId: string; scheduleId: string; action: 'pause' | 'resume' | 'cancel'; version: number; now: Date }): Promise<ScheduleChange> {
+  async setStatus(input: { userId: string; scheduleId: string; action: 'pause' | 'resume' | 'cancel'; version: number; now: Date; scope?: ScheduleScope }): Promise<ScheduleChange> {
     return this.transaction(async (client) => {
-      const row = await this.lockSchedule(client,input.scheduleId,input.userId);
+      const row = await this.lockSchedule(client, input.scheduleId, input.userId, input.scope);
       if (!row) throw new ScheduleNotFound();
       if (row.version !== input.version) throw new ScheduleConflict('STALE_VERSION');
       const fields = this.transition(row, input.action, null, null, input.now);
       if (!fields) return this.unchanged(client, row, input.now);
-      return this.recordState(client, await this.saveFields(client, row.id, fields, null,scheduleSourceContext(row)?.segments??[]), input.now);
+      return this.recordState(client, await this.saveFields(client, row.id, fields, null, scheduleSourceContext(row)?.segments ?? []), input.now);
     });
   }
 
-  list(userId: string, now: Date) {
-    return this.repo.listForUser(userId, now);
+  list(userId: string, now: Date, scope?: ScheduleScope) {
+    return this.repo.listForUser(userId, now, scope);
   }
 
-  async listRuns(userId: string, scheduleId: string, limit: number, now: Date) {
-    if (!await this.repo.ownedSchedule(scheduleId, userId)) throw new ScheduleNotFound();
+  async listRuns(userId: string, scheduleId: string, limit: number, now: Date, scope?: ScheduleScope) {
+    if (!await this.repo.ownedSchedule(scheduleId, userId, this.options.pool, false, scope)) throw new ScheduleNotFound();
     return this.repo.listRuns(scheduleId, limit, now);
   }
 
-  pendingCount(userId: string, now: Date) {
-    return this.repo.pendingCount(userId, now);
+  pendingCount(userId: string, now: Date, scope?: ScheduleScope) {
+    return this.repo.pendingCount(userId, now, scope);
   }
 
   /** Creates a run that plans now ("Chạy lượt này ngay", "Lập lại kế hoạch") and hands it to the scheduler. */
-  async startRun(input: ({ scheduleId: string; trigger: 'manual' } | { runId: string; trigger: 'replan' }) & { userId: string; now: Date }): Promise<ScheduleRunView> {
-    const { userId, now } = input;
+  async startRun(input: ({ scheduleId: string; trigger: 'manual' } | { runId: string; trigger: 'replan' }) & { userId: string; now: Date; scope?: ScheduleScope }): Promise<ScheduleRunView> {
+    const { userId, now, scope } = input;
     const row = await this.transaction(async (client) => {
       let scheduleId: string;
       if (input.trigger === 'replan') {
-        const previous = await this.repo.run(input.runId,client);
-        if (!previous || !await this.repo.ownedSchedule(previous.schedule_id, userId, client)) throw new ScheduleNotFound();
+        const previous = await this.repo.run(input.runId, client);
+        if (!previous || !await this.repo.ownedSchedule(previous.schedule_id, userId, client, false, scope)) throw new ScheduleNotFound();
         if (!REPLANNABLE.has(runState(previous, now))) throw new ScheduleConflict('RUN_NOT_REPLANNABLE');
         scheduleId = previous.schedule_id;
       } else {
         scheduleId = input.scheduleId;
       }
-      const schedule = await this.lockSchedule(client,scheduleId,userId);
+      const schedule = await this.lockSchedule(client, scheduleId, userId, scope);
       if (!schedule) throw new ScheduleNotFound();
       // A finished one-off schedule may plan again for a run that needs it, but not start new runs.
       if (schedule.status === 'cancelled' || (input.trigger === 'manual' && schedule.status === 'completed')) throw new ScheduleConflict('SCHEDULE_CLOSED');

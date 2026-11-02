@@ -1,5 +1,7 @@
 import { randomUUID, createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { EventEmitter } from 'node:events';
 import pg from 'pg';
 import request from 'supertest';
@@ -26,14 +28,22 @@ beforeAll(async () => {
 afterAll(async () => { await pool.end(); await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`); await admin.end(); });
 it('real planner lookups -> SSE -> PostgreSQL -> new repositories/HTTP reload preserve display names and immutable hash', async () => {
   const owner = randomUUID();
-  await pool.query('INSERT INTO users(id,email,password,name) VALUES($1,$2,$3,$4)', [owner, `${owner}@example.test`, 'test', 'Owner']);
+  await pool.query("INSERT INTO users(id,email,password,name,status) VALUES($1,$2,$3,$4,'active')", [owner, `${owner}@example.test`, 'test', 'Owner']);
   const convRepo = new ConversationRepo(pool), msgRepo = new MessageRepo(pool), plans = new PlanRepo(pool);
   const conv = await convRepo.createConversation(owner);
   const plan = { kind: 'plan', summary: 'Tạo thẻ', thinking: 'Dùng danh sách đã tra cứu.', warnings: [], steps: [{ id: 'step_1', tool: 'trello.create_card', description: 'Tạo thẻ', args: { listId: 'L1', title: 'B1' }, dependsOn: [] }] };
   const provider = new MockLLMProvider(); provider.setPlanResponses([plan]);
   const planner = new AIPlanner({ provider, toolCatalog: TRELLO_TOOLS, gatherSearch: async ({ tool }) => tool === 'trello.search_boards' ? [{ id: 'B1', name: 'Frontend' }] : [{ id: 'L1', name: 'Cần làm', boardId: 'B1' }] });
   const events = new EventEmitter(); events.on('error', () => {});
-  const chat = new ChatService({ convRepo, msgRepo, planRepo: plans, planner, eventEmitter: { emit: (event, data) => events.emit(event, data) } });
+  const bound = { ...plan, steps: [{ ...plan.steps[0], boardId: 'B1' }], connections: { trello: { credentialId: 'cred-trello', memberId: 'member-1', username: 'owner', boardIds: ['B1'] } } };
+  const chat = new ChatService({
+    convRepo, msgRepo, planRepo: plans, planner, eventEmitter: { emit: (event, data) => events.emit(event, data) },
+    trelloConnection: async () => ({
+      status: 'connected',
+      teamBoards: [{ boardId: 'B1', boardName: 'Frontend' }],
+      connection: { credentialId: 'cred-trello', memberId: 'member-1', username: 'owner', boardIds: ['B1'] },
+    }),
+  });
   const preview = new Promise<any>((resolve, reject) => { events.once('plan_preview', resolve); events.once('error', reject); events.once('clarification', reject); });
   const accepted = await chat.handleUserMessage({ conversationId: conv.id, userId: owner, content: 'Tạo thẻ trên board Frontend list Cần làm', requestId: 'fe03-sql-request' });
   const event = await preview;
@@ -41,8 +51,8 @@ it('real planner lookups -> SSE -> PostgreSQL -> new repositories/HTTP reload pr
   expect(event).toMatchObject({ replyToMessageId: accepted.messageId, requestId: 'fe03-sql-request' });
   const saved = await new PlanRepo(pool).getPlan(event.planId);
   expect(saved?.resource_labels).toEqual(event.resourceLabels);
-  expect(saved?.plan_text).toBe(JSON.stringify(plan));
-  expect(saved?.plan_hash).toBe(createHash('sha256').update(JSON.stringify(plan)).digest('hex'));
+  expect(saved?.plan_text).toBe(JSON.stringify(bound));
+  expect(saved?.plan_hash).toBe(createHash('sha256').update(JSON.stringify(bound)).digest('hex'));
   const secret = 'fe03-persistence-test-only-secret';
   const headers = { Authorization: `Bearer ${generateTokens({ id: owner, email: `${owner}@example.test`, name: 'Owner' }, secret).accessToken}` };
   const execution = new ExecutionService({ planRepo: new PlanRepo(pool), convRepo: new ConversationRepo(pool), stepRepo: new StepRepo(pool), adapterFactory: {} as any });

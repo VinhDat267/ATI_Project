@@ -1,5 +1,6 @@
 import { authStorage } from './auth-storage';
-import type { ScheduleView, ScheduleRunView } from '@wap/tool-schemas';
+import { getActiveWorkspaceId, getExplicitWorkspaceId, setActiveWorkspaceId } from './workspace-storage';
+import type { ScheduleApprovalMode, ScheduleView, ScheduleRunView } from '@wap/tool-schemas';
 import type {
   ActivePlan,
   ChatMessage,
@@ -11,6 +12,7 @@ import type {
   AuthMessageResponse,
   AccountProfile, AccountSession,
   PersonalSpreadsheetItem, MySheetsPickerSession,
+  WorkspaceSummary, WorkspacesListResponse,
 } from '../types';
 
 export function sharesAuthSession(previous: string | null, current: string | null): boolean {
@@ -50,6 +52,12 @@ export class ApiClient {
     if (accessToken) {
       if (isRetry || !headers.has('Authorization')) {
         headers.set('Authorization', `Bearer ${accessToken}`);
+      }
+      if (!headers.has('X-Workspace-Id')) {
+        const explicitWorkspaceId = getExplicitWorkspaceId();
+        if (explicitWorkspaceId) {
+          headers.set('X-Workspace-Id', explicitWorkspaceId);
+        }
       }
     }
 
@@ -127,13 +135,25 @@ export class ApiClient {
       if (response.status === 401 && latest.accessToken === requestToken && latest.refreshToken === requestRefresh) {
         authStorage.clearStoredTokens();
       }
-      const error: any = new Error(
-        (typeof data?.error === 'object' ? data.error?.message : data?.error) ||
-          data?.message ||
-          `Request failed with status ${response.status}`
-      );
+      const errCode = typeof data?.error === 'object' ? data.error?.code : typeof data?.code === 'string' ? data.code : typeof data?.error === 'string' && /^[A-Z0-9_]+$/.test(data.error) ? data.error : undefined;
+      if (
+        response.status === 403 &&
+        (errCode === 'WORKSPACE_MEMBER_PENDING' ||
+          errCode === 'WORKSPACE_MEMBER_DISABLED' ||
+          errCode === 'WORKSPACE_ACCESS_DENIED') &&
+        !url.includes('/api/workspaces/join') &&
+        getActiveWorkspaceId() !== 'personal'
+      ) {
+        setActiveWorkspaceId('personal');
+      }
+      const rawErrorText = typeof data?.error === 'object' ? data.error?.message : data?.error;
+      const preferredMessage =
+        typeof rawErrorText === 'string' && /^[A-Z0-9_]+$/.test(rawErrorText) && typeof data?.message === 'string' && data.message
+          ? data.message
+          : rawErrorText || data?.message || `Request failed with status ${response.status}`;
+      const error: any = new Error(preferredMessage);
       error.status = response.status;
-      error.code = data?.error?.code;
+      error.code = errCode;
       error.data = data;
       error.response = response;
       throw error;
@@ -234,6 +254,17 @@ export class ApiClient {
       body: JSON.stringify({ calendarIds }),
     });
   }
+  selectPrimaryMyCalendar() {
+    return this.request<{
+      status?: 'connected';
+      email: string;
+      selectedCalendars: Array<{ id: string; summary: string; timeZone?: string; primary?: boolean }>;
+      allowedScope: string[];
+    }>('/api/connections/mycalendar/select-primary', {
+      method: 'POST',
+      credentials: 'include',
+    });
+  }
   disconnectMyCalendar() {
     return this.request<{ success: true }>('/api/connections/mycalendar', { method: 'DELETE', credentials: 'include' });
   }
@@ -279,6 +310,160 @@ export class ApiClient {
   }
   disconnectMySheets() {
     return this.request<{ ok: boolean }>('/api/connections/mysheets', {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+  }
+  getTrelloConnection() {
+    return this.request<{
+      status: 'unconfigured' | 'not_connected' | 'reconnect_required' | 'needs_scope' | 'needs_membership' | 'connected';
+      username?: string;
+      workspaceName?: string;
+      boards: Array<{ boardId: string; boardName: string; member: boolean }>;
+    }>('/api/connections/trello', { credentials: 'include' });
+  }
+  startTrelloConnection(options: { returnTo?: string } = {}) {
+    return this.request<{ url: string }>('/api/connections/trello/start', {
+      method: 'POST',
+      credentials: 'include',
+      ...(options.returnTo ? { body: JSON.stringify({ returnTo: options.returnTo }) } : {}),
+    });
+  }
+  completeTrelloConnection(code: string, state: string) {
+    return this.request<{ username: string; returnTo?: string }>('/api/connections/trello/callback', {
+      method: 'POST',
+      credentials: 'include',
+      body: JSON.stringify({ code, state }),
+    }, true);
+  }
+  disconnectTrello() {
+    return this.request<{ success: true }>('/api/connections/trello', {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+  }
+  getTrelloWorkspaces() {
+    return this.request<{ workspaces: Array<{ id: string; name: string }> }>('/api/connections/trello/workspaces', {
+      credentials: 'include',
+    });
+  }
+  getTrelloBoards(workspaceId: string) {
+    return this.request<{ boards: Array<{ id: string; name: string; member: boolean }> }>(
+      `/api/connections/trello/workspaces/${encodeURIComponent(workspaceId)}/boards`,
+      { credentials: 'include' }
+    );
+  }
+  saveTrelloScope(workspaceId: string, boardIds: string[]) {
+    return this.request<{
+      chosenBy: string;
+      workspaceId: string;
+      workspaceName: string;
+      boards: Array<{ boardId: string; boardName: string }>;
+    }>('/api/connections/trello/scope', {
+      method: 'PUT',
+      credentials: 'include',
+      body: JSON.stringify({ workspaceId, boardIds }),
+    });
+  }
+  getGitHubConnection() {
+    return this.request<{
+      status: 'unconfigured' | 'not_connected' | 'reconnect_required' | 'needs_scope' | 'needs_membership' | 'connected';
+      login?: string;
+      repos: Array<{ repoId: string; fullName: string; name: string; accessible: boolean }>;
+    }>('/api/connections/github', { credentials: 'include' });
+  }
+  startGitHubConnection(options: { returnTo?: string } = {}) {
+    return this.request<{ url: string }>('/api/connections/github/start', {
+      method: 'POST',
+      credentials: 'include',
+      ...(options.returnTo ? { body: JSON.stringify({ returnTo: options.returnTo }) } : {}),
+    });
+  }
+  completeGitHubConnection(code: string, state: string) {
+    return this.request<{ login: string; returnTo?: string }>('/api/connections/github/callback', {
+      method: 'POST',
+      credentials: 'include',
+      body: JSON.stringify({ code, state }),
+    }, true);
+  }
+  disconnectGitHub() {
+    return this.request<{ success: true }>('/api/connections/github', {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+  }
+  getGitHubCandidateRepos() {
+    return this.request<{
+      repos: Array<{ repoId: string; fullName: string; name: string; private?: boolean }>;
+    }>('/api/connections/github/candidate-repos', { credentials: 'include' });
+  }
+  saveGitHubScope(repos: string[]) {
+    return this.request<{
+      chosenBy: string;
+      updatedAt: string;
+      repos: Array<{ repoId: string; fullName: string; name: string }>;
+    }>('/api/connections/github/scope', {
+      method: 'PUT',
+      credentials: 'include',
+      body: JSON.stringify({ repos }),
+    });
+  }
+  getTelegramConnection() {
+    return this.request<{
+      status: 'unconfigured' | 'not_connected' | 'reconnect_required' | 'needs_scope' | 'connected';
+      botUsername?: string;
+      telegramUserId?: string;
+      username?: string;
+      displayName?: string;
+      chats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean }>;
+      selectedChats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean }>;
+    }>('/api/connections/telegram', { credentials: 'include' });
+  }
+  startTelegramConnection(options: { returnTo?: string } = {}) {
+    return this.request<{
+      state: string;
+      botUsername: string;
+      deepLinkUrl: string;
+      groupDeepLinkUrl: string;
+    }>('/api/connections/telegram/start', {
+      method: 'POST',
+      credentials: 'include',
+      ...(options.returnTo ? { body: JSON.stringify({ returnTo: options.returnTo }) } : {}),
+    });
+  }
+  completeTelegramConnection(state: string) {
+    return this.request<{
+      status: 'connected' | 'needs_scope';
+      telegramUserId: string;
+      username: string;
+      displayName: string;
+      chats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean }>;
+      selectedChats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean }>;
+      returnTo?: string;
+    }>('/api/connections/telegram/callback', {
+      method: 'POST',
+      credentials: 'include',
+      body: JSON.stringify({ state }),
+    }, true);
+  }
+  getTelegramChats() {
+    return this.request<{
+      chats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean }>;
+      selectedChatIds: string[];
+    }>('/api/connections/telegram/chats', { credentials: 'include' });
+  }
+  saveTelegramScope(chatIds: string[]) {
+    return this.request<{
+      status: 'connected';
+      selectedChats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean }>;
+    }>('/api/connections/telegram/scope', {
+      method: 'PUT',
+      credentials: 'include',
+      body: JSON.stringify({ chatIds }),
+    });
+  }
+  disconnectTelegram() {
+    return this.request<{ success: true }>('/api/connections/telegram', {
       method: 'DELETE',
       credentials: 'include',
     });
@@ -409,7 +594,23 @@ export class ApiClient {
   getSchedules() { return this.request<{ schedules: ScheduleView[] }>('/api/schedules'); }
   getScheduleRuns(id: string, limit = 10) { return this.request<{ runs: ScheduleRunView[] }>(`/api/schedules/${encodeURIComponent(id)}/runs?limit=${limit}`); }
   getSchedulePendingCount() { return this.request<{ count: number }>('/api/schedules/pending-count'); }
-  confirmSchedule(convId: string, messageId: string) { return this.request<{ schedule: ScheduleView }>(`/api/conversations/${encodeURIComponent(convId)}/schedule-proposals/${encodeURIComponent(messageId)}/confirm`, { method: 'POST' }); }
+  confirmSchedule(
+    convId: string,
+    messageId: string,
+    approvalModeOrOptions?: ScheduleApprovalMode | { approvalMode?: ScheduleApprovalMode }
+  ) {
+    const approvalMode =
+      typeof approvalModeOrOptions === 'string'
+        ? approvalModeOrOptions
+        : approvalModeOrOptions?.approvalMode;
+    return this.request<{ schedule: ScheduleView }>(
+      `/api/conversations/${encodeURIComponent(convId)}/schedule-proposals/${encodeURIComponent(messageId)}/confirm`,
+      {
+        method: 'POST',
+        ...(approvalMode ? { body: JSON.stringify({ approvalMode }) } : {}),
+      }
+    );
+  }
   changeSchedule(id: string, action: 'pause' | 'resume' | 'cancel', version: number) { return this.request<{ schedule: ScheduleView }>(`/api/schedules/${encodeURIComponent(id)}/${action}`, { method: 'POST', body: JSON.stringify({ version }) }); }
   runScheduleNow(id: string) { return this.request<{ run: ScheduleRunView }>(`/api/schedules/${encodeURIComponent(id)}/run-now`, { method: 'POST' }); }
   replanScheduleRun(id: string) { return this.request<{ run: ScheduleRunView }>(`/api/schedule-runs/${encodeURIComponent(id)}/replan`, { method: 'POST' }); }
@@ -425,6 +626,46 @@ export class ApiClient {
 
   async changeAdminUser(id: string, action: 'approve' | 'disable' | 'enable' | 'role', role?: 'member' | 'admin'): Promise<{ user: AdminUser }> {
     return this.request(`/api/admin/users/${encodeURIComponent(id)}/${action}`, { method: 'POST', ...(action === 'role' ? { body: JSON.stringify({ role }) } : {}) });
+  }
+
+  async approveAllAdminUsers(): Promise<{ approvedCount: number; approvedUsers: AdminUser[] }> {
+    return this.request('/api/admin/users/approve-all', { method: 'POST' });
+  }
+
+  async rejectAdminUser(id: string): Promise<{ rejectedId: string }> {
+    return this.request(`/api/admin/users/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ action: 'reject' }) });
+  }
+
+  // --- Workspaces ---
+  async getWorkspaces(): Promise<WorkspacesListResponse> {
+    return this.request<WorkspacesListResponse>('/api/workspaces');
+  }
+
+  async createWorkspace(name: string, requireApproval = true): Promise<{ workspace: WorkspaceSummary }> {
+    return this.request<{ workspace: WorkspaceSummary }>('/api/workspaces', {
+      method: 'POST',
+      body: JSON.stringify({ name, requireApproval }),
+    });
+  }
+
+  async joinWorkspace(inviteCode: string): Promise<{ workspace: WorkspaceSummary; created: boolean }> {
+    return this.request<{ workspace: WorkspaceSummary; created: boolean }>('/api/workspaces/join', {
+      method: 'POST',
+      body: JSON.stringify({ inviteCode }),
+    });
+  }
+
+  async regenerateInviteCode(workspaceId: string): Promise<{ inviteCode: string }> {
+    return this.request<{ inviteCode: string }>(`/api/workspaces/${encodeURIComponent(workspaceId)}/invite-code/regenerate`, {
+      method: 'POST',
+    });
+  }
+
+  async updateWorkspaceSettings(workspaceId: string, settings: { requireApproval: boolean }): Promise<{ requireApproval: boolean }> {
+    return this.request<{ requireApproval: boolean }>(`/api/workspaces/${encodeURIComponent(workspaceId)}/settings`, {
+      method: 'PATCH',
+      body: JSON.stringify(settings),
+    });
   }
 
   // --- Own account (AUTH-05) ---

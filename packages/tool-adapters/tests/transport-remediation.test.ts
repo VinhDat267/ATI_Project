@@ -28,7 +28,7 @@ describe('adapter transport controls', () => {
         : new Response(JSON.stringify(service === 'slack' ? { ok: true, ts: '1', channel: 'C1' } : { id: 'c1' }));
     };
     const adapter = service === 'trello'
-      ? new TrelloBaseAdapter({ credentials: { apiKey: 'k', token: 't' }, fetchFn: fetchFn as typeof fetch })
+      ? new TrelloBaseAdapter({ credentials: { accessToken: 't' }, fetchFn: fetchFn as typeof fetch })
       : new SlackAdapter({ credentials: { botToken: 'token' }, fetchFn: fetchFn as typeof fetch });
 
     await expect(adapter.request(service === 'trello' ? '/cards' : '/chat.postMessage', { method: 'POST' })).resolves.toBeDefined();
@@ -42,7 +42,7 @@ describe('adapter transport controls', () => {
       return new Response('limited', { status: 429, headers: { 'Retry-After': '0' } });
     };
     const adapter = service === 'trello'
-      ? new TrelloBaseAdapter({ credentials: { apiKey: 'k', token: 't' }, fetchFn: fetchFn as typeof fetch })
+      ? new TrelloBaseAdapter({ credentials: { accessToken: 't' }, fetchFn: fetchFn as typeof fetch })
       : new SlackAdapter({ credentials: { botToken: 'token' }, fetchFn: fetchFn as typeof fetch });
 
     await expect(adapter.request(service === 'trello' ? '/cards' : '/chat.postMessage', { method: 'POST' })).rejects.toMatchObject({ category: 'RATE_LIMIT', statusCode: 429 });
@@ -56,7 +56,7 @@ describe('adapter transport controls', () => {
       calls++;
       return new Response('limited', { status: 429, headers: { 'Retry-After': '5' } });
     };
-    const adapter = new TrelloBaseAdapter({ credentials: { apiKey: 'k', token: 't' }, fetchFn: fetchFn as typeof fetch });
+    const adapter = new TrelloBaseAdapter({ credentials: { accessToken: 't' }, fetchFn: fetchFn as typeof fetch });
     const pending = adapter.request('/cards', { method: 'POST', signal: controller.signal });
     setTimeout(() => controller.abort(), 10);
 
@@ -75,7 +75,7 @@ describe('adapter transport controls', () => {
     };
     const limiter = new GlobalRateLimiter({ maxRequests: 10, windowMs: 1000 });
     const adapter = service === 'trello'
-      ? new TrelloBaseAdapter({ credentials: { apiKey: 'k', token: 't' }, rateLimiter: limiter, fetchFn: fetchFn as typeof fetch })
+      ? new TrelloBaseAdapter({ credentials: { accessToken: 't' }, rateLimiter: limiter, fetchFn: fetchFn as typeof fetch })
       : new SlackAdapter({ credentials: { botToken: 'token' }, rateLimiter: limiter, fetchFn: fetchFn as typeof fetch });
 
     await expect(adapter.request(service === 'trello' ? '/members/me' : '/conversations.list', { signal: controller.signal })).rejects.toMatchObject({ category: 'NETWORK' });
@@ -93,7 +93,7 @@ describe('adapter transport controls', () => {
           ? new Response('limited', { status: 429, headers: { 'Retry-After': '999999' } })
           : new Response('{}');
       };
-      const adapter = new TrelloBaseAdapter({ credentials: { apiKey: 'k', token: 't' }, fetchFn: fetchFn as typeof fetch });
+      const adapter = new TrelloBaseAdapter({ credentials: { accessToken: 't' }, fetchFn: fetchFn as typeof fetch });
       const request = adapter.request('/members/me');
       await vi.advanceTimersByTimeAsync(30_000);
       await expect(request).resolves.toEqual({});
@@ -118,7 +118,8 @@ describe('Trello write scope', () => {
       return new Response(JSON.stringify({ id: 'resource1' }));
     };
     const adapter = new TrelloAdapter({
-      credentials: { apiKey: 'k', token: 't' },
+      credentials: { accessToken: 't' },
+      allowedBoardIds: ['board1'],
       allowedScope: { boards: ['board1'] },
       fetchFn: fetchFn as typeof fetch,
     });
@@ -131,7 +132,7 @@ describe('Trello write scope', () => {
 describe('Trello read scope', () => {
   it('refuses a member search without an allowed board before sending a request', async () => {
     const fetchFn = vi.fn();
-    const adapter = new TrelloAdapter({ credentials: { apiKey: 'k', token: 't' }, allowedScope: { boards: ['board1'] }, fetchFn: fetchFn as typeof fetch });
+    const adapter = new TrelloAdapter({ credentials: { accessToken: 't' }, allowedBoardIds: ['board1'], allowedScope: { boards: ['board1'] }, fetchFn: fetchFn as typeof fetch });
     await expect(adapter.searchMembers({ query: 'Minh' })).rejects.toMatchObject({ category: 'AUTH_ERROR' });
     expect(fetchFn).not.toHaveBeenCalled();
   });
@@ -140,7 +141,7 @@ describe('Trello read scope', () => {
       { id: 'unknown', name: 'Hidden', idList: 'list1' },
       { id: 'allowed', name: 'Visible', idList: 'list1', idBoard: 'board1' },
     ] }));
-    const adapter = new TrelloAdapter({ credentials: { apiKey: 'k', token: 't' }, allowedScope: { boards: ['board1'] }, fetchFn: fetchFn as typeof fetch });
+    const adapter = new TrelloAdapter({ credentials: { accessToken: 't' }, allowedBoardIds: ['board1'], allowedScope: { boards: ['board1'] }, fetchFn: fetchFn as typeof fetch });
 
     await expect(adapter.searchCards({ query: 'card' })).resolves.toEqual([
       { id: 'allowed', name: 'Visible', url: '', listId: 'list1' },
@@ -149,7 +150,7 @@ describe('Trello read scope', () => {
 
   it('rejects a card detail without verifiable board identity', async () => {
     const fetchFn = async () => new Response(JSON.stringify({ id: 'card1', name: 'Hidden' }));
-    const adapter = new TrelloAdapter({ credentials: { apiKey: 'k', token: 't' }, allowedScope: { boards: ['board1'] }, fetchFn: fetchFn as typeof fetch });
+    const adapter = new TrelloAdapter({ credentials: { accessToken: 't' }, allowedBoardIds: ['board1'], allowedScope: { boards: ['board1'] }, fetchFn: fetchFn as typeof fetch });
 
     await expect(adapter.getCard({ cardId: 'card1' })).rejects.toMatchObject({ category: 'AUTH_ERROR', statusCode: 403 });
   });

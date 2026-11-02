@@ -134,6 +134,27 @@ export function PersonalMyCalendar({
     }
   };
 
+  const quickSelectPrimary = async () => {
+    if (pending.current || busy) return;
+    const owns = mycalendarSessionOwner();
+    pending.current = true;
+    setBusy(true);
+    setError('');
+    try {
+      await apiClient.selectPrimaryMyCalendar();
+      if (mounted.current && owns()) {
+        await refresh();
+      }
+    } catch (err: any) {
+      if (mounted.current && owns()) {
+        setError(err?.message || 'Không thể chọn nhanh Lịch chính. Vui lòng thử lại.');
+      }
+    } finally {
+      pending.current = false;
+      if (mounted.current) setBusy(false);
+    }
+  };
+
   const saveCalendars = async () => {
     if (checkedIds.length === 0 || busy) return;
     setBusy(true);
@@ -228,6 +249,15 @@ export function PersonalMyCalendar({
 
         {status === 'scope_required' && (
           <>
+            <button
+              id="mycalendar-quick-primary"
+              type="button"
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
+              disabled={busy}
+              onClick={() => void quickSelectPrimary()}
+            >
+              Dùng ngay Lịch chính (1 chạm)
+            </button>
             <button
               id="mycalendar-action"
               type="button"

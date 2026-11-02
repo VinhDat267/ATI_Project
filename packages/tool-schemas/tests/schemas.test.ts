@@ -33,7 +33,7 @@ describe('packages/tool-schemas (Task 2)', () => {
   it('publishes GitHub credentials, repository scope and executable tool contracts', () => {
     const github = getServiceDefinition('github');
     expect(github?.scopeKey).toBe('repos');
-    expect(github?.credentialFields).toEqual([{ key: 'token', label: 'Personal access token', type: 'password' }]);
+    expect(github?.credentialFields).toEqual([]);
     expect(GITHUB_TOOLS.map((tool) => tool.name)).toEqual([
       'github.search_repos', 'github.search_issues', 'github.get_issue', 'github.create_issue', 'github.add_label',
     ]);
