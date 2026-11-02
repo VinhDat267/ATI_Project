@@ -249,17 +249,31 @@ export async function getToolCatalogFor(
     const cred = await credentialRepo.getPersonalCredentials('github', options.userId);
     if (cred && cred.status === 'active') {
       try {
-        const scope = await options.githubTeamRepo.get();
-        if (scope && scope.repos && scope.repos.length > 0) {
+        const teamRepos = typeof options.githubTeamRepo.repos === 'function'
+          ? await options.githubTeamRepo.repos()
+          : (await options.githubTeamRepo.get?.())?.repos ?? [];
+        if (Array.isArray(teamRepos) && teamRepos.length > 0) {
           const dec = decryptCredentials(cred.config, encryptionKey);
           if (dec.accessToken) {
-            const provider = options.githubTokens.forConnection(options.userId, cred.id, dec.accessToken, dec.refreshToken);
+            const provider = options.githubTokens.forConnection(options.userId, cred.id, {
+              accessToken: dec.accessToken,
+              refreshToken: dec.refreshToken,
+            });
             const accessToken = await provider.getAccessToken();
             const callerRepos = await options.githubOAuthClient.repositories(
               accessToken,
               AbortSignal.timeout(10_000)
             );
-            if (scope.repos.some((r: any) => callerRepos.some((cr: any) => (cr.fullName.toLowerCase() === r.fullName.toLowerCase() || String(cr.id) === String(r.repoId)) && cr.member === true))) {
+            if (
+              teamRepos.some((r: any) =>
+                callerRepos.some(
+                  (cr: any) =>
+                    (String(cr.fullName || '').toLowerCase() === String(r.fullName || '').toLowerCase() ||
+                      String(cr.id) === String(r.repoId ?? r.id)) &&
+                    cr.member !== false
+                )
+              )
+            ) {
               catalog = [...catalog, ...GITHUB_TOOLS];
             }
           }

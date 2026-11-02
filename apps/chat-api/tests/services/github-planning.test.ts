@@ -541,4 +541,196 @@ describe('Task 6: GitHub personal OAuth planning, catalog, refusal, and executio
       expect(labels['nhom/ati']).toBe('nhom/ati');
     });
   });
+
+  describe('6. Audit fixes & extended GitHub capabilities (Gói A + Gói B)', () => {
+    it('getToolCatalogFor fallback branch calls githubTeamRepo.repos() and filters by member !== false', async () => {
+      const mockRepo = {
+        getCredentials: vi.fn().mockResolvedValue(null),
+        getPersonalCredentials: vi.fn().mockResolvedValue({
+          id: 'cred-1',
+          status: 'active',
+          config: encryptCredentials(
+            { accessToken: 'gho_123', githubUserId: '1001', login: 'octocat' },
+            encryptionKey
+          ),
+        }),
+      };
+      const mockTeamRepo = {
+        repos: vi.fn().mockResolvedValue([
+          { repoId: '101', fullName: 'nhom/ati', name: 'ati' },
+          { repoId: '102', fullName: 'nhom/forbidden', name: 'forbidden' },
+        ]),
+      };
+      const mockOAuthClient = {
+        repositories: vi.fn().mockResolvedValue([
+          { id: '101', fullName: 'nhom/ati', name: 'ati', private: true, member: true },
+          { id: '102', fullName: 'nhom/forbidden', name: 'forbidden', private: true, member: false },
+        ]),
+      };
+      const mockTokens = {
+        forConnection: vi.fn().mockReturnValue({
+          getAccessToken: vi.fn().mockResolvedValue('gho_live'),
+        }),
+      };
+
+      const catalog = await getToolCatalogFor(mockRepo as any, encryptionKey, {
+        userId,
+        gmailEnabled: false,
+        githubTeamRepo: mockTeamRepo as any,
+        githubOAuthClient: mockOAuthClient as any,
+        githubTokens: mockTokens as any,
+      });
+
+      expect(mockTeamRepo.repos).toHaveBeenCalledTimes(1);
+      expect(mockTokens.forConnection).toHaveBeenCalledWith(
+        userId,
+        'cred-1',
+        expect.objectContaining({ accessToken: 'gho_123' })
+      );
+      expect(catalog.some((t) => t.service === 'github')).toBe(true);
+    });
+
+    it('bindConnections normalizes short repo name into full owner/repo in step.args.repo and defaults single repo', async () => {
+      const chatService = new ChatService({
+        msgRepo: {} as any,
+        planner: {} as any,
+        eventEmitter: { emit: () => {} },
+        githubConnection: async () => ({
+          status: 'connected',
+          connection: {
+            credentialId: 'cred-1',
+            githubUserId: '1001',
+            login: 'octocat',
+            repos: ['nhom/ati'],
+          },
+          teamRepos: [{ repoId: '101', fullName: 'nhom/ati', name: 'ati' }],
+          memberRepos: [{ repoId: '101', fullName: 'nhom/ati', name: 'ati' }],
+        }),
+      });
+
+      const plan: PlanResponse = {
+        kind: 'plan',
+        thinking: 'Create and close issue',
+        summary: 'Tạo và đóng issue',
+        steps: [
+          {
+            id: 's1',
+            tool: 'github.create_issue',
+            description: 'Tạo issue dùng short repo name',
+            args: { repo: 'ati', title: 'Lỗi login' },
+            dependsOn: [],
+          },
+          {
+            id: 's2',
+            tool: 'github.update_issue',
+            description: 'Đóng issue khi user chỉ có 1 repo và LLM thiếu args.repo',
+            args: { issueNumber: 7, state: 'closed' },
+            dependsOn: ['s1'],
+          },
+        ],
+        warnings: [],
+      };
+
+      const result = await (chatService as any).bindConnections(plan, userId);
+      expect(result.kind).toBe('plan');
+      expect(result.steps[0].repo).toBe('nhom/ati');
+      expect(result.steps[0].args.repo).toBe('nhom/ati');
+      expect(result.steps[1].repo).toBe('nhom/ati');
+      expect(result.steps[1].args.repo).toBe('nhom/ati');
+    });
+
+    it('AdapterFactory rejects execution when step context.repo was removed from team scope even if another repo remains', async () => {
+      const mockCredRepo = {
+        getPersonalCredentials: vi.fn().mockResolvedValue({
+          id: 'cred-1',
+          status: 'active',
+          config: encryptCredentials({ accessToken: 'gho_1', githubUserId: '1001', login: 'octocat' }, encryptionKey),
+        }),
+      };
+      const mockTeamRepo = {
+        get: vi.fn().mockResolvedValue({
+          chosenBy: 'admin-1',
+          updatedAt: new Date(),
+          repos: [{ repoId: '102', fullName: 'nhom/web', name: 'web' }],
+        }),
+      };
+      const mockOAuthClient = {
+        repositories: vi.fn().mockResolvedValue([
+          { id: '102', fullName: 'nhom/web', name: 'web', private: true, member: true },
+        ]),
+      };
+      const mockTokens = {
+        forConnection: vi.fn().mockReturnValue({
+          getAccessToken: vi.fn().mockResolvedValue('gho_live_token'),
+        }),
+      };
+
+      const factory = new AdapterFactory({
+        credentialRepo: mockCredRepo as any,
+        encryptionKey,
+        githubTokens: mockTokens as any,
+        githubOAuthClient: mockOAuthClient as any,
+        githubTeamRepo: mockTeamRepo as any,
+      });
+
+      await expect(
+        factory.getAdapterForService('github', {
+          userId,
+          phase: 'execution',
+          repo: 'nhom/ati',
+          connections: {
+            github: {
+              credentialId: 'cred-1',
+              githubUserId: '1001',
+              login: 'octocat',
+              repos: ['nhom/ati', 'nhom/web'],
+            },
+          },
+        })
+      ).rejects.toMatchObject({
+        category: 'AUTH_ERROR',
+        message: 'Repository GitHub trong kế hoạch đã bị bỏ khỏi phạm vi nhóm.',
+      });
+    });
+
+    it('sandbox GITHUB_FAKE matches outputSchema for all GitHub tools', async () => {
+      const { GITHUB_FAKE } = await import('../../src/sandbox/fake-results/github.js');
+      const addLabelOut = GITHUB_FAKE.tools['github.add_label']!({ repo: 'nhom/ati', issueNumber: 9, label: 'bug' });
+      expect(addLabelOut).toMatchObject({
+        number: 9,
+        labels: ['bug'],
+        repo: 'nhom/ati',
+      });
+
+      const searchIssuesOut = GITHUB_FAKE.tools['github.search_issues']!({ repo: 'nhom/ati', query: 'bug' }) as any[];
+      expect(searchIssuesOut[0]).toMatchObject({
+        repo: 'nhom/ati',
+        number: expect.any(Number),
+      });
+
+      const updateIssueOut = GITHUB_FAKE.tools['github.update_issue']!({
+        repo: 'nhom/ati',
+        issueNumber: 9,
+        state: 'closed',
+        assignees: ['octocat'],
+      });
+      expect(updateIssueOut).toMatchObject({
+        number: 9,
+        repo: 'nhom/ati',
+        state: 'closed',
+        assignees: ['octocat'],
+      });
+
+      const commentOut = GITHUB_FAKE.tools['github.add_comment']!({
+        repo: 'nhom/ati',
+        issueNumber: 9,
+        body: 'LGTM',
+      });
+      expect(commentOut).toMatchObject({
+        issueNumber: 9,
+        body: 'LGTM',
+        repo: 'nhom/ati',
+      });
+    });
+  });
 });

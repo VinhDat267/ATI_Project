@@ -4,6 +4,7 @@ import {
   TRELLO_TOOLS,
   SLACK_TOOLS,
   GITHUB_TOOLS,
+  GITHUB_OAUTH_TOOLS,
   SERVICE_REGISTRY,
   getServiceDefinition,
   getToolDefinition,
@@ -12,6 +13,8 @@ import {
   type ClarificationResponse,
   type RefusalResponse,
   type PlannerResponse,
+  type GithubDigestConfig,
+  type GithubDigestDelivery,
 } from '../src/index.js';
 
 describe('packages/tool-schemas (Task 2)', () => {
@@ -42,6 +45,45 @@ describe('packages/tool-schemas (Task 2)', () => {
     expect(getToolDefinition('github.add_label')?.inputSchema.required).toEqual(['repo', 'issueNumber', 'label']);
     expect(getToolDefinition('github.search_repos')?.sideEffect).toBe('read');
     expect(getToolDefinition('github.create_issue')?.sideEffect).toBe('write');
+
+    expect(GITHUB_OAUTH_TOOLS.map((tool) => tool.name)).toEqual([
+      'github.get_pull_request',
+      'github.update_issue',
+      'github.add_comment',
+      'github.list_issues',
+    ]);
+    expect(getToolDefinition('github.update_issue')?.inputSchema.required).toEqual(['repo', 'issueNumber']);
+    expect(getToolDefinition('github.update_issue')?.inputSchema.properties.state.enum).toEqual(['open', 'closed']);
+    expect(getToolDefinition('github.add_comment')?.inputSchema.required).toEqual(['repo', 'issueNumber', 'body']);
+    expect(getToolDefinition('github.get_pull_request')?.sideEffect).toBe('read');
+    expect(getToolDefinition('github.list_issues')?.sideEffect).toBe('read');
+
+    const repoPattern = github?.gatherRules?.[0]?.pattern;
+    expect(repoPattern?.exec('Tạo issue trong repo nhom/ati')?.[1]).toBe('nhom/ati');
+    expect(repoPattern?.exec('Tạo issue trong repo ATI_Project')?.[1]).toBe('ATI_Project');
+
+    const tgDigestConfig: GithubDigestConfig = {
+      credentialId: 'cred-1',
+      githubUserId: 'gh-1',
+      login: 'vinhdat',
+      repos: ['nhom/ati'],
+      channelId: '',
+      channelName: '',
+      staleDays: 3,
+      telegramChatId: '-100123456',
+      telegramChatTitle: 'Dev Alerts',
+    };
+    const tgDelivery: GithubDigestDelivery = {
+      channelId: '',
+      channelName: '',
+      ts: null,
+      counts: { newIssues: 1, stalePrs: 0, unassignedIssues: 0 },
+      telegramChatId: '-100123456',
+      telegramChatTitle: 'Dev Alerts',
+      messageId: 42,
+    };
+    expect(tgDigestConfig.telegramChatId).toBe('-100123456');
+    expect(tgDelivery.telegramChatTitle).toBe('Dev Alerts');
   });
 
   it('should retrieve tools by name using getToolDefinition', () => {

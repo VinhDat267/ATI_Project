@@ -80,6 +80,17 @@ function limit(value: unknown): number {
   return value;
 }
 
+function normalizeAssignees(value: unknown): string[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) validation('GitHub assignees must be an array of strings');
+  return value.map((item) => {
+    if (typeof item !== 'string') validation('GitHub assignees must be non-empty strings');
+    const cleaned = item.trim().replace(/^@+/, '');
+    if (!cleaned) validation('GitHub assignees must be non-empty strings');
+    return cleaned;
+  });
+}
+
 function githubIssue(value: any, repo: string, writing: boolean, allowPullRequests = false) {
   if (!value || typeof value !== 'object' || !Number.isSafeInteger(value.id) ||
       !Number.isSafeInteger(value.number) || typeof value.title !== 'string' ||
@@ -136,7 +147,7 @@ export class GitHubAdapter extends BaseAdapter {
     return value;
   }
 
-  private async request<T>(path: string, signal?: AbortSignal, body?: unknown): Promise<T> {
+  private async request<T>(path: string, signal?: AbortSignal, body?: unknown, method?: 'GET' | 'POST' | 'PATCH'): Promise<T> {
     const writing = body !== undefined;
     if (signal?.aborted) {
       throw new StepError({ message: 'GitHub request was cancelled before dispatch', category: 'NETWORK', retryable: false });
@@ -144,7 +155,7 @@ export class GitHubAdapter extends BaseAdapter {
     const limiter = this.rateLimiter ?? sharedGitHubLimiter;
     await this.waitForTransportSlot(limiter, this.service, signal);
     const init: RequestInit = {
-      method: writing ? 'POST' : 'GET',
+      method: method ?? (writing ? 'POST' : 'GET'),
       headers: {
         Authorization: `Bearer ${this.token}`,
         Accept: 'application/vnd.github+json',
@@ -238,31 +249,132 @@ export class GitHubAdapter extends BaseAdapter {
       .map((item: any) => githubIssue(item, repo, false, allowPullRequests));
   }
 
-  async getIssue(args: { repo: string; issueNumber: number }, options?: { signal?: AbortSignal; repo?: string }) {
+  async getIssue(args: { repo: string; issueNumber: number; includePullRequest?: boolean }, options?: { signal?: AbortSignal; repo?: string; allowPullRequests?: boolean }) {
     const repo = this.checkedRepo(args.repo, options?.repo);
     const number = issueNumber(args.issueNumber);
     const value = await this.request<any>(`/repos/${repo}/issues/${number}`, options?.signal);
-    const normalized = githubIssue(value, repo, false);
+    const allowPr = Boolean(args.includePullRequest || options?.allowPullRequests);
+    const normalized = githubIssue(value, repo, false, allowPr);
     return {
       ...normalized,
       body: typeof value.body === 'string' ? value.body : '',
       labels: Array.isArray(value.labels) ? value.labels.filter((label: any) => typeof label?.name === 'string').map((label: any) => label.name as string) : [],
+      ...(allowPr ? { state: typeof value.state === 'string' ? value.state : 'open', isPullRequest: Boolean(value.pull_request) } : {}),
     };
   }
 
-  async createIssue(args: { repo: string; title: string; body?: string; labels?: string[] }, options?: { signal?: AbortSignal; repo?: string }) {
+  async getPullRequest(args: { repo: string; issueNumber: number }, options?: { signal?: AbortSignal; repo?: string }) {
+    return this.getIssue({ ...args, includePullRequest: true }, { ...options, allowPullRequests: true });
+  }
+
+  async createIssue(args: { repo: string; title: string; body?: string; labels?: string[]; assignees?: string[] }, options?: { signal?: AbortSignal; repo?: string }) {
     const repo = this.checkedRepo(args.repo, options?.repo);
     const title = text(args.title, 'title');
     if (args.body !== undefined && typeof args.body !== 'string') validation('GitHub body must be a string');
     if (args.labels !== undefined && (!Array.isArray(args.labels) || args.labels.some((label) => typeof label !== 'string' || !label.trim()))) {
       validation('GitHub labels must be non-empty strings');
     }
+    const assignees = normalizeAssignees(args.assignees);
     const value = await this.request<any>(`/repos/${repo}/issues`, options?.signal, {
       title,
       ...(args.body !== undefined ? { body: args.body } : {}),
       ...(args.labels !== undefined ? { labels: args.labels } : {}),
+      ...(assignees !== undefined ? { assignees } : {}),
     });
     return githubIssue(value, repo, true);
+  }
+
+  async updateIssue(
+    args: {
+      repo: string;
+      issueNumber: number;
+      title?: string;
+      body?: string;
+      state?: 'open' | 'closed';
+      labels?: string[];
+      assignees?: string[];
+    },
+    options?: { signal?: AbortSignal; repo?: string },
+  ) {
+    const repo = this.checkedRepo(args.repo, options?.repo);
+    const number = issueNumber(args.issueNumber);
+    const payload: Record<string, unknown> = {};
+    if (args.title !== undefined) payload.title = text(args.title, 'title');
+    if (args.body !== undefined) {
+      if (typeof args.body !== 'string') validation('GitHub body must be a string');
+      payload.body = args.body;
+    }
+    if (args.state !== undefined) {
+      if (args.state !== 'open' && args.state !== 'closed') validation('GitHub state must be open or closed');
+      payload.state = args.state;
+    }
+    if (args.labels !== undefined) {
+      if (!Array.isArray(args.labels) || args.labels.some((label) => typeof label !== 'string' || !label.trim())) {
+        validation('GitHub labels must be non-empty strings');
+      }
+      payload.labels = args.labels;
+    }
+    const assignees = normalizeAssignees(args.assignees);
+    if (assignees !== undefined) payload.assignees = assignees;
+    if (Object.keys(payload).length === 0) {
+      validation('GitHub update_issue requires at least one field to update');
+    }
+
+    const value = await this.request<any>(`/repos/${repo}/issues/${number}`, options?.signal, payload, 'PATCH');
+    const normalized = githubIssue(value, repo, true, true);
+    return {
+      ...normalized,
+      state: typeof value.state === 'string' ? value.state : (args.state ?? 'open'),
+      labels: Array.isArray(value.labels)
+        ? value.labels.filter((label: any) => typeof label?.name === 'string').map((label: any) => label.name as string)
+        : [],
+      assignees: Array.isArray(value.assignees)
+        ? value.assignees.filter((entry: any) => typeof entry?.login === 'string').map((entry: any) => entry.login as string)
+        : [],
+    };
+  }
+
+  async addComment(args: { repo: string; issueNumber: number; body: string }, options?: { signal?: AbortSignal; repo?: string }) {
+    const repo = this.checkedRepo(args.repo, options?.repo);
+    const number = issueNumber(args.issueNumber);
+    const body = text(args.body, 'body');
+    const value = await this.request<any>(`/repos/${repo}/issues/${number}/comments`, options?.signal, { body });
+    if (!value || typeof value !== 'object' || !Number.isSafeInteger(value.id) || typeof value.html_url !== 'string') {
+      throw new StepError({ message: 'GitHub comment write returned an invalid response', category: 'UNKNOWN', retryable: false });
+    }
+    return {
+      id: String(value.id),
+      issueNumber: number,
+      body: typeof value.body === 'string' ? value.body : body,
+      repo,
+      url: value.html_url as string,
+    };
+  }
+
+  async listIssues(
+    args: { repo?: string; state?: 'open' | 'closed'; query?: string; limit?: number },
+    options?: { signal?: AbortSignal; repo?: string },
+  ) {
+    const state = args.state ?? 'open';
+    if (state !== 'open' && state !== 'closed') validation('GitHub state must be open or closed');
+    const max = limit(args.limit);
+    const rawQuery = args.query?.trim()
+      ? `is:${state} ${args.query.trim()}`
+      : `is:issue is:${state}`;
+
+    if (args.repo !== undefined) {
+      return this.searchIssues({ repo: args.repo, query: rawQuery, limit: max }, options);
+    }
+
+    const repos = this.allowedRepositories();
+    const collected: Array<{ id: string; number: number; title: string; url: string; repo: string }> = [];
+    for (const repo of repos) {
+      const remaining = max - collected.length;
+      if (remaining <= 0) break;
+      const items = await this.searchIssues({ repo, query: rawQuery, limit: remaining }, options);
+      collected.push(...items);
+    }
+    return collected.slice(0, max);
   }
 
   async addLabel(args: { repo: string; issueNumber: number; label: string }, options?: { signal?: AbortSignal; repo?: string }) {
@@ -284,8 +396,12 @@ export class GitHubAdapter extends BaseAdapter {
     switch (toolName) {
       case 'github.search_repos': return this.searchRepos(args as any, context);
       case 'github.search_issues': return this.searchIssues(args as any, context);
+      case 'github.list_issues': return this.listIssues(args as any, context);
       case 'github.get_issue': return this.getIssue(args as any, context);
+      case 'github.get_pull_request': return this.getPullRequest(args as any, context);
       case 'github.create_issue': return this.createIssue(args as any, context);
+      case 'github.update_issue': return this.updateIssue(args as any, context);
+      case 'github.add_comment': return this.addComment(args as any, context);
       case 'github.add_label': return this.addLabel(args as any, context);
       default: validation(`Tool '${toolName}' is not supported by GitHubAdapter`);
     }

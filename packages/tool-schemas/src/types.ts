@@ -250,6 +250,8 @@ export interface GithubDigestConfig {
   channelId: string;
   channelName: string;
   staleDays: number;
+  telegramChatId?: string;
+  telegramChatTitle?: string;
 }
 
 export interface GithubDigestDelivery {
@@ -257,6 +259,9 @@ export interface GithubDigestDelivery {
   channelName: string;
   ts: string | null;
   counts: { newIssues: number; stalePrs: number; unassignedIssues: number };
+  telegramChatId?: string;
+  telegramChatTitle?: string;
+  messageId?: number | null;
 }
 
 export interface ScheduleDigestCandidate {

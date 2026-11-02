@@ -665,6 +665,24 @@ export class ChatService {
               targetRepo = stepRepoMap.get(refStepId);
             }
           }
+          if (targetRepo && !targetRepo.includes('/')) {
+            const shortLower = targetRepo.toLowerCase();
+            const matchingAllowed = (github.connection.repos as string[]).filter(
+              (r) => r.split('/')[1]?.toLowerCase() === shortLower,
+            );
+            if (matchingAllowed.length === 1) {
+              targetRepo = matchingAllowed[0];
+            } else {
+              const matchingTeam = (github.teamRepos ?? []).filter(
+                (r: any) =>
+                  String(r.name ?? '').toLowerCase() === shortLower ||
+                  String(r.fullName ?? '').split('/')[1]?.toLowerCase() === shortLower,
+              );
+              if (matchingTeam.length === 1 && typeof matchingTeam[0].fullName === 'string') {
+                targetRepo = matchingTeam[0].fullName;
+              }
+            }
+          }
           if (!targetRepo && github.connection.repos.length === 1) {
             targetRepo = github.connection.repos[0];
           }
@@ -676,7 +694,14 @@ export class ChatService {
               targetRepo;
             step.repo = canonical;
             stepRepoMap.set(step.id, canonical);
-            if (!allowedRepoSet.has(targetRepo.toLowerCase())) {
+            const rawRepoArg = step.args?.repo;
+            const isRefArg =
+              (typeof rawRepoArg === 'string' && rawRepoArg.startsWith('$')) ||
+              (typeof rawRepoArg === 'object' && rawRepoArg !== null && '$ref' in rawRepoArg);
+            if (!isRefArg) {
+              step.args = { ...(step.args ?? {}), repo: canonical };
+            }
+            if (!allowedRepoSet.has(canonical.toLowerCase())) {
               forbiddenRepoName = canonical;
               break;
             }
