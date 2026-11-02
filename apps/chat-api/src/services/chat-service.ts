@@ -14,6 +14,7 @@ import { evaluateGithubDigestCandidate } from './schedules/github-digest-candida
 import { evaluateTelegramDigestCandidate } from './schedules/telegram-digest-candidate.js';
 import { resolveRef } from '@wap/executor';
 import { eventsOverlap } from '@wap/tool-adapters';
+import { JiraPlanBinder, JiraBindingError } from './jira/jira-plan-binding.js';
 
 /** Only the server writes plan connections; the model's version is never kept or shown back to it. */
 function withoutConnections(plan: PlanResponse): PlanResponse {
@@ -147,6 +148,8 @@ export interface ChatServiceOptions {
   githubConnection?: (userId: string) => Promise<any>;
   /** The caller's active Telegram connection lookup; absent when Telegram is off or not connected. */
   telegramConnection?: (userId: string) => Promise<any>;
+  /** Server-side binder for Jira plans (JIRA-08); absent, personal Jira plans are refused. */
+  jiraBinder?: JiraPlanBinder;
   /** Scheduled workflows (SCHEDULES_ENABLED); absent, conversations have no schedule. */
   schedules?: {
     repo: ScheduleRepo;
@@ -187,6 +190,7 @@ export class ChatService {
   private trelloConnection?: ChatServiceOptions['trelloConnection'];
   private githubConnection?: ChatServiceOptions['githubConnection'];
   private telegramConnection?: ChatServiceOptions['telegramConnection'];
+  private jiraBinder?: JiraPlanBinder;
   private schedules?: ChatServiceOptions['schedules'];
   private getAdapter?: ChatServiceOptions['getAdapter'];
   private lookupTool?: ChatServiceOptions['lookupTool'];
@@ -199,6 +203,7 @@ export class ChatService {
     this.trelloConnection = options.trelloConnection;
     this.githubConnection = options.githubConnection;
     this.telegramConnection = options.telegramConnection;
+    this.jiraBinder = options.jiraBinder;
     this.getAdapter = options.getAdapter;
     this.lookupTool = options.lookupTool;
     this.mysheetsLookupTimeoutMs = options.mysheetsLookupTimeoutMs ?? 10_000;
@@ -260,6 +265,7 @@ export class ChatService {
     scopeId = 'default',
     onGitHubTeamRepos?: (repos: Array<{ repoId: string; fullName: string; name: string }>) => void,
     onTelegramChats?: (chats: Array<{ chatId: string; title: string }>) => void,
+    conversationId?: string,
   ): Promise<PlannerResponse> {
     signal?.throwIfAborted();
     const bound = withoutConnections(plan);
@@ -269,8 +275,9 @@ export class ChatService {
     const usesTrello = bound.steps.some((step) => step.tool.startsWith('trello.'));
     const usesGitHub = bound.steps.some((step) => step.tool.startsWith('github.'));
     const usesTelegram = bound.steps.some((step) => step.tool.startsWith('telegram.'));
+    const usesMyJira = bound.steps.some((step) => step.tool.startsWith('myjira.'));
 
-    if (!usesGmail && !usesMyCalendar && !usesMySheets && !usesTrello && !usesGitHub && !usesTelegram) return bound;
+    if (!usesGmail && !usesMyCalendar && !usesMySheets && !usesTrello && !usesGitHub && !usesTelegram && !usesMyJira) return bound;
 
     const unavailableServices: Array<{ id: string; name: string }> = [];
     const reasons: string[] = [];
@@ -280,6 +287,7 @@ export class ChatService {
     let trelloConn: NonNullable<PlanConnections['trello']> | undefined;
     let githubConn: NonNullable<PlanConnections['github']> | undefined;
     let telegramConn: NonNullable<PlanConnections['telegram']> | undefined;
+    let myjiraConn: NonNullable<PlanConnections['myjira']> | undefined;
 
     if (usesGmail) {
       const gmail = await this.gmailConnection?.(userId);
@@ -746,6 +754,40 @@ export class ChatService {
       }
     }
 
+    if (usesMyJira) {
+      if (!this.jiraBinder) {
+        unavailableServices.push({ id: 'myjira', name: 'Jira' });
+        reasons.push('Tính năng Jira chưa được kích hoạt trên hệ thống.');
+      } else {
+        const conv = conversationId && this.convRepo
+          ? await this.convRepo.getConversation(conversationId)
+          : null;
+        if (!conv) {
+          unavailableServices.push({ id: 'myjira', name: 'Jira' });
+          reasons.push('Hội thoại không tồn tại.');
+        } else {
+          try {
+            myjiraConn = await this.jiraBinder.bindPlan(
+              userId,
+              conv,
+              bound.steps,
+              { signal }
+            );
+          } catch (err: any) {
+            if (err instanceof JiraBindingError) {
+              return {
+                kind: 'refusal',
+                reason: err.message,
+                suggestion: err.suggestion ?? 'Hãy kiểm tra lại quyền truy cập Jira của bạn và gửi lại yêu cầu.',
+                unavailableServices: [{ id: 'myjira', name: 'Jira' }],
+              };
+            }
+            throw err;
+          }
+        }
+      }
+    }
+
     if (unavailableServices.length > 0) {
       return {
         kind: 'refusal',
@@ -763,6 +805,7 @@ export class ChatService {
     if (trelloConn) connections.trello = trelloConn;
     if (githubConn) connections.github = githubConn;
     if (telegramConn) connections.telegram = telegramConn;
+    if (myjiraConn) connections.myjira = myjiraConn;
 
     return { ...bound, connections };
   }
@@ -914,6 +957,7 @@ export class ChatService {
           scopeId,
           (repos) => { githubTeamRepos = repos; },
           (chats) => { telegramChats = chats; },
+          conversationId,
         )
       : planned;
     signal?.throwIfAborted();

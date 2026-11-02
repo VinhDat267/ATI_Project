@@ -49,6 +49,7 @@ import { JiraTokenManager } from './services/jira/jira-token-manager.js';
 import { JiraNativeVerifier } from './services/jira/jira-native-verifier.js';
 import { JiraPolicyService } from './services/jira/jira-policy-service.js';
 import { JiraHistorySanitizer } from './services/jira/jira-history-sanitizer.js';
+import { JiraPlanBinder } from './services/jira/jira-plan-binding.js';
 import {
   AIPlanner,
   createProviderFromEnv,
@@ -389,6 +390,9 @@ async function bootstrap() {
   const jiraHistorySanitizer = pool && jiraNativeVerifier
     ? new JiraHistorySanitizer(new JiraPolicyService({ pool, verifier: jiraNativeVerifier }))
     : undefined;
+  const jiraBinder = jiraAvailable && pool
+    ? new JiraPlanBinder({ pool })
+    : undefined;
 
   // 2. Initialize LLM Provider
   let provider: any;
@@ -514,6 +518,7 @@ async function bootstrap() {
     trelloConnection,
     githubConnection,
     telegramConnection,
+    jiraBinder,
     getAdapter: (serviceName, context) => (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(serviceName, context),
     schedules: schedules
       ? {
