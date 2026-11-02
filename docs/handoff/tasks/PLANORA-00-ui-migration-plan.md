@@ -6,12 +6,13 @@ Ngày 02/11/2026, chủ dự án yêu cầu kế hoạch chi tiết thay đổi 
 
 ## Phạm vi
 
-Chỉ khảo sát và tài liệu: spec/bảng đối chiếu, kế hoạch triển khai, card này và log bàn giao. Không thi công frontend, đổi backend, chạy migration, bật feature flag, merge/deploy hay sửa CURRENT-STATE/ROADMAP.
+Chỉ khảo sát và tài liệu: spec/bảng đối chiếu, kế hoạch triển khai, handoff chi tiết, card này và log bàn giao. Chủ dự án yêu cầu mở PR cho bộ tài liệu này. Không thi công frontend, đổi backend, chạy migration, bật feature flag, merge/deploy hay sửa CURRENT-STATE/ROADMAP.
 
 ## Tài liệu
 
 - [Thiết kế và inventory](../../superpowers/specs/2026-11-02-planora-migration-design.md).
 - [Kế hoạch 15 task](../../superpowers/plans/2026-11-02-planora-migration.md).
+- [Handoff chi tiết cho phiên nhận việc tiếp theo](../PLANORA-MIGRATION-HANDOFF.md).
 
 ## Tiêu chí nghiệm thu
 
@@ -34,3 +35,5 @@ Kiểm kê trực tiếp: 22 route entries, 13 Cockpit states, 8 callback view (
 Validation Python: **exit 0**, kiểm số route/state/task, callback/file tồn tại, link spec và whitespace. Chưa chạy runtime/unit/browser; không dùng kết quả lịch sử để khẳng định tương thích.
 
 Nhánh tài liệu: `codex/planora-migration-plan`, worktree riêng. Xem log cùng ngày cho bằng chứng và giới hạn.
+
+Bổ sung theo yêu cầu bàn giao và xuất bản PR: đã viết handoff tự đủ bối cảnh, mốc Git, quyết định đã chốt/đề xuất, inventory thiếu Planora, 15 task, bất biến, hướng dẫn nhận PL-01, môi trường/kiểm chứng và prompt nhận việc. Việc mở PR tài liệu không thay trạng thái duyệt thiết kế hoặc bắt đầu triển khai. Bằng chứng kiểm lại và review nằm trong log `2026-11-02-codex-planora-handoff-pr.md`.
