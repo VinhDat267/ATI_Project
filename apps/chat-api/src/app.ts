@@ -29,7 +29,7 @@ import type { ExecutionService } from './services/execution-service.js';
 import { userFacingError } from './services/user-facing-error.js';
 import type { EmailSender } from './services/email/index.js';
 import type { GoogleOAuthConfig } from './auth/google-oidc.js';
-import type { GmailOAuthConfig, GitHubOAuthConfig, TelegramBotConfig, TrelloOAuthConfig } from './config/env.js';
+import type { GmailOAuthConfig, GitHubOAuthConfig, TelegramBotConfig, TrelloOAuthConfig, JiraOAuthConfig } from './config/env.js';
 import type { GmailConnectionRepo } from './db/repositories/gmail-connection-repo.js';
 import { TrelloTeamRepo } from './db/repositories/trello-team-repo.js';
 import { GitHubTeamRepo } from './db/repositories/github-team-repo.js';
@@ -40,11 +40,15 @@ import { createMySheetsConnectionRoutes, isMySheetsAvailable } from './routes/co
 import { createTrelloConnectionRoutes, isTrelloConnectAvailable, type TrelloConnectionsOptions } from './routes/connections/trello.js';
 import { createGitHubConnectionRoutes, type GitHubConnectionsOptions } from './routes/connections/github.js';
 import { createTelegramConnectionRoutes, type TelegramConnectionsOptions } from './routes/connections/telegram.js';
+import { createMyJiraConnectionRoutes, isMyJiraAvailable, type MyJiraConnectionsOptions } from './routes/connections/myjira.js';
 import type { GlobalRateLimiter } from '@wap/tool-adapters';
 import type { GoogleAuthRepo } from './db/repositories/google-auth-repo.js';
 import type { GmailTokenManager } from './services/gmail/token-manager.js';
 import type { TrelloTokenManager } from './services/trello/token-manager.js';
 import type { GitHubTokenManager } from './services/github/token-manager.js';
+import type { JiraTokenManager } from './services/jira/jira-token-manager.js';
+import { JiraOAuthClient } from './services/jira/jira-oauth-client.js';
+import type { JiraOAuthRepo } from './db/repositories/jira-oauth-repo.js';
 
 /** Gmail as each member's own connection (GMAIL_ENABLED). Absent or disabled: the routes do not exist. */
 export interface GmailAppOptions {
@@ -113,6 +117,18 @@ export interface TelegramAppOptions {
   teamRepo?: TelegramTeamRepo;
 }
 
+/** Jira as each member's own OAuth connection and workspace sites (MYJIRA_ENABLED). */
+export interface JiraAppOptions {
+  enabled: boolean;
+  oauth?: JiraOAuthConfig;
+  repo?: JiraOAuthRepo;
+  tokens?: JiraTokenManager;
+  client?: JiraOAuthClient;
+  fetchFn?: typeof fetch;
+  jiraTimeoutMs?: number;
+  onConnectionChanged?: (userId: string) => void;
+}
+
 export interface AppOptions extends AdminUsersOptions {
   jwtSecret: string;
   runtimeMode?: 'sandbox' | 'live';
@@ -157,6 +173,7 @@ export interface AppOptions extends AdminUsersOptions {
   githubTeamRepo?: GitHubTeamRepo;
   telegram?: TelegramAppOptions;
   telegramTeamRepo?: TelegramTeamRepo;
+  jira?: JiraAppOptions;
   /** Scheduled workflows; present only when SCHEDULES_ENABLED is on and PostgreSQL is available. */
   schedules?: ScheduleRoutesOptions;
 }
@@ -223,6 +240,19 @@ export function createApp(options: AppOptions): Express {
     conversationOwner: options.convRepo ? async (id: string) => (await options.convRepo!.getConversation(id))?.user_id ?? null : undefined,
     adminUserIds: options.serviceAdminUserIds,
   };
+  const jiraRoutes: MyJiraConnectionsOptions | undefined = options.jira?.enabled ? {
+    jwtSecret: options.jwtSecret,
+    sessionRepo,
+    states,
+    repo: options.jira.repo,
+    client: options.jira.client ?? (options.jira.oauth ? new JiraOAuthClient({ ...options.jira.oauth, fetchFn: options.jira.fetchFn }) : undefined),
+    tokens: options.jira.tokens,
+    clock: options.authClock,
+    jiraTimeoutMs: options.jira.jiraTimeoutMs,
+    onConnectionChanged: options.jira.onConnectionChanged,
+    conversationOwner: options.convRepo ? async (id: string) => (await options.convRepo!.getConversation(id))?.user_id ?? null : undefined,
+    enabled: true,
+  } : undefined;
 
   app.use(express.json());
   app.use((_req, res, next) => {
@@ -239,8 +269,30 @@ export function createApp(options: AppOptions): Express {
 
   // CORS middleware
   app.use((req, res, next) => {
-    if (req.path.startsWith('/api/auth/google/') || (gmailRoutes && req.path.startsWith('/api/connections/gmail')) || (mycalendarRoutes && req.path.startsWith('/api/connections/mycalendar')) || (mysheetsRoutes && req.path.startsWith('/api/connections/mysheets')) || req.path.startsWith('/api/connections/trello') || req.path.startsWith('/api/connections/github') || req.path.startsWith('/api/connections/telegram')) {
-      const origins = [options.appBaseUrl, options.googleOAuth?.redirectUri, options.gmail?.oauth?.redirectUri, options.mycalendar?.oauth?.redirectUri, options.mysheets?.oauth?.redirectUri, options.trello?.oauth?.redirectUri, options.github?.oauth?.redirectUri, options.telegram?.bot?.callbackUrl].filter(Boolean).map(url => new URL(url!).origin);
+    if (
+      req.path.startsWith('/api/auth/google/') ||
+      (gmailRoutes && req.path.startsWith('/api/connections/gmail')) ||
+      (mycalendarRoutes && req.path.startsWith('/api/connections/mycalendar')) ||
+      (mysheetsRoutes && req.path.startsWith('/api/connections/mysheets')) ||
+      req.path.startsWith('/api/connections/trello') ||
+      req.path.startsWith('/api/connections/github') ||
+      req.path.startsWith('/api/connections/telegram') ||
+      req.path.startsWith('/api/connections/myjira')
+    ) {
+      const origins = [
+        options.appBaseUrl,
+        options.googleOAuth?.redirectUri,
+        options.gmail?.oauth?.redirectUri,
+        options.mycalendar?.oauth?.redirectUri,
+        options.mysheets?.oauth?.redirectUri,
+        options.trello?.oauth?.redirectUri,
+        options.github?.oauth?.redirectUri,
+        options.telegram?.bot?.callbackUrl,
+        options.jira?.oauth?.redirectUri,
+        options.jira?.oauth?.fixtureBaseUrl,
+      ]
+        .filter(Boolean)
+        .map((url) => new URL(url!).origin);
       const origin = req.get('Origin');
       res.vary('Origin');
       if (origin && origins.includes(origin)) {
@@ -264,6 +316,7 @@ export function createApp(options: AppOptions): Express {
       ...(gmailRoutes ? { gmailEnabled: isGmailAvailable(gmailRoutes) } : {}),
       ...(mycalendarRoutes ? { mycalendarEnabled: isMyCalendarAvailable(mycalendarRoutes) } : {}),
       ...(mysheetsRoutes ? { mysheetsEnabled: isMySheetsAvailable(mysheetsRoutes) } : {}),
+      ...(jiraRoutes ? { jiraEnabled: isMyJiraAvailable(jiraRoutes) } : {}),
       ...(options.schedules ? { schedulesEnabled: true } : {}) });
   });
 
@@ -328,7 +381,9 @@ export function createApp(options: AppOptions): Express {
     createServicesRoutes({ credentialRepo: options.credentialRepo, encryptionKey: options.encryptionKey, fetchFn: options.serviceFetchFn, onCredentialsChanged: options.onCredentialsChanged, adminUserIds: options.serviceAdminUserIds,
       gmailAvailable: Boolean(gmailRoutes && isGmailAvailable(gmailRoutes)),
       mycalendarAvailable: Boolean(mycalendarRoutes && isMyCalendarAvailable(mycalendarRoutes)),
-      mysheetsAvailable: Boolean(mysheetsRoutes && isMySheetsAvailable(mysheetsRoutes)) })
+      mysheetsAvailable: Boolean(mysheetsRoutes && isMySheetsAvailable(mysheetsRoutes)),
+      trelloTeamRepo: options.trelloTeamRepo ?? options.trello?.teamRepo,
+      githubTeamRepo: options.githubTeamRepo ?? options.github?.teamRepo })
   );
 
   if (gmailRoutes) app.use('/api/connections/gmail', createGmailConnectionRoutes(gmailRoutes));
@@ -337,6 +392,13 @@ export function createApp(options: AppOptions): Express {
   app.use('/api/connections/trello', createTrelloConnectionRoutes(trelloRoutes));
   app.use('/api/connections/github', createGitHubConnectionRoutes(githubRoutes));
   app.use('/api/connections/telegram', createTelegramConnectionRoutes(telegramRoutes));
+  if (jiraRoutes) {
+    app.use('/api/connections/myjira', createMyJiraConnectionRoutes(jiraRoutes));
+  } else {
+    app.use('/api/connections/myjira', (_req: Request, res: Response) => {
+      res.status(503).json({ error: 'Kết nối Jira chưa sẵn sàng.' });
+    });
+  }
 
   // Only schedule paths pass through this auth check, so other /api requests are not checked twice.
   if (options.schedules) {

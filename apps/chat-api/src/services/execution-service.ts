@@ -29,6 +29,7 @@ export interface ExecutionServiceOptions {
   };
   sseManager?: {
     emitEvent: (convId: string, eventName: string, data: any) => void;
+    clearPlanEvents?: (convId: string, planId?: string) => void;
   };
 }
 
@@ -56,6 +57,10 @@ export class ExecutionService {
 
   getPlanRepo(): PlanRepo {
     return this.planRepo;
+  }
+
+  clearPlanEvents(convId: string, planId?: string): void {
+    this.sseManager?.clearPlanEvents?.(convId, planId);
   }
 
   /**
@@ -149,6 +154,8 @@ export class ExecutionService {
 
     const convId = planRow.conv_id;
     const steps: PlanStep[] = planJson?.steps || [];
+
+    this.clearPlanEvents(convId, planId);
 
     // Emit exec_start
     this.sseManager?.emitEvent(convId, 'exec_start', { planId });

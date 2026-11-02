@@ -34,6 +34,12 @@ export interface ServicesRoutesOptions {
   mycalendarAvailable?: boolean;
   /** MySheets is enabled and usable (flag on, OAuth and PostgreSQL configured). */
   mysheetsAvailable?: boolean;
+  trelloTeamRepo?: {
+    get: (scopeId?: string) => Promise<{ boards?: Array<{ boardId: string; boardName?: string }> } | null>;
+  };
+  githubTeamRepo?: {
+    get: () => Promise<{ repos?: Array<{ repoId: string; fullName: string }> } | null>;
+  };
 }
 
 const PERSONAL_ONLY = 'Gmail do mỗi người tự kết nối ở mục "Của riêng bạn"; không có khoá chung để quản trị viên cấu hình.';
@@ -377,7 +383,16 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
             }
           }
 
-          const config = record && encryptionKey ? decryptCredentials(record.config, encryptionKey) : null;
+          let config: Record<string, any> | null = null;
+          if (record && encryptionKey) {
+            try {
+              config = decryptCredentials(record.config, encryptionKey);
+            } catch {
+              // One unreadable row (e.g. written under another ENCRYPTION_KEY) must not
+              // fail the whole list; the service is reported as not configured.
+              console.warn(`[services] Cannot decrypt stored credentials for '${id}'; listing it as unconfigured.`);
+            }
+          }
           const scope = config?.allowedScope as Record<string, unknown> | undefined;
           const entries = scope?.[scopeKey];
           const configured =
@@ -387,7 +402,8 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
           const check =
             savedCheck?.credentialVersion === (record ? versionOf(record.config) : null) ? savedCheck : undefined;
 
-          let personalStatus: 'connected' | 'reconnect_required' | undefined;
+          let personalStatus: 'connected' | 'scope_required' | 'reconnect_required' | undefined;
+          let personalAllowedScope: string[] | undefined;
           let username: string | undefined;
           let connectedAt: string | undefined;
 
@@ -409,14 +425,66 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
               } else if (personalRecord.status === 'active') {
                 personalStatus = 'connected';
               }
+              let dec: Record<string, any> | null = null;
               if (encryptionKey) {
                 try {
-                  const dec = decryptCredentials(personalRecord.config, encryptionKey);
-                  if (typeof dec.username === 'string') username = dec.username;
-                  else if (typeof dec.login === 'string') username = dec.login;
+                  const decrypted = decryptCredentials(personalRecord.config, encryptionKey);
+                  dec = decrypted;
+                  if (typeof decrypted.username === 'string') username = decrypted.username;
+                  else if (typeof decrypted.login === 'string') username = decrypted.login;
                 } catch {
                   if (personalRecord.status === 'active') {
                     personalStatus = 'reconnect_required';
+                  }
+                }
+              }
+              if (personalStatus === 'connected') {
+                if (id === 'trello' && options.trelloTeamRepo) {
+                  const trelloScopeId =
+                    mode === 'organization' && workspaceId
+                      ? workspaceId
+                      : mode === 'personal' && userId
+                        ? 'personal:' + userId
+                        : undefined;
+                  let teamScope: { boards?: Array<{ boardId: string; boardName?: string }> } | null = null;
+                  try {
+                    teamScope = await (trelloScopeId
+                      ? options.trelloTeamRepo.get(trelloScopeId)
+                      : options.trelloTeamRepo.get());
+                  } catch {
+                    teamScope = null;
+                  }
+                  if (!teamScope?.boards?.length) {
+                    personalStatus = 'scope_required';
+                  } else {
+                    personalAllowedScope = teamScope.boards.map((b) => b.boardId);
+                  }
+                } else if (id === 'github' && options.githubTeamRepo) {
+                  let teamScope: { repos?: Array<{ repoId: string; fullName: string }> } | null = null;
+                  try {
+                    teamScope = await options.githubTeamRepo.get();
+                  } catch {
+                    teamScope = null;
+                  }
+                  if (!teamScope?.repos?.length) {
+                    personalStatus = 'scope_required';
+                  } else {
+                    personalAllowedScope = teamScope.repos.map((r) => r.fullName);
+                  }
+                } else if (id === 'telegram' && dec) {
+                  const hasSelectedChats = Array.isArray(dec.selectedChats);
+                  const hasAllowedChats = Array.isArray(dec.allowedScope?.chats);
+                  if (hasSelectedChats || hasAllowedChats) {
+                    const selectedIds = hasSelectedChats
+                      ? dec.selectedChats.map((c: any) => (typeof c === 'string' ? c : c?.chatId)).filter(Boolean)
+                      : [];
+                    const allowedIds = hasAllowedChats ? dec.allowedScope.chats : [];
+                    const scopeIds = allowedIds.length > 0 ? allowedIds : selectedIds;
+                    if (scopeIds.length === 0) {
+                      personalStatus = 'scope_required';
+                    } else {
+                      personalAllowedScope = scopeIds;
+                    }
                   }
                 }
               }
@@ -437,7 +505,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
             connected: configured && check?.connectionStatus === 'healthy',
             connectionStatus: configured ? check?.connectionStatus ?? 'unchecked' : 'unconfigured',
             lastCheckedAt: check?.lastCheckedAt ?? null,
-            allowedScope: Array.isArray(entries) ? entries : [],
+            allowedScope: personalAllowedScope ?? (Array.isArray(entries) ? entries : []),
             ...(isPersonalOAuth && personalStatus
               ? { personalStatus, ...(username ? { username } : {}), ...(connectedAt ? { connectedAt } : {}) }
               : {}),

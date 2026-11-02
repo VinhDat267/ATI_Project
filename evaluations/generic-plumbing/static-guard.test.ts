@@ -32,6 +32,7 @@ const exceptions = [
   { file: 'apps/chat-api/src/services/schedules/telegram-digest-runner.ts', pattern: /^telegram(?:\.[A-Za-z_][\w]*)?$/, reason: 'Telegram digest runner delivers reports to telegram.' },
   { file: 'apps/chat-api/src/services/schedules/schedule-service.ts', pattern: /^(?:sheets|calendar|github|telegram)(?:\.[A-Za-z_][\w]*)?$/, reason: 'Digest schedule confirmation checks service kind.' },
   { file: 'apps/chat-api/src/services/registered-services.ts', pattern: /^(?:trello|github|telegram)(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal OAuth registration names those services.' },
+  { file: 'apps/chat-api/src/services/jira/jira-oauth-client.ts', pattern: /^jira$/, reason: 'Jira-specific OAuth client filters accessible Jira resources returned by Atlassian.' },
   { file: 'apps/chat-api/src/services/trello/connection-reference.ts', pattern: /^trello(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal Trello OAuth names that service.' },
   { file: 'apps/chat-api/src/services/trello/token-manager.ts', pattern: /^trello(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal Trello OAuth names that service.' },
   { file: 'apps/chat-api/src/services/github/connection-reference.ts', pattern: /^github(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal GitHub OAuth names that service.' },

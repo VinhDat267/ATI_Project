@@ -3,6 +3,7 @@ import { useChatStore } from '../../store/chat-store';
 import { apiClient } from '../../services/api-client';
 import { userErrorMessage } from '../../services/user-error';
 import { formatConversationTime } from '../../services/conversation-time';
+import { getActiveWorkspaceId, subscribeWorkspace } from '../../services/workspace-storage';
 import { loadConversationHistory } from '../../hooks/use-conversation-history';
 
 export interface SidebarHistoryProps {
@@ -14,6 +15,7 @@ export interface SidebarHistoryProps {
 export function SidebarHistory({ currentConversationId, onSelectConversation, onCloseMobileSidebar, prototype = false }: SidebarHistoryProps) {
   const conversations = useChatStore(state => state.conversations);
   const firstConfirmedUserMessage = useChatStore(state => state.messages.find(message => message.role === 'user' && message.status === 'sent')?.id);
+  const [workspaceId, setWorkspaceId] = useState(getActiveWorkspaceId());
   const [search, setSearch] = useState('');
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -24,6 +26,7 @@ export function SidebarHistory({ currentConversationId, onSelectConversation, on
   const request = useRef(0);
   const busy = useRef(false);
   const selection = useRef(0);
+  useEffect(() => subscribeWorkspace(() => setWorkspaceId(getActiveWorkspaceId())), []);
   const load = async (cursor?: string, generation = request.current) => {
     busy.current = true; setIsLoading(true); setError(null);
     try {
@@ -41,7 +44,7 @@ export function SidebarHistory({ currentConversationId, onSelectConversation, on
     setNextCursor(null);
     void load(undefined, generation);
     return () => { request.current++; selection.current++; };
-  }, [currentConversationId, search, firstConfirmedUserMessage]);
+  }, [currentConversationId, search, firstConfirmedUserMessage, workspaceId]);
   const select = async (id: string) => {
     onCloseMobileSidebar?.();
     if (id === currentConversationId) return;

@@ -29,7 +29,11 @@ export async function loadConversationHistory(id: string, isCurrent: () => boole
   }
   const saved = normalizeConversationMessages(data.messages || []);
   const savedKeys = new Set(saved.map(messageKey));
-  useChatStore.setState(current => ({ messages: [...saved, ...current.messages.filter(message => !savedKeys.has(messageKey(message)))] }));
+  useChatStore.setState(current => ({
+    messages: [...saved, ...current.messages.filter(message => !savedKeys.has(messageKey(message)))],
+    planLoadError: null,
+    historyHydrating: true,
+  }));
   const latest = data.messages?.filter(message => message.metadata?.type !== 'working_memory').at(-1);
   if (hydrateResponse && !useChatStore.getState().isPlanning) {
     const refusal = latest?.metadata?.type === 'refusal' || latest?.content.startsWith('Từ chối yêu cầu:');
@@ -44,22 +48,51 @@ export async function loadConversationHistory(id: string, isCurrent: () => boole
         reason: latest.metadata.reason === 'read_only' || latest.metadata.reason === 'destination' ? latest.metadata.reason : undefined });
     }
   }
+  const revision = useChatStore.getState().planRevision;
   try {
-    const revision = useChatStore.getState().planRevision;
-    const activePlan = await apiClient.getActivePlan(id);
-    if (!isCurrent()) return;
-    const current = useChatStore.getState();
-    const alreadyExecuted = activePlan?.id && (current.executionSnapshot?.plan.id === activePlan.id ||
-      (current.activePlan?.id === activePlan.id && ['executing', 'partial', 'reconciliation_required', 'completed', 'stopped', 'failed'].includes(current.planStatus)));
-    if (activePlan && !['answer', 'schedule_proposal', 'schedule_state', 'schedule_discarded'].includes(latest?.metadata?.type ?? '') && current.planRevision === revision && !alreadyExecuted && !current.isPlanning) {
-      store.setActivePlan(activePlan);
-      const status = activePlan.status;
-      store.setPlanStatus(!status || status === 'pending' ? 'preview' : status === 'approved' ? 'executing' : status);
+    try {
+      const activePlan = await apiClient.getActivePlan(id);
+      if (!isCurrent()) return;
+      const current = useChatStore.getState();
+      if (current.planRevision === revision) store.setPlanLoadError(null);
+      if (!activePlan) {
+        const settledIds = (data.messages || []).flatMap(message =>
+          message.metadata?.type === 'plan' && typeof message.metadata.planId === 'string' && message.metadata.planId
+            ? [message.metadata.planId]
+            : []
+        );
+        for (const planId of settledIds) store.markPlanSettled(planId);
+        if (
+          current.activePlan?.id &&
+          settledIds.includes(current.activePlan.id) &&
+          current.executionSnapshot?.plan.id !== current.activePlan.id &&
+          current.planStatus === 'preview' &&
+          !current.isPlanning
+        ) {
+          store.setActivePlan(null);
+          store.setPlanStatus('idle');
+        }
+      }
+      const alreadyExecuted = activePlan?.id && (current.executionSnapshot?.plan.id === activePlan.id ||
+        (current.activePlan?.id === activePlan.id && ['executing', 'partial', 'reconciliation_required', 'completed', 'stopped', 'failed'].includes(current.planStatus)));
+      if (activePlan && !['answer', 'schedule_proposal', 'schedule_state', 'schedule_discarded'].includes(latest?.metadata?.type ?? '') && current.planRevision === revision && !alreadyExecuted && !current.isPlanning) {
+        store.setActivePlan(activePlan);
+        const status = activePlan.status;
+        store.setPlanStatus(!status || status === 'pending' ? 'preview' : status === 'approved' ? 'executing' : status);
+      }
+    } catch (error) {
+      // A non-404 failure on /plans/active still permits loading durable execution evidence,
+      // but must be recorded so SavedConversation does not claim the plan expired/was cancelled.
+      if (isCurrent() && useChatStore.getState().planRevision === revision) {
+        store.setPlanLoadError(userErrorMessage(error, 'Không tải được kế hoạch đang chờ.'));
+      }
     }
-  } catch { /* A missing pending plan still permits loading durable execution evidence. */ }
-  if (isCurrent()) {
-    try { await refreshExecutionSnapshot(id); }
-    catch { /* Optional snapshot errors use the helper's error state/revision guards; keep loaded detail and preview. */ }
+    if (isCurrent()) {
+      try { await refreshExecutionSnapshot(id); }
+      catch { /* Optional snapshot errors use the helper's error state/revision guards; keep loaded detail and preview. */ }
+    }
+  } finally {
+    if (isCurrent()) store.setHistoryHydrating(false);
   }
 }
 
