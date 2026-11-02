@@ -39,6 +39,8 @@ Hoàn thành triển khai và kiểm thử các chức năng của JIRA-07 trong
    - Kiểm tra xác minh `jira_site` trong `validator.ts`: từ chối mọi `siteId` người dùng tự gõ nếu không nằm trong danh mục site đã xác minh của workspace (`grounding.memory.jira_site`).
    - Thẩm định tham chiếu `$ref` đa bước chặn việc truyền output giữa 2 bước thuộc 2 site khác nhau (kể cả khi trùng alias siteId nhưng khác cloudId hoặc workspaceId) với lỗi semantic validation "Cross-site reference is not allowed".
    - Nhận diện thông minh site đích khi có nhiều site: hỗ trợ tên ngắn (ví dụ: "Acme"), subdomain URL (ví dụ: "acme" từ `https://acme.atlassian.net`), và các token định danh đặc trưng; chỉ báo ambiguous khi người dùng không chỉ định hoặc dùng từ chung chung (như "Jira").
+   - Xác định site theo yêu cầu hiện tại hoặc lượt làm rõ liên quan (`relevantGroundingUserTexts` trong `planner.ts` và duyệt ngược `userTexts` trong `validator.ts`), ngăn các tin nhắn cũ từ yêu cầu đã xong kích hoạt site sai (ví dụ: yêu cầu hiện tại nói Beta không bị chấp nhận kế hoạch ghi vào Acme chỉ vì tin nhắn cũ từng nhắc Acme).
+   - Chuẩn hóa khớp định danh có dấu gạch nối trong `matchesWordExact` với guard `[\p{L}\p{N}_-]`, ngăn chặn `site-a` khớp nhầm các chuỗi mở rộng như `site-a-evil`, `evil-site-a` hoặc `site-a.evil.com`.
 3. **Vệ sinh dữ liệu nguồn & An toàn Prompt Injection (`validator.ts`, `working-memory.ts`, `system-prompt.ts`, `search.ts`, `planner.ts`):**
    - Mở rộng pattern chống injection phát hiện các chỉ thị tiếng Việt ("bỏ qua mọi chỉ dẫn/hướng dẫn...") và biến thể ("ignore instructions").
    - Hàm `invalidateSite(siteId)` trong `WorkingMemory` xóa toàn bộ thực thể và quan sát của site khi bị thu hồi quyền.
@@ -52,7 +54,7 @@ Hoàn thành triển khai và kiểm thử các chức năng của JIRA-07 trong
 ### Bằng chứng kiểm thử thực tế
 
 - `npm run test -w @wap/planner`:
-  - 31 test files, 443 tests PASS (exit 0)
+  - 31 test files, 451 tests PASS (exit 0)
 - `npx vitest run evaluations/generic-plumbing/static-guard.test.ts evaluations/golden-v2/run-myjira.test.ts`:
   - 2 test files, 8 tests PASS (exit 0)
 - `npx vitest run evaluations/golden-v2/`:

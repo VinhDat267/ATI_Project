@@ -147,6 +147,55 @@ function readOnlyQuestion(): PlannerResponse {
     context: 'Kế hoạch cần ít nhất một hành động ghi. Hãy chọn hành động trên dịch vụ đã kết nối.', reason: 'read_only' };
 }
 
+function isClarificationAssistantMessage(content: unknown): boolean {
+  if (!content) return false;
+  if (typeof content === 'object') {
+    const obj = content as Record<string, unknown>;
+    if (obj.kind === 'clarification') return true;
+    if (obj.kind === 'plan' || Array.isArray(obj.steps) || obj.kind === 'answer' || obj.kind === 'refusal' || obj.kind === 'schedule_proposal') {
+      return false;
+    }
+  }
+  if (typeof content === 'string') {
+    const trimmed = content.trim();
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (parsed && typeof parsed === 'object') {
+          if (parsed.kind === 'clarification') return true;
+          if (parsed.kind === 'plan' || Array.isArray(parsed.steps) || parsed.kind === 'answer' || parsed.kind === 'refusal' || parsed.kind === 'schedule_proposal') {
+            return false;
+          }
+        }
+      } catch {
+        // Not valid JSON
+      }
+    }
+    if (trimmed.startsWith('Previous answer.') || trimmed.includes('<previous_answer>')) {
+      return false;
+    }
+  }
+  return true;
+}
+
+export function relevantGroundingUserTexts(history: ChatMessage[] = [], currentMessage: string): string[] {
+  const texts: string[] = [currentMessage];
+  for (let i = history.length - 1; i >= 0; i--) {
+    const msg = history[i];
+    if (!msg) continue;
+    if (msg.role === 'assistant') {
+      if (!isClarificationAssistantMessage(msg.content)) {
+        break;
+      }
+      continue;
+    }
+    if (msg.role === 'user') {
+      texts.unshift(msg.content);
+    }
+  }
+  return texts;
+}
+
 export class AIPlanner {
   private async measure<T>(phase: PlanningPhaseMetrics['phase'], input: ProcessMessageInput, work: () => Promise<T>): Promise<T> {
     const started = performance.now();
@@ -448,6 +497,7 @@ export class AIPlanner {
     const { userMessage, history = [], memory, signal } = input;
     const conversation: ChatMessage[] = [...history, { role: 'user', content: userMessage }];
     const userTexts = conversation.filter((message) => message.role === 'user').map((message) => message.content);
+    const groundingUserTexts = relevantGroundingUserTexts(history, userMessage);
 
     // Route on the whole conversation: a short answer such as "Minh Anh" names no service.
     const route = this.route(userTexts.join('\n'), input);
@@ -493,7 +543,7 @@ export class AIPlanner {
       try { answerOutput = this.readAnswers && JSON.parse(output)?.kind === 'answer'; } catch { /* Normal JSON validation reports this. */ }
       const validation = answerOutput ? validateAnswer(output, { readAnswers: this.readAnswers,
         hasReadData: successfulReads.length > 0 || usedDirectory.length > 0 }) : this.scheduleValidation(output, input) ?? validatePlan(output, activeTools,
-        this.requireGroundedResources ? { grounding: { memory: groundingMemory(memory.getAll(), memory.getEntity('__observed')), userTexts } } : {});
+        this.requireGroundedResources ? { grounding: { memory: groundingMemory(memory.getAll(), memory.getEntity('__observed')), userTexts: groundingUserTexts } } : {});
       if (validation.valid) {
         if (validation.parsed.kind === 'answer') return { ...validation.parsed,
           lookups: successfulReads.map(answerLookup), usedDirectory };
@@ -560,7 +610,7 @@ export class AIPlanner {
 
     const validationOptions = this.requireGroundedResources ? { grounding: {
       memory: groundingMemory(memory.getAll(), memory.getEntity('__observed')),
-      userTexts: conversationHistory.filter((message) => message.role === 'user').map((message) => message.content),
+      userTexts: relevantGroundingUserTexts(history, planningMessage),
     } } : {};
 
     // 3. Attempt 1: Call LLM provider

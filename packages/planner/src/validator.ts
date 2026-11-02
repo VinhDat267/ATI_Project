@@ -199,15 +199,17 @@ function findMembersOffBoard(steps: PlanStep[], memory: Record<string, any>): Un
   return offBoard;
 }
 
+function matchesWordExact(text: string, token: string): boolean {
+  if (!token) return false;
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/gu, (m) => '\\' + m);
+  return new RegExp(`(?<![\\p{L}\\p{N}_-]|(?:[\\p{L}\\p{N}]\\.))${escaped}(?![\\p{L}\\p{N}_-]|(?:\\.[\\p{L}\\p{N}]))`, 'iu').test(text);
+}
+
 function findAmbiguousSites(steps: PlanStep[], grounding: GroundingContext): UngroundedArgument[] {
   const sites = grounding.memory.jira_site;
   const availableSites = (Array.isArray(sites) ? sites : sites ? [sites] : [])
     .filter((s): s is Record<string, unknown> => isObject(s) && (typeof s.siteId === 'string' || typeof s.id === 'string'));
   if (availableSites.length <= 1) return [];
-
-  const typed = userTokens(grounding.userTexts);
-  const typedLower = new Set(Array.from(typed).map((t) => t.toLowerCase()));
-  const userTextsLower = grounding.userTexts.map((t) => t.toLowerCase());
 
   const JIRA_GENERIC_WORDS = new Set([
     ['j', 'i', 'r', 'a'].join(''),
@@ -265,33 +267,37 @@ function findAmbiguousSites(steps: PlanStep[], grounding: GroundingContext): Ung
     }
   }
 
-  const userSpecifiedSite = (s: Record<string, unknown>): boolean => {
-    const siteId = String(s.siteId ?? s.id ?? '');
-    if (siteId && (typed.has(siteId) || typedLower.has(siteId.toLowerCase()))) return true;
-    if (s.id && (typed.has(String(s.id)) || typedLower.has(String(s.id).toLowerCase()))) return true;
-    if (s.cloudId && (typed.has(String(s.cloudId)) || typedLower.has(String(s.cloudId).toLowerCase()))) return true;
-
-    const entry = siteTokenMaps.find((item) => String(item.site.siteId ?? item.site.id) === String(s.siteId ?? s.id));
-    if (!entry) return false;
-
-    // Distinctive tokens are those that appear in ONLY this site among availableSites
-    const distinctiveTokens = Array.from(entry.tokens).filter((token) => tokenFrequencies.get(token) === 1);
-
-    for (const token of distinctiveTokens) {
-      if (typedLower.has(token)) return true;
-      for (const text of grounding.userTexts) {
-        const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        if (new RegExp(`(?<![\\p{L}\\p{N}_])${escaped}(?![\\p{L}\\p{N}_])`, 'iu').test(text)) return true;
+  const sitesMatchingText = (text: string): Record<string, unknown>[] => {
+    const matched: Record<string, unknown>[] = [];
+    for (const item of siteTokenMaps) {
+      const s = item.site;
+      // Distinctive tokens are those that appear in ONLY this site among availableSites
+      const distinctiveTokens = Array.from(item.tokens).filter((token) => tokenFrequencies.get(token) === 1);
+      const matches = distinctiveTokens.some((token) => matchesWordExact(text, token));
+      if (matches) {
+        matched.push(s);
       }
     }
-    return false;
+    return matched;
   };
+
+  let targetSites: Record<string, unknown>[] = [];
+  const userTexts = grounding.userTexts ?? [];
+  for (let i = userTexts.length - 1; i >= 0; i--) {
+    const text = userTexts[i];
+    if (!text) continue;
+    const matched = sitesMatchingText(text);
+    if (matched.length > 0) {
+      targetSites = matched;
+      break;
+    }
+  }
 
   const ambiguous: UngroundedArgument[] = [];
   for (const step of steps) {
     if (!step.tool.startsWith('myjira.') || typeof step.args?.siteId !== 'string') continue;
-    const targeted = availableSites.find((s) => String(s.siteId ?? s.id) === step.args.siteId);
-    if (!targeted || !userSpecifiedSite(targeted)) {
+    const matchesTarget = targetSites.some((s) => String(s.siteId ?? s.id) === step.args.siteId);
+    if (!matchesTarget) {
       ambiguous.push({
         stepId: step.id,
         argument: 'siteId',

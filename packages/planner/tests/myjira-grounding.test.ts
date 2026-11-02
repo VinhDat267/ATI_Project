@@ -289,4 +289,123 @@ describe('Jira site grounding', () => {
     });
     expect(result.valid).toBe(true);
   });
+
+  it('rejects plan targeting site Acme when current request specifies Beta, even if previous message mentioned Acme', () => {
+    const memoryWithBothIssues = {
+      ...memory,
+      jira_issue: [
+        { id: '100', key: 'ATI-12', siteId: 'site-a', cloudId: 'cloud-a', workspaceId: 'ws-1' },
+        { id: '200', key: 'ATI-99', siteId: 'site-b', cloudId: 'cloud-b', workspaceId: 'ws-1' },
+      ],
+    };
+
+    const result = validatePlan(plan([comment('site-a', 'ATI-12')]), MYJIRA_TOOLS, {
+      grounding: {
+        memory: memoryWithBothIssues,
+        userTexts: ['Tin nhắn cũ từng nhắc Acme', 'Cập nhật ticket trên Beta'],
+      },
+    });
+    expect(result.valid).toBe(false);
+    expect(result.error).toMatch(/ambiguous.*site/i);
+
+    const validBeta = validatePlan(plan([comment('site-b', 'ATI-99')]), MYJIRA_TOOLS, {
+      grounding: {
+        memory: memoryWithBothIssues,
+        userTexts: ['Tin nhắn cũ từng nhắc Acme', 'Cập nhật ticket trên Beta'],
+      },
+    });
+    expect(validBeta.valid).toBe(true);
+  });
+
+  it('does not allow site-a to match site-a-evil or evil-site-a', () => {
+    const evilFollow = validatePlan(plan([comment('site-a', 'ATI-12')]), MYJIRA_TOOLS, {
+      grounding: { memory, userTexts: ['Cập nhật ticket ATI-12 trên site-a-evil'] },
+    });
+    expect(evilFollow.valid).toBe(false);
+    expect(evilFollow.error).toMatch(/ambiguous.*site/i);
+
+    const evilPre = validatePlan(plan([comment('site-a', 'ATI-12')]), MYJIRA_TOOLS, {
+      grounding: { memory, userTexts: ['Cập nhật ticket ATI-12 trên evil-site-a'] },
+    });
+    expect(evilPre.valid).toBe(false);
+    expect(evilPre.error).toMatch(/ambiguous.*site/i);
+
+    const evilDomain = validatePlan(plan([comment('site-a', 'ATI-12')]), MYJIRA_TOOLS, {
+      grounding: { memory, userTexts: ['Cập nhật ticket ATI-12 trên site-a.evil.com'] },
+    });
+    expect(evilDomain.valid).toBe(false);
+    expect(evilDomain.error).toMatch(/ambiguous.*site/i);
+
+    const validExact = validatePlan(plan([comment('site-a', 'ATI-12')]), MYJIRA_TOOLS, {
+      grounding: { memory, userTexts: ['Cập nhật ticket ATI-12 trên site-a.'] },
+    });
+    expect(validExact.valid).toBe(true);
+  });
+
+  it('rejects plan targeting older turn site in multi-turn planner execution when new request specifies different site', async () => {
+    const mem = new WorkingMemory();
+    mem.setEntity('jira_site', memory.jira_site);
+    mem.setEntity('jira_issue', [
+      { id: '100', key: 'ATI-12', siteId: 'site-a', cloudId: 'cloud-a', workspaceId: 'ws-1' },
+      { id: '200', key: 'ATI-99', siteId: 'site-b', cloudId: 'cloud-b', workspaceId: 'ws-1' },
+    ]);
+
+    const planAcme = JSON.stringify({
+      kind: 'plan', thinking: 'use acme', summary: 'Acme work', warnings: [],
+      steps: [comment('site-a', 'ATI-12')],
+    });
+
+    const planBeta = JSON.stringify({
+      kind: 'plan', thinking: 'use beta', summary: 'Beta work', warnings: [],
+      steps: [comment('site-b', 'ATI-99')],
+    });
+
+    const history = [
+      { role: 'user' as const, content: 'Tạo ticket trên Acme Jira' },
+      { role: 'assistant' as const, content: planAcme },
+    ];
+
+    // Provider erroneously outputs plan targeting Acme on turn 2
+    const providerWrong = {
+      name: 'mock-llm',
+      async generatePlan() { return planAcme; },
+    };
+    const plannerWrong = new AIPlanner({
+      provider: providerWrong,
+      toolCatalog: [...ALL_TOOLS.filter(t => t.service !== 'jira'), ...MYJIRA_TOOLS],
+      serviceRegistry: [...SERVICE_REGISTRY, MYJIRA_SERVICE],
+      searchMode: 'llm',
+      requireGroundedResources: true,
+    });
+
+    const responseWrong = await plannerWrong.processMessage({
+      userMessage: 'Cập nhật ticket ATI-99 trên Beta Jira',
+      history,
+      memory: mem,
+    });
+    expect(responseWrong.kind).toBe('clarification');
+    if (responseWrong.kind === 'clarification') {
+      expect(responseWrong.question).toMatch(/jira_site/i);
+    }
+
+    // Provider outputs plan targeting Beta on turn 2
+    const providerCorrect = {
+      name: 'mock-llm',
+      async generatePlan() { return planBeta; },
+    };
+    const plannerCorrect = new AIPlanner({
+      provider: providerCorrect,
+      toolCatalog: [...ALL_TOOLS.filter(t => t.service !== 'jira'), ...MYJIRA_TOOLS],
+      serviceRegistry: [...SERVICE_REGISTRY, MYJIRA_SERVICE],
+      searchMode: 'llm',
+      requireGroundedResources: true,
+    });
+
+    const responseCorrect = await plannerCorrect.processMessage({
+      userMessage: 'Cập nhật ticket ATI-99 trên Beta Jira',
+      history,
+      memory: mem,
+    });
+    expect(responseCorrect.kind).toBe('plan');
+  });
 });
