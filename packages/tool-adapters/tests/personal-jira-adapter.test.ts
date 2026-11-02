@@ -652,6 +652,17 @@ describe('PersonalJiraAdapter', () => {
       });
     });
 
+    it('enforces transport own deadline when caller passes non-expiring AbortSignal (read tool times out as NETWORK)', async () => {
+      reply = () => ({ hang: true });
+      const adapter = make({ timeoutMs: 50 });
+      const controller = new AbortController();
+      await expect(
+        adapter.execute('myjira.search_issues', { siteId: 'opaque_1', projectKey: 'ATI' }, { signal: controller.signal })
+      ).rejects.toMatchObject({
+        category: 'NETWORK',
+      });
+    });
+
     it('enforces transport own deadline when caller does not pass AbortSignal (write tool times out in-flight as UNKNOWN)', async () => {
       reply = ({ url }) => {
         if (url.endsWith('/issue')) {
@@ -662,6 +673,23 @@ describe('PersonalJiraAdapter', () => {
       const adapter = make({ timeoutMs: 50 });
       await expect(
         adapter.execute('myjira.create_issue', { siteId: 'opaque_1', projectKey: 'ATI', summary: 'Bug' })
+      ).rejects.toMatchObject({
+        category: 'UNKNOWN',
+        retryable: false,
+      });
+    });
+
+    it('enforces transport own deadline when caller passes non-expiring AbortSignal (write tool times out in-flight as UNKNOWN)', async () => {
+      reply = ({ url }) => {
+        if (url.endsWith('/issue')) {
+          return { hang: true };
+        }
+        return { body: { startAt: 0, total: 1, issueTypes: [{ id: '2', name: 'Task', subtask: false }] } };
+      };
+      const adapter = make({ timeoutMs: 50 });
+      const controller = new AbortController();
+      await expect(
+        adapter.execute('myjira.create_issue', { siteId: 'opaque_1', projectKey: 'ATI', summary: 'Bug' }, { signal: controller.signal })
       ).rejects.toMatchObject({
         category: 'UNKNOWN',
         retryable: false,

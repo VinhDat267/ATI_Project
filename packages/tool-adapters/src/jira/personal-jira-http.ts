@@ -60,7 +60,8 @@ export class PersonalJiraHttpTransport {
     options?: { signal?: AbortSignal; method?: string; body?: unknown; timeoutMs?: number }
   ): Promise<any> {
     const deadlineMs = options?.timeoutMs ?? this.defaultTimeoutMs ?? (writing ? 30_000 : 15_000);
-    const signal = options?.signal ?? AbortSignal.timeout(deadlineMs);
+    const deadlineSignal = AbortSignal.timeout(deadlineMs);
+    const signal = options?.signal ? AbortSignal.any([options.signal, deadlineSignal]) : deadlineSignal;
     if (signal?.aborted) {
       throw createJiraStepError('NETWORK', undefined, 'Jira request cancelled before dispatch');
     }
