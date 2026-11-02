@@ -25,10 +25,14 @@ export function useSettings(user: User | null) {
   const personal = services.find(s => s.id === 'gmail' && s.connection === 'personal');
   const personalMyCalendar = services.find(s => s.id === 'mycalendar' && s.connection === 'personal');
   const personalMySheets = services.find(s => s.id === 'mysheets' && s.connection === 'personal');
+  const supersededByPersonal = new Set(
+    services.filter(s => s.connection === 'personal' && s.id.startsWith('my')).map(s => s.id.slice(2)),
+  );
   const list = services
     .filter(
       s =>
         !PERSONAL_OAUTH_SERVICE_IDS.has(s.id) &&
+        !supersededByPersonal.has(s.id) &&
         !(s.id === 'telegram' && Array.isArray(s.credentialFields) && s.credentialFields.length === 0) &&
         (s.connection !== 'personal' || (Array.isArray(s.credentialFields) && s.credentialFields.length > 0))
     )

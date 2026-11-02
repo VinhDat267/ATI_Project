@@ -35,7 +35,7 @@ describe('LandingPage — Make.com Orbital & OAuth 1-Click Redesign', () => {
     const heroSection = container.querySelector('[data-od-id="hero-section"]') as HTMLElement;
     expect(heroSection).not.toBeNull();
     expect(within(heroSection).getByTestId('landing-hero-trust-pills')).toHaveTextContent(
-      /Kết nối OAuth 1-Click.*Khóa phạm vi an toàn.*Duyệt trước khi ghi/,
+      /Kết nối trực tiếp bằng tài khoản.*Khóa phạm vi an toàn.*Duyệt trước khi ghi/,
     );
     expect(heroSection.textContent).not.toContain('Tài khoản mới cần quản trị viên duyệt. ·');
 
@@ -146,7 +146,7 @@ describe('LandingPage — Make.com Orbital & OAuth 1-Click Redesign', () => {
     const step2 = container.querySelector('[data-od-id="step-2"]') as HTMLElement;
     expect(step2.textContent).not.toContain('Hộp thư đến');
     expect(within(step2).getByTestId('onboarding-step2-oauth-badge')).toHaveTextContent(
-      /Kết nối OAuth 1-Click.*Chọn bảng & kênh trực tiếp từ danh sách/i,
+      /Kết nối trực tiếp bằng tài khoản.*Chọn bảng & kênh trực tiếp từ danh sách/i,
     );
   });
 

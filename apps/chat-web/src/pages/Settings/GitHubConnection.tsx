@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import type { User } from '../../types';
 import { apiClient } from '../../services/api-client';
 import { githubSessionOwner, redirectToGitHub } from '../../services/github-connection';
+import { getActiveWorkspaceSummary, subscribeWorkspace } from '../../services/workspace-storage';
 import { CockpitDialog } from '../../components/CockpitDialog';
 import { ServiceLogo } from '../../components/ServiceLogo';
 
@@ -51,7 +52,8 @@ export function GitHubConnection({
   const pending = useRef(false);
   const row = useRef<HTMLDivElement>(null);
 
-  const isAdmin = user?.role === 'admin';
+  const [workspace, setWorkspace] = useState(getActiveWorkspaceSummary());
+  const canSelectScope = workspace.id === 'personal' || workspace.role === 'admin' || user?.role === 'admin';
 
   const fetchStatus = async () => {
     try {
@@ -75,6 +77,15 @@ export function GitHubConnection({
   }, []);
 
   useEffect(() => {
+    return subscribeWorkspace(() => {
+      setWorkspace(getActiveWorkspaceSummary());
+      setEditingScope(false);
+      setError('');
+      void fetchStatus();
+    });
+  }, []);
+
+  useEffect(() => {
     const focus = () => {
       if (window.location.hash === '#github') {
         row.current?.scrollIntoView?.({ block: 'center' });
@@ -91,7 +102,7 @@ export function GitHubConnection({
   }, [selected]);
 
   useEffect(() => {
-    if (isAdmin && (data?.status === 'needs_scope' || editingScope)) {
+    if (canSelectScope && (data?.status === 'needs_scope' || editingScope)) {
       apiClient
         .getGitHubCandidateRepos()
         .then((res) => {
@@ -103,7 +114,7 @@ export function GitHubConnection({
           if (mounted.current) setCandidateRepos([]);
         });
     }
-  }, [isAdmin, data?.status, editingScope]);
+  }, [canSelectScope, data?.status, editingScope]);
 
   const connect = async () => {
     if (pending.current) return;
@@ -237,7 +248,7 @@ export function GitHubConnection({
               </div>
             ))}
           </div>
-          {isAdmin && !editingScope && (
+          {canSelectScope && !editingScope && (
             <button
               id="github-edit-scope"
               type="button"
@@ -274,7 +285,7 @@ export function GitHubConnection({
               </div>
             ))}
           </div>
-          {isAdmin && !editingScope && (
+          {canSelectScope && !editingScope && (
             <button
               id="github-edit-scope"
               type="button"
@@ -314,7 +325,7 @@ export function GitHubConnection({
         )}
       </div>
 
-      {isAdmin && (status === 'needs_scope' || editingScope) && (
+      {canSelectScope && (status === 'needs_scope' || editingScope) && (
         <div
           id="github-scope"
           data-testid="github-scope"

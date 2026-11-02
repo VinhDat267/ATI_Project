@@ -508,7 +508,7 @@ describe('WorkflowFlowCanvas — Make.com Orbital Workflow Visualizer', () => {
 
     expect(await screen.findByText('2 / 8 dịch vụ đã thiết lập · 2 kết nối tốt')).toBeInTheDocument();
     expect(screen.getByTestId('settings-oauth-summary')).toBeInTheDocument();
-    expect(document.body).toHaveTextContent(/OAuth 1-Click cá nhân \(Gmail, Calendar, Sheets, Trello, GitHub, Telegram\)/i);
+    expect(document.body).toHaveTextContent(/Tài khoản cá nhân \(Gmail, Lịch, Bảng tính, Trello, GitHub, Telegram\)/i);
   });
 
   it('Upgrade #6: renders compact WorkflowFlowCanvas in ScheduleSection and status filter pills in HistoryPage', async () => {

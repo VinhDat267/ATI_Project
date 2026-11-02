@@ -179,7 +179,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
                 </span>
               </div>
               <span data-testid="settings-oauth-summary" className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                OAuth 1-Click cá nhân &amp; Tích hợp Workspace
+                Liên kết tài khoản nhanh &amp; Chọn nơi làm việc
               </span>
             </div>}
           </div>
@@ -204,7 +204,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
         <section aria-labelledby="heading-personal-services" className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-3.5">
             <h2 id="heading-personal-services" className="text-xs font-bold uppercase tracking-wider text-[#6B7280]">Của riêng bạn</h2>
-            <span className="text-xs text-[#6B7280]">Tài khoản Cá nhân (OAuth 1-Click) · Chọn tài nguyên trực quan</span>
+            <span className="text-xs text-[#6B7280]">Đăng nhập trực tiếp bằng tài khoản của bạn · Chọn nơi ATI được phép làm việc</span>
           </div>
           <div className="v3-space-y-4">
             {personal && <PersonalGmail key={`gmail-${user?.id}`} selected={selected} service={personal} refresh={refresh} standalone={false} />}
@@ -250,7 +250,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
                 </span>
               </h2>
               <span className="text-xs text-[#6B7280]">
-                Bấm để thêm khoá truy cập và kích hoạt
+                Bấm để thiết lập kênh làm việc chung của nhóm
               </span>
             </div>
             <div id="list-unconnected-services" className="v3-space-y-3" role="list">
@@ -267,7 +267,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
               ATI — Nền tảng điều phối công việc liên dịch vụ · 2026
             </p>
             <p className="text-[11px] text-[#9CA3AF] mt-0.5">
-              {personal ? 'Dịch vụ dùng chung: chỉ quản trị viên cập nhật khoá. OAuth 1-Click cá nhân (Gmail, Calendar, Sheets, Trello, GitHub, Telegram) do mỗi người tự kết nối.' : 'Khoá dịch vụ là tài nguyên dùng chung của cả nhóm · Chỉ quản trị viên có quyền cập nhật'}
+              {personal ? 'Dịch vụ dùng chung: chỉ quản trị viên cập nhật khoá. Tài khoản cá nhân (Gmail, Lịch, Bảng tính, Trello, GitHub, Telegram) do mỗi người tự đăng nhập và chọn nơi làm việc.' : 'Khoá dịch vụ là tài nguyên dùng chung của cả nhóm · Chỉ quản trị viên có quyền cập nhật'}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-4 text-xs">

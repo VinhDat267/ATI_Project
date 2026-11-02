@@ -32,6 +32,10 @@ const connections = {
   unchecked: 'Chưa kiểm tra',
   unconfigured: 'Chưa kết nối',
 };
+const isServiceConnected = (service: ServiceInfo) =>
+  service.connected === true ||
+  service.personalStatus === 'connected' ||
+  (service.configured === true && service.connectionStatus !== 'unhealthy');
 // Presentation metadata uses the same service-keyed asset table as logos and prompts.
 interface CardColors { icon: string; decoration: string; name: string; logo?: string }
 const cardColors: Record<string, CardColors> = Object.fromEntries(
@@ -187,7 +191,7 @@ export function RequestMoment({
         </div>
       </form>
 
-      {services.some((service) => service.configured) ? (
+      {services.some(isServiceConnected) ? (
         <>
           <div className="v3-space-y-3">
             <div className="text-xs font-semibold uppercase tracking-wider text-brand-muted">
@@ -195,7 +199,7 @@ export function RequestMoment({
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {services
-                .filter((service) => service.configured)
+                .filter(isServiceConnected)
                 .slice(0, 4)
                 .map((service) => {
                   const colors = cardColors[service.id] ?? neutralCard;
@@ -233,7 +237,7 @@ export function RequestMoment({
             </div>
           </div>
 
-          {services.filter((service) => service.configured).length >= 2 && multiServicePlaybooks.length > 0 && (
+          {services.filter(isServiceConnected).length >= 2 && multiServicePlaybooks.length > 0 && (
             <div className="v3-space-y-3" data-testid="multi-service-playbooks">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-xs font-semibold uppercase tracking-wider text-brand-muted">
@@ -306,7 +310,7 @@ export function RequestMoment({
         >
           <span>Đã kết nối:</span>
           {services
-            .filter((service) => service.configured)
+            .filter(isServiceConnected)
             .map((service) => (
               <span
                 key={service.id}
@@ -317,7 +321,9 @@ export function RequestMoment({
                   className="w-3.5 h-3.5 shrink-0"
                 />
                 <span>{service.name}</span>
-                {service.connectionStatus !== 'healthy' && (
+                {service.connectionStatus !== 'healthy' &&
+                  !service.connected &&
+                  service.personalStatus !== 'connected' && (
                   <span>
                     <span aria-hidden="true">
                       {service.connectionStatus === 'unhealthy' ? '⚠' : '?'}
@@ -331,7 +337,7 @@ export function RequestMoment({
         <div className="flex items-center gap-2 text-neutral-500 flex-wrap w-full">
           <span>Chưa kết nối:</span>
           {services
-            .filter((service) => !service.configured)
+            .filter((service) => !isServiceConnected(service))
             .map((service) => (
               <span
                 key={service.id}

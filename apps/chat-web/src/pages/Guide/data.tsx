@@ -80,8 +80,8 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
         steps: [
           {
             num: 1,
-            title: 'Khuyên dùng: Kết nối OAuth 1-Click & Chọn Bảng trực tiếp',
-            desc: 'Mở trang Cài đặt dịch vụ trên ATI, tại mục Trello cá nhân bấm nút <strong>Kết nối OAuth 1-Click</strong>, bấm "Allow" trên màn hình Trello và tích chọn các bảng (Board) bạn muốn cho phép ngay trên giao diện trực quan.',
+            title: 'Khuyên dùng: Kết nối trực tiếp bằng tài khoản & Chọn Bảng trực tiếp',
+            desc: 'Mở trang Cài đặt dịch vụ trên ATI, tại mục Trello cá nhân bấm nút <strong>Kết nối trực tiếp bằng tài khoản</strong>, bấm "Allow" trên màn hình Trello và tích chọn các bảng (Board) bạn muốn cho phép ngay trên giao diện trực quan.',
             callout: 'Không cần tự tạo Power-Up hay thêm đuôi .json để tìm Board ID thủ công.'
           },
           {
@@ -143,28 +143,16 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
         steps: [
           {
             num: 1,
-            title: 'Vào cài đặt mã truy cập cá nhân',
-            desc: 'Đăng nhập GitHub, bấm vào ảnh đại diện góc trên cùng bên phải > chọn "Settings". Ở menu bên trái, cuộn xuống dưới cùng chọn "Developer settings" > "Personal access tokens" > "Tokens (classic)".',
-            callout: 'Đường dẫn trực tiếp: github.com/settings/tokens'
+            title: 'Khuyên dùng: Kết nối trực tiếp bằng tài khoản & Chọn Kho mã trực tiếp',
+            desc: 'Mở trang Kết nối dịch vụ (<a href="/settings#github" class="text-[#FF5701] font-medium underline">/settings#github</a>), tại mục <strong>Của riêng bạn</strong> bấm nút <strong>Kết nối trực tiếp bằng tài khoản</strong>, đăng nhập GitHub và tích chọn các kho mã (Repository) được phép thao tác.',
+            callout: 'Hoàn tất nhanh chóng mà không cần tự tạo hay sao chép Personal Access Token thủ công.'
           },
           {
             num: 2,
-            title: 'Tạo mã truy cập mới (Token)',
-            desc: 'Bấm nút "Generate new token" (chọn Generate new token classic). Đặt tên ghi chú (Note) là "ATI Automation". Chọn thời hạn (Expiration) theo nhu cầu.',
-            callout: 'Tích chọn đúng phạm vi quyền duy nhất: "repo" (toàn quyền quản lý issue và đọc kho mã).'
-          },
-          {
-            num: 3,
-            title: 'Sao chép mã ghp_...',
-            desc: 'Cuộn xuống cuối trang bấm "Generate token". GitHub sẽ hiển thị chuỗi mã bắt đầu bằng "ghp_". Hãy sao chép ngay lập tức.',
-            callout: 'GitHub chỉ hiển thị mã này MỘT LẦN duy nhất. Dán ngay vào ô "Personal access token" trên ATI.'
-          },
-          {
-            num: 4,
-            title: 'Điền tên Repository được phép',
-            desc: 'Nhập tên kho mã dưới định dạng "tên_chủ_sở_hữu/tên_kho_mã". Ví dụ tài khoản là VinhDat267 và kho là ati-test thì điền:',
+            title: 'Dành cho Quản trị viên Workspace: Tạo Personal Access Token (ghp_...)',
+            desc: 'Nếu nhóm cần dùng khoá chung toàn Workspace, đăng nhập GitHub > "Settings" > "Developer settings" > "Personal access tokens" > "Tokens (classic)" > "Generate new token" với quyền "repo", sao chép mã <code>ghp_...</code> và điền tên kho định dạng <code>chủ_sở_hữu/tên_kho</code>.',
             urlSample: 'VinhDat267/ati-test',
-            callout: 'Bạn có thể thêm nhiều kho mã bằng cách bấm "Thêm nơi được dùng".'
+            callout: 'Đường dẫn trực tiếp: github.com/settings/tokens'
           }
         ]
       },
@@ -181,8 +169,8 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
         steps: [
           {
             num: 1,
-            title: 'Khuyên dùng: Kết nối OAuth 1-Click & Chọn Bảng tính trực tiếp',
-            desc: 'Trong trang Cài đặt dịch vụ, tại thẻ Google Sheets của bạn bấm nút <strong>Kết nối OAuth 1-Click</strong>, đăng nhập tài khoản Google và tích chọn các bảng tính được phép đọc/ghi ngay trên danh sách trực quan.',
+            title: 'Khuyên dùng: Kết nối trực tiếp bằng tài khoản & Chọn Bảng tính trực tiếp',
+            desc: 'Trong trang Cài đặt dịch vụ, tại thẻ Google Sheets của bạn bấm nút <strong>Kết nối trực tiếp bằng tài khoản</strong>, đăng nhập tài khoản Google và tích chọn các bảng tính được phép đọc/ghi ngay trên danh sách trực quan.',
             callout: 'Hoàn tất trong 15 giây mà không cần tạo Service Account hay tải file JSON.'
           },
           {
@@ -203,12 +191,12 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
         sampleScope: 'team-calendar@group.calendar.google.com',
         timeEstimate: 'Khoảng 2 phút (dùng chung khoá Sheets)',
         summary: 'Xem lịch, kiểm tra thời gian trống và tạo sự kiện lịch họp cho các mốc sprint.',
-        importantNotice: 'Ưu tiên kết nối OAuth 1-Click cho lịch cá nhân hoặc dùng Service Account cho lịch phòng ban.',
+        importantNotice: 'Ưu tiên kết nối trực tiếp bằng tài khoản cho lịch cá nhân hoặc dùng Service Account cho lịch phòng ban.',
         steps: [
           {
             num: 1,
-            title: 'Khuyên dùng: Kết nối OAuth 1-Click & Chọn Lịch họp trực tiếp',
-            desc: 'Mở trang Cài đặt dịch vụ, tại thẻ Google Calendar của bạn bấm nút <strong>Kết nối OAuth 1-Click</strong>, uỷ quyền tài khoản Google và tích chọn các lịch (Calendar) cho phép ATI tra cứu hoặc đặt lịch họp.',
+            title: 'Khuyên dùng: Kết nối trực tiếp bằng tài khoản & Chọn Lịch họp trực tiếp',
+            desc: 'Mở trang Cài đặt dịch vụ, tại thẻ Google Calendar của bạn bấm nút <strong>Kết nối trực tiếp bằng tài khoản</strong>, uỷ quyền tài khoản Google và tích chọn các lịch (Calendar) cho phép ATI tra cứu hoặc đặt lịch họp.',
             callout: 'Tự động liệt kê các lịch của bạn mà không cần tìm Calendar ID thủ công.'
           },
           {
@@ -270,27 +258,15 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
         steps: [
           {
             num: 1,
-            title: 'Nói chuyện với BotFather trên Telegram',
-            desc: 'Mở Telegram và tìm kiếm tài khoản chính thức <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">@BotFather</code> (có tích xanh). Bấm Start và gửi lệnh <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">/newbot</code>.',
-            callout: 'Làm theo hướng dẫn: Đặt tên cho bot (ví dụ: ATI Alert) và username kết thúc bằng _bot (ví dụ: ati_alert_bot).'
+            title: 'Khuyên dùng: Kết nối trực tiếp bằng tài khoản & Chọn Nhóm chat',
+            desc: 'Mở trang Kết nối dịch vụ (<a href="/settings#telegram" class="text-[#229ED9] font-medium underline">/settings#telegram</a>), tại mục <strong>Của riêng bạn</strong> bấm nút <strong>Kết nối trực tiếp bằng tài khoản</strong> để liên kết nhanh qua Telegram và chọn nhóm nhận thông báo.',
+            callout: 'Không cần tự tạo bot thủ công nếu dùng kết nối trực tiếp tại mục Của riêng bạn.'
           },
           {
             num: 2,
-            title: 'Sao chép Bot Token từ tin nhắn phản hồi',
-            desc: 'BotFather sẽ gửi lại một tin nhắn chúc mừng kèm chuỗi mã HTTP API Token (dạng <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">123456789:ABCdef...</code>). Sao chép chuỗi này dán vào ô "Bot token" của ATI.',
-            callout: 'Không chia sẻ token này cho người lạ.'
-          },
-          {
-            num: 3,
-            title: 'Thêm bot vào nhóm chat của bạn',
-            desc: 'Mở nhóm chat Telegram của bạn, bấm vào tên nhóm > "Add Members" > tìm username của bot vừa tạo và thêm bot vào nhóm.',
-            callout: 'Bot cần có quyền gửi tin nhắn văn bản cơ bản trong nhóm.'
-          },
-          {
-            num: 4,
-            title: 'Lấy Chat ID của nhóm',
-            desc: 'Thêm bot <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">@getmyid_bot</code> hoặc <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">@userinfobot</code> vào nhóm, bot đó sẽ gửi tin nhắn báo mã Chat ID (thường là số âm có dạng <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">-100...</code>).',
-            callout: 'Dán mã số âm đó vào danh sách "Chat ID" trên ATI, sau đó bạn có thể xoá bot lấy ID ra khỏi nhóm.'
+            title: 'Dành cho Quản trị viên Workspace: Tạo Bot riêng qua @BotFather',
+            desc: 'Nếu nhóm muốn dùng Bot Token chung toàn Workspace, mở Telegram tìm <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">@BotFather</code>, gửi lệnh <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">/newbot</code> để lấy HTTP API Token, thêm bot vào nhóm chat và điền mã Chat ID (dạng <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">-100...</code>).',
+            callout: 'Làm theo hướng dẫn của @BotFather và không chia sẻ Bot Token cho người lạ.'
           }
         ]
       },
@@ -630,7 +606,7 @@ export const GUIDE_OAUTH_SHOWCASE_CARDS: GuideOAuthShowcaseCard[] = [
   {
     service: 'mycalendar',
     title: 'Google Calendar',
-    badge: 'OAuth 2.0 · 1-Click',
+    badge: 'Đăng nhập trực tiếp · 1 chạm',
     badgeStyle: 'oauth',
     iconClassName: 'w-4 h-4',
     description: 'Kết nối lịch cá nhân & tự gửi bản tin sáng không cần dán khoá.',
@@ -638,7 +614,7 @@ export const GUIDE_OAUTH_SHOWCASE_CARDS: GuideOAuthShowcaseCard[] = [
   {
     service: 'trello',
     title: 'Trello cá nhân',
-    badge: 'OAuth 2.0 · 1-Click',
+    badge: 'Đăng nhập trực tiếp · 1 chạm',
     badgeStyle: 'oauth',
     iconClassName: 'w-4 h-4 text-[#0079BF]',
     description: 'Cấp quyền 1 chạm và khoá đúng bảng Trello được phép thao tác.',
@@ -646,7 +622,7 @@ export const GUIDE_OAUTH_SHOWCASE_CARDS: GuideOAuthShowcaseCard[] = [
   {
     service: 'sheets',
     title: 'Google Sheets',
-    badge: 'OAuth 2.0 · 1-Click',
+    badge: 'Đăng nhập trực tiếp · 1 chạm',
     badgeStyle: 'oauth',
     iconClassName: 'w-4 h-4 text-[#16A34A]',
     description: 'Chọn file bảng tính hoặc dán URL trực tiếp để đọc/ghi và lập báo cáo.',
