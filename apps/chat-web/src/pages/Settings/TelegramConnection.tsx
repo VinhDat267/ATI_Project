@@ -55,6 +55,7 @@ export function TelegramConnection({
   const [editingScope, setEditingScope] = useState(false);
   const [candidateChats, setCandidateChats] = useState<TelegramChatItem[]>([]);
   const [selectedChatIds, setSelectedChatIds] = useState<string[]>([]);
+  const [chatFilter, setChatFilter] = useState('');
 
   const mounted = useRef(false);
   const pending = useRef(false);
@@ -197,6 +198,16 @@ export function TelegramConnection({
 
   const status = data?.status ?? 'not_connected';
   const showScopeEditor = status === 'needs_scope' || editingScope;
+  const normalizedFilter = chatFilter.trim().toLocaleLowerCase();
+  const visibleCandidateChats = normalizedFilter
+    ? candidateChats.filter(
+        (chat) =>
+          chat.title.toLocaleLowerCase().includes(normalizedFilter) ||
+          (chat.username && chat.username.toLocaleLowerCase().includes(normalizedFilter))
+      )
+    : candidateChats;
+  const chatTypeLabel = (type: TelegramChatItem['type']) =>
+    type === 'private' ? 'Chat cá nhân' : type === 'channel' ? 'Kênh Telegram' : 'Nhóm Telegram';
 
   const rowContent = (
     <div
@@ -215,10 +226,20 @@ export function TelegramConnection({
             Đã kết nối
           </span>
         )}
+        {status === 'needs_scope' && (
+          <span className="text-xs font-semibold px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-md">
+            Chưa chọn chat
+          </span>
+        )}
+        {status === 'reconnect_required' && (
+          <span className="text-xs font-semibold px-2 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-md">
+            Cần kết nối lại
+          </span>
+        )}
       </div>
 
       <p className="text-xs text-[#6B7280]">
-        Kết nối 1 chạm với Telegram cá nhân hoặc nhóm làm việc của bạn. Chọn từ 1 đến 10 cuộc trò chuyện bằng tên hiển thị rõ ràng.
+        Kết nối 1 chạm với Telegram cá nhân hoặc nhóm làm việc của bạn. Chọn từ 1 đến 10 cuộc trò chuyện bằng tên hiển thị rõ ràng để gửi thông báo, đọc tin nhắn nhóm và nhận Bản tin sáng tự động.
       </p>
 
       <div className="text-sm text-[#111827] break-words">
@@ -243,33 +264,51 @@ export function TelegramConnection({
 
       {status === 'connected' && data?.selectedChats && data.selectedChats.length > 0 && (
         <div className="v3-space-y-2 border-t border-[#F3F4F6] pt-3">
-          <p className="text-xs text-[#6B7280]">Cuộc trò chuyện được phép dùng:</p>
+          <p className="text-xs text-[#6B7280]">Cuộc trò chuyện được phép dùng ({data.selectedChats.length}/10):</p>
           <div className="v3-space-y-1.5">
             {data.selectedChats.map((chat) => (
               <div
                 key={chat.chatId}
-                className="flex items-center justify-between p-2.5 bg-neutral-50 rounded-lg text-xs"
+                className="flex items-center justify-between p-2.5 bg-neutral-50 rounded-lg text-xs gap-2"
               >
-                <span className="font-medium text-[#111827]">{chat.title}</span>
-                <span className="text-emerald-700 font-medium">
-                  {chat.type === 'private' ? 'Chat cá nhân' : 'Nhóm Telegram'}
+                <div className="min-w-0 truncate">
+                  <span className="font-medium text-[#111827]">{chat.title}</span>
+                  {chat.username && (
+                    <span className="text-[#6B7280] ml-1.5">@{chat.username.replace(/^@/, '')}</span>
+                  )}
+                </div>
+                <span className="text-emerald-700 font-medium flex-shrink-0">
+                  {chatTypeLabel(chat.type)}
                 </span>
               </div>
             ))}
           </div>
           {!editingScope && (
-            <button
-              id="telegram-edit-scope"
-              type="button"
-              className={secondary}
-              onClick={() => {
-                setCandidateChats(data.chats ?? data.selectedChats ?? []);
-                setSelectedChatIds((data.selectedChats ?? []).map((c) => c.chatId));
-                setEditingScope(true);
-              }}
-            >
-              Chọn chat / nhóm
-            </button>
+            <div className="flex flex-wrap items-center gap-3 pt-1">
+              <button
+                id="telegram-edit-scope"
+                type="button"
+                className={secondary}
+                onClick={() => {
+                  setCandidateChats(data.chats ?? data.selectedChats ?? []);
+                  setSelectedChatIds((data.selectedChats ?? []).map((c) => c.chatId));
+                  setChatFilter('');
+                  setEditingScope(true);
+                }}
+              >
+                Chọn chat / nhóm
+              </button>
+              {data?.botUsername && (
+                <a
+                  href={`https://t.me/${encodeURIComponent(data.botUsername)}?startgroup=ati_scope`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-[#FF5701] font-medium hover:underline"
+                >
+                  + Thêm bot vào nhóm mới
+                </a>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -281,9 +320,14 @@ export function TelegramConnection({
           className="mt-4 p-4 border border-[#E7E7E2] rounded-xl bg-[#F8F8F6] v3-space-y-3"
         >
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-[#6B7280]">
-              Chọn cuộc trò chuyện Telegram (1–10 chat)
-            </h4>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-[#6B7280]">
+                Chọn cuộc trò chuyện Telegram (1–10 chat)
+              </h4>
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-white border border-[#E7E7E2] text-[#111827]">
+                Đã chọn {selectedChatIds.length} / 10
+              </span>
+            </div>
             <button
               id="telegram-refresh-chats"
               type="button"
@@ -295,8 +339,22 @@ export function TelegramConnection({
             </button>
           </div>
 
+          {candidateChats.length > 0 && (
+            <div>
+              <input
+                id="telegram-chat-filter"
+                type="text"
+                value={chatFilter}
+                onChange={(event) => setChatFilter(event.target.value)}
+                placeholder="Tìm nhanh chat hoặc nhóm Telegram…"
+                aria-label="Tìm nhanh chat hoặc nhóm Telegram"
+                className="w-full px-3 py-1.5 rounded-lg border border-[#E7E7E2] bg-white text-xs text-[#111827] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#FF5701]/30 focus:border-[#FF5701]"
+              />
+            </div>
+          )}
+
           <div className="v3-space-y-1.5 max-h-48 overflow-y-auto">
-            {candidateChats.map((chat) => {
+            {visibleCandidateChats.map((chat) => {
               const checked = selectedChatIds.includes(chat.chatId);
               const disabled = !checked && selectedChatIds.length >= 10;
               return (
@@ -304,7 +362,7 @@ export function TelegramConnection({
                   key={chat.chatId}
                   className={`flex items-center justify-between gap-2 p-2 rounded-lg text-xs cursor-pointer ${
                     checked
-                      ? 'bg-[#F8F8F6] border border-[#111827]/30'
+                      ? 'bg-[#FFF6EE]/60 border border-[#FF5701]/40'
                       : 'bg-white border border-[#E7E7E2]'
                   }`}
                 >
@@ -317,9 +375,12 @@ export function TelegramConnection({
                       className="rounded text-[#111827] focus:ring-[#111827]"
                     />
                     <span className="font-medium text-[#111827] truncate">{chat.title}</span>
+                    {chat.username && (
+                      <span className="text-[11px] text-[#6B7280] truncate">@{chat.username.replace(/^@/, '')}</span>
+                    )}
                   </div>
                   <span className="text-[11px] text-[#6B7280] flex-shrink-0">
-                    {chat.type === 'private' ? 'Chat cá nhân' : 'Nhóm Telegram'}
+                    {chatTypeLabel(chat.type)}
                   </span>
                 </label>
               );
@@ -327,6 +388,11 @@ export function TelegramConnection({
             {candidateChats.length === 0 && (
               <p className="text-xs text-[#6B7280]">
                 Chưa tìm thấy cuộc trò chuyện nào. Hãy bấm Start hoặc thêm bot vào nhóm rồi bấm Làm mới danh sách.
+              </p>
+            )}
+            {candidateChats.length > 0 && visibleCandidateChats.length === 0 && (
+              <p className="text-xs text-[#6B7280]">
+                Không tìm thấy cuộc trò chuyện nào khớp với từ khóa &ldquo;{chatFilter}&rdquo;.
               </p>
             )}
           </div>

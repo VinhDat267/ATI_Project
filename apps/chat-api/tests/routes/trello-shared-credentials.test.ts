@@ -70,15 +70,18 @@ describe('Task 9: Shared Trello credentials removal', () => {
     expect(res.body).toEqual({ error: 'Trello dùng đăng nhập OAuth.' });
   });
 
-  it('GET /api/services lists trello with empty credentialFields and does not consider Trello configured from shared credentials', async () => {
+  it('GET /api/services lists trello with personal connection, empty credentialFields, and unconfigured when not connected', async () => {
     const app = build();
     const res = await request(app).get('/api/services').set('Authorization', bearer(member));
     expect(res.status).toBe(200);
 
     const trello = (res.body.services as any[]).find((s) => s.id === 'trello');
     expect(trello).toBeDefined();
+    expect(trello.connection).toBe('personal');
+    expect(trello.personalStatus).toBe('not_connected');
     expect(trello.credentialFields).toEqual([]);
     expect(trello.configured).toBe(false);
+    expect(trello.connected).toBe(false);
   });
 
   it('keeps shared credential saving for other services intact', async () => {
@@ -95,7 +98,7 @@ describe('Task 9: Shared Trello credentials removal', () => {
     expect(res.body).toMatchObject({ success: true });
   });
 
-  it('populates personal trello status and username in GET /api/services for caller with active personal credential', async () => {
+  it('populates personal trello status, configured: true, and username in GET /api/services for caller with active personal credential', async () => {
     await credentials.saveCredentials(
       'trello',
       encryptCredentials(
@@ -111,10 +114,35 @@ describe('Task 9: Shared Trello credentials removal', () => {
 
     const trello = (res.body.services as any[]).find((s) => s.id === 'trello');
     expect(trello).toBeDefined();
-    expect(trello.configured).toBe(false);
+    expect(trello.connection).toBe('personal');
+    expect(trello.configured).toBe(true);
+    expect(trello.connected).toBe(true);
+    expect(trello.connectionStatus).toBe('healthy');
     expect(trello.credentialFields).toEqual([]);
     expect(trello.personalStatus).toBe('connected');
     expect(trello.username).toBe('alice_trello');
     expect(typeof trello.connectedAt).toBe('string');
+  });
+
+  it('uses the explicit encryptionKey passed to CredentialRepo constructor when rotating personal Trello refresh tokens', async () => {
+    const customKey = 'fedcba9876543210fedcba9876543210';
+    const customRepo = new CredentialRepo(db.pool, customKey);
+    const saved = await customRepo.saveCredentials(
+      'trello',
+      encryptCredentials(
+        { refreshToken: 'rt-initial', memberId: 'm1', username: 'alice_trello' },
+        customKey
+      ),
+      member.id
+    );
+
+    const outcome = await customRepo.rotatePersonalSecret({
+      service: 'trello',
+      userId: member.id,
+      credentialId: saved.id,
+      previousRefreshToken: 'rt-initial',
+      nextRefreshToken: 'rt-rotated',
+    });
+    expect(outcome).toBe('rotated');
   });
 });

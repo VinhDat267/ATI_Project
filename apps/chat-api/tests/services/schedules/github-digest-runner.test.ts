@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import type { GithubDigestConfig, ScheduleRecurrence } from '@wap/tool-schemas';
 import { ScheduleRunner } from '../../../src/services/schedules/schedule-runner.js';
 import { ScheduleService } from '../../../src/services/schedules/schedule-service.js';
-import { computeDigestConfigHash } from '../../../src/services/schedules/github-digest-candidate.js';
+import { computeDigestConfigHash, evaluateGithubDigestCandidate } from '../../../src/services/schedules/github-digest-candidate.js';
 import { createGithubDigestRunner, escapeSlackMrkdwn } from '../../../src/services/schedules/github-digest-runner.js';
 import { createMigratedSchema } from '../../helpers/gmail-test-db.js';
 
@@ -456,5 +456,107 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
     const replanned = await service.startRun({ userId: owner.id, runId: runs[0]!.id, trigger: 'replan', now });
     expect(replanned.trigger).toBe('replan');
     expect(replanned.state).toBe('planning');
+  });
+
+  it('7. supports Telegram destination for github_digest (evaluateGithubDigestCandidate + createGithubDigestRunner)', async () => {
+    const candidate = await evaluateGithubDigestCandidate({
+      userId: owner.id,
+      proposal: {
+        kind: 'schedule',
+        action: 'create',
+        name: 'Bản tin GitHub Telegram',
+        request: 'Gửi bản tin GitHub repo nhom/ati vào nhóm Telegram Dev Alerts',
+        recurrence: dailyRecurrence,
+        summary: 'Gửi bản tin GitHub sang Telegram',
+      },
+      services: ['github', 'telegram'],
+      githubConnection: async () => ({
+        status: 'connected',
+        connection: {
+          credentialId: 'cred-gh-1',
+          githubUserId: '1001',
+          login: 'octocat',
+          repos: ['nhom/ati'],
+        },
+        teamRepos: [{ repoId: '101', fullName: 'nhom/ati', name: 'ati' }],
+      }),
+      telegramConnection: async () => ({
+        status: 'connected',
+        connection: {
+          credentialId: 'cred-tg-1',
+          telegramUserId: '777',
+          username: 'octo_tg',
+          chatIds: ['-100999888'],
+        },
+        selectedChats: [{ chatId: '-100999888', title: 'Dev Alerts', type: 'supergroup' }],
+      }),
+    });
+
+    expect(candidate.canAutoDigest).toBe(true);
+    expect(candidate.config?.telegramChatId).toBe('-100999888');
+    expect(candidate.config?.telegramChatTitle).toBe('Dev Alerts');
+
+    const schedule = await insertDigestSchedule({
+      config: candidate.config!,
+      configHash: candidate.configHash!,
+    });
+
+    const telegramMessages: Array<{ chatId: string; text: string }> = [];
+    const runDigest = createGithubDigestRunner({
+      pool: db.pool,
+      githubConnection: async () => ({
+        status: 'connected',
+        connection: {
+          credentialId: 'cred-gh-1',
+          githubUserId: '1001',
+          login: 'octocat',
+          repos: ['nhom/ati'],
+        },
+      }),
+      telegramConnection: async () => ({
+        status: 'connected',
+        connection: {
+          credentialId: 'cred-tg-1',
+          telegramUserId: '777',
+          username: 'octo_tg',
+          chatIds: ['-100999888'],
+        },
+        selectedChats: [{ chatId: '-100999888', title: 'Dev Alerts', type: 'supergroup' }],
+      }),
+      getAdapter: async (serviceName) => ({
+        execute: async (tool: string, args: any) => {
+          if (serviceName === 'github' && tool === 'github.search_issues') {
+            return [{ id: '1', number: 10, title: 'Fix OAuth bug', url: 'https://github.com/nhom/ati/issues/10', repo: 'nhom/ati' }];
+          }
+          if (serviceName === 'telegram' && tool === 'telegram.send_message') {
+            telegramMessages.push({ chatId: args.chatId, text: args.text });
+            return { messageId: 555, chatId: args.chatId };
+          }
+          return [];
+        },
+      }),
+    });
+
+    const runner = new ScheduleRunner({
+      pool: db.pool,
+      timeZone: VN,
+      now: () => now,
+      planRun: async () => ({ persist: async () => ({ state: 'needs_attention' }), afterCommit() {} }),
+      runDigest,
+      recordState: (client, row, at) => service.recordState(client, row, at),
+    });
+
+    await runner.tick();
+    await runner.stop();
+
+    expect(telegramMessages).toHaveLength(1);
+    expect(telegramMessages[0]?.chatId).toBe('-100999888');
+    expect(telegramMessages[0]?.text).toContain('Issue mới');
+    expect(telegramMessages[0]?.text).toContain('PR chờ review');
+    expect(telegramMessages[0]?.text).toContain('Issue mở chưa ai nhận');
+
+    const runs = await service.listRuns(owner.id, schedule.id, 10, now);
+    expect(runs[0]?.state).toBe('digest_sent');
+    expect((runs[0]?.delivery as any)?.telegramChatId).toBe('-100999888');
   });
 });

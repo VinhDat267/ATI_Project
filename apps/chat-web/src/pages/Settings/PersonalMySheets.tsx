@@ -27,6 +27,7 @@ export function PersonalMySheets({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [confirm, setConfirm] = useState(false);
+  const [urlInput, setUrlInput] = useState('');
 
   const mounted = useRef(false);
   const pending = useRef(false);
@@ -102,6 +103,31 @@ export function PersonalMySheets({
     }
   };
 
+  const addByUrl = async () => {
+    const trimmed = urlInput.trim();
+    if (!trimmed || pending.current) return;
+    const owns = mysheetsSessionOwner();
+    pending.current = true;
+    setBusy(true);
+    setError('');
+    try {
+      const existingIds = (service.selectedSpreadsheets ?? []).map((s) => s.id);
+      const nextIds = Array.from(new Set([...existingIds, trimmed]));
+      await apiClient.saveMySheetsScope({ spreadsheetIds: nextIds });
+      if (mounted.current && owns()) {
+        setUrlInput('');
+        await refresh();
+      }
+    } catch {
+      if (mounted.current && owns()) {
+        setError('Không thể thêm bảng tính từ liên kết. Hãy kiểm tra quyền truy cập và thử lại.');
+      }
+    } finally {
+      pending.current = false;
+      if (mounted.current) setBusy(false);
+    }
+  };
+
   const status = service.personalStatus ?? 'not_connected';
 
   const content = (
@@ -117,8 +143,8 @@ export function PersonalMySheets({
         Google Sheets của bạn
       </h3>
       <p className="text-xs text-[#6B7280]">
-        ATI chỉ thấy những bảng tính bạn chọn trong cửa sổ của Google. ATI đọc các ô và thêm dòng
-        mới, không sửa hay xoá ô có sẵn, không tạo bảng tính mới.
+        ATI chỉ thấy những bảng tính bạn chọn trong cửa sổ của Google. ATI chỉ đọc, thêm dòng,
+        cập nhật cột, xoá dòng hoặc tạo trang tính (tab) sau khi bạn phê duyệt kế hoạch, và không truy cập tệp Drive nào khác.
       </p>
 
       <p className="text-sm text-[#111827] break-words">
@@ -157,6 +183,16 @@ export function PersonalMySheets({
                 {!sheet.canEdit && (
                   <span className="text-[10px] text-amber-600 font-semibold">(chỉ xem)</span>
                 )}
+                <a
+                  href={`https://docs.google.com/spreadsheets/d/${encodeURIComponent(sheet.id)}/edit`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Mở bảng tính ${sheet.title} trên Google Sheets`}
+                  title={`Mở ${sheet.title} trên Google Sheets`}
+                  className="ml-0.5 text-emerald-700 hover:text-emerald-950 underline-offset-2 hover:underline"
+                >
+                  ↗
+                </a>
               </span>
             ))}
           </div>
@@ -167,6 +203,33 @@ export function PersonalMySheets({
           Quyền có thể đã bị thu hồi hoặc hết hạn sau 7 ngày ở chế độ thử nghiệm của Google. Hãy kết
           nối lại.
         </p>
+      )}
+
+      {(status === 'scope_required' || status === 'connected') && (
+        <div className="pt-1 v3-space-y-1.5">
+          <label htmlFor="mysheets-settings-url-input" className="block text-xs font-medium text-[#4B5563]">
+            Dán liên kết hoặc ID Google Sheets
+          </label>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              id="mysheets-settings-url-input"
+              type="text"
+              value={urlInput}
+              disabled={busy}
+              onChange={(e) => setUrlInput(e.target.value)}
+              placeholder="https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMd.../edit"
+              className="flex-1 px-3 py-1.5 rounded-xl border border-[#E7E7E2] text-xs text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#FF5701]"
+            />
+            <button
+              type="button"
+              className={secondary}
+              disabled={busy || !urlInput.trim()}
+              onClick={() => void addByUrl()}
+            >
+              Thêm từ liên kết
+            </button>
+          </div>
+        </div>
       )}
 
       <div className="flex flex-wrap items-center gap-3 pt-1">

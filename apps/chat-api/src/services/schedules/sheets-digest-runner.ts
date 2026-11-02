@@ -16,7 +16,7 @@ export interface SheetsDigestRunnerOptions {
   encryptionKey: string;
   mysheetsEnabled?: boolean;
   createAdapter: (
-    serviceId: 'mysheets' | 'sheets' | 'slack' | 'telegram',
+    serviceId: 'mysheets' | 'sheets' | 'slack' | 'telegram' | 'gmail',
     userId: string,
     config: SheetsDigestConfig
   ) => Promise<SheetsDigestAdapterLike>;
@@ -35,16 +35,62 @@ export function sanitizeSlackDigestText(text: string): string {
     .replace(/@(channel|here|everyone)\b/gi, '@\u200b$1');
 }
 
+export function parseSheetNumericCell(raw: string): number | null {
+  const cleaned = raw
+    .replace(/(?:vnđ|vnd|usd|đ|₫|\$|€)/giu, '')
+    .trim();
+  if (!cleaned) return null;
+  if (/^-?\d{1,3}(?:\.\d{3})+(?:,\d+)?$/.test(cleaned)) {
+    const normalized = cleaned.replaceAll('.', '').replace(',', '.');
+    const n = Number(normalized);
+    return Number.isFinite(n) ? n : null;
+  }
+  if (/^-?\d{1,3}(?:,\d{3})+(?:\.\d+)?$/.test(cleaned)) {
+    const normalized = cleaned.replaceAll(',', '');
+    const n = Number(normalized);
+    return Number.isFinite(n) ? n : null;
+  }
+  if (/^-?\d+(?:\.\d+)?$/.test(cleaned)) {
+    const n = Number(cleaned);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+export function parseSheetDeadlineCell(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const dmyMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmyMatch) {
+    const day = Number(dmyMatch[1]);
+    const month = Number(dmyMatch[2]);
+    const year = Number(dmyMatch[3]);
+    const ms = Date.UTC(year, month - 1, day, 23, 59, 59);
+    return Number.isNaN(ms) ? null : ms;
+  }
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/);
+  if (isoMatch) {
+    const year = Number(isoMatch[1]);
+    const month = Number(isoMatch[2]);
+    const day = Number(isoMatch[3]);
+    const ms = Date.UTC(year, month - 1, day, 23, 59, 59);
+    return Number.isNaN(ms) ? null : ms;
+  }
+  return null;
+}
+
 export function analyzeSheetKpiMetrics(
   headers: string[],
   records: Array<Record<string, string>>,
-  values: string[][]
+  values: string[][],
+  now: Date = new Date()
 ): {
   totalRows: number;
   doneCount: number;
   inProgressCount: number;
   overdueOrPendingCount: number;
   highlights: string[];
+  numericTotals: Array<{ column: string; sum: number; formattedSum: string }>;
 } {
   const dataRows = records.length > 0 ? records : values.slice(1).map((row) => {
     const rec: Record<string, string> = {};
@@ -57,32 +103,85 @@ export function analyzeSheetKpiMetrics(
   const statusKey = headers.find((h) =>
     /^(?:status|trạng\s*thái|tiến\s*độ|done|state)$/iu.test(h.trim())
   );
+  const deadlineKey = headers.find((h) =>
+    /^(?:deadline|due\s*date|due|hạn\s*chót|hạn\s*thanh\s*toán|ngày\s*đến\s*hạn|ngày\s*giao)$/iu.test(h.trim())
+  );
   const titleKey =
     headers.find((h) =>
       /^(?:task|hạng\s*mục|công\s*việc|title|tên|mục\s*tiêu|kpi|summary|issue)$/iu.test(h.trim())
     ) ?? headers[0];
 
+  const numericColumns = headers.filter((h) =>
+    /(?:doanh\s*thu|doanh\s*số|chi\s*phí|số\s*tiền|thành\s*tiền|giá\s*trị|ngân\s*sách|lợi\s*nhuận|số\s*lượng|amount|revenue|cost|budget|price|total)/iu.test(
+      h.trim()
+    )
+  );
+  const numericSums = new Map<string, { sum: number; count: number }>();
+
   let doneCount = 0;
   let inProgressCount = 0;
   let overdueOrPendingCount = 0;
-  const highlights: string[] = [];
+  const candidateHighlights: Array<{ text: string; priority: number; index: number }> = [];
+  const nowMs = now.getTime();
 
-  for (const row of dataRows) {
+  dataRows.forEach((row, index) => {
     const rawStatus = statusKey ? (row[statusKey] ?? '').trim().toLowerCase() : '';
-    if (/^(?:done|completed|hoàn\s*thành|xong|true|100%)$/iu.test(rawStatus)) {
+    const isDone = /^(?:done|completed|hoàn\s*thành|xong|true|100%)$/iu.test(rawStatus);
+    const isInProgressStatus = /^(?:in\s*progress|đang\s*làm|doing|active|review)$/iu.test(rawStatus);
+    const rawDeadline = deadlineKey ? (row[deadlineKey] ?? '').trim() : '';
+    const deadlineMs = rawDeadline ? parseSheetDeadlineCell(rawDeadline) : null;
+    const isOverdueByDate = !isDone && deadlineMs !== null && deadlineMs < nowMs;
+
+    let priority = 2;
+    if (isDone) {
       doneCount++;
-    } else if (/^(?:in\s*progress|đang\s*làm|doing|active|review)$/iu.test(rawStatus)) {
+      priority = 3;
+    } else if (isOverdueByDate) {
+      overdueOrPendingCount++;
+      priority = 0;
+    } else if (isInProgressStatus) {
       inProgressCount++;
+      priority = 1;
     } else if (rawStatus) {
       overdueOrPendingCount++;
+      priority = 0;
     }
 
-    if (highlights.length < 5) {
-      const label = titleKey ? (row[titleKey] ?? '').trim() : Object.values(row).filter(Boolean).join(' · ');
-      const statusText = statusKey && row[statusKey] ? ` [${row[statusKey]}]` : '';
-      if (label) {
-        highlights.push(`• ${label}${statusText}`);
+    for (const col of numericColumns) {
+      const parsed = parseSheetNumericCell(row[col] ?? '');
+      if (parsed !== null) {
+        const prev = numericSums.get(col) ?? { sum: 0, count: 0 };
+        numericSums.set(col, { sum: prev.sum + parsed, count: prev.count + 1 });
       }
+    }
+
+    const label = titleKey ? (row[titleKey] ?? '').trim() : Object.values(row).filter(Boolean).join(' · ');
+    if (label) {
+      let statusBadge = statusKey && row[statusKey] ? ` [${row[statusKey]}]` : '';
+      if (isOverdueByDate) {
+        statusBadge = ` 🚨 [Quá hạn${rawDeadline ? `: ${rawDeadline}` : ''}${statusKey && row[statusKey] ? ` · ${row[statusKey]}` : ''}]`;
+      }
+      candidateHighlights.push({
+        text: `• ${label}${statusBadge}`,
+        priority,
+        index,
+      });
+    }
+  });
+
+  const hasPrioritizedRows = candidateHighlights.some((item) => item.priority < 2);
+  const sortedHighlights = hasPrioritizedRows
+    ? [...candidateHighlights].sort((a, b) => a.priority - b.priority || b.index - a.index)
+    : candidateHighlights;
+  const highlights = sortedHighlights.slice(0, 5).map((item) => item.text);
+
+  const numericTotals: Array<{ column: string; sum: number; formattedSum: string }> = [];
+  for (const [column, { sum, count }] of numericSums.entries()) {
+    if (count > 0) {
+      const formattedSum = Number.isInteger(sum)
+        ? sum.toLocaleString('en-US')
+        : Number(sum.toFixed(2)).toLocaleString('en-US');
+      numericTotals.push({ column, sum, formattedSum });
     }
   }
 
@@ -92,6 +191,7 @@ export function analyzeSheetKpiMetrics(
     inProgressCount,
     overdueOrPendingCount,
     highlights,
+    numericTotals,
   };
 }
 
@@ -189,6 +289,17 @@ export class SheetsDigestRunner {
       } catch {
         return { ok: false, reason: 'Không đọc được cấu hình phạm vi Slack.' };
       }
+    } else if (config.destination.service === 'gmail') {
+      const gmailRec = await this.options.credentialRepo.getPersonalCredentials('gmail', schedule.user_id);
+      if (!gmailRec || gmailRec.status !== 'active') {
+        return { ok: false, reason: 'Kết nối Gmail cá nhân không còn hoạt động. Hãy kết nối lại.' };
+      }
+      if (config.destination.credentialId && gmailRec.id !== config.destination.credentialId) {
+        return { ok: false, reason: 'Tài khoản Gmail cá nhân đã thay đổi. Hãy xác nhận lại lịch.' };
+      }
+      if (!config.destination.recipientEmail || !config.destination.recipientEmail.includes('@')) {
+        return { ok: false, reason: 'Địa chỉ email nhận báo cáo không hợp lệ.' };
+      }
     } else {
       const tgRec =
         (await this.options.credentialRepo.getPersonalCredentials('telegram', schedule.user_id)) ??
@@ -198,11 +309,17 @@ export class SheetsDigestRunner {
       }
       try {
         const dec = decryptCredentials(tgRec.config, this.options.encryptionKey);
-        const chats: string[] = Array.isArray(dec.allowedScope?.chats)
+        const scopeChats: string[] = Array.isArray(dec.allowedScope?.chats)
           ? dec.allowedScope.chats
           : Array.isArray(dec.allowedScope)
             ? dec.allowedScope
             : [];
+        const selectedChatIds: string[] = Array.isArray(dec.selectedChats)
+          ? dec.selectedChats
+              .map((c: any) => (typeof c?.chatId === 'string' ? c.chatId.trim() : ''))
+              .filter(Boolean)
+          : [];
+        const chats = [...new Set([...selectedChatIds, ...scopeChats])];
         if (!chats.includes(config.destination.chatId)) {
           return {
             ok: false,
@@ -301,10 +418,14 @@ export class SheetsDigestRunner {
 
     const headerTitle = `📊 Báo cáo định kỳ: ${schedule.name}`;
     const sheetLine = `Nguồn: ${config.source.spreadsheetTitle}${config.source.sheetName ? ` (Tab: ${config.source.sheetName})` : ''}`;
+    const numericSuffix =
+      metrics.numericTotals.length > 0
+        ? ` · ${metrics.numericTotals.map((t) => `Tổng ${t.column}: ${t.formattedSum}`).join(' · ')}`
+        : '';
     const statsLine =
-      metrics.doneCount > 0 || metrics.inProgressCount > 0 || metrics.overdueOrPendingCount > 0
+      (metrics.doneCount > 0 || metrics.inProgressCount > 0 || metrics.overdueOrPendingCount > 0
         ? `Tổng số dòng: ${metrics.totalRows} · Hoàn thành: ${metrics.doneCount} · Đang làm: ${metrics.inProgressCount} · Cần chú ý/Chờ xử lý: ${metrics.overdueOrPendingCount}`
-        : `Tổng số dòng dữ liệu: ${metrics.totalRows}`;
+        : `Tổng số dòng dữ liệu: ${metrics.totalRows}`) + numericSuffix;
 
     const bodySection = aiSummaryText
       ? aiSummaryText
@@ -324,6 +445,16 @@ export class SheetsDigestRunner {
           { channel: config.destination.channelId, text: finalMessage },
           { signal: outerSignal }
         );
+      } else if (config.destination.service === 'gmail') {
+        await destAdapter.execute(
+          'gmail.send_message',
+          {
+            to: [config.destination.recipientEmail],
+            subject: headerTitle,
+            body: finalMessage,
+          },
+          { signal: outerSignal }
+        );
       } else {
         await destAdapter.execute(
           'telegram.send_message',
@@ -332,9 +463,15 @@ export class SheetsDigestRunner {
         );
       }
     } catch {
+      const destLabel =
+        config.destination.service === 'slack'
+          ? 'Slack'
+          : config.destination.service === 'gmail'
+            ? 'Gmail'
+            : 'Telegram';
       return {
         status: 'digest_failed',
-        error: `Không gửi được báo cáo tới ${config.destination.service === 'slack' ? 'Slack' : 'Telegram'}.`,
+        error: `Không gửi được báo cáo tới ${destLabel}.`,
       };
     }
 
@@ -343,12 +480,17 @@ export class SheetsDigestRunner {
       targetId:
         config.destination.service === 'slack'
           ? config.destination.channelId
-          : config.destination.chatId,
+          : config.destination.service === 'gmail'
+            ? config.destination.recipientEmail
+            : config.destination.chatId,
       ...(config.destination.service === 'slack' && config.destination.channelLabel
         ? { targetLabel: config.destination.channelLabel }
         : {}),
       ...(config.destination.service === 'telegram' && config.destination.chatLabel
         ? { targetLabel: config.destination.chatLabel }
+        : {}),
+      ...(config.destination.service === 'gmail'
+        ? { targetLabel: config.destination.recipientEmail }
         : {}),
       spreadsheetId: config.source.spreadsheetId,
       spreadsheetTitle: config.source.spreadsheetTitle,

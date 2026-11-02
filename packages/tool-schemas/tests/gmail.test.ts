@@ -9,11 +9,11 @@ const tool = (name: string) => GMAIL_TOOLS.find((candidate) => candidate.name ==
 const ajv = new Ajv({ strict: false });
 
 describe('Gmail tool catalog (kept outside ALL_TOOLS)', () => {
-  it('publishes exactly the ten Gmail tools of the spec, none of which delete permanently', () => {
+  it('publishes the eleven Gmail tools of the spec (including batch_modify_threads), none of which delete permanently', () => {
     expect(GMAIL_TOOLS.map((t) => t.name)).toEqual([
       'gmail.search_threads', 'gmail.get_thread', 'gmail.list_labels',
       'gmail.send_message', 'gmail.reply', 'gmail.forward', 'gmail.create_draft',
-      'gmail.modify_thread_labels', 'gmail.trash_thread', 'gmail.create_label',
+      'gmail.modify_thread_labels', 'gmail.batch_modify_threads', 'gmail.trash_thread', 'gmail.create_label',
     ]);
     for (const t of GMAIL_TOOLS) {
       expect(t.service).toBe('gmail');
@@ -23,7 +23,7 @@ describe('Gmail tool catalog (kept outside ALL_TOOLS)', () => {
       .toEqual(['gmail.search_threads', 'gmail.get_thread', 'gmail.list_labels']);
     expect(Object.fromEntries(GMAIL_TOOLS.filter((t) => t.sideEffect === 'write').map((t) => [t.name, t.riskLevel]))).toEqual({
       'gmail.send_message': 'high', 'gmail.reply': 'high', 'gmail.forward': 'high', 'gmail.create_draft': 'medium',
-      'gmail.modify_thread_labels': 'low', 'gmail.trash_thread': 'medium', 'gmail.create_label': 'low',
+      'gmail.modify_thread_labels': 'low', 'gmail.batch_modify_threads': 'low', 'gmail.trash_thread': 'medium', 'gmail.create_label': 'low',
     });
   });
 

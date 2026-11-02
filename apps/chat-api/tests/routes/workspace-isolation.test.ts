@@ -840,7 +840,7 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
       expect(delCalRes.status).toBe(400);
       expect(delCalRes.body.code).toBe('USE_PERSONAL_OAUTH');
 
-      // 3. GET /api/services in personal mode hides calendar & sheets and returns all 5 key-based services with connection: 'shared'
+      // 3. GET /api/services in personal mode hides calendar & sheets, returns key-based services as 'shared' and OAuth services as 'personal'
       const listRes = await request(app)
         .get('/api/services')
         .set('Authorization', `Bearer ${aliceToken}`)
@@ -849,10 +849,15 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
       const ids = listRes.body.services.map((s: any) => s.id);
       expect(ids).not.toContain('calendar');
       expect(ids).not.toContain('sheets');
-      for (const expectedId of ['slack', 'github', 'notion', 'telegram', 'jira']) {
+      for (const expectedId of ['slack', 'notion', 'jira']) {
         const svc = listRes.body.services.find((s: any) => s.id === expectedId);
         expect(svc).toBeDefined();
         expect(svc.connection).toBe('shared');
+      }
+      for (const expectedId of ['trello', 'github', 'telegram']) {
+        const svc = listRes.body.services.find((s: any) => s.id === expectedId);
+        expect(svc).toBeDefined();
+        expect(svc.connection).toBe('personal');
       }
     });
   });

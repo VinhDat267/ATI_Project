@@ -13,13 +13,24 @@ describe('MYCALENDAR_TOOLS and MYCALENDAR_SERVICE', () => {
     expect(MYCALENDAR_TOOLS.map(t => t.name)).toEqual([
       'mycalendar.list_calendars',
       'mycalendar.list_events',
+      'mycalendar.get_event',
+      'mycalendar.find_free_slots',
       'mycalendar.create_event',
+      'mycalendar.update_event',
+      'mycalendar.delete_event',
     ]);
+    const listEvents = MYCALENDAR_TOOLS.find(t => t.name === 'mycalendar.list_events')!;
+    expect(listEvents.discovers).toBe('myevent');
+    expect(listEvents.observedFields).toEqual(expect.arrayContaining(['id', 'title', 'start', 'end', 'meetLink', 'location', 'recurrence', 'calendarId']));
   });
 
-  it('marks mycalendar.create_event as a write tool in executor and separates x-resource mycalendar from shared calendar', () => {
+  it('marks mycalendar.create_event, update_event and delete_event as write tools in executor and separates x-resource mycalendar from shared calendar', () => {
     expect(isWriteTool('mycalendar.create_event')).toBe(true);
+    expect(isWriteTool('mycalendar.update_event')).toBe(true);
+    expect(isWriteTool('mycalendar.delete_event')).toBe(true);
     expect(isWriteTool('mycalendar.list_events')).toBe(false);
+    expect(isWriteTool('mycalendar.get_event')).toBe(false);
+    expect(isWriteTool('mycalendar.find_free_slots')).toBe(false);
     expect(isWriteTool('mycalendar.list_calendars')).toBe(false);
 
     // Review Focus #4: shared calendar ID in memory.calendar must not ground mycalendar.create_event

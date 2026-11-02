@@ -139,6 +139,39 @@ describe('ScheduleMoment — manual vs auto_digest mode selector', () => {
     expect(document.querySelector('#schedule-mode-auto-digest')).toBeNull();
     expect(screen.getByText(/Yêu cầu có thao tác ghi hoặc sửa lịch/i)).toBeInTheDocument();
   });
+
+  it('classifies 3-service schedule (mycalendar + mysheets + telegram) as TelegramDigestCandidate even when canAutoDigest is false', () => {
+    const message: ChatMessage = {
+      id: 'msg-proposal-multi-3',
+      role: 'assistant',
+      content: '',
+      metadata: {
+        type: 'schedule_proposal',
+        proposal: {
+          kind: 'schedule',
+          action: 'create',
+          name: 'Bản tin tổng hợp Lịch & Sheets sáng',
+          request: 'Mỗi sáng 8h đọc lịch họp Google Calendar, đối chiếu bảng tính Google Sheets và gửi báo cáo qua Telegram',
+          recurrence: { type: 'daily', time: '08:00' },
+          summary: 'Bản tin tổng hợp đa dịch vụ',
+        },
+        services: ['mycalendar', 'mysheets', 'telegram'],
+        nextRuns: ['2026-10-26T01:00:00Z'],
+        digestCandidate: {
+          canAutoDigest: false,
+          disabledReason: 'Cần chọn đúng 1 cuộc trò chuyện Telegram đích để bật tự gửi bản tin đa dịch vụ.',
+        },
+      },
+    };
+
+    render(<ScheduleMoment message={message} convId={CONV_ID} navigate={vi.fn()} onEdit={vi.fn()} />);
+    const autoDigestRadio = document.querySelector<HTMLInputElement>('#schedule-mode-auto-digest');
+    expect(autoDigestRadio).not.toBeNull();
+    expect(autoDigestRadio!.disabled).toBe(true);
+    expect(
+      screen.getByText(/Cần chọn đúng 1 cuộc trò chuyện Telegram đích để bật tự gửi bản tin đa dịch vụ/i)
+    ).toBeInTheDocument();
+  });
 });
 
 describe('ScheduleSection, ScheduleRunRecovery & runLabel for digest_sent / digest_failed', () => {

@@ -20,6 +20,57 @@ import {
   windowSize,
 } from './calendar-adapter.js';
 
+function resolveNaturalWindowFromQuery(rawQuery: unknown, now = new Date()): { timeMin: string; timeMax: string } {
+  if (typeof rawQuery !== 'string' || !rawQuery.trim()) {
+    invalid('time requires an explicit ISO timezone');
+  }
+  const q = text(rawQuery, 4000).trim().toLowerCase();
+  const vnParts = (d: Date) =>
+    Object.fromEntries(
+      new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Ho_Chi_Minh',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      })
+        .formatToParts(d)
+        .map((p) => [p.type, p.value]),
+    );
+  const isTomorrow = /\b(?:ngày\s+mai|ngay\s+mai|sáng\s+mai|sang\s+mai|chiều\s+mai|chieu\s+mai|mai|tomorrow)\b/iu.test(q);
+  const isWeek = /\b(?:tuần\s+này|tuan\s+nay|tuần\s+tới|tuan\s+toi|this\s+week|next\s+week|upcoming|sắp\s+tới|sap\s+toi)\b/iu.test(q);
+  const baseDate = isTomorrow ? new Date(now.getTime() + 86_400_000) : now;
+  const endDate = isWeek ? new Date(baseDate.getTime() + 6 * 86_400_000) : baseDate;
+  const s = vnParts(baseDate);
+  const e = vnParts(endDate);
+  return {
+    timeMin: `${s.year}-${s.month}-${s.day}T00:00:00+07:00`,
+    timeMax: `${e.year}-${e.month}-${e.day}T23:59:59+07:00`,
+  };
+}
+
+const RECURRENCE_PRESETS: Record<string, string> = {
+  DAILY: 'RRULE:FREQ=DAILY',
+  WEEKDAYS: 'RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',
+  WEEKLY: 'RRULE:FREQ=WEEKLY',
+  BIWEEKLY: 'RRULE:FREQ=WEEKLY;INTERVAL=2',
+  MONTHLY: 'RRULE:FREQ=MONTHLY',
+};
+
+const VALID_RRULE_RE = /^RRULE:FREQ=(?:DAILY|WEEKLY|MONTHLY|YEARLY)(?:;[A-Z]+=[A-Za-z0-9,+-]+)*$/;
+
+function normalizeRecurrenceRule(raw: unknown): string[] | undefined {
+  if (raw === undefined) return undefined;
+  const checked = text(raw, 500, true).trim().toUpperCase();
+  if (RECURRENCE_PRESETS[checked]) {
+    return [RECURRENCE_PRESETS[checked]!];
+  }
+  const normalized = checked.startsWith('RRULE:') ? checked : `RRULE:${checked}`;
+  if (!VALID_RRULE_RE.test(normalized)) {
+    invalid('recurrence must be DAILY, WEEKDAYS, WEEKLY, BIWEEKLY, MONTHLY, or a valid RFC 5545 RRULE');
+  }
+  return [normalized];
+}
+
 export interface PersonalCalendarAdapterConfig extends BaseAdapterConfig {
   userId: string;
   tokens: GmailAccessTokenProvider;
@@ -71,10 +122,12 @@ export class PersonalCalendarAdapter extends BaseAdapter {
     path: string,
     signal?: AbortSignal,
     body?: object,
-    onDispatch?: (dispatched: boolean) => void
+    onDispatch?: (dispatched: boolean) => void,
+    methodOverride?: 'GET' | 'POST' | 'PATCH' | 'DELETE',
   ): Promise<any> {
     if (signal?.aborted) throw new StepError({ message: 'Calendar request cancelled before dispatch', category: 'NETWORK' });
-    const writing = body !== undefined;
+    const method = methodOverride ?? (body !== undefined ? 'POST' : 'GET');
+    const writing = method !== 'GET';
     let networkRetries = 0;
     let serverRetries = 0;
     let rateRetries = 0;
@@ -102,14 +155,14 @@ export class PersonalCalendarAdapter extends BaseAdapter {
       try {
         if (writing) onDispatch?.(true);
         response = await this.fetchFn(this.apiBase + path, {
-          method: writing ? 'POST' : 'GET',
+          method,
           signal,
           redirect: 'error',
           headers: {
             Authorization: 'Bearer ' + token,
-            ...(writing ? { 'Content-Type': 'application/json' } : {}),
+            ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
           },
-          ...(writing ? { body: JSON.stringify(body) } : {}),
+          ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
         });
       } catch {
         if (!writing && !signal?.aborted && networkRetries++ < 2) continue;
@@ -187,6 +240,10 @@ export class PersonalCalendarAdapter extends BaseAdapter {
         });
       }
 
+      if (response.status === 204 || method === 'DELETE') {
+        return null;
+      }
+
       try {
         return await response.json();
       } catch {
@@ -222,7 +279,10 @@ export class PersonalCalendarAdapter extends BaseAdapter {
 
   async execute(toolName: string, args: Record<string, any>, context?: { signal?: AbortSignal }): Promise<any> {
     const signal = context?.signal;
-    const isWrite = toolName === 'mycalendar.create_event';
+    const isWrite =
+      toolName === 'mycalendar.create_event' ||
+      toolName === 'mycalendar.update_event' ||
+      toolName === 'mycalendar.delete_event';
     let writeDispatched = false;
 
     try {
@@ -244,12 +304,20 @@ export class PersonalCalendarAdapter extends BaseAdapter {
       if (toolName === 'mycalendar.list_events') {
         only(args, ['calendarId', 'timeMin', 'timeMax', 'query', 'limit']);
         const id = this.checkedId(args.calendarId);
-        windowSize(args.timeMin, args.timeMax, 31);
+        let timeMin = args.timeMin;
+        let timeMax = args.timeMax;
+        if (timeMin === undefined && timeMax === undefined) {
+          const resolved = resolveNaturalWindowFromQuery(args.query);
+          timeMin = resolved.timeMin;
+          timeMax = resolved.timeMax;
+        } else {
+          windowSize(timeMin, timeMax, 31);
+        }
         const maximum = limit(args.limit, 20);
         const parsedQuery = parseCalendarEventQuery(args.query);
         const params = new URLSearchParams({
-          timeMin: args.timeMin,
-          timeMax: args.timeMax,
+          timeMin,
+          timeMax,
           singleEvents: 'true',
           orderBy: 'startTime',
           maxResults: String(maximum),
@@ -286,20 +354,178 @@ export class PersonalCalendarAdapter extends BaseAdapter {
         throw new StepError({ message: 'Calendar event pagination exceeded its read budget; narrow the time interval', category: 'SERVER_ERROR' });
       }
 
+      if (toolName === 'mycalendar.get_event') {
+        only(args, ['calendarId', 'eventId']);
+        const id = this.checkedId(args.calendarId);
+        const eventId = text(args.eventId, 256, true).trim();
+        if (eventId === '.' || eventId === '..' || eventId.includes('/')) {
+          invalid('eventId is invalid');
+        }
+        const raw = await this.request(
+          `${encodeURIComponent(id)}/events/${encodeURIComponent(eventId)}`,
+          signal,
+        );
+        const { clipped: _clipped, ...base } = normalizedEvent(raw, false);
+        const description =
+          typeof raw?.description === 'string' && raw.description.trim().length > 0
+            ? raw.description.trim().slice(0, 4000)
+            : undefined;
+        return {
+          ...base,
+          ...(description ? { description } : {}),
+        };
+      }
+
+      if (toolName === 'mycalendar.find_free_slots') {
+        only(args, [
+          'calendarId',
+          'timeMin',
+          'timeMax',
+          'query',
+          'durationMinutes',
+          'workdayStartHour',
+          'workdayEndHour',
+          'limit',
+        ]);
+        const id = this.checkedId(args.calendarId);
+        let timeMin = args.timeMin;
+        let timeMax = args.timeMax;
+        if (timeMin === undefined && timeMax === undefined) {
+          const resolved = resolveNaturalWindowFromQuery(args.query);
+          timeMin = resolved.timeMin;
+          timeMax = resolved.timeMax;
+        } else {
+          windowSize(timeMin, timeMax, 31);
+        }
+        const durationMinutes =
+          args.durationMinutes === undefined ? 60 : limit(args.durationMinutes, 480);
+        if (durationMinutes < 15) invalid('durationMinutes must be at least 15');
+        const workdayStartHour =
+          args.workdayStartHour === undefined ? 8 : Number(args.workdayStartHour);
+        const workdayEndHour =
+          args.workdayEndHour === undefined ? 18 : Number(args.workdayEndHour);
+        if (
+          !Number.isInteger(workdayStartHour) ||
+          !Number.isInteger(workdayEndHour) ||
+          workdayStartHour < 0 ||
+          workdayEndHour > 24 ||
+          workdayEndHour <= workdayStartHour
+        ) {
+          invalid('workday hours are invalid');
+        }
+        const maxSlots = limit(args.limit, 10);
+
+        const listed = await this.execute(
+          'mycalendar.list_events',
+          { calendarId: id, timeMin, timeMax, limit: 20 },
+          { signal },
+        );
+        const busyEvents: Array<{ start: string; end: string }> = Array.isArray(listed?.events)
+          ? listed.events
+          : [];
+        const busyIntervals = busyEvents
+          .map((ev) => ({ startMs: Date.parse(ev.start), endMs: Date.parse(ev.end) }))
+          .filter((iv) => Number.isFinite(iv.startMs) && Number.isFinite(iv.endMs) && iv.endMs > iv.startMs)
+          .sort((a, b) => a.startMs - b.startMs);
+
+        const tzSuffixMatch = String(timeMin).match(/([+-]\d{2}:\d{2}|Z)$/);
+        const tzSuffix = tzSuffixMatch ? tzSuffixMatch[1]! : '+07:00';
+        const datePrefix = String(timeMin).slice(0, 10);
+        const pad2 = (n: number) => String(n).padStart(2, '0');
+        const workStartIso = `${datePrefix}T${pad2(workdayStartHour)}:00:00${tzSuffix}`;
+        const workEndIso =
+          workdayEndHour === 24
+            ? `${datePrefix}T23:59:59${tzSuffix}`
+            : `${datePrefix}T${pad2(workdayEndHour)}:00:00${tzSuffix}`;
+        const workStartMs = Math.max(Date.parse(timeMin), Date.parse(workStartIso));
+        const workEndMs = Math.min(Date.parse(timeMax), Date.parse(workEndIso));
+        const durationMs = durationMinutes * 60_000;
+        const stepMs = 30 * 60_000;
+
+        const formatLocalIso = (ms: number): { iso: string; hm: string } => {
+          const offsetMinutes =
+            tzSuffix === 'Z'
+              ? 0
+              : (tzSuffix.startsWith('-') ? -1 : 1) *
+                (Number(tzSuffix.slice(1, 3)) * 60 + Number(tzSuffix.slice(4, 6)));
+          const shifted = new Date(ms + offsetMinutes * 60_000);
+          const yyyy = shifted.getUTCFullYear();
+          const mm = pad2(shifted.getUTCMonth() + 1);
+          const dd = pad2(shifted.getUTCDate());
+          const hh = pad2(shifted.getUTCHours());
+          const min = pad2(shifted.getUTCMinutes());
+          const ss = pad2(shifted.getUTCSeconds());
+          return {
+            iso: `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}${tzSuffix}`,
+            hm: `${hh}:${min}`,
+          };
+        };
+
+        const freeSlots: Array<{
+          start: string;
+          end: string;
+          durationMinutes: number;
+          label: string;
+        }> = [];
+        let cursor = workStartMs;
+        while (cursor + durationMs <= workEndMs && freeSlots.length < maxSlots) {
+          const candEnd = cursor + durationMs;
+          const overlapping = busyIntervals.find(
+            (b) => cursor < b.endMs && b.startMs < candEnd,
+          );
+          if (!overlapping) {
+            const sFmt = formatLocalIso(cursor);
+            const eFmt = formatLocalIso(candEnd);
+            freeSlots.push({
+              start: sFmt.iso,
+              end: eFmt.iso,
+              durationMinutes,
+              label: `${sFmt.hm}–${eFmt.hm}`,
+            });
+            cursor = candEnd;
+          } else {
+            cursor = Math.max(cursor + stepMs, overlapping.endMs);
+          }
+        }
+
+        return {
+          calendarId: id,
+          busyCount: busyIntervals.length,
+          freeSlots,
+        };
+      }
+
       if (toolName === 'mycalendar.create_event') {
-        only(args, ['calendarId', 'summary', 'description', 'start', 'end', 'location']);
+        only(args, ['calendarId', 'summary', 'description', 'start', 'end', 'location', 'createMeetLink', 'recurrence']);
         const id = this.checkedId(args.calendarId);
         windowSize(args.start, args.end, 1);
+        if (args.createMeetLink !== undefined && typeof args.createMeetLink !== 'boolean') {
+          invalid('createMeetLink must be a boolean');
+        }
+        const recurrence = normalizeRecurrenceRule(args.recurrence);
+        const wantMeet = args.createMeetLink === true;
         const body = {
           summary: text(args.summary, 200, true),
           start: { dateTime: args.start },
           end: { dateTime: args.end },
           ...(args.description !== undefined ? { description: plainDescription(text(args.description, 4000)) } : {}),
           ...(args.location !== undefined ? { location: text(args.location, 1000) } : {}),
+          ...(recurrence ? { recurrence } : {}),
+          ...(wantMeet
+            ? {
+                conferenceData: {
+                  createRequest: {
+                    requestId: `ati-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                    conferenceSolutionKey: { type: 'hangoutsMeet' },
+                  },
+                },
+              }
+            : {}),
         };
+        const querySuffix = wantMeet ? '?sendUpdates=none&conferenceDataVersion=1' : '?sendUpdates=none';
         const { clipped: _clipped, ...created } = normalizedEvent(
           await this.request(
-            encodeURIComponent(id) + '/events?sendUpdates=none',
+            encodeURIComponent(id) + '/events' + querySuffix,
             signal,
             body,
             (dispatched) => { writeDispatched = dispatched; }
@@ -307,6 +533,77 @@ export class PersonalCalendarAdapter extends BaseAdapter {
           true
         );
         return created;
+      }
+
+      if (toolName === 'mycalendar.update_event') {
+        only(args, ['calendarId', 'eventId', 'summary', 'description', 'start', 'end', 'location', 'createMeetLink', 'recurrence']);
+        const id = this.checkedId(args.calendarId);
+        const eventId = text(args.eventId, 256, true).trim();
+        if (eventId === '.' || eventId === '..' || eventId.includes('/')) {
+          invalid('eventId is invalid');
+        }
+        if ((args.start !== undefined) !== (args.end !== undefined)) {
+          invalid('start and end must both be provided when rescheduling');
+        }
+        if (args.start !== undefined && args.end !== undefined) {
+          windowSize(args.start, args.end, 1);
+        }
+        if (args.createMeetLink !== undefined && typeof args.createMeetLink !== 'boolean') {
+          invalid('createMeetLink must be a boolean');
+        }
+        const recurrence = normalizeRecurrenceRule(args.recurrence);
+        const wantMeet = args.createMeetLink === true;
+        const body: Record<string, any> = {
+          ...(args.summary !== undefined ? { summary: text(args.summary, 200, true) } : {}),
+          ...(args.start !== undefined && args.end !== undefined
+            ? { start: { dateTime: args.start }, end: { dateTime: args.end } }
+            : {}),
+          ...(args.description !== undefined ? { description: plainDescription(text(args.description, 4000)) } : {}),
+          ...(args.location !== undefined ? { location: text(args.location, 1000) } : {}),
+          ...(recurrence ? { recurrence } : {}),
+          ...(wantMeet
+            ? {
+                conferenceData: {
+                  createRequest: {
+                    requestId: `ati-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                    conferenceSolutionKey: { type: 'hangoutsMeet' },
+                  },
+                },
+              }
+            : {}),
+        };
+        if (Object.keys(body).length === 0) {
+          invalid('update_event requires at least one field to update');
+        }
+        const querySuffix = wantMeet ? '?sendUpdates=none&conferenceDataVersion=1' : '?sendUpdates=none';
+        const { clipped: _clipped, ...updated } = normalizedEvent(
+          await this.request(
+            `${encodeURIComponent(id)}/events/${encodeURIComponent(eventId)}${querySuffix}`,
+            signal,
+            body,
+            (dispatched) => { writeDispatched = dispatched; },
+            'PATCH',
+          ),
+          true,
+        );
+        return updated;
+      }
+
+      if (toolName === 'mycalendar.delete_event') {
+        only(args, ['calendarId', 'eventId']);
+        const id = this.checkedId(args.calendarId);
+        const eventId = text(args.eventId, 256, true).trim();
+        if (eventId === '.' || eventId === '..' || eventId.includes('/')) {
+          invalid('eventId is invalid');
+        }
+        await this.request(
+          `${encodeURIComponent(id)}/events/${encodeURIComponent(eventId)}?sendUpdates=none`,
+          signal,
+          undefined,
+          (dispatched) => { writeDispatched = dispatched; },
+          'DELETE',
+        );
+        return { id: eventId, deleted: true };
       }
 
       return invalid('tool is unsupported');

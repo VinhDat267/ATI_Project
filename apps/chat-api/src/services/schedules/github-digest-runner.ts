@@ -32,6 +32,7 @@ export type RunGithubDigest = (
 export interface GithubDigestRunnerOptions {
   pool: pg.Pool;
   githubConnection?: (userId: string) => Promise<any>;
+  telegramConnection?: (userId: string) => Promise<any>;
   getAdapter?: (serviceName: string, context?: any) => Promise<any> | any;
   summarizeDigest?: (
     input: {
@@ -125,8 +126,10 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
       };
     }
 
+    const isTelegramDest = Boolean(config.telegramChatId);
     let githubAdapter: any;
     let slackAdapter: any;
+    let telegramAdapter: any;
     try {
       githubAdapter = await options.getAdapter?.('github', {
         userId: run.userId,
@@ -140,47 +143,73 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
           },
         },
       });
-      slackAdapter = await options.getAdapter?.('slack', {
-        userId: run.userId,
-        phase: 'execution',
-      });
+      if (isTelegramDest) {
+        if (options.telegramConnection) {
+          const tg = await options.telegramConnection(run.userId);
+          const allowedChatIds = new Set(
+            ((tg?.connection?.chatIds ?? []) as string[]).map((id) => String(id)),
+          );
+          if (!tg || tg.status !== 'connected' || !allowedChatIds.has(String(config.telegramChatId))) {
+            return {
+              state: 'blocked',
+              error: 'Cuộc trò chuyện Telegram nhận bản tin không còn nằm trong phạm vi cho phép.',
+              pauseReason: 'Cuộc trò chuyện Telegram nhận bản tin không còn nằm trong phạm vi cho phép.',
+            };
+          }
+        }
+        telegramAdapter = await options.getAdapter?.('telegram', {
+          userId: run.userId,
+          phase: 'execution',
+        });
+      } else {
+        slackAdapter = await options.getAdapter?.('slack', {
+          userId: run.userId,
+          phase: 'execution',
+        });
+      }
     } catch (err: any) {
       const msg = err?.message || 'Kết nối dịch vụ không khả dụng.';
       return { state: 'blocked', error: msg, pauseReason: msg };
     }
 
-    if (!githubAdapter || !slackAdapter) {
+    if (!githubAdapter || (isTelegramDest ? !telegramAdapter : !slackAdapter)) {
       return {
         state: 'blocked',
-        error: 'Không khởi tạo được kết nối GitHub hoặc Slack.',
-        pauseReason: 'Không khởi tạo được kết nối GitHub hoặc Slack.',
+        error: isTelegramDest
+          ? 'Không khởi tạo được kết nối GitHub hoặc Telegram.'
+          : 'Không khởi tạo được kết nối GitHub hoặc Slack.',
+        pauseReason: isTelegramDest
+          ? 'Không khởi tạo được kết nối GitHub hoặc Telegram.'
+          : 'Không khởi tạo được kết nối GitHub hoặc Slack.',
       };
     }
 
-    // Verify Slack channel is still in allowedScope
-    try {
-      const channels = await slackAdapter.execute(
-        'slack.search_channels',
-        { query: config.channelName },
-        { signal },
-      );
-      if (
-        Array.isArray(channels) &&
-        !channels.some((c: any) => String(c.id) === config.channelId)
-      ) {
-        return {
-          state: 'blocked',
-          error: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
-          pauseReason: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
-        };
-      }
-    } catch (err: any) {
-      if (err?.category === 'AUTH_ERROR') {
-        return {
-          state: 'blocked',
-          error: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
-          pauseReason: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
-        };
+    if (!isTelegramDest) {
+      // Verify Slack channel is still in allowedScope
+      try {
+        const channels = await slackAdapter.execute(
+          'slack.search_channels',
+          { query: config.channelName },
+          { signal },
+        );
+        if (
+          Array.isArray(channels) &&
+          !channels.some((c: any) => String(c.id) === config.channelId)
+        ) {
+          return {
+            state: 'blocked',
+            error: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
+            pauseReason: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
+          };
+        }
+      } catch (err: any) {
+        if (err?.category === 'AUTH_ERROR') {
+          return {
+            state: 'blocked',
+            error: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
+            pauseReason: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
+          };
+        }
       }
     }
 
@@ -318,7 +347,36 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
       return { state: 'discarded' };
     }
 
-    // 7. Send Slack message (once called, never transition to discarded)
+    // 7. Send Slack or Telegram message (once called, never transition to discarded)
+    if (isTelegramDest) {
+      try {
+        const sendRes = await telegramAdapter.execute(
+          'telegram.send_message',
+          { chatId: config.telegramChatId, text: messageText },
+          { signal, chatId: config.telegramChatId },
+        );
+        const delivery: GithubDigestDelivery = {
+          channelId: '',
+          channelName: '',
+          ts: null,
+          telegramChatId: config.telegramChatId,
+          telegramChatTitle: config.telegramChatTitle ?? '',
+          messageId: typeof sendRes?.messageId === 'number' ? sendRes.messageId : null,
+          counts: {
+            newIssues: newIssues.length,
+            stalePrs: stalePrs.length,
+            unassignedIssues: unassignedIssues.length,
+          },
+        };
+        return { state: 'digest_sent', delivery, text: messageText };
+      } catch {
+        return {
+          state: 'digest_failed',
+          error: 'Không gửi được bản tin lên Telegram. Hãy thử lại.',
+        };
+      }
+    }
+
     try {
       const sendRes = await slackAdapter.execute(
         'slack.send_message',

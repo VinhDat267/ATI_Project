@@ -35,6 +35,16 @@ export function outcomeURL(step:ExecutionStepInfo):string|undefined {
     try {const url=new URL(value); if(url.protocol==='https:' && !url.username && !url.password) return value;}catch { /* Untrusted output is kept only in technical details. */ }
   }
 }
+export function outcomeMeetURL(step:ExecutionStepInfo):string|undefined {
+  if(step.status!=='succeeded') return;
+  const output=resultObject(step.output);
+  const value=output?.meetLink;
+  if(typeof value!=='string') return;
+  try {
+    const url=new URL(value);
+    if(url.protocol==='https:' && !url.username && !url.password) return value;
+  } catch { /* Untrusted output is kept only in technical details. */ }
+}
 export function resultTitle(step:ExecutionStepInfo):string {
   if(step.status!=='succeeded') return step.description;
   const op=operation(step.tool), output=resultObject(step.output), value=op.titleField && output?.[op.titleField];

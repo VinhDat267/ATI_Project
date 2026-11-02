@@ -86,7 +86,10 @@ describe('Shared GitHub credentials removal', () => {
 
     const github = (res.body.services as any[]).find((s) => s.id === 'github');
     expect(github).toBeDefined();
-    expect(github.configured).toBe(false);
+    expect(github.connection).toBe('personal');
+    expect(github.configured).toBe(true);
+    expect(github.connected).toBe(true);
+    expect(github.connectionStatus).toBe('healthy');
     expect(github.credentialFields).toEqual([]);
     expect(github.personalStatus).toBe('connected');
     expect(github.username).toBe('alice_github');

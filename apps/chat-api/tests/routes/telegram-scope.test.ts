@@ -221,4 +221,17 @@ describe('Telegram chat & group scope routes', () => {
     expect(bobStatus.status).toBe(200);
     expect(bobStatus.body.status).toBe('needs_scope');
   });
+
+  it('automatically discovers newly joined Telegram groups on GET /api/connections/telegram without requiring a manual refresh', async () => {
+    const app = build();
+
+    // Alice initially only has her private chat 2000 in knownChats, but bot is in -100111 where Alice is a member
+    const aliceStatus = await request(app).get('/api/connections/telegram').set('Authorization', bearer(alice));
+    expect(aliceStatus.status).toBe(200);
+    expect(aliceStatus.body.status).toBe('connected');
+    expect(aliceStatus.body.chats).toEqual([
+      { chatId: '2000', title: 'Telegram của tôi (Alice)', type: 'private', selected: true, member: true },
+      { chatId: '-100111', title: 'Đội Sản Phẩm', type: 'supergroup', selected: false, member: true },
+    ]);
+  });
 });

@@ -68,8 +68,14 @@ export function RecoveryMoment({request,moment,snapshot,steps,services,controls}
   const calendarCheckUrl = paused?.status === 'unknown' && planStep?.tool === 'mycalendar.create_event' && mycalendarEmail
     ? `https://calendar.google.com/calendar/r?authuser=${encodeURIComponent(mycalendarEmail)}` : undefined;
   const mysheetsEmail = snapshot?.plan.connections?.mysheets?.email;
-  const spreadsheetCheckUrl = paused?.status === 'unknown' && planStep?.tool === 'mysheets.append_rows'
-    ? (typeof planStep.args.spreadsheetId === 'string' && planStep.args.spreadsheetId ? `https://docs.google.com/spreadsheets/d/${encodeURIComponent(planStep.args.spreadsheetId)}/edit` : 'https://docs.google.com/spreadsheets') : undefined;
+  const spreadsheetCheckUrl = paused?.status === 'unknown' && ['mysheets.append_rows', 'mysheets.update_rows', 'mysheets.create_sheet', 'sheets.append_rows', 'sheets.update_rows', 'sheets.create_sheet'].includes(planStep?.tool ?? '')
+    ? (typeof planStep?.args.spreadsheetId === 'string' && planStep.args.spreadsheetId ? `https://docs.google.com/spreadsheets/d/${encodeURIComponent(planStep.args.spreadsheetId)}/edit` : 'https://docs.google.com/spreadsheets') : undefined;
+  const notionWorkspace = snapshot?.plan.connections?.notion?.workspaceName;
+  const notionCheckUrl = paused?.status === 'unknown' && ['notion.create_page', 'notion.update_page', 'notion.append_text', 'notion.append_blocks'].includes(planStep?.tool ?? '')
+    ? 'https://www.notion.so' : undefined;
+  const trelloUsername = snapshot?.plan.connections?.trello?.username;
+  const trelloCheckUrl = paused?.status === 'unknown' && ['trello.create_card', 'trello.update_card', 'trello.add_member', 'trello.remove_member', 'trello.add_checklist', 'trello.update_checklist_item', 'trello.add_comment', 'trello.create_list', 'trello.set_card_due_complete'].includes(planStep?.tool ?? '')
+    ? (typeof planStep?.args.boardId === 'string' && planStep.args.boardId ? `https://trello.com/b/${encodeURIComponent(planStep.args.boardId)}` : 'https://trello.com') : undefined;
   const canRetry=moment===7 && !hasUnknown && paused?.status==='failed' && actions.includes('retry');
   const canContinue=moment===9 && !hasUnknown && !steps.some(step=>['failed','running'].includes(step.status)) && actions.includes('continue');
   const error=paused?.error ?? 'Dịch vụ không thể hoàn thành việc này.';
@@ -105,6 +111,8 @@ export function RecoveryMoment({request,moment,snapshot,steps,services,controls}
     {sentFolder && <p className="text-sm text-brand-text">Hãy tự kiểm tra thư đã gửi rồi chọn Bỏ qua hoặc Dừng. <a href={sentFolder} target="_blank" rel="noopener noreferrer" className="text-brand-primary underline">Mở thư mục Đã gửi</a></p>}
     {calendarCheckUrl && <p className="text-sm text-brand-text">Hãy tự kiểm tra trên Google Calendar của {mycalendarEmail} rồi chọn Bỏ qua hoặc Dừng. <a href={calendarCheckUrl} target="_blank" rel="noopener noreferrer" className="text-brand-primary underline">Mở Google Calendar</a></p>}
     {spreadsheetCheckUrl && <p className="text-sm text-brand-text">Hãy tự kiểm tra trên Google Sheets{mysheetsEmail ? ` của ${mysheetsEmail}` : ''} rồi chọn Bỏ qua hoặc Dừng. <a href={spreadsheetCheckUrl} target="_blank" rel="noopener noreferrer" className="text-brand-primary underline">Mở Google Sheets</a></p>}
+    {notionCheckUrl && <p className="text-sm text-brand-text">Hãy tự kiểm tra trên Notion{notionWorkspace ? ` (${notionWorkspace})` : ''} rồi chọn Bỏ qua hoặc Dừng. <a href={notionCheckUrl} target="_blank" rel="noopener noreferrer" className="text-brand-primary underline">Mở Notion kiểm tra</a></p>}
+    {trelloCheckUrl && <p className="text-sm text-brand-text">Hãy tự kiểm tra trên Trello{trelloUsername ? ` (@${trelloUsername})` : ''} rồi chọn Bỏ qua hoặc Dừng. <a href={trelloCheckUrl} target="_blank" rel="noopener noreferrer" className="text-brand-primary underline">Mở Trello kiểm tra</a></p>}
     {controls?.error && <p role="alert" className="text-sm text-brand-danger">{controls.error}</p>}
     <div className="flex flex-wrap items-center gap-3">
       {canRetry && <><button type="button" disabled={busy} onClick={()=>paused && controls?.onRetry(paused.id)} className={primary}>Thử lại việc {steps.findIndex(step=>step.id===paused?.id)+1}</button><button id="btn-recovery-edit" type="button" disabled={busy || !actions.includes('stop')} onClick={()=>setDialog('edit')} className={secondary}>Sửa rồi thử lại</button></>}

@@ -90,20 +90,20 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
 
   router.use(auth);
   router.use((req, res, next) => {
-    if (!(req as any).user?.sid) {
-      res.status(401).json({ error: 'Phiên đăng nhập không còn hợp lệ.', code: 'INVALID_SESSION' });
-      return;
-    }
-    next();
-  });
-
-  router.use((req, res, next) => {
     if (!isTelegramConnectAvailable(options)) {
       if (req.method === 'GET' && (req.path === '/' || req.path === '')) {
         res.json({ status: 'unconfigured', chats: [] });
         return;
       }
       res.status(503).json({ error: 'Telegram chưa được cấu hình trên máy chủ.' });
+      return;
+    }
+    next();
+  });
+
+  router.use((req, res, next) => {
+    if (!(req as any).user?.sid) {
+      res.status(401).json({ error: 'Phiên đăng nhập không còn hợp lệ.', code: 'INVALID_SESSION' });
       return;
     }
     next();
@@ -164,6 +164,26 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
     for (const c of [...selectedChats, ...knownChats]) {
       if (c && typeof c.chatId === 'string' && c.chatId) {
         mergedMap.set(c.chatId, c);
+      }
+    }
+    if (options.teamRepo) {
+      try {
+        const teamScope = await options.teamRepo.get();
+        for (const c of teamScope?.chats ?? []) {
+          if (c && c.type !== 'private') mergedMap.set(c.chatId, c);
+        }
+      } catch {
+        // Ignore teamRepo errors on status check
+      }
+    }
+    if (botClient) {
+      try {
+        const discovered = await botClient.discoverGroups(AbortSignal.timeout(Math.min(timeoutMs, 2500)));
+        for (const g of discovered) {
+          if (g && g.type !== 'private') mergedMap.set(g.chatId, g);
+        }
+      } catch {
+        // Best-effort auto-discovery; fall back to knownChats if Telegram is slow
       }
     }
 

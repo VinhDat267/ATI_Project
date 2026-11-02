@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { AIPlanner, WorkingMemory, buildSystemPrompt, type LLMGeneratePlanInput, type LLMProvider } from '../src/index.js';
-import { ALL_TOOLS, TRELLO_TOOLS, SLACK_TOOLS } from '@wap/tool-schemas';
+import { ALL_TOOLS, TRELLO_TOOLS, SLACK_TOOLS, MYSHEETS_TOOLS, SERVICE_REGISTRY, MYSHEETS_SERVICE } from '@wap/tool-schemas';
 
 function scripted(...outputs: unknown[]) {
   const inputs: LLMGeneratePlanInput[] = [];
@@ -176,5 +176,70 @@ describe('workspace directory prefetch', () => {
   it('tells the model to use the directory before searching', () => {
     const prompt = buildSystemPrompt([...TRELLO_TOOLS, ...SLACK_TOOLS], undefined, { search: true });
     expect(prompt).toMatch(/__observed.*already.*looked up/is);
+  });
+
+  it('prefetches mysheets spreadsheets and tab headers into __observed.mysheet before the first model call', async () => {
+    const sheetId = '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms';
+    const mysheetsPlan = {
+      kind: 'plan',
+      thinking: 'Append row aligned with headers',
+      summary: 'Thêm công việc vào bảng tính',
+      warnings: [],
+      steps: [
+        {
+          id: 's1',
+          tool: 'mysheets.append_rows',
+          description: 'Ghi dòng KPI',
+          args: {
+            spreadsheetId: sheetId,
+            sheet: 'KPI Tháng 11',
+            rows: [['TASK-01', 'Fix OAuth', 'Hoàn thành']],
+            deduplicate: true,
+            onDuplicate: 'update',
+          },
+          dependsOn: [],
+        },
+      ],
+    };
+    const { provider, inputs } = scripted(mysheetsPlan);
+    const planner = new AIPlanner({
+      provider,
+      toolCatalog: [...ALL_TOOLS.filter((t) => t.service !== 'sheets'), ...MYSHEETS_TOOLS],
+      serviceRegistry: [...SERVICE_REGISTRY, MYSHEETS_SERVICE],
+      searchMode: 'llm',
+      gatherSearch: async ({ tool }) => {
+        if (tool === 'mysheets.list_spreadsheets') {
+          return [{ id: sheetId, title: 'Báo cáo KPI', url: `https://docs.google.com/spreadsheets/d/${sheetId}/edit` }];
+        }
+        if (tool === 'mysheets.list_sheets') {
+          return [
+            {
+              id: 0,
+              title: 'KPI Tháng 11',
+              spreadsheetId: sheetId,
+              headers: ['Mã việc', 'Tên việc', 'Trạng thái'],
+            },
+          ];
+        }
+        return [];
+      },
+    });
+
+    const response = await planner.processMessage({
+      userMessage: 'Cập nhật trạng thái TASK-01 vào Google Sheets Báo cáo KPI',
+      memory: new WorkingMemory(),
+    });
+    expect(response).toEqual(mysheetsPlan);
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]!.workingMemory.__observed.mysheet).toEqual([
+      {
+        id: 0,
+        title: 'KPI Tháng 11',
+        spreadsheetId: sheetId,
+        headers: ['Mã việc', 'Tên việc', 'Trạng thái'],
+      },
+    ]);
+    expect(inputs[0]!.systemPrompt).toContain('Personal Google Sheets (mysheets) Rules');
+    expect(inputs[0]!.systemPrompt).toContain('onDuplicate: "update"');
   });
 });

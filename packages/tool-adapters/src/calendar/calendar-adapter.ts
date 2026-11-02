@@ -52,7 +52,38 @@ export function normalizedEvent(value: any, writing = false) {
   const end = value?.end?.dateTime ?? value?.end?.date;
   if (typeof value?.id !== 'string' || !value.id || typeof value.htmlLink !== 'string' || !value.htmlLink || typeof start !== 'string' || typeof end !== 'string') badResponse(writing);
   const title = clipText(typeof value.summary === 'string' ? value.summary : '(Không có tiêu đề)', CALENDAR_MAX_TITLE_CHARS);
-  return { id: value.id, title: title.text, start, end, url: value.htmlLink, ...(title.clipped ? { clipped: true } : {}) };
+  const location =
+    typeof value?.location === 'string' && value.location.trim().length > 0
+      ? clipText(value.location.trim(), 200).text
+      : undefined;
+  const meetLink =
+    typeof value?.hangoutLink === 'string' && value.hangoutLink.startsWith('https://')
+      ? value.hangoutLink
+      : Array.isArray(value?.conferenceData?.entryPoints)
+        ? value.conferenceData.entryPoints.find(
+            (ep: any) => ep?.entryPointType === 'video' && typeof ep?.uri === 'string' && ep.uri.startsWith('https://'),
+          )?.uri
+        : undefined;
+  const attendeesCount =
+    Array.isArray(value?.attendees) && value.attendees.length > 0 ? value.attendees.length : undefined;
+  const recurrence =
+    Array.isArray(value?.recurrence) && typeof value.recurrence[0] === 'string' && value.recurrence[0].trim()
+      ? value.recurrence[0].trim()
+      : typeof value?.recurrence === 'string' && value.recurrence.trim()
+        ? value.recurrence.trim()
+        : undefined;
+  return {
+    id: value.id,
+    title: title.text,
+    start,
+    end,
+    url: value.htmlLink,
+    ...(location ? { location } : {}),
+    ...(meetLink ? { meetLink } : {}),
+    ...(attendeesCount !== undefined ? { attendeesCount } : {}),
+    ...(recurrence ? { recurrence } : {}),
+    ...(title.clipped ? { clipped: true } : {}),
+  };
 }
 
 export interface CalendarEventWithConflict {
@@ -61,6 +92,10 @@ export interface CalendarEventWithConflict {
   start: string;
   end: string;
   url: string;
+  location?: string;
+  meetLink?: string;
+  attendeesCount?: number;
+  recurrence?: string;
   conflict?: boolean;
   conflictsWith?: string[];
 }

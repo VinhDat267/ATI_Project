@@ -222,75 +222,63 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
       notion: {
         id: 'notion',
         name: 'Notion',
-        category: 'Tài liệu, Wiki & Biên bản cuộc họp',
-        keys: ['Internal integration token'],
-        scopeLabel: 'Database ID',
-        sampleScope: '1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d',
-        timeEstimate: 'Khoảng 3 phút',
-        summary: 'Tìm database, đọc page, tạo page biên bản họp mới và nối nội dung tóm tắt.',
-        importantNotice: 'Sau khi tạo Integration, bắt buộc phải vào Database Notion bấm dấu ba chấm > "Connect to" > chọn ATI!',
+        category: 'Tài liệu, Wiki, CRM & Biên bản cuộc họp',
+        keys: ['Kết nối OAuth 1-Click (Không cần tạo Integration Secret)'],
+        scopeLabel: 'Database được chọn',
+        sampleScope: 'Roadmap 2026 · Biên bản họp (1–20 database)',
+        timeEstimate: 'Khoảng 30 giây',
+        summary: 'Kết nối 1 chạm qua Notion OAuth 2.0, truy vấn database, đọc chi tiết trang, tạo/cập nhật trạng thái trang và tự gửi Bản tin mỗi sáng.',
+        importantNotice: 'Khi cấp quyền trên Notion OAuth, hãy tích chọn các trang/database bạn muốn ATI truy cập. ATI tự động khoá phạm vi an toàn vào đúng các database đó!',
         steps: [
           {
             num: 1,
-            title: 'Tạo Integration mới trên Notion',
-            desc: 'Đăng nhập tài khoản Notion, mở trang quản lý tích hợp tại <a href="https://www.notion.so/profile/integrations" target="_blank" rel="noopener noreferrer" class="text-neutral-900 font-medium underline">notion.so/profile/integrations</a>. Bấm "New integration", đặt tên là "ATI Notion", chọn đúng Workspace của nhóm và bấm Save.',
-            callout: 'Chọn quyền mặc định: Read content, Update content, Insert content.'
+            title: 'Khuyên dùng: Kết nối OAuth 1-Click trong 30 giây',
+            desc: 'Mở trang Cài đặt dịch vụ trên ATI, tại mục Notion bấm nút <strong>Kết nối Notion</strong>. Đăng nhập Notion, bấm <strong>Select pages</strong> để tích chọn các Database cần dùng rồi nhấn <strong>Allow access</strong>.',
+            callout: 'Nếu bạn chia sẻ từ 1 đến 20 database, ATI tự động kích hoạt ngay mà không cần thao tác thêm.'
           },
           {
             num: 2,
-            title: 'Sao chép Internal Integration Secret',
-            desc: 'Sau khi lưu, Notion hiển thị chuỗi "Internal Integration Secret" bắt đầu bằng "secret_" hoặc "ntn_". Bấm nút Show rồi Copy chuỗi này.',
-            callout: 'Dán chuỗi này vào ô "Internal integration token" trong Cài đặt của ATI.'
+            title: 'Tích chọn hoặc Dán nhanh Link / ID Database Notion',
+            desc: 'Bạn có thể bấm nút <strong>Đổi database</strong> bất cứ lúc nào để tích chọn lại danh sách Database (tối đa 20 database) hoặc dán trực tiếp đường dẫn URL của Database Notion vào ô nhập nhanh:',
+            urlSample: 'https://www.notion.so/workspace/Roadmap-11111111222233334444555555555555',
+            callout: 'ATI tự động bóc tách mã UUID 32 ký tự từ đường dẫn Notion bạn dán vào.'
           },
           {
             num: 3,
-            title: 'Lấy Database ID từ URL',
-            desc: 'Mở Database bạn muốn dùng trên Notion dưới dạng trang đầy đủ (Full page). Nhìn lên thanh địa chỉ trình duyệt:',
-            urlSample: 'https://notion.so/workspace/[MÃ_DATABASE_ID_32_KÝ_TỰ]?v=...',
-            callout: 'Sao chép chuỗi 32 ký tự nằm giữa tên workspace và dấu hỏi chấm "?".'
-          },
-          {
-            num: 4,
-            title: 'Kết nối Integration vào Database',
-            desc: 'Tại trang Database đó trên Notion, bấm vào dấu ba chấm (...) ở góc trên cùng bên phải > cuộn xuống mục "Connections" (hoặc "Connect to") > tìm và bấm chọn "ATI Notion".',
-            callout: 'Nếu không làm bước này, Notion sẽ chặn và báo lỗi "Object not found" vì lý do bảo mật.'
+            title: 'Đọc/Cập nhật thuộc tính & Lên lịch Bản tin Notion (Auto-Digest)',
+            desc: 'Yêu cầu ATI lọc các trang theo <code>Status</code>, đọc toàn văn nội dung trang (<code>notion.get_page</code>), cập nhật tiến độ/trạng thái trang (<code>notion.update_page</code>) hoặc bật <strong>Bản tin Notion tự động</strong> gửi sang Telegram/Slack mỗi sáng.',
+            callout: 'Bản tin tự động ưu tiên phân nhóm các mục Quá hạn/Bị chặn (Overdue/Blocked) lên đầu để bạn xử lý ngay.'
           }
         ]
       },
       telegram: {
         id: 'telegram',
         name: 'Telegram',
-        category: 'Thông báo tin nhắn nhanh & Nhóm chat',
-        keys: ['Bot token (BotFather)'],
-        scopeLabel: 'Chat ID',
-        sampleScope: '-1002489102931',
-        timeEstimate: 'Khoảng 2 phút',
-        summary: 'Gửi tin nhắn văn bản thông báo tiến độ vào nhóm chat hoặc kênh Telegram của nhóm.',
-        importantNotice: 'Bot phải được thêm vào nhóm chat trước thì mới gửi tin vào nhóm đó được.',
+        category: 'Ghép đôi 1-Click, Đọc tin nhóm & Bản tin tự động',
+        keys: ['Ghép đôi 1-Click (Không cần tạo Bot Token)'],
+        scopeLabel: 'Chat / Nhóm được chọn',
+        sampleScope: 'Telegram của tôi · Đội Sản Phẩm (-1002489102931)',
+        timeEstimate: 'Khoảng 30 giây',
+        summary: 'Kết nối 1 chạm với bot chính thức của ATI, đọc tin nhắn gần đây trong nhóm, gửi thông báo tiến độ và nhận bản tin tổng hợp tự động mỗi ngày.',
+        importantNotice: 'Không cần tự tạo bot với @BotFather hay tra cứu Chat ID thủ công. ATI chỉ truy cập đúng cuộc trò chuyện và nhóm bạn tích chọn.',
         steps: [
           {
             num: 1,
-            title: 'Nói chuyện với BotFather trên Telegram',
-            desc: 'Mở Telegram và tìm kiếm tài khoản chính thức <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">@BotFather</code> (có tích xanh). Bấm Start và gửi lệnh <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">/newbot</code>.',
-            callout: 'Làm theo hướng dẫn: Đặt tên cho bot (ví dụ: ATI Alert) và username kết thúc bằng _bot (ví dụ: ati_alert_bot).'
+            title: 'Khuyên dùng: Kết nối Telegram 1-Click trong 15 giây',
+            desc: 'Mở trang Cài đặt dịch vụ trên ATI, tại mục Telegram bấm nút <strong>Kết nối Telegram</strong>. Hệ thống sẽ mở ứng dụng Telegram tới bot chính thức của ATI — bạn chỉ cần nhấn nút <strong>Start</strong> rồi quay lại bấm xác nhận.',
+            callout: 'Tự động nhận diện tài khoản và kích hoạt ngay cuộc trò chuyện "Telegram của tôi" mà không cần nhập khoá API.'
           },
           {
             num: 2,
-            title: 'Sao chép Bot Token từ tin nhắn phản hồi',
-            desc: 'BotFather sẽ gửi lại một tin nhắn chúc mừng kèm chuỗi mã HTTP API Token (dạng <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">123456789:ABCdef...</code>). Sao chép chuỗi này dán vào ô "Bot token" của ATI.',
-            callout: 'Không chia sẻ token này cho người lạ.'
+            title: 'Thêm Bot vào Nhóm công việc (Group / Supergroup)',
+            desc: 'Nếu muốn ATI gửi báo cáo hoặc đọc tin nhắn trong nhóm làm việc, bấm nút <strong>Thêm Bot vào Nhóm Telegram</strong> ngay trên trang Kết nối (hoặc mời bot của ATI vào nhóm).',
+            callout: 'ATI tự động phát hiện các nhóm mới mà bạn là thành viên và hiển thị ngay trong danh sách chọn phạm vi.'
           },
           {
             num: 3,
-            title: 'Thêm bot vào nhóm chat của bạn',
-            desc: 'Mở nhóm chat Telegram của bạn, bấm vào tên nhóm > "Add Members" > tìm username của bot vừa tạo và thêm bot vào nhóm.',
-            callout: 'Bot cần có quyền gửi tin nhắn văn bản cơ bản trong nhóm.'
-          },
-          {
-            num: 4,
-            title: 'Lấy Chat ID của nhóm',
-            desc: 'Thêm bot <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">@getmyid_bot</code> hoặc <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">@userinfobot</code> vào nhóm, bot đó sẽ gửi tin nhắn báo mã Chat ID (thường là số âm có dạng <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">-100...</code>).',
-            callout: 'Dán mã số âm đó vào danh sách "Chat ID" trên ATI, sau đó bạn có thể xoá bot lấy ID ra khỏi nhóm.'
+            title: 'Tích chọn Phạm vi Chat & Bật Bản tin Tự động (Auto-Digest)',
+            desc: 'Tích chọn tối đa 10 cuộc trò chuyện/nhóm được phép sử dụng rồi bấm <strong>Lưu phạm vi</strong>. Khi lập lịch báo cáo hàng ngày từ Google Calendar, Sheets, Trello hoặc GitHub, bạn có thể bật chế độ <strong>Tự gửi (Auto-Digest)</strong> thẳng về Telegram.',
+            callout: 'Mọi bản tin tự động đều kiểm tra quyền thành viên nhóm theo thời gian thực trước khi gửi.'
           }
         ]
       },
@@ -483,13 +471,15 @@ export const SAMPLE_PROMPTS: SamplePrompt[] = [
         id: 'p12',
         category: 'reporting',
         categoryLabel: 'Báo cáo & Giao tiếp',
-        title: 'Gửi thông báo tiến độ vào nhóm Telegram',
-        prompt: 'Gửi tin nhắn Telegram vào nhóm Vận hành thông báo hệ thống đã cập nhật xong các báo cáo tuần',
-        services: ['telegram'],
-        tools: ['telegram.list_chats', 'telegram.send_message'],
+        title: 'Tổng hợp tiến độ bảng tính & Trello rồi báo nhóm Telegram',
+        prompt: 'Đọc bảng tính Google Sheets ATI Test Tracker, kiểm tra các card trên bảng Trello To Do và gửi báo cáo tiến độ vào nhóm Telegram Vận hành',
+        services: ['sheets', 'trello', 'telegram'],
+        tools: ['sheets.list_spreadsheets', 'sheets.read_range', 'trello.search_boards', 'trello.search_cards', 'telegram.list_chats', 'telegram.send_message'],
         workflow: [
-          'Telegram: Gửi tin nhắn văn bản thuần vào đúng Chat ID nhóm vận hành'
-        ]
+          'Google Sheets & Trello: Đọc tiến độ công việc và danh sách thẻ đang thực hiện',
+          'Telegram: Gửi bản tổng hợp tiến độ vào đúng nhóm Telegram Vận hành đã cấp quyền'
+        ],
+        badge: 'Liên dịch vụ'
       }
     ];
 
@@ -575,28 +565,32 @@ export const CAPABILITIES_DATA: Capability[] = [
       {
         id: 'notion',
         name: 'Notion',
-        role: 'Không gian tài liệu & Biên bản làm việc',
+        role: 'Không gian tài liệu, Database công việc & Biên bản họp',
         canDo: [
-          'Tìm database trong danh sách đã cấp quyền kết nối',
-          'Đọc các page trong database (thuộc tính dạng chữ)',
-          'Tạo trang mới trong database (ví dụ: Biên bản họp)',
-          'Thêm các đoạn văn bản tóm tắt nội dung'
+          'Kết nối OAuth 2.0 1-Click và chuyển đổi linh hoạt giữa nhiều Workspace Notion',
+          'Tìm và truy vấn database theo từ khoá hoặc lọc theo cột trạng thái (Status / Select)',
+          'Đọc chi tiết toàn văn nội dung trang (notion.get_page) cùng đầy đủ thuộc tính (status, multi_select, checkbox, date, number)',
+          'Tạo trang mới, nối thêm đoạn văn bản và cập nhật trạng thái/thuộc tính trang (notion.update_page)',
+          'Lên lịch Bản tin Notion tự động (Auto-Digest) phân loại mục Quá hạn/Bị chặn gửi qua Telegram hoặc Slack'
         ],
         cannotDo: [
-          'Database có nhiều nguồn dữ liệu',
-          'Sửa page ngoài việc nối thêm văn bản'
+          'Truy cập trang hoặc database nằm ngoài danh sách bạn đã cấp quyền',
+          'Xoá vĩnh viễn database hoặc xoá khối nội dung đã viết'
         ]
       },
       {
         id: 'telegram',
         name: 'Telegram',
-        role: 'Nhóm chat & Thông báo tin tức nhanh',
+        role: 'Ghép đôi 1-Click, Đọc thảo luận nhóm & Bản tin tự động',
         canDo: [
-          'Đọc thông tin nhóm chat đã thêm bot',
-          'Gửi tin nhắn văn bản thông báo tiến độ vào nhóm'
+          'Kết nối 1 chạm không cần tự tạo BotFather hay tìm Chat ID',
+          'Tự động liệt kê chat cá nhân và các nhóm công việc bạn tham gia',
+          'Đọc tin nhắn văn bản và tin nhắn ghim gần đây trong nhóm được cấp quyền',
+          'Gửi báo cáo tiến độ liên dịch vụ và nhận Bản tin tự động (Auto-Digest) theo lịch'
         ],
         cannotDo: [
-          'Định dạng chữ (đậm, nghiêng, link xem trước)'
+          'Đọc tin nhắn ở nhóm chưa cấp quyền hoặc bạn không phải thành viên',
+          'Định dạng HTML/Markdown phức tạp hoặc quảng cáo trả phí'
         ]
       },
       {
@@ -650,6 +644,22 @@ export const GUIDE_OAUTH_SHOWCASE_CARDS: GuideOAuthShowcaseCard[] = [
     badgeStyle: 'oauth',
     iconClassName: 'w-4 h-4 text-[#16A34A]',
     description: 'Chọn file bảng tính hoặc dán URL trực tiếp để đọc/ghi và lập báo cáo.',
+  },
+  {
+    service: 'telegram',
+    title: 'Telegram cá nhân & Nhóm',
+    badge: '1-Click · Auto-Digest',
+    badgeStyle: 'oauth',
+    iconClassName: 'w-4 h-4 text-[#229ED9]',
+    description: 'Ghép đôi 1 chạm với @ati_cnhn_bot, đọc tin nhắn nhóm và nhận Bản tin sáng.',
+  },
+  {
+    service: 'notion',
+    title: 'Notion cá nhân & Wiki',
+    badge: 'OAuth 2.0 · 1-Click',
+    badgeStyle: 'oauth',
+    iconClassName: 'w-4 h-4 text-[#111827]',
+    description: 'Kết nối 1 chạm, đọc/cập nhật trang database và nhận Bản tin tiến độ mỗi sáng.',
   },
   {
     service: 'slack',

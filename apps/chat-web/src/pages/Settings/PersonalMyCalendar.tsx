@@ -189,8 +189,8 @@ export function PersonalMyCalendar({
         Google Calendar của bạn
       </h3>
       <p className="text-xs text-[#6B7280]">
-        ATI chỉ đọc sự kiện và tạo sự kiện mới trên các lịch bạn đã chọn, không sửa hay xoá sự kiện
-        có sẵn, không mời người tham dự.
+        ATI chỉ đọc sự kiện, tìm khung giờ trống và tạo, cập nhật hoặc huỷ sự kiện trên các lịch bạn
+        đã chọn sau khi bạn duyệt kế hoạch (không tự ý gửi lời mời cho người khác).
       </p>
 
       <p className="text-sm text-[#111827] break-words">

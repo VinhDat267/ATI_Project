@@ -5,8 +5,26 @@ import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 const directory = fileURLToPath(new URL('../../../../db/v3/', import.meta.url));
-const databaseUrl = process.env.DATABASE_URL || 'postgresql://ati_v3:ati_v3_local_only@127.0.0.1:56533/ati_v3';
 const hex = (n = 64) => randomUUID().replaceAll('-', '').padEnd(64, '0').slice(0, n);
+
+async function resolveDatabaseUrl(): Promise<string> {
+  const candidates = [
+    process.env.DATABASE_URL,
+    'postgresql://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3',
+    'postgresql://ati_v3:ati_v3_local_only@127.0.0.1:56533/ati_v3',
+  ].filter(Boolean) as string[];
+  for (const url of candidates) {
+    const p = new pg.Pool({ connectionString: url });
+    try {
+      await p.query('SELECT 1');
+      await p.end();
+      return url;
+    } catch {
+      await p.end().catch(() => {});
+    }
+  }
+  return candidates[0]!;
+}
 
 describe('migration 0013 (mysheets personal connections) on PostgreSQL', () => {
   const schema = `mysheets_migration_${randomUUID().replaceAll('-', '')}`;
@@ -26,6 +44,7 @@ describe('migration 0013 (mysheets personal connections) on PostgreSQL', () => {
   );
 
   beforeAll(async () => {
+    const databaseUrl = await resolveDatabaseUrl();
     admin = new pg.Pool({ connectionString: databaseUrl });
     await admin.query(`CREATE SCHEMA "${schema}"`);
     const url = new URL(databaseUrl);

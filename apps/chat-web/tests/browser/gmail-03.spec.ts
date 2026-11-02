@@ -50,6 +50,7 @@ for (const width of [1440, 375]) for (const theme of ['light', 'dark']) {
     });
     await page.getByRole('button', { name: 'Kết nối Gmail', exact: true }).click();
     await expect(row).toContainText('gmail-owner@example.test');
+    await expect(row.getByTestId('gmail-capabilities')).toContainText('Đọc & tóm tắt thư');
     await expect(page.getByRole('status')).toContainText('Đã kết nối gmail-owner@example.test');
     expect(callbacks).toBe(1);
     await page.screenshot({ path: info.outputPath(`gmail-connected-${width}-${theme}.png`), fullPage: true });
@@ -93,6 +94,7 @@ for (const width of [1440, 375]) for (const theme of ['light', 'dark']) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.getByRole('button', { name: 'Xem trước', exact: true }).click();
     const preview = page.getByRole('dialog', { name: 'Xem trước nội dung' });
+    await expect(preview.getByTestId('gmail-preview-card')).toBeVisible();
     await expect(preview).toContainText('lan@example.com'); await expect(preview).toContainText("lấy từ luồng thư 'Họp nhóm ATI'");
     await expect(preview).toContainText('Bcc');
     await expect(preview).toContainText('Mình đồng ý, hẹn gặp lúc 9 giờ.');
@@ -101,6 +103,7 @@ for (const width of [1440, 375]) for (const theme of ['light', 'dark']) {
     await page.getByRole('button', { name: 'Đóng xem trước', exact: true }).click();
     await page.getByRole('button', { name: 'Duyệt kế hoạch', exact: true }).click();
     await expect(page.locator('#moment-6')).toBeVisible();
+    await expect(page.locator('#moment-6')).toContainText('Gửi từ: gmail-owner@example.test (Gmail của bạn)');
     const receiptDestination = page.locator('#moment-6 p').filter({ hasText: longTitle });
     await expect(receiptDestination).toHaveText(longTitle);
     expect(await receiptDestination.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);

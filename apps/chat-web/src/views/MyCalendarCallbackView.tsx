@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { MyCalendarCallbackInput } from '../routes';
+import { tryLoopbackCallbackHop } from '../hooks/use-route';
 import { apiClient } from '../services/api-client';
 import { subscribeAuthTokens } from '../services/auth-storage';
 import {
@@ -132,7 +133,12 @@ export function MyCalendarCallbackView({
           })
           .catch((reason) => {
             if (!live()) return;
-            setError(mycalendarCallbackError(reason?.data?.code ?? reason?.code));
+            const code = reason?.data?.code ?? reason?.code;
+            if (code === 'MYCALENDAR_STATE_INVALID' && data?.code && data?.state) {
+              const query = `?code=${encodeURIComponent(data.code)}&state=${encodeURIComponent(data.state)}`;
+              if (tryLoopbackCallbackHop(window.location.pathname, query, '')) return;
+            }
+            setError(mycalendarCallbackError(code));
             setLoading(false);
           });
       }
@@ -231,8 +237,9 @@ export function MyCalendarCallbackView({
       {!loading && !error && (
         <>
           <div className="p-3.5 sm:p-4 rounded-xl bg-blue-50 border border-blue-200 text-xs sm:text-sm text-blue-900 leading-relaxed">
-            ATI chỉ có thể đọc sự kiện và tạo sự kiện mới trên những lịch bạn chọn dưới đây. ATI
-            không thể sửa hay xoá sự kiện có sẵn và không gửi lời mời cho người khác.
+            ATI chỉ đọc sự kiện, tìm khung giờ trống và tạo, cập nhật hoặc huỷ sự kiện trên những
+            lịch bạn chọn dưới đây sau khi bạn duyệt kế hoạch (không tự ý gửi lời mời cho người
+            khác).
           </div>
 
           <div className="v3-space-y-2.5" role="group" aria-label="Danh sách lịch ghi được">

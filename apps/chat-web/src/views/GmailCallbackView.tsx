@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GoogleCallbackInput } from '../routes';
+import { tryLoopbackCallbackHop } from '../hooks/use-route';
 import { apiClient } from '../services/api-client';
 import { subscribeAuthTokens } from '../services/auth-storage';
 import { gmailSessionOwner, gmailCallbackError, gmailConnectionNotice, conversationReturnPath } from '../services/gmail-connection';
@@ -31,7 +32,15 @@ export function GmailCallbackView({ navigate, input }: { navigate: (path: string
         if (back) { navigate(back, true); return; }
         gmailConnectionNotice.set(result.email);
         navigate('/settings#gmail', true);
-      }).catch(reason => { if (live()) setError(gmailCallbackError(reason?.data?.code)); });
+      }).catch(reason => {
+        if (!live()) return;
+        const code = reason?.data?.code;
+        if (code === 'GMAIL_STATE_INVALID' && data?.code && data?.state) {
+          const query = `?code=${encodeURIComponent(data.code)}&state=${encodeURIComponent(data.state)}`;
+          if (tryLoopbackCallbackHop(window.location.pathname, query, '')) return;
+        }
+        setError(gmailCallbackError(code));
+      });
     }
     return () => { mounted = false; unsubscribe(); window.removeEventListener('storage', onStorage); };
   }, [navigate]);

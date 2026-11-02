@@ -75,7 +75,17 @@ it('discards the previous user return target when a different user logs in', asy
   await waitFor(() => expect(location.pathname).toBe('/'));
 });
 
-it.each(['//evil.example/path', 'https://evil.example/path', '/login'])('rejects unsafe or account return target %s', target => {
+it.each([
+  '//evil.example/path',
+  'https://evil.example/path',
+  '/login',
+  '/connections/trello/callback?code=1&state=2',
+  '/connections/gmail/callback',
+  '/connections/mycalendar/callback',
+  '/connections/mysheets/callback',
+  '/connections/github/callback',
+  '/connections/telegram/callback',
+])('rejects unsafe, account, or one-shot OAuth callback return target %s', target => {
   saveAuthReturnTarget(target, firstUser.id);
   expect(consumeAuthReturnTarget(firstUser.id)).toBeNull();
 });

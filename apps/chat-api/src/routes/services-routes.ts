@@ -122,7 +122,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
       tools: GMAIL_TOOLS.map((tool) => tool.name),
       configured: connected,
       connected,
-      connectionStatus: connected ? 'unchecked' : 'unconfigured',
+      connectionStatus: connected ? 'healthy' : 'unconfigured',
       lastCheckedAt: null,
       allowedScope: [],
       personalStatus,
@@ -205,7 +205,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
       tools: MYCALENDAR_TOOLS.map((tool) => tool.name),
       configured: connected,
       connected,
-      connectionStatus: connected ? 'unchecked' : 'unconfigured',
+      connectionStatus: connected ? 'healthy' : 'unconfigured',
       lastCheckedAt: null,
       allowedScope: details.allowedScope ?? [],
       personalStatus,
@@ -291,7 +291,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
       tools: MYSHEETS_TOOLS.map((tool) => tool.name),
       configured: connected,
       connected,
-      connectionStatus: connected ? 'unchecked' : 'unconfigured',
+      connectionStatus: connected ? 'healthy' : 'unconfigured',
       lastCheckedAt: null,
       allowedScope: details.allowedScope ?? [],
       personalStatus,
@@ -342,10 +342,11 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
   });
 
   // Shared token administration is gone for Telegram (HTTP 410 Gone).
-  router.all('/telegram/credentials', (_req, res) => {
-    res.status(410).json({ error: 'Telegram dùng kết nối 1 chạm.' });
-  });
-  router.all('/telegram/scope', (_req, res) => {
+  router.all(/^\/telegram(?:\/(?:credentials|scope|connect|test))?$/, (req, res, next) => {
+    if (req.method === 'GET' && req.path === '/telegram') {
+      next();
+      return;
+    }
     res.status(410).json({ error: 'Telegram dùng kết nối 1 chạm.' });
   });
 
@@ -377,7 +378,14 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
             }
           }
 
-          const config = record && encryptionKey ? decryptCredentials(record.config, encryptionKey) : null;
+          let config: Record<string, unknown> | null = null;
+          if (record && encryptionKey) {
+            try {
+              config = decryptCredentials(record.config, encryptionKey);
+            } catch {
+              config = null;
+            }
+          }
           const scope = config?.allowedScope as Record<string, unknown> | undefined;
           const entries = scope?.[scopeKey];
           const configured =
@@ -387,7 +395,8 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
           const check =
             savedCheck?.credentialVersion === (record ? versionOf(record.config) : null) ? savedCheck : undefined;
 
-          let personalStatus: 'connected' | 'reconnect_required' | undefined;
+          let personalStatus: 'connected' | 'needs_scope' | 'reconnect_required' | 'not_connected' | undefined =
+            isPersonalOAuth ? 'not_connected' : undefined;
           let username: string | undefined;
           let connectedAt: string | undefined;
 
@@ -414,6 +423,13 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
                   const dec = decryptCredentials(personalRecord.config, encryptionKey);
                   if (typeof dec.username === 'string') username = dec.username;
                   else if (typeof dec.login === 'string') username = dec.login;
+                  if (
+                    id === 'telegram' &&
+                    personalRecord.status === 'active' &&
+                    (!Array.isArray(dec.selectedChats) || dec.selectedChats.length === 0)
+                  ) {
+                    personalStatus = 'needs_scope';
+                  }
                 } catch {
                   if (personalRecord.status === 'active') {
                     personalStatus = 'reconnect_required';
@@ -423,6 +439,19 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
             }
           }
 
+          const personalConnected = isPersonalOAuth && personalStatus === 'connected';
+          const effectiveConfigured = isPersonalOAuth ? personalConnected : configured;
+          const effectiveConnected = isPersonalOAuth
+            ? personalConnected
+            : configured && check?.connectionStatus === 'healthy';
+          const effectiveConnectionStatus = isPersonalOAuth
+            ? personalConnected
+              ? 'healthy'
+              : 'unconfigured'
+            : configured
+              ? check?.connectionStatus ?? 'unchecked'
+              : 'unconfigured';
+
           return {
             id,
             name,
@@ -431,11 +460,11 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
             scopeKey,
             scopeLabel,
             credentialFields,
-            connection: definition.connection ?? 'shared',
+            connection: isPersonalOAuth ? ('personal' as const) : (definition.connection ?? 'shared'),
             tools: ALL_TOOLS.filter((tool) => tool.service === id).map((tool) => tool.name),
-            configured,
-            connected: configured && check?.connectionStatus === 'healthy',
-            connectionStatus: configured ? check?.connectionStatus ?? 'unchecked' : 'unconfigured',
+            configured: effectiveConfigured,
+            connected: effectiveConnected,
+            connectionStatus: effectiveConnectionStatus,
             lastCheckedAt: check?.lastCheckedAt ?? null,
             allowedScope: Array.isArray(entries) ? entries : [],
             ...(isPersonalOAuth && personalStatus

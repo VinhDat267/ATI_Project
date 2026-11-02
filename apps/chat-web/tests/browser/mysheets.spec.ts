@@ -328,3 +328,110 @@ for (const width of [1440, 375]) {
     });
   }
 }
+
+test('MYSHEETS: Flow 7 - URL paste in settings, 4-step two-way closed-loop workflow (search, upsert, update, create tab), rich previews and receipt metrics', async ({ page }) => {
+  const pageErrors: Error[] = [];
+  page.on('pageerror', (err) => pageErrors.push(err));
+
+  await login(page);
+  const token = await page.evaluate(() => localStorage.getItem('wap_access_token'));
+  await page.request.delete('/api/connections/mysheets', { headers: { Authorization: `Bearer ${token}` } });
+
+  // 1. Connect and grant "Việc của tôi" via Fake Picker, then paste URL in Settings to discover tab list
+  await page.goto('/settings#mysheets');
+  const row = page.locator('#service-row-mysheets');
+  await expect(row).toBeVisible();
+  await row.getByRole('button', { name: 'Kết nối Google Sheets', exact: true }).click();
+
+  await expect(page.getByRole('heading', { name: /Chọn bảng tính cho ATI/i })).toBeVisible();
+  await page.getByRole('button', { name: 'Chọn bảng tính trong Google Drive', exact: true }).click();
+  const pickerModal = page.getByRole('dialog', { name: /Chọn bảng tính/i });
+  await expect(pickerModal).toBeVisible();
+  await pickerModal.getByRole('checkbox', { name: 'Việc của tôi' }).check();
+  await pickerModal.getByRole('button', { name: /Chọn \(1\)/i }).click();
+  await expect(pickerModal).not.toBeVisible();
+  await page.getByRole('button', { name: 'Xong', exact: true }).click();
+
+  await expect(page).toHaveURL(/.*\/settings.*#mysheets/);
+  await expect(row).toContainText('Đã kết nối');
+
+  const urlInput = row.locator('#mysheets-settings-url-input');
+  await expect(urlInput).toBeVisible();
+  await urlInput.fill('https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit');
+  await row.getByRole('button', { name: 'Thêm từ liên kết', exact: true }).click();
+
+  await expect(row).toContainText('Việc của tôi');
+  await expect(row).toContainText('(Sheet1, Tasks)');
+  const externalSheetLink = row.getByRole('link', { name: 'Mở bảng tính Việc của tôi trên Google Sheets' });
+  await expect(externalSheetLink).toBeVisible();
+  expect(await externalSheetLink.getAttribute('href')).toBe(
+    'https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit'
+  );
+
+  // 2. Navigate to Cockpit and send closed-loop 2-way prompt
+  await page.goto('/');
+  await page.getByRole('textbox').fill('Thực hiện quy trình khép kín trên bảng tính riêng của tôi Việc của tôi');
+  await page.getByRole('button', { name: 'Gửi yêu cầu', exact: true }).click();
+
+  await page.waitForURL(/\/c\/[0-9a-f-]{36}/);
+
+  // 3. Verify 4-step PlanMoment
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tôi sẽ làm 4 việc, theo thứ tự');
+  await expect(page.locator('#plan-cards-container')).toContainText('Lọc các dòng đã hoàn thành trong Sheet1');
+  await expect(page.locator('#plan-cards-container')).toContainText('Đồng bộ dòng công việc (Upsert chống trùng khóa)');
+  await expect(page.locator('#plan-cards-container')).toContainText('Cập nhật trạng thái dòng Write spec');
+  await expect(page.locator('#plan-cards-container')).toContainText('Tạo trang tính Sprint 15 mới');
+
+  // 4. Open PreviewModal for Step 1 (search_rows)
+  await page.locator('#preview-search_step').click();
+  const previewModal = page.locator('#preview-modal');
+  await expect(previewModal).toBeVisible();
+  await expect(previewModal.getByTestId('spreadsheet-search-preview')).toBeVisible();
+  await expect(previewModal).toContainText('Tra cứu có cấu trúc (Hỗ trợ gán cột theo tiêu đề)');
+  await expect(previewModal).toContainText('Status');
+  await expect(previewModal).toContainText('Bằng (=)');
+  await expect(previewModal).toContainText('Done');
+  await previewModal.getByRole('button', { name: 'Đóng Xem trước nội dung', exact: true }).click();
+  await expect(previewModal).not.toBeVisible();
+
+  // 5. Open PreviewModal for Step 2 (append_rows with Upsert + Row 1 column headers)
+  await page.locator('#preview-upsert_step').click();
+  await expect(previewModal).toBeVisible();
+  await expect(previewModal.getByTestId('spreadsheet-grid-preview')).toBeVisible();
+  await expect(previewModal).toContainText('Cập nhật dòng trùng khóa (Upsert)');
+  await expect(previewModal).toContainText('Cột A · Task');
+  await expect(previewModal).toContainText('Cột B · Status');
+  await previewModal.getByRole('button', { name: 'Đóng Xem trước nội dung', exact: true }).click();
+  await expect(previewModal).not.toBeVisible();
+
+  // 6. Open PreviewModal for Step 3 (update_rows)
+  await page.locator('#preview-update_step').click();
+  await expect(previewModal).toBeVisible();
+  await expect(previewModal.getByTestId('spreadsheet-update-preview')).toBeVisible();
+  await expect(previewModal).toContainText('Cập nhật cột chọn lọc (Bảo toàn công thức)');
+  await expect(previewModal).toContainText('Task = Write spec');
+  await expect(previewModal).toContainText('Verified');
+  await previewModal.getByRole('button', { name: 'Đóng Xem trước nội dung', exact: true }).click();
+  await expect(previewModal).not.toBeVisible();
+
+  // 7. Open PreviewModal for Step 4 (create_sheet)
+  await page.locator('#preview-create_tab_step').click();
+  await expect(previewModal).toBeVisible();
+  await expect(previewModal.getByTestId('spreadsheet-create-preview')).toBeVisible();
+  await expect(previewModal).toContainText('Sprint 15');
+  await expect(previewModal).toContainText('Cột A · Mã thẻ');
+  await expect(previewModal).toContainText('Cột B · Trạng thái');
+  await previewModal.getByRole('button', { name: 'Đóng Xem trước nội dung', exact: true }).click();
+  await expect(previewModal).not.toBeVisible();
+
+  // 8. Approve plan and verify ReceiptMoment metrics
+  await page.getByRole('button', { name: 'Duyệt kế hoạch', exact: true }).click();
+
+  const receipt = page.locator('#moment-6');
+  await expect(receipt).toBeVisible();
+  await expect(receipt).toContainText('Khớp 1 dòng');
+  await expect(receipt).toContainText('Đã cập nhật 1 dòng (1 ô)');
+  await expect(receipt).toContainText('Tab mới: Sprint 15');
+
+  expect(pageErrors).toEqual([]);
+});

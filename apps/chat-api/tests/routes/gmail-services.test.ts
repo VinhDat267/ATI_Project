@@ -34,33 +34,45 @@ describe('GET /api/services and the shared-key routes with personal Gmail', () =
   });
   afterAll(async () => { await db?.close(); });
 
-  it('lists the 8 shared services, each marked shared, and no Gmail while the flag is off', async () => {
+  it('lists the 8 registry services (5 shared-key and 3 personal OAuth) and no Gmail while the flag is off', async () => {
     await connectAs(alice, 'alice.mail@example.test');
     const services = await list(false, alice);
     expect(services.map((s) => s.id)).toEqual(['trello', 'slack', 'github', 'sheets', 'calendar', 'notion', 'telegram', 'jira']);
-    for (const service of services) expect(service.connection, service.id).toBe('shared');
-    for (const service of services) expect(service.personalStatus, service.id).toBeUndefined();
+    const personalIds = new Set(['trello', 'github', 'telegram']);
+    for (const service of services) {
+      if (personalIds.has(service.id)) {
+        expect(service.connection, service.id).toBe('personal');
+        expect(service.personalStatus, service.id).toBe('not_connected');
+      } else {
+        expect(service.connection, service.id).toBe('shared');
+        expect(service.personalStatus, service.id).toBeUndefined();
+      }
+    }
   });
 
   it("shows each caller only their own Gmail status, never anyone else's", async () => {
     const own = await connectAs(alice, 'alice.mail@example.test');
     const gmailOf = async (who: Person) => (await list(true, who)).find((s) => s.id === 'gmail')!;
     expect(await gmailOf(alice)).toMatchObject({
-      id: 'gmail', name: 'Gmail', connection: 'personal', personalStatus: 'connected', email: 'alice.mail@example.test',
+      id: 'gmail', name: 'Gmail', connection: 'personal', personalStatus: 'connected', connectionStatus: 'healthy', email: 'alice.mail@example.test',
       connectedAt: '2026-10-14T03:00:00.000Z', credentialFields: [], tools: GMAIL_TOOLS.map((t) => t.name),
     });
     for (const other of [bob, admin]) {
       const row = await gmailOf(other);
       expect(row.personalStatus).toBe('not_connected');
+      expect(row.connectionStatus).toBe('unconfigured');
       expect(row.email).toBeUndefined();
       expect(row.connectedAt).toBeUndefined();
       expect(JSON.stringify(row)).not.toContain('alice.mail');
     }
     await credentials.markReconnectRequired('gmail', alice.id, own.id);
-    expect(await gmailOf(alice)).toMatchObject({ personalStatus: 'reconnect_required', email: 'alice.mail@example.test' });
-    const shared = (await list(true, alice)).filter((s) => s.id !== 'gmail');
-    expect(shared).toHaveLength(8);
-    for (const service of shared) expect(service.connection).toBe('shared');
+    expect(await gmailOf(alice)).toMatchObject({ personalStatus: 'reconnect_required', connectionStatus: 'unconfigured', email: 'alice.mail@example.test' });
+    const nonGmail = (await list(true, alice)).filter((s) => s.id !== 'gmail');
+    expect(nonGmail).toHaveLength(8);
+    const personalIds = new Set(['trello', 'github', 'telegram']);
+    for (const service of nonGmail) {
+      expect(service.connection, service.id).toBe(personalIds.has(service.id) ? 'personal' : 'shared');
+    }
     const body = JSON.stringify(await list(true, alice));
     expect(body).not.toContain('1//fake-');
   });

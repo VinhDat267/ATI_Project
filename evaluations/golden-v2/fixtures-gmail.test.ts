@@ -42,6 +42,9 @@ describe('Gmail fixture mailbox', () => {
     const [summary] = await fixtureSearch({ tool: 'gmail.search_threads', args: { query: 'OAuth' } });
     expect(summary).not.toHaveProperty('messages');
     expect(summary.participants).toEqual(['lan@example.com', 'gmail-owner@example.test', 'minh@example.com']);
+    expect(summary).toMatchObject({ hasAttachment: false, attachmentNames: [] });
+    const [withAttachment] = await fixtureSearch({ tool: 'gmail.search_threads', args: { query: 'has:attachment' } });
+    expect(withAttachment).toMatchObject({ id: 'gmail-thread-2', hasAttachment: true, attachmentNames: ['báo cáo.pdf'] });
   });
   it('validates arguments at the schema boundary and rejects unknown threads like the adapter', async () => {
     await expect(fixtureSearch({ tool: 'gmail.search_threads', args: {} })).rejects.toThrow();

@@ -6,11 +6,22 @@ const fake = { GMAIL_OAUTH_AUTH_URL: 'http://127.0.0.1:4100/o/oauth2/v2/auth', G
 const live = { RUNTIME_MODE: 'live', DATABASE_URL: 'postgresql://local', JWT_SECRET: 'private-secret-at-least-32-characters', ENCRYPTION_KEY: 'a'.repeat(32), GEMINI_API_KEY: 'fake-for-validation' };
 
 describe('GMAIL_ENABLED policy', () => {
-  it('is off by default and keeps Gmail unconfigured even when every variable is present', () => {
-    const config = validateEnv({ ...gmail, ...fake, GMAIL_ENABLED: undefined });
-    expect(config.GMAIL_ENABLED).toBe(false);
-    expect(config.GMAIL_OAUTH).toBeUndefined();
-    expect(validateEnv({ ...live, ...gmail, GMAIL_ENABLED: 'off' }).GMAIL_OAUTH).toBeUndefined();
+  it('auto-enables Gmail when OAuth variables are complete and GMAIL_ENABLED is unset, stays off when unconfigured or explicitly off', () => {
+    expect(validateEnv({}).GMAIL_ENABLED).toBe(false);
+    expect(validateEnv({}).GMAIL_OAUTH).toBeUndefined();
+    expect(validateEnv({ ...live, GMAIL_OAUTH_CLIENT_ID: 'only-id' }).GMAIL_ENABLED).toBe(false);
+
+    const sandboxAuto = validateEnv({ ...gmail, ...fake, GMAIL_ENABLED: undefined });
+    expect(sandboxAuto.GMAIL_ENABLED).toBe(true);
+    expect(sandboxAuto.GMAIL_OAUTH).toMatchObject({ clientId: 'gmail-client' });
+
+    const liveAuto = validateEnv({ ...live, ...gmail, GMAIL_ENABLED: undefined });
+    expect(liveAuto.GMAIL_ENABLED).toBe(true);
+    expect(liveAuto.GMAIL_OAUTH).toMatchObject({ clientId: 'gmail-client' });
+
+    const explicitOff = validateEnv({ ...live, ...gmail, GMAIL_ENABLED: 'off' });
+    expect(explicitOff.GMAIL_ENABLED).toBe(false);
+    expect(explicitOff.GMAIL_OAUTH).toBeUndefined();
   });
 
   it.each(['true', 'ON', '1', 'yes'])('rejects the flag value %j', (value) => {

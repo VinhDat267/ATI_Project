@@ -601,6 +601,32 @@
           }
         ]
       }
+    },
+    {
+      "id": "gm18",
+      "category": "single_step",
+      "language": "vi",
+      "primaryService": "gmail",
+      "services": [
+        "gmail"
+      ],
+      "prompt": "Đánh dấu đã đọc cả hai email \"Họp nhóm ATI\" và \"Báo cáo tuần\" trong Gmail cùng lúc.",
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "gmail.batch_modify_threads",
+            "args": {
+              "threadIds": {
+                "contains": "gmail-thread-1"
+              },
+              "removeLabelIds": {
+                "contains": "UNREAD"
+              }
+            }
+          }
+        ]
+      }
     }
   ]
 }

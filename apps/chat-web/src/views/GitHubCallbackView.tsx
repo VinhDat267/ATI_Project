@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GitHubCallbackInput } from '../routes';
+import { tryLoopbackCallbackHop } from '../hooks/use-route';
 import { apiClient } from '../services/api-client';
 import { subscribeAuthTokens } from '../services/auth-storage';
 import { githubSessionOwner, githubCallbackError, githubConnectionNotice, conversationReturnPath } from '../services/github-connection';
@@ -32,7 +33,15 @@ export function GitHubCallbackView({ navigate, input }: { navigate: (path: strin
         if (back) { navigate(back, true); return; }
         githubConnectionNotice.set(result.login);
         navigate('/settings#github', true);
-      }).catch(reason => { if (live()) setError(githubCallbackError(reason?.data?.code)); });
+      }).catch(reason => {
+        if (!live()) return;
+        const code = reason?.data?.code;
+        if (code === 'GITHUB_STATE_INVALID' && data?.code && data?.state) {
+          const query = `?code=${encodeURIComponent(data.code)}&state=${encodeURIComponent(data.state)}`;
+          if (tryLoopbackCallbackHop(window.location.pathname, query, '')) return;
+        }
+        setError(githubCallbackError(code));
+      });
     }
     return () => { mounted = false; unsubscribe(); window.removeEventListener('storage', onStorage); };
   }, [navigate]);

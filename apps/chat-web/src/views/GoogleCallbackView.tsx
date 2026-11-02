@@ -5,6 +5,7 @@ import type { GoogleCallbackInput } from '../routes';
 import { type AuthViewProps } from './AuthFormFrame';
 import { AuthActionPage, type AuthActionMode } from '../pages/AuthAction/AuthActionPage';
 import { consumeAuthReturnTarget } from '../services/auth-return-target';
+import { tryLoopbackCallbackHop } from '../hooks/use-route';
 
 export function GoogleCallbackView({ navigate, googleCallback }: AuthViewProps & { googleCallback?: GoogleCallbackInput }) {
   const [busy, setBusy] = useState(true), [message, setMessage] = useState<string | null>(null), [error, setError] = useState<string | null>(null);
@@ -57,7 +58,14 @@ export function GoogleCallbackView({ navigate, googleCallback }: AuthViewProps &
       const code = reason?.data?.code;
       if (code === 'ACCOUNT_PENDING') { setMode('google-pending'); setMessage('Tài khoản đang chờ quản trị viên duyệt. Bạn có thể đăng nhập sau khi được duyệt.'); }
       else if (code === 'ACCOUNT_DISABLED') { setMode('blocked-locked'); setError('Tài khoản đã bị vô hiệu hóa. Hãy liên hệ quản trị viên.'); }
-      else { setMode('google-error'); setError('Không thể hoàn tất đăng nhập Google. Link có thể đã hết hạn hoặc đã được mở. Hãy đăng nhập lại.'); }
+      else {
+        if (callback.code && callback.state) {
+          const qs = `?${new URLSearchParams({ code: callback.code, state: callback.state }).toString()}`;
+          tryLoopbackCallbackHop('/auth/google/callback', qs);
+        }
+        setMode('google-error');
+        setError('Không thể hoàn tất đăng nhập Google. Link có thể đã hết hạn hoặc đã được mở. Hãy đăng nhập lại.');
+      }
     }).finally(() => { if (mounted) setBusy(false); });
     return () => { mounted = false; unsubscribe(); };
   }, [navigate]);
