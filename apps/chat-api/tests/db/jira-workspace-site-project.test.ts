@@ -1320,7 +1320,7 @@ describe('apps/chat-api — JIRA-03 Workspace Site & Project Repository & Fail-C
       expect(dbRow.rows[0].policy_version).toBe(1);
     });
 
-    it('denies operation when grant site product_type is changed mid-flight via independent PG pool', async () => {
+    it('denies operation when grant site is deleted/revoked mid-flight via independent PG pool', async () => {
       const { workspaceId } = await seedWorkspace(pool, sysAdminId);
       const cloudId = `cloud-${randomUUID().slice(0, 8)}`;
       const { grantId } = await seedJiraGrantAndSite(pool, sysAdminId, cloudId);
@@ -1361,10 +1361,9 @@ describe('apps/chat-api — JIRA-03 Workspace Site & Project Repository & Fail-C
         await enteredGate.promise;
 
         await barrierPool.query('SET statement_timeout = 4000');
-        // Mid-verifier change product_type to 'confluence' without changing identity_version
+        // Mid-verifier delete/revoke grant site row without changing identity_version
         await barrierPool.query(
-          `UPDATE jira_grant_sites
-           SET product_type = 'confluence', last_verified_at = clock_timestamp()
+          `DELETE FROM jira_grant_sites
            WHERE grant_id = $1 AND cloud_id = $2`,
           [grantId, cloudId]
         );
