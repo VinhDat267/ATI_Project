@@ -1,4 +1,5 @@
 import type pg from 'pg';
+import type { ExtendedNativeVerifier } from '../../../services/jira/jira-native-verifier.js';
 import { isUuid } from '../uuid.js';
 import { WorkspaceRepoError } from './errors.js';
 import { withTransaction } from './transaction.js';
@@ -1087,20 +1088,60 @@ export class WorkspaceSiteProjectRepo {
     };
   }
 
-  /**
-   * Capabilities directory endpoint.
-   * Explicitly throws 503 CAPABILITIES_UNAVAILABLE until JIRA-05.
-   */
+  /** Effective workspace × OAuth grant × native Jira permissions directory. */
   async getCapabilities(
     workspaceId: string,
     actorId: string
   ): Promise<WorkspaceJiraCapabilitiesResponse> {
     await assertActiveMember(this.pool, workspaceId, actorId);
-
-    throw new WorkspaceRepoError(
-      503,
-      'CAPABILITIES_UNAVAILABLE',
-      'Workspace Jira capabilities are unavailable until JIRA-05'
+    const directory: WorkspaceJiraCapabilitiesResponse = { workspaceId, sites: [] };
+    const account = await this.pool.query<{ id: string; identity_version: number }>(
+      `SELECT id, identity_version FROM jira_accounts WHERE user_id = $1 AND status = 'connected'`, [actorId]
     );
+    if (!account.rows[0]) return directory;
+    const rows = await this.pool.query<{
+      site_id: string; cloud_id: string; site_name: string; site_url: string;
+      project_id: string | null; project_key: string | null; project_name: string | null;
+    }>(
+      `SELECT s.id AS site_id, s.cloud_id, s.site_name, s.site_url,
+              p.numeric_project_id AS project_id, p.project_key, p.project_name
+       FROM ati_workspace_jira_sites s
+       LEFT JOIN ati_workspace_jira_projects p ON p.workspace_id = s.workspace_id
+         AND p.site_id = s.id AND p.selected = true
+       WHERE s.workspace_id = $1 AND s.active = true
+         AND EXISTS (
+           SELECT 1 FROM jira_grant_sites gs
+           JOIN jira_oauth_grants g ON g.id = gs.grant_id
+           WHERE gs.cloud_id = s.cloud_id AND gs.product_type = 'jira'
+             AND g.account_id = $2 AND g.status = 'active'
+         )
+       ORDER BY s.cloud_id, p.numeric_project_id`, [workspaceId, account.rows[0].id]
+    );
+    if (rows.rowCount === 0) return directory;
+    const verifier = this.options?.verifier as ExtendedNativeVerifier | undefined;
+    if (typeof verifier?.verifyUserPermissions !== 'function') {
+      throw new WorkspaceRepoError(503, 'NATIVE_VERIFIER_UNAVAILABLE', 'Jira native permission verifier unavailable');
+    }
+    const sites = new Map<string, WorkspaceJiraCapabilitiesResponse['sites'][number]>();
+    try {
+      for (const row of rows.rows) {
+        let site = sites.get(row.site_id);
+        if (!site) {
+          const nativeSite = await verifier.verifyUserPermissions({ actorId, workspaceId, cloudId: row.cloud_id, localAccountId: account.rows[0].id, identityVersion: account.rows[0].identity_version });
+          if (nativeSite.status === 'unavailable') throw new Error('Native site permission unavailable');
+          if (nativeSite.status === 'denied' || !nativeSite.canBrowse) continue;
+          site = { siteId: row.site_id, cloudId: row.cloud_id, name: row.site_name, url: row.site_url, projects: [] };
+          sites.set(row.site_id, site);
+        }
+        if (!row.project_id) continue;
+        const nativeProject = await verifier.verifyUserPermissions({ actorId, workspaceId, cloudId: row.cloud_id, projectId: row.project_id, localAccountId: account.rows[0].id, identityVersion: account.rows[0].identity_version });
+        if (nativeProject.status === 'unavailable') throw new Error('Native project permission unavailable');
+        if (nativeProject.status !== 'denied' && nativeProject.canBrowse) site.projects.push({ id: row.project_id, key: row.project_key ?? '', name: row.project_name ?? '' });
+      }
+    } catch {
+      throw new WorkspaceRepoError(503, 'NATIVE_VERIFIER_UNAVAILABLE', 'Jira native permission verifier unavailable');
+    }
+    directory.sites = [...sites.values()];
+    return directory;
   }
 }
