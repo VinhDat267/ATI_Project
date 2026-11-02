@@ -58,6 +58,26 @@ export interface CalendarDigestEvaluation {
   configHash?: string;
 }
 
+/** Compare resource sets without changing hashes of already approved schedules. */
+export function calendarDigestCandidateMatches(
+  candidate: CalendarDigestCandidate | undefined,
+  current: CalendarDigestEvaluation,
+): candidate is CalendarDigestCandidate & { config: CalendarDigestConfig } {
+  if (!candidate?.canAutoDigest || !candidate.config || !candidate.configPreview ||
+      !current.config || !current.candidate.configPreview) return false;
+  const ordered = <T extends { id: string }>(values: T[]) => [...values].sort((a, b) => a.id.localeCompare(b.id));
+  const configHash = (config: CalendarDigestConfig) => computeCalendarDigestHash({ ...config, calendars: ordered(config.calendars) });
+  const preview = (value: NonNullable<CalendarDigestCandidate['configPreview']>) => JSON.stringify({
+    email: value.email,
+    calendars: ordered(value.calendars).map(c => ({ id: c.id, summary: c.summary, primary: Boolean(c.primary) })),
+    destinationService: value.destinationService,
+    destinationId: value.destinationId,
+    destinationLabel: value.destinationLabel,
+  });
+  return configHash(candidate.config) === configHash(current.config) &&
+    preview(candidate.configPreview) === preview(current.candidate.configPreview);
+}
+
 export async function evaluateCalendarDigestCandidate(
   input: EvaluateCalendarDigestInput,
 ): Promise<CalendarDigestEvaluation> {
@@ -217,6 +237,7 @@ export async function evaluateCalendarDigestCandidate(
       candidate: {
         canAutoDigest: true,
         defaultMode: 'manual',
+        config,
         configPreview: {
           email,
           calendars,
@@ -262,6 +283,7 @@ export async function evaluateCalendarDigestCandidate(
     candidate: {
       canAutoDigest: true,
       defaultMode: 'manual',
+      config,
       configPreview: {
         email,
         calendars,
