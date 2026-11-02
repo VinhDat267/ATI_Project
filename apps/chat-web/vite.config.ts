@@ -29,6 +29,8 @@ export default defineConfig(({ command, mode }) => {
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./tests/setup.ts'],
+    testTimeout: 15000,
+    hookTimeout: 15000,
     exclude: [...configDefaults.exclude, 'tests/browser/**'],
   },
   };

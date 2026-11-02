@@ -118,7 +118,7 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
         setCachedOrganizations(nextOrgs);
         setActiveWorkspaceId(res.workspace.id);
         useChatStore.getState().reset();
-        navigate?.('/');
+        leaveWorkspaceBoundPage();
         setShowCreateModal(false);
         setCreateName('');
         setOpen(false);
@@ -148,7 +148,7 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
         if (res.workspace.status === 'active') {
           setActiveWorkspaceId(res.workspace.id);
           useChatStore.getState().reset();
-          navigate?.('/');
+          leaveWorkspaceBoundPage();
           setShowJoinModal(false);
           setJoinCode('');
           setOpen(false);

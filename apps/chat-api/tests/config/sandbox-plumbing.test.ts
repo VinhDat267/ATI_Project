@@ -16,3 +16,38 @@ it('runs extracted sandbox handlers with the same write results and partial fail
     { id: 'card_1', name: 'Thẻ hiện có', idBoard: 'b1', idList: 'list_1' },
   ]);
 });
+
+it('returns default sandbox Slack channels across scenarios and filters by query in default sandbox mode', async () => {
+  const { createSandboxAdapter } = await import('../../src/sandbox/index.js');
+  const defaultSlack = createSandboxAdapter('slack');
+
+  const allChannels = (await defaultSlack.execute('slack.search_channels', {})) as Array<{ id: string; name: string }>;
+  expect(allChannels.length).toBeGreaterThanOrEqual(2);
+  expect(allChannels).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ id: 'C_GENERAL', name: 'general' }),
+      expect.objectContaining({ id: 'C_ATI_TEST', name: 'ati-test' }),
+    ]),
+  );
+
+  const generalMatches = (await defaultSlack.execute('slack.search_channels', {
+    query: 'general',
+    limit: 5,
+  })) as Array<{ id: string; name: string }>;
+  expect(generalMatches).toEqual([expect.objectContaining({ id: 'C_GENERAL', name: 'general' })]);
+
+  const hashGeneralMatches = (await defaultSlack.execute('slack.search_channels', {
+    query: '#general',
+    limit: 5,
+  })) as Array<{ id: string; name: string }>;
+  expect(hashGeneralMatches).toEqual([expect.objectContaining({ id: 'C_GENERAL', name: 'general' })]);
+
+  const scheduleSlack = createSandboxAdapter('slack', 'schedule');
+  const scheduleChannels = (await scheduleSlack.execute('slack.search_channels', {})) as Array<{ id: string; name: string }>;
+  expect(scheduleChannels).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ id: 'C_GENERAL', name: 'general' }),
+      expect.objectContaining({ id: 'C_ATI_TEST', name: 'ati-test' }),
+    ]),
+  );
+});
