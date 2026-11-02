@@ -52,8 +52,6 @@ const KEPT_FIELDS = [
   'title',
   'boardId',
   'boardIds',
-  'spreadsheetId',
-  'headers',
   'url',
   'key',
   'listId',

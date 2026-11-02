@@ -33,7 +33,7 @@ export const SHEETS_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'sheets.list_sheets', service: 'sheets', sideEffect: 'read', riskLevel: 'low', discovers: 'sheet', listable: true,
-    observedFields: ['id', 'title', 'spreadsheetId', 'headers'],
+    observedFields: ['id', 'title', 'headers'],
     description: 'Liệt kê các tab của một bảng tính đã tìm thấy, lọc theo tên; query có thể rỗng.',
     inputSchema: input({ spreadsheetId, ...listInputs }, ['spreadsheetId', 'query']),
     outputSchema: { type: 'array', items: output({ id: { type: 'integer' }, title: str, spreadsheetId: str, headers: { type: 'array', items: str } }, ['id', 'title', 'spreadsheetId']) },
