@@ -30,6 +30,13 @@ Task: [CALENDAR-01](../tasks/CALENDAR-01-audit-fixes.md). Nhánh `fix/calendar-d
 
 ## Ranh giới
 
+### Kiểm tra bổ sung khi chủ dự án yêu cầu merge
+
+- Review cuối `613473be`: reviewer độc lập chạy36 API +7 UI PASS và xác nhận P2 đã đóng, không còn finding P1/P2/P3 trong Calendar F2/F3. CI41380361058 SUCCESS đúng head, gồm check/full browser.
+- Main nhận thêm #249 (`bea7660c`). Cây ghép thử `8e020b83` chạy full check với `VITEST_MAX_WORKERS=4`: **3.639v3 +406eval +99Node/launcher PASS**, exit0; browser2/2 PASS. Lượt full đầu có một timeout5s Trello; chạy riêng10/10 PASS, không sửa code Trello.
+- Trong khi kiểm tra, main nhận #250 (`6d550c2a`); CI của #250 và main FAIL ở positive-control Jira reject: fixture thiếu method `clearPlanEvents` mới từ Sprint1, trả500 thay200. Đã tái hiện1FAIL/61skipped trước sửa.
+- Bổ sung method vào fixture và assert chuyển đúng `ownedPlan.conv_id`/`planId`. Production Calendar không đổi. Sau sửa **5file/95test Calendar+Jira PASS**, exit0. Đồng bộ main vào nhánh Calendar tại `4a7c4f95`, chạy lại CI trên head kết hợp trước merge.
+
 - **NOT_RUN:** OAuth Google thật, Slack/Telegram thật, model live, triển khai/migration trên DB runtime. Không đổi flags.
 - Generic Telegram schedule classification và destination identity contract có sẵn ngoài task này. Giữ ranh giới đó vì bản sửa lưu snapshot cũ và kiểm tra scope runtime; review không chứng minh được mở rộng nguồn/đích từ hai điểm này.
 - Chỉ thay đổi nhánh riêng; checkout gốc, local main và hai nhánh sprint khác không sửa. Không sửa `CURRENT-STATE.md` hoặc `ROADMAP.md`.

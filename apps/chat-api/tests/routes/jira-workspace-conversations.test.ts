@@ -303,6 +303,7 @@ describe('apps/chat-api — JIRA-03 Conversation Scoped Access & Route Guards', 
 
     executionServiceSpy = {
       approveAndStart: vi.fn().mockResolvedValue({ success: true, status: 200, planId: randomUUID() }),
+      clearPlanEvents: vi.fn(),
       getLatestExecutionSnapshot: vi.fn().mockResolvedValue({ status: 'completed', steps: [] }),
       getOwnedPlan: vi.fn().mockImplementation(async (planId: string, userId: string) => {
         return { id: planId, conv_id: randomUUID(), user_id: userId };
@@ -605,6 +606,8 @@ describe('apps/chat-api — JIRA-03 Conversation Scoped Access & Route Guards', 
 
       expect(res.status).toBe(200);
       expect(res.body.status).toBe('rejected');
+      const ownedPlan = await executionServiceSpy.getOwnedPlan.mock.results.at(-1)!.value;
+      expect(executionServiceSpy.clearPlanEvents).toHaveBeenCalledWith(ownedPlan.conv_id, planId);
     });
 
     it('POST /api/executions/:planId/continue invokes executionService.continueExecution', async () => {

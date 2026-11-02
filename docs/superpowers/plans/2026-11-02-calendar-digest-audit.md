@@ -45,3 +45,4 @@ Files: `db/v3/0021_calendar_digest_delivery.sql`, `calendar-digest-runner.ts`, `
 - Final review:1 P2 implicit update after eligibility drift. Fixed in `c8b516e1`:2 regressions RED→GREEN;14 confirmation tests PASS. No deferred minors.
 - Integrated `afc25bd3` (#240) in `02012daa`. Full check3.507v3 +406eval +99Node PASS; browser2/2 PASS.
 - Final review boundary: generic Telegram classification/destination identity contract stays outside this Calendar change; no demonstrated source/destination expansion, snapshot and runtime guards retained. Live provider/model acceptance remains NOT_RUN; CI exact-head is a merge gate.
+- Merge follow-up: #249 combined full check3.639v3 +406eval +99Node PASS (4workers), browser2PASS. #250 then changed the base; repair its stale Jira execution-service fixture (clearPlanEvents), RED→GREEN,95 focused Calendar/Jira tests PASS. Production Calendar unchanged; re-run exact-head CI before merge.

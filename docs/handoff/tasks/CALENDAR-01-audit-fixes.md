@@ -13,4 +13,5 @@
 - `npm run check` trên cây tích hợp: **3.507 v3 +406 eval +99 Node/launcher PASS**, exit0. API162files/1.314tests; web89files/961tests. PostgreSQL16 riêng cổng56534 theo guard Jira mới.
 - Browser API thật desktop1440/mobile375: **2/2 PASS**, exit0. UI hiển thị hướng dẫn kiểm tra, không replan; endpoint trả409. Fixture seed trạng thái kết thúc, không gửi provider thật.
 - Migration0021 phải áp dụng trước API. Đề xuất cũ thiếu config snapshot cần tạo lại hoặc chọn thủ công.
+- Trong lượt merge, main nhận #249/#250. Đã tích hợp cả hai; fixture `jira-workspace-conversations.test.ts` bổ sung `clearPlanEvents` theo contract Sprint1 mới và kiểm tra đúng conversation/plan. Đây là sửa tương thích test, không đổi production. Lỗi main #250 tái hiện RED(500 thay200); sau sửa5file/95test Calendar+Jira PASS. CI chạy lại trên head mới trước merge.
 - NOT_RUN: Google OAuth, Slack/Telegram và model live; DB runtime không bị chạm, flags không đổi. CI exact-head theo dõi ở PR; chưa merge.
