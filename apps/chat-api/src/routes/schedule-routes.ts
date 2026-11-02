@@ -1,11 +1,16 @@
 import { Router, type Request, type Response } from 'express';
+import type pg from 'pg';
 import { ScheduleConflict, ScheduleNotFound, type ScheduleChange, type ScheduleService } from '../services/schedules/schedule-service.js';
+import { assertConversationAccessWithFallback, ConversationAccessDeniedError } from '../services/conversation-access.js';
+import type { ConversationRepo } from '../db/repositories/conversation-repo.js';
 
 export interface ScheduleRoutesOptions {
   service: ScheduleService;
   clock?: () => Date;
   /** Sends an SSE event to a conversation; called only after the change committed. */
   emit?: (convId: string, event: string, payload: unknown) => unknown;
+  pool?: pg.Pool;
+  convRepo?: Pick<ConversationRepo, 'getConversation'>;
 }
 
 /** The paths below /api that belong to these routes. */
@@ -18,6 +23,8 @@ export function createScheduleRoutes(options: ScheduleRoutesOptions): Router {
   const router = Router();
   const { service } = options;
   const now = () => options.clock?.() ?? new Date();
+  const pool = options.pool ?? (options.convRepo as any)?.getPool?.() ?? (service as any)?.pool;
+  const convRepo = options.convRepo ?? (service as any)?.convRepo;
 
   const handle = (work: (req: Request, res: Response, userId: string) => Promise<void>) => async (req: Request, res: Response) => {
     const userId = (req as any).user?.id;
@@ -25,9 +32,13 @@ export function createScheduleRoutes(options: ScheduleRoutesOptions): Router {
     try {
       await work(req, res, userId);
     } catch (error) {
-      if (error instanceof ScheduleConflict) res.status(409).json({ error: { code: error.code, message: error.message } });
-      else if (error instanceof ScheduleNotFound) res.status(404).json({ error: { code: 'NOT_FOUND', message: error.message } });
-      else {
+      if (error instanceof ConversationAccessDeniedError) {
+        res.status(error.status).json({ error: { code: error.code, message: error.message } });
+      } else if (error instanceof ScheduleConflict) {
+        res.status(409).json({ error: { code: error.code, message: error.message } });
+      } else if (error instanceof ScheduleNotFound) {
+        res.status(404).json({ error: { code: 'NOT_FOUND', message: error.message } });
+      } else {
         console.error('[schedules] request failed:', error instanceof Error ? error.message : error);
         res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Máy chủ gặp lỗi khi xử lý lịch.' } });
       }
@@ -61,6 +72,19 @@ export function createScheduleRoutes(options: ScheduleRoutesOptions): Router {
   }));
 
   router.post('/conversations/:convId/schedule-proposals/:messageId/confirm', handle(async (req, res, userId) => {
+    const convId = String(req.params.convId);
+    if (pool || convRepo) {
+      await assertConversationAccessWithFallback(
+        { pool, convRepo: convRepo as any },
+        convId,
+        userId,
+        {
+          legacyNonOwnerStatus: 404,
+          expectedWorkspaceId: req.workspace?.workspaceId ?? null,
+          expectedWorkspaceMode: req.workspace?.mode,
+        }
+      );
+    }
     const rawMode = req.body?.approvalMode;
     if (rawMode !== undefined && rawMode !== 'manual' && rawMode !== 'auto_digest') {
       res.status(400).json({ error: { code: 'BAD_REQUEST', message: 'Chế độ xác nhận lịch không hợp lệ.' } });
@@ -69,7 +93,7 @@ export function createScheduleRoutes(options: ScheduleRoutesOptions): Router {
     const scope = req.workspace ? { workspaceMode: req.workspace.mode, workspaceId: req.workspace.workspaceId } : undefined;
     const change = await service.confirmProposal({
       userId,
-      convId: String(req.params.convId),
+      convId,
       messageId: String(req.params.messageId),
       now: now(),
       scope,

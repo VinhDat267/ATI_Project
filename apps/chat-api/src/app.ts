@@ -1,4 +1,5 @@
 import express, { type Express, type Request, type Response, type NextFunction } from 'express';
+import type pg from 'pg';
 import { createAuthRoutes } from './routes/auth/index.js';
 import { createAccountRoutes } from './routes/auth/account.js';
 import { LoginFailures } from './auth/login-failures.js';
@@ -11,7 +12,10 @@ import { createScheduleRoutes, isSchedulePath, type ScheduleRoutesOptions } from
 import { createAuthMiddleware } from './auth/jwt.js';
 import { createWorkspaceContextMiddleware } from './middleware/workspace-context.js';
 import { createWorkspacesRouter } from './routes/workspaces-routes.js';
+import { createWorkspaceRoutes } from './routes/workspace-routes.js';
+import type { WorkspaceRateLimitConfig } from './routes/workspace-rate-limiter.js';
 import type { WorkspaceRepo } from './db/repositories/workspace-repo.js';
+import type { JiraWorkspaceRepo } from './db/repositories/index.js';
 import type { ConversationRepo } from './db/repositories/conversation-repo.js';
 import type { MessageRepo } from './db/repositories/message-repo.js';
 import type { PlanRepo } from './db/repositories/plan-repo.js';
@@ -143,6 +147,11 @@ export interface AppOptions extends AdminUsersOptions {
   trelloTokens?: Pick<TrelloTokenManager, 'forConnection'>;
   trelloTeamRepo?: TrelloTeamRepo;
   workspaceRepo?: WorkspaceRepo;
+  jiraWorkspaceRepo?: JiraWorkspaceRepo;
+  jiraWorkspaceRateLimit?: WorkspaceRateLimitConfig;
+  workspaceRateLimit?: WorkspaceRateLimitConfig;
+  pool?: pg.Pool;
+  enableWorkspaceConversations?: boolean;
   github?: GitHubAppOptions;
   githubTokens?: Pick<GitHubTokenManager, 'forConnection'>;
   githubTeamRepo?: GitHubTeamRepo;
@@ -286,11 +295,30 @@ export function createApp(options: AppOptions): Express {
     withAuthAndWorkspace(req, res, next);
   }, createAdminUsersRoutes(options));
 
+  const dbPool = options.pool ?? options.convRepo?.getPool?.();
+
   if (options.workspaceRepo) {
     app.use('/api/workspaces', authMiddleware, createWorkspacesRouter({
       workspaceRepo: options.workspaceRepo,
       emailSender: options.emailSender,
     }));
+  }
+
+  if (options.jiraWorkspaceRepo) {
+    const { adminRouter, workspaceRouter, joinRouter } = createWorkspaceRoutes({
+      workspaceRepo: options.jiraWorkspaceRepo,
+      rateLimit: options.jiraWorkspaceRateLimit ?? options.workspaceRateLimit,
+    });
+    app.use('/api/admin/jira-workspaces', authMiddleware, adminRouter);
+    app.use('/api/jira-workspaces', authMiddleware, workspaceRouter);
+    app.use('/api/jira-workspace-join-requests', authMiddleware, joinRouter);
+  } else {
+    const unavailableHandler = (_req: Request, res: Response) => {
+      res.status(503).json({ error: 'Jira workspace service is unavailable' });
+    };
+    app.use('/api/admin/jira-workspaces', authMiddleware, unavailableHandler);
+    app.use('/api/jira-workspaces', authMiddleware, unavailableHandler);
+    app.use('/api/jira-workspace-join-requests', authMiddleware, unavailableHandler);
   }
 
   // Services routes (protected via Bearer header)
@@ -311,15 +339,29 @@ export function createApp(options: AppOptions): Express {
   app.use('/api/connections/telegram', createTelegramConnectionRoutes(telegramRoutes));
 
   // Only schedule paths pass through this auth check, so other /api requests are not checked twice.
-  if (options.schedules) app.use('/api', (req, res, next) => isSchedulePath(req.path) ? withAuthAndWorkspace(req, res, next) : next(),
-    createScheduleRoutes(options.schedules));
+  if (options.schedules) {
+    app.use(
+      '/api',
+      (req, res, next) => (isSchedulePath(req.path) ? withAuthAndWorkspace(req, res, next) : next()),
+      createScheduleRoutes({
+        ...options.schedules,
+        pool: dbPool,
+        convRepo: options.convRepo,
+      })
+    );
+  }
 
   // Stream routes require the Authorization header and a conversation owner check.
   if (options.sseManager) {
     app.use(
       '/api/conversations',
       withAuthAndWorkspace,
-      createStreamRoutes({ sseManager: options.sseManager, convRepo: options.convRepo, workspaceRepo: options.workspaceRepo })
+      createStreamRoutes({
+        sseManager: options.sseManager,
+        convRepo: options.convRepo,
+        workspaceRepo: options.workspaceRepo,
+        pool: dbPool,
+      })
     );
   }
 
@@ -333,6 +375,8 @@ export function createApp(options: AppOptions): Express {
         msgRepo: options.msgRepo,
         chatService: options.chatService,
         planRepo: options.planRepo,
+        pool: dbPool,
+        enableWorkspaceConversations: options.enableWorkspaceConversations,
       })
     );
   }
@@ -342,7 +386,12 @@ export function createApp(options: AppOptions): Express {
     app.use(
       '/api',
       withAuthAndWorkspace,
-      createExecutionRoutes({ executionService: options.executionService })
+      createExecutionRoutes({
+        executionService: options.executionService,
+        pool: dbPool,
+        convRepo: options.convRepo,
+        planRepo: options.planRepo,
+      })
     );
   }
 

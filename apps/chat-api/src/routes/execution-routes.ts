@@ -1,20 +1,59 @@
 import { Router, type Request, type Response } from 'express';
+import type pg from 'pg';
 import type { ExecutionService } from '../services/execution-service.js';
+import type { ConversationRepo } from '../db/repositories/conversation-repo.js';
+import type { PlanRepo } from '../db/repositories/plan-repo.js';
+import {
+  assertConversationAccessWithFallback,
+  resolveAndAssertPlanAccess,
+  ConversationAccessDeniedError,
+} from '../services/conversation-access.js';
 
 export interface ExecutionRoutesOptions {
   executionService: ExecutionService;
+  pool?: pg.Pool;
+  convRepo?: ConversationRepo;
+  planRepo?: PlanRepo;
 }
 
 export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
   const router = Router();
   const { executionService } = options;
+  const convRepo = options.convRepo ?? (executionService as any).convRepo;
+  const planRepo =
+    options.planRepo ??
+    (executionService as any).planRepo ??
+    (executionService as any).getPlanRepo?.();
+  const pool =
+    options.pool ??
+    (convRepo as any)?.getPool?.() ??
+    (planRepo as any)?.pool ??
+    (executionService as any)?.getPlanRepo?.()?.pool;
+
+  const accessContext = { pool, convRepo, planRepo };
+
+  const guardPlan = async (planId: string, userId: string, req?: Request): Promise<void> => {
+    const reqWorkspace = (req as any)?.workspace;
+    await resolveAndAssertPlanAccess(accessContext, planId, userId, {
+      legacyNonOwnerStatus: 403,
+      expectedWorkspaceId: reqWorkspace?.workspaceId ?? null,
+      expectedWorkspaceMode: reqWorkspace?.mode,
+      ordinaryOrgAccessDeniedAs403: true,
+    });
+  };
 
   router.post('/executions/:planId/continue', async (req: Request, res: Response): Promise<void> => {
     try {
       const userId = (req as any).user?.id;
       if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
-      res.status(200).json(await executionService.continueExecution(req.params.planId as string, userId));
+      const planId = req.params.planId as string;
+      await guardPlan(planId, userId, req);
+      res.status(200).json(await executionService.continueExecution(planId, userId));
     } catch (error: any) {
+      if (error instanceof ConversationAccessDeniedError) {
+        res.status(error.status).json({ error: error.message });
+        return;
+      }
       res.status(error?.status || 500).json({ error: error?.message || 'Failed to continue execution' });
     }
   });
@@ -24,9 +63,21 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
     try {
       const userId = (req as any).user?.id;
       if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
-      const snapshot = await executionService.getLatestExecutionSnapshot(req.params.convId as string, userId);
+      const convId = req.params.convId as string;
+      const reqWorkspace = (req as any).workspace;
+      await assertConversationAccessWithFallback(accessContext, convId, userId, {
+        legacyNonOwnerStatus: 403,
+        expectedWorkspaceId: reqWorkspace?.workspaceId ?? null,
+        expectedWorkspaceMode: reqWorkspace?.mode,
+        ordinaryOrgAccessDeniedAs403: true,
+      });
+      const snapshot = await executionService.getLatestExecutionSnapshot(convId, userId);
       res.status(200).json(snapshot);
     } catch (error: any) {
+      if (error instanceof ConversationAccessDeniedError) {
+        res.status(error.status).json({ error: error.message });
+        return;
+      }
       res.status(error?.status || 500).json({ error: error?.message || 'Failed to fetch execution snapshot' });
     }
   });
@@ -40,9 +91,14 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
         res.status(401).json({ error: 'Unauthorized' });
         return;
       }
+      await guardPlan(planId, userId, req);
       const result = await executionService.approveAndStart(planId, userId);
       res.status(result.status).json(result);
     } catch (err: any) {
+      if (err instanceof ConversationAccessDeniedError) {
+        res.status(err.status).json({ error: err.message });
+        return;
+      }
       res.status(500).json({ error: err?.message || 'Failed to approve plan' });
     }
   });
@@ -56,6 +112,7 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
         res.status(401).json({ error: 'Unauthorized' });
         return;
       }
+      await guardPlan(planId, userId, req);
       await executionService.getOwnedPlan(planId, userId);
       const rejected = await executionService.getPlanRepo().rejectPlan(planId, userId);
       if (!rejected) {
@@ -64,11 +121,15 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
       }
       res.status(200).json({ success: true, status: 'rejected' });
     } catch (err: any) {
+      if (err instanceof ConversationAccessDeniedError) {
+        res.status(err.status).json({ error: err.message });
+        return;
+      }
       res.status(err?.status || 500).json({ error: err?.message || 'Failed to reject plan' });
     }
   });
 
-  // POST /api/executions/:planId/steps/:stepId/retry
+  // POST /executions/:planId/steps/:stepId/retry
   router.post(
     '/executions/:planId/steps/:stepId/retry',
     async (req: Request, res: Response): Promise<void> => {
@@ -79,9 +140,14 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
           return;
         }
         const { planId, stepId } = req.params;
+        await guardPlan(planId as string, userId, req);
         const result = await executionService.retryStep(planId as string, stepId as string, userId);
         res.status(200).json(result);
       } catch (err: any) {
+        if (err instanceof ConversationAccessDeniedError) {
+          res.status(err.status).json({ error: err.message });
+          return;
+        }
         const msg = err?.message || '';
         if (err?.status === 409) {
           res.status(409).json({ error: msg });
@@ -98,7 +164,7 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
     }
   );
 
-  // POST /api/executions/:planId/steps/:stepId/skip
+  // POST /executions/:planId/steps/:stepId/skip
   router.post(
     '/executions/:planId/steps/:stepId/skip',
     async (req: Request, res: Response): Promise<void> => {
@@ -109,9 +175,14 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
           return;
         }
         const { planId, stepId } = req.params;
+        await guardPlan(planId as string, userId, req);
         const result = await executionService.skipStep(planId as string, stepId as string, userId);
         res.status(200).json(result);
       } catch (err: any) {
+        if (err instanceof ConversationAccessDeniedError) {
+          res.status(err.status).json({ error: err.message });
+          return;
+        }
         const msg = err?.message || '';
         if (err?.status === 409) {
           res.status(409).json({ error: msg });
@@ -128,7 +199,7 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
     }
   );
 
-  // POST /api/executions/:planId/stop
+  // POST /executions/:planId/stop
   router.post(
     '/executions/:planId/stop',
     async (req: Request, res: Response): Promise<void> => {
@@ -139,9 +210,14 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
           return;
         }
         const { planId } = req.params;
+        await guardPlan(planId as string, userId, req);
         const result = await executionService.stop(planId as string, userId);
         res.status(200).json(result);
       } catch (err: any) {
+        if (err instanceof ConversationAccessDeniedError) {
+          res.status(err.status).json({ error: err.message });
+          return;
+        }
         const msg = err?.message || '';
         if (err?.status === 409) {
           res.status(409).json({ error: msg });
@@ -156,7 +232,7 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
     }
   );
 
-  // GET /api/executions/:planId/status
+  // GET /executions/:planId/status
   router.get(
     '/executions/:planId/status',
     async (req: Request, res: Response): Promise<void> => {
@@ -167,6 +243,7 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
           res.status(401).json({ error: 'Unauthorized' });
           return;
         }
+        await guardPlan(planId as string, userId, req);
         await executionService.getOwnedPlan(planId as string, userId);
         const result = await executionService.getExecutionStatusDurable(planId as string);
         if (!result) {
@@ -175,6 +252,10 @@ export function createExecutionRoutes(options: ExecutionRoutesOptions): Router {
         }
         res.status(200).json(result);
       } catch (err: any) {
+        if (err instanceof ConversationAccessDeniedError) {
+          res.status(err.status).json({ error: err.message });
+          return;
+        }
         res.status(err?.status || 500).json({ error: err?.message || 'Failed to fetch execution status' });
       }
     }

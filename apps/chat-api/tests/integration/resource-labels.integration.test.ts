@@ -1,5 +1,7 @@
 import { randomUUID, createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { EventEmitter } from 'node:events';
 import pg from 'pg';
 import request from 'supertest';
@@ -20,12 +22,16 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, options: 
 beforeAll(async () => {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL required for FE-03 persistence evidence');
   await admin.query(`CREATE SCHEMA ${schema}`);
-  for (const file of ['0001_v3_core.sql', '0004_conversation_titles.sql', '0006_fe03_resource_labels.sql']) await pool.query(await readFile(new URL(`../../../../db/v3/${file}`, import.meta.url), 'utf8'));
+  const migrationDir = fileURLToPath(new URL('../../../../db/v3', import.meta.url));
+  const files = (await readdir(migrationDir)).filter((f) => /^\d{4}_.*\.sql$/.test(f)).sort();
+  for (const file of files) {
+    await pool.query(await readFile(resolve(migrationDir, file), 'utf8'));
+  }
 });
 afterAll(async () => { await pool.end(); await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`); await admin.end(); });
 it('real planner lookups -> SSE -> PostgreSQL -> new repositories/HTTP reload preserve display names and immutable hash', async () => {
   const owner = randomUUID();
-  await pool.query('INSERT INTO users(id,email,password,name) VALUES($1,$2,$3,$4)', [owner, `${owner}@example.test`, 'test', 'Owner']);
+  await pool.query("INSERT INTO users(id,email,password,name,status) VALUES($1,$2,$3,$4,'active')", [owner, `${owner}@example.test`, 'test', 'Owner']);
   const convRepo = new ConversationRepo(pool), msgRepo = new MessageRepo(pool), plans = new PlanRepo(pool);
   const conv = await convRepo.createConversation(owner);
   const plan = { kind: 'plan', summary: 'Tạo thẻ', thinking: 'Dùng danh sách đã tra cứu.', warnings: [], steps: [{ id: 'step_1', tool: 'trello.create_card', description: 'Tạo thẻ', args: { listId: 'L1', title: 'B1' }, dependsOn: [] }] };
