@@ -479,6 +479,9 @@ export class ScheduleService {
           request: fields.request,
         });
         if (!evaluated.candidate.canAutoDigest || !evaluated.config || !evaluated.configHash) {
+          if ((metadata.digestCandidate as CalendarDigestCandidate | undefined)?.canAutoDigest) {
+            throw new ScheduleConflict('DIGEST_PREVIEW_CHANGED');
+          }
           const downgraded = await client.query(
             `UPDATE schedules SET name=$2, request=$3, recurrence=$4, services=$5, status=$6, pause_reason=$7, next_run_at=$8,
                kind='plan', digest_config=NULL, digest_config_hash=NULL, digest_approved_at=NULL,

@@ -80,6 +80,24 @@ describe('Calendar approval binds the stored preview on PostgreSQL', () => {
     expect(approved.schedule.digestConfig).toEqual(evaluation.config);
   });
 
+  it.each(['multiple destinations', 'revoked source'] as const)('rejects implicit updates when %s makes the preview ineligible', async drift => {
+    const initial = await confirm((await proposal((await evaluate()).candidate)).id, 'auto_digest');
+    const message = await proposal((await evaluate()).candidate, 'update', 1);
+    if (drift === 'multiple destinations') {
+      await db.pool.query("UPDATE service_credentials SET config=$1 WHERE service='slack' AND user_id IS NULL", [
+        encryptCredentials({ botToken: 'fixture', allowedScope: { channels: ['C0123456789', 'C0987654321'] } }, key),
+      ]);
+    } else {
+      await db.pool.query("UPDATE service_credentials SET status='reconnect_required' WHERE service='mycalendar' AND user_id=$1", [owner.id]);
+    }
+    await expect(confirm(message.id)).rejects.toMatchObject({ code: 'DIGEST_PREVIEW_CHANGED' });
+    const current = (await db.pool.query('SELECT * FROM schedules WHERE id=$1', [initial.schedule.id])).rows[0];
+    expect(current.kind).toBe('calendar_digest');
+    expect(current.version).toBe(1);
+    expect(current.last_proposal_id).not.toBe(message.id);
+    expect(current.digest_config).toEqual(initial.schedule.digestConfig);
+  });
+
   it('requires a fresh proposal when the old preview lacks the bound config', async () => {
     const candidate = (await evaluate()).candidate;
     delete candidate.config;
