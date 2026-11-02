@@ -136,13 +136,38 @@ export class JiraLeaseManager {
   }
 
   async revalidateLease(leaseId: string): Promise<RevalidateLeaseResult> {
-    const result = await this.pool.query<{ status: RevalidateLeaseResult['status']; expired: boolean }>(
-      `SELECT status, expires_at <= clock_timestamp() AS expired FROM jira_authorization_leases WHERE lease_id = $1`,
+    const result = await this.pool.query<{ status: RevalidateLeaseResult['status']; expired: boolean; authority_valid: boolean | null }>(
+      `SELECT l.status, l.expires_at <= clock_timestamp() AS expired,
+        (w.status = 'active' AND w.version = l.workspace_version
+         AND wm.status = 'active' AND jm.status = 'active' AND jm.version = l.membership_version
+         AND u.status = 'active' AND a.status = 'connected' AND a.identity_version = l.identity_version
+         AND a.atlassian_account_id = l.atlassian_account_id
+         AND g.status = 'active' AND gs.cloud_id IS NOT NULL
+         AND s.active = true AND s.policy_version = l.site_policy_version
+         AND (l.project_id IS NULL OR (p.selected = true AND p.policy_version = l.project_policy_version))) AS authority_valid
+       FROM jira_authorization_leases l
+       LEFT JOIN ati_workspaces w ON w.id = l.workspace_id
+       LEFT JOIN workspace_members wm ON wm.workspace_id = l.workspace_id AND wm.user_id = l.ati_user_id
+       LEFT JOIN ati_workspace_memberships jm ON jm.workspace_id = l.workspace_id AND jm.user_id = l.ati_user_id
+       LEFT JOIN users u ON u.id = l.ati_user_id
+       LEFT JOIN jira_accounts a ON a.id = l.jira_account_id AND a.user_id = l.ati_user_id
+       LEFT JOIN jira_oauth_grants g ON g.id = l.grant_id AND g.account_id = l.jira_account_id
+       LEFT JOIN jira_grant_sites gs ON gs.grant_id = l.grant_id AND gs.cloud_id = l.cloud_id AND gs.product_type = 'jira'
+       LEFT JOIN ati_workspace_jira_sites s ON s.workspace_id = l.workspace_id AND s.cloud_id = l.cloud_id
+       LEFT JOIN ati_workspace_jira_projects p ON p.workspace_id = l.workspace_id AND p.site_id = s.id AND p.numeric_project_id = l.project_id
+       WHERE l.lease_id = $1`,
       [leaseId]
     );
     const row = result.rows[0];
     if (!row) return { valid: false };
     if (row.expired && row.status === 'active') return { valid: false, status: 'expired' };
+    if (row.status === 'active' && row.authority_valid !== true) {
+      await this.pool.query(
+        `UPDATE jira_authorization_leases SET status = 'revoked', released_at = clock_timestamp()
+         WHERE lease_id = $1 AND status = 'active'`, [leaseId]
+      );
+      return { valid: false, status: 'revoked' };
+    }
     return { valid: row.status === 'active', status: row.status };
   }
 

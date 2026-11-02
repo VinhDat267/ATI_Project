@@ -483,6 +483,36 @@ describe('apps/chat-api — JIRA-05 Task 4 Capabilities Route (GET /api/jira-wor
   // Suite 2: Disconnected User Safe Empty
   // ============================================================================
   describe('2. Disconnected User Safe Empty Handling', () => {
+    it('hides capabilities when membership is revoked while native verification is in flight', async () => {
+      const user = await createActor('Racing Member', 'race_member');
+      const workspaceId = await seedWorkspace('Race Workspace', `race-${randomUUID()}`, user.id);
+      await seedMembership(workspaceId, user.id, 'admin', 'active');
+      const cloudId = `cloud-race-${randomUUID()}`;
+      await seedWorkspaceSite(workspaceId, cloudId);
+      const accountId = await seedJiraAccount(user.id);
+      await seedGrant(accountId, cloudId);
+      let signalStarted!: () => void;
+      let release!: () => void;
+      const started = new Promise<void>((resolve) => { signalStarted = resolve; });
+      const gate = new Promise<void>((resolve) => { release = resolve; });
+      const verifier: ExtendedNativeVerifier = {
+        verifyAdminister: async () => ({ status: 'denied' }),
+        verifyUserPermissions: async () => {
+          signalStarted();
+          await gate;
+          return { canBrowse: true, canCreateIssue: true, canAddComment: true, status: 'granted' };
+        },
+      };
+      const app = buildApp(new WorkspaceRepo(pool, { verifier }));
+      const response = request(app).get(`/api/jira-workspaces/${workspaceId}/jira-capabilities`)
+        .set('Authorization', `Bearer ${user.token}`).then((res) => res);
+      await started;
+      await pool.query("UPDATE ati_workspace_memberships SET status = 'removed', version = version + 1 WHERE workspace_id = $1 AND user_id = $2", [workspaceId, user.id]);
+      release();
+      const res = await response;
+      expect(res.status).toBe(404);
+      expect(JSON.stringify(res.body)).not.toContain(cloudId);
+    });
     it('returns 200 with safe empty { workspaceId, sites: [] } when user has never connected Jira account', async () => {
       const app = buildApp(workspaceRepoWithVerifier);
       const user = await createActor('Unconnected User', 'unconn', 'member');

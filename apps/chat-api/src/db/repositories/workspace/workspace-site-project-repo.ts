@@ -655,6 +655,13 @@ export class WorkspaceSiteProjectRepo {
       }
       const updatedSite = updateRes.rows[0];
 
+      await client.query(
+        `UPDATE jira_authorization_leases
+         SET status = 'revoked', released_at = clock_timestamp()
+         WHERE workspace_id = $1 AND cloud_id = $2 AND status = 'active'`,
+        [workspaceId, updatedSite.cloud_id]
+      );
+
       // 6. Audit log
       const action = req.active ? 'activate_site' : 'deactivate_site';
       await client.query(
@@ -947,6 +954,13 @@ export class WorkspaceSiteProjectRepo {
         }
       }
 
+      await client.query(
+        `UPDATE jira_authorization_leases
+         SET status = 'revoked', released_at = clock_timestamp()
+         WHERE workspace_id = $1 AND cloud_id = $2 AND status = 'active'`,
+        [workspaceId, lockedSite.cloud_id]
+      );
+
       // 7. Audit log
       await client.query(
         `INSERT INTO jira_authorization_audit
@@ -1099,10 +1113,7 @@ export class WorkspaceSiteProjectRepo {
       `SELECT id, identity_version FROM jira_accounts WHERE user_id = $1 AND status = 'connected'`, [actorId]
     );
     if (!account.rows[0]) return directory;
-    const rows = await this.pool.query<{
-      site_id: string; cloud_id: string; site_name: string; site_url: string;
-      project_id: string | null; project_key: string | null; project_name: string | null;
-    }>(
+    const directorySql =
       `SELECT s.id AS site_id, s.cloud_id, s.site_name, s.site_url,
               p.numeric_project_id AS project_id, p.project_key, p.project_name
        FROM ati_workspace_jira_sites s
@@ -1115,8 +1126,12 @@ export class WorkspaceSiteProjectRepo {
            WHERE gs.cloud_id = s.cloud_id AND gs.product_type = 'jira'
              AND g.account_id = $2 AND g.status = 'active'
          )
-       ORDER BY s.cloud_id, p.numeric_project_id`, [workspaceId, account.rows[0].id]
-    );
+       ORDER BY s.cloud_id, p.numeric_project_id`;
+    type DirectoryRow = {
+      site_id: string; cloud_id: string; site_name: string; site_url: string;
+      project_id: string | null; project_key: string | null; project_name: string | null;
+    };
+    const rows = await this.pool.query<DirectoryRow>(directorySql, [workspaceId, account.rows[0].id]);
     if (rows.rowCount === 0) return directory;
     const verifier = this.options?.verifier as ExtendedNativeVerifier | undefined;
     if (typeof verifier?.verifyUserPermissions !== 'function') {
@@ -1141,7 +1156,20 @@ export class WorkspaceSiteProjectRepo {
     } catch {
       throw new WorkspaceRepoError(503, 'NATIVE_VERIFIER_UNAVAILABLE', 'Jira native permission verifier unavailable');
     }
-    directory.sites = [...sites.values()];
+    await assertActiveMember(this.pool, workspaceId, actorId);
+    const currentAccount = await this.pool.query<{ id: string; identity_version: number }>(
+      `SELECT id, identity_version FROM jira_accounts WHERE user_id = $1 AND status = 'connected'`, [actorId]
+    );
+    if (currentAccount.rows[0]?.id !== account.rows[0].id || currentAccount.rows[0]?.identity_version !== account.rows[0].identity_version) {
+      return directory;
+    }
+    const currentRows = await this.pool.query<DirectoryRow>(directorySql, [workspaceId, account.rows[0].id]);
+    const currentSites = new Set(currentRows.rows.map((row) => row.site_id));
+    const currentProjects = new Set(currentRows.rows.filter((row) => row.project_id).map((row) => `${row.site_id}:${row.project_id}`));
+    directory.sites = [...sites.values()].filter((site) => currentSites.has(site.siteId)).map((site) => ({
+      ...site,
+      projects: site.projects.filter((project) => currentProjects.has(`${site.siteId}:${project.id}`)),
+    }));
     return directory;
   }
 }

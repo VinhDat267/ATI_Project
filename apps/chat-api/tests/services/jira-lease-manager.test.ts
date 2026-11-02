@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import type pg from 'pg';
+import WorkspaceRepo from '../../src/db/repositories/workspace/index.js';
+import { JiraOAuthRepo } from '../../src/db/repositories/jira-oauth-repo.js';
 import {
   createIsolatedTestSchema,
   createSyntheticUser,
@@ -593,6 +595,62 @@ describe('JiraLeaseManager (JIRA-05 Task 3 Real PostgreSQL Tests)', () => {
   // Suite 3: Revocation Marking & Revalidation (Fail-Closed Semantics)
   // ==========================================================================
   describe('Suite 3: Revocation Marking & Revalidation (Fail-Closed Semantics)', () => {
+    it('invalidates an existing lease when the site policy changes before explicit markRevoked', async () => {
+      const fixture = await seedJiraWorkspaceFixture(ctx.pool, 'reval_site_change');
+      const leaseManager = new JiraLeaseManager({ pool: ctx.pool, tokenManager: createStubTokenManager() });
+      const lease = await leaseManager.acquireLease({ userId: fixture.userId, workspaceId: fixture.workspaceId, cloudId: fixture.cloudId });
+      await ctx.pool.query('UPDATE ati_workspace_jira_sites SET active = false, policy_version = policy_version + 1 WHERE id = $1', [fixture.siteId]);
+      const result = await leaseManager.revalidateLease(lease.leaseId);
+      expect(result.valid).toBe(false);
+    });
+    it('marks active leases revoked in the same transaction that archives a Jira workspace', async () => {
+      const fixture = await seedJiraWorkspaceFixture(ctx.pool, 'archive_revocation');
+      const sysAdmin = await createSyntheticUser(ctx.pool, 'System Admin', 'archive_sys', { role: 'admin' });
+      const leaseManager = new JiraLeaseManager({ pool: ctx.pool, tokenManager: createStubTokenManager() });
+      const lease = await leaseManager.acquireLease({ userId: fixture.userId, workspaceId: fixture.workspaceId, cloudId: fixture.cloudId });
+      await new WorkspaceRepo(ctx.pool).archiveWorkspace(sysAdmin, fixture.workspaceId, 1);
+      const row = await ctx.pool.query<{ status: string }>('SELECT status FROM jira_authorization_leases WHERE lease_id = $1', [lease.leaseId]);
+      expect(row.rows[0]!.status).toBe('revoked');
+    });
+    it('marks active leases revoked when their Jira account disconnects', async () => {
+      const fixture = await seedJiraWorkspaceFixture(ctx.pool, 'disconnect_revocation');
+      const leaseManager = new JiraLeaseManager({ pool: ctx.pool, tokenManager: createStubTokenManager() });
+      const lease = await leaseManager.acquireLease({ userId: fixture.userId, workspaceId: fixture.workspaceId, cloudId: fixture.cloudId });
+      await new JiraOAuthRepo(ctx.pool, '01234567890123456789012345678901').disconnect(fixture.userId);
+      const row = await ctx.pool.query<{ status: string }>('SELECT status FROM jira_authorization_leases WHERE lease_id = $1', [lease.leaseId]);
+      expect(row.rows[0]!.status).toBe('revoked');
+    });
+    it('marks active leases revoked when an admin deactivates their Jira site', async () => {
+      const fixture = await seedJiraWorkspaceFixture(ctx.pool, 'site_deactivate_revocation');
+      const leaseManager = new JiraLeaseManager({ pool: ctx.pool, tokenManager: createStubTokenManager() });
+      const lease = await leaseManager.acquireLease({ userId: fixture.userId, workspaceId: fixture.workspaceId, cloudId: fixture.cloudId });
+      await new WorkspaceRepo(ctx.pool).updateSite(fixture.workspaceId, fixture.userId, fixture.siteId, { expectedPolicyVersion: 1, active: false });
+      const row = await ctx.pool.query<{ status: string }>('SELECT status FROM jira_authorization_leases WHERE lease_id = $1', [lease.leaseId]);
+      expect(row.rows[0]!.status).toBe('revoked');
+    });
+    it('marks only the removed member leases revoked in the membership decision transaction', async () => {
+      const fixture = await seedJiraWorkspaceFixture(ctx.pool, 'member_remove_revocation');
+      const member = await addSecondUser(ctx.pool, fixture, 'member_remove_target');
+      const leaseManager = new JiraLeaseManager({ pool: ctx.pool, tokenManager: createStubTokenManager() });
+      const memberLease = await leaseManager.acquireLease({ userId: member.userId, workspaceId: fixture.workspaceId, cloudId: fixture.cloudId });
+      const adminLease = await leaseManager.acquireLease({ userId: fixture.userId, workspaceId: fixture.workspaceId, cloudId: fixture.cloudId });
+      await new WorkspaceRepo(ctx.pool).decideMember(fixture.workspaceId, fixture.userId, member.userId, { decision: 'remove', expectedVersion: 1 });
+      const rows = await ctx.pool.query<{ lease_id: string; status: string }>('SELECT lease_id, status FROM jira_authorization_leases WHERE lease_id = ANY($1)', [[memberLease.leaseId, adminLease.leaseId]]);
+      expect(rows.rows.find((r) => r.lease_id === memberLease.leaseId)?.status).toBe('revoked');
+      expect(rows.rows.find((r) => r.lease_id === adminLease.leaseId)?.status).toBe('active');
+    });
+    it('marks site leases revoked when an admin deselects its projects', async () => {
+      const fixture = await seedJiraWorkspaceFixture(ctx.pool, 'project_deselect_revocation');
+      const leaseManager = new JiraLeaseManager({ pool: ctx.pool, tokenManager: createStubTokenManager() });
+      const lease = await leaseManager.acquireLease({ userId: fixture.userId, workspaceId: fixture.workspaceId, cloudId: fixture.cloudId, projectId: fixture.projectId });
+      const repo = new WorkspaceRepo(ctx.pool, { verifier: { verifyAdminister: async () => ({
+        status: 'granted', siteName: 'Test Site', siteUrl: 'https://test.atlassian.net',
+        verifiedProjectIds: [fixture.projectId], verifiedProjects: [{ projectId: fixture.projectId, key: fixture.projectKey, name: 'Test Project' }],
+      }) } });
+      await repo.configureProjects(fixture.workspaceId, fixture.userId, fixture.siteId, { expectedPolicyVersion: 1, selectedProjectIds: [] });
+      const row = await ctx.pool.query<{ status: string }>('SELECT status FROM jira_authorization_leases WHERE lease_id = $1', [lease.leaseId]);
+      expect(row.rows[0]!.status).toBe('revoked');
+    });
     it('marks active leases as revoked by workspaceId and records released_at timestamp', async () => {
       const fixtureA = await seedJiraWorkspaceFixture(ctx.pool, 'rev_ws_a');
       const fixtureB = await seedJiraWorkspaceFixture(ctx.pool, 'rev_ws_b');
