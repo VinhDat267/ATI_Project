@@ -423,7 +423,13 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
       return;
     }
 
-    const decrypted = decryptCredentials<PersonalTelegramConfig>(record.config, options.encryptionKey!);
+    let decrypted: PersonalTelegramConfig;
+    try {
+      decrypted = decryptCredentials<PersonalTelegramConfig>(record.config, options.encryptionKey!);
+    } catch {
+      res.status(409).json({ error: 'Tài khoản của bạn chưa Kết nối Telegram hoặc cần kết nối lại.' });
+      return;
+    }
     const { telegramUserId, displayName } = decrypted;
     const personalChat: TelegramTeamChatItem = {
       chatId: telegramUserId,
@@ -503,7 +509,13 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
       return;
     }
 
-    const decrypted = decryptCredentials<PersonalTelegramConfig>(record.config, options.encryptionKey!);
+    let decrypted: PersonalTelegramConfig;
+    try {
+      decrypted = decryptCredentials<PersonalTelegramConfig>(record.config, options.encryptionKey!);
+    } catch {
+      res.status(409).json({ error: 'Tài khoản của bạn chưa Kết nối Telegram hoặc cần kết nối lại.' });
+      return;
+    }
     const { telegramUserId, username, displayName } = decrypted;
     const personalChat: TelegramTeamChatItem = {
       chatId: telegramUserId,

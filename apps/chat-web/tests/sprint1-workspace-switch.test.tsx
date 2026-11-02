@@ -99,3 +99,104 @@ describe('PBI-04: chuyển không gian trên /settings', () => {
     expect(screen.queryByText('Hội thoại cá nhân')).toBeNull();
   });
 });
+
+async function createOrgViaMenu(name: string) {
+  fireEvent.click(screen.getByRole('button', { name: /Không gian làm việc:/ }));
+  const menu = await screen.findByRole('menu', { name: 'Danh sách không gian làm việc' });
+  fireEvent.click(within(menu).getByRole('button', { name: /\+ Tạo không gian tổ chức mới/i }));
+  const input = await screen.findByPlaceholderText(/Nhập tên tổ chức/i);
+  fireEvent.change(input, { target: { value: name } });
+  fireEvent.click(screen.getByRole('button', { name: /Xác nhận tạo/i }));
+}
+
+async function joinOrgViaMenu(code: string) {
+  fireEvent.click(screen.getByRole('button', { name: /Không gian làm việc:/ }));
+  const menu = await screen.findByRole('menu', { name: 'Danh sách không gian làm việc' });
+  fireEvent.click(within(menu).getByRole('button', { name: /🔑 Tham gia tổ chức bằng mã mời/i }));
+  const input = await screen.findByPlaceholderText(/ATI-XXXX-XXXX/i);
+  fireEvent.change(input, { target: { value: code } });
+  fireEvent.click(screen.getByRole('button', { name: /Tham gia ngay/i }));
+}
+
+describe('PBI-06: tạo tổ chức mới & tham gia bằng mã mời giữ nguyên trang hiện tại', () => {
+  it('tạo tổ chức mới khi đang ở /settings giữ nguyên /settings và chuyển sang tổ chức mới', async () => {
+    const createdOrg: WorkspaceSummary = { id: 'ws-created', name: 'Tổ chức Mới', role: 'admin', status: 'active', inviteCode: 'ATI-NEWW-0001', requireApproval: true };
+    vi.spyOn(apiClient, 'createWorkspace').mockResolvedValue({ workspace: createdOrg });
+    vi.spyOn(apiClient, 'getServices').mockImplementation(async () => ({
+      canConfigure: true,
+      services: [{ id: 'slack', name: getActiveWorkspaceId() === 'ws-created' ? 'Slack tổ chức mới' : 'Slack cá nhân', configured: true, connected: true, connectionStatus: 'healthy' as const, credentialFields: [{ key: 'botToken', label: 'Bot token' }] }],
+    }) as never);
+
+    window.history.replaceState({}, '', '/settings');
+    render(<App />);
+    expect(await screen.findByText('Slack cá nhân')).toBeInTheDocument();
+
+    await createOrgViaMenu('Tổ chức Mới');
+    await waitFor(() => expect(getActiveWorkspaceId()).toBe('ws-created'));
+    expect(window.location.pathname).toBe('/settings');
+    expect(await screen.findByText('Slack tổ chức mới')).toBeInTheDocument();
+  });
+
+  it('tham gia tổ chức bằng mã mời khi đang ở /settings và /history giữ nguyên trang hiện tại', async () => {
+    const joinedOrg: WorkspaceSummary = { id: 'ws-joined', name: 'Tổ chức Mã Mời', role: 'member', status: 'active', inviteCode: 'ATI-JOIN-9999' };
+    const joinedOrgHistory: WorkspaceSummary = { id: 'ws-joined-hist', name: 'Tổ chức Lịch sử', role: 'member', status: 'active', inviteCode: 'ATI-HIST-8888' };
+    vi.spyOn(apiClient, 'joinWorkspace').mockImplementation(async (code: string) => ({
+      workspace: code === 'ATI-HIST-8888' ? joinedOrgHistory : joinedOrg,
+      created: true,
+    }));
+    vi.spyOn(apiClient, 'getServices').mockImplementation(async () => ({
+      canConfigure: true,
+      services: [{ id: 'slack', name: getActiveWorkspaceId() === 'ws-joined' ? 'Slack tổ chức mã mời' : 'Slack cá nhân', configured: true, connected: true, connectionStatus: 'healthy' as const, credentialFields: [{ key: 'botToken', label: 'Bot token' }] }],
+    }) as never);
+    vi.spyOn(apiClient, 'getConversations').mockImplementation(async () => ({
+      conversations: getActiveWorkspaceId() === 'ws-joined-hist' ? [{ id: 'c-hist', title: 'Hội thoại tổ chức mới' }] : [],
+    }) as never);
+
+    window.history.replaceState({}, '', '/settings');
+    const { unmount } = render(<App />);
+    expect(await screen.findByText('Slack cá nhân')).toBeInTheDocument();
+
+    await joinOrgViaMenu('ATI-JOIN-9999');
+    await waitFor(() => expect(getActiveWorkspaceId()).toBe('ws-joined'));
+    expect(window.location.pathname).toBe('/settings');
+    expect(await screen.findByText('Slack tổ chức mã mời')).toBeInTheDocument();
+    unmount();
+
+    window.history.replaceState({}, '', '/history');
+    render(<App />);
+    await joinOrgViaMenu('ATI-HIST-8888');
+    await waitFor(() => expect(getActiveWorkspaceId()).toBe('ws-joined-hist'));
+    expect(window.location.pathname).toBe('/history');
+    expect(await screen.findByText('Hội thoại tổ chức mới')).toBeInTheDocument();
+  });
+
+  it('tạo hoặc tham gia tổ chức khi đang ở /c/conv-123 vẫn điều hướng về "/"', async () => {
+    const createdOrg: WorkspaceSummary = { id: 'ws-created-2', name: 'Đội Beta', role: 'admin', status: 'active' };
+    const joinedOrg: WorkspaceSummary = { id: 'ws-joined-2', name: 'Đội Gamma', role: 'member', status: 'active' };
+    vi.spyOn(apiClient, 'createWorkspace').mockResolvedValue({ workspace: createdOrg });
+    vi.spyOn(apiClient, 'joinWorkspace').mockResolvedValue({ workspace: joinedOrg, created: true });
+    vi.spyOn(apiClient, 'getConversation').mockResolvedValue({ conversation: { id: 'conv-123' }, messages: [{ id: 'm1', role: 'user', content: 'Xin chào' }] } as never);
+    vi.spyOn(apiClient, 'getActivePlan').mockResolvedValue(null);
+    vi.spyOn(apiClient, 'getLatestExecutionSnapshot').mockResolvedValue(null);
+
+    window.history.replaceState({}, '', '/c/conv-123');
+    const { unmount } = render(<App />);
+    await waitFor(() => expect(useChatStore.getState().conversationId).toBe('conv-123'));
+
+    await createOrgViaMenu('Đội Beta');
+    await waitFor(() => expect(window.location.pathname).toBe('/'));
+    expect(getActiveWorkspaceId()).toBe('ws-created-2');
+    expect(useChatStore.getState().conversationId).toBeNull();
+    unmount();
+
+    window.history.replaceState({}, '', '/c/conv-123');
+    render(<App />);
+    await waitFor(() => expect(useChatStore.getState().conversationId).toBe('conv-123'));
+
+    await joinOrgViaMenu('ATI-GAMM-1234');
+    await waitFor(() => expect(window.location.pathname).toBe('/'));
+    expect(getActiveWorkspaceId()).toBe('ws-joined-2');
+    expect(useChatStore.getState().conversationId).toBeNull();
+  });
+});
+

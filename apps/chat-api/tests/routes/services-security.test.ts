@@ -4,7 +4,7 @@ import { createApp } from '../../src/app.js';
 import { generateTokens } from '../../src/auth/jwt.js';
 import { CredentialRepo } from '../../src/db/repositories/credential-repo.js';
 import { decryptCredentials, encryptCredentials } from '@wap/tool-adapters';
-import { getConfiguredToolCatalog } from '../../src/services/registered-services.js';
+import { getConfiguredToolCatalog, getToolCatalogFor } from '../../src/services/registered-services.js';
 
 const secret = 'service-route-secret-at-least-32-chars';
 const key = 'test-only-encryption-key-with-32bytes';
@@ -227,5 +227,69 @@ describe('service credential and health boundary', () => {
     const github = res.body.services.find((s: any) => s.id === 'github');
     expect(trello).toMatchObject({ personalStatus: 'scope_required', username: 'vinhnguyndt1', allowedScope: [] });
     expect(github).toMatchObject({ personalStatus: 'scope_required', username: 'vinhgh', allowedScope: [] });
+  });
+
+  it('logs a warning without leaking secrets and skips undecryptable credentials in getConfiguredToolCatalog and getToolCatalogFor while preserving healthy services', async () => {
+    const foreignKey = 'another-encryption-key-of-32-bytes!';
+    const foreignNotion = encryptCredentials(
+      { token: 'ntn_secret_token_999', allowedScope: { databases: ['00000000-0000-0000-0000-000000000001'] } },
+      foreignKey,
+    );
+    const healthySlack = encryptCredentials(
+      { botToken: 'xoxb-healthy-token', allowedScope: { channels: ['C01234567'] } },
+      key,
+    );
+    const foreignGmail = encryptCredentials(
+      { refreshToken: 'rt-gmail-secret', email: 'a@example.test' },
+      foreignKey,
+    );
+    const healthyMyCal = encryptCredentials(
+      {
+        refreshToken: 'rt-cal-valid',
+        email: 'a@example.test',
+        selectedCalendars: [{ id: 'primary', summary: 'Primary' }],
+        allowedScope: { calendars: ['primary'] },
+      },
+      key,
+    );
+
+    const repo = {
+      getCredentials: async (service: string) => {
+        if (service === 'notion') return { config: foreignNotion };
+        if (service === 'slack') return { config: healthySlack };
+        return null;
+      },
+      getPersonalCredentials: async (service: string) => {
+        if (service === 'gmail') return { id: 'c-gmail', status: 'active', config: foreignGmail };
+        if (service === 'mycalendar') return { id: 'c-mycal', status: 'active', config: healthyMyCal };
+        return null;
+      },
+    };
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const catalog = await getToolCatalogFor(repo as any, key, {
+        userId: 'user-a',
+        gmailEnabled: true,
+        mycalendarEnabled: true,
+      });
+
+      const services = new Set(catalog.map((t) => t.service));
+      expect(services.has('slack')).toBe(true);
+      expect(services.has('mycalendar')).toBe(true);
+      expect(services.has('notion')).toBe(false);
+      expect(services.has('gmail')).toBe(false);
+
+      const warnText = warnSpy.mock.calls.map((args) => args.join(' ')).join('\n');
+      expect(warnText).toContain('notion');
+      expect(warnText).toContain('gmail');
+      expect(warnText).not.toContain('ntn_secret_token_999');
+      expect(warnText).not.toContain('rt-gmail-secret');
+      expect(warnText).not.toContain(foreignNotion);
+      expect(warnText).not.toContain(foreignGmail);
+      expect(warnText).not.toContain(key);
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });
