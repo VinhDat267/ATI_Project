@@ -1,5 +1,7 @@
 # Lộ trình đến cuối kỳ
 
+**Cập nhật 02/11 (merge #246 rồi #247):** sửa migration rerun vào main tại `b92cc4fc`; [TELEGRAM-01](tasks/TELEGRAM-01-audit-fixes.md) đóng phần sửa F1/F7/F8 sau audit tại `43b038ba`. Cả hai CI đúng head SUCCESS, gồm check/browser; reviewer kiểm tra106 test database và full check cây kết hợp **3.163 v3 +406 eval fixture +99 Node/launcher PASS**, exit0. Cây merge cuối trùng cây đã kiểm thử. Native Telegram/GitHub và model live vẫn NOT_RUN trong đợt sửa này; các lỗi audit ngoài Telegram vẫn mở. [Log merge](log/2026-11-02-reviewer-merge-246-247.md).
+
 Nguồn: mục 5.2 của báo cáo giữa kỳ. Hạn cuối kỳ dự kiến 11/11/2026. Trạng thái: `xong`, `đang làm` (ghi nhánh), `chờ` (đã có task card), `chưa có task card` (cần Claude Code lập kế hoạch trước khi giao).
 
 **Cập nhật 01/11 (Jira OAuth, merge #229 và #230):** JIRA-00 (thiết kế Jira cá nhân/workspace ATI) và JIRA-01 (probe OAuth 2.0 3LO) đã vào main tại 8cdd5a1 và 68039be. Hai CI v3 [#229](https://github.com/VinhDat267/ATI_Project/actions/runs/41296677039) và [#230](https://github.com/VinhDat267/ATI_Project/actions/runs/41296918366) SUCCESS; review độc lập không còn P1–P3. Cổng JIRA-01 đạt trong phạm vi probe với no-site identity, hai site đồng thời, token rotation và tài khoản Jira User thường. JIRA-02–11 chưa có task card chi tiết hoặc mã runtime; bước tiếp theo là lập card/plan cho JIRA-02 theo [thiết kế](../superpowers/specs/2026-10-30-jira-personal-workspaces-design.md). Không đồng nhất probe với kết nối Jira đã dùng được trong ATI. Xem [log reviewer](log/2026-11-01-reviewer-merge-jira-01.md).
@@ -28,6 +30,7 @@ Mốc 02/10/2026 (kế hoạch vào `main` qua #25 tại `af82961`): nhóm chố
 | 3 | Google Calendar | [W3-02](tasks/W3-02-google-calendar.md) | xong, #31 tại `ab2c599`; chạy thật qua harness W3-07 #57, chưa qua frontend live |
 | 3 | Notion | [W3-03](tasks/W3-03-notion.md) | xong, #32 tại `fca384d`; chạy thật W3-07 #49/#50, chưa qua frontend live |
 | 3 | Telegram | [W3-04](tasks/W3-04-telegram.md) | xong, #33 tại `4a4553b`; chạy thật W3-07 #48, chưa qua frontend live |
+| 5 (thêm 02/11) | Sửa Telegram sau audit #242: cancel/send, nguồn GitHub, pairing backlog/restart | [TELEGRAM-01](tasks/TELEGRAM-01-audit-fixes.md) | **xong phần mã**, #247 tại `43b038ba`, sau #246 tại `b92cc4fc`; CI check/browser PASS, full check cây kết hợp PASS; nghiệm thu bot/model thật còn mở |
 | 3 | Jira Cloud | [W3-05](tasks/W3-05-jira.md) | xong, #34 tại `dc80de4`; chạy thật W3-07 #55, readback sau sửa W3-09 #63 đạt |
 | 5 | Jira OAuth/workspace ATI: thiết kế | [JIRA-00](tasks/JIRA-00-oauth-workspaces-design.md) | xong phần thiết kế, #229 merge 8cdd5a1; chưa có runtime |
 | 5 | Jira OAuth: kiểm chứng provider | [JIRA-01](tasks/JIRA-01-oauth-feasibility.md) | xong phần probe và native gate, #230 merge 68039be; JIRA-02–11 chưa triển khai |
