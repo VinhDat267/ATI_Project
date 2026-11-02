@@ -81,6 +81,35 @@ describe('JiraConnection component', () => {
     });
   });
 
+  it('renders scope_required state with Atlassian name, account ID, badge and allows authorizing sites', async () => {
+    vi.spyOn(jiraApi, 'connection').mockResolvedValue({
+      connected: false,
+      connectionState: 'scope_required',
+      jiraAccountId: 'jira-scope-1',
+      atlassianAccountId: 'atl-scope-1',
+      displayName: 'Scope Required User',
+      sites: [],
+    });
+    vi.spyOn(jiraApi, 'workspaces').mockResolvedValue({ workspaces: [] });
+    const startSpy = vi.spyOn(jiraApi, 'start').mockResolvedValue({ authUrl: 'https://auth.atlassian.com/authorize-sites' });
+    const redirectSpy = vi.spyOn(jiraConn, 'redirectToJira').mockImplementation(() => {});
+
+    render(<JiraConnection user={user} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Cần cấp quyền site')).toBeInTheDocument();
+      expect(screen.getByText(/Scope Required User/i)).toBeInTheDocument();
+      expect(screen.getByText('atl-scope-1')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /cấp quyền jira site/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /cấp quyền jira site/i }));
+    await waitFor(() => {
+      expect(startSpy).toHaveBeenCalledWith('authorize_sites');
+      expect(redirectSpy).toHaveBeenCalledWith('https://auth.atlassian.com/authorize-sites');
+    });
+  });
+
   it('renders connected state with sites, sync sites and disconnect', async () => {
     vi.spyOn(jiraApi, 'connection').mockResolvedValue({
       connected: true,

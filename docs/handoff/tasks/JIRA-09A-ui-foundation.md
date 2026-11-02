@@ -42,13 +42,13 @@ Build the Jira connection and workspace administration UI against merged JIRA-02
 ### Verification Evidence
 - **Focused Jira Test Suites**:
   `npm test -w @wap/chat-web -- tests/jira-api.test.ts tests/jira-callback.test.tsx tests/jira-connection.test.tsx tests/jira-connection-responsive.test.tsx`
-  - Output: 4 test files passed, 46 tests passed (100% PASS), exit code 0.
+  - Output: 4 test files passed, 47 tests passed (100% PASS), exit code 0.
 - **Settings Page Integration Test**:
   `npm test -w @wap/chat-web -- tests/components/settings-page.test.tsx`
   - Output: 1 test file passed, 7 tests passed (100% PASS), exit code 0.
 - **Full Chat Web Test Suite**:
   `npm test -w @wap/chat-web`
-  - Output: 96 test files passed, 1032 tests passed (100% PASS), exit code 0.
+  - Output: 96 test files passed, 1033 tests passed (100% PASS), exit code 0.
 - **Typecheck**:
   `npm run typecheck:v3`
   - Output: `tsc -p apps/chat-api/tsconfig.json --noEmit && tsc -p apps/chat-web/tsconfig.json --noEmit` exit code 0.
@@ -58,9 +58,9 @@ Build the Jira connection and workspace administration UI against merged JIRA-02
 - **Production Web Build & Security Sentinel**:
   `npm run build:v3; node scripts/test-v3-web-build-security.mjs`
   - Output: `PASS: production build excludes credential sentinels and 7 forbidden UI claims`, exit code 0.
-- **Playwright Browser Test Suite (Connect, Reload, Switch, Errors 500/429/403/503)**:
+- **Playwright Browser Test Suite (Connect, Reload, Switch, Errors 500/429/403/503, Scope Required, In-flight Invite Hold)**:
   `npx playwright test apps/chat-web/tests/browser/jira-09a.spec.ts`
-  - Output: 1 passed (6.9s), exit code 0 against local Vite preview. Verified Connect flow, reload handling, workspace switch isolation, late invite token avoidance, 500/429/403/503 error display/retry, stale session 401 handling, and cross-account rejection.
+  - Output: 1 passed (4.9s), exit code 0 against local Vite preview. Verified Connect flow, reload handling, workspace switch isolation, in-flight delayed invite token avoidance across workspace switch, scope_required display (Atlassian name & account ID), 500/429/403/503 error display/retry, stale session 401 handling, and cross-account rejection.
 
 ### Limitations
 - Live Jira Cockpit conversation execution remains disabled in the UI (button clearly marked as pending JIRA-08) until backend and planner integration PBIs (JIRA-06, JIRA-07, JIRA-08) land.

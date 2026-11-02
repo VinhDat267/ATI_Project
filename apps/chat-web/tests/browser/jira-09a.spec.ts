@@ -76,6 +76,8 @@ test.describe('JIRA-09A: Jira UI Foundation Browser Tests', () => {
       workspaceId: 'workspace-uuid-1',
       sites: [],
     };
+    let holdInviteResponse = false;
+    let resumeInviteResponse: any = null;
 
     // Route mocks
     await page.route('**/api/connections/myjira', async (route) => {
@@ -200,6 +202,26 @@ test.describe('JIRA-09A: Jira UI Foundation Browser Tests', () => {
     await page.route('**/api/jira-workspaces/*/invites', async (route) => {
       const url = route.request().url();
       if (route.request().method() === 'POST') {
+        if (holdInviteResponse) {
+          await new Promise<void>((resolve) => {
+            resumeInviteResponse = resolve;
+          });
+          holdInviteResponse = false;
+          const delayedInvite = {
+            id: 'inv-delayed-1',
+            workspaceId: 'workspace-uuid-1',
+            inviterUserId: 'admin-user-uuid',
+            expiresAt: '2026-11-09T00:00:00Z',
+          };
+          workspaceInvites.push(delayedInvite);
+          return route.fulfill({
+            json: {
+              inviteId: 'inv-delayed-1',
+              inviteToken: 'DELAYED_INVITE_TOKEN_FOR_WS1',
+              expiresAt: '2026-11-09T00:00:00Z',
+            },
+          });
+        }
         const newInvite = {
           id: 'inv-browser-1',
           workspaceId: 'workspace-uuid-1',
@@ -291,9 +313,31 @@ test.describe('JIRA-09A: Jira UI Foundation Browser Tests', () => {
     await expect(jiraCard.getByText(/Dịch vụ Jira tạm thời không khả dụng/i)).toBeVisible();
     await expect(jiraCard.locator('#jira-retry-connection')).toBeVisible();
 
-    // Recover from 503 to 200 disconnected
+    // Recover from 503 to 200 scope_required
     jiraConnectionStatus = 200;
+    jiraConnectionResponse = {
+      connected: false,
+      connectionState: 'scope_required',
+      jiraAccountId: 'jira-acc-prod-1',
+      atlassianAccountId: 'atl-acc-prod-1',
+      displayName: 'Jira Administrator',
+      sites: [],
+    };
     await jiraCard.locator('#jira-retry-connection').click();
+    await expect(jiraCard.getByText('Cần cấp quyền site')).toBeVisible();
+    await expect(jiraCard.getByText('Tài khoản Atlassian: Jira Administrator', { exact: true })).toBeVisible();
+    await expect(jiraCard.getByText('atl-acc-prod-1', { exact: true })).toBeVisible();
+    await expect(jiraCard.locator('#jira-authorize-sites')).toBeVisible();
+
+    // Transition to 200 disconnected for connect flow
+    jiraConnectionResponse = {
+      connected: false,
+      connectionState: 'disconnected',
+      jiraAccountId: null,
+      atlassianAccountId: null,
+      sites: [],
+    };
+    await page.reload();
     await expect(jiraCard.getByText('Chưa kết nối')).toBeVisible();
     await expect(jiraCard.getByText('Lỗi kết nối')).not.toBeVisible();
     await expect(jiraCard.locator('#jira-connect')).toBeVisible();
@@ -358,6 +402,33 @@ test.describe('JIRA-09A: Jira UI Foundation Browser Tests', () => {
     await expect(page.getByRole('button', { name: 'Tạo mã mời' })).toBeVisible();
     // Invite token was one-time and must remain gone
     await expect(page.getByText('ATI_INVITE_TOKEN_SECRET_9999')).not.toBeVisible();
+
+    // Test holding in-flight invite creation response across workspace switch:
+    // 1. Hold invite creation request in-flight
+    // 2. Click "Tạo mã mời" on Workspace 1
+    // 3. Switch to Workspace 2 while request is still pending
+    // 4. Release held invite response
+    // 5. Verify the invite code NEVER appears in Workspace 2
+    holdInviteResponse = true;
+    await page.getByRole('button', { name: 'Tạo mã mời' }).click();
+
+    // Switch to Workspace 2 while invite creation is pending in-flight
+    await page.locator('#jira-workspace-select').selectOption('workspace-uuid-2');
+    await expect(page.getByText('Design System Team', { exact: true })).toBeVisible();
+
+    // Now release the held createInvite response for Workspace 1
+    if (resumeInviteResponse) {
+      resumeInviteResponse();
+    }
+
+    // Wait and verify: the delayed invite token from Workspace 1 NEVER appears on Workspace 2
+    await page.waitForTimeout(300);
+    await expect(page.getByText('DELAYED_INVITE_TOKEN_FOR_WS1')).not.toBeVisible();
+
+    // Switch back to Workspace 1 and verify clean state
+    await page.locator('#jira-workspace-select').selectOption('workspace-uuid-1');
+    await expect(page.getByRole('button', { name: 'Tạo mã mời' })).toBeVisible();
+    await expect(page.getByText('DELAYED_INVITE_TOKEN_FOR_WS1')).not.toBeVisible();
 
     // --- STEP 5: Stale tab & Account switch in callback view ---
     // Account changed error (ACCOUNT_CHANGED): displays error alert and prevents invalid switch

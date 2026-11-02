@@ -777,13 +777,21 @@ export function JiraConnection({
       )}
 
       {/* DETAILS: ATLANSSIAN IDENTITY & SITES */}
-      {(isConnected || isIdentityConnected) && (
+      {(isConnected || isIdentityConnected || isScopeRequired) && (
         <div className="py-4 border-b border-[#E7E7E2] dark:border-[#374151] text-xs">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-neutral-600 dark:text-neutral-400">
             <div>
               <span className="font-medium text-[#111827] dark:text-white">Tài khoản Atlassian: </span>
               {data?.displayName ?? data?.atlassianAccountId ?? 'Đã xác thực'}
             </div>
+            {data?.atlassianAccountId && (
+              <div>
+                <span className="font-medium text-[#111827] dark:text-white">ID tài khoản Atlassian: </span>
+                <code className="text-[11px] bg-neutral-100 dark:bg-neutral-800 px-1 py-0.5 rounded">
+                  {data.atlassianAccountId}
+                </code>
+              </div>
+            )}
             {data?.jiraAccountId && (
               <div>
                 <span className="font-medium text-[#111827] dark:text-white">Jira Account ID: </span>
