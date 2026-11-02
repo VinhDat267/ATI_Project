@@ -276,10 +276,21 @@ export class ScheduleService {
       const wsId = owner.rows[0].workspace_id ?? null;
       const wsMode = owner.rows[0].workspace_mode ?? 'legacy';
       const wantAutoDigest = approvalMode === 'auto_digest';
-      const isTelegramSchedule =
-        metadata.services.includes('telegram') || existing?.kind === 'telegram_digest';
+      const candidateConfig = (metadata.digestCandidate as any)?.config;
+      const hasGithubDigestCandidate =
+        Boolean(candidateConfig) &&
+        Array.isArray(candidateConfig.repos) &&
+        typeof candidateConfig.staleDays === 'number';
+      const hasTelegramDigestCandidate =
+        Boolean(candidateConfig) && Array.isArray(candidateConfig.sources);
       const isGithubSchedule =
-        !isTelegramSchedule && (metadata.services.includes('github') || existing?.kind === 'github_digest');
+        hasGithubDigestCandidate ||
+        (existing?.kind === 'github_digest' && !hasTelegramDigestCandidate) ||
+        (!metadata.services.includes('telegram') &&
+          (metadata.services.includes('github') || existing?.kind === 'github_digest'));
+      const isTelegramSchedule =
+        !isGithubSchedule &&
+        (metadata.services.includes('telegram') || existing?.kind === 'telegram_digest');
       const isCalendarSchedule =
         !isTelegramSchedule && !isGithubSchedule && (metadata.services.includes('mycalendar') || metadata.services.includes('calendar') || existing?.kind === 'calendar_digest');
       let digestFields: {

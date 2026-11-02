@@ -1,14 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import { encryptCredentials } from '@wap/tool-adapters';
-import { GITHUB_TOOLS, type PlanResponse } from '@wap/tool-schemas';
+import { GITHUB_OAUTH_TOOLS, GITHUB_TOOLS, type PlanResponse } from '@wap/tool-schemas';
 import { getToolCatalogFor } from '../../src/services/registered-services.js';
 import { runtimeToolCatalog, mayFallbackToShared } from '../../src/config/gmail-tools-runtime.js';
 import { ChatService } from '../../src/services/chat-service.js';
 import { resourceLabels } from '../../src/services/resource-labels.js';
 import { AdapterFactory } from '../../src/services/adapter-factory.js';
 import { createGitHubConnectionLookup } from '../../src/services/github/connection-reference.js';
-import { WorkingMemory } from '@wap/planner';
+import { GitHubOAuthClient } from '../../src/services/github/oauth-client.js';
+import { WorkingMemory, validatePlan } from '@wap/planner';
 
 describe('Task 6: GitHub personal OAuth planning, catalog, refusal, and execution guards', () => {
   const encryptionKey = '0123456789abcdef0123456789abcdef';
@@ -65,7 +66,7 @@ describe('Task 6: GitHub personal OAuth planning, catalog, refusal, and executio
       expect(catalog.some((t) => t.service === 'github')).toBe(false);
     });
 
-    it('includes all 5 github.* tools when caller is connected and has access to at least one team repo', async () => {
+    it('includes all 9 github.* tools (GITHUB_TOOLS + GITHUB_OAUTH_TOOLS) when caller is connected and has access to at least one team repo', async () => {
       const repo = mockCredRepo({ id: 'cred-1', status: 'active', config: 'dummy' });
       const catalog = await getToolCatalogFor(repo, encryptionKey, {
         userId,
@@ -78,8 +79,72 @@ describe('Task 6: GitHub personal OAuth planning, catalog, refusal, and executio
         }),
       });
       const githubTools = catalog.filter((t) => t.service === 'github');
-      expect(githubTools.length).toBe(5);
-      expect(githubTools.map((t) => t.name).sort()).toEqual(GITHUB_TOOLS.map((t) => t.name).sort());
+      expect(githubTools.length).toBe(9);
+      expect(githubTools.map((t) => t.name).sort()).toEqual(
+        [...GITHUB_TOOLS, ...GITHUB_OAUTH_TOOLS].map((t) => t.name).sort(),
+      );
+
+      const validation = validatePlan(
+        JSON.stringify({
+          kind: 'plan',
+          thinking: 'Close issue #42',
+          summary: 'Đóng issue #42',
+          steps: [
+            {
+              id: 'step_1',
+              tool: 'github.update_issue',
+              description: 'Đóng issue #42',
+              args: { repo: 'nhom/ati', issueNumber: 42, state: 'closed' },
+              dependsOn: [],
+            },
+          ],
+          warnings: [],
+        }),
+        catalog,
+      );
+      expect(validation.valid).toBe(true);
+    });
+
+    it('includes all 9 github.* tools via fallback path using real GitHubOAuthClient.repos()', async () => {
+      const encryptedConfig = encryptCredentials(
+        { accessToken: 'gho_tok', githubUserId: '1001', login: 'octocat' },
+        encryptionKey,
+      );
+      const repo = mockCredRepo({ id: 'cred-1', status: 'active', config: encryptedConfig });
+      const client = new GitHubOAuthClient(
+        {
+          clientId: 'cid',
+          clientSecret: 'csec',
+          redirectUri: 'http://localhost/cb',
+          authorizationUrl: 'http://localhost/authorize',
+          tokenUrl: 'http://localhost/token',
+          apiBaseUrl: 'http://localhost/api',
+          scope: 'repo',
+        },
+        vi.fn(async () =>
+          new Response(
+            JSON.stringify([
+              { id: 101, name: 'ati', full_name: 'nhom/ati', private: false, permissions: { push: true } },
+            ]),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        ) as any,
+      );
+      const catalog = await getToolCatalogFor(repo, encryptionKey, {
+        userId,
+        gmailEnabled: false,
+        githubTeamRepo: {
+          repos: async () => [{ repoId: '101', fullName: 'nhom/ati', name: 'ati' }],
+        },
+        githubOAuthClient: client,
+        githubTokens: {
+          forConnection: () => ({
+            getAccessToken: async () => 'gho_tok',
+          }),
+        },
+      });
+      const githubTools = catalog.filter((t) => t.service === 'github');
+      expect(githubTools.length).toBe(9);
     });
 
     it('runtimeToolCatalog in sandbox mode omits github.* when caller is ineligible and includes them when eligible', async () => {
@@ -102,7 +167,7 @@ describe('Task 6: GitHub personal OAuth planning, catalog, refusal, and executio
           memberRepos: [{ repoId: '101', fullName: 'nhom/ati', name: 'ati' }],
         }),
       });
-      expect(catalogEligible.filter((t) => t.service === 'github').length).toBe(5);
+      expect(catalogEligible.filter((t) => t.service === 'github').length).toBe(9);
     });
 
     it('mayFallbackToShared returns false when user message routes to github', () => {

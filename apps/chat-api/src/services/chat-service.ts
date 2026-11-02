@@ -816,7 +816,30 @@ export class ChatService {
       ? nextRuns(recurrence, this.schedules.now?.() ?? new Date(), this.schedules.timeZone).map((date) => date.toISOString()) : [];
     const current = proposal.action === 'create' ? null : schedule;
     let digestCandidate: ScheduleProposalMetadata['digestCandidate'] | undefined;
-    if ((proposal.action === 'create' || proposal.action === 'update') && services.includes('telegram') && this.telegramConnection) {
+    const isGithubThreeSectionOverTelegram =
+      services.length === 2 &&
+      services.includes('github') &&
+      services.includes('telegram') &&
+      Boolean(this.githubConnection) &&
+      Boolean(this.telegramConnection) &&
+      Boolean(proposal.request) &&
+      Boolean(recurrence) &&
+      current?.kind !== 'telegram_digest' &&
+      (current?.kind === 'github_digest' ||
+        /\b(bản\s+tin\s+github|github\s+digest|pull\s+request|pr\b|chờ\s+review|chưa\s+ai\s+nhận|unassigned|issue\s+mới|(?:quá|trên|hơn)\s*\d{1,2}\s*ngày|repo(?:sitory)?\s+[a-z0-9_.-]+|[a-z0-9_.-]+\/[a-z0-9_.-]+)\b/i.test(
+          proposal.request!,
+        ));
+    if ((proposal.action === 'create' || proposal.action === 'update') && isGithubThreeSectionOverTelegram) {
+      digestCandidate = await evaluateGithubDigestCandidate({
+        userId: actor.userId,
+        request: proposal.request,
+        services,
+        recurrence,
+        githubConnection: this.githubConnection,
+        telegramConnection: this.telegramConnection,
+        getAdapter: this.getAdapter,
+      });
+    } else if ((proposal.action === 'create' || proposal.action === 'update') && services.includes('telegram') && this.telegramConnection) {
       const tgLookup = await this.telegramConnection(actor.userId).catch(() => null);
       const ghLookup = services.includes('github') && this.githubConnection
         ? await this.githubConnection(actor.userId).catch(() => null)
@@ -856,6 +879,7 @@ export class ChatService {
         services,
         recurrence,
         githubConnection: this.githubConnection,
+        telegramConnection: this.telegramConnection,
         getAdapter: this.getAdapter,
       });
     } else if (

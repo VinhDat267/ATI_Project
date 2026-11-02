@@ -1,5 +1,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createServer } from 'node:http';
+import { encryptCredentials, TelegramAdapter } from '@wap/tool-adapters';
 import type { GithubDigestConfig, ScheduleRecurrence } from '@wap/tool-schemas';
+import { AdapterFactory } from '../../../src/services/adapter-factory.js';
 import { ScheduleRunner } from '../../../src/services/schedules/schedule-runner.js';
 import { ScheduleService } from '../../../src/services/schedules/schedule-service.js';
 import { computeDigestConfigHash, evaluateGithubDigestCandidate } from '../../../src/services/schedules/github-digest-candidate.js';
@@ -558,5 +561,215 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
     const runs = await service.listRuns(owner.id, schedule.id, 10, now);
     expect(runs[0]?.state).toBe('digest_sent');
     expect((runs[0]?.delivery as any)?.telegramChatId).toBe('-100999888');
+  });
+
+  it('8. (F3) passes connections.telegram snapshot to real AdapterFactory at execution phase', async () => {
+    const encryptionKey = 'a'.repeat(64);
+    const tg = {
+      status: 'connected',
+      connection: {
+        credentialId: 'cred-tg-1',
+        telegramUserId: '777',
+        username: 'octo_tg',
+        chatIds: ['-100999888'],
+      },
+      selectedChats: [{ chatId: '-100999888', title: 'Dev Alerts', type: 'supergroup' }],
+    };
+    const gh = {
+      status: 'connected',
+      connection: {
+        credentialId: 'cred-gh-1',
+        githubUserId: '1001',
+        login: 'octocat',
+        repos: ['nhom/ati'],
+      },
+      teamRepos: [{ repoId: '101', fullName: 'nhom/ati', name: 'ati' }],
+    };
+
+    const candidate = await evaluateGithubDigestCandidate({
+      userId: owner.id,
+      proposal: {
+        kind: 'schedule',
+        action: 'create',
+        name: 'Bản tin GitHub Telegram',
+        request: 'Gửi bản tin GitHub repo nhom/ati vào nhóm Telegram Dev Alerts',
+        recurrence: dailyRecurrence,
+        summary: 'Gửi bản tin GitHub sang Telegram',
+      },
+      services: ['github', 'telegram'],
+      githubConnection: async () => gh,
+      telegramConnection: async () => tg,
+    });
+
+    expect(candidate.canAutoDigest).toBe(true);
+    expect(candidate.config?.telegramCredentialId).toBe('cred-tg-1');
+
+    const tgRecord = {
+      id: 'cred-tg-1',
+      status: 'active',
+      config: encryptCredentials(
+        { telegramUserId: '777', selectedChats: tg.selectedChats },
+        encryptionKey,
+      ),
+    };
+    const sentMessages: Array<{ chatId: string; text: string }> = [];
+    const factory = new AdapterFactory({
+      credentialRepo: { getPersonalCredentials: async () => tgRecord } as any,
+      encryptionKey,
+      telegramBot: { botToken: '12345:review_fixture_token_12345', botUsername: 'review_bot' },
+      telegramBotClient: { getChatMember: async () => true },
+      createTelegramAdapter: () =>
+        ({
+          execute: async (tool: string, args: any) => {
+            if (tool === 'telegram.send_message') {
+              sentMessages.push({ chatId: args.chatId, text: args.text });
+            }
+            return { messageId: 42 };
+          },
+        }) as any,
+    });
+
+    const schedule = await insertDigestSchedule({
+      config: candidate.config!,
+      configHash: candidate.configHash!,
+    });
+
+    const runDigest = createGithubDigestRunner({
+      pool: db.pool,
+      githubConnection: async () => gh,
+      telegramConnection: async () => tg,
+      getAdapter: (serviceName, context) =>
+        serviceName === 'github'
+          ? { execute: async () => [] }
+          : factory.getAdapterForService(serviceName, context),
+    });
+
+    const runner = new ScheduleRunner({
+      pool: db.pool,
+      timeZone: VN,
+      now: () => now,
+      planRun: async () => ({ persist: async () => ({ state: 'needs_attention' }), afterCommit() {} }),
+      runGithubDigest: runDigest,
+      recordState: (client, row, at) => service.recordState(client, row, at),
+    });
+
+    await runner.tick();
+    await runner.stop();
+
+    const runs = await service.listRuns(owner.id, schedule.id, 10, now);
+    expect(runs[0]?.state).toBe('digest_sent');
+    expect(sentMessages).toHaveLength(1);
+    expect(sentMessages[0]?.chatId).toBe('-100999888');
+  });
+
+  it('9. (F2) records delivery_started_at and transitions to needs_attention (blocking replan) when Telegram write fails with UNKNOWN', async () => {
+    const tg = {
+      status: 'connected',
+      connection: {
+        credentialId: 'cred-tg-1',
+        telegramUserId: '777',
+        username: 'octo_tg',
+        chatIds: ['-100999888'],
+      },
+      selectedChats: [{ chatId: '-100999888', title: 'Dev Alerts', type: 'supergroup' }],
+    };
+    const gh = {
+      status: 'connected',
+      connection: {
+        credentialId: 'cred-gh-1',
+        githubUserId: '1001',
+        login: 'octocat',
+        repos: ['nhom/ati'],
+      },
+      teamRepos: [{ repoId: '101', fullName: 'nhom/ati', name: 'ati' }],
+    };
+
+    const candidate = await evaluateGithubDigestCandidate({
+      userId: owner.id,
+      proposal: {
+        kind: 'schedule',
+        action: 'create',
+        name: 'Bản tin GitHub Telegram',
+        request: 'Gửi bản tin GitHub repo nhom/ati vào nhóm Telegram Dev Alerts',
+        recurrence: dailyRecurrence,
+        summary: 'Gửi bản tin GitHub sang Telegram',
+      },
+      services: ['github', 'telegram'],
+      githubConnection: async () => gh,
+      telegramConnection: async () => tg,
+    });
+
+    let sendCalls = 0;
+    const server = createServer(async (req, res) => {
+      for await (const _ of req) {
+        // consume request
+      }
+      if (req.url?.endsWith('/getChat')) {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(
+          JSON.stringify({
+            ok: true,
+            result: { id: -100999888, type: 'supergroup', title: 'Dev Alerts' },
+          }),
+        );
+      } else if (req.url?.endsWith('/sendMessage')) {
+        sendCalls++;
+        req.socket.destroy();
+      } else {
+        res.writeHead(404).end();
+      }
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const port = (server.address() as any).port;
+
+    try {
+      const transport = new TelegramAdapter({
+        credentials: { botToken: '12345:review_fixture_token_12345' },
+        baseUrl: `http://127.0.0.1:${port}`,
+        allowedScope: { chats: ['-100999888'] },
+      });
+      const realRunner = createGithubDigestRunner({
+        pool: db.pool,
+        githubConnection: async () => gh,
+        telegramConnection: async () => tg,
+        getAdapter: (serviceName) =>
+          serviceName === 'github' ? { execute: async () => [] } : transport,
+      });
+
+      const schedule = await insertDigestSchedule({
+        config: candidate.config!,
+        configHash: candidate.configHash!,
+      });
+
+      const scheduler = new ScheduleRunner({
+        pool: db.pool,
+        timeZone: VN,
+        now: () => now,
+        planRun: async () => ({ persist: async () => ({ state: 'needs_attention' }), afterCommit() {} }),
+        runGithubDigest: realRunner,
+        recordState: (client, row, at) => service.recordState(client, row, at),
+      });
+
+      await scheduler.tick();
+      await scheduler.stop();
+
+      const saved = (
+        await db.pool.query(
+          'SELECT id, status, delivery_started_at FROM schedule_runs WHERE schedule_id = $1',
+          [schedule.id],
+        )
+      ).rows[0];
+
+      expect(sendCalls).toBe(1);
+      expect(saved.delivery_started_at).not.toBeNull();
+      expect(saved.status).toBe('needs_attention');
+
+      await expect(
+        service.startRun({ userId: owner.id, runId: saved.id, trigger: 'replan', now }),
+      ).rejects.toMatchObject({ code: 'RUN_NOT_REPLANNABLE' });
+      expect(sendCalls).toBe(1);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 });

@@ -12,6 +12,9 @@ export function canonicalizeDigestConfig(config: GithubDigestConfig): GithubDige
     staleDays: config.staleDays,
     ...(config.telegramChatId ? { telegramChatId: config.telegramChatId } : {}),
     ...(config.telegramChatTitle ? { telegramChatTitle: config.telegramChatTitle } : {}),
+    ...(config.telegramCredentialId ? { telegramCredentialId: config.telegramCredentialId } : {}),
+    ...(config.telegramUserId ? { telegramUserId: config.telegramUserId } : {}),
+    ...(config.telegramUsername ? { telegramUsername: config.telegramUsername } : {}),
   };
 }
 
@@ -195,6 +198,9 @@ export async function evaluateGithubDigestCandidate(
       staleDays,
       telegramChatId: String(matchedChat.chatId),
       telegramChatTitle: String(matchedChat.title),
+      ...(tg.connection?.credentialId ? { telegramCredentialId: String(tg.connection.credentialId) } : {}),
+      ...(tg.connection?.telegramUserId ? { telegramUserId: String(tg.connection.telegramUserId) } : {}),
+      ...(tg.connection?.username ? { telegramUsername: String(tg.connection.username) } : {}),
     });
 
     const configHash = computeDigestConfigHash({

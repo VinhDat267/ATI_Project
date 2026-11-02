@@ -1,7 +1,11 @@
 import type pg from 'pg';
 import type { GithubDigestConfig, GithubDigestDelivery, ScheduleRecurrence } from '@wap/tool-schemas';
+import { isUuid } from '../../db/repositories/uuid.js';
 import { computeDigestConfigHash } from './github-digest-candidate.js';
 import type { RunToPlan } from './schedule-runner.js';
+
+export const GITHUB_DELIVERY_UNKNOWN =
+  'Chưa xác định bản tin GitHub đã gửi hay chưa. Hãy kiểm tra kênh nhận trước khi gửi thêm; lượt này không tự gửi lại.';
 
 export function escapeSlackMrkdwn(text: string): string {
   return String(text ?? '')
@@ -20,6 +24,7 @@ export interface DigestRunInput extends RunToPlan {
 export type DigestRunOutcome =
   | { state: 'digest_sent'; delivery: GithubDigestDelivery; text: string }
   | { state: 'digest_failed'; error: string }
+  | { state: 'delivery_unknown'; error: string }
   | { state: 'blocked'; error: string; pauseReason: string }
   | { state: 'discarded' };
 
@@ -144,12 +149,19 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
         },
       });
       if (isTelegramDest) {
+        let tg: any = null;
         if (options.telegramConnection) {
-          const tg = await options.telegramConnection(run.userId);
+          tg = await options.telegramConnection(run.userId);
           const allowedChatIds = new Set(
             ((tg?.connection?.chatIds ?? []) as string[]).map((id) => String(id)),
           );
-          if (!tg || tg.status !== 'connected' || !allowedChatIds.has(String(config.telegramChatId))) {
+          if (
+            !tg ||
+            tg.status !== 'connected' ||
+            (config.telegramCredentialId && tg.connection?.credentialId !== config.telegramCredentialId) ||
+            (config.telegramUserId && tg.connection?.telegramUserId !== config.telegramUserId) ||
+            !allowedChatIds.has(String(config.telegramChatId))
+          ) {
             return {
               state: 'blocked',
               error: 'Cuộc trò chuyện Telegram nhận bản tin không còn nằm trong phạm vi cho phép.',
@@ -157,9 +169,20 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
             };
           }
         }
+        const telegramCredentialId = config.telegramCredentialId ?? tg?.connection?.credentialId ?? '';
+        const telegramUserId = config.telegramUserId ?? tg?.connection?.telegramUserId ?? '';
+        const telegramUsername = config.telegramUsername ?? tg?.connection?.username ?? '';
         telegramAdapter = await options.getAdapter?.('telegram', {
           userId: run.userId,
           phase: 'execution',
+          connections: {
+            telegram: {
+              credentialId: telegramCredentialId,
+              telegramUserId,
+              username: telegramUsername,
+              chatIds: [String(config.telegramChatId)],
+            },
+          },
         });
       } else {
         slackAdapter = await options.getAdapter?.('slack', {
@@ -331,20 +354,42 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
 
     const messageText = lines.join('\n').slice(0, 3500);
 
-    // 6. Pre-send schedule version and status check
+    // 6. Pre-send schedule version and status check + mark delivery_started_at
     signal.throwIfAborted();
-    const preSendCheck = await options.pool.query(
-      'SELECT version, status FROM schedules WHERE id = $1',
-      [run.scheduleId],
-    );
-    const currentSchedule = preSendCheck.rows[0];
-    if (
-      !currentSchedule ||
-      currentSchedule.version !== run.scheduleVersion ||
-      currentSchedule.status === 'cancelled' ||
-      currentSchedule.status === 'paused'
-    ) {
-      return { state: 'discarded' };
+    let deliveryStarted = false;
+    if (isUuid(run.runId)) {
+      const marked = await options.pool.query(
+        `UPDATE schedule_runs r
+            SET delivery_started_at = now(), updated_at = now()
+           FROM schedules s
+          WHERE r.id = $1
+            AND r.schedule_id = s.id
+            AND s.id = $2
+            AND r.status = 'planning'
+            AND r.delivery_started_at IS NULL
+            AND s.version = $3
+            AND s.status IN ('active', 'completed')
+          RETURNING r.id`,
+        [run.runId, run.scheduleId, run.scheduleVersion],
+      );
+      if (!marked.rowCount) {
+        return { state: 'discarded' };
+      }
+      deliveryStarted = true;
+    } else if (isUuid(run.scheduleId)) {
+      const preSendCheck = await options.pool.query(
+        'SELECT version, status FROM schedules WHERE id = $1',
+        [run.scheduleId],
+      );
+      const currentSchedule = preSendCheck.rows[0];
+      if (
+        currentSchedule &&
+        (currentSchedule.version !== run.scheduleVersion ||
+          currentSchedule.status === 'cancelled' ||
+          currentSchedule.status === 'paused')
+      ) {
+        return { state: 'discarded' };
+      }
     }
 
     // 7. Send Slack or Telegram message (once called, never transition to discarded)
@@ -369,7 +414,19 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
           },
         };
         return { state: 'digest_sent', delivery, text: messageText };
-      } catch {
+      } catch (err: any) {
+        if (err?.category === 'UNKNOWN') {
+          return {
+            state: 'delivery_unknown',
+            error: GITHUB_DELIVERY_UNKNOWN,
+          };
+        }
+        if (deliveryStarted) {
+          await options.pool.query(
+            "UPDATE schedule_runs SET delivery_started_at = NULL WHERE id = $1 AND status = 'planning'",
+            [run.runId],
+          );
+        }
         return {
           state: 'digest_failed',
           error: 'Không gửi được bản tin lên Telegram. Hãy thử lại.',
@@ -394,7 +451,19 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
         },
       };
       return { state: 'digest_sent', delivery, text: messageText };
-    } catch {
+    } catch (err: any) {
+      if (err?.category === 'UNKNOWN') {
+        return {
+          state: 'delivery_unknown',
+          error: GITHUB_DELIVERY_UNKNOWN,
+        };
+      }
+      if (deliveryStarted) {
+        await options.pool.query(
+          "UPDATE schedule_runs SET delivery_started_at = NULL WHERE id = $1 AND status = 'planning'",
+          [run.runId],
+        );
+      }
       return {
         state: 'digest_failed',
         error: 'Không gửi được bản tin lên Slack. Hãy thử lại.',

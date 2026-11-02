@@ -249,12 +249,18 @@ export class GitHubAdapter extends BaseAdapter {
       .map((item: any) => githubIssue(item, repo, false, allowPullRequests));
   }
 
-  async getIssue(args: { repo: string; issueNumber: number; includePullRequest?: boolean }, options?: { signal?: AbortSignal; repo?: string; allowPullRequests?: boolean }) {
+  async getIssue(
+    args: { repo: string; issueNumber: number; includePullRequest?: boolean },
+    options?: { signal?: AbortSignal; repo?: string; allowPullRequests?: boolean; requirePullRequest?: boolean },
+  ) {
     const repo = this.checkedRepo(args.repo, options?.repo);
     const number = issueNumber(args.issueNumber);
     const value = await this.request<any>(`/repos/${repo}/issues/${number}`, options?.signal);
     const allowPr = Boolean(args.includePullRequest || options?.allowPullRequests);
     const normalized = githubIssue(value, repo, false, allowPr);
+    if (options?.requirePullRequest && !value?.pull_request) {
+      validation('GitHub item is an issue, not a pull request');
+    }
     return {
       ...normalized,
       body: typeof value.body === 'string' ? value.body : '',
@@ -264,7 +270,7 @@ export class GitHubAdapter extends BaseAdapter {
   }
 
   async getPullRequest(args: { repo: string; issueNumber: number }, options?: { signal?: AbortSignal; repo?: string }) {
-    return this.getIssue({ ...args, includePullRequest: true }, { ...options, allowPullRequests: true });
+    return this.getIssue({ ...args, includePullRequest: true }, { ...options, allowPullRequests: true, requirePullRequest: true });
   }
 
   async createIssue(args: { repo: string; title: string; body?: string; labels?: string[]; assignees?: string[] }, options?: { signal?: AbortSignal; repo?: string }) {

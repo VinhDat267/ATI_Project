@@ -41,6 +41,10 @@ describe('packages/tool-schemas (Task 2)', () => {
       'github.search_repos', 'github.search_issues', 'github.get_issue', 'github.create_issue', 'github.add_label',
     ]);
     expect(getToolDefinition('github.create_issue')?.inputSchema.required).toEqual(['repo', 'title']);
+    expect(getToolDefinition('github.create_issue')?.inputSchema.properties.assignees).toEqual({
+      type: 'array',
+      items: { type: 'string' },
+    });
     expect(getToolDefinition('github.create_issue')?.outputSchema.properties.url.type).toBe('string');
     expect(getToolDefinition('github.add_label')?.inputSchema.required).toEqual(['repo', 'issueNumber', 'label']);
     expect(getToolDefinition('github.search_repos')?.sideEffect).toBe('read');

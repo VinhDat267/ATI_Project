@@ -1,5 +1,5 @@
 import { decryptCredentials } from '@wap/tool-adapters';
-import { ALL_TOOLS, GITHUB_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, TELEGRAM_TOOLS, TRELLO_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
+import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, GITHUB_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, TELEGRAM_TOOLS, TRELLO_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import type { ServiceTransport } from './transports/types.js';
 import { TRELLO_TRANSPORT } from './transports/trello.js';
@@ -240,7 +240,7 @@ export async function getToolCatalogFor(
     try {
       const github = await options.githubConnection(options.userId);
       if (github?.status === 'connected' && github.connection?.repos?.length > 0) {
-        catalog = [...catalog, ...GITHUB_TOOLS];
+        catalog = [...catalog, ...GITHUB_TOOLS, ...GITHUB_OAUTH_TOOLS];
       }
     } catch {
       // ignore
@@ -260,7 +260,12 @@ export async function getToolCatalogFor(
               refreshToken: dec.refreshToken,
             });
             const accessToken = await provider.getAccessToken();
-            const callerRepos = await options.githubOAuthClient.repositories(
+            const fetchRepos =
+              typeof options.githubOAuthClient.repos === 'function'
+                ? options.githubOAuthClient.repos
+                : options.githubOAuthClient.repositories;
+            const callerRepos = await fetchRepos.call(
+              options.githubOAuthClient,
               accessToken,
               AbortSignal.timeout(10_000)
             );
@@ -274,7 +279,7 @@ export async function getToolCatalogFor(
                 )
               )
             ) {
-              catalog = [...catalog, ...GITHUB_TOOLS];
+              catalog = [...catalog, ...GITHUB_TOOLS, ...GITHUB_OAUTH_TOOLS];
             }
           }
         }
