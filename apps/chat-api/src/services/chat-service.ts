@@ -840,6 +840,18 @@ export class ChatService {
       if (!schedule) throw new Error('This conversation has no schedule');
       services = schedule.services;
     }
+    if (services.some((s) => s === 'myjira' || s.startsWith('myjira')) || proposal.request?.toLowerCase().includes('myjira')) {
+      return {
+        kind: 'refusal',
+        reason: 'Tính năng lịch tự động chưa hỗ trợ tích hợp Jira cá nhân (myjira).',
+      };
+    }
+    if (actor.workspaceMode === 'personal' && (services.includes('jira') || proposal.request?.toLowerCase().includes('jira'))) {
+      return {
+        kind: 'refusal',
+        reason: 'Dịch vụ Jira chung (jira) không khả dụng ở không gian cá nhân; lịch không thể sử dụng Jira.',
+      };
+    }
     const recurrence = proposal.action === 'resume' ? schedule!.recurrence : proposal.recurrence;
     const runs = recurrence && proposal.action !== 'pause' && proposal.action !== 'cancel'
       ? nextRuns(recurrence, this.schedules.now?.() ?? new Date(), this.schedules.timeZone).map((date) => date.toISOString()) : [];
@@ -1158,14 +1170,23 @@ export class ChatService {
   async planScheduledRun(run: RunToPlan, convId: string, signal: AbortSignal): Promise<PreparedRun> {
     signal.throwIfAborted();
     if (!this.schedules) throw new Error('Schedules are off');
+    if ((run as any).services?.some((s: string) => s === 'myjira' || s.startsWith('myjira')) || run.request?.toLowerCase().includes('myjira')) {
+      throw new Error('Scheduled runs do not support personal Jira (myjira)');
+    }
+    const actor = run.workspaceMode && run.workspaceMode !== 'legacy'
+      ? { userId: run.userId, workspaceId: run.workspaceId ?? null, workspaceMode: run.workspaceMode }
+      : await this.actorForConversation(convId, run.userId);
+    if (!actor.userId || (actor.workspaceMode === 'organization' && !actor.workspaceId)) {
+      throw new Error('Scheduler execution requires valid actor and workspace');
+    }
+    if (actor.workspaceMode === 'personal' && ((run as any).services?.includes('jira') || run.request?.toLowerCase().includes('jira'))) {
+      throw new Error('Dịch vụ Jira chung (jira) không khả dụng ở không gian cá nhân.');
+    }
     const userMessage = runMessage(run, this.schedules.timeZone);
     const first = (await this.msgRepo.listMessages(convId)).find((m: any) => m.metadata?.type === 'schedule_run' && m.metadata.runId === run.runId);
     const correlation: Correlation = first ? { replyToMessageId: first.id } : {};
     this.eventEmitter.emit('agent_state', { conversationId: convId, state: 'planning', ...correlation });
     const memory = new WorkingMemory();
-    const actor = run.workspaceMode && run.workspaceMode !== 'legacy'
-      ? { userId: run.userId, workspaceId: run.workspaceId ?? null, workspaceMode: run.workspaceMode }
-      : await this.actorForConversation(convId, run.userId);
     const response = await this.planner.processMessage({
       userMessage, history: [], memory, signal, actor, scheduledRun: true,
       onGatherEvent: (event) => {

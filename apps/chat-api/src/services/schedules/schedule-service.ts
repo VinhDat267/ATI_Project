@@ -265,6 +265,12 @@ export class ScheduleService {
         "SELECT metadata FROM messages WHERE id=$1 AND conv_id=$2 AND metadata->>'type'='schedule_proposal'", [messageId, convId]);
       if (!message.rowCount) throw new ScheduleNotFound();
       const metadata = message.rows[0].metadata as ScheduleProposalMetadata;
+      if (metadata.services?.some((s) => s === 'myjira' || s.startsWith('myjira')) || metadata.proposal?.request?.toLowerCase().includes('myjira')) {
+        throw new ScheduleConflict('DIGEST_NOT_ELIGIBLE', 'Lịch tự động không hỗ trợ Jira cá nhân (myjira).');
+      }
+      if (scope?.workspaceMode === 'personal' && (metadata.services?.includes('jira') || metadata.proposal?.request?.toLowerCase().includes('jira'))) {
+        throw new ScheduleConflict('DIGEST_NOT_ELIGIBLE', 'Dịch vụ Jira chung (jira) không khả dụng ở không gian cá nhân.');
+      }
       const existing: ScheduleRow | undefined = (await client.query('SELECT * FROM schedules WHERE conv_id=$1 FOR UPDATE', [convId])).rows[0];
       // Confirming an applied proposal again changes nothing.
       if (existing?.last_proposal_id === messageId) return this.unchanged(client, existing, now);

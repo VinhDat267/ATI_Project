@@ -701,6 +701,7 @@ async function bootstrap() {
     convRepo,
     msgRepo,
     planRepo,
+    enableWorkspaceConversations: Boolean(env.MYJIRA_ENABLED && jiraAvailable),
     credentialRepo: credRepo,
     encryptionKey: env.ENCRYPTION_KEY,
     serviceAdminUserIds: (process.env.SERVICE_ADMIN_USER_IDS || '').split(',').map((id) => id.trim()).filter(Boolean),
