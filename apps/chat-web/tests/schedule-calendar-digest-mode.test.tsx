@@ -226,6 +226,23 @@ describe('ScheduleSection, ScheduleRunRecovery & runLabel for digest_sent / dige
   });
 });
 
+it('shows uncertain Calendar delivery instructions without a replan action', async () => {
+  const instructions = 'Chưa xác định bản tin lịch đã gửi hay chưa. Hãy kiểm tra kênh nhận trước khi gửi thêm; lượt này không tự gửi lại.';
+  const run: ScheduleRunView = {
+    id: 'uncertain-run', scheduleId: baseSchedule.id, state: 'needs_attention', trigger: 'manual',
+    dueAt: '2026-11-02T01:00:00Z', createdAt: '2026-11-02T01:00:00Z', missedCount: 0,
+    convId: CONV_ID, planId: null, planStatus: null, error: instructions, delivery: null,
+  };
+  vi.spyOn(apiClient, 'getScheduleRuns').mockResolvedValue({ runs: [run] });
+  const replan = vi.spyOn(apiClient, 'replanScheduleRun');
+  render(<ScheduleRunRecovery navigate={vi.fn()} message={{ id: 'unknown-run-message', role: 'user', content: 'Agenda',
+    metadata: { type: 'schedule_run', scheduleId: baseSchedule.id, runId: run.id, name: baseSchedule.name, dueAt: run.dueAt } }} />);
+  expect(await screen.findByText(instructions)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Lập lại kế hoạch' })).not.toBeInTheDocument();
+  expect(replan).not.toHaveBeenCalled();
+  expect(runLabel(run)).toContain('kiểm tra kênh nhận');
+});
+
 describe('One-click Primary Calendar Quick-Select (#mycalendar-quick-primary)', () => {
   it('allows 1-click primary calendar selection in MyCalendarCallbackView', async () => {
     const navigate = vi.fn();

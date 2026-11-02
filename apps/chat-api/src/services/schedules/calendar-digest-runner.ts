@@ -1,9 +1,11 @@
 import type pg from 'pg';
-import { decryptCredentials, detectCalendarConflicts, type CalendarEventWithConflict } from '@wap/tool-adapters';
+import { decryptCredentials, detectCalendarConflicts, StepError, type CalendarEventWithConflict } from '@wap/tool-adapters';
 import type { CalendarDigestConfig, CalendarDigestDelivery } from '@wap/tool-schemas';
 import { computeCalendarDigestHash } from './calendar-digest-candidate.js';
 import { localLabel } from './next-occurrence.js';
 import type { RunToPlan } from './schedule-runner.js';
+
+export const CALENDAR_DELIVERY_UNKNOWN = 'Chưa xác định bản tin lịch đã gửi hay chưa. Hãy kiểm tra kênh nhận trước khi gửi thêm; lượt này không tự gửi lại.';
 
 export function escapeDigestText(value: string): string {
   return value
@@ -21,6 +23,7 @@ export interface EnrichedDigestEvent extends CalendarEventWithConflict {
 export type DigestRunOutcome =
   | { state: 'digest_sent'; delivery: CalendarDigestDelivery; messageText: string }
   | { state: 'digest_failed'; error: string }
+  | { state: 'delivery_unknown'; error: string }
   | { state: 'blocked'; pauseReason: string }
   | { state: 'discarded' };
 
@@ -332,6 +335,7 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
     }
 
     // 6. Send to locked Slack channel or Telegram chat
+    let deliveryStarted = false;
     try {
       const destAdapter = await options.getAdapter(destService, { actor: { userId: run.userId } });
       if (!destAdapter) {
@@ -340,6 +344,17 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
           error: `Không khởi tạo được kết nối ${destService === 'slack' ? 'Slack' : 'Telegram'}.`,
         };
       }
+      signal.throwIfAborted();
+      const marked = await options.pool.query(
+        `UPDATE schedule_runs r SET delivery_started_at=now(), updated_at=now()
+         FROM schedules s WHERE r.id=$1 AND r.schedule_id=s.id AND s.id=$2
+           AND r.status='planning' AND r.delivery_started_at IS NULL
+           AND s.version=$3 AND s.status IN ('active', 'completed') RETURNING r.id`,
+        [run.runId, run.scheduleId, run.scheduleVersion],
+      );
+      if (!marked.rowCount) return { state: 'discarded' };
+      deliveryStarted = true;
+      signal.throwIfAborted();
       if (config.destination.service === 'slack') {
         await destAdapter.execute(
           'slack.send_message',
@@ -353,7 +368,15 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
           { signal },
         );
       }
-    } catch {
+    } catch (error) {
+      const definitelyRejected = error instanceof StepError &&
+        ['AUTH_ERROR', 'NOT_FOUND', 'VALIDATION', 'RATE_LIMIT'].includes(error.category);
+      if (deliveryStarted && !definitelyRejected) {
+        return { state: 'delivery_unknown', error: CALENDAR_DELIVERY_UNKNOWN };
+      }
+      if (deliveryStarted) {
+        await options.pool.query("UPDATE schedule_runs SET delivery_started_at=NULL WHERE id=$1 AND status='planning'", [run.runId]);
+      }
       return {
         state: 'digest_failed',
         error: `Không gửi được bản tin tới ${destService === 'slack' ? 'Slack' : 'Telegram'}.`,
