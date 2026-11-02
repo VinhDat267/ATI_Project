@@ -142,13 +142,19 @@ Card này xây dựng giao diện Hộp đề xuất (Proposal Inbox) trong ATI,
 
 ## 6. Kết quả (Dành cho Agent Thi công)
 
-- **Trạng thái:** Đã hoàn tất thi công `SLACK-06A` & `SLACK-06B` (kèm rà soát và vá lỗi `SLACK-05A` DM relevance) trên nhánh `feat/slack-05-modes` theo đúng kế hoạch M4 [`docs/superpowers/plans/2026-11-01-slack-m4-modes-inbox-digest.md`](../../superpowers/plans/2026-11-01-slack-m4-modes-inbox-digest.md).
-- **Chi tiết bàn giao và bằng chứng chạy lệnh:** Xem [`docs/handoff/log/2026-11-02-slack06ab-inbox-digest.md`](../log/2026-11-02-slack06ab-inbox-digest.md).
-- **Kết quả kiểm thử thực tế (PostgreSQL 16 cổng `56569`, HTTP fixtures thật, không dùng mock boolean):**
-  - `packages/tool-schemas` (`myslack-assistant.test.ts` + `myslack-post-plan.test.ts`): **40/40 PASS**
-  - `packages/planner` (`slack-proposal-plan.test.ts` + `slack-triage-planner.test.ts`): **6/6 PASS**
-  - `apps/chat-api` (`slack-rules-engine.test.ts` 5/5, `slack-triage-worker.test.ts` 16/16, `slack-assistant.test.ts` 6/6, `slack-proposals.test.ts` 4/4, `slack-digest-service.test.ts` 2/2): **33/33 PASS**
-  - `apps/chat-web` (`slack-assistant-settings.test.tsx` 7/7, `slack-proposal-inbox.test.tsx` 2/2): **9/9 PASS**
+- **Trạng thái:** Đã hoàn tất thi công `SLACK-06A`, `SLACK-06B` & `SLACK-06C` (bao gồm mở rộng hệ sinh thái đích đề xuất lên 7 dịch vụ `trello`, `jira`, `mysheets`, `mycalendar`, `github`, `gmail`, `myslack`, ghi đè đích trực tiếp `targetOverride` ngay trên thẻ đề xuất, bóc tách permalink thread Slack `parseSlackThreadInput`, danh bạ kênh/thành viên `GET /api/connections/myslack/:connectionId/directory`, cùng đại tu UI/UX Hộp thư đề xuất `/inbox`).
+- **Chi tiết bàn giao và bằng chứng chạy lệnh:** Xem [`docs/handoff/log/2026-11-02-slack06ab-inbox-digest.md`](../log/2026-11-02-slack06ab-inbox-digest.md) và [`docs/handoff/log/2026-11-02-slack-07-and-main-integration.md`](../log/2026-11-02-slack-07-and-main-integration.md).
+- **Kết quả kiểm thử thực tế (PostgreSQL 16 thật, HTTP fixtures thật, Chromium Playwright E2E thật):**
+  - `packages/tool-schemas` (24/24 files): **178/178 PASS**
+  - `packages/planner` (32/32 files): **165/165 PASS**
+  - `apps/chat-api` (`slack-rules-engine.test.ts`, `slack-triage-worker.test.ts`, `slack-assistant.test.ts`, `slack-proposals.test.ts`, `slack-digest-service.test.ts`): **PASS 100%**
+  - `apps/chat-web` (`slack-assistant-settings.test.tsx`, `slack-proposal-inbox.test.tsx`, `slack-read-controls.test.tsx`, `use-sse.test.ts`, `fe-12-main-nav.test.tsx`, `fe-09-pages.test.tsx`): **57/57 PASS**
+  - **Playwright Browser E2E (`scripts/test-v3-browser.mjs`):**
+    - `SCENARIO=slack_assistant`: **5/5 PASS (35.2s)**
+    - `SCENARIO=slack_oauth`: **4/4 PASS**
+    - `SCENARIO=slack_read`: **4/4 PASS**
+    - `SCENARIO=slack_write`: **4/4 PASS (44.1s)**
+    - `fe-12-nav.spec.ts`: **1/1 PASS (10.0s)**
   - `npm run typecheck:v3`: **PASS (0 errors)**
-  - `npx vitest run evaluations --maxWorkers=2` (bao gồm `evaluations/generic-plumbing/static-guard.test.ts`): **25/25 files, 406/406 PASS**
+  - `npx vitest run evaluations --maxWorkers=2`: **25/25 files, 406/406 PASS**
 - Không chỉnh sửa `docs/handoff/CURRENT-STATE.md` hoặc `docs/handoff/ROADMAP.md` (thuộc quyền Reviewer sau khi merge).

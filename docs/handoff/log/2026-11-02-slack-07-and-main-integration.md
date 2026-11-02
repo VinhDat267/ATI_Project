@@ -27,3 +27,12 @@
 - `npm test -w @wap/executor`: **7/7 files, 53/53 tests PASS**.
 - `npm test -w @wap/chat-web`: **98/98 files, 1028/1028 tests PASS**.
 - `apps/chat-api` (unit, DB migrations, routes, Slack M1–M4 runtime/origin/lineage/fanout/triage/digest suites, Jira 21/21 suites, Calendar/Sheets/GitHub/Telegram digest suites): **PASS**.
+- **Nâng cấp Thực chiến Đa dịch vụ (7 Services) & Đại tu UI/UX + Kiểm thử Playwright E2E (`7c27509d`, `e6b3c085`):**
+  - Mở rộng `SLACK_ASSISTANT_INTENT_SERVICES` và `planSlackProposalWorkflow` lên 7 dịch vụ đích (`trello`, `jira`, `mysheets`, `mycalendar`, `github`, `gmail`, `myslack`), hỗ trợ `targetOverride` ngay trên thẻ đề xuất, `parseSlackThreadInput` bóc tách URL thread Slack, và `GET /api/connections/myslack/:connectionId/directory` lấy danh bạ kênh/thành viên an toàn PII.
+  - Đại tu UI/UX trên `MainNav.tsx` (badge đếm đề xuất), `PersonalSlack.tsx` (cảnh báo F1 Consent), `SlackAutomationSettings.tsx`, `SlackProposalInbox.tsx` (KPI + bộ lọc + tìm kiếm), `SlackProposalCard.tsx`, `SlackReadControls.tsx`, `SlackReadResult.tsx`, và `use-sse.ts`.
+  - **Playwright E2E (`scripts/test-v3-browser.mjs` trên Chromium + PostgreSQL `ati_v3`):**
+    - `SCENARIO=slack_assistant`: **5/5 PASS (35.2s)**
+    - `SCENARIO=slack_oauth`: **4/4 PASS**
+    - `SCENARIO=slack_read`: **4/4 PASS**
+    - `SCENARIO=slack_write`: **4/4 PASS (44.1s)**
+    - `fe-12-nav.spec.ts` (`--grep "a member gets four tabs"`): **1/1 PASS (10.0s)**
