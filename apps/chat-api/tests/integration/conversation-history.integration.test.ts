@@ -11,13 +11,12 @@ import { createApp } from '../../src/app.js';
 import { generateTokens } from '../../src/auth/jwt.js';
 import { ExecutionService } from '../../src/services/execution-service.js';
 import { SSEManager } from '../../src/sse/sse-manager.js';
+import { createIsolatedTestSchema, validateDatabaseUrl, type IsolatedTestContext } from '../helpers/jira-test-db.js';
 
-const connectionString = process.env.DATABASE_URL;
-const schema = `fe02_history_${randomUUID().replaceAll('-', '')}`;
-const admin = new pg.Pool({ connectionString });
-const pool = new pg.Pool({ connectionString, options: `-c search_path=${schema},public` });
-const repo = new ConversationRepo(pool);
-const messages = new MessageRepo(pool);
+let ctx: IsolatedTestContext;
+let pool: pg.Pool;
+let repo: ConversationRepo;
+let messages: MessageRepo;
 const migration = () => readFile(new URL('../../../../db/v3/0004_conversation_titles.sql', import.meta.url), 'utf8');
 const secret = 'fe02_history_integration_jwt_secret';
 
@@ -30,24 +29,47 @@ function bearer(id: string) { return `Bearer ${generateTokens({ id, email: `${id
 
 describe('FE-02 conversation history: real PostgreSQL and HTTP', () => {
   beforeAll(async () => {
-    if (!connectionString) throw new Error('DATABASE_URL is required for FE-02 PostgreSQL evidence');
-    await admin.query('CREATE EXTENSION IF NOT EXISTS pgcrypto');
-    await admin.query(`CREATE SCHEMA ${schema}`);
-    await pool.query(await readFile(new URL('../../../../db/v3/0001_v3_core.sql', import.meta.url), 'utf8'));
+    ctx = await createIsolatedTestSchema();
+    await ctx.runAllMigrations();
+    pool = ctx.pool;
+    repo = new ConversationRepo(pool);
+    messages = new MessageRepo(pool);
   });
-  afterAll(async () => { await pool.end(); await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`); await admin.end(); });
+  afterAll(async () => {
+    await ctx?.cleanup();
+  });
 
   it('backfills existing first-user titles once and preserves data on a second migration', async () => {
-    const owner = await user();
-    const conversation = await repo.createConversation(owner);
-    await pool.query("INSERT INTO messages(conv_id,role,content) VALUES($1,'assistant','not a user title'),($1,'user',$2)", [conversation.id, 'Lịch sử trước migration']);
-    const sql = await migration();
-    await pool.query(sql);
-    expect((await repo.getConversation(conversation.id) as any).title).toBe('Lịch sử trước migration');
-    await pool.query('UPDATE conversations SET title=$2 WHERE id=$1', [conversation.id, 'Tên đã đổi']);
-    const before = (await pool.query('SELECT * FROM conversations WHERE id=$1', [conversation.id])).rows[0];
-    await pool.query(sql);
-    expect((await pool.query('SELECT * FROM conversations WHERE id=$1', [conversation.id])).rows[0]).toEqual(before);
+    const rawUrl = validateDatabaseUrl();
+    const uniqueSuffix = randomUUID().replaceAll('-', '');
+    const histSchema = `fe02_hist_${uniqueSuffix}`;
+    const histAdmin = new pg.Pool({ connectionString: rawUrl, max: 2, connectionTimeoutMillis: 5000 });
+    const isolatedUrl = new URL(rawUrl);
+    isolatedUrl.searchParams.set('options', `-c search_path=${histSchema}`);
+    const histPool = new pg.Pool({ connectionString: isolatedUrl.href, max: 2, connectionTimeoutMillis: 5000 });
+
+    try {
+      await histAdmin.query(`CREATE SCHEMA "${histSchema}"`);
+      await histPool.query(await readFile(new URL('../../../../db/v3/0001_v3_core.sql', import.meta.url), 'utf8'));
+
+      const owner = randomUUID();
+      await histPool.query('INSERT INTO users(id,email,password,name) VALUES($1,$2,$3,$4)', [owner, `${owner}@example.test`, 'test-only-hash', 'History test']);
+      const convId = randomUUID();
+      await histPool.query("INSERT INTO conversations(id, user_id, status) VALUES($1, $2, 'chatting')", [convId, owner]);
+      await histPool.query("INSERT INTO messages(conv_id,role,content) VALUES($1,'assistant','not a user title'),($1,'user',$2)", [convId, 'Lịch sử trước migration']);
+      const sql = await migration();
+      await histPool.query(sql);
+      const convRow = (await histPool.query('SELECT * FROM conversations WHERE id=$1', [convId])).rows[0];
+      expect(convRow.title).toBe('Lịch sử trước migration');
+      await histPool.query('UPDATE conversations SET title=$2 WHERE id=$1', [convId, 'Tên đã đổi']);
+      const before = (await histPool.query('SELECT * FROM conversations WHERE id=$1', [convId])).rows[0];
+      await histPool.query(sql);
+      expect((await histPool.query('SELECT * FROM conversations WHERE id=$1', [convId])).rows[0]).toEqual(before);
+    } finally {
+      await histPool.end().catch(() => undefined);
+      await histAdmin.query(`DROP SCHEMA IF EXISTS "${histSchema}" CASCADE`).catch(() => undefined);
+      await histAdmin.end().catch(() => undefined);
+    }
   });
 
   it('sets first user title to 60 Unicode characters and preserves it on later messages/rename', async () => {

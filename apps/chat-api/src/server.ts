@@ -10,6 +10,7 @@ import {
   CredentialRepo,
   UserRepo,
   WorkspaceRepo,
+  JiraWorkspaceRepo,
 } from './db/repositories/index.js';
 import { DEMO_ADMIN_ID } from './routes/auth-routes.js';
 import { verifyPassword } from './db/repositories/user-repo.js';
@@ -73,6 +74,7 @@ async function bootstrap() {
   let stepRepo: any = null;
   let credRepo: any = null;
   let workspaceRepo: any = null;
+  let jiraWorkspaceRepo: JiraWorkspaceRepo | null = null;
 
   try {
     const dbUrl = env.DATABASE_URL;
@@ -88,6 +90,7 @@ async function bootstrap() {
     stepRepo = new StepRepo(pool);
     credRepo = new CredentialRepo(pool, env.ENCRYPTION_KEY);
     workspaceRepo = new WorkspaceRepo(pool);
+    jiraWorkspaceRepo = new JiraWorkspaceRepo(pool);
 
     if (env.RUNTIME_MODE === 'live') {
       const seededAdmin = await userRepo.findByEmail('admin@wap.local');
@@ -97,6 +100,12 @@ async function bootstrap() {
     }
   } catch (err: any) {
     if (!mayUseMemoryStorage(env.RUNTIME_MODE)) throw err;
+    const unavailablePool = pool;
+    pool = null;
+    userRepo = null;
+    workspaceRepo = null;
+    jiraWorkspaceRepo = null;
+    await unavailablePool?.end();
     console.warn(
       `\x1b[33m[chat-api]\x1b[0m PostgreSQL không khả dụng (${err?.message || 'offline'}). Tự động chuyển sang chế độ Lưu trữ In-Memory phát triển.`
     );
@@ -627,6 +636,8 @@ async function bootstrap() {
     userRepo,
     adminUserRepo: pool && userRepo ? new AdminUserRepo(pool) : undefined,
     workspaceRepo,
+    jiraWorkspaceRepo: jiraWorkspaceRepo ?? undefined,
+    pool: pool ?? undefined,
     signupEnabled: env.AUTH_SIGNUP_ENABLED,
     googleSignupEnabled: env.GOOGLE_SIGNUP_ENABLED,
     googleOAuth: env.GOOGLE_OAUTH,
