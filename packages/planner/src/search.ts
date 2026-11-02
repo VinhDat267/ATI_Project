@@ -43,7 +43,14 @@ export function searchEntities(raw: unknown, schema: JSONSchema): unknown[] {
 }
 
 /** Entity fields worth remembering; anything else (descriptions, tokens) is dropped. */
-const KEPT_FIELDS = ['id', 'name', 'fullName', 'number', 'title', 'boardId', 'boardIds', 'url', 'key'];
+const KEPT_FIELDS = ['id', 'name', 'fullName', 'number', 'title', 'boardId', 'boardIds', 'url', 'key', 'siteId', 'cloudId'];
+
+function entityIdentity(entity: Record<string, unknown>): string {
+  if (typeof entity.siteId === 'string') {
+    return `${entity.siteId}:${entity.id}`;
+  }
+  return String(entity.id);
+}
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -94,7 +101,8 @@ export function prepareSearchCall(call: SearchCall, catalog: ToolDefinition[]): 
 
 function compact(entity: unknown, fields = KEPT_FIELDS): Record<string, unknown> | undefined {
   if (!isObject(entity) || (typeof entity.id !== 'string' && typeof entity.id !== 'number')) return undefined;
-  return Object.fromEntries(fields.filter((field) => entity[field] !== undefined).map((field) => [field, entity[field]]));
+  const allowed = new Set([...fields, 'revoked', 'status', 'masked']);
+  return Object.fromEntries([...allowed].filter((field) => entity[field] !== undefined).map((field) => [field, entity[field]]));
 }
 
 /**
@@ -109,15 +117,16 @@ export function recordObserved(
 ): Record<string, Array<Record<string, unknown>>> {
   const merged = { ...(observed ?? {}) };
   const fresh = results.map(entity => compact(entity, fields)).filter((entity): entity is Record<string, unknown> => entity !== undefined);
-  const freshIds = new Set(fresh.map((entity) => String(entity.id)));
+  const freshKeys = new Set(fresh.map(entityIdentity));
   const previous = (merged[resource] ?? []).map(entity => compact(entity, fields)).filter((entity): entity is Record<string, unknown> => entity !== undefined);
   for (const entity of fresh) {
     // A member can belong to several boards; keep every board it was seen on.
-    const earlier = previous.find((candidate) => String(candidate.id) === String(entity.id));
+    const key = entityIdentity(entity);
+    const earlier = previous.find((candidate) => entityIdentity(candidate) === key);
     const boards = [...new Set([...boardsOf(earlier), ...boardsOf(entity)])];
     if (boards.length > 1) entity.boardIds = boards;
   }
-  const kept = previous.filter((entity) => !freshIds.has(String(entity.id)));
+  const kept = previous.filter((entity) => !freshKeys.has(entityIdentity(entity)));
   merged[resource] = [...kept, ...fresh].slice(-MAX_OBSERVED_PER_RESOURCE);
   return merged;
 }
@@ -130,9 +139,47 @@ export function recordThreadLabels(labels: Record<string, string> | undefined, r
   }
   return Object.fromEntries([...entries].slice(-MAX_OBSERVED_PER_RESOURCE));
 }
+
+function isEntityRevoked(entity: unknown): boolean {
+  if (!isObject(entity)) return false;
+  return (
+    entity.revoked === true ||
+    entity.masked === true ||
+    entity.status === 'revoked' ||
+    entity.status === 'disabled'
+  );
+}
+
+function sanitizeEntities(val: unknown): unknown {
+  if (Array.isArray(val)) {
+    return val.filter((item) => !isEntityRevoked(item)).map(sanitizeEntities);
+  }
+  if (isObject(val)) {
+    if (isEntityRevoked(val)) return undefined;
+    const sanitized: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(val)) {
+      const cleaned = sanitizeEntities(v);
+      if (cleaned !== undefined) {
+        sanitized[k] = cleaned;
+      }
+    }
+    return sanitized;
+  }
+  return val;
+}
+
 export function providerMemory(memory: Record<string, any>): Record<string, any> {
   const { __labels: _displayOnly, ...safe } = memory;
-  return safe;
+  const result: Record<string, any> = {};
+  for (const [k, v] of Object.entries(safe)) {
+    if (!isEntityRevoked(v)) {
+      const sanitized = sanitizeEntities(v);
+      if (sanitized !== undefined) {
+        result[k] = sanitized;
+      }
+    }
+  }
+  return result;
 }
 
 /** What the grounding layer may treat as looked up: resolved entities plus everything observed. */
@@ -140,10 +187,16 @@ export function groundingMemory(
   memory: Record<string, any>,
   observed: Record<string, Array<Record<string, unknown>>> | undefined,
 ): Record<string, any> {
-  const merged: Record<string, any> = { ...memory };
+  const merged: Record<string, any> = {};
+  for (const [k, v] of Object.entries(memory)) {
+    if (!isEntityRevoked(v)) {
+      merged[k] = Array.isArray(v) ? v.filter(item => !isEntityRevoked(item)) : v;
+    }
+  }
   for (const [resource, entities] of Object.entries(observed ?? {})) {
-    const resolved = memory[resource];
-    merged[resource] = [...(Array.isArray(resolved) ? resolved : resolved ? [resolved] : []), ...entities];
+    const resolved = merged[resource];
+    const activeObserved = entities.filter(item => !isEntityRevoked(item));
+    merged[resource] = [...(Array.isArray(resolved) ? resolved : resolved ? [resolved] : []), ...activeObserved];
   }
   return merged;
 }

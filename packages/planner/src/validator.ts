@@ -38,9 +38,11 @@ export interface ValidatePlanOptions {
 export const INJECTION_PATTERNS = [
   /<\|im_start\|>/i,
   /<\|im_end\|>/i,
-  /ignore previous instructions/i,
+  /ignore (?:all |any )?(?:previous|prior|above) instructions/i,
+  /bỏ qua (?:mọi |tất cả )?(?:chỉ dẫn|hướng dẫn)(?: trước)?/i,
   /system prompt override/i,
   /you are now in developer mode/i,
+  /disregard (?:all |any )?(?:previous|prior|above) instructions/i,
 ];
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -197,6 +199,41 @@ function findMembersOffBoard(steps: PlanStep[], memory: Record<string, any>): Un
   return offBoard;
 }
 
+function findAmbiguousSites(steps: PlanStep[], grounding: GroundingContext): UngroundedArgument[] {
+  const sites = grounding.memory.jira_site;
+  const availableSites = (Array.isArray(sites) ? sites : sites ? [sites] : [])
+    .filter((s): s is Record<string, unknown> => isObject(s) && (typeof s.siteId === 'string' || typeof s.id === 'string'));
+  if (availableSites.length <= 1) return [];
+
+  const typed = userTokens(grounding.userTexts);
+  const userSpecifiedSite = (s: Record<string, unknown>): boolean => {
+    const siteId = String(s.siteId ?? s.id ?? '');
+    const name = typeof s.name === 'string' ? s.name.toLowerCase() : '';
+    const url = typeof s.url === 'string' ? s.url.toLowerCase() : '';
+    if (siteId && typed.has(siteId)) return true;
+    if (s.id && typed.has(String(s.id))) return true;
+    return grounding.userTexts.some((text) => {
+      const lower = text.toLowerCase();
+      return (Boolean(name) && lower.includes(name)) || (Boolean(url) && lower.includes(url)) || (Boolean(siteId) && lower.includes(siteId.toLowerCase()));
+    });
+  };
+
+  const ambiguous: UngroundedArgument[] = [];
+  for (const step of steps) {
+    if (!step.tool.startsWith('myjira.') || typeof step.args?.siteId !== 'string') continue;
+    const targeted = availableSites.find((s) => String(s.siteId ?? s.id) === step.args.siteId);
+    if (targeted && !userSpecifiedSite(targeted)) {
+      ambiguous.push({
+        stepId: step.id,
+        argument: 'siteId',
+        resource: 'jira_site',
+        value: step.args.siteId,
+      });
+    }
+  }
+  return ambiguous;
+}
+
 function findUngrounded(steps: PlanStep[], catalog: Map<string, ToolDefinition>, grounding: GroundingContext): UngroundedArgument[] {
   const typed = userTokens(grounding.userTexts);
   const typedEmails = userEmailAddresses(grounding.userTexts);
@@ -219,6 +256,16 @@ function findUngrounded(steps: PlanStep[], catalog: Map<string, ToolDefinition>,
       for (const value of values) {
         // $ref/$template values come from an earlier step's real output.
         if (typeof value !== 'string' && typeof value !== 'number') continue;
+        if (step.tool.startsWith('myjira.') && (resource === 'jira_project' || resource === 'jira_issue') &&
+          typeof step.args.siteId === 'string') {
+          const entries = grounding.memory[resource];
+          const observed = (Array.isArray(entries) ? entries : [entries]).filter((entry): entry is Record<string, unknown> =>
+            isObject(entry) && String(entry[schema['x-resource-field'] ?? 'id']) === String(value));
+          if (observed.length > 0 && !observed.some((entry) => entry.siteId === step.args.siteId)) {
+            ungrounded.push({ stepId: step.id, argument, resource, value });
+            continue;
+          }
+        }
         if (known.has(String(value)) || typed.has(String(value))) continue;
         ungrounded.push({ stepId: step.id, argument, resource, value });
       }
@@ -451,10 +498,25 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
         };
       }
 
+      const targetStep = stepMap.get(targetStepId);
+      if (
+        targetStep &&
+        step.tool.startsWith('myjira.') &&
+        targetStep.tool.startsWith('myjira.') &&
+        typeof step.args?.siteId === 'string' &&
+        typeof targetStep.args?.siteId === 'string' &&
+        step.args.siteId !== targetStep.args.siteId
+      ) {
+        return {
+          valid: false,
+          layer: 'semantic',
+          error: `Cross-site reference: step '${step.id}' on site '${step.args.siteId}' cannot reference output of step '${targetStepId}' on site '${targetStep.args.siteId}'`,
+        };
+      }
+
       // If referencing targetStepId.output.<prop>, verify prop exists in outputSchema
       if (parts[1] === 'output' && parts[2]) {
         const propName = parts[2];
-        const targetStep = stepMap.get(targetStepId);
         if (targetStep) {
           const targetToolDef = catalogMap.get(targetStep.tool);
           const outSchema = targetToolDef?.outputSchema;
@@ -514,6 +576,15 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
 
   // Layer 5: Grounding — resource IDs must come from lookups, the user or earlier steps
   if (options.grounding) {
+    const ambiguousSites = findAmbiguousSites(steps, options.grounding);
+    if (ambiguousSites.length > 0) {
+      return {
+        valid: false,
+        layer: 'grounding',
+        error: `Ambiguous site destination: multiple Jira sites exist in workspace, but target site was not specified by user: ${ambiguousSites.map(u => `${u.stepId}.siteId=${JSON.stringify(u.value)}`).join(', ')}. Clarify with the user to select the destination site.`,
+        ungrounded: ambiguousSites,
+      };
+    }
     const ungrounded = findUngrounded(steps, catalogMap, options.grounding);
     if (ungrounded.length > 0) {
       const listed = ungrounded.map((u) => `${u.stepId}.${u.argument}=${JSON.stringify(u.value)} (${u.resource})`).join(', ');
