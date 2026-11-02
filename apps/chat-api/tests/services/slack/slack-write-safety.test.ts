@@ -157,4 +157,33 @@ describe('04C real PostgreSQL/HTTP write attempt, echo and readback',()=>{
   expect(receipt).toMatchObject({status:'confirmed',channel:'C_FIXTURE',ts:'1730000000.000001'});
   expect((await outbox()).status).toBe('confirmed');
  });
+ it('confirms readback for skin-tone modifiers and extended emoji shortcodes such as :blush:',async()=>{
+  input.params.text='Ship it \u{1F44D}\u{1F3FD} \u{1F60A}';
+  const body={kind:'plan',steps:[{id:'post',tool:'myslack.chat_postMessage',args:input.params,dependsOn:[]}],connections:{myslack:{bindings:{[seed.binding.connectionId]:seed.binding},steps:{post:{connectionId:seed.binding.connectionId,tool:'myslack.chat_postMessage',dependencies:[]}}}}};
+  input.planHash=createHash('sha256').update(JSON.stringify(body)).digest('hex');
+  await env.db.pool.query('UPDATE plans SET plan_json=$2,plan_text=$3,plan_hash=$4 WHERE id=$1',[input.planId,body,JSON.stringify(body),input.planHash]);
+  env.fixture.setHandler('/chat.postMessage',r=>{const b=JSON.parse(r.body);const m={user:seed.binding.slackUserId,text:'Ship it :+1::skin-tone-4: :blush:',client_msg_id:b.client_msg_id,ts:'1730000000.000001'};saved=[m];return {body:{ok:true,channel:b.channel,ts:m.ts,message:m}};});
+  const receipt=await writer().execute(input);
+  expect(receipt).toMatchObject({status:'confirmed',channel:'C_FIXTURE',ts:'1730000000.000001'});
+  expect((await outbox()).status).toBe('confirmed');
+ });
+ it('reconciles a known provider_ts receipt after >500 newer messages by bounding conversations.history with oldest/latest',async()=>{
+  let historyCalls=0;
+  env.fixture.setHandler('/conversations.history',r=>{
+   historyCalls++;
+   const b=JSON.parse(r.body);
+   if(historyCalls===1)return {status:503,body:{ok:false}};
+   if(b.oldest==='1730000000.000001'&&b.latest==='1730000000.000001'&&b.inclusive===true){
+    return {body:{ok:true,messages:saved,has_more:false,response_metadata:{next_cursor:''}}};
+   }
+   const page=Number(b.cursor??'0');
+   const messages=Array.from({length:100},(_,n)=>({user:'U_OTHER',text:'newer message',ts:'1730009999.'+String(page*100+n).padStart(6,'0')}));
+   return {body:{ok:true,messages,has_more:page<5,response_metadata:{next_cursor:page<5?String(page+1):''}}};
+  });
+  await expect(writer().execute(input)).rejects.toMatchObject({category:'UNKNOWN'});
+  expect((await outbox()).provider_ts).toBe('1730000000.000001');
+  const receipt=await writer().reconcile(input);
+  expect(receipt).toMatchObject({status:'confirmed',channel:'C_FIXTURE',ts:'1730000000.000001'});
+  expect((await outbox()).status).toBe('confirmed');
+ });
 });

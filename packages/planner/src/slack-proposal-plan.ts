@@ -37,7 +37,7 @@ export interface SlackProposalPlanInput {
   overrideEndIso?:string;
   overrideRepo?:string;
   overrideToEmail?:string;
-  task?:{listId?:string;allowedListIds?:string[]};
+  task?:{listId?:string;boardId?:string;boardIds?:string[];allowedListIds?:string[]};
   bug?:{projectKey?:string;allowedProjectKeys?:string[]};
   progress?:{spreadsheetId?:string;sheet?:string;allowedSpreadsheetIds?:string[]};
   calendar?:{calendarId?:string;startIso?:string;endIso?:string};
@@ -273,7 +273,7 @@ export function planSlackProposalWorkflow(input:SlackProposalPlanInput):SlackPro
    },
   ];
   const destConn:Partial<PlanConnections>={
-   gmail:input.targetConnections?.gmail??{credentialId:'',email:toEmail},
+   gmail:input.targetConnections?.gmail??{credentialId:'',email:''},
   };
   const withReply=replyInThread
    ?appendReplyStep(baseSteps,input,'step_1','Đã tạo bản nháp email phản hồi: ${step_1.output.id}',destConn)
@@ -376,8 +376,9 @@ export function planSlackProposalWorkflow(input:SlackProposalPlanInput):SlackPro
    dependsOn:[],
   },
  ];
+ const fallbackBoardIds=input.targets.task?.boardIds??(input.targets.task?.boardId?[input.targets.task.boardId]:[]);
  const destConn:Partial<PlanConnections>={
-  [SLACK_PROPOSAL_WORKFLOW_TOOLS.taskService]:input.targetConnections?.[SLACK_PROPOSAL_WORKFLOW_TOOLS.taskService]??{credentialId:'',memberId:'',username:'',boardIds:[listId]},
+  [SLACK_PROPOSAL_WORKFLOW_TOOLS.taskService]:input.targetConnections?.[SLACK_PROPOSAL_WORKFLOW_TOOLS.taskService]??{credentialId:'',memberId:'',username:'',boardIds:fallbackBoardIds},
  };
  const withReply=replyInThread
   ?appendReplyStep(baseSteps,input,'step_1','Đã tạo thẻ công việc: ${step_1.output.url}',destConn)

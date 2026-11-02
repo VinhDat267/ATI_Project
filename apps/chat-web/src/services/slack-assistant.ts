@@ -165,7 +165,14 @@ export const slackAssistantApi = {
         id?: string;
         planHash?: string;
         summary: string;
-        steps: Array<{ id: string; tool?: string; action?: string; description: string }>;
+        steps: Array<{
+          id: string;
+          tool?: string;
+          action?: string;
+          description: string;
+          args?: Record<string, unknown>;
+        }>;
+        connections?: Record<string, unknown>;
       };
       clarification?: string;
       question?: string;

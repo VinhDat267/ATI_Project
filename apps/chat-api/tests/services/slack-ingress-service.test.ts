@@ -536,4 +536,43 @@ describe('SlackIngressService on PostgreSQL (SLACK-04A)', () => {
     expect(malformed.body.code).toBe('INVALID_JSON');
     expect(JSON.stringify(malformed.body)).not.toContain('not json');
   });
+
+  it('T3.11: group_left scopes channel invalidation strictly to envelope authorizations and rejects missing actor identity', async () => {
+    const leaving = await seedConnection({ actorId: 'U_GROUP_LEAVING' });
+    const staying = await seedConnection({ actorId: 'U_GROUP_STAYING' });
+    const svc = service();
+
+    const noActorBody = eventCallback({ type: 'group_left', channel: 'G_SHARED' });
+    const noActorRes = await svc.handleRequest(sign(noActorBody));
+    expect(noActorRes.status).toBe(400);
+    expect(noActorRes.body.code).toBe('MALFORMED_EVENT');
+
+    const groupLeftBody = eventCallback(
+      { type: 'group_left', channel: 'G_SHARED' },
+      {
+        authorizations: [
+          {
+            enterprise_id: null,
+            team_id: TEAM_ID,
+            user_id: 'U_GROUP_LEAVING',
+            is_bot: false,
+            is_enterprise_install: false,
+          },
+        ],
+      }
+    );
+    const okRes = await svc.handleRequest(sign(groupLeftBody));
+    expect(okRes.status).toBe(200);
+
+    const leavingBarriers = await db.pool.query(
+      "SELECT count(*)::int AS n FROM slack_invalidation_barriers WHERE active AND barrier_type = 'channel' AND connection_id = $1 AND channel_id = 'G_SHARED'",
+      [leaving.connectionId]
+    );
+    const stayingBarriers = await db.pool.query(
+      "SELECT count(*)::int AS n FROM slack_invalidation_barriers WHERE active AND barrier_type = 'channel' AND connection_id = $1 AND channel_id = 'G_SHARED'",
+      [staying.connectionId]
+    );
+    expect(leavingBarriers.rows[0]?.n).toBe(1);
+    expect(stayingBarriers.rows[0]?.n).toBe(0);
+  });
 });

@@ -133,7 +133,12 @@ type LifecycleClassification =
  * Lifecycle events are fail-closed: malformed fields produce a 400 and never fall through to
  * automation message processing. Any other event is ordinary content routing metadata.
  */
-function classifyLifecycle(event: Record<string, unknown>, eventType: string): LifecycleClassification {
+function classifyLifecycle(
+  event: Record<string, unknown>,
+  eventType: string,
+  envelope?: Record<string, unknown>,
+  teamId?: string | null
+): LifecycleClassification {
   if (eventType === 'tokens_revoked') {
     const tokens = event.tokens;
     if (!isRecord(tokens) || !Array.isArray(tokens.oauth)) return { kind: 'malformed' };
@@ -180,11 +185,54 @@ function classifyLifecycle(event: Record<string, unknown>, eventType: string): L
   if (eventType === 'member_left_channel' || eventType === 'group_left') {
     const channelId = safeId(event.channel);
     const hasUser = event.user !== undefined && event.user !== null;
-    const slackUserId = hasUser ? safeId(event.user) : null;
-    if (!channelId || (hasUser && !slackUserId)) return { kind: 'malformed' };
+    const eventUserId = hasUser ? safeId(event.user) : null;
+    if (!channelId || (hasUser && !eventUserId)) return { kind: 'malformed' };
+
+    const slackUserIds: string[] = [];
+    const seen = new Set<string>();
+    const addUser = (id: string | null) => {
+      if (id && !seen.has(id)) {
+        seen.add(id);
+        slackUserIds.push(id);
+      }
+    };
+    addUser(eventUserId);
+
+    if (envelope && envelope.authorizations !== undefined && envelope.authorizations !== null) {
+      if (!Array.isArray(envelope.authorizations)) return { kind: 'malformed' };
+      for (const entry of envelope.authorizations) {
+        if (!isRecord(entry)) return { kind: 'malformed' };
+        if (entry.team_id !== undefined && entry.team_id !== null) {
+          const authTeamId = safeId(entry.team_id);
+          if (!authTeamId) return { kind: 'malformed' };
+          if (teamId && authTeamId !== teamId) continue;
+        }
+        if (entry.user_id !== undefined && entry.user_id !== null) {
+          const authUserId = safeId(entry.user_id);
+          if (!authUserId) return { kind: 'malformed' };
+          addUser(authUserId);
+        }
+      }
+    }
+
+    if (envelope && envelope.authed_users !== undefined && envelope.authed_users !== null) {
+      if (!Array.isArray(envelope.authed_users)) return { kind: 'malformed' };
+      for (const entry of envelope.authed_users) {
+        const authUserId = safeId(entry);
+        if (!authUserId) return { kind: 'malformed' };
+        addUser(authUserId);
+      }
+    }
+
+    if (slackUserIds.length === 0) return { kind: 'malformed' };
     return {
       kind: 'lifecycle',
-      descriptor: { intentType: 'channel_membership_lost', channelId, slackUserId },
+      descriptor: {
+        intentType: 'channel_membership_lost',
+        channelId,
+        slackUserId: slackUserIds[0]!,
+        slackUserIds,
+      },
     };
   }
 
@@ -294,7 +342,7 @@ export class SlackIngressService {
     const eventContext = contextResolution.value;
     const payloadHash = createHash('sha256').update(rawBody).digest('hex');
 
-    const classification = classifyLifecycle(event, eventType);
+    const classification = classifyLifecycle(event, eventType, envelope, teamId);
     if (classification.kind === 'malformed') {
       return badRequest('MALFORMED_EVENT', 'Lifecycle event fields are malformed');
     }

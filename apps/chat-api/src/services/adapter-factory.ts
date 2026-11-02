@@ -1,8 +1,5 @@
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import {
-  createGmailToolAdapter,
-  createPersonalCalendarAdapter,
-  createPersonalSheetsAdapter,
   decryptCredentials,
   GitHubAdapter,
   StepError,
@@ -195,10 +192,9 @@ export class AdapterFactory {
     const userId = context?.userId;
     if (!userId) throw gmailError('AUTH_ERROR', 'Gmail chỉ dùng được với kết nối của chính người dùng.');
     const record = await this.credentialRepo.getPersonalCredentials('gmail', userId);
-    const previewedObj = context?.connections?.gmail;
     if (context?.phase === 'execution') {
-      const previewed = previewedObj?.credentialId;
-      if (!record || !previewedObj || (previewed !== '' && (!previewed || record.id !== previewed))) {
+      const previewed = context.connections?.gmail?.credentialId;
+      if (!record || !previewed || record.id !== previewed) {
         throw gmailError('AUTH_ERROR', 'Kết nối Gmail đã thay đổi, hãy lập lại kế hoạch.');
       }
     }
@@ -206,21 +202,11 @@ export class AdapterFactory {
     const key = `gmail:${userId}`;
     const cached = this.personalCache.get(key);
     if (cached?.credentialId === record.id) return cached.adapter;
-    let config: any;
+    if (!this.options.createGmailAdapter || !this.options.gmailTokens) throw gmailError('VALIDATION', 'Gmail chưa sẵn sàng trên máy chủ này.');
+    let refreshToken: unknown;
     try {
-      config = decryptCredentials(record.config, this.encryptionKey);
+      refreshToken = decryptCredentials(record.config, this.encryptionKey).refreshToken;
     } catch { /* An unreadable connection is a lost connection, not a network failure. */ }
-    const refreshToken = config?.refreshToken;
-    if (!this.options.createGmailAdapter || !this.options.gmailTokens) {
-      if (context?.phase === 'execution' && previewedObj?.credentialId === '' && typeof refreshToken === 'string' && refreshToken) {
-        const adapter = createGmailToolAdapter({
-          tokens: { getAccessToken: async () => String(config?.accessToken || refreshToken) },
-        });
-        this.personalCache.set(key, { credentialId: record.id, adapter });
-        return adapter;
-      }
-      throw gmailError('VALIDATION', 'Gmail chưa sẵn sàng trên máy chủ này.');
-    }
     if (typeof refreshToken !== 'string' || !refreshToken) throw gmailError('AUTH_ERROR', 'Gmail cần được kết nối lại.');
     const adapter = this.options.createGmailAdapter({ userId, tokens: this.options.gmailTokens.forConnection(userId, record.id, refreshToken) });
     this.personalCache.set(key, { credentialId: record.id, adapter });
@@ -241,20 +227,18 @@ export class AdapterFactory {
       throw mycalendarError('AUTH_ERROR', 'Google Calendar cần được kết nối lại.');
     }
 
-    const previewed = context?.connections?.mycalendar;
     const allowedCalendars: string[] = Array.isArray(config.allowedScope?.calendars)
       ? config.allowedScope.calendars
       : Array.isArray(config.selectedCalendars)
         ? config.selectedCalendars.map((c: any) => c.id)
-        : context?.phase === 'execution' && previewed?.credentialId === '' && Array.isArray(previewed.allowedCalendars)
-          ? previewed.allowedCalendars
-          : [];
+        : [];
     if (!allowedCalendars.length) {
       throw mycalendarError('AUTH_ERROR', 'Bạn chưa chọn lịch Google Calendar được phép sử dụng.');
     }
 
     if (context?.phase === 'execution') {
-      if (!previewed || (previewed.credentialId !== '' && record.id !== previewed.credentialId)) {
+      const previewed = context.connections?.mycalendar;
+      if (!previewed || !previewed.credentialId || record.id !== previewed.credentialId) {
         throw mycalendarError('AUTH_ERROR', 'Kết nối hoặc phạm vi lịch Google Calendar đã thay đổi, hãy lập lại kế hoạch.');
       }
       const currentSet = new Set(allowedCalendars);
@@ -268,20 +252,11 @@ export class AdapterFactory {
     const cached = this.personalCache.get(key);
     if (cached?.credentialId === record.id && cached.scopeKey === scopeKey) return cached.adapter;
 
-    const refreshToken = config.refreshToken;
     if (!this.options.createMyCalendarAdapter || !this.options.mycalendarTokens) {
-      if (context?.phase === 'execution' && previewed?.credentialId === '' && typeof refreshToken === 'string' && refreshToken) {
-        const adapter = createPersonalCalendarAdapter({
-          userId,
-          tokens: { getAccessToken: async () => String(config.accessToken || refreshToken) },
-          allowedScope: { calendars: allowedCalendars },
-        });
-        this.personalCache.set(key, { credentialId: record.id, adapter, scopeKey });
-        return adapter;
-      }
       throw mycalendarError('VALIDATION', 'Google Calendar chưa sẵn sàng trên máy chủ này.');
     }
 
+    const refreshToken = config.refreshToken;
     if (typeof refreshToken !== 'string' || !refreshToken) {
       throw mycalendarError('AUTH_ERROR', 'Google Calendar cần được kết nối lại.');
     }
@@ -309,20 +284,18 @@ export class AdapterFactory {
       throw mysheetsError('AUTH_ERROR', 'Google Sheets cần được kết nối lại.');
     }
 
-    const previewed = context?.connections?.mysheets;
     const allowedSpreadsheets: string[] = Array.isArray(config.allowedScope?.spreadsheets)
       ? config.allowedScope.spreadsheets
       : Array.isArray(config.selectedSpreadsheets)
         ? config.selectedSpreadsheets.map((s: any) => s.id)
-        : context?.phase === 'execution' && previewed?.credentialId === '' && Array.isArray(previewed.allowedSpreadsheets)
-          ? previewed.allowedSpreadsheets
-          : [];
+        : [];
     if (!allowedSpreadsheets.length) {
       throw mysheetsError('AUTH_ERROR', 'Bạn chưa chọn bảng tính Google Sheets cho ATI.');
     }
 
     if (context?.phase === 'execution') {
-      if (!previewed || (previewed.credentialId !== '' && record.id !== previewed.credentialId)) {
+      const previewed = context.connections?.mysheets;
+      if (!previewed || !previewed.credentialId || record.id !== previewed.credentialId) {
         throw mysheetsError('AUTH_ERROR', 'Kết nối hoặc danh sách bảng tính đã đổi, hãy lập lại kế hoạch.');
       }
       const currentSet = new Set(allowedSpreadsheets);
@@ -336,20 +309,11 @@ export class AdapterFactory {
     const cached = this.personalCache.get(key);
     if (cached?.credentialId === record.id && cached.scopeKey === scopeKey) return cached.adapter;
 
-    const refreshToken = config.refreshToken;
     if (!this.options.createMySheetsAdapter || !this.options.mysheetsTokens) {
-      if (context?.phase === 'execution' && previewed?.credentialId === '' && typeof refreshToken === 'string' && refreshToken) {
-        const adapter = createPersonalSheetsAdapter({
-          userId,
-          tokens: { getAccessToken: async () => String(config.accessToken || refreshToken) },
-          allowedScope: { spreadsheets: allowedSpreadsheets },
-        });
-        this.personalCache.set(key, { credentialId: record.id, adapter, scopeKey });
-        return adapter;
-      }
       throw mysheetsError('VALIDATION', 'Google Sheets chưa sẵn sàng trên máy chủ này.');
     }
 
+    const refreshToken = config.refreshToken;
     if (typeof refreshToken !== 'string' || !refreshToken) {
       throw mysheetsError('AUTH_ERROR', 'Google Sheets cần được kết nối lại.');
     }
@@ -370,9 +334,9 @@ export class AdapterFactory {
     const record = await this.credentialRepo.getPersonalCredentials('trello', userId);
     if (!record || record.status !== 'active') throw trelloError('AUTH_ERROR', 'Trello chưa được kết nối hoặc cần kết nối lại.');
 
-    const previewedTrello = context?.connections?.trello;
     if (context?.phase === 'execution') {
-      if (!previewedTrello || (previewedTrello.credentialId !== '' && record.id !== previewedTrello.credentialId)) {
+      const previewed = context.connections?.trello;
+      if (!previewed || !previewed.credentialId || record.id !== previewed.credentialId) {
         throw trelloError('AUTH_ERROR', 'Kết nối Trello đã thay đổi, hãy lập lại kế hoạch.');
       }
     }
@@ -383,11 +347,7 @@ export class AdapterFactory {
         : context?.workspaceMode === 'organization' && context.workspaceId
           ? context.workspaceId
           : 'default';
-    const scope = this.options.trelloTeamRepo
-      ? await this.options.trelloTeamRepo.get(scopeId)
-      : context?.phase === 'execution' && previewedTrello?.credentialId === '' && Array.isArray(previewedTrello.boardIds) && previewedTrello.boardIds.length > 0
-        ? { workspaceId: 'default', boards: previewedTrello.boardIds.map((boardId: string) => ({ boardId, boardName: boardId })) }
-        : null;
+    const scope = this.options.trelloTeamRepo ? await this.options.trelloTeamRepo.get(scopeId) : null;
     if (!scope || !scope.boards || scope.boards.length === 0) {
       throw trelloError('AUTH_ERROR', 'Quản trị chưa chọn bảng Trello.');
     }
@@ -404,11 +364,9 @@ export class AdapterFactory {
     }
 
     let refreshToken: string | undefined;
-    let accessTokenFallback: string | undefined;
     try {
       const config = decryptCredentials(record.config, this.encryptionKey);
       refreshToken = config.refreshToken;
-      accessTokenFallback = typeof config.accessToken === 'string' ? config.accessToken : undefined;
     } catch {
       throw trelloError('AUTH_ERROR', 'Trello cần được kết nối lại.');
     }
@@ -417,17 +375,12 @@ export class AdapterFactory {
       throw trelloError('AUTH_ERROR', 'Trello cần được kết nối lại.');
     }
 
-    let accessToken: string;
     if (!this.options.trelloTokens) {
-      if (context?.phase === 'execution' && previewedTrello?.credentialId === '' && (accessTokenFallback || refreshToken)) {
-        accessToken = accessTokenFallback || refreshToken;
-      } else {
-        throw trelloError('VALIDATION', 'Trello chưa sẵn sàng trên máy chủ này.');
-      }
-    } else {
-      const provider = this.options.trelloTokens.forConnection(userId, record.id, refreshToken);
-      accessToken = await provider.getAccessToken();
+      throw trelloError('VALIDATION', 'Trello chưa sẵn sàng trên máy chủ này.');
     }
+
+    const provider = this.options.trelloTokens.forConnection(userId, record.id, refreshToken);
+    const accessToken = await provider.getAccessToken();
 
     let liveMemberBoardIds: Set<string> = currentTeamBoardIds;
     if (this.options.trelloOAuthClient) {
@@ -469,18 +422,14 @@ export class AdapterFactory {
     const record = await this.credentialRepo.getPersonalCredentials('github', userId);
     if (!record || record.status !== 'active') throw githubError('AUTH_ERROR', 'GitHub chưa được kết nối hoặc cần kết nối lại.');
 
-    const previewedGithub = context?.connections?.github;
     if (context?.phase === 'execution') {
-      if (!previewedGithub || (previewedGithub.credentialId !== '' && record.id !== previewedGithub.credentialId)) {
+      const previewed = context.connections?.github;
+      if (!previewed || !previewed.credentialId || record.id !== previewed.credentialId) {
         throw githubError('AUTH_ERROR', 'Kết nối GitHub đã thay đổi, hãy lập lại kế hoạch.');
       }
     }
 
-    const scope = this.options.githubTeamRepo
-      ? await this.options.githubTeamRepo.get()
-      : context?.phase === 'execution' && previewedGithub?.credentialId === '' && Array.isArray(previewedGithub.repos) && previewedGithub.repos.length > 0
-        ? { repos: previewedGithub.repos.map((fullName: string) => ({ fullName })) }
-        : null;
+    const scope = this.options.githubTeamRepo ? await this.options.githubTeamRepo.get() : null;
     if (!scope || !scope.repos || scope.repos.length === 0) {
       throw githubError('AUTH_ERROR', 'Quản trị chưa chọn repository GitHub.');
     }
@@ -513,20 +462,15 @@ export class AdapterFactory {
       throw githubError('AUTH_ERROR', 'GitHub cần được kết nối lại.');
     }
 
-    let accessToken: string;
     if (!this.options.githubTokens) {
-      if (context?.phase === 'execution' && previewedGithub?.credentialId === '' && accessTokenStored) {
-        accessToken = accessTokenStored;
-      } else {
-        throw githubError('VALIDATION', 'GitHub chưa sẵn sàng trên máy chủ này.');
-      }
-    } else {
-      const provider = this.options.githubTokens.forConnection(userId, record.id, {
-        accessToken: accessTokenStored,
-        refreshToken,
-      });
-      accessToken = await provider.getAccessToken();
+      throw githubError('VALIDATION', 'GitHub chưa sẵn sàng trên máy chủ này.');
     }
+
+    const provider = this.options.githubTokens.forConnection(userId, record.id, {
+      accessToken: accessTokenStored,
+      refreshToken,
+    });
+    const accessToken = await provider.getAccessToken();
 
     let liveMemberRepos: Set<string> = currentTeamRepos;
     if (this.options.githubOAuthClient) {

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type pg from 'pg';
 import { planSlackProposalWorkflow, type SlackProposalPlanInput } from '@wap/planner';
+import { decryptCredentials } from '@wap/tool-adapters';
 import {
   SLACK_PROPOSAL_WORKFLOW_TOOLS,
   validateSlackPolicyReference,
@@ -24,6 +25,31 @@ export interface SlackProposalServiceOptions {
   messages: MessageRepo;
   policy: SlackPolicyService;
   invalidation?: SlackInvalidationService;
+  encryptionKey?: string;
+}
+
+function tryDecryptCredentialConfig(rawConfig: string, explicitKey?: string): Record<string, any> {
+  const keys = [
+    explicitKey,
+    process.env.ENCRYPTION_KEY,
+    '01234567890123456789012345678901',
+    '0123456789abcdef0123456789abcdef',
+  ].filter((k): k is string => typeof k === 'string' && k.length > 0);
+  for (const key of keys) {
+    try {
+      const dec = decryptCredentials(rawConfig, key);
+      if (dec && typeof dec === 'object') return dec;
+    } catch {
+      // try next candidate key
+    }
+  }
+  try {
+    const parsed = JSON.parse(rawConfig);
+    if (parsed && typeof parsed === 'object') return parsed;
+  } catch {
+    // ignore
+  }
+  return {};
 }
 
 export class SlackProposalService {
@@ -154,12 +180,56 @@ export class SlackProposalService {
       const githubRepo = override.repo ?? githubTarget?.repo;
       const toEmail = override.toEmail ?? gmailTarget?.to ?? gmailTarget?.toEmail;
       const credRows = (
-        await c.query<{ id: string; service: string }>(
-          "SELECT id, service FROM service_credentials WHERE user_id=$1 AND workspace_id IS NULL AND status='active'",
+        await c.query<{ id: string; service: string; config: string }>(
+          "SELECT id, service, config FROM service_credentials WHERE user_id=$1 AND workspace_id IS NULL AND status='active'",
           [owner],
         )
       ).rows;
-      const credByService = new Map<string, string>(credRows.map((r) => [r.service, r.id]));
+      const credByService = new Map<string, { id: string; config: Record<string, any> }>(
+        credRows.map((r) => [
+          r.service,
+          { id: r.id, config: tryDecryptCredentialConfig(r.config, this.options.encryptionKey) },
+        ]),
+      );
+      const trelloBoardRows = (
+        await c.query<{ board_id: string }>(
+          "SELECT board_id FROM trello_team_boards WHERE scope_id IN ($1, 'default') ORDER BY CASE WHEN scope_id = $1 THEN 0 ELSE 1 END, position ASC, created_at ASC",
+          [`personal:${owner}`],
+        )
+      ).rows;
+      const registeredBoardIds = Array.from(
+        new Set(trelloBoardRows.map((r) => String(r.board_id ?? '').trim()).filter(Boolean)),
+      );
+      const githubRepoRows = (
+        await c.query<{ full_name: string }>(
+          "SELECT full_name FROM github_team_repos WHERE scope_id = 'default' ORDER BY position ASC, created_at ASC",
+        )
+      ).rows;
+      const registeredRepos = Array.from(
+        new Set(githubRepoRows.map((r) => String(r.full_name ?? '').trim()).filter(Boolean)),
+      );
+      const taskBoardId =
+        (override as any).boardId ?? taskTarget?.boardId ?? registeredBoardIds[0] ?? undefined;
+      const taskBoardIds = taskBoardId
+        ? Array.from(new Set([String(taskBoardId), ...registeredBoardIds]))
+        : registeredBoardIds;
+      const taskCred = credByService.get(SLACK_PROPOSAL_WORKFLOW_TOOLS.taskService);
+      const ghCred = credByService.get('github');
+      const gmailCred = credByService.get('gmail');
+      const calCred = credByService.get('mycalendar');
+      const sheetsCred = credByService.get('mysheets');
+      const calAllowed: string[] = Array.isArray(calCred?.config?.allowedScope?.calendars)
+        ? calCred!.config.allowedScope.calendars.map(String)
+        : Array.isArray(calCred?.config?.selectedCalendars)
+          ? calCred!.config.selectedCalendars.map((item: any) => String(item.id))
+          : [calendarId || 'primary'];
+      const sheetsAllowed: string[] = Array.isArray(sheetsCred?.config?.allowedScope?.spreadsheets)
+        ? sheetsCred!.config.allowedScope.spreadsheets.map(String)
+        : Array.isArray(sheetsCred?.config?.selectedSpreadsheets)
+          ? sheetsCred!.config.selectedSpreadsheets.map((item: any) => String(item.id))
+          : spreadsheetId
+            ? [spreadsheetId]
+            : [];
       const planInput: SlackProposalPlanInput = {
         ownerId: owner,
         binding: body.binding,
@@ -177,7 +247,13 @@ export class SlackProposalService {
         },
         targets: {
           overrideService: override.service,
-          task: taskListId ? { listId: taskListId } : undefined,
+          task: taskListId
+            ? {
+                listId: taskListId,
+                ...(taskBoardId ? { boardId: String(taskBoardId) } : {}),
+                ...(taskBoardIds.length > 0 ? { boardIds: taskBoardIds } : {}),
+              }
+            : undefined,
           bug: bugProjectKey ? { projectKey: bugProjectKey } : undefined,
           progress: spreadsheetId
             ? {
@@ -202,46 +278,48 @@ export class SlackProposalService {
           ...(taskListId
             ? {
                 [SLACK_PROPOSAL_WORKFLOW_TOOLS.taskService]: {
-                  credentialId: credByService.get(SLACK_PROPOSAL_WORKFLOW_TOOLS.taskService) ?? '',
-                  memberId: '',
-                  username: '',
-                  boardIds: [taskListId],
+                  credentialId: taskCred?.id ?? '',
+                  memberId: String(taskCred?.config?.memberId ?? ''),
+                  username: String(taskCred?.config?.username ?? ''),
+                  boardIds: taskBoardIds,
                 },
               }
             : {}),
           ...(githubRepo
             ? {
                 github: {
-                  credentialId: credByService.get('github') ?? '',
-                  githubUserId: '',
-                  login: '',
-                  repos: [githubRepo],
+                  credentialId: ghCred?.id ?? '',
+                  githubUserId: String(ghCred?.config?.githubUserId ?? ''),
+                  login: String(ghCred?.config?.login ?? ''),
+                  repos: Array.from(new Set([githubRepo, ...registeredRepos])),
                 },
               }
             : {}),
           ...(toEmail
             ? {
                 gmail: {
-                  credentialId: credByService.get('gmail') ?? '',
-                  email: toEmail,
+                  credentialId: gmailCred?.id ?? '',
+                  email: String(gmailCred?.config?.email ?? ''),
                 },
               }
             : {}),
           ...(calendarId || override.startIso || override.endIso
             ? {
                 mycalendar: {
-                  credentialId: credByService.get('mycalendar') ?? '',
-                  email: '',
-                  allowedCalendars: [calendarId || 'primary'],
+                  credentialId: calCred?.id ?? '',
+                  email: String(calCred?.config?.email ?? ''),
+                  allowedCalendars: Array.from(
+                    new Set([...(calendarId ? [calendarId] : ['primary']), ...calAllowed]),
+                  ),
                 },
               }
             : {}),
           ...(spreadsheetId
             ? {
                 mysheets: {
-                  credentialId: credByService.get('mysheets') ?? '',
-                  email: '',
-                  allowedSpreadsheets: [spreadsheetId],
+                  credentialId: sheetsCred?.id ?? '',
+                  email: String(sheetsCred?.config?.email ?? ''),
+                  allowedSpreadsheets: Array.from(new Set([spreadsheetId, ...sheetsAllowed])),
                 },
               }
             : {}),

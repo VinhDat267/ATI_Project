@@ -477,7 +477,7 @@ function createEvalPolicyDb({ runtimeIdentity, maxRetentionDays, policyVersion, 
       '33333333-3333-4333-8333-333333333333',
       {
         id: '33333333-3333-4333-8333-333333333333',
-        user_id: '11111111-1111-4111-8111-111111111111',
+        user_id: '11111111-1111-4111-8111-222222222222',
         workspace_id: 'T_FREE_01',
         actor_id: 'U_OWNER_01',
         identity_version: 1,
@@ -633,29 +633,48 @@ export async function runSlackTriageBenchmark(options = {}) {
   );
 
   let pendingLease = null;
+  let activeLease = null;
   let activeFollowedByTs = new Map();
   let publishedDecision = { kind: 'no_action' };
   let caseModelCalls = 0;
   let caseReservedTokens = 0;
   let caseReportedTokens = 0;
+  const proposalArtifacts = new Map();
 
   const repo = {
     claim: async () => {
       if (!pendingLease) return [];
       const claimed = pendingLease;
       pendingLease = null;
+      activeLease = claimed;
       return [claimed];
     },
-    assertCurrent: async () => {},
-    isFollowed: async (_lease, trigger) => activeFollowedByTs.get(trigger.messageTs) === true,
-    reserveAttempt: async (_lease, reserved) => {
+    assertCurrent: async (lease) => {
+      if (
+        !activeLease ||
+        activeLease.jobId !== lease.jobId ||
+        activeLease.binding.atiUserId !== lease.binding.atiUserId ||
+        activeLease.binding.connectionId !== lease.binding.connectionId ||
+        activeLease.configVersion !== lease.configVersion
+      ) {
+        throw new Error('SLACK_TRIAGE_LEASE_STALE');
+      }
+    },
+    isFollowed: async (lease, trigger) => {
+      await repo.assertCurrent(lease);
+      return activeFollowedByTs.get(trigger.messageTs) === true;
+    },
+    reserveAttempt: async (lease, reserved) => {
+      await repo.assertCurrent(lease);
       caseModelCalls += 1;
       caseReservedTokens += reserved;
     },
-    recordReportedUsage: async (_lease, reported) => {
+    recordReportedUsage: async (lease, reported) => {
+      await repo.assertCurrent(lease);
       caseReportedTokens += typeof reported === 'number' ? reported : caseReservedTokens;
     },
-    publish: async (_lease, decision) => {
+    publish: async (lease, decision) => {
+      await repo.assertCurrent(lease);
       publishedDecision = decision;
       return { status: 'published' };
     },
@@ -663,6 +682,62 @@ export async function runSlackTriageBenchmark(options = {}) {
       throw new Error(`SLACK_EVAL_WORKER_HELD:${reason}`);
     },
   };
+
+  const proposalPool = {
+    connect: async () => ({
+      query: async (sql, params = []) => {
+        if (
+          sql.includes('FROM slack_verified_model_providers') ||
+          sql.includes('FROM slack_processing_consents')
+        ) {
+          return policyDb.query(sql, params);
+        }
+        if (sql.includes("FROM slack_assistant_artifacts WHERE id=$1 AND user_id=$2 AND kind='proposal_excerpt'")) {
+          const row = proposalArtifacts.get(`${params[1]}:${params[0]}`);
+          return row ? { rows: [row] } : { rows: [] };
+        }
+        if (sql.includes('FROM slack_assistant_artifacts a')) {
+          const row = proposalArtifacts.get(`${params[1]}:${params[0]}`);
+          return row ? { rows: [row] } : { rows: [] };
+        }
+        if (sql.includes('FROM service_credentials')) {
+          return {
+            rows: [
+              { id: 'c1111111-1111-4111-8111-111111111111', service: 'trello', config: JSON.stringify({ memberId: 'M_EVAL', username: 'eval_trello' }) },
+              { id: 'c2222222-2222-4222-8222-222222222222', service: 'github', config: JSON.stringify({ githubUserId: 'GH_EVAL', login: 'eval_gh' }) },
+              { id: 'c3333333-3333-4333-8333-333333333333', service: 'gmail', config: JSON.stringify({ email: 'eval-sender@example.test' }) },
+              { id: 'c4444444-4444-4444-8444-444444444444', service: 'mycalendar', config: JSON.stringify({ email: 'eval-cal@example.test', allowedScope: { calendars: ['primary'] } }) },
+              { id: 'c5555555-5555-4555-8555-555555555555', service: 'mysheets', config: JSON.stringify({ email: 'eval-sheets@example.test', allowedScope: { spreadsheets: ['sheet-eval-1'] } }) },
+            ],
+          };
+        }
+        if (sql.includes('FROM trello_team_boards')) {
+          return { rows: [{ board_id: 'board-eval-1' }] };
+        }
+        if (sql.includes('FROM github_team_repos')) {
+          return { rows: [{ full_name: 'acme/eval' }] };
+        }
+        return policyDb.query(sql, params);
+      },
+      release: () => {},
+    }),
+  };
+  const proposalService = new SlackProposalService({
+    pool: proposalPool,
+    repo: {},
+    artifacts: {
+      getSegmentsInTransaction: async () => [],
+      get: async (_owner, id) => ({ id, revision: '2', status: 'awaiting_approval' }),
+    },
+    plans: {
+      createSlackPlan: async ({ planHash }) => ({
+        id: '55555555-5555-4555-8555-555555555555',
+        plan_hash: planHash,
+      }),
+    },
+    messages: {},
+    policy: policyService,
+  });
 
   const worker = new SlackTriageWorker({
     repo,
@@ -696,7 +771,10 @@ export async function runSlackTriageBenchmark(options = {}) {
         for (const testCase of dataset.cases) {
           const label = dataset.labels.items[testCase.id];
           const binding = {
-            atiUserId: '11111111-1111-4111-8111-111111111111',
+            atiUserId:
+              testCase.workspaceId === 'T_PRO_01'
+                ? '11111111-1111-4111-8111-111111111111'
+                : '11111111-1111-4111-8111-222222222222',
             connectionId:
               testCase.workspaceId === 'T_PRO_01'
                 ? '22222222-2222-4222-8222-222222222222'
@@ -762,6 +840,7 @@ export async function runSlackTriageBenchmark(options = {}) {
           };
 
           const stats = await worker.runOnce(1);
+          activeLease = null;
           if (stats.applied !== 1) {
             throw new Error(`SLACK_EVAL_WORKER_DID_NOT_APPLY:${testCase.id}`);
           }
@@ -772,45 +851,62 @@ export async function runSlackTriageBenchmark(options = {}) {
           totalReportedTokens += caseReportedTokens;
 
           if (decision.kind === 'proposal') {
-            const planningPolicy = await policyService.resolveSlackModelPolicy({
-              binding,
-              purpose: 'planning',
-              requestedRetentionDays: 0,
+            const proposalId = '66666666-6666-4666-8666-666666666666';
+            const artifactKey = `${binding.atiUserId}:${proposalId}`;
+            proposalArtifacts.set(artifactKey, {
+              id: proposalId,
+              user_id: binding.atiUserId,
+              connection_id: binding.connectionId,
+              workspace_id: binding.workspaceId,
+              slack_user_id: binding.slackUserId,
+              identity_version: binding.identityVersion,
+              conv_id: '44444444-4444-4444-8444-444444444444',
+              kind: 'proposal_excerpt',
+              status: 'pending',
+              revision: '1',
+              payload_revision: '1',
+              review_current: true,
+              config_version: 1,
+              current_config_version: 1,
+              current_config_json: {
+                targets: {
+                  trello: { listId: 'list-eval-1', boardId: 'board-eval-1' },
+                  myjira: { projectKey: 'EVAL' },
+                  mysheets: { spreadsheetId: 'sheet-eval-1', range: 'Progress!A1' },
+                  mycalendar: { calendarId: 'primary' },
+                  github: { repo: 'acme/eval' },
+                  gmail: { to: 'eval@example.test' },
+                  replyToSource: false,
+                },
+              },
+              body_json: {
+                artifactId: proposalId,
+                configVersion: 1,
+                payloadRevision: '1',
+                binding,
+                decision,
+                context: context.map((m) => ({
+                  channelId: m.channelId,
+                  ts: m.ts,
+                  threadTs: m.threadTs ?? m.ts,
+                  text: m.text,
+                })),
+              },
             });
-            if (!planningPolicy.allowed) {
-              throw new Error(`SLACK_EVAL_PLANNING_POLICY_DENIED:${planningPolicy.reason}`);
-            }
-            const workflow = planSlackProposalWorkflow({
-              ownerId: binding.atiUserId,
-              binding,
-              policyReference: validateSlackPolicyReference(planningPolicy.policyReference),
-              source: {
-                channelId: firstMsg.channelId,
-                messageTs: firstMsg.ts,
-                ...(firstMsg.threadTs ? { threadTs: firstMsg.threadTs } : {}),
-              },
-              proposal: {
-                title: decision.title,
-                rationale: decision.rationale,
-                intents: decision.intents,
-                sourceTexts: context.map((m) => m.text),
-              },
-              targets: {
-                task: { listId: 'list-eval-1' },
-                bug: { projectKey: 'EVAL' },
-                progress: { spreadsheetId: 'sheet-eval-1', sheet: 'Progress' },
-                schedule: {
-                  calendarId: 'primary',
+            try {
+              const prepared = await proposalService.prepare(binding.atiUserId, proposalId, {
+                expectedRevision: 1,
+                replyInThread: false,
+                targetOverride: {
                   startIso: '2026-11-05T09:00:00.000Z',
                   endIso: '2026-11-05T09:30:00.000Z',
                 },
-                github: { repo: 'acme/eval' },
-                gmail: { toEmail: 'eval@example.test' },
-                replyInThread: false,
-              },
-            });
-            if (workflow.kind !== 'plan' && workflow.kind !== 'needs_info') {
-              throw new Error(`SLACK_EVAL_WORKFLOW_INVALID:${testCase.id}`);
+              });
+              if (prepared.status !== 'awaiting_approval' && prepared.status !== 'needs_info') {
+                throw new Error(`SLACK_EVAL_WORKFLOW_INVALID:${testCase.id}`);
+              }
+            } finally {
+              proposalArtifacts.delete(artifactKey);
             }
           }
 

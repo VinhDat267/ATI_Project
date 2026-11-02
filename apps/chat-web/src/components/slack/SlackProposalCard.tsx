@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { SlackIntentService, SlackProposalTargetOverride } from '@wap/tool-schemas';
 import { slackAssistantApi, type SlackProposalViewDto } from '../../services/slack-assistant';
 import { apiClient } from '../../services/api-client';
@@ -80,6 +80,9 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
   const [notice, setNotice] = useState('');
   const [question, setQuestion] = useState('');
   const [planPreview, setPlanPreview] = useState<{
+    proposalId: string;
+    sourceRevision: string;
+    preparedRevision: string;
     id: string;
     planHash: string;
     summary: string;
@@ -90,22 +93,52 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
       description: string;
       args?: Record<string, unknown>;
     }>;
+    connections?: Record<string, unknown>;
   } | null>(null);
   const [hasPreparedOnce, setHasPreparedOnce] = useState(false);
 
+  const latestProposalRef = useRef(proposal);
+  latestProposalRef.current = proposal;
+  const prepareSeqRef = useRef(0);
+
   const isStaleOrRedacted = proposal.status === 'stale' || proposal.body === null;
   const actionable = ['pending', 'needs_info', 'awaiting_approval'].includes(proposal.status) && !isStaleOrRedacted;
+  const isPreviewCurrent =
+    planPreview !== null &&
+    !isStaleOrRedacted &&
+    planPreview.proposalId === proposal.id &&
+    (proposal.revision === planPreview.preparedRevision ||
+      proposal.revision === planPreview.sourceRevision) &&
+    (!proposal.activePlanId || !planPreview.id || proposal.activePlanId === planPreview.id) &&
+    (!proposal.planHash || !planPreview.planHash || proposal.planHash === planPreview.planHash);
 
   useEffect(() => {
     if (isStaleOrRedacted) {
+      prepareSeqRef.current += 1;
       setPlanPreview(null);
       setHasPreparedOnce(false);
       setQuestion('');
       setNotice('');
+      return;
     }
-  }, [isStaleOrRedacted, proposal.id, proposal.status, proposal.body]);
+    if (planPreview && !isPreviewCurrent) {
+      setPlanPreview(null);
+      setNotice('');
+    }
+  }, [
+    isStaleOrRedacted,
+    isPreviewCurrent,
+    planPreview,
+    proposal.id,
+    proposal.revision,
+    proposal.status,
+    proposal.body,
+    proposal.activePlanId,
+    proposal.planHash,
+  ]);
 
   const invalidatePreview = () => {
+    prepareSeqRef.current += 1;
     setPlanPreview(null);
     setNotice('');
   };
@@ -136,12 +169,16 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
   const handleRefine = async () => {
     if (busy) return;
     const owns = slackSessionOwner();
+    const startId = proposal.id;
+    const startRevision = proposal.revision;
     setBusy(true);
     setError('');
     setNotice('');
     try {
       const res = await slackAssistantApi.refineProposal(proposal.id, proposal.revision);
-      if (owns()) {
+      const latest = latestProposalRef.current;
+      const latestStale = latest.status === 'stale' || latest.body === null;
+      if (owns() && latest.id === startId && latest.revision === startRevision && !latestStale) {
         onUpdated(res.proposal);
         navigate(conversationPath(res.conversationId));
       }
@@ -161,6 +198,9 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
   const handlePrepare = async () => {
     if (busy) return;
     const owns = slackSessionOwner();
+    const reqSeq = ++prepareSeqRef.current;
+    const startId = proposal.id;
+    const startRevision = proposal.revision;
     setBusy(true);
     setError('');
     setNotice('');
@@ -173,7 +213,15 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
         replyInThread,
         ...(targetOverride ? { targetOverride } : {}),
       });
-      if (owns()) {
+      const latest = latestProposalRef.current;
+      const latestStale = latest.status === 'stale' || latest.body === null;
+      if (
+        owns() &&
+        reqSeq === prepareSeqRef.current &&
+        latest.id === startId &&
+        latest.revision === startRevision &&
+        !latestStale
+      ) {
         onUpdated(res.proposal);
         if (res.status === 'needs_info') {
           setPlanPreview(null);
@@ -185,16 +233,20 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
           const resolvedHash = res.planHash ?? res.plan.planHash ?? res.proposal?.planHash ?? '';
           setHasPreparedOnce(true);
           setPlanPreview({
+            proposalId: startId,
+            sourceRevision: startRevision,
+            preparedRevision: res.proposal?.revision ?? startRevision,
             id: resolvedId,
             planHash: resolvedHash,
             summary: res.plan.summary,
             steps: res.plan.steps,
+            connections: res.plan.connections,
           });
           setNotice('Đã tạo bản xem trước kế hoạch. Kiểm tra các bước trước khi phê duyệt.');
         }
       }
     } catch (e: any) {
-      if (owns()) {
+      if (owns() && reqSeq === prepareSeqRef.current) {
         setError(
           e?.status === 409
             ? 'Đề xuất hoặc cấu hình dịch vụ chưa sẵn sàng. Hãy kiểm tra kết nối dịch vụ hoặc tải lại.'
@@ -207,7 +259,7 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
   };
 
   const handleApprove = async () => {
-    const planId = planPreview?.id;
+    const planId = isPreviewCurrent ? planPreview?.id : undefined;
     if (!planId) {
       setError('Vui lòng bấm "Xem trước kế hoạch" để kiểm tra chi tiết trước khi phê duyệt.');
       return;
@@ -234,12 +286,16 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
   const handleReject = async () => {
     if (busy) return;
     const owns = slackSessionOwner();
+    const startId = proposal.id;
+    const startRevision = proposal.revision;
     setBusy(true);
     setError('');
     setNotice('');
     try {
       const res = await slackAssistantApi.rejectProposal(proposal.id, proposal.revision);
-      if (owns()) {
+      const latest = latestProposalRef.current;
+      if (owns() && latest.id === startId && latest.revision === startRevision) {
+        prepareSeqRef.current += 1;
         setPlanPreview(null);
         onUpdated(res.proposal);
         setNotice('Đã từ chối đề xuất.');
@@ -334,7 +390,7 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
         </p>
       )}
 
-      {!isStaleOrRedacted && planPreview && (
+      {isPreviewCurrent && planPreview && (
         <div className="rounded-lg border border-[#D1D5DB] dark:border-[#4B5563] p-3 space-y-2">
           <p className="text-xs font-semibold">{planPreview.summary}</p>
           <ol className="list-decimal list-inside space-y-1.5 text-xs text-[#4B5563] dark:text-[#9CA3AF]">
@@ -361,6 +417,33 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
               </li>
             ))}
           </ol>
+          {planPreview.connections && Object.keys(planPreview.connections).length > 0 && (
+            <div className="border-t border-[#E7E7E2] dark:border-[#333333] pt-2 text-[11px] text-[#4B5563] dark:text-[#9CA3AF] space-y-1">
+              <p className="font-semibold text-[#111827] dark:text-white">Danh tính thực thi & phạm vi kết nối:</p>
+              {Object.entries(planPreview.connections).map(([serviceKey, connVal]) => {
+                if (!connVal || typeof connVal !== 'object') return null;
+                if (serviceKey === 'myslack') {
+                  const bindings = (connVal as { bindings?: Record<string, Record<string, unknown>> }).bindings ?? {};
+                  return Object.entries(bindings).map(([bindKey, b]) => (
+                    <div key={`myslack-${bindKey}`} className="font-mono break-all">
+                      {serviceLabels[serviceKey] ?? serviceKey}: workspace={String(b.workspaceId ?? '')} actor=
+                      {String(b.slackUserId ?? '')} connection={String(b.connectionId ?? bindKey)}
+                    </div>
+                  ));
+                }
+                const c = connVal as Record<string, unknown>;
+                const details = Object.entries(c)
+                  .filter(([, v]) => v !== undefined && v !== null && v !== '')
+                  .map(([k, v]) => `${k}=${Array.isArray(v) ? v.join(',') : String(v)}`)
+                  .join(' ');
+                return (
+                  <div key={serviceKey} className="font-mono break-all">
+                    {serviceLabels[serviceKey] ?? serviceKey}: {details}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

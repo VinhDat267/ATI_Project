@@ -1,4 +1,5 @@
 import { createServer, type Server } from 'node:http';
+import { useState } from 'react';
 import { beforeEach, afterEach, it, expect, vi, describe } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup, act } from '@testing-library/react';
 import { App } from '../src/App';
@@ -468,6 +469,111 @@ describe('SLACK-06A & SLACK-06B SlackProposalInbox UI and /inbox route', () => {
     expect(screen.getByText('Tạo công việc: SOURCE_SECRET_TITLE')).toBeInTheDocument();
     view.rerender(
       <SlackProposalCard proposal={{ ...prepared, status: 'stale', body: null }} navigate={() => {}} onUpdated={() => {}} />,
+    );
+    expect(screen.queryByText('Tạo công việc: SOURCE_SECRET_TITLE')).not.toBeInTheDocument();
+  });
+
+  it('R5 & R6: delayed prepare response does not restore a newer redacted proposal, new revision invalidates old preview, and preview renders bound execution identities', async () => {
+    const row: any = {
+      id: 'p1',
+      connectionId: 'c1',
+      status: 'pending',
+      revision: '1',
+      activePlanId: null,
+      body: {
+        decision: {
+          kind: 'proposal',
+          title: 'SOURCE_SECRET_TITLE',
+          rationale: 'Mention',
+          relevance: { kind: 'mention' },
+          intents: [{ service: 'trello', action: 'task', summary: 'Task' }],
+        },
+        context: [{ ts: '1.000100', user: 'U_AUTHOR', text: 'SOURCE_SECRET_EXCERPT' }],
+      },
+    };
+    const prepared = {
+      ...row,
+      status: 'awaiting_approval',
+      revision: '2',
+      activePlanId: 'plan-for-list-A',
+      planHash: 'hash-for-list-A',
+    };
+    const result: any = {
+      status: 'awaiting_approval',
+      proposal: prepared,
+      planId: 'plan-for-list-A',
+      planHash: 'hash-for-list-A',
+      plan: {
+        summary: 'Tạo công việc: SOURCE_SECRET_TITLE',
+        steps: [
+          {
+            id: 'step_1',
+            tool: 'trello.create_card',
+            description: 'Tạo thẻ công việc từ đề xuất Slack',
+            args: { listId: 'LIST_A', title: 'SOURCE_SECRET_TITLE', desc: 'ACTUAL_WRITE_BODY' },
+          },
+        ],
+        connections: {
+          trello: {
+            credentialId: 'trello-credential',
+            username: 'TARGET_ACCOUNT',
+            memberId: 'TARGET_ACTOR',
+            boardIds: ['BOARD_A'],
+          },
+          myslack: {
+            bindings: {
+              c1: {
+                atiUserId: 'owner-one',
+                connectionId: 'c1',
+                workspaceId: 'TARGET_WORKSPACE',
+                slackUserId: 'TARGET_SLACK_ACTOR',
+                identityVersion: 1,
+              },
+            },
+            steps: {},
+          },
+        },
+      },
+    };
+
+    // 1. Delayed prepare response must not restore a newer redacted proposal
+    let resolveDelayed!: (value: any) => void;
+    vi.spyOn(slackAssistantApi, 'prepareProposal').mockImplementation(
+      () =>
+        new Promise((r) => {
+          resolveDelayed = r;
+        }),
+    );
+    let replace!: (value: any) => void;
+    function Harness() {
+      const [proposal, setProposal] = useState(row);
+      replace = setProposal;
+      return <SlackProposalCard proposal={proposal} navigate={() => {}} onUpdated={setProposal} />;
+    }
+    const harnessView = render(<Harness />);
+    fireEvent.click(screen.getByRole('button', { name: 'Xem trước kế hoạch' }));
+    await act(async () => replace({ ...prepared, revision: '3', status: 'stale', body: null, activePlanId: null }));
+    expect(screen.queryByText('SOURCE_SECRET_EXCERPT')).not.toBeInTheDocument();
+    expect(screen.getByText(/Nguồn tin nhắn đã thay đổi/)).toBeInTheDocument();
+    await act(async () => resolveDelayed(result));
+    expect(screen.queryByText('SOURCE_SECRET_EXCERPT')).not.toBeInTheDocument();
+    expect(screen.queryByText('Tạo công việc: SOURCE_SECRET_TITLE')).not.toBeInTheDocument();
+    harnessView.unmount();
+
+    // 2. A new proposal revision invalidates its old local preview & 3. Preview shows bound identities
+    vi.spyOn(slackAssistantApi, 'prepareProposal').mockResolvedValue(result);
+    const view = render(<SlackProposalCard proposal={row} navigate={() => {}} onUpdated={() => {}} />);
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Xem trước kế hoạch' })));
+    expect(screen.getByText('Tạo công việc: SOURCE_SECRET_TITLE')).toBeInTheDocument();
+    expect(document.body.textContent).toContain('TARGET_ACCOUNT');
+    expect(document.body.textContent).toContain('TARGET_WORKSPACE');
+    expect(document.body.textContent).toContain('TARGET_SLACK_ACTOR');
+    view.rerender(
+      <SlackProposalCard
+        proposal={{ ...prepared, revision: '3', activePlanId: 'different-plan', planHash: 'different-hash' }}
+        navigate={() => {}}
+        onUpdated={() => {}}
+      />,
     );
     expect(screen.queryByText('Tạo công việc: SOURCE_SECRET_TITLE')).not.toBeInTheDocument();
   });

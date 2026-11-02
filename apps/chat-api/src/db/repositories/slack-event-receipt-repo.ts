@@ -138,7 +138,12 @@ export type SlackLifecycleDescriptor =
   | { intentType: 'app_uninstall_validation' }
   | { intentType: 'message_deleted'; channelId: string; deletedTs: string }
   | { intentType: 'message_changed'; channelId: string; messageTs: string; editTs: string }
-  | { intentType: 'channel_membership_lost'; channelId: string; slackUserId: string | null };
+  | {
+      intentType: 'channel_membership_lost';
+      channelId: string;
+      slackUserId: string | null;
+      slackUserIds?: string[];
+    };
 
 interface SlackEventInputBase {
   appId: string;
@@ -303,11 +308,37 @@ function normalizeDescriptor(value: unknown): SlackLifecycleDescriptor {
     }
     case 'channel_membership_lost': {
       const channelId = requireSafeId(descriptor.channelId, 'channelId');
-      const slackUserId =
-        descriptor.slackUserId === null || descriptor.slackUserId === undefined
-          ? null
-          : requireSafeId(descriptor.slackUserId, 'slackUserId');
-      return { intentType: 'channel_membership_lost', channelId, slackUserId };
+      const ids: string[] = [];
+      const seen = new Set<string>();
+      if (descriptor.slackUserId !== null && descriptor.slackUserId !== undefined) {
+        const clean = requireSafeId(descriptor.slackUserId, 'slackUserId');
+        seen.add(clean);
+        ids.push(clean);
+      }
+      if (descriptor.slackUserIds !== undefined) {
+        if (!Array.isArray(descriptor.slackUserIds)) {
+          throw new TypeError('slackUserIds must be an array');
+        }
+        if (descriptor.slackUserIds.length > 1000) {
+          throw new TypeError('slackUserIds is too large');
+        }
+        for (const id of descriptor.slackUserIds) {
+          const clean = requireSafeId(id, 'slackUserId');
+          if (!seen.has(clean)) {
+            seen.add(clean);
+            ids.push(clean);
+          }
+        }
+      }
+      if (ids.length === 0) {
+        throw new TypeError('channel_membership_lost requires at least one slackUserId');
+      }
+      return {
+        intentType: 'channel_membership_lost',
+        channelId,
+        slackUserId: ids[0]!,
+        slackUserIds: ids,
+      };
     }
     default:
       throw new TypeError('Unknown lifecycle intent type');
@@ -612,17 +643,22 @@ export class SlackEventReceiptRepo {
           },
         });
       } else if (descriptor.intentType === 'channel_membership_lost') {
-        const actorClause = descriptor.slackUserId ? 'AND actor_id = $3' : '';
-        const params: unknown[] = descriptor.slackUserId
-          ? [base.appId!, base.teamId!, descriptor.slackUserId]
-          : [base.appId!, base.teamId!];
+        const actorIds =
+          descriptor.slackUserIds && descriptor.slackUserIds.length > 0
+            ? descriptor.slackUserIds
+            : descriptor.slackUserId
+              ? [descriptor.slackUserId]
+              : [];
+        if (actorIds.length === 0) {
+          throw new TypeError('channel_membership_lost requires at least one slackUserId');
+        }
         const rows = (
           await client.query<ConnectionCandidate>(
             `SELECT id, user_id, app_id, workspace_id, actor_id, identity_version, status, config
              FROM slack_connections
-             WHERE app_id = $1 AND workspace_id = $2 AND status <> 'disconnected' ${actorClause}
+             WHERE app_id = $1 AND workspace_id = $2 AND status <> 'disconnected' AND actor_id = ANY($3::text[])
              ORDER BY user_id, id`,
-            params
+            [base.appId!, base.teamId!, actorIds]
           )
         ).rows;
         for (const row of rows) {

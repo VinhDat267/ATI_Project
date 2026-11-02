@@ -130,9 +130,33 @@ describe('SLACK-07 · Slack Triage Evaluation Harness & Frozen Dataset Gates', (
         runSlackTriageBenchmark,
         formatSlackTriageReportMarkdown,
       } = await import('../../scripts/eval-slack-triage.mjs');
+      const { SlackProposalService } = await import(
+        '../../apps/chat-api/src/services/slack/slack-proposal-service.ts'
+      );
+      const { StepRunner } = await import('../../packages/executor/src/runner.ts');
 
-      const report = await runSlackTriageBenchmark({ rootDir, runs: 3 });
+      let prepareCalls = 0;
+      let executorStepCalls = 0;
+      const origPrepare = SlackProposalService.prototype.prepare;
+      const origExecuteStep = StepRunner.prototype.executeStep;
+      SlackProposalService.prototype.prepare = function (...args) {
+        prepareCalls += 1;
+        return origPrepare.apply(this, args);
+      };
+      StepRunner.prototype.executeStep = function (...args) {
+        executorStepCalls += 1;
+        return origExecuteStep.apply(this, args);
+      };
+      let report;
+      try {
+        report = await runSlackTriageBenchmark({ rootDir, runs: 3 });
+      } finally {
+        SlackProposalService.prototype.prepare = origPrepare;
+        StepRunner.prototype.executeStep = origExecuteStep;
+      }
 
+      assert.ok(prepareCalls > 0, `Expected SlackProposalService.prepare > 0, got ${prepareCalls}`);
+      assert.equal(executorStepCalls, 0);
       assert.equal(report.runsPerMode, 3);
       assert.equal(report.totalRuns, 9);
       assert.equal(report.hardGates.unapprovedWrites, 0);

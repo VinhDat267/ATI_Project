@@ -543,57 +543,107 @@ describe('SLACK-06A protected inbox, refine/prepare/reject CAS, and cross-servic
   expect((await f.messages.listMessages(conv.id))[0]?.content).toBe('Slack content is unavailable.');
  },30000);
 
- it('F2: binds destination connection credentials for Trello, GitHub, Gmail, MyCalendar, and MySheets in both standalone and Inbox-prepared plans',async()=>{
+ it('F2 (R3 & R4): binds real destination credentials and Trello boardIds in Inbox-prepared plans and blocks accounts connected after preview',async()=>{
+  const {TrelloTeamRepo}=await import('../../src/db/repositories/trello-team-repo.js');
+  const {GitHubTeamRepo}=await import('../../src/db/repositories/github-team-repo.js');
   const f=await setupFixture();
   const creds=new CredentialRepo(env.db.pool,TEST_KEY);
-  for(const service of ['trello','github','gmail','mycalendar','mysheets']){
-   await creds.saveCredentials(
-    service,
-    encryptCredentials({
-     refreshToken:'fixture',
-     accessToken:'fixture',
-     allowedScope:{calendars:['primary'],spreadsheets:['spreadsheet_allowed_1234567890']},
-    },TEST_KEY),
-    f.owner.person.id,
-   );
-  }
 
-  const factory=new AdapterFactory({credentialRepo:creds,encryptionKey:TEST_KEY});
-  const planningRef=await env.canonicalRef(f.owner.binding,'planning');
-  const cases=[
-   {service:'trello',intent:{action:'task' as const,service:'trello' as const,summary:'Task'}},
-   {service:'github',intent:{action:'issue' as const,service:'github' as const,summary:'Issue'}},
-   {service:'gmail',intent:{action:'task' as const,service:'gmail' as const,summary:'Email'}},
-   {service:'mycalendar',intent:{action:'task' as const,service:'mycalendar' as const,summary:'Event'}},
-   {service:'mysheets',intent:{action:'progress' as const,service:'mysheets' as const,summary:'Row'}},
+  // R4: Prepare a Gmail plan BEFORE connecting Gmail; connecting later must fail with AUTH_ERROR
+  const unconnectedSeed=await f.seedProposal({
+   intents:[{action:'task',service:'gmail',summary:'Draft confidential report'}],
+  });
+  const unconnectedPrep=await f.proposalService.prepare(f.owner.person.id,unconnectedSeed.id,{
+   expectedRevision:1,
+   replyInThread:false,
+   targetOverride:{service:'gmail',toEmail:'recipient@example.test'},
+  });
+  if(unconnectedPrep.status!=='awaiting_approval')throw new Error('not prepared');
+  expect(unconnectedPrep.plan.connections.gmail.credentialId).toBe('');
+  expect(unconnectedPrep.plan.connections.gmail.email).toBe('');
+
+  await creds.saveCredentials('trello',encryptCredentials({refreshToken:'synthetic-refresh',accessToken:'synthetic-access',memberId:'M_1',username:'alice_trello'},TEST_KEY),f.owner.person.id);
+  await creds.saveCredentials('github',encryptCredentials({refreshToken:'synthetic-refresh',accessToken:'synthetic-access',githubUserId:'G_1',login:'octo_alice'},TEST_KEY),f.owner.person.id);
+  await creds.saveCredentials('gmail',encryptCredentials({refreshToken:'later-account-refresh',email:'sender@example.test'},TEST_KEY),f.owner.person.id);
+  await creds.saveCredentials('mycalendar',encryptCredentials({refreshToken:'synthetic-refresh',email:'sender@example.test',allowedScope:{calendars:['primary']}},TEST_KEY),f.owner.person.id);
+  await creds.saveCredentials('mysheets',encryptCredentials({refreshToken:'synthetic-refresh',email:'sender@example.test',allowedScope:{spreadsheets:['spreadsheet_allowed_1234567890']}},TEST_KEY),f.owner.person.id);
+
+  const trelloTeam=new TrelloTeamRepo(env.db.pool);
+  await trelloTeam.replace({
+   scopeId:`personal:${f.owner.person.id}`,
+   chosenBy:f.owner.person.id,
+   workspaceId:'TRELLO_WORKSPACE',
+   workspaceName:'Trello workspace',
+   boards:[{boardId:'B_1',boardName:'Allowed board'}],
+  });
+  const ghTeam=new GitHubTeamRepo(env.db.pool);
+  await ghTeam.replace({
+   chosenBy:f.owner.person.id,
+   repos:[{repoId:'R_1',fullName:'acme/repo',name:'repo'}],
+  });
+
+  const factory=new AdapterFactory({
+   credentialRepo:creds,
+   encryptionKey:TEST_KEY,
+   trelloTeamRepo:trelloTeam,
+   trelloTokens:{forConnection:()=>({getAccessToken:async()=>'synthetic-access'})},
+   trelloOAuthClient:{boards:async()=>[{id:'B_1',member:true}]},
+   githubTeamRepo:ghTeam,
+   githubTokens:{forConnection:()=>({getAccessToken:async()=>'synthetic-access'})},
+   githubOAuthClient:{repos:async()=>[{fullName:'acme/repo',member:true}]},
+   gmailTokens:{forConnection:()=>({getAccessToken:async()=>'synthetic-token'})} as any,
+   createGmailAdapter:()=>({execute:async()=>({id:'d1'})}),
+   mycalendarTokens:{forConnection:()=>({getAccessToken:async()=>'synthetic-token'})} as any,
+   createMyCalendarAdapter:()=>({execute:async()=>({id:'e1',url:'https://calendar.test/e1'})}),
+   mysheetsTokens:{forConnection:()=>({getAccessToken:async()=>'synthetic-token'})} as any,
+   createMySheetsAdapter:()=>({execute:async()=>({updatedRange:'Sheet1!A1:C1'})}),
+  });
+
+  // Verify the pre-connection Gmail plan is rejected with AUTH_ERROR
+  let lateError:any=null;
+  try{
+   await factory.getAdapterForService('gmail',{
+    userId:f.owner.person.id,
+    workspaceMode:'personal',
+    phase:'execution',
+    connections:unconnectedPrep.plan.connections,
+   });
+  }catch(e){
+   lateError=e;
+  }
+  expect(lateError?.category).toBe('AUTH_ERROR');
+
+  // Verify Inbox-prepared plans for all 5 services bind real credentialIds, Trello boardId B_1, and sender email
+  const inboxCases=[
+   {service:'trello',override:undefined},
+   {service:'github',override:{service:'github',repo:'acme/repo'}},
+   {service:'gmail',override:{service:'gmail',toEmail:'recipient@example.test'}},
+   {service:'mycalendar',override:{service:'mycalendar',calendarId:'primary',startIso:'2026-11-05T09:00:00Z',endIso:'2026-11-05T09:30:00Z'}},
+   {service:'mysheets',override:{service:'mysheets',spreadsheetId:'spreadsheet_allowed_1234567890',sheet:'Sheet1'}},
   ];
-  for(const item of cases){
-   for(const replyInThread of [false,true]){
-    const built=planSlackProposalWorkflow({
-     ownerId:f.owner.person.id,
-     binding:f.owner.binding,
-     policyReference:planningRef,
-     source:{channelId:'C_WORK',messageTs:'1730000000.000001'},
-     proposal:{title:'Title',rationale:'Reason',intents:[item.intent],sourceTexts:['Text']},
-     targets:{
-      task:{listId:'L_TODO'},
-      github:{repo:'acme/repo'},
-      gmail:{toEmail:'to@example.test'},
-      calendar:{calendarId:'primary',startIso:'2026-11-03T09:00:00Z',endIso:'2026-11-03T09:30:00Z'},
-      progress:{spreadsheetId:'spreadsheet_allowed_1234567890',sheet:'Sheet1'},
-      replyInThread,
-     },
-    });
-    expect(built.kind).toBe('plan');
-    if(built.kind==='plan'){
-     const adapter=await factory.getAdapterForService(item.service,{
-      userId:f.owner.person.id,
-      phase:'execution',
-      workspaceMode:'personal',
-      connections:built.plan.connections,
-     });
-     expect(typeof (adapter as any).execute).toBe('function');
+  for(const item of inboxCases){
+   const seeded=await f.seedProposal();
+   const prepared=await f.proposalService.prepare(f.owner.person.id,seeded.id,{
+    expectedRevision:1,
+    replyInThread:true,
+    ...(item.override?{targetOverride:item.override}:{}),
+   });
+   expect(prepared.status).toBe('awaiting_approval');
+   if(prepared.status==='awaiting_approval'){
+    if(item.service==='trello'){
+     expect(prepared.plan.connections.trello.boardIds).toEqual(['B_1']);
+     expect(prepared.plan.connections.trello.username).toBe('alice_trello');
     }
+    if(item.service==='gmail'){
+     expect(prepared.plan.connections.gmail.email).toBe('sender@example.test');
+    }
+    const adapter=await factory.getAdapterForService(item.service,{
+     userId:f.owner.person.id,
+     workspaceMode:'personal',
+     phase:'execution',
+     connections:prepared.plan.connections,
+    });
+    expect(typeof (adapter as any).execute).toBe('function');
    }
   }
  },30000);

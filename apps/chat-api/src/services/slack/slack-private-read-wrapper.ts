@@ -688,12 +688,17 @@ export class SlackPrivateReadWrapper {
             try {
               const hasStored = await client.query<{ n: number }>(
                 `SELECT (
-                   (SELECT count(*)::int FROM slack_sources WHERE connection_id = $1 AND channel_id = $2) +
-                   (SELECT count(*)::int FROM slack_derived_provenance_segments WHERE connection_id = $1 AND channel_id = $2)
+                   (SELECT count(*)::int FROM slack_sources
+                     WHERE connection_id = $1
+                       AND (metadata->>'channelId' = $2 OR (resource_type = 'conversation' AND resource_id = $2))
+                       AND purged_at IS NULL) +
+                   (SELECT count(*)::int FROM slack_derived_provenance_segments
+                     WHERE connection_id = $1
+                       AND (channel_id = $2 OR (resource_type = 'conversation' AND resource_id = $2)))
                  ) AS n`,
                 [cleanBinding.connectionId, channelId]
               );
-              if ((hasStored.rows[0]?.n ?? 0) > 0) {
+              if ((hasStored?.rows?.[0]?.n ?? 0) > 0) {
                 await this.deps.invalidationService.stageInTransaction!(client, {
                   sourceEventKey: `read_not_found:${cleanBinding.connectionId}:${cleanBinding.identityVersion}:${channelId}`,
                   effects: [
@@ -723,7 +728,7 @@ export class SlackPrivateReadWrapper {
             }
           });
         } catch {
-          // Best-effort barrier staging; always fail closed with SLACK_READ_NOT_FOUND.
+          throw new SlackPrivateReadError('SLACK_READ_INTERNAL');
         }
       }
       throw new SlackPrivateReadError(code);
