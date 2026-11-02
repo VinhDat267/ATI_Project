@@ -377,7 +377,16 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
             }
           }
 
-          const config = record && encryptionKey ? decryptCredentials(record.config, encryptionKey) : null;
+          let config: Record<string, any> | null = null;
+          if (record && encryptionKey) {
+            try {
+              config = decryptCredentials(record.config, encryptionKey);
+            } catch {
+              // One unreadable row (e.g. written under another ENCRYPTION_KEY) must not
+              // fail the whole list; the service is reported as not configured.
+              console.warn(`[services] Cannot decrypt stored credentials for '${id}'; listing it as unconfigured.`);
+            }
+          }
           const scope = config?.allowedScope as Record<string, unknown> | undefined;
           const entries = scope?.[scopeKey];
           const configured =

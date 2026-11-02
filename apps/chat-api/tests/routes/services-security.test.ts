@@ -117,4 +117,21 @@ describe('service credential and health boundary', () => {
     expect(catalog.every((tool) => tool.service === 'notion')).toBe(true);
     expect(catalog.some((tool) => tool.name === 'notion.create_page')).toBe(true);
   });
+
+  it('still lists services when one shared credential cannot be decrypted with the current key', async () => {
+    const db1 = '00000000-0000-0000-0000-000000000001';
+    // Row written by a server started with a different ENCRYPTION_KEY: AES-GCM auth fails on read.
+    const foreign = encryptCredentials({ token: 'notion-test-token', allowedScope: { databases: [db1] } }, 'another-encryption-key-of-32-bytes!');
+    const readable = encryptCredentials({ botToken: 'xoxb-k', allowedScope: { channels: ['C1'] } }, key);
+    const app = createApp({ jwtSecret: secret, credentialRepo: {
+      getCredentials: async (service: string) => service === 'notion' ? { config: foreign } : service === 'slack' ? { config: readable } : null,
+    } as any, encryptionKey: key });
+    const response = await request(app).get('/api/services').set('Authorization', `Bearer ${token}`);
+    expect(response.status).toBe(200);
+    const notion = response.body.services.find((service: any) => service.id === 'notion');
+    expect(notion).toMatchObject({ configured: false, connected: false, connectionStatus: 'unconfigured', allowedScope: [] });
+    expect(JSON.stringify(response.body)).not.toContain('notion-test-token');
+    const slack = response.body.services.find((service: any) => service.id === 'slack');
+    expect(slack).toMatchObject({ configured: true, allowedScope: ['C1'] });
+  });
 });
