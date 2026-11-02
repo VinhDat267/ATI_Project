@@ -67,6 +67,7 @@ describe.each([200, 500] as const)('PBI-03: mở lại hội thoại có kế ho
     expect(within(saved).getByText(REQUEST)).toBeInTheDocument();
     expect(within(saved).getByText(new RegExp(PLAN_SUMMARY))).toBeInTheDocument();
     expect(within(saved).getByText(/không còn chờ duyệt/)).toBeInTheDocument();
+    expect(within(saved).queryByRole('status')).toBeNull();
     expect(within(main).queryByRole('heading', { level: 1, name: 'Hôm nay bạn muốn nhờ việc gì?' })).toBeNull();
     expect(within(main).getByRole('heading', { level: 1, name: 'Tiếp tục hội thoại này' })).toBeInTheDocument();
     // Nút Xem hội thoại không còn bị ẩn khi đã có tin nhắn lưu.
@@ -103,4 +104,109 @@ it('PBI-03: hội thoại mới (chưa có tin nhắn) vẫn là màn hình bắ
   render(<App />);
   expect(await screen.findByRole('heading', { level: 1, name: 'Hôm nay bạn muốn nhờ việc gì?' })).toBeInTheDocument();
   expect(screen.queryByRole('region', { name: 'Hội thoại đã lưu' })).toBeNull();
+});
+
+describe.each([
+  { plansStatus: 500, executionsStatus: 500, label: 'plans/active 500 + executions/latest 500' },
+  { plansStatus: 500, executionsStatus: 404, label: 'plans/active 500 + executions/latest 404' },
+  { plansStatus: 404, executionsStatus: 500, label: 'plans/active 404 + executions/latest 500' },
+] as const)('PBI-03: lỗi máy chủ khi tải trạng thái kế hoạch/thực thi ($label)', ({ plansStatus, executionsStatus }) => {
+  it('không khẳng định sai rằng kế hoạch đã hết hạn duyệt hoặc đã bị huỷ, mà hiện thông báo trung lập kèm cảnh báo lỗi tải', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      const path = url.replace(/^https?:\/\/[^/]+/, '').split('?')[0];
+      if (path === `/api/conversations/${CONV_ID}`) return json(200, { conversation: { id: CONV_ID, title: REQUEST }, messages: savedMessages });
+      if (path === `/api/conversations/${CONV_ID}/plans/active`) return plansStatus === 500 ? json(500, { error: 'db down' }) : json(404, { error: 'No active pending plan found' });
+      if (path === `/api/conversations/${CONV_ID}/executions/latest`) return executionsStatus === 500 ? json(500, { error: 'db down' }) : json(404, { error: 'No execution found' });
+      if (path === '/api/services') return json(200, { services: [{ id: 'slack', name: 'Slack', configured: true, connected: true, connectionStatus: 'healthy' }], canConfigure: false });
+      return json(404, { error: 'not mocked' });
+    });
+
+    render(<App />);
+    await waitFor(() => expect(useChatStore.getState().messages.map(m => m.id)).toEqual(['m-user', 'm-plan']));
+    const main = await screen.findByRole('main');
+    const saved = await within(main).findByRole('region', { name: 'Hội thoại đã lưu' });
+    expect(within(saved).getByText(REQUEST)).toBeInTheDocument();
+    expect(within(saved).getByText(new RegExp(PLAN_SUMMARY))).toBeInTheDocument();
+    expect(within(saved).queryByText(/đã hết hạn duyệt hoặc đã bị huỷ/)).toBeNull();
+    expect(within(saved).queryByText(/không còn chờ duyệt/)).toBeNull();
+    expect(within(saved).getByRole('alert')).toHaveTextContent(/Không tải được trạng thái kế hoạch hoặc thực thi/);
+  });
+});
+
+describe('PBI-03: luồng lùi về Moment 1 giữ yêu cầu đã lưu và ô nhập mà không báo nhầm kế hoạch hết hạn', () => {
+  it('bấm "Quay lại" từ ClarificationMoment hiện Hội thoại đã lưu không có dòng kế hoạch hết hạn và giữ nguyên nội dung ô nhập', async () => {
+    const clarificationMessages = [
+      { id: 'm-user', role: 'user', content: REQUEST, created_at: '2026-11-01T08:00:00.000Z' },
+      {
+        id: 'm-clarify',
+        role: 'assistant',
+        content: 'Bạn muốn gửi vào kênh Slack nào?',
+        created_at: '2026-11-01T08:00:03.000Z',
+        metadata: { type: 'clarification', options: ['#ati-test', '#general'] },
+      },
+    ];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      const path = url.replace(/^https?:\/\/[^/]+/, '').split('?')[0];
+      if (path === `/api/conversations/${CONV_ID}`) return json(200, { conversation: { id: CONV_ID, title: REQUEST }, messages: clarificationMessages });
+      if (path === `/api/conversations/${CONV_ID}/plans/active`) return json(404, { error: 'No active pending plan found' });
+      if (path === `/api/conversations/${CONV_ID}/executions/latest`) return json(404, { error: 'No execution found' });
+      if (path === '/api/services') return json(200, { services: [{ id: 'slack', name: 'Slack', configured: true, connected: true, connectionStatus: 'healthy' }], canConfigure: false });
+      return json(404, { error: 'not mocked' });
+    });
+
+    render(<App />);
+    const backBtn = await screen.findByRole('button', { name: /Quay lại/ });
+    fireEvent.click(backBtn);
+
+    const main = await screen.findByRole('main');
+    const saved = await within(main).findByRole('region', { name: 'Hội thoại đã lưu' });
+    expect(within(saved).getByText(REQUEST)).toBeInTheDocument();
+    expect(within(saved).queryByText(/đã hết hạn duyệt hoặc đã bị huỷ/)).toBeNull();
+    expect(within(saved).getByText('Yêu cầu này không có kế hoạch nào đang chờ duyệt. Gửi lại yêu cầu nếu bạn vẫn muốn ATI xử lý.')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Mô tả công việc bạn muốn thực hiện' })).toHaveValue(REQUEST);
+  });
+
+  it('hội thoại có schedule_proposal khi schedulesEnabled tắt rơi về Moment 1 hiện Hội thoại đã lưu không báo kế hoạch hết hạn và giữ nguyên prefill', async () => {
+    const scheduleRequest = 'Mỗi sáng 08:00 gửi lịch họp lên #ati-test';
+    const scheduleMessages = [
+      { id: 'm-user', role: 'user', content: scheduleRequest, created_at: '2026-11-01T08:00:00.000Z' },
+      {
+        id: 'm-sched',
+        role: 'assistant',
+        content: 'Đề xuất lịch chạy mỗi ngày',
+        created_at: '2026-11-01T08:00:03.000Z',
+        metadata: {
+          type: 'schedule_proposal',
+          proposal: {
+            name: 'Lịch họp sáng',
+            request: scheduleRequest,
+            recurrence: { type: 'daily', time: '08:00' },
+            services: ['slack'],
+            nextRuns: ['2026-11-03T01:00:00.000Z'],
+          },
+        },
+      },
+    ];
+    sessionStorage.setItem('ati_prefill_prompt', scheduleRequest);
+    vi.spyOn(apiClient, 'getRuntime').mockResolvedValue({ runtimeMode: 'sandbox', schedulesEnabled: false } as never);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      const path = url.replace(/^https?:\/\/[^/]+/, '').split('?')[0];
+      if (path === `/api/conversations/${CONV_ID}`) return json(200, { conversation: { id: CONV_ID, title: scheduleRequest }, messages: scheduleMessages });
+      if (path === `/api/conversations/${CONV_ID}/plans/active`) return json(404, { error: 'No active pending plan found' });
+      if (path === `/api/conversations/${CONV_ID}/executions/latest`) return json(404, { error: 'No execution found' });
+      if (path === '/api/services') return json(200, { services: [{ id: 'slack', name: 'Slack', configured: true, connected: true, connectionStatus: 'healthy' }], canConfigure: false });
+      return json(404, { error: 'not mocked' });
+    });
+
+    render(<App />);
+    const main = await screen.findByRole('main');
+    const saved = await within(main).findByRole('region', { name: 'Hội thoại đã lưu' });
+    expect(within(saved).getByText(scheduleRequest)).toBeInTheDocument();
+    expect(within(saved).queryByText(/đã hết hạn duyệt hoặc đã bị huỷ/)).toBeNull();
+    expect(within(saved).getByText('Yêu cầu này không có kế hoạch nào đang chờ duyệt. Gửi lại yêu cầu nếu bạn vẫn muốn ATI xử lý.')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Mô tả công việc bạn muốn thực hiện' })).toHaveValue(scheduleRequest);
+  });
 });

@@ -4,6 +4,7 @@ import type { User } from '../../types';
 import { apiClient } from '../../services/api-client';
 import { useSchedulesEnabled } from '../../hooks/use-schedules';
 import { describeRecurrence, formatRunTime, runLabel, scheduleLabel } from '../../services/schedule-text';
+import { getActiveWorkspaceId, subscribeWorkspace } from '../../services/workspace-storage';
 import { ScheduleActions } from '../Cockpit/ScheduleActions';
 import { WorkflowFlowCanvas } from '../../components/WorkflowFlowCanvas';
 
@@ -70,7 +71,9 @@ function ScheduleEmptyState({ navigate }: { navigate: (path: string) => void }) 
 }
 export function ScheduleSection({ user, navigate }: { user: User | null; navigate: (path: string) => void }) {
   const enabled = useSchedulesEnabled();
+  const [workspaceId, setWorkspaceId] = useState(getActiveWorkspaceId());
   const [schedules, setSchedules] = useState<ScheduleView[]>([]), [error, setError] = useState(''), [loaded, setLoaded] = useState(false);
+  useEffect(() => subscribeWorkspace(() => setWorkspaceId(getActiveWorkspaceId())), []);
   useEffect(() => {
     setSchedules([]); setLoaded(false); setError('');
     if (!enabled || !user) return;
@@ -80,7 +83,7 @@ export function ScheduleSection({ user, navigate }: { user: User | null; navigat
     window.addEventListener('focus', listener); window.addEventListener('schedules:changed', listener);
     const timer = window.setInterval(listener, 30_000);
     return () => { current = false; window.clearInterval(timer); window.removeEventListener('focus', listener); window.removeEventListener('schedules:changed', listener); };
-  }, [enabled, user?.id]);
+  }, [enabled, user?.id, workspaceId]);
   const reload = async () => { const data = await apiClient.getSchedules(); setSchedules(data.schedules); };
   if (!enabled || !user) return null;
   return <section aria-labelledby="schedule-section-title" className="v3-space-y-4"><h2 id="schedule-section-title" className="font-display text-2xl font-bold text-[#111827]">Lịch chạy</h2>{!loaded && <p role="status" className="text-xs text-[#6B7280]">Đang tải lịch chạy…</p>}{error && <p role="alert" className="text-sm text-red-700">{error}</p>}{loaded && !error && !schedules.length && <ScheduleEmptyState navigate={navigate} />}{schedules.map(schedule => <ScheduleRow key={schedule.id} schedule={schedule} navigate={navigate} reload={reload} onChanged={changed => setSchedules(rows => rows.map(row => row.id === changed.id ? changed : row))} />)}</section>;

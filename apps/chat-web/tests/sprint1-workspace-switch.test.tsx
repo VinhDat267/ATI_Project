@@ -71,4 +71,31 @@ describe('PBI-04: chuyển không gian trên /settings', () => {
     await waitFor(() => expect(window.location.pathname).toBe('/'));
     expect(useChatStore.getState().conversationId).toBeNull();
   });
+
+  it('giữ nguyên /history và tải lại cả mục Lịch chạy lẫn danh sách hội thoại của không gian mới', async () => {
+    vi.spyOn(apiClient, 'getRuntime').mockResolvedValue({ runtimeMode: 'sandbox', schedulesEnabled: true } as never);
+    vi.spyOn(apiClient, 'getSchedules').mockImplementation(async () => ({
+      schedules: getActiveWorkspaceId() === 'personal'
+        ? [{ id: 's-personal', convId: 'c-p', version: 1, name: 'Lịch riêng cá nhân', request: 'Lịch riêng', recurrence: { type: 'daily', time: '08:00' }, services: ['slack'], status: 'active', pauseReason: null, nextRuns: ['2026-11-03T01:00:00Z'], lastRun: null }]
+        : [],
+    }) as never);
+    vi.spyOn(apiClient, 'getConversations').mockImplementation(async () => ({
+      conversations: getActiveWorkspaceId() === 'personal'
+        ? [{ id: 'conv-personal', title: 'Hội thoại cá nhân' }]
+        : [{ id: 'conv-shared', title: 'Hội thoại nhóm chung' }],
+    }) as never);
+
+    window.history.replaceState({}, '', '/history');
+    render(<App />);
+    const scheduleRegion = await screen.findByRole('region', { name: 'Lịch chạy' });
+    expect(await within(scheduleRegion).findByText('Lịch riêng cá nhân')).toBeInTheDocument();
+    expect(await screen.findByText('Hội thoại cá nhân')).toBeInTheDocument();
+
+    await act(async () => { await switchTo(/^Không gian Chung$/); });
+    expect(window.location.pathname).toBe('/history');
+    expect(await within(scheduleRegion).findByText('Chưa có lịch chạy nào')).toBeInTheDocument();
+    expect(within(scheduleRegion).queryByText('Lịch riêng cá nhân')).toBeNull();
+    expect(await screen.findByText('Hội thoại nhóm chung')).toBeInTheDocument();
+    expect(screen.queryByText('Hội thoại cá nhân')).toBeNull();
+  });
 });

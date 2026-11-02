@@ -83,7 +83,9 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
   }, [open]);
 
   // PBI-04: a conversation belongs to exactly one workspace, so only /c/:id leaves for "/".
-  // Every other page (settings, history, users…) subscribes to the workspace and reloads in place.
+  // Workspace-scoped views (/, /history conversations + ScheduleSection, /settings + TrelloConnection,
+  // /admin/users, MainNav, SidebarHistory) subscribe to workspace changes and reload in place;
+  // user/static pages (/account, /guide, /privacy) keep their route while MainNav updates the header.
   const leaveWorkspaceBoundPage = () => {
     if (/^\/c\//.test(window.location.pathname)) navigate?.('/');
   };

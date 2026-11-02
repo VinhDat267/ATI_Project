@@ -7,15 +7,37 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { ScheduleSection } from '../src/pages/History/ScheduleSection';
 import { SchedulesCapabilityContext } from '../src/hooks/use-schedules';
 import { apiClient } from '../src/services/api-client';
+import {
+  getActiveWorkspaceId,
+  resetWorkspaceStorage,
+  setActiveWorkspaceId,
+  setCachedOrganizations,
+} from '../src/services/workspace-storage';
 
 const user = { id: 'u1', name: 'An', email: 'an@example.test' };
+const scheduleItem = (id: string, name: string) => ({
+  id,
+  convId: 'c-' + id,
+  version: 1,
+  name,
+  request: name,
+  recurrence: { type: 'daily', time: '08:00' },
+  services: ['slack'],
+  status: 'active',
+  pauseReason: null,
+  nextRuns: ['2026-11-03T01:00:00Z'],
+  lastRun: null,
+});
 function view(enabled = true) {
   const navigate = vi.fn();
   render(<SchedulesCapabilityContext.Provider value={enabled}><ScheduleSection user={user} navigate={navigate} /></SchedulesCapabilityContext.Provider>);
   return { navigate };
 }
-beforeEach(() => { vi.spyOn(apiClient, 'getSchedules').mockResolvedValue({ schedules: [] }); });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+beforeEach(() => {
+  resetWorkspaceStorage();
+  vi.spyOn(apiClient, 'getSchedules').mockResolvedValue({ schedules: [] });
+});
+afterEach(() => { cleanup(); vi.restoreAllMocks(); resetWorkspaceStorage(); });
 
 describe('PBI-05: mục Lịch chạy khi chưa có lịch', () => {
   it('vẫn hiện mục Lịch chạy với trạng thái rỗng giải thích cách tạo lịch và nút về Không gian làm việc', async () => {
@@ -55,5 +77,22 @@ describe('PBI-05: mục Lịch chạy khi chưa có lịch', () => {
     await act(async () => {});
     expect(screen.queryByRole('region', { name: 'Lịch chạy' })).toBeNull();
     expect(apiClient.getSchedules).not.toHaveBeenCalled();
+  });
+
+  it('tải lại danh sách lịch chạy khi chuyển không gian làm việc ngay trên /history', async () => {
+    setCachedOrganizations([{ id: 'ws-shared', name: 'Chung', role: 'member', status: 'active' }] as never);
+    vi.mocked(apiClient.getSchedules).mockImplementation(async () => ({
+      schedules: getActiveWorkspaceId() === 'personal' ? [scheduleItem('p1', 'Lịch cá nhân')] : [],
+    }) as never);
+
+    view(true);
+    const section = await screen.findByRole('region', { name: 'Lịch chạy' });
+    expect(await within(section).findByText('Lịch cá nhân')).toBeInTheDocument();
+
+    await act(async () => {
+      setActiveWorkspaceId('ws-shared');
+    });
+    expect(await within(section).findByText('Chưa có lịch chạy nào')).toBeInTheDocument();
+    expect(within(section).queryByText('Lịch cá nhân')).toBeNull();
   });
 });

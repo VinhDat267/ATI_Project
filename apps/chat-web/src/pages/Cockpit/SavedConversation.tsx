@@ -9,9 +9,17 @@ export function latestSavedRequest(messages: ChatMessage[]): ChatMessage | undef
     message.status !== 'failed' && message.metadata?.type !== 'schedule_run' && message.content.trim() !== '');
 }
 
-function outcome(messages: ChatMessage[], request: ChatMessage): string {
+function outcome(messages: ChatMessage[], request: ChatMessage, statusLoadError?: string | null): string {
   const after = messages.slice(messages.indexOf(request) + 1);
   const plan = [...after].reverse().find(message => message.metadata?.type === 'plan');
+  if (statusLoadError) {
+    if (plan) {
+      const summary = plan.metadata?.plan?.summary ?? plan.content.replace(/^Kế hoạch:\s*/, '');
+      const count = plan.metadata?.plan?.steps?.length;
+      return `Kế hoạch đã lưu: “${summary}”${count ? ` (${count} việc)` : ''}. Chưa kiểm tra được trạng thái duyệt hoặc thực thi do lỗi tải dữ liệu từ máy chủ.`;
+    }
+    return 'Chưa kiểm tra được trạng thái xử lý của yêu cầu này do lỗi tải dữ liệu từ máy chủ.';
+  }
   if (plan) {
     const summary = plan.metadata?.plan?.summary ?? plan.content.replace(/^Kế hoạch:\s*/, '');
     const count = plan.metadata?.plan?.steps?.length;
@@ -20,8 +28,8 @@ function outcome(messages: ChatMessage[], request: ChatMessage): string {
   return 'Yêu cầu này không có kế hoạch nào đang chờ duyệt. Gửi lại yêu cầu nếu bạn vẫn muốn ATI xử lý.';
 }
 
-export function SavedConversation({ messages, request, onOpenConversation, onResend }: {
-  messages: ChatMessage[]; request: ChatMessage; onOpenConversation: () => void; onResend: (text: string) => void;
+export function SavedConversation({ messages, request, statusLoadError, onOpenConversation, onResend }: {
+  messages: ChatMessage[]; request: ChatMessage; statusLoadError?: string | null; onOpenConversation: () => void; onResend: (text: string) => void;
 }) {
   const timestamp = request.timestamp ?? request.created_at;
   const validTime = !!timestamp && Number.isFinite(Date.parse(timestamp));
@@ -33,7 +41,12 @@ export function SavedConversation({ messages, request, onOpenConversation, onRes
         {validTime && <span className="text-xs text-[#6B7280]">Yêu cầu lúc <time dateTime={timestamp}>{new Date(timestamp!).toLocaleString('vi-VN', { hour12: false })}</time></span>}
       </div>
       <blockquote className="border-l-2 border-[#E7E7E2] pl-3 text-base text-[#111827] leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">{request.content}</blockquote>
-      <p role="status" className="text-sm leading-relaxed rounded-xl bg-amber-50 border border-amber-200 text-amber-900 px-3 py-2 [overflow-wrap:anywhere]">{outcome(messages, request)}</p>
+      <p className="text-sm leading-relaxed rounded-xl bg-amber-50 border border-amber-200 text-amber-900 px-3 py-2 [overflow-wrap:anywhere]">{outcome(messages, request, statusLoadError)}</p>
+      {statusLoadError && (
+        <p role="alert" className="text-sm leading-relaxed rounded-xl bg-red-50 border border-red-200 text-red-800 px-3 py-2 [overflow-wrap:anywhere]">
+          Không tải được trạng thái kế hoạch hoặc thực thi: {statusLoadError} Hãy tải lại hội thoại hoặc thử lại sau.
+         </p>
+      )}
       <div className="flex flex-col min-[420px]:flex-row gap-2">
         <button type="button" onClick={() => onResend(request.content)}
           className="inline-flex items-center justify-center px-4 py-2 rounded-xl text-sm font-semibold bg-[#111827] text-white hover:opacity-90 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5701] focus-visible:ring-offset-2">
