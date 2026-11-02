@@ -82,6 +82,10 @@ describe('Telegram auto_digest schedule proposal & confirmation on PostgreSQL (T
     };
 
     const validCandidate = evaluateTelegramDigestCandidate({
+      githubLookup: {
+        status: 'connected',
+        connection: { credentialId: 'gh-cred', githubUserId: '123', login: 'tester', repos: ['acme/ati'] },
+      },
       proposal: {
         kind: 'schedule',
         action: 'create',
@@ -177,6 +181,11 @@ describe('Telegram auto_digest schedule proposal & confirmation on PostgreSQL (T
       },
       eventEmitter: { emit: (event, payload) => emitted.push({ event, payload }) },
       telegramConnection: telegramLookup,
+      githubConnection: async () => ({
+        status: 'connected',
+        connection: { credentialId: 'gh-cred', githubUserId: '123', login: 'tester', repos: ['acme/ati'] },
+        teamRepos: [], memberRepos: [],
+      }),
       schedules: { repo: scheduleService.repo, timeZone: 'Asia/Ho_Chi_Minh', now: () => now },
     });
 
@@ -211,7 +220,7 @@ describe('Telegram auto_digest schedule proposal & confirmation on PostgreSQL (T
     expect(confirmed.schedule.digest).toMatchObject({
       chatId: '777888999',
       chatTitle: 'Telegram của tôi (Digest User)',
-      sources: [{ service: 'github', label: 'GitHub Issues đang mở' }],
+      sources: [{ service: 'github', label: 'GitHub Issues đang mở (acme/ati)' }],
     });
 
     // Now test update proposal changing recurrence to 08:15 -> recomputes digest_config_hash

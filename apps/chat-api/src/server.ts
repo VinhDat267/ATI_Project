@@ -32,6 +32,7 @@ import { TrelloTokenManager } from './services/trello/token-manager.js';
 import { TrelloOAuthClient } from './services/trello/oauth-client.js';
 import { TrelloTeamRepo } from './db/repositories/trello-team-repo.js';
 import { TelegramTeamRepo } from './db/repositories/telegram-team-repo.js';
+import { TelegramUpdateRepo } from './db/repositories/telegram-update-repo.js';
 import { TelegramBotClient } from './services/telegram/bot-client.js';
 import { createTelegramConnectionLookup } from './services/telegram/connection-reference.js';
 import { TelegramDigestRunner } from './services/schedules/telegram-digest-runner.js';
@@ -325,7 +326,9 @@ async function bootstrap() {
   const githubConnection = githubLookup ?? sandboxGitHubConnection;
 
   const telegramAvailable = Boolean(env.TELEGRAM_BOT && pool);
-  const telegramBotClient = telegramAvailable ? new TelegramBotClient(env.TELEGRAM_BOT!) : undefined;
+  const telegramBotClient = telegramAvailable && pool
+    ? new TelegramBotClient(env.TELEGRAM_BOT!, fetch, new TelegramUpdateRepo(pool))
+    : undefined;
   const telegramTeamRepo = pool ? new TelegramTeamRepo(pool) : undefined;
   const telegramLookup = telegramAvailable && telegramBotClient
     ? createTelegramConnectionLookup({
@@ -597,6 +600,7 @@ async function bootstrap() {
   }
 
   const telegramDigestRunner = new TelegramDigestRunner({
+    pool,
     credentialRepo: credRepo,
     encryptionKey: env.ENCRYPTION_KEY,
     adapterFactory,
@@ -685,6 +689,7 @@ async function bootstrap() {
     githubTeamRepo,
     telegram: {
       bot: telegramAvailable ? env.TELEGRAM_BOT : undefined,
+      botClient: telegramBotClient,
       teamRepo: telegramTeamRepo,
       onConnectionChanged: (userId: string) => {
         realAdapterFactory.clearPersonal(userId);

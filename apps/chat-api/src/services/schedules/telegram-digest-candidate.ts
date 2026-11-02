@@ -6,12 +6,13 @@ import type {
   TelegramDigestSource,
 } from '@wap/tool-schemas';
 import type { TelegramConnectionLookupResult } from '../telegram/connection-reference.js';
+import type { GitHubConnectionLookupResult } from '../github/connection-reference.js';
 
 export const READ_DIGEST_SOURCE_MAP: Record<string, TelegramDigestSource> = {
   github: {
     service: 'github',
-    tool: 'github.list_issues',
-    args: { state: 'open' },
+    tool: 'github.search_issues',
+    args: { query: 'open' },
     label: 'GitHub Issues đang mở',
   },
   calendar: {
@@ -120,6 +121,7 @@ export interface EvaluateTelegramDigestInput {
   services: string[];
   timeZone: string;
   telegramLookup?: TelegramConnectionLookupResult | null;
+  githubLookup?: Pick<GitHubConnectionLookupResult, 'status' | 'connection'> | null;
   existingDigest?: TelegramDigestConfig | null;
 }
 
@@ -206,9 +208,24 @@ export function evaluateTelegramDigestCandidate(
     }
   }
 
-  const sources: TelegramDigestSource[] = nonTelegramServices.map((s) => ({
-    ...READ_DIGEST_SOURCE_MAP[s]!,
-  }));
+  const sources: TelegramDigestSource[] = [];
+  for (const service of [...new Set(nonTelegramServices)]) {
+    const source = READ_DIGEST_SOURCE_MAP[service]!;
+    if (service === 'github') {
+      const repos = input.githubLookup?.status === 'connected' ? input.githubLookup.connection?.repos : undefined;
+      if (!repos?.length) {
+        return {
+          canAutoDigest: false,
+          disabledReason: 'Hãy kết nối GitHub và chọn repository được phép đọc trước khi bật Tự gửi.',
+        };
+      }
+      for (const repo of [...new Set(repos)]) {
+        sources.push({ ...source, args: { repo, query: 'open' }, label: `${source.label} (${repo})` });
+      }
+    } else {
+      sources.push({ ...source });
+    }
+  }
 
   const config: TelegramDigestConfig = {
     credentialId: connection.credentialId,

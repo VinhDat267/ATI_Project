@@ -114,7 +114,7 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
       chatId: '-100555666777',
       chatTitle: 'Đội Sản Phẩm',
       sources: [
-        { service: 'github', tool: 'github.list_issues', args: { state: 'open' }, label: 'GitHub Issues đang mở' },
+        { service: 'github', tool: 'github.search_issues', args: { repo: 'acme/ati', query: 'open' }, label: 'GitHub Issues đang mở' },
         { service: 'calendar', tool: 'calendar.list_events', label: 'Lịch nhóm hôm nay' },
       ],
       recurrence: { type: 'daily', time: '08:00' },
@@ -154,6 +154,7 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
     };
 
     const digestRunner = new TelegramDigestRunner({
+      pool,
       credentialRepo: credRepo,
       encryptionKey: ENCRYPTION_KEY,
       adapterFactory,
@@ -218,7 +219,7 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
       chatId: '-100555666777',
       chatTitle: 'Đội Sản Phẩm',
       sources: [
-        { service: 'github', tool: 'github.list_issues', args: { state: 'open' }, label: 'GitHub Issues đang mở' },
+        { service: 'github', tool: 'github.search_issues', args: { repo: 'acme/ati', query: 'open' }, label: 'GitHub Issues đang mở' },
       ],
       recurrence: { type: 'daily', time: '08:00' },
       timeZone: 'Asia/Ho_Chi_Minh',
@@ -228,6 +229,7 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
     const telegramExecute = vi.fn();
 
     const digestRunner = new TelegramDigestRunner({
+      pool,
       credentialRepo: credRepo,
       encryptionKey: ENCRYPTION_KEY,
       adapterFactory: {
