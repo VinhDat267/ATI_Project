@@ -1,7 +1,11 @@
 import type pg from 'pg';
 import type { GithubDigestConfig, GithubDigestDelivery, ScheduleRecurrence } from '@wap/tool-schemas';
+import { isUuid } from '../../db/repositories/uuid.js';
 import { computeDigestConfigHash } from './github-digest-candidate.js';
 import type { RunToPlan } from './schedule-runner.js';
+
+export const GITHUB_DELIVERY_UNKNOWN =
+  'Chưa xác định bản tin GitHub đã gửi hay chưa. Hãy kiểm tra kênh nhận trước khi gửi thêm; lượt này không tự gửi lại.';
 
 export function escapeSlackMrkdwn(text: string): string {
   return String(text ?? '')
@@ -20,6 +24,7 @@ export interface DigestRunInput extends RunToPlan {
 export type DigestRunOutcome =
   | { state: 'digest_sent'; delivery: GithubDigestDelivery; text: string }
   | { state: 'digest_failed'; error: string }
+  | { state: 'delivery_unknown'; error: string }
   | { state: 'blocked'; error: string; pauseReason: string }
   | { state: 'discarded' };
 
@@ -32,6 +37,7 @@ export type RunGithubDigest = (
 export interface GithubDigestRunnerOptions {
   pool: pg.Pool;
   githubConnection?: (userId: string) => Promise<any>;
+  telegramConnection?: (userId: string) => Promise<any>;
   getAdapter?: (serviceName: string, context?: any) => Promise<any> | any;
   summarizeDigest?: (
     input: {
@@ -62,6 +68,128 @@ function formatSectionItems(
     const url = `https://github.com/${item.repo}/${kind}/${Number(item.number)}`;
     return `  - <${url}|${item.repo}#${Number(item.number)}>: ${safeTitle}`;
   });
+}
+
+function isDefiniteWriteRejection(err: any): boolean {
+  if (!err || typeof err !== 'object') return false;
+  if (err.details && typeof err.details === 'object' && err.details.requestSent === false) {
+    return true;
+  }
+  return (
+    typeof err.category === 'string' &&
+    ['AUTH_ERROR', 'NOT_FOUND', 'VALIDATION', 'RATE_LIMIT'].includes(err.category)
+  );
+}
+
+async function claimGithubDigestDelivery(
+  pool: pg.Pool,
+  run: DigestRunInput,
+  signal: AbortSignal,
+): Promise<'claimed' | 'discarded'> {
+  if (typeof pool.connect !== 'function') {
+    const marked = await pool.query(
+      `UPDATE schedule_runs r
+          SET delivery_started_at = now(), updated_at = now()
+         FROM schedules s
+        WHERE r.id = $1
+          AND r.schedule_id = s.id
+          AND s.id = $2
+          AND r.status = 'planning'
+          AND r.delivery_started_at IS NULL
+          AND s.version = $3
+          AND s.status IN ('active', 'completed')
+        RETURNING r.id`,
+      [run.runId, run.scheduleId, run.scheduleVersion],
+    );
+    return marked.rowCount ? 'claimed' : 'discarded';
+  }
+
+  const client = await pool.connect();
+  try {
+    const found = await client.query('SELECT conv_id FROM schedules WHERE id = $1', [run.scheduleId]);
+    if (!found.rowCount) {
+      return 'discarded';
+    }
+    const scheduleConvId = found.rows[0].conv_id;
+
+    for (;;) {
+      signal.throwIfAborted();
+      await client.query('BEGIN');
+      await client.query("SET LOCAL lock_timeout = '10s'");
+      // Follow the exact canonical lock order of ScheduleRepo.ownedSchedule:
+      // 1) schedule's conversation, 2) schedule row, 3) schedule_runs row.
+      await client.query('SELECT id FROM conversations WHERE id = $1 FOR UPDATE', [scheduleConvId]);
+      const schedule = (
+        await client.query(
+          `SELECT s.id, s.user_id, s.kind, s.version, s.status, s.digest_config_hash
+             FROM schedules s
+             JOIN users u ON u.id = s.user_id AND u.status = 'active'
+            WHERE s.id = $1
+              FOR UPDATE OF s`,
+          [run.scheduleId],
+        )
+      ).rows[0];
+      signal.throwIfAborted();
+      if (
+        !schedule ||
+        schedule.user_id !== run.userId ||
+        schedule.kind !== 'github_digest' ||
+        schedule.version !== run.scheduleVersion ||
+        schedule.digest_config_hash !== run.digestConfigHash ||
+        (schedule.status !== 'active' && schedule.status !== 'completed')
+      ) {
+        await client.query('COMMIT');
+        return 'discarded';
+      }
+
+      let currentRun: { status: string; delivery_started_at: Date | null } | undefined;
+      try {
+        currentRun = (
+          await client.query(
+            'SELECT status, delivery_started_at FROM schedule_runs WHERE id = $1 AND schedule_id = $2 FOR UPDATE NOWAIT',
+            [run.runId, run.scheduleId],
+          )
+        ).rows[0];
+      } catch (err: any) {
+        if (err?.code === '55P03') {
+          // Another transaction holds the run row lock directly without holding c,s.
+          // Release c,s before waiting on the run row lock to avoid blocking setStatus,
+          // then re-acquire c -> s -> r with a fresh snapshot once the run lock is released.
+          await client.query('ROLLBACK');
+          await client.query(
+            'SELECT id FROM schedule_runs WHERE id = $1 AND schedule_id = $2 FOR UPDATE',
+            [run.runId, run.scheduleId],
+          );
+          continue;
+        }
+        throw err;
+      }
+
+      signal.throwIfAborted();
+      if (!currentRun || currentRun.status !== 'planning' || currentRun.delivery_started_at !== null) {
+        await client.query('COMMIT');
+        return 'discarded';
+      }
+
+      const marked = await client.query(
+        `UPDATE schedule_runs
+            SET delivery_started_at = now(), updated_at = now()
+          WHERE id = $1
+            AND schedule_id = $2
+            AND status = 'planning'
+            AND delivery_started_at IS NULL
+        RETURNING id`,
+        [run.runId, run.scheduleId],
+      );
+      await client.query('COMMIT');
+      return marked.rowCount ? 'claimed' : 'discarded';
+    }
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export function createGithubDigestRunner(options: GithubDigestRunnerOptions): RunGithubDigest {
@@ -125,8 +253,10 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
       };
     }
 
+    const isTelegramDest = Boolean(config.telegramChatId);
     let githubAdapter: any;
     let slackAdapter: any;
+    let telegramAdapter: any;
     try {
       githubAdapter = await options.getAdapter?.('github', {
         userId: run.userId,
@@ -140,47 +270,91 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
           },
         },
       });
-      slackAdapter = await options.getAdapter?.('slack', {
-        userId: run.userId,
-        phase: 'execution',
-      });
+      if (isTelegramDest) {
+        let tg: any = null;
+        if (options.telegramConnection) {
+          tg = await options.telegramConnection(run.userId);
+          const allowedChatIds = new Set(
+            ((tg?.connection?.chatIds ?? []) as string[]).map((id) => String(id)),
+          );
+          if (
+            !tg ||
+            tg.status !== 'connected' ||
+            (config.telegramCredentialId && tg.connection?.credentialId !== config.telegramCredentialId) ||
+            (config.telegramUserId && tg.connection?.telegramUserId !== config.telegramUserId) ||
+            !allowedChatIds.has(String(config.telegramChatId))
+          ) {
+            return {
+              state: 'blocked',
+              error: 'Cuộc trò chuyện Telegram nhận bản tin không còn nằm trong phạm vi cho phép.',
+              pauseReason: 'Cuộc trò chuyện Telegram nhận bản tin không còn nằm trong phạm vi cho phép.',
+            };
+          }
+        }
+        const telegramCredentialId = config.telegramCredentialId ?? tg?.connection?.credentialId ?? '';
+        const telegramUserId = config.telegramUserId ?? tg?.connection?.telegramUserId ?? '';
+        const telegramUsername = config.telegramUsername ?? tg?.connection?.username ?? '';
+        telegramAdapter = await options.getAdapter?.('telegram', {
+          userId: run.userId,
+          phase: 'execution',
+          connections: {
+            telegram: {
+              credentialId: telegramCredentialId,
+              telegramUserId,
+              username: telegramUsername,
+              chatIds: [String(config.telegramChatId)],
+            },
+          },
+        });
+      } else {
+        slackAdapter = await options.getAdapter?.('slack', {
+          userId: run.userId,
+          phase: 'execution',
+        });
+      }
     } catch (err: any) {
       const msg = err?.message || 'Kết nối dịch vụ không khả dụng.';
       return { state: 'blocked', error: msg, pauseReason: msg };
     }
 
-    if (!githubAdapter || !slackAdapter) {
+    if (!githubAdapter || (isTelegramDest ? !telegramAdapter : !slackAdapter)) {
       return {
         state: 'blocked',
-        error: 'Không khởi tạo được kết nối GitHub hoặc Slack.',
-        pauseReason: 'Không khởi tạo được kết nối GitHub hoặc Slack.',
+        error: isTelegramDest
+          ? 'Không khởi tạo được kết nối GitHub hoặc Telegram.'
+          : 'Không khởi tạo được kết nối GitHub hoặc Slack.',
+        pauseReason: isTelegramDest
+          ? 'Không khởi tạo được kết nối GitHub hoặc Telegram.'
+          : 'Không khởi tạo được kết nối GitHub hoặc Slack.',
       };
     }
 
-    // Verify Slack channel is still in allowedScope
-    try {
-      const channels = await slackAdapter.execute(
-        'slack.search_channels',
-        { query: config.channelName },
-        { signal },
-      );
-      if (
-        Array.isArray(channels) &&
-        !channels.some((c: any) => String(c.id) === config.channelId)
-      ) {
-        return {
-          state: 'blocked',
-          error: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
-          pauseReason: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
-        };
-      }
-    } catch (err: any) {
-      if (err?.category === 'AUTH_ERROR') {
-        return {
-          state: 'blocked',
-          error: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
-          pauseReason: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
-        };
+    if (!isTelegramDest) {
+      // Verify Slack channel is still in allowedScope
+      try {
+        const channels = await slackAdapter.execute(
+          'slack.search_channels',
+          { query: config.channelName },
+          { signal },
+        );
+        if (
+          Array.isArray(channels) &&
+          !channels.some((c: any) => String(c.id) === config.channelId)
+        ) {
+          return {
+            state: 'blocked',
+            error: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
+            pauseReason: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
+          };
+        }
+      } catch (err: any) {
+        if (err?.category === 'AUTH_ERROR') {
+          return {
+            state: 'blocked',
+            error: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
+            pauseReason: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
+          };
+        }
       }
     }
 
@@ -302,23 +476,73 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
 
     const messageText = lines.join('\n').slice(0, 3500);
 
-    // 6. Pre-send schedule version and status check
+    // 6. Pre-send schedule version and status check + mark delivery_started_at
     signal.throwIfAborted();
-    const preSendCheck = await options.pool.query(
-      'SELECT version, status FROM schedules WHERE id = $1',
-      [run.scheduleId],
-    );
-    const currentSchedule = preSendCheck.rows[0];
-    if (
-      !currentSchedule ||
-      currentSchedule.version !== run.scheduleVersion ||
-      currentSchedule.status === 'cancelled' ||
-      currentSchedule.status === 'paused'
-    ) {
-      return { state: 'discarded' };
+    let deliveryStarted = false;
+    if (isUuid(run.runId)) {
+      const claimState = await claimGithubDigestDelivery(options.pool, run, signal);
+      if (claimState !== 'claimed') {
+        return { state: 'discarded' };
+      }
+      deliveryStarted = true;
+    } else if (isUuid(run.scheduleId)) {
+      const preSendCheck = await options.pool.query(
+        'SELECT version, status FROM schedules WHERE id = $1',
+        [run.scheduleId],
+      );
+      const currentSchedule = preSendCheck.rows[0];
+      if (
+        currentSchedule &&
+        (currentSchedule.version !== run.scheduleVersion ||
+          currentSchedule.status === 'cancelled' ||
+          currentSchedule.status === 'paused')
+      ) {
+        return { state: 'discarded' };
+      }
     }
 
-    // 7. Send Slack message (once called, never transition to discarded)
+    // 7. Send Slack or Telegram message (once called, never transition to discarded)
+    if (isTelegramDest) {
+      try {
+        const sendRes = await telegramAdapter.execute(
+          'telegram.send_message',
+          { chatId: config.telegramChatId, text: messageText },
+          { signal, chatId: config.telegramChatId },
+        );
+        const delivery: GithubDigestDelivery = {
+          channelId: '',
+          channelName: '',
+          ts: null,
+          telegramChatId: config.telegramChatId,
+          telegramChatTitle: config.telegramChatTitle ?? '',
+          messageId: typeof sendRes?.messageId === 'number' ? sendRes.messageId : null,
+          counts: {
+            newIssues: newIssues.length,
+            stalePrs: stalePrs.length,
+            unassignedIssues: unassignedIssues.length,
+          },
+        };
+        return { state: 'digest_sent', delivery, text: messageText };
+      } catch (err: any) {
+        if (!isDefiniteWriteRejection(err)) {
+          return {
+            state: 'delivery_unknown',
+            error: GITHUB_DELIVERY_UNKNOWN,
+          };
+        }
+        if (deliveryStarted) {
+          await options.pool.query(
+            "UPDATE schedule_runs SET delivery_started_at = NULL WHERE id = $1 AND status = 'planning'",
+            [run.runId],
+          );
+        }
+        return {
+          state: 'digest_failed',
+          error: 'Không gửi được bản tin lên Telegram. Hãy thử lại.',
+        };
+      }
+    }
+
     try {
       const sendRes = await slackAdapter.execute(
         'slack.send_message',
@@ -336,7 +560,19 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
         },
       };
       return { state: 'digest_sent', delivery, text: messageText };
-    } catch {
+    } catch (err: any) {
+      if (!isDefiniteWriteRejection(err)) {
+        return {
+          state: 'delivery_unknown',
+          error: GITHUB_DELIVERY_UNKNOWN,
+        };
+      }
+      if (deliveryStarted) {
+        await options.pool.query(
+          "UPDATE schedule_runs SET delivery_started_at = NULL WHERE id = $1 AND status = 'planning'",
+          [run.runId],
+        );
+      }
       return {
         state: 'digest_failed',
         error: 'Không gửi được bản tin lên Slack. Hãy thử lại.',

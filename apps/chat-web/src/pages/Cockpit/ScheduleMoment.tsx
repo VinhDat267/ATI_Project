@@ -31,9 +31,11 @@ export function ScheduleMoment({ message, convId, navigate, onEdit }: { message:
   const digestCandidate = metadata.digestCandidate as any;
   const isTelegramCandidate = Boolean(
     digestCandidate &&
+      !Array.isArray(digestCandidate?.config?.repos) &&
       (Array.isArray(digestCandidate?.config?.sources) ||
         typeof digestCandidate?.config?.telegramUserId === 'string' ||
         (metadata.services?.includes('telegram') &&
+          !metadata.services?.includes('github') &&
           !('eligible' in digestCandidate) &&
           !('configPreview' in digestCandidate) &&
           !digestCandidate?.config?.source))
@@ -210,11 +212,15 @@ export function ScheduleMoment({ message, convId, navigate, onEdit }: { message:
                   <p className="font-semibold text-[#111827]">Tự gửi bản tin, không cần duyệt lại</p>
                   {canAutoDigest && digestCandidate?.config ? (
                     <p className="text-xs text-[#4B5563] break-words">
-                      {`Repo: ${digestCandidate.config.repos.join(', ')} · Kênh Slack: #${digestCandidate.config.channelName.replace(/^#/, '')} · Nội dung: Issue mới, PR chờ review quá ${digestCandidate.config.staleDays} ngày, Issue chưa ai nhận (+ tóm tắt AI)`}
+                      {`Repo: ${digestCandidate.config.repos.join(', ')} · ${
+                        digestCandidate.config.telegramChatId || digestCandidate.config.telegramChatTitle
+                          ? `Telegram: ${digestCandidate.config.telegramChatTitle || digestCandidate.config.telegramChatId}`
+                          : `Kênh Slack: #${String(digestCandidate.config.channelName ?? '').replace(/^#/, '')}`
+                      } · Nội dung: Issue mới, PR chờ review quá ${digestCandidate.config.staleDays} ngày, Issue chưa ai nhận (+ tóm tắt AI)`}
                     </p>
                   ) : (
                     <p className="text-xs text-[#6B7280] break-words">
-                      {digestCandidate?.disabledReason || 'Chỉ bật được khi lịch chỉ đọc GitHub và gửi báo cáo vào 1 kênh Slack đã chọn.'}
+                      {digestCandidate?.disabledReason || 'Chỉ bật được khi lịch chỉ đọc GitHub và gửi báo cáo vào 1 kênh Slack hoặc nhóm Telegram đã chọn.'}
                     </p>
                   )}
                 </div>

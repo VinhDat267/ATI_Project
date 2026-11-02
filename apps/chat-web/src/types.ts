@@ -48,10 +48,11 @@ export interface PlanStep {
   description: string;
   args: Record<string, unknown>;
   chatId?: string;
+  repo?: string;
   dependsOn?: string[];
 }
 
-export type PersonalStatus = 'not_connected' | 'scope_required' | 'connected' | 'reconnect_required';
+export type PersonalStatus = 'not_connected' | 'scope_required' | 'needs_scope' | 'needs_membership' | 'connected' | 'reconnect_required';
 
 export interface PersonalCalendarSummary {
   id: string;

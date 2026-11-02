@@ -665,6 +665,24 @@ export class ChatService {
               targetRepo = stepRepoMap.get(refStepId);
             }
           }
+          if (targetRepo && !targetRepo.includes('/')) {
+            const shortLower = targetRepo.toLowerCase();
+            const matchingAllowed = (github.connection.repos as string[]).filter(
+              (r) => r.split('/')[1]?.toLowerCase() === shortLower,
+            );
+            if (matchingAllowed.length === 1) {
+              targetRepo = matchingAllowed[0];
+            } else {
+              const matchingTeam = (github.teamRepos ?? []).filter(
+                (r: any) =>
+                  String(r.name ?? '').toLowerCase() === shortLower ||
+                  String(r.fullName ?? '').split('/')[1]?.toLowerCase() === shortLower,
+              );
+              if (matchingTeam.length === 1 && typeof matchingTeam[0].fullName === 'string') {
+                targetRepo = matchingTeam[0].fullName;
+              }
+            }
+          }
           if (!targetRepo && github.connection.repos.length === 1) {
             targetRepo = github.connection.repos[0];
           }
@@ -676,7 +694,14 @@ export class ChatService {
               targetRepo;
             step.repo = canonical;
             stepRepoMap.set(step.id, canonical);
-            if (!allowedRepoSet.has(targetRepo.toLowerCase())) {
+            const rawRepoArg = step.args?.repo;
+            const isRefArg =
+              (typeof rawRepoArg === 'string' && rawRepoArg.startsWith('$')) ||
+              (typeof rawRepoArg === 'object' && rawRepoArg !== null && '$ref' in rawRepoArg);
+            if (!isRefArg) {
+              step.args = { ...(step.args ?? {}), repo: canonical };
+            }
+            if (!allowedRepoSet.has(canonical.toLowerCase())) {
               forbiddenRepoName = canonical;
               break;
             }
@@ -791,7 +816,30 @@ export class ChatService {
       ? nextRuns(recurrence, this.schedules.now?.() ?? new Date(), this.schedules.timeZone).map((date) => date.toISOString()) : [];
     const current = proposal.action === 'create' ? null : schedule;
     let digestCandidate: ScheduleProposalMetadata['digestCandidate'] | undefined;
-    if ((proposal.action === 'create' || proposal.action === 'update') && services.includes('telegram') && this.telegramConnection) {
+    const isGithubThreeSectionOverTelegram =
+      services.length === 2 &&
+      services.includes('github') &&
+      services.includes('telegram') &&
+      Boolean(this.githubConnection) &&
+      Boolean(this.telegramConnection) &&
+      Boolean(proposal.request) &&
+      Boolean(recurrence) &&
+      current?.kind !== 'telegram_digest' &&
+      (current?.kind === 'github_digest' ||
+        /\b(bản\s+tin\s+github|github\s+digest|pull\s+request|pr\b|chờ\s+review|chưa\s+ai\s+nhận|unassigned|issue\s+mới|(?:quá|trên|hơn)\s*\d{1,2}\s*ngày|repo(?:sitory)?\s+[a-z0-9_.-]+|[a-z0-9_.-]+\/[a-z0-9_.-]+)\b/i.test(
+          proposal.request!,
+        ));
+    if ((proposal.action === 'create' || proposal.action === 'update') && isGithubThreeSectionOverTelegram) {
+      digestCandidate = await evaluateGithubDigestCandidate({
+        userId: actor.userId,
+        request: proposal.request,
+        services,
+        recurrence,
+        githubConnection: this.githubConnection,
+        telegramConnection: this.telegramConnection,
+        getAdapter: this.getAdapter,
+      });
+    } else if ((proposal.action === 'create' || proposal.action === 'update') && services.includes('telegram') && this.telegramConnection) {
       const tgLookup = await this.telegramConnection(actor.userId).catch(() => null);
       const ghLookup = services.includes('github') && this.githubConnection
         ? await this.githubConnection(actor.userId).catch(() => null)
@@ -831,6 +879,7 @@ export class ChatService {
         services,
         recurrence,
         githubConnection: this.githubConnection,
+        telegramConnection: this.telegramConnection,
         getAdapter: this.getAdapter,
       });
     } else if (

@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import pg from 'pg';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { hashPassword } from '../../../chat-api/src/db/repositories/user-repo.js';
 
 const enabled = process.env.SANDBOX_SCENARIO === 'schedule';
@@ -13,7 +13,7 @@ async function loginUser(page: Page, email: string, password: string) {
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Hôm nay bạn muốn nhờ việc gì?');
 }
 
-test('GITHUB-DIGEST: admin selects team repos, member connects from refusal card, and schedules an auto-digest run end-to-end', async ({ page }) => {
+test('GITHUB-DIGEST: admin selects team repos, member connects from refusal card, and schedules an auto-digest run end-to-end', async ({ page }, testInfo) => {
   test.skip(!enabled, 'requires schedule sandbox scenario with SCHEDULES_ENABLED=on');
 
   const externalRequests: string[] = [];
@@ -72,9 +72,11 @@ test('GITHUB-DIGEST: admin selects team repos, member connects from refusal card
       return route.fulfill({
         json: {
           repos: [
-            { repoId: '101', fullName: 'acme/ati', name: 'ati' },
-            { repoId: '102', fullName: 'acme/docs', name: 'docs' },
-            { repoId: '103', fullName: 'acme/secret', name: 'secret' },
+            { repoId: '101', fullName: 'acme/ati', name: 'ati', private: false },
+            { repoId: '102', fullName: 'acme/docs', name: 'docs', private: false },
+            { repoId: '103', fullName: 'acme/secret', name: 'secret', private: true },
+            { repoId: '104', fullName: 'acme/infra', name: 'infra', private: true },
+            { repoId: '105', fullName: 'acme/sdk', name: 'sdk', private: false },
           ],
         },
       });
@@ -110,8 +112,22 @@ test('GITHUB-DIGEST: admin selects team repos, member connects from refusal card
     const scopeSection = page.locator('#github-scope');
     await expect(scopeSection).toBeVisible();
 
+    const scopeCounter = scopeSection.getByTestId('github-scope-counter');
+    await expect(scopeCounter).toHaveText('Đã chọn 0/10');
+    await expect(scopeSection.getByText('Private')).toHaveCount(2);
+    await expect(scopeSection.getByText('Public')).toHaveCount(3);
+
+    const filterInput = scopeSection.getByLabel('Tìm nhanh repository');
+    await expect(filterInput).toBeVisible();
+    await filterInput.fill('secret');
+    await expect(scopeSection.getByRole('checkbox', { name: /acme\/secret/i })).toBeVisible();
+    await expect(scopeSection.getByRole('checkbox', { name: /acme\/ati/i })).toHaveCount(0);
+    await filterInput.fill('');
+
     await page.getByRole('checkbox', { name: /acme\/ati/i }).check();
     await page.getByRole('checkbox', { name: /acme\/docs/i }).check();
+    await expect(scopeCounter).toHaveText('Đã chọn 2/10');
+    await page.screenshot({ path: testInfo.outputPath('github-scope-selector.png'), fullPage: true });
 
     const saveScopeBtn = page.locator('#github-save-scope');
     await expect(saveScopeBtn).toBeEnabled();
@@ -187,6 +203,7 @@ test('GITHUB-DIGEST: admin selects team repos, member connects from refusal card
     await autoRadio.click();
 
     await expect(page.getByText(/Repo: owner\/repo · Kênh Slack: #general/)).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('github-digest-slack-proposal.png'), fullPage: true });
 
     const confirmAutoBtn = page.getByRole('button', { name: 'Xác nhận và bật tự gửi', exact: true });
     await expect(confirmAutoBtn).toBeVisible();
@@ -200,14 +217,232 @@ test('GITHUB-DIGEST: admin selects team repos, member connects from refusal card
     await expect(page.getByRole('status').filter({ hasText: 'Đã gửi · 3 mục' })).toBeVisible();
     await expect(page.getByText(/Bản tin GitHub tự động của ATI/)).toBeVisible();
 
-    // Verify in /history that the schedule shows "Tự gửi" and the latest run shows "Đã gửi"
+    // Verify in /history that the schedule shows "Tự gửi" and the latest run shows "Đã gửi" + destination (#general)
     await page.goto('/history');
     const scheduleRegion = page.getByRole('region', { name: 'Lịch chạy' });
     await expect(scheduleRegion).toBeVisible();
     await expect(scheduleRegion.getByText('Tự gửi')).toBeVisible();
 
     await scheduleRegion.getByRole('button', { name: 'Xem 10 lượt gần nhất' }).click();
-    await expect(scheduleRegion.getByText(/^Đã gửi/)).toBeVisible();
+    await expect(scheduleRegion.getByText(/^Đã gửi/).first()).toBeVisible();
+    await expect(scheduleRegion.getByText('(#general)').first()).toBeVisible();
+
+    expect(externalRequests).toEqual([]);
+  } finally {
+    await db.end();
+  }
+});
+
+test('GITHUB-DIGEST: extended GitHub tools plan destination, preview badges, real backend execution, and Telegram digest proposal', async ({ page }, testInfo) => {
+  test.skip(!enabled, 'requires schedule sandbox scenario with SCHEDULES_ENABLED=on');
+
+  const externalRequests: string[] = [];
+  await page.route(/github\.com|api\.github\.com/, (route) => {
+    externalRequests.push(route.request().url());
+    return route.abort('blockedbyclient');
+  });
+
+  const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+  try {
+    await loginUser(page, process.env.CHAT_ADMIN_EMAIL!, process.env.CHAT_ADMIN_PASSWORD!);
+    const adminId = (await db.query('SELECT id FROM users WHERE email = $1', [process.env.CHAT_ADMIN_EMAIL!])).rows[0].id;
+
+    // 1. Seed a conversation with a 4-step GitHub plan exercising create_issue (with assignees), update_issue, get_pull_request, and add_comment
+    const planConvId = (await db.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [adminId])).rows[0].id;
+    await db.query(
+      "INSERT INTO messages(conv_id, role, content) VALUES($1, 'user', 'Tạo issue mới, đóng issue #42, đọc PR #18 và bình luận xác nhận trên owner/repo')",
+      [planConvId]
+    );
+
+    const plan = {
+      kind: 'plan',
+      summary: 'Quản lý vòng đời Issue & PR trên GitHub',
+      thinking: 'Tạo issue mới kèm người phụ trách, đóng issue #42, đọc thông tin PR #18 và để lại bình luận xác nhận.',
+      warnings: [],
+      connections: {
+        github: {
+          credentialId: 'cred-gh-admin',
+          githubUserId: 'gh-admin-1',
+          login: 'admin_octo',
+          repos: ['owner/repo'],
+        },
+      },
+      resourceLabels: {
+        'owner/repo': 'owner/repo',
+      },
+      steps: [
+        {
+          id: 'step_1',
+          tool: 'github.create_issue',
+          description: 'Tạo issue mới kèm người phụ trách',
+          args: {
+            repo: 'owner/repo',
+            title: 'Sửa lỗi OAuth callback',
+            body: 'Kiểm tra tham số state khi redirect',
+            labels: ['bug', 'security'],
+            assignees: ['alice'],
+          },
+          dependsOn: [],
+        },
+        {
+          id: 'step_2',
+          tool: 'github.update_issue',
+          description: 'Đóng issue #42 sau khi vá lỗi',
+          args: {
+            repo: 'owner/repo',
+            issueNumber: 42,
+            title: 'Đóng issue #42 sau khi vá lỗi',
+            state: 'closed',
+            labels: ['bug'],
+            assignees: ['alice', 'bob'],
+          },
+          dependsOn: ['step_1'],
+        },
+        {
+          id: 'step_3',
+          tool: 'github.get_pull_request',
+          description: 'Đọc chi tiết PR #18',
+          args: {
+            repo: 'owner/repo',
+            issueNumber: 18,
+          },
+          dependsOn: ['step_2'],
+        },
+        {
+          id: 'step_4',
+          tool: 'github.add_comment',
+          description: 'Bình luận xác nhận vào issue #42',
+          args: {
+            repo: 'owner/repo',
+            issueNumber: 42,
+            body: 'Đã xác nhận bản vá trên PR #18.',
+          },
+          dependsOn: ['step_3'],
+        },
+      ],
+    };
+
+    const planText = JSON.stringify(plan);
+    const planId = (
+      await db.query(
+        `INSERT INTO plans(conv_id, plan_json, plan_text, plan_hash, status, expires_at)
+         VALUES($1, $2::jsonb, $3, $4, 'pending', now() + interval '30 minutes') RETURNING id`,
+        [planConvId, planText, planText, createHash('sha256').update(planText).digest('hex')]
+      )
+    ).rows[0].id;
+
+    await db.query(
+      "INSERT INTO messages(conv_id, role, content, metadata) VALUES($1, 'assistant', $2, $3)",
+      [
+        planConvId,
+        plan.summary,
+        {
+          type: 'plan',
+          planId,
+          plan: { ...plan, id: planId, status: 'pending' },
+          resourceLabels: plan.resourceLabels,
+        },
+      ]
+    );
+
+    await page.goto(`/c/${planConvId}`);
+    const planMoment = page.locator('#moment-4');
+    await expect(planMoment).toBeVisible();
+
+    // Verify FE-GH-1 & FE-GH-2: operation labels and #N destination formatting
+    await expect(planMoment).toContainText('Tài khoản: @admin_octo (GitHub của bạn)');
+    await expect(planMoment.getByText('owner/repo · #42').first()).toBeVisible();
+    await expect(planMoment.getByText('owner/repo · #18')).toBeVisible();
+    await expect(planMoment.getByText(/chưa có tên trong dữ liệu/)).toHaveCount(0);
+    await expect(planMoment.getByText('Tạo mới', { exact: true })).toBeVisible();
+    await expect(planMoment.getByText('Cập nhật issue', { exact: true })).toBeVisible();
+    await expect(planMoment.getByText('Đọc PR', { exact: true })).toBeVisible();
+    await expect(planMoment.getByText('Bình luận issue', { exact: true })).toBeVisible();
+
+    // Verify FE-GH-3: open PreviewModal on step_2 (github.update_issue) and check badges
+    await planMoment.locator('#preview-step_2').click();
+    const previewBadges = page.getByTestId('github-preview-badges');
+    await expect(previewBadges).toBeVisible();
+    await expect(previewBadges.getByText('Đã đóng (closed)', { exact: true })).toBeVisible();
+    await expect(previewBadges.getByText('#bug', { exact: true })).toBeVisible();
+    await expect(previewBadges.getByText('@alice', { exact: true })).toBeVisible();
+    await expect(previewBadges.getByText('@bob', { exact: true })).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('github-preview-modal-badges.png'), fullPage: true });
+    await page.keyboard.press('Escape');
+    await expect(previewBadges).toHaveCount(0);
+
+    // Approve plan and execute through real Backend StepRunner + GITHUB_FAKE + PostgreSQL
+    await page.getByRole('button', { name: /Duyệt kế hoạch/ }).click();
+    await expect.poll(async () => (await db.query('SELECT status FROM plans WHERE id = $1', [planId])).rows[0]?.status).toBe('completed');
+
+    // Verify ReceiptMoment (#moment-6)
+    await expect(page.getByRole('heading', { level: 1, name: /^Đã xong 4 việc trên/ })).toBeVisible();
+    await expect(page.getByText('✓ Đã tạo issue', { exact: true })).toBeVisible();
+    await expect(page.getByText('✓ Đã cập nhật issue', { exact: true })).toBeVisible();
+    await expect(page.getByText('✓ Đã đọc PR', { exact: true })).toBeVisible();
+    await expect(page.getByText('✓ Đã bình luận', { exact: true })).toBeVisible();
+    await expect(page.getByText('PR #18', { exact: true })).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('github-receipt-moment.png'), fullPage: true });
+
+    // Verify PostgreSQL execution_steps outputs
+    const stepRows = (
+      await db.query('SELECT step_id, tool, status, output_json FROM execution_steps WHERE plan_id = $1 ORDER BY step_id', [planId])
+    ).rows;
+    expect(stepRows.map((r) => r.status)).toEqual(['succeeded', 'succeeded', 'succeeded', 'succeeded']);
+    expect(stepRows[0].output_json.assignees).toEqual(['alice']);
+    expect(stepRows[1].output_json.state).toBe('closed');
+    expect(stepRows[2].output_json.isPullRequest).toBe(true);
+    expect(stepRows[3].output_json.issueNumber).toBe(42);
+
+    // 2. Verify FE-GH-4: github_digest proposal with Telegram destination
+    const tgConvId = (await db.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [adminId])).rows[0].id;
+    await db.query(
+      "INSERT INTO messages(conv_id, role, content) VALUES($1, 'user', 'Mỗi sáng 8 giờ gửi bản tin GitHub repo owner/repo vào nhóm Telegram Kỹ Thuật ATI')",
+      [tgConvId]
+    );
+    await db.query(
+      "INSERT INTO messages(conv_id, role, content, metadata) VALUES($1, 'assistant', 'Đề xuất lịch chạy tự động gửi qua Telegram', $2)",
+      [
+        tgConvId,
+        {
+          type: 'schedule_proposal',
+          services: ['github', 'telegram'],
+          nextRuns: ['2026-11-03T01:00:00.000Z'],
+          proposal: {
+            kind: 'schedule',
+            action: 'create',
+            name: 'Bản tin GitHub Telegram',
+            request: 'Mỗi sáng 8 giờ gửi bản tin GitHub repo owner/repo vào nhóm Telegram Kỹ Thuật ATI',
+            recurrence: { type: 'daily', time: '08:00' },
+            summary: 'Mỗi sáng 8 giờ, gửi bản tin GitHub vào nhóm Telegram Kỹ Thuật ATI.',
+          },
+          digestCandidate: {
+            canAutoDigest: true,
+            config: {
+              githubUserId: 'gh-admin-1',
+              githubLogin: 'admin_octo',
+              repos: ['owner/repo'],
+              channelId: '',
+              channelName: '',
+              telegramChatId: '-100999888',
+              telegramChatTitle: 'Nhóm Kỹ Thuật ATI',
+              windowHours: 24,
+              staleDays: 3,
+            },
+          },
+        },
+      ]
+    );
+
+    await page.goto(`/c/${tgConvId}`);
+    await expect(page.locator('[data-moment="schedule"]')).toBeVisible();
+    const tgAutoRadio = page.locator('#schedule-mode-auto-digest');
+    await expect(tgAutoRadio).toBeVisible();
+    await tgAutoRadio.click();
+    await expect(
+      page.getByText(/Repo: owner\/repo · Telegram: Nhóm Kỹ Thuật ATI · Nội dung: Issue mới, PR chờ review quá 3 ngày/)
+    ).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('github-digest-telegram-proposal.png'), fullPage: true });
 
     expect(externalRequests).toEqual([]);
   } finally {

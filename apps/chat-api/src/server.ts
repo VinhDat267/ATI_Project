@@ -632,7 +632,25 @@ async function bootstrap() {
     digestRunnerImpl = createGithubDigestRunner({
       pool,
       githubConnection,
+      telegramConnection,
       getAdapter: (serviceName, context) => adapterFactory.getAdapterForService(serviceName, context),
+      summarizeDigest: async ({ repos, newIssues, stalePrs, unassignedIssues, staleDays }, signal) => {
+        if (newIssues.length === 0 && stalePrs.length === 0 && unassignedIssues.length === 0) {
+          return null;
+        }
+        const prompt = [
+          `Hãy tóm tắt ngắn gọn bằng tiếng Việt (tối đa 2 câu, tập trung vào điểm nghẽn quan trọng nhất cần xử lý trước) cho bản tin GitHub của các repo: ${repos.join(', ')}.`,
+          `- Issue mới (${newIssues.length}): ${newIssues.map((i) => `${i.repo}#${i.number} ${i.title}`).join('; ') || 'không có'}`,
+          `- PR chờ review quá ${staleDays} ngày (${stalePrs.length}): ${stalePrs.map((i) => `${i.repo}#${i.number} ${i.title}`).join('; ') || 'không có'}`,
+          `- Issue mở chưa ai nhận (${unassignedIssues.length}): ${unassignedIssues.map((i) => `${i.repo}#${i.number} ${i.title}`).join('; ') || 'không có'}`,
+        ].join('\n');
+        if (typeof provider?.generateText !== 'function') return null;
+        return provider.generateText(
+          'Bạn là trợ lý kỹ thuật phát hiện điểm nghẽn trên GitHub. Chỉ trả lời văn bản thuần túy bằng tiếng Việt, ngắn gọn tối đa 2 câu.',
+          prompt,
+          signal,
+        );
+      },
     });
   }
 

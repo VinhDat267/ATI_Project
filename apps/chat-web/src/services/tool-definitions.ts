@@ -1,4 +1,4 @@
-import { GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, getToolDefinition, type ToolDefinition } from '@wap/tool-schemas';
+import { GITHUB_OAUTH_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, getToolDefinition, type ToolDefinition } from '@wap/tool-schemas';
 
 /**
  * Every tool a plan may contain, including the personal Gmail, MyCalendar, and MySheets tools that stay outside
@@ -7,6 +7,7 @@ import { GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, getToolDefinition, type 
 export function toolDefinition(name: string): ToolDefinition | undefined {
   return (
     getToolDefinition(name) ??
+    GITHUB_OAUTH_TOOLS.find((tool) => tool.name === name) ??
     GMAIL_TOOLS.find((tool) => tool.name === name) ??
     MYCALENDAR_TOOLS.find((tool) => tool.name === name) ??
     MYSHEETS_TOOLS.find((tool) => tool.name === name)

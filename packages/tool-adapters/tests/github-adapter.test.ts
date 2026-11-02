@@ -257,4 +257,136 @@ describe('GitHub adapter', () => {
     expect(found).toEqual([{ id: '12', number: 7, title: 'Fix login', url: issue.html_url, repo }]);
     expect(fetchFn.mock.calls[0]![0]).toMatch(/^http:\/\/127\.0\.0\.1:9999\/search\/issues\?/);
   });
+
+  it('supports assignees on create_issue, get_pull_request, update_issue (close/reopen/edit), add_comment, and list_issues across allowed repos', async () => {
+    const fetchFn = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.endsWith('/issues') && init?.method === 'POST') {
+        return json({ ...issue, assignees: [{ login: 'octocat' }, { login: 'vinhdat' }] }, 201);
+      }
+      if (url.endsWith('/issues/42') && init?.method === 'GET') {
+        return json({
+          id: 201,
+          number: 42,
+          title: 'Feat: OAuth',
+          body: 'PR description',
+          state: 'open',
+          html_url: 'https://github.com/team/project/pull/42',
+          labels: [{ name: 'enhancement' }],
+          pull_request: { url: 'https://api.github.com/repos/team/project/pulls/42' },
+        });
+      }
+      if (url.endsWith('/issues/7') && init?.method === 'PATCH') {
+        return json({
+          ...issue,
+          state: 'closed',
+          title: 'Fixed login',
+          assignees: [{ login: 'vinhdat' }],
+          labels: [{ name: 'bug' }, { name: 'resolved' }],
+        });
+      }
+      if (url.endsWith('/issues/7/comments') && init?.method === 'POST') {
+        return json({
+          id: 9001,
+          body: 'Đã kiểm tra và xác nhận fix.',
+          html_url: 'https://github.com/team/project/issues/7#issuecomment-9001',
+        }, 201);
+      }
+      if (url.includes('/search/issues')) {
+        return json({
+          items: [
+            { ...issue, repository_url: 'https://api.github.com/repos/team/project' },
+          ],
+        });
+      }
+      return json({ message: 'Unexpected URL' }, 404);
+    });
+
+    const adapter = new GitHubAdapter({ credentials: { token: 'test' }, allowedScope, fetchFn: fetchFn as typeof fetch });
+
+    // 1. create_issue with assignees normalizes leading @
+    await adapter.execute('github.create_issue', {
+      repo,
+      title: 'Fix login',
+      assignees: ['@octocat', 'vinhdat'],
+    });
+    expect(JSON.parse(String(fetchFn.mock.calls[0]![1]?.body))).toEqual({
+      title: 'Fix login',
+      assignees: ['octocat', 'vinhdat'],
+    });
+
+    // 2. get_pull_request returns PR details without rejecting pull_request field
+    const pr = await adapter.execute('github.get_pull_request', { repo, issueNumber: 42 });
+    expect(pr).toEqual({
+      id: '201',
+      number: 42,
+      title: 'Feat: OAuth',
+      body: 'PR description',
+      url: 'https://github.com/team/project/pull/42',
+      repo,
+      labels: ['enhancement'],
+      state: 'open',
+      isPullRequest: true,
+    });
+
+    // 2b. get_pull_request rejects an ordinary issue (no pull_request field)
+    const ordinaryIssueFetch = vi.fn(async () => json(issue));
+    const ordinaryAdapter = new GitHubAdapter({
+      credentials: { token: 'test' },
+      allowedScope,
+      fetchFn: ordinaryIssueFetch as typeof fetch,
+    });
+    await expect(
+      ordinaryAdapter.execute('github.get_pull_request', { repo, issueNumber: 7 }),
+    ).rejects.toMatchObject({
+      category: 'VALIDATION',
+      message: 'GitHub item is an issue, not a pull request',
+    });
+
+    // 3. update_issue sends PATCH to close/update issue
+    const updated = await adapter.execute('github.update_issue', {
+      repo,
+      issueNumber: 7,
+      state: 'closed',
+      title: 'Fixed login',
+      assignees: ['@vinhdat'],
+      labels: ['bug', 'resolved'],
+    });
+    expect(updated).toEqual({
+      id: '12',
+      number: 7,
+      title: 'Fixed login',
+      url: issue.html_url,
+      repo,
+      state: 'closed',
+      labels: ['bug', 'resolved'],
+      assignees: ['vinhdat'],
+    });
+    expect(fetchFn.mock.calls[2]![1]?.method).toBe('PATCH');
+    expect(JSON.parse(String(fetchFn.mock.calls[2]![1]?.body))).toEqual({
+      title: 'Fixed login',
+      state: 'closed',
+      labels: ['bug', 'resolved'],
+      assignees: ['vinhdat'],
+    });
+
+    // 4. add_comment posts comment to issue
+    const comment = await adapter.execute('github.add_comment', {
+      repo,
+      issueNumber: 7,
+      body: 'Đã kiểm tra và xác nhận fix.',
+    });
+    expect(comment).toEqual({
+      id: '9001',
+      issueNumber: 7,
+      body: 'Đã kiểm tra và xác nhận fix.',
+      repo,
+      url: 'https://github.com/team/project/issues/7#issuecomment-9001',
+    });
+
+    // 5. list_issues works without repo (iterating allowedRepositories for TelegramDigestRunner)
+    const listed = await adapter.execute('github.list_issues', { state: 'open' });
+    expect(listed).toEqual([
+      { id: '12', number: 7, title: 'Fix login', url: issue.html_url, repo },
+    ]);
+  });
 });

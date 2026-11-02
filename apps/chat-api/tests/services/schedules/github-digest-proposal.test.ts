@@ -70,6 +70,16 @@ describe('Task 7: GitHub digest schedule proposal and approvalMode confirmation 
         teamRepos: [{ repoId: '101', fullName: 'nhom/ati', name: 'ati' }],
         memberRepos: [{ repoId: '101', fullName: 'nhom/ati', name: 'ati' }],
       }),
+      telegramConnection: async () => ({
+        status: 'connected',
+        connection: {
+          credentialId: 'cred-tg-1',
+          telegramUserId: '777',
+          username: 'octo_tg',
+          chatIds: ['-100999888'],
+        },
+        selectedChats: [{ chatId: '-100999888', title: 'Dev Alerts', type: 'supergroup' }],
+      }),
       getAdapter: async (serviceName: string) => {
         if (serviceName === 'slack') {
           return {
@@ -275,5 +285,59 @@ describe('Task 7: GitHub digest schedule proposal and approvalMode confirmation 
       userId: owner.id,
     });
     expect(dbRow.digest_config_hash).toBe(expectedHash);
+  });
+
+  it('(F4) routes 3-section GitHub -> Telegram digest through evaluateGithubDigestCandidate and confirms kind = github_digest', async () => {
+    const convTg = (await conversations.createConversation(owner.id)).id;
+    provider.setPlanResponses([
+      {
+        kind: 'schedule',
+        action: 'create',
+        name: 'GitHub 3 sections Telegram',
+        request:
+          'Gửi bản tin GitHub repo nhom/ati: issue mới, PR chờ review quá 3 ngày, issue chưa ai nhận vào Telegram Dev Alerts',
+        recurrence: { type: 'daily', time: '08:00' },
+        summary: 'Mỗi sáng 8 giờ, gửi bản tin 3 mục GitHub repo nhom/ati vào Telegram Dev Alerts.',
+      },
+    ]);
+
+    await send(
+      convTg,
+      'Mỗi sáng 8 giờ, gửi bản tin GitHub repo nhom/ati: issue mới, PR chờ review quá 3 ngày, issue chưa ai nhận vào Telegram Dev Alerts',
+    );
+    const proposalTg = await latestProposal(convTg);
+    expect(proposalTg.metadata.digestCandidate).toMatchObject({
+      canAutoDigest: true,
+      config: {
+        credentialId: 'cred-gh-1',
+        githubUserId: '1001',
+        login: 'octocat',
+        repos: ['nhom/ati'],
+        staleDays: 3,
+        telegramChatId: '-100999888',
+        telegramChatTitle: 'Dev Alerts',
+        telegramCredentialId: 'cred-tg-1',
+        telegramUserId: '777',
+        telegramUsername: 'octo_tg',
+      },
+    });
+
+    const confirmRes = await request(app)
+      .post(`/api/conversations/${convTg}/schedule-proposals/${proposalTg.id}/confirm`)
+      .set('Authorization', bearer(owner))
+      .send({ approvalMode: 'auto_digest' });
+    expect(confirmRes.status).toBe(200);
+    expect(confirmRes.body.schedule.kind).toBe('github_digest');
+    expect(confirmRes.body.schedule.digest.config).toEqual(proposalTg.metadata.digestCandidate.config);
+
+    const dbRow = (
+      await db.pool.query(
+        'SELECT kind, digest_config, digest_config_hash FROM schedules WHERE id=$1',
+        [confirmRes.body.schedule.id],
+      )
+    ).rows[0];
+    expect(dbRow.kind).toBe('github_digest');
+    expect(dbRow.digest_config.staleDays).toBe(3);
+    expect(dbRow.digest_config.telegramChatId).toBe('-100999888');
   });
 });

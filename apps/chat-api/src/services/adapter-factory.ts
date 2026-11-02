@@ -21,6 +21,7 @@ export interface AdapterContext {
   phase: 'planning' | 'execution';
   /** Required when phase is 'execution' and the service is personal: the connection the plan was previewed with. */
   connections?: PlanConnections;
+  repo?: string;
 }
 
 export interface AdapterFactoryOptions {
@@ -442,7 +443,10 @@ export class AdapterFactory {
       const previewed = context.connections?.github;
       if (previewed) {
         const inTeamScope = previewed.repos.filter((r: string) => currentTeamRepos.has(r.toLowerCase()));
-        if (inTeamScope.length === 0) {
+        if (
+          inTeamScope.length === 0 ||
+          (typeof context.repo === 'string' && !currentTeamRepos.has(context.repo.toLowerCase()))
+        ) {
           throw githubError('AUTH_ERROR', 'Repository GitHub trong kế hoạch đã bị bỏ khỏi phạm vi nhóm.');
         }
       }
@@ -494,7 +498,12 @@ export class AdapterFactory {
       .filter((r: string) => currentTeamRepos.has(r.toLowerCase()) && liveMemberRepos.has(r.toLowerCase()))
       .map((r: string) => canonicalTeamRepo.get(r.toLowerCase()) ?? r);
 
-    if (allowedRepos.length === 0) {
+    if (
+      allowedRepos.length === 0 ||
+      (context?.phase === 'execution' &&
+        typeof context.repo === 'string' &&
+        !liveMemberRepos.has(context.repo.toLowerCase()))
+    ) {
       if (context?.phase === 'execution') {
         throw githubError('AUTH_ERROR', 'Bạn không còn quyền truy cập repository GitHub trong kế hoạch.');
       }
