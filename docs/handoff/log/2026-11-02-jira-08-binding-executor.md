@@ -1,0 +1,50 @@
+# JIRA-08 Personal Jira Binding, Execution, and Source Guard — 2026-11-02
+
+- **Task:** `docs/handoff/tasks/JIRA-08-binding-executor.md`
+- **Branch:** `longnguyen005/jira-08-execution`
+- **Cờ tính năng:** `MYJIRA_ENABLED` tiếp tục giữ nguyên tắt mặc định (`off`), chỉ bật trong test opt-in.
+- **Nội dung hoàn thành:**
+  - **Task 1: Server binding trước plan hash (`96f2c7a`)**
+    - Tạo `apps/chat-api/src/services/jira/jira-plan-binding.ts` chứa `JiraPlanBinder` và hàm `bindJiraPlanConnections`.
+    - Gắn `connections.myjira` từ dữ liệu PostgreSQL hiện hành (owner, workspace, site, cloud, project, policy version) **trước** khi tính `plan_hash`; lọc bỏ connection hoặc version giả mạo từ model/browser.
+    - Test: `apps/chat-api/tests/services/jira-plan-binding.test.ts` (10/10 PASS).
+  - **Task 2: Recheck binding khi phê duyệt và khởi chạy (`be1b01c`)**
+    - Tạo `apps/chat-api/src/services/jira/jira-approval-guard.ts` với `validateJiraApprovalBinding` kiểm tra 2 lớp membership, grant site/project policy version, native permission, và trả pattern ẩn 404 cho tài nguyên lạ.
+    - Cập nhật `apps/chat-api/src/db/repositories/plan-repo.ts` bảo vệ CAS `WHERE status = 'pending'` trong `approvePlan`.
+    - Test: `apps/chat-api/tests/services/jira-approval-guard.test.ts` (10/10 PASS).
+  - **Task 3: Tuyến tính hóa dispatch và lease guard (`d0ecd4e`)**
+    - Tạo `apps/chat-api/src/services/jira/jira-dispatch-guard.ts` thực hiện khóa 2 client PostgreSQL: `FOR UPDATE` trên `jira_authorization_leases` và `FOR SHARE` trên `ati_workspace_jira_sites` / `ati_workspace_jira_projects` trong suốt quá trình HTTP dispatch.
+    - Lấy token ngoài giao dịch DB; hỗ trợ ngắt kết nối thực sự qua `AbortSignal` khi hủy hoặc timeout.
+    - Test: `apps/chat-api/tests/services/jira-dispatch-guard.test.ts` (6/6 PASS).
+  - **Task 4: Thực thi step đã bind, từ chối legacy fallback và giữ receipt (`7e79681`)**
+    - Mở rộng `packages/executor/src/runner.ts` bao gồm catalog `MYJIRA_TOOLS`.
+    - Xây dựng `myjiraAdapter` trong `apps/chat-api/src/services/adapter-factory.ts` gọi qua `JiraDispatchGuard`, từ chối fallback sang `jira.*` legacy trong personal context, sinh receipt chuẩn và giữ lỗi sau dispatch thành `UNKNOWN` (không tự retry).
+    - Mở rộng `JiraDispatchError` với `category: 'AUTH_ERROR'` và `details: { requestSent: false }` cho lỗi pre-dispatch.
+    - Test: `apps/chat-api/tests/integration/jira-execution.test.ts` (7/7 PASS).
+  - **Task 5: Guard nguồn dữ liệu, persistence và SSE publication (`5190aa0`)**
+    - Tích hợp `JiraHistorySanitizer` trong `ChatService.executePlannerPipeline` che mờ các message Jira đã bị thu hồi trước khi prompt model.
+    - Thêm bước recheck nguồn muộn trong `ChatService.prepareResponse` che mờ response model trước khi ghi DB và phát SSE khi quyền bị thu hồi.
+    - Lọc bỏ `output` khỏi `gather_progress` đối với `myjira.*` và `jira.*`.
+    - Kiểm tra binding Jira trong `GET /api/conversations/:id/plans/active` trả 404 khi quyền bị thu hồi.
+    - Test: `apps/chat-api/tests/services/jira-source-guard.test.ts` (9/9 PASS, bao gồm 2 mutation test bỏ guard để chứng minh test fail).
+  - **Task 6: Từ chối schedule, quyền workspace và opt-in production (`2a77753`)**
+    - Từ chối đề xuất và xác nhận schedule chứa `myjira` trong `ChatService.prepareProposal` và `ScheduleService.confirmProposal`.
+    - Từ chối khởi chạy scheduler khi thiếu actor hoặc workspace trong `ChatService.planScheduledRun`.
+    - Từ chối fallback `jira` legacy trong ngữ cảnh workspace cá nhân.
+    - Kiểm kê lịch legacy: `SELECT id, name, user_id, status, services, workspace_id, workspace_mode, created_at FROM schedules WHERE 'jira' = ANY(services) OR 'myjira' = ANY(services);` (0 dòng trong cơ sở dữ liệu).
+    - Khóa production opt-in `enableWorkspaceConversations` sau điều kiện `env.MYJIRA_ENABLED && jiraAvailable` trong `apps/chat-api/src/server.ts`.
+    - Test: `apps/chat-api/tests/services/schedules/jira-schedule-refusal.test.ts` (6/6 PASS).
+  - **Static guard registration (`fbd99a9`)**
+    - Khai báo ngoại lệ cho các file guard và router Jira của JIRA-08 trong `evaluations/generic-plumbing/static-guard.test.ts` (2/2 PASS).
+- **Bằng chứng kiểm thử tổng thể:**
+  - `apps/chat-api` focused suites: 7 test files PASS (63/63 tests PASS, exit 0).
+  - `@wap/executor` test suite: 5 test files PASS (42/42 tests PASS, exit 0).
+  - `evaluations/generic-plumbing/static-guard.test.ts`: 1 test file PASS (2/2 tests PASS, exit 0).
+  - `npm run typecheck:v3`: PASS (exit code 0).
+  - `npm run check`: PASS (toàn bộ kiểm thử v3, tool-schemas 347 tests, tool-adapters 520 tests, probes 66 tests, build:v3, web build security, launcher test; exit code 0).
+  - `npm run test:browser:v3`: PASS (toàn bộ 16 browser scenarios gồm `default` 96 passed, `auth02`, `auth04`, `clarification`, `partial_failure`, `three_service`, `sheets_slack`, `calendar_slack`, `notion_slack`, `telegram_slack`, `jira_slack`, `answer`, `gmail`, `mycalendar`, `mysheets`, `schedule`; exit code 0).
+- **Ranh giới tuân thủ:**
+  - Không sửa `packages/tool-schemas/`, adapter Jira gốc, planner, hoặc UI.
+  - Không sửa `docs/handoff/CURRENT-STATE.md` hay `docs/handoff/ROADMAP.md`.
+  - Không mock hình thức: 100% logic PostgreSQL chạy trên cluster PostgreSQL 18 thật; HTTP sử dụng fixture loopback.
+  - Sẵn sàng mở PR và bàn giao cho reviewer độc lập.
