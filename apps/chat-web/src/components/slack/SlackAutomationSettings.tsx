@@ -138,6 +138,7 @@ export function SlackAutomationSettings({connectionId,workspaceName,active}:{con
        <label className="block text-xs text-[#4B5563] dark:text-[#9CA3AF]">
         Thêm nhanh người gửi từ danh bạ Slack
         <select
+         aria-label="Thêm nhanh người gửi từ danh bạ Slack"
          className={field+' mt-1'}
          value=""
          onChange={e=>{
@@ -202,7 +203,7 @@ export function SlackAutomationSettings({connectionId,workspaceName,active}:{con
      {channels.length>0&&(
       <label className="block text-sm">
        Chọn kênh từ danh bạ Slack
-       <select className={field} value={channel} onChange={e=>setChannel(e.target.value)}>
+       <select aria-label="Chọn kênh từ danh bạ Slack" className={field} value={channel} onChange={e=>setChannel(e.target.value)}>
         <option value="">Chọn kênh (#channel)…</option>
         {channels.map(ch=><option key={ch.id} value={ch.id}>{ch.isPrivate?'🔒 ':'#'}{ch.name} ({ch.id})</option>)}
        </select>

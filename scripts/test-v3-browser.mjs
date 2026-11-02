@@ -76,10 +76,10 @@ for (const scenario of runScenarios) {
     if (['slack_oauth','slack_read','slack_write','slack_assistant'].includes(scenario.name)) {
       if(['slack_oauth','slack_assistant'].includes(scenario.name))delete env.SANDBOX_SCENARIO;
       const redirectUri = `http://127.0.0.1:${env.V3_WEB_PORT || 5174}/connections/myslack/callback`;
-      const fixture = await startSlackOAuthFixture({ redirectUri,readFixtures:scenario.name==='slack_read',writeFixtures:scenario.name==='slack_write' }); stopFixture = fixture.stop;
+      const fixture = await startSlackOAuthFixture({ redirectUri,readFixtures:['slack_read','slack_assistant'].includes(scenario.name),writeFixtures:scenario.name==='slack_write' }); stopFixture = fixture.stop;
       Object.assign(env, { MYSLACK_APP_ID: 'A_FIXTURE', MYSLACK_OAUTH_CLIENT_ID: 'slack-fixture-client', MYSLACK_OAUTH_CLIENT_SECRET: 'slack-fixture-secret', MYSLACK_OAUTH_REDIRECT_URI: redirectUri,
         MYSLACK_OAUTH_AUTH_URL: fixture.origin + '/authorize', MYSLACK_API_BASE_URL: fixture.origin + '/api' });
-      if(['slack_read','slack_write'].includes(scenario.name))Object.assign(env,{LLM_PROVIDER:'gemini',GEMINI_MODEL:'gemini-2.5-flash',RUNTIME_ACCOUNT_ID:'SLACK_M2_BROWSER',SLACK_SIGNING_SECRET:'fixture-slack-signing-secret-m2'});
+      if(['slack_read','slack_write','slack_assistant'].includes(scenario.name))Object.assign(env,{LLM_PROVIDER:'gemini',GEMINI_MODEL:'gemini-2.5-flash',RUNTIME_ACCOUNT_ID:'SLACK_M2_BROWSER',SLACK_SIGNING_SECRET:'fixture-slack-signing-secret-m2'});
     }
     if (scenario.name === 'gmail') {
       const redirectUri = `http://127.0.0.1:${env.V3_WEB_PORT || 5174}/connections/gmail/callback`;

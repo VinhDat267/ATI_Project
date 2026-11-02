@@ -32,13 +32,11 @@ export function createPersonalSlackAssistantRuntime(input:Options){
  const repo=new SlackAssistantRepo(input.pool,policy,{appId:input.oauth?.appId??env.MYSLACK_APP_ID??'disabled',automationEnabled:available,timezone:env.APP_TIME_ZONE},artifacts);
  const proposals=new SlackProposalService({pool:input.pool,repo,artifacts,plans:new PlanRepo(input.pool,lineage),messages:new MessageRepo(input.pool,lineage),policy,invalidation});
  const digests=new SlackDigestService({pool:input.pool,repo,artifacts,policy});
- if(!available)return {repo,artifacts,proposals,digests,directory:undefined,runner:undefined};
- // A dedicated provider is created from the very same frozen environment used by F1; never the canned sandbox planner.
- const provider=createProviderFromEnv({...env,LLM_PROVIDER:env.LLM_PROVIDER?.trim().toLowerCase(),LLM_MODEL:identity.model,GEMINI_MODEL:identity.model});
- const connections=new SlackConnectionRepo(input.pool,invalidation);
- const endpoint=new URL(input.oauth!.apiBaseUrl),apiBaseUrl=!input.live&&endpoint.pathname==='/api'?endpoint.origin:input.oauth!.apiBaseUrl;
- const wrapper=new SlackPrivateReadWrapper({policyService:policy,invalidationService:invalidation,ownerGate:connections,tokenManager:new SlackTokenManager(connections,new SlackOAuthClient(input.oauth!),input.encryptionKey),runtimeConfig:{env},apiBaseUrl});
- const directory={
+ const directoryReady=env.MYSLACK_ENABLED==='on'&&!!input.oauth&&!!input.encryptionKey&&!!identity.accountIdentifier&&!!identity.model;
+ const connections=directoryReady?new SlackConnectionRepo(input.pool,invalidation):undefined;
+ const endpoint=directoryReady?new URL(input.oauth!.apiBaseUrl):undefined,apiBaseUrl=directoryReady?(!input.live&&endpoint!.pathname==='/api'?endpoint!.origin:input.oauth!.apiBaseUrl):undefined;
+ const wrapper=directoryReady?new SlackPrivateReadWrapper({policyService:policy,invalidationService:invalidation,ownerGate:connections!,tokenManager:new SlackTokenManager(connections!,new SlackOAuthClient(input.oauth!),input.encryptionKey),runtimeConfig:{env},apiBaseUrl}):undefined;
+ const directory=wrapper&&connections?{
   async listDirectory(ownerId:string,connectionId:string){
    if(!isUuid(ownerId)||!isUuid(connectionId))throw new Error('SLACK_ASSISTANT_NOT_FOUND');
    const row=await connections.withOwner(ownerId,c=>connections.get(c,ownerId,connectionId));
@@ -62,7 +60,10 @@ export function createPersonalSlackAssistantRuntime(input:Options){
     throw new Error('SLACK_ASSISTANT_UNAVAILABLE');
    }
   },
- };
- const worker=new SlackTriageWorker({repo,wrapper,policy,planner:new SlackTriagePlanner(provider),workerId:input.workerId??'slack-assistant'});
+ }:undefined;
+ if(!available)return {repo,artifacts,proposals,digests,directory,runner:undefined};
+ // A dedicated provider is created from the very same frozen environment used by F1; never the canned sandbox planner.
+ const provider=createProviderFromEnv({...env,LLM_PROVIDER:env.LLM_PROVIDER?.trim().toLowerCase(),LLM_MODEL:identity.model,GEMINI_MODEL:identity.model});
+ const worker=new SlackTriageWorker({repo,wrapper:wrapper!,policy,planner:new SlackTriagePlanner(provider),workerId:input.workerId??'slack-assistant'});
  const runner=new SlackLifecycleValidationRunner({runOnce:async(limit?:number,signal?:AbortSignal)=>{const stats=await worker.runOnce(limit,signal);await digests.runDueDigests(new Date(),signal).catch(()=>{});return stats;}},{intervalMs:input.intervalMs});return {repo,artifacts,proposals,digests,directory,runner};
 }

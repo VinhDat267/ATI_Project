@@ -49,9 +49,17 @@ export function handleSSEEvent(
   const pending = source ? store.planningByConversation[source] : undefined;
   if (data.requestId && pending?.requestId && data.requestId !== pending.requestId) return;
   if (['plan', 'plan_preview', 'clarification', 'refusal', 'answer', 'error', 'schedule_proposal'].includes(event)) store.setIsPlanning(false, source, data.requestId);
+  if (event === 'agent_state' && (data.state === 'waiting_for_approval' || data.state === 'idle')) {
+    store.setIsPlanning(false, source, data.requestId);
+  }
   if (event === 'agent_state' && data.state === 'planning') {
-    store.setIsPlanning(true, source, data.requestId);
-    if (source && typeof data.replyToMessageId === 'string') store.confirmPlanningRequest(source, data.requestId, data.replyToMessageId);
+    const alreadySettled = typeof data.replyToMessageId === 'string' && store.messages.some(message =>
+      ['plan', 'clarification', 'refusal', 'answer', 'planning_error', 'schedule_proposal', 'schedule_discarded'].includes(message.metadata?.type ?? '') &&
+      message.metadata?.replyToMessageId === data.replyToMessageId);
+    if (!alreadySettled) {
+      store.setIsPlanning(true, source, data.requestId);
+      if (source && typeof data.replyToMessageId === 'string') store.confirmPlanningRequest(source, data.requestId, data.replyToMessageId);
+    }
   }
   // A late terminal event still settles its own request, but cannot populate
   // messages/plan state for the conversation the user is now reading.
