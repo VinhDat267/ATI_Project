@@ -66,7 +66,7 @@ export const TRELLO_FAKE: FakeService = {
           },
         ];
       }
-      return [baseCard];
+      return [{ id: 'card_1', name: 'Thẻ hiện có', idBoard: boardId, idList: listId }];
     },
     'trello.get_card': (args) => ({
       id: args.cardId || 'card_1',
