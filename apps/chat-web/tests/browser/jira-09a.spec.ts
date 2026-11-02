@@ -77,7 +77,8 @@ test.describe('JIRA-09A: Jira UI Foundation Browser Tests', () => {
       sites: [],
     };
     let holdInviteResponse = false;
-    let resumeInviteResponse: any = null;
+    let onInviteHeld: () => void = () => {};
+    let onInviteRelease: () => void = () => {};
 
     // Route mocks
     await page.route('**/api/connections/myjira', async (route) => {
@@ -203,8 +204,9 @@ test.describe('JIRA-09A: Jira UI Foundation Browser Tests', () => {
       const url = route.request().url();
       if (route.request().method() === 'POST') {
         if (holdInviteResponse) {
+          onInviteHeld();
           await new Promise<void>((resolve) => {
-            resumeInviteResponse = resolve;
+            onInviteRelease = resolve;
           });
           holdInviteResponse = false;
           const delayedInvite = {
@@ -404,28 +406,33 @@ test.describe('JIRA-09A: Jira UI Foundation Browser Tests', () => {
     await expect(page.getByText('ATI_INVITE_TOKEN_SECRET_9999')).not.toBeVisible();
 
     // Test holding in-flight invite creation response across workspace switch:
-    // 1. Hold invite creation request in-flight
-    // 2. Click "Tạo mã mời" on Workspace 1
-    // 3. Switch to Workspace 2 while request is still pending
-    // 4. Release held invite response
-    // 5. Verify the invite code NEVER appears in Workspace 2
+    // 1. Prepare synchronization promises
+    const inviteHeldPromise = new Promise<void>((resolve) => {
+      onInviteHeld = resolve;
+    });
+    const inviteResponsePromise = page.waitForResponse((res) =>
+      res.url().includes('/api/jira-workspaces') &&
+      res.url().includes('/invites') &&
+      res.request().method() === 'POST'
+    );
+
+    // 2. Click "Tạo mã mời" on Workspace 1 and wait until POST is definitely held
     holdInviteResponse = true;
     await page.getByRole('button', { name: 'Tạo mã mời' }).click();
+    await inviteHeldPromise; // Guaranteed that POST was dispatched and is now held in-flight
 
-    // Switch to Workspace 2 while invite creation is pending in-flight
+    // 3. Switch to Workspace 2 while invite creation is still held in-flight
     await page.locator('#jira-workspace-select').selectOption('workspace-uuid-2');
     await expect(page.getByText('Design System Team', { exact: true })).toBeVisible();
 
-    // Now release the held createInvite response for Workspace 1
-    if (resumeInviteResponse) {
-      resumeInviteResponse();
-    }
+    // 4. Release held response and wait until browser actually receives the response
+    onInviteRelease();
+    await inviteResponsePromise; // Guaranteed that response was received and processed
 
-    // Wait and verify: the delayed invite token from Workspace 1 NEVER appears on Workspace 2
-    await page.waitForTimeout(300);
+    // 5. Verify the delayed invite token NEVER appears on Workspace 2
     await expect(page.getByText('DELAYED_INVITE_TOKEN_FOR_WS1')).not.toBeVisible();
 
-    // Switch back to Workspace 1 and verify clean state
+    // 6. Switch back to Workspace 1 and verify clean state
     await page.locator('#jira-workspace-select').selectOption('workspace-uuid-1');
     await expect(page.getByRole('button', { name: 'Tạo mã mời' })).toBeVisible();
     await expect(page.getByText('DELAYED_INVITE_TOKEN_FOR_WS1')).not.toBeVisible();

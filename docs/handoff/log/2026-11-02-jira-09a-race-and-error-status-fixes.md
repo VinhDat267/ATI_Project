@@ -23,7 +23,7 @@
      - Playwright `apps/chat-web/tests/browser/jira-09a.spec.ts`:
        - Bổ sung xác thực trình duyệt thực tế cho chuỗi lỗi 500, 429, 403, và 503 đảm bảo hiển thị đúng badge "Lỗi kết nối", thông báo lỗi tương ứng, nút "Thử lại", và tuyệt đối không hiện "Chưa kết nối".
        - Bổ sung xác thực trạng thái `scope_required`: hiển thị badge "Cần cấp quyền site", tên tài khoản Atlassian, ID tài khoản Atlassian, và nút "Cấp quyền Jira site".
-       - Bổ sung kịch bản giữ phản hồi tạo mã mời đang chờ (`holdInviteResponse = true`), chuyển sang Workspace 2, sau đó mới trả phản hồi và xác nhận mã mời không bao giờ xuất hiện ở Workspace 2.
+       - Bổ sung kịch bản đồng bộ xác thực tạo mã mời đến muộn (`holdInviteResponse = true`): đợi chắc chắn request POST đã đến và bị giữ lại (`await inviteHeldPromise`), chuyển sang Workspace 2, mở phản hồi (`onInviteRelease()`), đợi request HTTP hoàn tất hoàn toàn trên browser (`await inviteResponsePromise`), và sau đó mới khẳng định mã mời không bao giờ xuất hiện ở Workspace 2.
 
 - **Bằng chứng kiểm thử thực tế:**
   - **Focused Jira Suites**:
@@ -46,4 +46,4 @@
     -> PASS: production build excludes credential sentinels and 7 forbidden UI claims (exit code 0).
   - **Playwright Browser Test**:
     `npx playwright test apps/chat-web/tests/browser/jira-09a.spec.ts`
-    -> 1 passed (4.9s, exit code 0).
+    -> 1 passed (7.6s, exit code 0).
