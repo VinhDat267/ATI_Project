@@ -137,7 +137,8 @@ export type SlackLifecycleDescriptor =
   | { intentType: 'token_revocation_validation'; slackUserIds: string[] }
   | { intentType: 'app_uninstall_validation' }
   | { intentType: 'message_deleted'; channelId: string; deletedTs: string }
-  | { intentType: 'message_changed'; channelId: string; messageTs: string; editTs: string };
+  | { intentType: 'message_changed'; channelId: string; messageTs: string; editTs: string }
+  | { intentType: 'channel_membership_lost'; channelId: string; slackUserId: string | null };
 
 interface SlackEventInputBase {
   appId: string;
@@ -299,6 +300,14 @@ function normalizeDescriptor(value: unknown): SlackLifecycleDescriptor {
         throw new TypeError('message_changed editTs precedes messageTs');
       }
       return { intentType: 'message_changed', channelId, messageTs, editTs };
+    }
+    case 'channel_membership_lost': {
+      const channelId = requireSafeId(descriptor.channelId, 'channelId');
+      const slackUserId =
+        descriptor.slackUserId === null || descriptor.slackUserId === undefined
+          ? null
+          : requireSafeId(descriptor.slackUserId, 'slackUserId');
+      return { intentType: 'channel_membership_lost', channelId, slackUserId };
     }
     default:
       throw new TypeError('Unknown lifecycle intent type');
@@ -602,6 +611,45 @@ export class SlackEventReceiptRepo {
             tombstoneReason: 'source_deleted',
           },
         });
+      } else if (descriptor.intentType === 'channel_membership_lost') {
+        const actorClause = descriptor.slackUserId ? 'AND actor_id = $3' : '';
+        const params: unknown[] = descriptor.slackUserId
+          ? [base.appId!, base.teamId!, descriptor.slackUserId]
+          : [base.appId!, base.teamId!];
+        const rows = (
+          await client.query<ConnectionCandidate>(
+            `SELECT id, user_id, app_id, workspace_id, actor_id, identity_version, status, config
+             FROM slack_connections
+             WHERE app_id = $1 AND workspace_id = $2 AND status <> 'disconnected' ${actorClause}
+             ORDER BY user_id, id`,
+            params
+          )
+        ).rows;
+        for (const row of rows) {
+          const binding: SlackBinding = {
+            atiUserId: row.user_id,
+            connectionId: row.id,
+            workspaceId: row.workspace_id,
+            slackUserId: row.actor_id,
+            identityVersion: row.identity_version,
+          };
+          effects.push({
+            effectKey: `channel:${row.id}:${descriptor.channelId}`,
+            barrier: {
+              barrierType: 'channel',
+              binding,
+              channelId: descriptor.channelId,
+              reason: 'channel_membership_lost',
+            },
+            purgeTarget: {
+              scope: 'channel_membership_lost',
+              binding,
+              channelId: descriptor.channelId,
+              cascadeTargetKinds: [...SLACK_DERIVED_TARGET_KINDS],
+              tombstoneReason: 'channel_membership_lost',
+            },
+          });
+        }
       } else {
         const resourceId = slackMessageResourceId(descriptor.channelId, descriptor.messageTs);
         effects.push({
@@ -655,24 +703,26 @@ export class SlackEventReceiptRepo {
       }
 
       const intents: SlackLifecycleIntentRow[] = [];
-      for (let index = 0; index < effects.length; index++) {
-        const effect = effects[index];
-        if (!effect) continue;
-        // Credentialless generations already have durable binding/purge effects above;
-        // creating an auth.test job for them would poison retries for healthy bindings.
-        if (effect.connection && !effect.connection.config) continue;
-        const barrierId = staged.barrierIds[index];
-        if (!barrierId) throw new Error('SLACK_BARRIER_NOT_STAGED');
-        const payload = this.buildIntentPayload(descriptor, effect.connection, barrierId, base);
-        const intent = await client.query(
-          `INSERT INTO slack_lifecycle_intents (
-             receipt_id, team_id, effect_key, intent_type, payload_json
-           ) VALUES ($1, $2, $3, $4, $5)
-           ON CONFLICT (receipt_id, effect_key) DO NOTHING
-           RETURNING *`,
-          [receipt.id, base.teamId, effect.effectKey, descriptor.intentType, JSON.stringify(payload)]
-        );
-        if (intent.rows[0]) intents.push(mapIntentRow(intent.rows[0]));
+      if (descriptor.intentType !== 'channel_membership_lost') {
+        for (let index = 0; index < effects.length; index++) {
+          const effect = effects[index];
+          if (!effect) continue;
+          // Credentialless generations already have durable binding/purge effects above;
+          // creating an auth.test job for them would poison retries for healthy bindings.
+          if (effect.connection && !effect.connection.config) continue;
+          const barrierId = staged.barrierIds[index];
+          if (!barrierId) throw new Error('SLACK_BARRIER_NOT_STAGED');
+          const payload = this.buildIntentPayload(descriptor, effect.connection, barrierId, base);
+          const intent = await client.query(
+            `INSERT INTO slack_lifecycle_intents (
+               receipt_id, team_id, effect_key, intent_type, payload_json
+             ) VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (receipt_id, effect_key) DO NOTHING
+             RETURNING *`,
+            [receipt.id, base.teamId, effect.effectKey, descriptor.intentType, JSON.stringify(payload)]
+          );
+          if (intent.rows[0]) intents.push(mapIntentRow(intent.rows[0]));
+        }
       }
 
       return { kind: 'recorded', receipt, intents, barrierIds: staged.barrierIds };
@@ -700,7 +750,7 @@ export class SlackEventReceiptRepo {
   }
 
   private buildIntentPayload(
-    descriptor: SlackLifecycleDescriptor,
+    descriptor: Exclude<SlackLifecycleDescriptor, { intentType: 'channel_membership_lost' }>,
     connection: ConnectionCandidate | undefined,
     barrierId: string,
     base: SlackEventInputBase

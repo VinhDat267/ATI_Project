@@ -17,6 +17,13 @@ import {createApp} from '../../src/app.js';
 import {generateAccessToken} from '../../src/auth/jwt.js';
 import {SLACK_USER_SCOPES} from '../../src/services/slack/oauth-client.js';
 import {defaultSlackAssistantConfig} from '@wap/tool-schemas';
+import {CredentialRepo} from '../../src/db/repositories/credential-repo.js';
+import {AdapterFactory} from '../../src/services/adapter-factory.js';
+import {encryptCredentials} from '@wap/tool-adapters';
+import {SlackEventReceiptRepo} from '../../src/db/repositories/slack-event-receipt-repo.js';
+import {SlackIngressService} from '../../src/services/slack/slack-ingress-service.js';
+import {createHmac} from 'node:crypto';
+import {planSlackProposalWorkflow} from '@wap/planner';
 
 const secret='m4-proposal-inbox-secret-at-least32chars';
 let env:Awaited<ReturnType<typeof createSlackReadEnvironment>>;
@@ -231,6 +238,10 @@ async function setupFixture(){
   app,
   plans,
   steps,
+  messages,
+  conversations,
+  execution,
+  slackWrite,
   artifacts,
   assistantRepo,
   proposalService,
@@ -476,5 +487,159 @@ describe('SLACK-06A protected inbox, refine/prepare/reject CAS, and cross-servic
   expect(ghPrep.status).toBe(200);
   expect(ghPrep.body.status).toBe('awaiting_approval');
   expect(ghPrep.body.plan.steps.map((s:any)=>s.tool)).toEqual(['github.search_issues','github.create_issue']);
+ },30000);
+
+ it('F1: invalidates and redacts stored private Slack content when channel membership is lost via signed event or native read denial',async()=>{
+  const f=await setupFixture();
+  const conv=await f.conversations.createConversation(f.owner.person.id);
+  const acqRef=await env.canonicalRef(f.owner.binding,'manual_lookup');
+  const storageRef={...acqRef,purpose:'storage' as const,requestedRetentionDays:1};
+  const savedMsg=await f.messages.createSlackMessage(
+   conv.id,
+   'assistant',
+   'CONFIDENTIAL_PRIVATE',
+   {},
+   {
+    segments:[{
+     sourceRef:{
+      binding:f.owner.binding,
+      resourceType:'message',
+      resourceId:JSON.stringify(['C_PRIVATE_LOSS','1730000000.000100']),
+      revision:'1730000000.000100',
+     },
+     storagePolicyRef:storageRef,
+     acquisitionPolicyRef:acqRef,
+     captureHash:'a'.repeat(64),
+     capturedAt:new Date().toISOString(),
+     channelId:'C_PRIVATE_LOSS',
+    }],
+    selectors:['content'],
+   },
+  );
+  expect((await f.messages.listMessages(conv.id))[0]?.content).toBe('CONFIDENTIAL_PRIVATE');
+
+  const rawBody=Buffer.from(JSON.stringify({
+   type:'event_callback',
+   api_app_id:f.owner.row.app_id,
+   team_id:f.owner.binding.workspaceId,
+   event_id:'Ev_'+randomUUID(),
+   event_context:'ctx',
+   event:{
+    type:'member_left_channel',
+    user:f.owner.binding.slackUserId,
+    channel:'C_PRIVATE_LOSS',
+    channel_type:'G',
+    event_ts:'1730000005.000100',
+   },
+  }));
+  const ts=String(Math.floor(Date.now()/1000));
+  const sig='v0='+createHmac('sha256','FIXTURE_SIGNING').update(`v0:${ts}:`).update(rawBody).digest('hex');
+  const ingress=new SlackIngressService({
+   config:{appId:f.owner.row.app_id,signingSecret:'FIXTURE_SIGNING',automationEnabled:true},
+   repo:new SlackEventReceiptRepo(env.db.pool,env.invalidationService),
+  });
+  const res=await ingress.handleRequest({rawBody,timestampHeader:ts,signatureHeader:sig});
+  expect(res.status).toBe(200);
+  expect((await f.messages.listMessages(conv.id))[0]?.content).toBe('Slack content is unavailable.');
+ },30000);
+
+ it('F2: binds destination connection credentials for Trello, GitHub, Gmail, MyCalendar, and MySheets in both standalone and Inbox-prepared plans',async()=>{
+  const f=await setupFixture();
+  const creds=new CredentialRepo(env.db.pool,TEST_KEY);
+  for(const service of ['trello','github','gmail','mycalendar','mysheets']){
+   await creds.saveCredentials(
+    service,
+    encryptCredentials({
+     refreshToken:'fixture',
+     accessToken:'fixture',
+     allowedScope:{calendars:['primary'],spreadsheets:['spreadsheet_allowed_1234567890']},
+    },TEST_KEY),
+    f.owner.person.id,
+   );
+  }
+
+  const factory=new AdapterFactory({credentialRepo:creds,encryptionKey:TEST_KEY});
+  const planningRef=await env.canonicalRef(f.owner.binding,'planning');
+  const cases=[
+   {service:'trello',intent:{action:'task' as const,service:'trello' as const,summary:'Task'}},
+   {service:'github',intent:{action:'issue' as const,service:'github' as const,summary:'Issue'}},
+   {service:'gmail',intent:{action:'task' as const,service:'gmail' as const,summary:'Email'}},
+   {service:'mycalendar',intent:{action:'task' as const,service:'mycalendar' as const,summary:'Event'}},
+   {service:'mysheets',intent:{action:'progress' as const,service:'mysheets' as const,summary:'Row'}},
+  ];
+  for(const item of cases){
+   for(const replyInThread of [false,true]){
+    const built=planSlackProposalWorkflow({
+     ownerId:f.owner.person.id,
+     binding:f.owner.binding,
+     policyReference:planningRef,
+     source:{channelId:'C_WORK',messageTs:'1730000000.000001'},
+     proposal:{title:'Title',rationale:'Reason',intents:[item.intent],sourceTexts:['Text']},
+     targets:{
+      task:{listId:'L_TODO'},
+      github:{repo:'acme/repo'},
+      gmail:{toEmail:'to@example.test'},
+      calendar:{calendarId:'primary',startIso:'2026-11-03T09:00:00Z',endIso:'2026-11-03T09:30:00Z'},
+      progress:{spreadsheetId:'spreadsheet_allowed_1234567890',sheet:'Sheet1'},
+      replyInThread,
+     },
+    });
+    expect(built.kind).toBe('plan');
+    if(built.kind==='plan'){
+     const adapter=await factory.getAdapterForService(item.service,{
+      userId:f.owner.person.id,
+      phase:'execution',
+      workspaceMode:'personal',
+      connections:built.plan.connections,
+     });
+     expect(typeof (adapter as any).execute).toBe('function');
+    }
+   }
+  }
+ },30000);
+
+ it('F9: allows retry and skip on failed non-Slack steps in a multi-step source-reply plan before the Slack post step has started',async()=>{
+  const f=await setupFixture();
+  const bugSeed=await f.seedProposal({
+   title:'Broken server',
+   intents:[{action:'issue',service:'jira',summary:'Fix server'}],
+   text:'<@U_OWNER> kiểm tra lỗi server',
+  });
+  const prep=await request(f.app).post(`/api/slack/proposals/${bugSeed.id}/prepare`).set('Authorization',f.ownerToken).send({expectedRevision:1,replyInThread:true});
+  expect(prep.status).toBe(200);
+  const planId=prep.body.planId;
+
+  let shouldFailSearch=true;
+  const customExec=new ExecutionService({
+   planRepo:f.plans,
+   stepRepo:f.steps,
+   convRepo:f.conversations,
+   slackWrite:f.slackWrite,
+   adapterFactory:{
+    getAdapterForService:async()=>({
+     execute:async(tool:string,args:any)=>{
+      if(tool==='jira.search_issues'){
+       if(shouldFailSearch)throw Object.assign(new Error('Jira temporary outage'),{category:'SERVER_ERROR'});
+       return {issues:[]};
+      }
+      if(tool==='jira.create_issue'){
+       return {id:'10001',key:`${args.projectKey}-99`,url:`https://jira.example/browse/${args.projectKey}-99`};
+      }
+      throw new Error(`Unexpected tool ${tool}`);
+     },
+    }),
+   },
+  });
+
+  const started=await customExec.approveAndStart(planId,f.owner.person.id);
+  expect(started.status).toBe(200);
+  await vi.waitFor(async()=>{
+   const rows=await f.steps.listSteps(planId,'planning');
+   expect(rows.find(r=>r.step_id==='step_1')?.status).toBe('failed');
+  },{timeout:10000});
+
+  shouldFailSearch=false;
+  const retried=await customExec.retryStep(planId,'step_1',f.owner.person.id);
+  expect(retried.status).toBe('completed');
  },30000);
 });

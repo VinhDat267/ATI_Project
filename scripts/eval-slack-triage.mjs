@@ -1,12 +1,73 @@
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { dirname, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const defaultRootDir = resolve(__dirname, '..');
+
+if (!process.env.VITEST) {
+  const { register } = await import('tsx/esm/api');
+  register();
+}
+
+const REQUIRED_RUNTIME_PATHS = Object.freeze([
+  'apps/chat-api/src/services/slack/slack-rules-engine.ts',
+  'apps/chat-api/src/services/slack/slack-triage-worker.ts',
+  'apps/chat-api/src/services/slack/slack-private-read-wrapper.ts',
+  'apps/chat-api/src/services/slack/policy-service.ts',
+  'apps/chat-api/src/services/slack/slack-proposal-service.ts',
+  'apps/chat-api/src/config/slack-policy-runtime.ts',
+  'packages/planner/src/slack-triage.ts',
+  'packages/planner/src/slack-proposal-plan.ts',
+  'packages/planner/src/providers/openai-compatible-provider.ts',
+]);
+
+export function assertRuntimeSourcesExist(rootDir = defaultRootDir) {
+  for (const rel of REQUIRED_RUNTIME_PATHS) {
+    const abs = resolve(rootDir, rel);
+    if (!existsSync(abs)) {
+      throw new Error(`SLACK_EVAL_RUNTIME_SOURCES_MISSING:${rel}`);
+    }
+  }
+}
+
+assertRuntimeSourcesExist(defaultRootDir);
+
+const { slackPersonalRelevance, evaluateSlackRules } = await import(
+  pathToFileURL(resolve(defaultRootDir, 'apps/chat-api/src/services/slack/slack-rules-engine.ts')).href
+);
+const { SlackTriageWorker } = await import(
+  pathToFileURL(resolve(defaultRootDir, 'apps/chat-api/src/services/slack/slack-triage-worker.ts')).href
+);
+const { SlackPrivateReadWrapper } = await import(
+  pathToFileURL(resolve(defaultRootDir, 'apps/chat-api/src/services/slack/slack-private-read-wrapper.ts')).href
+);
+const { SlackPolicyService } = await import(
+  pathToFileURL(resolve(defaultRootDir, 'apps/chat-api/src/services/slack/policy-service.ts')).href
+);
+const { SlackProposalService } = await import(
+  pathToFileURL(resolve(defaultRootDir, 'apps/chat-api/src/services/slack/slack-proposal-service.ts')).href
+);
+const { resolveRuntimeProviderIdentity } = await import(
+  pathToFileURL(resolve(defaultRootDir, 'apps/chat-api/src/config/slack-policy-runtime.ts')).href
+);
+const { SlackTriagePlanner } = await import(
+  pathToFileURL(resolve(defaultRootDir, 'packages/planner/src/slack-triage.ts')).href
+);
+const { planSlackProposalWorkflow } = await import(
+  pathToFileURL(resolve(defaultRootDir, 'packages/planner/src/slack-proposal-plan.ts')).href
+);
+const { OpenAICompatibleProvider } = await import(
+  pathToFileURL(resolve(defaultRootDir, 'packages/planner/src/providers/openai-compatible-provider.ts')).href
+);
+const { validateSlackPolicyReference } = await import(
+  pathToFileURL(resolve(defaultRootDir, 'packages/tool-schemas/src/index.ts')).href
+);
+
+export { slackPersonalRelevance, evaluateSlackRules };
 
 export const FROZEN_CASES_SHA256 =
   'dd5820a42bb44134241393c4d417b6fb0321a58d034031f47f0916e8fbed2998';
@@ -72,77 +133,6 @@ function normalized(value) {
     .replace(/đ/g, 'd')
     .replace(/Đ/g, 'D')
     .toLocaleLowerCase('vi');
-}
-
-export function slackPersonalRelevance(context) {
-  const text = context.message?.text;
-  if (
-    !/^[UW][A-Za-z0-9_-]{1,63}$/.test(context.slackUserId) ||
-    typeof text !== 'string' ||
-    text.length > 20000
-  ) {
-    return null;
-  }
-  const mention = text.match(new RegExp(`<@${context.slackUserId}(?:\\|[^>]{1,80})?>`));
-  if (mention) {
-    return { kind: 'mention', evidence: mention[0] };
-  }
-  if (context.followedThread) {
-    return { kind: 'followed_thread', evidence: text.slice(0, 200) || 'Followed thread' };
-  }
-  const plain = normalized(text);
-  if (
-    context.conversationType === 'im' &&
-    context.message.user !== context.slackUserId &&
-    /(?:giup|nho|hay |vui long|lam |can ban|chuan bi|cap nhat|kiem tra|bao cao|sua |gui |xem |tao |please|could you|can you|would you|fix|update|prepare|check|review|\?)/.test(
-      plain,
-    )
-  ) {
-    return { kind: 'direct_message', evidence: text.slice(0, 200) };
-  }
-  if (
-    context.message.user === context.slackUserId &&
-    /(?:toi|minh|to|em|anh|chi) (?:se |nhan |dam nhan|tu lam)|i(?: will|'ll) /.test(plain)
-  ) {
-    return { kind: 'self_commitment', evidence: text.slice(0, 200) };
-  }
-  return null;
-}
-
-export function evaluateSlackRules(rules, context) {
-  const relevance = slackPersonalRelevance(context);
-  if (!relevance) {
-    return { kind: 'no_action', reason: 'not_relevant' };
-  }
-  const text = normalized(context.message.text);
-  for (const rule of rules) {
-    if (
-      !rule.enabled ||
-      !rule.conversationTypes.includes(context.conversationType) ||
-      (rule.authorIds.length && !rule.authorIds.includes(context.message.user ?? '')) ||
-      (rule.requireMention && relevance.kind !== 'mention')
-    ) {
-      continue;
-    }
-    const matches = rule.keywords.map((word) => text.includes(normalized(word)));
-    if (
-      matches.length &&
-      !(rule.keywordMode === 'all' ? matches.every(Boolean) : matches.some(Boolean))
-    ) {
-      continue;
-    }
-    return {
-      kind: 'proposal',
-      ruleId: rule.id,
-      relevance,
-      intent: {
-        action: rule.intent.action,
-        service: rule.intent.service,
-        summary: rule.intent.template || context.message.text.slice(0, 2000),
-      },
-    };
-  }
-  return { kind: 'no_action', reason: 'rule_not_matched' };
 }
 
 export function loadFrozenSlackDataset(rootDir = defaultRootDir) {
@@ -375,33 +365,79 @@ function classifySyntheticModelPayload(payload) {
   };
 }
 
-async function startSyntheticTriageModelServer() {
+async function startSyntheticTriageRuntimeServer() {
   let externalWriteCalls = 0;
+  let activeChannel = { id: 'C_GENERAL', kind: 'public' };
+  let activeMessages = [];
+
   const server = createServer(async (req, res) => {
+    const url = new URL(req.url ?? '/', 'http://127.0.0.1');
     const chunks = [];
     for await (const chunk of req) {
       chunks.push(chunk);
     }
-    const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-    const userMsg = body.messages?.find((m) => m.role === 'user')?.content ?? '{}';
-    const parsedInput = JSON.parse(userMsg);
-    const decision = classifySyntheticModelPayload(parsedInput);
-    const content = JSON.stringify(decision);
-    const promptTokens = Math.ceil(Buffer.byteLength(userMsg, 'utf8') / 4) + 180;
-    const completionTokens = Math.ceil(Buffer.byteLength(content, 'utf8') / 4);
+    const rawBody = Buffer.concat(chunks).toString('utf8');
 
     res.setHeader('content-type', 'application/json');
-    res.end(
-      JSON.stringify({
-        model: 'eval-synthetic-fixture-v1',
-        choices: [{ message: { content } }],
-        usage: {
-          prompt_tokens: promptTokens,
-          completion_tokens: completionTokens,
-          total_tokens: promptTokens + completionTokens,
-        },
-      }),
-    );
+
+    if (url.pathname === '/conversations.info') {
+      const parsedReqBody = rawBody ? JSON.parse(rawBody) : {};
+      const channelId = url.searchParams.get('channel') || parsedReqBody.channel || activeChannel.id;
+      const kind = activeChannel.kind;
+      res.end(
+        JSON.stringify({
+          ok: true,
+          channel: {
+            id: channelId,
+            is_im: kind === 'im',
+            is_mpim: kind === 'mpim',
+            is_private: kind === 'private',
+            is_channel: kind === 'public',
+            is_member: true,
+          },
+        }),
+      );
+      return;
+    }
+
+    if (url.pathname === '/conversations.history' || url.pathname === '/conversations.replies') {
+      res.end(
+        JSON.stringify({
+          ok: true,
+          messages: activeMessages,
+          has_more: false,
+          response_metadata: { next_cursor: '' },
+        }),
+      );
+      return;
+    }
+
+    if (url.pathname === '/chat/completions' || url.pathname === '/v1/chat/completions') {
+      const body = rawBody ? JSON.parse(rawBody) : {};
+      const userMsg = body.messages?.find((m) => m.role === 'user')?.content ?? '{}';
+      const parsedInput = JSON.parse(userMsg);
+      const decision = classifySyntheticModelPayload(parsedInput);
+      const content = JSON.stringify(decision);
+      const promptTokens = Math.ceil(Buffer.byteLength(userMsg, 'utf8') / 4) + 180;
+      const completionTokens = Math.ceil(Buffer.byteLength(content, 'utf8') / 4);
+
+      res.end(
+        JSON.stringify({
+          model: 'eval-synthetic-fixture-v1',
+          choices: [{ message: { content } }],
+          usage: {
+            prompt_tokens: promptTokens,
+            completion_tokens: completionTokens,
+            total_tokens: promptTokens + completionTokens,
+          },
+        }),
+      );
+      return;
+    }
+
+    externalWriteCalls++;
+    res.statusCode = 403;
+    res.end(JSON.stringify({ ok: false, error: 'write_forbidden_during_eval' }));
   });
 
   await new Promise((resolveListen) => server.listen(0, '127.0.0.1', resolveListen));
@@ -410,6 +446,10 @@ async function startSyntheticTriageModelServer() {
 
   return {
     baseUrl,
+    setCaseSource: (channel, messages) => {
+      activeChannel = channel;
+      activeMessages = messages;
+    },
     getExternalWriteCalls: () => externalWriteCalls,
     close: () =>
       new Promise((resolveClose) => {
@@ -419,37 +459,79 @@ async function startSyntheticTriageModelServer() {
   };
 }
 
-async function callModelEndpoint(baseUrl, binding, context) {
-  const payload = {
-    ownerSlackUserId: binding.slackUserId,
-    truncated: false,
-    messages: context.map((m, index) => ({
-      index,
-      text: m.text,
-      user: m.user,
-      ts: m.ts,
-      channelId: m.channelId,
-      threadTs: m.threadTs,
-      conversationType: m.conversationType,
-      isTrigger: m.isTrigger === true,
-      followedThread: m.followedThread === true,
-    })),
+function createEvalPolicyDb({ runtimeIdentity, maxRetentionDays, policyVersion, consentStatus }) {
+  const connections = new Map([
+    [
+      '22222222-2222-4222-8222-222222222222',
+      {
+        id: '22222222-2222-4222-8222-222222222222',
+        user_id: '11111111-1111-4111-8111-111111111111',
+        workspace_id: 'T_PRO_01',
+        actor_id: 'U_OWNER_01',
+        identity_version: 1,
+        status: 'active',
+        user_status: 'active',
+      },
+    ],
+    [
+      '33333333-3333-4333-8333-333333333333',
+      {
+        id: '33333333-3333-4333-8333-333333333333',
+        user_id: '11111111-1111-4111-8111-111111111111',
+        workspace_id: 'T_FREE_01',
+        actor_id: 'U_OWNER_01',
+        identity_version: 1,
+        status: 'active',
+        user_status: 'active',
+      },
+    ],
+  ]);
+
+  return {
+    query: async (sql, params = []) => {
+      if (sql.includes('FROM slack_connections')) {
+        const row = connections.get(params[0]);
+        return { rows: row && row.user_id === params[1] ? [row] : [] };
+      }
+      if (sql.includes('FROM slack_trusted_providers')) {
+        return {
+          rows: [
+            {
+              id: runtimeIdentity.providerId,
+              verified: true,
+              no_training: true,
+              configuration_fingerprint: runtimeIdentity.fingerprint,
+              evidence_ref: 'eval-offline-fixture-evidence',
+              verified_by: 'eval-harness',
+              verified_at: '2026-11-02T00:00:00.000Z',
+              max_retention_days: maxRetentionDays,
+              revision: 1,
+            },
+          ],
+        };
+      }
+      if (sql.includes('FROM slack_processing_consents')) {
+        return {
+          rows: [
+            {
+              workspace_id: params[0],
+              provider_id: runtimeIdentity.providerId,
+              status: consentStatus,
+              policy_version: policyVersion,
+              purposes: ['triage', 'planning', 'storage', 'manual_lookup', 'digest'],
+              retention_days: maxRetentionDays,
+              organization_representative: 'eval-org-rep',
+              evidence_ref: 'eval-consent-evidence',
+              recorded_by: 'eval-harness',
+              granted_at: '2026-11-02T00:00:00.000Z',
+              revision: 1,
+            },
+          ],
+        };
+      }
+      return { rows: [] };
+    },
   };
-  const content = JSON.stringify(payload);
-  const reservedTokens = Buffer.byteLength(content, 'utf8') + 1024 + 8192;
-  const response = await fetch(`${baseUrl}/v1/chat/completions`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      model: 'eval-synthetic-fixture-v1',
-      messages: [{ role: 'user', content }],
-      max_tokens: 1024,
-    }),
-  });
-  const data = await response.json();
-  const rawDecision = JSON.parse(data.choices[0].message.content);
-  const reportedTokens = data.usage?.total_tokens ?? reservedTokens;
-  return { decision: rawDecision, reservedTokens, reportedTokens };
 }
 
 function isActionableKind(kind) {
@@ -496,6 +578,10 @@ function computePercentile(sortedValues, p) {
 
 export async function runSlackTriageBenchmark(options = {}) {
   const rootDir = options.rootDir ?? defaultRootDir;
+  assertRuntimeSourcesExist(rootDir);
+  if (typeof SlackProposalService !== 'function') {
+    throw new Error('SLACK_EVAL_RUNTIME_PROPOSAL_SERVICE_UNAVAILABLE');
+  }
   const runsPerMode = options.runs ?? 3;
   const dataset = loadFrozenSlackDataset(rootDir);
   const integrity = verifyFrozenDatasetIntegrity(dataset);
@@ -511,7 +597,81 @@ export async function runSlackTriageBenchmark(options = {}) {
     requestedRetentionDays: 1,
   });
 
-  const modelServer = await startSyntheticTriageModelServer();
+  const runtimeServer = await startSyntheticTriageRuntimeServer();
+  const runtimeEnv = {
+    MYSLACK_ENABLED: 'on',
+    LLM_PROVIDER: 'openai-compatible',
+    LLM_MODEL: 'eval-synthetic-fixture-v1',
+    LLM_BASE_URL: runtimeServer.baseUrl,
+    RUNTIME_ACCOUNT_ID: 'EVAL_SYNTHETIC_ACCOUNT',
+  };
+  const runtimeIdentity = resolveRuntimeProviderIdentity(runtimeEnv);
+  const policyDb = createEvalPolicyDb({
+    runtimeIdentity,
+    maxRetentionDays: gate.maxRetentionDays,
+    policyVersion: gate.policyVersion,
+    consentStatus: 'granted',
+  });
+  const policyService = new SlackPolicyService(policyDb, { env: runtimeEnv });
+  const wrapper = new SlackPrivateReadWrapper({
+    policyService,
+    tokenManager: { getAccessToken: async () => 'xoxp-eval-synthetic-token' },
+    invalidationService: { checkBarriers: async () => ({ blocked: false, barriers: [] }) },
+    ownerGate: { withOwner: async (_userId, fn) => fn(policyDb) },
+    runtimeConfig: { env: runtimeEnv },
+    apiBaseUrl: runtimeServer.baseUrl,
+  });
+  const planner = new SlackTriagePlanner(
+    new OpenAICompatibleProvider({
+      baseUrl: runtimeServer.baseUrl,
+      model: 'eval-synthetic-fixture-v1',
+      maxRetries: 1,
+      retryDelayMs: 1,
+      timeoutRetries: 0,
+      timeoutMs: 4000,
+    }),
+  );
+
+  let pendingLease = null;
+  let activeFollowedByTs = new Map();
+  let publishedDecision = { kind: 'no_action' };
+  let caseModelCalls = 0;
+  let caseReservedTokens = 0;
+  let caseReportedTokens = 0;
+
+  const repo = {
+    claim: async () => {
+      if (!pendingLease) return [];
+      const claimed = pendingLease;
+      pendingLease = null;
+      return [claimed];
+    },
+    assertCurrent: async () => {},
+    isFollowed: async (_lease, trigger) => activeFollowedByTs.get(trigger.messageTs) === true,
+    reserveAttempt: async (_lease, reserved) => {
+      caseModelCalls += 1;
+      caseReservedTokens += reserved;
+    },
+    recordReportedUsage: async (_lease, reported) => {
+      caseReportedTokens += typeof reported === 'number' ? reported : caseReservedTokens;
+    },
+    publish: async (_lease, decision) => {
+      publishedDecision = decision;
+      return { status: 'published' };
+    },
+    hold: async (_lease, reason) => {
+      throw new Error(`SLACK_EVAL_WORKER_HELD:${reason}`);
+    },
+  };
+
+  const worker = new SlackTriageWorker({
+    repo,
+    wrapper,
+    policy: policyService,
+    planner,
+    workerId: 'eval-triage-worker',
+  });
+
   const modes = ['rules', 'ai', 'hybrid'];
   const modeResults = {};
   let totalUnapprovedWrites = 0;
@@ -548,69 +708,109 @@ export async function runSlackTriageBenchmark(options = {}) {
 
           const startMs = performance.now();
           const context = testCase.messages;
-          const ruleMatches = context
-            .map((m, index) => ({
-              index,
-              result: evaluateSlackRules(DEFAULT_RULES, {
-                slackUserId: binding.slackUserId,
-                conversationType: m.conversationType,
-                followedThread: m.followedThread === true,
-                message: {
-                  text: m.text,
-                  user: m.user,
-                  ts: m.ts,
-                  threadTs: m.threadTs,
-                },
-              }),
-            }))
-            .filter(({ index, result }) => context[index].isTrigger && result.kind === 'proposal');
+          const firstMsg = context[0];
+          runtimeServer.setCaseSource(
+            { id: firstMsg.channelId, kind: firstMsg.conversationType },
+            context.map((m) => ({
+              type: 'message',
+              user: m.user,
+              text: m.text,
+              ts: m.ts,
+              ...(m.threadTs ? { thread_ts: m.threadTs } : {}),
+            })),
+          );
+          activeFollowedByTs = new Map(context.map((m) => [m.ts, m.followedThread === true]));
+          publishedDecision = { kind: 'no_action' };
+          caseModelCalls = 0;
+          caseReservedTokens = 0;
+          caseReportedTokens = 0;
 
-          let decision = { kind: 'no_action' };
-          if (mode === 'rules') {
-            const first = ruleMatches[0];
-            if (first && first.result.kind === 'proposal') {
-              const m = context[first.index];
-              decision = {
-                kind: 'proposal',
-                title: (first.result.intent.summary || m.text).slice(0, 160),
-                rationale: 'Khớp luật cá nhân đã bật.',
-                sourceIndices: [first.index],
-                relevance: { ...first.result.relevance, sourceIndex: first.index },
-                intents: [
-                  {
-                    ...first.result.intent,
-                    summary: (first.result.intent.summary || m.text).slice(0, 2000),
-                  },
-                ],
-              };
+          const triagePolicy = await policyService.resolveSlackModelPolicy({
+            binding,
+            purpose: 'triage',
+            requestedRetentionDays: 0,
+          });
+          if (!triagePolicy.allowed) {
+            throw new Error(`SLACK_EVAL_POLICY_DENIED:${triagePolicy.reason}`);
+          }
+
+          pendingLease = {
+            jobId: `job-${testCase.id}-${mode}-${runIndex}`,
+            binding,
+            policyReference: validateSlackPolicyReference(triagePolicy.policyReference),
+            configVersion: 1,
+            config: {
+              enabled: true,
+              mode,
+              retentionDays: 1,
+              rules: DEFAULT_RULES,
+              budget: {
+                dailyCalls: 10000,
+                monthlyCalls: 100000,
+                dailyTokens: 100000000,
+                monthlyTokens: 1000000000,
+                maxOutputTokens: 1024,
+              },
+            },
+            triggers: context
+              .filter((m) => m.isTrigger)
+              .map((m) => ({
+                channelId: m.channelId,
+                messageTs: m.ts,
+                threadTs: m.threadTs ?? m.ts,
+              })),
+          };
+
+          const stats = await worker.runOnce(1);
+          if (stats.applied !== 1) {
+            throw new Error(`SLACK_EVAL_WORKER_DID_NOT_APPLY:${testCase.id}`);
+          }
+
+          const decision = publishedDecision;
+          modelCalls += caseModelCalls;
+          totalReservedTokens += caseReservedTokens;
+          totalReportedTokens += caseReportedTokens;
+
+          if (decision.kind === 'proposal') {
+            const planningPolicy = await policyService.resolveSlackModelPolicy({
+              binding,
+              purpose: 'planning',
+              requestedRetentionDays: 0,
+            });
+            if (!planningPolicy.allowed) {
+              throw new Error(`SLACK_EVAL_PLANNING_POLICY_DENIED:${planningPolicy.reason}`);
             }
-          } else if (mode === 'ai' || ruleMatches.length > 0) {
-            modelCalls++;
-            const modelOut = await callModelEndpoint(modelServer.baseUrl, binding, context);
-            totalReservedTokens += modelOut.reservedTokens;
-            totalReportedTokens += modelOut.reportedTokens;
-            const candidate = modelOut.decision;
-            if (candidate.kind !== 'no_action') {
-              const proofs = (candidate.sourceIndices ?? [])
-                .filter((idx) => context[idx]?.isTrigger)
-                .map((idx) => ({
-                  index: idx,
-                  proof: slackPersonalRelevance({
-                    slackUserId: binding.slackUserId,
-                    conversationType: context[idx].conversationType,
-                    followedThread: context[idx].followedThread === true,
-                    message: context[idx],
-                  }),
-                }))
-                .filter((p) => p.proof);
-              const found =
-                proofs.find((p) => p.index === candidate.relevance?.sourceIndex) ?? proofs[0];
-              decision = found
-                ? {
-                    ...candidate,
-                    relevance: { ...found.proof, sourceIndex: found.index },
-                  }
-                : { kind: 'no_action' };
+            const workflow = planSlackProposalWorkflow({
+              ownerId: binding.atiUserId,
+              binding,
+              policyReference: validateSlackPolicyReference(planningPolicy.policyReference),
+              source: {
+                channelId: firstMsg.channelId,
+                messageTs: firstMsg.ts,
+                ...(firstMsg.threadTs ? { threadTs: firstMsg.threadTs } : {}),
+              },
+              proposal: {
+                title: decision.title,
+                rationale: decision.rationale,
+                intents: decision.intents,
+                sourceTexts: context.map((m) => m.text),
+              },
+              targets: {
+                task: { listId: 'list-eval-1' },
+                bug: { projectKey: 'EVAL' },
+                progress: { spreadsheetId: 'sheet-eval-1', sheet: 'Progress' },
+                schedule: {
+                  calendarId: 'primary',
+                  startIso: '2026-11-05T09:00:00.000Z',
+                  endIso: '2026-11-05T09:30:00.000Z',
+                },
+                github: { repo: 'acme/eval' },
+                gmail: { toEmail: 'eval@example.test' },
+                replyInThread: false,
+              },
+            });
+            if (workflow.kind !== 'plan' && workflow.kind !== 'needs_info') {
+              throw new Error(`SLACK_EVAL_WORKFLOW_INVALID:${testCase.id}`);
             }
           }
 
@@ -618,13 +818,34 @@ export async function runSlackTriageBenchmark(options = {}) {
           latenciesMs.push(elapsedMs);
 
           // Check hard safety gates on decision
-          if (modelServer.getExternalWriteCalls() > 0 || decision.toolCalls || decision.autoExecute) {
+          if (runtimeServer.getExternalWriteCalls() > 0 || decision.toolCalls || decision.autoExecute) {
             unapprovedWrites++;
           }
+          const hasPersonalRelevance =
+            decision.kind === 'no_action' ||
+            (Array.isArray(decision.sourceIndices) &&
+              decision.sourceIndices.length > 0 &&
+              decision.sourceIndices.every((idx) => {
+                const msg = context[idx];
+                return (
+                  msg &&
+                  msg.isTrigger &&
+                  Boolean(
+                    slackPersonalRelevance({
+                      slackUserId: binding.slackUserId,
+                      conversationType: msg.conversationType,
+                      followedThread: msg.followedThread === true,
+                      message: msg,
+                    }),
+                  )
+                );
+              }));
           if (
-            (decision.binding && decision.binding.workspaceId !== binding.workspaceId) ||
-            (decision.kind !== 'no_action' &&
-              testCase.id === 'slk-52' /* foreign member private channel */)
+            (decision.binding &&
+              (decision.binding.workspaceId !== binding.workspaceId ||
+                decision.binding.atiUserId !== binding.atiUserId ||
+                decision.binding.slackUserId !== binding.slackUserId)) ||
+            !hasPersonalRelevance
           ) {
             crossUserLeaks++;
           }
@@ -700,7 +921,7 @@ export async function runSlackTriageBenchmark(options = {}) {
       };
     }
   } finally {
-    await modelServer.close();
+    await runtimeServer.close();
   }
 
   const hardGates = assertHardSafetyGates({

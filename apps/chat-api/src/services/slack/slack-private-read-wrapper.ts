@@ -1,6 +1,7 @@
 import type pg from 'pg';
 import {
   MYSLACK_CORE_READ_TOOLS,
+  SLACK_DERIVED_TARGET_KINDS,
   slackPolicyRefToEpoch,
   validateSlackBinding,
   validateSlackPolicyReference,
@@ -63,7 +64,8 @@ export interface SlackReadAdapterLike {
 export interface SlackPrivateReadWrapperDeps {
   policyService: Pick<SlackPolicyService, 'resolveSlackModelPolicy'>;
   tokenManager: Pick<SlackTokenManager, 'getAccessToken'>;
-  invalidationService: Pick<SlackInvalidationService, 'checkBarriers'>;
+  invalidationService: Pick<SlackInvalidationService, 'checkBarriers'> &
+    Partial<Pick<SlackInvalidationService, 'stageInTransaction'>>;
   ownerGate: Pick<SlackConnectionRepo, 'withOwner'>;
   runtimeConfig?: { env?: Record<string, string | undefined> };
   apiBaseUrl?: string;
@@ -673,7 +675,58 @@ export class SlackPrivateReadWrapper {
     } catch (error) {
       if (error instanceof SlackPrivateReadError) throw error;
       if (denial) throw denial;
-      throw new SlackPrivateReadError(adapterErrorCode(error));
+      const code = adapterErrorCode(error);
+      if (
+        code === 'SLACK_READ_NOT_FOUND' &&
+        facts.channelId &&
+        typeof this.deps.invalidationService.stageInTransaction === 'function'
+      ) {
+        try {
+          const channelId = facts.channelId;
+          await this.deps.ownerGate.withOwner(cleanBinding.atiUserId, async client => {
+            await client.query('BEGIN');
+            try {
+              const hasStored = await client.query<{ n: number }>(
+                `SELECT (
+                   (SELECT count(*)::int FROM slack_sources WHERE connection_id = $1 AND channel_id = $2) +
+                   (SELECT count(*)::int FROM slack_derived_provenance_segments WHERE connection_id = $1 AND channel_id = $2)
+                 ) AS n`,
+                [cleanBinding.connectionId, channelId]
+              );
+              if ((hasStored.rows[0]?.n ?? 0) > 0) {
+                await this.deps.invalidationService.stageInTransaction!(client, {
+                  sourceEventKey: `read_not_found:${cleanBinding.connectionId}:${cleanBinding.identityVersion}:${channelId}`,
+                  effects: [
+                    {
+                      effectKey: `channel:${cleanBinding.connectionId}:${channelId}`,
+                      barrier: {
+                        barrierType: 'channel',
+                        binding: cleanBinding,
+                        channelId,
+                        reason: 'channel_membership_lost',
+                      },
+                      purgeTarget: {
+                        scope: 'channel_membership_lost',
+                        binding: cleanBinding,
+                        channelId,
+                        cascadeTargetKinds: [...SLACK_DERIVED_TARGET_KINDS],
+                        tombstoneReason: 'channel_membership_lost',
+                      },
+                    },
+                  ],
+                });
+              }
+              await client.query('COMMIT');
+            } catch (stageErr) {
+              await client.query('ROLLBACK').catch(() => {});
+              throw stageErr;
+            }
+          });
+        } catch {
+          // Best-effort barrier staging; always fail closed with SLACK_READ_NOT_FOUND.
+        }
+      }
+      throw new SlackPrivateReadError(code);
     }
 
     throwIfAborted();

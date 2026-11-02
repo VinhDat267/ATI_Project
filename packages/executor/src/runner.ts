@@ -100,10 +100,18 @@ export class StepRunner {
 
       if (step.tool === SLACK_PROPOSAL_WORKFLOW_TOOLS.bugCreateTool && Array.isArray(step.dependsOn) && step.dependsOn.length > 0 && typeof resolvedArgs.summary === 'string') {
         const wanted = resolvedArgs.summary.trim().toLowerCase();
+        const targetProjectKey = typeof resolvedArgs.projectKey === 'string' ? resolvedArgs.projectKey.trim().toUpperCase() : '';
         for (const depId of step.dependsOn) {
           const depOut = stepOutputs.get(depId) as any;
           const issues = Array.isArray(depOut?.issues) ? depOut.issues : Array.isArray(depOut?.output?.issues) ? depOut.output.issues : null;
-          const match = issues?.find((item: any) => typeof item?.title === 'string' && item.title.trim().toLowerCase() === wanted && typeof item.id === 'string' && typeof item.key === 'string' && typeof item.url === 'string');
+          const match = issues?.find((item: any) => {
+            if (typeof item?.title !== 'string' || item.title.trim().toLowerCase() !== wanted) return false;
+            if (typeof item.id !== 'string' || typeof item.key !== 'string' || typeof item.url !== 'string') return false;
+            if (!targetProjectKey) return true;
+            const itemProjectKey = typeof item.projectKey === 'string' ? item.projectKey.trim().toUpperCase() : '';
+            const keyPrefix = item.key.trim().toUpperCase().split('-')[0] ?? '';
+            return itemProjectKey === targetProjectKey || keyPrefix === targetProjectKey;
+          });
           if (match) {
             return {
               stepId: step.id,

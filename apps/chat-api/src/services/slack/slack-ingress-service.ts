@@ -177,6 +177,17 @@ function classifyLifecycle(event: Record<string, unknown>, eventType: string): L
     };
   }
 
+  if (eventType === 'member_left_channel' || eventType === 'group_left') {
+    const channelId = safeId(event.channel);
+    const hasUser = event.user !== undefined && event.user !== null;
+    const slackUserId = hasUser ? safeId(event.user) : null;
+    if (!channelId || (hasUser && !slackUserId)) return { kind: 'malformed' };
+    return {
+      kind: 'lifecycle',
+      descriptor: { intentType: 'channel_membership_lost', channelId, slackUserId },
+    };
+  }
+
   return { kind: 'ordinary' };
 }
 
@@ -338,7 +349,7 @@ export class SlackIngressService {
   }
 
   private receiptChannelId(event: Record<string, unknown>, eventType: string): string | null {
-    if (eventType !== 'message') return null;
+    if (eventType !== 'message' && eventType !== 'member_left_channel' && eventType !== 'group_left') return null;
     // Lifecycle message subtypes were already validated; ordinary ones degrade to null metadata.
     return safeId(event.channel);
   }

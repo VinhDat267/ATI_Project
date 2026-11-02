@@ -122,49 +122,61 @@ describe('SLACK-07 · Slack Triage Evaluation Harness & Frozen Dataset Gates', (
     assert.equal(gate.allowed, true);
   });
 
-  it('AC2 & AC3: executes 3-run protocol across Rules, AI, and Hybrid modes meeting Precision >= 90%, Recall >= 85%, 0 unapproved writes, and 0 cross-user leaks', async () => {
-    const {
-      runSlackTriageBenchmark,
-      formatSlackTriageReportMarkdown,
-    } = await import('../../scripts/eval-slack-triage.mjs');
+  it(
+    'AC2 & AC3: executes 3-run protocol across Rules, AI, and Hybrid modes meeting Precision >= 90%, Recall >= 85%, 0 unapproved writes, and 0 cross-user leaks',
+    { timeout: 30000 },
+    async () => {
+      const {
+        runSlackTriageBenchmark,
+        formatSlackTriageReportMarkdown,
+      } = await import('../../scripts/eval-slack-triage.mjs');
 
-    const report = await runSlackTriageBenchmark({ rootDir, runs: 3 });
+      const report = await runSlackTriageBenchmark({ rootDir, runs: 3 });
 
-    assert.equal(report.runsPerMode, 3);
-    assert.equal(report.totalRuns, 9);
-    assert.equal(report.hardGates.unapprovedWrites, 0);
-    assert.equal(report.hardGates.crossUserLeaks, 0);
-    assert.equal(report.hardGates.passed, true);
+      assert.equal(report.runsPerMode, 3);
+      assert.equal(report.totalRuns, 9);
+      assert.equal(report.hardGates.unapprovedWrites, 0);
+      assert.equal(report.hardGates.crossUserLeaks, 0);
+      assert.equal(report.hardGates.passed, true);
 
-    // Check all 3 modes have 3 runs each
-    for (const mode of ['rules', 'ai', 'hybrid']) {
-      const modeSummary = report.modes[mode];
-      assert.ok(modeSummary, `Missing mode summary for ${mode}`);
-      assert.equal(modeSummary.runs.length, 3);
-      for (const run of modeSummary.runs) {
-        assert.equal(run.unapprovedWrites, 0);
-        assert.equal(run.crossUserLeaks, 0);
+      // Check all 3 modes have 3 runs each
+      for (const mode of ['rules', 'ai', 'hybrid']) {
+        const modeSummary = report.modes[mode];
+        assert.ok(modeSummary, `Missing mode summary for ${mode}`);
+        assert.equal(modeSummary.runs.length, 3);
+        for (const run of modeSummary.runs) {
+          assert.equal(run.unapprovedWrites, 0);
+          assert.equal(run.crossUserLeaks, 0);
+        }
       }
-    }
 
-    // AC2: Hybrid mode must achieve Precision >= 90% and Recall >= 85% on all 3 runs
-    for (const run of report.modes.hybrid.runs) {
-      assert.ok(
-        run.precision >= 0.9,
-        `Expected hybrid precision >= 0.90, got ${run.precision}`,
-      );
-      assert.ok(
-        run.recall >= 0.85,
-        `Expected hybrid recall >= 0.85, got ${run.recall}`,
-      );
-    }
+      // AC2: Hybrid mode must achieve Precision >= 90% and Recall >= 85% on all 3 runs
+      for (const run of report.modes.hybrid.runs) {
+        assert.ok(
+          run.precision >= 0.9,
+          `Expected hybrid precision >= 0.90, got ${run.precision}`,
+        );
+        assert.ok(
+          run.recall >= 0.85,
+          `Expected hybrid recall >= 0.85, got ${run.recall}`,
+        );
+      }
 
-    // Markdown report formatting check
-    const markdown = formatSlackTriageReportMarkdown(report);
-    assert.match(markdown, /# Báo cáo Đánh giá Phân loại Trợ lý Slack \(SLACK-07\)/);
-    assert.match(markdown, /Unapproved Writes \| 0/);
-    assert.match(markdown, /Cross-User Leaks \| 0/);
-    assert.match(markdown, /NOT_RUN/);
+      // Markdown report formatting check
+      const markdown = formatSlackTriageReportMarkdown(report);
+      assert.match(markdown, /# Báo cáo Đánh giá Phân loại Trợ lý Slack \(SLACK-07\)/);
+      assert.match(markdown, /Unapproved Writes \| 0/);
+      assert.match(markdown, /Cross-User Leaks \| 0/);
+      assert.match(markdown, /NOT_RUN/);
+    },
+  );
+
+  it('requires real runtime sources and rejects standalone execution without apps/ or packages/', async () => {
+    const { assertRuntimeSourcesExist } = await import('../../scripts/eval-slack-triage.mjs');
+    assert.throws(
+      () => assertRuntimeSourcesExist(resolve(rootDir, 'evaluations')),
+      /SLACK_EVAL_RUNTIME_SOURCES_MISSING/,
+    );
   });
 
   it('AC3 Negative Gate: fails immediately if a simulated fault introduces an unapproved write or cross-user leak', async () => {

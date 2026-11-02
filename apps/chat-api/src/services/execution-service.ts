@@ -261,6 +261,17 @@ export class ExecutionService {
       throw recoveryConflict('Reconciliation required: execution controller is unavailable');
     }
     const { steps, connections } = verifiedRecoveryPlan(plan);
+    if (plan.plan_json?.connections?.myslack) {
+      const runtime = isBoundSlackExecutableWritePlan(plan.plan_json, userId) ? this.slackWrite : this.slackRead;
+      if (!runtime) throw recoveryConflict('SLACK_READ_UNAVAILABLE');
+      await runtime.assertApproval({
+        planId: plan.id,
+        planHash: plan.plan_hash,
+        userId,
+        steps,
+        bindings: plan.plan_json.connections.myslack,
+      });
+    }
     // Callers checked ownership with getOwnedPlan; claimRecovery checks it again in SQL.
     const context = this.executionContext(userId, connections, (plan as any).conversation);
     const before = restoredProgress(steps, await this.stepRepo.listSteps(plan.id, 'planning'));
@@ -322,9 +333,18 @@ export class ExecutionService {
     return this.continueStep(planId, stepId, userId, 'skip');
   }
 
+  private async requiresSlackPostReconcile(planRow: PlanRow, userId: string, stepId?: string): Promise<boolean> {
+    if (!isBoundSlackExecutableWritePlan(planRow.plan_json, userId)) return false;
+    if (isBoundSlackWritePlan(planRow.plan_json, userId)) return true;
+    const steps: PlanStep[] = Array.isArray(planRow.plan_json?.steps) ? planRow.plan_json.steps : [];
+    if (stepId && steps.find((s) => s.id === stepId)?.tool === 'myslack.chat_postMessage') return true;
+    const rows = this.stepRepo ? await this.stepRepo.listSteps(planRow.id, 'planning') : [];
+    return rows.some((r) => r.tool === 'myslack.chat_postMessage' && r.status !== 'pending');
+  }
+
   async continueExecution(planId: string, userId: string): Promise<any> {
     const plan = await this.getOwnedPlan(planId, userId);
-    if(isBoundSlackExecutableWritePlan(plan.plan_json,userId))throw recoveryConflict('SLACK_POST_RECONCILE_REQUIRED');
+    if (await this.requiresSlackPostReconcile(plan, userId)) throw recoveryConflict('SLACK_POST_RECONCILE_REQUIRED');
     if (this.activeRuns.has(planId) || this.activeControllers.get(planId)?.isExecuting()) {
       throw recoveryConflict('Execution is already running');
     }
@@ -350,12 +370,14 @@ export class ExecutionService {
 
   private async continueStep(planId: string, stepId: string, userId: string, action: 'retry' | 'skip'): Promise<any> {
     let planRow = await this.getOwnedPlan(planId, userId);
-    if(isBoundSlackExecutableWritePlan(planRow.plan_json,userId))throw recoveryConflict('SLACK_POST_RECONCILE_REQUIRED');
     // Include the preceding run's plan-status write in the serialization boundary.
     const priorRun = this.activeRuns.get(planId);
     if (priorRun) {
       await priorRun.catch(() => undefined);
       planRow = await this.getOwnedPlan(planId, userId);
+    }
+    if (await this.requiresSlackPostReconcile(planRow, userId, stepId)) {
+      throw recoveryConflict('SLACK_POST_RECONCILE_REQUIRED');
     }
     const status = this.executionOutcomes.get(planId)?.status || planRow.status;
     if (['completed', 'stopped', 'failed', 'pending', 'rejected', 'superseded', 'expired'].includes(status)) {
@@ -374,8 +396,9 @@ export class ExecutionService {
     }
     validateRecoveryAction(status, controller.getAllStepStates(), stepId, action);
     if(reuseController&&planRow.plan_json?.connections?.myslack){
-      if(!this.slackRead)throw recoveryConflict('SLACK_READ_UNAVAILABLE');
-      await this.slackRead.assertApproval({planId,planHash:planRow.plan_hash,userId,steps:planRow.plan_json.steps,bindings:planRow.plan_json.connections.myslack});
+      const runtime=isBoundSlackExecutableWritePlan(planRow.plan_json,userId)?this.slackWrite:this.slackRead;
+      if(!runtime)throw recoveryConflict('SLACK_READ_UNAVAILABLE');
+      await runtime.assertApproval({planId,planHash:planRow.plan_hash,userId,steps:planRow.plan_json.steps,bindings:planRow.plan_json.connections.myslack});
       if(!await this.planRepo.claimRecovery(planRow,userId,'executing'))throw recoveryConflict('Execution changed or recovery is already running');
     }
     this.executionOutcomes.delete(planId);

@@ -153,6 +153,13 @@ export class SlackProposalService {
       const calendarId = override.calendarId ?? calendarTarget?.calendarId;
       const githubRepo = override.repo ?? githubTarget?.repo;
       const toEmail = override.toEmail ?? gmailTarget?.to ?? gmailTarget?.toEmail;
+      const credRows = (
+        await c.query<{ id: string; service: string }>(
+          "SELECT id, service FROM service_credentials WHERE user_id=$1 AND workspace_id IS NULL AND status='active'",
+          [owner],
+        )
+      ).rows;
+      const credByService = new Map<string, string>(credRows.map((r) => [r.service, r.id]));
       const planInput: SlackProposalPlanInput = {
         ownerId: owner,
         binding: body.binding,
@@ -190,6 +197,54 @@ export class SlackProposalService {
           github: githubRepo ? { repo: githubRepo } : undefined,
           gmail: toEmail ? { toEmail } : undefined,
           replyInThread: input.replyInThread ?? (rawTargets.replyToSource === true),
+        },
+        targetConnections: {
+          ...(taskListId
+            ? {
+                [SLACK_PROPOSAL_WORKFLOW_TOOLS.taskService]: {
+                  credentialId: credByService.get(SLACK_PROPOSAL_WORKFLOW_TOOLS.taskService) ?? '',
+                  memberId: '',
+                  username: '',
+                  boardIds: [taskListId],
+                },
+              }
+            : {}),
+          ...(githubRepo
+            ? {
+                github: {
+                  credentialId: credByService.get('github') ?? '',
+                  githubUserId: '',
+                  login: '',
+                  repos: [githubRepo],
+                },
+              }
+            : {}),
+          ...(toEmail
+            ? {
+                gmail: {
+                  credentialId: credByService.get('gmail') ?? '',
+                  email: toEmail,
+                },
+              }
+            : {}),
+          ...(calendarId || override.startIso || override.endIso
+            ? {
+                mycalendar: {
+                  credentialId: credByService.get('mycalendar') ?? '',
+                  email: '',
+                  allowedCalendars: [calendarId || 'primary'],
+                },
+              }
+            : {}),
+          ...(spreadsheetId
+            ? {
+                mysheets: {
+                  credentialId: credByService.get('mysheets') ?? '',
+                  email: '',
+                  allowedSpreadsheets: [spreadsheetId],
+                },
+              }
+            : {}),
         },
         instruction: input.instruction,
       };

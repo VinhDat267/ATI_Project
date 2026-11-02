@@ -3,6 +3,22 @@ import type {SlackTokenManager} from './token-manager.js';
 import {SlackWriteOutboxRepo,normalizeSlackWrite,slackWriteDenied,slackWriteUnknown,type SlackWriteInput} from '../../db/repositories/slack-write-outbox-repo.js';
 interface Options {pool:pg.Pool;apiBaseUrl:string;tokens:Pick<SlackTokenManager,'getAccessToken'>;authorize:(input:SlackWriteInput,client?:pg.PoolClient)=>Promise<void>;timeoutMs?:number;fetchFn?:typeof fetch}
 const TS=/^[0-9]{1,10}\.[0-9]{6}$/;
+const SLACK_EMOJI_SHORTCODES:ReadonlyArray<readonly [string,string]>=[
+ [':tada:','\u{1F389}'],[':party_popper:','\u{1F389}'],[':rocket:','\u{1F680}'],[':white_check_mark:','\u{2705}'],
+ [':heavy_check_mark:','\u{2714}'],[':warning:','\u{26A0}'],[':x:','\u{274C}'],[':+1:','\u{1F44D}'],[':thumbsup:','\u{1F44D}'],
+ [':-1:','\u{1F44E}'],[':thumbsdown:','\u{1F44E}'],[':fire:','\u{1F525}'],[':eyes:','\u{1F440}'],[':heart:','\u{2764}'],
+ [':sparkles:','\u{2728}'],[':star:','\u{2B50}'],[':bug:','\u{1F41B}'],[':memo:','\u{1F4DD}'],[':calendar:','\u{1F4C5}'],
+ [':date:','\u{1F4C5}'],[':wave:','\u{1F44B}'],[':pray:','\u{1F64F}'],[':clap:','\u{1F44F}'],[':100:','\u{1F4AF}'],
+ [':bell:','\u{1F514}'],[':lock:','\u{1F512}'],[':key:','\u{1F511}'],[':link:','\u{1F517}'],[':bulb:','\u{1F4A1}'],
+ [':hammer_and_wrench:','\u{1F6E0}'],[':gear:','\u{2699}'],[':hourglass_flowing_sand:','\u{23F3}'],[':rotating_light:','\u{1F6A8}'],
+ [':speech_balloon:','\u{1F4AC}'],[':smile:','\u{1F604}'],[':grinning:','\u{1F600}'],[':slightly_smiling_face:','\u{1F642}'],
+ [':thinking_face:','\u{1F914}'],[':sob:','\u{1F62D}'],[':sweat_smile:','\u{1F605}'],
+];
+function normalizeSlackReadbackText(value:string):string{
+ let out=value.normalize('NFC');
+ for(const [code,emoji] of SLACK_EMOJI_SHORTCODES)out=out.split(code).join(emoji);
+ return out.replace(/\uFE0F/g,'');
+}
 /** Internal only until 03C2 supplies reviewed plan/source/policy callbacks. No automatic write retry. */
 export class SlackSafeWriter {
  private repo:SlackWriteOutboxRepo;private endpoint:string;private timeout:number;
@@ -73,10 +89,11 @@ export class SlackSafeWriter {
    for(const m of data.messages)if(!m||typeof m!=='object'||Array.isArray(m)||typeof m.ts!=='string'||!TS.test(m.ts)||typeof m.text!=='string'||
      (m.type!==undefined&&m.type!=='message')||(!id(m.user)&&!id(m.bot_id))||(m.user!==undefined&&!id(m.user))||
      (m.client_msg_id!==undefined&&(typeof m.client_msg_id!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(m.client_msg_id))))throw new Error();
-   for(const m of data.messages){if(m.user===i.binding.slackUserId&&m.text===i.params.text&&(!threadTs||m.thread_ts===threadTs||m.ts===threadTs)&&
+   const expectedText=normalizeSlackReadbackText(i.params.text);
+   for(const m of data.messages){if(m.user===i.binding.slackUserId&&normalizeSlackReadbackText(m.text)===expectedText&&(!threadTs||m.thread_ts===threadTs||m.ts===threadTs)&&
       (row.provider_ts?m.ts===row.provider_ts:m.client_msg_id===row.client_msg_id))matches.push(m);}
    const next=data.response_metadata?.next_cursor??'';if(typeof next!=='string'||next.length>2048||seen.has(next))throw new Error();
-   if(!next){if(data.has_more)throw new Error();break;}if(!data.has_more||page===4)throw new Error();seen.add(next);cursor=next;
+   if(!next){if(data.has_more)throw new Error();break;}if(!data.has_more)throw new Error();if(page===4)break;seen.add(next);cursor=next;
   }
   if(matches.length!==1)throw new Error();await this.ready(c,i,true);i.signal?.throwIfAborted();await this.repo.confirm(c,row,matches[0].ts);return this.result(row,matches[0].ts);
  }

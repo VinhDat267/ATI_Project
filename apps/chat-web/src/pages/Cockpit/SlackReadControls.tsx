@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { slackConnectionApi, slackSessionOwner, type SlackConnection } from '../../services/slack-connection';
 import {
   slackAssistantApi,
@@ -32,8 +32,13 @@ export function SlackReadControls({
   const [channels, setChannels] = useState<SlackDirectoryChannelDto[]>([]);
   const [users, setUsers] = useState<SlackDirectoryUserDto[]>([]);
   const [loadingDirectory, setLoadingDirectory] = useState(false);
+  const directoryReqIdRef = useRef(0);
+  const currentValueRef = useRef(value);
+  currentValueRef.current = value;
 
   useEffect(() => {
+    directoryReqIdRef.current += 1;
+    setLoadingDirectory(false);
     setChannels([]);
     setUsers([]);
   }, [value, active, userId]);
@@ -67,21 +72,25 @@ export function SlackReadControls({
 
   const loadDirectory = async () => {
     if (!value || loadingDirectory) return;
+    const requestedValue = value;
+    const reqId = ++directoryReqIdRef.current;
     const owns = slackSessionOwner();
     setLoadingDirectory(true);
     setError('');
     try {
-      const dir = await slackAssistantApi.getDirectory(value, AbortSignal.timeout(15000));
-      if (owns()) {
+      const dir = await slackAssistantApi.getDirectory(requestedValue, AbortSignal.timeout(15000));
+      if (owns() && directoryReqIdRef.current === reqId && currentValueRef.current === requestedValue) {
         setChannels(Array.isArray(dir.channels) ? dir.channels : []);
         setUsers(Array.isArray(dir.users) ? dir.users : []);
       }
     } catch {
-      if (owns()) {
+      if (owns() && directoryReqIdRef.current === reqId && currentValueRef.current === requestedValue) {
         setError('Chưa tải được danh bạ kênh Slack. Bạn vẫn có thể nhập mã kênh trực tiếp.');
       }
     } finally {
-      if (owns()) setLoadingDirectory(false);
+      if (owns() && directoryReqIdRef.current === reqId && currentValueRef.current === requestedValue) {
+        setLoadingDirectory(false);
+      }
     }
   };
 

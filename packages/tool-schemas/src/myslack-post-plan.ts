@@ -38,7 +38,10 @@ export function validateSlackSourceReplyPlan(value:unknown,owner:string){
  else{const tpl=strictSlackObject(params.text,['$template']);if(typeof tpl.$template!=='string'||!tpl.$template.trim()||tpl.$template.length>4000)throw new Error('SLACK_SOURCE_REPLY_PLAN_INVALID');}
  const dependencies=deriveSlackDependencySelectors(step.args,steps);
  if(dependencies.some(d=>d.kind!=='other'||!step.dependsOn?.includes(d.refStepId)||steps.findIndex(s=>s.id===d.refStepId)>=steps.length-1||!CERTIFIED_REPLY_OUTPUT_PATH.test(d.path)))throw new Error('SLACK_SOURCE_REPLY_PLAN_INVALID');
- const connections=strictSlackObject(p.connections,['myslack']),m=strictSlackObject(connections.myslack,['bindings','steps']);
+ const allowedConnectionKeys=['myslack','trello','github','gmail','mycalendar','mysheets','myjira','telegram'];
+ if(!p.connections||typeof p.connections!=='object'||Array.isArray(p.connections)||Object.getPrototypeOf(p.connections)!==Object.prototype||
+  !Object.hasOwn(p.connections,'myslack')||Object.keys(p.connections).some(k=>!allowedConnectionKeys.includes(k)))throw new Error('SLACK_SOURCE_REPLY_PLAN_INVALID');
+ const connections=p.connections as Record<string,unknown>,m=strictSlackObject(connections.myslack,['bindings','steps']);
  if(!m.bindings||!m.steps||Array.isArray(m.bindings)||Array.isArray(m.steps)||Object.keys(m.bindings).length!==1||Object.keys(m.steps).length!==1)throw new Error('SLACK_SOURCE_REPLY_PLAN_INVALID');
  const record=strictSlackObject(m.steps[step.id],['connectionId','tool','dependencies','policyReference']);
  const raw=strictSlackObject(m.bindings[record.connectionId],['atiUserId','connectionId','workspaceId','slackUserId','identityVersion']),binding=validateSlackBinding(raw);

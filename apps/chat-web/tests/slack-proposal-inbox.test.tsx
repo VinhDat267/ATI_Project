@@ -2,9 +2,11 @@ import { createServer, type Server } from 'node:http';
 import { beforeEach, afterEach, it, expect, vi, describe } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup, act } from '@testing-library/react';
 import { App } from '../src/App';
+import { SlackProposalCard } from '../src/components/slack/SlackProposalCard';
 import { SlackProposalInbox } from '../src/components/slack/SlackProposalInbox';
 import { apiClient } from '../src/services/api-client';
 import { authStorage } from '../src/services/auth-storage';
+import { slackAssistantApi } from '../src/services/slack-assistant';
 
 let server: Server;
 let requests: Array<{ method?: string; url?: string; body?: any }>;
@@ -393,5 +395,80 @@ describe('SLACK-06A & SLACK-06B SlackProposalInbox UI and /inbox route', () => {
         ),
       ).toBe(true),
     );
+  });
+
+  it('removes prepared source-derived preview after proposal is redacted, shows actual destination/write payload, and invalidates stale plan on destination edit', async () => {
+    const cardProposal: any = {
+      id: 'p1',
+      connectionId: 'c1',
+      status: 'pending',
+      revision: '1',
+      activePlanId: null,
+      body: {
+        decision: {
+          kind: 'proposal',
+          title: 'Task',
+          rationale: 'Mention',
+          relevance: { kind: 'mention' },
+          intents: [{ service: 'trello', action: 'task', summary: 'Task' }],
+        },
+        context: [],
+      },
+    };
+    const prepared = {
+      ...cardProposal,
+      status: 'awaiting_approval',
+      revision: '2',
+      activePlanId: 'plan-for-list-A',
+      planHash: 'hash-for-list-A',
+    };
+    const response: any = {
+      status: 'awaiting_approval',
+      proposal: prepared,
+      planId: 'plan-for-list-A',
+      planHash: 'hash-for-list-A',
+      plan: {
+        summary: 'Tạo công việc: SOURCE_SECRET_TITLE',
+        steps: [
+          {
+            id: 'step_1',
+            tool: 'trello.create_card',
+            description: 'Tạo thẻ công việc từ đề xuất Slack',
+            args: { listId: 'ACTUAL_LIST_A', title: 'SOURCE_SECRET_TITLE', desc: 'ACTUAL_WRITE_BODY' },
+          },
+        ],
+      },
+    };
+    const prepareSpy = vi.spyOn(slackAssistantApi, 'prepareProposal').mockResolvedValue(response);
+    const approveSpy = vi.spyOn(apiClient, 'approvePlan').mockResolvedValue({ success: true } as any);
+
+    // 1. Freshly mounted card without preview cannot dispatch stored activePlanId
+    const freshView = render(<SlackProposalCard proposal={prepared} navigate={() => {}} onUpdated={() => {}} />);
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Phê duyệt và thực thi' })));
+    expect(prepareSpy).not.toHaveBeenCalled();
+    expect(approveSpy).not.toHaveBeenCalled();
+    freshView.unmount();
+
+    // 2. Prepare shows actual destination and write payload; editing destination invalidates old plan/hash
+    const view = render(<SlackProposalCard proposal={cardProposal} navigate={() => {}} onUpdated={() => {}} />);
+    fireEvent.change(screen.getByLabelText('ID danh sách Trello (List ID)'), { target: { value: 'ACTUAL_LIST_A' } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Xem trước kế hoạch' })));
+    expect(prepareSpy.mock.calls[0][1].targetOverride?.listId).toBe('ACTUAL_LIST_A');
+    expect(screen.getByText('Tạo công việc: SOURCE_SECRET_TITLE')).toBeInTheDocument();
+    expect(document.body.textContent).toContain('ACTUAL_LIST_A');
+    expect(document.body.textContent).toContain('ACTUAL_WRITE_BODY');
+
+    fireEvent.change(screen.getByLabelText('ID danh sách Trello (List ID)'), { target: { value: 'CHANGED_LIST_B' } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Phê duyệt và thực thi' })));
+    expect(prepareSpy).toHaveBeenCalledTimes(1);
+    expect(approveSpy).not.toHaveBeenCalled();
+
+    // 3. Re-prepare and then redact/stale removes source-derived preview
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Xem trước kế hoạch' })));
+    expect(screen.getByText('Tạo công việc: SOURCE_SECRET_TITLE')).toBeInTheDocument();
+    view.rerender(
+      <SlackProposalCard proposal={{ ...prepared, status: 'stale', body: null }} navigate={() => {}} onUpdated={() => {}} />,
+    );
+    expect(screen.queryByText('Tạo công việc: SOURCE_SECRET_TITLE')).not.toBeInTheDocument();
   });
 });

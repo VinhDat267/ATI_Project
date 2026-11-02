@@ -1,8 +1,9 @@
 /** @vitest-environment jsdom */
 import { useState } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { SlackReadControls } from '../src/pages/Cockpit/SlackReadControls';
+import { slackAssistantApi } from '../src/services/slack-assistant';
 import { slackConnectionApi, type SlackConnection } from '../src/services/slack-connection';
 import { authStorage } from '../src/services/auth-storage';
 const connection = (id: string) => ({ id, workspaceId: 'T_'+id, workspaceName: 'Workspace '+id, slackUserId: 'U_ME', slackUserLabel: 'Lan', status: 'active' } as SlackConnection);
@@ -28,4 +29,16 @@ it('ignores a workspace list that arrives after the owner changes',async()=>{
  render(<View/>);fireEvent.click(screen.getByRole('button',{name:'Tra cứu Slack của bạn'}));
  authStorage.setStoredTokens({accessToken:'other',user:{id:'other'} as any});finish({connections:[connection('late')]});
  await new Promise(resolve=>setTimeout(resolve,0));expect(screen.queryByText(/Workspace late/)).toBeNull();expect(screen.getByTestId('selection').textContent).toBe('');
+});
+it('ignores a directory response after selecting another connection',async()=>{
+ vi.spyOn(slackConnectionApi,'list').mockResolvedValue({connections:[connection('c1'),connection('c2')]});
+ let resolve!:(x:any)=>void;
+ vi.spyOn(slackAssistantApi,'getDirectory').mockImplementation(()=>new Promise(r=>{resolve=r;}));
+ const noop=()=>{};
+ const view=render(<SlackReadControls userId="owner" busy={false} value="c1" onChange={noop}/>);
+ await act(async()=>{});
+ fireEvent.click(screen.getByRole('button',{name:'Chọn kênh từ danh bạ Slack'}));
+ view.rerender(<SlackReadControls userId="owner" busy={false} value="c2" onChange={noop}/>);
+ await act(async()=>resolve({channels:[{id:'C_FIRST',name:'first-private',isPrivate:true}],users:[]}));
+ expect(screen.queryByRole('option',{name:/first-private/})).not.toBeInTheDocument();
 });

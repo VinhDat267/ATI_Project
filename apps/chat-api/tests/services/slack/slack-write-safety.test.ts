@@ -136,4 +136,25 @@ describe('04C real PostgreSQL/HTTP write attempt, echo and readback',()=>{
    while(!(await env.db.pool.query('SELECT lease_until<clock_timestamp() expired FROM slack_write_outbox WHERE operation_id=$1',[row.operation_id])).rows[0].expired)await new Promise(r=>setTimeout(r,5));await holder.query('COMMIT');await rejected;expect((await outbox()).status).toBe('prepared');expect(posts()).toHaveLength(0);
   }finally{await holder.query('ROLLBACK');holder.release();await running?.catch(()=>{});c.release();}
  });
+ it('confirms readback on dense channels (>500 older messages) when the posted message is uniquely verified in the recent 5-page window',async()=>{
+  env.fixture.setHandler('/conversations.history',r=>{
+   const page=Number(JSON.parse(r.body).cursor??'0');
+   const messages=Array.from({length:100},(_,n)=>({user:'U_OTHER',text:'older retained message',ts:'1729999999.'+String(page*100+n).padStart(6,'0')}));
+   if(page===0&&saved[0])messages[0]=saved[0];
+   return {body:{ok:true,messages,has_more:page<5,response_metadata:{next_cursor:page<5?String(page+1):''}}};
+  });
+  const receipt=await writer().execute(input);
+  expect(receipt).toMatchObject({status:'confirmed',channel:'C_FIXTURE',ts:'1730000000.000001'});
+  expect((await outbox()).status).toBe('confirmed');
+ });
+ it('confirms readback when Slack normalizes Unicode emoji to shortcode in stored message text',async()=>{
+  input.params.text='Friday \u{1F389}';
+  const body={kind:'plan',steps:[{id:'post',tool:'myslack.chat_postMessage',args:input.params,dependsOn:[]}],connections:{myslack:{bindings:{[seed.binding.connectionId]:seed.binding},steps:{post:{connectionId:seed.binding.connectionId,tool:'myslack.chat_postMessage',dependencies:[]}}}}};
+  input.planHash=createHash('sha256').update(JSON.stringify(body)).digest('hex');
+  await env.db.pool.query('UPDATE plans SET plan_json=$2,plan_text=$3,plan_hash=$4 WHERE id=$1',[input.planId,body,JSON.stringify(body),input.planHash]);
+  env.fixture.setHandler('/chat.postMessage',r=>{const b=JSON.parse(r.body);const m={user:seed.binding.slackUserId,text:b.text.replace('\u{1F389}',':tada:'),client_msg_id:b.client_msg_id,ts:'1730000000.000001'};saved=[m];return {body:{ok:true,channel:b.channel,ts:m.ts,message:m}};});
+  const receipt=await writer().execute(input);
+  expect(receipt).toMatchObject({status:'confirmed',channel:'C_FIXTURE',ts:'1730000000.000001'});
+  expect((await outbox()).status).toBe('confirmed');
+ });
 });

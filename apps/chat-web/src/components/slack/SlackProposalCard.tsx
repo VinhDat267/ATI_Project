@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { SlackIntentService, SlackProposalTargetOverride } from '@wap/tool-schemas';
 import { slackAssistantApi, type SlackProposalViewDto } from '../../services/slack-assistant';
 import { apiClient } from '../../services/api-client';
@@ -83,11 +83,32 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
     id: string;
     planHash: string;
     summary: string;
-    steps: Array<{ id: string; tool?: string; action?: string; description: string }>;
+    steps: Array<{
+      id: string;
+      tool?: string;
+      action?: string;
+      description: string;
+      args?: Record<string, unknown>;
+    }>;
   } | null>(null);
+  const [hasPreparedOnce, setHasPreparedOnce] = useState(false);
 
   const isStaleOrRedacted = proposal.status === 'stale' || proposal.body === null;
   const actionable = ['pending', 'needs_info', 'awaiting_approval'].includes(proposal.status) && !isStaleOrRedacted;
+
+  useEffect(() => {
+    if (isStaleOrRedacted) {
+      setPlanPreview(null);
+      setHasPreparedOnce(false);
+      setQuestion('');
+      setNotice('');
+    }
+  }, [isStaleOrRedacted, proposal.id, proposal.status, proposal.body]);
+
+  const invalidatePreview = () => {
+    setPlanPreview(null);
+    setNotice('');
+  };
   const channelLabel = proposal.channelId ?? proposal.body?.context?.[0]?.channelId ?? 'Slack';
   const rawTs = proposal.triggerMessageTs ?? proposal.body?.context?.[0]?.ts;
   const formattedTs = formatSlackTs(rawTs);
@@ -162,6 +183,7 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
         } else if (res.plan) {
           const resolvedId = res.planId ?? res.plan.id ?? res.proposal?.activePlanId ?? '';
           const resolvedHash = res.planHash ?? res.plan.planHash ?? res.proposal?.planHash ?? '';
+          setHasPreparedOnce(true);
           setPlanPreview({
             id: resolvedId,
             planHash: resolvedHash,
@@ -185,8 +207,12 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
   };
 
   const handleApprove = async () => {
-    const planId = planPreview?.id || proposal.activePlanId;
-    if (!planId || busy) return;
+    const planId = planPreview?.id;
+    if (!planId) {
+      setError('Vui lòng bấm "Xem trước kế hoạch" để kiểm tra chi tiết trước khi phê duyệt.');
+      return;
+    }
+    if (busy) return;
     const owns = slackSessionOwner();
     setBusy(true);
     setError('');
@@ -308,12 +334,31 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
         </p>
       )}
 
-      {planPreview && (
+      {!isStaleOrRedacted && planPreview && (
         <div className="rounded-lg border border-[#D1D5DB] dark:border-[#4B5563] p-3 space-y-2">
           <p className="text-xs font-semibold">{planPreview.summary}</p>
-          <ol className="list-decimal list-inside space-y-1 text-xs text-[#4B5563] dark:text-[#9CA3AF]">
+          <ol className="list-decimal list-inside space-y-1.5 text-xs text-[#4B5563] dark:text-[#9CA3AF]">
             {planPreview.steps.map((step) => (
-              <li key={step.id}>{step.description}</li>
+              <li key={step.id} className="space-y-1">
+                <span className="font-medium text-[#111827] dark:text-white">{step.description}</span>
+                {step.tool && (
+                  <span className="ml-1.5 rounded bg-[#F3F4F6] dark:bg-[#2D2D2D] px-1.5 py-0.5 font-mono text-[11px]">
+                    {step.tool}
+                  </span>
+                )}
+                {step.args && Object.keys(step.args).length > 0 && (
+                  <dl className="ml-4 grid grid-cols-1 gap-0.5 rounded bg-[#F8F8F6] dark:bg-[#262626] p-2 text-[11px]">
+                    {Object.entries(step.args).map(([key, val]) => (
+                      <div key={key} className="flex flex-wrap gap-1">
+                        <dt className="font-semibold text-[#374151] dark:text-[#D1D5DB]">{key}:</dt>
+                        <dd className="break-all font-mono">
+                          {typeof val === 'string' ? val : JSON.stringify(val)}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+              </li>
             ))}
           </ol>
         </div>
@@ -338,7 +383,10 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
               value={instruction}
               maxLength={1000}
               disabled={busy}
-              onChange={(e) => setInstruction(e.target.value)}
+              onChange={(e) => {
+                setInstruction(e.target.value);
+                invalidatePreview();
+              }}
             />
           </label>
           <details className="rounded-lg border border-[#E7E7E2] dark:border-[#333333] bg-[#FAFAFA] dark:bg-[#242424] p-2.5 text-xs">
@@ -353,7 +401,10 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
                   className={inputClass}
                   value={overrideService}
                   disabled={busy}
-                  onChange={(e) => setOverrideService(e.target.value as SlackIntentService | '')}
+                  onChange={(e) => {
+                    setOverrideService(e.target.value as SlackIntentService | '');
+                    invalidatePreview();
+                  }}
                 >
                   <option value="">Theo gợi ý mặc định ({serviceLabels[primaryIntent?.service ?? ''] ?? (primaryIntent?.service || 'Tự động')})</option>
                   <option value="trello">Trello — Tạo thẻ công việc</option>
@@ -373,7 +424,10 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
                     placeholder="Ví dụ: list-sprint-1"
                     value={overrideListId}
                     disabled={busy}
-                    onChange={(e) => setOverrideListId(e.target.value)}
+                    onChange={(e) => {
+                      setOverrideListId(e.target.value);
+                      invalidatePreview();
+                    }}
                   />
                 </label>
               )}
@@ -385,7 +439,10 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
                     placeholder="Ví dụ: OPS"
                     value={overrideProjectKey}
                     disabled={busy}
-                    onChange={(e) => setOverrideProjectKey(e.target.value)}
+                    onChange={(e) => {
+                      setOverrideProjectKey(e.target.value);
+                      invalidatePreview();
+                    }}
                   />
                 </label>
               )}
@@ -398,7 +455,10 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
                       placeholder="Spreadsheet ID"
                       value={overrideSpreadsheetId}
                       disabled={busy}
-                      onChange={(e) => setOverrideSpreadsheetId(e.target.value)}
+                      onChange={(e) => {
+                        setOverrideSpreadsheetId(e.target.value);
+                        invalidatePreview();
+                      }}
                     />
                   </label>
                   <label className="block space-y-1">
@@ -408,7 +468,10 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
                       placeholder="Sheet1"
                       value={overrideSheet}
                       disabled={busy}
-                      onChange={(e) => setOverrideSheet(e.target.value)}
+                      onChange={(e) => {
+                        setOverrideSheet(e.target.value);
+                        invalidatePreview();
+                      }}
                     />
                   </label>
                 </>
@@ -422,7 +485,10 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
                       placeholder="primary"
                       value={overrideCalendarId}
                       disabled={busy}
-                      onChange={(e) => setOverrideCalendarId(e.target.value)}
+                      onChange={(e) => {
+                        setOverrideCalendarId(e.target.value);
+                        invalidatePreview();
+                      }}
                     />
                   </label>
                   <label className="block space-y-1">
@@ -432,7 +498,10 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
                       placeholder="2026-11-12T09:00:00+07:00"
                       value={overrideStartIso}
                       disabled={busy}
-                      onChange={(e) => setOverrideStartIso(e.target.value)}
+                      onChange={(e) => {
+                        setOverrideStartIso(e.target.value);
+                        invalidatePreview();
+                      }}
                     />
                   </label>
                   <label className="block space-y-1">
@@ -442,7 +511,10 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
                       placeholder="2026-11-12T09:30:00+07:00"
                       value={overrideEndIso}
                       disabled={busy}
-                      onChange={(e) => setOverrideEndIso(e.target.value)}
+                      onChange={(e) => {
+                        setOverrideEndIso(e.target.value);
+                        invalidatePreview();
+                      }}
                     />
                   </label>
                 </>
@@ -455,7 +527,10 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
                     placeholder="Ví dụ: acme/platform"
                     value={overrideRepo}
                     disabled={busy}
-                    onChange={(e) => setOverrideRepo(e.target.value)}
+                    onChange={(e) => {
+                      setOverrideRepo(e.target.value);
+                      invalidatePreview();
+                    }}
                   />
                 </label>
               )}
@@ -467,7 +542,10 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
                     placeholder="Ví dụ: ops@acme.vn"
                     value={overrideToEmail}
                     disabled={busy}
-                    onChange={(e) => setOverrideToEmail(e.target.value)}
+                    onChange={(e) => {
+                      setOverrideToEmail(e.target.value);
+                      invalidatePreview();
+                    }}
                   />
                 </label>
               )}
@@ -478,7 +556,10 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
               type="checkbox"
               checked={replyInThread}
               disabled={busy}
-              onChange={(e) => setReplyInThread(e.target.checked)}
+              onChange={(e) => {
+                setReplyInThread(e.target.checked);
+                invalidatePreview();
+              }}
             />
             Phản hồi lại vào thread nguồn kèm liên kết kết quả
           </label>
@@ -489,7 +570,7 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
             <button type="button" className={buttonClass} disabled={busy} onClick={() => void handlePrepare()}>
               Xem trước kế hoạch
             </button>
-            {(planPreview || proposal.activePlanId) && (
+            {(planPreview || hasPreparedOnce || proposal.activePlanId) && (
               <button type="button" className={primaryClass} disabled={busy} onClick={() => void handleApprove()}>
                 Phê duyệt và thực thi
               </button>
