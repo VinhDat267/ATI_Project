@@ -511,4 +511,158 @@ describe('JiraConnection component', () => {
       expect(screen.getByText(/chờ JIRA-08/i)).toBeInTheDocument();
     });
   });
+
+  it('displays connection error on 503 instead of "Chưa kết nối" and recovers on retry', async () => {
+    const error503: any = new Error('Service Unavailable');
+    error503.status = 503;
+    error503.code = 'upstream_unavailable';
+    const connSpy = vi.spyOn(jiraApi, 'connection').mockRejectedValueOnce(error503);
+    vi.spyOn(jiraApi, 'workspaces').mockResolvedValue({ workspaces: [] });
+
+    render(<JiraConnection user={user} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Lỗi kết nối')).toBeInTheDocument();
+      expect(screen.queryByText('Chưa kết nối')).not.toBeInTheDocument();
+      expect(screen.getByText(/Dịch vụ Jira tạm thời không khả dụng/i)).toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: /thử lại/i }).length).toBeGreaterThanOrEqual(1);
+      expect(screen.queryByRole('button', { name: /^kết nối jira$/i })).not.toBeInTheDocument();
+    });
+
+    // Mock successful recovery on retry
+    connSpy.mockResolvedValueOnce({
+      connected: false,
+      connectionState: 'disconnected',
+      jiraAccountId: null,
+      atlassianAccountId: null,
+      sites: [],
+    });
+
+    fireEvent.click(screen.getAllByRole('button', { name: /thử lại/i })[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText('Chưa kết nối')).toBeInTheDocument();
+      expect(screen.queryByText('Lỗi kết nối')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Dịch vụ Jira tạm thời không khả dụng/i)).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /kết nối jira/i })).toBeInTheDocument();
+    });
+  });
+
+  it('displays connection error on 401 and network errors instead of "Chưa kết nối"', async () => {
+    const error401: any = new Error('Unauthorized');
+    error401.status = 401;
+    error401.code = 'INVALID_SESSION';
+    vi.spyOn(jiraApi, 'connection').mockRejectedValueOnce(error401);
+    vi.spyOn(jiraApi, 'workspaces').mockResolvedValue({ workspaces: [] });
+
+    const { unmount } = render(<JiraConnection user={user} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Lỗi kết nối')).toBeInTheDocument();
+      expect(screen.queryByText('Chưa kết nối')).not.toBeInTheDocument();
+      expect(screen.getByText(/Phiên đăng nhập không hợp lệ hoặc đã hết hạn/i)).toBeInTheDocument();
+    });
+
+    unmount();
+
+    // Test Network Error
+    const networkError = new TypeError('Failed to fetch');
+    vi.spyOn(jiraApi, 'connection').mockRejectedValueOnce(networkError);
+
+    render(<JiraConnection user={user} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Lỗi kết nối')).toBeInTheDocument();
+      expect(screen.queryByText('Chưa kết nối')).not.toBeInTheDocument();
+      expect(screen.getByText(/Không thể kết nối đến máy chủ Jira/i)).toBeInTheDocument();
+    });
+  });
+
+  it('clears invite code and workspace details when switching workspace, preventing stale cross-workspace data and race conditions', async () => {
+    vi.spyOn(jiraApi, 'connection').mockResolvedValue({
+      connected: true,
+      connectionState: 'connected',
+      jiraAccountId: 'jira-123',
+      atlassianAccountId: 'atl-123',
+      sites: [],
+    });
+
+    vi.spyOn(jiraApi, 'workspaces').mockResolvedValue({
+      workspaces: [
+        {
+          id: 'ws-admin-1',
+          name: 'Workspace Alpha (Admin)',
+          slug: 'ws-alpha',
+          role: 'admin',
+          membershipStatus: 'active',
+          workspaceVersion: 1,
+          membershipVersion: 1,
+        },
+        {
+          id: 'ws-member-2',
+          name: 'Workspace Beta (Member)',
+          slug: 'ws-beta',
+          role: 'member',
+          membershipStatus: 'active',
+          workspaceVersion: 1,
+          membershipVersion: 1,
+        },
+      ],
+    });
+
+    vi.spyOn(jiraApi, 'members').mockImplementation(async (wsId) => {
+      if (wsId === 'ws-admin-1') {
+        return { members: [{ userId: 'user-alpha-only', role: 'member', status: 'pending', version: 1 }] };
+      }
+      return { members: [] };
+    });
+
+    vi.spyOn(jiraApi, 'invites').mockImplementation(async (wsId) => {
+      if (wsId === 'ws-admin-1') {
+        return {
+          invites: [
+            { id: 'inv-alpha-1', workspaceId: 'ws-admin-1', inviterUserId: 'user-1', expiresAt: '2026-11-10T00:00:00Z' },
+          ],
+        };
+      }
+      return { invites: [] };
+    });
+
+    vi.spyOn(jiraApi, 'sites').mockResolvedValue({ sites: [] });
+    vi.spyOn(jiraApi, 'capabilities').mockImplementation(async (wsId) => ({
+      workspaceId: wsId,
+      sites: [],
+    }));
+
+    vi.spyOn(jiraApi, 'createInvite').mockResolvedValue({
+      inviteId: 'inv-created-alpha',
+      inviteToken: 'ALPHA_INVITE_TOKEN_SECRET_123',
+      expiresAt: '2026-11-10T00:00:00Z',
+    });
+
+    render(<JiraConnection user={user} />);
+
+    // Initially in Workspace Alpha (admin)
+    await waitFor(() => {
+      expect(screen.getByText(/user-alpha-only/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /tạo mã mời/i })).toBeInTheDocument();
+    });
+
+    // Create invite in Workspace Alpha
+    fireEvent.click(screen.getByRole('button', { name: /tạo mã mời/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/ALPHA_INVITE_TOKEN_SECRET_123/i)).toBeInTheDocument();
+    });
+
+    // Switch to Workspace Beta (member)
+    const select = screen.getByLabelText(/chọn jira workspace/i);
+    fireEvent.change(select, { target: { value: 'ws-member-2' } });
+
+    // The invite token and admin members from Workspace Alpha MUST be cleared immediately
+    await waitFor(() => {
+      expect(screen.queryByText(/ALPHA_INVITE_TOKEN_SECRET_123/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/user-alpha-only/i)).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /tạo mã mời/i })).not.toBeInTheDocument();
+    });
+  });
 });

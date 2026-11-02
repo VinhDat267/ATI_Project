@@ -44,6 +44,7 @@ export function JiraConnection({
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [connectionError, setConnectionError] = useState('');
   const [infoNotice, setInfoNotice] = useState('');
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
 
@@ -68,6 +69,9 @@ export function JiraConnection({
   const mounted = useRef(false);
   const pending = useRef(false);
   const row = useRef<HTMLDivElement>(null);
+  const activeWorkspaceIdRef = useRef<string>('');
+  const prevWorkspaceIdRef = useRef<string>('');
+  const workspaceFetchSeqRef = useRef<number>(0);
 
   const selectedWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
   const isWorkspaceAdmin = selectedWorkspace?.role === 'admin';
@@ -88,8 +92,11 @@ export function JiraConnection({
     if (code === 'stale_version' || code === 'CONFLICT' || status === 409) {
       return 'Dữ liệu vừa được cập nhật bởi một người dùng khác. Đã tải lại thông tin mới nhất.';
     }
-    if (code === 'upstream_auth' || code === 'reconnect_required' || status === 401) {
+    if (code === 'upstream_auth' || code === 'reconnect_required') {
       return 'Cần xác thực lại với Atlassian. Hãy bấm "Kết nối lại Jira".';
+    }
+    if (code === 'INVALID_SESSION' || status === 401) {
+      return 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại.';
     }
     if (code === 'membership_required') {
       return 'Bạn chưa phải là thành viên hoạt động của Jira workspace này.';
@@ -100,31 +107,71 @@ export function JiraConnection({
     if (code === 'upstream_unavailable' || status === 503) {
       return 'Dịch vụ Jira tạm thời không khả dụng. Vui lòng thử lại sau.';
     }
+    if (
+      err?.name === 'TypeError' ||
+      err?.message?.includes('fetch') ||
+      err?.message?.includes('NetworkError') ||
+      err?.message?.includes('network')
+    ) {
+      return 'Không thể kết nối đến máy chủ Jira. Vui lòng kiểm tra mạng và thử lại.';
+    }
     return err?.data?.error || err?.message || 'Có lỗi xảy ra khi thực hiện thao tác với Jira.';
   };
 
   const fetchConnection = async () => {
     try {
+      setConnectionError('');
       const res = await jiraApi.connection();
-      if (mounted.current) setData(res);
-    } catch {
       if (mounted.current) {
-        setData({
-          connected: false,
-          connectionState: 'disconnected',
-          jiraAccountId: null,
-          atlassianAccountId: null,
-          sites: [],
-        });
+        setData(res);
+        setConnectionError('');
+      }
+    } catch (err: any) {
+      if (mounted.current) {
+        const status = err?.status ?? err?.statusCode;
+        const code = err?.data?.code || err?.code;
+        const isNetwork =
+          err?.name === 'TypeError' ||
+          err?.message?.includes('fetch') ||
+          err?.message?.includes('NetworkError') ||
+          err?.message?.includes('network');
+
+        if (
+          status === 401 ||
+          status === 503 ||
+          code === 'upstream_unavailable' ||
+          code === 'INVALID_SESSION' ||
+          isNetwork
+        ) {
+          setData(null);
+          setConnectionError(mapErrorMessage(err));
+        } else {
+          setData({
+            connected: false,
+            connectionState: 'disconnected',
+            jiraAccountId: null,
+            atlassianAccountId: null,
+            sites: [],
+          });
+          setConnectionError('');
+        }
       }
     }
   };
 
   const fetchWorkspaceDetails = async (wsId: string, currentWorkspaces?: WorkspaceSummary[]) => {
     if (!wsId) return;
+    const fetchSeq = ++workspaceFetchSeqRef.current;
     try {
       const capRes = await jiraApi.capabilities(wsId).catch(() => null);
-      if (mounted.current) setCapabilities(capRes);
+      if (
+        !mounted.current ||
+        activeWorkspaceIdRef.current !== wsId ||
+        workspaceFetchSeqRef.current !== fetchSeq
+      ) {
+        return;
+      }
+      setCapabilities(capRes);
 
       const targetList = currentWorkspaces ?? workspaces;
       const ws = targetList.find((w) => w.id === wsId);
@@ -134,11 +181,20 @@ export function JiraConnection({
           jiraApi.invites(wsId).catch(() => ({ invites: [] })),
           jiraApi.sites(wsId).catch(() => ({ sites: [] })),
         ]);
-        if (mounted.current) {
-          setMembers(memRes.members ?? []);
-          setInvites(invRes.invites ?? []);
-          setSites(sitesRes.sites ?? []);
+        if (
+          !mounted.current ||
+          activeWorkspaceIdRef.current !== wsId ||
+          workspaceFetchSeqRef.current !== fetchSeq
+        ) {
+          return;
         }
+        setMembers(memRes.members ?? []);
+        setInvites(invRes.invites ?? []);
+        setSites(sitesRes.sites ?? []);
+      } else {
+        setMembers([]);
+        setInvites([]);
+        setSites([]);
       }
     } catch {
       // ignore
@@ -156,12 +212,31 @@ export function JiraConnection({
             ? list[0].id
             : activeWorkspaceId;
         if (nextId) {
+          activeWorkspaceIdRef.current = nextId;
           setActiveWorkspaceId(nextId);
           void fetchWorkspaceDetails(nextId, list);
         }
       }
     } catch {
       if (mounted.current) setWorkspaces([]);
+    }
+  };
+
+  const handleSelectWorkspace = (nextId: string) => {
+    activeWorkspaceIdRef.current = nextId;
+    prevWorkspaceIdRef.current = nextId;
+    setCreatedInviteToken(null);
+    setMembers([]);
+    setInvites([]);
+    setSites([]);
+    setCapabilities(null);
+    setConfiguringSite(null);
+    setCandidateProjects([]);
+    setSelectedProjectIds([]);
+    setError('');
+    setActiveWorkspaceId(nextId);
+    if (nextId) {
+      void fetchWorkspaceDetails(nextId);
     }
   };
 
@@ -179,8 +254,24 @@ export function JiraConnection({
   }, []);
 
   useEffect(() => {
+    const isDifferentWorkspace = prevWorkspaceIdRef.current !== activeWorkspaceId;
+    prevWorkspaceIdRef.current = activeWorkspaceId;
+    activeWorkspaceIdRef.current = activeWorkspaceId;
+
+    if (isDifferentWorkspace) {
+      setCreatedInviteToken(null);
+      setMembers([]);
+      setInvites([]);
+      setSites([]);
+      setCapabilities(null);
+      setConfiguringSite(null);
+      setCandidateProjects([]);
+      setSelectedProjectIds([]);
+      setError('');
+    }
+
     if (activeWorkspaceId) {
-      void fetchWorkspaceDetails(activeWorkspaceId);
+      void fetchWorkspaceDetails(activeWorkspaceId, workspaces);
     }
   }, [activeWorkspaceId, workspaces]);
 
@@ -447,10 +538,17 @@ export function JiraConnection({
     }
   };
 
-  const isConnected = data?.connectionState === 'connected';
-  const isIdentityConnected = data?.connectionState === 'identity_connected';
-  const isScopeRequired = data?.connectionState === 'scope_required';
-  const isReconnectRequired = data?.connectionState === 'reconnect_required';
+  const isConnected = !connectionError && data?.connectionState === 'connected';
+  const isIdentityConnected = !connectionError && data?.connectionState === 'identity_connected';
+  const isScopeRequired = !connectionError && data?.connectionState === 'scope_required';
+  const isReconnectRequired = !connectionError && data?.connectionState === 'reconnect_required';
+  const isDisconnected =
+    !connectionError &&
+    data !== null &&
+    !isConnected &&
+    !isIdentityConnected &&
+    !isScopeRequired &&
+    !isReconnectRequired;
 
   // Available candidate sites that can be linked
   const authorizedSites = data?.sites ?? [];
@@ -477,31 +575,31 @@ export function JiraConnection({
               <h3 className="font-semibold text-sm sm:text-base text-[#111827] dark:text-white">
                 Atlassian Jira Cloud
               </h3>
-              {isConnected && (
+              {connectionError ? (
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900">
+                  Lỗi kết nối
+                </span>
+              ) : isConnected ? (
                 <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#16A34A]/10 text-[#16A34A] border border-[#16A34A]/20">
                   Đã kết nối
                 </span>
-              )}
-              {isIdentityConnected && (
+              ) : isIdentityConnected ? (
                 <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                   Đã kết nối danh tính
                 </span>
-              )}
-              {isScopeRequired && (
+              ) : isScopeRequired ? (
                 <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
                   Cần cấp quyền site
                 </span>
-              )}
-              {isReconnectRequired && (
+              ) : isReconnectRequired ? (
                 <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200">
                   Cần kết nối lại
                 </span>
-              )}
-              {!isConnected && !isIdentityConnected && !isScopeRequired && !isReconnectRequired && (
+              ) : isDisconnected ? (
                 <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
                   Chưa kết nối
                 </span>
-              )}
+              ) : null}
             </div>
             <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF] mt-0.5">
               Kết nối danh tính Atlassian, cấp quyền site Jira và quản lý quyền truy cập theo workspace.
@@ -511,66 +609,109 @@ export function JiraConnection({
 
         {/* PRIMARY ACTIONS */}
         <div className="flex flex-wrap items-center gap-2">
-          {!isConnected && !isIdentityConnected && !isScopeRequired && !isReconnectRequired && (
+          {connectionError ? (
             <button
               type="button"
-              id="jira-connect"
-              onClick={handleConnectIdentity}
+              id="jira-retry-connection"
+              onClick={() => {
+                void fetchConnection();
+                void fetchWorkspaces();
+              }}
               disabled={busy}
-              className={buttonPrimary}
+              className={buttonSecondary}
             >
-              {busy ? 'Đang chuyển hướng…' : 'Kết nối Jira'}
+              Thử lại
             </button>
-          )}
-
-          {(isIdentityConnected || isScopeRequired) && (
-            <button
-              type="button"
-              id="jira-authorize-sites"
-              onClick={handleAuthorizeSites}
-              disabled={busy}
-              className={buttonPrimary}
-            >
-              {busy ? 'Đang chuyển hướng…' : 'Cấp quyền Jira site'}
-            </button>
-          )}
-
-          {isReconnectRequired && (
-            <button
-              type="button"
-              id="jira-reconnect"
-              onClick={handleConnectIdentity}
-              disabled={busy}
-              className={buttonPrimary}
-            >
-              {busy ? 'Đang chuyển hướng…' : 'Kết nối lại Jira'}
-            </button>
-          )}
-
-          {isConnected && (
+          ) : (
             <>
-              <button
-                type="button"
-                id="jira-sync-sites"
-                onClick={handleSyncSites}
-                disabled={busy}
-                className={buttonSecondary}
-              >
-                {busy ? 'Đang đồng bộ…' : 'Đồng bộ sites'}
-              </button>
-              <button
-                type="button"
-                id="jira-disconnect"
-                onClick={() => setConfirmDisconnect(true)}
-                disabled={busy}
-                className={buttonDanger}
-              >
-                Ngắt kết nối
-              </button>
+              {isDisconnected && (
+                <button
+                  type="button"
+                  id="jira-connect"
+                  onClick={handleConnectIdentity}
+                  disabled={busy}
+                  className={buttonPrimary}
+                >
+                  {busy ? 'Đang chuyển hướng…' : 'Kết nối Jira'}
+                </button>
+              )}
+
+              {(isIdentityConnected || isScopeRequired) && (
+                <button
+                  type="button"
+                  id="jira-authorize-sites"
+                  onClick={handleAuthorizeSites}
+                  disabled={busy}
+                  className={buttonPrimary}
+                >
+                  {busy ? 'Đang chuyển hướng…' : 'Cấp quyền Jira site'}
+                </button>
+              )}
+
+              {isReconnectRequired && (
+                <button
+                  type="button"
+                  id="jira-reconnect"
+                  onClick={handleConnectIdentity}
+                  disabled={busy}
+                  className={buttonPrimary}
+                >
+                  {busy ? 'Đang chuyển hướng…' : 'Kết nối lại Jira'}
+                </button>
+              )}
+
+              {isConnected && (
+                <>
+                  <button
+                    type="button"
+                    id="jira-sync-sites"
+                    onClick={handleSyncSites}
+                    disabled={busy}
+                    className={buttonSecondary}
+                  >
+                    {busy ? 'Đang đồng bộ…' : 'Đồng bộ sites'}
+                  </button>
+                  <button
+                    type="button"
+                    id="jira-disconnect"
+                    onClick={() => setConfirmDisconnect(true)}
+                    disabled={busy}
+                    className={buttonDanger}
+                  >
+                    Ngắt kết nối
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>
       </div>
+
+      {/* CONNECTION ERROR ALERT */}
+      {connectionError && (
+        <div
+          id="jira-connection-error-alert"
+          aria-live="polite"
+          className="mt-4 p-3.5 rounded-xl bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-900 text-xs flex items-center justify-between gap-3"
+        >
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 flex-shrink-0 text-rose-600 dark:text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span>{connectionError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              void fetchConnection();
+              void fetchWorkspaces();
+            }}
+            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-100 hover:bg-rose-200 text-rose-800 dark:bg-rose-900 dark:hover:bg-rose-800 dark:text-rose-200 whitespace-nowrap"
+          >
+            Thử lại
+          </button>
+        </div>
+      )}
 
       {/* DISCONNECT CONFIRMATION MODAL / PANEL */}
       {confirmDisconnect && (
@@ -671,8 +812,9 @@ export function JiraConnection({
               </label>
               <select
                 id="jira-workspace-select"
+                aria-label="Chọn Jira Workspace"
                 value={activeWorkspaceId}
-                onChange={(e) => setActiveWorkspaceId(e.target.value)}
+                onChange={(e) => handleSelectWorkspace(e.target.value)}
                 className="px-2.5 py-1.5 text-xs rounded-lg border border-[#E7E7E2] dark:border-[#374151] bg-white dark:bg-[#1F2937] text-[#111827] dark:text-white"
               >
                 {workspaces.map((w) => (
