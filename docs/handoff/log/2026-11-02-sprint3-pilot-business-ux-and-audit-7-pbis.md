@@ -1,0 +1,24 @@
+# 2026-11-02 · antigravity · Sprint 3 Pilot — Ngôn ngữ nghiệp vụ (Business-First UX), đồng bộ OAuth/Digest liên dịch vụ & khắc phục 7 PBI từ kiểm thử E2E toàn diện
+
+- **Đã làm:**
+  - **(1) PBI-10 — Chuẩn hóa ngôn ngữ nghiệp vụ (Business-First UX) & Chống trùng lặp thẻ dịch vụ (`apps/chat-web`):** Cập nhật `SettingsPage.tsx`, `GuidePage.tsx`, `Guide/data.tsx` và `LandingPage.tsx` để thay toàn bộ các thuật ngữ kỹ thuật (`OAuth 1-Click`, `OAuth 2.0 · 1-Click`) bằng ngôn ngữ gần gũi với người dùng nghiệp vụ (`Đăng nhập trực tiếp · 1 chạm`, `Liên kết tài khoản nhanh & Chọn nơi làm việc`). Đồng thời lọc bỏ hai thẻ dùng chung `calendar` và `sheets` trên `/settings` khi đã có thẻ kết nối cá nhân `mycalendar` và `mysheets`.
+  - **(2) PBI-11 — Bộ lập kế hoạch Sandbox thích ứng theo ngữ cảnh câu lệnh (`apps/chat-api`):** Nâng cấp `createSandboxProvider(undefined)` và `createBackupSandboxProvider()` trong `apps/chat-api/src/sandbox/scenarios.ts` để phân tích câu lệnh của người dùng và trả về đúng kế hoạch đơn dịch vụ hoặc liên dịch vụ (Slack-only, Trello + Slack, Jira, Notion, Telegram, Google Sheets, Google Calendar) cũng như đề xuất lịch định kỳ (`kind: 'schedule'`) thay vì luôn trả về kế hoạch 2 bước Trello + Slack cố định.
+  - **(3) PBI-12 — Đồng bộ `selectedChats` và bổ sung `GET /api/connections/telegram/chats` (`apps/chat-api`):** Cập nhật `apps/chat-api/src/routes/connections/telegram.ts` trả về đầy đủ mảng `selectedChats` song song với `chats` trên `GET /`, `POST /callback`, `PUT /scope` và thêm alias `GET /api/connections/telegram/chats`.
+  - **(4) PBI-13 — Hỗ trợ `selectedChats` cho Digest, sửa thứ tự ưu tiên `sheets_digest` và kích hoạt `SheetsDigestRunner` (`apps/chat-api`):** Cập nhật `evaluateCalendarDigestCandidate` và `analyzeSheetsDigestCandidate` đọc cấu trúc `selectedChats` của Telegram cá nhân; sửa thứ tự ưu tiên trong `ScheduleService.confirmProposal` để chọn `sheets_digest` / `calendar_digest` trước `telegram_digest` khi yêu cầu kết hợp nguồn bảng tính/lịch với đích Telegram; kết nối `SheetsDigestRunner` vào `schedules-runtime.ts`.
+  - **(5) PBI-14 — Fallback cấu hình Trello OAuth & Phân quyền chọn kho GitHub theo Workspace (`apps/chat-api`, `apps/chat-web`):** Cho phép `trelloOAuth()` trong `env.ts` fallback sang `TRELLO_API_KEY` / `TRELLO_API_SECRET` và cho phép `GET /api/connections/trello` hiển thị trạng thái kết nối cá nhân ngay cả khi thiếu cấu hình OAuth máy chủ. Cập nhật `routes/connections/github.ts` và `GitHubConnection.tsx` để người dùng trong Không gian cá nhân hoặc Quản trị viên Không gian tổ chức đều chọn và lưu được phạm vi kho lưu trữ GitHub.
+  - **(6) PBI-15 — Gia cố `decryptCredentials` tại Jira OAuth và `PUT /api/services/:service/scope` (`apps/chat-api`):** Bọc `try/catch` khi giải mã token trong `JiraOAuthRepo.getConnectionStatus`, `JiraTokenManager.getAccessToken` và `PUT /api/services/:service/scope` để trả `reconnect_required` / `TOKEN_REFRESH_FAILED` / HTTP `409` thay vì lỗi `500 Internal Server Error`.
+  - **(7) PBI-16 — Suy luận trạng thái hội thoại `completed`, đồng bộ dải dịch vụ chân trang Cockpit & trạng thái trống bộ lọc `/history` (`apps/chat-api`, `apps/chat-web`):** Cập nhật truy vấn SQL trong `ConversationRepo` để hội thoại có kế hoạch đã thực thi xong nhận `status: 'completed'`; cập nhật `RequestMoments.tsx` hiển thị dịch vụ có `personalStatus === 'connected'` ở chân trang Cockpit; cập nhật `HistoryPage.tsx` hiển thị thông báo trống và ẩn nút `"Tải thêm"` khi tab bộ lọc không có hội thoại nào.
+
+- **PR / commit:** Nhánh `fix/sprint3-integration` (tích hợp từ `5a0ad270` và `d96c62d5` tại `bb59e21d`, hợp nhất `origin/main` `2b78f4b6` tại `8716ef1c`). Không sửa `CURRENT-STATE.md` hay `ROADMAP.md` trên nhánh PR.
+
+- **Kiểm tra đã chạy (lệnh và kết quả):**
+  - `npx vitest run evaluations/generic-plumbing/static-guard.test.ts` — 1 test file passed, 2 tests passed.
+  - `npm run typecheck:v3` — exit code 0.
+  - `npx --prefix apps/chat-api vitest run tests/sprint3-pbi11-to-16a.test.ts` — 1 test file passed, 15 tests passed.
+  - `Push-Location apps/chat-web; npx vitest run tests/sprint3-business-ux.test.tsx tests/guide-page.test.tsx tests/landing-orbital-redesign.test.tsx tests/workflow-flow-canvas.test.tsx; Pop-Location` — 4 test files passed, 29 tests passed.
+  - `npm --prefix apps/chat-web run build && node scripts/test-v3-web-build-security.mjs` — exit code 0 (`PASS: production build excludes credential sentinels and 7 forbidden UI claims`).
+  - Kiểm thử trình duyệt thực tế (`http://127.0.0.1:5175` + PostgreSQL 16): **7/7 PBIs PASS**, `0 console.error`, `0 pageerror`, `0 HTTP 500`; điểm đánh giá 5 trục đạt **`9.5 / 9.4 / 9.4 / 9.3 / 9.4` — `SHIP`**.
+
+- **Chưa làm / vấn đề phát hiện:** Không còn lỗi tồn đọng trong phạm vi 7 PBIs của Sprint 3 (`PBI-10` → `PBI-16`).
+
+- **Việc tiếp theo đề xuất:** Mở PR từ `fix/sprint3-integration` vào `main`, chờ GitHub Actions CI xanh 100% rồi thực hiện merge và ghi nhận bàn giao (`P-RECORD`).
