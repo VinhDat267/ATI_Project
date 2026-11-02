@@ -107,7 +107,7 @@ export function handleSSEEvent(
       window.dispatchEvent(new Event('schedules:changed'));
       const planObj = data.plan || data;
       const planId = data.planId || planObj.id;
-      if (planId && store.executionSnapshot?.plan.id === planId) break;
+      if (planId && (store.executionSnapshot?.plan.id === planId || store.settledPlanIds[planId])) break;
       store.setActivePlan({
         id: planId,
         summary: planObj.summary,
