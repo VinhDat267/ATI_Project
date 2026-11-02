@@ -14,4 +14,10 @@
 - Browser API thật desktop1440/mobile375: **2/2 PASS**, exit0. UI hiển thị hướng dẫn kiểm tra, không replan; endpoint trả409. Fixture seed trạng thái kết thúc, không gửi provider thật.
 - Migration0021 phải áp dụng trước API. Đề xuất cũ thiếu config snapshot cần tạo lại hoặc chọn thủ công.
 - Trong lượt merge, main nhận #249/#250. Đã tích hợp cả hai; fixture `jira-workspace-conversations.test.ts` bổ sung `clearPlanEvents` theo contract Sprint1 mới và kiểm tra đúng conversation/plan. Đây là sửa tương thích test, không đổi production. Lỗi main #250 tái hiện RED(500 thay200); sau sửa5file/95test Calendar+Jira PASS. CI chạy lại trên head mới trước merge.
-- NOT_RUN: Google OAuth, Slack/Telegram và model live; DB runtime không bị chạm, flags không đổi. CI exact-head theo dõi ở PR; chưa merge.
+- NOT_RUN: Google OAuth, Slack/Telegram và model live; DB runtime không bị chạm, flags không đổi.
+
+## Nghiệm thu và merge
+
+- Reviewer cuối tại `2d54251a61996aa2319eb7f2ef766999134fc1f8`: Đạt, không còn P1/P2/P3 trong phạm vi;6file/98test PASS, exit0, PostgreSQL riêng. Production Calendar giữ nguyên so với head đã review613473be.
+- Local full check head cuối với4workers: **3.696v3 +406eval +99Node/launcher PASS**, exit0. CI41403134147 SUCCESS cùng head, gồm full browser.
+- Chủ dự án yêu cầu merge; [PR#248](https://github.com/VinhDat267/ATI_Project/pull/248) đã merge14:07:58 +07 ngày02/11 tại `453372dda726069f217a1071dd984a6a8c15697e`. Cây merge trùng head đã kiểm thử, diff exit0. [Log reviewer](../log/2026-11-02-reviewer-merge-248.md).

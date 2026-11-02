@@ -1,6 +1,15 @@
 # Trạng thái hiện tại
 
-**Cập nhật lần cuối:** 02/11/2026, sau khi chủ dự án yêu cầu merge **#246 rồi #247**: bản sửa migration rerun [#246](https://github.com/VinhDat267/ATI_Project/pull/246) vào main tại `b92cc4fc` (08:59:39 +07), tiếp theo bản sửa Telegram [#247](https://github.com/VinhDat267/ATI_Project/pull/247) tại `43b038ba` (09:03:16 +07).
+**Cập nhật lần cuối:** 02/11/2026, theo yêu cầu chủ dự án, Calendar [#248](https://github.com/VinhDat267/ATI_Project/pull/248) vào main tại `453372dda726069f217a1071dd984a6a8c15697e` lúc14:07:58 +07.
+
+- **CALENDAR-01, audit F2/F3:** kết quả gửi chưa rõ chuyển sang `needs_attention`, không replan; marker `delivery_started_at` giữ qua timeout/stop/restart. Confirm create/update phải khớp config và preview đã hiển thị; đổi phạm vi/tài khoản/đích bị từ chối nguyên tử, không âm thầm đổi mode khi scope mất eligibility. Migration `0021_calendar_digest_delivery.sql`.
+- **Review/CI:** reviewer cuối Đạt, không còn P1/P2/P3 trong scope,98 test Calendar+Jira PASS. [CI41403134147](https://github.com/VinhDat267/ATI_Project/actions/runs/41403134147) SUCCESS đúng head `2d54251a`, gồm full check/browser. Local full check cây cuối: **3.696v3 +406eval +99Node/launcher PASS**, exit0, PostgreSQL16 riêng.
+- **Tích hợp:** nhánh chứa main #249/#250; fixture Jira reject bổ sung `clearPlanEvents` theo contract Sprint1 để đóng lỗi CI của #250, không đổi production ngoài Calendar. Cây merge trùng cây head đã kiểm thử (`3dfe0ccac20698088ed5dd518ccc9ae26236f77f`), diff exit0.
+- **Giới hạn:** OAuth Google/provider Slack/Telegram/model live vẫn NOT_RUN. Không đổi flags hoặc DB runtime; cần migration0021 trước API. Proposal cũ thiếu snapshot cần đề xuất mới hoặc chọn thủ công. Những hạng mục audit ngoài Calendar không đóng bởi merge này.
+
+Xem [task CALENDAR-01](tasks/CALENDAR-01-audit-fixes.md), [log merge](log/2026-11-02-reviewer-merge-248.md), [log triển khai](log/2026-11-02-fix-calendar-audit.md).
+
+**Cập nhật trước đó:** 02/11/2026, sau khi chủ dự án yêu cầu merge **#246 rồi #247**: bản sửa migration rerun [#246](https://github.com/VinhDat267/ATI_Project/pull/246) vào main tại `b92cc4fc` (08:59:39 +07), tiếp theo bản sửa Telegram [#247](https://github.com/VinhDat267/ATI_Project/pull/247) tại `43b038ba` (09:03:16 +07).
 
 - **#246:** chạy lại chuỗi migration với dữ liệu digest và OAuth state mới không còn bị constraint trung gian thu hẹp. Reviewer đọc diff và chạy lại **19 file /106 test database PASS**, exit0, trên PostgreSQL16 riêng.
 - **#247, TELEGRAM-01:** chặn gửi digest khi cancel/pause/version change thắng trước dispatch; giữ delivery khi tin đã gửi; nguồn GitHub dùng `search_issues` có repo trong scope; pairing có inbox/cursor PostgreSQL bền vững, vượt100 update và qua restart, xử lý ID giảm sau thời gian dài không có update. Migration `0020_telegram_update_inbox.sql`. Các lịch cũ dùng tool sai `github.list_issues` cần được sửa/xác nhận lại, không tự đổi config/hash đã duyệt.

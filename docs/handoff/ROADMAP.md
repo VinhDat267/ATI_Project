@@ -1,5 +1,7 @@
 # Lộ trình đến cuối kỳ
 
+**Cập nhật 02/11 (merge Calendar #248):** [CALENDAR-01](tasks/CALENDAR-01-audit-fixes.md) xong phần sửa audit F2/F3, main `453372dd`. Chặn replan khi kết quả gửi chưa rõ và bind xác nhận vào đúng preview. Review cuối Đạt,98 regression Calendar+Jira PASS; CI41403134147 SUCCESS đúng head `2d54251a`, gồm full browser; local full check **3.696v3 +406eval +99Node PASS**, exit0. Cây merge trùng cây đã kiểm thử. Đã tích hợp #249/#250 và cập nhật fixture Jira theo contract mới. OAuth/provider/model live vẫn NOT_RUN; audit Sheets/GitHub/Slack/UI không đóng bởi merge này. [Log merge](log/2026-11-02-reviewer-merge-248.md).
+
 **Cập nhật 02/11 (merge #246 rồi #247):** sửa migration rerun vào main tại `b92cc4fc`; [TELEGRAM-01](tasks/TELEGRAM-01-audit-fixes.md) đóng phần sửa F1/F7/F8 sau audit tại `43b038ba`. Cả hai CI đúng head SUCCESS, gồm check/browser; reviewer kiểm tra106 test database và full check cây kết hợp **3.163 v3 +406 eval fixture +99 Node/launcher PASS**, exit0. Cây merge cuối trùng cây đã kiểm thử. Native Telegram/GitHub và model live vẫn NOT_RUN trong đợt sửa này; các lỗi audit ngoài Telegram vẫn mở. [Log merge](log/2026-11-02-reviewer-merge-246-247.md).
 
 Nguồn: mục 5.2 của báo cáo giữa kỳ. Hạn cuối kỳ dự kiến 11/11/2026. Trạng thái: `xong`, `đang làm` (ghi nhánh), `chờ` (đã có task card), `chưa có task card` (cần Claude Code lập kế hoạch trước khi giao).
