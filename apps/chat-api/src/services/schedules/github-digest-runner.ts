@@ -70,6 +70,135 @@ function formatSectionItems(
   });
 }
 
+function isDefiniteWriteRejection(err: any): boolean {
+  if (!err || typeof err !== 'object') return false;
+  if (
+    typeof err.category === 'string' &&
+    ['AUTH_ERROR', 'NOT_FOUND', 'VALIDATION', 'RATE_LIMIT'].includes(err.category)
+  ) {
+    return true;
+  }
+  if (
+    err.details &&
+    typeof err.details === 'object' &&
+    (err.details.requestSent === false || err.details.ok === false)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+async function claimGithubDigestDelivery(
+  pool: pg.Pool,
+  run: DigestRunInput,
+  signal: AbortSignal,
+): Promise<'claimed' | 'discarded'> {
+  if (typeof pool.connect !== 'function') {
+    const marked = await pool.query(
+      `UPDATE schedule_runs r
+          SET delivery_started_at = now(), updated_at = now()
+         FROM schedules s
+        WHERE r.id = $1
+          AND r.schedule_id = s.id
+          AND s.id = $2
+          AND r.status = 'planning'
+          AND r.delivery_started_at IS NULL
+          AND s.version = $3
+          AND s.status IN ('active', 'completed')
+        RETURNING r.id`,
+      [run.runId, run.scheduleId, run.scheduleVersion],
+    );
+    return marked.rowCount ? 'claimed' : 'discarded';
+  }
+
+  const client = await pool.connect();
+  try {
+    const found = await client.query('SELECT conv_id FROM schedules WHERE id = $1', [run.scheduleId]);
+    if (!found.rowCount) {
+      return 'discarded';
+    }
+    const scheduleConvId = found.rows[0].conv_id;
+
+    for (;;) {
+      signal.throwIfAborted();
+      await client.query('BEGIN');
+      await client.query("SET LOCAL lock_timeout = '10s'");
+      // Follow the exact canonical lock order of ScheduleRepo.ownedSchedule:
+      // 1) schedule's conversation, 2) schedule row, 3) schedule_runs row.
+      await client.query('SELECT id FROM conversations WHERE id = $1 FOR UPDATE', [scheduleConvId]);
+      const schedule = (
+        await client.query(
+          `SELECT s.id, s.user_id, s.kind, s.version, s.status, s.digest_config_hash
+             FROM schedules s
+             JOIN users u ON u.id = s.user_id AND u.status = 'active'
+            WHERE s.id = $1
+              FOR UPDATE OF s`,
+          [run.scheduleId],
+        )
+      ).rows[0];
+      signal.throwIfAborted();
+      if (
+        !schedule ||
+        schedule.user_id !== run.userId ||
+        schedule.kind !== 'github_digest' ||
+        schedule.version !== run.scheduleVersion ||
+        schedule.digest_config_hash !== run.digestConfigHash ||
+        (schedule.status !== 'active' && schedule.status !== 'completed')
+      ) {
+        await client.query('COMMIT');
+        return 'discarded';
+      }
+
+      let currentRun: { status: string; delivery_started_at: Date | null } | undefined;
+      try {
+        currentRun = (
+          await client.query(
+            'SELECT status, delivery_started_at FROM schedule_runs WHERE id = $1 AND schedule_id = $2 FOR UPDATE NOWAIT',
+            [run.runId, run.scheduleId],
+          )
+        ).rows[0];
+      } catch (err: any) {
+        if (err?.code === '55P03') {
+          // Another transaction holds the run row lock directly without holding c,s.
+          // Release c,s before waiting on the run row lock to avoid blocking setStatus,
+          // then re-acquire c -> s -> r with a fresh snapshot once the run lock is released.
+          await client.query('ROLLBACK');
+          await client.query(
+            'SELECT id FROM schedule_runs WHERE id = $1 AND schedule_id = $2 FOR UPDATE',
+            [run.runId, run.scheduleId],
+          );
+          continue;
+        }
+        throw err;
+      }
+
+      signal.throwIfAborted();
+      if (!currentRun || currentRun.status !== 'planning' || currentRun.delivery_started_at !== null) {
+        await client.query('COMMIT');
+        return 'discarded';
+      }
+
+      const marked = await client.query(
+        `UPDATE schedule_runs
+            SET delivery_started_at = now(), updated_at = now()
+          WHERE id = $1
+            AND schedule_id = $2
+            AND status = 'planning'
+            AND delivery_started_at IS NULL
+        RETURNING id`,
+        [run.runId, run.scheduleId],
+      );
+      await client.query('COMMIT');
+      return marked.rowCount ? 'claimed' : 'discarded';
+    }
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export function createGithubDigestRunner(options: GithubDigestRunnerOptions): RunGithubDigest {
   const aiTimeoutMs = options.aiTimeoutMs ?? 10_000;
 
@@ -358,21 +487,8 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
     signal.throwIfAborted();
     let deliveryStarted = false;
     if (isUuid(run.runId)) {
-      const marked = await options.pool.query(
-        `UPDATE schedule_runs r
-            SET delivery_started_at = now(), updated_at = now()
-           FROM schedules s
-          WHERE r.id = $1
-            AND r.schedule_id = s.id
-            AND s.id = $2
-            AND r.status = 'planning'
-            AND r.delivery_started_at IS NULL
-            AND s.version = $3
-            AND s.status IN ('active', 'completed')
-          RETURNING r.id`,
-        [run.runId, run.scheduleId, run.scheduleVersion],
-      );
-      if (!marked.rowCount) {
+      const claimState = await claimGithubDigestDelivery(options.pool, run, signal);
+      if (claimState !== 'claimed') {
         return { state: 'discarded' };
       }
       deliveryStarted = true;
@@ -415,7 +531,7 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
         };
         return { state: 'digest_sent', delivery, text: messageText };
       } catch (err: any) {
-        if (err?.category === 'UNKNOWN') {
+        if (!isDefiniteWriteRejection(err)) {
           return {
             state: 'delivery_unknown',
             error: GITHUB_DELIVERY_UNKNOWN,
@@ -452,7 +568,7 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
       };
       return { state: 'digest_sent', delivery, text: messageText };
     } catch (err: any) {
-      if (err?.category === 'UNKNOWN') {
+      if (!isDefiniteWriteRejection(err)) {
         return {
           state: 'delivery_unknown',
           error: GITHUB_DELIVERY_UNKNOWN,
