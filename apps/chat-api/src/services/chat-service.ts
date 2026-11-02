@@ -791,17 +791,16 @@ export class ChatService {
       ? nextRuns(recurrence, this.schedules.now?.() ?? new Date(), this.schedules.timeZone).map((date) => date.toISOString()) : [];
     const current = proposal.action === 'create' ? null : schedule;
     let digestCandidate: ScheduleProposalMetadata['digestCandidate'] | undefined;
-    if ((proposal.action === 'create' || proposal.action === 'update') && services.includes('telegram') && this.telegramConnection) {
-      const tgLookup = await this.telegramConnection(actor.userId).catch(() => null);
-      const ghLookup = services.includes('github') && this.githubConnection
-        ? await this.githubConnection(actor.userId).catch(() => null)
-        : null;
-      digestCandidate = evaluateTelegramDigestCandidate({
-        proposal,
+    if (
+      (proposal.action === 'create' || proposal.action === 'update') &&
+      proposal.request &&
+      (services.includes('mycalendar') || services.includes('calendar')) &&
+      this.schedules.evaluateDigestCandidate
+    ) {
+      digestCandidate = await this.schedules.evaluateDigestCandidate({
+        userId: actor.userId,
         services,
-        timeZone: this.schedules.timeZone,
-        telegramLookup: tgLookup,
-        githubLookup: ghLookup,
+        request: proposal.request,
       });
     } else if (
       (proposal.action === 'create' || proposal.action === 'update') &&
@@ -818,6 +817,18 @@ export class ChatService {
         credentialRepo: this.schedules.credentialRepo,
         encryptionKey: this.schedules.encryptionKey,
         mysheetsEnabled: this.schedules.mysheetsEnabled,
+      });
+    } else if ((proposal.action === 'create' || proposal.action === 'update') && services.includes('telegram') && this.telegramConnection) {
+      const tgLookup = await this.telegramConnection(actor.userId).catch(() => null);
+      const ghLookup = services.includes('github') && this.githubConnection
+        ? await this.githubConnection(actor.userId).catch(() => null)
+        : null;
+      digestCandidate = evaluateTelegramDigestCandidate({
+        proposal,
+        services,
+        timeZone: this.schedules.timeZone,
+        telegramLookup: tgLookup,
+        githubLookup: ghLookup,
       });
     } else if (
       (proposal.action === 'create' || proposal.action === 'update') &&

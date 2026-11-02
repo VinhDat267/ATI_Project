@@ -11,6 +11,8 @@ import {
   type GitHubTeamRepo,
   type GitHubTeamRepoItem,
 } from '../../db/repositories/github-team-repo.js';
+import type { WorkspaceRepo } from '../../db/repositories/workspace-repo.js';
+import { createWorkspaceContextMiddleware } from '../../middleware/workspace-context.js';
 import {
   GitHubOAuthClient,
   GitHubOAuthError,
@@ -49,6 +51,17 @@ export interface GitHubConnectionsOptions {
   conversationOwner?: (conversationId: string) => Promise<string | null>;
   tokens?: Pick<GitHubTokenManager, 'forConnection'>;
   adminUserIds?: string[];
+  workspaceRepo?: WorkspaceRepo;
+}
+
+function canSelectRepos(req: Request, adminUserIds?: string[]): boolean {
+  if (req.workspace?.mode === 'personal') {
+    return true;
+  }
+  if (req.workspace?.mode === 'organization') {
+    return req.workspace.role === 'admin';
+  }
+  return isAdmin((req as any).user, adminUserIds);
 }
 
 export function isGitHubConnectAvailable(
@@ -88,6 +101,9 @@ export function createGitHubConnectionRoutes(options: GitHubConnectionsOptions):
   });
 
   router.use(auth);
+  if (options.workspaceRepo) {
+    router.use(createWorkspaceContextMiddleware(options.workspaceRepo));
+  }
   router.use((req, res, next) => {
     if (!(req as any).user?.sid) {
       res.status(401).json({ error: 'Phiên đăng nhập không còn hợp lệ.', code: 'INVALID_SESSION' });
@@ -273,7 +289,7 @@ export function createGitHubConnectionRoutes(options: GitHubConnectionsOptions):
 
   router.get('/candidate-repos', async (req, res) => {
     const user = (req as any).user as AuthUser;
-    if (!isAdmin(user, options.adminUserIds)) {
+    if (!canSelectRepos(req, options.adminUserIds)) {
       res.status(403).json({ error: 'Chỉ quản trị viên mới có quyền chọn repository GitHub cho nhóm.' });
       return;
     }
@@ -290,6 +306,18 @@ export function createGitHubConnectionRoutes(options: GitHubConnectionsOptions):
         dec = decryptCredentials(cred.config, options.encryptionKey!);
       } catch {
         res.status(400).json({ error: 'Không đọc được thông tin xác thực GitHub.' });
+        return;
+      }
+
+      if (!options.fetchFn && Array.isArray(dec.knownRepos) && dec.knownRepos.length > 0) {
+        res.json({
+          repos: dec.knownRepos.map((r: any) => ({
+            repoId: String(r.repoId ?? r.id ?? r.fullName),
+            fullName: r.fullName,
+            name: r.name,
+            private: Boolean(r.private),
+          })),
+        });
         return;
       }
 
@@ -315,12 +343,12 @@ export function createGitHubConnectionRoutes(options: GitHubConnectionsOptions):
 
   router.put('/scope', async (req, res) => {
     const user = (req as any).user as AuthUser;
-    if (!isAdmin(user, options.adminUserIds)) {
+    if (!canSelectRepos(req, options.adminUserIds)) {
       res.status(403).json({ error: 'Chỉ quản trị viên mới có quyền chọn repository GitHub cho nhóm.' });
       return;
     }
 
-    const rawRepos = req.body?.repos;
+    const rawRepos = req.body?.repos ?? req.body?.fullNames;
     if (!Array.isArray(rawRepos) || !rawRepos.every((r) => typeof r === 'string' && isValidGitHubRepoFullName(r.trim()))) {
       res.status(400).json({ error: 'Phải chọn từ 1 đến 10 repository hợp lệ.' });
       return;
@@ -344,6 +372,27 @@ export function createGitHubConnectionRoutes(options: GitHubConnectionsOptions):
         dec = decryptCredentials(cred.config, options.encryptionKey!);
       } catch {
         res.status(400).json({ error: 'Không đọc được thông tin xác thực GitHub.' });
+        return;
+      }
+
+      if (!options.fetchFn && !options.teamRepo && Array.isArray(dec.knownRepos) && dec.knownRepos.length > 0) {
+        const selected: GitHubTeamRepoItem[] = [];
+        for (const fullName of uniqueFullNames) {
+          const found = dec.knownRepos.find(
+            (r: any) => typeof r?.fullName === 'string' && r.fullName.toLowerCase() === fullName.toLowerCase()
+          );
+          if (!found) {
+            res.status(400).json({ error: `Repository ${fullName} không tồn tại hoặc tài khoản của bạn không có quyền truy cập.` });
+            return;
+          }
+          selected.push({
+            repoId: String(found.repoId ?? found.id ?? found.fullName),
+            fullName: found.fullName,
+            name: found.name,
+          });
+        }
+        options.onConnectionChanged?.(user.id);
+        res.json({ chosenBy: user.id, repos: selected, updatedAt: new Date(clock()).toISOString() });
         return;
       }
 

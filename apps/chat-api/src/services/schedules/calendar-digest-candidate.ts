@@ -189,8 +189,9 @@ export async function evaluateCalendarDigestCandidate(
   }
 
   let destAllowedScope: any = {};
+  let decryptedDest: any = {};
   try {
-    const decryptedDest = encryptionKey
+    decryptedDest = encryptionKey
       ? decryptCredentials(destRow.config, encryptionKey)
       : JSON.parse(destRow.config);
     destAllowedScope = decryptedDest?.allowedScope ?? {};
@@ -255,10 +256,18 @@ export async function evaluateCalendarDigestCandidate(
     ? destAllowedScope.chats
     : Array.isArray(destAllowedScope)
       ? destAllowedScope
-      : [];
-  const chats: string[] = rawChats.filter(
-    (c: unknown) => typeof c === 'string' && TELEGRAM_CHAT_ID_RE.test(c),
-  );
+      : Array.isArray(decryptedDest?.selectedChats)
+        ? decryptedDest.selectedChats
+        : [];
+  const chats: string[] = rawChats
+    .map((c: unknown) =>
+      typeof c === 'string'
+        ? c.trim()
+        : c && typeof c === 'object' && typeof (c as any).chatId === 'string'
+          ? (c as any).chatId.trim()
+          : '',
+    )
+    .filter((c: string) => TELEGRAM_CHAT_ID_RE.test(c));
   if (chats.length !== 1) {
     return {
       candidate: {

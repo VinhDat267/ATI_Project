@@ -101,7 +101,7 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
   router.use((req, res, next) => {
     if (!isTelegramConnectAvailable(options)) {
       if (req.method === 'GET' && (req.path === '/' || req.path === '')) {
-        res.json({ status: 'unconfigured', chats: [] });
+        res.json({ status: 'unconfigured', chats: [], selectedChats: [] });
         return;
       }
       res.status(503).json({ error: 'Telegram chưa được cấu hình trên máy chủ.' });
@@ -120,7 +120,7 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
     const user = (req as any).user as AuthUser;
     const record = await options.credentialRepo!.getPersonalConnectionStatus('telegram', user.id);
     if (!record) {
-      res.json({ status: 'not_connected', botUsername: options.bot!.botUsername, chats: [] });
+      res.json({ status: 'not_connected', botUsername: options.bot!.botUsername, chats: [], selectedChats: [] });
       return;
     }
 
@@ -128,7 +128,7 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
     try {
       decrypted = decryptCredentials<PersonalTelegramConfig>(record.config, options.encryptionKey!);
     } catch {
-      res.json({ status: 'reconnect_required', botUsername: options.bot!.botUsername, chats: [] });
+      res.json({ status: 'reconnect_required', botUsername: options.bot!.botUsername, chats: [], selectedChats: [] });
       return;
     }
 
@@ -144,6 +144,7 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
         telegramUserId,
         botUsername: options.bot!.botUsername,
         chats: [],
+        selectedChats: [],
       });
       return;
     }
@@ -156,6 +157,7 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
         telegramUserId,
         botUsername: options.bot!.botUsername,
         chats: [],
+        selectedChats: [],
       });
       return;
     }
@@ -186,6 +188,7 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
               telegramUserId,
               botUsername: options.bot!.botUsername,
               chats: [],
+              selectedChats: [],
             });
             return;
           }
@@ -210,6 +213,19 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
       telegramUserId,
       botUsername: options.bot!.botUsername,
       chats,
+      selectedChats: chats
+        .filter((c) => c.selected)
+        .map((c) => {
+          const orig = mergedMap.get(c.chatId) as (TelegramTeamChatItem & { username?: string }) | undefined;
+          return {
+            chatId: c.chatId,
+            title: c.title,
+            type: c.type,
+            ...(orig?.username ? { username: orig.username } : {}),
+            selected: true,
+            member: c.member,
+          };
+        }),
     });
   });
 
@@ -409,11 +425,19 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
         selected: selectedSet.has(c.chatId),
         member: true,
       })),
+      selectedChats: selectedChats.map((c) => ({
+        chatId: c.chatId,
+        title: c.title,
+        type: c.type,
+        ...((c as any).username ? { username: (c as any).username } : {}),
+        selected: true,
+        member: true,
+      })),
       ...(consumed.return_to ? { returnTo: consumed.return_to } : {}),
     });
   });
 
-  router.get('/candidate-chats', async (req: Request, res: Response) => {
+  const handleCandidateChats = async (req: Request, res: Response) => {
     res.setHeader('Cache-Control', 'no-store');
     const user = (req as any).user as AuthUser;
 
@@ -486,7 +510,10 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
     }
 
     res.json({ chats });
-  });
+  };
+
+  router.get('/candidate-chats', handleCandidateChats);
+  router.get('/chats', handleCandidateChats);
 
   router.put('/scope', async (req: Request, res: Response) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -605,6 +632,14 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
         chatId: c.chatId,
         title: c.title,
         type: c.type,
+        selected: true,
+        member: true,
+      })),
+      selectedChats: chosenChats.map((c) => ({
+        chatId: c.chatId,
+        title: c.title,
+        type: c.type,
+        ...((c as any).username ? { username: (c as any).username } : {}),
         selected: true,
         member: true,
       })),

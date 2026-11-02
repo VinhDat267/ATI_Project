@@ -500,8 +500,13 @@ export class JiraOAuthRepo {
       };
     }
 
-    const grantRes = await this.pool.query<{ id: string; status: string }>(
-      `SELECT id, status FROM jira_oauth_grants
+    const grantRes = await this.pool.query<{
+      id: string;
+      status: string;
+      encrypted_access_token?: string | null;
+      encrypted_refresh_token?: string | null;
+    }>(
+      `SELECT id, status, encrypted_access_token, encrypted_refresh_token FROM jira_oauth_grants
        WHERE account_id = $1
        ORDER BY created_at DESC
        LIMIT 1`,
@@ -520,6 +525,25 @@ export class JiraOAuthRepo {
       };
     }
 
+    let grantStatus = grant.status;
+    if (grantStatus === 'active' && this.encryptionKey) {
+      try {
+        if (typeof grant.encrypted_access_token === 'string' && grant.encrypted_access_token) {
+          decryptCredentials(grant.encrypted_access_token, this.encryptionKey);
+        }
+        if (typeof grant.encrypted_refresh_token === 'string' && grant.encrypted_refresh_token) {
+          decryptCredentials(grant.encrypted_refresh_token, this.encryptionKey);
+        }
+      } catch (err: any) {
+        console.warn('[jira-oauth-repo] Failed to decrypt stored Jira grant token; reporting reconnect_required', {
+          userId,
+          grantId: grant.id,
+          error: err?.message,
+        });
+        grantStatus = 'reconnect_required';
+      }
+    }
+
     const sitesRes = await this.pool.query<{
       cloud_id: string;
       site_name: string;
@@ -536,14 +560,15 @@ export class JiraOAuthRepo {
     const sites = sitesRes.rows.map((r) => ({
       cloudId: r.cloud_id,
       name: r.site_name,
+      siteUrl: r.site_url,
       url: r.site_url,
       lastVerifiedAt: r.last_verified_at ? new Date(r.last_verified_at).toISOString() : undefined,
     }));
 
     let connectionState: JiraConnectionState;
-    if (grant.status === 'reconnect_required') {
+    if (grantStatus === 'reconnect_required') {
       connectionState = 'reconnect_required';
-    } else if (grant.status === 'revoked') {
+    } else if (grantStatus === 'revoked') {
       connectionState = 'disconnected';
     } else if (sites.length > 0) {
       connectionState = 'connected';
@@ -552,7 +577,7 @@ export class JiraOAuthRepo {
     }
 
     return {
-      connected: grant.status !== 'revoked',
+      connected: grantStatus !== 'revoked',
       connectionState,
       jiraAccountId: account.id,
       atlassianAccountId: account.atlassian_account_id,

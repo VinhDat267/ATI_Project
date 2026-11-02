@@ -477,9 +477,12 @@ function mysheetsPicker(env: Record<string, string | undefined>, isLive: boolean
   return undefined;
 }
 
-function trelloOAuth(env: Record<string, string | undefined>, isLive: boolean): TrelloOAuthConfig | undefined {
-  const clientId = env.TRELLO_OAUTH_CLIENT_ID?.trim();
-  const clientSecret = env.TRELLO_OAUTH_CLIENT_SECRET?.trim();
+export function trelloOAuth(
+  env: Record<string, string | undefined>,
+  isLive = env.RUNTIME_MODE ? env.RUNTIME_MODE === 'live' : true
+): TrelloOAuthConfig | undefined {
+  const clientId = env.TRELLO_OAUTH_CLIENT_ID?.trim() || env.TRELLO_API_KEY?.trim();
+  const clientSecret = env.TRELLO_OAUTH_CLIENT_SECRET?.trim() || env.TRELLO_API_SECRET?.trim();
   const rawRedirect = env.TRELLO_OAUTH_REDIRECT_URI?.trim();
 
   if (!clientId || !clientSecret || !rawRedirect) {

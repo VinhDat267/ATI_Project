@@ -247,6 +247,21 @@ export function createSandboxProvider(scenario?: string) {
       { id: 'step_2', tool: 'slack.send_message', description: 'Thông báo key và liên kết ticket', args: { channel: '#general', text: { $template: 'Jira: ${step_1.output.key}; ${step_1.output.url}' } }, dependsOn: ['step_1'] },
     ],
   };
+  const slackOnlyPlan = {
+    kind: 'plan',
+    thinking: 'Gửi tin nhắn trực tiếp lên kênh Slack #general theo yêu cầu của người dùng.',
+    summary: 'Gửi tin nhắn lên kênh Slack #general',
+    warnings: [],
+    steps: [
+      {
+        id: 'step_1',
+        tool: 'slack.send_message',
+        description: 'Gửi tin nhắn thông báo lên kênh Slack #general',
+        args: { channel: '#general', text: 'Thông báo từ AI Workflow Platform' },
+        dependsOn: [],
+      },
+    ],
+  };
   if (scenario === 'schedule') {
     const meeting = { name: 'Lịch họp hằng ngày', request: 'Gửi lịch họp hôm nay lên Slack #ati-test' };
     // Select by this conversation's last request, not a global counter shared by users.
@@ -271,42 +286,184 @@ export function createSandboxProvider(scenario?: string) {
     };
     return mockProvider;
   }
-  mockProvider.setPlanResponses([scenario === 'jira_slack' ? jiraPlan : scenario === 'telegram_slack' ? telegramPlan : scenario === 'notion_slack' ? notionPlan : scenario === 'calendar_slack' ? calendarPlan : scenario === 'sheets_slack' ? sheetsPlan : scenario === 'three_service' ? threeServicePlan : sandboxPlan]);
+  if (scenario) {
+    mockProvider.setPlanResponses([scenario === 'jira_slack' ? jiraPlan : scenario === 'telegram_slack' ? telegramPlan : scenario === 'notion_slack' ? notionPlan : scenario === 'calendar_slack' ? calendarPlan : scenario === 'sheets_slack' ? sheetsPlan : scenario === 'three_service' ? threeServicePlan : sandboxPlan]);
+    return mockProvider;
+  }
+  mockProvider.setPlanResponses([sandboxPlan]);
+  const selectAdaptiveResponse = (input: any) =>
+    selectAdaptiveSandboxPlan(input, {
+      defaultPlan: sandboxPlan,
+      jiraPlan,
+      notionPlan,
+      telegramPlan,
+      sheetsPlan,
+      calendarPlan,
+      slackOnlyPlan,
+    });
+  mockProvider.generatePlan = async (input) => JSON.stringify(selectAdaptiveResponse(input));
+  (mockProvider as any).generate = async (messages: any) => JSON.stringify(selectAdaptiveResponse(messages));
   return mockProvider;
+}
+
+const SCHEDULE_PATTERN =
+  /(?:^|[^\p{L}\p{N}_])(mỗi\s+(sáng|chiều|tối|ngày|tuần|thứ)|hằng\s+(ngày|tuần)|định\s+kỳ)(?=[^\p{L}\p{N}_]|$)/iu;
+const SHEETS_PATTERN = /(?:^|[^\p{L}\p{N}_])(sheets|bảng\s+tính|trang\s+tính)(?=[^\p{L}\p{N}_]|$)/iu;
+const CALENDAR_PATTERN = /(?:^|[^\p{L}\p{N}_])(calendar|lịch\s+họp|sự\s+kiện)(?=[^\p{L}\p{N}_]|$)/iu;
+
+function extractLastUserText(input: any): { text: string; isScheduledRun: boolean } {
+  const history: Array<{ role?: string; content?: string }> = Array.isArray(input)
+    ? input
+    : Array.isArray(input?.conversationHistory)
+      ? input.conversationHistory
+      : [];
+  const realUserMessages = history.filter(
+    (m) =>
+      m?.role === 'user' &&
+      typeof m.content === 'string' &&
+      !m.content.includes('<search_results>') &&
+      !m.content.startsWith('Your previous response failed validation') &&
+      !m.content.startsWith('Your search request was invalid') &&
+      !m.content.startsWith('The search limit was reached'),
+  );
+  const text =
+    realUserMessages.at(-1)?.content ??
+    (typeof input?.userMessage === 'string' ? input.userMessage : '') ??
+    '';
+  const systemPrompt = typeof input?.systemPrompt === 'string' ? input.systemPrompt : '';
+  const isScheduledRun =
+    text.includes('(Lượt chạy theo lịch') ||
+    text.includes('[Lượt chạy tự động') ||
+    /lượt chạy (tự động|theo lịch)|scheduled run/i.test(systemPrompt) ||
+    history.some((m) => typeof m?.content === 'string' && m.content.includes('A schedule is not allowed in this turn'));
+  return { text, isScheduledRun };
+}
+
+function selectAdaptiveSandboxPlan(
+  input: any,
+  plans: {
+    defaultPlan: Record<string, unknown>;
+    jiraPlan: Record<string, unknown>;
+    notionPlan: Record<string, unknown>;
+    telegramPlan: Record<string, unknown>;
+    sheetsPlan: Record<string, unknown>;
+    calendarPlan: Record<string, unknown>;
+    slackOnlyPlan: Record<string, unknown>;
+  },
+): Record<string, unknown> {
+  const { text, isScheduledRun } = extractLastUserText(input);
+  if (!isScheduledRun && SCHEDULE_PATTERN.test(text)) {
+    const meeting = { name: 'Lịch họp hằng ngày', request: 'Gửi lịch họp hôm nay lên Slack #ati-test' };
+    if (/github|bản tin/i.test(text)) {
+      return {
+        kind: 'schedule',
+        action: 'create',
+        name: 'Bản tin GitHub sáng',
+        request: 'Gửi bản tin GitHub repo owner/repo lên Slack #general',
+        recurrence: { type: 'daily', time: '08:00' },
+        summary: 'Mỗi sáng 8 giờ, gửi bản tin GitHub repo owner/repo lên Slack #general.',
+      };
+    }
+    if (CALENDAR_PATTERN.test(text)) {
+      return {
+        kind: 'schedule',
+        action: 'create',
+        ...meeting,
+        recurrence: { type: 'daily', time: '08:00' },
+        summary: 'Mỗi sáng 8 giờ, gửi lịch họp hôm nay lên Slack #ati-test.',
+      };
+    }
+    const cleanRequest = text.trim().slice(0, 500) || meeting.request;
+    return {
+      kind: 'schedule',
+      action: 'create',
+      name: 'Lịch báo cáo định kỳ',
+      request: cleanRequest,
+      recurrence: { type: 'daily', time: '08:00' },
+      summary: `Mỗi sáng 8 giờ: ${cleanRequest}`,
+    };
+  }
+  if (/\btrello\b/i.test(text)) return plans.defaultPlan;
+  if (/\bjira\b/i.test(text)) return plans.jiraPlan;
+  if (/\bnotion\b/i.test(text)) return plans.notionPlan;
+  if (/\btelegram\b/i.test(text)) return plans.telegramPlan;
+  if (SHEETS_PATTERN.test(text)) return plans.sheetsPlan;
+  if (CALENDAR_PATTERN.test(text)) return plans.calendarPlan;
+  if (/\bslack\b|#[a-z0-9_-]+/i.test(text)) return plans.slackOnlyPlan;
+  return plans.defaultPlan;
 }
 
 export function createBackupSandboxProvider() {
   const backupMockProvider = new MockLLMProvider();
-  backupMockProvider.setPlanResponses([
-    {
-      kind: 'plan',
-      thinking: 'Hệ thống phân tích yêu cầu tạo task trên Trello và gửi thông báo qua Slack channel.',
-      summary: 'Tạo thẻ Trello sửa CSS, gán Minh và thông báo Slack #general',
-      steps: [
-        {
-          id: 'step_1',
-          tool: 'trello.create_card',
-          description: 'Tạo thẻ trên board Frontend',
-          args: { listId: 'list_todo', title: 'Sửa lỗi CSS responsive' },
-          dependsOn: [],
-        },
-        {
-          id: 'step_2',
-          tool: 'trello.add_member',
-          description: 'Gán người phụ trách Minh Dev',
-          args: { cardId: { $ref: 'step_1.output.id' }, memberId: 'member_minh' },
-          dependsOn: ['step_1'],
-        },
-        {
-          id: 'step_3',
-          tool: 'slack.send_message',
-          description: 'Gửi thông báo kênh Slack #general',
-          args: { channel: '#general', text: { $template: 'Đã tạo thẻ mới: ${step_1.output.url}' } },
-          dependsOn: ['step_1'],
-        },
-      ],
-      warnings: [],
-    },
-  ]);
+  const backupDefaultPlan = {
+    kind: 'plan',
+    thinking: 'Hệ thống phân tích yêu cầu tạo task trên Trello và gửi thông báo qua Slack channel.',
+    summary: 'Tạo thẻ Trello sửa CSS, gán Minh và thông báo Slack #general',
+    steps: [
+      {
+        id: 'step_1',
+        tool: 'trello.create_card',
+        description: 'Tạo thẻ trên board Frontend',
+        args: { listId: 'list_todo', title: 'Sửa lỗi CSS responsive' },
+        dependsOn: [],
+      },
+      {
+        id: 'step_2',
+        tool: 'trello.add_member',
+        description: 'Gán người phụ trách Minh Dev',
+        args: { cardId: { $ref: 'step_1.output.id' }, memberId: 'member_minh' },
+        dependsOn: ['step_1'],
+      },
+      {
+        id: 'step_3',
+        tool: 'slack.send_message',
+        description: 'Gửi thông báo kênh Slack #general',
+        args: { channel: '#general', text: { $template: 'Đã tạo thẻ mới: ${step_1.output.url}' } },
+        dependsOn: ['step_1'],
+      },
+    ],
+    warnings: [],
+  };
+  const backupSlackOnlyPlan = {
+    kind: 'plan',
+    thinking: 'Gửi tin nhắn trực tiếp lên kênh Slack #general theo yêu cầu của người dùng.',
+    summary: 'Gửi tin nhắn lên kênh Slack #general',
+    steps: [
+      {
+        id: 'step_1',
+        tool: 'slack.send_message',
+        description: 'Gửi thông báo kênh Slack #general',
+        args: { channel: '#general', text: 'Thông báo từ AI Workflow Platform' },
+        dependsOn: [],
+      },
+    ],
+    warnings: [],
+  };
+  backupMockProvider.setPlanResponses([backupDefaultPlan]);
+  const primaryDefault = createSandboxProvider(undefined);
+  backupMockProvider.generatePlan = async (input) => {
+    const { text, isScheduledRun } = extractLastUserText(input);
+    if (!isScheduledRun && SCHEDULE_PATTERN.test(text)) {
+      return primaryDefault.generatePlan(input);
+    }
+    if (/\btrello\b/i.test(text)) {
+      return JSON.stringify(backupDefaultPlan);
+    }
+    if (
+      /\bjira\b/i.test(text) ||
+      /\bnotion\b/i.test(text) ||
+      /\btelegram\b/i.test(text) ||
+      SHEETS_PATTERN.test(text) ||
+      CALENDAR_PATTERN.test(text)
+    ) {
+      return primaryDefault.generatePlan(input);
+    }
+    if (/\bslack\b|#[a-z0-9_-]+/i.test(text)) {
+      return JSON.stringify(backupSlackOnlyPlan);
+    }
+    return JSON.stringify(backupDefaultPlan);
+  };
+  (backupMockProvider as any).generate = async (messages: any) =>
+    backupMockProvider.generatePlan(Array.isArray(messages) ? { conversationHistory: messages } : messages);
   return backupMockProvider;
 }

@@ -215,11 +215,22 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
           };
         }
       } else {
-        const chats: string[] = Array.isArray(scopeObj?.chats)
+        const rawChats = Array.isArray(scopeObj?.chats)
           ? scopeObj.chats
           : Array.isArray(scopeObj)
             ? scopeObj
-            : [];
+            : Array.isArray(decryptedDest?.selectedChats)
+              ? decryptedDest.selectedChats
+              : [];
+        const chats: string[] = rawChats
+          .map((c: unknown) =>
+            typeof c === 'string'
+              ? c.trim()
+              : c && typeof c === 'object' && typeof (c as any).chatId === 'string'
+                ? (c as any).chatId.trim()
+                : '',
+          )
+          .filter(Boolean);
         if (!chats.includes(config.destination.chatId)) {
           return {
             state: 'blocked',

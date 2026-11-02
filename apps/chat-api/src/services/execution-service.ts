@@ -21,6 +21,7 @@ export interface ExecutionServiceOptions {
   stepRepo?: StepRepo;
   convRepo?: {
     getConversation: (id: string) => Promise<any>;
+    updateStatus?: (id: string, status: string) => Promise<void>;
   };
   credentialRepo?: CredentialRepo;
   workspaceRepo?: WorkspaceRepo;
@@ -249,6 +250,9 @@ export class ExecutionService {
       this.activeControllers.set(planId, controller);
       const summary = await controller.runUntilPause();
       await this.planRepo.updatePlanStatus(planId, summary.status);
+      if (summary.status === 'completed') {
+        await this.convRepo?.updateStatus?.(convId, 'completed').catch(() => {});
+      }
       this.executionOutcomes.set(planId, { status: summary.status, pausedStepId: summary.pausedAtStepId });
       this.sseManager?.emitEvent(convId, 'exec_done', { planId, ...summary });
     } catch (err: any) {
@@ -276,6 +280,9 @@ export class ExecutionService {
       try {
         const summary = await controller.runUntilPause();
         await this.planRepo.updatePlanStatus(planId, summary.status);
+        if (summary.status === 'completed') {
+          await this.convRepo?.updateStatus?.(plan.conv_id, 'completed').catch(() => {});
+        }
         this.executionOutcomes.set(planId, { status: summary.status, pausedStepId: summary.pausedAtStepId });
         this.sseManager?.emitEvent(plan.conv_id, 'exec_done', { planId, ...summary });
         return summary;
@@ -326,6 +333,9 @@ export class ExecutionService {
       }
       try {
         await this.planRepo.updatePlanStatus(planId, summary.status);
+        if (summary.status === 'completed' && convId) {
+          await this.convRepo?.updateStatus?.(convId, 'completed').catch(() => {});
+        }
       } catch (err) {
         await this.markExecutionFailed(planId, convId, err);
         throw err;

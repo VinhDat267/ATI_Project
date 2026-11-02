@@ -191,18 +191,30 @@ export class SheetsDigestRunner {
       }
     } else {
       const tgRec =
-        (await this.options.credentialRepo.getPersonalCredentials('telegram', schedule.user_id)) ??
-        (await this.options.credentialRepo.getCredentials('telegram'));
-      if (!tgRec) {
+        (await this.options.credentialRepo.getPersonalCredentials?.('telegram', schedule.user_id)) ??
+        (await (this.options.credentialRepo as any).getPersonalConnectionStatus?.('telegram', schedule.user_id)) ??
+        (await this.options.credentialRepo.getCredentials?.('telegram'));
+      if (!tgRec || !tgRec.config) {
         return { ok: false, reason: 'Dịch vụ Telegram không còn được cấu hình.' };
       }
       try {
         const dec = decryptCredentials(tgRec.config, this.options.encryptionKey);
-        const chats: string[] = Array.isArray(dec.allowedScope?.chats)
+        const rawChats = Array.isArray(dec.allowedScope?.chats)
           ? dec.allowedScope.chats
           : Array.isArray(dec.allowedScope)
             ? dec.allowedScope
-            : [];
+            : Array.isArray(dec.selectedChats)
+              ? dec.selectedChats
+              : [];
+        const chats: string[] = rawChats
+          .map((c: unknown) =>
+            typeof c === 'string'
+              ? c.trim()
+              : c && typeof c === 'object' && typeof (c as any).chatId === 'string'
+                ? (c as any).chatId.trim()
+                : '',
+          )
+          .filter(Boolean);
         if (!chats.includes(config.destination.chatId)) {
           return {
             ok: false,

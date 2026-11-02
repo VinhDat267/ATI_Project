@@ -37,6 +37,7 @@ import { TelegramUpdateRepo } from './db/repositories/telegram-update-repo.js';
 import { TelegramBotClient } from './services/telegram/bot-client.js';
 import { createTelegramConnectionLookup } from './services/telegram/connection-reference.js';
 import { TelegramDigestRunner } from './services/schedules/telegram-digest-runner.js';
+import { SheetsDigestRunner } from './services/schedules/sheets-digest-runner.js';
 import { StepError } from '@wap/tool-adapters';
 import { createTrelloConnectionLookup } from './services/trello/connection-reference.js';
 import { GitHubTokenManager } from './services/github/token-manager.js';
@@ -225,14 +226,22 @@ async function bootstrap() {
   // fall back to memory after failing to reconcile an available database.
   if (pool && userRepo) await reconcileInterruptedExecutions(pool);
 
+  // Gmail, MyCalendar and MySheets need the flag, their own OAuth client and PostgreSQL; otherwise none of it exists.
+  const gmailAvailable = Boolean(env.GMAIL_ENABLED && env.GMAIL_OAUTH && pool && userRepo);
+  const mycalendarAvailable = Boolean(env.MYCALENDAR_ENABLED && env.MYCALENDAR_OAUTH && pool && userRepo);
+  const mysheetsAvailable = Boolean(env.MYSHEETS_ENABLED && env.MYSHEETS_OAUTH && pool && userRepo);
+
   // Schedules need the flag and PostgreSQL; with the flag off nothing below exists.
   // A run is planned by chatService, created below; the runner starts only after listen.
   let digestRunnerImpl: RunGithubDigest | undefined;
+  let sheetsDigestRunner: SheetsDigestRunner | undefined;
   const schedules = createScheduleRuntime({
     enabled: env.SCHEDULES_ENABLED,
     pool: pool && userRepo ? pool : null,
     timeZone: env.APP_TIME_ZONE,
     encryptionKey: env.ENCRYPTION_KEY,
+    credentialRepo: credRepo,
+    mysheetsEnabled: mysheetsAvailable,
     planRun: (run, convId, signal) => chatService.planScheduledRun(run, convId, signal),
     runDigest: pool
       ? createCalendarDigestExecutor({
@@ -248,15 +257,14 @@ async function bootstrap() {
       return digestRunnerImpl(run, convId, signal);
     },
     executeDigestRun: (run, signal) => telegramDigestRunner.execute(run, signal),
+    executeSheetsDigestRun: (schedule, runVersion, isStillCurrent, signal) => {
+      if (!sheetsDigestRunner) throw new Error('Sheets digest runner is not ready');
+      return sheetsDigestRunner.executeDigest(schedule, runVersion, isStillCurrent, signal);
+    },
     emit: (convId, event, payload) => sseManager.emitEvent(convId, event, payload),
   });
   if (env.SCHEDULES_ENABLED && !schedules) console.warn('\x1b[33m[chat-api] SCHEDULES_ENABLED=on nhưng không có PostgreSQL: lịch chạy tạm tắt.\x1b[0m');
   if (schedules) await schedules.reconcile();
-
-  // Gmail, MyCalendar and MySheets need the flag, their own OAuth client and PostgreSQL; otherwise none of it exists.
-  const gmailAvailable = Boolean(env.GMAIL_ENABLED && env.GMAIL_OAUTH && pool && userRepo);
-  const mycalendarAvailable = Boolean(env.MYCALENDAR_ENABLED && env.MYCALENDAR_OAUTH && pool && userRepo);
-  const mysheetsAvailable = Boolean(env.MYSHEETS_ENABLED && env.MYSHEETS_OAUTH && pool && userRepo);
   const trelloAvailable = Boolean(env.TRELLO_OAUTH && pool);
   const trelloOAuthClient = trelloAvailable ? new TrelloOAuthClient(env.TRELLO_OAUTH!) : undefined;
   const trelloTeamRepo = pool ? new TrelloTeamRepo(pool) : undefined;
@@ -507,6 +515,9 @@ async function bootstrap() {
       ? {
           repo: schedules.service.repo,
           timeZone: env.APP_TIME_ZONE,
+          credentialRepo: credRepo,
+          encryptionKey: env.ENCRYPTION_KEY,
+          mysheetsEnabled: mysheetsAvailable,
           evaluateDigestCandidate: pool
             ? async (input) =>
                 (
@@ -622,6 +633,22 @@ async function bootstrap() {
       githubConnection,
       getAdapter: (serviceName, context) => adapterFactory.getAdapterForService(serviceName, context),
     });
+    if (schedules) {
+      sheetsDigestRunner = new SheetsDigestRunner({
+        repo: schedules.service.repo,
+        credentialRepo: credRepo,
+        messageRepo: msgRepo,
+        encryptionKey: env.ENCRYPTION_KEY,
+        mysheetsEnabled: mysheetsAvailable,
+        createAdapter: (serviceId, userId) =>
+          Promise.resolve(
+            adapterFactory.getAdapterForService(serviceId, {
+              userId,
+              phase: 'execution',
+            }),
+          ),
+      });
+    }
   }
 
   const telegramDigestRunner = new TelegramDigestRunner({

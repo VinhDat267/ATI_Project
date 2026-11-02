@@ -276,12 +276,30 @@ export class ScheduleService {
       const wsId = owner.rows[0].workspace_id ?? null;
       const wsMode = owner.rows[0].workspace_mode ?? 'legacy';
       const wantAutoDigest = approvalMode === 'auto_digest';
-      const isTelegramSchedule =
-        metadata.services.includes('telegram') || existing?.kind === 'telegram_digest';
-      const isGithubSchedule =
-        !isTelegramSchedule && (metadata.services.includes('github') || existing?.kind === 'github_digest');
+      const candidateObj = metadata.digestCandidate as Record<string, any> | undefined;
+      const hasTelegramCandidateConfig = Array.isArray(candidateObj?.config?.sources);
       const isCalendarSchedule =
-        !isTelegramSchedule && !isGithubSchedule && (metadata.services.includes('mycalendar') || metadata.services.includes('calendar') || existing?.kind === 'calendar_digest');
+        !hasTelegramCandidateConfig &&
+        existing?.kind !== 'telegram_digest' &&
+        (metadata.services.includes('mycalendar') ||
+          metadata.services.includes('calendar') ||
+          existing?.kind === 'calendar_digest');
+      const isSheetsSchedule =
+        !hasTelegramCandidateConfig &&
+        !isCalendarSchedule &&
+        existing?.kind !== 'telegram_digest' &&
+        (metadata.services.includes('mysheets') ||
+          metadata.services.includes('sheets') ||
+          existing?.kind === 'sheets_digest');
+      const isTelegramSchedule =
+        !isCalendarSchedule &&
+        !isSheetsSchedule &&
+        (metadata.services.includes('telegram') || existing?.kind === 'telegram_digest');
+      const isGithubSchedule =
+        !isCalendarSchedule &&
+        !isSheetsSchedule &&
+        !isTelegramSchedule &&
+        (metadata.services.includes('github') || existing?.kind === 'github_digest');
       let digestFields: {
         kind: 'plan' | 'sheets_digest' | 'calendar_digest' | 'github_digest' | 'telegram_digest';
         digestConfig: unknown | null;
@@ -297,24 +315,7 @@ export class ScheduleService {
       let telegramDigestHash: string | null = null;
 
       if (wantAutoDigest && (proposal.action === 'create' || proposal.action === 'update') && !isGithubSchedule) {
-        if (isTelegramSchedule) {
-          const candidate = metadata.digestCandidate as TelegramDigestCandidate | undefined;
-          if (!candidate || candidate.canAutoDigest !== true || !candidate.config || !candidate.configHash) {
-            throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
-          }
-          const computedHash = computeTelegramDigestConfigHash(candidate.config);
-          if (computedHash !== candidate.configHash) {
-            throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
-          }
-          telegramDigestConfig = candidate.config;
-          telegramDigestHash = computedHash;
-          digestFields = {
-            kind: 'telegram_digest',
-            digestConfig: JSON.stringify(telegramDigestConfig),
-            digestConfigHash: telegramDigestHash,
-            digestApprovedAt: now,
-          };
-        } else if (isCalendarSchedule) {
+        if (isCalendarSchedule) {
           const evaluated = await evaluateCalendarDigestCandidate({
             pool: client,
             encryptionKey: this.options.encryptionKey,
@@ -333,6 +334,53 @@ export class ScheduleService {
             kind: 'calendar_digest',
             digestConfig: JSON.stringify(candidate.config),
             digestConfigHash: computeCalendarDigestHash(candidate.config),
+            digestApprovedAt: now,
+          };
+        } else if (isSheetsSchedule) {
+          const sheetsCandidate = metadata.digestCandidate as SheetsDigestCandidate | undefined;
+          if (!sheetsCandidate?.canAutoDigest || !sheetsCandidate.config) {
+            throw new ScheduleConflict('DIGEST_NOT_ELIGIBLE');
+          }
+          if (this.options.credentialRepo && this.options.encryptionKey) {
+            const recheck = await analyzeSheetsDigestCandidate({
+              userId,
+              request: proposal.request!,
+              services: metadata.services,
+              credentialRepo: this.options.credentialRepo,
+              encryptionKey: this.options.encryptionKey,
+              mysheetsEnabled: this.options.mysheetsEnabled,
+            });
+            if (!recheck.canAutoDigest || !recheck.config) {
+              throw new ScheduleConflict('DIGEST_NOT_ELIGIBLE');
+            }
+          }
+          const config = sheetsCandidate.config;
+          const hash = computeSheetsDigestHash({
+            userId,
+            recurrence: proposal.recurrence!,
+            config,
+          });
+          digestFields = {
+            kind: 'sheets_digest',
+            digestConfig: JSON.stringify(config),
+            digestConfigHash: hash,
+            digestApprovedAt: now,
+          };
+        } else if (isTelegramSchedule) {
+          const candidate = metadata.digestCandidate as TelegramDigestCandidate | undefined;
+          if (!candidate || candidate.canAutoDigest !== true || !candidate.config || !candidate.configHash) {
+            throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
+          }
+          const computedHash = computeTelegramDigestConfigHash(candidate.config);
+          if (computedHash !== candidate.configHash) {
+            throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
+          }
+          telegramDigestConfig = candidate.config;
+          telegramDigestHash = computedHash;
+          digestFields = {
+            kind: 'telegram_digest',
+            digestConfig: JSON.stringify(telegramDigestConfig),
+            digestConfigHash: telegramDigestHash,
             digestApprovedAt: now,
           };
         } else {

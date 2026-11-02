@@ -757,25 +757,65 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
           res.status(409).json({ error: 'Hãy lưu thông tin kết nối dịch vụ trước khi đổi phạm vi tài nguyên.' });
           return;
         }
-        const dec = decryptCredentials(current.config, encryptionKey);
+        let dec: Record<string, any>;
+        try {
+          dec = decryptCredentials(current.config, encryptionKey);
+        } catch (err: any) {
+          console.warn('[services] Failed to decrypt personal credentials during scope update', {
+            workspaceId,
+            service,
+            userId,
+            error: err?.message,
+          });
+          res.status(409).json({
+            error: 'Thông tin xác thực hiện tại không đọc được. Vui lòng nhập lại thông tin xác thực trước khi đổi phạm vi tài nguyên.',
+          });
+          return;
+        }
         const newConfig = encryptCredentials({ ...dec, allowedScope: scope }, encryptionKey);
         await credentialRepo.upsertPersonalCredentials({ service, userId, config: newConfig, status: current.status });
         generations.set(key, (generations.get(key) ?? 0) + 1);
         checks.delete(key);
         options.onCredentialsChanged?.(service, null, userId);
       } else if (mode === 'organization') {
-        const saved = await credentialRepo.updateCredentials(
-          service,
-          (config) =>
-            encryptCredentials(
-              {
-                ...decryptCredentials(config, encryptionKey),
-                allowedScope: scope,
-              },
-              encryptionKey
-            ),
-          workspaceId
-        );
+        let decryptFailed = false;
+        let saved: unknown = null;
+        try {
+          saved = await credentialRepo.updateCredentials(
+            service,
+            (config) => {
+              let dec: Record<string, any>;
+              try {
+                dec = decryptCredentials(config, encryptionKey);
+              } catch (err: any) {
+                decryptFailed = true;
+                console.warn('[services] Failed to decrypt organization credentials during scope update', {
+                  workspaceId,
+                  service,
+                  userId,
+                  error: err?.message,
+                });
+                throw err;
+              }
+              return encryptCredentials(
+                {
+                  ...dec,
+                  allowedScope: scope,
+                },
+                encryptionKey
+              );
+            },
+            workspaceId
+          );
+        } catch (err) {
+          if (decryptFailed) {
+            res.status(409).json({
+              error: 'Thông tin xác thực hiện tại không đọc được. Vui lòng nhập lại thông tin xác thực trước khi đổi phạm vi tài nguyên.',
+            });
+            return;
+          }
+          throw err;
+        }
         if (!saved) {
           res.status(409).json({ error: 'Hãy lưu thông tin kết nối dịch vụ trước khi đổi phạm vi tài nguyên.' });
           return;
@@ -784,18 +824,44 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
         checks.delete(key);
         options.onCredentialsChanged?.(service, workspaceId);
       } else {
-        const saved = await credentialRepo.updateCredentials(
-          service,
-          (config) =>
-            encryptCredentials(
-              {
-                ...decryptCredentials(config, encryptionKey),
-                allowedScope: scope,
-              },
-              encryptionKey
-            ),
-          null
-        );
+        let decryptFailed = false;
+        let saved: unknown = null;
+        try {
+          saved = await credentialRepo.updateCredentials(
+            service,
+            (config) => {
+              let dec: Record<string, any>;
+              try {
+                dec = decryptCredentials(config, encryptionKey);
+              } catch (err: any) {
+                decryptFailed = true;
+                console.warn('[services] Failed to decrypt shared credentials during scope update', {
+                  workspaceId,
+                  service,
+                  userId,
+                  error: err?.message,
+                });
+                throw err;
+              }
+              return encryptCredentials(
+                {
+                  ...dec,
+                  allowedScope: scope,
+                },
+                encryptionKey
+              );
+            },
+            null
+          );
+        } catch (err) {
+          if (decryptFailed) {
+            res.status(409).json({
+              error: 'Thông tin xác thực hiện tại không đọc được. Vui lòng nhập lại thông tin xác thực trước khi đổi phạm vi tài nguyên.',
+            });
+            return;
+          }
+          throw err;
+        }
         if (!saved) {
           res.status(409).json({ error: 'Hãy lưu thông tin kết nối dịch vụ trước khi đổi phạm vi tài nguyên.' });
           return;

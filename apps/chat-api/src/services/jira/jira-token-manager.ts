@@ -16,6 +16,8 @@ export class JiraTokenManagerError extends Error {
   }
 }
 
+export { JiraTokenManagerError as JiraTokenError };
+
 export interface JiraTokenManagerOptions {
   pool: pg.Pool;
   client: JiraOAuthClient;
@@ -102,6 +104,43 @@ export class JiraTokenManager {
     });
   }
 
+  async getValidAccessToken(userId: string, options?: GetAccessTokenOptions): Promise<string> {
+    return this.getAccessToken(userId, options);
+  }
+
+  private async markGrantDecryptFailed(
+    grantId: string,
+    accountId?: string,
+    client?: pg.PoolClient
+  ): Promise<never> {
+    const executor = client ?? this.pool;
+    await executor
+      .query(
+        `UPDATE jira_oauth_grants
+         SET status = 'reconnect_required',
+             status_reason = 'TOKEN_DECRYPT_FAILED',
+             encrypted_access_token = NULL,
+             encrypted_refresh_token = NULL,
+             refresh_state = 'idle',
+             refresh_attempt_id = NULL,
+             updated_at = clock_timestamp()
+         WHERE id = $1 AND status = 'active'`,
+        [grantId]
+      )
+      .catch(() => null);
+    if (client) {
+      await client.query('COMMIT').catch(() => {});
+    }
+    if (accountId && this.onReconnectRequired) {
+      this.onReconnectRequired(accountId);
+    }
+    throw new JiraTokenManagerError(
+      'TOKEN_REFRESH_FAILED',
+      'Failed to decrypt Jira OAuth token; reconnect required',
+      403
+    );
+  }
+
   async getAccessToken(userId: string, options?: GetAccessTokenOptions): Promise<string> {
     if (!userId || !userId.trim()) {
       throw new JiraTokenManagerError('INVALID_INPUT', 'userId is required', 400);
@@ -181,8 +220,17 @@ export class JiraTokenManager {
     // 2. If unexpired and idle, return directly from storage (unless forceRefresh)
     const isExpired = !row.expires_at || new Date(row.expires_at).getTime() <= Date.now() + 60_000;
     if (!options?.forceRefresh && !isExpired && row.refresh_state === 'idle' && row.encrypted_access_token) {
-      const dec = decryptCredentials<{ token: string }>(row.encrypted_access_token, this.encryptionKey);
-      return dec.token;
+      try {
+        const dec = decryptCredentials<{ token: string }>(row.encrypted_access_token, this.encryptionKey);
+        return dec.token;
+      } catch (err: any) {
+        console.warn('[jira-token-manager] Failed to decrypt cached Jira access token', {
+          userId,
+          grantId,
+          error: err?.message,
+        });
+        return await this.markGrantDecryptFailed(grantId, row.account_id);
+      }
     }
 
     // 3. Single-flight check in current process
@@ -301,8 +349,17 @@ export class JiraTokenManager {
       ) {
         await client.query('COMMIT');
         releaseClient();
-        const dec = decryptCredentials<{ token: string }>(row.encrypted_access_token, this.encryptionKey);
-        return dec.token;
+        try {
+          const dec = decryptCredentials<{ token: string }>(row.encrypted_access_token, this.encryptionKey);
+          return dec.token;
+        } catch (err: any) {
+          console.warn('[jira-token-manager] Failed to decrypt refreshed Jira access token', {
+            userId,
+            grantId,
+            error: err?.message,
+          });
+          return await this.markGrantDecryptFailed(grantId, accountId);
+        }
       }
 
       // Check if refresh is already in-flight by another worker process
@@ -390,10 +447,19 @@ export class JiraTokenManager {
       }
 
       attemptId = randomUUID();
-      rawRefreshToken = decryptCredentials<{ token: string }>(
-        row.encrypted_refresh_token,
-        this.encryptionKey
-      ).token;
+      try {
+        rawRefreshToken = decryptCredentials<{ token: string }>(
+          row.encrypted_refresh_token,
+          this.encryptionKey
+        ).token;
+      } catch (err: any) {
+        console.warn('[jira-token-manager] Failed to decrypt Jira refresh token', {
+          userId,
+          grantId,
+          error: err?.message,
+        });
+        return await this.markGrantDecryptFailed(grantId, accountId, client);
+      }
 
       // Commit intent to database before making network call
       await client.query(
@@ -604,8 +670,17 @@ export class JiraTokenManager {
         (row.token_version > initialVersion || row.refresh_state === 'idle') &&
         row.encrypted_access_token
       ) {
-        const dec = decryptCredentials<{ token: string }>(row.encrypted_access_token, this.encryptionKey);
-        return dec.token;
+        try {
+          const dec = decryptCredentials<{ token: string }>(row.encrypted_access_token, this.encryptionKey);
+          return dec.token;
+        } catch (err: any) {
+          console.warn('[jira-token-manager] Failed to decrypt polled Jira access token', {
+            userId,
+            grantId,
+            error: err?.message,
+          });
+          return await this.markGrantDecryptFailed(grantId, accountId);
+        }
       }
     }
 

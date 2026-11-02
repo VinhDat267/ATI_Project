@@ -36,6 +36,23 @@ export interface ConversationRow {
   updated_at: Date;
 }
 
+const CONVERSATION_STATUS_PROJECTION = `CASE
+  WHEN conversations.status = 'chatting'
+    AND EXISTS (
+      SELECT 1 FROM plans p
+      WHERE p.conv_id = conversations.id AND p.status = 'completed'
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM plans p2
+      WHERE p2.conv_id = conversations.id
+        AND p2.status IN ('pending', 'approved', 'executing', 'stopping', 'partial', 'unknown', 'reconciliation_required')
+    )
+  THEN 'completed'
+  ELSE conversations.status
+END AS status`;
+
+const CONVERSATION_SELECT_COLUMNS = `id, user_id, title, ${CONVERSATION_STATUS_PROJECTION}, created_at, updated_at, workspace_id, workspace_mode, jira_context`;
+
 export class ConversationRepo {
   constructor(private pool: pg.Pool) {}
 
@@ -243,7 +260,7 @@ export class ConversationRepo {
     values.push(limit);
     try {
       const res = await this.pool.query<ConversationRow>(
-        `SELECT * FROM conversations
+        `SELECT ${CONVERSATION_SELECT_COLUMNS} FROM conversations
          WHERE user_id = $1${scopeClause}
          ORDER BY updated_at DESC
          LIMIT $${values.length}`,
@@ -254,14 +271,38 @@ export class ConversationRepo {
       if (err?.code === '42703' && scope?.workspaceMode === 'legacy') {
         return this.listConversations(userId, limit, undefined);
       }
+      if (err?.code === '42P01' || err?.code === '42703') {
+        const fallbackRes = await this.pool.query<ConversationRow>(
+          `SELECT * FROM conversations
+           WHERE user_id = $1${scopeClause}
+           ORDER BY updated_at DESC
+           LIMIT $${values.length}`,
+          values
+        );
+        return fallbackRes.rows;
+      }
       throw err;
     }
   }
 
   async getConversation(id: string): Promise<ConversationRow | null> {
     if (!isUuid(id)) return null;
-    const res = await this.pool.query<ConversationRow>('SELECT * FROM conversations WHERE id = $1', [id]);
-    return res.rows[0] ?? null;
+    try {
+      const res = await this.pool.query<ConversationRow>(
+        `SELECT ${CONVERSATION_SELECT_COLUMNS} FROM conversations WHERE id = $1`,
+        [id]
+      );
+      return res.rows[0] ?? null;
+    } catch (err: any) {
+      if (err?.code === '42P01' || err?.code === '42703') {
+        const fallback = await this.pool.query<ConversationRow>(
+          'SELECT * FROM conversations WHERE id = $1',
+          [id]
+        );
+        return fallback.rows[0] ?? null;
+      }
+      throw err;
+    }
   }
 
   async getConversationForUser(
@@ -294,13 +335,20 @@ export class ConversationRepo {
     }
     try {
       const res = await this.pool.query<ConversationRow>(
-        `SELECT * FROM conversations WHERE id = $1 AND user_id = $2${scopeClause}`,
+        `SELECT ${CONVERSATION_SELECT_COLUMNS} FROM conversations WHERE id = $1 AND user_id = $2${scopeClause}`,
         values
       );
       return res.rows[0] ?? null;
     } catch (err: any) {
       if (err?.code === '42703' && scope?.workspaceMode === 'legacy') {
         return this.getConversationForUser(userId, id, undefined);
+      }
+      if (err?.code === '42P01' || err?.code === '42703') {
+        const fallback = await this.pool.query<ConversationRow>(
+          `SELECT * FROM conversations WHERE id = $1 AND user_id = $2${scopeClause}`,
+          values
+        );
+        return fallback.rows[0] ?? null;
       }
       throw err;
     }
@@ -369,7 +417,7 @@ export class ConversationRepo {
     values.push(limit + 1);
     try {
       const result = await this.pool.query<ConversationRow & { cursor_updated_at: string }>(
-        `SELECT *, to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_updated_at
+        `SELECT ${CONVERSATION_SELECT_COLUMNS}, to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_updated_at
          FROM conversations WHERE ${where.join(' AND ')} ORDER BY updated_at DESC, id DESC LIMIT $${values.length}`,
         values
       );
@@ -383,6 +431,20 @@ export class ConversationRepo {
     } catch (err: any) {
       if (err?.code === '42703' && scope?.workspaceMode === 'legacy') {
         return this.listConversationPage(userId, options, undefined);
+      }
+      if (err?.code === '42P01' || err?.code === '42703') {
+        const fallbackResult = await this.pool.query<ConversationRow & { cursor_updated_at: string }>(
+          `SELECT *, to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_updated_at
+           FROM conversations WHERE ${where.join(' AND ')} ORDER BY updated_at DESC, id DESC LIMIT $${values.length}`,
+          values
+        );
+        const visible = fallbackResult.rows.slice(0, limit);
+        const last = visible.at(-1);
+        const nextCursor =
+          fallbackResult.rows.length > limit && last
+            ? encodeConversationCursor({ updatedAt: last.cursor_updated_at, id: last.id })
+            : null;
+        return { conversations: visible.map(({ cursor_updated_at: _timestamp, ...row }) => row), nextCursor };
       }
       throw err;
     }

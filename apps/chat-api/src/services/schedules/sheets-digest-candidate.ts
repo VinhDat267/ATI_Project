@@ -114,8 +114,10 @@ export async function analyzeSheetsDigestCandidate(
         reason: 'Google Sheets cá nhân chưa được bật hoặc chưa xác định người dùng.',
       };
     }
-    const record = await credentialRepo.getPersonalCredentials('mysheets', userId);
-    if (!record || record.status !== 'active') {
+    const record =
+      (await credentialRepo.getPersonalCredentials?.('mysheets', userId)) ??
+      (await (credentialRepo as any).getPersonalConnectionStatus?.('mysheets', userId));
+    if (!record || (record.status && record.status !== 'active')) {
       return {
         canAutoDigest: false,
         reason: 'Hãy kết nối Google Sheets cá nhân trước khi bật tự gửi báo cáo.',
@@ -130,9 +132,16 @@ export async function analyzeSheetsDigestCandidate(
         reason: 'Không đọc được cấu hình Google Sheets cá nhân.',
       };
     }
-    const selected: PersonalSpreadsheetItem[] = Array.isArray(dec.selectedSpreadsheets)
+    const rawSelected: any[] = Array.isArray(dec.selectedSpreadsheets)
       ? dec.selectedSpreadsheets
-      : [];
+      : Array.isArray(dec.spreadsheets)
+        ? dec.spreadsheets
+        : [];
+    const selected: PersonalSpreadsheetItem[] = rawSelected.map((s) => ({
+      ...s,
+      id: String(s.id),
+      title: s.title || s.name || String(s.id),
+    }));
     const allowedIds: string[] = Array.isArray(dec.allowedScope?.spreadsheets)
       ? dec.allowedScope.spreadsheets
       : selected.map((s) => s.id);
@@ -293,9 +302,12 @@ export async function analyzeSheetsDigestCandidate(
     };
   } else {
     const tgRec =
-      (userId ? await credentialRepo.getPersonalCredentials('telegram', userId) : null) ??
-      (await credentialRepo.getCredentials('telegram'));
-    if (!tgRec) {
+      (userId
+        ? (await credentialRepo.getPersonalCredentials?.('telegram', userId)) ??
+          (await (credentialRepo as any).getPersonalConnectionStatus?.('telegram', userId))
+        : null) ??
+      (await credentialRepo.getCredentials?.('telegram'));
+    if (!tgRec || !tgRec.config) {
       return {
         canAutoDigest: false,
         reason: 'Dịch vụ Telegram chưa được cấu hình.',
@@ -310,11 +322,26 @@ export async function analyzeSheetsDigestCandidate(
         reason: 'Không đọc được cấu hình Telegram.',
       };
     }
-    const chats: string[] = Array.isArray(dec.allowedScope?.chats)
+    const rawChats = Array.isArray(dec.allowedScope?.chats)
       ? dec.allowedScope.chats
       : Array.isArray(dec.allowedScope)
         ? dec.allowedScope
-        : [];
+        : Array.isArray(dec.selectedChats)
+          ? dec.selectedChats
+          : [];
+    const normalizedChats = rawChats
+      .map((c: unknown) => {
+        if (typeof c === 'string') return { chatId: c.trim(), title: '' };
+        if (c && typeof c === 'object' && typeof (c as any).chatId === 'string') {
+          return {
+            chatId: (c as any).chatId.trim(),
+            title: typeof (c as any).title === 'string' ? (c as any).title : '',
+          };
+        }
+        return { chatId: '', title: '' };
+      })
+      .filter((c: { chatId: string }) => Boolean(c.chatId));
+    const chats: string[] = normalizedChats.map((c: { chatId: string }) => c.chatId);
     if (chats.length === 0) {
       return {
         canAutoDigest: false,
@@ -325,8 +352,12 @@ export async function analyzeSheetsDigestCandidate(
     if (chats.length === 1) {
       chosenChat = chats[0];
     } else {
-      const matched = chats.filter((c) => reqLower.includes(c.toLowerCase()));
-      if (matched.length === 1) chosenChat = matched[0];
+      const matched = normalizedChats.filter(
+        (c: { chatId: string; title: string }) =>
+          reqLower.includes(c.chatId.toLowerCase()) ||
+          (c.title && reqLower.includes(c.title.toLowerCase())),
+      );
+      if (matched.length === 1) chosenChat = matched[0]!.chatId;
     }
     if (!chosenChat) {
       return {

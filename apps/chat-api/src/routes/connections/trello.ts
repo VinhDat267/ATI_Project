@@ -114,9 +114,21 @@ export function createTrelloConnectionRoutes(options: TrelloConnectionsOptions):
     next();
   });
 
-  router.use((req, res, next) => {
+  router.use(async (req, res, next) => {
     if (!isTrelloConnectAvailable(options)) {
       if (req.method === 'GET' && (req.path === '/' || req.path === '')) {
+        const userId = (req as any).user?.id as string | undefined;
+        if (userId && options.credentialRepo && options.encryptionKey) {
+          try {
+            const cred = await options.credentialRepo.getPersonalConnectionStatus('trello', userId);
+            if (cred) {
+              next();
+              return;
+            }
+          } catch {
+            // Fall through to unconfigured response
+          }
+        }
         res.json({ status: 'unconfigured', boards: [] });
         return;
       }
@@ -472,8 +484,9 @@ export function createTrelloConnectionRoutes(options: TrelloConnectionsOptions):
 
       let username: string | undefined;
       let refreshToken: string | undefined;
+      let dec: Record<string, any> = {};
       try {
-        const dec = decryptCredentials(cred.config, options.encryptionKey!);
+        dec = decryptCredentials(cred.config, options.encryptionKey!);
         username = dec.username;
         refreshToken = dec.refreshToken;
       } catch {
@@ -482,7 +495,24 @@ export function createTrelloConnectionRoutes(options: TrelloConnectionsOptions):
       }
 
       const scopeId = trelloScopeId(req);
-      const scope = options.teamRepo ? await options.teamRepo.get(scopeId) : null;
+      let scope: {
+        workspaceId: string;
+        workspaceName: string;
+        boards: Array<{ boardId: string; boardName: string }>;
+      } | null = options.teamRepo ? await options.teamRepo.get(scopeId) : null;
+      const fromPersonalBoards =
+        (!scope || !scope.boards || scope.boards.length === 0) &&
+        Array.isArray(dec.selectedBoards) &&
+        dec.selectedBoards.length > 0;
+      if (fromPersonalBoards) {
+        scope = {
+          workspaceId: typeof dec.workspaceId === 'string' ? dec.workspaceId : 'default',
+          workspaceName: typeof dec.workspaceName === 'string' ? dec.workspaceName : 'Default Workspace',
+          boards: dec.selectedBoards
+            .filter((b: any) => b && typeof b.boardId === 'string' && typeof b.boardName === 'string')
+            .map((b: any) => ({ boardId: b.boardId, boardName: b.boardName })),
+        };
+      }
       if (!scope || !scope.boards || scope.boards.length === 0) {
         res.json({
           status: 'needs_scope',
@@ -493,11 +523,12 @@ export function createTrelloConnectionRoutes(options: TrelloConnectionsOptions):
       }
 
       let callerBoards: TrelloBoardSummary[] = [];
-      if (options.tokens && refreshToken && client) {
+      const hasLiveBoardCheck = Boolean(options.tokens && refreshToken && client);
+      if (hasLiveBoardCheck) {
         try {
-          const provider = options.tokens.forConnection(user.id, cred.id, refreshToken);
+          const provider = options.tokens!.forConnection(user.id, cred.id, refreshToken!);
           const accessToken = await provider.getAccessToken();
-          callerBoards = await client.boards(
+          callerBoards = await client!.boards(
             accessToken,
             scope.workspaceId,
             AbortSignal.timeout(trelloTimeoutMs)
@@ -513,14 +544,21 @@ export function createTrelloConnectionRoutes(options: TrelloConnectionsOptions):
 
       const boards = scope.boards.map((b) => {
         const found = callerBoards.find((cb) => cb.id === b.boardId);
+        if (fromPersonalBoards && !hasLiveBoardCheck) {
+          return {
+            boardId: b.boardId,
+            boardName: b.boardName,
+            selected: true,
+          };
+        }
         return {
           boardId: b.boardId,
           boardName: b.boardName,
-          member: found ? found.member : false,
+          member: found ? found.member : !hasLiveBoardCheck,
         };
       });
 
-      const anyMember = boards.some((b) => b.member);
+      const anyMember = boards.some((b: any) => b.member === true || b.selected === true);
       const status = anyMember ? 'connected' : 'needs_membership';
 
       res.json({

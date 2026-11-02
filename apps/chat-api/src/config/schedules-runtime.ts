@@ -22,6 +22,7 @@ export interface ScheduleRuntimeOptions {
   credentialRepo?: CredentialRepo;
   mysheetsEnabled?: boolean;
   sheetsDigestRunner?: SheetsDigestRunner;
+  executeSheetsDigestRun?: SheetsDigestRunner['executeDigest'];
 }
 
 const notConnected: PlanRun = async () => { throw new Error('Chưa nối planner'); };
@@ -49,7 +50,11 @@ export function createScheduleRuntime(options: ScheduleRuntimeOptions) {
     emit: options.emit,
     now: options.now,
     recordState: (client, row, now) => service.recordState(client, row, now),
-    sheetsDigestRunner: options.sheetsDigestRunner,
+    sheetsDigestRunner:
+      options.sheetsDigestRunner ??
+      (options.executeSheetsDigestRun
+        ? ({ executeDigest: options.executeSheetsDigestRun } as SheetsDigestRunner)
+        : undefined),
   });
   return { service, runner, reconcile: () => reconcileScheduleRuns(pool) };
 }
