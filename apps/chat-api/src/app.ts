@@ -18,6 +18,7 @@ import type { WorkspaceRepo } from './db/repositories/workspace-repo.js';
 import type { JiraWorkspaceRepo } from './db/repositories/index.js';
 import type { ConversationRepo } from './db/repositories/conversation-repo.js';
 import type { MessageRepo } from './db/repositories/message-repo.js';
+import type { JiraHistorySanitizer } from './services/jira/jira-history-sanitizer.js';
 import type { PlanRepo } from './db/repositories/plan-repo.js';
 import type { UserRepo } from './db/repositories/user-repo.js';
 import type { SessionRepo } from './db/repositories/session-repo.js';
@@ -164,6 +165,7 @@ export interface AppOptions extends AdminUsersOptions {
   trelloTeamRepo?: TrelloTeamRepo;
   workspaceRepo?: WorkspaceRepo;
   jiraWorkspaceRepo?: JiraWorkspaceRepo;
+  jiraHistorySanitizer?: JiraHistorySanitizer;
   jiraWorkspaceRateLimit?: WorkspaceRateLimitConfig;
   workspaceRateLimit?: WorkspaceRateLimitConfig;
   pool?: pg.Pool;
@@ -440,6 +442,7 @@ export function createApp(options: AppOptions): Express {
         planRepo: options.planRepo,
         pool: dbPool,
         enableWorkspaceConversations: options.enableWorkspaceConversations,
+        jiraHistorySanitizer: options.jiraHistorySanitizer,
       })
     );
   }

@@ -539,6 +539,31 @@ describe('apps/chat-api — JIRA-03 Shared Organization Workspace Conversations 
       scopedSchedMsgId = await seedScheduleProposal(scopedJiraConvId);
     });
 
+    it('masks Jira assistant history when the native policy sanitizer is unavailable', async () => {
+      const secret = 'PRIVATE-JIRA-ISSUE-DETAILS';
+      const messageId = await seedMessage(scopedJiraConvId, 'assistant', secret);
+      await pool.query(
+        `UPDATE messages SET metadata = $1 WHERE id = $2`,
+        [JSON.stringify({ sourceRefs: [{ invalid: true }], customSecret: secret }), messageId]
+      );
+
+      const detail = await request(fixtureApp)
+        .get(`/api/conversations/${scopedJiraConvId}`)
+        .set('Authorization', `Bearer ${alice.token}`)
+        .set('X-Workspace-Id', orgId);
+      expect(detail.status).toBe(200);
+      expect(JSON.stringify(detail.body)).not.toContain(secret);
+      expect(detail.body.messages.find((m: { id: string }) => m.id === messageId).metadata)
+        .toEqual({ masked: true, maskReason: 'provider_unavailable' });
+
+      const latest = await request(fixtureApp)
+        .get(`/api/conversations/${scopedJiraConvId}/messages/latest`)
+        .set('Authorization', `Bearer ${alice.token}`)
+        .set('X-Workspace-Id', orgId);
+      expect(latest.status).toBe(200);
+      expect(JSON.stringify(latest.body)).not.toContain(secret);
+    });
+
     it('allows active dual-member Alice access across conversation, stream, execution, and schedule routes', async () => {
       // Detail
       const getRes = await request(fixtureApp)

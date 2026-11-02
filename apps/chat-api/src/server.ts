@@ -47,6 +47,9 @@ import { createGitHubConnectionLookup } from './services/github/connection-refer
 import { JiraOAuthClient } from './services/jira/jira-oauth-client.js';
 import { JiraOAuthRepo } from './db/repositories/jira-oauth-repo.js';
 import { JiraTokenManager } from './services/jira/jira-token-manager.js';
+import { JiraNativeVerifier } from './services/jira/jira-native-verifier.js';
+import { JiraPolicyService } from './services/jira/jira-policy-service.js';
+import { JiraHistorySanitizer } from './services/jira/jira-history-sanitizer.js';
 import {
   AIPlanner,
   createProviderFromEnv,
@@ -385,6 +388,15 @@ async function bootstrap() {
         encryptionKey: env.ENCRYPTION_KEY,
       })
     : undefined;
+  const jiraNativeVerifier = jiraAvailable && jiraTokens
+    ? new JiraNativeVerifier({ tokenManager: jiraTokens })
+    : undefined;
+  if (pool && jiraNativeVerifier) {
+    jiraWorkspaceRepo = new JiraWorkspaceRepo(pool, { verifier: jiraNativeVerifier });
+  }
+  const jiraHistorySanitizer = pool && jiraNativeVerifier
+    ? new JiraHistorySanitizer(new JiraPolicyService({ pool, verifier: jiraNativeVerifier }))
+    : undefined;
 
   // 2. Initialize LLM Provider
   let provider: any;
@@ -680,6 +692,7 @@ async function bootstrap() {
     adminUserRepo: pool && userRepo ? new AdminUserRepo(pool) : undefined,
     workspaceRepo,
     jiraWorkspaceRepo: jiraWorkspaceRepo ?? undefined,
+    jiraHistorySanitizer,
     pool: pool ?? undefined,
     signupEnabled: env.AUTH_SIGNUP_ENABLED,
     googleSignupEnabled: env.GOOGLE_SIGNUP_ENABLED,
@@ -759,6 +772,7 @@ async function bootstrap() {
       onConnectionChanged: (userId: string) => {
         realAdapterFactory.clearPersonal(userId);
         jiraTokens?.clear(userId);
+        jiraNativeVerifier?.clearCache();
       },
     } : undefined,
     chatService,

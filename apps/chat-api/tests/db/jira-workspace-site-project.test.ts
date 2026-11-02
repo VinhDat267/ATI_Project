@@ -2036,22 +2036,14 @@ describe('apps/chat-api — JIRA-03 Workspace Site & Project Repository & Fail-C
       }
     });
 
-    it('explicitly throws 503 CAPABILITIES_UNAVAILABLE on getCapabilities rather than returning empty array', async () => {
+    it('returns an empty capability directory when no Jira sites are connected', async () => {
       const { workspaceId } = await seedWorkspace(pool, sysAdminId);
       await seedMembership(pool, workspaceId, sysMemberId, 'member', 'active');
 
       const repo = new WorkspaceRepo(pool);
 
-      // Coordinator ruling 1: capabilities always 503 CAPABILITIES_UNAVAILABLE until JIRA-05
-      await expect(repo.getCapabilities(workspaceId, sysAdminId)).rejects.toMatchObject({
-        statusCode: 503,
-        code: 'CAPABILITIES_UNAVAILABLE',
-      });
-
-      await expect(repo.getCapabilities(workspaceId, sysMemberId)).rejects.toMatchObject({
-        statusCode: 503,
-        code: 'CAPABILITIES_UNAVAILABLE',
-      });
+      await expect(repo.getCapabilities(workspaceId, sysAdminId)).resolves.toEqual({ workspaceId, sites: [] });
+      await expect(repo.getCapabilities(workspaceId, sysMemberId)).resolves.toEqual({ workspaceId, sites: [] });
     });
   });
 
