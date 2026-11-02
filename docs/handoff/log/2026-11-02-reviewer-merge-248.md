@@ -33,3 +33,7 @@ Trong lúc kiểm tra, main nhận #249 rồi #250. Lượt default trên cây #
 - Reviewer cập nhật CURRENT-STATE, ROADMAP và nghiệm thu task [CALENDAR-01](../tasks/CALENDAR-01-audit-fixes.md) sau merge, trong commit tài liệu riêng.
 - Không deploy, đổi flags hoặc migrate DB runtime. OAuth Google thật, provider Slack/Telegram và model live:NOT_RUN. Migration0021 cần trước API; proposal cũ thiếu snapshot cần tạo lại/chọn thủ công.
 - Audit ngoài Calendar vẫn mở. Giữ worktree/branch để truy vết; không có yêu cầu cleanup trong lượt merge này.
+
+## Đồng bộ sau merge #251
+
+Trong khi đẩy handoff, main nhận #251 tại `a8ebe846`. PR đó thêm lại `clearPlanEvents` trong type/value fixture ở vị trí khác, trùng với #248. Typecheck tái hiện RED:TS2300 và TS1117. Đã bỏ2dòng của #248, giữ khai báo ở vị trí #251 cùng assertion forwarding; không sửa production. Reviewer độc lập Đạt, chỉ2dòng xoá, còn đúng1type/1spy/1assert. Sau sửa `npm run typecheck:v3` PASS và4file/89regression Calendar/Jira/execution-routes PASS, exit0. Đây là cleanup do hai merge đồng thời, không thay verdict/CI đã đạt của head #248.
