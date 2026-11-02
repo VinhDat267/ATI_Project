@@ -43,6 +43,9 @@ import { GitHubTokenManager } from './services/github/token-manager.js';
 import { GitHubOAuthClient } from './services/github/oauth-client.js';
 import { GitHubTeamRepo } from './db/repositories/github-team-repo.js';
 import { createGitHubConnectionLookup } from './services/github/connection-reference.js';
+import { JiraOAuthClient } from './services/jira/jira-oauth-client.js';
+import { JiraOAuthRepo } from './db/repositories/jira-oauth-repo.js';
+import { JiraTokenManager } from './services/jira/jira-token-manager.js';
 import {
   AIPlanner,
   createProviderFromEnv,
@@ -363,6 +366,18 @@ async function bootstrap() {
     : undefined;
   const telegramConnection = telegramLookup ?? sandboxTelegramConnection;
 
+  const jiraAvailable = Boolean(env.MYJIRA_ENABLED && env.JIRA_OAUTH && pool);
+  const jiraOAuthClient = jiraAvailable ? new JiraOAuthClient(env.JIRA_OAUTH!) : undefined;
+  const jiraOAuthRepo = jiraAvailable && pool ? new JiraOAuthRepo(pool, env.ENCRYPTION_KEY) : undefined;
+  const jiraTokens = jiraAvailable && pool && jiraOAuthClient && jiraOAuthRepo
+    ? new JiraTokenManager({
+        pool,
+        client: jiraOAuthClient,
+        repo: jiraOAuthRepo,
+        encryptionKey: env.ENCRYPTION_KEY,
+      })
+    : undefined;
+
   // 2. Initialize LLM Provider
   let provider: any;
   if (env.RUNTIME_MODE === 'live') {
@@ -512,6 +527,7 @@ async function bootstrap() {
   if (env.GMAIL_ENABLED && !gmailAvailable) console.warn('\x1b[33m[chat-api] GMAIL_ENABLED=on nhưng thiếu cấu hình Gmail hoặc PostgreSQL: kết nối Gmail tạm tắt (503).\x1b[0m');
   if (env.MYCALENDAR_ENABLED && !mycalendarAvailable) console.warn('\x1b[33m[chat-api] MYCALENDAR_ENABLED=on nhưng thiếu cấu hình MyCalendar hoặc PostgreSQL: kết nối MyCalendar tạm tắt (503).\x1b[0m');
   if (env.MYSHEETS_ENABLED && !mysheetsAvailable) console.warn('\x1b[33m[chat-api] MYSHEETS_ENABLED=on nhưng thiếu cấu hình MySheets hoặc PostgreSQL: kết nối MySheets tạm tắt (503).\x1b[0m');
+  if (env.MYJIRA_ENABLED && !jiraAvailable) console.warn('\x1b[33m[chat-api] MYJIRA_ENABLED=on nhưng thiếu cấu hình Jira OAuth hoặc PostgreSQL: kết nối Jira tạm tắt (503).\x1b[0m');
 
   let realAdapterFactory: AdapterFactory;
   const gmailTokens = gmailAvailable ? new GmailTokenManager({
@@ -707,6 +723,17 @@ async function bootstrap() {
       },
     },
     telegramTeamRepo,
+    jira: env.MYJIRA_ENABLED ? {
+      enabled: jiraAvailable,
+      oauth: env.JIRA_OAUTH,
+      repo: jiraOAuthRepo,
+      tokens: jiraTokens,
+      client: jiraOAuthClient,
+      onConnectionChanged: (userId: string) => {
+        realAdapterFactory.clearPersonal(userId);
+        jiraTokens?.clear(userId);
+      },
+    } : undefined,
     chatService,
     sseManager,
     executionService,

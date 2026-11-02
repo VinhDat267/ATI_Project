@@ -214,7 +214,8 @@ async function fetchActorJiraGrantPreCheck(
      JOIN jira_grant_sites s ON s.grant_id = g.id
      WHERE g.account_id = $1
        AND s.cloud_id = $2
-       AND s.product_type = 'jira'`,
+       AND s.product_type = 'jira'
+       AND g.status = 'active'`,
     [account.id, cloudId]
   );
 
@@ -434,11 +435,11 @@ export class WorkspaceSiteProjectRepo {
         );
       }
 
-      // 5. Lock grant and grant site (reassert product_type = 'jira')
+      // 5. Lock grant and grant site (reassert product_type = 'jira' and status = 'active')
       const grantRes = await client.query(
         `SELECT g.id FROM jira_oauth_grants g
          JOIN jira_grant_sites s ON s.grant_id = g.id
-         WHERE g.id = $1 AND g.account_id = $2 AND s.cloud_id = $3 AND s.product_type = 'jira' FOR UPDATE`,
+         WHERE g.id = $1 AND g.account_id = $2 AND s.cloud_id = $3 AND s.product_type = 'jira' AND g.status = 'active' FOR UPDATE`,
         [actorGrant.grantId, actorGrant.localAccountId, cloudId]
       );
       if (grantRes.rowCount === 0) {
@@ -614,7 +615,7 @@ export class WorkspaceSiteProjectRepo {
         const grantRes = await client.query(
           `SELECT g.id FROM jira_oauth_grants g
            JOIN jira_grant_sites s ON s.grant_id = g.id
-           WHERE g.id = $1 AND g.account_id = $2 AND s.cloud_id = $3 AND s.product_type = 'jira' FOR UPDATE`,
+           WHERE g.id = $1 AND g.account_id = $2 AND s.cloud_id = $3 AND s.product_type = 'jira' AND g.status = 'active' FOR UPDATE`,
           [actorGrant.grantId, actorGrant.localAccountId, preSite.cloud_id]
         );
         if (grantRes.rowCount === 0) {
@@ -826,11 +827,11 @@ export class WorkspaceSiteProjectRepo {
         );
       }
 
-      // Lock grant (reassert product_type = 'jira')
+      // Lock grant (reassert product_type = 'jira' and status = 'active')
       const grantRes = await client.query(
         `SELECT g.id FROM jira_oauth_grants g
          JOIN jira_grant_sites s ON s.grant_id = g.id
-         WHERE g.id = $1 AND g.account_id = $2 AND s.cloud_id = $3 AND s.product_type = 'jira' FOR UPDATE`,
+         WHERE g.id = $1 AND g.account_id = $2 AND s.cloud_id = $3 AND s.product_type = 'jira' AND g.status = 'active' FOR UPDATE`,
         [actorGrant.grantId, actorGrant.localAccountId, preSite.cloud_id]
       );
       if (grantRes.rowCount === 0) {
