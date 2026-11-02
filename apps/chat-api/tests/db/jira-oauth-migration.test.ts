@@ -287,7 +287,8 @@ describe('Jira OAuth Migration 0021 (Real PostgreSQL Schema & Constraints)', () 
     it('has index idx_jira_oauth_grants_account on jira_oauth_grants(account_id)', async () => {
       const idxRes = await ctx.pool.query<{ indexname: string; indexdef: string }>(
         `SELECT indexname, indexdef FROM pg_indexes
-         WHERE tablename = 'jira_oauth_grants' AND indexname = 'idx_jira_oauth_grants_account'`
+         WHERE schemaname = current_schema()
+           AND tablename = 'jira_oauth_grants' AND indexname = 'idx_jira_oauth_grants_account'`
       );
       expect(idxRes.rowCount).toBe(1);
       const idxRow = idxRes.rows[0];
