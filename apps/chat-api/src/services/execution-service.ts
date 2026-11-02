@@ -80,8 +80,8 @@ export class ExecutionService {
       userId: ownerId,
       phase: 'execution',
       connections,
-      workspaceId: conversation?.workspace_id ?? null,
-      workspaceMode: conversation?.workspace_mode ?? (this.workspaceRepo ? 'personal' : 'legacy'),
+      workspaceId: conversation?.workspace_id ?? connections?.myjira?.workspaceId ?? null,
+      workspaceMode: conversation?.workspace_mode ?? (connections?.myjira ? 'organization' : (this.workspaceRepo ? 'personal' : 'legacy')),
     };
   }
 

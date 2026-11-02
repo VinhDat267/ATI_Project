@@ -19,10 +19,14 @@ export interface GuardedDispatchOptions {
 
 export class JiraDispatchError extends Error {
   readonly code: string;
-  constructor(message: string, code = 'DISPATCH_DENIED', options?: { cause?: unknown }) {
+  readonly category: string;
+  readonly details: { requestSent: boolean };
+  constructor(message: string, code = 'DISPATCH_DENIED', options?: { cause?: unknown; category?: string }) {
     super(message, options);
     this.name = 'JiraDispatchError';
     this.code = code;
+    this.category = options?.category ?? 'AUTH_ERROR';
+    this.details = { requestSent: false };
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }

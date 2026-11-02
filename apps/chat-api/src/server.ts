@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { createMemoryConversationRepositories } from './db/repositories/memory-conversations.js';
-import { validateEnv } from './config/env.js';
+import { validateEnv, JIRA_ENDPOINTS } from './config/env.js';
 import { getPool } from './db/pool.js';
 import {
   ConversationRepo,
@@ -50,6 +50,8 @@ import { JiraNativeVerifier } from './services/jira/jira-native-verifier.js';
 import { JiraPolicyService } from './services/jira/jira-policy-service.js';
 import { JiraHistorySanitizer } from './services/jira/jira-history-sanitizer.js';
 import { JiraPlanBinder } from './services/jira/jira-plan-binding.js';
+import { JiraLeaseManager } from './services/jira/jira-lease-manager.js';
+import { JiraDispatchGuard } from './services/jira/jira-dispatch-guard.js';
 import {
   AIPlanner,
   createProviderFromEnv,
@@ -393,6 +395,12 @@ async function bootstrap() {
   const jiraBinder = jiraAvailable && pool
     ? new JiraPlanBinder({ pool })
     : undefined;
+  const jiraLeaseManager = jiraAvailable && pool && jiraTokens
+    ? new JiraLeaseManager({ pool, tokenManager: jiraTokens })
+    : undefined;
+  const jiraDispatchGuard = jiraAvailable && pool && jiraTokens && jiraLeaseManager
+    ? new JiraDispatchGuard(pool, jiraLeaseManager, jiraTokens)
+    : undefined;
 
   // 2. Initialize LLM Provider
   let provider: any;
@@ -581,6 +589,10 @@ async function bootstrap() {
     trelloApiBaseUrl: env.TRELLO_OAUTH?.apiBaseUrl,
     telegramBot: env.TELEGRAM_BOT,
     telegramBotClient,
+    jiraTokens,
+    jiraWorkspaceRepo: jiraWorkspaceRepo ?? undefined,
+    jiraDispatchGuard,
+    jiraApiBaseUrl: env.JIRA_OAUTH?.fixtureBaseUrl ?? JIRA_ENDPOINTS.apiBaseUrl,
     createTrelloAdapter: env.RUNTIME_MODE === 'sandbox' ? ({ allowedBoardIds }) => {
       const sandbox = createSandboxAdapter('trello');
       return {

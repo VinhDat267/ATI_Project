@@ -6,12 +6,22 @@ import {
   TelegramAdapter,
   TrelloAdapter,
   type GmailAccessTokenProvider,
+  createPersonalJiraAdapter,
+  type PersonalJiraAdapterConfig,
+  type JiraAccessTokenProvider,
 } from '@wap/tool-adapters';
-import { normalizeTelegramChatId, TELEGRAM_CHAT_ID_PATTERN, type AllowedScope, type PlanConnections } from '@wap/tool-schemas';
-import type { AdapterExecutor } from '@wap/executor';
+import {
+  normalizeTelegramChatId,
+  TELEGRAM_CHAT_ID_PATTERN,
+  type AllowedScope,
+  type PlanConnections,
+  type WorkspaceJiraCapabilitiesResponse,
+} from '@wap/tool-schemas';
+import { isWriteTool, type AdapterExecutor } from '@wap/executor';
 import { getRegisteredService, isServiceAccountService } from './registered-services.js';
 import type { GmailTokenManager } from './gmail/token-manager.js';
 import type { TelegramBotClient } from './telegram/bot-client.js';
+import type { JiraDispatchGuard, DispatchScope } from './jira/jira-dispatch-guard.js';
 
 /** Who an adapter is for. Shared services ignore it; Gmail & MyCalendar require it. */
 export interface AdapterContext {
@@ -58,7 +68,15 @@ export interface AdapterFactoryOptions {
     knownChats: Array<{ id: string; title: string; type: string }>;
   }) => AdapterExecutor;
   serviceFetchFn?: typeof fetch;
+  createPersonalJiraAdapter?: (input: PersonalJiraAdapterConfig) => AdapterExecutor;
+  jiraTokens?: JiraAccessTokenProvider;
+  jiraWorkspaceRepo?: any;
+  jiraDispatchGuard?: JiraDispatchGuard;
+  jiraApiBaseUrl?: string;
 }
+
+const myjiraError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
+  new StepError({ category, message, retryable: false });
 
 const gmailError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
   new StepError({ category, message, retryable: false });
@@ -109,6 +127,7 @@ export class AdapterFactory {
     this.personalCache.delete(`trello:${userId}`);
     this.personalCache.delete(`github:${userId}`);
     this.personalCache.delete(`telegram:${userId}`);
+    this.personalCache.delete(`myjira:${userId}`);
     for (const key of Array.from(this.adapterCache.keys())) {
       if (key.startsWith(`personal-shared:${userId}:`)) {
         this.adapterCache.delete(key);
@@ -122,6 +141,16 @@ export class AdapterFactory {
   }
 
   async getAdapterForService(serviceName: string, context?: AdapterContext): Promise<any> {
+    if (serviceName === 'jira') {
+      if (context?.workspaceMode === 'personal' || context?.connections?.myjira) {
+        throw new StepError({
+          category: 'AUTH_ERROR',
+          message: 'Dịch vụ Jira chung (jira) không khả dụng ở không gian cá nhân; hãy dùng myjira.',
+          retryable: false,
+        });
+      }
+    }
+    if (serviceName === 'myjira') return this.myjiraAdapter(context);
     if (serviceName === 'gmail') return this.gmailAdapter(context);
     if (serviceName === 'mycalendar') return this.mycalendarAdapter(context);
     if (serviceName === 'mysheets') return this.mysheetsAdapter(context);
@@ -622,5 +651,100 @@ export class AdapterFactory {
       knownChats: selectedChats,
       fetchFn: this.options.serviceFetchFn,
     });
+  }
+
+  private async myjiraAdapter(context?: AdapterContext): Promise<AdapterExecutor> {
+    const userId = context?.userId;
+    if (!userId) throw myjiraError('AUTH_ERROR', 'Jira cá nhân chỉ dùng được với kết nối của chính người dùng.');
+
+    const workspaceId = context?.workspaceId;
+    if (!workspaceId) throw myjiraError('AUTH_ERROR', 'Jira cá nhân yêu cầu không gian làm việc.');
+
+    if (context.phase === 'execution') {
+      const bound = context.connections?.myjira;
+      if (!bound) {
+        throw myjiraError('AUTH_ERROR', 'Kế hoạch không có kết nối Jira cá nhân được gắn kết.');
+      }
+      if (bound.atiUserId !== userId) {
+        throw myjiraError('AUTH_ERROR', 'Người thực thi không khớp với kết nối Jira được duyệt.');
+      }
+      if (bound.workspaceId !== workspaceId) {
+        throw myjiraError('AUTH_ERROR', 'Không gian làm việc không khớp với kết nối Jira được duyệt.');
+      }
+    }
+
+    let capabilities: WorkspaceJiraCapabilitiesResponse;
+    if (this.options.jiraWorkspaceRepo) {
+      capabilities = await this.options.jiraWorkspaceRepo.getCapabilities(workspaceId, userId);
+    } else {
+      capabilities = { workspaceId, sites: [] };
+    }
+
+    const baseAdapter = (this.options.createPersonalJiraAdapter ?? createPersonalJiraAdapter)({
+      userId,
+      workspaceId,
+      capabilities,
+      tokens: this.options.jiraTokens ?? { getAccessToken: async () => '' },
+      apiBaseUrl: this.options.jiraApiBaseUrl,
+      fetchFn: this.options.serviceFetchFn,
+    });
+
+    return {
+      execute: async (tool: string, args: Record<string, any>, callOpts?: any) => {
+        if (!this.options.jiraDispatchGuard || context?.phase !== 'execution' || tool === 'myjira.list_sites') {
+          return baseAdapter.execute(tool, args, callOpts);
+        }
+
+        const stepId = callOpts?.stepId;
+        const siteStep = stepId ? context?.connections?.myjira?.siteSteps?.[stepId] : undefined;
+        const targetSiteId = (args?.siteId as string) || siteStep?.siteId;
+        const targetSite = capabilities.sites?.find((s: any) => s.siteId === targetSiteId);
+        const cloudId = targetSite?.cloudId || siteStep?.cloudId;
+        if (!targetSiteId || !cloudId) {
+          throw new StepError({ category: 'VALIDATION', message: 'Missing target site for Jira dispatch' });
+        }
+
+        let projectId = siteStep?.projectId;
+        let projectPolicyVersion = siteStep?.projectPolicyVersion;
+        if (!projectId && args?.projectKey && targetSite) {
+          const proj = targetSite.projects?.find((p: any) => p.key === args.projectKey);
+          if (proj) projectId = proj.id;
+        }
+
+        const scope: DispatchScope = {
+          userId,
+          workspaceId,
+          siteId: targetSiteId,
+          cloudId,
+          sitePolicyVersion: siteStep?.sitePolicyVersion ?? (targetSite as any)?.policyVersion ?? 1,
+          projectId,
+          projectPolicyVersion,
+        };
+
+        const isWrite = isWriteTool(tool);
+        const timeoutMs = callOpts?.timeoutMs ?? (isWrite ? 30000 : 15000);
+
+        const rawOutput = await this.options.jiraDispatchGuard.executeGuardedDispatch(
+          scope,
+          { isWrite, timeoutMs, signal: callOpts?.signal },
+          async (token, signal) => {
+            return baseAdapter.execute(tool, args, { ...callOpts, signal });
+          }
+        );
+
+        const receipt = {
+          ownerId: userId,
+          workspaceId,
+          siteId: targetSiteId,
+          projectId: projectId ?? null,
+          connectionLabel: `Jira (${targetSite?.name ?? targetSiteId})`,
+        };
+
+        if (rawOutput && typeof rawOutput === 'object' && !Array.isArray(rawOutput)) {
+          return { ...rawOutput, _receipt: receipt };
+        }
+        return rawOutput;
+      },
+    };
   }
 }
