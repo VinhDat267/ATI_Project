@@ -45,7 +45,7 @@ it('lists only allowlisted databases with canonical ids, title filtering and pin
 });
 it('resolves database to data source and queries title with flattened properties and normalized ids', async () => {
   const { adapter, calls } = setup(); const signal = new AbortController().signal;
-  expect(await adapter.execute('notion.query_database', { databaseId: DB.replaceAll('-', '').toUpperCase(), query: 'ATI', limit: 20 }, { signal })).toEqual({ pages: [{ id: PAGE, title: 'ATI Review', url: page().url, properties: { Name: 'ATI Review', Notes: 'plain', Stage: 'Ready', Day: '2026-10-03', Link: 'https://example.test', Score: '2', Check: 'true' } }] });
+  expect(await adapter.execute('notion.query_database', { databaseId: DB.replaceAll('-', '').toUpperCase(), query: 'ATI', limit: 20 }, { signal })).toMatchObject({ pages: [{ id: PAGE, title: 'ATI Review', url: page().url, properties: { Name: 'ATI Review', Notes: 'plain', Stage: 'Ready', Day: '2026-10-03', Link: 'https://example.test', Score: '2', Check: 'true' } }] });
   expect(calls.map(c => new URL(c.url).pathname)).toEqual(['/v1/databases/' + DB, '/v1/data_sources/' + DS, '/v1/data_sources/' + DS + '/query']);
   expect(calls[2]!.method).toBe('POST'); expect(calls[2]!.body).toEqual({ page_size: 20, filter: { property: 'Name', title: { contains: 'ATI' } } });
   expect(calls.every(c => c.headers.get('Notion-Version') === '2026-03-11' && c.signal === signal)).toBe(true);
@@ -173,7 +173,7 @@ it.each(['outside', 'page_parent', 'in_trash', 'source_mismatch'])('rejects %s p
   await expect(adapter.execute('notion.append_text', { pageId: PAGE, text: 'No' })).rejects.toMatchObject({ category: kind === 'source_mismatch' ? 'SERVER_ERROR' : 'AUTH_ERROR' });
   expect(calls.filter(c => c.method === 'PATCH' || c.method === 'POST')).toHaveLength(0);
 });
-it.each([{ Unknown: 'x' }, { Check: 'true' }, { Score: 'NaN' }, { Score: '' }, { Day: '2026-02-30' }, { Link: 'javascript:bad' }, { Name: 'override title' }, { Stage: 'New option that would mutate schema' }])('rejects unsupported or invalid properties %j before page write', async properties => {
+it.each([{ Unknown: 'x' }, { Check: 'not-a-boolean' }, { Score: 'NaN' }, { Score: '' }, { Day: '2026-02-30' }, { Link: 'javascript:bad' }, { Name: 'override title' }, { Stage: 'New option that would mutate schema' }])('rejects unsupported or invalid properties %j before page write', async properties => {
   const { adapter, calls } = setup(); await expect(adapter.execute('notion.create_page', { databaseId: DB, title: 'No', properties })).rejects.toMatchObject({ category: 'VALIDATION' }); expect(calls.filter(c => c.url.endsWith('/pages') && c.method === 'POST')).toHaveLength(0);
 });
 it.each(['query', 'create'])('rejects ambiguous multi-source database before %s dispatch', async operation => {
@@ -243,4 +243,139 @@ it.each(['https://app.notion.com/', 'https://www.notion.so/', 'https://notion.so
 it.each(['https://app.notion.com.evil.test/', 'https://evil.test/app.notion.com/', 'http://app.notion.com/', 'https://user:pass@app.notion.com/', 'https://notion.site/'])('rejects a non-Notion or unsafe resource URL %s', async base => {
   const { adapter } = setup(call => ok(call.url.includes('/databases/') ? { ...database(), url: base + DB.replaceAll('-', '') } : source()));
   await expect(adapter.execute('notion.search_databases', { query: '' })).rejects.toMatchObject({ category: 'SERVER_ERROR' });
+});
+
+it('supports status, multi_select, and checkbox properties in create_page and returns schema & status filtering in query_database', async () => {
+  const richSource = () => ({
+    ...source(),
+    properties: {
+      ...source().properties,
+      Status: { type: 'status', status: { options: [{ name: 'Not started' }, { name: 'In progress' }, { name: 'Done' }] } },
+      Tags: { type: 'multi_select', multi_select: { options: [{ name: 'VIP' }, { name: 'Q4' }, { name: 'Urgent' }] } },
+    },
+  });
+  const { adapter, calls } = setup(call => {
+    if (call.url.includes('/databases/')) return ok(database());
+    if (call.url.endsWith('/data_sources/' + DS)) return ok(richSource());
+    if (call.url.endsWith('/query')) {
+      return ok({
+        object: 'list',
+        results: [{
+          ...page(),
+          last_edited_time: '2026-11-02T10:00:00.000Z',
+          properties: {
+            ...page().properties,
+            Status: { type: 'status', status: { name: 'In progress' } },
+            Tags: { type: 'multi_select', multi_select: [{ name: 'VIP' }, { name: 'Q4' }] },
+          },
+        }],
+        has_more: false,
+      });
+    }
+    return ok(page());
+  });
+
+  const queried = await adapter.execute('notion.query_database', { databaseId: DB, status: 'In progress' });
+  expect(queried.pages[0]?.lastEditedTime).toBe('2026-11-02T10:00:00.000Z');
+  expect(queried.pages[0]?.properties.Status).toBe('In progress');
+  expect(queried.pages[0]?.properties.Tags).toBe('VIP, Q4');
+  expect(queried.schema).toEqual(expect.arrayContaining([
+    { name: 'Status', type: 'status', options: ['Not started', 'In progress', 'Done'] },
+    { name: 'Tags', type: 'multi_select', options: ['VIP', 'Q4', 'Urgent'] },
+    { name: 'Check', type: 'checkbox' },
+  ]));
+  const queryCall = calls.find(c => c.url.endsWith('/query'))!;
+  expect(queryCall.body.filter).toEqual({ property: 'Status', status: { equals: 'In progress' } });
+
+  await adapter.execute('notion.create_page', {
+    databaseId: DB,
+    title: 'CRM Lead',
+    properties: {
+      Status: 'In progress',
+      Tags: 'VIP, Q4',
+      Check: 'true',
+    },
+  });
+  const createCall = calls.find(c => c.method === 'POST' && new URL(c.url).pathname === '/v1/pages')!;
+  expect(createCall.body.properties).toMatchObject({
+    Status: { status: { name: 'In progress' } },
+    Tags: { multi_select: [{ name: 'VIP' }, { name: 'Q4' }] },
+    Check: { checkbox: true },
+  });
+});
+
+it('reads page properties and nested content blocks via notion.get_page and enforces allowedDatabaseIds', async () => {
+  const { adapter, calls } = setup(call => {
+    const pathname = new URL(call.url).pathname;
+    if (pathname === '/v1/pages/' + PAGE) {
+      return ok({ ...page(), last_edited_time: '2026-11-02T12:00:00.000Z' });
+    }
+    if (pathname === '/v1/data_sources/' + DS) return ok(source());
+    if (pathname === '/v1/blocks/' + PAGE + '/children') {
+      return ok({
+        object: 'list',
+        results: [
+          { object: 'block', id: BLOCK, type: 'heading_2', heading_2: { rich_text: rich('Mục tiêu tuần này') } },
+          { object: 'block', id: '44444444-5555-6666-7777-888888888888', type: 'to_do', to_do: { rich_text: rich('Triển khai Notion OAuth'), checked: true } },
+          { object: 'block', id: '55555555-6666-7777-8888-999999999999', type: 'bulleted_list_item', bulleted_list_item: { rich_text: rich('Báo cáo tiến độ sang Slack') } },
+        ],
+        has_more: false,
+      });
+    }
+    return ok(page());
+  });
+
+  const detail = await adapter.execute('notion.get_page', { pageId: PAGE });
+  expect(detail).toMatchObject({
+    id: PAGE,
+    title: 'ATI Review',
+    url: page().url,
+    lastEditedTime: '2026-11-02T12:00:00.000Z',
+    content: '## Mục tiêu tuần này\n- [x] Triển khai Notion OAuth\n- Báo cáo tiến độ sang Slack',
+  });
+  expect(detail.blocks).toHaveLength(3);
+  expect(detail.blocks[1]).toMatchObject({ type: 'to_do', text: 'Triển khai Notion OAuth', checked: true });
+  expect(calls.map(c => [c.method, new URL(c.url).pathname])).toEqual([
+    ['GET', '/v1/pages/' + PAGE],
+    ['GET', '/v1/data_sources/' + DS],
+    ['GET', '/v1/blocks/' + PAGE + '/children'],
+  ]);
+});
+
+it('updates page title, properties, and archived state via notion.update_page after verifying database scope', async () => {
+  const richSource = () => ({
+    ...source(),
+    properties: {
+      ...source().properties,
+      Status: { type: 'status', status: { options: [{ name: 'Not started' }, { name: 'In progress' }, { name: 'Done' }] } },
+    },
+  });
+  const { adapter, calls } = setup(call => {
+    const pathname = new URL(call.url).pathname;
+    if (pathname === '/v1/pages/' + PAGE) return ok(page());
+    if (pathname === '/v1/data_sources/' + DS) return ok(richSource());
+    return ok(page());
+  });
+
+  const updated = await adapter.execute('notion.update_page', {
+    pageId: PAGE,
+    title: 'ATI Review (Done)',
+    properties: { Status: 'Done', Check: 'false' },
+    archived: false,
+  });
+  expect(updated).toEqual({
+    id: PAGE,
+    url: page().url,
+    updatedProperties: ['Name', 'Status', 'Check'],
+    archived: false,
+  });
+  const patchCall = calls.find(c => c.method === 'PATCH' && new URL(c.url).pathname === '/v1/pages/' + PAGE)!;
+  expect(patchCall.body).toEqual({
+    properties: {
+      Name: { title: [{ type: 'text', text: { content: 'ATI Review (Done)' } }] },
+      Status: { status: { name: 'Done' } },
+      Check: { checkbox: false },
+    },
+    archived: false,
+  });
 });

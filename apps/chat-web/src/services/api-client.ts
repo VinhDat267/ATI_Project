@@ -436,7 +436,7 @@ export class ApiClient {
       status: 'connected' | 'needs_scope';
       telegramUserId: string;
       username: string;
-      displayName: string;
+      displayName?: string;
       chats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean }>;
       selectedChats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean }>;
       returnTo?: string;
@@ -464,6 +464,121 @@ export class ApiClient {
   }
   disconnectTelegram() {
     return this.request<{ success: true }>('/api/connections/telegram', {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+  }
+  getNotionConnection() {
+    return this.request<{
+      available: boolean;
+      status: 'unconfigured' | 'not_connected' | 'reconnect_required' | 'needs_scope' | 'connected';
+      activeConnectionId?: string;
+      workspaceId?: string;
+      workspaceName?: string;
+      workspaceIcon?: string | null;
+      botId?: string;
+      ownerEmail?: string | null;
+      ownerName?: string | null;
+      selectedDatabases?: Array<{ id: string; title: string; url?: string }>;
+      connections: Array<{
+        id: string;
+        status: 'connected' | 'needs_scope' | 'reconnect_required';
+        workspaceId: string;
+        workspaceName: string;
+        workspaceIcon?: string | null;
+        botId: string;
+        ownerEmail?: string | null;
+        ownerName?: string | null;
+        isActive: boolean;
+        selectedDatabases: Array<{ id: string; title: string; url?: string }>;
+        lastHealthStatus?: string | null;
+        lastHealthCheckedAt?: string | null;
+      }>;
+    }>('/api/connections/notion', { credentials: 'include' });
+  }
+  startNotionConnection(options: { returnTo?: string } = {}) {
+    return this.request<{ url: string }>('/api/connections/notion/start', {
+      method: 'POST',
+      credentials: 'include',
+      ...(options.returnTo ? { body: JSON.stringify({ returnTo: options.returnTo }) } : {}),
+    });
+  }
+  completeNotionConnection(code: string, state: string) {
+    return this.request<{
+      available: boolean;
+      status: 'connected' | 'needs_scope' | 'reconnect_required' | 'not_connected';
+      activeConnectionId?: string;
+      workspaceId?: string;
+      workspaceName?: string;
+      selectedDatabases?: Array<{ id: string; title: string; url?: string }>;
+      connections: Array<any>;
+      returnTo?: string;
+    }>('/api/connections/notion/callback', {
+      method: 'POST',
+      credentials: 'include',
+      body: JSON.stringify({ code, state }),
+    }, true);
+  }
+  getNotionDatabases(connectionId: string, query?: string) {
+    const search = query ? `?query=${encodeURIComponent(query)}` : '';
+    return this.request<{
+      databases: Array<{ id: string; title: string; url?: string }>;
+    }>(`/api/connections/notion/${encodeURIComponent(connectionId)}/databases${search}`, {
+      credentials: 'include',
+    });
+  }
+  saveNotionScope(
+    connectionId: string,
+    databases: Array<string | { id: string; title?: string; url?: string }>
+  ) {
+    return this.request<{
+      available: boolean;
+      status: 'connected' | 'needs_scope';
+      activeConnectionId?: string;
+      workspaceId?: string;
+      workspaceName?: string;
+      botId?: string;
+      selectedDatabases?: Array<{ id: string; title: string; url?: string }>;
+      connections: Array<any>;
+    }>(`/api/connections/notion/${encodeURIComponent(connectionId)}/scope`, {
+      method: 'PUT',
+      credentials: 'include',
+      body: JSON.stringify({ databases }),
+    });
+  }
+  activateNotionConnection(connectionId: string) {
+    return this.request<{
+      available: boolean;
+      status: 'connected' | 'needs_scope' | 'reconnect_required';
+      activeConnectionId?: string;
+      workspaceId?: string;
+      workspaceName?: string;
+      botId?: string;
+      selectedDatabases?: Array<{ id: string; title: string; url?: string }>;
+      connections: Array<any>;
+    }>(`/api/connections/notion/${encodeURIComponent(connectionId)}/activate`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+  }
+  checkNotionConnection(connectionId: string) {
+    return this.request<{
+      status: 'healthy' | 'unhealthy';
+      latencyMs: number;
+      workspaceName?: string;
+      botId?: string;
+      message?: string;
+    }>(`/api/connections/notion/${encodeURIComponent(connectionId)}/check`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+  }
+  disconnectNotionConnection(connectionId: string) {
+    return this.request<{
+      available: boolean;
+      status: string;
+      connections: Array<any>;
+    }>(`/api/connections/notion/${encodeURIComponent(connectionId)}`, {
       method: 'DELETE',
       credentials: 'include',
     });

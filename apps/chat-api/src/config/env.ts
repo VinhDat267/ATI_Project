@@ -1,5 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { GOOGLE_ENDPOINTS, type GoogleOAuthConfig } from '../auth/google-oidc.js';
+import { notionOAuthEnv, type NotionOAuthConfig } from './notion-env.js';
+export type { NotionOAuthConfig };
 
 /** The Gmail OAuth client of its own Google Cloud project (not the sign-in client). */
 export interface GmailOAuthConfig {
@@ -112,6 +114,8 @@ export interface EnvConfig {
   TRELLO_OAUTH?: TrelloOAuthConfig;
   GITHUB_OAUTH?: GitHubOAuthConfig;
   TELEGRAM_BOT?: TelegramBotConfig;
+  NOTION_OAUTH?: NotionOAuthConfig;
+  MYNOTION_ENABLED?: boolean;
   /** The SCHEDULES_ENABLED flag (default off). Schedules also need PostgreSQL. */
   SCHEDULES_ENABLED: boolean;
   /** False only in live without SMTP: signup and every email route answer 503 (AUTH-02b). Sandbox uses the outbox. */
@@ -236,8 +240,9 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
   }
 
   if (env.GMAIL_ENABLED && !['on', 'off'].includes(env.GMAIL_ENABLED)) throw new Error('GMAIL_ENABLED must be on or off');
-  const GMAIL_ENABLED = env.GMAIL_ENABLED === 'on';
-  const GMAIL_OAUTH = GMAIL_ENABLED ? gmailOAuth(env, isLive) : undefined;
+  const explicitGmailOn = env.GMAIL_ENABLED === 'on';
+  const GMAIL_OAUTH = env.GMAIL_ENABLED === 'off' ? undefined : gmailOAuth(env, isLive, explicitGmailOn);
+  const GMAIL_ENABLED = explicitGmailOn ? true : Boolean(GMAIL_OAUTH);
   if (env.MYCALENDAR_ENABLED && !['on', 'off'].includes(env.MYCALENDAR_ENABLED)) throw new Error('MYCALENDAR_ENABLED must be on or off');
   const MYCALENDAR_ENABLED = env.MYCALENDAR_ENABLED === 'on';
   const MYCALENDAR_OAUTH = MYCALENDAR_ENABLED ? mycalendarOAuth(env, isLive) : undefined;
@@ -251,6 +256,36 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
   const TRELLO_OAUTH = trelloOAuth(env, isLive);
   const GITHUB_OAUTH = githubOAuth(env, isLive);
   const TELEGRAM_BOT = telegramBotConfig(env, isLive);
+  const NOTION_OAUTH = notionOAuthEnv(env, isLive);
+  const MYNOTION_ENABLED = env.MYNOTION_ENABLED === 'on' ? true : env.MYNOTION_ENABLED === 'off' ? false : Boolean(NOTION_OAUTH);
+
+  const explicitWebUrls: Array<{ field: string; url: string }> = [
+    ...(env.APP_BASE_URL?.trim() ? [{ field: 'APP_BASE_URL', url: APP_BASE_URL }] : []),
+    ...(GOOGLE_OAUTH ? [{ field: 'GOOGLE_OAUTH_REDIRECT_URI', url: GOOGLE_OAUTH.redirectUri }] : []),
+    ...(GMAIL_OAUTH ? [{ field: 'GMAIL_OAUTH_REDIRECT_URI', url: GMAIL_OAUTH.redirectUri }] : []),
+    ...(MYCALENDAR_OAUTH ? [{ field: 'MYCALENDAR_OAUTH_REDIRECT_URI', url: MYCALENDAR_OAUTH.redirectUri }] : []),
+    ...(MYSHEETS_OAUTH ? [{ field: 'MYSHEETS_OAUTH_REDIRECT_URI', url: MYSHEETS_OAUTH.redirectUri }] : []),
+    ...(TRELLO_OAUTH ? [{ field: 'TRELLO_OAUTH_REDIRECT_URI', url: TRELLO_OAUTH.redirectUri }] : []),
+    ...(GITHUB_OAUTH ? [{ field: 'GITHUB_OAUTH_REDIRECT_URI', url: GITHUB_OAUTH.redirectUri }] : []),
+    ...(TELEGRAM_BOT ? [{ field: 'TELEGRAM_WEB_CALLBACK_URL', url: TELEGRAM_BOT.callbackUrl }] : []),
+    ...(NOTION_OAUTH ? [{ field: 'NOTION_OAUTH_REDIRECT_URI', url: NOTION_OAUTH.redirectUri }] : []),
+  ];
+  if (explicitWebUrls.length > 1) {
+    const canonicalOrigin = (rawUrl: string) => {
+      const parsed = new URL(rawUrl);
+      const host = ['127.0.0.1', 'localhost', '[::1]'].includes(parsed.hostname) ? 'loopback' : parsed.hostname;
+      return `${parsed.protocol}//${host}${parsed.port ? `:${parsed.port}` : ''}`;
+    };
+    const base = explicitWebUrls[0]!;
+    const baseCanonical = canonicalOrigin(base.url);
+    for (const entry of explicitWebUrls.slice(1)) {
+      if (canonicalOrigin(entry.url) !== baseCanonical) {
+        throw new Error(
+          `Web origin mismatch: ${entry.field} (${new URL(entry.url).origin}) must match ${base.field} (${new URL(base.url).origin}) so browser sessions and OAuth cookies stay on one origin`
+        );
+      }
+    }
+  }
 
   return {
     DATABASE_URL,
@@ -276,6 +311,8 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
     TRELLO_OAUTH,
     GITHUB_OAUTH,
     TELEGRAM_BOT,
+    NOTION_OAUTH,
+    MYNOTION_ENABLED,
     SCHEDULES_ENABLED,
     EMAIL_ENABLED,
     APP_BASE_URL,
@@ -340,10 +377,11 @@ function validatePersonalGoogleProjects(env: Record<string, string | undefined>)
 }
 
 /** Live with the flag on refuses to start on a missing variable; sandbox disables Gmail instead. */
-function gmailOAuth(env: Record<string, string | undefined>, isLive: boolean): GmailOAuthConfig | undefined {
+function gmailOAuth(env: Record<string, string | undefined>, isLive: boolean, explicitOn = false): GmailOAuthConfig | undefined {
   const required = ['GMAIL_OAUTH_CLIENT_ID', 'GMAIL_OAUTH_CLIENT_SECRET', 'GMAIL_OAUTH_REDIRECT_URI'];
   const missing = required.find((field) => !env[field]?.trim());
-  if (missing && isLive) throw new Error(`${missing} is required when GMAIL_ENABLED=on in live mode`);
+  if (missing && isLive && explicitOn) throw new Error(`${missing} is required when GMAIL_ENABLED=on in live mode`);
+  if (missing && !explicitOn) return undefined;
   let redirectUri: string | undefined;
   if (env.GMAIL_OAUTH_REDIRECT_URI?.trim()) {
     try {

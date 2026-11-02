@@ -72,20 +72,107 @@ function dateValue(value: string): boolean {
   const clock = new Date(value.slice(0, 19) + 'Z');
   return Number.isFinite(Date.parse(value)) && Number.isFinite(clock.getTime()) && clock.toISOString().slice(0, 19) === value.slice(0, 19);
 }
-function propertyValue(type: string, value: string): object {
+function propertyValue(type: string, value: string | boolean | string[]): object {
   switch (type) {
-    case 'rich_text': return { rich_text: rich(value) };
-    case 'select': if (!value.trim() || value.length > 100) invalid('select value is invalid'); return { select: { name: value } };
-    case 'date': if (!dateValue(value)) invalid('date requires a valid ISO date or timezone-qualified instant'); return { date: { start: value } };
+    case 'rich_text': return { rich_text: rich(String(value)) };
+    case 'select': {
+      if (typeof value !== 'string' || !value.trim() || value.length > 100) invalid('select value is invalid');
+      return { select: { name: value } };
+    }
+    case 'status': {
+      if (typeof value !== 'string' || !value.trim() || value.length > 100) invalid('status value is invalid');
+      return { status: { name: value } };
+    }
+    case 'multi_select': {
+      const items = Array.isArray(value)
+        ? value.map(v => typeof v === 'string' ? v.trim() : '').filter(Boolean)
+        : typeof value === 'string'
+          ? value.split(',').map(v => v.trim()).filter(Boolean)
+          : [];
+      if (items.length === 0 || items.length > 20 || items.some(item => item.length > 100)) invalid('multi_select value is invalid');
+      return { multi_select: items.map(name => ({ name })) };
+    }
+    case 'checkbox': {
+      if (value === true || value === 'true') return { checkbox: true };
+      if (value === false || value === 'false') return { checkbox: false };
+      return invalid('checkbox value must be true or false');
+    }
+    case 'date': if (typeof value !== 'string' || !dateValue(value)) invalid('date requires a valid ISO date or timezone-qualified instant'); return { date: { start: value } };
     case 'url': {
+      if (typeof value !== 'string') invalid('url requires http or https');
       try { const url = new URL(value); if (!['https:', 'http:'].includes(url.protocol)) invalid('url requires http or https'); }
       catch { invalid('url requires http or https'); } return { url: value };
     }
     case 'number': {
-      if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(value) || !Number.isFinite(Number(value))) invalid('number value is invalid');
-      return { number: Number(value) };
+      const strVal = String(value);
+      if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(strVal) || !Number.isFinite(Number(strVal))) invalid('number value is invalid');
+      return { number: Number(strVal) };
     }
     default: return invalid('property type is unsupported');
+  }
+}
+
+function extractSchema(properties: Record<string, any>): Array<{ name: string; type: string; options?: string[] }> {
+  return Object.entries(properties).map(([name, def]) => {
+    const type = typeof def?.type === 'string' ? def.type : 'unknown';
+    const rawOpts = def?.[type]?.options;
+    const options = Array.isArray(rawOpts)
+      ? rawOpts.map((o: any) => o?.name).filter((n: any): n is string => typeof n === 'string' && n.length > 0)
+      : undefined;
+    return { name, type, ...(options && options.length > 0 ? { options } : {}) };
+  });
+}
+
+function validateAndConvertProperties(
+  source: { properties: Record<string, any>; title: string },
+  values: Record<string, any>,
+  titleOverride?: string,
+): Record<string, object> {
+  if (!values || typeof values !== 'object' || Array.isArray(values) || Object.keys(values).length > 100) {
+    invalid('properties must be a bounded string map');
+  }
+  const properties: Record<string, object> = {};
+  if (titleOverride !== undefined) {
+    Object.defineProperty(properties, source.title, { value: { title: rich(titleOverride) }, enumerable: true });
+  }
+  for (const [key, value] of Object.entries<any>(values)) {
+    if (typeof value === 'string') {
+      text(value, 2000);
+    } else if (typeof value !== 'boolean') {
+      invalid('text is outside its allowed size');
+    }
+    if (!Object.hasOwn(source.properties, key) || key === source.title) {
+      invalid('property does not exist or would override the title');
+    }
+    const definition = source.properties[key];
+    if (typeof definition?.type !== 'string') badResponse();
+    if (definition.type === 'select' && (!Array.isArray(definition.select?.options) || !definition.select.options.some((option: any) => option?.name === value))) {
+      invalid('select value must be an existing option');
+    }
+    if (definition.type === 'status' && Array.isArray(definition.status?.options) && definition.status.options.length > 0 && !definition.status.options.some((option: any) => option?.name === value)) {
+      invalid('status value must be an existing option');
+    }
+    if (definition.type === 'multi_select' && Array.isArray(definition.multi_select?.options) && definition.multi_select.options.length > 0) {
+      const items = typeof value === 'string' ? value.split(',').map(v => v.trim()).filter(Boolean) : [];
+      if (items.some(item => !definition.multi_select.options.some((option: any) => option?.name === item))) {
+        invalid('multi_select value must be an existing option');
+      }
+    }
+    Object.defineProperty(properties, key, { value: propertyValue(definition.type, value), enumerable: true });
+  }
+  return properties;
+}
+
+function formatBlockMarkdown(type: string, textContent: string, checked?: boolean): string {
+  switch (type) {
+    case 'heading_1': return `# ${textContent}`;
+    case 'heading_2': return `## ${textContent}`;
+    case 'heading_3': return `### ${textContent}`;
+    case 'bulleted_list_item': return `- ${textContent}`;
+    case 'numbered_list_item': return `1. ${textContent}`;
+    case 'to_do': return `- [${checked ? 'x' : ' '}] ${textContent}`;
+    case 'quote': case 'callout': return `> ${textContent}`;
+    default: return textContent;
   }
 }
 function retryDelay(header: string | null): number {
@@ -199,12 +286,35 @@ export class NotionAdapter extends BaseAdapter {
       return result;
     }
     if (toolName === 'notion.query_database') {
-      only(args, ['databaseId', 'query', 'limit']); const id = this.checkedDatabase(args.databaseId); const maximum = limit(args.limit, 20);
-      const query = args.query === undefined ? '' : text(args.query, 2000); const source = await this.schema(id, signal);
+      only(args, ['databaseId', 'query', 'status', 'limit']); const id = this.checkedDatabase(args.databaseId); const maximum = limit(args.limit, 20);
+      const query = args.query === undefined ? '' : text(args.query, 2000);
+      const statusFilter = args.status === undefined ? '' : text(args.status, 200).trim();
+      const source = await this.schema(id, signal);
+      const schema = extractSchema(source.properties);
+      const statusEntry =
+        Object.entries<any>(source.properties).find(([, def]) => def?.type === 'status') ??
+        Object.entries<any>(source.properties).find(
+          ([, def]) => def?.type === 'select' && Array.isArray(def?.select?.options),
+        );
+      let filter: object | undefined;
+      if (query && statusFilter && statusEntry) {
+        const [colName, colDef] = statusEntry;
+        filter = {
+          and: [
+            { property: source.title, title: { contains: query } },
+            { property: colName, [colDef.type]: { equals: statusFilter } },
+          ],
+        };
+      } else if (statusFilter && statusEntry) {
+        const [colName, colDef] = statusEntry;
+        filter = { property: colName, [colDef.type]: { equals: statusFilter } };
+      } else if (query) {
+        filter = { property: source.title, title: { contains: query } };
+      }
       const pages = []; const cursors = new Set<string>(); let cursor: string | undefined; let truncated = false;
       for (let index = 0; index < 20; index++) {
         const value = await this.request('data_sources/' + source.id + '/query', signal, 'POST', { page_size: maximum - pages.length,
-          ...(query ? { filter: { property: source.title, title: { contains: query } } } : {}), ...(cursor ? { start_cursor: cursor } : {}),
+          ...(filter ? { filter } : {}), ...(cursor ? { start_cursor: cursor } : {}),
         });
         if (value?.object !== 'list' || !Array.isArray(value.results) || typeof value.has_more !== 'boolean') badResponse();
         for (const item of value.results) {
@@ -215,10 +325,16 @@ export class NotionAdapter extends BaseAdapter {
             if (clipped.clipped) truncated = true;
             return [key, clipped.text];
           }));
-          pages.push({ id: uuid(item.id, true), title: properties[source.title] || '(Không có tiêu đề)', url: link(item), properties });
+          pages.push({
+            id: uuid(item.id, true),
+            title: properties[source.title] || '(Không có tiêu đề)',
+            url: link(item),
+            properties,
+            ...(typeof item.last_edited_time === 'string' ? { lastEditedTime: item.last_edited_time } : {}),
+          });
           if (pages.length >= maximum) break;
         }
-        if (pages.length >= maximum || !value.has_more) return { pages, ...(truncated ? { truncated: true } : {}) };
+        if (pages.length >= maximum || !value.has_more) return { pages, schema, ...(truncated ? { truncated: true } : {}) };
         if (typeof value.next_cursor !== 'string' || !value.next_cursor || cursors.has(value.next_cursor)) badResponse();
         const nextCursor: string = value.next_cursor; cursor = nextCursor; cursors.add(nextCursor);
       }
@@ -229,21 +345,92 @@ export class NotionAdapter extends BaseAdapter {
       const title = text(args.title, 200, true); const content = args.content === undefined ? '' : text(args.content, 4000);
       const values = args.properties === undefined ? {} : args.properties;
       if (!values || typeof values !== 'object' || Array.isArray(values) || Object.keys(values).length > 100) invalid('properties must be a bounded string map');
-      for (const value of Object.values(values)) text(value, 2000);
-      const source = await this.schema(id, signal); const properties: Record<string, object> = Object.fromEntries([[source.title, { title: rich(title) }]]);
-      for (const [key, value] of Object.entries<string>(values)) {
-        if (!Object.hasOwn(source.properties, key) || key === source.title) invalid('property does not exist or would override the title');
-        const definition = source.properties[key];
-        if (typeof definition?.type !== 'string') badResponse();
-        // A new select name would change the source schema implicitly, beyond creating a page.
-        if (definition.type === 'select' && (!Array.isArray(definition.select?.options) || !definition.select.options.some((option: any) => option?.name === value))) invalid('select value must be an existing option');
-        Object.defineProperty(properties, key, { value: propertyValue(definition.type, value), enumerable: true });
-      }
+      for (const value of Object.values(values)) if (typeof value !== 'boolean') text(value, 2000);
+      const source = await this.schema(id, signal);
+      const properties = validateAndConvertProperties(source, values, title);
       const result = await this.request('pages', signal, 'POST', { parent: { type: 'data_source_id', data_source_id: source.id }, properties,
         ...(content ? { children: paragraphs(content) } : {}),
       }, true);
       if (result?.object !== 'page') badResponse(true);
       return { id: uuid(result.id, true, true), url: link(result, true) };
+    }
+    if (toolName === 'notion.get_page') {
+      only(args, ['pageId']); const id = uuid(args.pageId); this.databaseIds();
+      const page = await this.request('pages/' + id, signal); this.resource(page, 'page', id);
+      if (page.parent?.type !== 'data_source_id') denied();
+      const source = await this.dataSource(uuid(page.parent.data_source_id, true), signal);
+      if (!source.properties || typeof source.properties !== 'object' || Array.isArray(source.properties)) badResponse();
+      const titles = Object.entries<any>(source.properties).filter(([, value]) => value?.type === 'title');
+      if (titles.length !== 1) badResponse();
+      const titleKey = titles[0]![0];
+      if (!page.properties || typeof page.properties !== 'object' || Array.isArray(page.properties)) badResponse();
+      let truncated = false;
+      const properties = Object.fromEntries(Object.entries(page.properties).map(([key, prop]) => {
+        const clipped = clipText(propertyText(prop), NOTION_MAX_PROPERTY_CHARS);
+        if (clipped.clipped) truncated = true;
+        return [key, clipped.text];
+      }));
+      const blockRes = await this.request('blocks/' + id + '/children', signal);
+      if (blockRes?.object !== 'list' || !Array.isArray(blockRes.results)) badResponse();
+      const blocks: Array<{ id: string; type: string; text: string; checked?: boolean }> = [];
+      const lines: string[] = [];
+      for (const blk of blockRes.results) {
+        if (!blk || blk.object !== 'block' || typeof blk.type !== 'string') continue;
+        const blkId = uuid(blk.id, true);
+        const data = blk[blk.type];
+        const rawText = Array.isArray(data?.rich_text) ? plainRich(data.rich_text) : '';
+        const clippedBlk = clipText(rawText, NOTION_MAX_PROPERTY_CHARS);
+        if (clippedBlk.clipped) truncated = true;
+        const checked = blk.type === 'to_do' ? Boolean(data?.checked) : undefined;
+        blocks.push({ id: blkId, type: blk.type, text: clippedBlk.text, ...(checked !== undefined ? { checked } : {}) });
+        if (clippedBlk.text || blk.type === 'to_do') {
+          lines.push(formatBlockMarkdown(blk.type, clippedBlk.text, checked));
+        }
+      }
+      const joinedContent = clipText(lines.join('\n'), 4000);
+      if (joinedContent.clipped) truncated = true;
+      return {
+        id,
+        title: properties[titleKey] || '(Không có tiêu đề)',
+        url: link(page),
+        properties,
+        content: joinedContent.text,
+        blocks,
+        ...(typeof page.last_edited_time === 'string' ? { lastEditedTime: page.last_edited_time } : {}),
+        ...(truncated || blockRes.has_more === true ? { truncated: true } : {}),
+      };
+    }
+    if (toolName === 'notion.update_page') {
+      only(args, ['pageId', 'title', 'properties', 'archived']);
+      const id = uuid(args.pageId);
+      const title = args.title === undefined ? undefined : text(args.title, 200, true);
+      const values = args.properties === undefined ? {} : args.properties;
+      if (!values || typeof values !== 'object' || Array.isArray(values) || Object.keys(values).length > 100) invalid('properties must be a bounded string map');
+      for (const value of Object.values(values)) if (typeof value !== 'boolean') text(value, 2000);
+      if (args.archived !== undefined && typeof args.archived !== 'boolean') invalid('archived must be a boolean');
+      if (title === undefined && Object.keys(values).length === 0 && args.archived === undefined) {
+        invalid('update_page requires at least one of title, properties, or archived');
+      }
+      this.databaseIds();
+      const page = await this.request('pages/' + id, signal); this.resource(page, 'page', id);
+      if (page.parent?.type !== 'data_source_id') denied();
+      const source = await this.dataSource(uuid(page.parent.data_source_id, true), signal);
+      if (!source.properties || typeof source.properties !== 'object' || Array.isArray(source.properties)) badResponse();
+      const titles = Object.entries<any>(source.properties).filter(([, value]) => value?.type === 'title');
+      if (titles.length !== 1) badResponse();
+      const titleKey = titles[0]![0];
+      const converted = validateAndConvertProperties({ properties: source.properties, title: titleKey }, values, title);
+      const body: Record<string, any> = {};
+      if (Object.keys(converted).length > 0) body.properties = converted;
+      if (typeof args.archived === 'boolean') body.archived = args.archived;
+      const result = await this.request('pages/' + id, signal, 'PATCH', body, true);
+      if (result?.object !== 'page') badResponse(true);
+      return {
+        id: uuid(result.id, true, true),
+        url: link(result, true),
+        updatedProperties: Object.keys(converted),
+        ...(typeof args.archived === 'boolean' ? { archived: args.archived } : {}),
+      };
     }
     if (toolName === 'notion.append_text') {
       only(args, ['pageId', 'text']); const id = uuid(args.pageId); const content = text(args.text, 2000, true); this.databaseIds();

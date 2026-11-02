@@ -6,5 +6,6 @@ export const NOTION_SERVICE: ServiceDefinition = {
   scopes: ['read_content', 'insert_content'], scopeKey: 'databases', scopeLabel: 'Database ID', scopePattern: NOTION_ID_PATTERN,
   normalizeScopeEntry: normalizeNotionId,
   credentialFields: [{ key: 'token', label: 'Internal integration token', type: 'password' }],
-  intentKeywords: ['notion'], fallbackIntentKeywords: ['ghi chú', 'wiki', 'tài liệu'],
+  intentKeywords: ['notion'],
+  fallbackIntentKeywords: ['ghi chú', 'wiki', 'tài liệu', 'biên bản họp', 'meeting notes', 'knowledge base', 'roadmap', 'backlog', 'crm'],
 };
