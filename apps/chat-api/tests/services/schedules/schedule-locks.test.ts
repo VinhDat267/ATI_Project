@@ -5,6 +5,7 @@ import type { ScheduleResponse } from '@wap/tool-schemas';
 import { ScheduleRunner } from '../../../src/services/schedules/schedule-runner.js';
 import { ScheduleConflict, ScheduleService } from '../../../src/services/schedules/schedule-service.js';
 import { createMigratedSchema } from '../../helpers/gmail-test-db.js';
+import {MessageRepo} from '../../../src/db/repositories/message-repo.js';
 
 const VN = 'Asia/Ho_Chi_Minh';
 type Db = Awaited<ReturnType<typeof createMigratedSchema>>;
@@ -32,8 +33,8 @@ describe('schedule lock order on PostgreSQL', () => {
   const waitsForLock = (name: string) => vi.waitFor(async () => expect((await db.pool.query(
     "SELECT 1 FROM pg_stat_activity WHERE application_name=$1 AND wait_event_type='Lock'", [name])).rowCount).toBe(1), { timeout: 5_000, interval: 20 });
   const propose = async (convId: string, proposal: ScheduleResponse, scheduleId: string | null = null, baseVersion: number | null = null) =>
-    (await db.pool.query("INSERT INTO messages(conv_id,role,content,metadata) VALUES($1,'assistant',$2,$3) RETURNING id", [convId, proposal.summary,
-      JSON.stringify({ type: 'schedule_proposal', proposal, scheduleId, baseVersion, services: ['calendar', 'slack'], nextRuns: [], previous: null })])).rows[0].id as string;
+    (await new MessageRepo(db.pool).createMessage(convId,'assistant',proposal.summary,
+      {type:'schedule_proposal',proposal,scheduleId,baseVersion,services:['calendar','slack'],nextRuns:[],previous:null})).id;
   const create = (over: Partial<ScheduleResponse> = {}): ScheduleResponse => ({ kind: 'schedule', action: 'create', name: 'Lịch họp',
     request: 'Gửi lịch họp hôm nay lên Slack #ati-test', recurrence: { type: 'daily', time: '08:00' }, summary: 'Mỗi sáng 8 giờ gửi lịch họp.', ...over });
   const confirmed = async (service: ScheduleService, proposal = create()) => {

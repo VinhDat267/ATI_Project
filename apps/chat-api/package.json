@@ -21,6 +21,7 @@
     "dev": "tsx src/server.ts",
     "start": "tsx src/server.ts",
     "admin:provision": "tsx src/cli/provision-user.ts",
+    "admin:slack-consent": "tsx src/cli/slack-consent.ts",
     "test": "vitest run"
   },
   "devDependencies": {

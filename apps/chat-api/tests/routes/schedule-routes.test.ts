@@ -5,6 +5,7 @@ import { createApp } from '../../src/app.js';
 import { generateAccessToken } from '../../src/auth/jwt.js';
 import { ScheduleService } from '../../src/services/schedules/schedule-service.js';
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
+import {MessageRepo} from '../../src/db/repositories/message-repo.js';
 
 const secret = 'schedule_routes_test_secret_at_least_32_characters';
 const VN = 'Asia/Ho_Chi_Minh';
@@ -26,8 +27,8 @@ describe('schedule routes over HTTP and PostgreSQL', () => {
   });
   const conversation = async (who: Person) => (await db.pool.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [who.id])).rows[0].id as string;
   const propose = async (convId: string, proposal: ScheduleResponse, scheduleId: string | null = null, baseVersion: number | null = null) =>
-    (await db.pool.query("INSERT INTO messages(conv_id,role,content,metadata) VALUES($1,'assistant',$2,$3) RETURNING id", [convId, proposal.summary,
-      JSON.stringify({ type: 'schedule_proposal', proposal, scheduleId, baseVersion, services: ['calendar', 'slack'], nextRuns: [], previous: null })])).rows[0].id as string;
+    (await new MessageRepo(db.pool).createMessage(convId,'assistant',proposal.summary,
+      {type:'schedule_proposal',proposal,scheduleId,baseVersion,services:['calendar','slack'],nextRuns:[],previous:null})).id;
   const confirm = (who: Person, convId: string, messageId: string) => api(who).post(`/api/conversations/${convId}/schedule-proposals/${messageId}/confirm`);
   /** A confirmed daily schedule owned by `who`. */
   const scheduled = async (who: Person, proposal = create()) => {

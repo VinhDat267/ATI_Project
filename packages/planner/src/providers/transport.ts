@@ -16,6 +16,8 @@ export interface TransportOptions {
   /** Provider name used in the timeout message. */
   label: string;
   signal?: AbortSignal;
+  /** Unlike diagnostics, denial must stop dispatch and must not be swallowed. */
+  beforeAttempt?: (signal: AbortSignal) => Promise<void>;
   /** Observer failures must not change provider behavior. */
   onAttempt?: (metrics: ModelAttemptMetrics) => void;
 }
@@ -51,6 +53,8 @@ async function attemptWithDeadline<T>(attempt: (signal: AbortSignal) => Promise<
   );
   const signal = options.signal ? AbortSignal.any([options.signal, timeout.signal]) : timeout.signal;
   try {
+    await options.beforeAttempt?.(signal);
+    if (signal.aborted) throw abortReason(signal, options.label);
     return await attempt(signal);
   } catch (err) {
     // Surface our own deadline rather than the transport's generic abort error.
@@ -93,5 +97,12 @@ export async function callWithRetry<T>(attempt: (signal: AbortSignal) => Promise
       await sleep(options.retryDelayMs * 2 ** retry, options.signal, options.label);
       retry += 1;
     }
+  }
+}
+
+/** The opt-in cap is validated before a gate can reserve any budget. */
+export function validateModelOutputLimit(value: number | undefined): void {
+  if (value !== undefined && (!Number.isSafeInteger(value) || value < 1 || value > 65536)) {
+    throw new TypeError('MODEL_OUTPUT_LIMIT_INVALID');
   }
 }

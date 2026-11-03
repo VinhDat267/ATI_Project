@@ -44,6 +44,8 @@ export function GitHubConnection({
   const [candidateRepos, setCandidateRepos] = useState<
     Array<{ repoId: string; fullName: string; name: string; private?: boolean }>
   >([]);
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
+  const [repoFilter, setRepoFilter] = useState('');
   const [selectedRepos, setSelectedRepos] = useState<string[]>([]);
   const [editingScope, setEditingScope] = useState(false);
 
@@ -57,6 +59,9 @@ export function GitHubConnection({
     try {
       const res = await apiClient.getGitHubConnection();
       if (mounted.current) {
+        if (isAdmin && res.status === 'needs_scope') {
+          setLoadingCandidates(true);
+        }
         setData(res);
       }
     } catch {
@@ -76,7 +81,7 @@ export function GitHubConnection({
 
   useEffect(() => {
     const focus = () => {
-      if (window.location.hash === '#github') {
+      if (window.location.hash === '#github' || window.location.hash === '#github-scope') {
         row.current?.scrollIntoView?.({ block: 'center' });
         row.current?.focus();
       }
@@ -92,6 +97,7 @@ export function GitHubConnection({
 
   useEffect(() => {
     if (isAdmin && (data?.status === 'needs_scope' || editingScope)) {
+      setLoadingCandidates(true);
       apiClient
         .getGitHubCandidateRepos()
         .then((res) => {
@@ -101,6 +107,9 @@ export function GitHubConnection({
         })
         .catch(() => {
           if (mounted.current) setCandidateRepos([]);
+        })
+        .finally(() => {
+          if (mounted.current) setLoadingCandidates(false);
         });
     }
   }, [isAdmin, data?.status, editingScope]);
@@ -325,32 +334,71 @@ export function GitHubConnection({
           </h4>
 
           <div className="v3-space-y-2">
-            <label className="text-xs font-semibold text-[#111827]">
-              Các repository được phép dùng (tối đa 10 repository)
-            </label>
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-xs font-semibold text-[#111827]">
+                Các repository được phép dùng (tối đa 10 repository)
+              </label>
+              <span
+                data-testid="github-scope-counter"
+                className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-white border border-[#E7E7E2] text-[#4B5563]"
+              >
+                Đã chọn {selectedRepos.length}/10
+              </span>
+            </div>
+            {candidateRepos.length >= 5 && (
+              <input
+                type="search"
+                value={repoFilter}
+                onChange={(e) => setRepoFilter(e.target.value)}
+                placeholder="Tìm nhanh theo tên repository..."
+                aria-label="Tìm nhanh repository"
+                className="w-full px-3 py-1.5 text-xs bg-white border border-[#E7E7E2] rounded-lg text-[#111827] focus:ring-2 focus:ring-[#FF5701] focus:v3-outline-none"
+              />
+            )}
             <div className="v3-space-y-1.5 max-h-48 overflow-y-auto">
-              {candidateRepos.map((r) => {
-                const checked = selectedRepos.includes(r.fullName);
-                const disabled = !checked && selectedRepos.length >= 10;
-                return (
-                  <label
-                    key={r.fullName}
-                    className={`flex items-center gap-2 p-2 rounded-lg text-xs cursor-pointer ${
-                      checked ? 'bg-[#F8F8F6] border border-[#111827]/30' : 'bg-white border border-[#E7E7E2]'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      disabled={disabled}
-                      onChange={() => toggleRepo(r.fullName)}
-                      className="rounded text-[#111827] focus:ring-[#111827]"
-                    />
-                    <span className="font-medium text-[#111827]">{r.fullName}</span>
-                  </label>
-                );
-              })}
-              {candidateRepos.length === 0 && (
+              {candidateRepos
+                .filter((r) =>
+                  !repoFilter.trim() ||
+                  r.fullName.toLowerCase().includes(repoFilter.trim().toLowerCase())
+                )
+                .map((r) => {
+                  const checked = selectedRepos.includes(r.fullName);
+                  const disabled = !checked && selectedRepos.length >= 10;
+                  return (
+                    <div
+                      key={r.fullName}
+                      className={`flex items-center justify-between gap-2 p-2 rounded-lg text-xs ${
+                        checked ? 'bg-[#F8F8F6] border border-[#111827]/30' : 'bg-white border border-[#E7E7E2]'
+                      }`}
+                    >
+                      <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={disabled}
+                          onChange={() => toggleRepo(r.fullName)}
+                          className="rounded text-[#111827] focus:ring-[#111827]"
+                        />
+                        <span className="font-medium text-[#111827] truncate">{r.fullName}</span>
+                      </label>
+                      {typeof r.private === 'boolean' && (
+                        <span
+                          className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border shrink-0 ${
+                            r.private
+                              ? 'bg-amber-50 text-amber-800 border-amber-200'
+                              : 'bg-neutral-100 text-neutral-600 border-neutral-200'
+                          }`}
+                        >
+                          {r.private ? 'Private' : 'Public'}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              {loadingCandidates && candidateRepos.length === 0 && (
+                <p className="text-xs text-[#6B7280]">Đang tải danh sách repository từ GitHub…</p>
+              )}
+              {!loadingCandidates && candidateRepos.length === 0 && (
                 <p className="text-xs text-[#6B7280]">Không có repository nào trong tài khoản này.</p>
               )}
             </div>

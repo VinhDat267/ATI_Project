@@ -1,6 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
-import type { LLMProvider, LLMGeneratePlanInput } from '../types.js';
-import { callWithRetry } from './transport.js';
+import type { LLMProvider, LLMGeneratePlanInput, ModelCallMetrics } from '../types.js';
+import { callWithRetry, validateModelOutputLimit } from './transport.js';
 
 /** The slice of the Gemini SDK the provider uses; injectable for tests. */
 export interface GeminiClient {
@@ -8,8 +8,8 @@ export interface GeminiClient {
     generateContent(request: {
       model: string;
       contents: Array<{ role: string; parts: Array<{ text: string }> }>;
-      config?: { systemInstruction?: string; responseMimeType?: string; abortSignal?: AbortSignal };
-    }): Promise<{ text?: string }>;
+      config?: { systemInstruction?: string; responseMimeType?: string; abortSignal?: AbortSignal; maxOutputTokens?: number; httpOptions?: {retryOptions?: {attempts: number}} };
+    }): Promise<{ text?: string;usageMetadata?:{promptTokenCount?:number;candidatesTokenCount?:number;thoughtsTokenCount?:number;totalTokenCount?:number} }>;
   };
 }
 
@@ -29,6 +29,8 @@ export interface GeminiProviderConfig {
 
 export class GeminiProvider implements LLMProvider {
   public readonly name = 'gemini';
+  public readonly supportsModelBudget = true as const;
+  public lastCallMetrics?:ModelCallMetrics;
   private apiKey: string;
   public readonly model: string;
   private client?: GeminiClient;
@@ -56,22 +58,30 @@ export class GeminiProvider implements LLMProvider {
   }
 
   async generatePlan(input: LLMGeneratePlanInput): Promise<string> {
+    validateModelOutputLimit(input.maxOutputTokens);
     const systemPrompt = `${input.systemPrompt}\n\nWorking Memory Context:\n${JSON.stringify(input.workingMemory, null, 2)}`;
     const contents = input.conversationHistory.map((m) => ({
       role: m.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: m.content }],
     }));
 
-    return callWithRetry(async (abortSignal) => {
+    const started=performance.now(),metrics:ModelCallMetrics={durationMs:0,attempts:[],usage:{promptTokens:null,completionTokens:null,reasoningTokens:null,totalTokens:null}};
+    this.lastCallMetrics=metrics;
+    try{return await callWithRetry(async (abortSignal) => {
       const response = await this.getClient().models.generateContent({
         model: this.model,
         contents,
-        config: { systemInstruction: systemPrompt, responseMimeType: 'application/json', abortSignal },
+        config: { systemInstruction: systemPrompt, responseMimeType: 'application/json', abortSignal,
+          ...(input.maxOutputTokens !== undefined ? {maxOutputTokens: input.maxOutputTokens} : {}),
+          ...(input.beforeModelAttempt ? {httpOptions: {retryOptions: {attempts: 1}}} : {}),
+        },
       });
+      const count=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>=0?v:null,u=response.usageMetadata;
+      metrics.usage={promptTokens:count(u?.promptTokenCount),completionTokens:count(u?.candidatesTokenCount),reasoningTokens:count(u?.thoughtsTokenCount),totalTokens:count(u?.totalTokenCount)};
       return response.text || '';
     }, {
       label: 'Gemini', timeoutMs: this.timeoutMs, maxRetries: this.maxRetries, timeoutRetries: this.timeoutRetries,
-      retryDelayMs: this.retryDelayMs, signal: input.signal,
-    });
+      retryDelayMs: this.retryDelayMs, signal: input.signal, beforeAttempt: input.beforeModelAttempt,onAttempt:attempt=>metrics.attempts.push(attempt),
+    });}finally{metrics.durationMs=performance.now()-started;}
   }
 }

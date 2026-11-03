@@ -11,7 +11,7 @@
     "notion": { "databaseId": "ID cơ sở dữ liệu Notion", "pageId": "ID trang Notion" },
     "telegram": { "chatId": "ID cuộc trò chuyện Telegram" },
     "jira": { "projectKey": "Mã dự án Jira", "issueKey": "Mã công việc Jira", "summary": "Tiêu đề công việc", "issueType": "Loại công việc", "body": "Nội dung bình luận" },
-    "github": { "repo": "Kho mã nguồn GitHub", "issueNumber": "Số công việc GitHub", "body": "Nội dung công việc", "labels": "Các nhãn", "label": "Nhãn" }
+    "github": { "repo": "Kho mã nguồn GitHub", "issueNumber": "Số công việc GitHub", "body": "Nội dung công việc", "labels": "Các nhãn", "label": "Nhãn", "assignees": "Người phụ trách", "state": "Trạng thái", "query": "Từ khóa tìm kiếm" }
   },
   "outputs": {
     "html_url": "liên kết", "webUrl": "liên kết", "key": "mã công việc",
@@ -23,6 +23,6 @@
     "boardId": "ID bảng Trello", "listId": "ID danh sách Trello", "cardId": "ID thẻ Trello",
     "memberId": "ID thành viên", "username": "tên người dùng", "email": "địa chỉ email",
     "items": "các mục", "pages": "các trang", "events": "các sự kiện", "issues": "các công việc",
-    "labels": "các nhãn", "repo": "kho mã nguồn", "status": "trạng thái", "type": "loại"
+    "labels": "các nhãn", "assignees": "người phụ trách", "state": "trạng thái", "repo": "kho mã nguồn", "status": "trạng thái", "type": "loại"
   }
 }

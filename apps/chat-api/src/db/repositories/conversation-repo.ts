@@ -1,4 +1,7 @@
+import {readScheduleArtifact,captureScheduleArtifact,prelockScheduleArtifacts,scheduleRegistry} from '../../services/slack/slack-schedule-lineage.js';
+import {messageFingerprint} from '../../services/slack/slack-message-selectors.js';
 import type pg from 'pg';
+import { sealMessageOrigin } from '../../services/slack/slack-message-origin.js';
 import {
   encodeConversationCursor,
   validateConversationPage,
@@ -43,6 +46,52 @@ export class ConversationRepo {
     return this.pool;
   }
 
+  private async insertAndSealConversation(
+    queryText: string,
+    values: unknown[]
+  ): Promise<ConversationRow> {
+    if (typeof this.pool.connect !== 'function') {
+      const res = await this.pool.query<ConversationRow>(queryText, values);
+      const row = res.rows[0];
+      if (!row) throw new Error('Insert returned no row');
+      return row;
+    }
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const res = await client.query<ConversationRow>(queryText, values);
+      const row = res.rows[0];
+      if (!row) throw new Error('Insert returned no row');
+      await client.query('SAVEPOINT conv_origin_seal');
+      try {
+        await sealMessageOrigin(client, 'conversations', row.id, 'conversation_create');
+        await client.query('RELEASE SAVEPOINT conv_origin_seal');
+      } catch (sealErr: any) {
+        await client.query('ROLLBACK TO SAVEPOINT conv_origin_seal');
+        if (sealErr?.code !== '42P01') throw sealErr;
+      }
+      await client.query('COMMIT');
+      delete (row as any).slack_lineage_manifest;
+      delete (row as any).slack_title_manual_fingerprint;
+      return row;
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async safeReadConversation(row: ConversationRow): Promise<ConversationRow> {
+    if (typeof this.pool.connect !== 'function') return row;
+    try {
+      return (await readScheduleArtifact(this.pool, 'conversations', row.id)) ?? row;
+    } catch (err: any) {
+      if (err?.code === '42P01') return row;
+      throw err;
+    }
+  }
+
   async createConversation(
     userId: string,
     titleOrScope?: string | ConversationScope,
@@ -74,28 +123,22 @@ export class ConversationRepo {
 
     // Legacy un-scoped conversation
     if (!title && !workspaceId && workspaceMode === 'legacy') {
-      const res = await this.pool.query<ConversationRow>(
+      return this.insertAndSealConversation(
         `INSERT INTO conversations (user_id, status, workspace_mode, jira_context)
          VALUES ($1, 'chatting', 'legacy', false)
          RETURNING *`,
         [userId]
       );
-      const row = res.rows[0];
-      if (!row) throw new Error('Insert returned no row');
-      return row;
     }
 
     // Personal workspace conversation
     if (workspaceMode === 'personal') {
-      const res = await this.pool.query<ConversationRow>(
+      return this.insertAndSealConversation(
         `INSERT INTO conversations (user_id, status, title, workspace_mode, jira_context)
          VALUES ($1, 'chatting', $2, 'personal', false)
          RETURNING *`,
         [userId, title]
       );
-      const row = res.rows[0];
-      if (!row) throw new Error('Insert returned no row');
-      return row;
     }
 
     // Organization workspace conversation (ordinary or Jira)
@@ -163,9 +206,19 @@ export class ConversationRepo {
            RETURNING *`,
           [userId, title, workspaceId, jiraContext]
         );
-        await client.query('COMMIT');
         const row = res.rows[0];
         if (!row) throw new Error('Insert returned no row');
+        await client.query('SAVEPOINT conv_origin_seal');
+        try {
+          await sealMessageOrigin(client, 'conversations', row.id, 'conversation_create');
+          await client.query('RELEASE SAVEPOINT conv_origin_seal');
+        } catch (sealErr: any) {
+          await client.query('ROLLBACK TO SAVEPOINT conv_origin_seal');
+          if (sealErr?.code !== '42P01') throw sealErr;
+        }
+        await client.query('COMMIT');
+        delete (row as any).slack_lineage_manifest;
+        delete (row as any).slack_title_manual_fingerprint;
         return row;
       } catch (err) {
         await client.query('ROLLBACK').catch(() => {});
@@ -176,15 +229,12 @@ export class ConversationRepo {
     }
 
     // Default legacy insert with title
-    const res = await this.pool.query<ConversationRow>(
+    return this.insertAndSealConversation(
       `INSERT INTO conversations (user_id, status, title, workspace_mode, jira_context)
        VALUES ($1, 'chatting', $2, 'legacy', false)
        RETURNING *`,
       [userId, title]
     );
-    const row = res.rows[0];
-    if (!row) throw new Error('Insert returned no row');
-    return row;
   }
 
   async listConversations(
@@ -249,7 +299,7 @@ export class ConversationRepo {
          LIMIT $${values.length}`,
         values
       );
-      return res.rows;
+      return Promise.all(res.rows.map((row) => this.safeReadConversation(row)));
     } catch (err: any) {
       if (err?.code === '42703' && scope?.workspaceMode === 'legacy') {
         return this.listConversations(userId, limit, undefined);
@@ -261,7 +311,7 @@ export class ConversationRepo {
   async getConversation(id: string): Promise<ConversationRow | null> {
     if (!isUuid(id)) return null;
     const res = await this.pool.query<ConversationRow>('SELECT * FROM conversations WHERE id = $1', [id]);
-    return res.rows[0] ?? null;
+    return res.rows[0] ? this.safeReadConversation(res.rows[0]) : null;
   }
 
   async getConversationForUser(
@@ -358,27 +408,36 @@ export class ConversationRepo {
         )
       )`);
     }
-    if (search) {
-      values.push(`%${search.replace(/[\\%_]/g, '\\$&')}%`);
-      where.push(`title ILIKE $${values.length} ESCAPE '\\'`);
-    }
     if (cursor) {
       values.push(cursor.updatedAt, cursor.id);
       where.push(`(updated_at, id) < ($${values.length - 1}::timestamptz, $${values.length}::uuid)`);
     }
-    values.push(limit + 1);
+    values.push(search ? 500 : limit + 1);
     try {
       const result = await this.pool.query<ConversationRow & { cursor_updated_at: string }>(
         `SELECT *, to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_updated_at
          FROM conversations WHERE ${where.join(' AND ')} ORDER BY updated_at DESC, id DESC LIMIT $${values.length}`,
         values
       );
-      const visible = result.rows.slice(0, limit);
-      const last = visible.at(-1);
-      const nextCursor =
-        result.rows.length > limit && last
-          ? encodeConversationCursor({ updatedAt: last.cursor_updated_at, id: last.id })
-          : null;
+      const guarded = await Promise.all(
+        result.rows.map(async (row) => ({
+          ...(await this.safeReadConversation(row)),
+          cursor_updated_at: row.cursor_updated_at,
+        }))
+      );
+      const matching = search
+        ? guarded.filter((row) => row.title?.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
+        : guarded;
+      const visible = matching.slice(0, limit);
+      const last =
+        matching.length > limit
+          ? visible.at(-1)
+          : result.rows.length === 500
+            ? guarded.at(-1)
+            : undefined;
+      const nextCursor = last
+        ? encodeConversationCursor({ updatedAt: last.cursor_updated_at, id: last.id })
+        : null;
       return { conversations: visible.map(({ cursor_updated_at: _timestamp, ...row }) => row), nextCursor };
     } catch (err: any) {
       if (err?.code === '42703' && scope?.workspaceMode === 'legacy') {
@@ -390,38 +449,84 @@ export class ConversationRepo {
 
   async renameConversation(id: string, userId: string, title: string): Promise<ConversationRow | null> {
     if (!isUuid(id) || !isUuid(userId)) return null;
-    const result = await this.pool.query<ConversationRow>(
-      `UPDATE conversations c
-       SET title = $3, updated_at = clock_timestamp()
-       WHERE c.id = $1
-         AND c.user_id = $2
-         AND (
-           c.workspace_id IS NULL
-           OR (
-             EXISTS (
-               SELECT 1 FROM workspace_members wm
-               JOIN workspaces w ON w.id = wm.workspace_id
-               WHERE wm.workspace_id = c.workspace_id
-                 AND wm.user_id = $2
-                 AND wm.status = 'active'
-             )
-             AND (
-               c.jira_context IS NOT TRUE
-               OR EXISTS (
-                 SELECT 1 FROM ati_workspace_memberships jm
-                 JOIN ati_workspaces jw ON jw.id = jm.workspace_id
-                 WHERE jm.workspace_id = c.workspace_id
-                   AND jm.user_id = $2
-                   AND jm.status = 'active'
-                   AND jw.status = 'active'
+    const cleaned = validateConversationTitle(title);
+    if (typeof this.pool.connect !== 'function') {
+      const result = await this.pool.query<ConversationRow>(
+        `UPDATE conversations c SET title = $3, updated_at = clock_timestamp() WHERE c.id = $1 AND c.user_id = $2 RETURNING c.*`,
+        [id, userId, cleaned]
+      );
+      return result.rows[0] ?? null;
+    }
+    const client = await this.pool.connect();
+    const registry = scheduleRegistry(this.pool);
+    try {
+      await client.query('BEGIN');
+      await client.query("SET LOCAL statement_timeout='5s'");
+      const snapshot = await captureScheduleArtifact(client, registry, 'conversations', id);
+      if (!snapshot || snapshot.owner !== userId) {
+        await client.query('COMMIT');
+        return null;
+      }
+      await prelockScheduleArtifacts(client, registry, [snapshot]);
+      await client.query('SELECT id FROM conversations WHERE id=$1 AND user_id=$2 FOR UPDATE', [id, userId]);
+      const current = await captureScheduleArtifact(client, registry, 'conversations', id);
+      if (JSON.stringify(current?.copies) !== JSON.stringify(snapshot.copies)) {
+        throw Error('SLACK_TITLE_CHANGED');
+      }
+      await client.query(
+        "UPDATE slack_derived_copies SET status='retired',retired_at=clock_timestamp(),retired_reason='manual',updated_at=clock_timestamp() WHERE target_kind='scheduled_workflow_arg' AND target_id=$1 AND target_sub_id='title' AND status='active'",
+        [id]
+      );
+      const result = await client.query<ConversationRow>(
+        `UPDATE conversations c
+         SET title = $3,
+             updated_at = now(),
+             slack_title_manual_fingerprint = $4,
+             slack_lineage_manifest = NULL
+         WHERE c.id = $1
+           AND c.user_id = $2
+           AND (
+             c.workspace_id IS NULL
+             OR (
+               EXISTS (
+                 SELECT 1 FROM workspace_members wm
+                 JOIN workspaces w ON w.id = wm.workspace_id
+                 WHERE wm.workspace_id = c.workspace_id
+                   AND wm.user_id = $2
+                   AND wm.status = 'active'
+               )
+               AND (
+                 c.jira_context IS NOT TRUE
+                 OR EXISTS (
+                   SELECT 1 FROM ati_workspace_memberships jm
+                   JOIN ati_workspaces jw ON jw.id = jm.workspace_id
+                   WHERE jm.workspace_id = c.workspace_id
+                     AND jm.user_id = $2
+                     AND jm.status = 'active'
+                     AND jw.status = 'active'
+                 )
                )
              )
            )
-         )
-       RETURNING c.*`,
-      [id, userId, validateConversationTitle(title)]
-    );
-    return result.rows[0] ?? null;
+         RETURNING c.*`,
+        [id, userId, cleaned, messageFingerprint(cleaned, 'title')]
+      );
+      const row = result.rows[0];
+      if (!row) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+      await sealMessageOrigin(client, 'conversations', id, 'title_manual');
+      await client.query('COMMIT');
+      delete (row as any).slack_lineage_manifest;
+      delete (row as any).slack_title_manual_fingerprint;
+      return row;
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async updateStatus(id: string, status: string): Promise<void> {

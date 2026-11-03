@@ -1,0 +1,292 @@
+{
+  "schemaVersion": "2026-11-02.v1",
+  "frozenBeforeModelRun": true,
+  "casesSha256": "dd5820a42bb44134241393c4d417b6fb0321a58d034031f47f0916e8fbed2998",
+  "items": {
+    "slk-01": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "mention",
+      "expectedSourceIndex": 0,
+      "expectedAction": "task",
+      "expectedService": "trello",
+      "expectedDeadlineText": "2026-11-06"
+    },
+    "slk-02": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "mention",
+      "expectedSourceIndex": 0,
+      "expectedAction": "task",
+      "expectedService": "trello"
+    },
+    "slk-03": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "mention",
+      "expectedSourceIndex": 0,
+      "expectedAction": "issue",
+      "expectedService": "jira"
+    },
+    "slk-04": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "self_commitment",
+      "expectedSourceIndex": 0,
+      "expectedAction": "progress",
+      "expectedService": "mysheets",
+      "expectedDeadlineText": "2026-11-05"
+    },
+    "slk-05": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "self_commitment",
+      "expectedSourceIndex": 0,
+      "expectedAction": "task",
+      "expectedService": "trello"
+    },
+    "slk-06": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "mention",
+      "expectedSourceIndex": 0,
+      "expectedAction": "task",
+      "expectedService": "trello",
+      "expectedDeadlineText": "2026-11-07"
+    },
+    "slk-07": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "mention",
+      "expectedSourceIndex": 0,
+      "expectedAction": "task",
+      "expectedService": "trello"
+    },
+    "slk-08": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "self_commitment",
+      "expectedSourceIndex": 0,
+      "expectedAction": "task",
+      "expectedService": "trello"
+    },
+    "slk-09": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "mention",
+      "expectedSourceIndex": 0,
+      "expectedAction": "issue",
+      "expectedService": "jira",
+      "expectedDeadlineText": "2026-11-04"
+    },
+    "slk-10": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "mention",
+      "expectedSourceIndex": 0,
+      "expectedAction": "task",
+      "expectedService": "trello"
+    },
+    "slk-11": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "self_commitment",
+      "expectedSourceIndex": 0,
+      "expectedAction": "task",
+      "expectedService": "trello"
+    },
+    "slk-12": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "mention",
+      "expectedSourceIndex": 0,
+      "expectedAction": "task",
+      "expectedService": "trello"
+    },
+    "slk-13": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "followed_thread",
+      "expectedSourceIndex": 0,
+      "expectedAction": "task",
+      "expectedService": "trello"
+    },
+    "slk-14": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "followed_thread",
+      "expectedSourceIndex": 0,
+      "expectedAction": "task",
+      "expectedService": "trello"
+    },
+    "slk-15": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "mention",
+      "expectedSourceIndex": 0,
+      "expectedAction": "issue",
+      "expectedService": "jira"
+    },
+    "slk-16": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "mention",
+      "expectedSourceIndex": 0,
+      "expectedAction": "task",
+      "expectedService": "trello",
+      "expectedDeadlineText": "tuần sau"
+    },
+    "slk-17": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "mention",
+      "expectedSourceIndex": 0,
+      "expectedAction": "task",
+      "expectedService": "trello",
+      "expectedDeadlineText": "thứ sáu tới"
+    },
+    "slk-18": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "mention",
+      "expectedSourceIndex": 0,
+      "expectedAction": "task",
+      "expectedService": "trello",
+      "expectedDeadlineText": "trước khi tan làm"
+    },
+    "slk-19": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "mention",
+      "expectedSourceIndex": 0,
+      "expectedAction": "issue",
+      "expectedService": "jira",
+      "expectedDeadlineText": "sớm nhất có thể"
+    },
+    "slk-20": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "self_commitment",
+      "expectedSourceIndex": 0,
+      "expectedAction": "task",
+      "expectedService": "trello",
+      "expectedDeadlineText": "vài ngày tới"
+    },
+    "slk-21": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "direct_message",
+      "expectedSourceIndex": 0,
+      "expectedAction": "task",
+      "expectedService": "trello",
+      "expectedDeadlineText": "khi có thể"
+    },
+    "slk-22": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "mention",
+      "expectedSourceIndex": 0,
+      "expectedAction": "task",
+      "expectedService": "trello",
+      "expectedDeadlineText": "next week"
+    },
+    "slk-23": {
+      "expectedKind": "no_action"
+    },
+    "slk-24": {
+      "expectedKind": "no_action"
+    },
+    "slk-25": {
+      "expectedKind": "no_action"
+    },
+    "slk-26": {
+      "expectedKind": "no_action"
+    },
+    "slk-27": {
+      "expectedKind": "no_action"
+    },
+    "slk-28": {
+      "expectedKind": "no_action"
+    },
+    "slk-29": {
+      "expectedKind": "no_action"
+    },
+    "slk-30": {
+      "expectedKind": "no_action"
+    },
+    "slk-31": {
+      "expectedKind": "no_action"
+    },
+    "slk-32": {
+      "expectedKind": "no_action"
+    },
+    "slk-33": {
+      "expectedKind": "no_action"
+    },
+    "slk-34": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "mention",
+      "expectedSourceIndex": 1,
+      "expectedAction": "task",
+      "expectedService": "trello"
+    },
+    "slk-35": {
+      "expectedKind": "no_action"
+    },
+    "slk-36": {
+      "expectedKind": "no_action"
+    },
+    "slk-37": {
+      "expectedKind": "no_action"
+    },
+    "slk-38": {
+      "expectedKind": "no_action"
+    },
+    "slk-39": {
+      "expectedKind": "no_action"
+    },
+    "slk-40": {
+      "expectedKind": "no_action"
+    },
+    "slk-41": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "mention",
+      "expectedSourceIndex": 0,
+      "expectedAction": "task",
+      "expectedService": "trello"
+    },
+    "slk-42": {
+      "expectedKind": "needs_clarification",
+      "expectedRelevanceKind": "mention",
+      "expectedSourceIndex": 0
+    },
+    "slk-43": {
+      "expectedKind": "needs_clarification",
+      "expectedRelevanceKind": "mention",
+      "expectedSourceIndex": 0
+    },
+    "slk-44": {
+      "expectedKind": "needs_clarification",
+      "expectedRelevanceKind": "mention",
+      "expectedSourceIndex": 0
+    },
+    "slk-45": {
+      "expectedKind": "needs_clarification",
+      "expectedRelevanceKind": "direct_message",
+      "expectedSourceIndex": 0
+    },
+    "slk-46": {
+      "expectedKind": "needs_clarification",
+      "expectedRelevanceKind": "mention",
+      "expectedSourceIndex": 0
+    },
+    "slk-47": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "direct_message",
+      "expectedSourceIndex": 0,
+      "expectedAction": "task",
+      "expectedService": "trello"
+    },
+    "slk-48": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "direct_message",
+      "expectedSourceIndex": 0,
+      "expectedAction": "issue",
+      "expectedService": "jira"
+    },
+    "slk-49": {
+      "expectedKind": "proposal",
+      "expectedRelevanceKind": "mention",
+      "expectedSourceIndex": 0,
+      "expectedAction": "task",
+      "expectedService": "trello"
+    },
+    "slk-50": {
+      "expectedKind": "no_action"
+    },
+    "slk-51": {
+      "expectedKind": "no_action"
+    },
+    "slk-52": {
+      "expectedKind": "no_action"
+    }
+  }
+}

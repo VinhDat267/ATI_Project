@@ -1,0 +1,5 @@
+import {it,expect} from 'vitest';
+import {StepRunner} from '../src/runner.js';
+const step={id:'post',tool:'myslack.chat_postMessage',description:'Post',args:{channel:'C_ONE',text:'Exact text'},dependsOn:[]};
+it('keeps personal writes disabled without the explicit server callback',async()=>{let calls=0;const result=await new StepRunner({getAdapter:()=>{calls++;throw new Error();}}).executeStep(step,new Map());expect(result.status).toBe('failed');expect(calls).toBe(0);});
+it('uses only the explicit server callback and preserves UNKNOWN after an actual AbortSignal timeout',async()=>{let calls=0,aborted=false;const result=await new StepRunner({getAdapter:()=>{throw new Error('No fallback');},slackWrite:async(_step,signal)=>{calls++;await new Promise<void>(resolve=>signal.addEventListener('abort',()=>{aborted=signal.aborted;resolve();},{once:true}));throw Object.assign(new Error('SLACK_WRITE_UNKNOWN'),{category:'UNKNOWN',details:{requestSent:true}});}}).executeStep(step,new Map(),{timeoutMs:30});expect(result.status).toBe('unknown');expect(calls).toBe(1);expect(aborted).toBe(true);});

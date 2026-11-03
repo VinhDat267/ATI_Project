@@ -23,6 +23,7 @@ import {
 import { isAdmin } from '../auth/jwt.js';
 
 export interface ServicesRoutesOptions {
+  slackOAuthAvailable?: boolean;
   credentialRepo?: CredentialRepo;
   encryptionKey?: string;
   fetchFn?: typeof fetch;
@@ -527,6 +528,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
         services,
         canConfigure: mode === 'personal' ? true : isAdminUser,
         canSelectTeamScope: mode === 'personal' ? true : isAdminUser,
+        ...(options.slackOAuthAvailable ? { personalOAuth: ['myslack'] } : {}),
       });
     } catch (err: any) {
       res.status(500).json({ error: err?.message || 'Failed to list services' });

@@ -44,7 +44,7 @@ export const GITHUB_TOOLS: ToolDefinition[] = [
     name: 'github.create_issue', service: 'github', sideEffect: 'write', riskLevel: 'medium',
     description: 'Create an issue in one allowed GitHub repository after approval.',
     inputSchema: { type: 'object', properties: {
-      repo: repoProperty, title: { type: 'string' }, body: { type: 'string' }, labels: { type: 'array', items: { type: 'string' } },
+      repo: repoProperty, title: { type: 'string' }, body: { type: 'string' }, labels: { type: 'array', items: { type: 'string' } }, assignees: { type: 'array', items: { type: 'string' } },
     }, required: ['repo', 'title'], additionalProperties: false },
     outputSchema: { type: 'object', properties: issueProperties, required: ['id', 'number', 'title', 'url', 'repo'] },
   },
@@ -55,5 +55,96 @@ export const GITHUB_TOOLS: ToolDefinition[] = [
     outputSchema: { type: 'object', properties: {
       number: { type: 'number' }, labels: { type: 'array', items: { type: 'string' } }, repo: { type: 'string' }, url: { type: 'string' },
     }, required: ['number', 'labels', 'repo', 'url'] },
+  },
+];
+
+export const GITHUB_OAUTH_TOOLS: ToolDefinition[] = [
+  {
+    name: 'github.get_pull_request', service: 'github', sideEffect: 'read', riskLevel: 'low',
+    description: 'Get pull request details in one allowed GitHub repository.',
+    inputSchema: { type: 'object', properties: { repo: repoProperty, issueNumber: issueNumberProperty }, required: ['repo', 'issueNumber'], additionalProperties: false },
+    outputSchema: { type: 'object', properties: {
+      ...issueProperties,
+      body: { type: 'string' },
+      labels: { type: 'array', items: { type: 'string' } },
+      state: { type: 'string' },
+      isPullRequest: { type: 'boolean' },
+    }, required: ['id', 'number', 'title', 'url', 'repo', 'body', 'labels'] },
+  },
+  {
+    name: 'github.update_issue', service: 'github', sideEffect: 'write', riskLevel: 'medium',
+    description: 'Update an issue (title, body, state open/closed, labels, or assignees) in one allowed GitHub repository after approval.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        repo: repoProperty,
+        issueNumber: issueNumberProperty,
+        title: { type: 'string' },
+        body: { type: 'string' },
+        state: { type: 'string', enum: ['open', 'closed'] },
+        labels: { type: 'array', items: { type: 'string' } },
+        assignees: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['repo', 'issueNumber'],
+      additionalProperties: false,
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        ...issueProperties,
+        state: { type: 'string' },
+        labels: { type: 'array', items: { type: 'string' } },
+        assignees: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['id', 'number', 'title', 'url', 'repo', 'state'],
+    },
+  },
+  {
+    name: 'github.add_comment', service: 'github', sideEffect: 'write', riskLevel: 'medium',
+    description: 'Add a comment to an issue or pull request in one allowed GitHub repository after approval.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        repo: repoProperty,
+        issueNumber: issueNumberProperty,
+        body: { type: 'string' },
+      },
+      required: ['repo', 'issueNumber', 'body'],
+      additionalProperties: false,
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        issueNumber: { type: 'number' },
+        body: { type: 'string' },
+        repo: { type: 'string' },
+        url: { type: 'string' },
+      },
+      required: ['id', 'issueNumber', 'body', 'repo', 'url'],
+    },
+  },
+  {
+    name: 'github.list_issues', service: 'github', discovers: 'issue', sideEffect: 'read', riskLevel: 'low',
+    description: 'List issues across allowed GitHub repositories or within one allowed repository.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        repo: repoProperty,
+        state: { type: 'string', enum: ['open', 'closed'] },
+        query: { type: 'string' },
+        limit: limitProperty,
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    outputSchema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: issueProperties,
+        required: ['id', 'number', 'title', 'url', 'repo'],
+      },
+    },
   },
 ];

@@ -1,3 +1,5 @@
+import {createPersonalSlackAssistantRuntime} from './config/slack-assistant-runtime.js';
+import {SlackDerivedExpiryFanout} from './services/slack/slack-derived-expiry.js';
 import { EventEmitter } from 'node:events';
 import { createMemoryConversationRepositories } from './db/repositories/memory-conversations.js';
 import { validateEnv, JIRA_ENDPOINTS } from './config/env.js';
@@ -26,6 +28,20 @@ import { createCalendarDigestExecutor } from './services/schedules/calendar-dige
 import { createGithubDigestRunner, type RunGithubDigest } from './services/schedules/github-digest-runner.js';
 import { AdapterFactory, type AdapterContext } from './services/adapter-factory.js';
 import { GmailConnectionRepo } from './db/repositories/gmail-connection-repo.js';
+import { SlackConnectionRepo } from './db/repositories/slack-connection-repo.js';
+import { SlackSourceRepo } from './db/repositories/slack-source-repo.js';
+import { SlackInvalidationService } from './services/slack/slack-invalidation-service.js';
+import { SlackPolicyEventConsumer } from './services/slack/slack-policy-event-consumer.js';
+import { SlackInvalidationRunner } from './services/slack/slack-invalidation-runner.js';
+import { SlackDerivedPolicyFanout } from './services/slack/slack-derived-policy-fanout.js';
+import { SlackMessagePurgeConsumer } from './services/slack/slack-message-purge-consumer.js';
+import { SlackEventReceiptRepo } from './db/repositories/slack-event-receipt-repo.js';
+import { SlackIngressService } from './services/slack/slack-ingress-service.js';
+import { slackIngressEnv } from './config/slack-ingress-env.js';
+import { createSlackLifecycleRuntime } from './services/slack/slack-lifecycle-runtime.js';
+import { createSlackFanoutRuntime } from './services/slack/slack-fanout-runtime.js';
+import {createPersonalSlackWriteRuntime} from './config/slack-write-runtime.js';
+import { createPersonalSlackReadRuntime } from './config/slack-read-runtime.js';
 import { GmailOAuthClient } from './services/gmail/oauth-client.js';
 import { GmailTokenManager } from './services/gmail/token-manager.js';
 import { createGmailConnectionLookup, createMyCalendarConnectionLookup, createMySheetsConnectionLookup } from './services/gmail/connection-reference.js';
@@ -528,7 +544,11 @@ async function bootstrap() {
     },
   };
 
+  const personalSlackReads=createPersonalSlackReadRuntime({pool:pool??undefined,oauth:env.MYSLACK_OAUTH,encryptionKey:env.ENCRYPTION_KEY,plans:planRepo,steps:stepRepo,provider,env:process.env});
+  const personalSlackWrites=createPersonalSlackWriteRuntime({pool:pool??undefined,oauth:env.MYSLACK_OAUTH,encryptionKey:env.ENCRYPTION_KEY,plans:planRepo,env:process.env});
   const chatService = new ChatService({
+    slackWrites:personalSlackWrites,
+    slackReads:personalSlackReads?.proposals,
     msgRepo,
     convRepo,
     planRepo,
@@ -671,7 +691,25 @@ async function bootstrap() {
     digestRunnerImpl = createGithubDigestRunner({
       pool,
       githubConnection,
+      telegramConnection,
       getAdapter: (serviceName, context) => adapterFactory.getAdapterForService(serviceName, context),
+      summarizeDigest: async ({ repos, newIssues, stalePrs, unassignedIssues, staleDays }, signal) => {
+        if (newIssues.length === 0 && stalePrs.length === 0 && unassignedIssues.length === 0) {
+          return null;
+        }
+        const prompt = [
+          `Hãy tóm tắt ngắn gọn bằng tiếng Việt (tối đa 2 câu, tập trung vào điểm nghẽn quan trọng nhất cần xử lý trước) cho bản tin GitHub của các repo: ${repos.join(', ')}.`,
+          `- Issue mới (${newIssues.length}): ${newIssues.map((i) => `${i.repo}#${i.number} ${i.title}`).join('; ') || 'không có'}`,
+          `- PR chờ review quá ${staleDays} ngày (${stalePrs.length}): ${stalePrs.map((i) => `${i.repo}#${i.number} ${i.title}`).join('; ') || 'không có'}`,
+          `- Issue mở chưa ai nhận (${unassignedIssues.length}): ${unassignedIssues.map((i) => `${i.repo}#${i.number} ${i.title}`).join('; ') || 'không có'}`,
+        ].join('\n');
+        if (typeof provider?.generateText !== 'function') return null;
+        return provider.generateText(
+          'Bạn là trợ lý kỹ thuật phát hiện điểm nghẽn trên GitHub. Chỉ trả lời văn bản thuần túy bằng tiếng Việt, ngắn gọn tối đa 2 câu.',
+          prompt,
+          signal,
+        );
+      },
     });
   }
 
@@ -686,6 +724,8 @@ async function bootstrap() {
 
   // 6. ExecutionService
   const executionService = new ExecutionService({
+    slackRead:personalSlackReads?.execution,
+    slackWrite:personalSlackWrites,
     planRepo,
     stepRepo,
     convRepo,
@@ -699,8 +739,50 @@ async function bootstrap() {
 
   if (!env.EMAIL_ENABLED) console.warn('\x1b[33m[chat-api] Chưa cấu hình SMTP: đăng ký, xác minh email và quên mật khẩu tạm tắt (503).\x1b[0m');
 
-  // 7. Express App
+  // 7. Slack Invalidation & Source Store Runtime
+  const slackInvalidationService = pool ? new SlackInvalidationService(pool) : undefined;
+  const slackSourceRepo = pool ? new SlackSourceRepo(pool) : undefined;
+  const slackPolicyEventConsumer = (pool && slackInvalidationService && slackSourceRepo)
+    ? new SlackPolicyEventConsumer(pool, slackInvalidationService, slackSourceRepo)
+    : undefined;
+  const slackInvalidationRunner = (slackSourceRepo && slackInvalidationService && slackPolicyEventConsumer)
+    ? new SlackInvalidationRunner(slackSourceRepo, slackInvalidationService, slackPolicyEventConsumer, {
+        sweepIntervalMs: 5000,
+        batchSize: 50,
+        derivedPolicyFanout: pool && slackInvalidationService ? new SlackDerivedPolicyFanout(pool,slackInvalidationService) : undefined,
+        messagePurgeConsumer: pool ? new SlackMessagePurgeConsumer(pool) : undefined,
+        derivedExpiryFanout:pool?new SlackDerivedExpiryFanout(pool):undefined,
+        memoryPurgeConsumer: pool ? new SlackMessagePurgeConsumer(pool,{targetKind:'working_memory_entity'}) : undefined,
+        artifactPurgeConsumers: pool ? [new SlackMessagePurgeConsumer(pool,{targetKind:'plan_step_arg'}),new SlackMessagePurgeConsumer(pool,{targetKind:'audit_log_entry'}),new SlackMessagePurgeConsumer(pool,{targetKind:'scheduled_workflow_arg'}),new SlackMessagePurgeConsumer(pool,{targetKind:'proposal_excerpt'}),new SlackMessagePurgeConsumer(pool,{targetKind:'daily_digest_entry'})] : [],
+      })
+    : undefined;
+
+  // Signed ingress is mounted whenever PostgreSQL is available. A missing Slack configuration
+  // leaves it mounted but fail-closed (503 CONFIG_MISSING), never silently acknowledging events.
+  const slackIngressConfig = slackIngressEnv(process.env, env.RUNTIME_MODE === 'live');
+  const slackEventReceiptRepo = pool && slackInvalidationService
+    ? new SlackEventReceiptRepo(pool, slackInvalidationService)
+    : undefined;
+  const slackIngress = slackEventReceiptRepo
+    ? { service: new SlackIngressService({ config: slackIngressConfig, repo: slackEventReceiptRepo }) }
+    : undefined;
+  const slackLifecycleRuntime = createSlackLifecycleRuntime({
+    pool: pool ?? undefined, encryptionKey: env.ENCRYPTION_KEY, env: process.env, live: env.RUNTIME_MODE === 'live',
+    onError: (code) => console.warn('[chat-api]', code),
+  });
+  const slackFanoutRuntime = await createSlackFanoutRuntime({
+    pool: pool ?? undefined, env: process.env, live: env.RUNTIME_MODE === 'live',
+    onError: (code) => console.warn('[chat-api]', code),
+  });
+  if (slackIngressConfig && !slackIngress) {
+    console.warn('\x1b[33m[chat-api] MYSLACK_ENABLED=on nhưng chưa có PostgreSQL: Slack signed ingress tạm tắt.\x1b[0m');
+  }
+
+  const slackAssistant=createPersonalSlackAssistantRuntime({pool:pool??undefined,oauth:env.MYSLACK_OAUTH,encryptionKey:env.ENCRYPTION_KEY,env:process.env,live:env.RUNTIME_MODE==='live'});
+  // 8. Express App
   const app = createApp({
+    slackAssistant,
+    myslack: env.MYSLACK_OAUTH && pool && userRepo ? { oauth: env.MYSLACK_OAUTH, repo: new SlackConnectionRepo(pool, slackInvalidationService) } : undefined,
     jwtSecret: env.JWT_SECRET,
     runtimeMode: env.RUNTIME_MODE,
     userRepo,
@@ -795,14 +877,43 @@ async function bootstrap() {
     sseManager,
     executionService,
     schedules: schedules ? { service: schedules.service, emit: (convId, event, payload) => sseManager.emitEvent(convId, event, payload) } : undefined,
+    slackSourceRepo,
+    slackInvalidationService,
+    slackInvalidationRunner,
+    slackIngress,
   });
+
+  // Receipts are body-free routing metadata kept for 7 days so Slack retries stay idempotent.
+  // Unfinished lifecycle validation keeps its receipt until resolved; durable barriers
+  // are independent of receipt cleanup.
+  const slackReceiptCleanupTimer = slackEventReceiptRepo
+    ? setInterval(() => {
+        void slackEventReceiptRepo.purgeExpiredReceipts(new Date()).catch((err) => {
+          console.warn('\x1b[33m[chat-api] Dọn receipt Slack thất bại:\x1b[0m', err?.message || err);
+        });
+      }, 6 * 60 * 60 * 1000)
+    : undefined;
+  slackReceiptCleanupTimer?.unref?.();
 
   const host = env.RUNTIME_MODE === 'sandbox' ? '127.0.0.1' : '0.0.0.0';
   app.listen(port, host, () => {
     console.log(`\x1b[32m[chat-api] ✓ Server đang lắng nghe tại http://${host}:${port}\x1b[0m`);
     console.log(`\x1b[36m[chat-api] ✓ Health check: http://${host}:${port}/api/health\x1b[0m`);
     schedules?.runner.start();
+    slackInvalidationRunner?.start();
+    slackLifecycleRuntime?.start();
+    slackFanoutRuntime?.start();
+    slackAssistant?.runner?.start();
   });
+
+  const shutdown = async () => {
+    schedules?.runner.stop();
+    if (slackReceiptCleanupTimer) clearInterval(slackReceiptCleanupTimer);
+    await Promise.all([slackInvalidationRunner?.stop(), slackLifecycleRuntime?.stop(), slackFanoutRuntime?.stop(),slackAssistant?.runner?.stop()]);
+    process.exit(0);
+  };
+  process.once('SIGINT', shutdown);
+  process.once('SIGTERM', shutdown);
 }
 
 bootstrap().catch((err) => {

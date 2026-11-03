@@ -3,6 +3,7 @@ import type { StepState, PlanStatus } from '../types';
 import { type JSONSchema } from '@wap/tool-schemas';
 import { toolDefinition } from '../services/tool-definitions';
 import { ServiceLogo } from './ServiceLogo';
+import { SlackReadResult } from './SlackReadResult';
 
 export interface ExecutionStepInfo {
   id: string;
@@ -21,7 +22,7 @@ export interface ExecutionProgressProps {
   status?: PlanStatus;
 }
 
-const resultNames: Record<string, string> = { name: 'Tên', title: 'Tiêu đề', fullName: 'Tên đầy đủ', url: 'Liên kết', html_url: 'Liên kết', id: 'Mã', key: 'Mã', number: 'Số', messageId: 'Mã tin nhắn', createdAt: 'Thời gian', updatedAt: 'Cập nhật', start: 'Bắt đầu', end: 'Kết thúc' };
+const resultNames: Record<string, string> = { name: 'Tên', title: 'Tiêu đề', fullName: 'Tên đầy đủ', repo: 'Kho mã', state: 'Trạng thái', body: 'Nội dung', issueNumber: 'Số issue', url: 'Liên kết', html_url: 'Liên kết', id: 'Mã', key: 'Mã', number: 'Số', messageId: 'Mã tin nhắn', createdAt: 'Thời gian', updatedAt: 'Cập nhật', start: 'Bắt đầu', end: 'Kết thúc' };
 const timeFields = new Set(['createdAt', 'updatedAt', 'start', 'end']);
 const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 const safeURL = (text: string) => { try { const url = new URL(text); return url.protocol === 'https:' && !url.username && !url.password; } catch { return false; } };
@@ -49,6 +50,8 @@ function collectionRows(value: unknown, tool: string): unknown[] | undefined {
 export function ResultFields({ output, tool }: { output: unknown; tool: string }) {
   let value = output;
   if (typeof output === 'string') { try { value = JSON.parse(output); } catch { /* Plain text remains visible. */ } }
+  if(tool==='myslack.chat_postMessage'&&isRecord(value))return <div className="mt-2 text-sm"><p>Đã xác nhận gửi trên Slack</p><p>Kênh: {String(value.channel??'')}</p><p>Mã tin: {String(value.ts??'')}</p></div>;
+  if (tool.startsWith('myslack.')) return <SlackReadResult value={value} />;
   const rows = collectionRows(value, tool);
   return <div className="mt-2 text-xs text-text-secondary break-words">
     {isRecord(value) && <FieldList value={value} />}

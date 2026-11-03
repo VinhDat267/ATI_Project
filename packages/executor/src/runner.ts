@@ -1,6 +1,8 @@
 import type { PlanStep, ToolDefinition } from '@wap/tool-schemas';
-import { ALL_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, MYJIRA_TOOLS } from '@wap/tool-schemas';
+import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, MYJIRA_TOOLS, SLACK_PROPOSAL_WORKFLOW_TOOLS } from '@wap/tool-schemas';
 import { resolveArgs } from './resolver.js';
+import { executeSlackRead } from './slack/read-guard.js';
+import { isSlackReadTool } from '@wap/tool-schemas';
 import type {
   StepOutputs,
   StepRunnerOptions,
@@ -12,10 +14,11 @@ import type {
 // Personal tools (Gmail, MyCalendar, MySheets, MyJira) are opt-in and outside ALL_TOOLS, but their writes must never fall to the name heuristic
 // (e.g. reply/forward/trash would read as reads: shorter timeout and no UNKNOWN, so a mail could be resent).
 const catalog = new Map<string, ToolDefinition>(
-  [...ALL_TOOLS, ...GMAIL_TOOLS, ...MYCALENDAR_TOOLS, ...MYSHEETS_TOOLS, ...MYJIRA_TOOLS].map((t) => [t.name, t])
+  [...ALL_TOOLS, ...GITHUB_OAUTH_TOOLS, ...GMAIL_TOOLS, ...MYCALENDAR_TOOLS, ...MYSHEETS_TOOLS, ...MYJIRA_TOOLS].map((t) => [t.name, t])
 );
 
 export function isWriteTool(toolName: string): boolean {
+  if (toolName.startsWith('myslack.')) return !isSlackReadTool(toolName);
   const def = catalog.get(toolName);
   if (def) {
     return def.sideEffect === 'write';
@@ -83,8 +86,43 @@ export class StepRunner {
     const combinedSignal = combineSignals(timeoutSignal, options?.signal);
 
     try {
+      if(step.tool==='myslack.chat_postMessage'&&this.options.slackWrite){
+        const resolvedStep={...structuredClone(step),args:resolveArgs(step.args||{},stepOutputs)};
+        const output=await this.options.slackWrite(resolvedStep,combinedSignal);
+        return {stepId:step.id,status:'success',output,error:null,durationMs:Date.now()-startTime};
+      }
+      if (step.tool.startsWith('myslack.')) {
+        const output = await executeSlackRead({step,outputs:stepOutputs,snapshot:this.options.slackSnapshot,guard:this.options.slackDispatchGuard,getAdapter:this.options.getAdapter,signal:combinedSignal});
+        return {stepId:step.id,status:'success',output,error:null,durationMs:Date.now()-startTime};
+      }
       // 1. Resolve arguments ($ref, $template)
       const resolvedArgs = resolveArgs(step.args || {}, stepOutputs);
+
+      if (step.tool === SLACK_PROPOSAL_WORKFLOW_TOOLS.bugCreateTool && Array.isArray(step.dependsOn) && step.dependsOn.length > 0 && typeof resolvedArgs.summary === 'string') {
+        const wanted = resolvedArgs.summary.trim().toLowerCase();
+        const targetProjectKey = typeof resolvedArgs.projectKey === 'string' ? resolvedArgs.projectKey.trim().toUpperCase() : '';
+        for (const depId of step.dependsOn) {
+          const depOut = stepOutputs.get(depId) as any;
+          const issues = Array.isArray(depOut?.issues) ? depOut.issues : Array.isArray(depOut?.output?.issues) ? depOut.output.issues : null;
+          const match = issues?.find((item: any) => {
+            if (typeof item?.title !== 'string' || item.title.trim().toLowerCase() !== wanted) return false;
+            if (typeof item.id !== 'string' || typeof item.key !== 'string' || typeof item.url !== 'string') return false;
+            if (!targetProjectKey) return true;
+            const itemProjectKey = typeof item.projectKey === 'string' ? item.projectKey.trim().toUpperCase() : '';
+            const keyPrefix = item.key.trim().toUpperCase().split('-')[0] ?? '';
+            return itemProjectKey === targetProjectKey || keyPrefix === targetProjectKey;
+          });
+          if (match) {
+            return {
+              stepId: step.id,
+              status: 'success',
+              output: { id: match.id, key: match.key, url: match.url },
+              error: null,
+              durationMs: Date.now() - startTime,
+            };
+          }
+        }
+      }
 
       // 2. Extract service name (e.g. 'trello' from 'trello.create_card')
       const dotIndex = step.tool.indexOf('.');
@@ -100,6 +138,7 @@ export class StepRunner {
         stepId: step.id,
         boardId: (step as any).boardId,
         ...((step as any).chatId ? { chatId: (step as any).chatId } : {}),
+        ...((step as any).repo ? { repo: (step as any).repo } : {}),
       });
 
       const durationMs = Date.now() - startTime;

@@ -1,0 +1,72 @@
+import {afterAll,beforeAll,it,expect,vi} from 'vitest';
+import request from 'supertest';
+import {createSlackReadEnvironment,TEST_KEY} from '../helpers/slack-private-read-fixture.js';
+import {SlackDerivedLineageRepo} from '../../src/db/repositories/slack-derived-lineage-repo.js';
+import {PlanRepo} from '../../src/db/repositories/plan-repo.js';
+import {StepRepo} from '../../src/db/repositories/step-repo.js';
+import {MessageRepo} from '../../src/db/repositories/message-repo.js';
+import {ConversationRepo} from '../../src/db/repositories/conversation-repo.js';
+import {SlackReadPlanBindings} from '../../src/services/slack/slack-plan-bindings.js';
+import {SlackReadRuntime} from '../../src/services/slack/slack-read-runtime.js';
+import {SlackReadProposalService} from '../../src/services/slack/slack-read-proposals.js';
+import {ChatService} from '../../src/services/chat-service.js';
+import {ExecutionService} from '../../src/services/execution-service.js';
+import {createApp} from '../../src/app.js';
+import {generateAccessToken} from '../../src/auth/jwt.js';
+import {SLACK_USER_SCOPES} from '../../src/services/slack/oauth-client.js';
+const secret='m2-public-test-secret-more-than-32chars';
+let env:Awaited<ReturnType<typeof createSlackReadEnvironment>>;
+beforeAll(async()=>{env=await createSlackReadEnvironment('public_reads');},30000);
+afterAll(async()=>{await env?.close();});
+async function setup(storage=true){
+ const owner=await env.addUser({name:'Public owner',workspaceId:'T_PUBLIC_'+Math.random().toString(36).slice(2),actorId:'U_PUBLIC'});
+ await env.db.pool.query('UPDATE slack_connections SET scopes=$2 WHERE id=$1',[owner.row.id,SLACK_USER_SCOPES]);
+ const consent=await env.consentRepo.getConsent(owner.row.workspace_id,env.runtimeIdentity.providerId);
+ await env.consentRepo.grantConsent({workspaceId:owner.row.workspace_id,providerId:env.runtimeIdentity.providerId,expectedRevision:consent!.revision,policyVersion:'v1.0.0',purposes:storage?['planning','manual_lookup','storage']:['planning','manual_lookup'],retentionDays:storage?7:0,organizationRepresentative:'fixture',evidenceRef:'fixture',recordedBy:'fixture'});
+ const registry=new SlackDerivedLineageRepo(env.db.pool,env.policyService),plans=new PlanRepo(env.db.pool,registry),steps=new StepRepo(env.db.pool,registry),messages=new MessageRepo(env.db.pool,registry),conversations=new ConversationRepo(env.db.pool),binder=new SlackReadPlanBindings(env.connectionRepo,env.policyService,env.invalidationService),{wrapper}=env.buildWrapper();
+ const runtime=new SlackReadRuntime({binder,plans,steps,policy:env.policyService,invalidation:env.invalidationService,wrapper});
+ const calls:any[]=[],events:any[]=[];
+ const provider={name:'metadata-fixture',generatePlan:async(input:any)=>{calls.push(input);return JSON.stringify({kind:'plan',thinking:'Read after approval',summary:'Read my Slack profile',warnings:[],steps:[{id:'step_1',tool:'myslack.users_info',description:'Read my profile',args:{user:'U_PUBLIC'},dependsOn:[]}],connections:{myslack:'FORGED'}});}};
+ const proposals=new SlackReadProposalService({connections:env.connectionRepo,policy:env.policyService,binder,provider});
+ const chat=new ChatService({msgRepo:messages,convRepo:conversations,planRepo:plans,slackReads:proposals,eventEmitter:{emit:(event,payload)=>events.push({event,payload})},planner:{processMessage:async()=>{throw new Error('No shared fallback');},routeSchedule:async()=>({services:[],unavailable:[]})}});
+ const execution=new ExecutionService({planRepo:plans,stepRepo:steps,convRepo:conversations,slackRead:runtime,sseManager:{emitEvent:(_c,event,payload)=>events.push({event,payload})},adapterFactory:{getAdapterForService:()=>{throw new Error('No shared adapter');}}});
+ const app=createApp({jwtSecret:secret,encryptionKey:TEST_KEY,userRepo:env.db.users,convRepo:conversations,msgRepo:messages,planRepo:plans,chatService:chat,executionService:execution});
+ const conv=await conversations.createConversation(owner.person.id);
+ const token='Bearer '+generateAccessToken(owner.person,secret,owner.person.sid).accessToken;
+ return {owner,plans,steps,messages,conversations,chat,execution,app,conv,token,calls,events};
+}
+it('public request creates a server-bound preview, reads only after approval, and masks revoked results',async()=>{
+ const f=await setup();await f.messages.createMessage(f.conv.id,'assistant','PRIVATE_PAST_CONTEXT');
+ expect((await request(f.app).get('/api/health')).body.myslackEnabled).toBe(true);
+ const before=env.fixture.gets.length;
+ const result=await request(f.app).post('/api/conversations/'+f.conv.id+'/slack-read-plans').set('Authorization',f.token).send({content:'Đọc hồ sơ của tôi',connectionId:f.owner.row.id,tempId:'public-request'});
+ expect(result.status).toBe(202);
+ await vi.waitFor(async()=>expect(await f.plans.getPendingPlan(f.conv.id)).not.toBeNull(),{timeout:5000});
+ const plan=(await f.plans.getPendingPlan(f.conv.id))!;expect(plan.plan_json.connections.myslack.bindings[f.owner.row.id]).toEqual(f.owner.binding);
+ expect(JSON.stringify(f.calls)).not.toContain('PRIVATE_PAST_CONTEXT');expect(env.fixture.gets).toHaveLength(before);
+ env.fixture.setHandler('/users.info',()=>({body:{ok:true,user:{id:'U_PUBLIC',name:'PRIVATE_FROM_HTTP'}}}));
+ expect((await request(f.app).post('/api/plans/'+plan.id+'/approve').set('Authorization',f.token)).status).toBe(200);
+ await vi.waitFor(async()=>expect((await f.plans.getPlan(plan.id))?.status).toBe('completed'),{timeout:15000});
+ const snapshot=await request(f.app).get('/api/conversations/'+f.conv.id+'/executions/latest').set('Authorization',f.token);
+ expect(snapshot.status).toBe(200);expect(snapshot.text).toContain('PRIVATE_FROM_HTTP');expect(JSON.stringify(f.events)).not.toContain('PRIVATE_FROM_HTTP');
+ await env.connectionRepo.disconnect(f.owner.person.id,f.owner.row.id);
+ const revoked=await request(f.app).get('/api/conversations/'+f.conv.id+'/executions/latest').set('Authorization',f.token);
+ expect(revoked.text).not.toContain('PRIVATE_FROM_HTTP');
+},30000);
+it('rejects another owner and extra client authority fields before planning',async()=>{
+ const f=await setup(),other=await env.db.person(),bearer='Bearer '+generateAccessToken(other,secret,other.sid).accessToken;
+ expect((await request(f.app).post('/api/conversations/'+f.conv.id+'/slack-read-plans').set('Authorization',bearer).send({content:'read',connectionId:f.owner.row.id})).status).toBe(404);
+ expect((await request(f.app).post('/api/conversations/'+f.conv.id+'/slack-read-plans').set('Authorization',f.token).send({content:'read',connectionId:f.owner.row.id,workspaceId:'T_FORGED'})).status).toBe(400);
+ expect(f.calls).toHaveLength(0);
+});
+it('does not call a model or Slack without explicit storage consent',async()=>{
+ const f=await setup(false),before=env.fixture.gets.length;
+ expect((await request(f.app).post('/api/conversations/'+f.conv.id+'/slack-read-plans').set('Authorization',f.token).send({content:'Đọc hồ sơ của tôi',connectionId:f.owner.row.id})).status).toBe(202);
+ await vi.waitFor(async()=>expect((await f.messages.listMessages(f.conv.id)).some(m=>m.metadata?.type==='refusal')).toBe(true),{timeout:5000});
+ expect(f.calls).toHaveLength(0);expect(env.fixture.gets).toHaveLength(before);
+});
+it('does not mount the proposal endpoint for an ordinary chat service',async()=>{
+ const f=await setup(),chat=new ChatService({msgRepo:f.messages,convRepo:f.conversations,planRepo:f.plans,planner:{processMessage:async()=>({kind:'refusal',reason:'off',suggestion:''}),routeSchedule:async()=>({services:[],unavailable:[]})},eventEmitter:{emit:()=>{}}});
+ const app=createApp({jwtSecret:secret,userRepo:env.db.users,convRepo:f.conversations,msgRepo:f.messages,planRepo:f.plans,chatService:chat});
+ expect((await request(app).post('/api/conversations/'+f.conv.id+'/slack-read-plans').set('Authorization',f.token).send({content:'read',connectionId:f.owner.row.id})).status).toBe(404);
+});

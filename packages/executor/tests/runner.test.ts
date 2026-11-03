@@ -118,6 +118,29 @@ describe('packages/executor (Task 13: StepRunner with AbortSignal Timeout & UNKN
     expect(result.status).toBe('unknown');
     expect(result.error?.category).toBe('UNKNOWN');
   });
+
+  it('forwards bound step.repo into adapter execution context', async () => {
+    let receivedContext: Record<string, any> | undefined;
+    const runner = new StepRunner({
+      getAdapter: () => ({
+        execute: async (_tool: string, _args: any, context?: Record<string, any>) => {
+          receivedContext = context;
+          return { id: '1', number: 1, title: 'Release', url: 'https://github.com/owner/repo/issues/1', repo: 'owner/repo' };
+        },
+      }),
+    });
+    const step = {
+      id: 'issue',
+      tool: 'github.create_issue',
+      description: 'Create issue',
+      args: { repo: 'owner/repo', title: 'Release' },
+      repo: 'owner/repo',
+      dependsOn: [],
+    } as PlanStep;
+    const result = await runner.executeStep(step, new Map());
+    expect(result.status).toBe('success');
+    expect(receivedContext?.repo).toBe('owner/repo');
+  });
 });
 
 describe('Gmail tools are classified from the Gmail catalog, not the name heuristic', () => {
@@ -141,5 +164,49 @@ describe('Gmail tools are classified from the Gmail catalog, not the name heuris
     const step: PlanStep = { id: 'reply', tool: 'gmail.reply', description: 'Reply', args: { threadId: 't1', to: ['a@example.com'], body: 'Hi' }, dependsOn: [] };
     const result = await runner.executeStep(step, new Map(), { timeoutMs: 20 });
     expect(result.status).toBe('unknown');
+  });
+
+  it('deduplicates jira.create_issue only within the same target projectKey and does not reuse an issue from another project', async () => {
+    let adapterCalled = false;
+    const runner = new StepRunner({
+      getAdapter: async () => ({
+        execute: async (_tool: string, args: any) => {
+          adapterCalled = true;
+          return { id: '200', key: `${args.projectKey}-1`, url: `https://example.atlassian.net/browse/${args.projectKey}-1` };
+        },
+      }),
+    });
+
+    const crossProjectResult = await runner.executeStep(
+      {
+        id: 'create-in-b',
+        tool: 'jira.create_issue',
+        description: 'Create a copy in project NEW',
+        args: { projectKey: 'NEW', summary: 'Same title', description: 'New content' },
+        dependsOn: ['search-old'],
+      },
+      new Map([
+        ['search-old', { issues: [{ id: '100', key: 'OLD-1', title: 'Same title', url: 'https://example.atlassian.net/browse/OLD-1' }] }],
+      ]),
+    );
+    expect(adapterCalled).toBe(true);
+    expect(crossProjectResult.status).toBe('success');
+    expect(crossProjectResult.output).toEqual({ id: '200', key: 'NEW-1', url: 'https://example.atlassian.net/browse/NEW-1' });
+
+    adapterCalled = false;
+    const sameProjectResult = await runner.executeStep(
+      {
+        id: 'create-in-old',
+        tool: 'jira.create_issue',
+        description: 'Create in OLD',
+        args: { projectKey: 'OLD', summary: 'Same title', description: 'Same project' },
+        dependsOn: ['search-old'],
+      },
+      new Map([
+        ['search-old', { issues: [{ id: '100', key: 'OLD-1', title: 'Same title', url: 'https://example.atlassian.net/browse/OLD-1' }] }],
+      ]),
+    );
+    expect(adapterCalled).toBe(false);
+    expect(sameProjectResult.output).toEqual({ id: '100', key: 'OLD-1', url: 'https://example.atlassian.net/browse/OLD-1' });
   });
 });

@@ -88,6 +88,7 @@ export interface PlanStep {
 
 /** The personal connections a plan was previewed with. */
 export interface PlanConnections {
+  myslack?: import('./myslack-plan-bindings.js').SlackPlanBindings;
   gmail?: { credentialId: string; email: string };
   mycalendar?: { credentialId: string; email: string; allowedCalendars: string[] };
   mysheets?: { credentialId: string; email: string; allowedSpreadsheets: string[] };
@@ -250,6 +251,11 @@ export interface GithubDigestConfig {
   channelId: string;
   channelName: string;
   staleDays: number;
+  telegramChatId?: string;
+  telegramChatTitle?: string;
+  telegramCredentialId?: string;
+  telegramUserId?: string;
+  telegramUsername?: string;
 }
 
 export interface GithubDigestDelivery {
@@ -257,6 +263,9 @@ export interface GithubDigestDelivery {
   channelName: string;
   ts: string | null;
   counts: { newIssues: number; stalePrs: number; unassignedIssues: number };
+  telegramChatId?: string;
+  telegramChatTitle?: string;
+  messageId?: number | null;
 }
 
 export interface ScheduleDigestCandidate {

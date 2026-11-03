@@ -1,5 +1,6 @@
 import { test,expect } from '@playwright/test';
 import pg from 'pg';
+import {fixtureConversation,fixtureMessage,certifyFixturePlan} from './persisted-artifacts.fixture.js';
 import { createHash } from 'node:crypto';
 
 for(const width of [1440,375]) for(const theme of ['light','dark'] as const) {
@@ -11,12 +12,13 @@ for(const width of [1440,375]) for(const theme of ['light','dark'] as const) {
     try {
       const owner=(await db.query('SELECT id FROM users WHERE email=$1',[process.env.CHAT_ADMIN_EMAIL])).rows[0].id;
       const title=`Kiểm chứng biên nhận ${width} ${theme} ${Date.now()}`;
-      const conv=(await db.query('INSERT INTO conversations(user_id,title) VALUES($1,$2) RETURNING id',[owner,title])).rows[0].id;
-      await db.query("INSERT INTO messages(conv_id,role,content) VALUES($1,'user','Tạo issue rồi báo nhóm')",[conv]);
+      const conv=await fixtureConversation(db,owner,title);
+      await fixtureMessage(db,conv,'user','Tạo issue rồi báo nhóm');
       const plan={kind:'plan',summary:'Tạo issue rồi báo nhóm',resourceLabels:{'owner/repo':'owner/repo','#general':'#general'},steps:[{id:'step_1',tool:'github.create_issue',description:'Tạo issue',args:{repo:'owner/repo',title:'Kiểm chứng',body:'Mô tả'}},{id:'step_2',tool:'slack.send_message',description:'Báo nhóm',args:{channel:'#general',text:{$template:'Issue ${step_1.output.number}'}}}]};
       const text=JSON.stringify(plan);
       const id=(await db.query("INSERT INTO plans(conv_id,plan_json,plan_text,plan_hash,status,expires_at) VALUES($1,$2::jsonb,$2,$3,'pending',now()+interval '30 minutes') RETURNING id",[conv,text,createHash('sha256').update(text).digest('hex')])).rows[0].id;
       for(const [i,step] of plan.steps.entries()) await db.query("INSERT INTO execution_steps(plan_id,step_id,tool,args_json,status,output_json,requested_by,duration_ms,started_at,completed_at) VALUES($1,$2,$3,$4::jsonb,$5,$6::jsonb,$7,$8,now()-interval '1 second',CASE WHEN $5='succeeded' THEN now() ELSE NULL END)",[id,step.id,step.tool,JSON.stringify(step.args),i?'running':'succeeded',JSON.stringify(i?{number:999,url:'https://slack.com/app_redirect?channel=general'}:{number:42,url:'https://github.com/owner/repo/issues/42'}),owner,i?7:1200]);
+      await certifyFixturePlan(db,id);
       await page.goto(`/c/${conv}`);await expect(page.locator('#moment-4')).toBeVisible();await expect(page.locator('textarea:visible')).toHaveCount(0);
       const historyOpener=page.getByRole('button',{name:'Mở danh sách hội thoại'});await historyOpener.click();
       const history=page.getByRole('dialog',{name:'Lịch sử yêu cầu'});

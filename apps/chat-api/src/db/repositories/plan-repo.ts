@@ -1,5 +1,15 @@
 import type pg from 'pg';
+import { isDeepStrictEqual } from 'node:util';
+import { createHash } from 'node:crypto';
 import { isUuid } from './uuid.js';
+import { SlackDerivedLineageRepo } from './slack-derived-lineage-repo.js';
+import { SlackPolicyService } from '../../services/slack/policy-service.js';
+import { guardPlanInTransaction,guardStepRowsInTransaction,planSelectors,type SlackPlanWriteContext } from '../../services/slack/slack-plan-lineage.js';
+import { hasSlackMarker } from '../../services/slack/slack-message-selectors.js';
+import { sealPlanOrigin } from '../../services/slack/slack-plan-origin.js';
+import { isBoundSlackReadPlan } from '../../services/slack/slack-read-plan.js';
+import {isBoundSlackManualPlan,isBoundSlackSourceReplyPlan,isBoundSlackWritePlan} from '../../services/slack/slack-write-plan.js';
+import {sameSlackBinding,validateSlackSourceReplyPlan} from '@wap/tool-schemas';
 
 export interface PlanRow {
   id: string;
@@ -24,7 +34,35 @@ export interface PlanJiraGuard {
 }
 
 export class PlanRepo {
-  constructor(private pool: pg.Pool) {}
+  private readonly slack:SlackDerivedLineageRepo;
+  constructor(private pool: pg.Pool,slack?:SlackDerivedLineageRepo) {this.slack=slack??new SlackDerivedLineageRepo(pool,new SlackPolicyService(pool));}
+
+  private async transaction<T>(work:(client:pg.PoolClient)=>Promise<T>):Promise<T>{
+    const c=await this.pool.connect();try{await c.query('BEGIN');await c.query("SET LOCAL statement_timeout='5s'");const result=await work(c);await c.query('COMMIT');return result;}
+    catch(error){await c.query('ROLLBACK').catch(()=>{});throw error;}finally{c.release();}
+  }
+
+  async createSlackPlan(data:Parameters<PlanRepo['createPlan']>[0],context:SlackPlanWriteContext,held?:pg.PoolClient,signal?:AbortSignal):Promise<PlanRow>{
+    const snapshot=structuredClone({data,context});
+    const planOwner=snapshot.context.segments[0]?.sourceRef.binding.atiUserId??'';
+    const hasSlackStep=snapshot.data.planJson.steps?.some((s:any)=>/^(myslack|slack)\./.test(s.tool));
+    if(hasSlackStep&&!isBoundSlackSourceReplyPlan(snapshot.data.planJson,planOwner))throw new Error('SLACK_DISPATCH_BINDING_REQUIRED');
+    const save=async(client:pg.PoolClient)=>{
+      signal?.throwIfAborted();const owner=snapshot.context.segments[0]?.sourceRef.binding.atiUserId;
+      if(!owner)throw new Error('SLACK_PROVENANCE_REQUIRED');
+      if(hasSlackStep){
+        const reply=validateSlackSourceReplyPlan(snapshot.data.planJson,owner);
+        const matchesSource=snapshot.context.segments.some(seg=>sameSlackBinding(seg.sourceRef.binding,reply.binding)&&(seg.channelId===reply.params.channel||(seg.sourceRef.resourceType==='message'&&seg.sourceRef.resourceId.startsWith(JSON.stringify([reply.params.channel]).slice(0,-1)+','))));
+        if(!matchesSource)throw new Error('SLACK_DISPATCH_BINDING_REQUIRED');
+      }
+      await this.slack.prepareConversationWriteInTransaction(client,snapshot.data.convId,owner,snapshot.context.segments,'planning');
+      const selectors=snapshot.context.selectors??planSelectors(snapshot.data);
+      if(!['plan_json','plan_text','plan_hash'].every(s=>selectors.includes(s))||new Set(selectors).size!==selectors.length||selectors.length>256)throw new Error('SLACK_PLAN_MANIFEST_INVALID');
+      const row=await this.insertPlan(client,snapshot.data);
+      for(const selector of selectors)await this.slack.registerDerivedCopyInTransaction(client,{atiUserId:owner,targetKind:'plan_step_arg',targetId:row.id,targetSubId:selector,segments:snapshot.context.segments});
+      await client.query('UPDATE plans SET slack_lineage_manifest=$2 WHERE id=$1',[row.id,JSON.stringify(selectors)]);signal?.throwIfAborted();return row;
+    };return held?save(held):this.transaction(save);
+  }
 
   async createPlan(data: {
     convId: string;
@@ -36,19 +74,52 @@ export class PlanRepo {
   },
   /** A client inside the caller's transaction; otherwise the plan is saved in a transaction of its own. */
   db?: pg.PoolClient): Promise<PlanRow> {
-    if (db) return this.insertPlan(db, data);
-    const client = await this.pool.connect();
-    try {
+    if(hasSlackMarker(data.planJson)||hasSlackMarker(data.resourceLabels))throw new Error('SLACK_PROVENANCE_REQUIRED');
+    const save=async(client:pg.PoolClient)=>{
+      const plan=await this.insertPlan(client,data);
+      await sealPlanOrigin(client,'plans',plan.id,'plan_writer');
+      return plan;
+    };
+    if(db)return save(db);
+    const client=await this.pool.connect();
+    try{
       await client.query('BEGIN');
-      const plan = await this.insertPlan(client, data);
+      const plan=await save(client);
       await client.query('COMMIT');
       return plan;
-    } catch (err) {
+    }catch(err){
       await client.query('ROLLBACK');
       throw err;
-    } finally {
-      client.release();
-    }
+    }finally{client.release();}
+  }
+
+  /** Internal writer for server-bound read proposals, with no Slack source payload. */
+  async createSlackReadPlan(data:Parameters<PlanRepo['createPlan']>[0],userId:string):Promise<PlanRow>{
+    const snapshot=structuredClone(data);
+    if(!isBoundSlackReadPlan(snapshot.planJson,userId)||hasSlackMarker(snapshot.resourceLabels))throw new Error('SLACK_READ_PLAN_INVALID');
+    const text=snapshot.planText??JSON.stringify(snapshot.planJson);
+    try{
+      if(!isDeepStrictEqual(JSON.parse(text),snapshot.planJson)||createHash('sha256').update(text).digest('hex')!==snapshot.planHash)throw new Error();
+    }catch{throw new Error('SLACK_READ_PLAN_INVALID');}
+    return this.transaction(async client=>{
+      const owner=(await client.query('SELECT user_id FROM conversations WHERE id=$1 FOR UPDATE',[snapshot.convId])).rows[0]?.user_id;
+      if(owner!==userId)throw new Error('SLACK_READ_IDENTITY_MISMATCH');
+      const row=await this.insertPlan(client,snapshot);await sealPlanOrigin(client,'plans',row.id,'plan_writer');return row;
+    });
+  }
+
+  async createSlackWritePlan(data:Parameters<PlanRepo['createPlan']>[0],userId:string):Promise<PlanRow>{
+    const snapshot=structuredClone(data);
+    if(!isBoundSlackWritePlan(snapshot.planJson,userId)||hasSlackMarker(snapshot.resourceLabels))throw new Error('SLACK_POST_PLAN_INVALID');
+    const text=snapshot.planText??JSON.stringify(snapshot.planJson);
+    try{
+      if(!isDeepStrictEqual(JSON.parse(text),snapshot.planJson)||createHash('sha256').update(text).digest('hex')!==snapshot.planHash)throw new Error();
+    }catch{throw new Error('SLACK_POST_PLAN_INVALID');}
+    return this.transaction(async client=>{
+      const owner=(await client.query('SELECT user_id FROM conversations WHERE id=$1 FOR UPDATE',[snapshot.convId])).rows[0]?.user_id;
+      if(owner!==userId)throw new Error('SLACK_READ_IDENTITY_MISMATCH');
+      const row=await this.insertPlan(client,snapshot);await sealPlanOrigin(client,'plans',row.id,'plan_writer');return row;
+    });
   }
 
   private async insertPlan(client: pg.PoolClient, data: Parameters<PlanRepo['createPlan']>[0]): Promise<PlanRow> {
@@ -68,10 +139,12 @@ export class PlanRepo {
     return res.rows[0];
   }
 
-  async getPlan(id: string): Promise<PlanRow | null> {
+  async getPlan(id: string,purpose:'planning'|'manual_lookup'='manual_lookup'): Promise<PlanRow | null> {
     if (!isUuid(id)) return null;
-    const res = await this.pool.query('SELECT *, xmin::text AS revision FROM plans WHERE id = $1', [id]);
-    return res.rows[0] || null;
+    return this.transaction(async client=>{
+      if(!(await client.query('SELECT id FROM plans WHERE id=$1',[id])).rowCount)return null;
+      return (await guardPlanInTransaction(client,this.slack,id,purpose)).row;
+    });
   }
 
   async getPendingPlan(convId: string): Promise<PlanRow | null> {
@@ -79,7 +152,7 @@ export class PlanRepo {
       "SELECT * FROM plans WHERE conv_id = $1 AND status = 'pending' AND expires_at > now() ORDER BY created_at DESC LIMIT 1",
       [convId]
     );
-    return res.rows[0] || null;
+    return res.rows[0]?this.getPlan(res.rows[0].id):null;
   }
 
   /**
@@ -91,49 +164,67 @@ export class PlanRepo {
     userId: string,
     jiraGuard?: PlanJiraGuard
   ): Promise<boolean> {
-    if (!jiraGuard) {
-      const res = await this.pool.query(
-        "UPDATE plans SET status = 'approved', decided_at = now() WHERE id = $1 AND plan_hash = $2 AND status = 'pending' AND expires_at > now() AND EXISTS (SELECT 1 FROM conversations WHERE conversations.id = plans.conv_id AND conversations.user_id = $3) RETURNING id",
-        [planId, expectedHash, userId]
-      );
-      return (res.rowCount ?? 0) > 0;
-    }
+    return this.transaction(async (client) => {
+      const context = await guardPlanInTransaction(client, this.slack, planId, 'planning');
+      if (!context.allowed) return false;
+      if (!jiraGuard) {
+        const res = await client.query(
+          "UPDATE plans SET status = 'approved', decided_at = now() WHERE id = $1 AND plan_hash = $2 AND status = 'pending' AND expires_at > now() AND EXISTS (SELECT 1 FROM conversations WHERE conversations.id = plans.conv_id AND conversations.user_id = $3) RETURNING id",
+          [planId, expectedHash, userId]
+        );
+        const ok = (res.rowCount ?? 0) > 0;
+        if (ok) {
+          await client.query(
+            "UPDATE slack_assistant_artifacts SET status='approved',revision=revision+1,updated_at=clock_timestamp() WHERE active_plan_id=$1 AND user_id=$2 AND status IN ('pending','needs_info')",
+            [planId, userId]
+          );
+        }
+        return ok;
+      }
 
-    const query = `
-      UPDATE plans SET status = 'approved', decided_at = now()
-      WHERE id = $1 AND plan_hash = $2 AND status = 'pending' AND expires_at > now()
-        AND EXISTS (SELECT 1 FROM conversations WHERE conversations.id = plans.conv_id AND conversations.user_id = $3)
-        AND EXISTS (
-          SELECT 1 FROM ati_workspaces w
-          WHERE w.id = $4 AND w.status = 'active' AND w.version = $5
-        )
-        AND EXISTS (
-          SELECT 1 FROM ati_workspace_memberships m
-          JOIN workspace_members wm ON wm.workspace_id = m.workspace_id AND wm.user_id = m.user_id
-          JOIN users u ON u.id = m.user_id
-          WHERE m.workspace_id = $4 AND m.user_id = $3
-            AND m.status = 'active' AND wm.status = 'active' AND u.status = 'active'
-            AND m.version = $6
-        )
-        AND EXISTS (
-          SELECT 1 FROM jira_oauth_grants g
-          JOIN jira_accounts a ON a.id = g.account_id
-          WHERE g.id = $7 AND g.status = 'active'
-            AND a.user_id = $3 AND a.status = 'connected' AND a.identity_version = $8
-        )
-      RETURNING id
-    `;
-    const res = await this.pool.query(query, [
-      planId,
-      expectedHash,
-      userId,
-      jiraGuard.workspaceId,
-      jiraGuard.workspaceVersion,
-      jiraGuard.membershipVersion,
-      jiraGuard.grantId,
-      jiraGuard.identityVersion,
-    ]);
-    return (res.rowCount ?? 0) > 0;
+      const query = `
+        UPDATE plans SET status = 'approved', decided_at = now()
+        WHERE id = $1 AND plan_hash = $2 AND status = 'pending' AND expires_at > now()
+          AND EXISTS (SELECT 1 FROM conversations WHERE conversations.id = plans.conv_id AND conversations.user_id = $3)
+          AND EXISTS (
+            SELECT 1 FROM ati_workspaces w
+            WHERE w.id = $4 AND w.status = 'active' AND w.version = $5
+          )
+          AND EXISTS (
+            SELECT 1 FROM ati_workspace_memberships m
+            JOIN workspace_members wm ON wm.workspace_id = m.workspace_id AND wm.user_id = m.user_id
+            JOIN users u ON u.id = m.user_id
+            WHERE m.workspace_id = $4 AND m.user_id = $3
+              AND m.status = 'active' AND wm.status = 'active' AND u.status = 'active'
+              AND m.version = $6
+          )
+          AND EXISTS (
+            SELECT 1 FROM jira_oauth_grants g
+            JOIN jira_accounts a ON a.id = g.account_id
+            WHERE g.id = $7 AND g.status = 'active'
+              AND a.user_id = $3 AND a.status = 'connected' AND a.identity_version = $8
+          )
+        RETURNING id
+      `;
+      const res = await client.query(query, [
+        planId,
+        expectedHash,
+        userId,
+        jiraGuard.workspaceId,
+        jiraGuard.workspaceVersion,
+        jiraGuard.membershipVersion,
+        jiraGuard.grantId,
+        jiraGuard.identityVersion,
+      ]);
+      const ok = (res.rowCount ?? 0) > 0;
+      if (ok) {
+        await client.query(
+          "UPDATE slack_assistant_artifacts SET status='approved',revision=revision+1,updated_at=clock_timestamp() WHERE active_plan_id=$1 AND user_id=$2 AND status IN ('pending','needs_info')",
+          [planId, userId]
+        );
+      }
+      return ok;
+    });
   }
 
   /**
@@ -148,7 +239,33 @@ export class PlanRepo {
   }
 
   async updatePlanStatus(planId: string, status: string): Promise<void> {
-    await this.pool.query('UPDATE plans SET status = $2 WHERE id = $1', [planId, status]);
+    await this.pool.query(`UPDATE plans SET status=$2 WHERE id=$1 AND
+      (slack_lineage_manifest IS NULL OR status NOT IN ('failed','superseded'))`, [planId, status]);
+    const mapped=status==='executing'?'running':status==='completed'?'completed':['failed','stopped','partial','reconciliation_required'].includes(status)?'failed':null;
+    if(mapped)await this.pool.query("UPDATE slack_assistant_artifacts SET status=$2,revision=revision+1,updated_at=clock_timestamp() WHERE active_plan_id=$1 AND status NOT IN ('rejected','stale')",[planId,mapped]);
+  }
+
+  async assertSourceDispatchAllowed(planId:string,userId:string,expectedHash:string,stepId:string,tool:string,signal?:AbortSignal):Promise<void>{
+    signal?.throwIfAborted();await this.transaction(async client=>{
+      const checked=await guardPlanInTransaction(client,this.slack,planId,'planning');
+      if(checked.source&&/^(myslack|slack)\./.test(tool)&&!isBoundSlackManualPlan(checked.row.plan_json,userId)&&!isBoundSlackSourceReplyPlan(checked.row.plan_json,userId))throw Object.assign(new Error('SLACK_DISPATCH_BINDING_REQUIRED'),{category:'AUTH_ERROR',details:{requestSent:false}});
+      const owner=(await client.query('SELECT user_id FROM conversations WHERE id=$1',[checked.row.conv_id])).rows[0]?.user_id;
+      if(!checked.allowed||owner!==userId||checked.row.plan_hash!==expectedHash||!['approved','executing'].includes(checked.row.status)||
+        !checked.row.plan_json.steps?.some((s:any)=>s.id===stepId&&s.tool===tool))throw Object.assign(new Error('SLACK_SOURCE_UNAVAILABLE'),{category:'AUTH_ERROR',details:{requestSent:false}});
+      const stored=(await client.query('SELECT * FROM execution_steps WHERE plan_id=$1 ORDER BY step_id FOR SHARE',[planId])).rows;
+      const safe=await guardStepRowsInTransaction(client,this.slack,checked,stored,'planning'),step=safe.find(s=>s.step_id===stepId&&s.tool===tool);
+      const approved=checked.row.plan_json.steps.find((s:any)=>s.id===stepId);
+      if(!step||safe.some(s=>s.status==='unknown')||!isDeepStrictEqual(step.args_json,approved.args??{}))throw Object.assign(new Error('SLACK_SOURCE_UNAVAILABLE'),{category:'AUTH_ERROR',details:{requestSent:false}});
+      signal?.throwIfAborted();
+    });
+  }
+
+  async getSourceExecutionSnapshot(planId:string):Promise<{plan:PlanRow;steps:any[]}>{
+    return this.transaction(async client=>{
+      const checked=await guardPlanInTransaction(client,this.slack,planId,'manual_lookup');
+      const rows=(await client.query('SELECT * FROM execution_steps WHERE plan_id=$1 ORDER BY step_id FOR SHARE',[planId])).rows;
+      return {plan:checked.row,steps:await guardStepRowsInTransaction(client,this.slack,checked,rows,'manual_lookup')};
+    });
   }
 
   /** Claim exactly the approved durable snapshot read by the recovery request.
@@ -156,7 +273,10 @@ export class PlanRepo {
    */
   async claimRecovery(plan: PlanRow, userId: string, nextStatus: 'executing' | 'stopped'): Promise<boolean> {
     if (!plan.revision) return false;
-    const result = await this.pool.query(
+    return this.transaction(async client=>{
+    const checked=await guardPlanInTransaction(client,this.slack,plan.id,'planning');
+    if(!checked.allowed && nextStatus!=='stopped')return false;
+    const result = await client.query(
       `UPDATE plans SET status = $6
        WHERE id = $1 AND plan_hash = $2 AND status = $3 AND xmin::text = $4
          AND status IN ('partial', 'reconciliation_required') AND decided_at IS NOT NULL
@@ -165,6 +285,7 @@ export class PlanRepo {
       [plan.id, plan.plan_hash, plan.status, plan.revision, userId, nextStatus],
     );
     return (result.rowCount ?? 0) > 0;
+    });
   }
 
   async getLatestExecutedPlan(convId: string): Promise<PlanRow | null> {
@@ -174,6 +295,6 @@ export class PlanRepo {
        ORDER BY created_at DESC, id DESC LIMIT 1`,
       [convId],
     );
-    return result.rows[0] ?? null;
+    return result.rows[0]?this.getPlan(result.rows[0].id):null;
   }
 }

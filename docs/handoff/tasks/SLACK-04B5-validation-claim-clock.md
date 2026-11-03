@@ -1,0 +1,27 @@
+# SLACK-04B5 · Validation claims use the database clock
+
+Base accepted M3 staging `ef63950b8c45b494ca5c2369b65b1bfaafe05490`; branch `fix/slack-lifecycle-claim-clock`. One Backend corrective card discovered while verifying documentation PR #234. Main/user work remains isolated. No flag/native/live change.
+
+## Evidence and contract
+
+Documentation CI41313243051 attempt1 failed the existing contradictory-principal assertion after40ms. Initial500ms timeout hypothesis was ruled out by that duration. Original isolated23/23 passed; an ignored observer rerun reproduced the identical assertion plus other failures with actual SQL jobs still pending, validation_attempts0. Claim currently compares PostgreSQL microsecond due/lease timestamps only with the JavaScript caller Date. Existing repo fixture explicitly backdates due rows to avoid this edge, but the real worker does not. A due job can be skipped when the caller clock is behind PostgreSQL.
+
+Use one statement-time SQL cutoff equal to the later of the validated caller Date and PostgreSQL clock_timestamp. Use that same cutoff for due and expired-lease eligibility. Keep SKIP LOCKED, status/intent filters, bounds, distinct lease ownership, lease duration and completion/retry fencing. Explicit future clocks used by existing tests retain their semantics. No sleep/retry or timeout/assertion relaxation in original tests.
+
+## Files and verification
+
+Own apps/chat-api/src/db/repositories/slack-lifecycle-validation-repo.ts, apps/chat-api/tests/db/slack-lifecycle-validation-repo.test.ts, apps/chat-api/tests/services/slack/slack-lifecycle-runtime.test.ts, this card and a new implementation log. The runtime test observes actual holder→worker blocking through pg_blocking_pids, independent of the SQL query prefix. Add deterministic actual-PG cases: due timestamp one microsecond after a stale caller cutoff but before DB now; expired lease in that same gap with stale-owner retry denied; genuinely future due remains unclaimed. Watch first two fail before implementation. Run repo+unchanged worker suites, final fullcheck/typecheck/build/security and relevant existing browser. One fresh whole-branch review, one TDD fix pass if Important; exact-head check/all-browser CI and merge-tree equality before staging acceptance. Reviewer then resumes canonical M3 record.
+
+Review focus: single SQL cutoff does not pull truly future jobs or steal a live lease; old owner stays fenced; caller Date validation/future-clock tests retain behavior; no test helper workaround hides the defect.
+
+## Kết quả
+
+Publication status: **ACCEPTED (internal/real PostgreSQL + HTTP fixture; metadata lifecycle correction)**, [PR #236](https://github.com/VinhDat267/ATI_Project/pull/236), published head `ea918f270e0d38a28e08dc1bafce70ee7729b967`. [CI41315880709](https://github.com/VinhDat267/ATI_Project/actions/runs/41315880709) exact-head check + all browser **completed SUCCESS; named check + all-browser steps SUCCESS (19 scenarios/179 PASS;0 flaky summaries)**; merge `0e3da2b58c00480d13bb1183a747f9b37f8bf2a4` at `2026-11-01T14:40:31Z`, head/merge tree `f3a9d1ab8112a0b459c234dd460fb689e9ef573f`, diff exit0.
+
+Deterministic actual-PG RED2FAIL/7PASS exit1 → repository/unchanged worker32/32 PASS exit0. One MATERIALIZED SQL cutoff fixes due/expired-lease eligibility; genuinely future due, fresh lease duration, explicit future Date and token/owner/status fencing remain. New cases explicitly override the unchanged fixture baseline rather than adding backdating or sleeps. Runtime actual-block detection uses the captured holder PID in pg_blocking_pids(workerPID), retaining all shutdown/abort/barrier/no-late-authority/no-HTTP assertions/timeouts.
+
+Independent fresh whole-branch review at007282e8 covered all5 files, found no new P1/P2/P3 and independently ran original repo/worker/runtime48/48 PASS exit0 (15.64s). Root confirms published ea918f27 changes only task/log from that reviewed product tree. Final corrected-source npm run check3,935 PASS exit0 (3,462 v3 +406 eval +1 launcher +66 Node), typecheck/build/security included. Final local slack_read browser4/4 exit0 (54.8s;375/1440 light/dark). Retained raw SHA256: fullcheck-04b5-r2.log `b1f6c7427e9ebe872ac1427cdbb786189caf3105fb946a47249f1d80ecc43bf9`; browser-04b5.log `3db0d76438c62c0449553a6d9f9caf807d78dabe48bdf5a66573d5901b469904`.
+
+Original docs CI failure and canceled obsolete rerun remain evidence, not acceptance. The40ms principal failure ruled out the initial500ms timeout hypothesis; actual observer SQL showed pending/validation_attempts0. Fullcheck attempt1 exposed the query-prefix test detector, then actual holder-block proof replaced it without weakening assertions. [Implementation log](../log/2026-11-01-slack-04b5-validation-claim-clock.md) remains unchanged; [current aggregate](../log/2026-11-01-slack-m3-review-integration.md) preserves full chronology/all27 Rulings and costs.
+
+This is metadata lifecycle correction only. Core M3 remains literal C/G text≤4,000, explicit source-free user text/internal realPG+HTTP fixture. M4 SLACK05/06, two future artifact kinds,03D/03E broader APIs,07 native/model/echo, fullF3/F4/main/live/production/OS/unchanged rotation/erasure remain open; flags default-off. Prior terminal stopped/UNKNOWN action-projection P3 stays deferred, requests denied/no write bypass. Fresh04B5 review does not claim a second product review of the older fixes.

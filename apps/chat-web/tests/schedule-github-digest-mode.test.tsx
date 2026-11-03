@@ -218,4 +218,44 @@ describe('Task 9: ScheduleMoment mode choice & GitHub digest run states', () => 
     expect(await screen.findByText(/Gửi.*thất bại/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Lập lại kế hoạch' })).toBeInTheDocument();
   });
+
+  it('FE-GH-4: renders github_digest candidate with Telegram destination when services include github and telegram', async () => {
+    const message: ChatMessage = {
+      id: 'msg-sched-gh-tg',
+      role: 'assistant',
+      content: 'Đề xuất lịch GitHub gửi qua Telegram',
+      metadata: {
+        type: 'schedule_proposal',
+        services: ['github', 'telegram'],
+        nextRuns: ['2026-11-03T01:00:00.000Z'],
+        proposal: {
+          kind: 'schedule',
+          action: 'create',
+          name: 'Bản tin GitHub Telegram',
+          request: 'Mỗi sáng gửi báo cáo GitHub vào nhóm Telegram Kỹ thuật',
+          recurrence: { type: 'daily', time: '08:00' },
+          summary: 'Mỗi ngày lúc 08:00',
+        },
+        digestCandidate: {
+          canAutoDigest: true,
+          config: {
+            githubUserId: 'gh-42',
+            githubLogin: 'octocat',
+            repos: ['acme/ati'],
+            channelId: '',
+            channelName: '',
+            telegramChatId: '-100999888',
+            telegramChatTitle: 'Nhóm Kỹ Thuật ATI',
+            windowHours: 24,
+            staleDays: 3,
+          },
+        } as any,
+      },
+    };
+
+    render(<ScheduleMoment message={message} convId="conv-1" navigate={vi.fn()} onEdit={vi.fn()} />);
+    expect(
+      screen.getByText(/Repo: acme\/ati · Telegram: Nhóm Kỹ Thuật ATI · Nội dung: Issue mới, PR chờ review quá 3 ngày/)
+    ).toBeInTheDocument();
+  });
 });

@@ -1,6 +1,8 @@
+import {scheduleSourceContext,tagScheduleContext} from './slack/slack-schedule-lineage.js';
 import { createHash } from 'node:crypto';
 import type pg from 'pg';
-import type { MessageRepo } from '../db/repositories/message-repo.js';
+import { mergeSlackMessageContexts, slackMessageContext, type MessageRepo, type SlackMessageWriteContext } from '../db/repositories/message-repo.js';
+import { messageOutputSelectors, memoryOutputSelectors, messageSelectorValue, messageFingerprint } from './slack/slack-message-selectors.js';
 import type { ConversationRepo } from '../db/repositories/conversation-repo.js';
 import type { PlanRepo } from '../db/repositories/plan-repo.js';
 import type { ScheduleRepo } from '../db/repositories/schedule-repo.js';
@@ -13,6 +15,8 @@ import { runMessage, type PreparedRun, type RunToPlan } from './schedules/schedu
 import { evaluateGithubDigestCandidate } from './schedules/github-digest-candidate.js';
 import { evaluateTelegramDigestCandidate } from './schedules/telegram-digest-candidate.js';
 import { resolveRef } from '@wap/executor';
+import type { SlackWriteRuntime } from './slack/slack-write-runtime.js';
+import type { SlackReadProposalService } from './slack/slack-read-proposals.js';
 import { eventsOverlap } from '@wap/tool-adapters';
 import { JiraPlanBinder, JiraBindingError, createSourceRefsFromConnection } from './jira/jira-plan-binding.js';
 import type { JiraHistorySanitizer } from './jira/jira-history-sanitizer.js';
@@ -127,6 +131,8 @@ export interface ChatPlanner {
 }
 
 export interface ChatServiceOptions {
+  slackReads?: SlackReadProposalService;
+  slackWrites?: SlackWriteRuntime;
   msgRepo: MessageRepo;
   convRepo?: ConversationRepo;
   planRepo?: PlanRepo;
@@ -204,8 +210,11 @@ export class ChatService {
   private getAdapter?: ChatServiceOptions['getAdapter'];
   private lookupTool?: ChatServiceOptions['lookupTool'];
   private mysheetsLookupTimeoutMs: number;
+  private slackReads?: SlackReadProposalService;
+  private slackWrites?: SlackWriteRuntime;
 
   constructor(options: ChatServiceOptions) {
+    this.slackReads=options.slackReads;this.slackWrites=options.slackWrites;
     this.gmailConnection = options.gmailConnection;
     this.mycalendarConnection = options.mycalendarConnection;
     this.mysheetsConnection = options.mysheetsConnection;
@@ -260,6 +269,48 @@ export class ChatService {
       status: 202,
       messageId: message.id,
     };
+  }
+
+  hasSlackReads():boolean{return Boolean(this.slackReads&&this.planRepo&&this.convRepo);}
+
+  /** Metadata-only proposal path; previous service data/history never enters this planner. */
+  async handleSlackReadProposal(input:HandleUserMessageInput&{connectionId:string}):Promise<IngestionResult>{
+    if(!this.hasSlackReads()||(await this.convRepo!.getConversation(input.conversationId))?.user_id!==input.userId)throw Object.assign(new Error('Conversation not found'),{status:404});
+    const message=await this.msgRepo.createMessage(input.conversationId,'user',input.content,input.requestId?{requestId:input.requestId}:{});
+    const correlation={replyToMessageId:message.id,...(input.requestId?{requestId:input.requestId}:{})};
+    setImmediate(()=>{
+      void (async()=>{
+        this.eventEmitter.emit('agent_state',{conversationId:input.conversationId,state:'planning',...correlation});
+        const proposal=await this.slackReads!.propose({userId:input.userId,connectionId:input.connectionId,request:input.content});
+        const prepared=await this.prepareResponse({conversationId:input.conversationId,userId:input.userId,correlation,slackReadPlan:true,readLabels:proposal.labels},proposal.response,new WorkingMemory(),[input.content]);
+        await prepared.write();prepared.announce();
+      })().catch(async()=>{
+        const text='Không lập được yêu cầu đọc Slack. Hãy thử lại.';
+        try{await this.msgRepo.createMessage(input.conversationId,'system',text,{type:'planning_error',...correlation});}catch{}
+        this.eventEmitter.emit('error',{conversationId:input.conversationId,message:text,...correlation});
+      });
+    });
+    return {status:202,messageId:message.id};
+  }
+
+  hasSlackWrites():boolean{return Boolean(this.slackWrites&&this.planRepo&&this.convRepo);}
+  async handleSlackWriteProposal(input:HandleUserMessageInput&{connectionId:string;channel:string}):Promise<IngestionResult>{
+    if(!this.hasSlackWrites()||(await this.convRepo!.getConversation(input.conversationId))?.user_id!==input.userId)throw Object.assign(new Error('Conversation not found'),{status:404});
+    const message=await this.msgRepo.createMessage(input.conversationId,'user',input.content,input.requestId?{requestId:input.requestId}:{});
+    const correlation={replyToMessageId:message.id,...(input.requestId?{requestId:input.requestId}:{})};
+    setImmediate(()=>{
+      void (async()=>{
+        this.eventEmitter.emit('agent_state',{conversationId:input.conversationId,state:'planning',...correlation});
+        const proposal=await this.slackWrites!.propose({userId:input.userId,connectionId:input.connectionId,request:input.content,channel:input.channel});
+        const prepared=await this.prepareResponse({conversationId:input.conversationId,userId:input.userId,correlation,slackWritePlan:true,readLabels:proposal.labels},proposal.response,new WorkingMemory(),[input.content]);
+        await prepared.write();prepared.announce();
+      })().catch(async()=>{
+        const text='Không lập được yêu cầu gửi Slack. Hãy thử lại.';
+        try{await this.msgRepo.createMessage(input.conversationId,'system',text,{type:'planning_error',...correlation});}catch{}
+        this.eventEmitter.emit('error',{conversationId:input.conversationId,message:text,...correlation});
+      });
+    });
+    return {status:202,messageId:message.id};
   }
 
   /**
@@ -490,8 +541,8 @@ export class ChatService {
       }
     }
 
-    if (usesTrello) {
-      const trello = await this.trelloConnection?.(userId, scopeId);
+    if (usesTrello && this.trelloConnection) {
+      const trello = await this.trelloConnection(userId, scopeId);
       if (!trello || trello.status === 'not_connected' || trello.status === 'reconnect_required') {
         unavailableServices.push({ id: 'trello', name: 'Trello' });
         reasons.push('Tài khoản của bạn chưa Kết nối Trello hoặc cần kết nối lại.');
@@ -684,6 +735,24 @@ export class ChatService {
               targetRepo = stepRepoMap.get(refStepId);
             }
           }
+          if (targetRepo && !targetRepo.includes('/')) {
+            const shortLower = targetRepo.toLowerCase();
+            const matchingAllowed = (github.connection.repos as string[]).filter(
+              (r) => r.split('/')[1]?.toLowerCase() === shortLower,
+            );
+            if (matchingAllowed.length === 1) {
+              targetRepo = matchingAllowed[0];
+            } else {
+              const matchingTeam = (github.teamRepos ?? []).filter(
+                (r: any) =>
+                  String(r.name ?? '').toLowerCase() === shortLower ||
+                  String(r.fullName ?? '').split('/')[1]?.toLowerCase() === shortLower,
+              );
+              if (matchingTeam.length === 1 && typeof matchingTeam[0].fullName === 'string') {
+                targetRepo = matchingTeam[0].fullName;
+              }
+            }
+          }
           if (!targetRepo && github.connection.repos.length === 1) {
             targetRepo = github.connection.repos[0];
           }
@@ -695,7 +764,14 @@ export class ChatService {
               targetRepo;
             step.repo = canonical;
             stepRepoMap.set(step.id, canonical);
-            if (!allowedRepoSet.has(targetRepo.toLowerCase())) {
+            const rawRepoArg = step.args?.repo;
+            const isRefArg =
+              (typeof rawRepoArg === 'string' && rawRepoArg.startsWith('$')) ||
+              (typeof rawRepoArg === 'object' && rawRepoArg !== null && '$ref' in rawRepoArg);
+            if (!isRefArg) {
+              step.args = { ...(step.args ?? {}), repo: canonical };
+            }
+            if (!allowedRepoSet.has(canonical.toLowerCase())) {
               forbiddenRepoName = canonical;
               break;
             }
@@ -857,7 +933,30 @@ export class ChatService {
       ? nextRuns(recurrence, this.schedules.now?.() ?? new Date(), this.schedules.timeZone).map((date) => date.toISOString()) : [];
     const current = proposal.action === 'create' ? null : schedule;
     let digestCandidate: ScheduleProposalMetadata['digestCandidate'] | undefined;
-    if ((proposal.action === 'create' || proposal.action === 'update') && services.includes('telegram') && this.telegramConnection) {
+    const isGithubThreeSectionOverTelegram =
+      services.length === 2 &&
+      services.includes('github') &&
+      services.includes('telegram') &&
+      Boolean(this.githubConnection) &&
+      Boolean(this.telegramConnection) &&
+      Boolean(proposal.request) &&
+      Boolean(recurrence) &&
+      current?.kind !== 'telegram_digest' &&
+      (current?.kind === 'github_digest' ||
+        /\b(bản\s+tin\s+github|github\s+digest|pull\s+request|pr\b|chờ\s+review|chưa\s+ai\s+nhận|unassigned|issue\s+mới|(?:quá|trên|hơn)\s*\d{1,2}\s*ngày|repo(?:sitory)?\s+[a-z0-9_.-]+|[a-z0-9_.-]+\/[a-z0-9_.-]+)\b/i.test(
+          proposal.request!,
+        ));
+    if ((proposal.action === 'create' || proposal.action === 'update') && isGithubThreeSectionOverTelegram) {
+      digestCandidate = await evaluateGithubDigestCandidate({
+        userId: actor.userId,
+        request: proposal.request,
+        services,
+        recurrence,
+        githubConnection: this.githubConnection,
+        telegramConnection: this.telegramConnection,
+        getAdapter: this.getAdapter,
+      });
+    } else if ((proposal.action === 'create' || proposal.action === 'update') && services.includes('telegram') && this.telegramConnection) {
       const tgLookup = await this.telegramConnection(actor.userId).catch(() => null);
       const ghLookup = services.includes('github') && this.githubConnection
         ? await this.githubConnection(actor.userId).catch(() => null)
@@ -897,6 +996,7 @@ export class ChatService {
         services,
         recurrence,
         githubConnection: this.githubConnection,
+        telegramConnection: this.telegramConnection,
         getAdapter: this.getAdapter,
       });
     } else if (
@@ -956,10 +1056,13 @@ export class ChatService {
    * With `memoryState`, `write` saves the working memory first.
    */
   private async prepareResponse(
-    target: { conversationId: string; userId: string; correlation: Correlation; schedule?: ScheduleView | null; memoryState?: unknown },
+    target: { conversationId: string; userId: string; correlation: Correlation; schedule?: ScheduleView | null; memoryState?: unknown; slackContext?: SlackMessageWriteContext; memorySelectors?: string[];slackReadPlan?:boolean;slackWritePlan?:boolean;readLabels?:Record<string,string> },
     planned: PlannerResponse, memory: WorkingMemory, userTexts: string[], signal?: AbortSignal,
   ): Promise<PreparedResponse> {
     const { conversationId, correlation } = target;
+    if (target.slackContext && planned.kind === 'plan' && (!this.planRepo || planned.steps.some(s => /^(myslack|slack)\./.test(s.tool)))) {
+      throw new Error('SLACK_DISPATCH_BINDING_REQUIRED');
+    }
     let trelloTeamBoards: Array<{ boardId: string; boardName: string }> | undefined;
     let githubTeamRepos: Array<{ repoId: string; fullName: string; name: string }> | undefined;
     let telegramChats: Array<{ chatId: string; title: string }> | undefined;
@@ -970,7 +1073,7 @@ export class ChatService {
     } else if (actor.workspaceMode === 'personal' && target.userId) {
       scopeId = `personal:${target.userId}`;
     }
-    let response = planned.kind === 'plan'
+    let response = planned.kind === 'plan' && !target.slackReadPlan && !target.slackWritePlan
       ? await this.bindConnections(
           planned,
           target.userId,
@@ -1127,14 +1230,19 @@ export class ChatService {
               ...(telegramChats ? { telegramChats } : {}),
             }
           : undefined;
-      labels = resourceLabels(response, memory, userTexts, labelOptions);
+      labels = target.readLabels ?? resourceLabels(response, memory, userTexts, labelOptions);
     }
 
-    const write = async (client?: pg.PoolClient) => {
+    const write = async (client?: pg.PoolClient): Promise<{planId: string | null}> => {
+      if (target.slackContext && !client) return this.msgRepo.inSlackTransaction(conversationId, target.slackContext, held => write(held), signal);
       // Without a client the repositories keep their own transactions, called exactly as before.
-      const save = (role: string, content: string, metadata: Record<string, unknown>) => client
-        ? this.msgRepo.createMessage(conversationId, role, content, metadata, client)
-        : this.msgRepo.createMessage(conversationId, role, content, metadata);
+      const save = (role: string, content: string, metadata: Record<string, unknown>) => {
+        if (target.slackContext) {
+          const selectors = metadata.type === 'working_memory' ? target.memorySelectors ?? [] : messageOutputSelectors({content,metadata});
+          if (selectors.length) return this.msgRepo.createSlackMessage(conversationId, role, content, metadata, { segments: target.slackContext.segments, selectors }, client, signal);
+        }
+        return client ? this.msgRepo.createMessage(conversationId, role, content, metadata, client) : this.msgRepo.createMessage(conversationId, role, content, metadata);
+      };
       if (target.memoryState !== undefined) await save('system', '', { type: 'working_memory', state: target.memoryState });
       if (maskedMetadata) {
         await save('assistant', (response as any).text, { ...maskedMetadata, ...correlation });
@@ -1155,13 +1263,14 @@ export class ChatService {
             expiresAt,
             resourceLabels: labels,
           };
-          planId = (client ? await this.planRepo.createPlan(data, client) : await this.planRepo.createPlan(data)).id;
+          planId = (target.slackWritePlan ? await this.planRepo.createSlackWritePlan(data,target.userId) : target.slackReadPlan ? await this.planRepo.createSlackReadPlan(data,target.userId) : target.slackContext ? await this.planRepo.createSlackPlan(data,{segments:target.slackContext.segments},client,signal) :
+            client ? await this.planRepo.createPlan(data, client) : await this.planRepo.createPlan(data)).id;
         }
         const sourceRefs = (response as any).sourceRefs;
         await save('assistant', `Kế hoạch: ${response.summary}`, {
           type: 'plan',
           planId,
-          plan: response,
+          plan: target.slackReadPlan || target.slackWritePlan ? withoutConnections(response) : response,
           resourceLabels: labels,
           ...(sourceRefs ? { sourceRefs } : {}),
           ...correlation,
@@ -1196,6 +1305,8 @@ export class ChatService {
         emit('agent_state', { state: 'idle' });
         return;
       }
+      // No source-derived plaintext enters the replay cache. Re-open through guarded HTTP history.
+      if (target.slackContext) { emit('source_changed', { reload: true }); emit('agent_state', { state: 'idle' }); return; }
       if (response.kind === 'plan') {
         emit('plan_preview', {
           planId,
@@ -1238,10 +1349,11 @@ export class ChatService {
     });
 
     // Retrieve previous messages for conversation context
-    const rawPreviousMessages = await this.msgRepo.listMessages(conversationId);
+    const rawPreviousMessages = await this.msgRepo.listMessages(conversationId, 100, 'planning');
     const previousMessages = this.jiraHistorySanitizer
       ? await this.jiraHistorySanitizer.sanitizeMessages(userId, rawPreviousMessages)
       : rawPreviousMessages;
+    let slackContext = mergeSlackMessageContexts(previousMessages);
     const lastMemory = [...previousMessages].reverse().find((m: any) => m.metadata?.type === 'working_memory');
     const history: ChatMessage[] = previousMessages
       .filter((m: any) => m.id !== currentMessageId && m.metadata?.type !== 'working_memory' &&
@@ -1263,13 +1375,17 @@ export class ChatService {
           ...((m as any).sourceRefs ? { sourceRefs: (m as any).sourceRefs } : {}),
         };
       });
-    const schedule = this.schedules ? await this.schedules.repo.getByConversation(conversationId, this.schedules.now?.() ?? new Date()) : null;
+    const schedule = this.schedules ? await this.schedules.repo.getByConversation(conversationId, this.schedules.now?.() ?? new Date(), 'planning') : null;
+    const scheduleContext = scheduleSourceContext(schedule);
+    if (scheduleContext) slackContext = { segments: [...(slackContext?.segments ?? []), ...scheduleContext.segments], selectors: [] };
 
     // Call planner
     const memory = new WorkingMemory();
     if (lastMemory?.metadata?.state && typeof lastMemory.metadata.state === 'object') {
       memory.fromJSON(lastMemory.metadata.state);
     }
+    const previousState = structuredClone(memory.toJSON());
+    if (slackContext) await this.msgRepo.inSlackTransaction(conversationId, slackContext, async () => undefined, undefined, 'planning');
     const actor = await this.actorForConversation(conversationId, userId);
     const gatheredJiraSourceRefs: any[] = [];
     const plannerResponse: PlannerResponse = await this.planner.processMessage({
@@ -1277,11 +1393,15 @@ export class ChatService {
       history,
       memory,
       actor,
+      // Gather callbacks may contain a query, labels or model-derived source text.
+      // Keep those payloads out of live SSE and its replay cache on source-bound turns.
       onGatherEvent: (event) => {
         const safeEvent = (event.tool.startsWith('myjira.') || event.tool.startsWith('jira.'))
           ? { tool: event.tool, status: event.status }
           : event;
-        this.eventEmitter.emit('gather_progress', { conversationId, ...safeEvent });
+        if (!slackContext) {
+          this.eventEmitter.emit('gather_progress', { conversationId, ...safeEvent });
+        }
         if (event.tool.startsWith('myjira.') || event.tool.startsWith('jira.')) {
           const out = (event as any).output;
           if (out) {
@@ -1305,8 +1425,15 @@ export class ChatService {
     if (!(plannerResponse as any).sourceRefs && gatheredJiraSourceRefs.length > 0) {
       (plannerResponse as any).sourceRefs = gatheredJiraSourceRefs;
     }
-    await this.msgRepo.createMessage(conversationId, 'system', '', { type: 'working_memory', state: memory.toJSON() });
-    const prepared = await this.prepareResponse({ conversationId, userId, correlation, schedule }, plannerResponse, memory,
+    const memoryState = memory.toJSON();
+    let memorySelectors: string[] | undefined;
+    if (slackContext) {
+      const inherited = new Set(lastMemory ? slackMessageContext(lastMemory)?.selectors ?? [] : []);
+      memorySelectors = memoryOutputSelectors(memoryState).filter(selector => inherited.has(selector) ||
+        messageFingerprint(messageSelectorValue({content:'',metadata:{type:'working_memory',state:memoryState}}, 'working_memory_entity', selector),selector) !==
+        messageFingerprint(messageSelectorValue({content:'',metadata:{type:'working_memory',state:previousState}}, 'working_memory_entity', selector),selector));
+    }
+    const prepared = await this.prepareResponse({ conversationId, userId, correlation, schedule, memoryState, slackContext, memorySelectors }, plannerResponse, memory,
       [...history.filter(m => m.role === 'user').map(m => m.content), content]);
     await prepared.write();
     prepared.announce();
@@ -1333,13 +1460,16 @@ export class ChatService {
       throw new Error('Dịch vụ Jira chung (jira) không khả dụng ở không gian cá nhân.');
     }
     const userMessage = runMessage(run, this.schedules.timeZone);
-    const first = (await this.msgRepo.listMessages(convId)).find((m: any) => m.metadata?.type === 'schedule_run' && m.metadata.runId === run.runId);
+    const first = (await this.msgRepo.listMessages(convId,100,'planning',signal)).find((m: any) => m.metadata?.type === 'schedule_run' && m.metadata.runId === run.runId);
+    const slackContext=scheduleSourceContext(run);
+    if(slackContext)await this.msgRepo.inSlackTransaction(convId,slackContext,async()=>undefined,signal,'planning');
     const correlation: Correlation = first ? { replyToMessageId: first.id } : {};
     this.eventEmitter.emit('agent_state', { conversationId: convId, state: 'planning', ...correlation });
     const memory = new WorkingMemory();
     const response = await this.planner.processMessage({
       userMessage, history: [], memory, signal, actor, scheduledRun: true,
       onGatherEvent: (event) => {
+        if (slackContext) return;
         const safeEvent = (event.tool.startsWith('myjira.') || event.tool.startsWith('jira.'))
           ? { tool: event.tool, status: event.status }
           : event;
@@ -1348,7 +1478,7 @@ export class ChatService {
     });
     signal.throwIfAborted();
     if (response.kind === 'schedule') throw new Error('A scheduled run must be planned, not scheduled again');
-    const prepared = await this.prepareResponse({ conversationId: convId, userId: run.userId, correlation, memoryState: memory.toJSON() },
+    const prepared = await this.prepareResponse({ conversationId: convId, userId: run.userId, correlation, memoryState: memory.toJSON(),slackContext,memorySelectors:slackContext?memoryOutputSelectors(memory.toJSON()):undefined },
       response, memory, [userMessage], signal);
     return {
       persist: async (client) => {

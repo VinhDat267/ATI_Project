@@ -23,6 +23,7 @@ export const GITHUB_FAKE: FakeService = {
             assignees: ['octo'],
             createdAt: '2026-10-25T08:00:00Z',
             url: 'https://github.com/' + repo + '/pull/12',
+            repo,
           },
         ];
       }
@@ -36,6 +37,7 @@ export const GITHUB_FAKE: FakeService = {
             labels: ['bug'],
             assignees: [],
             url: 'https://github.com/' + repo + '/issues/42',
+            repo,
           },
         ];
       }
@@ -48,6 +50,22 @@ export const GITHUB_FAKE: FakeService = {
           labels: ['bug'],
           assignees: [],
           url: 'https://github.com/' + repo + '/issues/42',
+          repo,
+        },
+      ];
+    },
+    'github.list_issues': (args) => {
+      const repo = args.repo || 'owner/repo';
+      return [
+        {
+          id: 'issue_42',
+          number: 42,
+          title: 'Fix responsive CSS',
+          state: args.state || 'open',
+          labels: ['bug'],
+          assignees: [],
+          url: 'https://github.com/' + repo + '/issues/42',
+          repo,
         },
       ];
     },
@@ -63,6 +81,22 @@ export const GITHUB_FAKE: FakeService = {
         labels: ['bug'],
         assignees: [],
         url: 'https://github.com/' + repo + '/issues/' + num,
+        repo,
+      };
+    },
+    'github.get_pull_request': (args) => {
+      const repo = args.repo || 'owner/repo';
+      const num = args.issueNumber ?? 12;
+      return {
+        id: 'pr_' + num,
+        number: num,
+        title: 'Feat: OAuth PKCE',
+        body: 'Chi tiết pull request',
+        state: 'open',
+        labels: ['enhancement'],
+        isPullRequest: true,
+        url: 'https://github.com/' + repo + '/pull/' + num,
+        repo,
       };
     },
     'github.create_issue': (args) => {
@@ -72,13 +106,52 @@ export const GITHUB_FAKE: FakeService = {
         number: 42,
         title: args.title,
         url: 'https://github.com/' + repo + '/issues/42',
-        repo: args.repo,
+        repo,
+        ...(Array.isArray(args.labels) ? { labels: args.labels } : {}),
+        ...(Array.isArray(args.assignees) ? { assignees: args.assignees } : {}),
       };
     },
-    'github.add_label': (args) => ({
-      ok: true,
-      issueNumber: args.issueNumber ?? 42,
-      labels: args.labels ?? [],
-    }),
+    'github.update_issue': (args) => {
+      const repo = args.repo || 'owner/repo';
+      const num = args.issueNumber ?? 42;
+      return {
+        id: 'issue_' + num,
+        number: num,
+        title: args.title ?? 'Issue hiện có',
+        state: args.state ?? 'open',
+        labels: Array.isArray(args.labels) ? args.labels : ['bug'],
+        assignees: Array.isArray(args.assignees) ? args.assignees : [],
+        url: 'https://github.com/' + repo + '/issues/' + num,
+        repo,
+      };
+    },
+    'github.add_comment': (args) => {
+      const repo = args.repo || 'owner/repo';
+      const num = args.issueNumber ?? 42;
+      return {
+        id: 'comment_9001',
+        issueNumber: num,
+        body: args.body ?? '',
+        repo,
+        url: `https://github.com/${repo}/issues/${num}#issuecomment-9001`,
+      };
+    },
+    'github.add_label': (args) => {
+      const repo = args.repo || 'owner/repo';
+      const num = args.issueNumber ?? 42;
+      const labels = Array.isArray(args.labels)
+        ? args.labels
+        : typeof args.label === 'string'
+          ? [args.label]
+          : [];
+      return {
+        ok: true,
+        number: num,
+        issueNumber: num,
+        labels,
+        repo,
+        url: `https://github.com/${repo}/issues/${num}`,
+      };
+    },
   },
 };

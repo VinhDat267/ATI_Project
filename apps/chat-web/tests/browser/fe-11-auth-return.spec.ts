@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import pg from 'pg';
+import {fixtureConversation,fixtureMessage} from './persisted-artifacts.fixture.js';
 import { pbkdf2Sync, randomBytes, randomUUID } from 'node:crypto';
 
 const password = 'Fe11Return!password';
@@ -14,10 +15,10 @@ test('FE-11: revoked session logs back into the same saved conversation', async 
   const id = randomUUID(), email = `fe11-return-${id}@example.test`;
   try {
     const userId = (await db.query("INSERT INTO users(email,password,name,status,email_verified,role) VALUES($1,$2,'FE11 Return','active',true,'member') RETURNING id", [email, hashPassword()])).rows[0].id;
-    const conversationId = (await db.query("INSERT INTO conversations(user_id,status) VALUES($1,'chatting') RETURNING id", [userId])).rows[0].id;
-    await db.query(`INSERT INTO messages(conv_id,role,content,metadata,created_at) VALUES
-      ($1,'user','FE11 durable request',NULL,now() - interval '1 second'),
-      ($1,'assistant','FE11 durable planning error','{"type":"planning_error"}'::jsonb,now())`, [conversationId]);
+    const conversationId = await fixtureConversation(db,userId);
+    const first=await fixtureMessage(db,conversationId,'user','FE11 durable request');
+    await db.query("UPDATE messages SET created_at=now()-interval '1 second' WHERE id=$1",[first]);
+    await fixtureMessage(db,conversationId,'assistant','FE11 durable planning error',{type:'planning_error'});
 
     await page.goto('/login');
     await page.getByLabel('Email', { exact: true }).fill(email);
