@@ -2,14 +2,14 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useChatStore } from '../store/chat-store';
 import { useSSE } from '../hooks/use-sse';
 import { apiClient } from '../services/api-client';
-import { Cockpit } from './Cockpit';
+import { PlanoraChatWorkspace } from '../planora/workspace/PlanoraChatWorkspace';
 import { recoveryEditRequest } from '../pages/Cockpit/recovery-request';
 import { userErrorMessage } from '../services/user-error';
 import type { ServiceInfo, User } from '../types';
 
 import { useExecutionRecovery } from '../hooks/use-execution-recovery';
 import { useConversationHistory } from '../hooks/use-conversation-history';
-import { conversationPath, type AppRoute } from '../routes';
+import { conversationPath, readRoute, type AppRoute } from '../routes';
 import { NotFoundView } from '../views/NotFoundView';
 import { useNetworkStatus } from '../hooks/use-network-status';
 import { OfflineBanner } from '../pages/Errors/PlanningErrors';
@@ -136,7 +136,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
     try { await request; }
     catch (error) {
       if (!workspaceMounted.current) return;
-      if (currentRoute.current.kind === 'home' && useChatStore.getState().conversationId === null) {
+      if ((currentRoute.current.kind === 'home' || readRoute().kind === 'home') && useChatStore.getState().conversationId === null) {
         useChatStore.setState({
           messages: previous.messages, streamingText: previous.streamingText, isStreaming: previous.isStreaming,
           activePlan: previous.activePlan, planStatus: previous.planStatus,
@@ -148,8 +148,16 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
         setConversationId(previous.conversationId);
         if (previousRoute.kind === 'conversation') {
           const path = conversationPath(previousRoute.conversationId);
-          window.addEventListener('popstate', () => navigate(path, true), { once: true });
+          let restored = false;
+          const onPop = () => {
+            if (restored) return;
+            restored = true;
+            window.removeEventListener('popstate', onPop);
+            navigate(path, true);
+          };
+          window.addEventListener('popstate', onPop, { once: true });
           window.history.back();
+          setTimeout(onPop, 0);
         }
       }
       setActionError(userErrorMessage(error));
@@ -278,7 +286,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
         {(disconnected || network.offline) && <OfflineBanner busy={network.busy} onRetry={() => { void network.retry(); reconnect?.(); }} />}
         {actionError && <p role="alert" className="px-4 py-2 text-danger-text">{actionError}</p>}
         <div className="contents">
-          <Cockpit user={user} canConfigureServices={canConfigureServices} onLogout={onLogout} navigate={navigate} services={services} servicesLoading={servicesLoading} servicesError={servicesError} onRefreshServices={loadServices}
+          <PlanoraChatWorkspace user={user} canConfigureServices={canConfigureServices} onLogout={onLogout} navigate={navigate} services={services} servicesLoading={servicesLoading} servicesError={servicesError} onRefreshServices={loadServices}
             networkError={disconnected || network.offline}
             contentOverride={history.error || route.kind === 'not-found' ? <NotFoundView message={history.error || undefined} onGoHome={() => navigate('/')} /> : history.loading ? <p role="status" className="p-6">Đang tải hội thoại...</p> : undefined}
             onSendMessage={handleSendMessage} onNewConversation={handleNewConversation}
