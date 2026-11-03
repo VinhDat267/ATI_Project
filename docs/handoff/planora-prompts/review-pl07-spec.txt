@@ -1,0 +1,44 @@
+BẠN LÀ REVIEWER ĐỘC LẬP (CODEX REALITY CHECKER).
+NHIỆM VỤ: REVIEW ĐỘC LẬP PL-07 (RESPONSES, CLARIFICATION, REFUSAL, ERRORS & RECOVERY MOMENTS) TRÊN HEAD 4405fd36bfda8e46623261c81aaa971301ec834c.
+
+1. BỐI CẢNH VÀ PHẠM VI:
+- Base SHA: 514d982fd9fc152290feb305b0d97f2c40dda21a (trên branch codex/planora-ui).
+- Head cần review: 4405fd36bfda8e46623261c81aaa971301ec834c (trên branch longnguyen005/feat-planora-pl-07, worktree review-planora-pl-07).
+- Task card: docs/handoff/tasks/PL-07-planora-responses-recovery.md.
+- Worker log: docs/handoff/log/2026-11-04-gemini-pl-07.md.
+
+2. NỘI DUNG THAY ĐỔI CẦN KIỂM CHỨNG:
+- **ResponseMoment (Answer & Sources / Moment 6):**
+  - Chuyển đổi sang CSS tokens Planora, trích dẫn tra cứu HTTPS an toàn, nút "Đã tra cứu" (`#answer-lookups`), bảo toàn `[data-answer-text]` và thông báo `NoWritesNotice`.
+- **RefusalMoment (Moment 2):**
+  - Hiển thị danh sách dịch vụ thiếu/chưa cấp quyền (`#s1-services-list`), các nút CTA kết nối thật (`#trello-connect`, `#github-connect`, `#telegram-connect`, etc.).
+  - Nút "Gửi lại yêu cầu" chỉ kích hoạt khi người dùng bấm trực tiếp (`onResend`).
+- **ClarificationMoment (Moment 3):**
+  - Bấm vào gợi ý chỉ pre-fill lựa chọn vào draft của dock composer, không tự ý gửi tin nhắn trước khi người dùng bấm "Xác nhận và tiếp tục".
+- **Planning Errors & Slow Notice:**
+  - `SlowPlanningMoment` (#view-timeout), `PlanningErrorMoment` (#view-server), `OfflineBanner` (#network-offline-banner) hiển thị trung thực.
+- **Recovery Moments (Moments 7, 8, 9 & Unsuccessful):**
+  - Moment 7: đầy đủ hành vi theo `recoveryActions` (Thử lại, Bỏ qua, Sửa rồi thử lại, Dừng kế hoạch).
+  - Moment 8 (Unknown): TUYỆT ĐỐI KHÔNG mở Retry, Edit hay Continue.
+  - Moment 9: hiển thị danh sách `SavedWork`, chỉ cho phép Continue khi sạch lỗi.
+  - Hộp thoại dừng (`CockpitDialog`): Bấm Escape chỉ đóng hộp thoại, không được dừng execution. Thao tác dừng yêu cầu bấm nút "Dừng hẳn quy trình".
+  - Sửa kế hoạch (`RecoveryEditor`): giao diện 2 bước xác nhận dừng kế hoạch cũ và gửi yêu cầu mới.
+
+3. TIÊU CHUẨN KIỂM CHỨNG BẮT BUỘC (REALITY CHECKER):
+- `npm run typecheck:v3` (phải exit 0).
+- `npm test -w @wap/chat-web` (phải exit 0, 102/102 test files).
+- `npm run build:v3` (phải exit 0).
+- `node scripts/test-v3-web-build-security.mjs` (phải exit 0).
+- Chạy Playwright browser tests trên sandbox riêng:
+  `node scripts/test-v3-browser.mjs planora-chat.spec.ts fe-05-cockpit.spec.ts`.
+- Thực hiện các probe độc lập kiểm tra:
+  + Unknown moment không có nút Retry.
+  + Thao tác Stop có modal xác nhận, Escape không hủy execution.
+  + Pre-fill clarification không tự gửi.
+  + Responsive layout ở cả 5 viewports (1440, 1024, 768, 375, 320) và 2 theme (light/dark).
+
+4. KẾT QUẢ VÀ BÀN GIAO:
+- Viết báo cáo review chi tiết vào file: `docs/handoff/log/2026-11-04-codex-review-pl-07.md`.
+- Ghi rõ kết luận: ĐẠT hay CHƯA ĐẠT (kèm bằng chứng lệnh và exit code).
+- Nếu CHƯA ĐẠT: ghi rõ từng finding (P1/P2/P3) và hướng dẫn sửa cụ thể.
+- Báo hoàn thành qua Orca với kết luận và đường dẫn báo cáo.
