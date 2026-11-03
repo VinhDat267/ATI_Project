@@ -1,6 +1,30 @@
 {
   "playbooks": [
     {
+      "id": "playbook-all-nine-services",
+      "title": "Điều phối liên thông toàn diện 9 dịch vụ",
+      "services": ["calendar", "jira", "github", "trello", "notion", "sheets", "gmail", "telegram", "slack"],
+      "prompt": "Tạo lịch họp khẩn trên Google Calendar, tạo ticket sự cố trên Jira kèm link lịch họp, mở issue trên GitHub tham chiếu mã Jira, tạo thẻ theo dõi trên Trello, lập trang biên bản sự cố trên Notion tổng hợp các liên kết, ghi dòng nhật ký vào bảng tính Google Sheets, gửi email báo cáo qua Gmail tới oncall@ati.local, gửi cảnh báo trực ca qua Telegram và đăng tổng hợp toàn bộ vào kênh Slack #general"
+    },
+    {
+      "id": "playbook-five-service-release",
+      "title": "Đồng bộ phát hành Sprint qua 5 dịch vụ",
+      "services": ["jira", "github", "trello", "sheets", "slack"],
+      "prompt": "Tạo ticket phát hành trên Jira, mở issue checklist trên GitHub tham chiếu mã Jira, tạo thẻ triển khai trên Trello đính kèm link GitHub, ghi nhật ký phát hành vào bảng tính Google Sheets và gửi thông báo tổng hợp vào kênh Slack #general"
+    },
+    {
+      "id": "playbook-four-service-incident",
+      "title": "Ứng cứu sự cố P1 qua 4 dịch vụ",
+      "services": ["jira", "notion", "telegram", "slack"],
+      "prompt": "Tạo ticket sự cố thanh toán P1 trên Jira, lập trang biên bản sự cố trên Notion kèm mã và liên kết Jira, gửi cảnh báo trực ca qua Telegram kèm liên kết biên bản và đăng tổng hợp vào kênh Slack #general"
+    },
+    {
+      "id": "playbook-scheduled-calendar-slack",
+      "title": "Đặt lịch điểm danh lịch họp mỗi sáng 08:00",
+      "services": ["calendar", "slack"],
+      "prompt": "Mỗi sáng 08:00 từ thứ 2 đến thứ 6, kiểm tra lịch họp Google Calendar trong ngày và gửi bản tóm tắt vào kênh Slack #general"
+    },
+    {
       "id": "playbook-bug-triage",
       "title": "Đồng bộ lỗi liên công cụ",
       "services": ["trello", "github", "slack"],

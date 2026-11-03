@@ -1,4 +1,4 @@
-import { ALL_TOOLS, GMAIL_SERVICE, MYCALENDAR_SERVICE, MYJIRA_SERVICE, MYSHEETS_SERVICE, NOTION_OAUTH_TOOLS, SERVICE_REGISTRY, type AllowedScope } from '@wap/tool-schemas';
+import { ALL_TOOLS, GMAIL_SERVICE, GMAIL_TOOLS, MYCALENDAR_SERVICE, MYJIRA_SERVICE, MYSHEETS_SERVICE, NOTION_OAUTH_TOOLS, SERVICE_REGISTRY, type AllowedScope } from '@wap/tool-schemas';
 import { createGmailToolAdapter, createPersonalCalendarAdapter, createPersonalSheetsAdapter, type GmailAccessTokenProvider } from '@wap/tool-adapters';
 import { routeIntent, type ProcessMessageInput } from '@wap/planner';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
@@ -28,7 +28,7 @@ export const gmailServiceRegistry = (enabled: boolean) => serviceRegistryForRunt
  * sandbox Slack that has no channels, asking back before the model runs.
  */
 export function runtimePlannerSearchMode(mode: RuntimeMode, configured: 'llm' | 'regex', scenario?: string): 'llm' | 'regex' {
-  return mode === 'sandbox' && (scenario === 'gmail' || scenario === 'schedule' || scenario === 'mycalendar' || scenario === 'mysheets') ? 'llm' : configured;
+  return mode === 'sandbox' && (scenario === 'gmail' || scenario === 'schedule' || scenario === 'mycalendar' || scenario === 'mysheets' || scenario === 'nine_service' || scenario === 'five_service' || scenario === 'four_service') ? 'llm' : configured;
 }
 
 export async function runtimeToolCatalog(
@@ -74,6 +74,7 @@ export async function runtimeToolCatalog(
         (!options.myjiraEnabled || t.service !== 'jira')
     ),
     ...NOTION_OAUTH_TOOLS,
+    ...(process.env.SANDBOX_SCENARIO === 'nine_service' ? GMAIL_TOOLS : []),
   ];
   const tools = [
     ...baseTools,

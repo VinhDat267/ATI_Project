@@ -268,7 +268,7 @@ export function RequestMoment({
                     }}
                     className="text-left p-3.5 bg-white hover:bg-neutral-50 rounded-2xl border border-brand-border hover:border-brand-primary/50 shadow-soft-card transition-all group flex flex-col justify-between gap-2.5"
                   >
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       {playbook.services.map((svcId, idx) => (
                         <span key={svcId} className="inline-flex items-center gap-1">
                           <span className="w-7 h-7 rounded-full bg-white border border-brand-border shadow-2xs flex items-center justify-center">

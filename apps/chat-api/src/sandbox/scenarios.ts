@@ -358,6 +358,216 @@ export function createSandboxProvider(scenario?: string) {
       { id: 'step_2', tool: 'slack.send_message', description: 'Thông báo key và liên kết ticket', args: { channel: '#general', text: { $template: 'Jira: ${step_1.output.key}; ${step_1.output.url}' } }, dependsOn: ['step_1'] },
     ],
   };
+  const fourServicePlan = {
+    kind: 'plan',
+    thinking: 'Tạo ticket sự cố trên Jira, lập trang biên bản trên Notion kèm mã và liên kết Jira, gửi cảnh báo trực ca qua Telegram, rồi đăng tổng hợp vào kênh Slack.',
+    summary: 'Điều phối sự cố qua 4 dịch vụ: Jira, Notion, Telegram và Slack',
+    warnings: [],
+    steps: [
+      {
+        id: 'step_1',
+        tool: 'jira.create_issue',
+        description: 'Tạo ticket sự cố thanh toán P1 trên Jira',
+        args: { projectKey: 'ATI', summary: 'Sự cố thanh toán P1', description: 'Mô tả sự cố P1 trong sandbox' },
+        dependsOn: [],
+      },
+      {
+        id: 'step_2',
+        tool: 'notion.create_page',
+        description: 'Lập trang biên bản sự cố trên Notion dẫn tới Jira',
+        args: {
+          databaseId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+          title: 'Biên bản sự cố P1',
+          content: { $template: 'Theo dõi Jira ${step_1.output.key}: ${step_1.output.url}' },
+        },
+        dependsOn: ['step_1'],
+      },
+      {
+        id: 'step_3',
+        tool: 'telegram.send_message',
+        description: 'Gửi cảnh báo trực ca qua Telegram kèm liên kết biên bản',
+        args: {
+          chatId: '-1001234567890',
+          text: { $template: 'Cảnh báo trực ca ${step_1.output.key}: ${step_2.output.url}' },
+        },
+        dependsOn: ['step_1', 'step_2'],
+      },
+      {
+        id: 'step_4',
+        tool: 'slack.send_message',
+        description: 'Thông báo tổng hợp 4 dịch vụ vào kênh Slack #general',
+        args: {
+          channel: '#general',
+          text: { $template: 'Jira: ${step_1.output.key} (${step_1.output.url}); Notion: ${step_2.output.url}; Telegram: ${step_3.output.messageId}' },
+        },
+        dependsOn: ['step_1', 'step_2', 'step_3'],
+      },
+    ],
+  };
+  const fiveServicePlan = {
+    kind: 'plan',
+    thinking: 'Tạo ticket phát hành trên Jira, mở issue theo dõi trên GitHub, tạo thẻ triển khai trên Trello, ghi dòng theo dõi vào Google Sheets và báo tổng hợp lên kênh Slack.',
+    summary: 'Đồng bộ phát hành Sprint qua 5 dịch vụ: Jira, GitHub, Trello, Sheets và Slack',
+    warnings: [],
+    steps: [
+      {
+        id: 'step_1',
+        tool: 'jira.create_issue',
+        description: 'Tạo ticket phát hành trên Jira',
+        args: { projectKey: 'ATI', summary: 'Release Sprint 15', description: 'Phát hành phiên bản mới' },
+        dependsOn: [],
+      },
+      {
+        id: 'step_2',
+        tool: 'github.create_issue',
+        description: 'Mở issue phát hành trên GitHub tham chiếu Jira',
+        args: {
+          repo: 'owner/repo',
+          title: 'Release checklist Sprint 15',
+          body: { $template: 'Theo dõi Jira ${step_1.output.key}: ${step_1.output.url}' },
+        },
+        dependsOn: ['step_1'],
+      },
+      {
+        id: 'step_3',
+        tool: 'trello.create_card',
+        description: 'Tạo thẻ triển khai trên Trello đính kèm link GitHub',
+        args: {
+          listId: 'list_frontend_todo',
+          title: 'Triển khai Release Sprint 15',
+          desc: { $template: 'Jira: ${step_1.output.key} | GitHub: ${step_2.output.url}' },
+        },
+        dependsOn: ['step_1', 'step_2'],
+      },
+      {
+        id: 'step_4',
+        tool: 'sheets.append_rows',
+        description: 'Ghi nhật ký phát hành vào bảng tính Google Sheets',
+        args: {
+          spreadsheetId: 'spreadsheet_fixture_123456',
+          sheet: 'Tasks',
+          rows: [[{ $template: '${step_1.output.key}' }, { $template: '${step_3.output.url}' }]],
+        },
+        dependsOn: ['step_1', 'step_3'],
+      },
+      {
+        id: 'step_5',
+        tool: 'slack.send_message',
+        description: 'Thông báo tổng hợp 5 dịch vụ lên kênh Slack #general',
+        args: {
+          channel: '#general',
+          text: { $template: 'Release ${step_1.output.key}: GitHub=${step_2.output.url}; Trello=${step_3.output.url}; Sheets=${step_4.output.updatedRange}' },
+        },
+        dependsOn: ['step_1', 'step_2', 'step_3', 'step_4'],
+      },
+    ],
+  };
+  const nineServicePlan = {
+    kind: 'plan',
+    thinking: 'Điều phối quy trình liên thông qua đủ 9 dịch vụ: tạo lịch họp Google Calendar, tạo ticket Jira, mở issue GitHub, tạo thẻ Trello, lập biên bản Notion, ghi dòng nhật ký Google Sheets, gửi email báo cáo Gmail, bắn cảnh báo Telegram và đăng tổng hợp lên Slack.',
+    summary: 'Điều phối liên thông toàn diện 9 dịch vụ từ lịch họp đến báo cáo tổng hợp',
+    warnings: [],
+    steps: [
+      {
+        id: 'step_1',
+        tool: 'calendar.create_event',
+        description: 'Tạo lịch họp khẩn xử lý sự cố trên Google Calendar',
+        args: {
+          calendarId: 'ati@group.calendar.google.com',
+          summary: 'Họp khẩn sự cố P1',
+          start: '2026-10-09T15:00:00+07:00',
+          end: '2026-10-09T16:00:00+07:00',
+        },
+        dependsOn: [],
+      },
+      {
+        id: 'step_2',
+        tool: 'jira.create_issue',
+        description: 'Tạo ticket sự cố trên Jira kèm liên kết lịch họp',
+        args: {
+          projectKey: 'ATI',
+          summary: 'Sự cố thanh toán P1',
+          description: { $template: 'Lịch họp khẩn: ${step_1.output.url}' },
+        },
+        dependsOn: ['step_1'],
+      },
+      {
+        id: 'step_3',
+        tool: 'github.create_issue',
+        description: 'Mở issue kỹ thuật trên GitHub tham chiếu mã Jira',
+        args: {
+          repo: 'owner/repo',
+          title: 'Hotfix sự cố thanh toán P1',
+          body: { $template: 'Theo dõi Jira ${step_2.output.key}: ${step_2.output.url}' },
+        },
+        dependsOn: ['step_2'],
+      },
+      {
+        id: 'step_4',
+        tool: 'trello.create_card',
+        description: 'Tạo thẻ theo dõi trên Trello đính kèm GitHub issue',
+        args: {
+          listId: 'list_frontend_todo',
+          title: 'Theo dõi vá lỗi thanh toán P1',
+          desc: { $template: 'GitHub: ${step_3.output.url} | Jira: ${step_2.output.key}' },
+        },
+        dependsOn: ['step_2', 'step_3'],
+      },
+      {
+        id: 'step_5',
+        tool: 'notion.create_page',
+        description: 'Lập trang biên bản sự cố trên Notion tổng hợp các liên kết',
+        args: {
+          databaseId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+          title: 'Biên bản sự cố P1',
+          content: { $template: 'Jira: ${step_2.output.url} | GitHub: ${step_3.output.url} | Trello: ${step_4.output.url}' },
+        },
+        dependsOn: ['step_2', 'step_3', 'step_4'],
+      },
+      {
+        id: 'step_6',
+        tool: 'sheets.append_rows',
+        description: 'Ghi dòng nhật ký SLA vào bảng tính Google Sheets',
+        args: {
+          spreadsheetId: 'spreadsheet_fixture_123456',
+          sheet: 'Tasks',
+          rows: [[{ $template: '${step_2.output.key}' }, { $template: '${step_5.output.url}' }]],
+        },
+        dependsOn: ['step_2', 'step_5'],
+      },
+      {
+        id: 'step_7',
+        tool: 'gmail.send_message',
+        description: 'Gửi email báo cáo ban điều hành qua Gmail',
+        args: {
+          to: ['oncall@ati.local'],
+          subject: 'Báo cáo sự cố thanh toán P1',
+          body: { $template: 'Biên bản Notion: ${step_5.output.url} | Vùng Sheets: ${step_6.output.updatedRange}' },
+        },
+        dependsOn: ['step_5', 'step_6'],
+      },
+      {
+        id: 'step_8',
+        tool: 'telegram.send_message',
+        description: 'Gửi cảnh báo trực ca qua Telegram kèm mã thư Gmail',
+        args: {
+          chatId: '-1001234567890',
+          text: { $template: 'Cảnh báo ${step_2.output.key}: Biên bản ${step_5.output.url} | Email ${step_7.output.id}' },
+        },
+        dependsOn: ['step_2', 'step_5', 'step_7'],
+      },
+      {
+        id: 'step_9',
+        tool: 'slack.send_message',
+        description: 'Đăng bản tổng hợp toàn bộ 9 dịch vụ vào kênh Slack #general',
+        args: {
+          channel: '#general',
+          text: { $template: 'Calendar: ${step_1.output.url}; Jira: ${step_2.output.key}; GitHub: ${step_3.output.url}; Trello: ${step_4.output.url}; Notion: ${step_5.output.url}; Sheets: ${step_6.output.updatedRange}; Gmail: ${step_7.output.id}; Telegram: ${step_8.output.messageId}' },
+        },
+        dependsOn: ['step_1', 'step_2', 'step_3', 'step_4', 'step_5', 'step_6', 'step_7', 'step_8'],
+      },
+    ],
+  };
   if (scenario === 'schedule') {
     const meeting = { name: 'Lịch họp hằng ngày', request: 'Gửi lịch họp hôm nay lên Slack #ati-test' };
     // Select by this conversation's last request, not a global counter shared by users.
@@ -390,7 +600,27 @@ export function createSandboxProvider(scenario?: string) {
     };
     return mockProvider;
   }
-  mockProvider.setPlanResponses([scenario === 'jira_slack' ? jiraPlan : scenario === 'telegram_slack' ? telegramPlan : scenario === 'notion_slack' ? notionPlan : scenario === 'calendar_slack' ? calendarPlan : scenario === 'sheets_slack' ? sheetsPlan : scenario === 'three_service' ? threeServicePlan : sandboxPlan]);
+  mockProvider.setPlanResponses([
+    scenario === 'nine_service'
+      ? nineServicePlan
+      : scenario === 'five_service'
+        ? fiveServicePlan
+        : scenario === 'four_service'
+          ? fourServicePlan
+          : scenario === 'jira_slack'
+            ? jiraPlan
+            : scenario === 'telegram_slack'
+              ? telegramPlan
+              : scenario === 'notion_slack'
+                ? notionPlan
+                : scenario === 'calendar_slack'
+                  ? calendarPlan
+                  : scenario === 'sheets_slack'
+                    ? sheetsPlan
+                    : scenario === 'three_service'
+                      ? threeServicePlan
+                      : sandboxPlan,
+  ]);
   return mockProvider;
 }
 

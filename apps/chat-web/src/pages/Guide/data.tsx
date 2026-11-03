@@ -510,6 +510,86 @@ export const SAMPLE_PROMPTS: SamplePrompt[] = [
           'Slack: Đăng thông báo kèm liên kết báo cáo Notion vào kênh #ati-test'
         ],
         badge: 'Tự động hoá PM'
+      },
+      {
+        id: 'p15',
+        category: 'sprint-bug',
+        categoryLabel: 'Lỗi Sprint & Kỹ thuật',
+        title: 'Điều phối War-Room toàn diện qua 8 công cụ (Calendar, Jira, GitHub, Trello, Notion, Sheets, Telegram, Slack)',
+        prompt: 'Tạo lịch họp khẩn trên Google Calendar, tạo ticket sự cố trên Jira kèm link lịch họp, mở issue trên GitHub tham chiếu mã Jira, tạo thẻ theo dõi trên Trello, lập trang biên bản sự cố trên Notion tổng hợp các liên kết, ghi dòng nhật ký vào bảng tính Google Sheets, gửi cảnh báo trực ca qua Telegram và đăng tổng hợp toàn bộ vào kênh Slack #general',
+        services: ['calendar', 'jira', 'github', 'trello', 'notion', 'sheets', 'telegram', 'slack'],
+        tools: [
+          'calendar.create_event',
+          'jira.create_issue',
+          'github.create_issue',
+          'trello.create_card',
+          'notion.create_page',
+          'sheets.append_rows',
+          'telegram.send_message',
+          'slack.send_message'
+        ],
+        workflow: [
+          'Google Calendar & Jira: Đặt lịch họp War-room và tạo ticket sự cố P1 đính kèm liên kết cuộc họp',
+          'GitHub & Trello: Tạo issue kỹ thuật tham chiếu mã Jira và tạo thẻ theo dõi trên bảng Sprint',
+          'Notion & Google Sheets: Lập trang biên bản tổng hợp tất cả liên kết và ghi dòng kiểm toán vào bảng tính',
+          'Telegram & Slack: Gửi cảnh báo trực ca qua Telegram và đăng thông báo toàn diện vào kênh Slack #general'
+        ],
+        badge: 'Liên thông toàn diện'
+      },
+      {
+        id: 'p16',
+        category: 'sprint-bug',
+        categoryLabel: 'Lỗi Sprint & Kỹ thuật',
+        title: 'Đồng bộ phát hành Sprint qua 5 dịch vụ (Jira, GitHub, Trello, Sheets, Slack)',
+        prompt: 'Tạo ticket phát hành trên Jira, mở issue checklist trên GitHub tham chiếu mã Jira, tạo thẻ triển khai trên Trello đính kèm link GitHub, ghi nhật ký phát hành vào bảng tính Google Sheets và gửi thông báo tổng hợp vào kênh Slack #general',
+        services: ['jira', 'github', 'trello', 'sheets', 'slack'],
+        tools: [
+          'jira.create_issue',
+          'github.create_issue',
+          'trello.create_card',
+          'sheets.append_rows',
+          'slack.send_message'
+        ],
+        workflow: [
+          'Jira & GitHub: Tạo ticket phát hành và mở checklist kiểm tra trên kho mã',
+          'Trello & Google Sheets: Tạo thẻ theo dõi triển khai và ghi dòng nhật ký phát hành',
+          'Slack: Đăng thông báo tổng hợp kèm toàn bộ đường dẫn phát hành vào #general'
+        ],
+        badge: 'Chuỗi 5 dịch vụ'
+      },
+      {
+        id: 'p17',
+        category: 'sprint-bug',
+        categoryLabel: 'Lỗi Sprint & Kỹ thuật',
+        title: 'Ứng cứu sự cố P1 qua 4 dịch vụ (Jira, Notion, Telegram, Slack)',
+        prompt: 'Tạo ticket sự cố thanh toán P1 trên Jira, lập trang biên bản sự cố trên Notion kèm mã và liên kết Jira, gửi cảnh báo trực ca qua Telegram kèm liên kết biên bản và đăng tổng hợp vào kênh Slack #general',
+        services: ['jira', 'notion', 'telegram', 'slack'],
+        tools: [
+          'jira.create_issue',
+          'notion.create_page',
+          'telegram.send_message',
+          'slack.send_message'
+        ],
+        workflow: [
+          'Jira: Tạo ticket sự cố P1 và lấy mã cùng liên kết trực tiếp',
+          'Notion: Khởi tạo trang biên bản sự cố đính kèm thông tin từ Jira',
+          'Telegram & Slack: Phát cảnh báo trực ca qua Telegram và đăng báo cáo tổng hợp vào Slack'
+        ],
+        badge: 'Chuỗi 4 dịch vụ'
+      },
+      {
+        id: 'p18',
+        category: 'reporting',
+        categoryLabel: 'Báo cáo & Giao tiếp',
+        title: 'Đặt lịch tự động mỗi sáng 08:00 điểm danh lịch họp Calendar và gửi bản tin Slack',
+        prompt: 'Mỗi sáng 08:00 từ thứ 2 đến thứ 6, kiểm tra lịch họp Google Calendar trong ngày và gửi bản tóm tắt vào kênh Slack #general',
+        services: ['calendar', 'slack'],
+        tools: ['calendar.list_events', 'slack.send_message'],
+        workflow: [
+          'Lịch chạy tự động (0 8 * * 1-5): Kích hoạt mỗi sáng 08:00 các ngày làm việc theo múi giờ Asia/Ho_Chi_Minh',
+          'Google Calendar & Slack: Đọc danh sách lịch họp trong ngày và tự động gửi bản tin tổng hợp vào kênh Slack'
+        ],
+        badge: 'Lịch chạy định kỳ'
       }
     ];
 
