@@ -43,7 +43,8 @@ export function searchEntities(raw: unknown, schema: JSONSchema): unknown[] {
 }
 
 /** Entity fields worth remembering; anything else (descriptions, tokens) is dropped. */
-const KEPT_FIELDS = ['id', 'name', 'fullName', 'number', 'title', 'boardId', 'boardIds', 'url', 'key', 'siteId', 'cloudId', 'workspaceId'];
+const PROVENANCE_FIELDS = ['_sourceRef', '_sourceRefs', 'sourceRef', 'sourceRefs'];
+const KEPT_FIELDS = ['id', 'name', 'fullName', 'number', 'title', 'boardId', 'boardIds', 'url', 'key', 'siteId', 'cloudId', 'workspaceId', ...PROVENANCE_FIELDS];
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -120,7 +121,7 @@ export function prepareSearchCall(call: SearchCall, catalog: ToolDefinition[]): 
   return problem ? { error: `${call.tool}: ${problem}` } : { args };
 }
 
-const SCOPING_FIELDS = ['siteId', 'cloudId', 'workspaceId'];
+const SCOPING_FIELDS = ['siteId', 'cloudId', 'workspaceId', ...PROVENANCE_FIELDS];
 
 function compact(entity: unknown, fields = KEPT_FIELDS): Record<string, unknown> | undefined {
   if (!isObject(entity) || (typeof entity.id !== 'string' && typeof entity.id !== 'number')) return undefined;

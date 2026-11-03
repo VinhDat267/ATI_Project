@@ -119,6 +119,35 @@
   - Typecheck v3: **0 errors** (exit code 0).
   - Evaluator test suites: **26/26 files PASS**, **412/412 tests PASS** (exit code 0).
   - `npm run check`: **ALL PASS** (exit code 0).
+- **Khắc phục đợt review thứ bảy (2 phát hiện: 1 P1, 1 P2):**
+  - **1. [P1] Giữ provenance qua bước rút gọn recordObserved và cho phép kết quả gather hợp lệ tới model:**
+    - Cập nhật `packages/planner/src/search.ts`:
+      - Thêm `PROVENANCE_FIELDS = ['_sourceRef', '_sourceRefs', 'sourceRef', 'sourceRefs']`.
+      - Bổ sung `...PROVENANCE_FIELDS` vào cả `KEPT_FIELDS` và `SCOPING_FIELDS`.
+      - `compact(entity, fields)` giờ đây luôn giữ lại các trường provenance ngay cả khi `fields` được ghi đè bằng `tool.observedFields` (ví dụ: `['id', 'siteId', 'cloudId', 'name', 'url']` của `myjira.list_sites`).
+      - Nhờ vậy, thực thể Jira trong `workingMemory.__observed` luôn bảo toàn `_sourceRef` và `_sourceRefs`.
+    - Cập nhật `apps/chat-api/src/services/jira/jira-provider-guard.ts` (`validateEntity`):
+      - Khi thực thể mang `_sourceRef`, guard gọi `policyService.revalidateSource` và xác nhận `{ valid: true }` nếu nguồn còn hiệu lực.
+      - Nếu thực thể Jira thiếu `_sourceRef` trực tiếp nhưng có `siteId`/`cloudId`, guard truy vấn PostgreSQL đối chiếu trạng thái active của workspace, membership, account, grant, site và project thay vì mặc định trả về `invalid_evidence`.
+    - Tests:
+      - `packages/planner/tests/myjira-security-source.test.ts` bổ sung unit test xác minh `recordObserved` bảo toàn `_sourceRef` và `_sourceRefs` qua bước rút gọn với `tool.observedFields`.
+      - `apps/chat-api/tests/services/jira-source-guard.test.ts` bổ sung test tích hợp: sau khi adapter trả kết quả `myjira.list_sites` mang `_sourceRef`, `recordObserved` rút gọn và lưu vào memory, Turn 2 gọi `guardedProvider.generatePlan`, xác nhận thực thể site không bị xóa khỏi `workingMemory.__observed` và model prompt nhận được dữ liệu site.
+  - **2. [P2] Lọc Search results theo từng outcome/result thay cho cờ che toàn bộ anyRevokedGathered:**
+    - Cập nhật `apps/chat-api/src/services/jira/jira-provider-guard.ts`:
+      - Loại bỏ cờ toàn cục `anyRevokedGathered` (cờ này trước đây được kích hoạt khi bất kỳ thực thể nào trong memory bị loại bỏ, dẫn tới việc che mù quáng toàn bộ lượt `Search results.` bất kể nội dung mới có hợp lệ hay không).
+      - Xử lý tin nhắn chứa `<search_results>`: bóc tách JSON outcomes và kiểm tra từng outcome/item qua `validateEntity`.
+      - Outcome/item của site bị thu hồi/disabled sẽ bị lọc bỏ hoặc chuyển thành `outcome.error = '[Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi: ...]'`.
+      - Outcome/item của site còn active hoặc của các dịch vụ khác (Slack, Gmail, ...) được giữ nguyên vẹn.
+      - Tái tạo lại thẻ `<search_results>` với danh sách outcome đã lọc. Chỉ che toàn bộ tin nhắn nếu toàn bộ outcome đều là Jira và tất cả đều bị thu hồi/vô hiệu hóa.
+    - Test:
+      - `apps/chat-api/tests/services/jira-source-guard.test.ts` bổ sung test: khi `workingMemory` và `<search_results>` chứa cả kết quả từ Site 1 (bị tắt) và Site 2 (còn active), kết quả của Site 1 bị loại bỏ trong khi Site 2 được bảo toàn trong memory và trong model prompt.
+- **Tổng kết kiểm thử sau đợt sửa thứ bảy:**
+  - Toàn bộ 7 suites Jira focused: **109/109 tests PASS** (Duration: 2.79s, exit code 0).
+  - Planner test suites: **31/31 files PASS**, **452/452 tests PASS** (exit code 0).
+  - Executor test suites: **5/5 files PASS**, **42/42 tests PASS** (exit code 0).
+  - Typecheck v3: **0 errors** (exit code 0).
+  - Evaluator test suites: **26/26 files PASS**, **412/412 tests PASS** (exit code 0).
+  - `npm run check`: **ALL PASS** (exit code 0).
   - **3. [P2] Từ chối khi actor thiếu workspace ID thay vì tự chọn:**
     - Cập nhật `apps/chat-api/src/server.ts` (`gatherSearch`): loại bỏ hoàn toàn câu lệnh `SELECT ... LIMIT 1` tự ý chọn một workspace membership ngẫu nhiên.
     - Với mọi công cụ `myjira.*`, nếu `actor.workspaceId` bị thiếu hoặc null, ném lỗi rõ ràng (`Workspace ID is required for Jira gather search`), ngăn ngừa nguy cơ rò rỉ hoặc truy vấn chéo giữa các workspace khác nhau của cùng một người dùng.
@@ -162,6 +191,35 @@
     - Test: `apps/chat-api/tests/services/jira-source-guard.test.ts` (PASS, test scenario với tin nhắn mô tả chi tiết nội dung issue nhưng hoàn toàn không chứa chuỗi siteId, cloudId hay siteName; chứng minh tin nhắn vẫn bị che mờ chuẩn xác với `site_disabled` khi site bị deactivate trong PostgreSQL).
 - **Tổng kết kiểm thử sau đợt sửa thứ sáu:**
   - Toàn bộ 7 suites Jira focused: **107/107 tests PASS** (Duration: 3.62s, exit code 0).
+  - Typecheck v3: **0 errors** (exit code 0).
+  - Evaluator test suites: **26/26 files PASS**, **412/412 tests PASS** (exit code 0).
+  - `npm run check`: **ALL PASS** (exit code 0).
+- **Khắc phục đợt review thứ bảy (2 phát hiện: 1 P1, 1 P2):**
+  - **1. [P1] Giữ provenance qua bước rút gọn recordObserved và cho phép kết quả gather hợp lệ tới model:**
+    - Cập nhật `packages/planner/src/search.ts`:
+      - Thêm `PROVENANCE_FIELDS = ['_sourceRef', '_sourceRefs', 'sourceRef', 'sourceRefs']`.
+      - Bổ sung `...PROVENANCE_FIELDS` vào cả `KEPT_FIELDS` và `SCOPING_FIELDS`.
+      - `compact(entity, fields)` giờ đây luôn giữ lại các trường provenance ngay cả khi `fields` được ghi đè bằng `tool.observedFields` (ví dụ: `['id', 'siteId', 'cloudId', 'name', 'url']` của `myjira.list_sites`).
+      - Nhờ vậy, thực thể Jira trong `workingMemory.__observed` luôn bảo toàn `_sourceRef` và `_sourceRefs`.
+    - Cập nhật `apps/chat-api/src/services/jira/jira-provider-guard.ts` (`validateEntity`):
+      - Khi thực thể mang `_sourceRef`, guard gọi `policyService.revalidateSource` và xác nhận `{ valid: true }` nếu nguồn còn hiệu lực.
+      - Nếu thực thể Jira thiếu `_sourceRef` trực tiếp nhưng có `siteId`/`cloudId`, guard truy vấn PostgreSQL đối chiếu trạng thái active của workspace, membership, account, grant, site và project thay vì mặc định trả về `invalid_evidence`.
+    - Tests:
+      - `packages/planner/tests/myjira-security-source.test.ts` bổ sung unit test xác minh `recordObserved` bảo toàn `_sourceRef` và `_sourceRefs` qua bước rút gọn với `tool.observedFields`.
+      - `apps/chat-api/tests/services/jira-source-guard.test.ts` bổ sung test tích hợp: sau khi adapter trả kết quả `myjira.list_sites` mang `_sourceRef`, `recordObserved` rút gọn và lưu vào memory, Turn 2 gọi `guardedProvider.generatePlan`, xác nhận thực thể site không bị xóa khỏi `workingMemory.__observed` và model prompt nhận được dữ liệu site.
+  - **2. [P2] Lọc Search results theo từng outcome/result thay cho cờ che toàn bộ anyRevokedGathered:**
+    - Cập nhật `apps/chat-api/src/services/jira/jira-provider-guard.ts`:
+      - Loại bỏ cờ toàn cục `anyRevokedGathered` (cờ này trước đây được kích hoạt khi bất kỳ thực thể nào trong memory bị loại bỏ, dẫn tới việc che mù quáng toàn bộ lượt `Search results.` bất kể nội dung mới có hợp lệ hay không).
+      - Xử lý tin nhắn chứa `<search_results>`: bóc tách JSON outcomes và kiểm tra từng outcome/item qua `validateEntity`.
+      - Outcome/item của site bị thu hồi/disabled sẽ bị lọc bỏ hoặc chuyển thành `outcome.error = '[Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi: ...]'`.
+      - Outcome/item của site còn active hoặc của các dịch vụ khác (Slack, Gmail, ...) được giữ nguyên vẹn.
+      - Tái tạo lại thẻ `<search_results>` với danh sách outcome đã lọc. Chỉ che toàn bộ tin nhắn nếu toàn bộ outcome đều là Jira và tất cả đều bị thu hồi/vô hiệu hóa.
+    - Test:
+      - `apps/chat-api/tests/services/jira-source-guard.test.ts` bổ sung test: khi `workingMemory` và `<search_results>` chứa cả kết quả từ Site 1 (bị tắt) và Site 2 (còn active), kết quả của Site 1 bị loại bỏ trong khi Site 2 được bảo toàn trong memory và trong model prompt.
+- **Tổng kết kiểm thử sau đợt sửa thứ bảy:**
+  - Toàn bộ 7 suites Jira focused: **109/109 tests PASS** (Duration: 2.79s, exit code 0).
+  - Planner test suites: **31/31 files PASS**, **452/452 tests PASS** (exit code 0).
+  - Executor test suites: **5/5 files PASS**, **42/42 tests PASS** (exit code 0).
   - Typecheck v3: **0 errors** (exit code 0).
   - Evaluator test suites: **26/26 files PASS**, **412/412 tests PASS** (exit code 0).
   - `npm run check`: **ALL PASS** (exit code 0).
