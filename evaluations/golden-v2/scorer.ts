@@ -1,7 +1,7 @@
-import type { PlannerResponse, PlanStep, ToolDefinition } from '@wap/tool-schemas';
+import type { PlannerResponse, PlanStep, ScheduleRecurrence, ScheduleResponse, ToolDefinition } from '@wap/tool-schemas';
 import { ALL_TOOLS } from '@wap/tool-schemas';
 
-export type Category = 'single_step' | 'multi_step' | 'cross_service' | 'clarification' | 'refusal' | 'free_form' | 'free_form_heldout' | 'read_only' | 'answer' | 'injection'
+export type Category = 'single_step' | 'multi_step' | 'cross_service' | 'clarification' | 'refusal' | 'free_form' | 'free_form_heldout' | 'read_only' | 'answer' | 'injection' | 'schedule'
   /** Multi-turn (W4-02): edit the previous plan, answer the assistant's question, or a new request after a plan. */
   | 'turn_edit' | 'turn_reply' | 'turn_new';
 
@@ -54,6 +54,8 @@ export interface GoldenCase {
   turns?: Array<{ role: 'user' | 'assistant'; content: string | Record<string, unknown> }>;
   expect: {
     kind: PlannerResponse['kind'];
+    action?: ScheduleResponse['action'];
+    recurrence?: ScheduleRecurrence;
     steps?: StepSpec[];
     /** Actual successful gather calls required for a read-only request. */
     searches?: StepSpec[];
@@ -230,6 +232,66 @@ export function scoreCase(golden: GoldenCase, response: PlannerResponse | undefi
   }
   if (acceptedKind && golden.expect.requireSearchesOnAccept) return { kindOk, toolsOk: false, argsOk: false, passed: false,
     matchers: { passed: 0, total: 0 }, failures: ['searches: required lookup labels are missing'] };
+  if (golden.expect.kind === 'schedule') {
+    const checks: Array<{ name: string; ok: boolean; detail: string }> = [];
+    const actual = response?.kind === 'schedule' ? response : undefined;
+    if (golden.expect.action !== undefined) {
+      const ok = actual?.action === golden.expect.action;
+      checks.push({
+        name: 'action',
+        ok,
+        detail: `action: expected ${golden.expect.action}, got ${actual?.action ?? 'none'}`,
+      });
+    }
+    if (golden.expect.recurrence !== undefined) {
+      const exp = golden.expect.recurrence;
+      const rec = actual?.recurrence;
+      const typeOk = rec?.type === exp.type;
+      checks.push({
+        name: 'recurrence.type',
+        ok: typeOk,
+        detail: `recurrence.type: expected ${exp.type}, got ${rec?.type ?? 'none'}`,
+      });
+      const timeOk = rec?.time === exp.time;
+      checks.push({
+        name: 'recurrence.time',
+        ok: timeOk,
+        detail: `recurrence.time: expected ${exp.time}, got ${rec?.time ?? 'none'}`,
+      });
+      if (exp.type === 'once') {
+        const dateOk = rec?.type === 'once' && rec.date === exp.date;
+        checks.push({
+          name: 'recurrence.date',
+          ok: dateOk,
+          detail: `recurrence.date: expected ${exp.date}, got ${(rec as { date?: string } | undefined)?.date ?? 'none'}`,
+        });
+      } else if (exp.type === 'weekly') {
+        const actualDays = rec?.type === 'weekly' ? rec.days : undefined;
+        const daysOk =
+          Array.isArray(actualDays) &&
+          actualDays.length === exp.days.length &&
+          exp.days.every((day, i) => actualDays[i] === day);
+        checks.push({
+          name: 'recurrence.days',
+          ok: daysOk,
+          detail: `recurrence.days: expected ${JSON.stringify(exp.days)}, got ${JSON.stringify(actualDays ?? null)}`,
+        });
+      }
+    }
+    for (const check of checks) {
+      if (!check.ok) failures.push(check.detail);
+    }
+    const passedCount = checks.filter((c) => c.ok).length;
+    const argsOk = checks.length > 0 ? passedCount === checks.length : null;
+    return {
+      kindOk,
+      toolsOk: null,
+      argsOk: kindOk ? argsOk : checks.length > 0 ? false : null,
+      passed: kindOk && failures.length === 0,
+      matchers: { passed: kindOk ? passedCount : 0, total: checks.length },
+      failures,
+    };
+  }
   if (golden.expect.kind !== 'plan') {
     return { kindOk, toolsOk: null, argsOk: null, passed: kindOk && failures.length === 0, matchers: { passed: 0, total: 0 }, failures };
   }

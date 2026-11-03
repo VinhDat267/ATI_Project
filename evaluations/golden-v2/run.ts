@@ -11,7 +11,7 @@ import { buildMemory, fixtureSearch } from './fixtures.js';
 import { validateIndependentSet } from '../golden-independent/validate.js';
 
 const THRESHOLDS = { toolSelectionAccuracy: 0.85, argumentQuality: 0.75 };
-export type EvalSet = 'core' | 'freeform' | 'services' | 'independent' | 'gmail' | 'answers' | 'multiturn' | 'mycalendar' | 'myjira';
+export type EvalSet = 'core' | 'freeform' | 'services' | 'independent' | 'gmail' | 'answers' | 'multiturn' | 'mycalendar' | 'myjira' | 'schedule';
 const EVAL_FILES: Record<EvalSet, string> = {
   core: 'evaluations/golden-v2/cases.json', freeform: 'evaluations/golden-v2/cases-freeform.json',
   services: 'evaluations/golden-v2/cases-services.json', independent: 'evaluations/golden-independent/cases.json',
@@ -19,6 +19,7 @@ const EVAL_FILES: Record<EvalSet, string> = {
   multiturn: 'evaluations/golden-v2/cases-multiturn.json',
   mycalendar: 'evaluations/golden/cases-mycalendar.json',
   myjira: 'evaluations/golden/cases-myjira.json',
+  schedule: 'evaluations/golden-v2/cases-schedule.json',
 };
 export interface GoldenFile { version: number; clock: string; timeZone: string; cases: GoldenCase[] }
 export interface ObservedRun extends CaseRun { searches: SearchTrace[]; prefetches: SearchTrace[]; searchRounds: number; servedModels: string[]; providerError?: string;
@@ -42,7 +43,7 @@ const pct = (value: number | null | undefined) => value == null ? 'n/a' : `${(va
 
 export function parseEvalOptions(env: NodeJS.ProcessEnv) {
   const set = env.EVAL_SET ?? 'core';
-  if (!Object.hasOwn(EVAL_FILES, set)) throw new Error('EVAL_SET must be core, freeform, services, independent, gmail, answers, multiturn, mycalendar, myjira');
+  if (!Object.hasOwn(EVAL_FILES, set)) throw new Error('EVAL_SET must be core, freeform, services, independent, gmail, answers, multiturn, mycalendar, myjira, schedule');
   if (env.EVAL_SEARCH_MODE && env.PLANNER_SEARCH_MODE && env.EVAL_SEARCH_MODE !== env.PLANNER_SEARCH_MODE)
     throw new Error('EVAL_SEARCH_MODE and PLANNER_SEARCH_MODE disagree');
   const searchMode = env.EVAL_SEARCH_MODE ?? env.PLANNER_SEARCH_MODE ?? 'regex';
@@ -52,12 +53,17 @@ export function parseEvalOptions(env: NodeJS.ProcessEnv) {
   const readAnswers = env.EVAL_READ_ANSWERS ?? env.PLANNER_READ_ANSWERS ?? (set === 'answers' ? 'on' : 'off');
   if (readAnswers !== 'on' && readAnswers !== 'off') throw new Error('Read answers must be on or off');
   if (set === 'answers' && readAnswers !== 'on') throw new Error('EVAL_SET=answers needs read answers on');
+  if (env.EVAL_SCHEDULES && env.SCHEDULES_ENABLED && env.EVAL_SCHEDULES !== env.SCHEDULES_ENABLED)
+    throw new Error('EVAL_SCHEDULES and SCHEDULES_ENABLED disagree');
+  const schedules = env.EVAL_SCHEDULES ?? env.SCHEDULES_ENABLED ?? (set === 'schedule' ? 'on' : 'off');
+  if (schedules !== 'on' && schedules !== 'off') throw new Error('Schedules must be on or off');
+  if (set === 'schedule' && schedules !== 'on') throw new Error('EVAL_SET=schedule needs schedules on');
   const integer = (name: string, fallback: number, maximum: number) => {
     const value = Number(env[name] ?? fallback);
     if (!Number.isInteger(value) || value < 1 || value > maximum) throw new Error(`${name} must be an integer from 1 to ${maximum}`);
     return value;
   };
-  return { set: set as EvalSet, searchMode: searchMode as 'regex' | 'llm', readAnswers: readAnswers === 'on',
+  return { set: set as EvalSet, searchMode: searchMode as 'regex' | 'llm', readAnswers: readAnswers === 'on', schedules: schedules === 'on',
     runsCount: integer('EVAL_RUNS', 3, 10), concurrency: integer('EVAL_CONCURRENCY', 2, 4) };
 }
 export function loadEvalFile(set: EvalSet) {
@@ -90,9 +96,35 @@ function safeError(err: unknown): string {
   return 'Request failed (details omitted from public evidence)';
 }
 
-/** Earlier turns as chat-service sends them: user text as written, a saved plan as its JSON, a question as text. */
+/** Earlier turns as chat-service sends them: user text as written, a saved plan or schedule proposal as its JSON, a question as text. */
 export function historyOf(golden: GoldenCase): ChatMessage[] {
-  return (golden.turns ?? []).map(turn => ({ role: turn.role, content: typeof turn.content === 'string' ? turn.content : JSON.stringify(turn.content) }));
+  return (golden.turns ?? []).map(turn => {
+    if (typeof turn.content === 'string') return { role: turn.role, content: turn.content };
+    const payload = turn.content.type === 'schedule_proposal' && turn.content.proposal ? turn.content.proposal : turn.content;
+    return { role: turn.role, content: JSON.stringify(payload) };
+  });
+}
+/** Extracts the active schedule context ({ services }) from earlier turns just like ChatService. */
+export function scheduleOf(golden: GoldenCase, planner: AIPlanner): { services: string[] } | undefined {
+  for (let i = (golden.turns ?? []).length - 1; i >= 0; i--) {
+    const turn = golden.turns![i]!;
+    if (turn.role !== 'assistant' || typeof turn.content !== 'object' || turn.content === null) continue;
+    const obj = turn.content as Record<string, unknown>;
+    if (obj.type === 'schedule_proposal' && obj.proposal && typeof obj.proposal === 'object') {
+      const proposal = obj.proposal as Record<string, unknown>;
+      const services = Array.isArray(obj.services)
+        ? (obj.services as string[])
+        : typeof proposal.request === 'string'
+          ? planner.routeSchedule(proposal.request).services
+          : golden.services ?? [];
+      return { services };
+    }
+    if (obj.kind === 'schedule') {
+      const services = typeof obj.request === 'string' ? planner.routeSchedule(obj.request).services : golden.services ?? [];
+      return { services };
+    }
+  }
+  return undefined;
 }
 /** Every request text of a case: the final prompt and the user's earlier turns. */
 export function casePrompts(golden: GoldenCase): string[] {
@@ -157,7 +189,10 @@ export function summarizeResponses(runs: ObservedRun[][]) {
       modelCalls: { mean: calls.length ? calls.reduce((sum, n) => sum + n, 0) / calls.length : null, max: calls.length ? Math.max(...calls) : 0, distribution },
       withoutLookups: answers.filter(r => r.response?.kind === 'answer' && r.response.lookups.length === 0).length },
     plans: { count: rows.filter(r => r.response?.kind === 'plan').length, latencyMs: latency(rows.filter(r => r.response?.kind === 'plan')) },
+    schedules: { count: rows.filter(r => r.response?.kind === 'schedule').length, latencyMs: latency(rows.filter(r => r.response?.kind === 'schedule')) },
     answeredActionCases: runs.flatMap((run, index) => run.filter(r => !['read_only', 'answer'].includes(r.case.category) && r.response?.kind === 'answer')
+      .map(r => ({ id: r.case.id, run: index + 1 }))),
+    scheduledNonScheduleCases: runs.flatMap((run, index) => run.filter(r => r.case.expect.kind !== 'schedule' && r.response?.kind === 'schedule')
       .map(r => ({ id: r.case.id, run: index + 1 }))),
     gmailPromptChars: { calls: prompts.length, p50: percentile(prompts, 0.5), p95: percentile(prompts, 0.95), max: prompts.at(-1) ?? 0 },
   };
@@ -194,14 +229,15 @@ function makeProvider(dryRun: boolean): LLMProvider & { model?: string } {
   return mock;
 }
 export async function runCase(golden: GoldenCase, file: GoldenFile, dryRun: boolean, searchMode: 'regex' | 'llm',
-  options: { provider?: LLMProvider; signal?: AbortSignal; catalog?: EvalCatalog; readAnswers?: boolean } = {}): Promise<ObservedRun> {
+  options: { provider?: LLMProvider; signal?: AbortSignal; catalog?: EvalCatalog; readAnswers?: boolean; schedules?: boolean } = {}): Promise<ObservedRun> {
   const turnStarted = performance.now();
   const provider = new CountingProvider(options.provider ?? makeProvider(dryRun), turnStarted);
   const catalog = options.catalog ?? evalCatalog('core');
   const phases: PlanningPhaseMetrics[] = [];
   const traces: SearchTrace[] = [];
   const planner = new AIPlanner({
-    provider, toolCatalog: catalog.tools, serviceRegistry: catalog.services, readAnswers: options.readAnswers ?? false, searchMode,
+    provider, toolCatalog: catalog.tools, serviceRegistry: catalog.services, readAnswers: options.readAnswers ?? false,
+    schedules: options.schedules ?? false, searchMode,
     now: () => new Date(file.clock), timeZone: file.timeZone,
     gatherSearch: async request => {
       const trace: SearchTrace = { tool: request.tool, args: structuredClone(request.args) };
@@ -215,9 +251,10 @@ export async function runCase(golden: GoldenCase, file: GoldenFile, dryRun: bool
   const actor = catalog.tools.some(t => t.service === 'myjira')
     ? { userId: 'eval-user', workspaceId: 'ws-eval', workspaceMode: 'organization' as const }
     : undefined;
+  const schedule = scheduleOf(golden, planner);
   const started = Date.now();
   let response: PlannerResponse | undefined, error: string | undefined;
-  try { response = await planner.processMessage({ userMessage: golden.prompt, history: historyOf(golden), memory, actor, signal: options.signal, onTiming: metrics => {
+  try { response = await planner.processMessage({ userMessage: golden.prompt, history: historyOf(golden), memory, actor, ...(schedule ? { schedule } : {}), signal: options.signal, onTiming: metrics => {
     phases.push(metrics);
     // Planner phases are sequential; each callback closes the current batch,
     // including parallel directory calls. Tool names alone cannot identify origin.
@@ -277,7 +314,7 @@ function preregistration(relativePath: string, raw: string, dryRun: boolean) {
 export async function main() {
   const dryRun = process.env.EVAL_DRY_RUN === '1';
   if (!dryRun && process.env.LIVE_EVAL !== '1') throw new Error('Set LIVE_EVAL=1 for provider calls, or EVAL_DRY_RUN=1');
-  const { set, searchMode, readAnswers, runsCount, concurrency } = parseEvalOptions(process.env);
+  const { set, searchMode, readAnswers, schedules, runsCount, concurrency } = parseEvalOptions(process.env);
   const catalog = evalCatalog(set);
   const { casesFile, relativePath, raw, file } = loadEvalFile(set);
   assertSetReady(set, file);
@@ -293,7 +330,7 @@ export async function main() {
   const sourceTrees = Object.fromEntries(['packages/planner', 'packages/tool-schemas'].map(path => [path, git('rev-parse', `HEAD:${path}`)]));
   const startedAt = new Date().toISOString();
   const stamp = startedAt.replace(/[:.]/g, '-');
-  const dir = join(process.env.EVAL_OUTPUT_DIR ?? join('docs', 'ai-evidence', 'V3-GOLDEN-V2'), `${dryRun ? 'dry-run-' : ''}${set}-${searchMode}-${readAnswers && set !== 'answers' ? 'answers-on-' : ''}${only.length ? 'subset-' : ''}${stamp}`);
+  const dir = join(process.env.EVAL_OUTPUT_DIR ?? join('docs', 'ai-evidence', 'V3-GOLDEN-V2'), `${dryRun ? 'dry-run-' : ''}${set}-${searchMode}-${readAnswers && set !== 'answers' ? 'answers-on-' : ''}${schedules && set !== 'schedule' ? 'schedules-on-' : ''}${only.length ? 'subset-' : ''}${stamp}`);
   mkdirSync(dir, { recursive: true });
   const runs: ObservedRun[][] = [];
   let stopped = false;
@@ -301,7 +338,7 @@ export async function main() {
   let pendingIds: string[] = [];
   for (let index = 0; index < runsCount; index++) {
     const result = await runPool(file.cases, concurrency, async (golden, signal) => {
-      const row = await runCase(golden, file, dryRun, searchMode, { signal, catalog, readAnswers });
+      const row = await runCase(golden, file, dryRun, searchMode, { signal, catalog, readAnswers, schedules });
       console.log(`run ${index + 1}/${runsCount} ${golden.id}: ${row.score.passed ? 'PASS' : 'FAIL'} ${row.latencyMs}ms ${row.llmCalls} model calls`);
       return row;
     });
@@ -327,7 +364,7 @@ export async function main() {
     const report = {
       evidence: dryRun ? 'dry_run' : complete ? 'provider_observed' : 'provider_observed_partial', complete,
       provider: configured.name, model: configured.model ?? 'mock', gateway: safeGateway(process.env.LLM_BASE_URL), servedModels,
-      set, searchMode, readAnswers, subset: only.length ? only : undefined,
+      set, searchMode, readAnswers, schedules, subset: only.length ? only : undefined,
       labels: { file: casesFile, commit: labelCommit, sha256: hash(raw), version: file.version, cases: allCases, selectedCases: file.cases.length },
       sourceCommit, sourceTrees, fixtureSha256: hash(readFileSync('evaluations/golden-v2/fixtures.ts', 'utf8')),
       catalogSha256: hash(JSON.stringify(catalog.tools)), catalog: { tools: catalog.tools.length, services: [...new Set(catalog.tools.map(t => t.service))] },
@@ -369,10 +406,12 @@ Attempts per call (0 means provider does not expose diagnostics): ${JSON.stringi
 Time share: model ${pct(timing.timeShare.model)}, directory ${pct(timing.timeShare.prefetch)}, search rounds ${pct(timing.timeShare.search)}, regex gather ${pct(timing.timeShare.gather)}, other ${pct(timing.timeShare.other)}.
 Under 15 seconds: ${timing.under15Seconds.count}/${timing.under15Seconds.total} (${pct(timing.under15Seconds.rate)}).
 
-Read answers: ${readAnswers ? 'on' : 'off'}; catalog ${report.catalog.tools} tools (${report.catalog.services.join(', ')}), SHA-256 \`${report.catalogSha256}\`.
+Read answers: ${readAnswers ? 'on' : 'off'}; schedules: ${schedules ? 'on' : 'off'}; catalog ${report.catalog.tools} tools (${report.catalog.services.join(', ')}), SHA-256 \`${report.catalogSha256}\`.
 Answers: ${responses.answers.count}; p50 / p95 / max ${responses.answers.latencyMs.p50} / ${responses.answers.latencyMs.p95} / ${responses.answers.latencyMs.max} ms; model calls per answer mean ${responses.answers.modelCalls.mean?.toFixed(2) ?? 'n/a'}, max ${responses.answers.modelCalls.max}, ${JSON.stringify(responses.answers.modelCalls.distribution)}; answers without a model-opened lookup (directory only): ${responses.answers.withoutLookups}.
 Plans: ${responses.plans.count}; p50 / p95 / max ${responses.plans.latencyMs.p50} / ${responses.plans.latencyMs.p95} / ${responses.plans.latencyMs.max} ms. Answers are not held to the 15-second planning target.
+Schedules: ${responses.schedules.count}; p50 / p95 / max ${responses.schedules.latencyMs.p50} / ${responses.schedules.latencyMs.p95} / ${responses.schedules.latencyMs.max} ms.
 Action cases (every category except read_only and answer) that got an answer: ${responses.answeredActionCases.map(r => `${r.id} (run ${r.run})`).join(', ') || 'none'}.
+Non-schedule cases that got a schedule: ${responses.scheduledNonScheduleCases.map(r => `${r.id} (run ${r.run})`).join(', ') || 'none'}.
 ${responses.gmailPromptChars.calls ? `Prompt characters per model call in Gmail cases: p50 / p95 / max ${responses.gmailPromptChars.p50} / ${responses.gmailPromptChars.p95} / ${responses.gmailPromptChars.max} over ${responses.gmailPromptChars.calls} calls (system prompt, working memory and history, as sent).\n` : ''}
 Per-call timing includes retry backoff; attempts measure each actual transport attempt, including reading the response body. Missing token counts are null, never fabricated. Reasoning may be included in prompt_tokens by the gateway; do not add it to prompt/completion totals.
 
