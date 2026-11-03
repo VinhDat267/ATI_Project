@@ -1,4 +1,4 @@
-import type { AnswerLookup, CalendarDigestDelivery, ScheduleResponse, ScheduleView, ScheduleProposalMetadata } from '@wap/tool-schemas';
+import type { AnswerLookup, CalendarDigestDelivery, ScheduleResponse, ScheduleView, ScheduleProposalMetadata, SlackPlanBindings } from '@wap/tool-schemas';
 export type MessageRole = 'user' | 'assistant' | 'system';
 export interface AuthMessageResponse {
   message: string;
@@ -77,6 +77,7 @@ export type MySheetsPickerSession =
 
 export interface ActivePlan {
   connections?: {
+    myslack?: SlackPlanBindings;
     gmail?: { credentialId: string; email: string };
     mycalendar?: {
       credentialId: string;
@@ -191,7 +192,7 @@ export interface ExecutionSnapshot {
     completedAt?: string | null;
     durationMs?: number | null;
   }>;
-  recoveryActions: Array<'retry' | 'skip' | 'stop' | 'continue'>;
+  recoveryActions: Array<'retry' | 'skip' | 'stop' | 'continue'|'slack-reconcile'>;
 }
 
 export interface ClarificationState {

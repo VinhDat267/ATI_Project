@@ -17,6 +17,8 @@ function extractSuggestedFreeSlots(warning: string): string[] {
 
 export function PlanMoment({request,runtimeMode,plan,services,destination,onPreview,onApprove,onCancel,onEdit,inlineComposer}:{request?:string;runtimeMode:'sandbox'|'live'|null;plan:ActivePlan;services:ServiceInfo[];destination:(step:PlanStep,labels?:Record<string,string>)=>string;onPreview:(step:PlanStep)=>void;onApprove:()=>void;onCancel:()=>void;onEdit:(prefillText?:string)=>void;inlineComposer:ReactNode}) {
  const [techOpen,setTechOpen]=useState(false);
+ const slackRead = !!plan.connections?.myslack&&plan.steps.every(s=>s.tool!=='myslack.chat_postMessage');
+ const slackPost=plan.steps.some(s=>s.tool==='myslack.chat_postMessage');
  const [selectedService,setSelectedService]=useState<string|null>(null);
  const dataFlows=planStepDataFlows(plan.steps);
  return (<section id="moment-4" className="stage-section is-active v3-space-y-6 relative" aria-label="Cockpit" data-moment="4" aria-labelledby="heading-moment-4">
@@ -26,12 +28,13 @@ export function PlanMoment({request,runtimeMode,plan,services,destination,onPrev
               Tôi sẽ làm {plan.steps.length} việc, theo thứ tự
             </h1>
             <p className="text-sm sm:text-base text-brand-muted">
-              Xin hãy xem trước nội dung sẽ được ghi vào các công cụ dưới đây trước khi duyệt.
+              {slackRead ? 'Xem workspace và phạm vi tra cứu trước khi duyệt.' : 'Xin hãy xem trước nội dung sẽ được ghi vào các công cụ dưới đây trước khi duyệt.'}
             </p>
           </div>
           {plan.steps.some(step => step.tool.startsWith('gmail.')) && plan.connections?.gmail && <p className="text-sm text-brand-text break-words">Gửi từ: {plan.connections.gmail.email}</p>}
           {plan.connections?.mycalendar?.email && <p className="text-sm text-brand-text break-words">Tài khoản: {plan.connections.mycalendar.email} (Google Calendar của bạn)</p>}
           {plan.connections?.mysheets?.email && <p className="text-sm text-brand-text break-words">Tài khoản: {plan.connections.mysheets.email} (Google Sheets của bạn)</p>}
+          {plan.connections?.myslack && Object.values(plan.connections.myslack.bindings).map(binding => <p key={binding.connectionId} className="text-sm text-brand-text [overflow-wrap:anywhere]">Workspace: {plan.resourceLabels?.[binding.connectionId] ?? `${binding.workspaceId} · ${binding.slackUserId}`}</p>)}
           {plan.connections?.trello?.username && <p className="text-sm text-brand-text break-words">Tài khoản: @{plan.connections.trello.username} (Trello của bạn)</p>}
           {plan.connections?.github?.login && <p className="text-sm text-brand-text break-words">Tài khoản: @{plan.connections.github.login} (GitHub của bạn)</p>}
           {plan.connections?.notion?.workspaceName && <p className="text-sm text-brand-text break-words">Workspace Notion: {plan.connections.notion.workspaceName}</p>}
@@ -69,6 +72,7 @@ export function PlanMoment({request,runtimeMode,plan,services,destination,onPrev
                     <p className="text-xs text-brand-muted mt-1 break-words">
                       Đích đến: {destination(step, plan.resourceLabels)}
                     </p>
+                    {step.tool==='myslack.chat_postMessage'&&<div className="mt-3 whitespace-pre-wrap break-words text-sm text-brand-text"><span className="font-semibold">Nội dung gửi:</span><p>{String(step.args.text)}</p></div>}
                     {(service === 'mycalendar' || service === 'calendar') && (step.args.createMeetLink === true || Boolean(formatRecurrenceLabel(step.args.recurrence)) || (typeof step.args.location === 'string' && step.args.location.trim().length > 0)) && (
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
                         {step.args.createMeetLink === true && (
@@ -207,7 +211,7 @@ export function PlanMoment({request,runtimeMode,plan,services,destination,onPrev
             </svg>
             <div className="text-xs sm:text-sm text-neutral-800 v3-space-y-0.5">
               <div className="font-semibold text-neutral-900">
-                {runtimeMode==='sandbox' ? 'Các thao tác này chỉ chạy trong chế độ thử nghiệm, không ghi lên công cụ thật.' : runtimeMode==='live' ? 'Các thao tác này ghi thật vào công cụ của nhóm và không tự hoàn tác.' : 'Hãy kiểm tra chế độ máy chủ trước khi duyệt các thao tác ghi.'}
+                {slackPost?'Gửi nguyên văn bằng tài khoản Slack của bạn sau khi duyệt. Nếu chưa rõ kết quả, hãy đối soát trước khi tạo lần gửi khác.':slackRead ? 'Chỉ đọc Slack sau khi duyệt. Kết quả được lưu tối đa 1 ngày và có thể bị ẩn khi quyền hoặc nguồn thay đổi.' : runtimeMode==='sandbox' ? 'Các thao tác này chỉ chạy trong chế độ thử nghiệm, không ghi lên công cụ thật.' : runtimeMode==='live' ? 'Các thao tác này ghi thật vào công cụ của nhóm và không tự hoàn tác.' : 'Hãy kiểm tra chế độ máy chủ trước khi duyệt các thao tác ghi.'}
               </div>
               <div className="text-neutral-600">
                 Kế hoạch được giữ trong 30 phút. Bạn có thể sửa đổi bằng chat hoặc bấm duyệt để bắt đầu ngay.
@@ -249,7 +253,7 @@ export function PlanMoment({request,runtimeMode,plan,services,destination,onPrev
             </div>
           )}
           {!plan.id && <p role="alert">Kế hoạch thiếu mã định danh hợp lệ. Hãy tải lại hội thoại trước khi duyệt.</p>}
-          {techOpen && <div id="tech-details-panel" className="p-4 rounded-xl bg-neutral-900 text-neutral-200 font-mono text-xs v3-space-y-3 border border-neutral-800"><pre className="whitespace-pre-wrap break-all">{JSON.stringify(plan,null,2)}</pre></div>}
+          {techOpen && <div id="tech-details-panel" className="p-4 rounded-xl bg-neutral-900 text-neutral-200 font-mono text-xs v3-space-y-3 border border-neutral-800"><pre className="whitespace-pre-wrap break-all">{JSON.stringify(slackRead ? {summary:plan.summary,steps:plan.steps} : plan,null,2)}</pre></div>}
           {/* NHÓM 1: Thanh hành động sticky ở đáy màn hình, luôn nhìn thấy và bấm được; KHÔNG bị che; có ô sửa qua chat ngay phía trên */}
           <div id="moment-4-sticky-bar" className="sticky bottom-0 z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-[#F8F8F6]/95 backdrop-blur-md border-t border-brand-border mt-6 shadow-[0_-4px_16px_rgba(0,0,0,0.04)]">
             {/* Ô nhập sửa qua Chat ngay phía trên thanh hành động (Ẩn mặc định) */}

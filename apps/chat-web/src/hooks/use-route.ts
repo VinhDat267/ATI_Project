@@ -3,6 +3,7 @@ import { readRoute, type AppRoute } from '../routes';
 import { authStorage } from '../services/auth-storage';
 
 const CONNECTION_CALLBACK_KINDS = new Set<AppRoute['kind']>([
+  'slack-callback',
   'gmail-callback',
   'mycalendar-callback',
   'mysheets-callback',

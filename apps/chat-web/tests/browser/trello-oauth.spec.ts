@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import pg from 'pg';
 import { createHash, randomUUID } from 'node:crypto';
 import { hashPassword } from '../../../chat-api/src/db/repositories/user-repo.js';
+import { fixtureConversation, fixtureMessage, certifyFixturePlan } from './persisted-artifacts.fixture.js';
 
 async function loginUser(page: Page, email: string, password: string) {
   await page.goto('/login');
@@ -273,12 +274,12 @@ test('TRELLO-E2E: extended Trello tools plan, guardrail warnings callout, Kanban
     ).rows[0].id;
 
     // 1. Seed a conversation with a 6-step Trello plan exercising create_list, create_card, add_checklist, update_checklist_item, add_comment, and set_card_due_complete + Pre-Execution Guardrail warnings
-    const planConvId = (
-      await db.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [adminId])
-    ).rows[0].id;
-    await db.query(
-      "INSERT INTO messages(conv_id, role, content) VALUES($1, 'user', 'Tạo cột QA Review, tạo thẻ Triển khai Trello OAuth, thêm checklist nghiệm thu, tích mục Kiểm tra unit test, bình luận xác nhận và đánh dấu hoàn thành hạn chót')",
-      [planConvId]
+    const planConvId = await fixtureConversation(db, adminId);
+    await fixtureMessage(
+      db,
+      planConvId,
+      'user',
+      'Tạo cột QA Review, tạo thẻ Triển khai Trello OAuth, thêm checklist nghiệm thu, tích mục Kiểm tra unit test, bình luận xác nhận và đánh dấu hoàn thành hạn chót',
     );
 
     const plan = {
@@ -399,20 +400,14 @@ test('TRELLO-E2E: extended Trello tools plan, guardrail warnings callout, Kanban
         ]
       )
     ).rows[0].id;
+    await certifyFixturePlan(db, planId);
 
-    await db.query(
-      "INSERT INTO messages(conv_id, role, content, metadata) VALUES($1, 'assistant', $2, $3)",
-      [
-        planConvId,
-        plan.summary,
-        {
-          type: 'plan',
-          planId,
-          plan: { ...plan, id: planId, status: 'pending' },
-          resourceLabels: plan.resourceLabels,
-        },
-      ]
-    );
+    await fixtureMessage(db, planConvId, 'assistant', plan.summary, {
+      type: 'plan',
+      planId,
+      plan: { ...plan, id: planId, status: 'pending' },
+      resourceLabels: plan.resourceLabels,
+    });
 
     await page.goto(`/c/${planConvId}`);
     const planMoment = page.locator('#moment-4');
@@ -519,46 +514,46 @@ test('TRELLO-E2E: extended Trello tools plan, guardrail warnings callout, Kanban
 
     // 2. Verify trello_digest proposal with Telegram destination on ScheduleMoment
     if (process.env.SCHEDULES_ENABLED === 'on') {
-      const tgConvId = (
-        await db.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [adminId])
-      ).rows[0].id;
-      await db.query(
-        "INSERT INTO messages(conv_id, role, content) VALUES($1, 'user', 'Mỗi sáng 8 giờ gửi bản tin Trello bảng Sprint Board vào nhóm Telegram Kỹ Thuật ATI')",
-        [tgConvId]
+      const tgConvId = await fixtureConversation(db, adminId);
+      await fixtureMessage(
+        db,
+        tgConvId,
+        'user',
+        'Mỗi sáng 8 giờ gửi bản tin Trello bảng Sprint Board vào nhóm Telegram Kỹ Thuật ATI',
       );
-      await db.query(
-        "INSERT INTO messages(conv_id, role, content, metadata) VALUES($1, 'assistant', 'Đề xuất lịch chạy tự động gửi bản tin Trello qua Telegram', $2)",
-        [
-          tgConvId,
-          {
-            type: 'schedule_proposal',
-            services: ['trello', 'telegram'],
-            nextRuns: ['2026-11-03T01:00:00.000Z'],
-            proposal: {
-              kind: 'schedule',
-              action: 'create',
-              name: 'Bản tin Trello Telegram',
-              request: 'Mỗi sáng 8 giờ gửi bản tin Trello bảng Sprint Board vào nhóm Telegram Kỹ Thuật ATI',
-              recurrence: { type: 'daily', time: '08:00' },
-              summary: 'Mỗi sáng 8 giờ, gửi bản tin Trello vào nhóm Telegram Kỹ Thuật ATI.',
-            },
-            digestCandidate: {
-              canAutoDigest: true,
-              config: {
-                credentialId: 'sandbox-trello',
-                trelloMemberId: 'sandbox-member',
-                username: 'admin_trello',
-                boards: [{ id: 'b1', name: 'Sprint Board' }],
-                channelId: '',
-                channelName: '',
-                telegramChatId: '-100999888',
-                telegramChatTitle: 'Nhóm Kỹ Thuật ATI',
-                dueSoonHours: 24,
-              },
-              configHash: 'hash-trello-e2e-1',
-            },
+      await fixtureMessage(
+        db,
+        tgConvId,
+        'assistant',
+        'Đề xuất lịch chạy tự động gửi bản tin Trello qua Telegram',
+        {
+          type: 'schedule_proposal',
+          services: ['trello', 'telegram'],
+          nextRuns: ['2026-11-03T01:00:00.000Z'],
+          proposal: {
+            kind: 'schedule',
+            action: 'create',
+            name: 'Bản tin Trello Telegram',
+            request: 'Mỗi sáng 8 giờ gửi bản tin Trello bảng Sprint Board vào nhóm Telegram Kỹ Thuật ATI',
+            recurrence: { type: 'daily', time: '08:00' },
+            summary: 'Mỗi sáng 8 giờ, gửi bản tin Trello vào nhóm Telegram Kỹ Thuật ATI.',
           },
-        ]
+          digestCandidate: {
+            canAutoDigest: true,
+            config: {
+              credentialId: 'sandbox-trello',
+              trelloMemberId: 'sandbox-member',
+              username: 'admin_trello',
+              boards: [{ id: 'b1', name: 'Sprint Board' }],
+              channelId: '',
+              channelName: '',
+              telegramChatId: '-100999888',
+              telegramChatTitle: 'Nhóm Kỹ Thuật ATI',
+              dueSoonHours: 24,
+            },
+            configHash: 'hash-trello-e2e-1',
+          },
+        },
       );
 
       await page.goto(`/c/${tgConvId}`);

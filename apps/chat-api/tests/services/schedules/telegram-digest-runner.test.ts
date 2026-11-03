@@ -9,6 +9,7 @@ import { ScheduleService } from '../../../src/services/schedules/schedule-servic
 import { ScheduleRunner } from '../../../src/services/schedules/schedule-runner.js';
 import { computeTelegramDigestConfigHash, READ_DIGEST_SOURCE_MAP } from '../../../src/services/schedules/telegram-digest-candidate.js';
 import { TelegramDigestRunner, summarizeSourceItems } from '../../../src/services/schedules/telegram-digest-runner.js';
+import { certifyScheduleFixture } from '../../../src/services/slack/slack-schedule-origin.js';
 import type { TelegramDigestConfig } from '@wap/tool-schemas';
 
 const directory = fileURLToPath(new URL('../../../../../db/v3/', import.meta.url));
@@ -86,6 +87,7 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
        RETURNING *`,
       [USER_ID, convId, JSON.stringify(config.recurrence), JSON.stringify(config), hash],
     );
+    await certifyScheduleFixture(pool, res.rows[0].id);
     return res.rows[0];
   }
 

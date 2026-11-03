@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import pg from 'pg';
 import { createHash, randomUUID } from 'node:crypto';
 import { hashPassword } from '../../../chat-api/src/db/repositories/user-repo.js';
+import { fixtureConversation, fixtureMessage, certifyFixturePlan } from './persisted-artifacts.fixture.js';
 
 async function loginUser(page: Page, email: string, password: string) {
   await page.goto('/login');
@@ -365,12 +366,12 @@ test('TELEGRAM-E2E-2: 2-way Telegram workflow (telegram.read_messages + telegram
     await loginUser(page, process.env.CHAT_ADMIN_EMAIL!, process.env.CHAT_ADMIN_PASSWORD!);
     const adminId = (await db.query('SELECT id FROM users WHERE email = $1', [process.env.CHAT_ADMIN_EMAIL!])).rows[0].id;
 
-    const planConvId = (
-      await db.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [adminId])
-    ).rows[0].id;
-    await db.query(
-      "INSERT INTO messages(conv_id, role, content) VALUES($1, 'user', 'Đọc 5 tin nhắn gần nhất trong Nhóm Vận Hành ATI rồi gửi thông báo xác nhận đã tiếp nhận')",
-      [planConvId],
+    const planConvId = await fixtureConversation(db, adminId);
+    await fixtureMessage(
+      db,
+      planConvId,
+      'user',
+      'Đọc 5 tin nhắn gần nhất trong Nhóm Vận Hành ATI rồi gửi thông báo xác nhận đã tiếp nhận',
     );
 
     const plan = {
@@ -429,20 +430,14 @@ test('TELEGRAM-E2E-2: 2-way Telegram workflow (telegram.read_messages + telegram
         ],
       )
     ).rows[0].id;
+    await certifyFixturePlan(db, planId);
 
-    await db.query(
-      "INSERT INTO messages(conv_id, role, content, metadata) VALUES($1, 'assistant', $2, $3)",
-      [
-        planConvId,
-        plan.summary,
-        {
-          type: 'plan',
-          planId,
-          plan: { ...plan, id: planId, status: 'pending' },
-          resourceLabels: plan.resourceLabels,
-        },
-      ],
-    );
+    await fixtureMessage(db, planConvId, 'assistant', plan.summary, {
+      type: 'plan',
+      planId,
+      plan: { ...plan, id: planId, status: 'pending' },
+      resourceLabels: plan.resourceLabels,
+    });
 
     await page.goto(`/c/${planConvId}`);
     const planMoment = page.locator('#moment-4');

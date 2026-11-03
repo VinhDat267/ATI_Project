@@ -8,6 +8,10 @@ import { SERVICE_REGISTRY } from '@wap/tool-schemas';
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const directories = ['packages/planner/src', 'packages/executor/src', 'apps/chat-api/src/routes', 'apps/chat-api/src/services', 'apps/chat-web/src'];
 const exceptions = [
+  { file: 'apps/chat-api/src/services/slack/slack-private-read-wrapper.ts', pattern: /^slack\.com$/, reason: 'SLACK-03B4A provider boundary pins the native Slack credential destination; no generic routing branch.' },
+  { file: 'apps/chat-api/src/services/slack/slack-proposal-service.ts', pattern: /^(?:calendar|github)$/, reason: 'SLACK-06 proposal service maps personal cross-service targets into proposal workflow plan input.' },
+  { file: 'apps/chat-web/src/components/slack/SlackAutomationSettings.tsx', pattern: /^(?:trello|jira|github)$/, reason: 'SLACK-06 automation settings UI configures cross-service proposal destination targets.' },
+  { file: 'apps/chat-web/src/components/slack/SlackProposalCard.tsx', pattern: /^(?:trello|jira|github)$/, reason: 'SLACK-06 proposal inbox card lets the owner review or override cross-service destination targets.' },
   { file: 'packages/planner/src/validator.ts', pattern: /^(?:trello\.(?:create_card|add_member)|sheets\.create_sheet)$/, reason: 'Trello board membership and Sheets tab creation business rules; explicit W3-00 exception.' },
   { file: 'packages/planner/src/prompts/system-prompt.ts', pattern: /^(?:trello\.(?:create_card|add_member)|slack\.send_message|telegram\.send_message|notion\.create_page)$/, reason: 'Catalog-gated example; keep prompt and golden comparability.' },
   { file: 'packages/planner/src/recipients.ts', pattern: /^(?:sheets|notion|trello|jira)$/, reason: 'Service recipient label extraction rules.' },

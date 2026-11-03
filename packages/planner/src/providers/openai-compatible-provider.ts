@@ -1,5 +1,5 @@
 import type { LLMProvider, LLMGeneratePlanInput, ModelCallMetrics } from '../types.js';
-import { callWithRetry } from './transport.js';
+import { callWithRetry, validateModelOutputLimit } from './transport.js';
 
 export interface OpenAICompatibleProviderConfig {
   /** Gateway root including the version segment, e.g. http://localhost:20128/v1 */
@@ -41,6 +41,7 @@ function messageText(content: unknown): string {
  */
 export class OpenAICompatibleProvider implements LLMProvider {
   public readonly name = 'openai-compatible';
+  public readonly supportsModelBudget = true as const;
   public readonly model: string;
   /** Model name reported by the gateway for the latest completion. */
   public lastServedModel?: string;
@@ -67,6 +68,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
   }
 
   async generatePlan(input: LLMGeneratePlanInput): Promise<string> {
+    validateModelOutputLimit(input.maxOutputTokens);
     const started = performance.now();
     const metrics: ModelCallMetrics = { durationMs: 0, attempts: [], usage: { promptTokens: null, completionTokens: null, reasoningTokens: null } };
     this.lastCallMetrics = metrics;
@@ -75,6 +77,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
     const body = JSON.stringify({
       model: this.model,
       stream: false,
+      ...(input.maxOutputTokens !== undefined ? { max_completion_tokens: input.maxOutputTokens } : {}),
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: system },
@@ -112,6 +115,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
       label: 'LLM gateway', timeoutMs: this.timeoutMs, maxRetries: this.maxRetries, timeoutRetries: this.timeoutRetries,
       retryDelayMs: this.retryDelayMs, signal: input.signal,
       onAttempt: attempt => metrics.attempts.push(attempt),
+      beforeAttempt: input.beforeModelAttempt,
     }); } finally { metrics.durationMs = performance.now() - started; }
   }
 }

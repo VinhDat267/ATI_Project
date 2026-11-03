@@ -106,6 +106,18 @@ export class CredentialRepo {
     }
   }
 
+  async saveCredential(
+    userId: string,
+    service: string,
+    payload: string | { encryptedData: string; iv: string; authTag: string },
+  ): Promise<ServiceCredentialRow> {
+    const config =
+      typeof payload === 'string'
+        ? payload
+        : `v1:${payload.iv}:${payload.authTag}:${payload.encryptedData}`;
+    return this.saveCredentials(service, config, userId);
+  }
+
   async upsertCredentials(
     service: string,
     config: string,

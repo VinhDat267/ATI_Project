@@ -6,6 +6,7 @@ import { ScheduleService } from '../../../src/services/schedules/schedule-servic
 import { ScheduleRunner } from '../../../src/services/schedules/schedule-runner.js';
 import { TelegramDigestRunner } from '../../../src/services/schedules/telegram-digest-runner.js';
 import { computeTelegramDigestConfigHash } from '../../../src/services/schedules/telegram-digest-candidate.js';
+import { certifyScheduleFixture } from '../../../src/services/slack/slack-schedule-origin.js';
 import type { TelegramDigestConfig } from '@wap/tool-schemas';
 
 const KEY = '0123456789abcdef0123456789abcdef';
@@ -43,6 +44,7 @@ describe('Telegram digest dispatch cancellation on PostgreSQL', () => {
        VALUES($1,$2,'Digest','Notion Telegram',$3,'{notion,telegram}','active','2026-11-02T01:00:00Z','telegram_digest',$4,$5,now()) RETURNING *`,
       [owner.id, conv.id, JSON.stringify(config.recurrence), JSON.stringify(config), computeTelegramDigestConfigHash(config)],
     )).rows[0];
+    await certifyScheduleFixture(db.pool, schedule.id);
     const writes: unknown[] = [];
     const telegram = new TelegramAdapter({
       credentials: { botToken: '123456789:fixture_only_telegram_token' },

@@ -1,3 +1,4 @@
+export * from './myslack-assistant.js';
 import type { ToolDefinition } from './types.js';
 import { TRELLO_TOOLS, TRELLO_OAUTH_TOOLS } from './trello.js';
 import { SLACK_TOOLS } from './slack.js';
@@ -24,6 +25,11 @@ export * from './mycalendar.js';
 export * from './mysheets.js';
 export * from './myslack-context.js';
 export * from './myslack-policy.js';
+export * from './myslack-connection.js';
+export * from './myslack-source.js';
+export * from './myslack-tools.js';
+export * from './myslack-plan-bindings.js';
+export * from './myslack-post-plan.js';
 // Jira OAuth cá nhân and workspace contracts (opt-in personal connection, stays out of ALL_TOOLS and SERVICE_REGISTRY)
 export * from './myjira.js';
 export * from './myjira-context.js';

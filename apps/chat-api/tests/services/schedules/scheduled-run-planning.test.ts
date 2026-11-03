@@ -7,6 +7,7 @@ import { PlanRepo } from '../../../src/db/repositories/plan-repo.js';
 import { ScheduleRepo } from '../../../src/db/repositories/schedule-repo.js';
 import { ScheduleRunner } from '../../../src/services/schedules/schedule-runner.js';
 import { ScheduleService } from '../../../src/services/schedules/schedule-service.js';
+import { certifyScheduleFixture } from '../../../src/services/slack/slack-schedule-origin.js';
 import { createMigratedSchema } from '../../helpers/gmail-test-db.js';
 
 const VN = 'Asia/Ho_Chi_Minh';
@@ -64,9 +65,11 @@ describe('scheduled runs planned through ChatService on PostgreSQL', () => {
   };
   const schedule = async (request = 'Gửi lịch họp hôm nay lên Slack #ati-test') => {
     const convId = (await db.pool.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [owner.id])).rows[0].id;
-    return (await db.pool.query(`INSERT INTO schedules(user_id,conv_id,name,request,recurrence,services,status,next_run_at)
+    const row = (await db.pool.query(`INSERT INTO schedules(user_id,conv_id,name,request,recurrence,services,status,next_run_at)
       VALUES($1,$2,'Lịch họp',$3,'{"type":"daily","time":"08:00"}','{calendar,slack}','active','2026-10-25T01:00:00.000Z') RETURNING *`,
       [owner.id, convId, request])).rows[0];
+    await certifyScheduleFixture(db.pool, row.id);
+    return row;
   };
   const runOf = async (scheduleId: string) => (await db.pool.query('SELECT * FROM schedule_runs WHERE schedule_id=$1', [scheduleId])).rows[0];
   const messagesOf = async (convId: string) => (await db.pool.query('SELECT id, role, content, metadata FROM messages WHERE conv_id=$1 ORDER BY created_at, id', [convId])).rows;

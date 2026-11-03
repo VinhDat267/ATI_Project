@@ -30,6 +30,7 @@ export const routes = [
   { kind: 'reset-password', pattern: /^\/reset-password\/?$/, publicView: (props: PublicViewProps) => createElement(ResetPasswordView, props) },
   { kind: 'google-callback', pattern: /^\/auth\/google\/callback\/?$/, publicView: (props: PublicViewProps) => createElement(GoogleCallbackView, props) },
   { kind: 'gmail-callback', pattern: /^\/connections\/gmail\/callback\/?$/ },
+  { kind: 'slack-callback', pattern: /^\/connections\/myslack\/callback\/?$/ },
   { kind: 'mycalendar-callback', pattern: /^\/connections\/mycalendar\/callback\/?$/ },
   { kind: 'mysheets-callback', pattern: /^\/connections\/mysheets\/callback\/?$/ },
   { kind: 'trello-callback', pattern: /^\/connections\/trello\/callback\/?$/ },
@@ -42,6 +43,7 @@ export const routes = [
   { kind: 'account', pattern: /^\/account\/?$/ },
   { kind: 'settings', pattern: /^\/settings\/?$/ },
   { kind: 'history', pattern: /^\/history\/?$/ },
+  { kind: 'inbox', pattern: /^\/inbox\/?$/ },
   { kind: 'guide', pattern: /^\/guide\/?$/, publicView: (props: PublicViewProps) => createElement(GuidePage, { navigate: props.navigate }) },
   { kind: 'privacy', pattern: /^\/privacy\/?$/, publicView: (props: PublicViewProps) => createElement(PrivacyPage, { navigate: props.navigate }) },
 ] as const;
@@ -56,7 +58,7 @@ export function readRoute(): AppRoute {
   for (const route of routes) {
     const match = window.location.pathname.match(route.pattern);
     if (!match) continue;
-    if (route.kind === 'google-callback' || route.kind === 'gmail-callback') {
+    if (route.kind === 'google-callback' || route.kind === 'gmail-callback' || route.kind === 'slack-callback') {
       const single = (key: string) => query.getAll(key).length === 1 ? query.get(key) || undefined : undefined;
       return { kind: route.kind, googleCallback: { code: single('code'), state: single('state'), error: query.has('error') ? 'denied' : undefined } };
     }

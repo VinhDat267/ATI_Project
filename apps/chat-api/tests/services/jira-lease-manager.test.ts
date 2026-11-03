@@ -658,10 +658,12 @@ describe('JiraLeaseManager (JIRA-05 Task 3 Real PostgreSQL Tests)', () => {
         await holder.query('BEGIN');
         await holder.query("UPDATE jira_oauth_grants SET status = 'revoked' WHERE id = $1", [fixture.grantId]);
         const leaseManager = new JiraLeaseManager({ pool: ctx.pool, tokenManager: createStubTokenManager() });
-        const acquisition = leaseManager.acquireLease({ userId: fixture.userId, workspaceId: fixture.workspaceId, cloudId: fixture.cloudId });
+        const acquisition = expect(
+          leaseManager.acquireLease({ userId: fixture.userId, workspaceId: fixture.workspaceId, cloudId: fixture.cloudId })
+        ).rejects.toThrow();
         await new Promise((resolve) => setTimeout(resolve, 40));
         await holder.query('COMMIT');
-        await expect(acquisition).rejects.toThrow();
+        await acquisition;
         const rows = await ctx.pool.query<{ count: string }>(
           'SELECT count(*)::text AS count FROM jira_authorization_leases WHERE grant_id = $1', [fixture.grantId]
         );

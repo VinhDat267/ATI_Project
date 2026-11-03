@@ -3,6 +3,7 @@ import { encryptCredentials } from '@wap/tool-adapters';
 import { createScheduleRuntime } from '../../src/config/schedules-runtime.js';
 import { CredentialRepo } from '../../src/db/repositories/credential-repo.js';
 import { computeSheetsDigestHash } from '../../src/services/schedules/sheets-digest-candidate.js';
+import { certifyScheduleFixture } from '../../src/services/slack/slack-schedule-origin.js';
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
 
 const TEST_ENC_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
@@ -23,6 +24,7 @@ describe('createScheduleRuntime', () => {
     const convId = (await db.pool.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [owner.id])).rows[0].id;
     const id = (await db.pool.query(`INSERT INTO schedules(user_id,conv_id,name,request,recurrence,services,status,next_run_at)
       VALUES($1,$2,'Lịch','Gửi lịch họp','{"type":"daily","time":"08:00"}','{calendar,slack}','active','2026-10-25T01:00:00Z') RETURNING id`, [owner.id, convId])).rows[0].id;
+    await certifyScheduleFixture(db.pool, id);
     await runtime.runner.tick();
     expect((await db.pool.query('SELECT status FROM schedule_runs WHERE schedule_id=$1', [id])).rows).toEqual([{ status: 'planning_failed' }]);
     await runtime.runner.stop();
@@ -100,6 +102,7 @@ describe('createScheduleRuntime', () => {
         [owner.id, convId, JSON.stringify(digestConfig), digestHash]
       )
     ).rows[0].id;
+    await certifyScheduleFixture(db.pool, id);
 
     await runtime.runner.tick();
     expect((await db.pool.query('SELECT status FROM schedule_runs WHERE schedule_id=$1', [id])).rows).toEqual([

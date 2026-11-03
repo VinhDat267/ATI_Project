@@ -6,6 +6,7 @@ import { EventEmitter } from 'node:events';
 import pg from 'pg';
 import request from 'supertest';
 import { afterAll, beforeAll, expect, it } from 'vitest';
+import { applyV3Migrations } from '../helpers/gmail-test-db.js';
 import { AIPlanner, MockLLMProvider } from '@wap/planner';
 import { TRELLO_TOOLS } from '@wap/tool-schemas';
 import { ChatService } from '../../src/services/chat-service.js';
@@ -22,11 +23,7 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, options: 
 beforeAll(async () => {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL required for FE-03 persistence evidence');
   await admin.query(`CREATE SCHEMA ${schema}`);
-  const migrationDir = fileURLToPath(new URL('../../../../db/v3', import.meta.url));
-  const files = (await readdir(migrationDir)).filter((f) => /^\d{4}_.*\.sql$/.test(f)).sort();
-  for (const file of files) {
-    await pool.query(await readFile(resolve(migrationDir, file), 'utf8'));
-  }
+  await applyV3Migrations(pool);
 });
 afterAll(async () => { await pool.end(); await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`); await admin.end(); });
 it('real planner lookups -> SSE -> PostgreSQL -> new repositories/HTTP reload preserve display names and immutable hash', async () => {

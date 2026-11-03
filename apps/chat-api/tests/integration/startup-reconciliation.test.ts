@@ -12,6 +12,7 @@ import { ConversationRepo } from '../../src/db/repositories/conversation-repo.js
 import { PlanRepo } from '../../src/db/repositories/plan-repo.js';
 import { StepRepo } from '../../src/db/repositories/step-repo.js';
 import { generateAccessToken } from '../../src/auth/jwt.js';
+import { applyV3Migrations } from '../helpers/gmail-test-db.js';
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
 const databaseUrl = process.env.DATABASE_URL || 'postgresql://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3';
@@ -85,17 +86,13 @@ describe('startup execution reconciliation on real PostgreSQL', () => {
     adminPool = new pg.Pool({ connectionString: databaseUrl });
     await adminPool.query(`CREATE SCHEMA "${schema}"`);
     pool = new pg.Pool({ connectionString: scopedUrl.href });
-    const migrationDir = resolve(root, 'db/v3');
-    const migrations = (await readdir(migrationDir)).filter(f => /^\d{4}_.*\.sql$/.test(f)).sort();
-    for (const migration of migrations) {
-      await pool.query(await readFile(resolve(migrationDir, migration), 'utf8'));
-    }
+    await applyV3Migrations(pool);
     planRepo = new PlanRepo(pool);
     stepRepo = new StepRepo(pool);
     convRepo = new ConversationRepo(pool);
     const users = new UserRepo(pool);
     const user = await users.createUser({ email: 'reconciliation@localhost.test', name: 'Fixture', password: 'Fixture-test-password' });
-    await pool.query("UPDATE users SET status = 'active' WHERE id = $1", [user.id]);
+    await pool.query("UPDATE users SET status='active',email_verified=true WHERE id=$1", [user.id]);
     const activeUser = { ...user, status: 'active' as const };
     userId = user.id;
     const session = await users.sessions.create(user.id, 'Startup reconciliation fixture');
@@ -255,15 +252,15 @@ describe('startup execution reconciliation on real PostgreSQL', () => {
   }, API_TEST_TIMEOUT_MS);
 
   it('reconciles persisted progress after killing the actual execution process mid-write', async () => {
-    const plan = await fixture('pending', []);
-    const planJson = { steps: [
+    const conv = await convRepo.createConversation(userId);
+    const planJson = { kind: 'plan', thinking: 'Fixture', warnings: [], steps: [
       { id: 'step_1', tool: 'trello.create_card', description: 'Complete before crash', args: { listId: 'test-list', title: 'Fixture' }, dependsOn: [] },
       { id: 'step_2', tool: 'slack.send_message', description: 'Interrupted write', args: { channel: 'test-channel', text: 'Fixture' }, dependsOn: ['step_1'] },
       { id: 'step_3', tool: 'trello.create_card', description: 'Never started', args: { listId: 'test-list', title: 'Pending' }, dependsOn: ['step_2'] },
     ] };
     const text = JSON.stringify(planJson);
-    await pool.query('UPDATE plans SET plan_json = $2, plan_text = $3, plan_hash = $4 WHERE id = $1',
-      [plan.id, planJson, text, createHash('sha256').update(text).digest('hex')]);
+    const plan = await planRepo.createPlan({ convId: conv.id, planJson, planText: text,
+      planHash: createHash('sha256').update(text).digest('hex'), expiresAt: new Date(Date.now() + 60_000) });
     const worker = spawn(process.execPath, ['--import', 'tsx', 'apps/chat-api/tests/integration/fixtures/interrupted-execution-worker.ts'], {
       cwd: root, env: { ...process.env, DATABASE_URL: scopedUrl.href, TEST_PLAN_ID: plan.id, TEST_USER_ID: userId },
       stdio: ['ignore', 'pipe', 'pipe', 'ipc'],

@@ -2,6 +2,7 @@ import type pg from 'pg';
 import type { PlanRow } from '../db/repositories/plan-repo.js';
 import type { ExecutionStepRow } from '../db/repositories/step-repo.js';
 import { restoredProgress, verifiedRecoverySteps } from './execution-recovery.js';
+import { resealHeldExecutionStep } from './slack/slack-plan-origin.js';
 
 /** Reconcile a stopped API instance's durable progress before accepting requests.
  * The previous executor must be stopped; this is not a lease for multiple replicas.
@@ -28,6 +29,7 @@ export async function reconcileInterruptedExecutions(pool: pg.Pool): Promise<voi
          RETURNING id`,
         [plan.id, JSON.stringify({ category: 'UNKNOWN', message: 'Server restarted while this step was running' })],
       );
+      for (const row of interrupted.rows) await resealHeldExecutionStep(client, row.id);
       const uncertain = await client.query<{ exists: boolean }>(
         "SELECT EXISTS (SELECT 1 FROM execution_steps WHERE plan_id = $1 AND status = 'unknown')",
         [plan.id],

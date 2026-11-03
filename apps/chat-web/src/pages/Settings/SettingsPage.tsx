@@ -10,6 +10,7 @@ import { useSettings } from './useSettings';
 import { PersonalGmail } from './PersonalGmail';
 import { PersonalMyCalendar } from './PersonalMyCalendar';
 import { PersonalMySheets } from './PersonalMySheets';
+import { PersonalSlack } from './PersonalSlack';
 import { TrelloConnection } from './TrelloConnection';
 import { GitHubConnection } from './GitHubConnection';
 import { NotionConnection } from './NotionConnection';
@@ -107,7 +108,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
   usePrototypePage(meta);
   const [workspace, setWorkspace] = useState(getActiveWorkspaceSummary());
   useEffect(() => subscribeWorkspace(() => setWorkspace(getActiveWorkspaceSummary())), []);
-  const { list, personal, personalMyCalendar, personalMySheets, active, draft, selected, loading, loadError, refresh, canEdit, errors, results, busy, keyHelpOpen, actions } = useSettings(user);
+  const { slackOAuthEnabled, list, personal, personalMyCalendar, personalMySheets, active, draft, selected, loading, loadError, refresh, canEdit, errors, results, busy, keyHelpOpen, actions } = useSettings(user);
   const [connectedEmail, setConnectedEmail] = useState<string>();
   useEffect(() => {
     const email =
@@ -213,6 +214,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
             </div>
           </div>
         </div>
+        {slackOAuthEnabled && <PersonalSlack key={`slack-${user?.id}`} />}
         {loading && <p role="status" className="text-xs text-[#6B7280]">Đang tải dịch vụ...</p>}
         {loadError && <div role="alert" className="text-xs text-[#DC2626] mb-4">{loadError} <button type="button" onClick={() => void refresh()} className="underline">Thử lại</button></div>}
         {connectedEmail && <p role="status" className="text-sm text-[#111827] mb-4">Đã kết nối {connectedEmail}</p>}

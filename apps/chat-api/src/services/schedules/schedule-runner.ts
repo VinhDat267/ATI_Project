@@ -1,3 +1,4 @@
+import {captureScheduleArtifact,guardScheduleArtifact,prelockScheduleArtifacts,registerScheduleFields,scheduleRegistry,scheduleSourceContext,tagScheduleContext} from '../slack/slack-schedule-lineage.js';
 import type pg from 'pg';
 import type { CalendarDigestConfig, GithubDigestConfig, NotionDigestConfig, ScheduleKind, ScheduleRecurrence, ScheduleRunMessageMetadata, TelegramDigestConfig, TrelloDigestConfig } from '@wap/tool-schemas';
 import { MessageRepo } from '../../db/repositories/message-repo.js';
@@ -54,6 +55,8 @@ export interface ScheduleRunnerOptions {
 
 const LATE_MS = 10 * 60_000;
 const DUE_PER_TICK = 5;
+/** Uncertified rows stay due. A tick walks past them instead of rereading the same five. */
+const SCAN_CAP = 50;
 const MAX_MISSED = 1000;
 const BLOCKED = 'Tài khoản không còn hoạt động.';
 const UNAPPROVED = '3 lượt liền không được duyệt';
@@ -108,6 +111,7 @@ export async function reconcileScheduleRuns(pool: pg.Pool): Promise<void> {
  */
 export class ScheduleRunner {
   private messages: MessageRepo;
+  private registry;
   private now: () => Date;
   private planTimeoutMs: number;
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -115,9 +119,11 @@ export class ScheduleRunner {
   private queue: Promise<void> = Promise.resolve();
   private current: AbortController | null = null;
   private stopping = false;
+  private scanCursor: { at: string; id: string } | null = null;
 
   constructor(private options: ScheduleRunnerOptions) {
     this.messages = new MessageRepo(options.pool);
+    this.registry = scheduleRegistry(options.pool);
     this.now = options.now ?? (() => new Date());
     this.planTimeoutMs = options.planTimeoutMs ?? 180_000;
   }
@@ -151,7 +157,7 @@ export class ScheduleRunner {
 
   private announce(changes: ScheduleChange[]) {
     for (const change of changes) {
-      if (change.state) this.send(change.convId, 'schedule_updated', { conversationId: change.convId, messageId: change.state.messageId, ...change.state.metadata });
+      if (change.state) this.send(change.convId, 'schedule_updated', change.sourceBound ? {conversationId:change.convId,reload:true} : { conversationId: change.convId, messageId: change.state.messageId, ...change.state.metadata });
     }
   }
 
@@ -192,53 +198,96 @@ export class ScheduleRunner {
     const now = this.now();
     const { timeZone } = this.options;
     const toPlan: string[] = [];
-    const changes = await inTransaction(this.options.pool, async (client) => {
-      const changes: ScheduleChange[] = [];
-      // Claim the conversation with the schedule, skipping both when either is held: a confirmation
-      // holds the conversation while it waits for the schedule (lock order in ScheduleRepo.ownedSchedule).
-      const due = await client.query(
-        `SELECT s.*, u.status AS owner_status, wm.status AS member_status FROM schedules s
-         JOIN conversations c ON c.id = s.conv_id JOIN users u ON u.id = s.user_id
-         LEFT JOIN workspace_members wm ON wm.workspace_id = s.workspace_id AND wm.user_id = s.user_id
-         WHERE s.status = 'active' AND s.next_run_at <= $1
-         ORDER BY s.next_run_at, s.id FOR UPDATE OF c, s SKIP LOCKED LIMIT ${DUE_PER_TICK}`, [now]);
-      for (const row of due.rows as Array<ScheduleRow & { owner_status: string; member_status?: string }>) {
-        // A run started by hand is still planning; look again next tick.
-        if ((await client.query("SELECT 1 FROM schedule_runs WHERE schedule_id=$1 AND status='planning'", [row.id])).rowCount) continue;
-        const dueAt = new Date(row.next_run_at!);
-        if (row.owner_status !== 'active' || (row.workspace_mode === 'organization' && row.member_status !== 'active')) {
-          await this.insertRun(client, row, dueAt, 'blocked', { error: BLOCKED });
-          changes.push(await this.options.recordState(client, await this.pause(client, row.id, BLOCKED), now));
-          continue;
-        }
-        if (now.getTime() - dueAt.getTime() > LATE_MS) {
-          // Missed while the server was off: one row for all of them, no write is ever replayed.
-          let missed = 0;
-          let next: Date | null = dueAt;
-          while (next && next.getTime() <= now.getTime() && missed < MAX_MISSED) {
-            missed++;
-            next = nextOccurrence(row.recurrence, next, timeZone);
-          }
-          await this.insertRun(client, row, dueAt, 'missed', { missedCount: missed });
-          const moved = await this.advance(client, row.id, next);
-          if (moved.status === 'completed') changes.push(await this.options.recordState(client, moved, now));
-          continue;
-        }
-        if (row.kind !== 'github_digest' && row.kind !== 'trello_digest' && row.kind !== 'notion_digest' && row.kind !== 'telegram_digest' && await this.lastThreeExpired(client, row.id, now)) {
-          changes.push(await this.options.recordState(client, await this.pause(client, row.id, UNAPPROVED), now));
-          continue;
-        }
-        if (row.kind === 'calendar_digest' && await this.lastThreeDigestFailed(client, row.id)) {
-          changes.push(await this.options.recordState(client, await this.pause(client, row.id, DIGEST_FAILED_3X), now));
-          continue;
-        }
-        const inserted = await this.insertRun(client, row, dueAt, 'planning');
-        const moved = await this.advance(client, row.id, nextOccurrence(row.recurrence, new Date(Math.max(now.getTime(), dueAt.getTime())), timeZone));
-        if (moved.status === 'completed') changes.push(await this.options.recordState(client, moved, now));
-        if (inserted.rowCount) toPlan.push(inserted.rows[0].id);
+    const changes: ScheduleChange[] = [];
+    // Read only bounded IDs first. Each candidate takes its complete source union
+    // before conversation/schedule claims; SKIP LOCKED still applies to both.
+    // A refused source-free row keeps its due time, so the cursor moves past it.
+    let inspected = 0;
+    while (toPlan.length < DUE_PER_TICK && inspected < SCAN_CAP) {
+      const scan = await this.options.pool.connect();
+      let candidates: any[];
+      try {
+        candidates = (
+          await scan.query(
+            `SELECT id, next_run_at::text AS cursor_at FROM schedules WHERE status='active' AND next_run_at<=$1
+             AND ($2::timestamptz IS NULL OR (next_run_at, id) > ($2::timestamptz, $3::uuid))
+             ORDER BY next_run_at, id LIMIT ${DUE_PER_TICK}`,
+            [now, this.scanCursor?.at ?? null, this.scanCursor?.id ?? null],
+          )
+        ).rows;
+      } finally {
+        scan.release();
       }
-      return changes;
-    });
+      if (!candidates.length) {
+        this.scanCursor = null;
+        break;
+      }
+      let last: { id: string; cursor_at: string } | null = null;
+      for (const candidate of candidates) {
+        if (toPlan.length >= DUE_PER_TICK) break;
+        inspected++;
+        last = candidate;
+        const committed = await inTransaction(this.options.pool, async (client) => {
+          const changes: ScheduleChange[] = [];
+          const state = await captureScheduleArtifact(client, this.registry, 'schedules', candidate.id);
+          if (!state) return changes;
+          await prelockScheduleArtifacts(client, this.registry, [state]);
+          const due = await client.query(
+            `SELECT s.*, u.status AS owner_status, wm.status AS member_status FROM schedules s
+             JOIN conversations c ON c.id = s.conv_id JOIN users u ON u.id = s.user_id
+             LEFT JOIN workspace_members wm ON wm.workspace_id = s.workspace_id AND wm.user_id = s.user_id
+             WHERE s.id = $2 AND s.status = 'active' AND s.next_run_at <= $1 FOR UPDATE OF c, s SKIP LOCKED`,
+            [now, candidate.id],
+          );
+          for (const row of due.rows as Array<ScheduleRow & { owner_status: string; member_status?: string }>) {
+            const checked = await guardScheduleArtifact(client, this.registry, state, 'planning', 'UPDATE');
+            if (!checked.allowed) {
+              if (checked.source) await this.pause(client, row.id, 'slack_source_invalidated');
+              continue;
+            }
+            const segments = checked.segments;
+            tagScheduleContext(row, segments);
+            // A run started by hand is still planning; look again next tick.
+            if ((await client.query("SELECT 1 FROM schedule_runs WHERE schedule_id=$1 AND status='planning'", [row.id])).rowCount) continue;
+            const dueAt = new Date(row.next_run_at!);
+            if (row.owner_status !== 'active' || (row.workspace_mode === 'organization' && row.member_status !== 'active')) {
+              await this.insertRun(client, row, dueAt, 'blocked', { error: BLOCKED });
+              changes.push(await this.options.recordState(client, tagScheduleContext(await this.pause(client, row.id, BLOCKED), segments), now));
+              continue;
+            }
+            if (now.getTime() - dueAt.getTime() > LATE_MS) {
+              // Missed while the server was off: one row for all of them, no write is ever replayed.
+              let missed = 0;
+              let next: Date | null = dueAt;
+              while (next && next.getTime() <= now.getTime() && missed < MAX_MISSED) {
+                missed++;
+                next = nextOccurrence(row.recurrence, next, timeZone);
+              }
+              await this.insertRun(client, row, dueAt, 'missed', { missedCount: missed });
+              const moved = await this.advance(client, row.id, next);
+              if (moved.status === 'completed') changes.push(await this.options.recordState(client, tagScheduleContext(moved, segments), now));
+              continue;
+            }
+            if (row.kind !== 'github_digest' && row.kind !== 'trello_digest' && row.kind !== 'notion_digest' && row.kind !== 'telegram_digest' && await this.lastThreeExpired(client, row.id, now)) {
+              changes.push(await this.options.recordState(client, tagScheduleContext(await this.pause(client, row.id, UNAPPROVED), segments), now));
+              continue;
+            }
+            if (row.kind === 'calendar_digest' && await this.lastThreeDigestFailed(client, row.id)) {
+              changes.push(await this.options.recordState(client, tagScheduleContext(await this.pause(client, row.id, DIGEST_FAILED_3X), segments), now));
+              continue;
+            }
+            const inserted = await this.insertRun(client, row, dueAt, 'planning');
+            const moved = await this.advance(client, row.id, nextOccurrence(row.recurrence, new Date(Math.max(now.getTime(), dueAt.getTime())), timeZone));
+            if (moved.status === 'completed') changes.push(await this.options.recordState(client, tagScheduleContext(moved, segments), now));
+            if (inserted.rowCount) toPlan.push(inserted.rows[0].id);
+          }
+          return changes;
+        });
+        changes.push(...committed);
+      }
+      this.scanCursor = last && candidates.length === DUE_PER_TICK && toPlan.length < DUE_PER_TICK ? { at: last.cursor_at, id: last.id } : null;
+      if (this.scanCursor === null) break;
+    }
     this.announce(changes);
     for (const runId of toPlan) await this.planNow(runId);
   }
@@ -253,25 +302,57 @@ export class ScheduleRunner {
   private async planOne(runId: string): Promise<void> {
     const { pool, timeZone } = this.options;
     const started = await inTransaction(pool, async (client) => {
-      const res = await client.query(
-        `SELECT r.*, s.user_id, s.conv_id AS schedule_conv_id, s.name, s.request, s.recurrence, s.services,
-                s.status AS schedule_status, s.pause_reason, s.version AS current_schedule_version,
-                s.next_run_at, s.last_proposal_id, s.workspace_id, s.workspace_mode,
-                s.kind, s.digest_config, s.digest_config_hash, s.digest_approved_at,
-                s.created_at AS schedule_created_at, s.updated_at AS schedule_updated_at
-         FROM schedule_runs r JOIN schedules s ON s.id = r.schedule_id
-         WHERE r.id = $1 AND r.status = 'planning' FOR UPDATE OF r`, [runId]);
-      const run = res.rows[0];
-      if (!run) return null;
+      const found = (await client.query('SELECT schedule_id FROM schedule_runs WHERE id=$1', [runId])).rows[0];
+      if (!found) return null;
+      const state = await captureScheduleArtifact(client, this.registry, 'schedules', found.schedule_id);
+      const runState = await captureScheduleArtifact(client, this.registry, 'schedule_runs', runId);
+      if (!state || !runState) return null;
+      await prelockScheduleArtifacts(client, this.registry, [state, runState]);
+      const checked = await guardScheduleArtifact(client, this.registry, state, 'planning', 'UPDATE');
+      const runChecked = await guardScheduleArtifact(client, this.registry, runState, 'planning', 'UPDATE');
+      const run = {
+        ...checked.row,
+        ...runChecked.row,
+        user_id: state.owner,
+        name: checked.row.name,
+        request: checked.row.request,
+        schedule_conv_id: checked.row.conv_id,
+        schedule_status: checked.row.status,
+        current_schedule_version: checked.row.version,
+        schedule_created_at: checked.row.created_at,
+        schedule_updated_at: checked.row.updated_at,
+      };
+      if (run.status !== 'planning') return null;
+      if (!checked.allowed || !runChecked.allowed || run.schedule_version !== checked.row.version || checked.row.status === 'cancelled') {
+        await client.query("UPDATE schedule_runs SET status='discarded',plan_id=NULL,error=$2,updated_at=now() WHERE id=$1", [runId, DISCARDED]);
+        return null;
+      }
+      const segments = checked.segments;
       const dueAt = new Date(run.due_at);
       const label = localLabel(dueAt, timeZone);
-      const convId = (await client.query("INSERT INTO conversations(user_id, status, title, workspace_id, workspace_mode) VALUES($1, 'chatting', $2, $3, $4) RETURNING id",
-        [run.user_id, `Lịch: ${run.name} · ${label}`, run.workspace_id ?? null, run.workspace_mode ?? 'legacy'])).rows[0].id as string;
+      const convId = (await client.query(
+        "INSERT INTO conversations(user_id, status, title, workspace_id, workspace_mode) VALUES($1, 'chatting', $2, $3, $4) RETURNING id",
+        [run.user_id, `Lịch: ${run.name} · ${label}`, run.workspace_id ?? null, run.workspace_mode ?? 'legacy'],
+      )).rows[0].id as string;
       const metadata: ScheduleRunMessageMetadata = { type: 'schedule_run', scheduleId: run.schedule_id, runId: run.id, name: run.name, dueAt: dueAt.toISOString(), trigger: run.trigger };
-      const first = await this.messages.createMessage(convId, 'user', runMessage({ name: run.name, request: run.request, dueAt }, timeZone), metadata, client);
       await client.query('UPDATE schedule_runs SET conv_id=$2, updated_at=now() WHERE id=$1', [runId, convId]);
-      const toPlan: RunToPlan = { runId: run.id, scheduleId: run.schedule_id, scheduleVersion: run.schedule_version, userId: run.user_id,
-        name: run.name, request: run.request, dueAt, trigger: run.trigger, workspaceId: run.workspace_id ?? null, workspaceMode: run.workspace_mode ?? 'legacy' };
+      await registerScheduleFields(client, this.registry, 'conversations', convId, run.user_id, segments, ['title']);
+      const content = runMessage({ name: run.name, request: run.request, dueAt }, timeZone);
+      const first = segments.length
+        ? await this.messages.createSlackRunMessage(convId, content, metadata, { segments, selectors: ['content', 'metadata.name'] }, client)
+        : await this.messages.createMessage(convId, 'user', content, metadata, client);
+      const toPlan: RunToPlan = {
+        runId: run.id,
+        scheduleId: run.schedule_id,
+        scheduleVersion: run.schedule_version,
+        userId: run.user_id,
+        name: run.name,
+        request: run.request,
+        dueAt,
+        trigger: run.trigger,
+        workspaceId: run.workspace_id ?? null,
+        workspaceMode: run.workspace_mode ?? 'legacy',
+      };
       const scheduleRow: ScheduleRow = {
         id: run.schedule_id,
         user_id: run.user_id,
@@ -295,7 +376,7 @@ export class ScheduleRunner {
         updated_at: run.schedule_updated_at,
       };
       return {
-        toPlan,
+        toPlan: tagScheduleContext(toPlan, segments),
         convId,
         messageId: first.id,
         scheduleRow,
@@ -372,7 +453,7 @@ export class ScheduleRunner {
       prepared = await Promise.race([this.options.planRun(started.toPlan, started.convId, controller.signal), aborted]);
     } catch (error) {
       failure = timedOut ? TIMED_OUT : this.stopping ? STOPPED : FAILED;
-      if (!timedOut && !this.stopping) console.error('[schedules] planning a run failed:', error instanceof Error ? error.message : error);
+      if (!timedOut && !this.stopping) console.error('[schedules] planning a run failed:', scheduleSourceContext(started.toPlan)?'SLACK_SCHEDULE_UNAVAILABLE':error instanceof Error ? error.message : error);
     } finally {
       clearTimeout(timer);
       this.current = null;
@@ -380,11 +461,25 @@ export class ScheduleRunner {
 
     // 'planned', the text a run ended with when it has no result to announce, or null when another process ended it.
     const ended = await inTransaction(pool, async (client): Promise<string | null> => {
-      const schedule = (await client.query('SELECT version, status FROM schedules WHERE id=$1 FOR UPDATE', [started.toPlan.scheduleId])).rows[0];
+      const snapshot=await captureScheduleArtifact(client,this.registry,'schedules',started.toPlan.scheduleId);
+      if(!snapshot)return null;
+      // Include the ORIGINAL run sources even if a replacement schedule now uses
+      // a different source set. Prepared plan/message writers only reacquire keys
+      // from this prelocked union.
+      const original=scheduleSourceContext(started.toPlan)?.segments??[];
+      await prelockScheduleArtifacts(client,this.registry,[{...snapshot,segments:[...snapshot.segments,...original]}]);
+      let originalAllowed=true;
+      if(original.length)try{await this.registry.prepareConversationWriteInTransaction(client,snapshot.convId,snapshot.owner,original,'planning');}catch(error){if(error&&typeof error==='object'&&'code' in error)throw error;originalAllowed=false;}
+      const checked=await guardScheduleArtifact(client,this.registry,snapshot,'planning','UPDATE');
+      const schedule=checked.row;
       const run = (await client.query('SELECT status FROM schedule_runs WHERE id=$1 FOR UPDATE', [runId])).rows[0];
       if (run?.status !== 'planning') return null;
       // Both endings answer the run's first message, as the error of a chat turn answers its request.
       const replyTo = { replyToMessageId: started.messageId };
+      if(!checked.allowed||!originalAllowed){
+        await this.messages.createMessage(started.convId,'system',DISCARDED,{type:'schedule_discarded',...replyTo},client);
+        await client.query("UPDATE schedule_runs SET status='discarded',plan_id=NULL,error=$2,updated_at=now() WHERE id=$1",[runId,DISCARDED]);return DISCARDED;
+      }
       if (failure || !prepared) {
         const text = failure ?? FAILED;
         await this.messages.createMessage(started.convId, 'system', `Lỗi: ${text}`, { type: 'planning_error', ...replyTo }, client);
@@ -393,7 +488,7 @@ export class ScheduleRunner {
         return text;
       }
       // Every change by the member bumps the version: a result planned for an older version is dropped.
-      if (schedule.version !== started.toPlan.scheduleVersion || schedule.status === 'cancelled') {
+      if (!checked.allowed || schedule.version !== started.toPlan.scheduleVersion || schedule.status === 'cancelled') {
         await this.messages.createMessage(started.convId, 'system', DISCARDED, { type: 'schedule_discarded', ...replyTo }, client);
         await client.query("UPDATE schedule_runs SET status='discarded', updated_at=now() WHERE id=$1", [runId]);
         return DISCARDED;
@@ -415,6 +510,7 @@ export class ScheduleRunner {
     const { pool } = this.options;
     const controller = new AbortController();
     this.current = controller;
+    if (this.stopping) controller.abort();
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
@@ -423,9 +519,11 @@ export class ScheduleRunner {
 
     let outcome: Awaited<ReturnType<SheetsDigestRunner['executeDigest']>>;
     try {
-      const aborted = new Promise<never>((_, reject) =>
-        controller.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
-      );
+      const aborted = controller.signal.aborted
+        ? Promise.reject(new Error('aborted'))
+        : new Promise<never>((_, reject) =>
+            controller.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
+          );
       outcome = await Promise.race([
         this.options.sheetsDigestRunner!.executeDigest(
           started.scheduleRow,

@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import pg from 'pg';
 import { createHash, randomUUID } from 'node:crypto';
 import { hashPassword } from '../../../chat-api/src/db/repositories/user-repo.js';
+import { certifyFixturePlan, fixtureConversation, fixtureMessage } from './persisted-artifacts.fixture.js';
 
 const enabled = process.env.SANDBOX_SCENARIO === 'schedule';
 
@@ -33,23 +34,18 @@ test('GITHUB-DIGEST: admin selects team repos, member connects from refusal card
       "INSERT INTO users(id, email, password, name, status, role, email_verified) VALUES($1, $2, $3, 'GitHub Member', 'active', 'member', true)",
       [memberId, memberEmail, hashPassword(memberPassword)]
     );
-    refusalConvId = (
-      await db.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [memberId])
-    ).rows[0].id;
-    await db.query(
-      "INSERT INTO messages(conv_id, role, content) VALUES($1, 'user', 'Tạo issue trên repo acme/ati')",
-      [refusalConvId]
-    );
-    await db.query(
-      "INSERT INTO messages(conv_id, role, content, metadata) VALUES($1, 'assistant', 'Từ chối yêu cầu: Bạn cần kết nối GitHub cá nhân trước khi tạo hoặc tra cứu issue trên GitHub.', $2)",
-      [
-        refusalConvId,
-        {
-          type: 'refusal',
-          reason: 'Bạn cần kết nối GitHub cá nhân trước khi tạo hoặc tra cứu issue trên GitHub.',
-          unavailableServices: [{ id: 'github', name: 'GitHub' }],
-        },
-      ]
+    refusalConvId = await fixtureConversation(db, memberId);
+    await fixtureMessage(db, refusalConvId, 'user', 'Tạo issue trên repo acme/ati');
+    await fixtureMessage(
+      db,
+      refusalConvId,
+      'assistant',
+      'Từ chối yêu cầu: Bạn cần kết nối GitHub cá nhân trước khi tạo hoặc tra cứu issue trên GitHub.',
+      {
+        type: 'refusal',
+        reason: 'Bạn cần kết nối GitHub cá nhân trước khi tạo hoặc tra cứu issue trên GitHub.',
+        unavailableServices: [{ id: 'github', name: 'GitHub' }],
+      },
     );
 
     // 1. Admin logs in and selects two repositories for the team
@@ -248,10 +244,12 @@ test('GITHUB-DIGEST: extended GitHub tools plan destination, preview badges, rea
     const adminId = (await db.query('SELECT id FROM users WHERE email = $1', [process.env.CHAT_ADMIN_EMAIL!])).rows[0].id;
 
     // 1. Seed a conversation with a 4-step GitHub plan exercising create_issue (with assignees), update_issue, get_pull_request, and add_comment
-    const planConvId = (await db.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [adminId])).rows[0].id;
-    await db.query(
-      "INSERT INTO messages(conv_id, role, content) VALUES($1, 'user', 'Tạo issue mới, đóng issue #42, đọc PR #18 và bình luận xác nhận trên owner/repo')",
-      [planConvId]
+    const planConvId = await fixtureConversation(db, adminId);
+    await fixtureMessage(
+      db,
+      planConvId,
+      'user',
+      'Tạo issue mới, đóng issue #42, đọc PR #18 và bình luận xác nhận trên owner/repo'
     );
 
     const plan = {
@@ -330,19 +328,19 @@ test('GITHUB-DIGEST: extended GitHub tools plan destination, preview badges, rea
         [planConvId, planText, planText, createHash('sha256').update(planText).digest('hex')]
       )
     ).rows[0].id;
+    await certifyFixturePlan(db, planId);
 
-    await db.query(
-      "INSERT INTO messages(conv_id, role, content, metadata) VALUES($1, 'assistant', $2, $3)",
-      [
-        planConvId,
-        plan.summary,
-        {
-          type: 'plan',
-          planId,
-          plan: { ...plan, id: planId, status: 'pending' },
-          resourceLabels: plan.resourceLabels,
-        },
-      ]
+    await fixtureMessage(
+      db,
+      planConvId,
+      'assistant',
+      plan.summary,
+      {
+        type: 'plan',
+        planId,
+        plan: { ...plan, id: planId, status: 'pending' },
+        resourceLabels: plan.resourceLabels,
+      },
     );
 
     await page.goto(`/c/${planConvId}`);
@@ -395,43 +393,45 @@ test('GITHUB-DIGEST: extended GitHub tools plan destination, preview badges, rea
     expect(stepRows[3].output_json.issueNumber).toBe(42);
 
     // 2. Verify FE-GH-4: github_digest proposal with Telegram destination
-    const tgConvId = (await db.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [adminId])).rows[0].id;
-    await db.query(
-      "INSERT INTO messages(conv_id, role, content) VALUES($1, 'user', 'Mỗi sáng 8 giờ gửi bản tin GitHub repo owner/repo vào nhóm Telegram Kỹ Thuật ATI')",
-      [tgConvId]
+    const tgConvId = await fixtureConversation(db, adminId);
+    await fixtureMessage(
+      db,
+      tgConvId,
+      'user',
+      'Mỗi sáng 8 giờ gửi bản tin GitHub repo owner/repo vào nhóm Telegram Kỹ Thuật ATI'
     );
-    await db.query(
-      "INSERT INTO messages(conv_id, role, content, metadata) VALUES($1, 'assistant', 'Đề xuất lịch chạy tự động gửi qua Telegram', $2)",
-      [
-        tgConvId,
-        {
-          type: 'schedule_proposal',
-          services: ['github', 'telegram'],
-          nextRuns: ['2026-11-03T01:00:00.000Z'],
-          proposal: {
-            kind: 'schedule',
-            action: 'create',
-            name: 'Bản tin GitHub Telegram',
-            request: 'Mỗi sáng 8 giờ gửi bản tin GitHub repo owner/repo vào nhóm Telegram Kỹ Thuật ATI',
-            recurrence: { type: 'daily', time: '08:00' },
-            summary: 'Mỗi sáng 8 giờ, gửi bản tin GitHub vào nhóm Telegram Kỹ Thuật ATI.',
-          },
-          digestCandidate: {
-            canAutoDigest: true,
-            config: {
-              githubUserId: 'gh-admin-1',
-              githubLogin: 'admin_octo',
-              repos: ['owner/repo'],
-              channelId: '',
-              channelName: '',
-              telegramChatId: '-100999888',
-              telegramChatTitle: 'Nhóm Kỹ Thuật ATI',
-              windowHours: 24,
-              staleDays: 3,
-            },
+    await fixtureMessage(
+      db,
+      tgConvId,
+      'assistant',
+      'Đề xuất lịch chạy tự động gửi qua Telegram',
+      {
+        type: 'schedule_proposal',
+        services: ['github', 'telegram'],
+        nextRuns: ['2026-11-03T01:00:00.000Z'],
+        proposal: {
+          kind: 'schedule',
+          action: 'create',
+          name: 'Bản tin GitHub Telegram',
+          request: 'Mỗi sáng 8 giờ gửi bản tin GitHub repo owner/repo vào nhóm Telegram Kỹ Thuật ATI',
+          recurrence: { type: 'daily', time: '08:00' },
+          summary: 'Mỗi sáng 8 giờ, gửi bản tin GitHub vào nhóm Telegram Kỹ Thuật ATI.',
+        },
+        digestCandidate: {
+          canAutoDigest: true,
+          config: {
+            githubUserId: 'gh-admin-1',
+            githubLogin: 'admin_octo',
+            repos: ['owner/repo'],
+            channelId: '',
+            channelName: '',
+            telegramChatId: '-100999888',
+            telegramChatTitle: 'Nhóm Kỹ Thuật ATI',
+            windowHours: 24,
+            staleDays: 3,
           },
         },
-      ]
+      },
     );
 
     await page.goto(`/c/${tgConvId}`);

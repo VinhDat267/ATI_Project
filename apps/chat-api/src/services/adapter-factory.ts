@@ -214,7 +214,7 @@ export class AdapterFactory {
     const userId = context?.userId;
     if (!userId) throw gmailError('AUTH_ERROR', 'Gmail chỉ dùng được với kết nối của chính người dùng.');
     const record = await this.credentialRepo.getPersonalCredentials('gmail', userId);
-    if (context.phase === 'execution') {
+    if (context?.phase === 'execution') {
       const previewed = context.connections?.gmail?.credentialId;
       if (!record || !previewed || record.id !== previewed) {
         throw gmailError('AUTH_ERROR', 'Kết nối Gmail đã thay đổi, hãy lập lại kế hoạch.');
@@ -258,9 +258,9 @@ export class AdapterFactory {
       throw mycalendarError('AUTH_ERROR', 'Bạn chưa chọn lịch Google Calendar được phép sử dụng.');
     }
 
-    if (context.phase === 'execution') {
+    if (context?.phase === 'execution') {
       const previewed = context.connections?.mycalendar;
-      if (!previewed || record.id !== previewed.credentialId) {
+      if (!previewed || !previewed.credentialId || record.id !== previewed.credentialId) {
         throw mycalendarError('AUTH_ERROR', 'Kết nối hoặc phạm vi lịch Google Calendar đã thay đổi, hãy lập lại kế hoạch.');
       }
       const currentSet = new Set(allowedCalendars);
@@ -315,9 +315,9 @@ export class AdapterFactory {
       throw mysheetsError('AUTH_ERROR', 'Bạn chưa chọn bảng tính Google Sheets cho ATI.');
     }
 
-    if (context.phase === 'execution') {
+    if (context?.phase === 'execution') {
       const previewed = context.connections?.mysheets;
-      if (!previewed || record.id !== previewed.credentialId) {
+      if (!previewed || !previewed.credentialId || record.id !== previewed.credentialId) {
         throw mysheetsError('AUTH_ERROR', 'Kết nối hoặc danh sách bảng tính đã đổi, hãy lập lại kế hoạch.');
       }
       const currentSet = new Set(allowedSpreadsheets);
@@ -358,7 +358,7 @@ export class AdapterFactory {
 
     if (context?.phase === 'execution') {
       const previewed = context.connections?.trello;
-      if (!previewed || record.id !== previewed.credentialId) {
+      if (!previewed || !previewed.credentialId || record.id !== previewed.credentialId) {
         throw trelloError('AUTH_ERROR', 'Kết nối Trello đã thay đổi, hãy lập lại kế hoạch.');
       }
     }
@@ -446,7 +446,7 @@ export class AdapterFactory {
 
     if (context?.phase === 'execution') {
       const previewed = context.connections?.github;
-      if (!previewed || record.id !== previewed.credentialId) {
+      if (!previewed || !previewed.credentialId || record.id !== previewed.credentialId) {
         throw githubError('AUTH_ERROR', 'Kết nối GitHub đã thay đổi, hãy lập lại kế hoạch.');
       }
     }

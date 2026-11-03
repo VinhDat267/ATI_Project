@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { createHash, randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { hashPassword } from '../../../chat-api/src/db/repositories/user-repo.js';
+import { certifyFixtureSchedule, fixtureConversation, fixtureMessage } from './persisted-artifacts.fixture.js';
 import type { CalendarDigestConfig } from '@wap/tool-schemas';
 
 for (const width of [1440, 375]) test(`SCHED-03: Calendar uncertain delivery requires verification at ${width}px`, async ({ page }) => {
@@ -10,18 +11,18 @@ for (const width of [1440, 375]) test(`SCHED-03: Calendar uncertain delivery req
   try {
     const email = `calendar-delivery-${randomUUID()}@example.test`, password = 'Calendar!browser-fixture';
     const owner = (await db.query("INSERT INTO users(email,password,name,status,email_verified) VALUES($1,$2,'Calendar reviewer','active',true) RETURNING id", [email, hashPassword(password)])).rows[0].id;
-    const conv = async () => (await db.query("INSERT INTO conversations(user_id,title) VALUES($1,'Calendar digest') RETURNING id", [owner])).rows[0].id;
+    const conv = async () => fixtureConversation(db, owner, 'Calendar digest');
     const scheduleConv = await conv(), runConv = await conv();
     const config: CalendarDigestConfig = { version: 1, source: 'mycalendar', credentialId: randomUUID(), email,
       calendars: [{ id: 'work@example.test', summary: 'Work' }], destination: { service: 'slack', channelId: 'C0123456789' }, windowHours: 24, includeSummary: false };
     const schedule = (await db.query(`INSERT INTO schedules(user_id,conv_id,name,request,recurrence,services,status,next_run_at,kind,digest_config,digest_config_hash,digest_approved_at)
       VALUES($1,$2,'Agenda','Daily agenda','{"type":"daily","time":"08:00"}',ARRAY['mycalendar','slack'],'active',now()+interval '1 day','calendar_digest',$3,$4,now()) RETURNING id`,
       [owner, scheduleConv, config, createHash('sha256').update(JSON.stringify(config)).digest('hex')])).rows[0].id;
+    await certifyFixtureSchedule(db, schedule);
     const instructions = 'Chưa xác định bản tin lịch đã gửi hay chưa. Hãy kiểm tra kênh nhận trước khi gửi thêm; lượt này không tự gửi lại.';
     const run = (await db.query(`INSERT INTO schedule_runs(schedule_id,schedule_version,trigger,due_at,status,conv_id,error,delivery_started_at)
       VALUES($1,1,'manual',now(),'needs_attention',$2,$3,now()) RETURNING id,due_at`, [schedule, runConv, instructions])).rows[0];
-    await db.query("INSERT INTO messages(conv_id,role,content,metadata) VALUES($1,'user','Daily agenda',$2)",
-      [runConv, { type: 'schedule_run', scheduleId: schedule, runId: run.id, name: 'Agenda', dueAt: run.due_at.toISOString(), trigger: 'manual' }]);
+    await fixtureMessage(db, runConv, 'user', 'Daily agenda', { type: 'schedule_run', scheduleId: schedule, runId: run.id, name: 'Agenda', dueAt: run.due_at.toISOString(), trigger: 'manual' });
     const login = await page.request.post('/api/auth/login', { data: { email, password } });
     expect(login.status()).toBe(200);
     const tokens = await login.json();

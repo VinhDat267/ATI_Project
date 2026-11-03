@@ -16,6 +16,8 @@ Dự án được làm bởi nhiều agent (Claude Code, Codex, Antigravity, Cur
 
 ## Vòng làm việc
 
+Riêng Slack03–07: đọc [SLACK-DELIVERY.md](SLACK-DELIVERY.md) để chọn deliverable kế tiếp và phân biệt code/tích hợp/native. Một card có thể bao gồm nhiều lớp cần cho cùng luồng; tránh mở PR chỉ thêm primitive rồi thiếu wiring. Frozen inventory là snapshot tài liệu, không phải bảng tiến độ runtime.
+
 1. **Lập kế hoạch** (Claude Code): viết hoặc cập nhật task card trong `tasks/`, đánh dấu trong `ROADMAP.md`.
 2. **Thi công** (Codex, Antigravity, Claude Code…): nhận một task card, làm trên một nhánh riêng, mở PR. Trong cùng PR: điền phần "Kết quả" của task card và thêm một file vào `log/`. Không sửa `CURRENT-STATE.md` hay `ROADMAP.md`.
 3. **Review** (Claude Code): review PR theo `REVIEW-CHECKLIST.md` và task card. Đạt và CI xanh thì người dùng merge. Sau khi merge, reviewer cập nhật `CURRENT-STATE.md` và trạng thái trong `ROADMAP.md` bằng một commit hoặc PR nhỏ.

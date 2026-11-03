@@ -1,6 +1,8 @@
+import {createSlackAssistantRoutes,type SlackAssistantServices} from './routes/slack-assistant.js';
 import express, { type Express, type Request, type Response, type NextFunction } from 'express';
 import type pg from 'pg';
 import { createAuthRoutes } from './routes/auth/index.js';
+import { createSlackConnectionRoutes, type SlackConnectionsOptions } from './routes/connections/slack.js';
 import { createAccountRoutes } from './routes/auth/account.js';
 import { LoginFailures } from './auth/login-failures.js';
 import { createAdminUsersRoutes, type AdminUsersOptions } from './routes/auth/admin-users.js';
@@ -47,6 +49,10 @@ import { createMyJiraConnectionRoutes, isMyJiraAvailable, type MyJiraConnections
 import type { GlobalRateLimiter } from '@wap/tool-adapters';
 import type { GoogleAuthRepo } from './db/repositories/google-auth-repo.js';
 import type { GmailTokenManager } from './services/gmail/token-manager.js';
+import type { SlackSourceRepo } from './db/repositories/slack-source-repo.js';
+import type { SlackInvalidationService } from './services/slack/slack-invalidation-service.js';
+import type { SlackInvalidationRunner } from './services/slack/slack-invalidation-runner.js';
+import { createSlackEventsRouter, type SlackEventsRouterOptions } from './routes/slack-events.js';
 import type { TrelloTokenManager } from './services/trello/token-manager.js';
 import type { GitHubTokenManager } from './services/github/token-manager.js';
 import type { NotionTokenManager } from './services/notion/token-manager.js';
@@ -147,6 +153,8 @@ export interface JiraAppOptions {
 }
 
 export interface AppOptions extends AdminUsersOptions {
+  slackAssistant?:SlackAssistantServices;
+  myslack?: Pick<SlackConnectionsOptions, 'oauth' | 'repo' | 'fetchFn' | 'timeoutMs'>;
   jwtSecret: string;
   runtimeMode?: 'sandbox' | 'live';
   userRepo?: UserRepo;
@@ -196,6 +204,11 @@ export interface AppOptions extends AdminUsersOptions {
   jira?: JiraAppOptions;
   /** Scheduled workflows; present only when SCHEDULES_ENABLED is on and PostgreSQL is available. */
   schedules?: ScheduleRoutesOptions;
+  slackSourceRepo?: SlackSourceRepo;
+  slackInvalidationService?: SlackInvalidationService;
+  slackInvalidationRunner?: SlackInvalidationRunner;
+  /** Signed Slack Events API ingress. Undefined: the endpoint is not mounted. */
+  slackIngress?: SlackEventsRouterOptions;
 }
 
 export function createApp(options: AppOptions): Express {
@@ -292,6 +305,10 @@ export function createApp(options: AppOptions): Express {
     enabled: true,
   } : undefined;
 
+  // Slack signs the exact bytes it sends, so this router must see the raw stream before
+  // express.json() parses it and before the user-facing error rewrite can alter a response.
+  if (options.slackIngress) app.use(createSlackEventsRouter(options.slackIngress));
+
   app.use(express.json());
   app.use((_req, res, next) => {
     const json = res.json.bind(res);
@@ -312,6 +329,7 @@ export function createApp(options: AppOptions): Express {
       (gmailRoutes && req.path.startsWith('/api/connections/gmail')) ||
       (mycalendarRoutes && req.path.startsWith('/api/connections/mycalendar')) ||
       (mysheetsRoutes && req.path.startsWith('/api/connections/mysheets')) ||
+      req.path.startsWith('/api/connections/myslack') ||
       req.path.startsWith('/api/connections/trello') ||
       req.path.startsWith('/api/connections/github') ||
       req.path.startsWith('/api/connections/telegram') ||
@@ -325,6 +343,7 @@ export function createApp(options: AppOptions): Express {
         options.gmail?.oauth?.redirectUri,
         options.mycalendar?.oauth?.redirectUri,
         options.mysheets?.oauth?.redirectUri,
+        options.myslack?.oauth?.redirectUri,
         options.trello?.oauth?.redirectUri,
         options.github?.oauth?.redirectUri,
         options.telegram?.bot?.callbackUrl,
@@ -357,6 +376,8 @@ export function createApp(options: AppOptions): Express {
       ...(gmailRoutes ? { gmailEnabled: isGmailAvailable(gmailRoutes) } : {}),
       ...(mycalendarRoutes ? { mycalendarEnabled: isMyCalendarAvailable(mycalendarRoutes) } : {}),
       ...(mysheetsRoutes ? { mysheetsEnabled: isMySheetsAvailable(mysheetsRoutes) } : {}),
+      ...(options.chatService?.hasSlackReads?.() ? { myslackEnabled: true } : {}),
+      ...(options.chatService?.hasSlackWrites?.() ? { myslackWritesEnabled: true } : {}),
       ...(jiraRoutes ? { jiraEnabled: isMyJiraAvailable(jiraRoutes) } : {}),
       ...(options.schedules ? { schedulesEnabled: true } : {}) });
   });
@@ -420,6 +441,7 @@ export function createApp(options: AppOptions): Express {
     '/api/services',
     withAuthAndWorkspace,
     createServicesRoutes({ credentialRepo: options.credentialRepo, encryptionKey: options.encryptionKey, fetchFn: options.serviceFetchFn, onCredentialsChanged: options.onCredentialsChanged, adminUserIds: options.serviceAdminUserIds,
+      slackOAuthAvailable: Boolean(options.myslack && sessionRepo && options.encryptionKey),
       gmailAvailable: Boolean(gmailRoutes && isGmailAvailable(gmailRoutes)),
       mycalendarAvailable: Boolean(mycalendarRoutes && isMyCalendarAvailable(mycalendarRoutes)),
       mysheetsAvailable: Boolean(mysheetsRoutes && isMySheetsAvailable(mysheetsRoutes)),
@@ -427,7 +449,12 @@ export function createApp(options: AppOptions): Express {
       githubTeamRepo: options.githubTeamRepo ?? options.github?.teamRepo })
   );
 
+  if(options.slackAssistant&&sessionRepo)app.use(createSlackAssistantRoutes({...options.slackAssistant,jwtSecret:options.jwtSecret,sessionRepo}));
   if (gmailRoutes) app.use('/api/connections/gmail', createGmailConnectionRoutes(gmailRoutes));
+  if (options.myslack && sessionRepo && options.encryptionKey) app.use('/api/connections/myslack', createSlackConnectionRoutes({
+    ...options.myslack, jwtSecret: options.jwtSecret, sessionRepo, encryptionKey: options.encryptionKey, clock: options.authClock,
+    conversationOwner: options.convRepo ? async (id: string) => (await options.convRepo!.getConversation(id))?.user_id ?? null : undefined,
+  }));
   if (mycalendarRoutes) app.use('/api/connections/mycalendar', createMyCalendarConnectionRoutes(mycalendarRoutes));
   if (mysheetsRoutes) app.use('/api/connections/mysheets', createMySheetsConnectionRoutes(mysheetsRoutes));
   app.use('/api/connections/trello', createTrelloConnectionRoutes(trelloRoutes));

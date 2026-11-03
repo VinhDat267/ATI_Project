@@ -1,4 +1,17 @@
 import type pg from 'pg';
+import {messageOriginAllowed,sealMessageOrigin} from '../../services/slack/slack-message-origin.js';
+import { SlackDerivedLineageRepo, type DerivedSegmentInput } from './slack-derived-lineage-repo.js';
+import { SlackPolicyService } from '../../services/slack/policy-service.js';
+import { eraseMessageSelector, hasSlackMarker, messageSelectorKind, messageSelectorValue, SLACK_MESSAGE_TOMBSTONE, validateMessageSelector } from '../../services/slack/slack-message-selectors.js';
+
+export interface SlackMessageWriteContext { segments: DerivedSegmentInput[]; selectors: string[] }
+const lineage = Symbol('server Slack message context');
+export function slackMessageContext(row: MessageRow): SlackMessageWriteContext | undefined { return (row as any)[lineage] ? structuredClone((row as any)[lineage]) : undefined; }
+export function mergeSlackMessageContexts(rows: MessageRow[]): SlackMessageWriteContext | undefined {
+  const contexts = rows.map(slackMessageContext).filter((c): c is SlackMessageWriteContext => !!c);
+  const segments = [...new Map(contexts.flatMap(c => c.segments).map(s => [JSON.stringify(s), s])).values()];
+  return segments.length ? { segments, selectors: [] } : undefined;
+}
 
 export interface MessageRow {
   id: string;
@@ -10,7 +23,8 @@ export interface MessageRow {
 }
 
 export class MessageRepo {
-  constructor(private pool: pg.Pool) {}
+  private readonly slack: SlackDerivedLineageRepo;
+  constructor(private pool: pg.Pool, slack?: SlackDerivedLineageRepo) { this.slack = slack ?? new SlackDerivedLineageRepo(pool, new SlackPolicyService(pool)); }
 
   async createMessage(
     convId: string,
@@ -20,6 +34,23 @@ export class MessageRepo {
     /** A client inside the caller's transaction; the pool otherwise. */
     db: Pick<pg.Pool | pg.PoolClient, 'query'> = this.pool,
   ): Promise<MessageRow> {
+    const snapshot=structuredClone(metadata);
+    if (hasSlackMarker(snapshot)) throw new Error('SLACK_PROVENANCE_REQUIRED');
+    const held=db===this.pool?undefined:db as pg.PoolClient,client=held??await this.pool.connect();
+    try{
+      if(!held)await client.query('BEGIN');
+      await client.query('SAVEPOINT message_writer_tx_guard');await client.query('RELEASE SAVEPOINT message_writer_tx_guard');
+      const before=(await client.query('SELECT title FROM conversations WHERE id=$1 FOR UPDATE',[convId])).rows[0];
+      const row=await this.insertMessage(convId,role,content,snapshot,client);
+      await sealMessageOrigin(client,'messages',row.id,'message_writer');
+      if(role==='user'&&before?.title===null)await sealMessageOrigin(client,'conversations',convId,'title_first_user');
+      if(!held)await client.query('COMMIT');return row;
+    }catch(error){if(!held)await client.query('ROLLBACK').catch(()=>{});throw error;}
+    finally{if(!held)client.release();}
+  }
+
+  private async insertMessage(convId: string, role: string, content: string, metadata: any,
+    db: Pick<pg.Pool | pg.PoolClient, 'query'>): Promise<MessageRow> {
     const res = await db.query(
       `WITH locked_conversation AS (
          SELECT id FROM conversations WHERE id=$1 FOR UPDATE
@@ -37,14 +68,132 @@ export class MessageRepo {
     return res.rows[0];
   }
 
-  async listMessages(convId: string, limit: number = 100): Promise<MessageRow[]> {
+  /** Private server entrypoint. HTTP/model payloads never supply this context. */
+  async createSlackMessage(convId: string, role: string, content: string, metadata: any,
+    context: SlackMessageWriteContext, held?: pg.PoolClient, signal?: AbortSignal): Promise<MessageRow> {
+    return this.writeSlackMessage(convId,role,content,metadata,context,held,signal);
+  }
+
+  /** Server-created user-role seed only: linked durable run and owner must match. */
+  async createSlackRunMessage(convId:string,content:string,metadata:any,context:SlackMessageWriteContext,held:pg.PoolClient):Promise<MessageRow>{
+    const run=(await held.query(`SELECT r.id,s.user_id FROM schedule_runs r JOIN schedules s ON s.id=r.schedule_id
+      WHERE r.id=$1 AND r.conv_id=$2 AND r.status='planning' AND r.schedule_id=$3`,[metadata.runId,convId,metadata.scheduleId])).rows[0];
+    if(metadata.type!=='schedule_run'||run?.user_id!==context.segments[0]?.sourceRef.binding.atiUserId)throw Error('SLACK_PROVENANCE_REQUIRED');
+    return this.writeSlackMessage(convId,'user',content,metadata,context,held,undefined,true);
+  }
+
+  private async writeSlackMessage(convId:string,role:string,content:string,metadata:any,context:SlackMessageWriteContext,held?:pg.PoolClient,signal?:AbortSignal,runSeed=false):Promise<MessageRow>{
+    signal?.throwIfAborted();
+    const snapshot = structuredClone({ content, metadata, context });
+    const { selectors, segments } = snapshot.context;
+    if ((!['assistant','system'].includes(role) && !(runSeed&&role==='user')) || !Array.isArray(selectors) || selectors.length === 0 || selectors.length > 256 || new Set(selectors).size !== selectors.length || !Array.isArray(segments) || segments.length === 0) throw new Error('SLACK_PROVENANCE_REQUIRED');
+    for (const selector of selectors) {
+      validateMessageSelector(messageSelectorKind(selector), selector);
+      if (messageSelectorValue(snapshot, messageSelectorKind(selector), selector) === undefined) throw new Error('SLACK_SELECTOR_MISSING');
+    }
+    const uncovered = structuredClone(snapshot);
+    for (const selector of selectors) eraseMessageSelector(uncovered,messageSelectorKind(selector),selector);
+    if (hasSlackMarker(uncovered.metadata)) throw new Error('SLACK_PROVENANCE_UNCOVERED');
+    const owner = segments[0]!.sourceRef.binding.atiUserId;
+    const client = held ?? await this.pool.connect();
+    try {
+      if (!held) await client.query('BEGIN');
+      await client.query('SAVEPOINT slack_message_writer_tx_guard');await client.query('RELEASE SAVEPOINT slack_message_writer_tx_guard');
+      await this.slack.prepareConversationWriteInTransaction(client, convId, owner, segments);
+      signal?.throwIfAborted();
+      const before=(await client.query('SELECT title FROM conversations WHERE id=$1',[convId])).rows[0];
+      const row = await this.insertMessage(convId, role, snapshot.content, snapshot.metadata, client);
+      await client.query('UPDATE messages SET slack_lineage_manifest=$2 WHERE id=$1', [row.id, JSON.stringify(selectors)]);
+      for (const selector of selectors) await this.slack.registerDerivedCopyInTransaction(client, { atiUserId: owner,
+        targetKind: messageSelectorKind(selector), targetId: row.id, targetSubId: selector, segments });
+      await sealMessageOrigin(client,'messages',row.id,'message_writer');
+      if(role==='user'&&before?.title===null){
+        await client.query('UPDATE conversations SET slack_lineage_manifest=$2,slack_title_manual_fingerprint=NULL WHERE id=$1',[convId,JSON.stringify(['title'])]);
+        await this.slack.registerDerivedCopyInTransaction(client,{atiUserId:owner,targetKind:'scheduled_workflow_arg',targetId:convId,targetSubId:'title',segments});
+        await sealMessageOrigin(client,'conversations',convId,'schedule_title');
+      }
+      signal?.throwIfAborted();
+      if (!held) await client.query('COMMIT');
+      delete (row as any).slack_lineage_manifest;
+      Object.defineProperty(row, lineage, { value: snapshot.context });
+      return row;
+    } catch (error) { if (!held) await client.query('ROLLBACK'); throw error; }
+    finally { if (!held) client.release(); }
+  }
+
+  async inSlackTransaction<T>(convId: string, context: SlackMessageWriteContext, work: (client: pg.PoolClient) => Promise<T>, signal?: AbortSignal, purpose?: 'planning'): Promise<T> {
+    const snapshot = structuredClone(context), client = await this.pool.connect();
+    try {
+      await client.query('BEGIN'); await client.query("SET LOCAL statement_timeout='5s'");
+      signal?.throwIfAborted();
+      await this.slack.prepareConversationWriteInTransaction(client, convId, snapshot.segments[0]!.sourceRef.binding.atiUserId, snapshot.segments, purpose);
+      const result = await work(client); signal?.throwIfAborted();
+      await client.query('COMMIT'); return result;
+    } catch (error) { await client.query('ROLLBACK').catch(() => {}); throw error; }
+    finally { client.release(); }
+  }
+
+  async listMessages(convId: string, limit: number = 100, purpose: 'manual_lookup' | 'planning' = 'manual_lookup', signal?: AbortSignal): Promise<MessageRow[]> {
     const res = await this.pool.query(
-      `SELECT * FROM messages
-       WHERE conv_id = $1
+      `SELECT m.*, EXISTS(SELECT 1 FROM slack_derived_copies c WHERE c.target_id=m.id::text
+         AND c.target_kind IN ('chat_history_message','working_memory_entity')) AS slack_registered FROM messages m
+       WHERE m.conv_id = $1
        ORDER BY created_at DESC, id DESC
        LIMIT $2`,
       [convId, limit]
     );
-    return res.rows.reverse();
+    const rows = res.rows.reverse();
+    for (let index = 0; index < rows.length; index++) {
+      const row = rows[index];
+      rows[index] = await this.readSlackMessage(row.id, purpose, signal);
+      delete rows[index].slack_lineage_manifest; delete rows[index].slack_registered;
+    }
+    return rows;
+  }
+
+  private async readSlackMessage(id: string, purpose: 'manual_lookup' | 'planning', signal?: AbortSignal): Promise<any> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN'); await client.query("SET LOCAL statement_timeout='5s'");
+      const found = (await client.query('SELECT m.*,v.user_id FROM messages m JOIN conversations v ON v.id=m.conv_id WHERE m.id=$1', [id])).rows[0];
+      if (!found) throw new Error('SLACK_MESSAGE_NOT_FOUND');
+      const manifest = found.slack_lineage_manifest;
+      if (manifest!=null&&(!Array.isArray(manifest) || manifest.length === 0 || manifest.length > 256 || new Set(manifest).size !== manifest.length)) {
+        found.content = SLACK_MESSAGE_TOMBSTONE; found.metadata = { type: 'slack_source_unavailable' };
+        await client.query('COMMIT'); delete found.user_id; return found;
+      }
+      const copies = (await client.query(`SELECT * FROM slack_derived_copies WHERE target_id=$1 AND ati_user_id=$2
+        AND target_kind IN ('chat_history_message','working_memory_entity') AND status='active'`, [id, found.user_id])).rows;
+      if (copies.some(c => !manifest?.includes(c.target_sub_id))) throw new Error('SLACK_LINEAGE_UNCOVERED');
+      const allSegments: DerivedSegmentInput[] = [];
+      for (const copy of copies) allSegments.push(...await this.slack.segmentsInTransaction(client, copy.id));
+      // All sorted source locks precede the common parent row; never acquire another source after that.
+      if (allSegments.length) await this.slack.lockSegmentsInTransaction(client, allSegments, found.user_id);
+      await client.query('SELECT id FROM conversations WHERE id=$1 AND user_id=$2 FOR SHARE', [found.conv_id, found.user_id]);
+      const row = (await client.query('SELECT * FROM messages WHERE id=$1 FOR SHARE', [id])).rows[0];
+      if (JSON.stringify(row.slack_lineage_manifest) !== JSON.stringify(manifest)) throw new Error('SLACK_LINEAGE_CHANGED');
+      if(!await messageOriginAllowed(client,'messages',row,found.user_id))throw Error('SLACK_ORIGIN_UNAVAILABLE');
+      const safe = structuredClone(row), permitted: DerivedSegmentInput[] = [], allowedSelectors: string[] = [];
+      for (const selector of manifest??[]) {
+        validateMessageSelector(messageSelectorKind(selector), selector);
+        const copy = copies.find(c => c.target_sub_id === selector && c.target_kind === messageSelectorKind(selector));
+        const decision = copy ? await this.slack.assertDerivedCopyAllowedInTransaction(client, { callerAtiUserId: found.user_id,
+          consumerPurpose: purpose, targetKind: copy.target_kind, targetId: id, targetSubId: selector, expectedTargetVersion: copy.target_version, signal }) : null;
+        if (decision?.status === 'allowed') { permitted.push(...await this.slack.segmentsInTransaction(client, copy.id)); allowedSelectors.push(selector); }
+        else eraseMessageSelector(safe, messageSelectorKind(selector), selector);
+      }
+      const uncovered = structuredClone(row);
+      for (const selector of manifest??[]) eraseMessageSelector(uncovered,messageSelectorKind(selector),selector);
+      if (hasSlackMarker(uncovered.metadata)) throw new Error('SLACK_LINEAGE_UNCOVERED');
+      signal?.throwIfAborted();
+      await client.query('COMMIT');
+      if (permitted.length) Object.defineProperty(safe, lineage, { value: { segments: permitted, selectors: allowedSelectors } });
+      return safe;
+    } catch {
+      await client.query('ROLLBACK').catch(() => {});
+      // A metadata-only fallback cannot carry source-derived content into HTTP or planner hydration.
+      const row = (await client.query('SELECT id,conv_id,role,created_at FROM messages WHERE id=$1', [id])).rows[0];
+      return { ...row, content: SLACK_MESSAGE_TOMBSTONE, metadata: { type: 'slack_source_unavailable' } };
+    } finally { client.release(); }
   }
 }

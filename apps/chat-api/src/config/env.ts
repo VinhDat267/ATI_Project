@@ -1,4 +1,6 @@
 import { randomBytes } from 'node:crypto';
+import { slackOAuthEnv } from './slack-env.js';
+import type { SlackOAuthConfig } from '../services/slack/oauth-client.js';
 import { GOOGLE_ENDPOINTS, type GoogleOAuthConfig } from '../auth/google-oidc.js';
 import { notionOAuthEnv, type NotionOAuthConfig } from './notion-env.js';
 export type { NotionOAuthConfig };
@@ -98,6 +100,7 @@ export const JIRA_ENDPOINTS = {
 };
 
 export interface EnvConfig {
+  MYSLACK_OAUTH?: SlackOAuthConfig;
   DATABASE_URL: string;
   JWT_SECRET: string;
   ENCRYPTION_KEY: string;
@@ -318,6 +321,7 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
   }
 
   return {
+    MYSLACK_OAUTH: slackOAuthEnv(env, isLive),
     DATABASE_URL,
     JWT_SECRET,
     ENCRYPTION_KEY,
