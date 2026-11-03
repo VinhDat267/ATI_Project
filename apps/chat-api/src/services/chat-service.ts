@@ -964,6 +964,7 @@ export class ChatService {
     let githubTeamRepos: Array<{ repoId: string; fullName: string; name: string }> | undefined;
     let telegramChats: Array<{ chatId: string; title: string }> | undefined;
     const actor = await this.actorForConversation(conversationId, target.userId);
+    const conv = this.convRepo ? await this.convRepo.getConversation(conversationId) : null;
     let scopeId = 'default';
     if (actor.workspaceMode === 'organization' && actor.workspaceId) {
       scopeId = actor.workspaceId;
@@ -994,7 +995,6 @@ export class ChatService {
 
     let maskedMetadata: Record<string, unknown> | null = null;
     if (response.kind === 'answer') {
-      const conv = this.convRepo ? await this.convRepo.getConversation(conversationId) : null;
       const isJiraConv = Boolean(conv?.workspace_id && conv.workspace_mode === 'organization' && conv.jira_context);
 
       const observed = memory.getEntity<Record<string, Array<Record<string, unknown>>>>('__observed') ?? {};
@@ -1085,7 +1085,10 @@ export class ChatService {
 
     if (!maskedMetadata && Array.isArray((response as any).sourceRefs) && (response as any).sourceRefs.length > 0 && this.jiraPolicyService) {
       for (const ref of (response as any).sourceRefs) {
-        const decision = await this.jiraPolicyService.revalidateSource(target.userId, ref, { signal });
+        const decision = await this.jiraPolicyService.revalidateSource(target.userId, ref, {
+          signal,
+          expectedWorkspaceId: conv?.workspace_id ?? actor.workspaceId ?? undefined,
+        });
         if (!decision.allowed) {
           const maskText = `[Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi: ${decision.reason}]`;
           maskedMetadata = { masked: true, maskReason: decision.reason, sourceRefs: (response as any).sourceRefs };
@@ -1238,9 +1241,10 @@ export class ChatService {
     });
 
     // Retrieve previous messages for conversation context
+    const conv = this.convRepo ? await this.convRepo.getConversation(conversationId) : null;
     const rawPreviousMessages = await this.msgRepo.listMessages(conversationId);
     const previousMessages = this.jiraHistorySanitizer
-      ? await this.jiraHistorySanitizer.sanitizeMessages(userId, rawPreviousMessages)
+      ? await this.jiraHistorySanitizer.sanitizeMessages(userId, rawPreviousMessages, conv?.workspace_id ?? undefined)
       : rawPreviousMessages;
     const lastMemory = [...previousMessages].reverse().find((m: any) => m.metadata?.type === 'working_memory');
     const history: ChatMessage[] = previousMessages

@@ -26,7 +26,7 @@ export class JiraHistorySanitizer {
     };
   }
 
-  async sanitizeMessage(userId: string, message: MessageRow): Promise<MessageRow> {
+  async sanitizeMessage(userId: string, message: MessageRow, expectedWorkspaceId?: string): Promise<MessageRow> {
     if (message.role === 'user' || message.role === 'system') return message;
 
     let metadata: unknown;
@@ -50,13 +50,16 @@ export class JiraHistorySanitizer {
       let ref;
       try { ref = validateJiraSourceRef(rawRef); }
       catch { return this.masked(message, 'invalid_evidence'); }
-      const decision = await this.policy.revalidateSource(userId, ref);
-      if (!decision.allowed) return this.masked(message, decision.reason);
+      if (expectedWorkspaceId && (ref.workspaceId !== expectedWorkspaceId || ref.binding?.workspaceId !== expectedWorkspaceId)) {
+        return this.masked(message, 'source_mismatch');
+      }
+      const decision = await this.policy.revalidateSource(userId, ref, { expectedWorkspaceId });
+      if (!decision.allowed) return this.masked(message, decision.reason ?? 'invalid_evidence');
     }
     return message;
   }
 
-  async sanitizeMessages(userId: string, messages: MessageRow[]): Promise<MessageRow[]> {
-    return Promise.all(messages.map((message) => this.sanitizeMessage(userId, message)));
+  async sanitizeMessages(userId: string, messages: MessageRow[], expectedWorkspaceId?: string): Promise<MessageRow[]> {
+    return Promise.all(messages.map((message) => this.sanitizeMessage(userId, message, expectedWorkspaceId)));
   }
 }

@@ -223,3 +223,27 @@
   - Typecheck v3: **0 errors** (exit code 0).
   - Evaluator test suites: **26/26 files PASS**, **412/412 tests PASS** (exit code 0).
   - `npm run check`: **ALL PASS** (exit code 0).
+
+- **Khắc phục đợt review thứ tám (2 phát hiện P1):**
+  - **1. [P1] Từ chối thực thể thiếu sourceRef và loại bỏ hoàn toàn fallback query:**
+    - Cập nhật `apps/chat-api/src/services/jira/jira-provider-guard.ts` (`validateEntity`):
+      - Gỡ bỏ hoàn toàn khối truy vấn cơ sở dữ liệu lỏng lẻo (trước đây truy vấn bất kỳ grant active nào cho `(workspaceId, userId, siteId)` và bỏ qua phiên bản policy hay quyền native).
+      - Triển khai nguyên tắc zero-trust provenance: mọi thực thể Jira (`jira_*`, có `cloudId`/`siteId`, hoặc key định dạng Jira issue) nếu thiếu `_sourceRef` hợp lệ đều lập tức bị từ chối với `{ valid: false, reason: 'invalid_evidence' }` và bị loại bỏ khỏi `workingMemory`.
+      - Khi lọc `<search_results>`, nếu outcome là công cụ Jira mà payload thiếu `_sourceRef` hợp lệ, outcome bị đánh dấu lỗi với `invalid_evidence`.
+    - Test: `apps/chat-api/tests/services/jira-source-guard.test.ts` bổ sung test tích hợp `strictly rejects unprovenanced Jira entities lacking valid _sourceRef, even if active grant and site exist in PostgreSQL` — xác nhận ngay cả khi DB có grant và site active, thực thể thiếu `_sourceRef` vẫn bị loại bỏ khỏi `workingMemory` và không bao giờ xuất hiện trong prompt gửi tới LLM.
+  - **2. [P1] Ràng buộc chặt chẽ nguồn dữ liệu với workspace hiện tại (chống cross-workspace leakage):**
+    - Cập nhật `apps/chat-api/src/services/jira/jira-provider-guard.ts`:
+      - Khi kiểm tra thực thể hoặc tin nhắn có `_sourceRef`: nếu `ref.workspaceId !== actor.workspaceId || ref.binding.workspaceId !== actor.workspaceId`, guard trả về `{ valid: false, reason: 'source_mismatch' }` và che mờ dữ liệu.
+      - Truyền `expectedWorkspaceId: actor.workspaceId` vào `policyService.revalidateSource`.
+    - Cập nhật `apps/chat-api/src/services/jira/jira-policy-service.ts`:
+      - Phương thức `revalidateSource` nhận tùy chọn `options.expectedWorkspaceId`: nếu `source.workspaceId !== options.expectedWorkspaceId || source.binding.workspaceId !== options.expectedWorkspaceId`, lập tức từ chối với `{ allowed: false, reason: 'source_mismatch' }`.
+    - Cập nhật `apps/chat-api/src/services/chat-service.ts`, `jira-history-sanitizer.ts`, và `conversation-routes.ts`:
+      - Chuyển `conversation.workspace_id ?? actor.workspaceId` làm `expectedWorkspaceId` khi revalidate và sanitize lịch sử hội thoại. Nếu tin nhắn có `sourceRef` thuộc workspace khác, tin nhắn lập tức bị che mờ với `source_mismatch`.
+    - Test: `apps/chat-api/tests/services/jira-source-guard.test.ts` bổ sung test tích hợp đa workspace `strictly bounds Jira source to current workspace: rejects sourceRef from different workspace even if user has active rights in both workspaces` — chứng minh người dùng có quyền hợp lệ ở cả Workspace A và Workspace B nhưng `sourceRef` của Workspace B không bao giờ được chấp nhận khi thực thi trong ngữ cảnh Workspace A.
+- **Tổng kết kiểm thử sau đợt sửa thứ tám:**
+  - Toàn bộ 7 suites Jira focused: **135/135 tests PASS** (Duration: 4.71s, exit code 0).
+  - Planner test suites: **31/31 files PASS**, **452/452 tests PASS** (exit code 0).
+  - Executor test suites: **5/5 files PASS**, **42/42 tests PASS** (exit code 0).
+  - Tool schemas & adapters: **38/38 files PASS**, **867/867 tests PASS** (exit code 0).
+  - Typecheck v3: **0 errors** (exit code 0).
+  - Evaluator test suites: **26/26 files PASS**, **412/412 tests PASS** (exit code 0).

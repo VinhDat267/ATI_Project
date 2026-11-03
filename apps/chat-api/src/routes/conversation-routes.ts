@@ -249,7 +249,7 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
       const rawLatest = messages[messages.length - 1];
       const latest = conversation?.jira_context && rawLatest
         ? options.jiraHistorySanitizer
-          ? await options.jiraHistorySanitizer.sanitizeMessage(userId, rawLatest)
+          ? await options.jiraHistorySanitizer.sanitizeMessage(userId, rawLatest, conversation.workspace_id ?? undefined)
           : rawLatest.role === 'user' ? rawLatest : {
               ...rawLatest,
               content: '[Nội dung Jira đã bị ẩn do quyền truy cập không khả dụng]',
@@ -294,7 +294,7 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
       const rawMessages = await msgRepo.listMessages(conversationId);
       const messages = conversation?.jira_context
         ? options.jiraHistorySanitizer
-          ? await options.jiraHistorySanitizer.sanitizeMessages(userId, rawMessages)
+          ? await options.jiraHistorySanitizer.sanitizeMessages(userId, rawMessages, conversation.workspace_id ?? undefined)
           : rawMessages.map((message) => message.role === 'user' ? message : {
               ...message,
               content: '[Nội dung Jira đã bị ẩn do quyền truy cập không khả dụng]',
