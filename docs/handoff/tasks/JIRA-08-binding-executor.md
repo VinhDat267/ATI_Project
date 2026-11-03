@@ -51,9 +51,15 @@ Hoàn thành toàn diện cả 6 nhiệm vụ theo kế hoạch `docs/superpower
   - Kiểm kê lịch legacy: `SELECT id, name, user_id, status, services, workspace_id, workspace_mode, created_at FROM schedules WHERE 'jira' = ANY(services) OR 'myjira' = ANY(services);` trả về 0 dòng.
   - Cờ `MYJIRA_ENABLED` tiếp tục giữ nguyên giá trị mặc định là tắt (`off`).
 - **Bằng chứng kiểm thử thực tế:**
-  - `npx vitest run apps/chat-api/tests/services/jira-*.test.ts apps/chat-api/tests/integration/jira-execution.test.ts apps/chat-api/tests/services/schedules/jira-schedule-refusal.test.ts`: 7 test files PASS (63/63 tests PASS, exit code 0).
+  - `npx vitest run apps/chat-api/tests/services/jira-*.test.ts apps/chat-api/tests/integration/jira-execution.test.ts apps/chat-api/tests/services/schedules/jira-schedule-refusal.test.ts`: 7 test files PASS (68/68 tests PASS, exit code 0).
   - `npm test -w @wap/executor`: 5 test files PASS (42/42 tests PASS, exit code 0).
   - `npx vitest run evaluations/generic-plumbing/static-guard.test.ts`: 1 test file PASS (2/2 tests PASS, exit code 0).
   - `npm run typecheck:v3`: PASS (exit code 0).
   - `npm run check`: PASS (toàn bộ tool-schemas 347 tests, tool-adapters 520 tests, probes 66 tests, planner, executor, chat-api, web build security, launcher; exit code 0).
   - `npm run test:browser:v3`: PASS (toàn bộ 16 scenarios bao gồm `default` 96 passed, `auth02`, `auth04`, `clarification`, `partial_failure`, `three_service`, `sheets_slack`, `calendar_slack`, `notion_slack`, `telegram_slack`, `jira_slack`, `answer`, `gmail`, `mycalendar`, `mysheets`, `schedule`; exit code 0).
+- **Khắc phục các phát hiện review P1 (2026-11-03):**
+  - **[P1] Đối chiếu grantId, account, versions:** `jira-dispatch-guard.ts` kiểm tra chặt chẽ `expectedGrantId`, `expectedAccountId`, `expectedAtlassianAccountId`, `expectedMembershipVersion`, `expectedIdentityVersion`, `expectedWorkspaceVersion` trước và trong khóa hàng; `adapter-factory.ts` truyền toàn bộ scope mong đợi.
+  - **[P1] Kiểm soát phát SSE bằng JiraStreamBuffer:** `execution-service.ts` lưu đệm output trong `JiraStreamBuffer`, revalidate lease trước khi phát SSE và chuyển lease thành `released`; hủy delta và chuyển step sang failed nếu quyền bị thu hồi.
+  - **[P1] Hoàn thiện trọn đường truyền sourceRefs & sửa sanitizer:** `chat-service.ts` lưu `sourceRefs` vào metadata của tin nhắn câu trả lời và kế hoạch; `jira-history-sanitizer.ts` chỉ kiểm tra và che mờ các tin nhắn liên quan Jira, giữ nguyên vẹn các tin nhắn thông thường.
+  - **[P1] Kiểm tra quyền Jira native lúc duyệt và trước outbound:** `jira-approval-guard.ts` và `execution-service.ts` kiểm tra quyền browse/createIssue/addComment qua `JiraNativeVerifier` tại duyệt, queued start và recovery; `jira-dispatch-guard.ts` kiểm tra quyền native trước khi gửi request tới Jira API.
+  - Toàn bộ 7 suites focused (68 tests) PASS 100%. Typecheck v3 và `npm run check` PASS 100%.

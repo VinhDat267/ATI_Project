@@ -14,7 +14,7 @@ import { evaluateGithubDigestCandidate } from './schedules/github-digest-candida
 import { evaluateTelegramDigestCandidate } from './schedules/telegram-digest-candidate.js';
 import { resolveRef } from '@wap/executor';
 import { eventsOverlap } from '@wap/tool-adapters';
-import { JiraPlanBinder, JiraBindingError } from './jira/jira-plan-binding.js';
+import { JiraPlanBinder, JiraBindingError, createSourceRefsFromConnection } from './jira/jira-plan-binding.js';
 import type { JiraHistorySanitizer } from './jira/jira-history-sanitizer.js';
 import type { JiraPolicyService } from './jira/jira-policy-service.js';
 import { validateJiraApprovalBinding } from './jira/jira-approval-guard.js';
@@ -984,6 +984,76 @@ export class ChatService {
         )
       : planned;
     signal?.throwIfAborted();
+
+    if (Array.isArray((planned as any).sourceRefs) && !(response as any).sourceRefs) {
+      (response as any).sourceRefs = (planned as any).sourceRefs;
+    }
+    if (response.kind === 'plan' && response.connections?.myjira && !(response as any).sourceRefs) {
+      (response as any).sourceRefs = createSourceRefsFromConnection(response.connections.myjira);
+    }
+    if (response.kind === 'answer' && !(response as any).sourceRefs && this.jiraBinder && this.convRepo) {
+      try {
+        const conv = await this.convRepo.getConversation(conversationId);
+        if (conv?.workspace_id && conv.workspace_mode === 'organization' && conv.jira_context) {
+          const observed = memory.getEntity<Record<string, Array<Record<string, unknown>>>>('__observed') ?? {};
+          const observedIssues = observed.jira_issue || [];
+          const observedProjects = observed.jira_project || [];
+          const observedSites = observed.jira_site || [];
+          const stepsToBind: PlanStep[] = [];
+
+          if (observedIssues.length > 0) {
+            for (let i = 0; i < Math.min(observedIssues.length, 5); i++) {
+              const iss = observedIssues[i]!;
+              if (iss.siteId) {
+                const args: Record<string, string> = { siteId: String(iss.siteId) };
+                if (iss.projectKey) args.projectKey = String(iss.projectKey);
+                if (iss.key) args.issueKey = String(iss.key);
+                stepsToBind.push({
+                  id: `gather_iss_${i}`,
+                  tool: 'myjira.search_issues',
+                  description: 'Gather Jira issue',
+                  dependsOn: [],
+                  args,
+                });
+              }
+            }
+          } else if (observedProjects.length > 0) {
+            for (let i = 0; i < Math.min(observedProjects.length, 5); i++) {
+              const proj = observedProjects[i]!;
+              if (proj.siteId) {
+                const args: Record<string, string> = { siteId: String(proj.siteId) };
+                if (proj.key) args.projectKey = String(proj.key);
+                stepsToBind.push({
+                  id: `gather_proj_${i}`,
+                  tool: 'myjira.search_projects',
+                  description: 'Gather Jira project',
+                  dependsOn: [],
+                  args,
+                });
+              }
+            }
+          } else if (observedSites.length > 0) {
+            for (let i = 0; i < Math.min(observedSites.length, 5); i++) {
+              const site = observedSites[i]!;
+              stepsToBind.push({
+                id: `gather_site_${i}`,
+                tool: 'myjira.list_sites',
+                description: 'Gather Jira site',
+                dependsOn: [],
+                args: { siteId: String(site.siteId || site.id) },
+              });
+            }
+          }
+
+          if (stepsToBind.length > 0) {
+            const boundConn = await this.jiraBinder.bindPlan(target.userId, conv, stepsToBind, { signal });
+            (response as any).sourceRefs = createSourceRefsFromConnection(boundConn);
+          }
+        }
+      } catch {
+        // Ignored if binding during answer gather fails
+      }
+    }
     let maskedMetadata: Record<string, unknown> | null = null;
     if (Array.isArray((response as any).sourceRefs) && (response as any).sourceRefs.length > 0 && this.jiraPolicyService) {
       for (const ref of (response as any).sourceRefs) {
@@ -1059,14 +1129,27 @@ export class ChatService {
           };
           planId = (client ? await this.planRepo.createPlan(data, client) : await this.planRepo.createPlan(data)).id;
         }
+        const sourceRefs = (response as any).sourceRefs;
         await save('assistant', `Kế hoạch: ${response.summary}`, {
-          type: 'plan', planId, plan: response, resourceLabels: labels, ...correlation,
+          type: 'plan',
+          planId,
+          plan: response,
+          resourceLabels: labels,
+          ...(sourceRefs ? { sourceRefs } : {}),
+          ...correlation,
         });
       } else if (proposal) {
         messageId = (await save('assistant', proposal.proposal.summary, { ...proposal, ...correlation })).id;
       } else if (response.kind === 'answer') {
         const { text, lookups, usedDirectory } = response;
-        await save('assistant', text, { type: 'answer', lookups, usedDirectory, ...correlation });
+        const sourceRefs = (response as any).sourceRefs;
+        await save('assistant', text, {
+          type: 'answer',
+          lookups,
+          usedDirectory,
+          ...(sourceRefs ? { sourceRefs } : {}),
+          ...correlation,
+        });
       } else if (response.kind === 'clarification') {
         const reason = response.reason ? { reason: response.reason } : {};
         await save('assistant', response.question, {
@@ -1086,12 +1169,22 @@ export class ChatService {
         return;
       }
       if (response.kind === 'plan') {
-        emit('plan_preview', { planId, plan: response, resourceLabels: labels });
+        emit('plan_preview', {
+          planId,
+          plan: response,
+          resourceLabels: labels,
+          ...((response as any).sourceRefs ? { sourceRefs: (response as any).sourceRefs } : {}),
+        });
         emit('agent_state', { state: 'waiting_for_approval' });
         return;
       }
       if (proposal) emit('schedule_proposal', { messageId, metadata: proposal });
-      else if (response.kind === 'answer') emit('answer', { text: response.text, lookups: response.lookups, usedDirectory: response.usedDirectory });
+      else if (response.kind === 'answer') emit('answer', {
+        text: response.text,
+        lookups: response.lookups,
+        usedDirectory: response.usedDirectory,
+        ...((response as any).sourceRefs ? { sourceRefs: (response as any).sourceRefs } : {}),
+      });
       else if (response.kind === 'clarification') {
         emit('clarification', { question: response.question, options: response.options ?? [], context: response.context,
           ...(response.reason ? { reason: response.reason } : {}) });
@@ -1142,6 +1235,7 @@ export class ChatService {
       memory.fromJSON(lastMemory.metadata.state);
     }
     const actor = await this.actorForConversation(conversationId, userId);
+    const gatheredJiraSourceRefs: any[] = [];
     const plannerResponse: PlannerResponse = await this.planner.processMessage({
       userMessage: content,
       history,
@@ -1152,9 +1246,18 @@ export class ChatService {
           ? { tool: event.tool, status: event.status }
           : event;
         this.eventEmitter.emit('gather_progress', { conversationId, ...safeEvent });
+        if (event.tool.startsWith('myjira.') || event.tool.startsWith('jira.')) {
+          const out = (event as any).output;
+          if (out && Array.isArray(out._sourceRefs)) {
+            gatheredJiraSourceRefs.push(...out._sourceRefs);
+          }
+        }
       },
       ...(schedule ? { schedule: { services: schedule.services } } : {}),
     });
+    if (!(plannerResponse as any).sourceRefs && gatheredJiraSourceRefs.length > 0) {
+      (plannerResponse as any).sourceRefs = gatheredJiraSourceRefs;
+    }
     await this.msgRepo.createMessage(conversationId, 'system', '', { type: 'working_memory', state: memory.toJSON() });
     const prepared = await this.prepareResponse({ conversationId, userId, correlation, schedule }, plannerResponse, memory,
       [...history.filter(m => m.role === 'user').map(m => m.content), content]);

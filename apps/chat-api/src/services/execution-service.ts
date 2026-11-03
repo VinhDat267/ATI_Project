@@ -10,6 +10,8 @@ import { readableRecoveryPlan, recoveryConflict, restoredProgress, validateRecov
 import type { AdapterContext } from './adapter-factory.js';
 import { validateJiraApprovalBinding } from './jira/jira-approval-guard.js';
 import type { PlanJiraGuard } from '../db/repositories/plan-repo.js';
+import { JiraStreamBuffer, JiraStreamBufferRevokedError } from '../sse/jira-stream-guard.js';
+import type { JiraLeaseManager } from './jira/jira-lease-manager.js';
 import type pg from 'pg';
 
 export interface ApproveResult {
@@ -35,6 +37,8 @@ export interface ExecutionServiceOptions {
     emitEvent: (convId: string, eventName: string, data: any) => void;
     clearPlanEvents?: (convId: string, planId?: string) => void;
   };
+  jiraLeaseManager?: JiraLeaseManager;
+  jiraNativeVerifier?: any;
 }
 
 export class ExecutionService {
@@ -45,6 +49,8 @@ export class ExecutionService {
   private adapterFactory: ExecutionServiceOptions['adapterFactory'];
   private sseManager?: ExecutionServiceOptions['sseManager'];
   private pool?: pg.Pool;
+  private jiraLeaseManager?: JiraLeaseManager;
+  private jiraNativeVerifier?: any;
   private activeControllers = new Map<string, ExecutionController>();
   private activeRuns = new Map<string, Promise<unknown>>();
   private queuedStarts = new Set<string>();
@@ -59,6 +65,8 @@ export class ExecutionService {
     this.adapterFactory = options.adapterFactory;
     this.sseManager = options.sseManager;
     this.pool = options.pool ?? (options.planRepo as any).pool;
+    this.jiraLeaseManager = options.jiraLeaseManager;
+    this.jiraNativeVerifier = options.jiraNativeVerifier;
   }
 
   getPlanRepo(): PlanRepo {
@@ -147,6 +155,12 @@ export class ExecutionService {
 
     // Everything that can fail is done before the approval CAS commits.
     const context = this.executionContext(userId, planJson?.connections, planRow.conversation);
+    const steps: PlanStep[] = planJson?.steps || [];
+    const requiredPermissions = {
+      browse: true,
+      createIssue: steps.some((s) => s.tool === 'myjira.create_issue'),
+      addComment: steps.some((s) => s.tool === 'myjira.add_comment'),
+    };
 
     // Recheck Jira connection authority if present
     let jiraGuard: PlanJiraGuard | undefined;
@@ -155,7 +169,10 @@ export class ExecutionService {
       if (!pool) {
         return { success: false, status: 503, error: 'Database authority unavailable' };
       }
-      const jiraCheck = await validateJiraApprovalBinding(pool, planJson.connections.myjira);
+      const jiraCheck = await validateJiraApprovalBinding(pool, planJson.connections.myjira, {
+        verifier: this.jiraNativeVerifier,
+        requiredPermissions,
+      });
       if (!jiraCheck.valid) {
         return {
           success: false,
@@ -184,7 +201,6 @@ export class ExecutionService {
     }
 
     const convId = planRow.conv_id;
-    const steps: PlanStep[] = planJson?.steps || [];
 
     this.clearPlanEvents(convId, planId);
 
@@ -197,7 +213,10 @@ export class ExecutionService {
       if (context.connections?.myjira) {
         const pool = this.pool ?? (this.planRepo as any).pool;
         if (pool) {
-          const startCheck = await validateJiraApprovalBinding(pool, context.connections.myjira);
+          const startCheck = await validateJiraApprovalBinding(pool, context.connections.myjira, {
+            verifier: this.jiraNativeVerifier,
+            requiredPermissions,
+          });
           if (!startCheck.valid) {
             this.queuedStarts.delete(planId);
             await this.markExecutionFailed(planId, convId, new Error(`Queued execution aborted: ${startCheck.reason}`));
@@ -234,6 +253,51 @@ export class ExecutionService {
       steps, initialStates,
       onStepUpdate: async (stepId, state) => {
         const dbId = dbIds.get(stepId);
+        const leaseId = (state.output as any)?._leaseId ?? (state.output as any)?._receipt?.leaseId;
+
+        if (state.status === 'succeeded' && leaseId && this.jiraLeaseManager) {
+          const streamBuffer = new JiraStreamBuffer({
+            revalidateLease: (id, opts) => this.jiraLeaseManager!.revalidateLease(id),
+          });
+          streamBuffer.bufferDelta({
+            planId,
+            stepId,
+            status: state.status,
+            output: state.output,
+            error: state.error,
+          });
+          try {
+            await streamBuffer.flushOnStepComplete(leaseId, (delta) => {
+              if (dbId && this.stepRepo) {
+                void this.stepRepo.updateStepStatus(dbId, delta.status, delta.output, delta.error);
+              }
+              this.sseManager?.emitEvent(convId, 'exec_step', delta);
+            });
+            const pool = this.pool ?? (this.planRepo as any)?.pool;
+            if (pool) {
+              await pool.query(
+                `UPDATE jira_authorization_leases SET status = 'released', released_at = clock_timestamp() WHERE lease_id = $1`,
+                [leaseId]
+              );
+            }
+          } catch (err: any) {
+            if (dbId && this.stepRepo) {
+              await this.stepRepo.updateStepStatus(dbId, 'failed', null, {
+                message: 'Quyền Jira đã bị thu hồi sau khi thực thi',
+              });
+            }
+            this.sseManager?.emitEvent(convId, 'exec_step', {
+              planId,
+              stepId,
+              status: 'failed',
+              output: null,
+              error: { message: 'Quyền Jira đã bị thu hồi sau khi thực thi' },
+            });
+            throw err;
+          }
+          return;
+        }
+
         if (dbId && this.stepRepo) await this.stepRepo.updateStepStatus(dbId, state.status, state.output, state.error);
         this.sseManager?.emitEvent(convId, 'exec_step', {
           planId, stepId, status: state.status, output: state.output, error: state.error,
@@ -250,7 +314,15 @@ export class ExecutionService {
     if (connections?.myjira) {
       const pool = this.pool ?? (this.planRepo as any).pool;
       if (pool) {
-        const recoveryCheck = await validateJiraApprovalBinding(pool, connections.myjira);
+        const requiredPermissions = {
+          browse: true,
+          createIssue: steps.some((s) => s.tool === 'myjira.create_issue'),
+          addComment: steps.some((s) => s.tool === 'myjira.add_comment'),
+        };
+        const recoveryCheck = await validateJiraApprovalBinding(pool, connections.myjira, {
+          verifier: this.jiraNativeVerifier,
+          requiredPermissions,
+        });
         if (!recoveryCheck.valid) {
           throw recoveryConflict(`Recovery denied: ${recoveryCheck.reason}`);
         }

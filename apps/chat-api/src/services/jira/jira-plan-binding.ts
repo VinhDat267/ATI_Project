@@ -1,8 +1,10 @@
 import type pg from 'pg';
 import {
   validateJiraPlanConnection,
+  validateJiraSourceRef,
   type JiraPlanConnection,
   type JiraPlanStepScope,
+  type JiraSourceRef,
   type PlanStep,
 } from '@wap/tool-schemas';
 
@@ -290,4 +292,51 @@ export class JiraPlanBinder {
 
     return validateJiraPlanConnection(planConnection);
   }
+}
+
+export function createSourceRefsFromConnection(connection: JiraPlanConnection): JiraSourceRef[] {
+  const {
+    atiUserId,
+    jiraAccountId,
+    atlassianAccountId,
+    workspaceId,
+    membershipVersion,
+    grantId,
+    identityVersion,
+    workspaceVersion,
+    siteSteps,
+  } = connection;
+
+  const binding = {
+    atiUserId,
+    jiraAccountId,
+    atlassianAccountId,
+    workspaceId,
+    membershipVersion,
+    grantId,
+    identityVersion,
+  };
+
+  return Object.values(siteSteps).map((scope) => {
+    const rawRef: unknown = {
+      binding,
+      workspaceId,
+      workspaceVersion,
+      siteId: scope.siteId,
+      cloudId: scope.cloudId,
+      sitePolicyVersion: scope.sitePolicyVersion,
+      resourceType: scope.projectId ? 'project' : 'site',
+      ...(scope.projectId
+        ? {
+            projectId: scope.projectId,
+            projectPolicyVersion: scope.projectPolicyVersion ?? 1,
+            providerResourceId: scope.projectId,
+          }
+        : {
+            providerResourceId: scope.cloudId,
+          }),
+      revision: '1',
+    };
+    return validateJiraSourceRef(rawRef);
+  });
 }

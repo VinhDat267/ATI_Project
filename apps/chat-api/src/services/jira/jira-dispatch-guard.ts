@@ -9,12 +9,26 @@ export interface DispatchScope {
   projectId?: string;
   sitePolicyVersion?: number;
   projectPolicyVersion?: number;
+  expectedGrantId?: string;
+  expectedAccountId?: string;
+  expectedAtlassianAccountId?: string;
+  expectedMembershipVersion?: number;
+  expectedIdentityVersion?: number;
+  expectedWorkspaceVersion?: number;
 }
 
 export interface GuardedDispatchOptions {
   isWrite: boolean;
   timeoutMs?: number;
   signal?: AbortSignal;
+  verifier?: {
+    verifyUserPermissions: (
+      evidence: { actorId: string; workspaceId?: string; cloudId: string; projectId?: string },
+      options?: { signal?: AbortSignal }
+    ) => Promise<{ canBrowse: boolean; canCreateIssue: boolean; canAddComment: boolean; status?: string; reason?: string }>;
+  };
+  tool?: string;
+  deferRelease?: boolean;
 }
 
 export class JiraDispatchError extends Error {
@@ -100,6 +114,69 @@ export class JiraDispatchGuard {
       );
     }
 
+    // Verify lease binding against approved plan binding parameters
+    if (scope.expectedGrantId && lease.binding.grantId !== scope.expectedGrantId) {
+      throw new JiraDispatchError(
+        `Approved grant mismatch: expected ${scope.expectedGrantId}, got ${lease.binding.grantId}`,
+        'GRANT_MISMATCH'
+      );
+    }
+    if (scope.expectedAccountId && lease.binding.jiraAccountId !== scope.expectedAccountId) {
+      throw new JiraDispatchError(
+        `Approved account mismatch: expected ${scope.expectedAccountId}, got ${lease.binding.jiraAccountId}`,
+        'ACCOUNT_MISMATCH'
+      );
+    }
+    if (scope.expectedAtlassianAccountId && lease.binding.atlassianAccountId !== scope.expectedAtlassianAccountId) {
+      throw new JiraDispatchError(
+        `Approved Atlassian account mismatch: expected ${scope.expectedAtlassianAccountId}, got ${lease.binding.atlassianAccountId}`,
+        'ATLASSIAN_ACCOUNT_MISMATCH'
+      );
+    }
+    if (scope.expectedMembershipVersion !== undefined && lease.binding.membershipVersion !== scope.expectedMembershipVersion) {
+      throw new JiraDispatchError(
+        `Approved membership version mismatch: expected ${scope.expectedMembershipVersion}, got ${lease.binding.membershipVersion}`,
+        'MEMBERSHIP_VERSION_STALE'
+      );
+    }
+    if (scope.expectedIdentityVersion !== undefined && lease.binding.identityVersion !== scope.expectedIdentityVersion) {
+      throw new JiraDispatchError(
+        `Approved identity version mismatch: expected ${scope.expectedIdentityVersion}, got ${lease.binding.identityVersion}`,
+        'IDENTITY_VERSION_STALE'
+      );
+    }
+
+    // Check native permissions if verifier is provided
+    if (options.verifier) {
+      const nativeRes = await options.verifier.verifyUserPermissions(
+        {
+          actorId: scope.userId,
+          workspaceId: scope.workspaceId,
+          cloudId: scope.cloudId,
+          projectId: scope.projectId,
+        },
+        { signal: options.signal }
+      );
+      if (nativeRes.status === 'denied' || !nativeRes.canBrowse) {
+        throw new JiraDispatchError(
+          `Native Jira permission denied: ${nativeRes.reason || 'User lacks BROWSE_PROJECTS'}`,
+          'PERMISSION_DENIED'
+        );
+      }
+      if (options.tool === 'myjira.create_issue' && !nativeRes.canCreateIssue) {
+        throw new JiraDispatchError(
+          'Native Jira permission denied: User lacks CREATE_ISSUES permission',
+          'PERMISSION_DENIED'
+        );
+      }
+      if (options.tool === 'myjira.add_comment' && !nativeRes.canAddComment) {
+        throw new JiraDispatchError(
+          'Native Jira permission denied: User lacks ADD_COMMENTS permission',
+          'PERMISSION_DENIED'
+        );
+      }
+    }
+
     // Step 3: Set up timeout and abort controller
     const abortController = new AbortController();
     let timeoutId: NodeJS.Timeout | undefined;
@@ -130,8 +207,19 @@ export class JiraDispatchGuard {
       await client.query('BEGIN');
 
       // Lock lease row FOR UPDATE to linearize against concurrent markRevoked
-      const leaseRes = await client.query<{ status: string; expired: boolean }>(
-        `SELECT status, expires_at <= clock_timestamp() AS expired
+      const leaseRes = await client.query<{
+        status: string;
+        expired: boolean;
+        grant_id: string;
+        jira_account_id: string;
+        atlassian_account_id: string;
+        membership_version: number;
+        identity_version: number;
+        workspace_version: number;
+      }>(
+        `SELECT status, expires_at <= clock_timestamp() AS expired,
+                grant_id, jira_account_id, atlassian_account_id,
+                membership_version, identity_version, workspace_version
          FROM jira_authorization_leases
          WHERE lease_id = $1 FOR UPDATE`,
         [lease.leaseId]
@@ -140,6 +228,44 @@ export class JiraDispatchGuard {
       const leaseRow = leaseRes.rows[0];
       if (!leaseRow || leaseRow.status !== 'active' || leaseRow.expired) {
         throw new JiraDispatchError('Lease expired or revoked before dispatch lock', 'LEASE_INVALID');
+      }
+      if (scope.expectedGrantId && leaseRow.grant_id !== scope.expectedGrantId) {
+        throw new JiraDispatchError('Approved grant mismatch on locked lease', 'GRANT_MISMATCH');
+      }
+      if (scope.expectedAccountId && leaseRow.jira_account_id !== scope.expectedAccountId) {
+        throw new JiraDispatchError('Approved account mismatch on locked lease', 'ACCOUNT_MISMATCH');
+      }
+      if (scope.expectedMembershipVersion !== undefined && leaseRow.membership_version !== scope.expectedMembershipVersion) {
+        throw new JiraDispatchError('Approved membership version changed before dispatch', 'MEMBERSHIP_VERSION_STALE');
+      }
+      if (scope.expectedIdentityVersion !== undefined && leaseRow.identity_version !== scope.expectedIdentityVersion) {
+        throw new JiraDispatchError('Approved identity version changed before dispatch', 'IDENTITY_VERSION_STALE');
+      }
+      if (scope.expectedWorkspaceVersion !== undefined && leaseRow.workspace_version !== scope.expectedWorkspaceVersion) {
+        throw new JiraDispatchError('Approved workspace version changed before dispatch', 'WORKSPACE_VERSION_STALE');
+      }
+
+      // Check approved grant row FOR SHARE
+      if (scope.expectedGrantId) {
+        const grantRes = await client.query<{ status: string }>(
+          `SELECT status FROM jira_oauth_grants WHERE id = $1 FOR SHARE`,
+          [scope.expectedGrantId]
+        );
+        if (!grantRes.rows[0] || grantRes.rows[0].status !== 'active') {
+          throw new JiraDispatchError('Approved grant is revoked or inactive before dispatch', 'GRANT_REVOKED');
+        }
+      }
+
+      // Check workspace FOR SHARE
+      const wsRes = await client.query<{ status: string; version: number }>(
+        `SELECT status, version FROM ati_workspaces WHERE id = $1 FOR SHARE`,
+        [scope.workspaceId]
+      );
+      if (!wsRes.rows[0] || wsRes.rows[0].status !== 'active') {
+        throw new JiraDispatchError('Workspace inactive or archived before dispatch', 'WORKSPACE_INACTIVE');
+      }
+      if (scope.expectedWorkspaceVersion !== undefined && wsRes.rows[0].version !== scope.expectedWorkspaceVersion) {
+        throw new JiraDispatchError('Workspace version changed before dispatch', 'WORKSPACE_VERSION_STALE');
       }
 
       // Check site policy FOR SHARE
@@ -185,15 +311,26 @@ export class JiraDispatchGuard {
         throw dispatchErr;
       }
 
-      // Step 6: Dispatch succeeded. Transition lease to released and commit hold.
-      await client.query(
-        `UPDATE jira_authorization_leases
-         SET status = 'released', released_at = clock_timestamp()
-         WHERE lease_id = $1`,
-        [lease.leaseId]
-      );
+      // Step 6: Dispatch succeeded. Commit hold.
+      if (!options.deferRelease) {
+        await client.query(
+          `UPDATE jira_authorization_leases
+           SET status = 'released', released_at = clock_timestamp()
+           WHERE lease_id = $1`,
+          [lease.leaseId]
+        );
+      }
       await client.query('COMMIT');
       committed = true;
+
+      if (result && typeof result === 'object' && !Array.isArray(result)) {
+        Object.defineProperty(result, '_leaseId', {
+          value: lease.leaseId,
+          enumerable: false,
+          writable: true,
+          configurable: true,
+        });
+      }
 
       return result;
     } catch (err: any) {

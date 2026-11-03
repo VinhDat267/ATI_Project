@@ -72,6 +72,7 @@ export interface AdapterFactoryOptions {
   jiraTokens?: JiraAccessTokenProvider;
   jiraWorkspaceRepo?: any;
   jiraDispatchGuard?: JiraDispatchGuard;
+  jiraNativeVerifier?: any;
   jiraApiBaseUrl?: string;
 }
 
@@ -660,8 +661,8 @@ export class AdapterFactory {
     const workspaceId = context?.workspaceId;
     if (!workspaceId) throw myjiraError('AUTH_ERROR', 'Jira cá nhân yêu cầu không gian làm việc.');
 
+    const bound = context?.connections?.myjira;
     if (context.phase === 'execution') {
-      const bound = context.connections?.myjira;
       if (!bound) {
         throw myjiraError('AUTH_ERROR', 'Kế hoạch không có kết nối Jira cá nhân được gắn kết.');
       }
@@ -719,6 +720,12 @@ export class AdapterFactory {
           sitePolicyVersion: siteStep?.sitePolicyVersion ?? (targetSite as any)?.policyVersion ?? 1,
           projectId,
           projectPolicyVersion,
+          expectedGrantId: bound?.grantId,
+          expectedAccountId: bound?.jiraAccountId,
+          expectedAtlassianAccountId: bound?.atlassianAccountId,
+          expectedMembershipVersion: bound?.membershipVersion,
+          expectedIdentityVersion: bound?.identityVersion,
+          expectedWorkspaceVersion: bound?.workspaceVersion,
         };
 
         const isWrite = isWriteTool(tool);
@@ -726,22 +733,40 @@ export class AdapterFactory {
 
         const rawOutput = await this.options.jiraDispatchGuard.executeGuardedDispatch(
           scope,
-          { isWrite, timeoutMs, signal: callOpts?.signal },
+          {
+            isWrite,
+            timeoutMs,
+            signal: callOpts?.signal,
+            verifier: this.options.jiraNativeVerifier,
+            tool,
+            deferRelease: Boolean(context?.connections?.myjira),
+          },
           async (token, signal) => {
             return baseAdapter.execute(tool, args, { ...callOpts, signal });
           }
         );
 
+        const leaseId = (rawOutput as any)?._leaseId;
         const receipt = {
           ownerId: userId,
           workspaceId,
           siteId: targetSiteId,
           projectId: projectId ?? null,
           connectionLabel: `Jira (${targetSite?.name ?? targetSiteId})`,
+          leaseId,
         };
 
         if (rawOutput && typeof rawOutput === 'object' && !Array.isArray(rawOutput)) {
-          return { ...rawOutput, _receipt: receipt };
+          const resultObj = { ...rawOutput, _receipt: receipt };
+          if (leaseId) {
+            Object.defineProperty(resultObj, '_leaseId', {
+              value: leaseId,
+              enumerable: false,
+              writable: true,
+              configurable: true,
+            });
+          }
+          return resultObj;
         }
         return rawOutput;
       },

@@ -13,10 +13,25 @@ export type JiraApprovalValidationResult =
       reason: string;
     };
 
+export interface JiraApprovalValidationOptions {
+  signal?: AbortSignal;
+  verifier?: {
+    verifyUserPermissions: (
+      evidence: { actorId: string; workspaceId?: string; cloudId: string; projectId?: string },
+      options?: { signal?: AbortSignal }
+    ) => Promise<{ canBrowse: boolean; canCreateIssue: boolean; canAddComment: boolean; status?: string; reason?: string }>;
+  };
+  requiredPermissions?: {
+    browse?: boolean;
+    createIssue?: boolean;
+    addComment?: boolean;
+  };
+}
+
 export async function validateJiraApprovalBinding(
   pool: pg.Pool,
   rawConnection: JiraPlanConnection,
-  options?: { signal?: AbortSignal }
+  options?: JiraApprovalValidationOptions
 ): Promise<JiraApprovalValidationResult> {
   if (options?.signal?.aborted) {
     return {
@@ -261,6 +276,50 @@ export async function validateJiraApprovalBinding(
             category: 'stale',
             status: 409,
             reason: `Project policy version conflict for project ${scope.projectId}`,
+          };
+        }
+      }
+
+      if (options?.verifier) {
+        const nativeRes = await options.verifier.verifyUserPermissions(
+          {
+            actorId: atiUserId,
+            workspaceId,
+            cloudId: scope.cloudId,
+            projectId: scope.projectId,
+          },
+          { signal: options.signal }
+        );
+        if (nativeRes.status === 'unavailable') {
+          return {
+            valid: false,
+            category: 'unavailable',
+            status: 503,
+            reason: `Native Jira permission verification unavailable: ${nativeRes.reason || 'service unreachable'}`,
+          };
+        }
+        if (nativeRes.status === 'denied' || !nativeRes.canBrowse) {
+          return {
+            valid: false,
+            category: 'denied',
+            status: 403,
+            reason: `Native Jira permission denied: ${nativeRes.reason || 'User lacks BROWSE_PROJECTS permission'}`,
+          };
+        }
+        if (options.requiredPermissions?.createIssue && !nativeRes.canCreateIssue) {
+          return {
+            valid: false,
+            category: 'denied',
+            status: 403,
+            reason: 'Native Jira permission denied: User lacks CREATE_ISSUES permission',
+          };
+        }
+        if (options.requiredPermissions?.addComment && !nativeRes.canAddComment) {
+          return {
+            valid: false,
+            category: 'denied',
+            status: 403,
+            reason: 'Native Jira permission denied: User lacks ADD_COMMENTS permission',
           };
         }
       }

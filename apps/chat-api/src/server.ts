@@ -597,6 +597,7 @@ async function bootstrap() {
     jiraTokens,
     jiraWorkspaceRepo: jiraWorkspaceRepo ?? undefined,
     jiraDispatchGuard,
+    jiraNativeVerifier: jiraNativeVerifier ?? undefined,
     jiraApiBaseUrl: env.JIRA_OAUTH?.fixtureBaseUrl ?? JIRA_ENDPOINTS.apiBaseUrl,
     createTrelloAdapter: env.RUNTIME_MODE === 'sandbox' ? ({ allowedBoardIds }) => {
       const sandbox = createSandboxAdapter('trello');
@@ -675,6 +676,9 @@ async function bootstrap() {
     workspaceRepo,
     adapterFactory,
     sseManager,
+    pool: pool ?? undefined,
+    jiraLeaseManager: jiraLeaseManager ?? undefined,
+    jiraNativeVerifier: jiraNativeVerifier ?? undefined,
   });
 
   if (!env.EMAIL_ENABLED) console.warn('\x1b[33m[chat-api] Chưa cấu hình SMTP: đăng ký, xác minh email và quên mật khẩu tạm tắt (503).\x1b[0m');

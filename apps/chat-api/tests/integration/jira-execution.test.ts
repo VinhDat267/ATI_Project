@@ -323,9 +323,10 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
       workspaceRepo: { findMember: async () => ({ status: 'active', role: 'admin' }) } as any,
       adapterFactory,
       pool,
+      jiraLeaseManager: leaseManager,
     });
 
-    return { executionService, adapterFactory, tokenManager };
+    return { executionService, adapterFactory, tokenManager, leaseManager };
   }
 
   async function createApprovedPlan(
@@ -707,5 +708,80 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
         },
       })
     ).rejects.toThrow(/không khả dụng ở không gian cá nhân/);
+  });
+
+  it('suppresses Jira output via JiraStreamBuffer when lease is revoked before SSE flush', async () => {
+    const f = await setupFixture();
+    const { executionService, leaseManager } = createTestExecutionService(f);
+
+    const emittedEvents: Array<{ event: string; payload: any }> = [];
+    const sseManager = {
+      emitEvent: (convId: string, event: string, payload: any) => {
+        emittedEvents.push({ event, payload });
+      },
+    } as any;
+    (executionService as any).sseManager = sseManager;
+
+    // Plan with 1 read step
+    const steps: PlanStep[] = [
+      {
+        id: 'read_stream_step',
+        tool: 'myjira.search_issues',
+        description: 'Read issues for stream test',
+        dependsOn: [],
+        args: { siteId: f.siteId1, projectKey: 'PROJ', query: '' },
+      },
+    ];
+
+    const { plan } = await createApprovedPlan(f, steps, {
+      read_stream_step: {
+        siteId: f.siteId1,
+        cloudId: f.cloudId1,
+        sitePolicyVersion: 1,
+        projectId: '10001',
+        projectPolicyVersion: 1,
+      },
+    });
+
+    // Intercept revalidateLease to simulate revocation right at the boundary after dispatch
+    const originalRevalidate = leaseManager.revalidateLease.bind(leaseManager);
+    leaseManager.revalidateLease = async (leaseId: string) => {
+      // Lease is marked revoked in database
+      await pool.query(
+        `UPDATE jira_authorization_leases SET status = 'revoked', released_at = clock_timestamp() WHERE lease_id = $1`,
+        [leaseId]
+      );
+      return { valid: false, status: 'revoked', reason: 'Grant was revoked concurrently' };
+    };
+
+    const approveResult = await executionService.approveAndStart(plan.id, f.userId);
+    expect(approveResult.success).toBe(true);
+
+    // Wait for execution to settle
+    let status = executionService.getExecutionStatus(plan.id);
+    for (let i = 0; i < 50 && (!status || status.status === 'executing'); i++) {
+      await new Promise((r) => setTimeout(r, 50));
+      status = executionService.getExecutionStatus(plan.id);
+    }
+
+    // Step output MUST NOT be emitted via SSE
+    const execStepEvents = emittedEvents.filter((e) => e.event === 'exec_step');
+    for (const event of execStepEvents) {
+      if (event.payload.status === 'succeeded') {
+        // Output must NEVER leak
+        expect.unreachable('Succeeded step with revoked lease should not be emitted');
+      }
+    }
+
+    // A failed step event must be emitted
+    const failedEvent = execStepEvents.find((e) => e.payload.status === 'failed');
+    expect(failedEvent).toBeDefined();
+    expect(failedEvent!.payload.output).toBeNull();
+    expect(failedEvent!.payload.error.message).toContain('thu hồi sau khi thực thi');
+
+    // DB step status must also be failed without leaking output
+    const executedSteps = await stepRepo.listSteps(plan.id);
+    expect(executedSteps[0]!.status).toBe('failed');
+    expect(executedSteps[0]!.output_json).toBeNull();
   });
 });

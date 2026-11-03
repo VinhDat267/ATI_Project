@@ -494,4 +494,70 @@ describe('Jira Dispatch Guard & Revocation Linearization (JIRA-08 Task 3 Real Po
 
     await expect(Promise.all([dispatchPromise, rotationPromise])).resolves.toBeDefined();
   });
+
+  it('rejects dispatch if active grant changes from the approved grantId (grant mismatch)', async () => {
+    httpHoldDelayMs = 0;
+    const f = await createFixture('grant_mismatch');
+
+    const tokenManager = {
+      getAccessToken: async () => 'test-token',
+    };
+    const leaseManager = new JiraLeaseManager({ pool, tokenManager });
+    const guard = new JiraDispatchGuard(pool, leaseManager, tokenManager);
+
+    // Simulate grant revocation and creation of a new active grant
+    await pool.query(
+      `UPDATE jira_oauth_grants SET status = 'revoked' WHERE id = $1`,
+      [f.grantId]
+    );
+
+    const newGrantRes = await pool.query<{ id: string }>(
+      `INSERT INTO jira_oauth_grants (
+        account_id, app_client_id, grant_kind, refresh_state, status, token_version
+      ) VALUES ($1, 'atlassian_3lo', '3lo', 'idle', 'active', 1)
+      RETURNING id`,
+      [f.accountId]
+    );
+    const newGrantId = newGrantRes.rows[0]!.id;
+
+    await pool.query(
+      `INSERT INTO jira_grant_sites (
+        grant_id, cloud_id, site_name, site_url, product_type, scopes, last_verified_at
+      ) VALUES ($1, $2, $3, $4, 'jira', $5, clock_timestamp())`,
+      [
+        newGrantId,
+        f.cloudId,
+        'Site grant_mismatch',
+        'https://mismatch.atlassian.net',
+        ['read:jira-work', 'write:jira-work'],
+      ]
+    );
+
+    // Dispatch scope expects the OLD approved grantId f.grantId
+    const scope: DispatchScope = {
+      userId: f.userId,
+      workspaceId: f.workspaceId,
+      cloudId: f.cloudId,
+      siteId: f.siteId,
+      projectId: f.projectId,
+      sitePolicyVersion: 1,
+      projectPolicyVersion: 1,
+      expectedGrantId: f.grantId,
+      expectedAccountId: f.accountId,
+    };
+
+    let dispatchCalled = false;
+    await expect(
+      guard.executeGuardedDispatch(
+        scope,
+        { isWrite: false, timeoutMs: 5000 },
+        async () => {
+          dispatchCalled = true;
+          return { ok: true };
+        }
+      )
+    ).rejects.toThrow(/Approved grant|grant mismatch|GRANT_MISMATCH/i);
+
+    expect(dispatchCalled).toBe(false);
+  });
 });

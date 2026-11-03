@@ -695,4 +695,85 @@ describe('JIRA-08 Task 5 Source Guard, Persistence, and Publication Guards', () 
       expect(assistantMsg!.content).toContain(lateSecret);
     });
   });
+
+  describe('Non-Jira Message Preservation & Answer sourceRefs Persistence', () => {
+    it('leaves non-Jira assistant messages completely unmasked in history sanitizer', async () => {
+      const f = await setupFixture();
+      const verifier = {
+        verifyUserPermissions: async () => ({
+          canBrowse: true, canCreateIssue: true, canAddComment: true, status: 'granted' as const,
+        }),
+      };
+      const policyService = new JiraPolicyService({ pool, verifier });
+      const sanitizer = new JiraHistorySanitizer(policyService);
+
+      const nonJiraMessage: any = {
+        id: 'msg-non-jira',
+        conversation_id: f.conversationId,
+        role: 'assistant',
+        content: 'Xin chào, tôi là trợ lý AI. Tôi có thể giúp gì cho bạn?',
+        metadata: { type: 'answer', lookups: [], usedDirectory: [] },
+        created_at: new Date(),
+      };
+
+      const sanitized = await sanitizer.sanitizeMessage(f.userId, nonJiraMessage);
+      expect(sanitized.content).toBe('Xin chào, tôi là trợ lý AI. Tôi có thể giúp gì cho bạn?');
+      expect((sanitized.metadata as any)?.masked).toBeUndefined();
+    });
+
+    it('persists sourceRefs in message metadata for answers with Jira sources', async () => {
+      const f = await setupFixture();
+      const verifier = {
+        verifyUserPermissions: async () => ({
+          canBrowse: true, canCreateIssue: true, canAddComment: true, status: 'granted' as const,
+        }),
+      };
+      const policyService = new JiraPolicyService({ pool, verifier });
+      const sanitizer = new JiraHistorySanitizer(policyService);
+
+      const convRepo = new ConversationRepo(pool);
+      const msgRepo = new MessageRepo(pool);
+      const planRepo = new PlanRepo(pool);
+
+      const normalAnswer = 'Đây là kết quả tìm kiếm Jira hợp lệ';
+      const mockPlanner = {
+        processMessage: vi.fn(async () => {
+          return {
+            kind: 'answer' as const,
+            text: normalAnswer,
+            sourceRefs: [f.sourceRef],
+            lookups: [{ tool: 'myjira.search_issues', args: { query: 'test' } }],
+            usedDirectory: ['myjira'],
+          };
+        }),
+      };
+
+      const chatEvents = createChatEventEmitter();
+      const chatService = new ChatService({
+        msgRepo,
+        convRepo,
+        planRepo,
+        planner: mockPlanner as any,
+        eventEmitter: chatEvents.emitter,
+        jiraHistorySanitizer: sanitizer,
+        jiraPolicyService: policyService,
+      });
+
+      await chatService.handleUserMessage({
+        conversationId: f.conversationId,
+        userId: f.userId,
+        content: 'Tìm issue',
+      });
+      await chatEvents.waitForTurn();
+
+      const messages = await msgRepo.listMessages(f.conversationId);
+      const assistantMsg = messages.find((m) => m.role === 'assistant');
+      expect(assistantMsg).toBeDefined();
+      expect(assistantMsg!.content).toBe(normalAnswer);
+      const metadata = typeof assistantMsg!.metadata === 'string' ? JSON.parse(assistantMsg!.metadata) : assistantMsg!.metadata;
+      expect(metadata.sourceRefs).toBeDefined();
+      expect(Array.isArray(metadata.sourceRefs)).toBe(true);
+      expect(metadata.sourceRefs[0].providerResourceId).toBe('10001');
+    });
+  });
 });

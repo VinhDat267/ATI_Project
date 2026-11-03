@@ -1,0 +1,30 @@
+# JIRA-08 Personal Jira Binding, Execution, and Source Guard — Review Findings Fix — 2026-11-03
+
+- **Task:** `docs/handoff/tasks/JIRA-08-binding-executor.md`
+- **Branch:** `longnguyen005/jira-08-execution`
+- **PR:** #264
+- **Cờ tính năng:** `MYJIRA_ENABLED` tiếp tục giữ nguyên tắt mặc định (`off`), chỉ bật trong test opt-in.
+- **Nội dung hoàn thành khắc phục 4 phát hiện P1:**
+  - **1. [P1] Đối chiếu grantId, account, versions tại dispatch guard:**
+    - Mở rộng `DispatchScope` trong `apps/chat-api/src/services/jira/jira-dispatch-guard.ts` với `expectedGrantId`, `expectedAccountId`, `expectedAtlassianAccountId`, `expectedMembershipVersion`, `expectedIdentityVersion`, `expectedWorkspaceVersion`.
+    - Kiểm tra đối chiếu trước khóa hàng và trong giao dịch khóa hàng `FOR SHARE` trên `jira_oauth_grants` và `ati_workspaces`. Từ chối thực thi khi grantId của lease không khớp với grant được duyệt (`GRANT_MISMATCH`).
+    - Cập nhật `apps/chat-api/src/services/adapter-factory.ts` truyền đầy đủ thông tin binding vào dispatch scope.
+    - Test: `apps/chat-api/tests/services/jira-dispatch-guard.test.ts` (PASS, 7/7 tests).
+  - **2. [P1] Kiểm soát phát SSE bằng JiraStreamBuffer và thu hồi quyền sau thực thi:**
+    - Tích hợp `JiraStreamBuffer` vào `apps/chat-api/src/services/execution-service.ts` tại `buildController` / `onStepUpdate`.
+    - Khi step Jira kết thúc thành công, lưu đệm `state.output` vào buffer và gọi `flushOnStepComplete(leaseId)` để revalidate lease qua `JiraLeaseManager`.
+    - Khi hợp lệ: phát delta qua SSE và giải phóng lease (`status = 'released'`).
+    - Khi quyền bị thu hồi: hủy toàn bộ delta, không phát dữ liệu nhạy cảm ra SSE hay lưu vào DB, cập nhật step thành `failed` và phát sự kiện `exec_step` failed.
+    - Test: `apps/chat-api/tests/integration/jira-execution.test.ts` (PASS, 8/8 tests).
+  - **3. [P1] Hoàn thiện trọn đường truyền sourceRefs và sửa sanitizer:**
+    - Bổ sung `sourceRefs` vào metadata câu trả lời và kế hoạch khi lưu DB trong `apps/chat-api/src/services/chat-service.ts`.
+    - Xuất hàm `createSourceRefsFromConnection` trong `apps/chat-api/src/services/jira/jira-plan-binding.ts`.
+    - Thu thập `sourceRefs` từ quá trình gather/planner và gắn vào response trước khi kiểm tra revalidate muộn.
+    - Cập nhật `apps/chat-api/src/services/jira/jira-history-sanitizer.ts`: chỉ kiểm tra và che mờ các tin nhắn có liên quan đến Jira (`sourceRefs`, `ticket`, `issue`, `myjira`, kế hoạch Jira), giữ nguyên vẹn các tin nhắn thông thường không liên quan Jira.
+    - Test: `apps/chat-api/tests/services/jira-source-guard.test.ts` (PASS, 11/11 tests).
+  - **4. [P1] Kiểm tra quyền native Jira tại duyệt, khởi chạy, phục hồi và dispatch:**
+    - Cập nhật `validateJiraApprovalBinding` trong `apps/chat-api/src/services/jira/jira-approval-guard.ts` nhận `options.verifier` (`JiraNativeVerifier`) và `requiredPermissions` (`browse`, `createIssue`, `addComment`).
+    - Gọi `verifier.verifyUserPermissions` trên từng project; từ chối (403) nếu thiếu quyền duyệt hoặc thao tác ghi tương ứng.
+    - Tích hợp verifier vào `approveAndStart`, hàng đợi background start và `restoreController` trong `apps/chat-api/src/services/execution-service.ts`.
+    - Tích hợp verifier vào `executeGuardedDispatch` trong `apps/chat-api/src/services/jira/jira-dispatch-guard.ts`.
+    - Test: `apps/chat-api/tests/services/jira-approval-guard.test.ts` (PASS, 11/11 tests).

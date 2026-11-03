@@ -500,4 +500,92 @@ describe('Jira Approval and Start Guards (JIRA-08 Task 2 Real PostgreSQL Tests)'
     const planRow = await planRepo.getPlan(f.planId);
     expect(planRow?.status).toBe('failed');
   });
+
+  it('rejects approval binding when Jira native permissions lack browse, createIssue, or addComment', async () => {
+    const f = await createFixture('native_perm');
+
+    // 1. Browse permission denied
+    const browseDeniedVerifier = {
+      verifyUserPermissions: async () => ({
+        canBrowse: false,
+        canCreateIssue: false,
+        canAddComment: false,
+        status: 'denied' as const,
+        reason: 'User lacks BROWSE_PROJECTS',
+      }),
+    };
+
+    const res1 = await validateJiraApprovalBinding(pool, f.boundConnection, {
+      verifier: browseDeniedVerifier,
+      requiredPermissions: { browse: true },
+    });
+    expect(res1.valid).toBe(false);
+    if (!res1.valid) {
+      expect(res1.status).toBe(403);
+      expect(res1.category).toBe('denied');
+      expect(res1.reason).toMatch(/BROWSE_PROJECTS/i);
+    }
+
+    // 2. Create issue denied
+    const createDeniedVerifier = {
+      verifyUserPermissions: async () => ({
+        canBrowse: true,
+        canCreateIssue: false,
+        canAddComment: true,
+        status: 'granted' as const,
+      }),
+    };
+
+    const res2 = await validateJiraApprovalBinding(pool, f.boundConnection, {
+      verifier: createDeniedVerifier,
+      requiredPermissions: { browse: true, createIssue: true },
+    });
+    expect(res2.valid).toBe(false);
+    if (!res2.valid) {
+      expect(res2.status).toBe(403);
+      expect(res2.category).toBe('denied');
+      expect(res2.reason).toMatch(/CREATE_ISSUES/i);
+    }
+
+    // 3. Add comment denied
+    const commentDeniedVerifier = {
+      verifyUserPermissions: async () => ({
+        canBrowse: true,
+        canCreateIssue: true,
+        canAddComment: false,
+        status: 'granted' as const,
+      }),
+    };
+
+    const res3 = await validateJiraApprovalBinding(pool, f.boundConnection, {
+      verifier: commentDeniedVerifier,
+      requiredPermissions: { browse: true, addComment: true },
+    });
+    expect(res3.valid).toBe(false);
+    if (!res3.valid) {
+      expect(res3.status).toBe(403);
+      expect(res3.category).toBe('denied');
+      expect(res3.reason).toMatch(/ADD_COMMENTS/i);
+    }
+
+    // 4. Verification unavailable (503)
+    const unavailVerifier = {
+      verifyUserPermissions: async () => ({
+        canBrowse: false,
+        canCreateIssue: false,
+        canAddComment: false,
+        status: 'unavailable' as const,
+        reason: 'Atlassian API timeout',
+      }),
+    };
+
+    const res4 = await validateJiraApprovalBinding(pool, f.boundConnection, {
+      verifier: unavailVerifier,
+    });
+    expect(res4.valid).toBe(false);
+    if (!res4.valid) {
+      expect(res4.status).toBe(503);
+      expect(res4.category).toBe('unavailable');
+    }
+  });
 });
