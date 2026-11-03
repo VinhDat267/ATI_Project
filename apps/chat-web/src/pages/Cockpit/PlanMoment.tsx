@@ -28,6 +28,7 @@ export function PlanMoment({request,runtimeMode,plan,services,destination,onPrev
           {plan.connections?.trello?.username && <p className="text-sm text-brand-text break-words">Tài khoản: @{plan.connections.trello.username} (Trello của bạn)</p>}
           {plan.connections?.github?.login && <p className="text-sm text-brand-text break-words">Tài khoản: @{plan.connections.github.login} (GitHub của bạn)</p>}
           {plan.connections?.telegram?.username && <p className="text-sm text-brand-text break-words">Tài khoản: @{plan.connections.telegram.username} (Telegram của bạn)</p>}
+          {plan.connections?.myjira && <p className="text-sm text-brand-text break-words">Tài khoản Atlassian: {plan.connections.myjira.atlassianAccountId} · Workspace: {plan.connections.myjira.workspaceId}</p>}
           <WorkflowFlowCanvas steps={plan.steps} mode="preview" resourceLabels={plan.resourceLabels} selectedService={selectedService} onSelectService={setSelectedService} onStepPreview={onPreview} />
           {/* 4 Task Action Cards (NHÓM 2: Hiện so le dưới 300ms, NHÓM 8: Biểu tượng SVG) */}
           <div className="v3-space-y-3" id="plan-cards-container" role="list" aria-label="Các bước thực thi">
@@ -60,7 +61,7 @@ export function PlanMoment({request,runtimeMode,plan,services,destination,onPrev
                     </h2>
                     <p className="text-xs text-brand-muted mt-1 break-words">
                       Đích đến: {destination(step, plan.resourceLabels)}
-                    </p>{step.tool==='myslack.chat_postMessage'&&<div className="mt-3 whitespace-pre-wrap break-words text-sm text-brand-text"><span className="font-semibold">Nội dung gửi:</span><p>{String(step.args.text)}</p></div>}
+                    </p>{service==='myjira' && plan.connections?.myjira?.siteSteps?.[step.id] && (()=>{const siteStep=plan.connections!.myjira!.siteSteps[step.id],siteLabel=plan.resourceLabels?.[siteStep.siteId] ?? plan.resourceLabels?.[`jira_site:${siteStep.siteId}`] ?? siteStep.siteId,projectLabel=(typeof step.args.projectKey==='string'&&step.args.projectKey) || (siteStep.projectId ? (plan.resourceLabels?.[siteStep.projectId] ?? plan.resourceLabels?.[`jira_project:${siteStep.projectId}`] ?? siteStep.projectId) : undefined);return <p className="text-xs text-brand-muted mt-1 break-words">Site đích: {siteLabel}{projectLabel?` · Dự án: ${projectLabel}`:''}</p>;})()}{step.tool==='myslack.chat_postMessage'&&<div className="mt-3 whitespace-pre-wrap break-words text-sm text-brand-text"><span className="font-semibold">Nội dung gửi:</span><p>{String(step.args.text)}</p></div>}
                   </div>
                 </div>
                 <button id={`preview-${step.id}`} type="button" onClick={() => onPreview(step)} className="flex-shrink-0 px-3 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-brand-text text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1.5" aria-label="Xem trước">

@@ -453,6 +453,12 @@ test.describe('JIRA-09A: Jira UI Foundation Browser Tests', () => {
 
     // --- STEP 6: CTA guard & Responsive (375px) & Dark Mode ---
     await page.goto('/settings#jira');
+    const enabledCta = page.locator('#jira-start-conversation');
+    await expect(enabledCta).toBeEnabled();
+    await expect(enabledCta).toHaveText('Bắt đầu hội thoại Jira');
+
+    workspaceCapabilities = { workspaceId: 'workspace-uuid-1', sites: [] };
+    await page.reload();
     const ctaButton = page.getByRole('button', { name: /Bắt đầu hội thoại Jira \(Chờ JIRA-08\)/i });
     await expect(ctaButton).toBeDisabled();
     await expect(page.getByText(/chờ hoàn tất JIRA-08/i)).toBeVisible();

@@ -8,7 +8,7 @@ import { GmailPreview } from './GmailPreview';
 const names: Record<string,string> = {
   title:'Tiêu đề', name:'Tên', summary:'Tiêu đề', body:'Nội dung', text:'Nội dung',
   desc:'Mô tả ngắn', description:'Mô tả', range:'Vùng dữ liệu yêu cầu', values:'Giá trị', rows:'Các dòng',
-  repo:'Kho mã', issueNumber:'Số issue / PR', label:'Nhãn', labels:'Nhãn',
+  repo:'Kho mã', issueNumber:'Số issue / PR', issueKey:'Mã issue', projectKey:'Mã dự án', issueType:'Loại issue', label:'Nhãn', labels:'Nhãn',
   assignees:'Người phụ trách', state:'Trạng thái', query:'Từ khóa tìm kiếm',
 };
 const text = (value:unknown) => formatArgValue(value).text;
