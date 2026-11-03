@@ -3,6 +3,9 @@ import request from 'supertest';
 import { randomUUID } from 'node:crypto';
 import type pg from 'pg';
 import type { JiraPlanConnection, JiraSourceRef } from '@wap/tool-schemas';
+import { validateJiraSourceRef, MYJIRA_SERVICE, MYJIRA_TOOLS, SERVICE_REGISTRY, ALL_TOOLS } from '@wap/tool-schemas';
+import { AIPlanner, WorkingMemory } from '@wap/planner';
+import { JiraGuardedProvider } from '../../src/services/jira/jira-provider-guard.js';
 
 process.env.JWT_SECRET = '01234567890123456789012345678901_jwt_secret';
 process.env.ENCRYPTION_KEY = 'a'.repeat(32);
@@ -1067,6 +1070,26 @@ describe('JIRA-08 Task 5 Source Guard, Persistence, and Publication Guards', () 
       expect(itemRef.binding.grantId).toBe(f.grantId);
       expect(itemRef.binding.membershipVersion).toBe(1);
       expect(itemRef.binding.identityVersion).toBe(1);
+
+      // Validate complete JiraSourceRef schema per specification
+      const validated = validateJiraSourceRef(itemRef);
+      expect(validated.resourceType).toBe('site');
+      expect(validated.providerResourceId).toBe(f.cloudId);
+      expect(validated.revision).toBe(String(validated.sitePolicyVersion));
+      expect(validated.workspaceVersion).toBeGreaterThan(0);
+      expect(validated.sitePolicyVersion).toBeGreaterThan(0);
+
+      // Validate array sourceRef schema
+      const validatedArrayRef = validateJiraSourceRef(arrayRefs[0]);
+      expect(validatedArrayRef.resourceType).toBe('site');
+      expect(validatedArrayRef.providerResourceId).toBe(f.cloudId);
+
+      // Verify that the lease remains active in PostgreSQL (not prematurely released)
+      const leaseRow = await pool.query(
+        `SELECT status FROM jira_authorization_leases WHERE lease_id = $1`,
+        [siteItem._leaseId]
+      );
+      expect(leaseRow.rows[0]?.status).toBe('active');
     });
 
     it('rejects myjira.list_sites under phase: planning when user membership is removed in DB', async () => {
@@ -1108,6 +1131,212 @@ describe('JIRA-08 Task 5 Source Guard, Persistence, and Publication Guards', () 
           phase: 'planning',
         })
       ).rejects.toThrow(/không gian làm việc|Missing user or workspace/i);
+    });
+
+    it('closes gather-to-model window: revoking membership via second PostgreSQL client after adapter returns prevents Jira data from reaching model prompt', async () => {
+      const f = await setupFixture();
+      const client2 = await pool.connect();
+      try {
+        const factory = createGatherFactory(f, {
+          baseAdapterExecute: async (tool) => {
+            if (tool === 'myjira.list_sites') {
+              return [{ id: f.siteId, siteId: f.siteId, cloudId: f.cloudId, name: 'Top Secret Jira Site', url: 'https://secret.atlassian.net' }];
+            }
+            return [];
+          },
+        });
+
+        const tokenManager = { getAccessToken: async () => 'test-token-jira-gather' };
+        const leaseManager = new JiraLeaseManager({ pool, tokenManager });
+        const verifier = {
+          verifyUserPermissions: async () => ({
+            status: 'granted' as const,
+            canBrowse: true,
+            canCreateIssue: true,
+            canAddComment: true,
+          }),
+        };
+        const policyService = new JiraPolicyService({ pool, verifier });
+
+        let interceptionExecuted = false;
+        const gatherSearch = async ({ tool, args, signal, actor }: any) => {
+          const adapter = await factory.getAdapterForService('myjira', {
+            userId: actor?.userId,
+            workspaceId: actor?.workspaceId,
+            phase: 'planning',
+          });
+          const output = await adapter.execute(tool, args, { signal });
+
+          // Điểm chặn: ngay sau khi adapter trả kết quả, client PostgreSQL thứ hai thu hồi quyền thành viên
+          await client2.query(
+            `UPDATE ati_workspace_memberships SET status = 'removed' WHERE workspace_id = $1 AND user_id = $2`,
+            [f.workspaceId, f.userId]
+          );
+          interceptionExecuted = true;
+          return output;
+        };
+
+        let callCount = 0;
+        const receivedInputs: any[] = [];
+        const baseProvider = {
+          name: 'recording-provider',
+          async generatePlan(input: any) {
+            receivedInputs.push(input);
+            callCount++;
+            if (callCount === 1) {
+              return JSON.stringify({
+                kind: 'search',
+                thinking: 'Looking up Jira sites',
+                calls: [{ tool: 'myjira.list_sites', args: { query: '' } }],
+              });
+            }
+            return JSON.stringify({
+              kind: 'clarification',
+              question: 'Không tìm thấy site Jira khả dụng.',
+            });
+          },
+        };
+
+        const guardedProvider = new JiraGuardedProvider(baseProvider, {
+          pool,
+          jiraPolicyService: policyService,
+          jiraLeaseManager: leaseManager,
+          actor: { userId: f.userId, workspaceId: f.workspaceId },
+        });
+
+        const planner = new AIPlanner({
+          provider: guardedProvider,
+          toolCatalog: [...ALL_TOOLS.filter((t) => t.service !== 'jira'), ...MYJIRA_TOOLS],
+          serviceRegistry: [...SERVICE_REGISTRY, MYJIRA_SERVICE],
+          searchMode: 'llm',
+          prefetchDirectory: false,
+          gatherSearch,
+          requireGroundedResources: false,
+        });
+
+        await planner.processMessage({
+          userMessage: 'Hiển thị các site Jira của tôi',
+          history: [],
+          memory: new WorkingMemory(),
+          actor: { userId: f.userId, workspaceId: f.workspaceId },
+        });
+
+        expect(interceptionExecuted).toBe(true);
+        expect(receivedInputs.length).toBeGreaterThanOrEqual(2);
+
+        // Turn 2 is the prompt assembled after gatherSearch returned
+        const modelInputAfterGather = receivedInputs[1];
+        // Xác nhận model không nhận dữ liệu: workingMemory không còn site Jira
+        const observedSites = modelInputAfterGather.workingMemory?.__observed?.jira_site;
+        expect(observedSites === undefined || observedSites.length === 0).toBe(true);
+        expect(JSON.stringify(modelInputAfterGather)).not.toContain('Top Secret Jira Site');
+        expect(JSON.stringify(modelInputAfterGather)).not.toContain(f.cloudId);
+      } finally {
+        client2.release();
+      }
+    });
+
+    it('closes gather-to-model window: revoking site active status via second PostgreSQL client after adapter returns prevents site from reaching model prompt', async () => {
+      const f = await setupFixture();
+      const client2 = await pool.connect();
+      try {
+        const factory = createGatherFactory(f, {
+          baseAdapterExecute: async (tool) => {
+            if (tool === 'myjira.list_sites') {
+              return [{ id: f.siteId, siteId: f.siteId, cloudId: f.cloudId, name: 'Active Then Disabled Site', url: 'https://disabled.atlassian.net' }];
+            }
+            return [];
+          },
+        });
+
+        const tokenManager = { getAccessToken: async () => 'test-token-jira-gather' };
+        const leaseManager = new JiraLeaseManager({ pool, tokenManager });
+        const verifier = {
+          verifyUserPermissions: async () => ({
+            status: 'granted' as const,
+            canBrowse: true,
+            canCreateIssue: true,
+            canAddComment: true,
+          }),
+        };
+        const policyService = new JiraPolicyService({ pool, verifier });
+
+        let interceptionExecuted = false;
+        const gatherSearch = async ({ tool, args, signal, actor }: any) => {
+          const adapter = await factory.getAdapterForService('myjira', {
+            userId: actor?.userId,
+            workspaceId: actor?.workspaceId,
+            phase: 'planning',
+          });
+          const output = await adapter.execute(tool, args, { signal });
+
+          // Điểm chặn: ngay sau khi adapter trả kết quả, client PostgreSQL thứ hai tắt active của site
+          await client2.query(
+            `UPDATE ati_workspace_jira_sites SET active = false WHERE workspace_id = $1 AND cloud_id = $2`,
+            [f.workspaceId, f.cloudId]
+          );
+          interceptionExecuted = true;
+          return output;
+        };
+
+        let callCount = 0;
+        const receivedInputs: any[] = [];
+        const baseProvider = {
+          name: 'recording-provider',
+          async generatePlan(input: any) {
+            receivedInputs.push(input);
+            callCount++;
+            if (callCount === 1) {
+              return JSON.stringify({
+                kind: 'search',
+                thinking: 'Looking up Jira sites',
+                calls: [{ tool: 'myjira.list_sites', args: { query: '' } }],
+              });
+            }
+            return JSON.stringify({
+              kind: 'clarification',
+              question: 'Không tìm thấy site Jira khả dụng.',
+            });
+          },
+        };
+
+        const guardedProvider = new JiraGuardedProvider(baseProvider, {
+          pool,
+          jiraPolicyService: policyService,
+          jiraLeaseManager: leaseManager,
+          actor: { userId: f.userId, workspaceId: f.workspaceId },
+        });
+
+        const planner = new AIPlanner({
+          provider: guardedProvider,
+          toolCatalog: [...ALL_TOOLS.filter((t) => t.service !== 'jira'), ...MYJIRA_TOOLS],
+          serviceRegistry: [...SERVICE_REGISTRY, MYJIRA_SERVICE],
+          searchMode: 'llm',
+          prefetchDirectory: false,
+          gatherSearch,
+          requireGroundedResources: false,
+        });
+
+        await planner.processMessage({
+          userMessage: 'Hiển thị các site Jira của tôi',
+          history: [],
+          memory: new WorkingMemory(),
+          actor: { userId: f.userId, workspaceId: f.workspaceId },
+        });
+
+        expect(interceptionExecuted).toBe(true);
+        expect(receivedInputs.length).toBeGreaterThanOrEqual(2);
+
+        // Turn 2 is the prompt assembled after gatherSearch returned
+        const modelInputAfterGather = receivedInputs[1];
+        // Xác nhận model không nhận dữ liệu
+        const observedSites = modelInputAfterGather.workingMemory?.__observed?.jira_site;
+        expect(observedSites === undefined || observedSites.length === 0).toBe(true);
+        expect(JSON.stringify(modelInputAfterGather)).not.toContain('Active Then Disabled Site');
+        expect(JSON.stringify(modelInputAfterGather)).not.toContain(f.cloudId);
+      } finally {
+        client2.release();
+      }
     });
   });
 });

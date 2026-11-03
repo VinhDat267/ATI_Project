@@ -77,7 +77,55 @@
       - Gắn đầy đủ `_sourceRef` và `_sourceRefs` lên từng item site và lên mảng kết quả, mang trọn vẹn thông tin binding (`atiUserId`, `jiraAccountId`, `atlassianAccountId`, `grantId`, `membershipVersion`, `identityVersion`).
       - Nếu trong phase execution (`deferRelease: true`), lease được giữ lại để `flushOnStepComplete` tuyến tính hóa; nếu trong phase planning, lease được giải phóng ngay sau khi ghi nhận bằng chứng nguồn.
       - Test: `apps/chat-api/tests/services/jira-source-guard.test.ts` (19/19 tests PASS).
+- **Khắc phục đợt review thứ năm (2 phát hiện P1):**
+  - **1. [P1] list_sites tạo source ref đầy đủ và hợp lệ theo schema:**
+    - Cập nhật `JiraLeaseManager.acquireLease` trả về `ExtendedJiraAuthorizationLease` chứa `workspaceVersion`, `sitePolicyVersion`, `siteId` lấy trực tiếp từ các hàng đã khóa trong cùng giao dịch PostgreSQL.
+    - Cập nhật `apps/chat-api/src/services/adapter-factory.ts` (`myjira.list_sites`):
+      - Tạo `JiraSourceRef` đầy đủ các trường bắt buộc theo schema: `resourceType: 'site'`, `providerResourceId: site.cloudId`, `revision: String(sitePolicyVersion)`, `workspaceVersion` và `sitePolicyVersion` lấy từ DB query/lease, cùng `siteId` chuẩn.
+      - Gọi trực tiếp `validateJiraSourceRef(siteSourceRef)` từ `@wap/tool-schemas` để đảm bảo ref 100% hợp lệ, tránh lỗi `invalid_evidence` và ngăn che mờ sai câu trả lời hợp lệ.
+      - Gỡ bỏ lệnh `releaseLease` sớm trước khi trả kết quả để lease giữ nguyên trạng thái `active` trong phiên planning.
+      - Bổ sung `context.gatheredSourceRefs.push(...allSourceRefs)` để ghi nhận nguồn.
+    - Test: `apps/chat-api/tests/services/jira-source-guard.test.ts` (PASS, kiểm tra `validateJiraSourceRef(itemRef)`, kiểm tra các trường `resourceType`, `providerResourceId`, `revision`, `workspaceVersion`, `sitePolicyVersion` và kiểm tra lease còn `active` trong DB).
+  - **2. [P1] Đóng khoảng trống giữa gather và model:**
+    - Xây dựng `JiraGuardedProvider` (`apps/chat-api/src/services/jira/jira-provider-guard.ts`) triển khai `LLMProvider` và bọc quanh provider cơ sở. Tích hợp tại `apps/chat-api/src/server.ts` trong `plannerFor`.
+    - Ngay trước khi gửi prompt vào model (`generatePlan`), guard truy vấn PostgreSQL kiểm tra tính hợp lệ hiện hành của toàn bộ hàng quyền Jira (`ati_workspaces`, `workspace_members`, `ati_workspace_memberships`, `users`, `jira_accounts`, `jira_oauth_grants`, `ati_workspace_jira_sites`).
+    - Nếu quyền bị thu hồi sau khi adapter trả kết quả (bất kể membership bị gỡ, grant bị thu hồi hay site bị tắt active):
+      - Guard tự động lọc bỏ (purge) toàn bộ các thực thể site/project/issue Jira bị thu hồi khỏi `workingMemory` (`__observed` và root).
+      - Che mờ (mask) các lượt hội thoại chứa kết quả tìm kiếm hoặc thông tin Jira trong `conversationHistory` (`[Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi: ...]`).
+      - Gỡ bỏ toàn bộ công cụ `myjira.*` khỏi `toolCatalog` nếu không còn site nào khả dụng.
+    - Kiểm thử bằng 2 client PostgreSQL thật:
+      - Client 1 chạy planner turn với `myjira.list_sites`. Ngay sau khi adapter trả kết quả (điểm chặn), Client 2 cập nhật `ati_workspace_memberships SET status = 'removed'`. Model prompt tiếp theo hoàn toàn không nhận thông tin site Jira bí mật (`workingMemory` không còn site Jira, JSON input không chứa tên hay cloudId của site).
+      - Client 2 tắt active của site (`ati_workspace_jira_sites SET active = false`). Model prompt tiếp theo được chứng minh không nhận dữ liệu của site đã bị tắt.
+    - Test: `apps/chat-api/tests/services/jira-source-guard.test.ts` (21/21 tests PASS).
+- **Tổng kết kiểm thử sau đợt sửa thứ năm:**
+  - Toàn bộ 7 suites Jira focused: **105/105 tests PASS** (2.71s, exit code 0).
+  - Typecheck v3: **0 errors** (exit code 0).
+  - `npm run check`: **ALL PASS** (exit code 0).
   - **3. [P2] Từ chối khi actor thiếu workspace ID thay vì tự chọn:**
     - Cập nhật `apps/chat-api/src/server.ts` (`gatherSearch`): loại bỏ hoàn toàn câu lệnh `SELECT ... LIMIT 1` tự ý chọn một workspace membership ngẫu nhiên.
     - Với mọi công cụ `myjira.*`, nếu `actor.workspaceId` bị thiếu hoặc null, ném lỗi rõ ràng (`Workspace ID is required for Jira gather search`), ngăn ngừa nguy cơ rò rỉ hoặc truy vấn chéo giữa các workspace khác nhau của cùng một người dùng.
     - Test: `apps/chat-api/tests/services/jira-source-guard.test.ts` (19/19 tests PASS).
+- **Khắc phục đợt review thứ năm (2 phát hiện P1):**
+  - **1. [P1] list_sites tạo source ref đầy đủ và hợp lệ theo schema:**
+    - Cập nhật `JiraLeaseManager.acquireLease` trả về `ExtendedJiraAuthorizationLease` chứa `workspaceVersion`, `sitePolicyVersion`, `siteId` lấy trực tiếp từ các hàng đã khóa trong cùng giao dịch PostgreSQL.
+    - Cập nhật `apps/chat-api/src/services/adapter-factory.ts` (`myjira.list_sites`):
+      - Tạo `JiraSourceRef` đầy đủ các trường bắt buộc theo schema: `resourceType: 'site'`, `providerResourceId: site.cloudId`, `revision: String(sitePolicyVersion)`, `workspaceVersion` và `sitePolicyVersion` lấy từ DB query/lease, cùng `siteId` chuẩn.
+      - Gọi trực tiếp `validateJiraSourceRef(siteSourceRef)` từ `@wap/tool-schemas` để đảm bảo ref 100% hợp lệ, tránh lỗi `invalid_evidence` và ngăn che mờ sai câu trả lời hợp lệ.
+      - Gỡ bỏ lệnh `releaseLease` sớm trước khi trả kết quả để lease giữ nguyên trạng thái `active` trong phiên planning.
+      - Bổ sung `context.gatheredSourceRefs.push(...allSourceRefs)` để ghi nhận nguồn.
+    - Test: `apps/chat-api/tests/services/jira-source-guard.test.ts` (PASS, kiểm tra `validateJiraSourceRef(itemRef)`, kiểm tra các trường `resourceType`, `providerResourceId`, `revision`, `workspaceVersion`, `sitePolicyVersion` và kiểm tra lease còn `active` trong DB).
+  - **2. [P1] Đóng khoảng trống giữa gather và model:**
+    - Xây dựng `JiraGuardedProvider` (`apps/chat-api/src/services/jira/jira-provider-guard.ts`) triển khai `LLMProvider` và bọc quanh provider cơ sở. Tích hợp tại `apps/chat-api/src/server.ts` trong `plannerFor`.
+    - Ngay trước khi gửi prompt vào model (`generatePlan`), guard truy vấn PostgreSQL kiểm tra tính hợp lệ hiện hành của toàn bộ hàng quyền Jira (`ati_workspaces`, `workspace_members`, `ati_workspace_memberships`, `users`, `jira_accounts`, `jira_oauth_grants`, `ati_workspace_jira_sites`).
+    - Nếu quyền bị thu hồi sau khi adapter trả kết quả (bất kể membership bị gỡ, grant bị thu hồi hay site bị tắt active):
+      - Guard tự động lọc bỏ (purge) toàn bộ các thực thể site/project/issue Jira bị thu hồi khỏi `workingMemory` (`__observed` và root).
+      - Che mờ (mask) các lượt hội thoại chứa kết quả tìm kiếm hoặc thông tin Jira trong `conversationHistory` (`[Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi: ...]`).
+      - Gỡ bỏ toàn bộ công cụ `myjira.*` khỏi `toolCatalog` nếu không còn site nào khả dụng.
+    - Kiểm thử bằng 2 client PostgreSQL thật:
+      - Client 1 chạy planner turn với `myjira.list_sites`. Ngay sau khi adapter trả kết quả (điểm chặn), Client 2 cập nhật `ati_workspace_memberships SET status = 'removed'`. Model prompt tiếp theo hoàn toàn không nhận thông tin site Jira bí mật (`workingMemory` không còn site Jira, JSON input không chứa tên hay cloudId của site).
+      - Client 2 tắt active của site (`ati_workspace_jira_sites SET active = false`). Model prompt tiếp theo được chứng minh không nhận dữ liệu của site đã bị tắt.
+    - Test: `apps/chat-api/tests/services/jira-source-guard.test.ts` (21/21 tests PASS).
+- **Tổng kết kiểm thử sau đợt sửa thứ năm:**
+  - Toàn bộ 7 suites Jira focused: **105/105 tests PASS** (2.71s, exit code 0).
+  - Typecheck v3: **0 errors** (exit code 0).
+  - `npm run check`: **ALL PASS** (exit code 0).

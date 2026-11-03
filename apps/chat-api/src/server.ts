@@ -52,6 +52,7 @@ import { JiraHistorySanitizer } from './services/jira/jira-history-sanitizer.js'
 import { JiraPlanBinder } from './services/jira/jira-plan-binding.js';
 import { JiraLeaseManager } from './services/jira/jira-lease-manager.js';
 import { JiraDispatchGuard } from './services/jira/jira-dispatch-guard.js';
+import { createJiraGuardedProvider } from './services/jira/jira-provider-guard.js';
 import {
   AIPlanner,
   createProviderFromEnv,
@@ -461,8 +462,19 @@ async function bootstrap() {
     userId: string;
     workspaceId?: string | null;
     workspaceMode?: 'legacy' | 'personal' | 'organization';
-  }) => new AIPlanner({
-    provider: env.RUNTIME_MODE === 'sandbox' && (process.env.SANDBOX_SCENARIO === 'gmail' || process.env.SANDBOX_SCENARIO === 'mycalendar' || process.env.SANDBOX_SCENARIO === 'mysheets') ? createSandboxProvider(process.env.SANDBOX_SCENARIO) : provider,
+  }) => {
+    const rawProvider = env.RUNTIME_MODE === 'sandbox' && (process.env.SANDBOX_SCENARIO === 'gmail' || process.env.SANDBOX_SCENARIO === 'mycalendar' || process.env.SANDBOX_SCENARIO === 'mysheets') ? createSandboxProvider(process.env.SANDBOX_SCENARIO) : provider;
+    const guardedProvider = (pool && actor?.userId && actor?.workspaceId)
+      ? createJiraGuardedProvider(rawProvider, {
+          pool,
+          jiraPolicyService,
+          jiraLeaseManager,
+          actor,
+        })
+      : rawProvider;
+
+    return new AIPlanner({
+      provider: guardedProvider,
     toolCatalog: await runtimeToolCatalog(env.RUNTIME_MODE, credRepo, env.ENCRYPTION_KEY, {
       userId: actor?.userId,
       workspaceMode: actor?.workspaceMode ?? (workspaceRepo ? 'personal' : undefined),
@@ -491,6 +503,7 @@ async function bootstrap() {
     readAnswers: env.PLANNER_READ_ANSWERS,
     schedules: Boolean(schedules),
   });
+};
   const planner = {
     ...createRuntimePlanner(env.RUNTIME_MODE,
       async (input: any) => (await plannerFor(input?.actor)).processMessage(input),

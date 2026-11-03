@@ -16,6 +16,8 @@ import {
   type AllowedScope,
   type PlanConnections,
   type WorkspaceJiraCapabilitiesResponse,
+  validateJiraSourceRef,
+  type JiraSourceRef,
 } from '@wap/tool-schemas';
 import { isWriteTool, type AdapterExecutor } from '@wap/executor';
 import { getRegisteredService, isServiceAccountService } from './registered-services.js';
@@ -727,7 +729,9 @@ export class AdapterFactory {
               if (!primaryLeaseId) {
                 primaryLeaseId = lease.leaseId;
               }
-              const siteSourceRef = {
+              const workspaceVersion = (lease as any).workspaceVersion ?? bound?.workspaceVersion ?? (currentCapabilities as any)?.workspaceVersion ?? 1;
+              const sitePolicyVersion = (lease as any).sitePolicyVersion ?? (site as any)?.policyVersion ?? 1;
+              const siteSourceRef: JiraSourceRef = {
                 binding: {
                   atiUserId: userId,
                   jiraAccountId: lease.binding.jiraAccountId,
@@ -738,11 +742,15 @@ export class AdapterFactory {
                   identityVersion: lease.binding.identityVersion,
                 },
                 workspaceId,
-                workspaceVersion: bound?.workspaceVersion ?? 1,
-                siteId: site.siteId,
+                workspaceVersion,
+                siteId: site.siteId ?? (lease as any).siteId,
                 cloudId: site.cloudId,
-                sitePolicyVersion: (site as any)?.policyVersion ?? 1,
+                sitePolicyVersion,
+                resourceType: 'site',
+                providerResourceId: site.cloudId,
+                revision: String(sitePolicyVersion),
               };
+              validateJiraSourceRef(siteSourceRef);
               siteLeaseMap.set(site.siteId, { lease, siteSourceRef });
               allSourceRefs.push(siteSourceRef);
             }
@@ -756,7 +764,6 @@ export class AdapterFactory {
             list = list.filter((item: any) => activeCloudIds.has(item.cloudId));
           }
 
-          const deferRelease = Boolean(context?.connections?.myjira);
           if (leaseManager && siteLeaseMap.size > 0) {
             for (const siteItem of list) {
               const matched = siteLeaseMap.get(siteItem.siteId);
@@ -766,11 +773,10 @@ export class AdapterFactory {
                 Object.defineProperty(siteItem, '_sourceRefs', { value: [matched.siteSourceRef], writable: true, configurable: true, enumerable: true });
               }
             }
-            if (!deferRelease) {
-              for (const { lease } of siteLeaseMap.values()) {
-                await leaseManager.releaseLease(lease.leaseId);
-              }
-            }
+          }
+
+          if (context?.gatheredSourceRefs) {
+            context.gatheredSourceRefs.push(...allSourceRefs);
           }
 
           if (primaryLeaseId && context?.stepLeaseMap && callOpts?.stepId) {

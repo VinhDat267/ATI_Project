@@ -21,6 +21,13 @@ export interface MarkRevokedFilter {
   userId?: string;
 }
 
+export interface ExtendedJiraAuthorizationLease extends JiraAuthorizationLease {
+  workspaceVersion: number;
+  sitePolicyVersion: number;
+  siteId: string;
+  projectPolicyVersion?: number | null;
+}
+
 export interface RevalidateLeaseResult {
   valid: boolean;
   status?: 'active' | 'released' | 'expired' | 'revoked';
@@ -45,7 +52,7 @@ export class JiraLeaseManager {
     return result.rows[0] as Row;
   }
 
-  async acquireLease(params: AcquireLeaseParams): Promise<JiraAuthorizationLease> {
+  async acquireLease(params: AcquireLeaseParams): Promise<ExtendedJiraAuthorizationLease> {
     const ttlMs = params.ttlMs ?? 15_000;
     if (!Number.isSafeInteger(ttlMs) || ttlMs <= 0 || ttlMs > 60_000) fail('invalid TTL');
     if (!params.userId || !params.workspaceId || !params.cloudId || (params.projectId !== undefined && !/^[1-9][0-9]*$/.test(params.projectId))) fail('invalid scope');
@@ -115,6 +122,10 @@ export class JiraLeaseManager {
           workspaceId: params.workspaceId, membershipVersion: Number(membership.version), grantId: String(grants.rows[0]!.id),
           identityVersion: Number(account.identity_version),
         },
+        workspaceVersion: Number(workspace.version),
+        sitePolicyVersion: Number(site.policy_version),
+        siteId: String(site.id),
+        projectPolicyVersion: projectVersion,
       };
     } catch (error) {
       if (!committed) await client.query('ROLLBACK').catch(() => {});
