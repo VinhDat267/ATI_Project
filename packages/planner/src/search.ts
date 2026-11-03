@@ -60,7 +60,6 @@ const KEPT_FIELDS = [
   'workspaceId',
   'accountId',
   'displayName',
-  'status',
   'priority',
   'assignee',
   'issueType',
