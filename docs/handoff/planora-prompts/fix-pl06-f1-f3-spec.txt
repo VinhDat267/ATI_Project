@@ -1,0 +1,50 @@
+NHIỆM VỤ: SỬA 3 FINDINGS P2 (F1–F3) TỪ CODEX REVIEW VÒNG 1 (PL-06)
+
+1. MÔ TẢ VÀ HƯỚNG DẪN SỬA CHI TIẾT:
+
+### F1 — P2: Tích hợp hiển thị Step Cards Planora thực tế trong các Moment (PlanMoment, ExecutionMoment, ReceiptMoment)
+- **Vấn đề:** Các moment (`PlanMoment.tsx:106, 110`, `ExecutionMoment.tsx:98`, `ReceiptMoment.tsx:365`) đang truyền `showStepCards={false}` khi gọi `PlanoraWorkflowSteps`, đồng thời `PlanMoment` tiếp tục render danh sách cũ `v3-space-y-3`. Do đó người dùng không thấy step cards Planora mới (thiếu grid 2 cột desktop, nhãn Read/Write, hiển thị phụ thuộc `dependsOn` và trạng thái).
+- **Cách sửa:**
+  - Trong `PlanMoment.tsx`:
+    - Sử dụng `PlanoraWorkflowSteps` làm renderer chính cho các bước kế hoạch với `showStepCards={true}` (hoặc loại bỏ prop tắt này).
+    - Đảm bảo container hoặc component chứa `id="plan-cards-container"` bọc lấy danh sách các step cards `[data-testid="planora-step-cards-grid"]`.
+    - Bảo toàn toàn bộ test IDs và attributes: `#plan-cards-container`, `[data-od-id]`, `#preview-${step.id}` trên từng card.
+    - Hiển thị rõ ràng:
+      + Nhãn `Chỉ đọc` (Read) vs `Ghi` (Write) theo `toolDefinition`.
+      + Nhãn `Phụ thuộc:` khi bước có `dependsOn`.
+      + Liên kết luồng dữ liệu data-flow mappings.
+      + Responsive grid: 2 cột trên desktop (`min-w-[768px]`), 1 cột trên mobile.
+    - Xóa bỏ danh sách thẻ cũ `v3-space-y-3` trong `PlanMoment` để tránh render trùng lặp.
+  - Trong `ExecutionMoment.tsx`:
+    - Cho phép `PlanoraWorkflowSteps` hiển thị step cards ở chế độ `executing`, cập nhật trạng thái thời gian thực.
+  - Trong `ReceiptMoment.tsx`:
+    - Cho phép `PlanoraWorkflowSteps` hiển thị step cards ở chế độ `receipt`, hiển thị tóm tắt kết quả từng bước.
+
+### F2 — P2: Trường “plan_hash” không được gán nghĩa fallback là UUID
+- **Vị trí:** `PlanMoment.tsx:197`.
+- **Vấn đề:** Code dùng `const displayHash = (plan as any).plan_hash || plan.id;` dưới nhãn "Mã băm ràng buộc kế hoạch (plan_hash)". UUID là ID định danh, không phải cryptographic hash.
+- **Cách sửa:**
+  - Kiểm tra rõ ràng:
+    + Nếu `plan.plan_hash` thực sự tồn tại (chuỗi hash hợp lệ): hiển thị nhãn `Mã băm ràng buộc kế hoạch (plan_hash): {plan.plan_hash}`.
+    + Nếu không có `plan_hash`: hiển thị `Mã định danh kế hoạch: {plan.id}`. Tuyệt đối không gọi UUID là plan_hash.
+  - Giữ nguyên `data-testid="plan-hash-binding"` bọc phần hiển thị này để tương thích test selector.
+
+### F3 — P2: Ẩn nút "Đặt lịch quy trình" khi capability schedulesEnabled đang tắt
+- **Vị trí:** `ReceiptMoment.tsx:437` (nút `receipt-schedule-workflow-btn`) và `PlanoraActiveTurn.tsx`.
+- **Vấn đề:** Nút đặt lịch luôn xuất hiện dù runtime/workspace không bật capability `schedulesEnabled`.
+- **Cách sửa:**
+  - Bổ sung prop hoặc lấy capability `schedulesEnabled` (từ `useChatStore` hoặc props).
+  - Chỉ hiển thị nút `[data-testid="receipt-schedule-workflow-btn"]` khi `schedulesEnabled === true`. Khi `false` hoặc `undefined`, không render nút này.
+  - Cập nhật test trong `apps/chat-web/tests/planora-workflow-steps.test.tsx` kiểm tra cả 2 trường hợp `schedulesEnabled: true` và `false`.
+
+2. TIÊU CHUẨN KIỂM CHỨNG BẮT BUỘC:
+- `npm run typecheck:v3` (exit 0).
+- `npm test -w @wap/chat-web` (101/101 test files PASS, 1124+ tests).
+- `npm run build:v3` (exit 0).
+- `node scripts/test-v3-web-build-security.mjs` (exit 0).
+
+3. BÀN GIAO:
+- Thêm log bàn giao: `docs/handoff/log/2026-11-04-gemini-pl-06-review-fixes.md`.
+- Commit vào nhánh `longnguyen005/feat-planora-pl-06` trong worktree `C:\Users\Admin\orca\workspaces\ATI_Project\feat-planora-pl-06`.
+- Chỉ `git add` đúng các file thay đổi, không dùng `git add -A`.
+- Báo hoàn thành qua Orca với HEAD SHA mới.
