@@ -64,11 +64,16 @@ describe('schedule scoring (SCHED-04)', () => {
       expect: { kind: 'schedule', action: 'update', recurrence: { type: 'weekly', time: '08:30', days: [1, 2, 3, 4, 5] } },
     };
     expect(scoreCase(weeklyCase, schedule('update', { type: 'weekly', time: '08:30', days: [1, 2, 3, 4, 5] }), ALL_TOOLS).passed).toBe(true);
-    // Subset or different days must fail
-    const wrongDays = scoreCase(weeklyCase, schedule('update', { type: 'weekly', time: '08:30', days: [1, 3, 5] }), ALL_TOOLS);
-    expect(wrongDays.passed).toBe(false);
-    expect(wrongDays.argsOk).toBe(false);
-    expect(wrongDays.failures.join('\n')).toMatch(/recurrence\.days/);
+    // Subset or different days (including same-length different weekdays) must fail
+    const wrongDaysSubset = scoreCase(weeklyCase, schedule('update', { type: 'weekly', time: '08:30', days: [1, 3, 5] }), ALL_TOOLS);
+    expect(wrongDaysSubset.passed).toBe(false);
+    expect(wrongDaysSubset.argsOk).toBe(false);
+    expect(wrongDaysSubset.failures.join('\n')).toMatch(/recurrence\.days/);
+
+    const wrongDaysSameLength = scoreCase(weeklyCase, schedule('update', { type: 'weekly', time: '08:30', days: [1, 2, 3, 4, 6] }), ALL_TOOLS);
+    expect(wrongDaysSameLength.passed).toBe(false);
+    expect(wrongDaysSameLength.argsOk).toBe(false);
+    expect(wrongDaysSameLength.failures.join('\n')).toMatch(/recurrence\.days/);
   });
 
   it('catches mutation 2 (accepting schedule for a Calendar event plan case): rejects schedule response when expect.kind is plan', () => {
