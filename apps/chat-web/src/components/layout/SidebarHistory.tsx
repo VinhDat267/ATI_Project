@@ -8,11 +8,12 @@ import { loadConversationHistory } from '../../hooks/use-conversation-history';
 
 export interface SidebarHistoryProps {
   prototype?: boolean;
+  planora?: boolean;
   currentConversationId: string | null;
   onSelectConversation?: (id: string) => void;
   onCloseMobileSidebar?: () => void;
 }
-export function SidebarHistory({ currentConversationId, onSelectConversation, onCloseMobileSidebar, prototype = false }: SidebarHistoryProps) {
+export function SidebarHistory({ currentConversationId, onSelectConversation, onCloseMobileSidebar, prototype = false, planora = false }: SidebarHistoryProps) {
   const conversations = useChatStore(state => state.conversations);
   const firstConfirmedUserMessage = useChatStore(state => state.messages.find(message => message.role === 'user' && message.status === 'sent')?.id);
   const [workspaceId, setWorkspaceId] = useState(getActiveWorkspaceId());
@@ -69,7 +70,7 @@ export function SidebarHistory({ currentConversationId, onSelectConversation, on
   };
   return <div className="mt-6 flex-1 flex flex-col min-h-0">
     <span className="text-sm font-semibold text-text-muted tracking-wider uppercase px-1 shrink-0">Lịch sử hội thoại</span>
-    <input type="search" aria-label="Tìm hội thoại theo tiêu đề" value={search} onChange={event => setSearch(event.target.value)}
+    <input type="search" aria-label={planora ? "Tìm hội thoại" : "Tìm hội thoại theo tiêu đề"} value={search} onChange={event => setSearch(event.target.value)}
       className="mt-2 w-full border border-border rounded-lg p-2 text-xs bg-surface" placeholder="Tìm hội thoại..." />
     {error && <p role="alert" className="text-xs text-danger-text py-2">{error}</p>}
     <div role="region" aria-label="Danh sách hội thoại" className="mt-2 flex-1 overflow-y-auto flex flex-col gap-1 pr-1"
@@ -83,11 +84,11 @@ export function SidebarHistory({ currentConversationId, onSelectConversation, on
             <input autoFocus aria-label="Tiêu đề hội thoại" value={title} onChange={event => setTitle(event.target.value)} className="w-full border border-border rounded p-1" />
             <div className="flex gap-2 mt-1"><button type="submit" disabled={saving} aria-label="Lưu tên hội thoại" className="text-primary-text">Lưu</button>
               <button type="button" disabled={saving} onClick={() => setEditing(null)}>Hủy đổi tên</button></div>
-          </form> : <><button type="button" aria-label={prototype ? label : undefined} onClick={() => void select(conv.id)} className={prototype ? 'min-w-0 flex-1 text-left cursor-pointer' : 'min-w-0 flex-1 text-left cursor-pointer flex items-center'}>
+          </form> : <><button type="button" aria-label={planora ? `Hội thoại: ${label}` : prototype ? label : undefined} onClick={() => void select(conv.id)} className={prototype ? 'min-w-0 flex-1 text-left cursor-pointer' : 'min-w-0 flex-1 text-left cursor-pointer flex items-center'}>
             {prototype ? <><div className={`flex justify-between items-center text-[11px] ${conv.id === currentConversationId ? 'text-brand-primary font-semibold' : 'text-neutral-500'}`}>
               {conv.status && <span className="uppercase">{({chatting:'Đang trao đổi',planning:'Đang lập kế hoạch',completed:'Hoàn thành',executing:'Đang chạy',partial:'Cần xử lý',failed:'Cần xử lý',reconciliation_required:'Cần đối soát',stopped:'Đã dừng'} as Record<string,string>)[conv.status] ?? 'Hội thoại'}</span>}{time && <span>{time}</span>}
-            </div><div className={`font-medium mt-1 ${conv.id === currentConversationId ? 'text-brand-text' : 'text-neutral-800'}`}>{label}</div></> : <><span className="truncate flex-1">{label}</span>{time && <span className="text-sm text-text-muted ml-2 shrink-0">{time}</span>}</>}
-          </button><button type="button" aria-label={`Đổi tên ${label}`} onClick={() => { setEditing(conv.id); setTitle(conv.title || ''); }} className="shrink-0 text-text-muted p-1">✎</button></>}
+            </div><div className={`font-medium mt-1 ${conv.id === currentConversationId ? 'text-brand-text' : 'text-neutral-800'}`}>{label}</div></> : <><span className="truncate flex-1">{planora ? `💬 ${label}` : label}</span>{time && <span className="text-sm text-text-muted ml-2 shrink-0">{time}</span>}</>}
+          </button><button type="button" aria-label={planora ? `Đổi tên hội thoại ${label}` : `Đổi tên ${label}`} onClick={() => { setEditing(conv.id); setTitle(conv.title || ''); }} className="shrink-0 text-text-muted p-1">✎</button></>}
         </div>;
       })}
       {isLoading && <p role="status" className="px-2 py-3 text-xs text-text-muted italic">Đang tải danh sách...</p>}

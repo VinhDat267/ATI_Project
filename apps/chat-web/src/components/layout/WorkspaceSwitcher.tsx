@@ -14,9 +14,10 @@ import type { WorkspaceSummary } from '../../types';
 
 export interface WorkspaceSwitcherProps {
   navigate?: (path: string) => void;
+  variant?: 'header' | 'sidebar';
 }
 
-export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
+export function WorkspaceSwitcher({ navigate, variant = 'header' }: WorkspaceSwitcherProps) {
   const [open, setOpen] = useState(false);
   const [activeSummary, setActiveSummary] = useState(getActiveWorkspaceSummary());
   const [organizations, setOrganizations] = useState<WorkspaceSummary[]>(getCachedOrganizations());
@@ -168,41 +169,71 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
   const isPersonal = activeSummary.id === 'personal';
 
   return (
-    <div ref={menuRef} className="relative inline-block text-left">
-      <button
-        ref={buttonRef}
-        type="button"
-        aria-label={`Không gian làm việc: ${activeSummary.name}`}
-        aria-haspopup="true"
-        aria-expanded={open}
-        aria-controls={open ? menuId : undefined}
-        onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border border-[#E7E7E2] bg-white hover:bg-[#F8F8F6] text-[#111827] shadow-sm transition-colors focus:outline-none focus:ring-1 focus:ring-[#FF5701]"
-      >
-        <span className="truncate max-w-[140px] sm:max-w-[180px] flex items-center gap-1">
-          <span>{isPersonal ? '👤' : '🏢'}</span>
-          <span className="font-semibold hidden xl:inline">{activeSummary.name}</span>
-        </span>
-        {!isPersonal && (
-          <span
-            className={`hidden xl:inline px-1.5 py-0.2 rounded text-[10px] font-medium ${
-              activeSummary.role === 'admin'
-                ? 'bg-amber-100 text-amber-800'
-                : 'bg-neutral-100 text-neutral-600'
-            }`}
-          >
-            {activeSummary.role === 'admin' ? 'Quản trị viên' : 'Thành viên'}
-          </span>
-        )}
-        <svg
-          className={`w-3.5 h-3.5 text-[#6B7280] transition-transform ${open ? 'rotate-180' : ''}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
+    <div ref={menuRef} className={`relative ${variant === 'sidebar' ? 'w-full' : 'inline-block text-left'}`}>
+      {variant === 'sidebar' ? (
+        <button
+          ref={buttonRef}
+          type="button"
+          aria-label={`Không gian làm việc: ${activeSummary.name}`}
+          aria-haspopup="true"
+          aria-expanded={open}
+          aria-controls={open ? menuId : undefined}
+          onClick={() => setOpen(!open)}
+          className="planora-ws-switcher-sidebar-btn"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-base flex-shrink-0">{isPersonal ? '👤' : '🏢'}</span>
+            <div className="min-w-0 text-left">
+              <div className="text-xs font-semibold truncate text-[var(--planora-text)]">
+                {activeSummary.name}
+              </div>
+              <div className="text-[10px] text-[var(--planora-muted)] truncate">
+                {isPersonal
+                  ? 'Cá nhân'
+                  : `Tổ chức · ${activeSummary.role === 'admin' ? 'Quản trị viên' : 'Thành viên'}`}
+              </div>
+            </div>
+          </div>
+          <span className="text-xs text-[var(--planora-muted)] flex-shrink-0 ml-1">
+            {open ? '▲' : '▼'}
+          </span>
+        </button>
+      ) : (
+        <button
+          ref={buttonRef}
+          type="button"
+          aria-label={`Không gian làm việc: ${activeSummary.name}`}
+          aria-haspopup="true"
+          aria-expanded={open}
+          aria-controls={open ? menuId : undefined}
+          onClick={() => setOpen(!open)}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border border-[#E7E7E2] bg-white hover:bg-[#F8F8F6] text-[#111827] shadow-sm transition-colors focus:outline-none focus:ring-1 focus:ring-[#FF5701]"
+        >
+          <span className="truncate max-w-[140px] sm:max-w-[180px] flex items-center gap-1">
+            <span>{isPersonal ? '👤' : '🏢'}</span>
+            <span className="font-semibold">{activeSummary.name}</span>
+          </span>
+          {!isPersonal && (
+            <span
+              className={`hidden sm:inline px-1.5 py-0.2 rounded text-[10px] font-medium ${
+                activeSummary.role === 'admin'
+                  ? 'bg-amber-100 text-amber-800'
+                  : 'bg-neutral-100 text-neutral-600'
+              }`}
+            >
+              {activeSummary.role === 'admin' ? 'Quản trị viên' : 'Thành viên'}
+            </span>
+          )}
+          <svg
+            className={`w-3.5 h-3.5 text-[#6B7280] transition-transform ${open ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      )}
 
       {/* Dropdown Menu */}
       {open && (
@@ -323,7 +354,7 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
 
       {/* Modal Tạo Không Gian Tổ Chức */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="w-full max-w-md bg-white rounded-2xl border border-[#E7E7E2] shadow-2xl p-6 v3-space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-[#111827] flex items-center gap-2">
@@ -398,7 +429,7 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
 
       {/* Modal Tham Gia Bằng Mã Mời */}
       {showJoinModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="w-full max-w-md bg-white rounded-2xl border border-[#E7E7E2] shadow-2xl p-6 v3-space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-[#111827] flex items-center gap-2">
