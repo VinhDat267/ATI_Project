@@ -61,6 +61,8 @@ describe('FE-10 public guide and privacy routes', () => {
     expect(main).toHaveTextContent('các tin nhắn trong hội thoại, kế hoạch bạn đã duyệt và kết quả từng bước');
     expect(main).toHaveTextContent('Khoá dịch vụ được mã hoá khi lưu');
     expect(main).toHaveTextContent('Phiên đăng nhập có hạn 7 ngày');
+    expect(main).toHaveTextContent('Tài khoản Jira Cloud bạn kết nối');
+    expect(main).toHaveTextContent('không tự thu hồi grant phía Atlassian');
     expect(main.textContent).not.toMatch(/gỡ khoá|bản nháp|lịch sử của cả nhóm|security@/i);
   });
 

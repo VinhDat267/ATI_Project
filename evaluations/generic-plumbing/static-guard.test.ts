@@ -52,6 +52,7 @@ const exceptions = [
   { file: 'apps/chat-api/src/services/jira/jira-approval-guard.ts', pattern: /^jira$/, reason: 'Jira-specific approval binding checks grant-site product type in SQL.' },
   { file: 'apps/chat-api/src/services/jira/jira-dispatch-guard.ts', pattern: /^jira$/, reason: 'Jira-specific dispatch guard checks grant-site product type in SQL.' },
   { file: 'apps/chat-api/src/services/jira/jira-history-sanitizer.ts', pattern: /^jira$/, reason: 'Jira-specific history sanitizer checks message service type.' },
+  { file: 'apps/chat-api/src/services/jira-legacy-migration.ts', pattern: /^jira$/, reason: 'JIRA-11 legacy Jira schedule migration scans and pauses legacy jira.* schedules.' },
   { file: 'apps/chat-api/src/services/trello/connection-reference.ts', pattern: /^trello(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal Trello OAuth names that service.' },
   { file: 'apps/chat-api/src/services/trello/token-manager.ts', pattern: /^trello(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal Trello OAuth names that service.' },
   { file: 'apps/chat-api/src/services/github/connection-reference.ts', pattern: /^github(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal GitHub OAuth names that service.' },

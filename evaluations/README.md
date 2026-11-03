@@ -968,6 +968,39 @@ Sheets and outputs stay in the ignored `docs/ai-evidence/USABLE-PLAN/`; only
 the summary goes here after the session. **Not measured yet**: no session has
 run.
 
+## JIRA-10 & JIRA-11: Jira Cloud OAuth 3LO (`myjira`) evaluation and rollout
+
+- **`EVAL_SET=myjira` (`evaluations/golden-v2/cases-myjira.json`).** Preregisters
+  24 cases covering single-step (`myjira.create_issue`, `myjira.add_comment`),
+  multi-step/multi-site in one plan, cross-service (`myjira` + `slack`, `myjira`
+  + `trello`), clarification (ambiguous project across sites, missing project,
+  unconnected site), read-only immediate clarification, refusal (destructive
+  delete), and prompt injection (direct and indirect via `myjira.search_issues`).
+  `run.ts` supplies a synthetic workspace actor (`userId: 'eval-user'`,
+  `workspaceId: 'ws-eval'`) so the planner's composite `(workspaceId, siteId,
+  projectKey, issueKey)` grounding rules are exercised identically to
+  production.
+
+  ```bash
+  LIVE_EVAL=1 EVAL_SET=myjira PLANNER_SEARCH_MODE=llm EVAL_CONCURRENCY=1 EVAL_RUNS=3 node --env-file=.env --import tsx evaluations/golden-v2/run.ts
+  ```
+
+- **Pre-cutover legacy Jira schedule scanner/pauser (`JIRA-11`).** Before or
+  during cutover from shared Basic Auth `jira.*` to per-member OAuth 3LO
+  `myjira.*`, scan and pause any active schedules whose approved plan still
+  contains legacy `jira.*` steps:
+
+  ```bash
+  node --env-file=.env scripts/scan-pause-legacy-jira.mjs --dry-run
+  node --env-file=.env scripts/scan-pause-legacy-jira.mjs --apply
+  ```
+
+- **Live Atlassian acceptance (`P-LIVE`).** Rollout keeps `MYJIRA_ENABLED=off`
+  by default in `.env.example`. When real Atlassian 3LO credentials and two test
+  sites are provisioned by the project owner, store private live-acceptance
+  artifacts only in the ignored `docs/ai-evidence/JIRA-LIVE/` directory (verify
+  `git check-ignore docs/ai-evidence/JIRA-LIVE/probe.json` before writing).
+
 ## Legacy golden set (v1)
 
 `runEvaluations({ useMock: true })` over `golden-prompts.json` is an offline
