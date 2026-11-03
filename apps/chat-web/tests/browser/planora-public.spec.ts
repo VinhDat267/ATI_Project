@@ -39,12 +39,30 @@ for (const vp of VIEWPORTS) {
       await expect(page.getByTestId('landing-schedule-digest-section')).toBeVisible();
       await expect(page.getByTestId('workflow-flow-canvas')).toBeVisible();
 
-      // Header actions fit within viewport without overflow
-      const navSignup = page.locator('.planora-landing-nav-actions button').filter({ hasText: 'Đăng ký' });
+      // Header actions fit within viewport without overflow (R1, R2, R3)
+      const navSignup = page.locator('.planora-landing-nav-actions [data-od-id="btn-header-signup"]');
       await expect(navSignup).toBeVisible();
       const navBox = await navSignup.boundingBox();
       expect(navBox).not.toBeNull();
       expect((navBox?.x ?? 0) + (navBox?.width ?? 0)).toBeLessThanOrEqual(vp.width);
+      expect(navBox?.height).toBeGreaterThanOrEqual(44);
+
+      const navLogin = page.locator('.planora-landing-nav-actions [data-od-id="btn-header-login"]');
+      await expect(navLogin).toBeVisible();
+      const navLoginBox = await navLogin.boundingBox();
+      expect(navLoginBox).not.toBeNull();
+      expect(navLoginBox?.height).toBeGreaterThanOrEqual(44);
+
+      // Landing CTA tap targets >= 44px (R3)
+      const playbookBtn = page.getByTestId('landing-try-playbook-btn');
+      await expect(playbookBtn).toBeVisible();
+      const playbookBox = await playbookBtn.boundingBox();
+      expect(playbookBox?.height).toBeGreaterThanOrEqual(44);
+
+      const digestBtn = page.getByTestId('landing-try-digest-btn');
+      await expect(digestBtn).toBeVisible();
+      const digestBox = await digestBtn.boundingBox();
+      expect(digestBox?.height).toBeGreaterThanOrEqual(44);
 
       // No horizontal overflow across all sections
       const noOverflow = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);

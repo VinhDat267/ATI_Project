@@ -92,6 +92,23 @@ html.dark[data-proto-page="index"] {
   height: 44px;
 }
 
+.planora-landing-nav-actions .planora-btn-sm {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+[data-testid="landing-try-playbook-btn"],
+[data-testid="landing-try-digest-btn"] {
+  min-height: 44px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+}
+
 /* ==========================================================================
    2. Hero Section
    ========================================================================== */
@@ -830,21 +847,48 @@ html.dark[data-proto-page="index"] {
 
 @media (max-width: 768px) {
   .planora-landing-nav-inner {
-    padding: 10px 14px;
+    padding: 8px 12px;
     gap: 8px;
     justify-content: space-between;
   }
-  .planora-brand .planora-brand-sub {
-    display: none;
+  .planora-landing-nav .planora-brand .planora-brand-sub {
+    display: none !important;
+  }
+  .planora-landing-nav .planora-brand-symbol svg {
+    width: 22px !important;
+    height: 22px !important;
+  }
+  .planora-landing-nav .planora-brand.planora-brand-md,
+  .planora-landing-nav .planora-brand {
+    gap: 6px !important;
+    min-height: 44px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+  }
+  .planora-landing-nav .planora-brand.planora-brand-md .planora-brand-word,
+  .planora-landing-nav .planora-brand .planora-brand-word {
+    font-size: 18px !important;
+    line-height: 1 !important;
   }
   .planora-landing-nav-actions {
     gap: 6px;
     flex-shrink: 0;
   }
+  .planora-landing-nav-actions .ati-theme-toggle {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
   .planora-landing-nav-actions .planora-btn-sm {
-    padding: 6px 10px;
-    font-size: 12px;
-    min-width: auto;
+    min-height: 44px !important;
+    height: 44px !important;
+    padding: 0 10px !important;
+    font-size: 12px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
   }
   .planora-landing-links {
     display: none;
@@ -888,18 +932,40 @@ html.dark[data-proto-page="index"] {
 
 @media (max-width: 360px) {
   .planora-landing-nav-inner {
-    padding: 8px 10px;
+    padding: 6px 8px;
     gap: 4px;
   }
-  .planora-brand .planora-brand-word {
-    font-size: 18px;
+  .planora-landing-nav .planora-brand-symbol svg {
+    width: 20px !important;
+    height: 20px !important;
+  }
+  .planora-landing-nav .planora-brand.planora-brand-md,
+  .planora-landing-nav .planora-brand {
+    gap: 4px !important;
+    min-height: 44px !important;
+  }
+  .planora-landing-nav .planora-brand.planora-brand-md .planora-brand-word,
+  .planora-landing-nav .planora-brand .planora-brand-word {
+    font-size: 16px !important;
+    line-height: 1 !important;
   }
   .planora-landing-nav-actions {
     gap: 4px;
   }
+  .planora-landing-nav-actions .ati-theme-toggle {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
   .planora-landing-nav-actions .planora-btn-sm {
-    padding: 6px 8px;
-    font-size: 11px;
+    min-height: 44px !important;
+    height: 44px !important;
+    padding: 0 6px !important;
+    font-size: 11px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
   }
   .planora-hero-section {
     padding: 32px 12px 48px;

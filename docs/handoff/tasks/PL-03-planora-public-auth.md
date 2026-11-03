@@ -128,6 +128,9 @@ Port giao diện Landing, Đăng nhập (Login), Đăng ký (Signup) và Auth Fr
     - Thêm `|PL-03:` vào default grep của `scripts/test-v3-browser.mjs:15`.
   - **F7 (P3) - Breakpoint auth 1024px:** Điều chỉnh boundary thành `max-width: 1023.98px` trong `auth.css` và `page.css`, đảm bảo tại viewport 1024×768 panel split nghệ thuật giấy Planora luôn hiển thị đúng đặc tả.
   - **F8 (P3) - Tap target >= 44px trên mọi control:** Tăng kích thước vùng tương tác cho "Quên mật khẩu?" (`.planora-auth-forgot-link` min-height 44px), nút ThemeToggle (44×44px), nút đóng cửa sổ (44×44px), và nút Brand (min-height 44px). Bổ sung assertions kiểm chứng trong `planora-public.spec.ts`.
+  - **R1 (P2) - Xử lý dứt điểm F1 header navbar mobile:** Tăng độ đặc hiệu CSS scoped với `.planora-landing-nav .planora-brand.planora-brand-md .planora-brand-word` (18px trên <=768px, 16px trên <=360px), biểu tượng SVG (22px / 20px), khoảng cách gap (6px / 4px), và padding (8px 12px / 6px 8px). Quy tắc này thắng hoàn toàn stylesheet order của `components.css`, đảm bảo `scrollWidth <= window.innerWidth` trên 375px và 320px không bị cắt hay tràn ngang.
+  - **R2 (P2) - Sửa Playwright locator khớp element `<a>` thật:** Sửa selector trong `planora-public.spec.ts` từ `button` sang `[data-od-id="btn-header-signup"]` (khớp đúng thẻ `<a>` hiện có của nút Đăng ký), loại bỏ lỗi timeout trên cả 10 ca kiểm thử responsive.
+  - **R3 (P3) - Vùng tương tác tap target >= 44px cho toàn bộ Landing CTAs:** Thiết lập `min-height: 44px` cho `[data-testid="landing-try-playbook-btn"]`, `[data-testid="landing-try-digest-btn"]`, nút Đăng nhập header và Đăng ký header; bổ sung kiểm chứng bounding box height >= 44px trong `planora-public.spec.ts`.
 
 - **Kết quả kiểm thử:**
   - `npm run typecheck:v3`: PASS (exit code 0).
