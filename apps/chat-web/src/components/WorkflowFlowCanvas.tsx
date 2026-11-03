@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { getServiceDefinition } from '@wap/tool-schemas';
 import assets from '../assets/cockpit-services.json';
-import type { PlanStep, StepState } from '../types';
+import type { PlanStep, ServiceInfo, StepState } from '../types';
 import { ServiceLogo } from './ServiceLogo';
 import { operation, planStepDataFlows, serviceId } from '../pages/Cockpit/presentation';
 import { PlanoraWorkflowSteps } from '../planora/workspace/PlanoraWorkflowSteps';
@@ -18,6 +18,8 @@ export interface WorkflowFlowStep {
   dependsOn?: string[];
   status?: StepState;
   duration?: string;
+  output?: unknown;
+  error?: string;
 }
 
 export interface WorkflowFlowCanvasProps {
@@ -34,6 +36,8 @@ export interface WorkflowFlowCanvasProps {
   className?: string;
   variant?: 'orbital' | 'planora';
   showStepCards?: boolean;
+  serviceInfos?: ServiceInfo[];
+  destination?: (step: PlanStep, labels?: Record<string, string>) => string;
 }
 
 interface OrbitalServiceMeta {

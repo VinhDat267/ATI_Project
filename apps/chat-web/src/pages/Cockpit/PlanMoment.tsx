@@ -1,9 +1,7 @@
 // Source: AppStagePage.tsx moment-4. Demo actions replaced with the approved-plan API callbacks.
 import { useState, type ReactNode } from 'react';
 import type { ActivePlan, PlanStep, ServiceInfo } from '../../types';
-import { ServiceLogo } from '../../components/ServiceLogo';
 import { PlanoraWorkflowSteps } from '../../planora/workspace/PlanoraWorkflowSteps';
-import { operation, planStepDataFlows, serviceId, servicePalette, serviceName } from './presentation';
 import { RequestEcho } from './RequestEcho';
 
 export function PlanMoment({
@@ -34,7 +32,6 @@ export function PlanMoment({
   const [techOpen, setTechOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<string | null>(null);
   const [approvingLocal, setApprovingLocal] = useState(false);
-  const dataFlows = planStepDataFlows(plan.steps);
 
   const handleApprove = () => {
     if (approvingLocal || isApproving || !plan.id) return;
@@ -103,98 +100,25 @@ export function PlanMoment({
         selectedService={selectedService}
         onSelectService={setSelectedService}
         onStepPreview={onPreview}
-        showStepCards={false}
+        destination={destination}
+        serviceInfos={services}
+        showStepCards={true}
       />
 
-      {/* 4 Task Action Cards */}
-      <div className="v3-space-y-3" id="plan-cards-container" role="list" aria-label="Các bước thực thi">
-        {plan.steps.map((step, index) => {
-          const service = serviceId(step.tool);
-          const palette = servicePalette(service);
-          const isHighlighted = selectedService === service;
-          const incomingFlows = dataFlows.filter((edge) => edge.toStepId === step.id);
-          return (
-            <article
-              key={step.id}
-              data-highlighted-step={isHighlighted ? 'true' : undefined}
-              className={`plan-card-stagger-${Math.min(index + 1, 4)} bg-[var(--planora-paper)] rounded-2xl border ${
-                isHighlighted
-                  ? 'border-[var(--planora-primary)] ring-2 ring-[var(--planora-primary)]/20'
-                  : 'border-[var(--planora-divider)]'
-              } p-4 sm:p-5 shadow-soft-card transition-all hover:border-[var(--planora-border-strong)]`}
-              data-od-id={`plan-item-${index + 1}`}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-3.5 min-w-0">
-                  <div
-                    className={`w-9 h-9 rounded-xl ${palette.icon} flex items-center justify-center flex-shrink-0 mt-0.5 border shadow-sm`}
-                  >
-                    <ServiceLogo service={service} className={`w-4 h-4 ${palette.logo ?? ''}`} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`text-xs font-semibold px-2 py-0.5 ${palette.badge} rounded-md`}>
-                        {serviceName(service, services)}
-                      </span>
-                      <span className="text-xs font-medium px-2 py-0.5 bg-[var(--planora-surface-inset)] text-[var(--planora-text)] rounded-md border border-[var(--planora-divider)]">
-                        {operation(step.tool).action}
-                      </span>
-                      <span className="text-xs text-[var(--planora-muted)]">Việc {index + 1}</span>
-                      {incomingFlows.map((edge) => (
-                        <span
-                          key={`${edge.fromStepId}-${edge.field}`}
-                          data-testid="plan-step-data-flow-badge"
-                          className="text-[11px] font-semibold px-2 py-0.5 bg-[var(--planora-pending-bg)] text-[var(--planora-pending-text)] border border-[var(--planora-pending-border)] rounded-full"
-                        >
-                          Dữ liệu từ Việc {edge.fromIndex} → Việc {edge.toIndex} ({edge.field})
-                        </span>
-                      ))}
-                    </div>
-                    <h2 className="text-base font-semibold text-[var(--planora-text)] mt-1.5 leading-snug">
-                      {step.tool === 'mysheets.read_range'
-                        ? `Đọc từ bảng tính của bạn: ${plan.resourceLabels?.[String(step.args.spreadsheetId)] ?? step.description}`
-                        : step.description}
-                    </h2>
-                    <p className="text-xs text-[var(--planora-muted)] mt-1 break-words">
-                      Đích đến: {destination(step, plan.resourceLabels)}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  id={`preview-${step.id}`}
-                  type="button"
-                  onClick={() => onPreview(step)}
-                  className="flex-shrink-0 px-3 py-1.5 bg-[var(--planora-surface-inset)] hover:bg-[var(--planora-surface-hover)] text-[var(--planora-text)] text-xs font-medium rounded-lg border border-[var(--planora-divider)] transition-colors inline-flex items-center gap-1.5 cursor-pointer"
-                  aria-label="Xem trước"
-                >
-                  <svg className="w-3.5 h-3.5 text-[var(--planora-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                    />
-                  </svg>
-                  <span>Xem trước</span>
-                </button>
-              </div>
-            </article>
-          );
-        })}
-      </div>
-
-      {/* Cryptographic Plan Hash Binding */}
+      {/* Cryptographic Plan Hash Binding / Plan Identifier */}
       <div
         data-testid="plan-hash-binding"
         className="text-[11px] font-mono text-[var(--planora-muted)] bg-[var(--planora-surface-inset)] border border-[var(--planora-divider)] p-2.5 sm:p-3 rounded-xl break-all"
       >
-        Mã băm ràng buộc kế hoạch (plan_hash): <code>{(plan as { plan_hash?: string }).plan_hash ?? plan.id}</code>
+        {(plan as { plan_hash?: string }).plan_hash ? (
+          <>
+            Mã băm ràng buộc kế hoạch (plan_hash): <code>{(plan as { plan_hash?: string }).plan_hash}</code>
+          </>
+        ) : (
+          <>
+            Mã định danh kế hoạch: <code>{plan.id}</code>
+          </>
+        )}
       </div>
 
       {/* Warning Banner */}

@@ -39,9 +39,21 @@ export function ExecutionMoment({
   const running = steps.findIndex((step) => step.status === 'running');
   const current = running < 0 ? Math.min(completed + 1, steps.length) : running + 1;
   const stepStatuses = Object.fromEntries(steps.map((step) => [step.id, step.status]));
-  const canvasSteps: PlanStep[] = planSteps.length
+  const baseSteps: PlanStep[] = planSteps.length
     ? planSteps
-    : steps.map((step) => ({ id: step.id, tool: step.tool, description: step.description, args: {} }));
+    : steps.map((s) => ({ id: s.id, tool: s.tool, description: s.description, args: {} }));
+  const canvasSteps = baseSteps.map((planStep) => {
+    const execStep = steps.find((s) => s.id === planStep.id);
+    return {
+      id: planStep.id,
+      tool: planStep.tool,
+      description: planStep.description,
+      args: planStep.args ?? {},
+      dependsOn: planStep.dependsOn,
+      status: execStep?.status ?? 'pending',
+      duration: execStep?.duration,
+    };
+  });
 
   return (
     <section
@@ -95,7 +107,8 @@ export function ExecutionMoment({
         selectedService={selectedService}
         onSelectService={setSelectedService}
         mode="executing"
-        showStepCards={false}
+        destination={destination}
+        showStepCards={true}
       />
       {/* Timeline items with Vietnam duration and service logo */}
       <div className="v3-space-y-3" id="exec-timeline">

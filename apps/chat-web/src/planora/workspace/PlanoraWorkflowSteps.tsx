@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { getServiceDefinition } from '@wap/tool-schemas';
 import { toolDefinition } from '../../services/tool-definitions';
 import assets from '../../assets/cockpit-services.json';
-import type { StepState } from '../../types';
+import type { PlanStep, StepState } from '../../types';
+import type { ExecutionStepInfo } from '../../components/ExecutionProgress';
+import { resourceDestination } from '../../components/Cockpit';
 import { ServiceLogo } from '../../components/ServiceLogo';
 import { StatusBadge } from '../components/StatusBadge';
 import {
@@ -12,6 +14,7 @@ import {
   serviceName,
   servicePalette,
   statusLabel,
+  resultTitle,
 } from '../../pages/Cockpit/presentation';
 import type {
   WorkflowFlowCanvasProps,
@@ -279,6 +282,8 @@ export function PlanoraWorkflowSteps({
   onStepPreview,
   className = '',
   showStepCards = true,
+  serviceInfos,
+  destination,
 }: WorkflowFlowCanvasProps) {
   const [internalSelectedService, setInternalSelectedService] = useState<string | null>(null);
 
@@ -648,131 +653,184 @@ export function PlanoraWorkflowSteps({
       {/* Planora Step Cards: Structured Grid (desktop 2-cols, mobile vertical) */}
       {steps.length > 0 && showStepCards && (
         <div
-          data-testid="planora-step-cards-grid"
-          className="grid grid-cols-1 md:grid-cols-2 gap-3.5 mt-3 pt-3 border-t border-[var(--planora-divider)]"
+          id={mode === 'preview' ? 'plan-cards-container' : undefined}
+          role={mode === 'preview' ? 'list' : undefined}
+          aria-label={mode === 'preview' ? 'Các bước thực thi' : undefined}
+          className="mt-3 pt-3 border-t border-[var(--planora-divider)]"
         >
-          {steps.map((step, index) => {
-            const svc = serviceId(step.tool);
-            const palette = servicePalette(svc);
-            const isHighlighted = selectedService === svc;
-            const toolDef = toolDefinition(step.tool);
-            const isRead = toolDef?.sideEffect === 'read';
-            const incomingFlows = dataFlowBadges.filter((edge) => edge.toStepId === step.id);
-            const stepStatus = stepStatuses[step.id] ?? step.status ?? (mode === 'receipt' ? 'succeeded' : 'pending');
-            const scopes = extractScopeBadges(step, resourceLabels);
+          <div
+            data-testid="planora-step-cards-grid"
+            className="grid grid-cols-1 md:grid-cols-2 gap-3.5"
+          >
+            {steps.map((step, index) => {
+              const svc = serviceId(step.tool);
+              const palette = servicePalette(svc);
+              const isHighlighted = selectedService === svc;
+              const toolDef = toolDefinition(step.tool);
+              const isRead = toolDef?.sideEffect === 'read';
+              const incomingFlows = dataFlowBadges.filter((edge) => edge.toStepId === step.id);
+              const stepStatus = stepStatuses[step.id] ?? step.status ?? (mode === 'receipt' ? 'succeeded' : 'pending');
+              const scopes = extractScopeBadges(step, resourceLabels);
+              const resolvedDest = destination
+                ? destination(step as PlanStep, resourceLabels)
+                : resourceDestination(step as PlanStep, resourceLabels);
+              const nonRedundantScopes = scopes.filter(
+                (scope) =>
+                  !resolvedDest ||
+                  (!resolvedDest.toLowerCase().includes(scope.toLowerCase()) &&
+                    !scope.toLowerCase().includes(resolvedDest.toLowerCase()))
+              );
 
-            return (
-              <div
-                key={step.id}
-                data-testid={`planora-step-card-${step.id}`}
-                data-step-index={index + 1}
-                data-highlighted-step={isHighlighted ? 'true' : undefined}
-                className={`p-4 rounded-xl border transition-all ${
-                  isHighlighted
-                    ? 'border-[var(--planora-primary)] ring-2 ring-[var(--planora-primary)]/20 bg-[var(--planora-paper)] shadow-sm'
-                    : 'border-[var(--planora-divider)] bg-[var(--planora-canvas)] hover:border-[var(--planora-border-strong)]'
-                } flex flex-col justify-between gap-3 min-w-0`}
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className={`w-7 h-7 rounded-lg ${palette.icon} flex items-center justify-center p-1 border flex-shrink-0`}>
-                        <ServiceLogo service={svc} className="w-4 h-4" />
-                      </div>
-                      <span className="font-semibold text-xs text-[var(--planora-text)] truncate">
-                        Bước {index + 1}: {serviceName(svc, [])}
-                      </span>
-                      <span
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                          isRead
-                            ? 'bg-[var(--planora-primary-soft)] text-[var(--planora-primary)]'
-                            : 'bg-[var(--planora-pending-bg)] text-[var(--planora-pending-text)] border border-[var(--planora-pending-border)]'
-                        }`}
-                      >
-                        {isRead ? 'Chỉ đọc' : 'Ghi'}
-                      </span>
-                    </div>
-                    <StatusBadge
-                      status={
-                        stepStatus === 'succeeded'
-                          ? 'success'
-                          : stepStatus === 'failed'
-                            ? 'error'
-                            : 'pending'
-                      }
-                      label={statusLabel(stepStatus)}
-                    />
-                  </div>
-
-                  <div className="mt-1">
-                    <div className="text-xs font-semibold text-[var(--planora-text)] mb-0.5">
-                      {operation(step.tool).action}
-                    </div>
-                    <p className="text-xs text-[var(--planora-muted)] leading-relaxed break-words">
-                      {step.description}
-                    </p>
-                  </div>
-
-                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                    {scopes.map((scope) => (
-                      <span
-                        key={scope}
-                        className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[var(--planora-surface-inset)] text-[var(--planora-text)] border border-[var(--planora-divider)] truncate max-w-full"
-                      >
-                        Phạm vi: {scope}
-                      </span>
-                    ))}
-                    {step.dependsOn && step.dependsOn.length > 0 && (
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--planora-surface-inset)] text-[var(--planora-muted)] border border-[var(--planora-divider)]">
-                        Phụ thuộc: {step.dependsOn.map((depId) => {
-                          const depIndex = steps.findIndex((s) => s.id === depId);
-                          return depIndex >= 0 ? `Việc ${depIndex + 1}` : depId;
-                        }).join(', ')}
-                      </span>
-                    )}
-                    {incomingFlows.map((edge) => (
-                      <span
-                        key={`${edge.fromStepId}-${edge.field}`}
-                        data-testid="plan-step-data-flow-badge"
-                        className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[var(--planora-pending-bg)] text-[var(--planora-pending-text)] border border-[var(--planora-pending-border)]"
-                      >
-                        Dữ liệu từ Việc {edge.fromIndex} → Việc {edge.toIndex} ({edge.field})
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="pt-2 border-t border-[var(--planora-divider)] flex items-center justify-between gap-2 flex-wrap">
+              return (
+                <article
+                  key={step.id}
+                  data-testid={`planora-step-card-${step.id}`}
+                  data-step-index={index + 1}
+                  data-od-id={`plan-item-${index + 1}`}
+                  data-highlighted-step={isHighlighted ? 'true' : undefined}
+                  className={`plan-card-stagger-${Math.min(index + 1, 4)} p-4 rounded-xl border transition-all ${
+                    isHighlighted
+                      ? 'border-[var(--planora-primary)] ring-2 ring-[var(--planora-primary)]/20 bg-[var(--planora-paper)] shadow-sm'
+                      : 'border-[var(--planora-divider)] bg-[var(--planora-canvas)] hover:border-[var(--planora-border-strong)]'
+                  } flex flex-col justify-between gap-3 min-w-0`}
+                >
                   <div>
-                    {step.duration && (
-                      <span className="text-[11px] font-mono text-[var(--planora-muted)]">
-                        {step.duration}
-                      </span>
+                    <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className={`w-7 h-7 rounded-lg ${palette.icon} flex items-center justify-center p-1 border flex-shrink-0`}>
+                          <ServiceLogo service={svc} className="w-4 h-4" />
+                        </div>
+                        <span className="font-semibold text-xs text-[var(--planora-text)] truncate">
+                          Bước {index + 1}: {serviceName(svc, serviceInfos ?? [])}
+                        </span>
+                        <span
+                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                            isRead
+                              ? 'bg-[var(--planora-primary-soft)] text-[var(--planora-primary)]'
+                              : 'bg-[var(--planora-pending-bg)] text-[var(--planora-pending-text)] border border-[var(--planora-pending-border)]'
+                          }`}
+                        >
+                          {isRead ? 'Chỉ đọc' : 'Ghi'}
+                        </span>
+                      </div>
+                      <StatusBadge
+                        status={
+                          stepStatus === 'succeeded'
+                            ? 'success'
+                            : stepStatus === 'failed'
+                              ? 'error'
+                              : 'pending'
+                        }
+                        label={statusLabel(stepStatus)}
+                      />
+                    </div>
+
+                    <div className="mt-1">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className="text-xs font-medium px-2 py-0.5 bg-[var(--planora-surface-inset)] text-[var(--planora-text)] rounded-md border border-[var(--planora-divider)]">
+                          {operation(step.tool).action}
+                        </span>
+                        <span className="text-xs text-[var(--planora-muted)]">Việc {index + 1}</span>
+                        {mode === 'receipt' && stepStatus === 'succeeded' && (
+                          <span className="text-xs font-semibold text-emerald-600">
+                            ✓ {operation(step.tool).receipt}
+                          </span>
+                        )}
+                      </div>
+
+                      <h2 className="text-sm sm:text-base font-semibold text-[var(--planora-text)] mt-1 leading-snug break-words">
+                        {mode === 'receipt'
+                          ? `Kết quả: ${resultTitle(step as ExecutionStepInfo)}`
+                          : mode === 'executing'
+                            ? `Bước ${index + 1}: ${step.description}`
+                            : step.tool === 'mysheets.read_range'
+                              ? `Đọc từ bảng tính của bạn: ${resourceLabels?.[String(step.args?.spreadsheetId)] ?? step.description}`
+                              : step.description}
+                      </h2>
+
+                      {mode !== 'receipt' && resolvedDest && (
+                        <p className="text-xs text-[var(--planora-muted)] mt-1 break-words">
+                          Đích đến: {resolvedDest}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                      {nonRedundantScopes.map((scope) => (
+                        <span
+                          key={scope}
+                          className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[var(--planora-surface-inset)] text-[var(--planora-text)] border border-[var(--planora-divider)] truncate max-w-full"
+                        >
+                          Phạm vi: {scope}
+                        </span>
+                      ))}
+                      {step.dependsOn && step.dependsOn.length > 0 && (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--planora-surface-inset)] text-[var(--planora-muted)] border border-[var(--planora-divider)]">
+                          Phụ thuộc: {step.dependsOn.map((depId) => {
+                            const depIndex = steps.findIndex((s) => s.id === depId);
+                            return depIndex >= 0 ? `Việc ${depIndex + 1}` : depId;
+                          }).join(', ')}
+                        </span>
+                      )}
+                      {incomingFlows.map((edge) => (
+                        <span
+                          key={`${edge.fromStepId}-${edge.field}`}
+                          data-testid="plan-step-data-flow-badge"
+                          className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[var(--planora-pending-bg)] text-[var(--planora-pending-text)] border border-[var(--planora-pending-border)]"
+                        >
+                          Dữ liệu từ Việc {edge.fromIndex} → Việc {edge.toIndex} ({edge.field})
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-[var(--planora-divider)] flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      {stepStatus === 'succeeded' && step.duration && (
+                        <span className="text-[11px] font-mono text-[var(--planora-muted)]">
+                          Thời gian: {step.duration}
+                        </span>
+                      )}
+                    </div>
+                    {onStepPreview && (
+                      <button
+                        id={`preview-${step.id}`}
+                        data-testid={`preview-step-btn-${step.id}`}
+                        type="button"
+                        aria-label="Xem trước"
+                        onClick={() =>
+                          onStepPreview({
+                            id: step.id,
+                            tool: step.tool,
+                            description: step.description,
+                            args: step.args ?? {},
+                            dependsOn: step.dependsOn,
+                          })
+                        }
+                        className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-[var(--planora-surface-inset)] hover:bg-[var(--planora-surface-hover)] text-[var(--planora-text)] border border-[var(--planora-divider)] transition-colors inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <svg className="w-3.5 h-3.5 text-[var(--planora-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                          />
+                        </svg>
+                        <span>Xem trước</span>
+                      </button>
                     )}
                   </div>
-                  {onStepPreview && step.args && (
-                    <button
-                      type="button"
-                      data-testid={`preview-step-btn-${step.id}`}
-                      aria-label="Xem trước"
-                      onClick={() =>
-                        onStepPreview({
-                          id: step.id,
-                          tool: step.tool,
-                          description: step.description,
-                          args: step.args ?? {},
-                          dependsOn: step.dependsOn,
-                        })
-                      }
-                      className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-[var(--planora-surface-inset)] hover:bg-[var(--planora-surface-hover)] text-[var(--planora-text)] border border-[var(--planora-divider)] transition-colors inline-flex items-center gap-1 cursor-pointer"
-                    >
-                      <span>Xem trước</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+                </article>
+              );
+            })}
+          </div>
         </div>
       )}
 

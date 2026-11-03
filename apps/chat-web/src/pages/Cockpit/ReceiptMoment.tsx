@@ -244,6 +244,7 @@ export function ReceiptMoment({
   onSettings,
   servicesLoading,
   servicesError,
+  schedulesEnabled,
 }: CardProps & {
   request?: string;
   terminalStatus?: string;
@@ -255,6 +256,7 @@ export function ReceiptMoment({
   onSettings?: () => void;
   servicesLoading?: boolean;
   servicesError?: string | null;
+  schedulesEnabled?: boolean;
 }) {
   const [selectedService, setSelectedService] = useState<string | null>(null);
   const rows: ExecutionStepInfo[][] = [];
@@ -274,9 +276,23 @@ export function ReceiptMoment({
   };
   const getPrompt = servicePrompt ?? ((s) => s.name);
   const stepStatuses = Object.fromEntries(steps.map((step) => [step.id, step.status]));
-  const canvasSteps: PlanStep[] = planSteps.length
+  const baseSteps: PlanStep[] = planSteps.length
     ? planSteps
-    : steps.map((step) => ({ id: step.id, tool: step.tool, description: step.description, args: {} }));
+    : steps.map((s) => ({ id: s.id, tool: s.tool, description: s.description, args: {} }));
+  const canvasSteps = baseSteps.map((planStep) => {
+    const execStep = steps.find((s) => s.id === planStep.id);
+    return {
+      id: planStep.id,
+      tool: planStep.tool,
+      description: planStep.description,
+      args: planStep.args ?? {},
+      dependsOn: planStep.dependsOn,
+      status: execStep?.status ?? (terminalStatus ? 'failed' : 'succeeded'),
+      duration: execStep?.duration,
+      output: execStep?.output,
+      error: execStep?.error,
+    };
+  });
 
   return (
     <section
@@ -362,7 +378,9 @@ export function ReceiptMoment({
           selectedService={selectedService}
           onSelectService={setSelectedService}
           mode="receipt"
-          showStepCards={false}
+          destination={destination}
+          serviceInfos={services}
+          showStepCards={true}
         />
         <div id="receipt-chain" className="flex flex-col gap-3">
           {rows.map((row, rowIndex) => {
@@ -434,22 +452,24 @@ export function ReceiptMoment({
                 <span>{getPrompt(service)}</span>
               </button>
             ))}
-          <button
-            type="button"
-            data-testid="receipt-schedule-workflow-btn"
-            onClick={() => onFollowup(`Mỗi sáng 08:00, tự động thực hiện: ${request || 'quy trình vừa hoàn tất'}`)}
-            className="px-4 py-2.5 bg-[var(--planora-pending-bg)] hover:opacity-90 border border-[var(--planora-pending-border)] text-[var(--planora-pending-text)] text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition-all inline-flex items-center gap-1.5 cursor-pointer"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <span>Đặt lịch chạy định kỳ quy trình này</span>
-          </button>
+          {schedulesEnabled === true && (
+            <button
+              type="button"
+              data-testid="receipt-schedule-workflow-btn"
+              onClick={() => onFollowup(`Mỗi sáng 08:00, tự động thực hiện: ${request || 'quy trình vừa hoàn tất'}`)}
+              className="px-4 py-2.5 bg-[var(--planora-pending-bg)] hover:opacity-90 border border-[var(--planora-pending-border)] text-[var(--planora-pending-text)] text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition-all inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span>Đặt lịch chạy định kỳ quy trình này</span>
+            </button>
+          )}
           {!servicesLoading && !servicesError && !services.some((service) => service.configured) && (
             <p className="text-xs text-[var(--planora-muted)]">
               Chưa có dịch vụ nào được kết nối.{' '}

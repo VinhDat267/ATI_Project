@@ -331,6 +331,7 @@ export function PlanoraActiveTurn(props: PlanoraActiveTurnProps) {
           onSettings={onSettings}
           servicesLoading={servicesLoading}
           servicesError={servicesError}
+          schedulesEnabled={schedulesEnabled}
         />
       ) : [7, 8, 9].includes(moment as number) ? (
         <RecoveryMoment

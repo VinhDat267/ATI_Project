@@ -81,19 +81,20 @@ Chuyển đổi giao diện hiển thị kế hoạch (Plan), thực thi (Execut
 ## 5. Kết quả (Worker điền sau khi hoàn thành)
 
 - **Worker:** Antigravity (Gemini).
-- **Trạng thái:** Hoàn thành toàn diện, sẵn sàng Codex review (`STATUS: READY_FOR_CODEX_REVIEW`).
+- **Trạng thái:** Đã hoàn thành sửa 3 findings P2 (F1–F3) từ Codex Review Vòng 1 (`STATUS: READY_FOR_CODEX_RE_REVIEW`).
 - **Base SHA:** `e97d71862cee773be9e37f9ef9e456ea36975932`.
 - **Target branch:** `codex/planora-ui`.
 - **Các thay đổi chính:**
-  1. `apps/chat-web/src/planora/workspace/PlanoraWorkflowSteps.tsx`: Khởi tạo component hiển thị luồng quy trình Planora hỗ trợ đầy đủ 5 modes (`preview`, `executing`, `receipt`, `schedule`, `blueprint`), step cards hiển thị grid/cột responsive, nhãn Read/Write, phụ thuộc `dependsOn`, data-flow mappings và `showStepCards` toggle.
-  2. `apps/chat-web/src/components/WorkflowFlowCanvas.tsx`: Hỗ trợ `variant?: 'orbital' | 'planora'` và xuất khẩu `PlanoraWorkflowSteps`.
-  3. `apps/chat-web/src/pages/Cockpit/PlanMoment.tsx`: Tích hợp `PlanoraWorkflowSteps`, bổ sung busy locking chống click đúp duyệt kế hoạch (`approvingLocal` guard) và mã băm mật mã ràng buộc kế hoạch `data-testid="plan-hash-binding"`.
-  4. `apps/chat-web/src/pages/Cockpit/ExecutionMoment.tsx`: Tích hợp `PlanoraWorkflowSteps` chế độ `executing`, đồng bộ token màu Planora.
-  5. `apps/chat-web/src/pages/Cockpit/ReceiptMoment.tsx`: Tích hợp `PlanoraWorkflowSteps` chế độ `receipt`, bảo toàn safe result links và nút 1-click đặt lịch định kỳ.
-  6. `apps/chat-web/src/pages/Cockpit/{PreviewContents,GmailPreview,PreviewModal}.tsx`: Bảo vệ an toàn chống tràn ngang layout 320px (`overflow-x-auto min-w-0 break-words break-all`), chống giả mạo email Gmail, bảo toàn đầy đủ test selectors.
-  7. `apps/chat-web/tests/planora-workflow-steps.test.tsx`: 9 unit tests chuyên sâu kiểm tra chi tiết workflow steps, action bar busy locking, preview modals và anti-spoofing.
+  1. `apps/chat-web/src/planora/workspace/PlanoraWorkflowSteps.tsx`: Khởi tạo component hiển thị luồng quy trình Planora hỗ trợ đầy đủ 5 modes (`preview`, `executing`, `receipt`, `schedule`, `blueprint`), step cards hiển thị grid/cột responsive, nhãn Read/Write, phụ thuộc `dependsOn`, data-flow mappings và `showStepCards` toggle. Sửa F1: container `#plan-cards-container` bọc grid step cards `[data-testid="planora-step-cards-grid"]`, card là thẻ `<article>` bảo toàn `[data-od-id]`, preview button `#preview-${step.id}`, responsive 2 cột desktop (`md:grid-cols-2`), lọc `nonRedundantScopes`.
+  2. `apps/chat-web/src/components/WorkflowFlowCanvas.tsx`: Hỗ trợ `variant?: 'orbital' | 'planora'`, các props `serviceInfos`, `destination` và xuất khẩu `PlanoraWorkflowSteps`.
+  3. `apps/chat-web/src/pages/Cockpit/PlanMoment.tsx`: Tích hợp `PlanoraWorkflowSteps` làm renderer chính với `showStepCards={true}`, xóa danh sách thẻ cũ `v3-space-y-3` tránh render trùng lặp; sửa F2: hiển thị rõ `plan_hash` khi tồn tại hoặc `Mã định danh kế hoạch: {plan.id}` khi không có `plan_hash` (không gọi UUID là `plan_hash`).
+  4. `apps/chat-web/src/pages/Cockpit/ExecutionMoment.tsx`: Tích hợp `PlanoraWorkflowSteps` chế độ `executing` với `showStepCards={true}` và trạng thái thời gian thực.
+  5. `apps/chat-web/src/pages/Cockpit/ReceiptMoment.tsx`: Tích hợp `PlanoraWorkflowSteps` chế độ `receipt` với `showStepCards={true}` và tóm tắt kết quả từng bước; sửa F3: ẩn nút `[data-testid="receipt-schedule-workflow-btn"]` khi capability `schedulesEnabled` đang tắt/undefined.
+  6. `apps/chat-web/src/planora/workspace/PlanoraActiveTurn.tsx`: Truyền prop `schedulesEnabled={schedulesEnabled}` xuống `ReceiptMoment`.
+  7. `apps/chat-web/src/pages/Cockpit/{PreviewContents,GmailPreview,PreviewModal}.tsx`: Bảo vệ an toàn chống tràn ngang layout 320px (`overflow-x-auto min-w-0 break-words break-all`), chống giả mạo email Gmail, bảo toàn đầy đủ test selectors.
+  8. `apps/chat-web/tests/planora-workflow-steps.test.tsx`: 13 unit tests chuyên sâu kiểm tra chi tiết workflow steps, action bar busy locking, preview modals, anti-spoofing và kiểm tra cả 3 findings F1, F2, F3.
 - **Bằng chứng kiểm chứng thực tế:**
   - `npm run typecheck:v3`: Exit code 0.
-  - `npm test -w @wap/chat-web`: 101/101 test files passed, 1124/1124 tests passed (exit code 0).
+  - `npm test -w @wap/chat-web`: 101/101 test files passed, 1128/1128 tests passed (exit code 0).
   - `node scripts/test-v3-web-build-security.mjs`: PASS (exit code 0).
   - `npm run build:v3`: Built successfully (exit code 0).

@@ -5,6 +5,8 @@ import { render, screen, fireEvent, cleanup, within } from '@testing-library/rea
 import type { ActivePlan, PlanStep } from '../src/types';
 import { PlanoraWorkflowSteps } from '../src/planora/workspace/PlanoraWorkflowSteps';
 import { PlanMoment } from '../src/pages/Cockpit/PlanMoment';
+import { ExecutionMoment } from '../src/pages/Cockpit/ExecutionMoment';
+import { ReceiptMoment } from '../src/pages/Cockpit/ReceiptMoment';
 import { PreviewModal } from '../src/pages/Cockpit/PreviewModal';
 import { GmailPreview } from '../src/pages/Cockpit/GmailPreview';
 import { PreviewContents } from '../src/pages/Cockpit/PreviewContents';
@@ -57,7 +59,7 @@ describe('PL-06: PlanoraWorkflowSteps Component', () => {
     const step1Card = screen.getByTestId('planora-step-card-step_1');
     expect(within(step1Card).getByText(/Bước 1/i)).toBeInTheDocument();
     expect(within(step1Card).getByText('Chỉ đọc')).toBeInTheDocument();
-    expect(within(step1Card).getByText(/Đọc dữ liệu KPI quý 4 từ bảng tính/i)).toBeInTheDocument();
+    expect(within(step1Card).getByText('Đọc từ bảng tính của bạn: Bảng KPI Q4')).toBeInTheDocument();
 
     const step2Card = screen.getByTestId('planora-step-card-step_2');
     expect(within(step2Card).getByText(/Bước 2/i)).toBeInTheDocument();
@@ -324,5 +326,231 @@ describe('PL-06: Rich Previews & Overflow Safety', () => {
     // Escape closes modal
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('F1: renders PlanMoment using PlanoraWorkflowSteps with responsive 2-column grid inside #plan-cards-container, preserving test IDs and attributes', () => {
+    const onPreview = vi.fn();
+    const plan: ActivePlan = {
+      id: 'plan_f1_test',
+      summary: 'Kế hoạch test F1',
+      steps: sampleLinearSteps,
+      resourceLabels: { sheet_kpi_123: 'Bảng KPI Q4', 'org/repo': 'Kho chính org/repo', '#kpi-updates': '#kpi-updates' },
+    };
+
+    render(
+      <PlanMoment
+        request="Test F1 PlanMoment cards integration"
+        runtimeMode="sandbox"
+        plan={plan}
+        services={[
+          { id: 'mysheets', name: 'Google Sheets', configured: true, connected: true },
+          { id: 'github', name: 'GitHub', configured: true, connected: true },
+          { id: 'slack', name: 'Slack', configured: true, connected: true },
+        ]}
+        destination={(step, labels) => (labels?.[String(step.args?.spreadsheetId)] ?? step.description)}
+        onPreview={onPreview}
+        onApprove={vi.fn()}
+        onCancel={vi.fn()}
+        onEdit={vi.fn()}
+        inlineComposer={null}
+      />
+    );
+
+    // #plan-cards-container wraps [data-testid="planora-step-cards-grid"]
+    const container = document.getElementById('plan-cards-container');
+    expect(container).toBeInTheDocument();
+    expect(container).toHaveAttribute('role', 'list');
+    expect(container).toHaveAttribute('aria-label', 'Các bước thực thi');
+
+    const grid = screen.getByTestId('planora-step-cards-grid');
+    expect(grid).toBeInTheDocument();
+    expect(grid.className).toContain('grid');
+    expect(grid.className).toContain('grid-cols-1');
+    expect(grid.className).toContain('md:grid-cols-2');
+
+    // 3 cards rendered as <article> with [data-od-id]
+    const articles = document.querySelectorAll('#plan-cards-container article');
+    expect(articles).toHaveLength(3);
+    expect(articles[0]).toHaveAttribute('data-od-id', 'plan-item-1');
+    expect(articles[1]).toHaveAttribute('data-od-id', 'plan-item-2');
+    expect(articles[2]).toHaveAttribute('data-od-id', 'plan-item-3');
+
+    // Labels Read vs Write
+    expect(within(articles[0] as HTMLElement).getByText('Chỉ đọc')).toBeInTheDocument();
+    expect(within(articles[1] as HTMLElement).getByText('Ghi')).toBeInTheDocument();
+    expect(within(articles[2] as HTMLElement).getByText('Ghi')).toBeInTheDocument();
+
+    // Dependencies label
+    expect(within(articles[1] as HTMLElement).getByText(/Phụ thuộc: Việc 1/i)).toBeInTheDocument();
+
+    // Data-flow mapping badge
+    expect(screen.getAllByTestId('plan-step-data-flow-badge').length).toBeGreaterThanOrEqual(1);
+
+    // #preview-${step.id} button on each card
+    const preview1 = document.getElementById('preview-step_1');
+    expect(preview1).toBeInTheDocument();
+    expect(preview1).toHaveAttribute('aria-label', 'Xem trước');
+    fireEvent.click(preview1!);
+    expect(onPreview).toHaveBeenCalledWith(expect.objectContaining({ id: 'step_1' }));
+  });
+
+  it('F1: renders ExecutionMoment and ReceiptMoment with active step cards in executing and receipt modes', () => {
+    const execSteps = [
+      { id: 'step_1', tool: 'mysheets.read_range', description: 'Đọc KPI', status: 'succeeded' as const, duration: '1,0 giây' },
+      { id: 'step_2', tool: 'github.create_issue', description: 'Tạo issue', status: 'running' as const },
+      { id: 'step_3', tool: 'slack.send_message', description: 'Gửi Slack', status: 'pending' as const },
+    ];
+
+    const { unmount: unmountExec } = render(
+      <ExecutionMoment
+        request="Chạy quy trình"
+        steps={execSteps}
+        planSteps={sampleLinearSteps}
+        destination={(step) => step.description}
+      />
+    );
+
+    // ExecutionMoment shows step cards in executing mode with real-time statuses
+    const execCards = screen.getAllByTestId(/^planora-step-card-/);
+    expect(execCards).toHaveLength(3);
+    expect(within(execCards[0]).getByText('Hoàn thành')).toBeInTheDocument();
+    expect(within(execCards[1]).getByText('Đang chạy')).toBeInTheDocument();
+    expect(within(execCards[2]).getByText('Chờ')).toBeInTheDocument();
+    unmountExec();
+
+    // ReceiptMoment shows step cards in receipt mode with summary
+    const receiptSteps = [
+      { id: 'step_1', tool: 'mysheets.read_range', description: 'Đọc KPI', status: 'succeeded' as const, duration: '0,5 giây', output: { rows: 10 } },
+      { id: 'step_2', tool: 'github.create_issue', description: 'Tạo issue', status: 'succeeded' as const, duration: '0,8 giây', output: { number: 42, title: 'Issue 42' } },
+      { id: 'step_3', tool: 'slack.send_message', description: 'Gửi Slack', status: 'succeeded' as const, duration: '0,2 giây', output: { messageId: 'm1' } },
+    ];
+
+    render(
+      <ReceiptMoment
+        request="Hoàn thành quy trình"
+        steps={receiptSteps}
+        planSteps={sampleLinearSteps}
+        services={[]}
+        destination={(step) => step.description}
+        onNewConversation={vi.fn()}
+        onFollowup={vi.fn()}
+      />
+    );
+
+    const receiptCards = screen.getAllByTestId(/^planora-step-card-/);
+    expect(receiptCards).toHaveLength(3);
+    expect(within(receiptCards[0]).getByText('Hoàn thành')).toBeInTheDocument();
+    expect(within(receiptCards[0]).getByText(/✓ Đã đọc/i)).toBeInTheDocument();
+    expect(within(receiptCards[1]).getByText(/✓ Đã tạo/i)).toBeInTheDocument();
+    expect(within(receiptCards[2]).getByText(/✓ Đã gửi/i)).toBeInTheDocument();
+  });
+
+  it('F2: renders cryptographic plan_hash when present, and displays plan.id as identifier when plan_hash is absent', () => {
+    const planWithHash: ActivePlan & { plan_hash?: string } = {
+      id: 'plan-uuid-9876-5432',
+      plan_hash: 'sha256_mock_hash_real_crypto_abc123',
+      summary: 'Kế hoạch có cryptographic plan_hash',
+      steps: sampleLinearSteps,
+    };
+
+    const { unmount } = render(
+      <PlanMoment
+        plan={planWithHash}
+        services={[]}
+        destination={(step) => step.description}
+        onPreview={vi.fn()}
+        onApprove={vi.fn()}
+        onCancel={vi.fn()}
+        onEdit={vi.fn()}
+        inlineComposer={null}
+        runtimeMode="sandbox"
+      />
+    );
+
+    const bindingWithHash = screen.getByTestId('plan-hash-binding');
+    expect(bindingWithHash).toHaveTextContent('Mã băm ràng buộc kế hoạch (plan_hash): sha256_mock_hash_real_crypto_abc123');
+    unmount();
+
+    // When plan_hash is undefined/missing: must display "Mã định danh kế hoạch: {plan.id}" and NEVER label UUID as plan_hash
+    const planWithoutHash: ActivePlan & { plan_hash?: string } = {
+      id: 'plan-uuid-9876-5432',
+      summary: 'Kế hoạch không có plan_hash',
+      steps: sampleLinearSteps,
+    };
+
+    render(
+      <PlanMoment
+        plan={planWithoutHash}
+        services={[]}
+        destination={(step) => step.description}
+        onPreview={vi.fn()}
+        onApprove={vi.fn()}
+        onCancel={vi.fn()}
+        onEdit={vi.fn()}
+        inlineComposer={null}
+        runtimeMode="sandbox"
+      />
+    );
+
+    const bindingWithoutHash = screen.getByTestId('plan-hash-binding');
+    expect(bindingWithoutHash).toHaveTextContent('Mã định danh kế hoạch: plan-uuid-9876-5432');
+    expect(bindingWithoutHash.textContent).not.toContain('plan_hash');
+    expect(bindingWithoutHash.textContent).not.toContain('Mã băm');
+  });
+
+  it('F3: shows schedule workflow button only when schedulesEnabled capability is true, and hides it when false or undefined', () => {
+    const receiptSteps = [
+      { id: 'step_1', tool: 'slack.send_message', description: 'Gửi tin', status: 'succeeded' as const },
+    ];
+    const planSteps = [
+      { id: 'step_1', tool: 'slack.send_message', description: 'Gửi tin', args: {} },
+    ];
+
+    // Case 1: schedulesEnabled = true -> button is rendered
+    const { unmount: unmount1 } = render(
+      <ReceiptMoment
+        request="Gửi tin Slack"
+        steps={receiptSteps}
+        planSteps={planSteps}
+        services={[]}
+        destination={(step) => step.description}
+        onNewConversation={vi.fn()}
+        onFollowup={vi.fn()}
+        schedulesEnabled={true}
+      />
+    );
+    expect(screen.getByTestId('receipt-schedule-workflow-btn')).toBeInTheDocument();
+    expect(screen.getByTestId('receipt-schedule-workflow-btn')).toHaveTextContent(/Đặt lịch chạy định kỳ quy trình này/i);
+    unmount1();
+
+    // Case 2: schedulesEnabled = false -> button is hidden
+    const { unmount: unmount2 } = render(
+      <ReceiptMoment
+        request="Gửi tin Slack"
+        steps={receiptSteps}
+        planSteps={planSteps}
+        services={[]}
+        destination={(step) => step.description}
+        onNewConversation={vi.fn()}
+        onFollowup={vi.fn()}
+        schedulesEnabled={false}
+      />
+    );
+    expect(screen.queryByTestId('receipt-schedule-workflow-btn')).toBeNull();
+    unmount2();
+
+    // Case 3: schedulesEnabled = undefined -> button is hidden
+    render(
+      <ReceiptMoment
+        request="Gửi tin Slack"
+        steps={receiptSteps}
+        planSteps={planSteps}
+        services={[]}
+        destination={(step) => step.description}
+        onNewConversation={vi.fn()}
+        onFollowup={vi.fn()}
+      />
+    );
+    expect(screen.queryByTestId('receipt-schedule-workflow-btn')).toBeNull();
   });
 });
