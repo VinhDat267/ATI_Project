@@ -28,8 +28,18 @@ describe('apps/chat-api Reality Check (End-to-End Real HTTP Integration)', () =>
     getConversation: vi.fn().mockImplementation(async (id: string) => ({
       id,
       user_id: DEMO_ADMIN_ID,
+      workspace_id: null,
       title: 'New Conversation',
     })),
+  };
+
+  const mockPlanRepo = {
+    getPlan: vi.fn().mockImplementation(async (id: string) => {
+      if (id === 'plan-e2e-1') {
+        return { id: 'plan-e2e-1', conv_id: 'conv-e2e-1' };
+      }
+      return null;
+    }),
   };
 
   const mockMsgRepo = {
@@ -64,6 +74,7 @@ describe('apps/chat-api Reality Check (End-to-End Real HTTP Integration)', () =>
           ? { id: DEMO_ADMIN_ID, email, name: 'Fixture Admin' }
           : null,
       convRepo: mockConvRepo as any,
+      planRepo: mockPlanRepo as any,
       msgRepo: mockMsgRepo as any,
       chatService: mockChatService as any,
       sseManager,

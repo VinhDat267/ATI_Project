@@ -44,7 +44,7 @@ export const GITHUB_TOOLS: ToolDefinition[] = [
     name: 'github.create_issue', service: 'github', sideEffect: 'write', riskLevel: 'medium',
     description: 'Create an issue in one allowed GitHub repository after approval.',
     inputSchema: { type: 'object', properties: {
-      repo: repoProperty, title: { type: 'string' }, body: { type: 'string' }, labels: { type: 'array', items: { type: 'string' } },
+      repo: repoProperty, title: { type: 'string' }, body: { type: 'string' }, labels: { type: 'array', items: { type: 'string' } }, assignees: { type: 'array', items: { type: 'string' } },
     }, required: ['repo', 'title'], additionalProperties: false },
     outputSchema: { type: 'object', properties: issueProperties, required: ['id', 'number', 'title', 'url', 'repo'] },
   },

@@ -39,7 +39,7 @@ export function createMemoryConversationRepositories() {
       scopeArg?: ConversationScope
     ): Promise<ConversationRow> {
       let title: string | null = null;
-      let scope: ConversationScope | undefined;
+      let scope: ConversationScope | undefined = scopeArg;
       if (typeof titleOrScope === 'string') {
         title = titleOrScope;
         scope = scopeArg;

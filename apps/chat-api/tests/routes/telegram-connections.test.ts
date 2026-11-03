@@ -7,6 +7,8 @@ import { generateAccessToken } from '../../src/auth/jwt.js';
 import { ConversationRepo } from '../../src/db/repositories/conversation-repo.js';
 import { CredentialRepo } from '../../src/db/repositories/credential-repo.js';
 import { TelegramTeamRepo } from '../../src/db/repositories/telegram-team-repo.js';
+import { TelegramUpdateRepo } from '../../src/db/repositories/telegram-update-repo.js';
+import { TelegramBotClient } from '../../src/services/telegram/bot-client.js';
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
 
 const secret = 'telegram_connection_test_secret_at_least_32_characters';
@@ -173,6 +175,26 @@ describe('Telegram 1-click pairing connection routes', () => {
   });
 
   describe('callback', () => {
+    it('uses the injected durable bot client through createApp and stores the pairing before completion', async () => {
+      const app = build({ botClient: new TelegramBotClient(mockBotConfig, fakeFetch, new TelegramUpdateRepo(db.pool)) });
+      const start = await request(app).post('/api/connections/telegram/start')
+        .set('Authorization', bearer(alice)).send({});
+      const cookie = (start.headers['set-cookie'] as unknown as string[])[0]!.split(';')[0]!;
+      telegramUpdates = [{
+        update_id: 501,
+        message: {
+          from: { id: 778899, is_bot: false, first_name: 'Alice' },
+          chat: { id: 778899, type: 'private' }, text: `/start ati_${start.body.state}`,
+        },
+      }];
+      const response = await request(app).post('/api/connections/telegram/callback')
+        .set('Authorization', bearer(alice)).set('Cookie', cookie).send({ state: start.body.state });
+      expect(response.status).toBe(200);
+      const saved = await db.pool.query("SELECT payload FROM telegram_update_inbox WHERE payload->>'pairingStateHash'=$1", [hash(start.body.state)]);
+      expect(saved.rows).toHaveLength(1);
+      expect(saved.rows[0].payload.message.from.id).toBe(778899);
+    });
+
     it('rejects invalid state or another user before making any HTTP call to Telegram', async () => {
       const app = build();
       const startRes = await request(app)

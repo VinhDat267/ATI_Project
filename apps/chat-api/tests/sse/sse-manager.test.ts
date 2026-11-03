@@ -67,4 +67,29 @@ describe('apps/chat-api (Task 17: SSE Stream Manager & Sequence Tracking)', () =
     newServer.emitEvent('conv', 'text_delta', { delta: 'new' });
     expect(newServer.getMissedEventsForCursor('conv', oldCursor)).toMatchObject([{ id: 1 }]);
   });
+
+  it('clears buffered plan/plan_preview events via clearPlanEvents and when a new plan_preview supersedes an old one', () => {
+    const manager = new SSEManager();
+    const convId = 'conv-plan';
+
+    manager.emitEvent(convId, 'thinking', { text: 'Planning...' });
+    manager.emitEvent(convId, 'plan_preview', { planId: 'plan-1', plan: { id: 'plan-1', steps: [] } });
+    expect(manager.getMissedEventsForCursor(convId, undefined).map((e) => e.event)).toEqual(['thinking', 'plan_preview']);
+
+    // Superseding with plan-2 removes plan-1 from buffer
+    manager.emitEvent(convId, 'plan_preview', { planId: 'plan-2', plan: { id: 'plan-2', steps: [] } });
+    const afterSupersede = manager.getMissedEventsForCursor(convId, undefined);
+    expect(afterSupersede.filter((e) => e.event === 'plan_preview')).toHaveLength(1);
+    expect(afterSupersede.find((e) => e.event === 'plan_preview')?.data.planId).toBe('plan-2');
+
+    // Explicit clearPlanEvents removes the rejected plan_preview
+    manager.clearPlanEvents(convId, 'plan-2');
+    expect(manager.getMissedEventsForCursor(convId, undefined).map((e) => e.event)).toEqual(['thinking']);
+
+    // Also handles stringified event data when clearing by planId
+    manager.emitEvent(convId, 'plan_preview', JSON.stringify({ planId: 'plan-str-3', plan: { id: 'plan-str-3', steps: [] } }));
+    expect(manager.getMissedEventsForCursor(convId, undefined).map((e) => e.event)).toEqual(['thinking', 'plan_preview']);
+    manager.clearPlanEvents(convId, 'plan-str-3');
+    expect(manager.getMissedEventsForCursor(convId, undefined).map((e) => e.event)).toEqual(['thinking']);
+  });
 });

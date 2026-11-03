@@ -10,6 +10,71 @@ const config = {
 };
 
 describe('TelegramBotClient', () => {
+  it('finds pairing after the first 100 updates without losing another pending user', async () => {
+    const aliceState = 'x'.repeat(43), bobState = 'y'.repeat(43);
+    const updates = Array.from({ length: 101 }, (_, index) => ({
+      update_id: index + 1,
+      message: {
+        from: { id: index === 100 ? 222 : 111, is_bot: false, first_name: index === 100 ? 'Bob' : 'Alice' },
+        chat: { id: index === 100 ? 222 : 111, type: 'private' },
+        text: index === 0 ? `/start ati_${aliceState}` : index === 100 ? `/start ati_${bobState}` : 'ordinary private message',
+      },
+    }));
+    const offsets: Array<number | undefined> = [];
+    const client = new TelegramBotClient(config, async (_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      offsets.push(body.offset);
+      return Response.json({ ok: true, result: updates.filter(u => body.offset === undefined || u.update_id >= body.offset).slice(0, body.limit) });
+    });
+    let bob;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      bob = await client.verifyPairing(bobState, AbortSignal.timeout(2000));
+      if (bob.matched) break;
+    }
+    expect(bob).toMatchObject({ matched: true, telegramUserId: '222' });
+    expect(await client.verifyPairing(aliceState, AbortSignal.timeout(2000))).toMatchObject({ matched: true, telegramUserId: '111' });
+    expect(offsets.some(offset => offset !== undefined && offset > 100)).toBe(true);
+  });
+
+  it('advances past a valid full page of long messages before finding the pairing', async () => {
+    const state = 'z'.repeat(43);
+    const backlog = Array.from({ length: 101 }, (_, index) => ({
+      update_id: index + 1,
+      message: {
+        from: { id: 555, is_bot: false, first_name: 'Tester' },
+        chat: { id: 555, type: 'private' },
+        text: index === 100 ? `/start ati_${state}` : 'a'.repeat(4000),
+      },
+    }));
+    const client = new TelegramBotClient(config, async (_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      return Response.json({ ok: true, result: backlog.filter(update => body.offset === undefined || update.update_id >= body.offset).slice(0, body.limit) });
+    });
+    await client.verifyPairing(state, AbortSignal.timeout(2000));
+    expect(await client.verifyPairing(state, AbortSignal.timeout(2000))).toMatchObject({ matched: true, telegramUserId: '555' });
+  });
+
+  it('recovers a lower update ID after a week without updates in a standalone client', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const firstState = 'j'.repeat(43), nextState = 'k'.repeat(43);
+      const update = (id: number, state: string) => ({
+        update_id: id, message: { from: { id: 555, is_bot: false, first_name: 'Tester' }, chat: { id: 555, type: 'private' }, text: `/start ati_${state}` },
+      });
+      let queue = [update(1_000_000_000, firstState)];
+      const client = new TelegramBotClient(config, async (_url, init) => {
+        const body = JSON.parse(String(init?.body));
+        if (body.offset !== undefined) queue = queue.filter(item => item.update_id >= body.offset);
+        return Response.json({ ok: true, result: queue });
+      });
+      expect(await client.verifyPairing(firstState, AbortSignal.timeout(2000))).toMatchObject({ matched: true });
+      await client.verifyPairing(firstState, AbortSignal.timeout(2000));
+      vi.setSystemTime(Date.now() + 8 * 24 * 60 * 60_000);
+      queue = [update(101, nextState)];
+      expect(await client.verifyPairing(nextState, AbortSignal.timeout(2000))).toMatchObject({ matched: true, telegramUserId: '555' });
+    } finally { vi.useRealTimers(); }
+  });
+
   it('builds 1-click deepLinkUrl, groupDeepLinkUrl, and web callbackUrl with state', () => {
     const client = new TelegramBotClient(config);
     const state = 'a'.repeat(43);

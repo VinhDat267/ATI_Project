@@ -9,6 +9,7 @@ const CONNECTION_CALLBACK_KINDS = new Set<AppRoute['kind']>([
   'trello-callback',
   'github-callback',
   'notion-callback',
+  'jira-callback',
   'telegram-callback',
 ]);
 const LOOPBACK_HOP_KEY = 'wap_loopback_callback_hop';

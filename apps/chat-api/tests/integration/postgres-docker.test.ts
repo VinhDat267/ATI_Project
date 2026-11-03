@@ -7,7 +7,7 @@ import { StepRepo } from '../../src/db/repositories/step-repo.js';
 
 const PG_URL = process.env.DATABASE_URL || 'postgresql://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3';
 
-describe('Real PostgreSQL Docker Container Integration (ati_v3)', () => {
+describe('Real PostgreSQL Docker Container Integration (configured test database)', () => {
   let pool: pg.Pool;
   let userRepo: UserRepo;
   let convRepo: ConversationRepo;
@@ -18,7 +18,7 @@ describe('Real PostgreSQL Docker Container Integration (ati_v3)', () => {
     pool = new pg.Pool({ connectionString: PG_URL, max: 10 });
     // Verify connection
     const res = await pool.query('SELECT current_database() as db');
-    expect(res.rows[0].db).toBe('ati_v3');
+    expect(res.rows[0].db).toBe(decodeURIComponent(new URL(PG_URL).pathname.slice(1)));
 
     userRepo = new UserRepo(pool);
     convRepo = new ConversationRepo(pool);

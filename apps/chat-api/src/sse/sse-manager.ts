@@ -26,7 +26,10 @@ export class SSEManager {
       timestamp: Date.now(),
     };
 
-    // Store in circular buffer
+    // Store in circular buffer (supersede older buffered plan previews when emitting a new one)
+    if (eventName === 'plan' || eventName === 'plan_preview') {
+      this.clearPlanEvents(convId);
+    }
     let buffer = this.bufferMap.get(convId);
     if (!buffer) {
       buffer = [];
@@ -59,6 +62,37 @@ export class SSEManager {
       return [];
     }
     return buffer.filter((e) => e.id > lastEventId);
+  }
+
+  clearPlanEvents(convId: string, planId?: string): void {
+    const buffer = this.bufferMap.get(convId);
+    if (!buffer) {
+      return;
+    }
+    this.bufferMap.set(
+      convId,
+      buffer.filter((e) => {
+        if (e.event !== 'plan' && e.event !== 'plan_preview') {
+          return true;
+        }
+        if (!planId) {
+          return false;
+        }
+        let payload = e.data;
+        if (typeof payload === 'string') {
+          try {
+            payload = JSON.parse(payload);
+          } catch {
+            payload = null;
+          }
+        }
+        return !(
+          payload?.planId === planId ||
+          payload?.plan?.id === planId ||
+          payload?.id === planId
+        );
+      })
+    );
   }
 
   getMissedEventsForCursor(convId: string, cursor: string | undefined): SSEEvent[] {

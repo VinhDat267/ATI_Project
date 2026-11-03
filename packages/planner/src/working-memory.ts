@@ -20,6 +20,41 @@ export class WorkingMemory {
     delete this.entities[key];
   }
 
+  invalidateSite(siteId: string): void {
+    for (const [key, val] of Object.entries(this.entities)) {
+      if (key === '__observed' && val && typeof val === 'object') {
+        const cleanedObserved: Record<string, unknown[]> = {};
+        for (const [res, list] of Object.entries(val as Record<string, unknown[]>)) {
+          if (Array.isArray(list)) {
+            cleanedObserved[res] = list.filter((item) => {
+              if (item && typeof item === 'object') {
+                const sId = (item as Record<string, unknown>).siteId ?? (item as Record<string, unknown>).id;
+                return sId !== siteId;
+              }
+              return true;
+            });
+          } else {
+            cleanedObserved[res] = list;
+          }
+        }
+        this.entities[key] = cleanedObserved;
+      } else if (Array.isArray(val)) {
+        this.entities[key] = val.filter((item) => {
+          if (item && typeof item === 'object') {
+            const sId = (item as Record<string, unknown>).siteId ?? (item as Record<string, unknown>).id;
+            return sId !== siteId;
+          }
+          return true;
+        });
+      } else if (val && typeof val === 'object') {
+        const sId = (val as Record<string, unknown>).siteId ?? (val as Record<string, unknown>).id;
+        if (sId === siteId) {
+          delete this.entities[key];
+        }
+      }
+    }
+  }
+
   addMember(member: ResolvedMember): void {
     const existingIndex = this.members.findIndex((m) => m.id === member.id);
     if (existingIndex >= 0) {

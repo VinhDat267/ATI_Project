@@ -5,6 +5,7 @@ import {
   WorkingMemory,
   classifyIntent,
   buildSystemPrompt,
+  relevantGroundingUserTexts,
 } from '../src/index.js';
 import { TRELLO_TOOLS, SLACK_TOOLS, GITHUB_TOOLS, SERVICE_REGISTRY, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
 
@@ -632,6 +633,54 @@ describe('packages/planner (Task 10: Hierarchical Router & Planner with 1x Autom
       ).rejects.toThrow(/Validation failed after retry/i);
 
       expect(mockLLM.getCallCount()).toBe(2);
+    });
+  });
+
+  describe('relevantGroundingUserTexts', () => {
+    it('returns only current message when history is empty', () => {
+      expect(relevantGroundingUserTexts([], 'Hello')).toEqual(['Hello']);
+    });
+
+    it('excludes user texts from previous completed turns ending with a plan', () => {
+      const history = [
+        { role: 'user' as const, content: 'Tạo ticket trên Acme' },
+        { role: 'assistant' as const, content: JSON.stringify({ kind: 'plan', steps: [] }) },
+      ];
+      expect(relevantGroundingUserTexts(history, 'Cập nhật ticket trên Beta')).toEqual(['Cập nhật ticket trên Beta']);
+    });
+
+    it('excludes user texts from previous completed turns ending with an answer or refusal', () => {
+      const historyAnswer = [
+        { role: 'user' as const, content: 'Xem ticket' },
+        { role: 'assistant' as const, content: JSON.stringify({ kind: 'answer', text: 'Info' }) },
+      ];
+      expect(relevantGroundingUserTexts(historyAnswer, 'Làm việc mới')).toEqual(['Làm việc mới']);
+
+      const historyRefusal = [
+        { role: 'user' as const, content: 'Hành động không hợp lệ' },
+        { role: 'assistant' as const, content: JSON.stringify({ kind: 'refusal', reason: 'Denied' }) },
+      ];
+      expect(relevantGroundingUserTexts(historyRefusal, 'Thử lại')).toEqual(['Thử lại']);
+    });
+
+    it('includes user texts from ongoing clarification turns', () => {
+      const historyClarification = [
+        { role: 'user' as const, content: 'Tạo ticket' },
+        { role: 'assistant' as const, content: JSON.stringify({ kind: 'clarification', question: 'Chọn site nào?' }) },
+      ];
+      expect(relevantGroundingUserTexts(historyClarification, 'Acme')).toEqual(['Tạo ticket', 'Acme']);
+    });
+
+    it('chains multiple clarification rounds but stops at the preceding completed plan', () => {
+      const history = [
+        { role: 'user' as const, content: 'Yêu cầu cũ đã xong' },
+        { role: 'assistant' as const, content: JSON.stringify({ kind: 'plan', steps: [] }) },
+        { role: 'user' as const, content: 'Yêu cầu mới' },
+        { role: 'assistant' as const, content: JSON.stringify({ kind: 'clarification', question: 'Site nào?' }) },
+        { role: 'user' as const, content: 'Acme' },
+        { role: 'assistant' as const, content: 'Project nào?' }, // plain text clarification question
+      ];
+      expect(relevantGroundingUserTexts(history, 'PROJ')).toEqual(['Yêu cầu mới', 'Acme', 'PROJ']);
     });
   });
 });

@@ -82,6 +82,14 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
     return () => document.removeEventListener('mousedown', handleOutside);
   }, [open]);
 
+  // PBI-04: a conversation belongs to exactly one workspace, so only /c/:id leaves for "/".
+  // Workspace-scoped views (/, /history conversations + ScheduleSection, /settings + TrelloConnection,
+  // /admin/users, MainNav, SidebarHistory) subscribe to workspace changes and reload in place;
+  // user/static pages (/account, /guide, /privacy) keep their route while MainNav updates the header.
+  const leaveWorkspaceBoundPage = () => {
+    if (/^\/c\//.test(window.location.pathname)) navigate?.('/');
+  };
+
   const handleSelectWorkspace = (id: string) => {
     const prev = getActiveWorkspaceId();
     setActiveWorkspaceId(id);
@@ -90,7 +98,7 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
       return;
     }
     useChatStore.getState().reset();
-    navigate?.('/');
+    leaveWorkspaceBoundPage();
     setOpen(false);
   };
 
@@ -110,7 +118,7 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
         setCachedOrganizations(nextOrgs);
         setActiveWorkspaceId(res.workspace.id);
         useChatStore.getState().reset();
-        navigate?.('/');
+        leaveWorkspaceBoundPage();
         setShowCreateModal(false);
         setCreateName('');
         setOpen(false);
@@ -140,7 +148,7 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
         if (res.workspace.status === 'active') {
           setActiveWorkspaceId(res.workspace.id);
           useChatStore.getState().reset();
-          navigate?.('/');
+          leaveWorkspaceBoundPage();
           setShowJoinModal(false);
           setJoinCode('');
           setOpen(false);

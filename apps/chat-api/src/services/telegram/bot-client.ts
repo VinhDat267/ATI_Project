@@ -1,5 +1,6 @@
 import type { TelegramBotConfig } from '../../config/env.js';
 import type { TelegramChatType, TelegramTeamChatItem } from '../../db/repositories/telegram-team-repo.js';
+import { MemoryTelegramUpdateStore, projectTelegramUpdate, telegramStateHash, type TelegramUpdateStore } from './update-inbox.js';
 
 export class TelegramBotError extends Error {
   constructor(
@@ -23,6 +24,8 @@ export type TelegramPairingResult =
     };
 
 const MAX_BODY_CHARS = 128_000;
+// getUpdates contains up to 100 messages, unlike the single-object methods.
+const MAX_UPDATES_BODY_CHARS = 1_048_576;
 
 function normalizeChatType(raw: unknown): TelegramChatType {
   if (raw === 'private' || raw === 'group' || raw === 'supergroup' || raw === 'channel') {
@@ -35,6 +38,7 @@ export class TelegramBotClient {
   constructor(
     private config: TelegramBotConfig,
     private fetchFn: typeof fetch = fetch,
+    private updates: TelegramUpdateStore = new MemoryTelegramUpdateStore(),
   ) {}
 
   get botUsername(): string {
@@ -82,11 +86,7 @@ export class TelegramBotClient {
     for (let i = updates.length - 1; i >= 0; i--) {
       const msg = updates[i]?.message;
       const from = msg?.from;
-      const text = typeof msg?.text === 'string' ? msg.text.trim() : '';
-      if (!from || from.is_bot === true || !text) continue;
-
-      const match = text.match(/^\/start(?:@[A-Za-z0-9_]+)?\s+ati_([A-Za-z0-9_-]{16,128})$/);
-      if (!match || match[1] !== state) continue;
+      if (!from || from.is_bot === true || updates[i]?.pairingStateHash !== telegramStateHash(state)) continue;
 
       const telegramUserId = String(from.id ?? '').trim();
       if (!/^[1-9]\d{0,19}$/.test(telegramUserId)) continue;
@@ -186,12 +186,21 @@ export class TelegramBotClient {
   }
 
   private async getUpdates(signal: AbortSignal): Promise<any[]> {
-    const result = await this.callMethod(
-      'getUpdates',
-      { limit: 100, timeout: 0, allowed_updates: ['message', 'my_chat_member', 'channel_post'] },
-      signal,
-    );
-    return Array.isArray(result) ? result : [];
+    const botKey = telegramStateHash(`${this.config.apiBaseUrl}:${this.config.botToken}`);
+    try {
+      return await this.updates.poll(botKey, signal, async (offset) => {
+        const result = await this.callMethod(
+          'getUpdates',
+          { limit: 100, timeout: 0, allowed_updates: ['message', 'my_chat_member', 'channel_post'], ...(offset !== undefined ? { offset } : {}) },
+          signal,
+        );
+        if (!Array.isArray(result)) throw new TelegramBotError('server');
+        return result.map(projectTelegramUpdate);
+      });
+    } catch (error) {
+      if (error instanceof TelegramBotError) throw error;
+      throw new TelegramBotError(signal.aborted ? 'network' : 'server');
+    }
   }
 
   private async callMethod(method: string, payload: Record<string, unknown>, signal: AbortSignal): Promise<any> {
@@ -224,7 +233,8 @@ export class TelegramBotClient {
 
     let body: any = null;
     try {
-      body = text && text.length <= MAX_BODY_CHARS ? JSON.parse(text) : null;
+      const limit = method === 'getUpdates' ? MAX_UPDATES_BODY_CHARS : MAX_BODY_CHARS;
+      body = text && text.length <= limit ? JSON.parse(text) : null;
     } catch {
       body = null;
     }

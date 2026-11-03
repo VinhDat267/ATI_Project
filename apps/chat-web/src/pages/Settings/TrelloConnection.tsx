@@ -84,6 +84,8 @@ export function TrelloConnection({
   useEffect(() => {
     return subscribeWorkspace(() => {
       setWorkspace(getActiveWorkspaceSummary());
+      setEditingScope(false);
+      setError('');
       void fetchStatus();
     });
   }, []);

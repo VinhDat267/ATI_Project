@@ -1,5 +1,6 @@
 import type pg from 'pg';
 import type {
+  CalendarDigestCandidate,
   GithubDigestConfig,
   ScheduleApprovalMode,
   ScheduleDigestCandidate,
@@ -21,7 +22,7 @@ import type { CredentialRepo } from '../../db/repositories/credential-repo.js';
 import { MessageRepo } from '../../db/repositories/message-repo.js';
 import { ScheduleRepo, type Queryable, type ScheduleRow, type ScheduleScope } from '../../db/repositories/schedule-repo.js';
 import { isUuid } from '../../db/repositories/uuid.js';
-import { evaluateCalendarDigestCandidate } from './calendar-digest-candidate.js';
+import { calendarDigestCandidateMatches, computeCalendarDigestHash, evaluateCalendarDigestCandidate } from './calendar-digest-candidate.js';
 import { runState, runView } from './run-state.js';
 import { nextOccurrence } from './next-occurrence.js';
 import { analyzeSheetsDigestCandidate, computeSheetsDigestHash } from './sheets-digest-candidate.js';
@@ -42,6 +43,7 @@ export const SCHEDULE_CONFLICTS = {
   DIGEST_NOT_ELIGIBLE: 'Lịch này không đủ điều kiện tự gửi báo cáo. Hãy chọn chế độ chờ duyệt mỗi lượt.',
   AUTO_DIGEST_NOT_ELIGIBLE: 'Lịch này không đủ điều kiện gửi tự động hoặc kết nối Google Calendar/kênh nhận đã thay đổi. Hãy chọn chế độ duyệt thủ công hoặc kiểm tra lại kết nối.',
   AUTO_DIGEST_NOT_ALLOWED: 'Lịch này cần duyệt từng lượt.',
+  DIGEST_PREVIEW_CHANGED: 'Kết nối, phạm vi lịch hoặc kênh nhận khác bản xem trước. Hãy yêu cầu đề xuất mới và xác nhận lại.',
 } as const;
 export type ScheduleConflictCode = keyof typeof SCHEDULE_CONFLICTS;
 
@@ -287,60 +289,80 @@ export class ScheduleService {
       const wsId = owner.rows[0].workspace_id ?? null;
       const wsMode = owner.rows[0].workspace_mode ?? 'legacy';
       const wantAutoDigest = approvalMode === 'auto_digest';
+      const candidateConfig = (metadata.digestCandidate as any)?.config;
+      const hasGithubDigestCandidate =
+        Boolean(candidateConfig) &&
+        Array.isArray(candidateConfig.repos) &&
+        typeof candidateConfig.staleDays === 'number';
+      const hasTrelloDigestCandidate =
+        Boolean(candidateConfig) && Array.isArray(candidateConfig.boards);
+      const hasNotionDigestCandidate =
+        Boolean(candidateConfig) && Array.isArray(candidateConfig.databases);
       const candidateHasTelegramSources = Boolean(
-        metadata.digestCandidate &&
-          typeof metadata.digestCandidate === 'object' &&
-          'config' in metadata.digestCandidate &&
-          metadata.digestCandidate.config &&
-          typeof metadata.digestCandidate.config === 'object' &&
-          'sources' in metadata.digestCandidate.config,
+        candidateConfig && typeof candidateConfig === 'object' && 'sources' in candidateConfig,
       );
       const candidateHasNotionDatabases = Boolean(
-        metadata.digestCandidate &&
-          typeof metadata.digestCandidate === 'object' &&
-          'config' in metadata.digestCandidate &&
-          metadata.digestCandidate.config &&
-          typeof metadata.digestCandidate.config === 'object' &&
-          'databases' in metadata.digestCandidate.config,
+        candidateConfig && typeof candidateConfig === 'object' && 'databases' in candidateConfig,
       );
       const isCalendarSchedule =
         existing?.kind === 'calendar_digest' ||
         (!candidateHasTelegramSources &&
+          !hasGithubDigestCandidate &&
+          !hasTrelloDigestCandidate &&
+          !hasNotionDigestCandidate &&
           existing?.kind !== 'telegram_digest' &&
           existing?.kind !== 'github_digest' &&
+          existing?.kind !== 'trello_digest' &&
+          existing?.kind !== 'notion_digest' &&
           (metadata.services.includes('mycalendar') ||
             (metadata.services.includes('calendar') && !metadata.services.includes('github'))));
       const isSheetsSchedule =
         existing?.kind === 'sheets_digest' ||
         (!candidateHasTelegramSources &&
+          !hasGithubDigestCandidate &&
+          !hasTrelloDigestCandidate &&
+          !hasNotionDigestCandidate &&
           existing?.kind !== 'telegram_digest' &&
           existing?.kind !== 'github_digest' &&
+          existing?.kind !== 'trello_digest' &&
+          existing?.kind !== 'notion_digest' &&
           existing?.kind !== 'calendar_digest' &&
           (metadata.services.includes('mysheets') || metadata.services.includes('sheets')));
-      const isTelegramSchedule =
-        !isCalendarSchedule &&
-        !isSheetsSchedule &&
-        !candidateHasNotionDatabases &&
-        existing?.kind !== 'notion_digest' &&
-        (metadata.services.includes('telegram') || existing?.kind === 'telegram_digest');
       const isGithubSchedule =
         !isCalendarSchedule &&
         !isSheetsSchedule &&
-        !isTelegramSchedule &&
-        (metadata.services.includes('github') || existing?.kind === 'github_digest');
+        (hasGithubDigestCandidate ||
+          (existing?.kind === 'github_digest' && !candidateHasTelegramSources) ||
+          (!candidateHasTelegramSources &&
+            !metadata.services.includes('telegram') &&
+            (metadata.services.includes('github') || existing?.kind === 'github_digest')));
       const isTrelloSchedule =
         !isCalendarSchedule &&
         !isSheetsSchedule &&
-        !isTelegramSchedule &&
         !isGithubSchedule &&
-        (metadata.services.includes('trello') || existing?.kind === 'trello_digest');
+        (hasTrelloDigestCandidate ||
+          (existing?.kind === 'trello_digest' && !candidateHasTelegramSources) ||
+          (!candidateHasTelegramSources &&
+            !metadata.services.includes('telegram') &&
+            (metadata.services.includes('trello') || existing?.kind === 'trello_digest')));
       const isNotionSchedule =
         !isCalendarSchedule &&
         !isSheetsSchedule &&
-        !isTelegramSchedule &&
         !isGithubSchedule &&
         !isTrelloSchedule &&
-        (metadata.services.includes('notion') || existing?.kind === 'notion_digest');
+        (hasNotionDigestCandidate ||
+          candidateHasNotionDatabases ||
+          (existing?.kind === 'notion_digest' && !candidateHasTelegramSources) ||
+          (!candidateHasTelegramSources &&
+            !metadata.services.includes('telegram') &&
+            (metadata.services.includes('notion') || existing?.kind === 'notion_digest')));
+      const isTelegramSchedule =
+        !isCalendarSchedule &&
+        !isSheetsSchedule &&
+        !isGithubSchedule &&
+        !isTrelloSchedule &&
+        !isNotionSchedule &&
+        (metadata.services.includes('telegram') || existing?.kind === 'telegram_digest');
       let digestFields: {
         kind: 'plan' | 'sheets_digest' | 'calendar_digest' | 'github_digest' | 'telegram_digest' | 'trello_digest' | 'notion_digest';
         digestConfig: unknown | null;
@@ -384,10 +406,14 @@ export class ScheduleService {
           if (!evaluated.candidate.canAutoDigest || !evaluated.config || !evaluated.configHash) {
             throw new ScheduleConflict('AUTO_DIGEST_NOT_ELIGIBLE');
           }
+          const candidate = metadata.digestCandidate as CalendarDigestCandidate | undefined;
+          if (!calendarDigestCandidateMatches(candidate, evaluated)) {
+            throw new ScheduleConflict('DIGEST_PREVIEW_CHANGED');
+          }
           digestFields = {
             kind: 'calendar_digest',
-            digestConfig: JSON.stringify(evaluated.config),
-            digestConfigHash: evaluated.configHash,
+            digestConfig: JSON.stringify(candidate.config),
+            digestConfigHash: computeCalendarDigestHash(candidate.config),
             digestApprovedAt: now,
           };
         } else {
@@ -608,6 +634,9 @@ export class ScheduleService {
           request: fields.request,
         });
         if (!evaluated.candidate.canAutoDigest || !evaluated.config || !evaluated.configHash) {
+          if ((metadata.digestCandidate as CalendarDigestCandidate | undefined)?.canAutoDigest) {
+            throw new ScheduleConflict('DIGEST_PREVIEW_CHANGED');
+          }
           const downgraded = await client.query(
             `UPDATE schedules SET name=$2, request=$3, recurrence=$4, services=$5, status=$6, pause_reason=$7, next_run_at=$8,
                kind='plan', digest_config=NULL, digest_config_hash=NULL, digest_approved_at=NULL,
@@ -617,12 +646,16 @@ export class ScheduleService {
           );
           return this.recordState(client, downgraded.rows[0], now);
         }
+        const candidate = metadata.digestCandidate as CalendarDigestCandidate | undefined;
+        if (!calendarDigestCandidateMatches(candidate, evaluated)) {
+          throw new ScheduleConflict('DIGEST_PREVIEW_CHANGED');
+        }
         const updatedDigest = await client.query(
           `UPDATE schedules SET name=$2, request=$3, recurrence=$4, services=$5, status=$6, pause_reason=$7, next_run_at=$8,
              digest_config=$10::jsonb, digest_config_hash=$11, digest_approved_at=$12,
              version=version+1, updated_at=now(), last_proposal_id=COALESCE($9, last_proposal_id)
            WHERE id=$1 RETURNING *`,
-          [existing.id, fields.name, fields.request, JSON.stringify(fields.recurrence), fields.services, fields.status, fields.pause_reason, fields.next_run_at, messageId, JSON.stringify(evaluated.config), evaluated.configHash, now],
+          [existing.id, fields.name, fields.request, JSON.stringify(fields.recurrence), fields.services, fields.status, fields.pause_reason, fields.next_run_at, messageId, JSON.stringify(candidate.config), computeCalendarDigestHash(candidate.config), now],
         );
         return this.recordState(client, updatedDigest.rows[0], now);
       }

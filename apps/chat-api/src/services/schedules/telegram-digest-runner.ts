@@ -32,6 +32,7 @@ export interface DigestRunInput {
 }
 
 export type DigestRunOutcome =
+  | { status: 'discarded' }
   | {
       status: 'digest_sent';
       digestText: string;
@@ -52,7 +53,7 @@ export type DigestRunOutcome =
     };
 
 export interface TelegramDigestRunnerOptions {
-  pool?: Pick<pg.Pool, 'query'> | null;
+  pool?: pg.Pool | Pick<pg.Pool, 'query'> | null;
   credentialRepo: Pick<CredentialRepo, 'getPersonalCredentials'>;
   encryptionKey: string;
   adapterFactory: {
@@ -226,6 +227,52 @@ export function summarizeSourceItems(
 export class TelegramDigestRunner {
   constructor(private options: TelegramDigestRunnerOptions) {}
 
+  private async dispatch(
+    run: DigestRunInput,
+    signal: AbortSignal,
+    send: () => Promise<DigestRunOutcome>,
+  ): Promise<DigestRunOutcome> {
+    if (!this.options.pool) {
+      return { status: 'digest_failed', error: 'Lịch tự gửi cần kết nối PostgreSQL.', pauseSchedule: true };
+    }
+    if (typeof (this.options.pool as any).connect !== 'function') {
+      return send();
+    }
+    const client = await (this.options.pool as pg.Pool).connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("SET LOCAL lock_timeout = '10s'");
+      // Use the same conversation/schedule lock as schedule management. A cancellation
+      // that commits first prevents dispatch; a later cancellation waits for this send.
+      const schedule = (await client.query(
+        `SELECT s.* FROM schedules s JOIN conversations c ON c.id=s.conv_id
+         JOIN users u ON u.id=s.user_id AND u.status='active'
+         WHERE s.id=$1 FOR UPDATE OF c,s`,
+        [run.scheduleId],
+      )).rows[0];
+      const currentRun = (await client.query(
+        'SELECT status FROM schedule_runs WHERE id=$1 AND schedule_id=$2 FOR UPDATE',
+        [run.runId, run.scheduleId],
+      )).rows[0];
+      signal.throwIfAborted();
+      if (!schedule || currentRun?.status !== 'planning' ||
+        schedule.user_id !== run.userId || schedule.kind !== 'telegram_digest' ||
+        schedule.version !== run.scheduleVersion || schedule.digest_config_hash !== run.digestConfigHash ||
+        schedule.status === 'cancelled' || schedule.status === 'paused') {
+        await client.query('COMMIT');
+        return { status: 'discarded' };
+      }
+      const outcome = await send();
+      await client.query('COMMIT');
+      return outcome;
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async execute(run: DigestRunInput, signal: AbortSignal): Promise<DigestRunOutcome> {
     signal.throwIfAborted();
     const { digestConfig, digestConfigHash, userId } = run;
@@ -311,7 +358,9 @@ export class TelegramDigestRunner {
 
     for (const source of digestConfig.sources) {
       const allowed = READ_DIGEST_SOURCE_MAP[source.service];
-      if (!allowed || allowed.tool !== source.tool) {
+      const isLegacyGithubListIssues =
+        source.service === 'github' && source.tool === 'github.list_issues';
+      if (!allowed || (allowed.tool !== source.tool && !isLegacyGithubListIssues)) {
         return {
           status: 'blocked',
           error: `Công cụ nguồn "${source.tool}" không nằm trong danh sách chỉ đọc được phép.`,
@@ -600,23 +649,24 @@ export class TelegramDigestRunner {
           },
         },
       });
-      const sendRes = await telegramAdapter.execute(
-        'telegram.send_message',
-        { chatId: targetChatId, text: digestText },
-        { signal, chatId: targetChatId },
-      );
-
-      return {
-        status: 'digest_sent',
-        digestText,
-        delivery: {
-          chatId: targetChatId,
-          chatTitle: digestConfig.chatTitle,
-          ...(typeof sendRes?.messageId === 'number' ? { messageId: sendRes.messageId } : {}),
-          sentAt: new Date().toISOString(),
-          sources: sourceStatuses,
-        },
-      };
+      return await this.dispatch(run, signal, async () => {
+        const sendRes = await telegramAdapter.execute(
+          'telegram.send_message',
+          { chatId: targetChatId, text: digestText },
+          { signal, chatId: targetChatId },
+        );
+        return {
+          status: 'digest_sent',
+          digestText,
+          delivery: {
+            chatId: targetChatId,
+            chatTitle: digestConfig.chatTitle,
+            ...(typeof sendRes?.messageId === 'number' ? { messageId: sendRes.messageId } : {}),
+            sentAt: new Date().toISOString(),
+            sources: sourceStatuses,
+          },
+        };
+      });
     } catch {
       return {
         status: 'digest_failed',

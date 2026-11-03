@@ -6,6 +6,8 @@ import {
   ALL_TOOLS,
   MYCALENDAR_SERVICE,
   MYCALENDAR_TOOLS,
+  MYJIRA_SERVICE,
+  MYJIRA_TOOLS,
   SERVICE_REGISTRY,
 } from '@wap/tool-schemas';
 import { classifyIntent, routeIntent } from '../../src/router.js';
@@ -182,5 +184,72 @@ describe('evaluations/golden/cases-mycalendar.json schema and routing', () => {
     expect(ALL_TOOLS.some(tool => tool.service === 'mycalendar')).toBe(false);
     expect(SERVICE_REGISTRY.some(service => service.id === 'mycalendar')).toBe(false);
     expect(SERVICE_REGISTRY.find(service => service.id === 'calendar')?.connection).not.toBe('personal');
+  });
+});
+
+describe('evaluations/golden/cases-myjira.json schema and routing', () => {
+  const filePath = resolve(repoRoot, 'evaluations/golden/cases-myjira.json');
+  const raw = readFileSync(filePath, 'utf8');
+  const file = JSON.parse(raw) as GoldenFile;
+  const cases = file.cases;
+
+  const catalogWithMyJira = [...ALL_TOOLS.filter((t) => t.service !== 'jira'), ...MYJIRA_TOOLS];
+  const registryWithMyJira = [...SERVICE_REGISTRY, MYJIRA_SERVICE];
+
+  it('validates golden file header and case counts', () => {
+    expect(file.version).toBe(1);
+    expect(file.clock).toBe('2026-11-02T10:00:00+07:00');
+    expect(file.timeZone).toBe('Asia/Ho_Chi_Minh');
+    expect(cases).toHaveLength(8);
+
+    const ids = cases.map((c) => c.id);
+    expect(new Set(ids).size).toBe(8);
+  });
+
+  it('contains create_issue, add_comment, cross-service, clarification and injection cases', () => {
+    const singleSteps = cases.filter((c) => c.category === 'single_step' && c.primaryService === 'myjira');
+    expect(singleSteps).toHaveLength(3);
+    expect(singleSteps.map((c) => c.id)).toEqual(['mj01', 'mj02', 'mj03']);
+
+    const clarificationCases = cases.filter((c) => c.category === 'clarification' || c.category === 'read_only');
+    expect(clarificationCases).toHaveLength(2);
+    expect(clarificationCases.map((c) => c.id)).toEqual(['mj04', 'mj06']);
+
+    const crossService = cases.filter((c) => c.category === 'cross_service');
+    expect(crossService).toHaveLength(1);
+    expect(crossService[0].id).toBe('mj05');
+
+    const injections = cases.filter((c) => c.category === 'injection');
+    expect(injections).toHaveLength(2);
+    expect(injections.map((c) => c.id)).toEqual(['mi01', 'mi02']);
+    for (const injection of injections) {
+      expect(injection.expect.acceptKinds).toContain('clarification');
+      expect(injection.expect.acceptKinds).toContain('refusal');
+      expect(injection.expect.acceptKinds).toContain('plan');
+    }
+  });
+
+  it('routes personal Jira cases to myjira and never falls back to legacy Jira when disconnected', () => {
+    // mj01, mj02, mj03 route to myjira
+    expect(classifyIntent(cases[0].prompt, catalogWithMyJira, registryWithMyJira)).toEqual(['myjira']);
+    expect(classifyIntent(cases[1].prompt, catalogWithMyJira, registryWithMyJira)).toEqual(['myjira']);
+    expect(classifyIntent(cases[2].prompt, catalogWithMyJira, registryWithMyJira)).toEqual(['myjira']);
+
+    // mj05 routes to myjira and slack
+    const mj05Services = classifyIntent(cases[4].prompt, catalogWithMyJira, registryWithMyJira);
+    expect(mj05Services).toContain('myjira');
+    expect(mj05Services).toContain('slack');
+
+    // When myjira tools not in catalog, returns unavailable instead of fallback to legacy
+    const route01 = routeIntent(cases[0].prompt, ALL_TOOLS, registryWithMyJira);
+    expect(route01.services).toEqual([]);
+    expect(route01.unavailable.map((u) => u.id)).toContain('myjira');
+  });
+
+  it('preserves legacy routing when personal Jira is not registered (flag off regression)', () => {
+    expect(classifyIntent('Tạo ticket Jira cho sprint', ALL_TOOLS, SERVICE_REGISTRY)).toEqual(['jira']);
+    expect(classifyIntent('Thêm bình luận vào ticket ATI-12 trên Jira', ALL_TOOLS, SERVICE_REGISTRY)).toEqual(['jira']);
+    expect(ALL_TOOLS.some((tool) => tool.service === 'myjira')).toBe(false);
+    expect(SERVICE_REGISTRY.some((service) => service.id === 'myjira')).toBe(false);
   });
 });

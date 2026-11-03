@@ -328,6 +328,20 @@ describe('GitHub adapter', () => {
       isPullRequest: true,
     });
 
+    // 2b. get_pull_request rejects an ordinary issue (no pull_request field)
+    const ordinaryIssueFetch = vi.fn(async () => json(issue));
+    const ordinaryAdapter = new GitHubAdapter({
+      credentials: { token: 'test' },
+      allowedScope,
+      fetchFn: ordinaryIssueFetch as typeof fetch,
+    });
+    await expect(
+      ordinaryAdapter.execute('github.get_pull_request', { repo, issueNumber: 7 }),
+    ).rejects.toMatchObject({
+      category: 'VALIDATION',
+      message: 'GitHub item is an issue, not a pull request',
+    });
+
     // 3. update_issue sends PATCH to close/update issue
     const updated = await adapter.execute('github.update_issue', {
       repo,

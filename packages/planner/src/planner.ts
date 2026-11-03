@@ -6,7 +6,7 @@ import { validatePlan, validateAnswer, type ValidationResult } from './validator
 import { validateSchedule } from './schedule-validator.js';
 import { buildSystemPrompt } from './prompts/system-prompt.js';
 import {
-  MAX_DIRECTORY_CALLS, MAX_DIRECTORY_PARENTS, MAX_RESULTS_PER_CALL, formatSearchResults, groundingMemory, parseSearchRequest, prepareSearchCall, recordObserved, recordThreadLabels, providerMemory, searchEntities,
+  MAX_DIRECTORY_CALLS, MAX_DIRECTORY_PARENTS, MAX_RESULTS_PER_CALL, formatSearchResults, groundingMemory, parseSearchRequest, prepareSearchCall, recordObserved, recordThreadLabels, providerMemory, sanitizeEntities, searchEntities,
   type SearchOutcome,
 } from './search.js';
 import { extractWorkspaceRecipients } from './recipients.js';
@@ -87,12 +87,19 @@ interface GatherCandidate { id: string; name: string; [key: string]: unknown }
 interface PendingGather { key: string; query: string; candidates: GatherCandidate[] }
 interface GatherRequest { key: string; query: string; rule: GatherRule }
 
-/** The first message naming a resource wins, so a clarification reply can name resources the original request left out. */
-function entityNames(messages: string[], rules: GatherRule[]): GatherRequest[] {
+/**
+ * The first message naming a resource wins, so a clarification reply can name resources the original request left out.
+ * A registered service's id or name is never a resource name: "kênh Slack" or "bảng Trello" names where the
+ * resource lives, so that match is skipped and the next one in the message is tried.
+ */
+function entityNames(messages: string[], rules: GatherRule[], serviceNames: Set<string>): Array<GatherRequest & { fromMessage: number }> {
   return rules.flatMap((rule) => {
-    for (const message of messages) {
-      const query = rule.pattern.exec(message)?.[1]?.trim();
-      if (query) return [{ key: rule.entityKey, query, rule }];
+    const pattern = new RegExp(rule.pattern.source, rule.pattern.flags.replace(/[gy]/g, '') + 'g');
+    for (const [fromMessage, message] of messages.entries()) {
+      for (const match of message.matchAll(pattern)) {
+        const query = match[1]?.trim();
+        if (query && !serviceNames.has(query.toLocaleLowerCase())) return [{ key: rule.entityKey, query, rule, fromMessage }];
+      }
     }
     return [];
   });
@@ -139,6 +146,55 @@ function answerLookup(outcome: SearchOutcome): AnswerLookup {
 function readOnlyQuestion(): PlannerResponse {
   return { kind: 'clarification', question: 'Bạn muốn làm gì với dữ liệu này, chẳng hạn gửi thông báo, ghi vào bảng tính hoặc tạo công việc?',
     context: 'Kế hoạch cần ít nhất một hành động ghi. Hãy chọn hành động trên dịch vụ đã kết nối.', reason: 'read_only' };
+}
+
+function isClarificationAssistantMessage(content: unknown): boolean {
+  if (!content) return false;
+  if (typeof content === 'object') {
+    const obj = content as Record<string, unknown>;
+    if (obj.kind === 'clarification') return true;
+    if (obj.kind === 'plan' || Array.isArray(obj.steps) || obj.kind === 'answer' || obj.kind === 'refusal' || obj.kind === 'schedule_proposal') {
+      return false;
+    }
+  }
+  if (typeof content === 'string') {
+    const trimmed = content.trim();
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (parsed && typeof parsed === 'object') {
+          if (parsed.kind === 'clarification') return true;
+          if (parsed.kind === 'plan' || Array.isArray(parsed.steps) || parsed.kind === 'answer' || parsed.kind === 'refusal' || parsed.kind === 'schedule_proposal') {
+            return false;
+          }
+        }
+      } catch {
+        // Not valid JSON
+      }
+    }
+    if (trimmed.startsWith('Previous answer.') || trimmed.includes('<previous_answer>')) {
+      return false;
+    }
+  }
+  return true;
+}
+
+export function relevantGroundingUserTexts(history: ChatMessage[] = [], currentMessage: string): string[] {
+  const texts: string[] = [currentMessage];
+  for (let i = history.length - 1; i >= 0; i--) {
+    const msg = history[i];
+    if (!msg) continue;
+    if (msg.role === 'assistant') {
+      if (!isClarificationAssistantMessage(msg.content)) {
+        break;
+      }
+      continue;
+    }
+    if (msg.role === 'user') {
+      texts.unshift(msg.content);
+    }
+  }
+  return texts;
 }
 
 export class AIPlanner {
@@ -247,9 +303,10 @@ export class AIPlanner {
     const missing = memory.getEntity<{ key: string }>('__gatherMissing');
     const rules = this.serviceRegistry.flatMap((service) => service.gatherRules ?? [])
       .filter((rule) => this.toolCatalog.some((tool) => tool.name === rule.tool && tool.sideEffect === 'read'));
-    const requests = entityNames(intent === userMessage ? [intent] : [userMessage, intent], rules).map((request) =>
-      missing?.key === request.key ? { ...request, query: userMessage.trim() } : request
-    );
+    const serviceNames = new Set(this.serviceRegistry.flatMap((service) => [service.id, service.name].map((name) => name.toLocaleLowerCase())));
+    // A reply that names the missing resource itself ("kênh general") is searched by that name, not as a whole.
+    const requests: GatherRequest[] = entityNames(intent === userMessage ? [intent] : [userMessage, intent], rules, serviceNames)
+      .map(({ fromMessage, ...request }) => missing?.key === request.key && fromMessage > 0 ? { ...request, query: userMessage.trim() } : request);
     if (missing && !requests.some((request) => request.key === missing.key)) {
       const rule = rules.find((candidate) => candidate.entityKey === missing.key);
       if (rule) requests.unshift({ key: missing.key, query: userMessage.trim(), rule });
@@ -342,10 +399,33 @@ export class AIPlanner {
       const raw = await this.gatherSearch({ tool: tool.name, args, signal, actor: input.actor });
       const list = searchEntities(raw, tool.outputSchema);
       if (signal?.aborted) throw signal.reason ?? new Error('Lookup was aborted');
-      const result = list.slice(0, MAX_RESULTS_PER_CALL);
+      const sanitized = (sanitizeEntities(list) as unknown[]) ?? [];
+      const result = sanitized.slice(0, MAX_RESULTS_PER_CALL);
       if (tool.discovers) {
+        const enrichedStamp: Record<string, unknown> = { ...stamp };
+        if (input.actor?.workspaceId && !enrichedStamp.workspaceId) {
+          enrichedStamp.workspaceId = input.actor.workspaceId;
+        }
+        if (tool.service === 'myjira') {
+          const siteId = typeof args.siteId === 'string'
+            ? args.siteId
+            : (typeof enrichedStamp.siteId === 'string' ? (enrichedStamp.siteId as string) : undefined);
+          if (siteId) {
+            const observedMap = memory.getEntity<Record<string, Array<Record<string, unknown>>>>('__observed');
+            const observedSites = observedMap?.jira_site ?? [];
+            const explicitSites = memory.getEntity<Array<Record<string, unknown>>>('jira_site') ?? [];
+            const allSites = [...observedSites, ...explicitSites];
+            const matchedSite = allSites.find((s) => s.siteId === siteId || s.id === siteId);
+            if (matchedSite?.cloudId && !enrichedStamp.cloudId) {
+              enrichedStamp.cloudId = matchedSite.cloudId;
+            }
+            if (matchedSite?.workspaceId && !enrichedStamp.workspaceId) {
+              enrichedStamp.workspaceId = matchedSite.workspaceId;
+            }
+          }
+        }
         // `stamp` records the parent a result was found under, e.g. the board of a member.
-        const stamped = result.map((entity) => (entity && typeof entity === 'object' ? { ...stamp, ...entity } : entity));
+        const stamped = result.map((entity) => (entity && typeof entity === 'object' ? { ...enrichedStamp, ...entity } : entity));
         memory.setEntity('__observed', recordObserved(memory.getEntity('__observed'), tool.discovers, stamped, tool.observedFields));
         if (tool.service === 'gmail' && tool.discovers === 'thread') {
           const labels = memory.getEntity('__labels') ?? {};
@@ -422,6 +502,7 @@ export class AIPlanner {
     const { userMessage, history = [], memory, signal } = input;
     const conversation: ChatMessage[] = [...history, { role: 'user', content: userMessage }];
     const userTexts = conversation.filter((message) => message.role === 'user').map((message) => message.content);
+    const groundingUserTexts = relevantGroundingUserTexts(history, userMessage);
 
     // Route on the whole conversation: a short answer such as "Minh Anh" names no service.
     const route = this.route(userTexts.join('\n'), input);
@@ -467,7 +548,7 @@ export class AIPlanner {
       try { answerOutput = this.readAnswers && JSON.parse(output)?.kind === 'answer'; } catch { /* Normal JSON validation reports this. */ }
       const validation = answerOutput ? validateAnswer(output, { readAnswers: this.readAnswers,
         hasReadData: successfulReads.length > 0 || usedDirectory.length > 0 }) : this.scheduleValidation(output, input) ?? validatePlan(output, activeTools,
-        this.requireGroundedResources ? { grounding: { memory: groundingMemory(memory.getAll(), memory.getEntity('__observed')), userTexts } } : {});
+        this.requireGroundedResources ? { grounding: { memory: groundingMemory(memory.getAll(), memory.getEntity('__observed')), userTexts: groundingUserTexts } } : {});
       if (validation.valid) {
         if (validation.parsed.kind === 'answer') return { ...validation.parsed,
           lookups: successfulReads.map(answerLookup), usedDirectory };
@@ -534,7 +615,7 @@ export class AIPlanner {
 
     const validationOptions = this.requireGroundedResources ? { grounding: {
       memory: groundingMemory(memory.getAll(), memory.getEntity('__observed')),
-      userTexts: conversationHistory.filter((message) => message.role === 'user').map((message) => message.content),
+      userTexts: relevantGroundingUserTexts(history, planningMessage),
     } } : {};
 
     // 3. Attempt 1: Call LLM provider

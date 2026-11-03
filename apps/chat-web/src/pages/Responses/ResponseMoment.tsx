@@ -250,7 +250,7 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
                   ? 'Cần kết nối lại'
                   : trelloConnected
                   ? `Đã kết nối${current('trello')?.username ? ` · @${current('trello')!.username}` : ''}`
-                  : service.id === 'trello' && trelloStatus === 'needs_scope'
+                  : service.id === 'trello' && (trelloStatus === 'needs_scope' || trelloStatus === 'scope_required')
                   ? `Đã kết nối · Chưa chọn bảng${current('trello')?.username ? ` · @${current('trello')!.username}` : ''}`
                   : service.id === 'trello' && trelloStatus === 'needs_membership'
                   ? `Đã kết nối · Cần cấp quyền bảng${current('trello')?.username ? ` · @${current('trello')!.username}` : ''}`
@@ -258,6 +258,8 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
                   ? 'Cần kết nối lại'
                   : githubConnected
                   ? `Đã kết nối${githubHandle ? ` · @${githubHandle}` : ''}`
+                  : service.id === 'github' && githubStatus === 'scope_required'
+                  ? `Đã kết nối · Chưa chọn kho${githubHandle ? ` · @${githubHandle}` : ''}`
                   : service.id === 'github' && githubStatus === 'needs_scope'
                   ? `Đã kết nối · Chưa chọn repo${githubHandle ? ` · @${githubHandle}` : ''}`
                   : service.id === 'github' && githubStatus === 'needs_membership'
@@ -346,13 +348,13 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
               if (back && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)) return;
               event.preventDefault();
               if (trelloStatus === 'needs_scope') navigate('/settings#trello-scope');
-              else if (trelloStatus === 'needs_membership') navigate('/settings#trello');
+              else if (trelloStatus === 'scope_required' || trelloStatus === 'needs_membership') navigate('/settings#trello');
               else if (back) void connectTrello(back);
               else navigate('/settings#trello');
             }}
             className={`${primary} flex items-center gap-1.5`}
           >
-            {trelloStatus === 'needs_scope'
+            {trelloStatus === 'needs_scope' || trelloStatus === 'scope_required'
               ? 'Chọn bảng Trello'
               : trelloStatus === 'needs_membership'
               ? 'Kiểm tra quyền Trello'
@@ -372,7 +374,7 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
               if (back && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)) return;
               event.preventDefault();
               if (githubStatus === 'needs_scope') navigate('/settings#github-scope');
-              else if (githubStatus === 'needs_membership') navigate('/settings#github');
+              else if (githubStatus === 'scope_required' || githubStatus === 'needs_membership') navigate('/settings#github');
               else if (back) void connectGitHub(back);
               else navigate('/settings#github');
             }}
@@ -380,6 +382,8 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
           >
             {githubStatus === 'needs_scope'
               ? 'Chọn repository GitHub'
+              : githubStatus === 'scope_required'
+              ? 'Chọn kho GitHub'
               : githubStatus === 'needs_membership'
               ? 'Kiểm tra quyền GitHub'
               : githubStatus === 'reconnect_required'

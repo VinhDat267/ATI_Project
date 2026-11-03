@@ -3,12 +3,12 @@ import { createHash } from 'node:crypto';
 import type { GoogleProfile } from '../../auth/google-oidc.js';
 import type { UserRow } from './user-repo.js';
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
-export type OAuthMode = 'login' | 'link' | 'connect_gmail' | 'connect_mycalendar' | 'connect_mysheets' | 'connect_trello' | 'connect_github' | 'connect_telegram' | 'connect_notion';
+export type OAuthMode = 'login' | 'link' | 'connect_gmail' | 'connect_mycalendar' | 'connect_mysheets' | 'connect_trello' | 'connect_github' | 'connect_telegram' | 'connect_notion' | 'connect_jira_identity' | 'connect_jira_sites';
 export interface OAuthState {
   id?: string;
   state_hash: string; browser_binding_hash: string; code_verifier: string; nonce: string;
   mode: OAuthMode; user_id: string | null; session_id: string | null;
-  /** connect_gmail only: the caller's own conversation, `/c/<uuid>`, to return to (OAUTH-01). */
+  /** OAuth connection return: the caller's own conversation, `/c/<uuid>`, to return to (OAUTH-01). */
   return_to?: string | null;
 }
 export class GoogleAccountError extends Error {

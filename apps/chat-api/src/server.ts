@@ -10,6 +10,7 @@ import {
   CredentialRepo,
   UserRepo,
   WorkspaceRepo,
+  JiraWorkspaceRepo,
 } from './db/repositories/index.js';
 import { DEMO_ADMIN_ID } from './routes/auth-routes.js';
 import { verifyPassword } from './db/repositories/user-repo.js';
@@ -34,6 +35,7 @@ import { TrelloTokenManager } from './services/trello/token-manager.js';
 import { TrelloOAuthClient } from './services/trello/oauth-client.js';
 import { TrelloTeamRepo } from './db/repositories/trello-team-repo.js';
 import { TelegramTeamRepo } from './db/repositories/telegram-team-repo.js';
+import { TelegramUpdateRepo } from './db/repositories/telegram-update-repo.js';
 import { TelegramBotClient } from './services/telegram/bot-client.js';
 import { createTelegramConnectionLookup } from './services/telegram/connection-reference.js';
 import { TelegramDigestRunner } from './services/schedules/telegram-digest-runner.js';
@@ -47,6 +49,12 @@ import { NotionConnectionRepo } from './db/repositories/notion-connection-repo.j
 import { NotionOAuthClient } from './services/notion/oauth-client.js';
 import { NotionTokenManager } from './services/notion/token-manager.js';
 import { createNotionConnectionLookup } from './services/notion/connection-reference.js';
+import { JiraOAuthClient } from './services/jira/jira-oauth-client.js';
+import { JiraOAuthRepo } from './db/repositories/jira-oauth-repo.js';
+import { JiraTokenManager } from './services/jira/jira-token-manager.js';
+import { JiraNativeVerifier } from './services/jira/jira-native-verifier.js';
+import { JiraPolicyService } from './services/jira/jira-policy-service.js';
+import { JiraHistorySanitizer } from './services/jira/jira-history-sanitizer.js';
 import {
   AIPlanner,
   createProviderFromEnv,
@@ -78,6 +86,7 @@ async function bootstrap() {
   let stepRepo: any = null;
   let credRepo: any = null;
   let workspaceRepo: any = null;
+  let jiraWorkspaceRepo: JiraWorkspaceRepo | null = null;
 
   try {
     const dbUrl = env.DATABASE_URL;
@@ -93,6 +102,7 @@ async function bootstrap() {
     stepRepo = new StepRepo(pool);
     credRepo = new CredentialRepo(pool, env.ENCRYPTION_KEY);
     workspaceRepo = new WorkspaceRepo(pool);
+    jiraWorkspaceRepo = new JiraWorkspaceRepo(pool);
 
     if (env.RUNTIME_MODE === 'live') {
       const seededAdmin = await userRepo.findByEmail('admin@wap.local');
@@ -102,6 +112,12 @@ async function bootstrap() {
     }
   } catch (err: any) {
     if (!mayUseMemoryStorage(env.RUNTIME_MODE)) throw err;
+    const unavailablePool = pool;
+    pool = null;
+    userRepo = null;
+    workspaceRepo = null;
+    jiraWorkspaceRepo = null;
+    await unavailablePool?.end();
     console.warn(
       `\x1b[33m[chat-api]\x1b[0m PostgreSQL không khả dụng (${err?.message || 'offline'}). Tự động chuyển sang chế độ Lưu trữ In-Memory phát triển.`
     );
@@ -413,7 +429,9 @@ async function bootstrap() {
   const githubConnection = githubLookup ?? sandboxGitHubConnection;
 
   const telegramAvailable = Boolean(env.TELEGRAM_BOT && pool);
-  const telegramBotClient = telegramAvailable ? new TelegramBotClient(env.TELEGRAM_BOT!) : undefined;
+  const telegramBotClient = telegramAvailable && pool
+    ? new TelegramBotClient(env.TELEGRAM_BOT!, fetch, new TelegramUpdateRepo(pool))
+    : undefined;
   const telegramTeamRepo = pool ? new TelegramTeamRepo(pool) : undefined;
   const telegramLookup = telegramAvailable && telegramBotClient
     ? createTelegramConnectionLookup({
@@ -446,6 +464,27 @@ async function bootstrap() {
     ? new NotionTokenManager(notionRepo, notionOAuthClient, env.ENCRYPTION_KEY, (userId) => realAdapterFactory.clearPersonal(userId))
     : undefined;
   const notionConnection = notionRepo ? createNotionConnectionLookup({ repo: notionRepo }) : undefined;
+
+  const jiraAvailable = Boolean(env.MYJIRA_ENABLED && env.JIRA_OAUTH && pool);
+  const jiraOAuthClient = jiraAvailable ? new JiraOAuthClient(env.JIRA_OAUTH!) : undefined;
+  const jiraOAuthRepo = jiraAvailable && pool ? new JiraOAuthRepo(pool, env.ENCRYPTION_KEY) : undefined;
+  const jiraTokens = jiraAvailable && pool && jiraOAuthClient && jiraOAuthRepo
+    ? new JiraTokenManager({
+        pool,
+        client: jiraOAuthClient,
+        repo: jiraOAuthRepo,
+        encryptionKey: env.ENCRYPTION_KEY,
+      })
+    : undefined;
+  const jiraNativeVerifier = jiraAvailable && jiraTokens
+    ? new JiraNativeVerifier({ tokenManager: jiraTokens })
+    : undefined;
+  if (pool && jiraNativeVerifier) {
+    jiraWorkspaceRepo = new JiraWorkspaceRepo(pool, { verifier: jiraNativeVerifier });
+  }
+  const jiraHistorySanitizer = pool && jiraNativeVerifier
+    ? new JiraHistorySanitizer(new JiraPolicyService({ pool, verifier: jiraNativeVerifier }))
+    : undefined;
 
   // 2. Initialize LLM Provider
   let provider: any;
@@ -602,6 +641,7 @@ async function bootstrap() {
   if (env.GMAIL_ENABLED && !gmailAvailable) console.warn('\x1b[33m[chat-api] GMAIL_ENABLED=on nhưng thiếu cấu hình Gmail hoặc PostgreSQL: kết nối Gmail tạm tắt (503).\x1b[0m');
   if (env.MYCALENDAR_ENABLED && !mycalendarAvailable) console.warn('\x1b[33m[chat-api] MYCALENDAR_ENABLED=on nhưng thiếu cấu hình MyCalendar hoặc PostgreSQL: kết nối MyCalendar tạm tắt (503).\x1b[0m');
   if (env.MYSHEETS_ENABLED && !mysheetsAvailable) console.warn('\x1b[33m[chat-api] MYSHEETS_ENABLED=on nhưng thiếu cấu hình MySheets hoặc PostgreSQL: kết nối MySheets tạm tắt (503).\x1b[0m');
+  if (env.MYJIRA_ENABLED && !jiraAvailable) console.warn('\x1b[33m[chat-api] MYJIRA_ENABLED=on nhưng thiếu cấu hình Jira OAuth hoặc PostgreSQL: kết nối Jira tạm tắt (503).\x1b[0m');
 
   let realAdapterFactory: AdapterFactory;
   const gmailTokens = gmailAvailable ? new GmailTokenManager({
@@ -796,6 +836,9 @@ async function bootstrap() {
     userRepo,
     adminUserRepo: pool && userRepo ? new AdminUserRepo(pool) : undefined,
     workspaceRepo,
+    jiraWorkspaceRepo: jiraWorkspaceRepo ?? undefined,
+    jiraHistorySanitizer,
+    pool: pool ?? undefined,
     signupEnabled: env.AUTH_SIGNUP_ENABLED,
     googleSignupEnabled: env.GOOGLE_SIGNUP_ENABLED,
     googleOAuth: env.GOOGLE_OAUTH,
@@ -858,6 +901,7 @@ async function bootstrap() {
     githubTeamRepo,
     telegram: {
       bot: telegramAvailable ? env.TELEGRAM_BOT : undefined,
+      botClient: telegramBotClient,
       teamRepo: telegramTeamRepo,
       onConnectionChanged: (userId: string) => {
         realAdapterFactory.clearPersonal(userId);
@@ -873,6 +917,18 @@ async function bootstrap() {
         realAdapterFactory.clearPersonal(userId);
       },
     },
+    jira: env.MYJIRA_ENABLED ? {
+      enabled: jiraAvailable,
+      oauth: env.JIRA_OAUTH,
+      repo: jiraOAuthRepo,
+      tokens: jiraTokens,
+      client: jiraOAuthClient,
+      onConnectionChanged: (userId: string) => {
+        realAdapterFactory.clearPersonal(userId);
+        jiraTokens?.clear(userId);
+        jiraNativeVerifier?.clearCache();
+      },
+    } : undefined,
     chatService,
     sseManager,
     executionService,

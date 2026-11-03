@@ -183,7 +183,17 @@ export class AdapterFactory {
       throw new Error(`No credentials configured for service '${serviceName}'`);
     }
 
-    const decrypted = decryptCredentials(record.config, this.encryptionKey);
+    let decrypted: Record<string, any>;
+    try {
+      decrypted = decryptCredentials(record.config, this.encryptionKey);
+    } catch {
+      console.warn(
+        `[adapter-factory] Cannot decrypt stored credentials for '${serviceName}'; service requires reconfiguration.`,
+      );
+      throw new Error(
+        `Stored credentials for service '${serviceName}' cannot be decrypted; please reconfigure the service.`,
+      );
+    }
     const allowedScope: AllowedScope = (decrypted.allowedScope || {}) as AllowedScope;
     const entries = allowedScope[registration.definition.scopeKey];
     if (!Array.isArray(entries) || entries.length === 0) {

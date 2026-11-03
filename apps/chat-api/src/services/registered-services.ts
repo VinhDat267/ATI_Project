@@ -1,5 +1,5 @@
 import { decryptCredentials } from '@wap/tool-adapters';
-import { ALL_TOOLS, GITHUB_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, NOTION_TOOLS, NOTION_OAUTH_TOOLS, TELEGRAM_TOOLS, TELEGRAM_OAUTH_TOOLS, TRELLO_TOOLS, TRELLO_OAUTH_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
+import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, GITHUB_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, NOTION_TOOLS, NOTION_OAUTH_TOOLS, TELEGRAM_TOOLS, TELEGRAM_OAUTH_TOOLS, TRELLO_TOOLS, TRELLO_OAUTH_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import type { ServiceTransport } from './transports/types.js';
 import { TRELLO_TRANSPORT } from './transports/trello.js';
@@ -88,6 +88,9 @@ export async function getConfiguredToolCatalog(
       available.add(definition.id);
     } catch {
       // Corrupt or stale credentials do not authorize a service.
+      console.warn(
+        `[registered-services] Cannot decrypt stored credentials for '${definition.id}'; skipping service.`,
+      );
     }
   }
   return ALL_TOOLS.filter((tool) => available.has(tool.service));
@@ -135,7 +138,19 @@ export async function getToolCatalogFor(
   if (!options.userId) return catalog;
   if (options.gmailEnabled) {
     const gmail = await credentialRepo.getPersonalCredentials('gmail', options.userId);
-    if (gmail && gmail.status === 'active') catalog = [...catalog, ...GMAIL_TOOLS];
+    if (gmail && gmail.status === 'active') {
+      try {
+        if (typeof gmail.config === 'string' && encryptionKey) {
+          decryptCredentials(gmail.config, encryptionKey);
+        }
+        catalog = [...catalog, ...GMAIL_TOOLS];
+      } catch {
+        // stale or unreadable connection does not add tools
+        console.warn(
+          "[registered-services] Cannot decrypt stored credentials for 'gmail'; skipping service.",
+        );
+      }
+    }
   }
   if (options.mycalendarEnabled) {
     const mycal = await credentialRepo.getPersonalCredentials('mycalendar', options.userId);
@@ -152,6 +167,9 @@ export async function getToolCatalogFor(
         }
       } catch {
         // stale or unreadable connection does not add tools
+        console.warn(
+          "[registered-services] Cannot decrypt stored credentials for 'mycalendar'; skipping service.",
+        );
       }
     }
   }
@@ -170,6 +188,9 @@ export async function getToolCatalogFor(
         }
       } catch {
         // stale or unreadable connection does not add tools
+        console.warn(
+          "[registered-services] Cannot decrypt stored credentials for 'mysheets'; skipping service.",
+        );
       }
     }
   }
@@ -221,7 +242,7 @@ export async function getToolCatalogFor(
     try {
       const github = await options.githubConnection(options.userId);
       if (github?.status === 'connected' && github.connection?.repos?.length > 0) {
-        catalog = [...catalog, ...GITHUB_TOOLS];
+        catalog = [...catalog, ...GITHUB_TOOLS, ...GITHUB_OAUTH_TOOLS];
       }
     } catch {
       // ignore
@@ -241,7 +262,12 @@ export async function getToolCatalogFor(
               refreshToken: dec.refreshToken,
             });
             const accessToken = await provider.getAccessToken();
-            const callerRepos = await options.githubOAuthClient.repositories(
+            const fetchRepos =
+              typeof options.githubOAuthClient.repos === 'function'
+                ? options.githubOAuthClient.repos
+                : options.githubOAuthClient.repositories;
+            const callerRepos = await fetchRepos.call(
+              options.githubOAuthClient,
               accessToken,
               AbortSignal.timeout(10_000)
             );
@@ -255,7 +281,7 @@ export async function getToolCatalogFor(
                 )
               )
             ) {
-              catalog = [...catalog, ...GITHUB_TOOLS];
+              catalog = [...catalog, ...GITHUB_TOOLS, ...GITHUB_OAUTH_TOOLS];
             }
           }
         }

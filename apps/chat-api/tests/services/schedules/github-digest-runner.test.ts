@@ -1,5 +1,9 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createServer } from 'node:http';
+import pg from 'pg';
+import { encryptCredentials, GlobalRateLimiter, SlackAdapter, StepError, TelegramAdapter } from '@wap/tool-adapters';
 import type { GithubDigestConfig, ScheduleRecurrence } from '@wap/tool-schemas';
+import { AdapterFactory } from '../../../src/services/adapter-factory.js';
 import { ScheduleRunner } from '../../../src/services/schedules/schedule-runner.js';
 import { ScheduleService } from '../../../src/services/schedules/schedule-service.js';
 import { computeDigestConfigHash, evaluateGithubDigestCandidate } from '../../../src/services/schedules/github-digest-candidate.js';
@@ -424,7 +428,12 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
             return [{ id: 'C0123456789', name: 'team' }];
           }
           if (serviceName === 'slack' && tool === 'slack.send_message') {
-            throw new Error('Slack 503 Service Unavailable');
+            throw new StepError({
+              message: 'Slack rate limit exceeded (429)',
+              category: 'RATE_LIMIT',
+              statusCode: 429,
+              retryable: true,
+            });
           }
           return [];
         },
@@ -558,5 +567,487 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
     const runs = await service.listRuns(owner.id, schedule.id, 10, now);
     expect(runs[0]?.state).toBe('digest_sent');
     expect((runs[0]?.delivery as any)?.telegramChatId).toBe('-100999888');
+  });
+
+  it('8. (F3) passes connections.telegram snapshot to real AdapterFactory at execution phase', async () => {
+    const encryptionKey = 'a'.repeat(64);
+    const tg = {
+      status: 'connected',
+      connection: {
+        credentialId: 'cred-tg-1',
+        telegramUserId: '777',
+        username: 'octo_tg',
+        chatIds: ['-100999888'],
+      },
+      selectedChats: [{ chatId: '-100999888', title: 'Dev Alerts', type: 'supergroup' }],
+    };
+    const gh = {
+      status: 'connected',
+      connection: {
+        credentialId: 'cred-gh-1',
+        githubUserId: '1001',
+        login: 'octocat',
+        repos: ['nhom/ati'],
+      },
+      teamRepos: [{ repoId: '101', fullName: 'nhom/ati', name: 'ati' }],
+    };
+
+    const candidate = await evaluateGithubDigestCandidate({
+      userId: owner.id,
+      proposal: {
+        kind: 'schedule',
+        action: 'create',
+        name: 'Bản tin GitHub Telegram',
+        request: 'Gửi bản tin GitHub repo nhom/ati vào nhóm Telegram Dev Alerts',
+        recurrence: dailyRecurrence,
+        summary: 'Gửi bản tin GitHub sang Telegram',
+      },
+      services: ['github', 'telegram'],
+      githubConnection: async () => gh,
+      telegramConnection: async () => tg,
+    });
+
+    expect(candidate.canAutoDigest).toBe(true);
+    expect(candidate.config?.telegramCredentialId).toBe('cred-tg-1');
+
+    const tgRecord = {
+      id: 'cred-tg-1',
+      status: 'active',
+      config: encryptCredentials(
+        { telegramUserId: '777', selectedChats: tg.selectedChats },
+        encryptionKey,
+      ),
+    };
+    const sentMessages: Array<{ chatId: string; text: string }> = [];
+    const factory = new AdapterFactory({
+      credentialRepo: { getPersonalCredentials: async () => tgRecord } as any,
+      encryptionKey,
+      telegramBot: { botToken: '12345:review_fixture_token_12345', botUsername: 'review_bot' },
+      telegramBotClient: { getChatMember: async () => true },
+      createTelegramAdapter: () =>
+        ({
+          execute: async (tool: string, args: any) => {
+            if (tool === 'telegram.send_message') {
+              sentMessages.push({ chatId: args.chatId, text: args.text });
+            }
+            return { messageId: 42 };
+          },
+        }) as any,
+    });
+
+    const schedule = await insertDigestSchedule({
+      config: candidate.config!,
+      configHash: candidate.configHash!,
+    });
+
+    const runDigest = createGithubDigestRunner({
+      pool: db.pool,
+      githubConnection: async () => gh,
+      telegramConnection: async () => tg,
+      getAdapter: (serviceName, context) =>
+        serviceName === 'github'
+          ? { execute: async () => [] }
+          : factory.getAdapterForService(serviceName, context),
+    });
+
+    const runner = new ScheduleRunner({
+      pool: db.pool,
+      timeZone: VN,
+      now: () => now,
+      planRun: async () => ({ persist: async () => ({ state: 'needs_attention' }), afterCommit() {} }),
+      runGithubDigest: runDigest,
+      recordState: (client, row, at) => service.recordState(client, row, at),
+    });
+
+    await runner.tick();
+    await runner.stop();
+
+    const runs = await service.listRuns(owner.id, schedule.id, 10, now);
+    expect(runs[0]?.state).toBe('digest_sent');
+    expect(sentMessages).toHaveLength(1);
+    expect(sentMessages[0]?.chatId).toBe('-100999888');
+  });
+
+  it('9. (F2) records delivery_started_at and transitions to needs_attention (blocking replan) when Telegram write fails with UNKNOWN', async () => {
+    const tg = {
+      status: 'connected',
+      connection: {
+        credentialId: 'cred-tg-1',
+        telegramUserId: '777',
+        username: 'octo_tg',
+        chatIds: ['-100999888'],
+      },
+      selectedChats: [{ chatId: '-100999888', title: 'Dev Alerts', type: 'supergroup' }],
+    };
+    const gh = {
+      status: 'connected',
+      connection: {
+        credentialId: 'cred-gh-1',
+        githubUserId: '1001',
+        login: 'octocat',
+        repos: ['nhom/ati'],
+      },
+      teamRepos: [{ repoId: '101', fullName: 'nhom/ati', name: 'ati' }],
+    };
+
+    const candidate = await evaluateGithubDigestCandidate({
+      userId: owner.id,
+      proposal: {
+        kind: 'schedule',
+        action: 'create',
+        name: 'Bản tin GitHub Telegram',
+        request: 'Gửi bản tin GitHub repo nhom/ati vào nhóm Telegram Dev Alerts',
+        recurrence: dailyRecurrence,
+        summary: 'Gửi bản tin GitHub sang Telegram',
+      },
+      services: ['github', 'telegram'],
+      githubConnection: async () => gh,
+      telegramConnection: async () => tg,
+    });
+
+    let sendCalls = 0;
+    const server = createServer(async (req, res) => {
+      for await (const _ of req) {
+        // consume request
+      }
+      if (req.url?.endsWith('/getChat')) {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(
+          JSON.stringify({
+            ok: true,
+            result: { id: -100999888, type: 'supergroup', title: 'Dev Alerts' },
+          }),
+        );
+      } else if (req.url?.endsWith('/sendMessage')) {
+        sendCalls++;
+        req.socket.destroy();
+      } else {
+        res.writeHead(404).end();
+      }
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const port = (server.address() as any).port;
+
+    try {
+      const transport = new TelegramAdapter({
+        credentials: { botToken: '12345:review_fixture_token_12345' },
+        baseUrl: `http://127.0.0.1:${port}`,
+        allowedScope: { chats: ['-100999888'] },
+      });
+      const realRunner = createGithubDigestRunner({
+        pool: db.pool,
+        githubConnection: async () => gh,
+        telegramConnection: async () => tg,
+        getAdapter: (serviceName) =>
+          serviceName === 'github' ? { execute: async () => [] } : transport,
+      });
+
+      const schedule = await insertDigestSchedule({
+        config: candidate.config!,
+        configHash: candidate.configHash!,
+      });
+
+      const scheduler = new ScheduleRunner({
+        pool: db.pool,
+        timeZone: VN,
+        now: () => now,
+        planRun: async () => ({ persist: async () => ({ state: 'needs_attention' }), afterCommit() {} }),
+        runGithubDigest: realRunner,
+        recordState: (client, row, at) => service.recordState(client, row, at),
+      });
+
+      await scheduler.tick();
+      await scheduler.stop();
+
+      const saved = (
+        await db.pool.query(
+          'SELECT id, status, delivery_started_at FROM schedule_runs WHERE schedule_id = $1',
+          [schedule.id],
+        )
+      ).rows[0];
+
+      expect(sendCalls).toBe(1);
+      expect(saved.delivery_started_at).not.toBeNull();
+      expect(saved.status).toBe('needs_attention');
+
+      await expect(
+        service.startRun({ userId: owner.id, runId: saved.id, trigger: 'replan', now }),
+      ).rejects.toMatchObject({ code: 'RUN_NOT_REPLANNABLE' });
+      expect(sendCalls).toBe(1);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  it('10. (R2 + C1) preserves delivery_started_at and transitions to needs_attention (blocking replan) for Slack NETWORK, internal_error, fatal_error, HTTP 500, and malformed JSON while allowing replan on definite rejections', async () => {
+    const gh = {
+      status: 'connected',
+      connection: {
+        credentialId: 'cred-gh-1',
+        githubUserId: '1001',
+        login: 'octocat',
+        repos: ['nhom/ati'],
+      },
+    };
+
+    const modes = [
+      { mode: 'lost_ack', ambiguous: true },
+      { mode: 'internal_error', ambiguous: true },
+      { mode: 'fatal_error', ambiguous: true },
+      { mode: 'http_500', ambiguous: true },
+      { mode: 'malformed_json', ambiguous: true },
+      { mode: 'invalid_auth', ambiguous: false },
+      { mode: 'channel_not_found', ambiguous: false },
+      { mode: 'ratelimited', ambiguous: false },
+    ] as const;
+
+    for (const { mode, ambiguous } of modes) {
+      let slackWrites = 0;
+      const slackServer = createServer(async (req, res) => {
+        for await (const _ of req) {
+          // consume request
+        }
+        res.setHeader('Content-Type', 'application/json');
+        if (req.url?.startsWith('/conversations.list')) {
+          res.end(
+            JSON.stringify({
+              ok: true,
+              channels: [{ id: 'C0123456789', name: 'team', is_private: false }],
+            }),
+          );
+        } else if (req.url === '/chat.postMessage') {
+          slackWrites++;
+          if (mode === 'lost_ack') {
+            req.socket.destroy();
+          } else if (mode === 'http_500') {
+            res.writeHead(500).end(JSON.stringify({ ok: false, error: 'server_error' }));
+          } else if (mode === 'malformed_json') {
+            res.end('{');
+          } else {
+            res.end(JSON.stringify({ ok: false, error: mode }));
+          }
+        } else {
+          res.writeHead(404).end();
+        }
+      });
+      await new Promise<void>((resolve) => slackServer.listen(0, '127.0.0.1', resolve));
+      const port = (slackServer.address() as any).port;
+
+      try {
+        const slack = new SlackAdapter({
+          credentials: { botToken: 'fixture' },
+          allowedScope: { channels: ['C0123456789'] },
+          baseUrl: `http://127.0.0.1:${port}`,
+          rateLimiter: new GlobalRateLimiter({ maxRequests: 100, windowMs: 1000 }),
+        });
+        const schedule = await insertDigestSchedule();
+        const runner = createGithubDigestRunner({
+          pool: db.pool,
+          githubConnection: async () => gh,
+          getAdapter: (serviceName) =>
+            serviceName === 'github' ? { execute: async () => [] } : slack,
+        });
+        const scheduler = new ScheduleRunner({
+          pool: db.pool,
+          timeZone: VN,
+          now: () => now,
+          planRun: async () => ({ persist: async () => ({ state: 'needs_attention' }), afterCommit() {} }),
+          runGithubDigest: runner,
+          recordState: (client, row, at) => service.recordState(client, row, at),
+        });
+
+        await scheduler.tick();
+        await scheduler.stop();
+
+        const saved = (
+          await db.pool.query(
+            'SELECT id, status, delivery_started_at FROM schedule_runs WHERE schedule_id = $1',
+            [schedule.id],
+          )
+        ).rows[0];
+
+        expect(slackWrites).toBe(1);
+        if (ambiguous) {
+          expect(saved.delivery_started_at).not.toBeNull();
+          expect(saved.status).toBe('needs_attention');
+          await expect(
+            service.startRun({ userId: owner.id, runId: saved.id, trigger: 'replan', now }),
+          ).rejects.toMatchObject({ code: 'RUN_NOT_REPLANNABLE' });
+          expect(slackWrites).toBe(1);
+        } else {
+          expect(saved.delivery_started_at).toBeNull();
+          expect(saved.status).toBe('digest_failed');
+          const replanned = await service.startRun({
+            userId: owner.id,
+            runId: saved.id,
+            trigger: 'replan',
+            now,
+          });
+          expect(replanned.state).toBe('planning');
+        }
+      } finally {
+        await new Promise<void>((resolve) => slackServer.close(() => resolve()));
+      }
+    }
+  });
+
+  it('11. (R1) discards run without HTTP writes when cancel or pause commits while marker claim waits on row lock', async () => {
+    const gh = {
+      status: 'connected',
+      connection: {
+        credentialId: 'cred-gh-1',
+        githubUserId: '1001',
+        login: 'octocat',
+        repos: ['nhom/ati'],
+      },
+    };
+    const tg = {
+      status: 'connected',
+      connection: {
+        credentialId: 'cred-tg-1',
+        telegramUserId: '777',
+        username: 'octo_tg',
+        chatIds: ['-100999888'],
+      },
+    };
+    const telegramWrites: Array<{ action: string; scheduleStateAtWrite: string }> = [];
+    let observedScheduleId = '';
+    let currentAction = '';
+
+    const telegramServer = createServer(async (req, res) => {
+      for await (const _ of req) {
+        // consume request
+      }
+      res.setHeader('Content-Type', 'application/json');
+      if (req.url?.endsWith('/getChat')) {
+        res.end(
+          JSON.stringify({
+            ok: true,
+            result: { id: -100999888, type: 'supergroup', title: 'Dev Alerts' },
+          }),
+        );
+      } else if (req.url?.endsWith('/sendMessage')) {
+        const status = (
+          await db.pool.query('SELECT status FROM schedules WHERE id = $1', [observedScheduleId])
+        ).rows[0].status;
+        telegramWrites.push({ action: currentAction, scheduleStateAtWrite: status });
+        res.end(
+          JSON.stringify({
+            ok: true,
+            result: { message_id: telegramWrites.length, date: 1793667610, chat: { id: -100999888 } },
+          }),
+        );
+      } else {
+        res.writeHead(404).end();
+      }
+    });
+    await new Promise<void>((resolve) => telegramServer.listen(0, '127.0.0.1', resolve));
+    const port = (telegramServer.address() as any).port;
+
+    try {
+      for (const action of ['cancel', 'pause'] as const) {
+        currentAction = action;
+        const config: GithubDigestConfig = {
+          ...baseConfig,
+          channelId: '',
+          channelName: '',
+          telegramChatId: '-100999888',
+          telegramChatTitle: 'Dev Alerts',
+          telegramCredentialId: 'cred-tg-1',
+          telegramUserId: '777',
+          telegramUsername: 'octo_tg',
+        };
+        const schedule = await insertDigestSchedule({ config });
+        observedScheduleId = schedule.id;
+        const planned = await service.startRun({
+          userId: owner.id,
+          scheduleId: schedule.id,
+          trigger: 'manual',
+          now,
+        });
+
+        const holder = await db.pool.connect();
+        const markerPool = new pg.Pool({
+          ...(db.pool as any).options,
+          max: 1,
+          application_name: `test_r1_${action}`,
+        });
+        let runnerPromise: Promise<any> | undefined;
+        try {
+          const pid = (await markerPool.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+          await holder.query('BEGIN');
+          await holder.query('SELECT id FROM schedule_runs WHERE id = $1 FOR UPDATE', [planned.id]);
+
+          const telegram = new TelegramAdapter({
+            credentials: { botToken: '12345:review_fixture_token_12345' },
+            allowedScope: { chats: ['-100999888'] },
+            baseUrl: `http://127.0.0.1:${port}`,
+          });
+          const runner = createGithubDigestRunner({
+            pool: markerPool,
+            githubConnection: async () => gh,
+            telegramConnection: async () => tg,
+            getAdapter: (s) => (s === 'github' ? { execute: async () => [] } : telegram),
+          });
+          runnerPromise = runner(
+            {
+              runId: planned.id,
+              scheduleId: schedule.id,
+              scheduleVersion: schedule.version,
+              userId: owner.id,
+              name: schedule.name,
+              request: schedule.request,
+              dueAt: now,
+              trigger: 'manual',
+              recurrence: dailyRecurrence,
+              digestConfig: config,
+              digestConfigHash: schedule.digest_config_hash,
+            },
+            schedule.conv_id,
+            new AbortController().signal,
+          );
+
+          const deadline = Date.now() + 5000;
+          let waiting = false;
+          while (Date.now() < deadline) {
+            const observed = (
+              await db.pool.query('SELECT wait_event_type FROM pg_stat_activity WHERE pid = $1', [pid])
+            ).rows[0];
+            if (observed?.wait_event_type === 'Lock') {
+              waiting = true;
+              break;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 10));
+          }
+          expect(waiting).toBe(true);
+
+          const changed = await service.setStatus({
+            userId: owner.id,
+            scheduleId: schedule.id,
+            action,
+            version: schedule.version,
+            now,
+          });
+          expect(changed.schedule.status).toBe(action === 'cancel' ? 'cancelled' : 'paused');
+
+          await holder.query('COMMIT');
+          const outcome = await runnerPromise;
+
+          expect(outcome.state).toBe('discarded');
+          expect(telegramWrites.filter((w) => w.action === action)).toHaveLength(0);
+          const runRow = (
+            await db.pool.query('SELECT delivery_started_at FROM schedule_runs WHERE id = $1', [planned.id])
+          ).rows[0];
+          expect(runRow.delivery_started_at).toBeNull();
+        } finally {
+          await holder.query('ROLLBACK').catch(() => undefined);
+          holder.release();
+          if (runnerPromise) await runnerPromise.catch(() => undefined);
+          await markerPool.end();
+        }
+      }
+    } finally {
+      await new Promise<void>((resolve) => telegramServer.close(() => resolve()));
+    }
   });
 });

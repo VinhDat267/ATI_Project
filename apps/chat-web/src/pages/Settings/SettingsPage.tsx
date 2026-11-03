@@ -14,6 +14,7 @@ import { TrelloConnection } from './TrelloConnection';
 import { GitHubConnection } from './GitHubConnection';
 import { NotionConnection } from './NotionConnection';
 import { TelegramConnection } from './TelegramConnection';
+import { JiraConnection } from './JiraConnection';
 import {
   gmailConnectionNotice,
   mycalendarConnectionNotice,
@@ -23,6 +24,7 @@ import { trelloConnectionNotice } from '../../services/trello-connection';
 import { githubConnectionNotice } from '../../services/github-connection';
 import { notionConnectionNotice } from '../../services/notion-connection';
 import { telegramConnectionNotice } from '../../services/telegram-connection';
+import { jiraConnectionNotice } from '../../services/jira-connection';
 import { meta } from './meta';
 
 const SAVED_PLACEHOLDER = 'Đã lưu · nhập lại nếu muốn thay';
@@ -116,11 +118,13 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
     const githubUser = githubConnectionNotice.take(user?.id);
     const telegramUser = telegramConnectionNotice.take(user?.id);
     const notionWorkspace = notionConnectionNotice.take(user?.id);
+    const jiraUser = jiraConnectionNotice.take(user?.id);
     if (email) setConnectedEmail(email);
     else if (trelloUser) setConnectedEmail(`@${trelloUser}`);
     else if (githubUser) setConnectedEmail(`@${githubUser}`);
     else if (telegramUser) setConnectedEmail(`@${telegramUser}`);
     else if (notionWorkspace) setConnectedEmail(`Notion: ${notionWorkspace}`);
+    else if (jiraUser) setConnectedEmail(jiraUser);
   }, [user?.id]);
   const backgroundRef = useRef<HTMLDivElement>(null), containerRef = useRef<HTMLDivElement>(null), closeButtonRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef(actions.closeServiceDrawer); closeRef.current = actions.closeServiceDrawer;
@@ -225,6 +229,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
             <GitHubConnection key={`github-${user?.id}`} user={user} selected={selected} refresh={refresh} standalone={false} />
             <NotionConnection key={`notion-${user?.id}`} user={user} selected={selected === 'notion'} refresh={refresh} standalone={false} />
             <TelegramConnection key={`telegram-${user?.id}`} user={user} selected={selected} refresh={refresh} navigate={navigate} standalone={false} />
+            <JiraConnection key={`jira-${user?.id}`} user={user} selected={selected} refresh={refresh} navigate={navigate} standalone={false} />
           </div>
         </section>
         {/* DANH SÁCH 2 NHÓM DỊCH VỤ */}

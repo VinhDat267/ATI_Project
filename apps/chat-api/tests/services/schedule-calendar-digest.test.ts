@@ -472,6 +472,15 @@ describe('Calendar auto_digest schedule candidate & confirmation on PostgreSQL 1
       } as any,
       mycalendarConnection: createMyCalendarConnectionLookup(credentials, key),
       telegramConnection: createTelegramConnectionLookup({ credentialRepo: credentials, encryptionKey: key }),
+      githubConnection: async () => ({
+        status: 'connected',
+        connection: {
+          credentialId: 'gh-cred-1',
+          githubUserId: '1001',
+          login: 'alice_gh',
+          repos: ['acme/ati'],
+        },
+      }),
       schedules: {
         repo: new ScheduleRepo(db.pool, VN),
         timeZone: VN,
@@ -500,7 +509,7 @@ describe('Calendar auto_digest schedule candidate & confirmation on PostgreSQL 1
     expect(proposalEvent!.payload.metadata.digestCandidate.config.sources).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ service: 'mycalendar', tool: 'mycalendar.list_events' }),
-        expect.objectContaining({ service: 'github', tool: 'github.list_issues' }),
+        expect.objectContaining({ service: 'github', tool: 'github.search_issues' }),
       ]),
     );
   });

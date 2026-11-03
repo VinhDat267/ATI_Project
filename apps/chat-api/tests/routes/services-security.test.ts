@@ -4,7 +4,7 @@ import { createApp } from '../../src/app.js';
 import { generateTokens } from '../../src/auth/jwt.js';
 import { CredentialRepo } from '../../src/db/repositories/credential-repo.js';
 import { decryptCredentials, encryptCredentials } from '@wap/tool-adapters';
-import { getConfiguredToolCatalog } from '../../src/services/registered-services.js';
+import { getConfiguredToolCatalog, getToolCatalogFor } from '../../src/services/registered-services.js';
 
 const secret = 'service-route-secret-at-least-32-chars';
 const key = 'test-only-encryption-key-with-32bytes';
@@ -116,5 +116,180 @@ describe('service credential and health boundary', () => {
     expect(catalog.length).toBeGreaterThan(0);
     expect(catalog.every((tool) => tool.service === 'notion')).toBe(true);
     expect(catalog.some((tool) => tool.name === 'notion.create_page')).toBe(true);
+  });
+
+  it('still lists services when one shared credential cannot be decrypted with the current key', async () => {
+    const db1 = '00000000-0000-0000-0000-000000000001';
+    // Row written by a server started with a different ENCRYPTION_KEY: AES-GCM auth fails on read.
+    const foreign = encryptCredentials({ token: 'notion-test-token', allowedScope: { databases: [db1] } }, 'another-encryption-key-of-32-bytes!');
+    const readable = encryptCredentials({ botToken: 'xoxb-k', allowedScope: { channels: ['C1'] } }, key);
+    const app = createApp({ jwtSecret: secret, credentialRepo: {
+      getCredentials: async (service: string) => service === 'notion' ? { config: foreign } : service === 'slack' ? { config: readable } : null,
+    } as any, encryptionKey: key });
+    const response = await request(app).get('/api/services').set('Authorization', `Bearer ${token}`);
+    expect(response.status).toBe(200);
+    const notion = response.body.services.find((service: any) => service.id === 'notion');
+    expect(notion).toMatchObject({ configured: false, connected: false, connectionStatus: 'unconfigured', allowedScope: [] });
+    expect(JSON.stringify(response.body)).not.toContain('notion-test-token');
+    const slack = response.body.services.find((service: any) => service.id === 'slack');
+    expect(slack).toMatchObject({ configured: true, allowedScope: ['C1'] });
+  });
+
+  it('reports personalStatus as scope_required when Trello/GitHub/Telegram OAuth is active with 0 selected boards/repos/chats, and connected when scope exists', async () => {
+    const trelloConfig = encryptCredentials({ refreshToken: 'rt-1', username: 'vinhnguyndt1' }, key);
+    const githubConfig = encryptCredentials({ accessToken: 'gho-1', login: 'vinhgh' }, key);
+    const telegramNoChats = encryptCredentials({ telegramUserId: '111', username: 'vinhtg', selectedChats: [] }, key);
+
+    let trelloBoards: Array<{ boardId: string; boardName: string }> = [];
+    let githubRepos: Array<{ repoId: string; fullName: string }> = [];
+    let telegramCredConfig = telegramNoChats;
+
+    const app = createApp({
+      jwtSecret: secret,
+      credentialRepo: {
+        getCredentials: async () => null,
+        getPersonalCredentials: async () => null,
+        getPersonalConnectionStatus: async (service: string) => {
+          if (service === 'trello') return { id: 'c-trello', status: 'active', config: trelloConfig, updated_at: new Date() };
+          if (service === 'github') return { id: 'c-github', status: 'active', config: githubConfig, updated_at: new Date() };
+          if (service === 'telegram') return { id: 'c-tg', status: 'active', config: telegramCredConfig, updated_at: new Date() };
+          return null;
+        },
+      } as any,
+      encryptionKey: key,
+      trelloTeamRepo: {
+        get: async () => ({ boards: trelloBoards }),
+      } as any,
+      githubTeamRepo: {
+        get: async () => ({ repos: githubRepos }),
+      } as any,
+    });
+
+    // 1. 0 boards / repos / chats -> scope_required
+    const resEmpty = await request(app).get('/api/services').set('Authorization', `Bearer ${token}`);
+    expect(resEmpty.status).toBe(200);
+    const trelloEmpty = resEmpty.body.services.find((s: any) => s.id === 'trello');
+    const githubEmpty = resEmpty.body.services.find((s: any) => s.id === 'github');
+    const telegramEmpty = resEmpty.body.services.find((s: any) => s.id === 'telegram');
+    expect(trelloEmpty).toMatchObject({ personalStatus: 'scope_required', username: 'vinhnguyndt1', allowedScope: [] });
+    expect(githubEmpty).toMatchObject({ personalStatus: 'scope_required', username: 'vinhgh', allowedScope: [] });
+    expect(telegramEmpty).toMatchObject({ personalStatus: 'scope_required', username: 'vinhtg', allowedScope: [] });
+
+    // 2. Boards / repos / chats configured -> connected with allowedScope populated
+    trelloBoards = [{ boardId: 'b-123', boardName: 'Sprint 1' }];
+    githubRepos = [{ repoId: 'r-1', fullName: 'ati/wap-v3' }];
+    telegramCredConfig = encryptCredentials(
+      { telegramUserId: '111', username: 'vinhtg', selectedChats: [{ chatId: '111', title: 'Private', type: 'private' }] },
+      key
+    );
+
+    const resScoped = await request(app).get('/api/services').set('Authorization', `Bearer ${token}`);
+    expect(resScoped.status).toBe(200);
+    const trelloScoped = resScoped.body.services.find((s: any) => s.id === 'trello');
+    const githubScoped = resScoped.body.services.find((s: any) => s.id === 'github');
+    const telegramScoped = resScoped.body.services.find((s: any) => s.id === 'telegram');
+    expect(trelloScoped).toMatchObject({ personalStatus: 'connected', username: 'vinhnguyndt1', allowedScope: ['b-123'] });
+    expect(githubScoped).toMatchObject({ personalStatus: 'connected', username: 'vinhgh', allowedScope: ['ati/wap-v3'] });
+    expect(telegramScoped).toMatchObject({ personalStatus: 'connected', username: 'vinhtg', allowedScope: ['111'] });
+  });
+
+  it('still returns 200 on GET /api/services when trelloTeamRepo.get or githubTeamRepo.get rejects with a DB error', async () => {
+    const trelloConfig = encryptCredentials({ refreshToken: 'rt-1', username: 'vinhnguyndt1' }, key);
+    const githubConfig = encryptCredentials({ accessToken: 'gho-1', login: 'vinhgh' }, key);
+
+    const app = createApp({
+      jwtSecret: secret,
+      credentialRepo: {
+        getCredentials: async () => null,
+        getPersonalCredentials: async () => null,
+        getPersonalConnectionStatus: async (service: string) => {
+          if (service === 'trello') return { id: 'c-trello', status: 'active', config: trelloConfig, updated_at: new Date() };
+          if (service === 'github') return { id: 'c-github', status: 'active', config: githubConfig, updated_at: new Date() };
+          return null;
+        },
+      } as any,
+      encryptionKey: key,
+      trelloTeamRepo: {
+        get: async () => {
+          throw new Error('DB connection error reading trello_team_scope');
+        },
+      } as any,
+      githubTeamRepo: {
+        get: async () => {
+          throw new Error('DB connection error reading github_team_scope');
+        },
+      } as any,
+    });
+
+    const res = await request(app).get('/api/services').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    const trello = res.body.services.find((s: any) => s.id === 'trello');
+    const github = res.body.services.find((s: any) => s.id === 'github');
+    expect(trello).toMatchObject({ personalStatus: 'scope_required', username: 'vinhnguyndt1', allowedScope: [] });
+    expect(github).toMatchObject({ personalStatus: 'scope_required', username: 'vinhgh', allowedScope: [] });
+  });
+
+  it('logs a warning without leaking secrets and skips undecryptable credentials in getConfiguredToolCatalog and getToolCatalogFor while preserving healthy services', async () => {
+    const foreignKey = 'another-encryption-key-of-32-bytes!';
+    const foreignNotion = encryptCredentials(
+      { token: 'ntn_secret_token_999', allowedScope: { databases: ['00000000-0000-0000-0000-000000000001'] } },
+      foreignKey,
+    );
+    const healthySlack = encryptCredentials(
+      { botToken: 'xoxb-healthy-token', allowedScope: { channels: ['C01234567'] } },
+      key,
+    );
+    const foreignGmail = encryptCredentials(
+      { refreshToken: 'rt-gmail-secret', email: 'a@example.test' },
+      foreignKey,
+    );
+    const healthyMyCal = encryptCredentials(
+      {
+        refreshToken: 'rt-cal-valid',
+        email: 'a@example.test',
+        selectedCalendars: [{ id: 'primary', summary: 'Primary' }],
+        allowedScope: { calendars: ['primary'] },
+      },
+      key,
+    );
+
+    const repo = {
+      getCredentials: async (service: string) => {
+        if (service === 'notion') return { config: foreignNotion };
+        if (service === 'slack') return { config: healthySlack };
+        return null;
+      },
+      getPersonalCredentials: async (service: string) => {
+        if (service === 'gmail') return { id: 'c-gmail', status: 'active', config: foreignGmail };
+        if (service === 'mycalendar') return { id: 'c-mycal', status: 'active', config: healthyMyCal };
+        return null;
+      },
+    };
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const catalog = await getToolCatalogFor(repo as any, key, {
+        userId: 'user-a',
+        gmailEnabled: true,
+        mycalendarEnabled: true,
+      });
+
+      const services = new Set(catalog.map((t) => t.service));
+      expect(services.has('slack')).toBe(true);
+      expect(services.has('mycalendar')).toBe(true);
+      expect(services.has('notion')).toBe(false);
+      expect(services.has('gmail')).toBe(false);
+
+      const warnText = warnSpy.mock.calls.map((args) => args.join(' ')).join('\n');
+      expect(warnText).toContain('notion');
+      expect(warnText).toContain('gmail');
+      expect(warnText).not.toContain('ntn_secret_token_999');
+      expect(warnText).not.toContain('rt-gmail-secret');
+      expect(warnText).not.toContain(foreignNotion);
+      expect(warnText).not.toContain(foreignGmail);
+      expect(warnText).not.toContain(key);
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });

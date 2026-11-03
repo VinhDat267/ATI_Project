@@ -263,6 +263,9 @@ export interface GithubDigestConfig {
   staleDays: number;
   telegramChatId?: string;
   telegramChatTitle?: string;
+  telegramCredentialId?: string;
+  telegramUserId?: string;
+  telegramUsername?: string;
 }
 
 export interface GithubDigestDelivery {

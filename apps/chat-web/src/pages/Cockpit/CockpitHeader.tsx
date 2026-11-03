@@ -62,13 +62,13 @@ export function CockpitHeader({
         </svg>
         <span className="hidden xl:inline">Lịch sử</span>
       </button>
-      {/* Nút Xem hội thoại (Ẩn ở khoảnh khắc 1, NHÓM 5 thay py-0.2 -> py-[2px]) */}
+      {/* Nút Xem hội thoại (Ẩn ở khoảnh khắc 1 khi chưa có tin nhắn; PBI-03: hội thoại đã lưu vẫn mở được) */}
       <button
         id="btn-open-chat"
         type="button"
         aria-label="Xem hội thoại"
         onClick={() => onConversation()}
-        className={`${moment === 1 ? 'hidden! ' : ''}inline-flex items-center gap-1.5 px-3 py-1.5 whitespace-nowrap text-xs font-medium text-white bg-brand-text hover:bg-black rounded-lg shadow-sm transition-all`}
+        className={`${moment === 1 && chatCount === 0 ? 'hidden! ' : ''}inline-flex items-center gap-1.5 px-3 py-1.5 whitespace-nowrap text-xs font-medium text-white bg-brand-text hover:bg-black rounded-lg shadow-sm transition-all`}
         aria-expanded={chatOpen ? 'true' : 'false'}
         aria-controls={chatOpen ? chatDialogId : undefined}
       >

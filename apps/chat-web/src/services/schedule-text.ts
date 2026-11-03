@@ -30,6 +30,7 @@ export function scheduleLabel(s: ScheduleView): string {
     : s.status === 'paused' ? `Đã tạm dừng${s.pauseReason ? `: ${s.pauseReason}` : ''}` : s.status === 'cancelled' ? 'Đã hủy' : 'Đã chạy xong';
 }
 export function runLabel(run: ScheduleRunView): string {
+  if (run.state === 'needs_attention' && run.error) return run.error;
   if (run.state === 'approved') return ({ executing: 'Đang chạy', approved: 'Đang chạy', completed: 'Đã xong', partial: 'Xong một phần', failed: 'Có lỗi', stopped: 'Đã dừng', reconciliation_required: 'Cần đối soát' } as Record<string, string>)[run.planStatus ?? ''] ?? 'Đang chạy';
   if (run.state === 'missed') return run.missedCount > 1 ? `Đã lỡ ${run.missedCount} lượt` : 'Đã lỡ';
   if (run.state === 'digest_sent') {

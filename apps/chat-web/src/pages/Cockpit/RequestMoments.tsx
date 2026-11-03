@@ -17,6 +17,8 @@ interface Props {
   input: RefObject<HTMLTextAreaElement | null>;
   inputHidden?: boolean;
   feedback?: ReactNode;
+  /** PBI-03: thẻ hội thoại đã lưu; khi có, tiêu đề mời tiếp tục thay vì bắt đầu mới. */
+  resume?: ReactNode;
   onDraft: (value: string) => void;
   onSend: (value: string) => void;
   onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
@@ -50,6 +52,7 @@ export function RequestMoment({
   input,
   inputHidden,
   feedback,
+  resume,
   onDraft,
   onSend,
   onKeyDown,
@@ -117,13 +120,15 @@ export function RequestMoment({
           className="font-display text-4xl sm:text-5xl lg:text-[52px] text-brand-text font-normal tracking-tight leading-[1.12]"
           tabIndex={-1}
         >
-          Hôm nay bạn muốn nhờ việc gì?
+          {resume ? 'Tiếp tục hội thoại này' : 'Hôm nay bạn muốn nhờ việc gì?'}
         </h1>
         <p className="text-base sm:text-lg text-brand-muted max-w-2xl leading-relaxed">
-          Mô tả bằng lời thường điều bạn cần. Tôi sẽ tự chia việc, lên kế hoạch
-          và thao tác trên các công cụ của nhóm.
+          {resume
+            ? 'Xem lại yêu cầu trước bên dưới, rồi gửi tiếp hoặc mô tả việc mới.'
+            : 'Mô tả bằng lời thường điều bạn cần. Tôi sẽ tự chia việc, lên kế hoạch và thao tác trên các công cụ của nhóm.'}
         </p>
       </div>
+      {resume}
       {feedback}
       {/* Large Input Area */}
       <form

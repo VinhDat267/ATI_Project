@@ -52,6 +52,8 @@ describe('Settings page and drawer semantics (former page/modal cases)', () => {
       if (url === '/api/connections/github') return new Response(JSON.stringify({ status: 'not_connected', repos: [] }));
       if (url === '/api/connections/notion') return new Response(JSON.stringify({ status: 'not_connected', connections: [] }));
       if (url === '/api/connections/telegram') return new Response(JSON.stringify({ status: 'not_connected', chats: [] }));
+      if (url === '/api/connections/myjira') return new Response(JSON.stringify({ connected: false, connectionState: 'disconnected', sites: [] }));
+      if (url === '/api/jira-workspaces') return new Response(JSON.stringify({ workspaces: [] }));
       configured = true; return new Response(JSON.stringify({ success: true, message: 'Saved' }));
     }));
     render(<SettingsPage {...props} />); const old = await screen.findByRole('button', { name: /Slack —/ }); fireEvent.click(old);

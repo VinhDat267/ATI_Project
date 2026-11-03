@@ -81,6 +81,22 @@ export const TELEGRAM_ENDPOINTS = {
   deepLinkBaseUrl: 'https://t.me',
 };
 
+export interface JiraOAuthConfig {
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+  mode?: 'live' | 'fixture';
+  fixtureBaseUrl?: string;
+  timeoutMs?: number;
+}
+export const JIRA_ENDPOINTS = {
+  authorizationUrl: 'https://auth.atlassian.com/authorize',
+  tokenUrl: 'https://auth.atlassian.com/oauth/token',
+  apiBaseUrl: 'https://api.atlassian.com',
+  meUrl: 'https://api.atlassian.com/me',
+  accessibleResourcesUrl: 'https://api.atlassian.com/oauth/token/accessible-resources',
+};
+
 export interface EnvConfig {
   DATABASE_URL: string;
   JWT_SECRET: string;
@@ -116,6 +132,9 @@ export interface EnvConfig {
   TELEGRAM_BOT?: TelegramBotConfig;
   NOTION_OAUTH?: NotionOAuthConfig;
   MYNOTION_ENABLED?: boolean;
+  /** The MYJIRA_ENABLED flag (default off). */
+  MYJIRA_ENABLED: boolean;
+  JIRA_OAUTH?: JiraOAuthConfig;
   /** The SCHEDULES_ENABLED flag (default off). Schedules also need PostgreSQL. */
   SCHEDULES_ENABLED: boolean;
   /** False only in live without SMTP: signup and every email route answer 503 (AUTH-02b). Sandbox uses the outbox. */
@@ -259,6 +278,17 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
   const NOTION_OAUTH = notionOAuthEnv(env, isLive);
   const MYNOTION_ENABLED = env.MYNOTION_ENABLED === 'on' ? true : env.MYNOTION_ENABLED === 'off' ? false : Boolean(NOTION_OAUTH);
 
+  if (env.MYJIRA_ENABLED && !['on', 'off'].includes(env.MYJIRA_ENABLED)) throw new Error('MYJIRA_ENABLED must be on or off');
+  const MYJIRA_ENABLED = env.MYJIRA_ENABLED === 'on';
+  if (isLive && MYJIRA_ENABLED) {
+    const required = ['JIRA_OAUTH_CLIENT_ID', 'JIRA_OAUTH_CLIENT_SECRET', 'JIRA_OAUTH_REDIRECT_URI'];
+    const missing = required.find((f) => !env[f]?.trim());
+    if (missing) {
+      throw new Error(`${missing} is required when MYJIRA_ENABLED=on in live mode`);
+    }
+  }
+  const JIRA_OAUTH = jiraOAuth(env, isLive);
+
   const explicitWebUrls: Array<{ field: string; url: string }> = [
     ...(env.APP_BASE_URL?.trim() ? [{ field: 'APP_BASE_URL', url: APP_BASE_URL }] : []),
     ...(GOOGLE_OAUTH ? [{ field: 'GOOGLE_OAUTH_REDIRECT_URI', url: GOOGLE_OAUTH.redirectUri }] : []),
@@ -313,6 +343,8 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
     TELEGRAM_BOT,
     NOTION_OAUTH,
     MYNOTION_ENABLED,
+    MYJIRA_ENABLED,
+    JIRA_OAUTH,
     SCHEDULES_ENABLED,
     EMAIL_ENABLED,
     APP_BASE_URL,
@@ -669,5 +701,45 @@ function telegramBotConfig(env: Record<string, string | undefined>, isLive: bool
     botUsername: rawUsername,
     callbackUrl,
     ...endpoints,
+  };
+}
+
+function jiraOAuth(env: Record<string, string | undefined>, isLive: boolean): JiraOAuthConfig | undefined {
+  const clientId = env.JIRA_OAUTH_CLIENT_ID?.trim();
+  const clientSecret = env.JIRA_OAUTH_CLIENT_SECRET?.trim();
+  const rawRedirect = env.JIRA_OAUTH_REDIRECT_URI?.trim();
+
+  if (!clientId || !clientSecret || !rawRedirect) {
+    return undefined;
+  }
+
+  let redirectUri: string;
+  try {
+    const url = new URL(rawRedirect);
+    const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname);
+    if (
+      !['http:', 'https:'].includes(url.protocol) ||
+      (url.protocol === 'http:' && !loopback) ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash
+    ) {
+      throw new Error();
+    }
+    redirectUri = url.href;
+  } catch {
+    throw new Error('JIRA_OAUTH_REDIRECT_URI must be an HTTP(S) URL without query, fragment or credentials (HTTPS, or loopback HTTP)');
+  }
+
+  const mode = isLive ? 'live' : (env.JIRA_OAUTH_MODE === 'fixture' ? 'fixture' : 'live');
+  const fixtureBaseUrl = env.JIRA_OAUTH_FIXTURE_BASE_URL?.trim();
+
+  return {
+    clientId,
+    clientSecret,
+    redirectUri,
+    mode,
+    fixtureBaseUrl: mode === 'fixture' ? fixtureBaseUrl : undefined,
   };
 }

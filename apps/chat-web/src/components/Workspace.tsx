@@ -143,7 +143,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
           activeClarification: previous.activeClarification, gatherState: previous.gatherState,
           stepStatuses: previous.stepStatuses, stepErrors: previous.stepErrors,
           executionSnapshot: previous.executionSnapshot, executionLoadError: previous.executionLoadError,
-          retiredExecutionPlanId: previous.retiredExecutionPlanId,
+          retiredExecutionPlanId: previous.retiredExecutionPlanId, settledPlanIds: previous.settledPlanIds,
         });
         setConversationId(previous.conversationId);
         if (previousRoute.kind === 'conversation') {
@@ -248,6 +248,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
     const revision = useChatStore.getState().planRevision;
     try {
       await apiClient.rejectPlan(planId);
+      useChatStore.getState().markPlanSettled(planId);
       const current = useChatStore.getState();
       if (!workspaceMounted.current || current.conversationId !== owner || current.activePlan?.id !== planId || current.planRevision !== revision) return;
       setActivePlan(null); setPlanStatus('rejected');

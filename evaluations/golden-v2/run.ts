@@ -5,19 +5,20 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { AIPlanner, MockLLMProvider, WorkingMemory, createProviderFromEnv, type ChatMessage, type LLMGeneratePlanInput, type LLMProvider, type ModelCallMetrics, type PlanningPhaseMetrics } from '@wap/planner';
-import { ALL_TOOLS, GMAIL_SERVICE, GMAIL_TOOLS, MYCALENDAR_SERVICE, MYCALENDAR_TOOLS, SERVICE_REGISTRY, type PlannerResponse, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
+import { ALL_TOOLS, GMAIL_SERVICE, GMAIL_TOOLS, MYCALENDAR_SERVICE, MYCALENDAR_TOOLS, MYJIRA_SERVICE, MYJIRA_TOOLS, SERVICE_REGISTRY, type PlannerResponse, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
 import { aggregateRuns, percentile, scoreCase, type CaseRun, type GoldenCase, type SearchTrace } from './scorer.js';
 import { buildMemory, fixtureSearch } from './fixtures.js';
 import { validateIndependentSet } from '../golden-independent/validate.js';
 
 const THRESHOLDS = { toolSelectionAccuracy: 0.85, argumentQuality: 0.75 };
-export type EvalSet = 'core' | 'freeform' | 'services' | 'independent' | 'gmail' | 'answers' | 'multiturn' | 'mycalendar';
+export type EvalSet = 'core' | 'freeform' | 'services' | 'independent' | 'gmail' | 'answers' | 'multiturn' | 'mycalendar' | 'myjira';
 const EVAL_FILES: Record<EvalSet, string> = {
   core: 'evaluations/golden-v2/cases.json', freeform: 'evaluations/golden-v2/cases-freeform.json',
   services: 'evaluations/golden-v2/cases-services.json', independent: 'evaluations/golden-independent/cases.json',
   gmail: 'evaluations/golden-v2/cases-gmail.json', answers: 'evaluations/golden-v2/cases-answers.json',
   multiturn: 'evaluations/golden-v2/cases-multiturn.json',
   mycalendar: 'evaluations/golden/cases-mycalendar.json',
+  myjira: 'evaluations/golden/cases-myjira.json',
 };
 export interface GoldenFile { version: number; clock: string; timeZone: string; cases: GoldenCase[] }
 export interface ObservedRun extends CaseRun { searches: SearchTrace[]; prefetches: SearchTrace[]; searchRounds: number; servedModels: string[]; providerError?: string;
@@ -25,6 +26,7 @@ export interface ObservedRun extends CaseRun { searches: SearchTrace[]; prefetch
 export interface EvalCatalog { tools: ToolDefinition[]; services: ServiceDefinition[] }
 /** Gmail and MyCalendar stay outside ALL_TOOLS: only their own sets add them, so the older sets keep their catalog and hash. */
 export function evalCatalog(set: EvalSet): EvalCatalog {
+  if (set === 'myjira') return { tools: [...ALL_TOOLS.filter(t => t.service !== 'jira'), ...MYJIRA_TOOLS], services: [...SERVICE_REGISTRY, MYJIRA_SERVICE] };
   if (set === 'mycalendar') return { tools: [...ALL_TOOLS, ...MYCALENDAR_TOOLS], services: [...SERVICE_REGISTRY, MYCALENDAR_SERVICE] };
   return set === 'gmail' || set === 'answers' ? { tools: [...ALL_TOOLS, ...GMAIL_TOOLS], services: [...SERVICE_REGISTRY, GMAIL_SERVICE] }
     : { tools: ALL_TOOLS, services: SERVICE_REGISTRY };
@@ -40,7 +42,7 @@ const pct = (value: number | null | undefined) => value == null ? 'n/a' : `${(va
 
 export function parseEvalOptions(env: NodeJS.ProcessEnv) {
   const set = env.EVAL_SET ?? 'core';
-  if (!Object.hasOwn(EVAL_FILES, set)) throw new Error('EVAL_SET must be core, freeform, services, independent, gmail, answers, multiturn, mycalendar');
+  if (!Object.hasOwn(EVAL_FILES, set)) throw new Error('EVAL_SET must be core, freeform, services, independent, gmail, answers, multiturn, mycalendar, myjira');
   if (env.EVAL_SEARCH_MODE && env.PLANNER_SEARCH_MODE && env.EVAL_SEARCH_MODE !== env.PLANNER_SEARCH_MODE)
     throw new Error('EVAL_SEARCH_MODE and PLANNER_SEARCH_MODE disagree');
   const searchMode = env.EVAL_SEARCH_MODE ?? env.PLANNER_SEARCH_MODE ?? 'regex';

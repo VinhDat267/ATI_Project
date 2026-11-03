@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
+import express from 'express';
+import request from 'supertest';
 import { ExecutionService } from '../../src/services/execution-service.js';
+import { createExecutionRoutes } from '../../src/routes/execution-routes.js';
+import { SSEManager } from '../../src/sse/sse-manager.js';
 import { createHash } from 'node:crypto';
 
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -109,5 +113,49 @@ describe('apps/chat-api (Task 18: Execution Service Approval & Adapter Injection
       'exec_done',
       expect.objectContaining({ planId: 'p2', status: 'completed' })
     );
+  });
+
+  it('clears buffered plan_preview from SSEManager when a plan is rejected via POST /api/plans/:id/reject', async () => {
+    const sseManager = new SSEManager();
+    const convId = 'conv-reject-1';
+    const planId = 'plan-reject-1';
+
+    sseManager.emitEvent(convId, 'thinking', { text: 'Planning...' });
+    sseManager.emitEvent(convId, 'plan_preview', { planId, plan: { id: planId, steps: [] } });
+    expect(sseManager.getMissedEventsForCursor(convId, undefined).some((e) => e.event === 'plan_preview')).toBe(true);
+
+    const mockPlanRepo = {
+      getPlan: vi.fn().mockResolvedValue({
+        id: planId,
+        conv_id: convId,
+        status: 'pending',
+        plan_json: { steps: [] },
+        plan_hash: hash({ steps: [] }),
+      }),
+      rejectPlan: vi.fn().mockResolvedValue(true),
+    };
+
+    const executionService = new ExecutionService({
+      planRepo: mockPlanRepo as any,
+      convRepo: { getConversation: async () => ({ user_id: 'u1' }) },
+      adapterFactory: { getAdapterForService: vi.fn() } as any,
+      sseManager,
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use((req, _res, next) => {
+      (req as any).user = { id: 'u1' };
+      next();
+    });
+    app.use('/api', createExecutionRoutes({ executionService }));
+
+    const res = await request(app).post(`/api/plans/${planId}/reject`);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, status: 'rejected' });
+
+    const missedAfterReject = sseManager.getMissedEventsForCursor(convId, undefined);
+    expect(missedAfterReject.some((e) => e.event === 'plan_preview' || e.event === 'plan')).toBe(false);
+    expect(missedAfterReject.map((e) => e.event)).toEqual(['thinking']);
   });
 });

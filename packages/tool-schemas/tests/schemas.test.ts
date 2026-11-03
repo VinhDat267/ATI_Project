@@ -44,6 +44,10 @@ describe('packages/tool-schemas (Task 2)', () => {
       'github.search_repos', 'github.search_issues', 'github.get_issue', 'github.create_issue', 'github.add_label',
     ]);
     expect(getToolDefinition('github.create_issue')?.inputSchema.required).toEqual(['repo', 'title']);
+    expect(getToolDefinition('github.create_issue')?.inputSchema.properties.assignees).toEqual({
+      type: 'array',
+      items: { type: 'string' },
+    });
     expect(getToolDefinition('github.create_issue')?.outputSchema.properties.url.type).toBe('string');
     expect(getToolDefinition('github.add_label')?.inputSchema.required).toEqual(['repo', 'issueNumber', 'label']);
     expect(getToolDefinition('github.search_repos')?.sideEffect).toBe('read');
@@ -105,10 +109,12 @@ describe('packages/tool-schemas (Task 2)', () => {
 
     const trelloDigestConfig: TrelloDigestConfig = {
       credentialId: 'cred-trello-1',
-      memberId: 'mem-1',
+      trelloMemberId: 'mem-1',
       username: 'vinhdat_trello',
-      boardIds: ['b1', 'b2'],
-      boardNames: { b1: 'Sprint Board', b2: 'Bug Tracker' },
+      boards: [
+        { id: 'b1', name: 'Sprint Board' },
+        { id: 'b2', name: 'Bug Tracker' },
+      ],
       channelId: 'C0123456789',
       channelName: 'frontend',
       dueSoonHours: 24,
@@ -119,7 +125,7 @@ describe('packages/tool-schemas (Task 2)', () => {
       ts: '1700000000.000100',
       counts: { overdueCards: 2, dueSoonCards: 1, unassignedCards: 3 },
     };
-    expect(trelloDigestConfig.boardIds).toEqual(['b1', 'b2']);
+    expect(trelloDigestConfig.boards.map((b) => b.id)).toEqual(['b1', 'b2']);
     expect(trelloDigestDelivery.counts.overdueCards).toBe(2);
   });
 
