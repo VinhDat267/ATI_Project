@@ -41,6 +41,8 @@ const exceptions = [
   { file: 'apps/chat-api/src/services/schedules/trello-digest-runner.ts', pattern: /^(?:trello|slack|telegram)(?:\.[A-Za-z_][\w]*)?$/, reason: 'Scheduled Trello digest execution.' },
   { file: 'apps/chat-api/src/services/schedules/notion-digest-candidate.ts', pattern: /^(?:notion|slack|telegram)(?:\.[A-Za-z_][\w]*)?$/, reason: 'Scheduled Notion digest candidate validation.' },
   { file: 'apps/chat-api/src/services/schedules/notion-digest-runner.ts', pattern: /^(?:notion|slack|telegram)(?:\.[A-Za-z_][\w]*)?$/, reason: 'Scheduled Notion digest execution.' },
+  { file: 'apps/chat-api/src/services/schedules/jira-digest-candidate.ts', pattern: /^(?:jira|slack|telegram)(?:\.[A-Za-z_][\w]*)?$/, reason: 'Scheduled read-only Jira digest candidate validation.' },
+  { file: 'apps/chat-api/src/services/schedules/jira-digest-runner.ts', pattern: /^(?:jira|slack|telegram)(?:\.[A-Za-z_][\w]*)?$/, reason: 'Scheduled read-only Jira digest execution.' },
   { file: 'apps/chat-api/src/services/schedules/telegram-digest-candidate.ts', pattern: /^(?:trello|slack|github|sheets|calendar|notion|telegram|jira)(?:\.[A-Za-z_][\w]*)?$/, reason: 'Telegram digest candidate checks read-only sources and telegram destination.' },
   { file: 'apps/chat-api/src/services/schedules/telegram-digest-runner.ts', pattern: /^(?:telegram|notion)(?:\.[A-Za-z_][\w]*)?$/, reason: 'Telegram digest runner delivers reports to telegram.' },
   { file: 'apps/chat-api/src/services/schedules/schedule-service.ts', pattern: /^(?:sheets|calendar|github|telegram|trello|notion|jira)(?:\.[A-Za-z_][\w]*)?$/, reason: 'Digest schedule confirmation checks service kind.' },

@@ -5,7 +5,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { AIPlanner, MockLLMProvider, WorkingMemory, createProviderFromEnv, type ChatMessage, type LLMGeneratePlanInput, type LLMProvider, type ModelCallMetrics, type PlanningPhaseMetrics } from '@wap/planner';
-import { ALL_TOOLS, GMAIL_SERVICE, GMAIL_TOOLS, MYCALENDAR_SERVICE, MYCALENDAR_TOOLS, MYJIRA_SERVICE, MYJIRA_TOOLS, SERVICE_REGISTRY, type PlannerResponse, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
+import { ALL_TOOLS, GMAIL_SERVICE, GMAIL_TOOLS, MYCALENDAR_SERVICE, MYCALENDAR_TOOLS, MYJIRA_CORE_TOOLS, MYJIRA_SERVICE, SERVICE_REGISTRY, type PlannerResponse, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
 import { aggregateRuns, percentile, scoreCase, type CaseRun, type GoldenCase, type SearchTrace } from './scorer.js';
 import { buildMemory, fixtureSearch } from './fixtures.js';
 import { validateIndependentSet } from '../golden-independent/validate.js';
@@ -26,7 +26,7 @@ export interface ObservedRun extends CaseRun { searches: SearchTrace[]; prefetch
 export interface EvalCatalog { tools: ToolDefinition[]; services: ServiceDefinition[] }
 /** Gmail and MyCalendar stay outside ALL_TOOLS: only their own sets add them, so the older sets keep their catalog and hash. */
 export function evalCatalog(set: EvalSet): EvalCatalog {
-  if (set === 'myjira') return { tools: [...ALL_TOOLS.filter(t => t.service !== 'jira'), ...MYJIRA_TOOLS], services: [...SERVICE_REGISTRY, MYJIRA_SERVICE] };
+  if (set === 'myjira') return { tools: [...ALL_TOOLS.filter(t => t.service !== 'jira'), ...MYJIRA_CORE_TOOLS], services: [...SERVICE_REGISTRY, MYJIRA_SERVICE] };
   if (set === 'mycalendar') return { tools: [...ALL_TOOLS, ...MYCALENDAR_TOOLS], services: [...SERVICE_REGISTRY, MYCALENDAR_SERVICE] };
   return set === 'gmail' || set === 'answers' ? { tools: [...ALL_TOOLS, ...GMAIL_TOOLS], services: [...SERVICE_REGISTRY, GMAIL_SERVICE] }
     : { tools: ALL_TOOLS, services: SERVICE_REGISTRY };

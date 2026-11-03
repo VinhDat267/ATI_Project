@@ -224,6 +224,35 @@ export function createWorkspaceRoutes(options: WorkspaceRoutesOptions): Workspac
     }
   });
 
+  // POST /api/jira-workspaces (Self-service workspace creation for any active user)
+  workspaceRouter.post('/', async (req: Request, res: Response): Promise<void> => {
+    const user = (req as any).user;
+    if (!user?.id) {
+      res.status(401).json({ code: 'UNAUTHORIZED', error: 'Authentication required' });
+      return;
+    }
+
+    const { name, slug } = (req.body || {}) as { name?: unknown; slug?: unknown };
+    if (!name || typeof name !== 'string' || !name.trim() || name.trim().length > 100) {
+      res.status(400).json({ code: 'INVALID_NAME', error: 'Valid workspace name (1-100 chars) is required' });
+      return;
+    }
+    if (slug !== undefined && (typeof slug !== 'string' || !slug.trim() || slug.trim().length > 100)) {
+      res.status(400).json({ code: 'INVALID_SLUG', error: 'Valid slug is required' });
+      return;
+    }
+
+    try {
+      const result = await workspaceRepo.createSelfServiceWorkspace(user.id, {
+        name: name.trim(),
+        ...(typeof slug === 'string' && slug.trim() ? { slug: slug.trim() } : {}),
+      });
+      res.status(201).json(result);
+    } catch (err) {
+      handleRouteError(res, err);
+    }
+  });
+
   // ============================================================================
   // 3. Workspace Join Requests (/api/jira-workspace-join-requests)
   // ============================================================================

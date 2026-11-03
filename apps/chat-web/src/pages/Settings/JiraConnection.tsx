@@ -49,8 +49,9 @@ export function JiraConnection({
   const [infoNotice, setInfoNotice] = useState('');
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
 
-  // Join workspace state
+  // Join & Create workspace state
   const [inviteTokenInput, setInviteTokenInput] = useState('');
+  const [newWorkspaceName, setNewWorkspaceName] = useState('');
 
   // Admin workspace states
   const [members, setMembers] = useState<WorkspaceMemberItem[]>([]);
@@ -392,6 +393,30 @@ export function JiraConnection({
         setInviteTokenInput('');
         setInfoNotice('Yêu cầu tham gia workspace Jira đã được gửi và đang chờ duyệt.');
         await fetchWorkspaces();
+      }
+    } catch (err) {
+      if (mounted.current) setError(mapErrorMessage(err));
+    } finally {
+      if (mounted.current) setBusy(false);
+    }
+  };
+
+  // Create self-service Jira workspace
+  const handleCreateWorkspace = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newWorkspaceName.trim() || busy) return;
+    setBusy(true);
+    setError('');
+    setInfoNotice('');
+    try {
+      const res = await jiraApi.createSelfServiceWorkspace(newWorkspaceName.trim());
+      if (mounted.current) {
+        setNewWorkspaceName('');
+        setInfoNotice(`Đã tạo Jira Workspace "${res.workspace.name}" thành công.`);
+        await fetchWorkspaces();
+        if (res.workspace.id) {
+          handleSelectWorkspace(res.workspace.id);
+        }
       }
     } catch (err) {
       if (mounted.current) setError(mapErrorMessage(err));
@@ -858,24 +883,44 @@ export function JiraConnection({
           )}
         </div>
 
-        {/* JOIN WORKSPACE FORM */}
-        <form onSubmit={handleJoinWorkspace} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-5">
-          <input
-            type="text"
-            placeholder="Nhập mã mời Jira (invite token)..."
-            value={inviteTokenInput}
-            onChange={(e) => setInviteTokenInput(e.target.value)}
-            disabled={busy}
-            className="flex-1 px-3 py-2 text-xs rounded-xl border border-[#E7E7E2] dark:border-[#374151] bg-white dark:bg-[#1F2937] text-[#111827] dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-[#FF5701]"
-          />
-          <button
-            type="submit"
-            disabled={busy || !inviteTokenInput.trim()}
-            className={buttonSecondary}
-          >
-            Tham gia Jira workspace
-          </button>
-        </form>
+        {/* CREATE OR JOIN WORKSPACE FORMS */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-5">
+          <form onSubmit={handleCreateWorkspace} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <input
+              type="text"
+              placeholder="Tên Jira Workspace mới (ví dụ: Team Kỹ thuật)..."
+              value={newWorkspaceName}
+              onChange={(e) => setNewWorkspaceName(e.target.value)}
+              disabled={busy}
+              className="flex-1 px-3 py-2 text-xs rounded-xl border border-[#E7E7E2] dark:border-[#374151] bg-white dark:bg-[#1F2937] text-[#111827] dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-[#FF5701]"
+            />
+            <button
+              type="submit"
+              disabled={busy || !newWorkspaceName.trim()}
+              className={buttonPrimary}
+            >
+              Tạo Jira Workspace mới
+            </button>
+          </form>
+
+          <form onSubmit={handleJoinWorkspace} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <input
+              type="text"
+              placeholder="Nhập mã mời Jira (invite token)..."
+              value={inviteTokenInput}
+              onChange={(e) => setInviteTokenInput(e.target.value)}
+              disabled={busy}
+              className="flex-1 px-3 py-2 text-xs rounded-xl border border-[#E7E7E2] dark:border-[#374151] bg-white dark:bg-[#1F2937] text-[#111827] dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-[#FF5701]"
+            />
+            <button
+              type="submit"
+              disabled={busy || !inviteTokenInput.trim()}
+              className={buttonSecondary}
+            >
+              Tham gia Jira workspace
+            </button>
+          </form>
+        </div>
 
         {/* CURRENT WORKSPACE DETAILS */}
         {selectedWorkspace ? (

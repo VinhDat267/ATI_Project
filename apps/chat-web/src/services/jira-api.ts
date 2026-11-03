@@ -59,6 +59,12 @@ export const jiraApi = {
   workspaces: () =>
     apiClient.request<GetWorkspacesResponse>('/api/jira-workspaces'),
 
+  createSelfServiceWorkspace: (name: string, slug?: string) =>
+    apiClient.request<CreateWorkspaceResponse>(
+      '/api/jira-workspaces',
+      json({ name, ...(slug ? { slug } : {}) })
+    ),
+
   createWorkspace: (name: string, slug: string, bootstrapAdminUserId: string) =>
     apiClient.request<CreateWorkspaceResponse>(
       '/api/admin/jira-workspaces',

@@ -101,6 +101,30 @@ function TrelloReceiptMetrics({step}:{step:ExecutionStepInfo}) {
     {pills.map((pill,i)=><span key={i} className={`px-2 py-0.5 rounded-md text-[11px] font-medium border ${pill.warn ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200'}`}>{pill.text}</span>)}
   </div>;
 }
+function MyJiraReceiptMetrics({step}:{step:ExecutionStepInfo}) {
+  if(step.status!=='succeeded') return null;
+  if(serviceId(step.tool)!=='myjira') return null;
+  const out=resultObject(step.output);
+  if(!out) return null;
+  const pills: Array<{text:string;warn?:boolean}> = [];
+  if(step.tool==='myjira.transition_issue' && typeof out.newStatus==='string' && out.newStatus) {
+    const prev=typeof out.previousStatus==='string' && out.previousStatus ? `${out.previousStatus} → ` : '';
+    pills.push({text:`🔄 Trạng thái: ${prev}${out.newStatus}`});
+  }
+  if(step.tool==='myjira.update_issue' && Array.isArray(out.updatedFields) && out.updatedFields.length>0) {
+    pills.push({text:`✏️ Đã cập nhật: ${out.updatedFields.join(', ')}`});
+  }
+  if(typeof out.priority==='string' && out.priority) {
+    pills.push({text:`⚡ Ưu tiên: ${out.priority}`});
+  }
+  if(typeof out.assignee==='string' && out.assignee) {
+    pills.push({text:`👤 Phụ trách: ${out.assignee}`});
+  }
+  if(pills.length===0) return null;
+  return <div data-testid="myjira-receipt-metrics" className="flex flex-wrap items-center gap-1.5 mt-2">
+    {pills.map((pill,i)=><span key={i} className={`px-2 py-0.5 rounded-md text-[11px] font-medium border ${pill.warn ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200'}`}>{pill.text}</span>)}
+  </div>;
+}
 function ReceiptCard({step,index,highlighted,services,planSteps,labels,gmailConnection,mycalendarConnection,mysheetsConnection,trelloConnection,githubConnection,notionConnection,telegramConnection,myjiraConnection,destination}:CardProps & {step:ExecutionStepInfo;index:number;highlighted?:boolean}) { const service=serviceId(step.tool),palette=servicePalette(service);return (<div data-highlighted-step={highlighted ? 'true' : undefined} className={`receipt-stagger-${Math.min(index+1,4)} flex-1 bg-white rounded-2xl border ${highlighted ? 'border-brand-primary ring-2 ring-brand-primary/20' : 'border-brand-border'} p-4 sm:p-5 shadow-soft-card flex flex-col justify-between ${palette.receiptHover} transition-all group`} aria-label={serviceName(service,services)}>
                   <div className="v3-space-y-2.5">
                     <div className="flex items-center justify-between gap-2">
@@ -133,6 +157,7 @@ function ReceiptCard({step,index,highlighted,services,planSteps,labels,gmailConn
                       <SheetsReceiptMetrics step={step} />
                       <NotionReceiptMetrics step={step} />
                       <TrelloReceiptMetrics step={step} />
+                      <MyJiraReceiptMetrics step={step} />
                     </div>
                   </div>
                   <div className="pt-3 border-t border-brand-border-subtle mt-4 flex items-center justify-between flex-wrap gap-2">
