@@ -27,9 +27,9 @@ export function CockpitDialog({ id, title, onClose, returnFocusId, side, childre
       (document.getElementById(returnFocusId) ?? (opener?.isConnected ? opener : null))?.focus();
     };
   }, [returnFocusId]);
-  return <div className="fixed inset-0 z-50 flex bg-black/40" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
-    <div id={id} ref={ref} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} className={`bg-surface text-text border border-border flex flex-col min-w-0 w-full ${side ? `max-w-md h-full ${side === 'right' ? 'ml-auto' : ''}` : 'max-w-2xl max-h-[85dvh] m-auto rounded-2xl'} shadow-xl`}>
-      <div className="flex items-center justify-between gap-3 border-b border-border p-4"><h2 className="font-semibold">{title}</h2><button type="button" aria-label={`Đóng ${title}`} className="h-10 w-10 shrink-0" onClick={onClose}>✕</button></div>
+  return <div className="fixed inset-0 z-50 flex bg-black/40 backdrop-blur-xs" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
+    <div id={id} ref={ref} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} className={`bg-[var(--planora-paper)] text-[var(--planora-text)] border border-[var(--planora-divider)] flex flex-col min-w-0 w-full ${side ? `max-w-md h-full ${side === 'right' ? 'ml-auto' : ''}` : 'max-w-2xl max-h-[85dvh] m-auto rounded-2xl'} shadow-xl`}>
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--planora-divider)] p-4"><h2 className="font-semibold text-[var(--planora-text)]">{title}</h2><button type="button" aria-label={`Đóng ${title}`} className="h-10 w-10 shrink-0 text-[var(--planora-muted)] hover:text-[var(--planora-text)] hover:bg-[var(--planora-surface-hover)] rounded-lg flex items-center justify-center transition-colors cursor-pointer" onClick={onClose}>✕</button></div>
       <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
     </div>
   </div>;
