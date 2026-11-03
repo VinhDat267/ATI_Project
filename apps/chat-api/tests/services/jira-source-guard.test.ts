@@ -1338,5 +1338,199 @@ describe('JIRA-08 Task 5 Source Guard, Persistence, and Publication Guards', () 
         client2.release();
       }
     });
+
+    it('strictly revalidates per-sourceRef exact grant when user has multiple grants and one is revoked', async () => {
+      const f = await setupFixture();
+      const client2 = await pool.connect();
+      try {
+        // Create second grant for the same user and account, linked to the same cloudId
+        const grant2Res = await client2.query<{ id: string }>(
+          `INSERT INTO jira_oauth_grants (
+            account_id, app_client_id, grant_kind, refresh_state, status, token_version
+          ) VALUES ($1, 'atlassian_3lo', '3lo', 'idle', 'active', 1)
+          RETURNING id`,
+          [f.accountId]
+        );
+        const grantId2 = grant2Res.rows[0]!.id;
+        await client2.query(
+          `INSERT INTO jira_grant_sites (
+            grant_id, cloud_id, site_name, site_url, product_type, scopes, last_verified_at
+          ) VALUES ($1, $2, 'Guard Site', 'https://guard.atlassian.net', 'jira', $3, clock_timestamp())`,
+          [grantId2, f.cloudId, ['read:jira-work', 'write:jira-work']]
+        );
+
+        const sourceRef1: JiraSourceRef = {
+          ...f.sourceRef,
+          binding: { ...f.sourceRef.binding, grantId: f.grantId },
+        };
+        const sourceRef2: JiraSourceRef = {
+          ...f.sourceRef,
+          binding: { ...f.sourceRef.binding, grantId: grantId2 },
+        };
+
+        const verifier = {
+          verifyUserPermissions: async () => ({
+            status: 'granted' as const,
+            canBrowse: true,
+            canCreateIssue: true,
+            canAddComment: true,
+          }),
+        };
+        const policyService = new JiraPolicyService({ pool, verifier });
+
+        // Both grants active initially
+        expect((await policyService.revalidateSource(f.userId, sourceRef1)).allowed).toBe(true);
+        expect((await policyService.revalidateSource(f.userId, sourceRef2)).allowed).toBe(true);
+
+        // Client 2 revokes Grant 1, but keeps Grant 2 ACTIVE
+        await client2.query(`UPDATE jira_oauth_grants SET status = 'revoked' WHERE id = $1`, [f.grantId]);
+
+        // Revalidation for sourceRef1 MUST FAIL with identity_changed, while sourceRef2 stays allowed
+        const decision1 = await policyService.revalidateSource(f.userId, sourceRef1);
+        expect(decision1).toEqual({ allowed: false, reason: 'identity_changed' });
+        const decision2 = await policyService.revalidateSource(f.userId, sourceRef2);
+        expect(decision2).toEqual({ allowed: true });
+
+        // Test JiraGuardedProvider with both entities in workingMemory and messages in history
+        let receivedInput: any;
+        const baseProvider = {
+          name: 'recording-provider',
+          async generatePlan(input: any) {
+            receivedInput = input;
+            return JSON.stringify({ kind: 'clarification', question: 'Done' });
+          },
+        };
+        const guardedProvider = new JiraGuardedProvider(baseProvider, {
+          pool,
+          jiraPolicyService: policyService,
+          actor: { userId: f.userId, workspaceId: f.workspaceId },
+        });
+
+        const entity1 = { id: 'issue-1', key: 'GRD-1', summary: 'Grant 1 Issue', _sourceRef: sourceRef1 };
+        const entity2 = { id: 'issue-2', key: 'GRD-2', summary: 'Grant 2 Issue', _sourceRef: sourceRef2 };
+
+        const msgFromGrant1 = {
+          role: 'assistant' as const,
+          content: 'Issue GRD-1 is in Progress under Grant 1',
+          sourceRefs: [sourceRef1],
+          metadata: { sourceRefs: [sourceRef1] },
+        };
+        const msgFromGrant2 = {
+          role: 'assistant' as const,
+          content: 'Issue GRD-2 is in Done under Grant 2',
+          sourceRefs: [sourceRef2],
+          metadata: { sourceRefs: [sourceRef2] },
+        };
+
+        await guardedProvider.generatePlan({
+          systemPrompt: 'system prompt',
+          conversationHistory: [
+            { role: 'user', content: 'What is the status?' },
+            msgFromGrant1,
+            msgFromGrant2,
+          ],
+          toolCatalog: MYJIRA_TOOLS,
+          workingMemory: {
+            __observed: {
+              jira_issue: [entity1, entity2],
+            },
+          },
+        });
+
+        // Entity 1 (Grant 1) MUST be purged, Entity 2 (Grant 2) MUST be preserved
+        const observedIssues = receivedInput.workingMemory.__observed.jira_issue;
+        expect(observedIssues).toHaveLength(1);
+        expect(observedIssues[0].key).toBe('GRD-2');
+        expect(JSON.stringify(receivedInput.workingMemory)).not.toContain('Grant 1 Issue');
+
+        // msgFromGrant1 MUST be masked with identity_changed
+        expect(receivedInput.conversationHistory[1].content).toContain(
+          '[Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi: identity_changed]'
+        );
+        expect(receivedInput.conversationHistory[1].content).not.toContain('Grant 1');
+
+        // msgFromGrant2 MUST NOT be masked
+        expect(receivedInput.conversationHistory[2].content).toBe('Issue GRD-2 is in Done under Grant 2');
+      } finally {
+        client2.release();
+      }
+    });
+
+    it('masks conversation history by provenance (sourceRefs) rather than text string substring matching', async () => {
+      const f = await setupFixture();
+      const client2 = await pool.connect();
+      try {
+        const verifier = {
+          verifyUserPermissions: async () => ({
+            status: 'granted' as const,
+            canBrowse: true,
+            canCreateIssue: true,
+            canAddComment: true,
+          }),
+        };
+        const policyService = new JiraPolicyService({ pool, verifier });
+
+        let receivedInput: any;
+        const baseProvider = {
+          name: 'recording-provider',
+          async generatePlan(input: any) {
+            receivedInput = input;
+            return JSON.stringify({ kind: 'clarification', question: 'Done' });
+          },
+        };
+        const guardedProvider = new JiraGuardedProvider(baseProvider, {
+          pool,
+          jiraPolicyService: policyService,
+          actor: { userId: f.userId, workspaceId: f.workspaceId },
+        });
+
+        // A message that contains Jira issue content but NO siteId, cloudId, or siteName strings!
+        const subtleMessage = {
+          role: 'assistant' as const,
+          content: 'Nội dung chi tiết: Người dùng gặp sự cố khi thanh toán đơn hàng bằng thẻ tín dụng. Trạng thái Đang xử lý.',
+          sourceRefs: [f.sourceRef],
+          metadata: { sourceRefs: [f.sourceRef] },
+        };
+
+        // Initially site is active, message should pass unmasked
+        await guardedProvider.generatePlan({
+          systemPrompt: 'system prompt',
+          conversationHistory: [
+            { role: 'user', content: 'Có update gì mới không?' },
+            subtleMessage,
+          ],
+          toolCatalog: MYJIRA_TOOLS,
+          workingMemory: {},
+        });
+        expect(receivedInput.conversationHistory[1].content).toBe(subtleMessage.content);
+
+        // Deactivate site in PostgreSQL via client 2
+        await client2.query(
+          `UPDATE ati_workspace_jira_sites SET active = false WHERE id = $1`,
+          [f.siteId]
+        );
+
+        // Call generatePlan again
+        await guardedProvider.generatePlan({
+          systemPrompt: 'system prompt',
+          conversationHistory: [
+            { role: 'user', content: 'Có update gì mới không?' },
+            subtleMessage,
+          ],
+          toolCatalog: MYJIRA_TOOLS,
+          workingMemory: {},
+        });
+
+        // Provenance check must mask subtleMessage based on its sourceRef, not string matching
+        expect(receivedInput.conversationHistory[1].content).toBe(
+          '[Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi: site_disabled]'
+        );
+        expect(receivedInput.conversationHistory[1].content).not.toContain(
+          'Người dùng gặp sự cố khi thanh toán đơn hàng bằng thẻ tín dụng'
+        );
+      } finally {
+        client2.release();
+      }
+    });
   });
 });

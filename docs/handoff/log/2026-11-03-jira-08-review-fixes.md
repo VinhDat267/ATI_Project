@@ -97,9 +97,27 @@
       - Client 1 chạy planner turn với `myjira.list_sites`. Ngay sau khi adapter trả kết quả (điểm chặn), Client 2 cập nhật `ati_workspace_memberships SET status = 'removed'`. Model prompt tiếp theo hoàn toàn không nhận thông tin site Jira bí mật (`workingMemory` không còn site Jira, JSON input không chứa tên hay cloudId của site).
       - Client 2 tắt active của site (`ati_workspace_jira_sites SET active = false`). Model prompt tiếp theo được chứng minh không nhận dữ liệu của site đã bị tắt.
     - Test: `apps/chat-api/tests/services/jira-source-guard.test.ts` (21/21 tests PASS).
-- **Tổng kết kiểm thử sau đợt sửa thứ năm:**
-  - Toàn bộ 7 suites Jira focused: **105/105 tests PASS** (2.71s, exit code 0).
+- **Khắc phục đợt review thứ sáu (2 phát hiện P1):**
+  - **1. [P1] Xác thực từng sourceRef theo đúng grant, phiên bản policy và quyền project:**
+    - Cập nhật `apps/chat-api/src/services/jira/jira-policy-service.ts`:
+      - Truy vấn tài khoản và grant OAuth trong `revalidateSource` được cập nhật ràng buộc chính xác `g.id = $3` (`source.binding.grantId`) và `a.id = $4` (`source.binding.jiraAccountId`) thay vì chỉ sắp xếp theo thời gian tạo `ORDER BY g.created_at DESC LIMIT 1`. Nếu grant cụ thể gắn với `sourceRef` bị thu hồi (status != 'active'), truy vấn không trả về hàng nào và lập tức trả về `{ allowed: false, reason: 'identity_changed' }`.
+    - Cập nhật `apps/chat-api/src/services/jira/jira-provider-guard.ts`:
+      - Loại bỏ hoàn toàn câu lệnh SQL kiểm tra quyền tổng hợp rộng (`overallValid`) vốn cho phép dữ liệu của grant cũ lọt qua khi người dùng có grant thứ hai còn active.
+      - Thay thế bằng việc kiểm tra per-sourceRef qua `policyService.revalidateSource`: duyệt qua từng thực thể Jira trong `workingMemory` (`__observed` và các khóa gốc `jira_site`, `jira_project`, `jira_issue`). Nếu thực thể mang `sourceRef` bị thu hồi quyền hoặc không có `sourceRef` (untrusted), nó bị purge khỏi `workingMemory`. Khi người dùng có nhiều grant và grant cũ bị thu hồi, thực thể của grant cũ bị purge trong khi thực thể của grant mới vẫn được giữ lại.
+    - Test: `apps/chat-api/tests/services/jira-source-guard.test.ts` (PASS, test scenario với 2 grant trong PostgreSQL: grant 1 bị thu hồi, grant 2 active; chứng minh thực thể và tin nhắn của grant 1 bị purge/mask với `identity_changed`, thực thể và tin nhắn của grant 2 được bảo toàn).
+  - **2. [P1] Gắn và xác thực nguồn của tin nhắn thay cho dò chuỗi nội dung:**
+    - Cập nhật `apps/chat-api/src/services/chat-service.ts`:
+      - Khi chuyển đổi `previousMessages` thành `history: ChatMessage[]` đưa vào planner, trích xuất và bảo toàn `sourceRefs` từ `metadata.sourceRefs` lên đối tượng `ChatMessage`.
+    - Cập nhật `apps/chat-api/src/services/jira/jira-provider-guard.ts`:
+      - Loại bỏ hoàn toàn cơ chế quét chuỗi thô (`msg.content.includes(siteId) || msg.content.includes(cloudId) || msg.content.includes(siteName)`).
+      - Triển khai xác thực nguồn gốc (provenance): duyệt qua từng tin nhắn trong `conversationHistory`, trích xuất `sourceRefs` và gọi `policyService.revalidateSource`. Nếu bất kỳ `sourceRef` nào không còn hợp lệ (site bị disabled, grant bị revoked, membership bị removed, project bị unselected, policy bị stale), tin nhắn lập tức bị che mờ (`[Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi: ${reason}]`).
+      - Tin nhắn assistant liên quan đến Jira nhưng thiếu `sourceRefs` hợp lệ bị che mờ theo nguyên tắc fail-closed (`invalid_evidence`).
+      - Lượt kết quả tìm kiếm (`Search results.`) bị che mờ nếu các nguồn vừa thu thập trong phiên bị thu hồi.
+    - Test: `apps/chat-api/tests/services/jira-source-guard.test.ts` (PASS, test scenario với tin nhắn mô tả chi tiết nội dung issue nhưng hoàn toàn không chứa chuỗi siteId, cloudId hay siteName; chứng minh tin nhắn vẫn bị che mờ chuẩn xác với `site_disabled` khi site bị deactivate trong PostgreSQL).
+- **Tổng kết kiểm thử sau đợt sửa thứ sáu:**
+  - Toàn bộ 7 suites Jira focused: **107/107 tests PASS** (Duration: 3.62s, exit code 0).
   - Typecheck v3: **0 errors** (exit code 0).
+  - Evaluator test suites: **26/26 files PASS**, **412/412 tests PASS** (exit code 0).
   - `npm run check`: **ALL PASS** (exit code 0).
   - **3. [P2] Từ chối khi actor thiếu workspace ID thay vì tự chọn:**
     - Cập nhật `apps/chat-api/src/server.ts` (`gatherSearch`): loại bỏ hoàn toàn câu lệnh `SELECT ... LIMIT 1` tự ý chọn một workspace membership ngẫu nhiên.
@@ -125,7 +143,25 @@
       - Client 1 chạy planner turn với `myjira.list_sites`. Ngay sau khi adapter trả kết quả (điểm chặn), Client 2 cập nhật `ati_workspace_memberships SET status = 'removed'`. Model prompt tiếp theo hoàn toàn không nhận thông tin site Jira bí mật (`workingMemory` không còn site Jira, JSON input không chứa tên hay cloudId của site).
       - Client 2 tắt active của site (`ati_workspace_jira_sites SET active = false`). Model prompt tiếp theo được chứng minh không nhận dữ liệu của site đã bị tắt.
     - Test: `apps/chat-api/tests/services/jira-source-guard.test.ts` (21/21 tests PASS).
-- **Tổng kết kiểm thử sau đợt sửa thứ năm:**
-  - Toàn bộ 7 suites Jira focused: **105/105 tests PASS** (2.71s, exit code 0).
+- **Khắc phục đợt review thứ sáu (2 phát hiện P1):**
+  - **1. [P1] Xác thực từng sourceRef theo đúng grant, phiên bản policy và quyền project:**
+    - Cập nhật `apps/chat-api/src/services/jira/jira-policy-service.ts`:
+      - Truy vấn tài khoản và grant OAuth trong `revalidateSource` được cập nhật ràng buộc chính xác `g.id = $3` (`source.binding.grantId`) và `a.id = $4` (`source.binding.jiraAccountId`) thay vì chỉ sắp xếp theo thời gian tạo `ORDER BY g.created_at DESC LIMIT 1`. Nếu grant cụ thể gắn với `sourceRef` bị thu hồi (status != 'active'), truy vấn không trả về hàng nào và lập tức trả về `{ allowed: false, reason: 'identity_changed' }`.
+    - Cập nhật `apps/chat-api/src/services/jira/jira-provider-guard.ts`:
+      - Loại bỏ hoàn toàn câu lệnh SQL kiểm tra quyền tổng hợp rộng (`overallValid`) vốn cho phép dữ liệu của grant cũ lọt qua khi người dùng có grant thứ hai còn active.
+      - Thay thế bằng việc kiểm tra per-sourceRef qua `policyService.revalidateSource`: duyệt qua từng thực thể Jira trong `workingMemory` (`__observed` và các khóa gốc `jira_site`, `jira_project`, `jira_issue`). Nếu thực thể mang `sourceRef` bị thu hồi quyền hoặc không có `sourceRef` (untrusted), nó bị purge khỏi `workingMemory`. Khi người dùng có nhiều grant và grant cũ bị thu hồi, thực thể của grant cũ bị purge trong khi thực thể của grant mới vẫn được giữ lại.
+    - Test: `apps/chat-api/tests/services/jira-source-guard.test.ts` (PASS, test scenario với 2 grant trong PostgreSQL: grant 1 bị thu hồi, grant 2 active; chứng minh thực thể và tin nhắn của grant 1 bị purge/mask với `identity_changed`, thực thể và tin nhắn của grant 2 được bảo toàn).
+  - **2. [P1] Gắn và xác thực nguồn của tin nhắn thay cho dò chuỗi nội dung:**
+    - Cập nhật `apps/chat-api/src/services/chat-service.ts`:
+      - Khi chuyển đổi `previousMessages` thành `history: ChatMessage[]` đưa vào planner, trích xuất và bảo toàn `sourceRefs` từ `metadata.sourceRefs` lên đối tượng `ChatMessage`.
+    - Cập nhật `apps/chat-api/src/services/jira/jira-provider-guard.ts`:
+      - Loại bỏ hoàn toàn cơ chế quét chuỗi thô (`msg.content.includes(siteId) || msg.content.includes(cloudId) || msg.content.includes(siteName)`).
+      - Triển khai xác thực nguồn gốc (provenance): duyệt qua từng tin nhắn trong `conversationHistory`, trích xuất `sourceRefs` và gọi `policyService.revalidateSource`. Nếu bất kỳ `sourceRef` nào không còn hợp lệ (site bị disabled, grant bị revoked, membership bị removed, project bị unselected, policy bị stale), tin nhắn lập tức bị che mờ (`[Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi: ${reason}]`).
+      - Tin nhắn assistant liên quan đến Jira nhưng thiếu `sourceRefs` hợp lệ bị che mờ theo nguyên tắc fail-closed (`invalid_evidence`).
+      - Lượt kết quả tìm kiếm (`Search results.`) bị che mờ nếu các nguồn vừa thu thập trong phiên bị thu hồi.
+    - Test: `apps/chat-api/tests/services/jira-source-guard.test.ts` (PASS, test scenario với tin nhắn mô tả chi tiết nội dung issue nhưng hoàn toàn không chứa chuỗi siteId, cloudId hay siteName; chứng minh tin nhắn vẫn bị che mờ chuẩn xác với `site_disabled` khi site bị deactivate trong PostgreSQL).
+- **Tổng kết kiểm thử sau đợt sửa thứ sáu:**
+  - Toàn bộ 7 suites Jira focused: **107/107 tests PASS** (Duration: 3.62s, exit code 0).
   - Typecheck v3: **0 errors** (exit code 0).
+  - Evaluator test suites: **26/26 files PASS**, **412/412 tests PASS** (exit code 0).
   - `npm run check`: **ALL PASS** (exit code 0).

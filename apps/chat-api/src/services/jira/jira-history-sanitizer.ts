@@ -2,7 +2,7 @@ import { validateJiraSourceRef, type JiraModelBlockReason } from '@wap/tool-sche
 import type { MessageRow } from '../../db/repositories/message-repo.js';
 import type { JiraPolicyService } from './jira-policy-service.js';
 
-function isJiraRelatedMessage(message: MessageRow, metadata: Record<string, unknown> | null): boolean {
+export function isJiraRelatedMessage(message: { role: string; content?: string }, metadata: Record<string, unknown> | null): boolean {
   if (message.role === 'user' || message.role === 'system') return false;
   if (!metadata) return false;
   if (metadata.sourceRefs !== undefined) return true;
