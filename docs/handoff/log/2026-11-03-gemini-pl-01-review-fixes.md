@@ -52,6 +52,13 @@
   - Hợp nhất `describedBy = [errorId, helperId, externalDescribedBy].filter(Boolean).join(' ') || undefined`.
   - Bổ sung unit test kiểm tra không còn dangling IDREF trong DOM.
 
+### R1 · P3 · Unit test tương phản parse tokens.css thực tế, bắt được mutation CSS
+- **Nguyên nhân:** Test tương phản ban đầu dùng object literal JS độc lập để tính tỉ lệ, không đọc file CSS thật nên nếu token CSS bị đổi (ví dụ: `--planora-placeholder: #fffdf7`), test vẫn PASS.
+- **Khắc phục:**
+  - Chuyển `apps/chat-web/tests/planora-foundation.test.tsx` sang đọc file `apps/chat-web/src/planora/styles/tokens.css` bằng `node:fs` và trích xuất trực tiếp các biến màu `--planora-*` từ các khối selector `:root` (Light) và `html.dark` (Dark).
+  - Tự động kiểm tra sự tồn tại của từng token và tính luminance / contrast ratio trực tiếp trên giá trị CSS thật.
+  - Đã xác thực bằng mutation test thực tế: khi đổi thử `--planora-placeholder: #fffdf7` trong CSS, test fail lập tức (`AssertionError: expected 1 to be >= 4.5`, exit code 1); khi revert về `#686e5e`, test pass hoàn toàn (exit code 0).
+
 ---
 
 ## 2. Bằng chứng kiểm thử thực tế (Exit Code 0)

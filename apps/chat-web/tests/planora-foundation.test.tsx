@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 import './setup';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { PlanoraMark, Brand, ServiceLogo } from '../src/planora/components/Brand';
@@ -17,8 +20,30 @@ import { SettingsScopeSample } from '../src/planora/samples/SettingsScopeSample'
 import { HistoryScheduleSample } from '../src/planora/samples/HistoryScheduleSample';
 
 // ============================================================================
-// 1. WCAG AA Contrast Verification (Mathematical Verification)
+// 1. WCAG AA Contrast Verification (Mathematical Verification on tokens.css)
 // ============================================================================
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const tokensCssPath = path.resolve(__dirname, '../src/planora/styles/tokens.css');
+const tokensCss = readFileSync(tokensCssPath, 'utf8');
+
+function parsePlanoraTokens(css: string) {
+  const extract = (selector: string) => {
+    const idx = css.indexOf(selector);
+    if (idx === -1) return {} as Record<string, string>;
+    const block = css.slice(idx).split('}')[0];
+    return Object.fromEntries(
+      [...block.matchAll(/--(planora-[a-z0-9-]+):\s*(#[0-9A-Fa-f]{3,8})\s*;/g)].map(m => [m[1], m[2]])
+    );
+  };
+  return {
+    light: extract(':root {'),
+    dark: extract('html.dark,'),
+  };
+}
+
+const { light: lightTokens, dark: darkTokens } = parsePlanoraTokens(tokensCss);
+
 describe('Planora Tokens & Accessibility Contrast', () => {
   function luminance(hex: string): number {
     const rgb = hex
@@ -35,76 +60,111 @@ describe('Planora Tokens & Accessibility Contrast', () => {
     return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
   }
 
-  it('meets WCAG AA (>= 4.5:1) for all Light mode color pairs', () => {
-    // Light mode tokens
-    const canvas = '#f8f4eb';
-    const paper = '#fffdf7';
-    const sidebar = '#eee9dd';
-    const text = '#2e382d';
-    const muted = '#656b5b';
-    const primary = '#3c5741';
+  it('meets WCAG AA (>= 4.5:1) for all Light mode color pairs parsed from tokens.css', () => {
+    // Light mode tokens extracted directly from tokens.css
+    const canvas = lightTokens['planora-canvas'];
+    const paper = lightTokens['planora-paper'];
+    const sidebar = lightTokens['planora-sidebar'];
+    const text = lightTokens['planora-text'];
+    const muted = lightTokens['planora-muted'];
+    const primary = lightTokens['planora-primary'];
+    const onPrimary = lightTokens['planora-on-primary'];
+    const placeholder = lightTokens['planora-placeholder'];
 
     // Status tokens
-    const pendingText = '#85532b';
-    const pendingBg = '#f6e6cf';
-    const errorText = '#9a3f32';
-    const errorBg = '#f8e6df';
-    const unknownText = '#654576';
-    const unknownBg = '#eee6f2';
+    const pendingText = lightTokens['planora-pending-text'];
+    const pendingBg = lightTokens['planora-pending-bg'];
+    const errorText = lightTokens['planora-error-text'];
+    const errorBg = lightTokens['planora-error-bg'];
+    const unknownText = lightTokens['planora-unknown-text'];
+    const unknownBg = lightTokens['planora-unknown-bg'];
 
-    expect(contrastRatio(text, canvas)).toBeGreaterThanOrEqual(4.5); // ~11.12:1
-    expect(contrastRatio(text, paper)).toBeGreaterThanOrEqual(4.5); // ~12.00:1
-    expect(contrastRatio(text, sidebar)).toBeGreaterThanOrEqual(4.5); // ~10.08:1
-    expect(contrastRatio(muted, paper)).toBeGreaterThanOrEqual(4.5); // ~5.42:1
-    expect(contrastRatio(primary, paper)).toBeGreaterThanOrEqual(4.5); // ~7.84:1
-    expect(contrastRatio(paper, primary)).toBeGreaterThanOrEqual(4.5); // Button text on primary
+    // Verify all required tokens exist in tokens.css
+    expect(canvas).toBeDefined();
+    expect(paper).toBeDefined();
+    expect(sidebar).toBeDefined();
+    expect(text).toBeDefined();
+    expect(muted).toBeDefined();
+    expect(primary).toBeDefined();
+    expect(onPrimary).toBeDefined();
+    expect(placeholder).toBeDefined();
+    expect(pendingText).toBeDefined();
+    expect(pendingBg).toBeDefined();
+    expect(errorText).toBeDefined();
+    expect(errorBg).toBeDefined();
+    expect(unknownText).toBeDefined();
+    expect(unknownBg).toBeDefined();
+
+    expect(contrastRatio(text, canvas)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(text, paper)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(text, sidebar)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(muted, paper)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(primary, paper)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(onPrimary, primary)).toBeGreaterThanOrEqual(4.5);
 
     // Placeholder tokens (WCAG AA requirement >= 4.5:1)
-    const placeholder = '#686e5e';
-    expect(contrastRatio(placeholder, paper)).toBeGreaterThanOrEqual(4.5); // ~5.19:1
-    expect(contrastRatio(placeholder, canvas)).toBeGreaterThanOrEqual(4.5); // ~4.81:1
+    expect(contrastRatio(placeholder, paper)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(placeholder, canvas)).toBeGreaterThanOrEqual(4.5);
 
-    expect(contrastRatio(pendingText, pendingBg)).toBeGreaterThanOrEqual(4.5); // ~5.24:1
-    expect(contrastRatio(errorText, errorBg)).toBeGreaterThanOrEqual(4.5); // ~5.55:1
-    expect(contrastRatio(unknownText, unknownBg)).toBeGreaterThanOrEqual(4.5); // ~6.46:1
+    expect(contrastRatio(pendingText, pendingBg)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(errorText, errorBg)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(unknownText, unknownBg)).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('meets WCAG AA (>= 4.5:1) for all Dark mode color pairs', () => {
-    // Dark mode tokens
-    const canvas = '#171c18';
-    const paper = '#202820';
-    const sidebar = '#151b16';
-    const text = '#f5f1e7';
-    const muted = '#b5bcae';
-    const primary = '#8fb68e';
-    const onPrimary = '#132014';
+  it('meets WCAG AA (>= 4.5:1) for all Dark mode color pairs parsed from tokens.css', () => {
+    // Dark mode tokens extracted directly from tokens.css
+    const canvas = darkTokens['planora-canvas'];
+    const paper = darkTokens['planora-paper'];
+    const sidebar = darkTokens['planora-sidebar'];
+    const text = darkTokens['planora-text'];
+    const muted = darkTokens['planora-muted'];
+    const primary = darkTokens['planora-primary'];
+    const onPrimary = darkTokens['planora-on-primary'];
+    const placeholder = darkTokens['planora-placeholder'];
 
     // Status tokens
-    const pendingText = '#f5c07a';
-    const pendingBg = '#332314';
-    const errorText = '#fca5a5';
-    const errorBg = '#351a1a';
-    const unknownText = '#d8b4fe';
-    const unknownBg = '#281a33';
-    const successText = '#a7f3d0';
-    const successBg = '#1a2e1d';
+    const pendingText = darkTokens['planora-pending-text'];
+    const pendingBg = darkTokens['planora-pending-bg'];
+    const errorText = darkTokens['planora-error-text'];
+    const errorBg = darkTokens['planora-error-bg'];
+    const unknownText = darkTokens['planora-unknown-text'];
+    const unknownBg = darkTokens['planora-unknown-bg'];
+    const successText = darkTokens['planora-success-text'];
+    const successBg = darkTokens['planora-success-bg'];
 
-    expect(contrastRatio(text, canvas)).toBeGreaterThanOrEqual(4.5); // ~15.31:1
-    expect(contrastRatio(text, paper)).toBeGreaterThanOrEqual(4.5); // ~13.44:1
-    expect(contrastRatio(text, sidebar)).toBeGreaterThanOrEqual(4.5); // ~15.51:1
-    expect(contrastRatio(muted, paper)).toBeGreaterThanOrEqual(4.5); // ~7.77:1
-    expect(contrastRatio(primary, paper)).toBeGreaterThanOrEqual(4.5); // ~6.67:1
-    expect(contrastRatio(onPrimary, primary)).toBeGreaterThanOrEqual(4.5); // ~7.43:1
+    // Verify all required tokens exist in tokens.css
+    expect(canvas).toBeDefined();
+    expect(paper).toBeDefined();
+    expect(sidebar).toBeDefined();
+    expect(text).toBeDefined();
+    expect(muted).toBeDefined();
+    expect(primary).toBeDefined();
+    expect(onPrimary).toBeDefined();
+    expect(placeholder).toBeDefined();
+    expect(pendingText).toBeDefined();
+    expect(pendingBg).toBeDefined();
+    expect(errorText).toBeDefined();
+    expect(errorBg).toBeDefined();
+    expect(unknownText).toBeDefined();
+    expect(unknownBg).toBeDefined();
+    expect(successText).toBeDefined();
+    expect(successBg).toBeDefined();
+
+    expect(contrastRatio(text, canvas)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(text, paper)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(text, sidebar)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(muted, paper)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(primary, paper)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(onPrimary, primary)).toBeGreaterThanOrEqual(4.5);
 
     // Placeholder tokens (WCAG AA requirement >= 4.5:1)
-    const placeholder = '#9ba393';
-    expect(contrastRatio(placeholder, paper)).toBeGreaterThanOrEqual(4.5); // ~5.81:1
-    expect(contrastRatio(placeholder, canvas)).toBeGreaterThanOrEqual(4.5); // ~6.62:1
+    expect(contrastRatio(placeholder, paper)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(placeholder, canvas)).toBeGreaterThanOrEqual(4.5);
 
-    expect(contrastRatio(pendingText, pendingBg)).toBeGreaterThanOrEqual(4.5); // ~9.13:1
-    expect(contrastRatio(errorText, errorBg)).toBeGreaterThanOrEqual(4.5); // ~8.42:1
-    expect(contrastRatio(unknownText, unknownBg)).toBeGreaterThanOrEqual(4.5); // ~9.24:1
-    expect(contrastRatio(successText, successBg)).toBeGreaterThanOrEqual(4.5); // ~11.27:1
+    expect(contrastRatio(pendingText, pendingBg)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(errorText, errorBg)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(unknownText, unknownBg)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(successText, successBg)).toBeGreaterThanOrEqual(4.5);
   });
 });
 
