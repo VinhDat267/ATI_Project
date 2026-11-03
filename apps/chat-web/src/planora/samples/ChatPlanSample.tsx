@@ -1,28 +1,47 @@
+import { useState } from 'react';
 import { Brand, ServiceLogo } from '../components/Brand';
 import { Button } from '../components/Button';
 import { StatusBadge } from '../components/StatusBadge';
 
 export function ChatPlanSample() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   return (
-    <div className="planora-chat-plan-sample" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="planora-chat-plan-sample">
       {/* Demo Notice Banner */}
-      <div className="planora-sample-banner">
+      <div className="planora-sample-banner" style={{ flexShrink: 0 }}>
         <span className="planora-sample-tag">Mẫu tham chiếu 2 / 4</span>
         <span>Mẫu giao diện Hội thoại làm trung tâm &amp; Card kế hoạch (Chat with Plan) — Demo chưa kết nối API thật</span>
       </div>
 
-      <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden' }}>
-        {/* Left Sidebar (Desktop 248px) */}
-        <aside
-          style={{
-            width: 'var(--planora-sidebar-width)',
-            backgroundColor: 'var(--planora-sidebar)',
-            borderRight: '1px solid var(--planora-divider)',
-            display: 'flex',
-            flexDirection: 'column',
-            padding: '16px',
-            flexShrink: 0,
+      <div className="planora-chat-layout">
+        {/* Mobile Navigation Toggle Bar */}
+        <div
+          className="planora-mobile-nav-toggle"
+          onClick={() => setSidebarOpen(prev => !prev)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setSidebarOpen(prev => !prev);
+            }
           }}
+          aria-expanded={sidebarOpen}
+          aria-label="Chuyển đổi điều hướng không gian làm việc"
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 14 }}>☰</span>
+            <span>ATI Project Workspace</span>
+          </div>
+          <span style={{ fontSize: 11, color: 'var(--planora-muted)' }}>
+            {sidebarOpen ? '▲ Đóng menu' : '▼ Danh sách hội thoại'}
+          </span>
+        </div>
+
+        {/* Left Sidebar (Desktop 248px, Collapsible on Mobile) */}
+        <aside
+          className={`planora-chat-sidebar ${sidebarOpen ? 'planora-sidebar-open' : ''}`}
           aria-label="Thanh điều hướng bên"
         >
           <div style={{ marginBottom: 20 }}>
@@ -176,19 +195,9 @@ export function ChatPlanSample() {
         </aside>
 
         {/* Center Main Work Area */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--planora-canvas)' }}>
+        <div className="planora-chat-main">
           {/* Top Chat Header */}
-          <header
-            style={{
-              padding: '12px 24px',
-              borderBottom: '1px solid var(--planora-divider)',
-              backgroundColor: 'var(--planora-paper)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 16,
-            }}
-          >
+          <header className="planora-chat-header">
             <div>
               <h1
                 className="planora-font-serif"
@@ -209,17 +218,7 @@ export function ChatPlanSample() {
           </header>
 
           {/* Feed Container */}
-          <div
-            style={{
-              flex: 1,
-              overflowY: 'auto',
-              padding: '24px',
-              maxWidth: 'var(--planora-chat-max-width)',
-              margin: '0 auto',
-              width: '100%',
-              boxSizing: 'border-box',
-            }}
-          >
+          <div className="planora-chat-feed">
             {/* User Message Turn */}
             <div
               style={{
@@ -230,7 +229,7 @@ export function ChatPlanSample() {
             >
               <div
                 style={{
-                  maxWidth: '75%',
+                  maxWidth: '85%',
                   backgroundColor: 'var(--planora-primary-soft)',
                   border: '1px solid var(--planora-divider)',
                   padding: '14px 18px',
@@ -238,6 +237,7 @@ export function ChatPlanSample() {
                   color: 'var(--planora-text)',
                   fontSize: 'var(--planora-text-sm)',
                   lineHeight: 1.5,
+                  wordBreak: 'break-word',
                 }}
               >
                 Lấy danh sách các PR đã merge trong tuần này trên repo VinhDat267/ATI_Project và cập nhật thẻ tương ứng trên bảng Trello Sprint 4 sang cột Hoàn thành.
@@ -262,7 +262,7 @@ export function ChatPlanSample() {
                 <Brand size="sm" showWordmark={false} />
               </div>
 
-              <div style={{ flex: 1, maxWidth: 800 }}>
+              <div style={{ flex: 1, minWidth: 0, maxWidth: 800 }}>
                 {/* Plan Card */}
                 <div
                   className="planora-card"
@@ -270,7 +270,9 @@ export function ChatPlanSample() {
                     backgroundColor: 'var(--planora-paper)',
                     border: '1px solid var(--planora-divider)',
                     borderRadius: 'var(--planora-radius-xl)',
-                    padding: '24px',
+                    padding: '20px',
+                    boxSizing: 'border-box',
+                    minWidth: 0,
                   }}
                 >
                   <div
@@ -281,6 +283,8 @@ export function ChatPlanSample() {
                       marginBottom: 16,
                       borderBottom: '1px solid var(--planora-divider)',
                       paddingBottom: 14,
+                      flexWrap: 'wrap',
+                      gap: 8,
                     }}
                   >
                     <div>
@@ -325,7 +329,7 @@ export function ChatPlanSample() {
                         borderRadius: 'var(--planora-radius-md)',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <ServiceLogo name="GitHub" size={18} />
                           <span style={{ fontWeight: 600, fontSize: 'var(--planora-text-sm)' }}>
@@ -334,7 +338,7 @@ export function ChatPlanSample() {
                         </div>
                         <StatusBadge status="success" label="Đã nạp dữ liệu" />
                       </div>
-                      <div style={{ fontSize: 'var(--planora-text-xs)', color: 'var(--planora-muted)', lineHeight: 1.5 }}>
+                      <div style={{ fontSize: 'var(--planora-text-xs)', color: 'var(--planora-muted)', lineHeight: 1.5, wordBreak: 'break-word' }}>
                         <div><strong>Kho mục tiêu:</strong> VinhDat267/ATI_Project · #260 (Đã cấp quyền cá nhân)</div>
                         <div><strong>Bộ lọc:</strong> state=closed, merged=true, limit=10</div>
                       </div>
@@ -349,7 +353,7 @@ export function ChatPlanSample() {
                         borderRadius: 'var(--planora-radius-md)',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <ServiceLogo name="Trello" size={18} />
                           <span style={{ fontWeight: 600, fontSize: 'var(--planora-text-sm)' }}>
@@ -358,7 +362,7 @@ export function ChatPlanSample() {
                         </div>
                         <StatusBadge status="pending" label="Chờ phê duyệt" />
                       </div>
-                      <div style={{ fontSize: 'var(--planora-text-xs)', color: 'var(--planora-muted)', lineHeight: 1.5 }}>
+                      <div style={{ fontSize: 'var(--planora-text-xs)', color: 'var(--planora-muted)', lineHeight: 1.5, wordBreak: 'break-word' }}>
                         <div><strong>Bảng Trello:</strong> Sprint 4 (Workspace ATI Team)</div>
                         <div><strong>Cột đích:</strong> Hoàn thành (Done)</div>
                         <div><strong>Phụ thuộc:</strong> Kết quả PR từ Bước 1</div>
@@ -376,13 +380,15 @@ export function ChatPlanSample() {
                       padding: '8px 12px',
                       borderRadius: 'var(--planora-radius-sm)',
                       marginBottom: 20,
+                      wordBreak: 'break-all',
+                      overflowWrap: 'anywhere',
                     }}
                   >
                     Mã băm ràng buộc kế hoạch (plan_hash): <code>a7f9c2d184eb402...93f4</code>
                   </div>
 
                   {/* Actions Dock */}
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                     <Button variant="primary" size="md">
                       Phê duyệt và Thực thi
                     </Button>
@@ -399,23 +405,19 @@ export function ChatPlanSample() {
           </div>
 
           {/* Bottom Single Composer */}
-          <div
-            style={{
-              padding: '16px 24px',
-              borderTop: '1px solid var(--planora-divider)',
-              backgroundColor: 'var(--planora-paper)',
-            }}
-          >
-            <div style={{ maxWidth: 'var(--planora-chat-max-width)', margin: '0 auto' }}>
+          <div className="planora-chat-composer-dock">
+            <div style={{ maxWidth: 'var(--planora-chat-max-width)', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
               <div
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 12,
+                  gap: 10,
                   backgroundColor: 'var(--planora-canvas)',
                   border: '1px solid var(--planora-divider)',
                   borderRadius: 'var(--planora-radius-xl)',
-                  padding: '8px 16px',
+                  padding: '8px 14px',
+                  boxSizing: 'border-box',
+                  width: '100%',
                 }}
               >
                 <textarea
@@ -423,6 +425,7 @@ export function ChatPlanSample() {
                   rows={1}
                   style={{
                     flex: 1,
+                    minWidth: 0,
                     border: 'none',
                     background: 'transparent',
                     resize: 'none',
@@ -443,9 +446,11 @@ export function ChatPlanSample() {
                   display: 'flex',
                   justifyContent: 'space-between',
                   marginTop: 6,
-                  padding: '0 8px',
+                  padding: '0 4px',
                   fontSize: 10,
                   color: 'var(--planora-muted)',
+                  flexWrap: 'wrap',
+                  gap: 4,
                 }}
               >
                 <span>Enter để gửi · Shift+Enter để xuống dòng</span>

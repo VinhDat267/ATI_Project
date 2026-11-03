@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useTheme } from '../../hooks/use-theme';
 import { LandingSample } from './LandingSample';
 import { ChatPlanSample } from './ChatPlanSample';
 import { SettingsScopeSample } from './SettingsScopeSample';
@@ -16,6 +17,9 @@ export interface PlanoraShowcaseProps {
  * Hỗ trợ chuyển đổi nhanh giữa 4 mẫu và đổi theme sáng/tối đồng bộ qua ati-theme.
  */
 export function PlanoraShowcase({ initialView = 'landing' }: PlanoraShowcaseProps) {
+  const { theme, toggleTheme } = useTheme();
+  const isDark = theme === 'dark';
+
   const [activeView, setActiveView] = useState<SampleViewType>(() => {
     if (typeof window !== 'undefined') {
       const param = new URLSearchParams(window.location.search).get('sample');
@@ -26,43 +30,6 @@ export function PlanoraShowcase({ initialView = 'landing' }: PlanoraShowcaseProp
     }
     return initialView;
   });
-
-  const [isDark, setIsDark] = useState<boolean>(() => {
-    if (typeof document !== 'undefined') {
-      return document.documentElement.classList.contains('dark');
-    }
-    return false;
-  });
-
-  useEffect(() => {
-    const handleThemeChange = (e: Event) => {
-      const customEvent = e as CustomEvent<{ dark?: boolean }>;
-      if (typeof customEvent.detail?.dark === 'boolean') {
-        setIsDark(customEvent.detail.dark);
-      } else {
-        setIsDark(document.documentElement.classList.contains('dark'));
-      }
-    };
-
-    window.addEventListener('ati:theme', handleThemeChange);
-    return () => window.removeEventListener('ati:theme', handleThemeChange);
-  }, []);
-
-  const toggleTheme = () => {
-    const newDark = !isDark;
-    setIsDark(newDark);
-    if (typeof document !== 'undefined') {
-      document.documentElement.classList.toggle('dark', newDark);
-      document.documentElement.setAttribute('data-theme', newDark ? 'dark' : 'light');
-      document.documentElement.style.colorScheme = newDark ? 'dark' : 'light';
-      try {
-        localStorage.setItem('ati-theme', newDark ? 'dark' : 'light');
-      } catch {
-        // Safe fallback when storage blocked
-      }
-      window.dispatchEvent(new CustomEvent('ati:theme', { detail: { dark: newDark } }));
-    }
-  };
 
   return (
     <div className="planora-root" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>

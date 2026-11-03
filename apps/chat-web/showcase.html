@@ -2,6 +2,17 @@
 <html lang="vi">
   <head>
     <meta charset="UTF-8" />
+    <script id="theme-bootstrap">
+      (() => {
+        let preference;
+        try { preference = localStorage.getItem('ati-theme'); } catch {}
+        const dark = preference === 'dark' || (preference !== 'light' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', Boolean(dark));
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+      })();
+    </script>
+    <style>html { background: #f8f4eb; } html.dark { background: #171c18; }</style>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Planora Samples Showcase (PL-01)</title>

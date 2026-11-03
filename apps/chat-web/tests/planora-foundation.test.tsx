@@ -1,8 +1,12 @@
 // @vitest-environment jsdom
 import './setup';
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { PlanoraMark, Brand, ServiceLogo } from '../src/planora/components/Brand';
+
+afterEach(() => {
+  cleanup();
+});
 import { Button } from '../src/planora/components/Button';
 import { Field } from '../src/planora/components/Field';
 import { StatusBadge } from '../src/planora/components/StatusBadge';
@@ -55,6 +59,11 @@ describe('Planora Tokens & Accessibility Contrast', () => {
     expect(contrastRatio(primary, paper)).toBeGreaterThanOrEqual(4.5); // ~7.84:1
     expect(contrastRatio(paper, primary)).toBeGreaterThanOrEqual(4.5); // Button text on primary
 
+    // Placeholder tokens (WCAG AA requirement >= 4.5:1)
+    const placeholder = '#686e5e';
+    expect(contrastRatio(placeholder, paper)).toBeGreaterThanOrEqual(4.5); // ~5.19:1
+    expect(contrastRatio(placeholder, canvas)).toBeGreaterThanOrEqual(4.5); // ~4.81:1
+
     expect(contrastRatio(pendingText, pendingBg)).toBeGreaterThanOrEqual(4.5); // ~5.24:1
     expect(contrastRatio(errorText, errorBg)).toBeGreaterThanOrEqual(4.5); // ~5.55:1
     expect(contrastRatio(unknownText, unknownBg)).toBeGreaterThanOrEqual(4.5); // ~6.46:1
@@ -86,6 +95,11 @@ describe('Planora Tokens & Accessibility Contrast', () => {
     expect(contrastRatio(muted, paper)).toBeGreaterThanOrEqual(4.5); // ~7.77:1
     expect(contrastRatio(primary, paper)).toBeGreaterThanOrEqual(4.5); // ~6.67:1
     expect(contrastRatio(onPrimary, primary)).toBeGreaterThanOrEqual(4.5); // ~7.43:1
+
+    // Placeholder tokens (WCAG AA requirement >= 4.5:1)
+    const placeholder = '#9ba393';
+    expect(contrastRatio(placeholder, paper)).toBeGreaterThanOrEqual(4.5); // ~5.81:1
+    expect(contrastRatio(placeholder, canvas)).toBeGreaterThanOrEqual(4.5); // ~6.62:1
 
     expect(contrastRatio(pendingText, pendingBg)).toBeGreaterThanOrEqual(4.5); // ~9.13:1
     expect(contrastRatio(errorText, errorBg)).toBeGreaterThanOrEqual(4.5); // ~8.42:1
@@ -225,6 +239,25 @@ describe('Planora Foundation Components', () => {
       expect(errorAlert).toHaveTextContent('Mô tả không được để trống');
       expect(textarea).toHaveAttribute('aria-describedby', errorAlert.id);
     });
+
+    it('composes external aria-describedby with error without dangling helper ID', () => {
+      render(
+        <Field
+          id="custom-field"
+          label="Tên nhánh"
+          helper="Gợi ý: feature/abc"
+          error="Tên nhánh không hợp lệ"
+          aria-describedby="external-audit-note"
+        />
+      );
+
+      const input = screen.getByLabelText(/Tên nhánh/);
+      expect(screen.queryByText('Gợi ý: feature/abc')).not.toBeInTheDocument();
+      const errorAlert = screen.getByRole('alert');
+      expect(errorAlert.id).toBe('custom-field-error');
+      expect(input).toHaveAttribute('aria-describedby', 'custom-field-error external-audit-note');
+      expect(document.getElementById('custom-field-helper')).toBeNull();
+    });
   });
 
   describe('StatusBadge Component', () => {
@@ -260,14 +293,26 @@ describe('Planora Reference Samples (PL-01)', () => {
     expect(screen.getByText('Google Sheets')).toBeInTheDocument();
   });
 
-  it('renders ChatPlanSample with sidebar, plan card and composer', () => {
-    render(<ChatPlanSample />);
+  it('renders ChatPlanSample with sidebar, mobile toggle, plan card and composer', () => {
+    const { container } = render(<ChatPlanSample />);
     expect(screen.getByText(/Mẫu giao diện Hội thoại làm trung tâm/)).toBeInTheDocument();
     expect(screen.getByText(/Kế hoạch thực thi 2 bước/)).toBeInTheDocument();
     expect(screen.getByText(/github\.list_issues/)).toBeInTheDocument();
     expect(screen.getByText(/trello\.update_card/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Phê duyệt và Thực thi' })).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/Nhập yêu cầu tiếp theo/)).toBeInTheDocument();
+
+    // Mobile nav toggle exists and toggles sidebar class
+    const mobileToggle = screen.getByRole('button', { name: 'Chuyển đổi điều hướng không gian làm việc' });
+    expect(mobileToggle).toBeInTheDocument();
+    expect(mobileToggle).toHaveAttribute('aria-expanded', 'false');
+
+    const sidebar = container.querySelector('.planora-chat-sidebar');
+    expect(sidebar).not.toHaveClass('planora-sidebar-open');
+
+    fireEvent.click(mobileToggle);
+    expect(mobileToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(sidebar).toHaveClass('planora-sidebar-open');
   });
 
   it('renders SettingsScopeSample with PR #260 GitHub OAuth repo filter and destinations', () => {
@@ -279,15 +324,24 @@ describe('Planora Reference Samples (PL-01)', () => {
     expect(screen.getByText(/Đích gửi GitHub Digest tự động/)).toBeInTheDocument();
   });
 
-  it('renders HistoryScheduleSample with schedules, needs_attention and audit log', () => {
-    render(<HistoryScheduleSample />);
+  it('renders HistoryScheduleSample with scrollable audit log table', () => {
+    const { container } = render(<HistoryScheduleSample />);
     expect(screen.getByRole('heading', { level: 1, name: /Nhật ký hoạt động & Lịch chạy tự động/ })).toBeInTheDocument();
     expect(screen.getByText('GitHub Digest buổi sáng')).toBeInTheDocument();
     expect(screen.getByText('needs_attention')).toBeInTheDocument();
     expect(screen.getByText(/Đã giữ marker chống gửi trùng/)).toBeInTheDocument();
+
+    // Verifies F2 scroll container accessibility
+    const scrollRegion = screen.getByRole('region', { name: 'Bảng nhật ký thực thi gần đây' });
+    expect(scrollRegion).toBeInTheDocument();
+    expect(scrollRegion).toHaveClass('planora-table-scroll');
+    const table = container.querySelector('table');
+    expect(table).toBeInTheDocument();
+    expect(table?.style.minWidth).toBe('540px');
   });
 
-  it('PlanoraShowcase renders tabs and toggles between samples and theme', () => {
+  it('PlanoraShowcase renders tabs and synchronizes theme via useTheme standard contract', () => {
+    localStorage.clear();
     render(<PlanoraShowcase initialView="landing" />);
     expect(screen.getByText(/PLANORA PL-01/)).toBeInTheDocument();
 
@@ -299,9 +353,17 @@ describe('Planora Reference Samples (PL-01)', () => {
     fireEvent.click(screen.getByRole('button', { name: '3. Settings (OAuth & Scope)' }));
     expect(screen.getByText(/Cài đặt kết nối & Phạm vi tài nguyên/)).toBeInTheDocument();
 
-    // Toggle theme
+    // Toggle theme to dark
     const themeBtn = screen.getByRole('button', { name: /Chuyển sang giao diện/ });
     fireEvent.click(themeBtn);
     expect(document.documentElement.classList.contains('dark')).toBe(true);
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+    expect(localStorage.getItem('ati-theme')).toBe('dark');
+
+    // Toggle theme back to light
+    fireEvent.click(themeBtn);
+    expect(document.documentElement.classList.contains('dark')).toBe(false);
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+    expect(localStorage.getItem('ati-theme')).toBe('light');
   });
 });

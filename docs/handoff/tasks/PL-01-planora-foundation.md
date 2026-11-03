@@ -118,7 +118,7 @@ Tạo bộ nền Planora dùng được (design tokens, typography, CSS nền, c
   - Cập nhật thông báo `DESIGN.md` gốc trỏ sang `apps/chat-web/DESIGN.md`.
   - Cập nhật `apps/chat-web/index.html` và `apps/chat-web/src/index.css` tích hợp tokens Planora.
 - **Bằng chứng kiểm thử:**
-  - `npm run test -w @wap/chat-web`: 97 test files / 1054 tests PASS, exit 0 (trong đó có 17 tests của `tests/planora-foundation.test.tsx`).
+  - `npm run test -w @wap/chat-web`: 97 test files / 1056 tests PASS, exit 0 (trong đó có 19 tests của `tests/planora-foundation.test.tsx`).
   - `npm run typecheck:v3`: PASS, exit 0.
   - `npm run build:v3`: PASS, exit 0.
   - `node scripts/test-v3-web-build-security.mjs`: PASS, exit 0.
@@ -126,4 +126,10 @@ Tạo bộ nền Planora dùng được (design tokens, typography, CSS nền, c
     - 4 mẫu tại 1440×900 (sáng và tối).
     - 4 mẫu tại 375×812 (sáng và tối).
     - Kiểm tra tràn ngang tại 320px: 4/4 mẫu PASS (scrollWidth: 320px, không tràn ngang).
-- **Trạng thái:** `READY_FOR_CODEX_REVIEW`. Dừng lại chờ Codex review độc lập và chủ dự án duyệt hình thức bộ mẫu trước khi triển khai PL-02.
+- **Khắc phục các finding P2 từ Codex review (F1 - F5):**
+  - **F1 (Chat mobile layout & composer desktop docked):** Thêm `.planora-mobile-nav-toggle` và `.planora-sidebar-open` cho sidebar trên mobile; thiết lập `.planora-chat-plan-sample` có `height: calc(100vh - 60px)` trên desktop giúp feed cuộn độc lập và composer luôn ghim tại đáy viewport 900px; trên mobile controls co giãn tự nhiên (`flex-wrap: wrap`, textarea `min-width: 0`), script capture chứng minh các bounding box (`approveBtn`, `textarea`, `sendBtn`) không bị clipping tại 375px và 320px.
+  - **F2 (Bảng nhật ký có vùng cuộn ngang trên mobile):** Bọc bảng trong `.planora-table-scroll` (`overflow-x: auto`), khai báo `role="region"`, `aria-label="Bảng nhật ký thực thi gần đây"`, `tabIndex={0}`, bảng có `minWidth: 540` đảm bảo cột "Chi tiết kết quả" xem được trọn vẹn.
+  - **F3 (Hợp đồng theme showcase):** `showcase.html` tích hợp `#theme-bootstrap` inline script giải quyết FOUC trước first paint; `PlanoraShowcase.tsx` chuyển sang dùng hook chuẩn `useTheme()` đồng bộ hoàn toàn với `localStorage('ati-theme')`, `data-theme`, `colorScheme` và CustomEvent `ati:theme`.
+  - **F4 (Placeholder contrast WCAG AA ≥ 4.5:1):** Đặt `--planora-placeholder: #686e5e` (Light, 5.19:1 trên paper, 4.81:1 trên canvas) và `--planora-placeholder: #9ba393` (Dark, 5.81:1 trên paper, 6.62:1 trên canvas); áp dụng vào `.planora-field-input::placeholder` và `.planora-field-textarea::placeholder`.
+  - **F5 (Field aria-describedby composition & no phantom ID):** Tách `aria-describedby` ngoại vi, chỉ sinh `helperId` khi không có lỗi, ghép `[errorId, helperId, externalDescribedBy]` loại bỏ triệt để IDREF ảo.
+- **Trạng thái:** `FIXES_APPLIED_READY_FOR_RECHECK`. Đã sửa toàn bộ 5 findings P2, vượt qua 100% kiểm thử và assertions thực tế.

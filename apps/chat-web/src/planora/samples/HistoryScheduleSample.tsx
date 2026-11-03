@@ -138,6 +138,8 @@ export function HistoryScheduleSample() {
                     borderTop: '1px solid var(--planora-divider)',
                     fontSize: 'var(--planora-text-xs)',
                     color: 'var(--planora-muted)',
+                    flexWrap: 'wrap',
+                    gap: 8,
                   }}
                 >
                   <div>Lần chạy gần nhất: {sched.lastRun}</div>
@@ -171,28 +173,43 @@ export function HistoryScheduleSample() {
               overflow: 'hidden',
             }}
           >
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--planora-text-xs)' }}>
-              <thead>
-                <tr style={{ backgroundColor: 'var(--planora-canvas)', borderBottom: '1px solid var(--planora-divider)' }}>
-                  <th style={{ padding: '12px 16px', fontWeight: 600 }}>Tên phiên chạy</th>
-                  <th style={{ padding: '12px 16px', fontWeight: 600 }}>Thời điểm</th>
-                  <th style={{ padding: '12px 16px', fontWeight: 600 }}>Trạng thái</th>
-                  <th style={{ padding: '12px 16px', fontWeight: 600 }}>Chi tiết kết quả</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sampleRuns.map(run => (
-                  <tr key={run.id} style={{ borderBottom: '1px solid var(--planora-divider)' }}>
-                    <td style={{ padding: '14px 16px', fontWeight: 500 }}>{run.name}</td>
-                    <td style={{ padding: '14px 16px', color: 'var(--planora-muted)' }}>{run.time}</td>
-                    <td style={{ padding: '14px 16px' }}>
-                      <StatusBadge status={run.status} />
-                    </td>
-                    <td style={{ padding: '14px 16px', color: 'var(--planora-muted)' }}>{run.details}</td>
+            <div
+              className="planora-table-scroll"
+              tabIndex={0}
+              role="region"
+              aria-label="Bảng nhật ký thực thi gần đây"
+            >
+              <table
+                style={{
+                  width: '100%',
+                  minWidth: 540,
+                  borderCollapse: 'collapse',
+                  textAlign: 'left',
+                  fontSize: 'var(--planora-text-xs)',
+                }}
+              >
+                <thead>
+                  <tr style={{ backgroundColor: 'var(--planora-canvas)', borderBottom: '1px solid var(--planora-divider)' }}>
+                    <th style={{ padding: '12px 16px', fontWeight: 600 }}>Tên phiên chạy</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 600 }}>Thời điểm</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 600 }}>Trạng thái</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 600 }}>Chi tiết kết quả</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {sampleRuns.map(run => (
+                    <tr key={run.id} style={{ borderBottom: '1px solid var(--planora-divider)' }}>
+                      <td style={{ padding: '14px 16px', fontWeight: 500, whiteSpace: 'nowrap' }}>{run.name}</td>
+                      <td style={{ padding: '14px 16px', color: 'var(--planora-muted)', whiteSpace: 'nowrap' }}>{run.time}</td>
+                      <td style={{ padding: '14px 16px' }}>
+                        <StatusBadge status={run.status} />
+                      </td>
+                      <td style={{ padding: '14px 16px', color: 'var(--planora-muted)', minWidth: 200 }}>{run.details}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
       </main>

@@ -19,7 +19,8 @@
   /* Text & Content (Light) */
   --planora-text: #2e382d;
   --planora-muted: #656b5b;
-  --planora-muted-subtle: #848a7b;
+  --planora-muted-subtle: #686e5e;
+  --planora-placeholder: #686e5e;
   --planora-divider: #deded0;
   --planora-border-strong: #c2c2b0;
 
@@ -120,7 +121,8 @@ html.dark,
   /* Text & Content (Dark) */
   --planora-text: #f5f1e7;
   --planora-muted: #b5bcae;
-  --planora-muted-subtle: #8a9382;
+  --planora-muted-subtle: #9ba393;
+  --planora-placeholder: #9ba393;
   --planora-divider: #394638;
   --planora-border-strong: #4e5e4d;
 

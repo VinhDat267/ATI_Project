@@ -39,14 +39,15 @@ export const Field = forwardRef<HTMLInputElement | HTMLTextAreaElement, FieldPro
       className = '',
       wrapperClassName = '',
       disabled,
+      'aria-describedby': externalDescribedBy,
       ...rest
     } = props;
 
     const id = explicitId || generatedId;
     const errorId = error ? `${id}-error` : undefined;
-    const helperId = helper ? `${id}-helper` : undefined;
+    const helperId = !error && helper ? `${id}-helper` : undefined;
 
-    const describedBy = [errorId, helperId].filter(Boolean).join(' ') || undefined;
+    const describedBy = [errorId, helperId, externalDescribedBy].filter(Boolean).join(' ') || undefined;
 
     const controlClass = [
       multiline ? 'planora-field-textarea' : 'planora-field-input',
