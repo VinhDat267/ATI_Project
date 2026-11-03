@@ -11,6 +11,7 @@ export interface PlanoraShellProps {
   currentTab?: NavTab;
   navigate: (to: string) => void;
   onLogout: () => void;
+  onNewConversation?: () => void;
   children: React.ReactNode;
 }
 
@@ -23,12 +24,43 @@ export function PlanoraShell({
   currentTab,
   navigate,
   onLogout,
+  onNewConversation,
   children,
 }: PlanoraShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
   const prevOpenRef = useRef(false);
+
+  // Monitor breakpoint crossing (F6): sync drawer state and prevent scroll lock leak
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const syncBreakpoint = () => {
+      let isDesktop = false;
+      if (typeof window.matchMedia === 'function') {
+        isDesktop = window.matchMedia('(min-width: 1024px)').matches;
+      } else if (typeof window.innerWidth === 'number') {
+        isDesktop = window.innerWidth >= 1024;
+      }
+      if (isDesktop) {
+        setDrawerOpen(false);
+      }
+    };
+
+    let mql: MediaQueryList | null = null;
+    if (typeof window.matchMedia === 'function') {
+      mql = window.matchMedia('(min-width: 1024px)');
+      mql.addEventListener?.('change', syncBreakpoint);
+    }
+    window.addEventListener('resize', syncBreakpoint);
+
+    return () => {
+      mql?.removeEventListener?.('change', syncBreakpoint);
+      window.removeEventListener('resize', syncBreakpoint);
+    };
+  }, []);
 
   // Preserve workspace invariants: reset store and isolate state on workspace switch
   const lastWorkspaceId = useRef(getActiveWorkspaceId());
@@ -47,7 +79,7 @@ export function PlanoraShell({
     });
   }, [navigate]);
 
-  // Focus restore and Escape key handling for accessible mobile drawer
+  // Focus restore and initial focus for mobile drawer (F2)
   useEffect(() => {
     if (prevOpenRef.current && !drawerOpen) {
       triggerRef.current?.focus();
@@ -56,12 +88,26 @@ export function PlanoraShell({
 
     if (!drawerOpen) return;
 
-    // Body scroll lock
+    // Body scroll lock with original overflow preservation (F6)
+    const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
+    // Move initial focus into drawer on mobile (F2)
+    queueMicrotask(() => {
+      if (closeBtnRef.current) {
+        closeBtnRef.current.focus();
+      } else if (sidebarRef.current) {
+        const first = sidebarRef.current.querySelector<HTMLElement>(
+          'button:not(:disabled), [href], input:not(:disabled)'
+        );
+        first?.focus();
+      }
+    });
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't intercept Escape if inside an open dialog modal (e.g. WorkspaceSwitcher modal)
-      if ((e.target as Element)?.closest?.('[role="dialog"]')) return;
+      // If a non-sidebar modal dialog is currently open, let that dialog handle Escape (F4)
+      const nonSidebarModal = document.querySelector('[role="dialog"]:not(.planora-sidebar)');
+      if (nonSidebarModal) return;
 
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -70,8 +116,10 @@ export function PlanoraShell({
       }
 
       if (e.key === 'Tab' && sidebarRef.current) {
-        const focusable = sidebarRef.current.querySelectorAll<HTMLElement>(
-          'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+        const focusable = Array.from(
+          sidebarRef.current.querySelectorAll<HTMLElement>(
+            'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+          )
         );
         if (focusable.length > 0) {
           const first = focusable[0];
@@ -90,7 +138,7 @@ export function PlanoraShell({
     window.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      document.body.style.overflow = '';
+      document.body.style.overflow = originalOverflow;
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [drawerOpen]);
@@ -113,15 +161,21 @@ export function PlanoraShell({
         <div className="planora-screen-layout">
           <PlanoraSidebar
             ref={sidebarRef}
+            closeButtonRef={closeBtnRef}
             user={user}
             currentTab={currentTab}
             navigate={navigate}
             onLogout={onLogout}
+            onNewConversation={onNewConversation}
             isOpen={drawerOpen}
             onClose={() => setDrawerOpen(false)}
           />
 
-          <div className="planora-main-work" id="main">
+          <div
+            className="planora-main-work"
+            id="main"
+            inert={drawerOpen ? true : undefined}
+          >
             {/* Mobile Top Bar (< 1024px) */}
             <div className="planora-mobile-bar">
               <button

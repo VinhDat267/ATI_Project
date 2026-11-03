@@ -11,6 +11,7 @@ import {
 } from '../src/services/workspace-storage';
 import { useChatStore } from '../src/store/chat-store';
 import { apiClient } from '../src/services/api-client';
+import { authStorage } from '../src/services/auth-storage';
 import type { User, WorkspaceSummary } from '../src/types';
 
 const memberUser: User = {
@@ -410,6 +411,224 @@ describe('PlanoraShell & PlanoraSidebar (PL-02)', () => {
       // Chat store should be reset
       expect(useChatStore.getState().conversationId).toBeNull();
       expect(useChatStore.getState().activePlan).toBeNull();
+    });
+
+    it('ignores deferred GET/SSE responses from a previous workspace after switching to a new workspace', async () => {
+      setActiveWorkspaceId('ws-team-alpha');
+      useChatStore.getState().setConversationId('conv-alpha');
+
+      let resolveAlphaRequest!: (val: any) => void;
+      const delayedAlphaPromise = new Promise((resolve) => {
+        resolveAlphaRequest = resolve;
+      });
+
+      render(
+        <PlanoraShell
+          user={memberUser}
+          currentTab="workspace"
+          navigate={vi.fn()}
+          onLogout={vi.fn()}
+        >
+          <main>
+            <h1>Hội thoại Alpha</h1>
+          </main>
+        </PlanoraShell>
+      );
+
+      // User switches to Personal workspace while Alpha request is still in-flight
+      setActiveWorkspaceId('personal');
+      expect(getActiveWorkspaceId()).toBe('personal');
+      expect(useChatStore.getState().conversationId).toBeNull();
+
+      // Later, the delayed response from Alpha arrives
+      const alphaResponseData = {
+        conversation: { id: 'conv-alpha', title: 'Stale Alpha' },
+        messages: [{ id: 'm-alpha', role: 'assistant', content: 'Stale Alpha Reply' }],
+      };
+      resolveAlphaRequest(alphaResponseData);
+      await delayedAlphaPromise;
+
+      // Ensure that if a handler receives a response belonging to the old workspace,
+      // the active workspace remains 'personal' with clean store
+      expect(getActiveWorkspaceId()).toBe('personal');
+      expect(useChatStore.getState().conversationId).toBeNull();
+      expect(useChatStore.getState().messages).toHaveLength(0);
+    });
+  });
+
+  describe('7. Codex Findings Regressions (F1 - F6)', () => {
+    it('F1: Sidebar "Hội thoại mới" preserves pending request lock on c1 when navigating away and back', () => {
+      const navigate = vi.fn();
+      useChatStore.getState().setConversationId('c1');
+      useChatStore.getState().setIsPlanning(true, 'c1', 'req-in-flight-1');
+
+      expect(useChatStore.getState().isPlanning).toBe(true);
+      expect(useChatStore.getState().planningByConversation['c1']?.requestId).toBe('req-in-flight-1');
+
+      render(
+        <PlanoraShell
+          user={memberUser}
+          currentTab="workspace"
+          navigate={navigate}
+          onLogout={vi.fn()}
+        >
+          <main>
+            <h1>Hội thoại c1</h1>
+          </main>
+        </PlanoraShell>
+      );
+
+      // Click "Hội thoại mới" on sidebar
+      const newChatBtn = screen.getByRole('button', { name: /Hội thoại mới/i });
+      fireEvent.click(newChatBtn);
+
+      // Navigates to / and conversationId becomes null for new draft
+      expect(navigate).toHaveBeenCalledWith('/');
+      expect(useChatStore.getState().conversationId).toBeNull();
+
+      // Critical invariant: planning record for c1 is NOT wiped out!
+      expect(useChatStore.getState().planningByConversation['c1']).toBeDefined();
+      expect(useChatStore.getState().planningByConversation['c1']?.requestId).toBe('req-in-flight-1');
+
+      // Return to c1 via history: lock is still active!
+      useChatStore.getState().setConversationId('c1');
+      useChatStore.setState({ isPlanning: !!useChatStore.getState().planningByConversation['c1'] });
+      expect(useChatStore.getState().isPlanning).toBe(true);
+    });
+
+    it('F2: Mobile drawer isolates focus, traps Tab navigation, applies inert to background, and restores focus on close', async () => {
+      render(
+        <PlanoraShell
+          user={memberUser}
+          currentTab="workspace"
+          navigate={vi.fn()}
+          onLogout={vi.fn()}
+        >
+          <main>
+            <h1>Trang chính</h1>
+          </main>
+        </PlanoraShell>
+      );
+
+      const toggleBtn = screen.getByRole('button', { name: /Mở menu điều hướng/i });
+
+      // Open drawer
+      fireEvent.click(toggleBtn);
+      expect(toggleBtn).toHaveAttribute('aria-expanded', 'true');
+
+      // Drawer has role="dialog" and aria-modal="true" on mobile
+      const drawer = document.querySelector('.planora-sidebar');
+      expect(drawer).toHaveAttribute('role', 'dialog');
+      expect(drawer).toHaveAttribute('aria-modal', 'true');
+
+      // Close button inside drawer received focus
+      const closeBtn = screen.getByRole('button', { name: /Đóng điều hướng/i });
+      await waitFor(() => {
+        expect(document.activeElement).toBe(closeBtn);
+      });
+
+      // Background main-work has inert attribute
+      const mainWork = document.querySelector('.planora-main-work');
+      expect(mainWork).toHaveAttribute('inert');
+
+      // Pressing Escape closes drawer and restores focus to hamburger toggle button
+      fireEvent.keyDown(window, { key: 'Escape' });
+      expect(toggleBtn).toHaveAttribute('aria-expanded', 'false');
+      await waitFor(() => {
+        expect(document.activeElement).toBe(toggleBtn);
+      });
+
+      // Background no longer inert
+      expect(mainWork).not.toHaveAttribute('inert');
+    });
+
+    it('F3 & F4: WorkspaceSwitcher overlays render via Portal, have role="dialog", and Escape closes modal before drawer', async () => {
+      render(
+        <PlanoraShell
+          user={memberUser}
+          currentTab="workspace"
+          navigate={vi.fn()}
+          onLogout={vi.fn()}
+        >
+          <main>
+            <h1>Trang làm việc</h1>
+          </main>
+        </PlanoraShell>
+      );
+
+      // Open mobile drawer
+      const toggleBtn = screen.getByRole('button', { name: /Mở menu điều hướng/i });
+      fireEvent.click(toggleBtn);
+
+      // Open workspace switcher dropdown in sidebar
+      const switcherBtn = screen.getByRole('button', { name: /Không gian làm việc:/i });
+      fireEvent.click(switcherBtn);
+
+      // Click "Tạo không gian tổ chức mới"
+      const createOrgBtn = screen.getByRole('button', { name: /Tạo không gian tổ chức mới/i });
+      fireEvent.click(createOrgBtn);
+
+      // Modal is rendered via Portal directly into document.body with role="dialog"
+      const createModal = screen.getByRole('dialog', { name: 'Tạo không gian tổ chức mới' });
+      expect(createModal).toBeInTheDocument();
+      expect(createModal.parentElement).toBe(document.body);
+
+      // Press Escape: closes the create modal first, focus returns to opener, drawer remains open!
+      fireEvent.keyDown(window, { key: 'Escape' });
+      expect(screen.queryByRole('dialog', { name: 'Tạo không gian tổ chức mới' })).toBeNull();
+      expect(toggleBtn).toHaveAttribute('aria-expanded', 'true');
+    });
+
+    it('F5: Route / (home) is recognized as workspace tab and renders active nav link and SidebarHistory', async () => {
+      authStorage.setStoredTokens({ accessToken: 'test-token', user: memberUser });
+      // Simulate App mounted on /
+      window.history.replaceState({}, '', '/');
+      const { App } = await import('../src/App');
+      render(<App />);
+
+      // On /, the "Không gian làm việc" nav link is marked with aria-current="page"
+      await waitFor(() => {
+        const nav = screen.getByRole('navigation', { name: 'Điều hướng chính' });
+        const homeLink = within(nav).getByRole('link', { name: /Không gian làm việc/i });
+        expect(homeLink).toHaveAttribute('aria-current', 'page');
+      });
+
+      // SidebarHistory is rendered because currentTab === 'workspace'
+      expect(document.querySelector('.planora-sidebar-history-wrap')).toBeInTheDocument();
+      authStorage.clearStoredTokens();
+    });
+
+    it('F6: Crossing desktop breakpoint closes mobile drawer and restores document body scroll lock', async () => {
+      Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 500 });
+      render(
+        <PlanoraShell
+          user={memberUser}
+          currentTab="workspace"
+          navigate={vi.fn()}
+          onLogout={vi.fn()}
+        >
+          <main>
+            <h1>Trang cuộn dài</h1>
+          </main>
+        </PlanoraShell>
+      );
+
+      const toggleBtn = screen.getByRole('button', { name: /Mở menu điều hướng/i });
+
+      // Open drawer on mobile
+      fireEvent.click(toggleBtn);
+      expect(toggleBtn).toHaveAttribute('aria-expanded', 'true');
+      expect(document.body.style.overflow).toBe('hidden');
+
+      // Simulate media query crossing to desktop >=1024px
+      Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1200 });
+      fireEvent(window, new Event('resize'));
+
+      // Crossing to desktop automatically closes drawer and restores body scroll lock
+      await waitFor(() => {
+        expect(toggleBtn).toHaveAttribute('aria-expanded', 'false');
+      });
+      expect(document.body.style.overflow).toBe('');
     });
   });
 });

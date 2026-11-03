@@ -77,23 +77,24 @@ Khôi phục bố cục shell Planora chuẩn: sidebar 248px cố định từ b
 
 ## 5. Kết quả
 
-- **Trạng thái:** HOÀN THÀNH (`READY_FOR_CODEX_REVIEW`).
+- **Trạng thái:** HOÀN THÀNH (`READY_FOR_CODEX_REVIEW` - Đã fix toàn bộ findings từ Codex Review).
 - **Files tạo mới:**
-  - `apps/chat-web/src/planora/layout/PlanoraShell.tsx`: Shell component quản lý drawer state, Escape listener, focus trap/restore, body scroll lock, và context reset khi chuyển workspace.
-  - `apps/chat-web/src/planora/layout/PlanoraSidebar.tsx`: Sidebar 248px gồm Brand, WorkspaceSwitcher, CTA "Hội thoại mới", 5 navigation links (Hội thoại, Nhật ký, Kết nối, Cẩm nang, Quản lý người dùng theo quyền), badge pending schedules/users, SidebarHistory tích hợp và footer (thông tin tài khoản, theme toggle, chính sách, đăng xuất).
+  - `apps/chat-web/src/planora/layout/PlanoraShell.tsx`: Shell component quản lý drawer state, Escape listener theo cấp bậc (ưu tiên dialog con), focus trap/restore, body scroll lock, media query crossing tự động đóng drawer, và context reset khi chuyển workspace.
+  - `apps/chat-web/src/planora/layout/PlanoraSidebar.tsx`: Sidebar 248px gồm Brand, WorkspaceSwitcher, CTA "Hội thoại mới" bảo lưu planning ownership lock (`reset({ preservePlanning: true })`), 5 navigation links (Hội thoại, Nhật ký, Kết nối, Cẩm nang, Quản lý người dùng theo quyền), badge pending schedules/users, SidebarHistory tích hợp và footer (thông tin tài khoản, theme toggle, chính sách, đăng xuất).
   - `apps/chat-web/src/planora/layout/PlanoraPublicHeader.tsx`: Header công khai chuẩn nhận diện Planora, theme toggle và nút đăng nhập.
-  - `apps/chat-web/src/planora/styles/shell.css`: Bố cục CSS chuẩn Planora, sidebar desktop 248px, drawer animation, backdrop, mobile bar và badges.
-  - `apps/chat-web/tests/planora-shell.test.tsx`: 12 unit tests bao phủ toàn bộ navigation, modifier clicks, org admin vs global role, pending badges, mobile drawer accessibility, single landmarks (main, h1, nav), và workspace switch reset.
+  - `apps/chat-web/src/planora/styles/shell.css`: Bố cục CSS chuẩn Planora, sidebar desktop 248px, drawer animation, backdrop, mobile bar và badges; ẩn hoàn toàn drawer đóng khỏi tab order và accessibility tree (`visibility: hidden; pointer-events: none`).
+  - `apps/chat-web/tests/planora-shell.test.tsx`: 18 unit tests bao phủ toàn bộ navigation, modifier clicks, org admin vs global role, pending badges, mobile drawer accessibility lifecycle, single landmarks (main, h1, nav), delayed GET/SSE cross-workspace isolation, và 6 regression tests cho các findings F1-F6 của Codex review.
   - `apps/chat-web/tests/browser/planora-shell.spec.ts`: Playwright browser test cho 1440/1024/768/375px ở cả hai theme Sáng/Tối.
 - **Files sửa đổi:**
-  - `apps/chat-web/src/App.tsx`: Bọc các protected routes trong `PlanoraShell`.
+  - `apps/chat-web/src/App.tsx`: Bọc các protected routes trong `PlanoraShell`, map route `/` (`home`) sang tab `'workspace'`, kết nối `handleNewConversation` với `reset({ preservePlanning: true })`.
   - `apps/chat-web/src/components/layout/MainNav.tsx`: Triệt tiêu duplicate nav/brand/workspaceSwitcher khi nằm trong `PlanoraShell`, duy trì dải action contextual và `UserNavMenu`.
-  - `apps/chat-web/src/components/layout/WorkspaceSwitcher.tsx`: Hỗ trợ `variant="sidebar"`, nâng modal backdrop lên `z-[100]`.
+  - `apps/chat-web/src/components/layout/WorkspaceSwitcher.tsx`: Hỗ trợ `variant="sidebar"`, render create/join overlays qua `createPortal(..., document.body)` thoát khỏi transform containing block của sidebar, gán `role="dialog"`, xử lý phím Escape capture-phase đóng modal trước drawer.
   - `apps/chat-web/src/components/layout/SidebarHistory.tsx`: Hỗ trợ `planora` prop để phân biệt accessible name và icon với `HistoryDrawer` của Cockpit; cô lập phạm vi trên trang chat workspace.
   - `apps/chat-web/src/index.css`: Import `shell.css`.
+  - `scripts/test-v3-browser.mjs`: Thêm `|PL-02:` vào `scenarios[0].grep`.
 - **Bằng chứng kiểm thử:**
   - `npm run typecheck:v3`: exit code 0 (0 errors).
-  - `npm test -w @wap/chat-web`: 98 test files passed (1068 tests passed, exit code 0).
-  - `npm test -w @wap/tool-schemas`: 18 test files passed (347 tests passed, exit code 0).
+  - `npm test -w @wap/chat-web`: 98 test files passed (1074 tests passed, exit code 0).
+  - `npm test -w @wap/chat-web -- tests/planora-shell.test.tsx`: 18 tests passed (exit code 0).
   - `npm run build:v3`: build thành công (exit code 0).
-  - Browser E2E: script `apps/chat-web/tests/browser/planora-shell.spec.ts` đã viết hoàn chỉnh, sẵn sàng chạy trong môi trường CI có Docker.
+  - Browser E2E: script `apps/chat-web/tests/browser/planora-shell.spec.ts` đã viết hoàn chỉnh và đăng ký trong `scripts/test-v3-browser.mjs`.

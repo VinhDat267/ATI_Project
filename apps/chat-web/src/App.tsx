@@ -19,6 +19,8 @@ import { PrivacyPage } from './pages/Privacy/PrivacyPage';
 import { SchedulesCapabilityProvider } from './hooks/use-schedules';
 import { PlanoraShell } from './planora/layout/PlanoraShell';
 import type { NavTab } from './components/layout/MainNav';
+import type { AppRoute } from './routes';
+import { useChatStore } from './store/chat-store';
 
 export interface AppProps { initialView?: 'landing' | 'login'; }
 
@@ -26,18 +28,24 @@ export function App({ initialView }: AppProps) {
   useTheme();
   const { route, navigate } = useRoute(initialView);
 
-  const getTab = (kind: string): NavTab | undefined => {
+  const getTab = (kind: AppRoute['kind']): NavTab | undefined => {
     switch (kind) {
       case 'settings': return 'settings';
       case 'history': return 'history';
       case 'admin-users': return 'users';
       case 'guide': return 'guide';
-      case 'workspace':
+      case 'home':
       case 'conversation':
         return 'workspace';
       default:
         return undefined;
     }
+  };
+
+  const handleNewConversation = () => {
+    useChatStore.getState().reset({ preservePlanning: true });
+    useChatStore.getState().setConversationId(null);
+    navigate('/');
   };
 
   return (
@@ -59,6 +67,7 @@ export function App({ initialView }: AppProps) {
               currentTab={currentTab}
               navigate={navigate}
               onLogout={session.onLogout}
+              onNewConversation={handleNewConversation}
             >
               {route.kind === 'not-found' ? (
                 <NotFoundPage signedIn navigate={navigate} />

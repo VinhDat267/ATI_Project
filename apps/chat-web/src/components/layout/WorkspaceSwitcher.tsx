@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { apiClient } from '../../services/api-client';
 import {
   getActiveWorkspaceId,
@@ -37,7 +38,39 @@ export function WorkspaceSwitcher({ navigate, variant = 'header' }: WorkspaceSwi
 
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const createTriggerRef = useRef<HTMLButtonElement>(null);
+  const joinTriggerRef = useRef<HTMLButtonElement>(null);
   const menuId = useId();
+
+  // Escape key and focus return for create organization modal (F3 & F4)
+  useEffect(() => {
+    if (!showCreateModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setShowCreateModal(false);
+        createTriggerRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [showCreateModal]);
+
+  // Escape key and focus return for join organization modal (F3 & F4)
+  useEffect(() => {
+    if (!showJoinModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setShowJoinModal(false);
+        joinTriggerRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [showJoinModal]);
 
   // Subscribe to storage changes
   useEffect(() => {
@@ -241,7 +274,11 @@ export function WorkspaceSwitcher({ navigate, variant = 'header' }: WorkspaceSwi
           id={menuId}
           role="menu"
           aria-label="Danh sách không gian làm việc"
-          className="absolute left-0 top-full mt-1.5 w-72 sm:w-80 bg-white rounded-xl border border-[#E7E7E2] shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100"
+          className={`absolute top-full mt-1.5 bg-white rounded-xl border border-[#E7E7E2] shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100 ${
+            variant === 'sidebar'
+              ? 'left-0 right-0 w-full min-w-[220px] max-w-[calc(100vw-32px)]'
+              : 'left-0 w-72 sm:w-80 max-w-[calc(100vw-32px)]'
+          }`}
         >
           <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-[#6B7280]">
             Không gian làm việc
@@ -325,6 +362,7 @@ export function WorkspaceSwitcher({ navigate, variant = 'header' }: WorkspaceSwi
           {/* Action buttons */}
           <div className="mt-2 border-t border-[#E7E7E2] pt-1.5 px-2 v3-space-y-1">
             <button
+              ref={createTriggerRef}
               type="button"
               onClick={() => {
                 setShowCreateModal(true);
@@ -337,6 +375,7 @@ export function WorkspaceSwitcher({ navigate, variant = 'header' }: WorkspaceSwi
             </button>
 
             <button
+              ref={joinTriggerRef}
               type="button"
               onClick={() => {
                 setShowJoinModal(true);
@@ -352,9 +391,14 @@ export function WorkspaceSwitcher({ navigate, variant = 'header' }: WorkspaceSwi
         </div>
       )}
 
-      {/* Modal Tạo Không Gian Tổ Chức */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      {/* Modal Tạo Không Gian Tổ Chức (Rendered via Portal to escape transformed sidebar containing block - F3 & F4) */}
+      {showCreateModal && typeof document !== 'undefined' && createPortal(
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Tạo không gian tổ chức mới"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+        >
           <div className="w-full max-w-md bg-white rounded-2xl border border-[#E7E7E2] shadow-2xl p-6 v3-space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-[#111827] flex items-center gap-2">
@@ -363,8 +407,12 @@ export function WorkspaceSwitcher({ navigate, variant = 'header' }: WorkspaceSwi
               </h3>
               <button
                 type="button"
-                onClick={() => setShowCreateModal(false)}
+                onClick={() => {
+                  setShowCreateModal(false);
+                  createTriggerRef.current?.focus();
+                }}
                 className="text-[#9CA3AF] hover:text-[#111827] text-sm font-semibold"
+                aria-label="Đóng biểu mẫu"
               >
                 ✕
               </button>
@@ -409,7 +457,10 @@ export function WorkspaceSwitcher({ navigate, variant = 'header' }: WorkspaceSwi
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E7E7E2]">
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    createTriggerRef.current?.focus();
+                  }}
                   className="px-4 py-2 rounded-xl text-xs font-medium text-[#4B5563] hover:bg-neutral-100"
                 >
                   Hủy
@@ -424,12 +475,18 @@ export function WorkspaceSwitcher({ navigate, variant = 'header' }: WorkspaceSwi
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Modal Tham Gia Bằng Mã Mời */}
-      {showJoinModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      {/* Modal Tham Gia Bằng Mã Mời (Rendered via Portal to escape transformed sidebar containing block - F3 & F4) */}
+      {showJoinModal && typeof document !== 'undefined' && createPortal(
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Tham gia tổ chức bằng mã mời"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+        >
           <div className="w-full max-w-md bg-white rounded-2xl border border-[#E7E7E2] shadow-2xl p-6 v3-space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-[#111827] flex items-center gap-2">
@@ -438,8 +495,12 @@ export function WorkspaceSwitcher({ navigate, variant = 'header' }: WorkspaceSwi
               </h3>
               <button
                 type="button"
-                onClick={() => setShowJoinModal(false)}
+                onClick={() => {
+                  setShowJoinModal(false);
+                  joinTriggerRef.current?.focus();
+                }}
                 className="text-[#9CA3AF] hover:text-[#111827] text-sm font-semibold"
+                aria-label="Đóng biểu mẫu"
               >
                 ✕
               </button>
@@ -479,7 +540,10 @@ export function WorkspaceSwitcher({ navigate, variant = 'header' }: WorkspaceSwi
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E7E7E2]">
                 <button
                   type="button"
-                  onClick={() => setShowJoinModal(false)}
+                  onClick={() => {
+                    setShowJoinModal(false);
+                    joinTriggerRef.current?.focus();
+                  }}
                   className="px-4 py-2 rounded-xl text-xs font-medium text-[#4B5563] hover:bg-neutral-100"
                 >
                   Đóng
@@ -494,7 +558,8 @@ export function WorkspaceSwitcher({ navigate, variant = 'header' }: WorkspaceSwi
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

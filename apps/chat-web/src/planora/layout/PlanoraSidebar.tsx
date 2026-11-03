@@ -18,6 +18,7 @@ export interface PlanoraSidebarProps {
   isOpen?: boolean;
   onClose?: () => void;
   onNewConversation?: () => void;
+  closeButtonRef?: React.Ref<HTMLButtonElement>;
 }
 
 interface TabDef {
@@ -38,7 +39,7 @@ const TABS: TabDef[] = [
 ];
 
 export const PlanoraSidebar = forwardRef<HTMLElement, PlanoraSidebarProps>(function PlanoraSidebar(
-  { user, currentTab, navigate, onLogout, isOpen = false, onClose, onNewConversation },
+  { user, currentTab, navigate, onLogout, isOpen = false, onClose, onNewConversation, closeButtonRef },
   ref
 ) {
   const pendingCount = useSchedulePendingCount(user);
@@ -60,10 +61,13 @@ export const PlanoraSidebar = forwardRef<HTMLElement, PlanoraSidebarProps>(funct
 
   const handleNewChat = () => {
     onClose?.();
-    useChatStore.getState().reset();
-    useChatStore.getState().setConversationId(null);
-    if (onNewConversation) onNewConversation();
-    navigate('/');
+    if (onNewConversation) {
+      onNewConversation();
+    } else {
+      useChatStore.getState().reset({ preservePlanning: true });
+      useChatStore.getState().setConversationId(null);
+      navigate('/');
+    }
   };
 
   const canManageUsers =
@@ -90,13 +94,16 @@ export const PlanoraSidebar = forwardRef<HTMLElement, PlanoraSidebarProps>(funct
     <aside
       ref={ref}
       className={`planora-sidebar ${isOpen ? 'planora-sidebar-open' : ''}`}
-      aria-label="Thanh điều hướng bên"
+      role={isOpen ? 'dialog' : undefined}
+      aria-modal={isOpen ? 'true' : undefined}
+      aria-label={isOpen ? 'Menu điều hướng' : 'Thanh điều hướng bên'}
     >
       {/* 1. Header: Monogram Planora + Tên thương hiệu + Close button (mobile) + WorkspaceSwitcher */}
       <div className="planora-sidebar-header">
         <div className="planora-sidebar-brand-row">
           <Brand size="sm" onClick={() => { onClose?.(); navigate('/'); }} />
           <button
+            ref={closeButtonRef}
             type="button"
             className="planora-sidebar-close"
             onClick={onClose}
