@@ -247,13 +247,41 @@ export class ExecutionService {
   }
 
   private buildController(convId: string, planId: string, steps: PlanStep[], dbIds: Map<string, string>, context: AdapterContext, initialStates?: Record<string, StepState>) {
+    const stepLeaseMap = context.stepLeaseMap ?? new Map<string, string>();
+    context.stepLeaseMap = stepLeaseMap;
+
     return new ExecutionController({
       // The executor keeps its interface; who runs and which connection was previewed travel in this closure.
       runner: new StepRunner({ getAdapter: serviceName => this.adapterFactory.getAdapterForService(serviceName, context) }),
       steps, initialStates,
       onStepUpdate: async (stepId, state) => {
         const dbId = dbIds.get(stepId);
-        const leaseId = (state.output as any)?._leaseId ?? (state.output as any)?._receipt?.leaseId;
+        const leaseId =
+          stepLeaseMap.get(stepId) ??
+          (state.output as any)?._leaseId ??
+          (state.output as any)?._receipt?.leaseId;
+
+        const stepDef = steps.find((s) => s.id === stepId);
+        const isGuardedJiraStep = Boolean(
+          (stepDef?.tool.startsWith('myjira.') && stepDef?.tool !== 'myjira.list_sites') ||
+          (context.connections?.myjira && stepDef?.tool.includes('jira.') && !stepDef?.tool.includes('list_sites'))
+        );
+
+        if (isGuardedJiraStep && state.status === 'succeeded' && !leaseId) {
+          if (dbId && this.stepRepo) {
+            await this.stepRepo.updateStepStatus(dbId, 'failed', null, {
+              message: 'Không tìm thấy lease ủy quyền Jira cho bước thực thi',
+            });
+          }
+          this.sseManager?.emitEvent(convId, 'exec_step', {
+            planId,
+            stepId,
+            status: 'failed',
+            output: null,
+            error: { message: 'Không tìm thấy lease ủy quyền Jira cho bước thực thi' },
+          });
+          throw new Error('Missing authorization lease for Jira execution step');
+        }
 
         if (state.status === 'succeeded' && leaseId && this.jiraLeaseManager) {
           const streamBuffer = new JiraStreamBuffer({

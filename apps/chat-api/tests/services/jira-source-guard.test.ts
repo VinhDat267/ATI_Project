@@ -775,5 +775,72 @@ describe('JIRA-08 Task 5 Source Guard, Persistence, and Publication Guards', () 
       expect(Array.isArray(metadata.sourceRefs)).toBe(true);
       expect(metadata.sourceRefs[0].providerResourceId).toBe('10001');
     });
+
+    it('masks Jira answer when Jira gather occurred but permissions were revoked before answer preparation', async () => {
+      const f = await setupFixture();
+      const verifier = {
+        verifyUserPermissions: async () => ({
+          canBrowse: true, canCreateIssue: true, canAddComment: true, status: 'granted' as const,
+        }),
+      };
+      const policyService = new JiraPolicyService({ pool, verifier });
+      const sanitizer = new JiraHistorySanitizer(policyService);
+
+      const convRepo = new ConversationRepo(pool);
+      const msgRepo = new MessageRepo(pool);
+      const planRepo = new PlanRepo(pool);
+
+      const sensitiveText = 'Nội dung Jira bí mật: Token 123456';
+      const mockPlanner = {
+        processMessage: vi.fn(async (input: any) => {
+          // Emit a gather event with Jira output containing sourceRef
+          input.onGatherEvent?.({
+            tool: 'myjira.search_issues',
+            status: 'completed',
+            output: [{ id: '10001', key: 'PROJ-1', _sourceRefs: [f.sourceRef] }],
+          });
+
+          // Simulate grant revocation in PostgreSQL right after gather finishes
+          await pool.query(
+            `UPDATE jira_oauth_grants SET status = 'revoked' WHERE id = $1`,
+            [f.grantId]
+          );
+
+          return {
+            kind: 'answer' as const,
+            text: sensitiveText,
+            lookups: [{ tool: 'myjira.search_issues', args: { query: 'test' } }],
+            usedDirectory: ['myjira'],
+          };
+        }),
+      };
+
+      const chatEvents = createChatEventEmitter();
+      const chatService = new ChatService({
+        msgRepo,
+        convRepo,
+        planRepo,
+        planner: mockPlanner as any,
+        eventEmitter: chatEvents.emitter,
+        jiraHistorySanitizer: sanitizer,
+        jiraPolicyService: policyService,
+      });
+
+      await chatService.handleUserMessage({
+        conversationId: f.conversationId,
+        userId: f.userId,
+        content: 'Tìm issue',
+      });
+      await chatEvents.waitForTurn();
+
+      const messages = await msgRepo.listMessages(f.conversationId);
+      const assistantMsg = messages.find((m) => m.role === 'assistant');
+      expect(assistantMsg).toBeDefined();
+      // Sensitive content must NEVER be saved
+      expect(assistantMsg!.content).not.toContain('Token 123456');
+      expect(assistantMsg!.content).toContain('Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi');
+      const metadata = typeof assistantMsg!.metadata === 'string' ? JSON.parse(assistantMsg!.metadata) : assistantMsg!.metadata;
+      expect(metadata.masked).toBe(true);
+    });
   });
 });

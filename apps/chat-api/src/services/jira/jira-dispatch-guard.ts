@@ -245,15 +245,80 @@ export class JiraDispatchGuard {
         throw new JiraDispatchError('Approved workspace version changed before dispatch', 'WORKSPACE_VERSION_STALE');
       }
 
+      // Check dual-layer membership FOR SHARE (ati_workspace_memberships + workspace_members + users)
+      const memRes = await client.query<{
+        jira_member_status: string;
+        membership_version: number;
+        general_member_status: string;
+        user_status: string;
+      }>(
+        `SELECT m.status AS jira_member_status, m.version AS membership_version,
+                wm.status AS general_member_status,
+                u.status AS user_status
+         FROM ati_workspace_memberships m
+         JOIN workspace_members wm ON wm.workspace_id = m.workspace_id AND wm.user_id = m.user_id
+         JOIN users u ON u.id = m.user_id
+         WHERE m.workspace_id = $1 AND m.user_id = $2
+         FOR SHARE`,
+        [scope.workspaceId, scope.userId]
+      );
+      const memRow = memRes.rows[0];
+      if (
+        !memRow ||
+        memRow.jira_member_status !== 'active' ||
+        memRow.general_member_status !== 'active' ||
+        memRow.user_status !== 'active'
+      ) {
+        throw new JiraDispatchError('Membership is inactive or removed before dispatch', 'MEMBERSHIP_INACTIVE');
+      }
+      if (scope.expectedMembershipVersion !== undefined && memRow.membership_version !== scope.expectedMembershipVersion) {
+        throw new JiraDispatchError('Approved membership version changed before dispatch', 'MEMBERSHIP_VERSION_STALE');
+      }
+
+      // Check Jira account FOR SHARE
+      const targetAccountId = scope.expectedAccountId ?? leaseRow.jira_account_id;
+      const accRes = await client.query<{
+        id: string;
+        atlassian_account_id: string;
+        status: string;
+        identity_version: number;
+      }>(
+        `SELECT id, atlassian_account_id, status, identity_version
+         FROM jira_accounts
+         WHERE id = $1 AND user_id = $2
+         FOR SHARE`,
+        [targetAccountId, scope.userId]
+      );
+      const accRow = accRes.rows[0];
+      if (!accRow || accRow.status !== 'connected') {
+        throw new JiraDispatchError('Jira account disconnected or inactive before dispatch', 'ACCOUNT_DISCONNECTED');
+      }
+      if (scope.expectedAtlassianAccountId && accRow.atlassian_account_id !== scope.expectedAtlassianAccountId) {
+        throw new JiraDispatchError('Atlassian account mismatch before dispatch', 'ACCOUNT_MISMATCH');
+      }
+      if (scope.expectedIdentityVersion !== undefined && accRow.identity_version !== scope.expectedIdentityVersion) {
+        throw new JiraDispatchError('Jira account identity version changed before dispatch', 'IDENTITY_VERSION_STALE');
+      }
+
       // Check approved grant row FOR SHARE
-      if (scope.expectedGrantId) {
-        const grantRes = await client.query<{ status: string }>(
-          `SELECT status FROM jira_oauth_grants WHERE id = $1 FOR SHARE`,
-          [scope.expectedGrantId]
-        );
-        if (!grantRes.rows[0] || grantRes.rows[0].status !== 'active') {
-          throw new JiraDispatchError('Approved grant is revoked or inactive before dispatch', 'GRANT_REVOKED');
-        }
+      const activeGrantId = scope.expectedGrantId ?? leaseRow.grant_id;
+      const grantRes = await client.query<{ status: string; account_id: string }>(
+        `SELECT status, account_id FROM jira_oauth_grants WHERE id = $1 FOR SHARE`,
+        [activeGrantId]
+      );
+      if (!grantRes.rows[0] || grantRes.rows[0].status !== 'active') {
+        throw new JiraDispatchError('Approved grant is revoked or inactive before dispatch', 'GRANT_REVOKED');
+      }
+
+      // Check grant site access FOR SHARE
+      const grantSiteRes = await client.query<{ id: string }>(
+        `SELECT id FROM jira_grant_sites
+         WHERE grant_id = $1 AND cloud_id = $2 AND product_type = 'jira'
+         FOR SHARE`,
+        [activeGrantId, scope.cloudId]
+      );
+      if (!grantSiteRes.rows[0]) {
+        throw new JiraDispatchError('Site access revoked from grant before dispatch', 'SITE_ACCESS_REVOKED');
       }
 
       // Check workspace FOR SHARE
@@ -323,7 +388,7 @@ export class JiraDispatchGuard {
       await client.query('COMMIT');
       committed = true;
 
-      if (result && typeof result === 'object' && !Array.isArray(result)) {
+      if (result && typeof result === 'object') {
         Object.defineProperty(result, '_leaseId', {
           value: lease.leaseId,
           enumerable: false,

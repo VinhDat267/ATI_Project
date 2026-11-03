@@ -560,4 +560,113 @@ describe('Jira Dispatch Guard & Revocation Linearization (JIRA-08 Task 3 Real Po
 
     expect(dispatchCalled).toBe(false);
   });
+
+  it('revoking membership after acquireLease blocks outbound dispatch at guard boundary', async () => {
+    const f = await createFixture('mem_revoked_after_lease');
+
+    const tokenManager = {
+      getAccessToken: async () => 'test-token',
+    };
+    const realLeaseManager = new JiraLeaseManager({ pool, tokenManager });
+    const client2Pool = ctx.createWorkerPool({ max: 1, applicationName: 'client2_mem_revoker' });
+
+    // Spy on acquireLease to simulate a pause right after lease is committed,
+    // where a second client revokes membership before dispatch lock transaction proceeds.
+    const leaseManagerProxy = {
+      acquireLease: async (scope: any) => {
+        const lease = await realLeaseManager.acquireLease(scope);
+        // Client 2 revokes membership immediately after lease is acquired
+        await client2Pool.query(
+          `UPDATE ati_workspace_memberships SET status = 'removed' WHERE workspace_id = $1 AND user_id = $2`,
+          [f.workspaceId, f.userId]
+        );
+        return lease;
+      },
+    };
+
+    const guard = new JiraDispatchGuard(pool, leaseManagerProxy as any, tokenManager);
+
+    const scope: DispatchScope = {
+      userId: f.userId,
+      workspaceId: f.workspaceId,
+      cloudId: f.cloudId,
+      siteId: f.siteId,
+      projectId: f.projectId,
+      sitePolicyVersion: 1,
+      projectPolicyVersion: 1,
+      expectedGrantId: f.grantId,
+      expectedAccountId: f.accountId,
+    };
+
+    let outboundCalled = false;
+    try {
+      await expect(
+        guard.executeGuardedDispatch(
+          scope,
+          { isWrite: false, timeoutMs: 5000 },
+          async () => {
+            outboundCalled = true;
+            return { ok: true };
+          }
+        )
+      ).rejects.toThrow(/membership/i);
+
+      expect(outboundCalled).toBe(false);
+    } finally {
+      await client2Pool.end();
+    }
+  });
+
+  it('disconnecting account or revoking grant site after acquireLease blocks outbound dispatch', async () => {
+    const f = await createFixture('acc_revoked_after_lease');
+
+    const tokenManager = {
+      getAccessToken: async () => 'test-token',
+    };
+    const realLeaseManager = new JiraLeaseManager({ pool, tokenManager });
+    const client2Pool = ctx.createWorkerPool({ max: 1, applicationName: 'client2_acc_revoker' });
+
+    const leaseManagerProxy = {
+      acquireLease: async (scope: any) => {
+        const lease = await realLeaseManager.acquireLease(scope);
+        await client2Pool.query(
+          `UPDATE jira_accounts SET status = 'disconnected' WHERE id = $1`,
+          [f.accountId]
+        );
+        return lease;
+      },
+    };
+
+    const guard = new JiraDispatchGuard(pool, leaseManagerProxy as any, tokenManager);
+
+    const scope: DispatchScope = {
+      userId: f.userId,
+      workspaceId: f.workspaceId,
+      cloudId: f.cloudId,
+      siteId: f.siteId,
+      projectId: f.projectId,
+      sitePolicyVersion: 1,
+      projectPolicyVersion: 1,
+      expectedGrantId: f.grantId,
+      expectedAccountId: f.accountId,
+    };
+
+    let outboundCalled = false;
+    try {
+      await expect(
+        guard.executeGuardedDispatch(
+          scope,
+          { isWrite: false, timeoutMs: 5000 },
+          async () => {
+            outboundCalled = true;
+            return { ok: true };
+          }
+        )
+      ).rejects.toThrow(/account disconnected/i);
+
+      expect(outboundCalled).toBe(false);
+    } finally {
+      await client2Pool.end();
+    }
+  });
 });

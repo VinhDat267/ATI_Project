@@ -991,14 +991,21 @@ export class ChatService {
     if (response.kind === 'plan' && response.connections?.myjira && !(response as any).sourceRefs) {
       (response as any).sourceRefs = createSourceRefsFromConnection(response.connections.myjira);
     }
-    if (response.kind === 'answer' && !(response as any).sourceRefs && this.jiraBinder && this.convRepo) {
-      try {
-        const conv = await this.convRepo.getConversation(conversationId);
-        if (conv?.workspace_id && conv.workspace_mode === 'organization' && conv.jira_context) {
-          const observed = memory.getEntity<Record<string, Array<Record<string, unknown>>>>('__observed') ?? {};
-          const observedIssues = observed.jira_issue || [];
-          const observedProjects = observed.jira_project || [];
-          const observedSites = observed.jira_site || [];
+
+    let maskedMetadata: Record<string, unknown> | null = null;
+    if (response.kind === 'answer') {
+      const conv = this.convRepo ? await this.convRepo.getConversation(conversationId) : null;
+      const isJiraConv = Boolean(conv?.workspace_id && conv.workspace_mode === 'organization' && conv.jira_context);
+
+      const observed = memory.getEntity<Record<string, Array<Record<string, unknown>>>>('__observed') ?? {};
+      const observedIssues = observed.jira_issue || [];
+      const observedProjects = observed.jira_project || [];
+      const observedSites = observed.jira_site || [];
+      const hasObservedJira = observedIssues.length > 0 || observedProjects.length > 0 || observedSites.length > 0;
+      const hasPlannedJiraRefs = Boolean(Array.isArray((planned as any).sourceRefs) && (planned as any).sourceRefs.length > 0);
+
+      if ((isJiraConv && hasObservedJira) || hasPlannedJiraRefs) {
+        if (this.jiraBinder && conv && isJiraConv) {
           const stepsToBind: PlanStep[] = [];
 
           if (observedIssues.length > 0) {
@@ -1046,16 +1053,37 @@ export class ChatService {
           }
 
           if (stepsToBind.length > 0) {
-            const boundConn = await this.jiraBinder.bindPlan(target.userId, conv, stepsToBind, { signal });
-            (response as any).sourceRefs = createSourceRefsFromConnection(boundConn);
+            try {
+              const boundConn = await this.jiraBinder.bindPlan(target.userId, conv, stepsToBind, { signal });
+              (response as any).sourceRefs = createSourceRefsFromConnection(boundConn);
+            } catch (err: any) {
+              const reason = err?.message || 'Quyền truy cập Jira không khả dụng hoặc đã bị thu hồi';
+              maskedMetadata = { masked: true, maskReason: reason };
+              response = {
+                kind: 'answer',
+                text: `[Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi: ${reason}]`,
+                lookups: [],
+                usedDirectory: [],
+              };
+            }
           }
         }
-      } catch {
-        // Ignored if binding during answer gather fails
+
+        // If Jira was gathered or observed, but we still could not establish valid sourceRefs and not yet masked:
+        if (!maskedMetadata && (!Array.isArray((response as any).sourceRefs) || (response as any).sourceRefs.length === 0)) {
+          const reason = 'Không dựng được bằng chứng nguồn Jira hợp lệ';
+          maskedMetadata = { masked: true, maskReason: reason };
+          response = {
+            kind: 'answer',
+            text: `[Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi: ${reason}]`,
+            lookups: [],
+            usedDirectory: [],
+          };
+        }
       }
     }
-    let maskedMetadata: Record<string, unknown> | null = null;
-    if (Array.isArray((response as any).sourceRefs) && (response as any).sourceRefs.length > 0 && this.jiraPolicyService) {
+
+    if (!maskedMetadata && Array.isArray((response as any).sourceRefs) && (response as any).sourceRefs.length > 0 && this.jiraPolicyService) {
       for (const ref of (response as any).sourceRefs) {
         const decision = await this.jiraPolicyService.revalidateSource(target.userId, ref, { signal });
         if (!decision.allowed) {
@@ -1248,8 +1276,19 @@ export class ChatService {
         this.eventEmitter.emit('gather_progress', { conversationId, ...safeEvent });
         if (event.tool.startsWith('myjira.') || event.tool.startsWith('jira.')) {
           const out = (event as any).output;
-          if (out && Array.isArray(out._sourceRefs)) {
-            gatheredJiraSourceRefs.push(...out._sourceRefs);
+          if (out) {
+            if (Array.isArray(out._sourceRefs)) {
+              gatheredJiraSourceRefs.push(...out._sourceRefs);
+            }
+            if (Array.isArray(out)) {
+              for (const item of out) {
+                if (item && Array.isArray(item._sourceRefs)) {
+                  gatheredJiraSourceRefs.push(...item._sourceRefs);
+                } else if (item && item._sourceRef) {
+                  gatheredJiraSourceRefs.push(item._sourceRef);
+                }
+              }
+            }
           }
         }
       },

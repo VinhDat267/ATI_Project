@@ -31,6 +31,11 @@ export interface AdapterContext {
   phase: 'planning' | 'execution';
   /** Required when phase is 'execution' and the service is personal: the connection the plan was previewed with. */
   connections?: PlanConnections;
+  actorId?: string;
+  conversationId?: string;
+  planId?: string;
+  stepLeaseMap?: Map<string, string>;
+  gatheredSourceRefs?: any[];
 }
 
 export interface AdapterFactoryOptions {
@@ -747,6 +752,43 @@ export class AdapterFactory {
         );
 
         const leaseId = (rawOutput as any)?._leaseId;
+        if (leaseId && context?.stepLeaseMap && callOpts?.stepId) {
+          context.stepLeaseMap.set(callOpts.stepId, leaseId);
+        }
+
+        const sourceRef = {
+          binding: {
+            atiUserId: userId,
+            jiraAccountId: bound?.jiraAccountId ?? '',
+            atlassianAccountId: bound?.atlassianAccountId ?? '',
+            workspaceId,
+            membershipVersion: bound?.membershipVersion ?? 1,
+            grantId: bound?.grantId ?? '',
+            identityVersion: bound?.identityVersion ?? 1,
+          },
+          workspaceId,
+          workspaceVersion: bound?.workspaceVersion ?? 1,
+          siteId: targetSiteId,
+          cloudId,
+          sitePolicyVersion: siteStep?.sitePolicyVersion ?? (targetSite as any)?.policyVersion ?? 1,
+          ...(projectId
+            ? {
+                projectId,
+                projectPolicyVersion: projectPolicyVersion ?? 1,
+                resourceType: (tool.includes('issue') ? 'issue' : 'project') as any,
+                providerResourceId: projectId,
+              }
+            : {
+                resourceType: 'site' as any,
+                providerResourceId: cloudId,
+              }),
+          revision: '1',
+        };
+
+        if (context?.gatheredSourceRefs) {
+          context.gatheredSourceRefs.push(sourceRef);
+        }
+
         const receipt = {
           ownerId: userId,
           workspaceId,
@@ -756,7 +798,47 @@ export class AdapterFactory {
           leaseId,
         };
 
-        if (rawOutput && typeof rawOutput === 'object' && !Array.isArray(rawOutput)) {
+        if (Array.isArray(rawOutput)) {
+          Object.defineProperty(rawOutput, '_receipt', {
+            value: receipt,
+            enumerable: false,
+            writable: true,
+            configurable: true,
+          });
+          if (leaseId) {
+            Object.defineProperty(rawOutput, '_leaseId', {
+              value: leaseId,
+              enumerable: false,
+              writable: true,
+              configurable: true,
+            });
+          }
+          Object.defineProperty(rawOutput, '_sourceRefs', {
+            value: [sourceRef],
+            enumerable: false,
+            writable: true,
+            configurable: true,
+          });
+          for (const item of rawOutput) {
+            if (item && typeof item === 'object') {
+              Object.defineProperty(item, '_sourceRefs', {
+                value: [sourceRef],
+                enumerable: false,
+                writable: true,
+                configurable: true,
+              });
+              Object.defineProperty(item, '_sourceRef', {
+                value: sourceRef,
+                enumerable: false,
+                writable: true,
+                configurable: true,
+              });
+            }
+          }
+          return rawOutput;
+        }
+
+        if (rawOutput && typeof rawOutput === 'object') {
           const resultObj = { ...rawOutput, _receipt: receipt };
           if (leaseId) {
             Object.defineProperty(resultObj, '_leaseId', {
@@ -766,6 +848,12 @@ export class AdapterFactory {
               configurable: true,
             });
           }
+          Object.defineProperty(resultObj, '_sourceRefs', {
+            value: [sourceRef],
+            enumerable: false,
+            writable: true,
+            configurable: true,
+          });
           return resultObj;
         }
         return rawOutput;

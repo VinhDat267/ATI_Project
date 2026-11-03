@@ -28,3 +28,19 @@
     - Tích hợp verifier vào `approveAndStart`, hàng đợi background start và `restoreController` trong `apps/chat-api/src/services/execution-service.ts`.
     - Tích hợp verifier vào `executeGuardedDispatch` trong `apps/chat-api/src/services/jira/jira-dispatch-guard.ts`.
     - Test: `apps/chat-api/tests/services/jira-approval-guard.test.ts` (PASS, 11/11 tests).
+- **Khắc phục đợt review thứ hai (3 phát hiện P1):**
+  - **1. [P1] Khóa và đối chiếu 2 lớp membership, account và grant-site tại ranh giới dispatch:**
+    - Cập nhật `executeGuardedDispatch` trong `apps/chat-api/src/services/jira/jira-dispatch-guard.ts` khóa `FOR SHARE` và kiểm tra hai lớp membership (`ati_workspace_memberships` + `workspace_members` + `users`), tài khoản Jira (`jira_accounts`), grant OAuth (`jira_oauth_grants`) và quyền site của grant (`jira_grant_sites`).
+    - Ngăn chặn hoàn toàn kịch bản thu hồi quyền ở client PostgreSQL thứ hai sau `acquireLease`: dispatch guard lập tức ném lỗi (`MEMBERSHIP_INACTIVE`, `ACCOUNT_DISCONNECTED`, `SITE_ACCESS_REVOKED`) và không bao giờ gọi outbound HTTP.
+    - Test: `apps/chat-api/tests/services/jira-dispatch-guard.test.ts` (PASS, 9/9 tests).
+  - **2. [P1] Mang lease ID ngoài payload cho mọi kiểu kết quả (kể cả dạng mảng):**
+    - Mở rộng `AdapterContext` với `stepLeaseMap: Map<string, string>`. Trong `buildController` và `adapter-factory.ts`, ghi nhận lease ID theo `stepId` ngoài payload độc lập với kiểu dữ liệu của kết quả.
+    - Tại `jira-dispatch-guard.ts` và `adapter-factory.ts`, gắn `_leaseId`, `_receipt` và `_sourceRefs` lên cả kết quả dạng mảng (Array) lẫn đối tượng (Object) bằng `Object.defineProperty`.
+    - Trong `execution-service.ts` (`onStepUpdate`), truy xuất lease ID từ `stepLeaseMap` trước payload; với mọi bước Jira hoàn thành, kiểm tra và bảo vệ stream qua `JiraStreamBuffer`.
+    - Test: `apps/chat-api/tests/integration/jira-execution.test.ts` (PASS, 9/9 tests).
+  - **3. [P1] Gắn refs tại kết quả gather và từ chối/che câu trả lời Jira khi không dựng được bằng chứng nguồn:**
+    - Trong `adapter-factory.ts`, tự động dựng và gắn `_sourceRefs` và `_sourceRef` cho từng phần tử và mảng kết quả gather.
+    - Trong `chat-service.ts` (`onGatherEvent`), trích xuất `_sourceRefs` từ cả đối tượng lẫn mảng kết quả gather từ planner.
+    - Trong `chat-service.ts` (`prepareResponse`), nếu câu trả lời sử dụng dữ liệu Jira đã thu thập/quan sát nhưng việc bind lại thất bại (do quyền bị thu hồi), lỗi không còn bị nuốt (swallowed); câu trả lời Jira lập tức bị che mờ (`maskedMetadata`) và thông báo che mờ trước khi lưu DB và phát SSE.
+    - Test: `apps/chat-api/tests/services/jira-source-guard.test.ts` (PASS, 12/12 tests).
+  - **Đăng ký static guard:** Bổ sung exception cho `jira-dispatch-guard.ts` kiểm tra `product_type = 'jira'` trong `evaluations/generic-plumbing/static-guard.test.ts`.

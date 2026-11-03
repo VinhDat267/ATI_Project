@@ -82,6 +82,17 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
         return;
       }
 
+      // 2b. /project (search_projects returns array)
+      if (url.includes('/project') && !url.includes('/createmeta')) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify([
+            { id: '10001', key: 'PROJ', name: 'Project 1' },
+          ])
+        );
+        return;
+      }
+
       // 3. /search/jql
       if (url.includes('/search/jql')) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -420,9 +431,9 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
       status = executionService.getExecutionStatus(plan.id);
     }
 
-    expect(status?.status).toBe('completed');
-
     const executedSteps = await stepRepo.listSteps(plan.id);
+
+    expect(status?.status).toBe('completed');
     expect(executedSteps).toHaveLength(3);
     for (const step of executedSteps) {
       expect(step.status).toBe('succeeded');
@@ -780,6 +791,72 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
     expect(failedEvent!.payload.error.message).toContain('thu hồi sau khi thực thi');
 
     // DB step status must also be failed without leaking output
+    const executedSteps = await stepRepo.listSteps(plan.id);
+    expect(executedSteps[0]!.status).toBe('failed');
+    expect(executedSteps[0]!.output_json).toBeNull();
+  });
+
+  it('suppresses array Jira output (search_projects) via JiraStreamBuffer when lease is revoked before SSE flush', async () => {
+    const f = await setupFixture();
+    const { executionService, leaseManager } = createTestExecutionService(f);
+
+    const emittedEvents: Array<{ event: string; payload: any }> = [];
+    const sseManager = {
+      emitEvent: (convId: string, event: string, payload: any) => {
+        emittedEvents.push({ event, payload });
+      },
+    } as any;
+    (executionService as any).sseManager = sseManager;
+
+    // Plan with 1 read step that returns an array: search_projects
+    const steps: PlanStep[] = [
+      {
+        id: 'array_step',
+        tool: 'myjira.search_projects',
+        description: 'Read projects array for stream test',
+        dependsOn: [],
+        args: { siteId: f.siteId1, query: '' },
+      },
+    ];
+
+    const { plan } = await createApprovedPlan(f, steps, {
+      array_step: {
+        siteId: f.siteId1,
+        cloudId: f.cloudId1,
+        sitePolicyVersion: 1,
+      },
+    });
+
+    // Intercept revalidateLease to simulate revocation right at the boundary after dispatch
+    leaseManager.revalidateLease = async (leaseId: string) => {
+      await pool.query(
+        `UPDATE jira_authorization_leases SET status = 'revoked', released_at = clock_timestamp() WHERE lease_id = $1`,
+        [leaseId]
+      );
+      return { valid: false, status: 'revoked', reason: 'Grant was revoked concurrently' };
+    };
+
+    const approveResult = await executionService.approveAndStart(plan.id, f.userId);
+    expect(approveResult.success).toBe(true);
+
+    let status = executionService.getExecutionStatus(plan.id);
+    for (let i = 0; i < 50 && (!status || status.status === 'executing'); i++) {
+      await new Promise((r) => setTimeout(r, 50));
+      status = executionService.getExecutionStatus(plan.id);
+    }
+
+    const execStepEvents = emittedEvents.filter((e) => e.event === 'exec_step');
+    for (const event of execStepEvents) {
+      if (event.payload.status === 'succeeded') {
+        expect.unreachable('Succeeded step with revoked lease should not be emitted');
+      }
+    }
+
+    const failedEvent = execStepEvents.find((e) => e.payload.status === 'failed');
+    expect(failedEvent).toBeDefined();
+    expect(failedEvent!.payload.output).toBeNull();
+    expect(failedEvent!.payload.error.message).toContain('thu hồi sau khi thực thi');
+
     const executedSteps = await stepRepo.listSteps(plan.id);
     expect(executedSteps[0]!.status).toBe('failed');
     expect(executedSteps[0]!.output_json).toBeNull();
