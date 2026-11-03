@@ -406,6 +406,9 @@ export function createApp(options: AppOptions): Express {
       gmailAvailable: Boolean(gmailRoutes && isGmailAvailable(gmailRoutes)),
       mycalendarAvailable: Boolean(mycalendarRoutes && isMyCalendarAvailable(mycalendarRoutes)),
       mysheetsAvailable: Boolean(mysheetsRoutes && isMySheetsAvailable(mysheetsRoutes)),
+      myjiraAvailable: Boolean(jiraRoutes && isMyJiraAvailable(jiraRoutes)),
+      jiraOAuthRepo: options.jira?.repo,
+      jiraWorkspaceRepo: options.jiraWorkspaceRepo,
       trelloTeamRepo: options.trelloTeamRepo ?? options.trello?.teamRepo,
       githubTeamRepo: options.githubTeamRepo ?? options.github?.teamRepo })
   );

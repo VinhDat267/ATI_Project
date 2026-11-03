@@ -166,14 +166,17 @@ describe('Jira Approval and Start Guards (JIRA-08 Task 2 Real PostgreSQL Tests)'
 
     const planText = JSON.stringify(planJson);
     const planHash = createHash('sha256').update(planText).digest('hex');
-    const planId = randomUUID();
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
 
-    await pool.query(
-      `INSERT INTO plans (id, conv_id, plan_json, plan_text, plan_hash, status, expires_at)
-       VALUES ($1, $2, $3, $4, $5, 'pending', $6)`,
-      [planId, conversationId, planJson, planText, planHash, expiresAt]
-    );
+    const planRepoForFixture = new PlanRepo(pool);
+    const createdPlan = await planRepoForFixture.createPlan({
+      convId: conversationId,
+      planJson,
+      planText,
+      planHash,
+      expiresAt,
+    });
+    const planId = createdPlan.id;
 
     return {
       userId,

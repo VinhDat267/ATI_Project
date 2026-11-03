@@ -114,11 +114,12 @@
       - Tin nhắn assistant liên quan đến Jira nhưng thiếu `sourceRefs` hợp lệ bị che mờ theo nguyên tắc fail-closed (`invalid_evidence`).
       - Lượt kết quả tìm kiếm (`Search results.`) bị che mờ nếu các nguồn vừa thu thập trong phiên bị thu hồi.
     - Test: `apps/chat-api/tests/services/jira-source-guard.test.ts` (PASS, test scenario với tin nhắn mô tả chi tiết nội dung issue nhưng hoàn toàn không chứa chuỗi siteId, cloudId hay siteName; chứng minh tin nhắn vẫn bị che mờ chuẩn xác với `site_disabled` khi site bị deactivate trong PostgreSQL).
-- **Tổng kết kiểm thử sau đợt sửa thứ sáu:**
-  - Toàn bộ 7 suites Jira focused: **107/107 tests PASS** (Duration: 3.62s, exit code 0).
+- **Tổng kết kiểm thử sau đợt sửa thứ sáu & hợp nhất runtime wiring:**
+  - Hợp nhất `origin/main` (`e7927e1d`), nối `MYJIRA_SERVICE` / `MYJIRA_TOOLS` vào `registered-services.ts`, `gmail-tools-runtime.ts`, `server.ts`, `services-routes.ts`, `app.ts`, `resource-labels.ts` và bổ sung `apps/chat-api/tests/services/jira-runtime-catalog.test.ts` (6/6 tests PASS).
+  - Toàn bộ 8 suites Jira focused: **113/113 tests PASS** (exit code 0).
+  - Executor test suites: **7/7 files PASS**, **55/55 tests PASS** (exit code 0).
   - Typecheck v3: **0 errors** (exit code 0).
-  - Evaluator test suites: **26/26 files PASS**, **412/412 tests PASS** (exit code 0).
-  - `npm run check`: **ALL PASS** (exit code 0).
+  - Static guard (`evaluations/generic-plumbing/static-guard.test.ts`): **2/2 tests PASS** (exit code 0).
   - **3. [P2] Từ chối khi actor thiếu workspace ID thay vì tự chọn:**
     - Cập nhật `apps/chat-api/src/server.ts` (`gatherSearch`): loại bỏ hoàn toàn câu lệnh `SELECT ... LIMIT 1` tự ý chọn một workspace membership ngẫu nhiên.
     - Với mọi công cụ `myjira.*`, nếu `actor.workspaceId` bị thiếu hoặc null, ném lỗi rõ ràng (`Workspace ID is required for Jira gather search`), ngăn ngừa nguy cơ rò rỉ hoặc truy vấn chéo giữa các workspace khác nhau của cùng một người dùng.
@@ -160,8 +161,9 @@
       - Tin nhắn assistant liên quan đến Jira nhưng thiếu `sourceRefs` hợp lệ bị che mờ theo nguyên tắc fail-closed (`invalid_evidence`).
       - Lượt kết quả tìm kiếm (`Search results.`) bị che mờ nếu các nguồn vừa thu thập trong phiên bị thu hồi.
     - Test: `apps/chat-api/tests/services/jira-source-guard.test.ts` (PASS, test scenario với tin nhắn mô tả chi tiết nội dung issue nhưng hoàn toàn không chứa chuỗi siteId, cloudId hay siteName; chứng minh tin nhắn vẫn bị che mờ chuẩn xác với `site_disabled` khi site bị deactivate trong PostgreSQL).
-- **Tổng kết kiểm thử sau đợt sửa thứ sáu:**
-  - Toàn bộ 7 suites Jira focused: **107/107 tests PASS** (Duration: 3.62s, exit code 0).
+- **Tổng kết kiểm thử sau đợt sửa thứ sáu & hợp nhất runtime wiring:**
+  - Hợp nhất `origin/main` (`e7927e1d`), nối `MYJIRA_SERVICE` / `MYJIRA_TOOLS` vào `registered-services.ts`, `gmail-tools-runtime.ts`, `server.ts`, `services-routes.ts`, `app.ts`, `resource-labels.ts` và bổ sung `apps/chat-api/tests/services/jira-runtime-catalog.test.ts` (6/6 tests PASS).
+  - Toàn bộ 8 suites Jira focused: **113/113 tests PASS** (exit code 0).
+  - Executor test suites: **7/7 files PASS**, **55/55 tests PASS** (exit code 0).
   - Typecheck v3: **0 errors** (exit code 0).
-  - Evaluator test suites: **26/26 files PASS**, **412/412 tests PASS** (exit code 0).
-  - `npm run check`: **ALL PASS** (exit code 0).
+  - Static guard (`evaluations/generic-plumbing/static-guard.test.ts`): **2/2 tests PASS** (exit code 0).

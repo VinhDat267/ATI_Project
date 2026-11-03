@@ -1,5 +1,5 @@
 import { decryptCredentials } from '@wap/tool-adapters';
-import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, GITHUB_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, TELEGRAM_TOOLS, TRELLO_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
+import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, GITHUB_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYJIRA_TOOLS, MYSHEETS_TOOLS, TELEGRAM_TOOLS, TRELLO_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import type { ServiceTransport } from './transports/types.js';
 import { TRELLO_TRANSPORT } from './transports/trello.js';
@@ -63,12 +63,14 @@ export async function getConfiguredToolCatalog(
     workspaceMode?: 'legacy' | 'personal' | 'organization';
     workspaceId?: string | null;
     userId?: string;
+    myjiraEnabled?: boolean;
   }
 ) {
   const available = new Set<string>();
   const mode = scope?.workspaceMode ?? 'legacy';
   for (const definition of getRegisteredServices()) {
     if (definition.id === 'trello' || definition.id === 'github' || definition.id === 'telegram') continue;
+    if (scope?.myjiraEnabled && definition.id === 'jira') continue;
     if (mode === 'personal' && isServiceAccountService(definition)) continue;
     let record;
     if (mode === 'personal') {
@@ -124,6 +126,11 @@ export async function getToolCatalogFor(
     githubConnection?: (userId: string) => Promise<any>;
     telegramEnabled?: boolean;
     telegramConnection?: (userId: string) => Promise<any>;
+    myjiraEnabled?: boolean;
+    jiraWorkspaceRepo?: {
+      getCapabilities: (workspaceId: string, userId: string) => Promise<{ sites?: unknown[] } | null>;
+    };
+    myjiraConnection?: (userId: string, workspaceId?: string | null) => Promise<any>;
   },
 ): Promise<ToolDefinition[]> {
   let catalog = (
@@ -131,8 +138,15 @@ export async function getToolCatalogFor(
       workspaceMode: options.workspaceMode,
       workspaceId: options.workspaceId,
       userId: options.userId,
+      myjiraEnabled: options.myjiraEnabled,
     })
-  ).filter((tool) => tool.service !== 'trello' && tool.service !== 'github' && tool.service !== 'telegram');
+  ).filter(
+    (tool) =>
+      tool.service !== 'trello' &&
+      tool.service !== 'github' &&
+      tool.service !== 'telegram' &&
+      (!options.myjiraEnabled || tool.service !== 'jira')
+  );
   if (!options.userId) return catalog;
   if (options.gmailEnabled) {
     const gmail = await credentialRepo.getPersonalCredentials('gmail', options.userId);
@@ -313,6 +327,29 @@ export async function getToolCatalogFor(
       } catch {
         // stale or unreadable connection does not add tools
       }
+    }
+  }
+  if (options.myjiraEnabled) {
+    if (options.myjiraConnection) {
+      try {
+        const myjira = await options.myjiraConnection(options.userId, options.workspaceId);
+        if (myjira?.status === 'connected' && Array.isArray(myjira.sites) && myjira.sites.length > 0) {
+          catalog = [...catalog, ...MYJIRA_TOOLS];
+        }
+      } catch {
+        // ignore
+      }
+    } else if (options.jiraWorkspaceRepo && options.workspaceId) {
+      try {
+        const caps = await options.jiraWorkspaceRepo.getCapabilities(options.workspaceId, options.userId);
+        if (caps && Array.isArray(caps.sites) && caps.sites.length > 0) {
+          catalog = [...catalog, ...MYJIRA_TOOLS];
+        }
+      } catch {
+        // stale or unauthorized workspace does not add tools
+      }
+    } else if (options.workspaceId) {
+      catalog = [...catalog, ...MYJIRA_TOOLS];
     }
   }
   return catalog;

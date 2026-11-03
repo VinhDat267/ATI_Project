@@ -510,8 +510,10 @@ async function bootstrap() {
       githubConnection,
       telegramEnabled: telegramAvailable,
       telegramConnection,
+      myjiraEnabled: jiraAvailable,
+      jiraWorkspaceRepo: jiraWorkspaceRepo ?? undefined,
     }),
-    serviceRegistry: serviceRegistryForRuntime(gmailAvailable, mycalendarAvailable, mysheetsAvailable),
+    serviceRegistry: serviceRegistryForRuntime(gmailAvailable, mycalendarAvailable, mysheetsAvailable, jiraAvailable),
     gatherSearch,
     requireGroundedResources: env.RUNTIME_MODE === 'live',
     timeZone: env.APP_TIME_ZONE,
@@ -524,7 +526,7 @@ async function bootstrap() {
     ...createRuntimePlanner(env.RUNTIME_MODE,
       async (input: any) => (await plannerFor(input?.actor)).processMessage(input),
       (input: any) => {
-        if (!mayFallbackToShared(input, gmailAvailable, mycalendarAvailable, mysheetsAvailable)) throw new Error('Personal service planning failed');
+        if (!mayFallbackToShared(input, gmailAvailable, mycalendarAvailable, mysheetsAvailable, jiraAvailable)) throw new Error('Personal service planning failed');
         return backupPlanner.processMessage(input);
       }),
     routeSchedule: async (

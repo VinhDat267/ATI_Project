@@ -7,6 +7,8 @@ import {
   GMAIL_TOOLS,
   MYCALENDAR_SERVICE,
   MYCALENDAR_TOOLS,
+  MYJIRA_SERVICE,
+  MYJIRA_TOOLS,
   MYSHEETS_SERVICE,
   MYSHEETS_TOOLS,
   type PersonalCalendarItem,
@@ -35,6 +37,28 @@ export interface ServicesRoutesOptions {
   mycalendarAvailable?: boolean;
   /** MySheets is enabled and usable (flag on, OAuth and PostgreSQL configured). */
   mysheetsAvailable?: boolean;
+  /** MyJira OAuth is enabled and usable (flag on, OAuth and PostgreSQL configured). */
+  myjiraAvailable?: boolean;
+  jiraOAuthRepo?: {
+    getConnectionStatus?: (userId: string) => Promise<{
+      connected?: boolean;
+      connectionState?: string;
+      jiraAccountId?: string | null;
+      atlassianAccountId?: string | null;
+      displayName?: string;
+      sites?: Array<{ cloudId: string; name: string; url: string }>;
+    }>;
+    getIdentityConnection?: (userId: string) => Promise<{
+      status?: string;
+      jiraAccountId?: string;
+      updatedAt?: Date | string;
+    } | null>;
+  };
+  jiraWorkspaceRepo?: {
+    getCapabilities: (workspaceId: string, userId: string) => Promise<{
+      sites?: Array<{ siteId: string; siteName?: string }>;
+    } | null>;
+  };
   trelloTeamRepo?: {
     get: (scopeId?: string) => Promise<{ boards?: Array<{ boardId: string; boardName?: string }> } | null>;
   };
@@ -46,6 +70,7 @@ export interface ServicesRoutesOptions {
 const PERSONAL_ONLY = 'Gmail do mỗi người tự kết nối ở mục "Của riêng bạn"; không có khoá chung để quản trị viên cấu hình.';
 const MYCALENDAR_PERSONAL_ONLY = 'Google Calendar cá nhân do mỗi người tự kết nối ở mục "Của riêng bạn"; không có khoá chung để quản trị viên cấu hình.';
 const MYSHEETS_PERSONAL_ONLY = 'Google Sheets cá nhân do mỗi người tự kết nối ở mục "Của riêng bạn"; không có khoá chung để quản trị viên cấu hình.';
+const MYJIRA_PERSONAL_ONLY = 'Jira dùng đăng nhập OAuth cá nhân và ATI Workspace.';
 
 async function verifyService(
   service: string,
@@ -334,6 +359,22 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
     next();
   });
 
+  router.use('/myjira', (_req, res, next) => {
+    if (options.myjiraAvailable) {
+      res.status(400).json({ error: MYJIRA_PERSONAL_ONLY, code: 'PERSONAL_CONNECTION' });
+      return;
+    }
+    next();
+  });
+
+  router.use('/jira', (_req, res, next) => {
+    if (options.myjiraAvailable) {
+      res.status(410).json({ error: MYJIRA_PERSONAL_ONLY, code: 'PERSONAL_CONNECTION' });
+      return;
+    }
+    next();
+  });
+
   // Shared token administration is gone for Trello and GitHub (HTTP 410 Gone).
   router.all('/trello/credentials', (_req, res) => {
     res.status(410).json({ error: 'Trello dùng đăng nhập OAuth.' });
@@ -363,6 +404,9 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
       const userId = (req as any).user?.id;
 
       let registered = getRegisteredServices();
+      if (options.myjiraAvailable) {
+        registered = registered.filter((s) => s.id !== 'jira');
+      }
       if (mode === 'personal') {
         // In personal mode, enterprise service account services are hidden
         registered = registered.filter((s) => !isServiceAccountService(s));
@@ -522,6 +566,65 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
       }
       if (options.mysheetsAvailable && credentialRepo && encryptionKey && userId) {
         services.push(await personalMySheets(userId));
+      }
+      if (options.myjiraAvailable && userId) {
+        const { id, name, description, scopes, scopeKey, scopeLabel, credentialFields } = MYJIRA_SERVICE;
+        let personalStatus: 'connected' | 'scope_required' | 'reconnect_required' | 'not_connected' = 'not_connected';
+        let allowedScope: string[] = [];
+        try {
+          if (options.jiraOAuthRepo?.getConnectionStatus) {
+            const statusRes = await options.jiraOAuthRepo.getConnectionStatus(userId);
+            if (statusRes.connectionState === 'reconnect_required') {
+              personalStatus = 'reconnect_required';
+            } else if (statusRes.connectionState === 'identity_connected' || statusRes.connectionState === 'scope_required') {
+              personalStatus = 'scope_required';
+            } else if (statusRes.connectionState === 'connected') {
+              if (workspaceId && options.jiraWorkspaceRepo) {
+                const caps = await options.jiraWorkspaceRepo.getCapabilities(workspaceId, userId);
+                allowedScope = (caps?.sites ?? []).map((s) => s.siteId);
+                personalStatus = allowedScope.length > 0 ? 'connected' : 'scope_required';
+              } else {
+                allowedScope = (statusRes.sites ?? []).map((s) => s.cloudId);
+                personalStatus = allowedScope.length > 0 ? 'connected' : 'scope_required';
+              }
+            }
+          } else if (options.jiraOAuthRepo?.getIdentityConnection) {
+            const identity = await options.jiraOAuthRepo.getIdentityConnection(userId);
+            if (identity) {
+              if (identity.status === 'reconnect_required') {
+                personalStatus = 'reconnect_required';
+              } else if (identity.status === 'active') {
+                if (workspaceId && options.jiraWorkspaceRepo) {
+                  const caps = await options.jiraWorkspaceRepo.getCapabilities(workspaceId, userId);
+                  allowedScope = (caps?.sites ?? []).map((s) => s.siteId);
+                  personalStatus = allowedScope.length > 0 ? 'connected' : 'scope_required';
+                } else {
+                  personalStatus = 'connected';
+                }
+              }
+            }
+          }
+        } catch {
+          personalStatus = 'not_connected';
+        }
+        const connected = personalStatus === 'connected';
+        services.push({
+          id,
+          name,
+          description,
+          scopes,
+          scopeKey,
+          scopeLabel,
+          credentialFields,
+          connection: 'personal' as const,
+          tools: MYJIRA_TOOLS.map((tool) => tool.name),
+          configured: connected,
+          connected,
+          connectionStatus: connected ? 'unchecked' : 'unconfigured',
+          lastCheckedAt: null,
+          allowedScope,
+          personalStatus,
+        });
       }
 
       res.status(200).json({
