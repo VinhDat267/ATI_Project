@@ -1,7 +1,8 @@
 # PL-06 · Kế hoạch, thực thi, preview và biên nhận (Plan, Preview, Execution & Receipt Cards)
 
-**Trạng thái:** sẵn sàng nhận · **Nhánh gợi ý:** `longnguyen005/feat-planora-pl-06` · **Phụ thuộc:** PL-05 đã hoàn tất và được Codex duyệt Đạt.  
-**Base SHA:** `e97d71862cee773be9e37f9ef9e456ea36975932` (trên integration branch `codex/planora-ui`).  
+**Trạng thái:** HOÀN THÀNH (ĐÃ ĐƯỢC CODEX NGHIỆM THU ĐẠT) · **Nhánh hoàn thành:** `longnguyen005/feat-planora-pl-06` · **Phụ thuộc:** PL-05 đã hoàn tất và được Codex duyệt Đạt.  
+**Base SHA:** `e97d71862cee773be9e37f9ef9e456ea36975932`.  
+**Merged/Fast-Forwarded HEAD SHA:** `514d982fd9fc152290feb305b0d97f2c40dda21a` (trên integration branch `codex/planora-ui`).  
 **Target branch:** `codex/planora-ui`.  
 **Đặc tả:** [Planora migration design](../../superpowers/specs/2026-11-02-planora-migration-design.md) mục 4.3, 8.3 · **Kế hoạch:** [Planora migration plan](../../superpowers/plans/2026-11-02-planora-migration.md) mục PL-06.  
 **Prompt thi công:** [PL-06.md](../planora-prompts/PL-06.md).  
@@ -66,18 +67,32 @@ Chuyển đổi giao diện hiển thị kế hoạch (Plan), thực thi (Execut
 
 ## 4. Tiêu chí nghiệm thu (Acceptance Criteria)
 
-- [ ] Component `PlanoraWorkflowSteps` được triển khai tại `apps/chat-web/src/planora/workspace/PlanoraWorkflowSteps.tsx`.
-- [ ] Giao diện step cards hiển thị chuẩn nhận diện Planora, responsive trên cả 5 viewports (1440, 1024, 768, 375, 320) và cả hai theme (light/dark).
-- [ ] Giữ đầy đủ các nút bấm hành động với busy locking: Duyệt kế hoạch, Sửa qua Chat, Chi tiết kỹ thuật.
-- [ ] Preview Gmail và Sheets hiển thị chuẩn xác dữ liệu mẫu, không gây tràn ngang giao diện.
-- [ ] Các kịch bản chống hồi quy (double approve, stale hash, cancel pending) hoạt động đúng như thiết kế.
-- [ ] `npm run typecheck:v3` đạt exit code 0.
-- [ ] `npm test -w @wap/chat-web` đạt exit code 0.
-- [ ] `node scripts/test-v3-web-build-security.mjs` đạt exit code 0.
-- [ ] Các browser specs liên quan (`fe-05-cockpit.spec.ts`, `planora-chat.spec.ts`, v.v.) đều PASS.
+- [x] Component `PlanoraWorkflowSteps` được triển khai tại `apps/chat-web/src/planora/workspace/PlanoraWorkflowSteps.tsx`.
+- [x] Giao diện step cards hiển thị chuẩn nhận diện Planora, responsive trên cả 5 viewports (1440, 1024, 768, 375, 320) và cả hai theme (light/dark).
+- [x] Giữ đầy đủ các nút bấm hành động với busy locking: Duyệt kế hoạch, Sửa qua Chat, Chi tiết kỹ thuật.
+- [x] Preview Gmail và Sheets hiển thị chuẩn xác dữ liệu mẫu, không gây tràn ngang giao diện.
+- [x] Các kịch bản chống hồi quy (double approve, stale hash, cancel pending) hoạt động đúng như thiết kế.
+- [x] `npm run typecheck:v3` đạt exit code 0.
+- [x] `npm test -w @wap/chat-web` đạt exit code 0 (101/101 test files, 1128/1128 tests).
+- [x] `node scripts/test-v3-web-build-security.mjs` đạt exit code 0.
+- [x] Các browser specs liên quan (`fe-05-cockpit.spec.ts`, `planora-chat.spec.ts`, và 39 probe/visual cases) đều PASS.
 
 ---
 
-## 5. Kết quả (Worker điền sau khi hoàn thành)
+## 5. Kết quả (Hoàn thành & Bàn giao)
 
-*(Phần này do worker hoàn thiện sau khi thi công)*
+- **Trạng thái:** HOÀN THÀNH — ĐÃ ĐƯỢC CODEX NGHIỆM THU ĐẠT (REVIEW_PASS) VÒNG 2.
+- **Commit HEAD:** `514d982fd9fc152290feb305b0d97f2c40dda21a`.
+- **Nhánh tích hợp:** Đã fast-forward nhánh `codex/planora-ui` lên HEAD `514d982fd9fc152290feb305b0d97f2c40dda21a`.
+- **Báo cáo Review Codex:** `docs/handoff/log/2026-11-04-codex-review-pl-06-r2.md`.
+- **Các findings F1–F3 đã xử lý triệt để:**
+  - F1: Kích hoạt `PlanoraWorkflowSteps` làm renderer chính trong `PlanMoment`, `ExecutionMoment`, và `ReceiptMoment` (`showStepCards={true}`), loại bỏ danh sách thẻ cũ `v3-space-y-3`, hiển thị đầy đủ step cards dạng grid 2 cột desktop (`md:grid-cols-2`) / 1 cột mobile, nhãn Read/Write từ toolDefinition, quan hệ `dependsOn` thuần, và data-flow mappings. Bảo toàn các test ID: `#plan-cards-container`, `[data-od-id]`, `#preview-${step.id}`.
+  - F2: Phân định rõ ràng: nếu có `plan_hash` thì hiển thị nhãn `Mã băm ràng buộc kế hoạch (plan_hash)`; nếu không có hash thì hiển thị `Mã định danh kế hoạch: {plan.id}`, tuyệt đối không gọi UUID là hash.
+  - F3: `ReceiptMoment` nhận capability `schedulesEnabled` và chỉ hiển thị nút `[data-testid="receipt-schedule-workflow-btn"]` khi `schedulesEnabled === true`.
+- **Bằng chứng kiểm thử nghiệm thu:**
+  - `npm run typecheck:v3`: PASS (exit code 0).
+  - `npm test -w @wap/chat-web`: 101/101 files, 1,128 tests PASS (exit code 0).
+  - `npm run build:v3`: PASS (exit code 0).
+  - `node scripts/test-v3-web-build-security.mjs`: PASS (exit code 0).
+  - Browser tests: 23/23 passed (`planora-chat.spec.ts` 16, `fe-05-cockpit.spec.ts` 4, acceptance assertions 3).
+  - Independent probes & visual: 13/13 passed + 3/3 passed (1440, 1024, 768, 375, 320 trên cả 2 theme).
