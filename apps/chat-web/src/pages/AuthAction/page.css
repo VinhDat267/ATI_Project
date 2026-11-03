@@ -1,47 +1,222 @@
-/* <style> của auth-action.html, giữ nguyên thứ tự (biến --font-* đổi thành --page-font-*). */
-    :root {
-      --bg: #F8F8F6;
-      --surface: #FFFFFF;
-      --fg: #111827;
-      --muted: #6B7280;
-      --border: #E7E7E2;
-      --accent: #FF5701;
-      --success: #16A34A;
-      --warn: #D97706;
-      --danger: #DC2626;
-      --page-font-display: 'Playfair Display', Georgia, serif;
-      --page-font-body: 'Be Vietnam Pro', sans-serif;
-      --page-font-mono: 'JetBrains Mono', monospace;
-    }
+/**
+ * Planora AuthAction Styles (PL-04)
+ *
+ * Giao diện xác thực nâng cao, khôi phục mật khẩu, xử lý liên kết hết hạn/đã dùng
+ * và các trạng thái chặn đăng nhập theo nhận diện Planora.
+ */
 
-    body {
-      background-color: #F8F8F6;
-      color: #111827;
-      font-family: 'Be Vietnam Pro', sans-serif;
-      -webkit-font-smoothing: antialiased;
-    }
+:root {
+  --bg: var(--planora-canvas);
+  --surface: var(--planora-paper);
+  --fg: var(--planora-text);
+  --muted: var(--planora-muted);
+  --border: var(--planora-divider);
+  --accent: var(--planora-primary);
+  --success: var(--planora-success-text);
+  --warn: var(--planora-pending-text);
+  --danger: var(--planora-error-text);
+  --page-font-display: var(--planora-font-serif);
+  --page-font-body: var(--planora-font-sans);
+  --page-font-mono: var(--planora-font-mono);
+}
 
-    /* Focus visible */
-    a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible {
-      outline: 2px solid #FF5701;
-      outline-offset: 2px;
-    }
+body {
+  background-color: var(--planora-canvas);
+  color: var(--planora-text);
+  font-family: var(--planora-font-sans);
+  -webkit-font-smoothing: antialiased;
+}
 
-    /* Ẩn thanh cuộn nhưng vẫn cuộn được */
-    .no-scrollbar::-webkit-scrollbar {
-      display: none;
-    }
-    .no-scrollbar {
-      -ms-overflow-style: none;
-      scrollbar-width: none;
-    }
+/* Focus visible */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--planora-primary);
+  outline-offset: 2px;
+}
 
-    /* prefers-reduced-motion */
-    @media (prefers-reduced-motion: reduce) {
-      *, ::before, ::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-        scroll-behavior: auto !important;
-      }
-    }
+.planora-auth-action-body {
+  background-color: var(--planora-canvas);
+  color: var(--planora-text);
+}
+
+/* Info Card in AuthAction */
+.planora-auth-info-card {
+  background-color: var(--planora-surface-inset);
+  border: 1px solid var(--planora-divider);
+  border-radius: var(--planora-radius-xl);
+  padding: 18px 20px;
+  margin: 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+}
+
+/* Timeline in AuthAction */
+.planora-auth-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.planora-timeline-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: var(--planora-text-sm);
+}
+
+.planora-timeline-badge {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  min-height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.planora-timeline-badge.done {
+  background-color: var(--planora-primary);
+  color: var(--planora-on-primary);
+}
+
+.planora-timeline-badge.pending {
+  background-color: var(--planora-pending-bg);
+  color: var(--planora-pending-text);
+  border: 1px solid var(--planora-pending-border);
+}
+
+.planora-timeline-badge.waiting {
+  background-color: var(--planora-surface-hover);
+  color: var(--planora-muted);
+  border: 1px solid var(--planora-divider);
+}
+
+.planora-timeline-content {
+  min-width: 0;
+  flex: 1;
+}
+
+.planora-timeline-title {
+  font-weight: 600;
+  color: var(--planora-text);
+  line-height: 1.4;
+}
+
+.planora-timeline-desc {
+  font-size: var(--planora-text-xs);
+  color: var(--planora-muted);
+  line-height: 1.5;
+  margin-top: 2px;
+}
+
+/* Blocked Countdown Timer */
+.planora-blocked-timer-container {
+  text-align: center;
+  padding: 16px;
+  background-color: var(--planora-paper);
+  border: 1px solid var(--planora-divider);
+  border-radius: var(--planora-radius-lg);
+  margin: 12px 0;
+}
+
+.planora-blocked-timer-display {
+  font-family: var(--planora-font-mono);
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--planora-text);
+}
+
+.planora-blocked-timer-display.timer-done {
+  color: var(--planora-primary);
+}
+
+.planora-blocked-timer-bar-wrapper {
+  width: 100%;
+  height: 6px;
+  background-color: var(--planora-divider);
+  border-radius: var(--planora-radius-pill);
+  overflow: hidden;
+  margin: 12px 0 8px;
+}
+
+.planora-blocked-timer-bar {
+  height: 100%;
+  background-color: var(--planora-pending-text);
+  border-radius: var(--planora-radius-pill);
+  transition: width 1s linear;
+}
+
+/* Password Strength Meter */
+.planora-strength-bars {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 6px;
+  width: 100%;
+  margin: 8px 0 4px;
+}
+
+.planora-strength-bar {
+  flex: 1;
+  height: 100%;
+  border-radius: var(--planora-radius-pill);
+  background-color: var(--planora-divider);
+  transition: background-color var(--planora-transition-fast);
+}
+
+.planora-strength-bar.bar-danger {
+  background-color: var(--planora-error-text);
+}
+
+.planora-strength-bar.bar-warn {
+  background-color: var(--planora-pending-text);
+}
+
+.planora-strength-bar.bar-success {
+  background-color: var(--planora-primary);
+}
+
+/* Loading status spinner in AuthAction */
+.planora-auth-loading-text {
+  padding: 12px 16px;
+  border-radius: var(--planora-radius-md);
+  background-color: var(--planora-surface-inset);
+  color: var(--planora-muted);
+  border: 1px solid var(--planora-divider);
+  font-size: var(--planora-text-sm);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Ẩn thanh cuộn nhưng vẫn cuộn được */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

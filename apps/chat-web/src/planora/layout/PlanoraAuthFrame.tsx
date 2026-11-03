@@ -13,6 +13,7 @@ export interface PlanoraAuthFrameProps {
   showEditorial?: boolean;
   tabs?: ReactNode;
   className?: string;
+  cardId?: string;
 }
 
 /**
@@ -112,6 +113,7 @@ export const PlanoraAuthFrame = forwardRef<HTMLDivElement, PlanoraAuthFrameProps
       showEditorial = true,
       tabs,
       className = '',
+      cardId,
     },
     ref
   ) {
@@ -151,7 +153,7 @@ export const PlanoraAuthFrame = forwardRef<HTMLDivElement, PlanoraAuthFrameProps
         <div className={`planora-auth-main ${showEditorial ? 'has-editorial' : 'no-editorial'}`}>
           {showEditorial && <PlanoraEditorial badge={badge} />}
 
-          <section className="planora-auth-card" aria-labelledby="planora-auth-title">
+          <section id={cardId ?? 'action-card'} className="planora-auth-card" aria-labelledby="planora-auth-title">
             {tabs && <div className="planora-auth-tabs">{tabs}</div>}
 
             <div className="planora-auth-header">
