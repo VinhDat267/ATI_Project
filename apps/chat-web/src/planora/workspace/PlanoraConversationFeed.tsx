@@ -63,7 +63,7 @@ export function PlanoraConversationFeed({
       aria-live="polite"
       aria-label="Hội thoại"
       onScroll={handleScroll}
-      className="planora-conversation-feed planora-chat-feed flex-1 overflow-y-auto min-h-0 w-full max-w-[var(--planora-chat-max-width)] mx-auto px-4 sm:px-6 py-6 space-y-5"
+      className="planora-conversation-feed planora-chat-feed flex-1 overflow-y-auto min-h-0 w-full max-w-[var(--planora-chat-max-width)] mx-auto px-4 sm:px-6 pt-6 pb-28 sm:pb-32 space-y-5"
     >
       {messages.map((message) => {
         const isScheduleRun = isSchedulesActive && message.metadata?.type === 'schedule_run';

@@ -492,14 +492,18 @@ describe('PL-05: Planora Chat Workspace & One-Composer Policy', () => {
       );
 
       // Verify the chat feed container has the required contract classes
-      const feed = document.querySelector('.planora-conversation-feed');
+      const feed = document.querySelector('.planora-conversation-feed') as HTMLElement;
       expect(feed).toBeInTheDocument();
       expect(feed).toHaveClass('planora-chat-feed');
+      expect(feed).toHaveClass('overflow-y-auto');
+      expect(feed).toHaveClass('min-h-0');
+      expect(feed).toHaveClass('flex-1');
 
-      // Set scroll position
-      if (document.scrollingElement) {
-        document.scrollingElement.scrollTop = 500;
-      }
+      // Mock scroll properties on feed (JSDOM does not calculate layout geometry)
+      Object.defineProperty(feed, 'scrollHeight', { value: 3000, configurable: true });
+      Object.defineProperty(feed, 'clientHeight', { value: 600, configurable: true });
+      Object.defineProperty(feed, 'scrollTop', { value: 500, writable: true, configurable: true });
+      fireEvent.scroll(feed);
 
       // Transition from moment 2 (planning) to moment 4 (preview)
       useChatStore.setState({
@@ -523,10 +527,23 @@ describe('PL-05: Planora Chat Workspace & One-Composer Policy', () => {
         />
       );
 
-      // Moment transition MUST NOT forcibly reset document scroll to 0
-      if (document.scrollingElement) {
-        expect(document.scrollingElement.scrollTop).toBe(500);
-      }
+      // Moment transition MUST NOT forcibly reset feed scroll to 0
+      expect(feed.scrollTop).toBe(500);
+    });
+
+    it('R1 regression: feed container has independent scroll layout and bottom spacing for dock', () => {
+      const messages: ChatMessage[] = [
+        { id: 'm1', role: 'user', content: 'Tin 1' },
+      ];
+
+      render(<PlanoraConversationFeed messages={messages} />);
+      const feed = document.querySelector('.planora-conversation-feed') as HTMLElement;
+      expect(feed).toBeInTheDocument();
+      expect(feed).toHaveClass('overflow-y-auto');
+      expect(feed).toHaveClass('min-h-0');
+      expect(feed).toHaveClass('flex-1');
+      // Must contain sufficient bottom padding to prevent overlap with #global-bottom-bar
+      expect(feed.className).toMatch(/pb-(28|32)/);
     });
   });
 

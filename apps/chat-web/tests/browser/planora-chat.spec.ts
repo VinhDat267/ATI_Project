@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import pg from 'pg';
 
 async function login(page: Page, email: string, pass: string) {
   await page.goto('/login');
@@ -100,3 +101,65 @@ for (const vp of VIEWPORTS) {
     });
   }
 }
+
+test('PL-05: R1 long conversation feed scrolls independently within viewport without expanding shell', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+  try {
+    const userRow = await pool.query('SELECT id FROM users WHERE email=$1', [process.env.CHAT_ADMIN_EMAIL]);
+    if (!userRow.rows.length) return;
+    const userId = userRow.rows[0].id;
+    const convId = (
+      await pool.query('INSERT INTO conversations(user_id, title) VALUES($1, $2) RETURNING id', [
+        userId,
+        'PL-05 Long Feed Test',
+      ])
+    ).rows[0].id;
+
+    for (let i = 0; i < 80; i++) {
+      await pool.query('INSERT INTO messages(conv_id, role, content) VALUES($1, $2, $3)', [
+        convId,
+        i % 2 === 0 ? 'user' : 'assistant',
+        `Tin nhắn kiểm tra cuộn độc lập thứ ${i + 1}.`,
+      ]);
+    }
+
+    await login(page, process.env.CHAT_ADMIN_EMAIL!, process.env.CHAT_ADMIN_PASSWORD!);
+    await page.goto(`/c/${convId}`);
+
+    const feed = page.locator('.planora-conversation-feed');
+    await expect(feed).toBeVisible();
+
+    // R1: Container must be bounded by viewport and scroll independently
+    const metrics = await feed.evaluate((el) => ({
+      clientHeight: el.clientHeight,
+      scrollHeight: el.scrollHeight,
+      scrollTop: el.scrollTop,
+    }));
+
+    expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
+    expect(metrics.clientHeight).toBeLessThan(900);
+
+    // Reading history preserved
+    await feed.evaluate((el) => {
+      el.scrollTop = 100;
+      el.dispatchEvent(new Event('scroll'));
+    });
+    await expect.poll(() => feed.evaluate((el) => el.scrollTop)).toBe(100);
+
+    // Bottom spacing: last message should not be obscured by global bottom bar
+    const lastMsg = feed.locator('> div').last();
+    const lastMsgBox = await lastMsg.boundingBox();
+    const bottomBar = page.locator('#global-bottom-bar');
+    if (await bottomBar.isVisible()) {
+      const barBox = await bottomBar.boundingBox();
+      if (lastMsgBox && barBox) {
+        expect(lastMsgBox.y + lastMsgBox.height).toBeLessThanOrEqual(barBox.y + 10);
+      }
+    }
+  } finally {
+    await pool.end();
+  }
+});

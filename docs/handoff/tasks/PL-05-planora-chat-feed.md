@@ -116,4 +116,26 @@ Khôi phục bố cục không gian làm việc hội thoại Planora (Planora C
   - `node scripts/test-v3-web-build-security.mjs`: PASS (exit code 0).
   - `node --check scripts/test-v3-browser.mjs`: PASS (exit code 0).
   - `scripts/test-v3-browser.mjs planora-chat.spec.ts`: NOT_RUN cục bộ do máy không có Docker chạy PostgreSQL port 55533; Playwright spec file và runner đã sẵn sàng cho môi trường CI.
+
+- **Kết quả đợt sửa findings vòng 2 (R1-R2):**
+  1. `apps/chat-web/src/planora/styles/shell.css`:
+     - **R1 fix:** Thiết lập chiều cao hữu hạn và ngăn nở layout xuyên suốt toàn bộ chuỗi cha: `.planora-shell` (`height: 100dvh; max-height: 100dvh; min-height: 0; overflow: hidden;`), `.planora-screen-layout`, `.planora-main-work`, `.planora-content-body`, `.planora-chat-workspace` (`height: 100%; max-height: 100%; min-height: 0; overflow: hidden;`).
+     - Thiết lập `.planora-conversation-feed` (`flex: 1; min-height: 0; overflow-y: auto;`) trở thành scroll container độc lập thực thụ, không bị nở theo nội dung (khắc phục hiện tượng 80 tin nhắn đẩy feed lên 10.177px khiến `clientHeight === scrollHeight`).
+  2. `apps/chat-web/src/planora/workspace/PlanoraConversationFeed.tsx`:
+     - Tăng padding dưới lên `pt-6 pb-28 sm:pb-32 space-y-5` đảm bảo tin nhắn cuối cùng và action buttons không bao giờ bị `#global-bottom-bar` che khuất.
+  3. `apps/chat-web/tests/planora-chat.test.tsx`:
+     - Cập nhật test F2/R1: assert trực tiếp trên element `.planora-conversation-feed` (kiểm tra class contract `overflow-y-auto min-h-0 flex-1`, mock scroll properties trên feed và xác nhận moment transition không reset `feed.scrollTop = 500`). Loại bỏ hoàn toàn điều kiện lỏng lẻo `if (document.scrollingElement)`.
+     - Bổ sung test kiểm tra layout feed độc lập và padding đáy chống che khuất bởi `#global-bottom-bar`. Tổng số unit tests: 17/17 PASS.
+  4. `apps/chat-web/tests/browser/fe-05-cockpit.spec.ts`:
+     - **R2 fix:** Đồng bộ assertion bố cục preview với One-Composer Policy từ 0 sang 1 textarea (`expect(page.locator('textarea:visible')).toHaveCount(1)`), giữ nguyên 100% assertions về focus, approval và cancel.
+  5. `apps/chat-web/tests/browser/fe-02-routing-history.spec.ts`:
+     - **R2 fix:** Scope locator tin nhắn số 24 thành `area.getByText(/Saved message 24:/)` thay vì query toàn trang `page.getByText(...)`, loại bỏ strict mode violation do tin nhắn xuất hiện đồng thời trong feed và drawer.
+  6. `apps/chat-web/tests/browser/planora-chat.spec.ts`:
+     - Bổ sung browser test case cho R1: chèn 80 tin nhắn vào cơ sở dữ liệu, kiểm tra `.planora-conversation-feed` có `scrollHeight > clientHeight`, `clientHeight < 900`, cuộn đọc lịch sử được bảo toàn khi có tin mới, và khoảng đệm đáy không bị `#global-bottom-bar` che khuất.
+  - **Kiểm tra đã chạy và kết quả vòng 2:**
+    - `npm run typecheck:v3`: PASS (exit code 0).
+    - `npm test -w @wap/chat-web -- tests/planora-chat.test.tsx`: PASS 17/17 tests (exit code 0).
+    - `npm test -w @wap/chat-web`: PASS 100/100 test files, 1115/1115 tests (exit code 0).
+    - `npm run build:v3`: PASS (exit code 0).
+    - `node scripts/test-v3-web-build-security.mjs`: PASS (exit code 0).
 - **Trạng thái:** `STATUS: READY_FOR_CODEX_REVIEW`.
