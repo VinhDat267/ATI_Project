@@ -1,0 +1,76 @@
+# PL-07 · Trả lời, hỏi lại, từ chối, lỗi và phục hồi (Responses, Clarification, Refusal & Recovery Moments)
+
+**Trạng thái:** sẵn sàng nhận · **Nhánh gợi ý:** `longnguyen005/feat-planora-pl-07` · **Phụ thuộc:** PL-05 và PL-06 đã hoàn tất và được Codex duyệt Đạt.  
+**Base SHA:** `514d982fd9fc152290feb305b0d97f2c40dda21a` (trên integration branch `codex/planora-ui`).  
+**Target branch:** `codex/planora-ui`.  
+**Đặc tả:** [Planora migration design](../../superpowers/specs/2026-11-02-planora-migration-design.md) mục 4.3, 8.3 · **Kế hoạch:** [Planora migration plan](../../superpowers/plans/2026-11-02-planora-migration.md) mục PL-07.  
+**Prompt thi công:** [PL-07.md](../planora-prompts/PL-07.md).  
+**Quy ước chung:** [COMMON.md](../planora-prompts/COMMON.md).
+
+---
+
+## 1. Mục tiêu
+
+Chuyển đổi các thẻ phản hồi của hệ thống sang chuẩn nhận diện Planora, bảo toàn toàn bộ state machine, logic phân loại moment và các quy tắc phục hồi an toàn:
+1. **Answer & Sources:** Thẻ trả lời trực tiếp (Response Moment / Moment 6) với nguồn tham chiếu (sources/citations), hiển thị trích dẫn có thể click xem an toàn.
+2. **Clarification Moment (Moment 3):** Thẻ hỏi làm rõ với các câu hỏi và lựa chọn đa dạng (single/multi-choice, text input), bảo toàn logic pre-fill draft vào dock composer khi bấm gợi ý (không tự ý gửi tin).
+3. **Refusal Moment (Moment 2):** Thẻ từ chối/yêu cầu quyền khi thiếu kết nối dịch vụ hoặc phạm vi tài nguyên (scope_required / needs_membership), hiển thị nút CTA kết nối thật (ví dụ: "Kết nối Trello", "Chọn kho GitHub", v.v.) và nút "Gửi lại yêu cầu" chỉ gửi khi người dùng bấm trực tiếp.
+4. **Planning Errors & Slow Notice:** Thẻ thông báo lập kế hoạch chậm (slow planning notice sau 10s), lỗi mạng/offline, lỗi lập kế hoạch (`PlanningErrors`), hiển thị thông điệp trung thực từ server.
+5. **Recovery Moments (Moments 7, 8, 9 & Unsuccessful):**
+   - Phân biệt rõ ràng giữa lỗi thất bại xác định (`failure`), trạng thái không rõ (`unknown`/`needs_attention`), và hòa giải (`reconciliation`).
+   - Trạng thái `unknown` TUYỆT ĐỐI KHÔNG hiển thị nút Retry.
+   - Thao tác Dừng (`Stop`) phải có hộp thoại xác nhận.
+   - Nhấn phím Escape chỉ đóng hộp thoại, không được dừng hay hủy execution đang chạy.
+   - Sửa đổi kế hoạch phục hồi (`RecoveryEditor`) chỉ gửi yêu cầu mới sau khi Stop thành công đúng kế hoạch hiện hành.
+
+---
+
+## 2. Ranh giới sở hữu & Phạm vi file
+
+- **Sửa đổi cho phép:**
+  - `apps/chat-web/src/pages/Responses/ResponseMoment.tsx`
+  - `apps/chat-web/src/pages/Responses/page.css`
+  - `apps/chat-web/src/pages/Errors/PlanningErrors.tsx`
+  - `apps/chat-web/src/pages/Errors/page.css`
+  - `apps/chat-web/src/pages/Cockpit/ClarificationMoment.tsx`
+  - `apps/chat-web/src/pages/Cockpit/RequestMoments.tsx`
+  - `apps/chat-web/src/pages/Cockpit/RecoveryMoment.tsx`
+  - `apps/chat-web/src/pages/Cockpit/RecoveryEditor.tsx`
+  - `apps/chat-web/src/pages/Cockpit/RequestEcho.tsx`
+  - `apps/chat-web/src/components/CockpitDialog.tsx`
+  - Tests liên quan trong `apps/chat-web/tests/`.
+- **Ngoài phạm vi:**
+  - Không sửa `apps/chat-api` hay backend protocol.
+  - Không thay đổi thứ tự ưu tiên trong `selectMoment`.
+  - Không tự ý cấp các quyền/hành động mà `recoveryActions` từ server không cho phép.
+
+---
+
+## 3. Interfaces & Yêu cầu kỹ thuật
+
+1. **State Machine & Priority:**
+   - Bảo toàn thứ tự ưu tiên của `selectMoment` từ Sprint 1/2 và v3 design.
+   - Tiếp tục sử dụng `RecoveryControls`, `snapshot.recoveryActions` từ controller.
+2. **Bố cục & Styling:**
+   - Sử dụng CSS tokens của Planora (`--planora-text`, `--planora-paper`, `--planora-divider`, `--planora-primary`, etc.).
+   - Responsive trên 5 viewports (1440, 1024, 768, 375, 320) và cả 2 theme (light/dark).
+
+---
+
+## 4. Tiêu chí nghiệm thu (Acceptance Criteria)
+
+- [ ] Các moment Answer, Clarification, Refusal, PlanningErrors và Recovery Moments hiển thị chuẩn phong cách Planora, responsive và không tràn ngang.
+- [ ] Refusal hiển thị đúng CTA kết nối dịch vụ tương ứng và nút "Gửi lại" chỉ gửi khi người dùng bấm trực tiếp.
+- [ ] Bấm gợi ý trong Clarification chỉ điền draft vào dock composer, không tự ý gửi tin nhắn.
+- [ ] Trạng thái `unknown` không hiển thị nút Retry.
+- [ ] Thao tác Stop có xác nhận, Escape chỉ đóng modal mà không ngắt execution.
+- [ ] `npm run typecheck:v3` đạt exit code 0.
+- [ ] `npm test -w @wap/chat-web` đạt exit code 0.
+- [ ] `node scripts/test-v3-web-build-security.mjs` đạt exit code 0.
+- [ ] Các tests browser liên quan (`fe-06a-recovery`, `fe-06b`, etc.) đều PASS.
+
+---
+
+## 5. Kết quả (Worker điền sau khi hoàn thành)
+
+*(Phần này do worker hoàn thiện sau khi thi công)*
