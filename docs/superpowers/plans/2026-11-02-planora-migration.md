@@ -1,6 +1,6 @@
 # Planora UI Migration Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans for the native implementation proposed here. Work task-by-task with independent review before integrating each task. This document is a draft for approval; it does not authorize implementation.
+> **For agentic workers:** Implement assigned tasks through Antigravity/Gemini using the task prompts linked below. Each worker follows superpowers:executing-plans for its own task; Codex performs independent task and final reviews. This document is a draft for approval; it does not authorize implementation.
 
 **Goal:** Khôi phục toàn bộ bố cục và nhận diện Planora cũ trên nền chức năng main mới nhất, bao phủ các trang/trạng thái mới mà bản cũ chưa có.
 
@@ -11,6 +11,8 @@
 **Spec:** [2026-11-02-planora-migration-design.md](../specs/2026-11-02-planora-migration-design.md).
 
 **Status:** Dự thảo ngày 02/11/2026; user đã chọn phục hồi cả bố cục cũ. Cần duyệt bản thiết kế/kế hoạch trước khi thi công. Mốc khảo sát main `1977ec7`; source thị giác `Frontend_UXUI@ef13c56`.
+
+**Execution roles (03/11/2026):** Theo lựa chọn của chủ dự án, Antigravity/Gemini thi công và **Codex review**. [Bộ prompt điều phối, PL-01–15 và review](../../handoff/planora-prompts/README.md) ghi rõ phạm vi, dependency và packet bàn giao. Việc soạn prompt không khởi chạy agent hoặc thay trạng thái duyệt thiết kế.
 
 ## Global Constraints
 

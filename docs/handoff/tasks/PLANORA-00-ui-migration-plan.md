@@ -13,6 +13,7 @@ Chỉ khảo sát và tài liệu: spec/bảng đối chiếu, kế hoạch tri�
 - [Thiết kế và inventory](../../superpowers/specs/2026-11-02-planora-migration-design.md).
 - [Kế hoạch 15 task](../../superpowers/plans/2026-11-02-planora-migration.md).
 - [Handoff chi tiết cho phiên nhận việc tiếp theo](../PLANORA-MIGRATION-HANDOFF.md).
+- [Bộ prompt Antigravity/Gemini thi công và Codex review](../planora-prompts/README.md).
 
 ## Tiêu chí nghiệm thu
 
@@ -37,3 +38,5 @@ Validation Python: **exit 0**, kiểm số route/state/task, callback/file tồn
 Nhánh tài liệu: `codex/planora-migration-plan`, worktree riêng. Xem log cùng ngày cho bằng chứng và giới hạn.
 
 Bổ sung theo yêu cầu bàn giao và xuất bản PR: đã viết handoff tự đủ bối cảnh, mốc Git, quyết định đã chốt/đề xuất, inventory thiếu Planora, 15 task, bất biến, hướng dẫn nhận PL-01, môi trường/kiểm chứng và prompt nhận việc. Việc mở PR tài liệu không thay trạng thái duyệt thiết kế hoặc bắt đầu triển khai. Bằng chứng kiểm lại và review nằm trong log `2026-11-02-codex-planora-handoff-pr.md`.
+
+Bổ sung 03/11 theo yêu cầu chủ dự án: bộ prompt điều phối, COMMON, PL-01–15, Codex review từng task/toàn nhánh và Gemini sửa findings. Đã ghi rõ Codex là reviewer thực, dependency/ownership và gate theo SHA/CI. Chưa khởi chạy worker hay sửa product code; main đã tiến thêm nên prompt yêu cầu cập nhật inventory khi nhận việc. Bằng chứng nằm trong log `2026-11-03-codex-planora-gemini-prompts.md`.

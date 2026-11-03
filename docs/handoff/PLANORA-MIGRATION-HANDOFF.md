@@ -8,7 +8,7 @@ Chủ dự án muốn khôi phục giao diện Planora cũ cho toàn bộ sản 
 
 Hướng đã được yêu cầu: sidebar, hội thoại làm trung tâm, nền kem/xanh rừng, nhận diện Planora. Sản phẩm vẫn cần đủ chức năng mới trên main. Không được coi việc quay về App/store/API cũ là cách hoàn thành yêu cầu này.
 
-**Hiện đã có kế hoạch và thiết kế dự thảo; chưa triển khai migration giao diện.** Yêu cầu gần nhất là viết handoff và mở PR tài liệu. Yêu cầu đó không đồng nghĩa đã duyệt mọi chi tiết đề xuất hoặc yêu cầu bắt đầu PL-01.
+**Hiện đã có kế hoạch và thiết kế dự thảo; chưa triển khai migration giao diện.** Sau yêu cầu handoff/PR tài liệu, ngày 03/11 chủ dự án yêu cầu prompt cho subagents Antigravity/Gemini và chọn **Codex review**. Việc chuẩn bị tài liệu/prompt không đồng nghĩa đã duyệt mọi chi tiết đề xuất hoặc bắt đầu PL-01.
 
 ## 2. Thứ tự tài liệu cần đọc
 
@@ -167,3 +167,13 @@ Chỉ dùng đoạn này sau khi chủ dự án duyệt phạm vi thi công:
 > Đọc AGENTS.md, docs/handoff/CURRENT-STATE.md, README bàn giao và ba log mới nhất. Sau đó đọc docs/handoff/PLANORA-MIGRATION-HANDOFF.md, spec và plan Planora ngày 02/11/2026. Kiểm main mới nhất và bổ sung inventory nếu feature đã thay đổi từ mốc 1977ec7. Chỉ nhận PL-01: baseline, nền tokens/component và bốn mẫu Planora để chủ dự án duyệt. Dùng worktree/nhánh/task card riêng, bảo vệ mọi chức năng main, không merge PR #262 hoặc phục hồi code v1/v2. Ghi bằng chứng thật, điền Kết quả và thêm log riêng. Chưa chuyển hàng loạt các màn và chưa merge/deploy khi chưa đến gate tương ứng.
 
 Khi đóng từng task, dùng [REVIEW-CHECKLIST](REVIEW-CHECKLIST.md), chạy lại kiểm tương ứng, ghi SHA/output/exit code và tạo PR đúng template. Reviewer chỉ cập nhật CURRENT-STATE/ROADMAP sau merge.
+
+## 13. Prompt giao việc theo vai trò — bổ sung 03/11/2026
+
+Chủ dự án chọn Antigravity/Gemini làm phía thi công và Codex làm reviewer độc lập. Dùng [bộ prompt](planora-prompts/README.md): điều phối, quy ước chung, một prompt cho từng PL-01 đến PL-15, Codex review task, Codex review tích hợp cuối và Gemini sửa findings.
+
+Mỗi worker chỉ một task; điều phối chuẩn bị card/base/dependency và tránh sửa file shared đồng thời. Worker gửi packet SHA/test/ảnh/giới hạn cho Codex; review phải đúng head mới và CI phải xanh trước gate tích hợp/chuyển task. Nếu không có kênh gọi Codex, xuất packet để chủ dự án chuyển sang Codex, không cho Gemini tự đóng vai Codex.
+
+Ngày 03/11, GitHub main đã là `c8cf236d79c962011e100d1ee25e5b5ee71b4582`, khác mốc khảo sát `1977ec7`. Prompt yêu cầu khóa lại main mới nhất và cập nhật inventory trước thi công; không dùng số đếm cũ để bỏ các màn mới. Chưa có agent triển khai được khởi chạy trong lần soạn prompt này.
+
+Trong phiên soạn prompt, PR #263 đã được merge; nhánh bổ sung `codex/planora-gemini-prompts` được tách và fast-forward nền tới main `6c235837efa6811064c652b570e8c91bf8f77ab6`, đã có GitHub #260 và bộ tài liệu #263. Các thay đổi sản phẩm đi theo fast-forward là của main, không thuộc diff bổ sung prompt.
