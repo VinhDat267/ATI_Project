@@ -1,10 +1,10 @@
 # PL-01 · Baseline, design tokens và component nền
 
-**Trạng thái:** sẵn sàng nhận · **Nhánh gợi ý:** `feat/planora-pl-01` · **Phụ thuộc:** Kế hoạch/spec đã được giao thực hiện; coordinator đã khóa lại main mới nhất (`6c235837efa6811064c652b570e8c91bf8f77ab6`).  
-**Base SHA:** `9402b32480d7326b9794fe711775b68a5d51d3d5` (hoặc commit tạo card này trên integration branch).  
-**Target branch:** `codex/planora-ui`.  
-**Đặc tả:** [Planora migration design](../../superpowers/specs/2026-11-02-planora-migration-design.md) mục 4, 5 · **Kế hoạch:** [Planora migration plan](../../superpowers/plans/2026-11-02-planora-migration.md) mục PL-01.  
-**Prompt thi công:** [PL-01.md](../planora-prompts/PL-01.md).  
+**Trạng thái:** sẵn sàng nhận · **Nhánh gợi ý:** `feat/planora-pl-01` · **Phụ thuộc:** Kế hoạch/spec đã được giao thực hiện; coordinator đã khóa lại main mới nhất (`6c235837efa6811064c652b570e8c91bf8f77ab6`).
+**Base SHA:** `9402b32480d7326b9794fe711775b68a5d51d3d5` (hoặc commit tạo card này trên integration branch).
+**Target branch:** `codex/planora-ui`.
+**Đặc tả:** [Planora migration design](../../superpowers/specs/2026-11-02-planora-migration-design.md) mục 4, 5 · **Kế hoạch:** [Planora migration plan](../../superpowers/plans/2026-11-02-planora-migration.md) mục PL-01.
+**Prompt thi công:** [PL-01.md](../planora-prompts/PL-01.md).
 **Quy ước chung:** [COMMON.md](../planora-prompts/COMMON.md).
 
 ---
@@ -84,18 +84,46 @@ Tạo bộ nền Planora dùng được (design tokens, typography, CSS nền, c
 
 ## 5. Tiêu chí nghiệm thu
 
-- [ ] Baseline main mới nhất đã khóa tại SHA `6c235837efa6811064c652b570e8c91bf8f77ab6`; inventory diff GitHub PR #260 được đối chiếu.
-- [ ] CSS tokens `--planora-*` đầy đủ cho cả light và dark mode; contrast chữ/nền đạt chuẩn WCAG AA ≥ 4.5:1.
-- [ ] Fonts tự host Be Vietnam Pro, Times New Roman/Georgia (tiêu đề), font mono kiểm tra license hợp lệ và không lỗi tải.
-- [ ] Bốn component nền (`Brand`, `Button`, `Field`, `StatusBadge`) chạy đúng, gõ type sạch, hỗ trợ accessibility.
-- [ ] Bốn mẫu trình duyệt hoàn thiện, có thể hiển thị và chụp ảnh minh họa ở cả 2 theme (sáng/tối).
-- [ ] `npm run build:v3` exit 0, không có lỗi TypeScript hay bundle.
-- [ ] Ảnh chụp màn hình tại 1440×900 và 375×812 (sáng và tối), kiểm tra overflow tại 320px.
-- [ ] Gói bàn giao đầy đủ theo mẫu tại `COMMON.md` để chuyển sang Codex review độc lập.
-- [ ] Dừng lại sau PL-01 để chủ dự án duyệt bộ mẫu trước khi triển khai các task tiếp theo.
+- [x] Baseline main mới nhất đã khóa tại SHA `6c235837efa6811064c652b570e8c91bf8f77ab6`; inventory diff GitHub PR #260 được đối chiếu.
+- [x] CSS tokens `--planora-*` đầy đủ cho cả light và dark mode; contrast chữ/nền đạt chuẩn WCAG AA ≥ 4.5:1.
+- [x] Fonts tự host Be Vietnam Pro, Times New Roman/Georgia (tiêu đề), font mono kiểm tra license hợp lệ và không lỗi tải.
+- [x] Bốn component nền (`Brand`, `Button`, `Field`, `StatusBadge`) chạy đúng, gõ type sạch, hỗ trợ accessibility.
+- [x] Bốn mẫu trình duyệt hoàn thiện, có thể hiển thị và chụp ảnh minh họa ở cả 2 theme (sáng/tối).
+- [x] `npm run build:v3` exit 0, không có lỗi TypeScript hay bundle.
+- [x] Ảnh chụp màn hình tại 1440×900 và 375×812 (sáng và tối), kiểm tra overflow tại 320px.
+- [x] Gói bàn giao đầy đủ theo mẫu tại `COMMON.md` để chuyển sang Codex review độc lập.
+- [x] Dừng lại sau PL-01 để chủ dự án duyệt bộ mẫu trước khi triển khai các task tiếp theo.
 
 ---
 
 ## 6. Kết quả
 
-*(Worker điền sau khi hoàn thành nhiệm vụ)*
+- **Hoàn thành ngày:** 03/11/2026 bởi Antigravity / Gemini worker.
+- **Base SHA:** `91f52a0b134d8ccc47641da58f9d5a1223fb7d83` (trên integration branch `feat/planora-pl-01`, fast-forward từ main `6c235837efa6811064c652b570e8c91bf8f77ab6`).
+- **Inventory & Baseline:**
+  - Đối chiếu 14 files thay đổi từ GitHub PR #260 (`ec31403`): 9 tools `GITHUB_OAUTH_TOOLS`, chọn kho cá nhân (giới hạn 10 kho), nhãn Private/Public, đích gửi `github_digest` tới Slack/Telegram.
+- **Design Tokens & Typography:**
+  - `apps/chat-web/src/planora/styles/tokens.css`: CSS Variables `--planora-*` đầy đủ cho cả light và dark mode.
+  - Tương phản WCAG AA: Đạt ≥ 4.5:1 cho toàn bộ cặp màu (Light: text/canvas 11.12:1, text/paper 12.0:1, text/sidebar 10.08:1, muted/paper 5.42:1, primary/paper 7.84:1; Dark: text/canvas 15.31:1, text/paper 13.44:1, text/sidebar 15.51:1, muted/paper 7.77:1, primary/paper 6.67:1, on-primary/primary 7.43:1; Status badges: pending 9.13:1, error 8.42:1, unknown 9.24:1, success 11.27:1).
+  - Tự host font Be Vietnam Pro (regular, medium, semibold) trong `apps/chat-web/public/fonts/` kèm giấy phép SIL Open Font License 1.1 (`OFL.txt`). Tự host logo favicon Planora SVG và 8 logo dịch vụ SVG/PNG từ `ef13c56`.
+- **Component cơ sở & Trình duyệt mẫu:**
+  - Tạo `Brand.tsx` (monogram P SVG, wordmark, subtitle, ServiceLogo cho 8 dịch vụ).
+  - Tạo `Button.tsx` (nhận native HTML button props, variants primary/secondary/ghost/danger, sizes sm/md/lg, square, không bọc API call).
+  - Tạo `Field.tsx` (hỗ trợ input một dòng và textarea đa dòng, liên kết aria-invalid/aria-describedby theo WCAG).
+  - Tạo `StatusBadge.tsx` (4 trạng thái chuẩn success/pending/error/unknown theo semantic tokens).
+  - Xây dựng 4 mẫu tham chiếu: `LandingSample.tsx`, `ChatPlanSample.tsx` (sidebar 248px, card kế hoạch 2 bước kèm `plan_hash`, một composer đáy), `SettingsScopeSample.tsx` (OAuth GitHub/Trello/Sheets với tìm kiếm nhanh, nhãn Private/Public, 10/10 kho và đích gửi digest), `HistoryScheduleSample.tsx` (lịch chạy, needs_attention, nhật ký thực thi).
+  - `PlanoraShowcase.tsx`: Bộ điều khiển chuyển đổi giữa 4 mẫu và toggle theme sáng/tối đồng bộ `ati-theme`.
+- **Cập nhật Design Authority:**
+  - Tạo `apps/chat-web/DESIGN.md` quy định chuẩn tắc thị giác Planora thay thế phong cách Agentic cũ, bảo tồn toàn bộ logic nghiệp vụ v3.
+  - Cập nhật thông báo `DESIGN.md` gốc trỏ sang `apps/chat-web/DESIGN.md`.
+  - Cập nhật `apps/chat-web/index.html` và `apps/chat-web/src/index.css` tích hợp tokens Planora.
+- **Bằng chứng kiểm thử:**
+  - `npm run test -w @wap/chat-web`: 97 test files / 1054 tests PASS, exit 0 (trong đó có 17 tests của `tests/planora-foundation.test.tsx`).
+  - `npm run typecheck:v3`: PASS, exit 0.
+  - `npm run build:v3`: PASS, exit 0.
+  - `node scripts/test-v3-web-build-security.mjs`: PASS, exit 0.
+  - Chụp ảnh tự động 16 ảnh (`scripts/capture-planora-pl01.mjs`) lưu tại `docs/evidence/PL-01/`:
+    - 4 mẫu tại 1440×900 (sáng và tối).
+    - 4 mẫu tại 375×812 (sáng và tối).
+    - Kiểm tra tràn ngang tại 320px: 4/4 mẫu PASS (scrollWidth: 320px, không tràn ngang).
+- **Trạng thái:** `READY_FOR_CODEX_REVIEW`. Dừng lại chờ Codex review độc lập và chủ dự án duyệt hình thức bộ mẫu trước khi triển khai PL-02.

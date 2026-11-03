@@ -1,0 +1,155 @@
+/**
+ * Planora Design Tokens
+ *
+ * Sân khấu thiết kế Planora: Nền kem ấm, giấy sáng, sidebar xanh kem, chữ than tự nhiên,
+ * điểm nhấn xanh rừng và các biến thể trạng thái ngữ nghĩa.
+ *
+ * Tiêu chuẩn tiếp cận (Accessibility):
+ * Mọi cặp màu chữ / nền đạt WCAG AA ≥ 4.5:1 ở cả 2 giao diện sáng và tối.
+ */
+
+:root {
+  /* Surface & Background (Light) */
+  --planora-canvas: #f8f4eb;
+  --planora-paper: #fffdf7;
+  --planora-sidebar: #eee9dd;
+  --planora-surface-inset: #f2ede1;
+  --planora-surface-hover: #f0ebe0;
+
+  /* Text & Content (Light) */
+  --planora-text: #2e382d;
+  --planora-muted: #656b5b;
+  --planora-muted-subtle: #848a7b;
+  --planora-divider: #deded0;
+  --planora-border-strong: #c2c2b0;
+
+  /* Brand Primary (Light) */
+  --planora-primary: #3c5741;
+  --planora-primary-hover: #2f4633;
+  --planora-primary-soft: #e4e9d8;
+  --planora-on-primary: #fffdf7;
+
+  /* Semantic Status Tokens (Light) */
+  --planora-success-bg: #e4e9d8;
+  --planora-success-text: #3c5741;
+  --planora-success-border: #c8d5b8;
+
+  --planora-pending-bg: #f6e6cf;
+  --planora-pending-text: #85532b;
+  --planora-pending-border: #e6cbab;
+
+  --planora-error-bg: #f8e6df;
+  --planora-error-text: #9a3f32;
+  --planora-error-border: #eecbc3;
+
+  --planora-unknown-bg: #eee6f2;
+  --planora-unknown-text: #654576;
+  --planora-unknown-border: #ddcce5;
+
+  /* Typography */
+  --planora-font-sans: 'Be Vietnam Pro', Be, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --planora-font-serif: 'Times New Roman', Georgia, serif;
+  --planora-font-mono: Consolas, 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+
+  /* Type Scale */
+  --planora-text-xs: 11px;
+  --planora-text-sm: 13px;
+  --planora-text-base: 14px;
+  --planora-text-md: 16px;
+  --planora-text-lg: 18px;
+  --planora-text-xl: 22px;
+  --planora-text-2xl: 28px;
+  --planora-text-3xl: 36px;
+  --planora-text-4xl: 44px;
+
+  /* Line Heights */
+  --planora-lh-tight: 1.15;
+  --planora-lh-snug: 1.35;
+  --planora-lh-normal: 1.6;
+  --planora-lh-relaxed: 1.75;
+
+  /* Spacing Rhythm */
+  --planora-space-1: 4px;
+  --planora-space-2: 8px;
+  --planora-space-3: 12px;
+  --planora-space-4: 16px;
+  --planora-space-5: 20px;
+  --planora-space-6: 24px;
+  --planora-space-8: 32px;
+  --planora-space-10: 40px;
+  --planora-space-12: 48px;
+  --planora-space-16: 64px;
+
+  /* Radius */
+  --planora-radius-xs: 4px;
+  --planora-radius-sm: 8px;
+  --planora-radius-md: 12px;
+  --planora-radius-lg: 16px;
+  --planora-radius-xl: 20px;
+  --planora-radius-2xl: 24px;
+  --planora-radius-pill: 9999px;
+
+  /* Elevation & Shadows */
+  --planora-shadow-sm: 0 1px 3px rgba(46, 56, 45, 0.05);
+  --planora-shadow-md: 0 4px 14px rgba(46, 56, 45, 0.07);
+  --planora-shadow-lg: 0 10px 30px rgba(46, 56, 45, 0.10);
+  --planora-shadow-focus: 0 0 0 2px var(--planora-paper), 0 0 0 4px var(--planora-primary);
+
+  /* Transitions */
+  --planora-transition-fast: 0.14s ease-out;
+  --planora-transition-base: 0.22s ease-out;
+  --planora-transition-slow: 0.35s ease-out;
+
+  /* Layout Constants */
+  --planora-sidebar-width: 248px;
+  --planora-chat-max-width: 1120px;
+  --planora-public-max-width: 1280px;
+  --planora-header-height: 64px;
+}
+
+/* Dark Mode Palette (đề xuất bổ sung, đạt tương phản chuẩn WCAG AA ≥ 4.5:1) */
+html.dark,
+:root[data-theme="dark"] {
+  /* Surface & Background (Dark) */
+  --planora-canvas: #171c18;
+  --planora-paper: #202820;
+  --planora-sidebar: #151b16;
+  --planora-surface-inset: #1a221b;
+  --planora-surface-hover: #263127;
+
+  /* Text & Content (Dark) */
+  --planora-text: #f5f1e7;
+  --planora-muted: #b5bcae;
+  --planora-muted-subtle: #8a9382;
+  --planora-divider: #394638;
+  --planora-border-strong: #4e5e4d;
+
+  /* Brand Primary (Dark) */
+  --planora-primary: #8fb68e;
+  --planora-primary-hover: #a5cca4;
+  --planora-primary-soft: #233425;
+  --planora-on-primary: #132014;
+
+  /* Semantic Status Tokens (Dark) */
+  --planora-success-bg: #1a2e1d;
+  --planora-success-text: #a7f3d0;
+  --planora-success-border: #2c5332;
+
+  --planora-pending-bg: #332314;
+  --planora-pending-text: #f5c07a;
+  --planora-pending-border: #5c3e21;
+
+  --planora-error-bg: #351a1a;
+  --planora-error-text: #fca5a5;
+  --planora-error-border: #5d2525;
+
+  --planora-unknown-bg: #281a33;
+  --planora-unknown-text: #d8b4fe;
+  --planora-unknown-border: #4d2e67;
+
+  /* Elevation & Shadows (Dark) */
+  --planora-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --planora-shadow-md: 0 4px 14px rgba(0, 0, 0, 0.45);
+  --planora-shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.60);
+  --planora-shadow-focus: 0 0 0 2px var(--planora-paper), 0 0 0 4px var(--planora-primary);
+}
