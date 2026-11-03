@@ -415,7 +415,7 @@ function findUngrounded(steps: PlanStep[], catalog: Map<string, ToolDefinition>,
         ungrounded.push({ stepId: step.id, argument, resource, value });
       }
     }
-    if (step.tool === 'trello.update_checklist_item' && typeof step.args?.cardId === 'string') {
+    if (step.tool.endsWith('.update_checklist_item') && typeof step.args?.cardId === 'string') {
       const cardEntries = [
         ...(Array.isArray(grounding.memory.card)
           ? grounding.memory.card
