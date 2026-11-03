@@ -171,7 +171,7 @@ const GRIDS: Record<string, string[][]> = {
 const ENTITIES: Record<string, Array<{ id: string | number }>> = {
   board: BOARDS, list: LISTS, member: MEMBERS, card: CARDS, channel: CHANNELS, repository: REPOS, issue: ISSUES,
   spreadsheet: SPREADSHEETS, sheet: SHEETS, calendar: CALENDARS, mycalendar: MYCALENDARS, database: DATABASES, page: PAGES,
-  chat: CHATS, project: PROJECTS, jira_site: MYJIRA_SITES, jira_project: [...PROJECTS, ...MYJIRA_PROJECTS], jira_issue: [...JIRA_ISSUES, ...MYJIRA_ISSUES], thread: GMAIL_THREADS, label: GMAIL_LABELS,
+  chat: CHATS, project: PROJECTS, jira_site: MYJIRA_SITES, jira_project: PROJECTS, jira_issue: JIRA_ISSUES, myjira_project: MYJIRA_PROJECTS, myjira_issue: MYJIRA_ISSUES, thread: GMAIL_THREADS, label: GMAIL_LABELS,
 };
 
 /** Every value a resource argument may legitimately take, by x-resource name. */
@@ -256,7 +256,7 @@ export async function fixtureSearch({ tool, args }: { tool: string; args: Record
       return bounded(MYJIRA_PROJECTS.filter(item => item.siteId === args.siteId && (matches(item.name, args.query) || matches(item.key, args.query))), 20);
     case 'myjira.search_issues':
       requireParent('jira_site', args.siteId, 'siteId');
-      requireParent('jira_project', args.projectKey, 'key');
+      requireParent('myjira_project', args.projectKey, 'key');
       return { issues: bounded(MYJIRA_ISSUES.filter(item => item.siteId === args.siteId && item.projectKey === args.projectKey && (matches(item.title, args.query) || matches(item.key, args.query)))
         .map(({ projectKey: _parent, ...issue }) => issue), 20) };
     case 'gmail.search_threads':
