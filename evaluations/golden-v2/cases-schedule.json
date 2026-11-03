@@ -1,0 +1,422 @@
+{
+  "version": 1,
+  "clock": "2026-09-29T10:00:00+07:00",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "cases": [
+    {
+      "id": "sc_create01",
+      "category": "schedule",
+      "language": "vi",
+      "services": [
+        "calendar",
+        "slack"
+      ],
+      "prompt": "9 giờ sáng mai, lấy các sự kiện trong Google Calendar Team rồi gửi lên kênh Slack #frontend.",
+      "expect": {
+        "kind": "schedule",
+        "action": "create",
+        "recurrence": {
+          "type": "once",
+          "date": "2026-09-30",
+          "time": "09:00"
+        }
+      }
+    },
+    {
+      "id": "sc_create02",
+      "category": "schedule",
+      "language": "en",
+      "services": [
+        "trello",
+        "slack"
+      ],
+      "prompt": "Tomorrow at 2:30 PM, create a card \"Release checklist\" in list To Do of Trello board Frontend and post its link to Slack #release.",
+      "expect": {
+        "kind": "schedule",
+        "action": "create",
+        "recurrence": {
+          "type": "once",
+          "date": "2026-09-30",
+          "time": "14:30"
+        }
+      }
+    },
+    {
+      "id": "sc_create03",
+      "category": "schedule",
+      "language": "vi",
+      "services": [
+        "calendar",
+        "slack"
+      ],
+      "prompt": "Mỗi sáng 8 giờ, gửi lịch họp hôm nay từ Google Calendar Team lên kênh Slack #frontend.",
+      "expect": {
+        "kind": "schedule",
+        "action": "create",
+        "recurrence": {
+          "type": "daily",
+          "time": "08:00"
+        }
+      }
+    },
+    {
+      "id": "sc_create04",
+      "category": "schedule",
+      "language": "en",
+      "services": [
+        "sheets",
+        "slack"
+      ],
+      "prompt": "Every day at 17:00, read cells Tasks!A1:B2 from the Google Sheets spreadsheet Frontend and post a summary to Slack #general.",
+      "expect": {
+        "kind": "schedule",
+        "action": "create",
+        "recurrence": {
+          "type": "daily",
+          "time": "17:00"
+        }
+      }
+    },
+    {
+      "id": "sc_create05",
+      "category": "schedule",
+      "language": "vi",
+      "services": [
+        "jira",
+        "telegram"
+      ],
+      "prompt": "Thứ Hai và thứ Sáu hằng tuần lúc 9 giờ sáng, tổng hợp các issue đang mở của dự án Jira FE rồi gửi vào nhóm Telegram frontend.",
+      "expect": {
+        "kind": "schedule",
+        "action": "create",
+        "recurrence": {
+          "type": "weekly",
+          "time": "09:00",
+          "days": [
+            1,
+            5
+          ]
+        }
+      }
+    },
+    {
+      "id": "sc_create06",
+      "category": "schedule",
+      "language": "en",
+      "services": [
+        "github",
+        "slack"
+      ],
+      "prompt": "Every Monday, Wednesday, and Friday at 08:30, check open issues in GitHub repo acme/web and post them to Slack #frontend.",
+      "expect": {
+        "kind": "schedule",
+        "action": "create",
+        "recurrence": {
+          "type": "weekly",
+          "time": "08:30",
+          "days": [
+            1,
+            3,
+            5
+          ]
+        }
+      }
+    },
+    {
+      "id": "sc_plan01",
+      "category": "single_step",
+      "language": "vi",
+      "services": [
+        "calendar"
+      ],
+      "prompt": "Tạo sự kiện \"Họp Sprint\" trên Google Calendar Team ngày mai từ 09:00 đến 10:00, chỉ ghi lịch, không mời người tham gia.",
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "calendar.create_event",
+            "args": {
+              "calendarId": {
+                "equals": "team@example.test"
+              },
+              "summary": {
+                "includesAll": [
+                  "Họp Sprint"
+                ]
+              },
+              "start": {
+                "instantEquals": "2026-09-30T09:00:00+07:00"
+              },
+              "end": {
+                "instantEquals": "2026-09-30T10:00:00+07:00"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "sc_plan02",
+      "category": "single_step",
+      "language": "en",
+      "services": [
+        "calendar"
+      ],
+      "prompt": "Create a Google Calendar event \"Architecture sync\" in Team tomorrow from 3pm to 4pm, without invitations.",
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "calendar.create_event",
+            "args": {
+              "calendarId": {
+                "equals": "team@example.test"
+              },
+              "summary": {
+                "includesAll": [
+                  "Architecture sync"
+                ]
+              },
+              "start": {
+                "instantEquals": "2026-09-30T15:00:00+07:00"
+              },
+              "end": {
+                "instantEquals": "2026-09-30T16:00:00+07:00"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "sc_plan03",
+      "category": "single_step",
+      "language": "vi",
+      "services": [
+        "trello"
+      ],
+      "prompt": "Tạo card \"Hoàn thiện báo cáo\" trong list To Do của board Trello Frontend, hạn chót thứ Sáu tuần này.",
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "trello.create_card",
+            "args": {
+              "listId": {
+                "equals": "list_fe_todo"
+              },
+              "title": {
+                "equals": "Hoàn thiện báo cáo"
+              },
+              "due": {
+                "startsWith": "2026-10-02"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "sc_plan04",
+      "category": "single_step",
+      "language": "en",
+      "services": [
+        "slack"
+      ],
+      "prompt": "Right now, send a message to Slack #general saying \"Deployment v3.1 has started\".",
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "slack.send_message",
+            "args": {
+              "channel": {
+                "equals": "C_GEN"
+              },
+              "text": {
+                "includesAll": [
+                  "v3.1"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "sc_clar01",
+      "category": "clarification",
+      "language": "vi",
+      "services": [
+        "calendar",
+        "slack"
+      ],
+      "prompt": "Mỗi ngày gửi lịch họp từ Google Calendar Team lên kênh Slack #frontend.",
+      "expect": {
+        "kind": "clarification"
+      }
+    },
+    {
+      "id": "sc_clar02",
+      "category": "clarification",
+      "language": "en",
+      "services": [
+        "slack"
+      ],
+      "prompt": "On the first day of every month at 09:00, post the release checklist to Slack #release.",
+      "expect": {
+        "kind": "clarification"
+      }
+    },
+    {
+      "id": "sc_clar03",
+      "category": "read_only",
+      "language": "vi",
+      "services": [
+        "calendar"
+      ],
+      "prompt": "Mỗi sáng 8 giờ, cho tôi xem danh sách sự kiện hôm nay trên Google Calendar Team; không ghi hay gửi đi đâu.",
+      "expect": {
+        "kind": "clarification"
+      }
+    },
+    {
+      "id": "sc_turn01",
+      "category": "schedule",
+      "language": "vi",
+      "services": [
+        "calendar",
+        "slack"
+      ],
+      "turns": [
+        {
+          "role": "user",
+          "content": "Mỗi sáng 8 giờ, gửi lịch họp hôm nay từ Google Calendar Team lên kênh Slack #frontend."
+        },
+        {
+          "role": "assistant",
+          "content": {
+            "type": "schedule_proposal",
+            "services": [
+              "calendar",
+              "slack"
+            ],
+            "proposal": {
+              "kind": "schedule",
+              "action": "create",
+              "name": "Lịch họp hằng ngày",
+              "request": "Gửi lịch họp hôm nay từ Google Calendar Team lên kênh Slack #frontend",
+              "recurrence": {
+                "type": "daily",
+                "time": "08:00"
+              },
+              "summary": "Mỗi sáng 8 giờ, gửi lịch họp hôm nay từ Google Calendar Team lên kênh Slack #frontend."
+            }
+          }
+        }
+      ],
+      "prompt": "Đổi lịch này sang 8 giờ 30 sáng mỗi ngày.",
+      "expect": {
+        "kind": "schedule",
+        "action": "update",
+        "recurrence": {
+          "type": "daily",
+          "time": "08:30"
+        }
+      }
+    },
+    {
+      "id": "sc_turn02",
+      "category": "schedule",
+      "language": "vi",
+      "services": [
+        "calendar",
+        "slack"
+      ],
+      "turns": [
+        {
+          "role": "user",
+          "content": "Mỗi sáng 8 giờ, gửi lịch họp hôm nay từ Google Calendar Team lên kênh Slack #frontend."
+        },
+        {
+          "role": "assistant",
+          "content": {
+            "type": "schedule_proposal",
+            "services": [
+              "calendar",
+              "slack"
+            ],
+            "proposal": {
+              "kind": "schedule",
+              "action": "create",
+              "name": "Lịch họp hằng ngày",
+              "request": "Gửi lịch họp hôm nay từ Google Calendar Team lên kênh Slack #frontend",
+              "recurrence": {
+                "type": "daily",
+                "time": "08:00"
+              },
+              "summary": "Mỗi sáng 8 giờ, gửi lịch họp hôm nay từ Google Calendar Team lên kênh Slack #frontend."
+            }
+          }
+        }
+      ],
+      "prompt": "Đổi thành chỉ chạy từ thứ Hai đến thứ Sáu lúc 8 giờ 30 sáng.",
+      "expect": {
+        "kind": "schedule",
+        "action": "update",
+        "recurrence": {
+          "type": "weekly",
+          "time": "08:30",
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
+        }
+      }
+    },
+    {
+      "id": "sc_turn03",
+      "category": "schedule",
+      "language": "vi",
+      "services": [
+        "calendar",
+        "slack"
+      ],
+      "turns": [
+        {
+          "role": "user",
+          "content": "Mỗi sáng 8 giờ, gửi lịch họp hôm nay từ Google Calendar Team lên kênh Slack #frontend."
+        },
+        {
+          "role": "assistant",
+          "content": {
+            "type": "schedule_proposal",
+            "services": [
+              "calendar",
+              "slack"
+            ],
+            "proposal": {
+              "kind": "schedule",
+              "action": "create",
+              "name": "Lịch họp hằng ngày",
+              "request": "Gửi lịch họp hôm nay từ Google Calendar Team lên kênh Slack #frontend",
+              "recurrence": {
+                "type": "daily",
+                "time": "08:00"
+              },
+              "summary": "Mỗi sáng 8 giờ, gửi lịch họp hôm nay từ Google Calendar Team lên kênh Slack #frontend."
+            }
+          }
+        }
+      ],
+      "prompt": "Tạm dừng lịch này.",
+      "expect": {
+        "kind": "schedule",
+        "action": "pause"
+      }
+    }
+  ]
+}
