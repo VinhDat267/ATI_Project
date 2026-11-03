@@ -598,5 +598,63 @@ describe('Trello Frontend UI/UX Suite (Tasks 1-4)', () => {
       const boardLink = await screen.findByRole('link', { name: /Sprint Board/i });
       expect(boardLink).toHaveAttribute('href', 'https://trello.com/b/b1');
     });
+
+    it('renders closed: false unarchive badge, checklist itemName + checkItemId, and full Calendar RRULE parameters in PreviewContents', () => {
+      const { unmount: unmountUnarchive } = render(
+        <PreviewContents
+          step={{
+            id: 's-unarchive',
+            tool: 'trello.update_card',
+            description: 'Mở lại thẻ',
+            args: { cardId: 'c1', closed: false },
+            dependsOn: [],
+          }}
+          destination="Thẻ đã lưu trữ"
+        />
+      );
+      expect(screen.getByText(/Mở lại thẻ \(Unarchive\)/i)).toBeInTheDocument();
+      unmountUnarchive();
+
+      const { unmount: unmountChk } = render(
+        <PreviewContents
+          step={{
+            id: 's-chk',
+            tool: 'trello.update_checklist_item',
+            description: 'Cập nhật checklist',
+            args: {
+              cardId: 'c1',
+              itemName: 'Deploy production',
+              checkItemId: 'chk-item-99',
+              state: 'complete',
+            },
+            dependsOn: [],
+          }}
+          destination="Release Card"
+        />
+      );
+      expect(screen.getByText(/Deploy production/)).toBeInTheDocument();
+      expect(screen.getByText(/\(chk-item-99\)/)).toBeInTheDocument();
+      unmountChk();
+
+      render(
+        <PreviewContents
+          step={{
+            id: 's-cal',
+            tool: 'mycalendar.create_event',
+            description: 'Tạo lịch họp định kỳ',
+            args: {
+              calendarId: 'primary',
+              summary: 'Sprint Retrospective',
+              start: '2026-11-10T09:00:00Z',
+              end: '2026-11-10T10:00:00Z',
+              recurrence: 'RRULE:FREQ=WEEKLY;INTERVAL=3;COUNT=2',
+            },
+            dependsOn: [],
+          }}
+          destination="Lịch chính"
+        />
+      );
+      expect(screen.getByText(/3 tuần 1 lần, 2 lần/)).toBeInTheDocument();
+    });
   });
 });

@@ -387,5 +387,189 @@ describe('Trello Automated Digest (Task 3: trello_digest & Telegram Trello enric
         },
       });
     });
+
+    it('marks run as needs_attention on ambiguous delivery failure (blocking duplicate replan) and discards when schedule is cancelled before delivery', async () => {
+      const user = await db.person('TrelloDigestSafetyOwner');
+      const convRes = await db.pool.query(
+        "INSERT INTO conversations(user_id, status, title) VALUES($1, 'chatting', 'Lịch Trello Safety') RETURNING id",
+        [user.id]
+      );
+      const convId = convRes.rows[0].id as string;
+
+      const config = {
+        credentialId: 'cred-trello-1',
+        trelloMemberId: 'mem-1',
+        username: 'alice_trello',
+        boards: [{ id: 'b1', name: 'Frontend' }],
+        channelId: 'C_DEV',
+        channelName: 'dev',
+        dueSoonHours: 24,
+      };
+      const configHash = computeTrelloDigestConfigHash({ config, recurrence, userId: user.id });
+      const proposalMeta = {
+        type: 'schedule_proposal',
+        proposal: {
+          kind: 'schedule',
+          action: 'create',
+          name: 'Báo cáo Trello Safety',
+          request: 'Mỗi sáng báo cáo các thẻ quá hạn trên bảng Frontend gửi vào kênh #dev',
+          recurrence,
+          summary: 'Tạo lịch báo cáo Trello mỗi sáng lúc 08:30',
+        },
+        scheduleId: null,
+        baseVersion: null,
+        services: ['trello', 'slack'],
+        nextRuns: ['2026-11-03T01:30:00.000Z'],
+        previous: null,
+        digestCandidate: { canAutoDigest: true, config, configHash },
+      };
+
+      const msgRes = await db.pool.query(
+        "INSERT INTO messages(conv_id, role, content, metadata) VALUES($1, 'assistant', 'Đề xuất lịch', $2::jsonb) RETURNING id",
+        [convId, JSON.stringify(proposalMeta)]
+      );
+      const service = new ScheduleService({ pool: db.pool, timeZone: 'Asia/Ho_Chi_Minh' });
+      const confirmed = await service.confirmProposal({
+        userId: user.id,
+        convId,
+        messageId: msgRes.rows[0].id as string,
+        now: new Date('2026-11-02T01:00:00.000Z'),
+        approvalMode: 'auto_digest',
+      });
+
+      // 1. Ambiguous Slack delivery error -> delivery_unknown -> needs_attention -> replanRun rejected with 409
+      let slackSendCalls = 0;
+      const runner1 = new ScheduleRunner({
+        pool: db.pool,
+        timeZone: 'Asia/Ho_Chi_Minh',
+        now: () => new Date('2026-11-02T01:31:00.000Z'),
+        planRun: async () => {
+          throw new Error('Should not call planRun');
+        },
+        runTrelloDigest: createTrelloDigestRunner({
+          pool: db.pool,
+          trelloConnection: async () => ({
+            status: 'connected',
+            connection: {
+              credentialId: 'cred-trello-1',
+              memberId: 'mem-1',
+              username: 'alice_trello',
+              boardIds: ['b1'],
+            },
+          }),
+          getAdapter: async (serviceName: string) => {
+            if (serviceName === 'trello') {
+              return { execute: vi.fn().mockResolvedValue([]) };
+            }
+            if (serviceName === 'slack') {
+              return {
+                execute: vi.fn().mockImplementation(async (tool: string) => {
+                  if (tool === 'slack.search_channels') return [{ id: 'C_DEV', name: 'dev' }];
+                  if (tool === 'slack.send_message') {
+                    slackSendCalls++;
+                    throw new Error('Socket hang up after Slack accepted POST');
+                  }
+                }),
+              };
+            }
+            return null;
+          },
+        }),
+        recordState: (client, row, now) => service.recordState(client, row, now),
+      });
+
+      await runner1.tick();
+      expect(slackSendCalls).toBe(1);
+
+      const runsAfterUnknown = await service.listRuns(
+        user.id,
+        confirmed.schedule.id,
+        5,
+        new Date('2026-11-02T01:32:00.000Z')
+      );
+      expect(runsAfterUnknown[0]?.state).toBe('needs_attention');
+
+      await expect(
+        service.startRun({
+          userId: user.id,
+          runId: runsAfterUnknown[0]!.id,
+          trigger: 'replan',
+          now: new Date('2026-11-02T01:32:00.000Z'),
+        })
+      ).rejects.toMatchObject({ code: 'RUN_NOT_REPLANNABLE' });
+
+      // 2. Schedule cancelled after Trello cards are read -> claimTrelloDigestDelivery returns discarded without calling slack.send_message
+      const convRes2 = await db.pool.query(
+        "INSERT INTO conversations(user_id, status, title) VALUES($1, 'chatting', 'Lịch Trello Safety 2') RETURNING id",
+        [user.id]
+      );
+      const convId2 = convRes2.rows[0].id as string;
+      const msgRes2 = await db.pool.query(
+        "INSERT INTO messages(conv_id, role, content, metadata) VALUES($1, 'assistant', 'Đề xuất lịch 2', $2::jsonb) RETURNING id",
+        [convId2, JSON.stringify(proposalMeta)]
+      );
+      const confirmed2 = await service.confirmProposal({
+        userId: user.id,
+        convId: convId2,
+        messageId: msgRes2.rows[0].id as string,
+        now: new Date('2026-11-02T01:00:00.000Z'),
+        approvalMode: 'auto_digest',
+      });
+
+      let slackSendCallsAfterCancel = 0;
+      const runner2 = new ScheduleRunner({
+        pool: db.pool,
+        timeZone: 'Asia/Ho_Chi_Minh',
+        now: () => new Date('2026-11-02T01:31:00.000Z'),
+        planRun: async () => {
+          throw new Error('Should not call planRun');
+        },
+        runTrelloDigest: createTrelloDigestRunner({
+          pool: db.pool,
+          trelloConnection: async () => ({
+            status: 'connected',
+            connection: {
+              credentialId: 'cred-trello-1',
+              memberId: 'mem-1',
+              username: 'alice_trello',
+              boardIds: ['b1'],
+            },
+          }),
+          getAdapter: async (serviceName: string) => {
+            if (serviceName === 'trello') {
+              return {
+                execute: vi.fn().mockImplementation(async () => {
+                  // Cancel the schedule while Trello read is in flight!
+                  await service.setStatus({
+                    userId: user.id,
+                    scheduleId: confirmed2.schedule.id,
+                    action: 'cancel',
+                    version: confirmed2.schedule.version,
+                    now: new Date('2026-11-02T01:31:05.000Z'),
+                  });
+                  return [];
+                }),
+              };
+            }
+            if (serviceName === 'slack') {
+              return {
+                execute: vi.fn().mockImplementation(async (tool: string) => {
+                  if (tool === 'slack.search_channels') return [{ id: 'C_DEV', name: 'dev' }];
+                  if (tool === 'slack.send_message') {
+                    slackSendCallsAfterCancel++;
+                    return { ts: '1700000099.001' };
+                  }
+                }),
+              };
+            }
+            return null;
+          },
+        }),
+        recordState: (client, row, now) => service.recordState(client, row, now),
+      });
+
+      await runner2.tick();
+      expect(slackSendCallsAfterCancel).toBe(0);
+    });
   });
 });

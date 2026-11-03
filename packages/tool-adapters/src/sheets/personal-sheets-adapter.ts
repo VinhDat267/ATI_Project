@@ -264,13 +264,16 @@ export class PersonalSheetsAdapter extends BaseAdapter {
         const quotedSheet = /\s|'/.test(sheet) ? "'" + sheet.replaceAll("'", "''") + "'" : sheet;
         const readRange = `${quotedSheet}!A1:Z500`;
         const value = await this.request(id + '/values/' + encodeURIComponent(readRange), signal);
-        const rawRows = (Array.isArray(value?.values) ? value.values : []).slice(0, 500).map((row: unknown[]) =>
-          (Array.isArray(row) ? row : []).slice(0, SHEETS_MAX_COLUMNS).map((cell) => {
-            const clipped = clipText(cell == null ? '' : String(cell), SHEETS_MAX_CELL_CHARS);
-            return clipped.text;
-          })
+        const rawValues: unknown[][] = Array.isArray(value?.values) ? value.values : [];
+        const rowTruncated =
+          rawValues.length > 500 ||
+          rawValues.slice(0, 500).some((r) => Array.isArray(r) && r.length > SHEETS_MAX_COLUMNS);
+        const rawRows = rawValues.slice(0, 500).map((row: unknown[]) =>
+          (Array.isArray(row) ? row : []).slice(0, SHEETS_MAX_COLUMNS).map((cell) =>
+            cell == null ? '' : String(cell)
+          )
         );
-        return filterSearchedRows(sheet, rawRows, args, limit);
+        return filterSearchedRows(sheet, rawRows, args, limit, rowTruncated);
       }
 
       if (toolName === 'mysheets.aggregate_rows') {
@@ -288,10 +291,9 @@ export class PersonalSheetsAdapter extends BaseAdapter {
         const readRange = `${quotedSheet}!A1:Z500`;
         const value = await this.request(id + '/values/' + encodeURIComponent(readRange), signal);
         const rawRows = (Array.isArray(value?.values) ? value.values : []).slice(0, 500).map((row: unknown[]) =>
-          (Array.isArray(row) ? row : []).slice(0, SHEETS_MAX_COLUMNS).map((cell) => {
-            const clipped = clipText(cell == null ? '' : String(cell), SHEETS_MAX_CELL_CHARS);
-            return clipped.text;
-          })
+          (Array.isArray(row) ? row : []).slice(0, SHEETS_MAX_COLUMNS).map((cell) =>
+            cell == null ? '' : String(cell)
+          )
         );
         return computeSheetAggregation(sheet, rawRows, args);
       }
@@ -441,7 +443,7 @@ export class PersonalSheetsAdapter extends BaseAdapter {
         const id = this.checkedId(args.spreadsheetId);
         const sheet = titleText(args.sheet);
         if (args.rowNumbers !== undefined) {
-          buildDeleteRowRequests(0, [], { rowNumbers: args.rowNumbers });
+          buildDeleteRowRequests(0, [], args);
         }
         const tabs = await this.tabs(id, signal);
         const matchedTab = tabs.find((tab) => tab.title === sheet);
@@ -521,7 +523,24 @@ export class PersonalSheetsAdapter extends BaseAdapter {
           actualTitle = typeof props?.title === 'string' ? props.title : title;
         }
 
-        if (rawHeaders && (!existing?.headers || existing.headers.length === 0)) {
+        let existingHeaders = existing?.headers && existing.headers.length > 0 ? existing.headers : undefined;
+        if (existing && !existingHeaders) {
+          const quotedExisting = /\s|'/.test(actualTitle) ? "'" + actualTitle.replaceAll("'", "''") + "'" : actualTitle;
+          const row1Data = await this.request(
+            id + '/values/' + encodeURIComponent(`${quotedExisting}!A1:Z1`),
+            signal,
+          );
+          const row1 = Array.isArray(row1Data?.values?.[0]) ? row1Data.values[0] : [];
+          const extracted = row1
+            .slice(0, SHEETS_MAX_COLUMNS)
+            .map((cell: unknown) => clipText(cell == null ? '' : String(cell).trim(), SHEETS_MAX_CELL_CHARS).text)
+            .filter((cell: string) => cell.length > 0);
+          if (extracted.length > 0) {
+            existingHeaders = extracted;
+          }
+        }
+
+        if (rawHeaders && (!existingHeaders || existingHeaders.length === 0)) {
           const quotedTitle = /\s|'/.test(actualTitle) ? "'" + actualTitle.replaceAll("'", "''") + "'" : actualTitle;
           await this.request(
             id + '/values:batchUpdate',
@@ -542,7 +561,7 @@ export class PersonalSheetsAdapter extends BaseAdapter {
           );
         }
 
-        const finalHeaders = rawHeaders ?? existing?.headers;
+        const finalHeaders = existingHeaders && existingHeaders.length > 0 ? existingHeaders : rawHeaders;
         return {
           id: sheetId,
           title: actualTitle,

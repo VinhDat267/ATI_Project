@@ -1,4 +1,5 @@
 import { StepError } from '../base-adapter.js';
+import { SHEETS_MAX_CELL_CHARS, clipText } from '../bounds.js';
 import { GlobalRateLimiter } from '../rate-limiter.js';
 
 export const spreadsheetPattern = /^[A-Za-z0-9_-]{20,}$/;
@@ -447,7 +448,7 @@ export function filterDuplicateRows(
   skippedDuplicates: number;
 } {
   const existingRowMap = new Map<string, { rowNumber: number; fullSig: string }>();
-  for (let i = 0; i < existingRows.length; i++) {
+  for (let i = 1; i < existingRows.length; i++) {
     const existing = existingRows[i];
     if (!Array.isArray(existing)) continue;
     const sig = buildRowDedupSignature(existing, keyColumns);
@@ -591,18 +592,27 @@ export function mapRecordsToRows(records: unknown, headers: string[]): string[][
 }
 
 export function parseSheetNumber(raw: string): number | null {
+  const hasVnCurrency = /(?:vnđ|vnd|đ|₫)/iu.test(raw);
   const cleaned = raw
     .replace(/(?:vnđ|vnd|usd|đ|₫|\$|€|%)/giu, '')
     .trim();
   if (!cleaned) return null;
-  if (/^-?\d{1,3}(?:\.\d{3})+(?:,\d+)?$/.test(cleaned)) {
+  if (
+    /^-?[1-9]\d{0,2}(?:\.\d{3}){2,}(?:,\d+)?$/.test(cleaned) ||
+    /^-?[1-9]\d{0,2}(?:\.\d{3})+,\d+$/.test(cleaned) ||
+    (hasVnCurrency && /^-?[1-9]\d{0,2}(?:\.\d{3})+$/.test(cleaned))
+  ) {
     const normalized = cleaned.replaceAll('.', '').replace(',', '.');
     const n = Number(normalized);
     return Number.isFinite(n) ? n : null;
   }
-  if (/^-?\d{1,3}(?:,\d{3})+(?:\.\d+)?$/.test(cleaned)) {
+  if (/^-?[1-9]\d{0,2}(?:,\d{3})+(?:\.\d+)?$/.test(cleaned)) {
     const normalized = cleaned.replaceAll(',', '');
     const n = Number(normalized);
+    return Number.isFinite(n) ? n : null;
+  }
+  if (/^-?\d+,\d+$/.test(cleaned)) {
+    const n = Number(cleaned.replace(',', '.'));
     return Number.isFinite(n) ? n : null;
   }
   if (/^-?\d+(?:\.\d+)?$/.test(cleaned)) {
@@ -721,12 +731,14 @@ export function filterSearchedRows(
   sheet: string,
   rawRows: string[][],
   args: Record<string, unknown>,
-  limit: number
+  limit: number,
+  initialTruncated = false
 ): {
   sheet: string;
   headers: string[];
   totalMatched: number;
   matches: Array<{ rowNumber: number; values: string[]; record: Record<string, string> }>;
+  truncated?: boolean;
 } {
   if (args.query !== undefined && (typeof args.query !== 'string' || args.query.length > 200)) {
     invalid('query must be a string up to 200 characters');
@@ -741,8 +753,14 @@ export function filterSearchedRows(
     invalid('value must be a string up to 500 characters');
   }
 
+  let truncated = initialTruncated;
   const headerRow = rawRows[0] ?? [];
-  const headers = headerRow.map((h, idx) => h.trim() || `col_${idx + 1}`);
+  const headers = headerRow.map((h, idx) => {
+    const rawH = h.trim() || `col_${idx + 1}`;
+    const clippedH = clipText(rawH, SHEETS_MAX_CELL_CHARS);
+    if (clippedH.clipped) truncated = true;
+    return clippedH.text;
+  });
 
   const resolvedConditions: Array<{
     colIdx: number;
@@ -785,7 +803,7 @@ export function filterSearchedRows(
 
   const queryLower = typeof args.query === 'string' ? args.query.trim().toLowerCase() : '';
 
-  const allMatches: Array<{ rowNumber: number; values: string[]; record: Record<string, string> }> = [];
+  const allMatches: Array<{ rowNumber: number; rawValues: string[] }> = [];
   for (let i = 1; i < rawRows.length; i++) {
     const row = rawRows[i] ?? [];
     if (row.every((c) => c.trim() === '')) continue;
@@ -805,24 +823,37 @@ export function filterSearchedRows(
     }
     if (!allCondsPass) continue;
 
-    const record: Record<string, string> = {};
-    const maxCols = Math.max(headers.length, row.length);
-    for (let c = 0; c < maxCols; c++) {
-      const key = headers[c] || `col_${c + 1}`;
-      record[key] = row[c] ?? '';
-    }
     allMatches.push({
       rowNumber: i + 1,
-      values: row,
-      record,
+      rawValues: row,
     });
   }
+
+  const matches = allMatches.slice(0, limit).map(({ rowNumber, rawValues }) => {
+    const clippedValues = rawValues.map((c) => {
+      const clipped = clipText(c, SHEETS_MAX_CELL_CHARS);
+      if (clipped.clipped) truncated = true;
+      return clipped.text;
+    });
+    const record: Record<string, string> = {};
+    const maxCols = Math.max(headers.length, clippedValues.length);
+    for (let c = 0; c < maxCols; c++) {
+      const key = headers[c] || `col_${c + 1}`;
+      record[key] = clippedValues[c] ?? '';
+    }
+    return {
+      rowNumber,
+      values: clippedValues,
+      record,
+    };
+  });
 
   return {
     sheet,
     headers,
     totalMatched: allMatches.length,
-    matches: allMatches.slice(0, limit),
+    matches,
+    ...(truncated ? { truncated: true } : {}),
   };
 }
 
@@ -955,6 +986,9 @@ export function buildDeleteRowRequests(
   if (!hasRowNumbers && (!hasMatchCol || !hasMatchVal)) {
     invalid('delete_rows requires either rowNumbers or matchColumn + matchValue');
   }
+  if (hasRowNumbers && (args.matchColumn !== undefined || args.matchValue !== undefined)) {
+    invalid('delete_rows accepts either rowNumbers or matchColumn + matchValue, not both');
+  }
 
   const targetRowSet = new Set<number>();
 
@@ -981,6 +1015,7 @@ export function buildDeleteRowRequests(
     const colIdx = resolveSheetColumnIndex(args.matchColumn as string, headerRow);
     const needle = normalizeCellForDedup(args.matchValue).toLowerCase();
     for (let i = 1; i < existingRows.length; i++) {
+      if (targetRowSet.size >= 20) break;
       const row = existingRows[i];
       if (!Array.isArray(row)) continue;
       if (normalizeCellForDedup(row[colIdx]).toLowerCase() === needle) {

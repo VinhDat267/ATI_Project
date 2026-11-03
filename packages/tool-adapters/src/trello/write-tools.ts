@@ -327,35 +327,90 @@ export class TrelloWriteTools extends TrelloReadTools {
     const cardInfo = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
     this.assertParentBoard(cardInfo, options?.boardId);
 
-    let targetCheckItemId = args.checkItemId;
-    let matchedName = args.itemName;
-
-    if (!targetCheckItemId) {
-      const checklists = await this.request<any[]>(`/cards/${args.cardId}/checklists`, { signal: options?.signal });
-      const needle = (args.itemName || '').trim().toLowerCase();
-      const allItems: Array<{ id: string; name: string; state: string }> = [];
-      if (Array.isArray(checklists)) {
-        for (const chk of checklists) {
-          const items = Array.isArray(chk?.checkItems) ? chk.checkItems : Array.isArray(chk?.items) ? chk.items : [];
-          for (const it of items) {
-            if (it?.id && it?.name) {
-              allItems.push({ id: String(it.id), name: String(it.name), state: String(it.state || 'incomplete') });
-            }
+    const checklists = await this.request<any[]>(`/cards/${args.cardId}/checklists`, { signal: options?.signal });
+    const needle = (args.itemName || '').trim().toLowerCase();
+    const allItems: Array<{ id: string; name: string; state: string }> = [];
+    if (Array.isArray(checklists)) {
+      for (const chk of checklists) {
+        const items = Array.isArray(chk?.checkItems) ? chk.checkItems : Array.isArray(chk?.items) ? chk.items : [];
+        for (const it of items) {
+          if (it?.id && it?.name) {
+            allItems.push({ id: String(it.id), name: String(it.name), state: String(it.state || 'incomplete') });
           }
         }
       }
-      const exact = allItems.find((it) => it.name.trim().toLowerCase() === needle);
-      const partial = exact ?? allItems.find((it) => it.name.toLowerCase().includes(needle) || needle.includes(it.name.toLowerCase()));
-      if (!partial) {
+    }
+
+    let targetCheckItemId =
+      typeof args.checkItemId === 'string' && args.checkItemId.trim()
+        ? args.checkItemId.trim()
+        : undefined;
+    let matchedName = args.itemName;
+
+    if (targetCheckItemId) {
+      const byId = allItems.find((it) => it.id === targetCheckItemId);
+      if (!byId) {
         throw new StepError({
-          message: `Checklist item '${args.itemName}' not found on card '${args.cardId}'`,
+          message: `Checklist item '${targetCheckItemId}' not found on card '${args.cardId}'`,
           category: 'NOT_FOUND',
           statusCode: 404,
           retryable: false,
         });
       }
-      targetCheckItemId = partial.id;
-      matchedName = partial.name;
+      if (needle) {
+        const itemLower = byId.name.trim().toLowerCase();
+        const exactMatch = itemLower === needle;
+        const partialMatches = allItems.filter(
+          (it) => it.name.toLowerCase().includes(needle) || needle.includes(it.name.toLowerCase()),
+        );
+        const unambiguousPartial =
+          partialMatches.length === 1 && partialMatches[0]!.id === byId.id;
+        if (!exactMatch && !unambiguousPartial) {
+          throw new StepError({
+            message: `Checklist item ID '${targetCheckItemId}' ('${byId.name}') does not match itemName '${args.itemName}'`,
+            category: 'VALIDATION',
+            statusCode: 400,
+            retryable: false,
+          });
+        }
+      }
+      matchedName = byId.name;
+    } else {
+      const exactMatches = allItems.filter((it) => it.name.trim().toLowerCase() === needle);
+      if (exactMatches.length > 1) {
+        throw new StepError({
+          message: `Checklist item '${args.itemName}' is ambiguous (${exactMatches.length} exact matches) on card '${args.cardId}'`,
+          category: 'VALIDATION',
+          statusCode: 400,
+          retryable: false,
+        });
+      }
+      if (exactMatches.length === 1) {
+        targetCheckItemId = exactMatches[0]!.id;
+        matchedName = exactMatches[0]!.name;
+      } else {
+        const partialMatches = allItems.filter(
+          (it) => it.name.toLowerCase().includes(needle) || needle.includes(it.name.toLowerCase()),
+        );
+        if (partialMatches.length === 0) {
+          throw new StepError({
+            message: `Checklist item '${args.itemName}' not found on card '${args.cardId}'`,
+            category: 'NOT_FOUND',
+            statusCode: 404,
+            retryable: false,
+          });
+        }
+        if (partialMatches.length > 1) {
+          throw new StepError({
+            message: `Checklist item '${args.itemName}' is ambiguous (${partialMatches.length} matches) on card '${args.cardId}'`,
+            category: 'VALIDATION',
+            statusCode: 400,
+            retryable: false,
+          });
+        }
+        targetCheckItemId = partialMatches[0]!.id;
+        matchedName = partialMatches[0]!.name;
+      }
     }
 
     const res = await this.request<any>(`/cards/${args.cardId}/checkItem/${targetCheckItemId}`, {

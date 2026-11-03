@@ -1,8 +1,12 @@
 import type pg from 'pg';
 import type { TrelloDigestConfig, TrelloDigestDelivery, ScheduleRecurrence } from '@wap/tool-schemas';
+import { isUuid } from '../../db/repositories/uuid.js';
 import { computeTrelloDigestConfigHash } from './trello-digest-candidate.js';
 import { escapeSlackMrkdwn } from './github-digest-runner.js';
 import type { RunToPlan } from './schedule-runner.js';
+
+export const TRELLO_DELIVERY_UNKNOWN =
+  'Chưa xác định bản tin Trello đã gửi hay chưa. Hãy kiểm tra kênh nhận trước khi gửi thêm; lượt này không tự gửi lại.';
 
 export interface TrelloDigestRunInput extends RunToPlan {
   recurrence: ScheduleRecurrence;
@@ -13,6 +17,7 @@ export interface TrelloDigestRunInput extends RunToPlan {
 export type TrelloDigestRunOutcome =
   | { state: 'digest_sent'; delivery: TrelloDigestDelivery; text: string }
   | { state: 'digest_failed'; error: string }
+  | { state: 'delivery_unknown'; error: string }
   | { state: 'blocked'; error: string; pauseReason: string }
   | { state: 'discarded' };
 
@@ -61,6 +66,123 @@ function formatTrelloSectionItems(items: TrelloCardDigestItem[]): string[] {
     }
     return `  - [${safeBoard}] ${safeTitle}${dueSuffix}`;
   });
+}
+
+function isDefiniteWriteRejection(err: any): boolean {
+  if (!err || typeof err !== 'object') return false;
+  if (err.details && typeof err.details === 'object' && err.details.requestSent === false) {
+    return true;
+  }
+  return (
+    typeof err.category === 'string' &&
+    ['AUTH_ERROR', 'NOT_FOUND', 'VALIDATION', 'RATE_LIMIT'].includes(err.category)
+  );
+}
+
+async function claimTrelloDigestDelivery(
+  pool: pg.Pool,
+  run: TrelloDigestRunInput,
+  signal: AbortSignal,
+): Promise<'claimed' | 'discarded'> {
+  if (typeof pool.connect !== 'function') {
+    const marked = await pool.query(
+      `UPDATE schedule_runs r
+          SET delivery_started_at = now(), updated_at = now()
+         FROM schedules s
+        WHERE r.id = $1
+          AND r.schedule_id = s.id
+          AND s.id = $2
+          AND r.status = 'planning'
+          AND r.delivery_started_at IS NULL
+          AND s.version = $3
+          AND s.status IN ('active', 'completed')
+        RETURNING r.id`,
+      [run.runId, run.scheduleId, run.scheduleVersion],
+    );
+    return marked.rowCount ? 'claimed' : 'discarded';
+  }
+
+  const client = await pool.connect();
+  try {
+    const found = await client.query('SELECT conv_id FROM schedules WHERE id = $1', [run.scheduleId]);
+    if (!found.rowCount) {
+      return 'discarded';
+    }
+    const scheduleConvId = found.rows[0].conv_id;
+
+    for (;;) {
+      signal.throwIfAborted();
+      await client.query('BEGIN');
+      await client.query("SET LOCAL lock_timeout = '10s'");
+      await client.query('SELECT id FROM conversations WHERE id = $1 FOR UPDATE', [scheduleConvId]);
+      const schedule = (
+        await client.query(
+          `SELECT s.id, s.user_id, s.kind, s.version, s.status, s.digest_config_hash
+             FROM schedules s
+             JOIN users u ON u.id = s.user_id AND u.status = 'active'
+            WHERE s.id = $1
+              FOR UPDATE OF s`,
+          [run.scheduleId],
+        )
+      ).rows[0];
+      signal.throwIfAborted();
+      if (
+        !schedule ||
+        schedule.user_id !== run.userId ||
+        schedule.kind !== 'trello_digest' ||
+        schedule.version !== run.scheduleVersion ||
+        schedule.digest_config_hash !== run.digestConfigHash ||
+        (schedule.status !== 'active' && schedule.status !== 'completed')
+      ) {
+        await client.query('COMMIT');
+        return 'discarded';
+      }
+
+      let currentRun: { status: string; delivery_started_at: Date | null } | undefined;
+      try {
+        currentRun = (
+          await client.query(
+            'SELECT status, delivery_started_at FROM schedule_runs WHERE id = $1 AND schedule_id = $2 FOR UPDATE NOWAIT',
+            [run.runId, run.scheduleId],
+          )
+        ).rows[0];
+      } catch (err: any) {
+        if (err?.code === '55P03') {
+          await client.query('ROLLBACK');
+          await client.query(
+            'SELECT id FROM schedule_runs WHERE id = $1 AND schedule_id = $2 FOR UPDATE',
+            [run.runId, run.scheduleId],
+          );
+          continue;
+        }
+        throw err;
+      }
+
+      signal.throwIfAborted();
+      if (!currentRun || currentRun.status !== 'planning' || currentRun.delivery_started_at !== null) {
+        await client.query('COMMIT');
+        return 'discarded';
+      }
+
+      const marked = await client.query(
+        `UPDATE schedule_runs
+            SET delivery_started_at = now(), updated_at = now()
+          WHERE id = $1
+            AND schedule_id = $2
+            AND status = 'planning'
+            AND delivery_started_at IS NULL
+        RETURNING id`,
+        [run.runId, run.scheduleId],
+      );
+      await client.query('COMMIT');
+      return marked.rowCount ? 'claimed' : 'discarded';
+    }
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): RunTrelloDigest {
@@ -323,23 +445,32 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
 
     const messageText = lines.join('\n').slice(0, 3500);
 
-    // 5. Pre-send schedule version and status check
+    // 5. Pre-send schedule version and status check + mark delivery_started_at
     signal.throwIfAborted();
-    const preSendCheck = await options.pool.query(
-      'SELECT version, status FROM schedules WHERE id = $1',
-      [run.scheduleId]
-    );
-    const currentSchedule = preSendCheck.rows[0];
-    if (
-      !currentSchedule ||
-      currentSchedule.version !== run.scheduleVersion ||
-      currentSchedule.status === 'cancelled' ||
-      currentSchedule.status === 'paused'
-    ) {
-      return { state: 'discarded' };
+    let deliveryStarted = false;
+    if (isUuid(run.runId)) {
+      const claimState = await claimTrelloDigestDelivery(options.pool, run, signal);
+      if (claimState !== 'claimed') {
+        return { state: 'discarded' };
+      }
+      deliveryStarted = true;
+    } else {
+      const preSendCheck = await options.pool.query(
+        'SELECT version, status FROM schedules WHERE id = $1',
+        [run.scheduleId]
+      );
+      const currentSchedule = preSendCheck.rows[0];
+      if (
+        !currentSchedule ||
+        currentSchedule.version !== run.scheduleVersion ||
+        currentSchedule.status === 'cancelled' ||
+        currentSchedule.status === 'paused'
+      ) {
+        return { state: 'discarded' };
+      }
     }
 
-    // 6. Send Slack or Telegram message
+    // 6. Send Slack or Telegram message (once called, never transition to discarded)
     if (isTelegramDest) {
       try {
         const sendRes = await telegramAdapter.execute(
@@ -361,7 +492,19 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
           },
         };
         return { state: 'digest_sent', delivery, text: messageText };
-      } catch {
+      } catch (err: any) {
+        if (!isDefiniteWriteRejection(err)) {
+          return {
+            state: 'delivery_unknown',
+            error: TRELLO_DELIVERY_UNKNOWN,
+          };
+        }
+        if (deliveryStarted) {
+          await options.pool.query(
+            "UPDATE schedule_runs SET delivery_started_at = NULL WHERE id = $1 AND status = 'planning'",
+            [run.runId],
+          );
+        }
         return {
           state: 'digest_failed',
           error: 'Không gửi được bản tin Trello lên Telegram. Hãy thử lại.',
@@ -386,7 +529,19 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
         },
       };
       return { state: 'digest_sent', delivery, text: messageText };
-    } catch {
+    } catch (err: any) {
+      if (!isDefiniteWriteRejection(err)) {
+        return {
+          state: 'delivery_unknown',
+          error: TRELLO_DELIVERY_UNKNOWN,
+        };
+      }
+      if (deliveryStarted) {
+        await options.pool.query(
+          "UPDATE schedule_runs SET delivery_started_at = NULL WHERE id = $1 AND status = 'planning'",
+          [run.runId],
+        );
+      }
       return {
         state: 'digest_failed',
         error: 'Không gửi được bản tin Trello lên Slack. Hãy thử lại.',

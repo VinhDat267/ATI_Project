@@ -48,12 +48,49 @@ export function formatRecurrenceLabel(recurrence: unknown): string | null {
   if (normalized === 'BIWEEKLY') return '2 tuần 1 lần';
   if (normalized === 'MONTHLY') return 'Hàng tháng';
   if (normalized.startsWith('RRULE:')) {
-    if (normalized.includes('FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR')) return 'Thứ 2 – Thứ 6 hàng tuần';
-    if (normalized.includes('FREQ=DAILY')) return 'Hàng ngày';
-    if (normalized.includes('FREQ=WEEKLY;INTERVAL=2')) return '2 tuần 1 lần';
-    if (normalized.includes('FREQ=WEEKLY')) return 'Hàng tuần';
-    if (normalized.includes('FREQ=MONTHLY')) return 'Hàng tháng';
-    return recurrence.trim();
+    const body = normalized.slice(6);
+    const parts = body.split(';').filter(Boolean);
+    const params = new Map<string, string>();
+    const allowedKeys = new Set(['FREQ', 'INTERVAL', 'COUNT', 'UNTIL', 'BYDAY']);
+    for (const part of parts) {
+      const eqIdx = part.indexOf('=');
+      if (eqIdx <= 0) return recurrence.trim();
+      const k = part.slice(0, eqIdx).trim();
+      const v = part.slice(eqIdx + 1).trim();
+      if (!allowedKeys.has(k) || !v) return recurrence.trim();
+      params.set(k, v);
+    }
+    const freq = params.get('FREQ');
+    if (!freq) return recurrence.trim();
+    const intervalRaw = params.get('INTERVAL');
+    const interval = intervalRaw ? Number(intervalRaw) : 1;
+    if (!Number.isInteger(interval) || interval < 1) return recurrence.trim();
+    const byday = params.get('BYDAY');
+    const count = params.get('COUNT');
+    const until = params.get('UNTIL');
+
+    let label = '';
+    if (freq === 'DAILY') {
+      label = interval === 1 ? 'Hàng ngày' : `${interval} ngày 1 lần`;
+    } else if (freq === 'WEEKLY') {
+      if (byday === 'MO,TU,WE,TH,FR' && interval === 1) {
+        label = 'Thứ 2 – Thứ 6 hàng tuần';
+      } else {
+        label = interval === 1 ? 'Hàng tuần' : `${interval} tuần 1 lần`;
+        if (byday) label += ` (${byday})`;
+      }
+    } else if (freq === 'MONTHLY') {
+      label = interval === 1 ? 'Hàng tháng' : `${interval} tháng 1 lần`;
+      if (byday) label += ` (${byday})`;
+    } else if (freq === 'YEARLY') {
+      label = interval === 1 ? 'Hàng năm' : `${interval} năm 1 lần`;
+    } else {
+      return recurrence.trim();
+    }
+
+    if (count) label += `, ${count} lần`;
+    if (until) label += `, đến ${until}`;
+    return label;
   }
   return recurrence.trim();
 }
@@ -174,7 +211,7 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
       ? step.args.state
       : null;
     const isRemoveMember = step.tool === 'trello.remove_member';
-    const hasBadges = rawMembers.length > 0 || step.args.due != null || typeof step.args.dueComplete === 'boolean' || step.args.closed === true || chkState !== null;
+    const hasBadges = rawMembers.length > 0 || step.args.due != null || typeof step.args.dueComplete === 'boolean' || typeof step.args.closed === 'boolean' || chkState !== null;
 
     return <div data-testid="trello-card-preview" className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 v3-space-y-3">
       {step.args.title!=null && <div>
@@ -185,9 +222,16 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
         <span className="text-[11px] text-neutral-400 uppercase font-semibold">{step.tool === 'trello.create_list' ? 'Tên cột mới:' : step.tool === 'trello.add_checklist' ? 'Tên checklist:' : 'Tên:'}</span>
         <div className="text-sm font-bold text-neutral-900 mt-0.5">{text(step.args.name)}</div>
       </div>}
-      {step.args.itemName!=null && <div>
+      {(step.args.itemName!=null || step.args.checkItemId!=null) && <div>
         <span className="text-[11px] text-neutral-400 uppercase font-semibold">Mục checklist:</span>
-        <div className="text-sm font-bold text-neutral-900 mt-0.5">{text(step.args.itemName)}</div>
+        <div className="text-sm font-bold text-neutral-900 mt-0.5">
+          {step.args.itemName != null ? text(step.args.itemName) : text(labels?.[String(step.args.checkItemId)] ?? step.args.checkItemId)}
+          {step.args.itemName != null && step.args.checkItemId != null && (
+            <span className="ml-1.5 text-xs font-normal text-neutral-500">
+              ({labels?.[String(step.args.checkItemId)] ?? String(step.args.checkItemId)})
+            </span>
+          )}
+        </div>
       </div>}
       <div>
         <span className="text-[11px] text-neutral-400 uppercase font-semibold">Đích:</span>
@@ -226,9 +270,15 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
               {step.args.dueComplete ? '✓ Đã hoàn thành hạn' : '⏳ Chưa hoàn thành hạn'}
             </span>
           )}
-          {step.args.closed === true && (
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-              📦 Lưu trữ (Archive)
+          {typeof step.args.closed === 'boolean' && (
+            <span
+              className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                step.args.closed
+                  ? 'bg-rose-50 text-rose-700 border-rose-200'
+                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              }`}
+            >
+              {step.args.closed ? '📦 Lưu trữ (Archive)' : '📂 Mở lại thẻ (Unarchive)'}
             </span>
           )}
           {chkState && (
@@ -265,7 +315,7 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
         <span className="text-[11px] text-neutral-400 uppercase font-semibold">Nội dung bình luận:</span>
         <p className="text-xs text-neutral-800 bg-white p-2.5 rounded-lg border border-neutral-200 mt-1 leading-relaxed whitespace-pre-wrap break-words">{text(step.args.text)}</p>
       </div>}
-      <OtherArguments step={step} except={['title','name','itemName','desc','text','due','dueComplete','closed','items','idMembers','memberId', ...(chkState ? ['state'] : [])]}/>
+      <OtherArguments step={step} except={['title','name','itemName','checkItemId','desc','text','due','dueComplete','closed','items','idMembers','memberId', ...(chkState ? ['state'] : [])]}/>
     </div>;
   }
   if(style==='message') return <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 v3-space-y-2.5">

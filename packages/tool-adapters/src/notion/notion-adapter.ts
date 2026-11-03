@@ -374,6 +374,7 @@ export class NotionAdapter extends BaseAdapter {
       if (blockRes?.object !== 'list' || !Array.isArray(blockRes.results)) badResponse();
       const blocks: Array<{ id: string; type: string; text: string; checked?: boolean }> = [];
       const lines: string[] = [];
+      let childFetchCount = 0;
       for (const blk of blockRes.results) {
         if (!blk || blk.object !== 'block' || typeof blk.type !== 'string') continue;
         const blkId = uuid(blk.id, true);
@@ -385,6 +386,36 @@ export class NotionAdapter extends BaseAdapter {
         blocks.push({ id: blkId, type: blk.type, text: clippedBlk.text, ...(checked !== undefined ? { checked } : {}) });
         if (clippedBlk.text || blk.type === 'to_do') {
           lines.push(formatBlockMarkdown(blk.type, clippedBlk.text, checked));
+        }
+        if (blk.has_children === true) {
+          if (childFetchCount >= 5) {
+            truncated = true;
+          } else {
+            childFetchCount++;
+            const childRes = await this.request('blocks/' + blkId + '/children', signal);
+            if (childRes?.object === 'list' && Array.isArray(childRes.results)) {
+              for (const childBlk of childRes.results) {
+                if (!childBlk || childBlk.object !== 'block' || typeof childBlk.type !== 'string') continue;
+                const childId = uuid(childBlk.id, true);
+                const childData = childBlk[childBlk.type];
+                const childRawText = Array.isArray(childData?.rich_text) ? plainRich(childData.rich_text) : '';
+                const clippedChild = clipText(childRawText, NOTION_MAX_PROPERTY_CHARS);
+                if (clippedChild.clipped) truncated = true;
+                const childChecked = childBlk.type === 'to_do' ? Boolean(childData?.checked) : undefined;
+                blocks.push({
+                  id: childId,
+                  type: childBlk.type,
+                  text: clippedChild.text,
+                  ...(childChecked !== undefined ? { checked: childChecked } : {}),
+                });
+                if (clippedChild.text || childBlk.type === 'to_do') {
+                  lines.push('  ' + formatBlockMarkdown(childBlk.type, clippedChild.text, childChecked));
+                }
+                if (childBlk.has_children === true) truncated = true;
+              }
+              if (childRes.has_more === true) truncated = true;
+            }
+          }
         }
       }
       const joinedContent = clipText(lines.join('\n'), 4000);

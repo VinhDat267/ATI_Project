@@ -146,6 +146,7 @@ describe('packages/tool-adapters (Task 4c: Trello Write Tools & Unified Adapter)
             checkItems: [
               { id: 'item_1', name: 'Viết unit test', state: 'incomplete' },
               { id: 'item_2', name: 'Review code', state: 'incomplete' },
+              { id: 'item_3', name: 'Viết integration test', state: 'incomplete' },
             ],
           },
         ],
@@ -306,5 +307,24 @@ describe('packages/tool-adapters (Task 4c: Trello Write Tools & Unified Adapter)
     });
     expect(fallbackChk.name).toBe('Definition of Done');
     expect(fallbackChk.items).toHaveLength(1);
+
+    // Rejects update_checklist_item when checkItemId does not match itemName
+    await expect(
+      adapter.execute('trello.update_checklist_item', {
+        cardId: 'card_created_1',
+        checkItemId: 'item_1',
+        itemName: 'Deploy production',
+        state: 'complete',
+      })
+    ).rejects.toMatchObject({ category: 'VALIDATION', statusCode: 400 });
+
+    // Rejects update_checklist_item when itemName partially matches multiple items (" test" matches both "Viết unit test" and "Chạy integration test")
+    await expect(
+      adapter.execute('trello.update_checklist_item', {
+        cardId: 'card_created_1',
+        itemName: 'test',
+        state: 'complete',
+      })
+    ).rejects.toMatchObject({ category: 'VALIDATION', statusCode: 400 });
   });
 });

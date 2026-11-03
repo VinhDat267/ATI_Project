@@ -531,9 +531,10 @@ export class ApiClient {
     connectionId: string,
     databases: Array<string | { id: string; title?: string; url?: string }>
   ) {
+    const databaseIds = databases.map((d) => (typeof d === 'string' ? d : d.id));
     return this.request<{
       available: boolean;
-      status: 'connected' | 'needs_scope';
+      status: 'connected' | 'needs_scope' | 'scope_required';
       activeConnectionId?: string;
       workspaceId?: string;
       workspaceName?: string;
@@ -543,7 +544,7 @@ export class ApiClient {
     }>(`/api/connections/notion/${encodeURIComponent(connectionId)}/scope`, {
       method: 'PUT',
       credentials: 'include',
-      body: JSON.stringify({ databases }),
+      body: JSON.stringify({ databaseIds, databases }),
     });
   }
   activateNotionConnection(connectionId: string) {

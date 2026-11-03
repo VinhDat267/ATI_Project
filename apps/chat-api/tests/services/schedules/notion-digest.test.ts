@@ -451,5 +451,112 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
         counts: { databasesChecked: 1, totalPages: 3 },
       });
     });
+
+    it('marks run as needs_attention on ambiguous delivery failure and discards when schedule is cancelled before delivery', async () => {
+      const user = await db.person('NotionDigestSafetyOwner');
+      const convRes = await db.pool.query(
+        "INSERT INTO conversations(user_id, status, title) VALUES($1, 'chatting', 'Lịch Notion Safety') RETURNING id",
+        [user.id]
+      );
+      const convId = convRes.rows[0].id as string;
+
+      const config = {
+        credentialId: 'cred-notion-1',
+        workspaceId: 'ws-notion-1',
+        workspaceName: 'ATI Notion',
+        botId: 'bot-notion-1',
+        identityVersion: 1,
+        databases: [{ id: dbId1, title: 'Kế hoạch Sprint' }],
+        channelId: 'C_DEV',
+        channelName: 'dev',
+      };
+      const configHash = computeNotionDigestConfigHash({ config, recurrence, userId: user.id });
+      const proposalMeta = {
+        type: 'schedule_proposal',
+        proposal: {
+          kind: 'schedule',
+          action: 'create',
+          name: 'Báo cáo Notion Safety',
+          request: 'Mỗi sáng tổng hợp database Kế hoạch Sprint gửi vào kênh #dev',
+          recurrence,
+          summary: 'Tạo lịch báo cáo Notion mỗi sáng lúc 08:30',
+        },
+        scheduleId: null,
+        baseVersion: null,
+        services: ['notion', 'slack'],
+        nextRuns: ['2026-11-03T01:30:00.000Z'],
+        previous: null,
+        digestCandidate: { canAutoDigest: true, config, configHash },
+      };
+
+      const msgRes = await db.pool.query(
+        "INSERT INTO messages(conv_id, role, content, metadata) VALUES($1, 'assistant', 'Đề xuất lịch Notion', $2::jsonb) RETURNING id",
+        [convId, JSON.stringify(proposalMeta)]
+      );
+      const service = new ScheduleService({ pool: db.pool, timeZone: 'Asia/Ho_Chi_Minh' });
+      const confirmed = await service.confirmProposal({
+        userId: user.id,
+        convId,
+        messageId: msgRes.rows[0].id as string,
+        now: new Date('2026-11-02T10:00:00.000Z'),
+        approvalMode: 'auto_digest',
+      });
+
+      let slackSendCallsAfterCancel = 0;
+      const runner = new ScheduleRunner({
+        pool: db.pool,
+        timeZone: 'Asia/Ho_Chi_Minh',
+        now: () => new Date('2026-11-03T01:31:00.000Z'),
+        planRun: async () => {
+          throw new Error('Should not call planRun');
+        },
+        runNotionDigest: createNotionDigestRunner({
+          pool: db.pool,
+          notionConnection: async () => ({
+            status: 'connected',
+            connection: {
+              credentialId: 'cred-notion-1',
+              workspaceId: 'ws-notion-1',
+              workspaceName: 'ATI Notion',
+              botId: 'bot-notion-1',
+              identityVersion: 1,
+              databaseIds: [dbId1],
+            },
+          }),
+          getAdapter: async (serviceName: string) => {
+            if (serviceName === 'notion') {
+              return {
+                execute: vi.fn().mockImplementation(async () => {
+                  await service.setStatus({
+                    userId: user.id,
+                    scheduleId: confirmed.schedule.id,
+                    action: 'cancel',
+                    version: confirmed.schedule.version,
+                    now: new Date('2026-11-03T01:31:05.000Z'),
+                  });
+                  return { pages: [] };
+                }),
+              };
+            }
+            if (serviceName === 'slack') {
+              return {
+                execute: vi.fn().mockImplementation(async (tool: string) => {
+                  if (tool === 'slack.search_channels') return [{ id: 'C_DEV', name: 'dev' }];
+                  if (tool === 'slack.send_message') {
+                    slackSendCallsAfterCancel++;
+                    return { ts: '1700000099.009' };
+                  }
+                }),
+              };
+            }
+            return null;
+          },
+        }),
+        recordState: (client, row, now) => service.recordState(client, row, now),
+      });
+
+      await runner.tick();
+      expect(slackSendCallsAfterCancel).toBe(0);
+    });
   });
 });

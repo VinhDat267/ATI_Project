@@ -1087,5 +1087,102 @@ describe('PersonalSheetsAdapter', () => {
         rowNumbers: [1],
       })
     ).rejects.toMatchObject({ category: 'VALIDATION' });
+
+    // Rejects combining rowNumbers with matchColumn/matchValue
+    await expect(
+      adapter.execute('mysheets.delete_rows', {
+        spreadsheetId,
+        sheet: 'Sheet1',
+        rowNumbers: [2],
+        matchColumn: 'Trạng thái',
+        matchValue: 'Đã huỷ',
+      })
+    ).rejects.toMatchObject({ category: 'VALIDATION' });
+  });
+
+  it('preserves existing tab headers in create_sheet, skips header row 1 during upsert, parses English decimals accurately, and filters unclipped cells before clipping output', async () => {
+    const longCell = 'a'.repeat(500) + ' needle-target';
+    const { adapter, calls } = setup({
+      handler: (url, init) => {
+        if (init.method === 'POST' && url.pathname.endsWith('/values:batchUpdate')) {
+          return json({
+            spreadsheetId,
+            totalUpdatedRows: 1,
+            responses: [{ updatedRange: 'Tasks!A2:B2', updatedRows: 1 }],
+          });
+        }
+        if (init.method === 'POST' && url.pathname.includes(':append')) {
+          return json({
+            spreadsheetId,
+            updates: { updatedRange: 'Tasks!A2:B2', updatedRows: 1 },
+          });
+        }
+        if (url.pathname.includes('/values/')) {
+          const decoded = decodeURIComponent(url.pathname);
+          if (decoded.endsWith('!A1:Z1')) {
+            return json({
+              range: 'Tasks!A1:B1',
+              values: [['RealHeaderA', 'RealHeaderB']],
+            });
+          }
+          return json({
+            range: 'Tasks!A1:C3',
+            values: [
+              ['ID', 'Rate', 'Notes'],
+              ['row-1', '0.125', longCell],
+              ['row-2', '0.875', 'short note'],
+            ],
+          });
+        }
+        return json({
+          sheets: [{ properties: { sheetId: 10, title: 'Tasks' } }],
+        });
+      },
+    });
+
+    // F5: create_sheet on existing tab preserves RealHeaderA, RealHeaderB without POSTing values:batchUpdate
+    const createdTab = await adapter.execute('mysheets.create_sheet', {
+      spreadsheetId,
+      title: 'Tasks',
+      headers: ['NewA', 'NewB'],
+    });
+    expect(createdTab.headers).toEqual(['RealHeaderA', 'RealHeaderB']);
+    expect(calls.filter((c) => c.init.method === 'POST')).toHaveLength(0);
+
+    // F8: append_rows upsert with row matching header key ('ID') appends as new data row instead of overwriting row 1
+    await adapter.execute('mysheets.append_rows', {
+      spreadsheetId,
+      sheet: 'Tasks',
+      keyColumn: 'ID',
+      onDuplicate: 'update',
+      rows: [['ID', '0.500', 'should-not-overwrite-header']],
+    });
+    expect(
+      calls.filter((c) => c.init.method === 'POST' && c.url.pathname.endsWith('/values:batchUpdate'))
+    ).toHaveLength(0);
+
+    // F9: aggregate_rows parses 0.125 + 0.875 = 1 (avg 0.5), not 1000
+    const agg = await adapter.execute('mysheets.aggregate_rows', {
+      spreadsheetId,
+      sheet: 'Tasks',
+      metrics: [
+        { column: 'Rate', fn: 'sum' },
+        { column: 'Rate', fn: 'avg' },
+      ],
+    });
+    expect(agg.totals).toEqual({
+      Rate_sum: 1,
+      Rate_avg: 0.5,
+    });
+
+    // F10: search_rows finds 'needle-target' beyond char 500, then clips returned cell to 500 chars with truncated: true
+    const searched = await adapter.execute('mysheets.search_rows', {
+      spreadsheetId,
+      sheet: 'Tasks',
+      query: 'needle-target',
+    });
+    expect(searched.totalMatched).toBe(1);
+    expect(searched.truncated).toBe(true);
+    expect(searched.matches[0]?.record.Notes).toHaveLength(500);
   });
 });

@@ -42,6 +42,7 @@ export class NotionTokenManager {
         'UPDATE notion_connections SET refresh_in_flight = true WHERE id = $1 AND user_id = $2',
         [id, userId],
       );
+      let refreshedAccessToken: string;
       try {
         const next = await this.oauth.refresh(cfg.refreshToken, AbortSignal.timeout(10_000));
         if (
@@ -70,7 +71,7 @@ export class NotionTokenManager {
             next.workspaceName,
           ],
         );
-        return await operation(next.accessToken, row.bot_id);
+        refreshedAccessToken = next.accessToken;
       } catch {
         await c.query(
           `UPDATE notion_connections
@@ -80,6 +81,22 @@ export class NotionTokenManager {
         );
         this.onReconnectRequired?.(userId);
         throw new NotionOAuthError(true);
+      }
+
+      try {
+        return await operation(refreshedAccessToken, row.bot_id);
+      } catch (postRefreshErr) {
+        if (postRefreshErr instanceof NotionOAuthError && postRefreshErr.authenticationLost) {
+          await c.query(
+            `UPDATE notion_connections
+                SET status = 'reconnect_required', config = NULL, refresh_in_flight = false
+              WHERE id = $1 AND user_id = $2`,
+            [id, userId],
+          );
+          this.onReconnectRequired?.(userId);
+          throw new NotionOAuthError(true);
+        }
+        throw postRefreshErr;
       }
     });
   }

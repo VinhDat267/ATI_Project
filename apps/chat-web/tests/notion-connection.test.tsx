@@ -95,7 +95,7 @@ describe('Task 5: Notion OAuth 1-Click UI, Callback View, and Chat Moments', () 
       const scopeArea = await screen.findByTestId('notion-scope');
       expect(scopeArea).toBeInTheDocument();
       expect(scopeArea).toHaveAttribute('id', 'notion-scope');
-      expect(await screen.findByTestId('notion-scope-counter')).toHaveTextContent('Đã chọn 0/20');
+      expect(await screen.findByTestId('notion-scope-counter')).toHaveTextContent('Đã chọn 0/10');
 
       const db1Checkbox = await screen.findByRole('checkbox', { name: /Roadmap 2026/i });
       fireEvent.click(db1Checkbox);
@@ -109,7 +109,7 @@ describe('Task 5: Notion OAuth 1-Click UI, Callback View, and Chat Moments', () 
       });
       fireEvent.click(addBtn);
 
-      expect(await screen.findByTestId('notion-scope-counter')).toHaveTextContent('Đã chọn 2/20');
+      expect(await screen.findByTestId('notion-scope-counter')).toHaveTextContent('Đã chọn 2/10');
 
       const saveBtn = screen.getByRole('button', { name: /Lưu phạm vi database/i });
       expect(saveBtn).toHaveAttribute('id', 'notion-save-scope');
@@ -558,6 +558,74 @@ describe('Task 5: Notion OAuth 1-Click UI, Callback View, and Chat Moments', () 
         />
       );
       expect(screen.getByRole('link', { name: /Mở Notion kiểm tra/i })).toBeInTheDocument();
+    });
+
+    it('normalizes backend wire status disconnected/scope_required, sends databaseIds in saveNotionScope, and handles check health response', async () => {
+      const db1 = '11111111-2222-3333-4444-555555555555';
+      // 1. Backend raw wire payload for new user: status = "disconnected"
+      vi.spyOn(apiClient, 'getNotionConnection').mockResolvedValueOnce({
+        status: 'disconnected',
+        toolsAvailable: false,
+        connections: [],
+        activeConnection: null,
+        databases: [],
+      } as any);
+
+      const { unmount } = render(<NotionConnection user={memberUser} refresh={vi.fn()} />);
+      const connectBtn = await screen.findByRole('button', { name: 'Kết nối Notion' });
+      expect(connectBtn).toHaveAttribute('id', 'notion-connect');
+      unmount();
+
+      // 2. Backend raw wire payload for newly connected workspace without scope: status = "scope_required"
+      vi.spyOn(apiClient, 'getNotionConnection').mockResolvedValue({
+        status: 'scope_required',
+        toolsAvailable: false,
+        connections: [
+          {
+            id: 'conn-wire-1',
+            workspaceId: 'ws-wire-1',
+            workspaceName: 'Wire Workspace',
+            botId: 'bot-wire-1',
+            status: 'scope_required',
+            allowedDatabases: [],
+            selectedDatabases: [],
+            isDefault: true,
+            toolsAvailable: false,
+          },
+        ],
+        activeConnection: {
+          id: 'conn-wire-1',
+          workspaceId: 'ws-wire-1',
+          workspaceName: 'Wire Workspace',
+          botId: 'bot-wire-1',
+          status: 'scope_required',
+          allowedDatabases: [],
+          selectedDatabases: [],
+          isDefault: true,
+          toolsAvailable: false,
+        },
+        databases: [],
+      } as any);
+      vi.spyOn(apiClient, 'getNotionDatabases').mockResolvedValue({
+        databases: [{ id: db1, title: 'Sprint DB' }],
+      });
+
+      render(<NotionConnection user={memberUser} refresh={vi.fn()} />);
+      expect(await screen.findByTestId('notion-scope')).toBeInTheDocument();
+
+      // 3. Verify apiClient.saveNotionScope sends databaseIds array in JSON body
+      const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(JSON.stringify({ id: 'conn-wire-1', status: 'connected', toolsAvailable: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+      vi.stubGlobal('fetch', fetchMock);
+      await apiClient.saveNotionScope('conn-wire-1', [{ id: db1, title: 'Sprint DB' }]);
+      const [, init] = fetchMock.mock.calls[0]!;
+      expect(JSON.parse(String(init?.body))).toMatchObject({
+        databaseIds: [db1],
+      });
     });
   });
 });

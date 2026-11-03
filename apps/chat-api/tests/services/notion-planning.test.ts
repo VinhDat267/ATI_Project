@@ -288,4 +288,183 @@ describe('Notion OAuth tool catalog, ChatService plan binding, and AdapterFactor
       vi.unstubAllGlobals();
     }
   });
+
+  it('allows shared Notion plans when user has no personal OAuth connection, and preserves healthy OAuth tokens on 403 out-of-scope errors', async () => {
+    const bob = await db.person('bob_notion');
+    const lookup = createNotionConnectionLookup({ repo: notionRepo });
+
+    // F6: Bob has not connected personal Notion -> shared Notion tool (notion.create_page) must NOT be refused by bindConnections
+    const chatService = new ChatService({
+      msgRepo,
+      convRepo,
+      planRepo,
+      notionConnection: lookup,
+      eventEmitter: { emit: () => {} },
+      planner: {
+        processMessage: async () => ({
+          kind: 'plan',
+          thinking: 'Shared Notion create_page',
+          summary: 'Tạo trang Notion shared',
+          warnings: [],
+          steps: [
+            {
+              id: 's1',
+              tool: 'notion.create_page',
+              description: 'Tạo trang shared',
+              args: { databaseId: db1, title: 'Shared Page' },
+              dependsOn: [],
+            },
+          ],
+        }),
+        routeSchedule: () => ({ services: ['notion'], unavailable: [] }),
+      },
+    });
+
+    const sharedBound = await (chatService as any).bindConnections(
+      {
+        kind: 'plan',
+        thinking: 'Shared Notion create_page',
+        summary: 'Tạo trang Notion shared',
+        warnings: [],
+        steps: [
+          {
+            id: 's1',
+            tool: 'notion.create_page',
+            description: 'Tạo trang shared',
+            args: { databaseId: db1, title: 'Shared Page' },
+            dependsOn: [],
+          },
+        ],
+      },
+      bob.id,
+    );
+    expect(sharedBound.kind).toBe('plan');
+
+    // Whereas personal-only Notion tool (notion.get_page) IS refused when Bob has not connected personal Notion
+    const personalOnlyBound = await (chatService as any).bindConnections(
+      {
+        kind: 'plan',
+        thinking: 'Personal Notion get_page',
+        summary: 'Đọc trang Notion cá nhân',
+        warnings: [],
+        steps: [
+          {
+            id: 's1',
+            tool: 'notion.get_page',
+            description: 'Đọc trang',
+            args: { pageId: db1 },
+            dependsOn: [],
+          },
+        ],
+      },
+      bob.id,
+    );
+    expect(personalOnlyBound.kind).toBe('refusal');
+
+    // F7: 403 out-of-scope error on NotionAdapter must NOT trigger refresh or wipe healthy tokens in NotionTokenManager
+    await notionRepo.start({
+      userId: bob.id,
+      sessionId: bob.sid,
+      stateHash: NotionConnectionRepo.hash('s-bob'),
+      browserHash: NotionConnectionRepo.hash('b-bob'),
+    });
+    const consumed = (await notionRepo.consume({
+      userId: bob.id,
+      sessionId: bob.sid,
+      state: 's-bob',
+      browser: 'b-bob',
+    }))!;
+    const bobSaved = (await notionRepo.save(bob.id, consumed.id, {
+      appId: 'notion-app',
+      workspaceId: '55555555-6666-7777-8888-999999999999',
+      workspaceName: 'Bob Notion WS',
+      actorId,
+      botId,
+      config: encryptCredentials(
+        { accessToken: 'ntn_bob_live', refreshToken: 'ntn_bob_ref', botId },
+        key,
+      ),
+      scopes: [],
+    }))!;
+    await notionRepo.selectDatabases(bob.id, bobSaved.id, bobSaved.identity_version, [
+      { id: db1, title: 'Bảng Công Việc' },
+    ]);
+
+    const refreshSpy = vi.fn();
+    const fetch403 = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/oauth/token')) {
+        refreshSpy();
+      }
+      // Return a page whose parent data_source belongs to forbiddenDb -> local 403 AUTH_ERROR
+      if (url.includes('/pages/')) {
+        return new Response(
+          JSON.stringify({
+            object: 'page',
+            id: forbiddenDb,
+            url: 'https://www.notion.so/forbidden-page',
+            parent: { type: 'data_source_id', data_source_id: forbiddenDb },
+            properties: { Name: { type: 'title', title: [{ plain_text: 'Out of scope' }] } },
+          }),
+        );
+      }
+      if (url.includes('/data_sources/')) {
+        return new Response(
+          JSON.stringify({
+            object: 'data_source',
+            id: forbiddenDb,
+            parent: { type: 'database_id', database_id: forbiddenDb },
+            properties: { Name: { type: 'title' } },
+          }),
+        );
+      }
+      return new Response(JSON.stringify({ object: 'error' }), { status: 404 });
+    }) as unknown as typeof fetch;
+
+    const oauthClient = new NotionOAuthClient(
+      {
+        clientId: 'notion-app',
+        clientSecret: 'secret',
+        redirectUri: 'http://127.0.0.1:5174/connections/notion/callback',
+        authorizationUrl: 'http://127.0.0.1:4100/v1/oauth/authorize',
+        apiBaseUrl: 'http://127.0.0.1:4100/v1',
+      },
+      fetch403,
+    );
+    const tokenManager = new NotionTokenManager(notionRepo, oauthClient, key);
+    const factory = new AdapterFactory({
+      credentialRepo: credRepo,
+      encryptionKey: key,
+      notionRepo,
+      notionTokens: tokenManager,
+      serviceFetchFn: fetch403,
+    });
+
+    const bobAdapter = await factory.getAdapterForService('notion', {
+      userId: bob.id,
+      phase: 'execution',
+      connections: {
+        notion: {
+          credentialId: bobSaved.id,
+          workspaceId: '55555555-6666-7777-8888-999999999999',
+          workspaceName: 'Bob Notion WS',
+          botId,
+          identityVersion: 2,
+          databaseIds: [db1],
+        },
+      },
+    });
+
+    await expect(
+      bobAdapter.execute('notion.update_page', {
+        pageId: forbiddenDb,
+        title: 'Should Fail 403 Without Wiping Token',
+      }),
+    ).rejects.toMatchObject({ category: 'AUTH_ERROR', statusCode: 403 });
+
+    expect(refreshSpy).not.toHaveBeenCalled();
+    const bobAfter = await notionRepo.getActive(bob.id, bobSaved.id);
+    expect(bobAfter?.status).toBe('active');
+    expect(bobAfter?.config).toBeTruthy();
+  });
 });

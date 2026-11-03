@@ -340,6 +340,47 @@ it('reads page properties and nested content blocks via notion.get_page and enfo
     ['GET', '/v1/data_sources/' + DS],
     ['GET', '/v1/blocks/' + PAGE + '/children'],
   ]);
+
+  // Also fetches 1-level nested child blocks when a parent block has has_children: true
+  const childBlockId = '66666666-7777-8888-9999-000000000000';
+  const { adapter: nestedAdapter } = setup(call => {
+    const pathname = new URL(call.url).pathname;
+    if (pathname === '/v1/pages/' + PAGE) return ok(page());
+    if (pathname === '/v1/data_sources/' + DS) return ok(source());
+    if (pathname === '/v1/blocks/' + PAGE + '/children') {
+      return ok({
+        object: 'list',
+        results: [
+          {
+            object: 'block',
+            id: BLOCK,
+            type: 'toggle',
+            has_children: true,
+            toggle: { rich_text: rich('Chi tiết triển khai') },
+          },
+        ],
+        has_more: false,
+      });
+    }
+    if (pathname === '/v1/blocks/' + BLOCK + '/children') {
+      return ok({
+        object: 'list',
+        results: [
+          {
+            object: 'block',
+            id: childBlockId,
+            type: 'paragraph',
+            paragraph: { rich_text: rich('Nội dung con bên trong toggle') },
+          },
+        ],
+        has_more: false,
+      });
+    }
+    return ok(page());
+  });
+  const nestedDetail = await nestedAdapter.execute('notion.get_page', { pageId: PAGE });
+  expect(nestedDetail.content).toContain('Nội dung con bên trong toggle');
+  expect(nestedDetail.blocks.map((b: any) => b.id)).toEqual([BLOCK, childBlockId]);
 });
 
 it('updates page title, properties, and archived state via notion.update_page after verifying database scope', async () => {

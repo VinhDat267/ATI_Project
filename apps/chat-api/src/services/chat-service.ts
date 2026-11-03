@@ -1123,9 +1123,17 @@ export class ChatService {
 
     if (usesNotion) {
       const notion = await this.notionConnection?.(userId);
-      if (!notion || notion.status === 'not_connected' || notion.status === 'reconnect_required') {
+      const usesPersonalOnlyNotion = bound.steps.some(
+        (step) => step.tool === 'notion.get_page' || step.tool === 'notion.update_page',
+      );
+      if (notion?.status === 'reconnect_required') {
         unavailableServices.push({ id: 'notion', name: 'Notion' });
         reasons.push('Tài khoản của bạn chưa Kết nối Notion hoặc cần kết nối lại.');
+      } else if (!notion || notion.status === 'not_connected') {
+        if (usesPersonalOnlyNotion) {
+          unavailableServices.push({ id: 'notion', name: 'Notion' });
+          reasons.push('Tài khoản của bạn chưa Kết nối Notion hoặc cần kết nối lại.');
+        }
       } else if (notion.status === 'needs_scope' || !notion.connection) {
         return {
           kind: 'refusal',

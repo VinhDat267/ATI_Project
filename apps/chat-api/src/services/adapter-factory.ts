@@ -728,7 +728,7 @@ export class AdapterFactory {
                 if (
                   err instanceof StepError &&
                   err.category === 'AUTH_ERROR' &&
-                  (err.statusCode === 401 || err.statusCode === 403 || /HTTP (401|403)/i.test(err.message))
+                  (err.statusCode === 401 || /HTTP 401\b/i.test(err.message))
                 ) {
                   throw new NotionOAuthError(err.message, true);
                 }

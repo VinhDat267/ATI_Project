@@ -42,6 +42,60 @@ interface NotionConnectionStatus {
   connections: NotionConnectionItem[];
 }
 
+function normalizeNotionStatus(raw: any): NotionConnectionStatus {
+  const mapStatus = (s: unknown): NotionConnectionStatus['status'] => {
+    if (s === 'disconnected' || s === 'not_connected') return 'not_connected';
+    if (s === 'scope_required' || s === 'needs_scope') return 'needs_scope';
+    if (s === 'connected' || s === 'reconnect_required' || s === 'unconfigured') return s;
+    return 'not_connected';
+  };
+  const mapConnStatus = (s: unknown): NotionConnectionItem['status'] => {
+    if (s === 'scope_required' || s === 'needs_scope') return 'needs_scope';
+    if (s === 'reconnect_required') return 'reconnect_required';
+    return 'connected';
+  };
+  const rawConnections = Array.isArray(raw?.connections) ? raw.connections : [];
+  const connections: NotionConnectionItem[] = rawConnections.map((c: any) => ({
+    ...c,
+    id: String(c?.id ?? ''),
+    status: mapConnStatus(c?.status),
+    workspaceId: String(c?.workspaceId ?? ''),
+    workspaceName: String(c?.workspaceName ?? ''),
+    botId: String(c?.botId ?? ''),
+    isActive: Boolean(c?.isActive ?? c?.isDefault),
+    selectedDatabases: Array.isArray(c?.selectedDatabases)
+      ? c.selectedDatabases
+      : Array.isArray(c?.databases)
+        ? c.databases
+        : [],
+  }));
+  const activeConn =
+    raw?.activeConnection ??
+    connections.find((c) => c.isActive) ??
+    connections[0] ??
+    null;
+  const status = mapStatus(raw?.status);
+  return {
+    available: raw?.available !== undefined ? Boolean(raw.available) : status !== 'unconfigured',
+    status,
+    activeConnectionId: raw?.activeConnectionId ?? activeConn?.id,
+    workspaceId: raw?.workspaceId ?? activeConn?.workspaceId,
+    workspaceName: raw?.workspaceName ?? activeConn?.workspaceName,
+    workspaceIcon: raw?.workspaceIcon ?? activeConn?.workspaceIcon ?? null,
+    botId: raw?.botId ?? activeConn?.botId,
+    ownerEmail: raw?.ownerEmail ?? activeConn?.ownerEmail ?? null,
+    ownerName: raw?.ownerName ?? activeConn?.ownerName ?? null,
+    selectedDatabases: Array.isArray(raw?.selectedDatabases)
+      ? raw.selectedDatabases
+      : Array.isArray(activeConn?.selectedDatabases)
+        ? activeConn.selectedDatabases
+        : Array.isArray(raw?.databases)
+          ? raw.databases
+          : [],
+    connections,
+  };
+}
+
 export function NotionConnection({
   selected,
   refresh,
@@ -77,7 +131,7 @@ export function NotionConnection({
     try {
       const res = await apiClient.getNotionConnection();
       if (ownerRef.current !== startOwner) return;
-      setData(res);
+      setData(normalizeNotionStatus(res));
     } catch {
       if (ownerRef.current !== startOwner) return;
       if (standalone) {
@@ -205,8 +259,12 @@ export function NotionConnection({
     try {
       const res = await apiClient.checkNotionConnection(activeConnectionId);
       if (ownerRef.current !== startOwner) return;
-      if (res.status === 'healthy') {
-        setNotice(`Kết nối Notion hoạt động tốt (${res.latencyMs}ms).`);
+      if (
+        res.status === 'healthy' ||
+        (res as any).status === 'connected' ||
+        (res as any).healthStatus === 'healthy'
+      ) {
+        setNotice(`Kết nối Notion hoạt động tốt (${res.latencyMs ?? 0}ms).`);
       } else {
         setError(res.message || 'Kết nối Notion không phản hồi.');
       }
@@ -224,7 +282,7 @@ export function NotionConnection({
       const next = new Map(prev);
       if (next.has(db.id)) {
         next.delete(db.id);
-      } else if (next.size < 20) {
+      } else if (next.size < 10) {
         next.set(db.id, db);
       }
       return next;
@@ -238,8 +296,8 @@ export function NotionConnection({
       setPasteError('Link hoặc ID Database Notion không hợp lệ (cần UUID 32 ký tự hex).');
       return;
     }
-    if (selectedDatabases.size >= 20 && !selectedDatabases.has(extractedId)) {
-      setPasteError('Chỉ được chọn tối đa 20 database.');
+    if (selectedDatabases.size >= 10 && !selectedDatabases.has(extractedId)) {
+      setPasteError('Chỉ được chọn tối đa 10 database.');
       return;
     }
     const existing = candidateDatabases.find((d) => d.id === extractedId);
@@ -260,7 +318,7 @@ export function NotionConnection({
   };
 
   const handleSaveScope = async () => {
-    if (!activeConnectionId || selectedDatabases.size < 1 || selectedDatabases.size > 20) return;
+    if (!activeConnectionId || selectedDatabases.size < 1 || selectedDatabases.size > 10) return;
     const startOwner = ownerRef.current;
     setSavingScope(true);
     setError('');
@@ -494,13 +552,13 @@ export function NotionConnection({
         >
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-semibold text-neutral-800">
-              Chọn phạm vi Database Notion (1–20 database)
+              Chọn phạm vi Database Notion (1–10 database)
             </p>
             <span
               data-testid="notion-scope-counter"
               className="rounded border border-neutral-200 bg-white px-2 py-0.5 text-[11px] font-medium text-neutral-700"
             >
-              Đã chọn {selectedDatabases.size}/20
+              Đã chọn {selectedDatabases.size}/10
             </span>
           </div>
 
@@ -548,7 +606,7 @@ export function NotionConnection({
                 <div className="max-h-48 overflow-y-auto space-y-1.5 rounded border border-neutral-200 bg-white p-2">
                   {visibleCandidates.map((db) => {
                     const checked = selectedDatabases.has(db.id);
-                    const disableNew = !checked && selectedDatabases.size >= 20;
+                    const disableNew = !checked && selectedDatabases.size >= 10;
                     return (
                       <label
                         key={db.id}
@@ -583,7 +641,7 @@ export function NotionConnection({
             <button
               id="notion-save-scope"
               type="button"
-              disabled={savingScope || selectedDatabases.size < 1 || selectedDatabases.size > 20}
+              disabled={savingScope || selectedDatabases.size < 1 || selectedDatabases.size > 10}
               onClick={handleSaveScope}
               className="rounded bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
             >

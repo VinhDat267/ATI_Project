@@ -116,6 +116,7 @@ export function notionConnectionView(row: NotionConnectionRow) {
     allowedDatabases: row.allowed_databases,
     selectedDatabases: row.selected_databases ?? [],
     isDefault: Boolean(row.is_default),
+    isActive: Boolean(row.is_default),
     toolsAvailable,
     connectedAt: row.connected_at,
   };
@@ -141,10 +142,12 @@ export function createNotionConnectionRoutes(options: NotionConnectionsOptions):
     if (!isNotionConnectAvailable(options) || !client || !tokens) {
       if (req.method === 'GET' && (req.path === '/' || req.path === '')) {
         res.status(200).json({
+          available: false,
           status: 'unconfigured',
           toolsAvailable: false,
           connections: [],
           activeConnection: null,
+          selectedDatabases: [],
           databases: [],
         });
         return;
@@ -165,8 +168,14 @@ export function createNotionConnectionRoutes(options: NotionConnectionsOptions):
     const connections = rows.map(notionConnectionView);
     const activeConnection = connections.find((c) => c.isDefault) ?? connections[0] ?? null;
     res.status(200).json({
+      available: true,
       status: activeConnection ? activeConnection.status : 'disconnected',
       toolsAvailable: Boolean(activeConnection?.toolsAvailable),
+      activeConnectionId: activeConnection?.id,
+      workspaceId: activeConnection?.workspaceId,
+      workspaceName: activeConnection?.workspaceName,
+      botId: activeConnection?.botId,
+      selectedDatabases: activeConnection?.selectedDatabases ?? [],
       connections,
       activeConnection,
       databases: activeConnection?.selectedDatabases ?? [],
@@ -267,7 +276,7 @@ export function createNotionConnectionRoutes(options: NotionConnectionsOptions):
       if (row.allowed_databases.length === 0) {
         try {
           const discovered = await client!.databases(grant.accessToken, '', AbortSignal.timeout(timeoutMs));
-          if (discovered.databases.length >= 1 && discovered.databases.length <= 20 && !discovered.hasMore) {
+          if (discovered.databases.length >= 1 && discovered.databases.length <= 10 && !discovered.hasMore) {
             const autoScoped = await options.repo!.selectDatabases(
               user.id,
               row.id,
@@ -340,14 +349,22 @@ export function createNotionConnectionRoutes(options: NotionConnectionsOptions):
       res.status(404).json({ error: 'Không tìm thấy kết nối Notion.' });
       return;
     }
-    const rawIds = req.body?.databaseIds;
+    const rawIds = Array.isArray(req.body?.databaseIds)
+      ? req.body.databaseIds
+      : req.body?.databases;
     if (!Array.isArray(rawIds) || rawIds.length === 0 || rawIds.length > 10) {
       res.status(400).json({ error: 'Chọn từ 1 đến 10 database Notion hợp lệ.' });
       return;
     }
     const parsedIds: string[] = [];
     for (const rawItem of rawIds) {
-      const parsed = extractNotionDatabaseId(rawItem);
+      const candidate =
+        typeof rawItem === 'string'
+          ? rawItem
+          : rawItem && typeof rawItem === 'object'
+            ? ((rawItem as Record<string, unknown>).id ?? (rawItem as Record<string, unknown>).url)
+            : undefined;
+      const parsed = extractNotionDatabaseId(candidate);
       if (!parsed) {
         res.status(400).json({ error: 'Chọn từ 1 đến 10 database Notion hợp lệ.' });
         return;
@@ -423,12 +440,18 @@ export function createNotionConnectionRoutes(options: NotionConnectionsOptions):
       res.status(404).json({ error: 'Không tìm thấy kết nối Notion.' });
       return;
     }
+    const startedAt = clock();
     try {
       await tokens!.execute(user.id, row.id, row.identity_version, (accessToken, botId) =>
         client!.verify(accessToken, botId, AbortSignal.timeout(timeoutMs)),
       );
       const latest = await options.repo!.getActive(user.id, row.id);
-      res.status(200).json(notionConnectionView(latest ?? row));
+      const latencyMs = Math.max(0, clock() - startedAt);
+      res.status(200).json({
+        ...notionConnectionView(latest ?? row),
+        healthStatus: 'healthy',
+        latencyMs,
+      });
     } catch (err) {
       const latest = await options.repo!.getActive(user.id, row.id);
       res.status(409).json({

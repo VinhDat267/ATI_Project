@@ -415,6 +415,86 @@ function findUngrounded(steps: PlanStep[], catalog: Map<string, ToolDefinition>,
         ungrounded.push({ stepId: step.id, argument, resource, value });
       }
     }
+    if (step.tool === 'trello.update_checklist_item' && typeof step.args?.cardId === 'string') {
+      const cardEntries = [
+        ...(Array.isArray(grounding.memory.card)
+          ? grounding.memory.card
+          : grounding.memory.card
+            ? [grounding.memory.card]
+            : []),
+        ...(isObject(grounding.memory.__observed) && Array.isArray((grounding.memory.__observed as any).card)
+          ? (grounding.memory.__observed as any).card
+          : []),
+      ].filter((c): c is Record<string, unknown> => isObject(c) && String(c.id) === step.args.cardId);
+
+      const allItems: Array<{ id: string; name: string }> = [];
+      for (const card of cardEntries) {
+        if (!Array.isArray(card.checklists)) continue;
+        for (const chk of card.checklists) {
+          if (!isObject(chk)) continue;
+          const items = Array.isArray(chk.checkItems)
+            ? chk.checkItems
+            : Array.isArray(chk.items)
+              ? chk.items
+              : [];
+          for (const it of items) {
+            if (isObject(it) && typeof it.id === 'string' && typeof it.name === 'string') {
+              allItems.push({ id: it.id, name: it.name });
+            }
+          }
+        }
+      }
+
+      if (allItems.length > 0) {
+        const needle = typeof step.args.itemName === 'string' ? step.args.itemName.trim().toLowerCase() : '';
+        const rawCheckItemId =
+          typeof step.args.checkItemId === 'string' && step.args.checkItemId.trim()
+            ? step.args.checkItemId.trim()
+            : undefined;
+        if (rawCheckItemId) {
+          const byId = allItems.find((it) => it.id === rawCheckItemId);
+          const partialMatches = needle
+            ? allItems.filter(
+                (it) => it.name.toLowerCase().includes(needle) || needle.includes(it.name.toLowerCase()),
+              )
+            : [];
+          const matchesName =
+            !needle ||
+            byId?.name.trim().toLowerCase() === needle ||
+            (partialMatches.length === 1 && partialMatches[0]!.id === rawCheckItemId);
+          if (!byId || !matchesName) {
+            ungrounded.push({
+              stepId: step.id,
+              argument: 'checkItemId',
+              resource: 'checkItem',
+              value: rawCheckItemId,
+            });
+          }
+        } else if (needle) {
+          const exactMatches = allItems.filter((it) => it.name.trim().toLowerCase() === needle);
+          if (exactMatches.length === 0) {
+            const partialMatches = allItems.filter(
+              (it) => it.name.toLowerCase().includes(needle) || needle.includes(it.name.toLowerCase()),
+            );
+            if (partialMatches.length !== 1) {
+              ungrounded.push({
+                stepId: step.id,
+                argument: 'itemName',
+                resource: 'checkItem',
+                value: String(step.args.itemName),
+              });
+            }
+          } else if (exactMatches.length > 1) {
+            ungrounded.push({
+              stepId: step.id,
+              argument: 'itemName',
+              resource: 'checkItem',
+              value: String(step.args.itemName),
+            });
+          }
+        }
+      }
+    }
   }
   return ungrounded;
 }
