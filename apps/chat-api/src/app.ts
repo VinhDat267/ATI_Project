@@ -32,8 +32,9 @@ import type { ExecutionService } from './services/execution-service.js';
 import { userFacingError } from './services/user-facing-error.js';
 import type { EmailSender } from './services/email/index.js';
 import type { GoogleOAuthConfig } from './auth/google-oidc.js';
-import type { GmailOAuthConfig, GitHubOAuthConfig, TelegramBotConfig, TrelloOAuthConfig, JiraOAuthConfig } from './config/env.js';
+import type { GmailOAuthConfig, GitHubOAuthConfig, NotionOAuthConfig, TelegramBotConfig, TrelloOAuthConfig, JiraOAuthConfig } from './config/env.js';
 import type { GmailConnectionRepo } from './db/repositories/gmail-connection-repo.js';
+import type { NotionConnectionRepo } from './db/repositories/notion-connection-repo.js';
 import { TrelloTeamRepo } from './db/repositories/trello-team-repo.js';
 import { GitHubTeamRepo } from './db/repositories/github-team-repo.js';
 import { TelegramTeamRepo } from './db/repositories/telegram-team-repo.js';
@@ -43,6 +44,7 @@ import { createMySheetsConnectionRoutes, isMySheetsAvailable } from './routes/co
 import { createTrelloConnectionRoutes, isTrelloConnectAvailable, type TrelloConnectionsOptions } from './routes/connections/trello.js';
 import { createGitHubConnectionRoutes, type GitHubConnectionsOptions } from './routes/connections/github.js';
 import { createTelegramConnectionRoutes, type TelegramConnectionsOptions } from './routes/connections/telegram.js';
+import { createNotionConnectionRoutes, isNotionConnectAvailable, type NotionConnectionsOptions } from './routes/connections/notion.js';
 import { createMyJiraConnectionRoutes, isMyJiraAvailable, type MyJiraConnectionsOptions } from './routes/connections/myjira.js';
 import type { GlobalRateLimiter } from '@wap/tool-adapters';
 import type { GoogleAuthRepo } from './db/repositories/google-auth-repo.js';
@@ -53,6 +55,7 @@ import type { SlackInvalidationRunner } from './services/slack/slack-invalidatio
 import { createSlackEventsRouter, type SlackEventsRouterOptions } from './routes/slack-events.js';
 import type { TrelloTokenManager } from './services/trello/token-manager.js';
 import type { GitHubTokenManager } from './services/github/token-manager.js';
+import type { NotionTokenManager } from './services/notion/token-manager.js';
 import type { JiraTokenManager } from './services/jira/jira-token-manager.js';
 import { JiraOAuthClient } from './services/jira/jira-oauth-client.js';
 import type { JiraOAuthRepo } from './db/repositories/jira-oauth-repo.js';
@@ -124,6 +127,19 @@ export interface TelegramAppOptions {
   teamRepo?: TelegramTeamRepo;
 }
 
+/** Notion as each member's own 1-click OAuth connection and selected databases. */
+export interface NotionAppOptions {
+  enabled?: boolean;
+  oauth?: NotionOAuthConfig;
+  repo?: NotionConnectionRepo;
+  tokens?: NotionTokenManager;
+  fetchFn?: typeof fetch;
+  notionTimeoutMs?: number;
+  revokeTimeoutMs?: number;
+  onConnectionChanged?: (userId: string) => void;
+  conversationOwner?: (conversationId: string) => Promise<string | null>;
+}
+
 /** Jira as each member's own OAuth connection and workspace sites (MYJIRA_ENABLED). */
 export interface JiraAppOptions {
   enabled: boolean;
@@ -183,6 +199,8 @@ export interface AppOptions extends AdminUsersOptions {
   githubTeamRepo?: GitHubTeamRepo;
   telegram?: TelegramAppOptions;
   telegramTeamRepo?: TelegramTeamRepo;
+  notion?: NotionAppOptions;
+  mynotion?: NotionAppOptions;
   jira?: JiraAppOptions;
   /** Scheduled workflows; present only when SCHEDULES_ENABLED is on and PostgreSQL is available. */
   schedules?: ScheduleRoutesOptions;
@@ -255,6 +273,24 @@ export function createApp(options: AppOptions): Express {
     conversationOwner: options.convRepo ? async (id: string) => (await options.convRepo!.getConversation(id))?.user_id ?? null : undefined,
     adminUserIds: options.serviceAdminUserIds,
   };
+  const notionCfg = options.notion ?? options.mynotion;
+  const notionRoutes: NotionConnectionsOptions = {
+    jwtSecret: options.jwtSecret,
+    encryptionKey: options.encryptionKey,
+    sessionRepo,
+    states,
+    repo: notionCfg?.repo,
+    oauth: notionCfg?.oauth,
+    tokens: notionCfg?.tokens,
+    fetchFn: notionCfg?.fetchFn,
+    clock: options.authClock,
+    notionTimeoutMs: notionCfg?.notionTimeoutMs,
+    revokeTimeoutMs: notionCfg?.revokeTimeoutMs,
+    onConnectionChanged: notionCfg?.onConnectionChanged,
+    conversationOwner:
+      notionCfg?.conversationOwner ??
+      (options.convRepo ? async (id: string) => (await options.convRepo!.getConversation(id))?.user_id ?? null : undefined),
+  };
   const jiraRoutes: MyJiraConnectionsOptions | undefined = options.jira?.enabled ? {
     jwtSecret: options.jwtSecret,
     sessionRepo,
@@ -297,6 +333,8 @@ export function createApp(options: AppOptions): Express {
       req.path.startsWith('/api/connections/trello') ||
       req.path.startsWith('/api/connections/github') ||
       req.path.startsWith('/api/connections/telegram') ||
+      req.path.startsWith('/api/connections/notion') ||
+      req.path.startsWith('/api/connections/mynotion') ||
       req.path.startsWith('/api/connections/myjira')
     ) {
       const origins = [
@@ -309,6 +347,7 @@ export function createApp(options: AppOptions): Express {
         options.trello?.oauth?.redirectUri,
         options.github?.oauth?.redirectUri,
         options.telegram?.bot?.callbackUrl,
+        notionCfg?.oauth?.redirectUri,
         options.jira?.oauth?.redirectUri,
         options.jira?.oauth?.fixtureBaseUrl,
       ]
@@ -421,6 +460,10 @@ export function createApp(options: AppOptions): Express {
   app.use('/api/connections/trello', createTrelloConnectionRoutes(trelloRoutes));
   app.use('/api/connections/github', createGitHubConnectionRoutes(githubRoutes));
   app.use('/api/connections/telegram', createTelegramConnectionRoutes(telegramRoutes));
+  app.use('/api/connections/notion', createNotionConnectionRoutes(notionRoutes));
+  if (notionCfg?.enabled !== false) {
+    app.use('/api/connections/mynotion', createNotionConnectionRoutes(notionRoutes));
+  }
   if (jiraRoutes) {
     app.use('/api/connections/myjira', createMyJiraConnectionRoutes(jiraRoutes));
   } else {

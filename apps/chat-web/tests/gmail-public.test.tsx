@@ -3,14 +3,17 @@ import { within, cleanup, fireEvent, render, screen, waitFor } from '@testing-li
 import { ALL_TOOLS, GMAIL_TOOLS } from '@wap/tool-schemas';
 import { GuidePage } from '../src/pages/Guide/GuidePage';
 import { LandingPage } from '../src/pages/Landing/LandingPage';
-import { GMAIL_PROMPTS } from '../src/pages/Guide/gmail-data';
+import { GMAIL_PROMPTS, GMAIL_CAPABILITY } from '../src/pages/Guide/gmail-data';
 import { SAMPLE_PROMPTS } from '../src/pages/Guide/data';
 import { apiClient } from '../src/services/api-client';
 afterEach(() => { cleanup(); vi.restoreAllMocks(); window.history.replaceState({}, '', '/'); });
-it('uses only available tools in the enabled and disabled guide sample catalogues', () => {
+it('uses only available tools in the enabled and disabled guide sample catalogues and showcases Inbox Zero & Cross-Service Gmail prompts', () => {
   const base = new Set(ALL_TOOLS.map(tool => tool.name)), enabled = new Set([...ALL_TOOLS, ...GMAIL_TOOLS].map(tool => tool.name));
   for (const prompt of SAMPLE_PROMPTS) for (const tool of prompt.tools) expect(base.has(tool)).toBe(true);
   for (const prompt of [...SAMPLE_PROMPTS, ...GMAIL_PROMPTS]) for (const tool of prompt.tools) expect(enabled.has(tool)).toBe(true);
+  expect(GMAIL_PROMPTS.some(p => p.tools.includes('gmail.batch_modify_threads'))).toBe(true);
+  expect(GMAIL_PROMPTS.some(p => p.services.includes('sheets') && p.services.includes('gmail'))).toBe(true);
+  expect(GMAIL_CAPABILITY.canDo.some(item => item.includes('Inbox Zero'))).toBe(true);
 });
 it.each([false, true])('gates Gmail guide, sample prompts and landing on the public capability: %s', async enabled => {
   vi.spyOn(apiClient, 'getRuntime').mockResolvedValue({ runtimeMode: 'sandbox', gmailEnabled: enabled });

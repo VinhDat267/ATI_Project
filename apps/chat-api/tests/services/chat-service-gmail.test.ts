@@ -3,7 +3,9 @@ import { createHash } from 'node:crypto';
 import { encryptCredentials } from '@wap/tool-adapters';
 import type { PlanResponse, PlannerResponse } from '@wap/tool-schemas';
 import type { ProcessMessageInput } from '@wap/planner';
+import { WorkingMemory } from '@wap/planner';
 import { ChatService } from '../../src/services/chat-service.js';
+import { resourceLabels } from '../../src/services/resource-labels.js';
 import { ConversationRepo } from '../../src/db/repositories/conversation-repo.js';
 import { CredentialRepo } from '../../src/db/repositories/credential-repo.js';
 import { MessageRepo } from '../../src/db/repositories/message-repo.js';
@@ -107,5 +109,30 @@ describe('ChatService binds a plan to the previewed Gmail connection before hash
     expect(previous).toBeDefined();
     expect(previous.content).not.toContain('connections');
     expect(previous.content).not.toContain('owner.mail@example.test');
+  });
+
+  it('projects workspace service recipient labels and batch_modify_threads thread subjects in resourceLabels', () => {
+    const memory = new WorkingMemory();
+    memory.setEntity('__observed', {
+      recipient: [{ id: 'khachhang@agency.vn', service: 'sheets' }],
+      label: [{ id: 'UNREAD', name: 'UNREAD' }],
+    });
+    memory.setEntity('__labels', {
+      thread: { 'gmail-thread-1': 'Họp nhóm ATI', 'gmail-thread-2': 'Báo cáo tuần' },
+    });
+    const labels = resourceLabels(
+      plan([
+        { id: 's1', tool: 'gmail.send_message', description: 'Gửi', args: { to: ['khachhang@agency.vn'], subject: 'Báo giá', body: 'OK' }, dependsOn: [] },
+        { id: 's2', tool: 'gmail.batch_modify_threads', description: 'Đánh dấu đã đọc', args: { threadIds: ['gmail-thread-1', 'gmail-thread-2'], removeLabelIds: ['UNREAD'] }, dependsOn: [] },
+      ]),
+      memory,
+      ['Gửi báo giá cho khách hàng trong Sheet và đánh dấu đã đọc 2 email'],
+    );
+    expect(labels).toMatchObject({
+      'recipient:khachhang@agency.vn': 'service:Google Sheets',
+      'gmail-thread-1': 'Họp nhóm ATI',
+      'gmail-thread-2': 'Báo cáo tuần',
+      UNREAD: 'UNREAD',
+    });
   });
 });

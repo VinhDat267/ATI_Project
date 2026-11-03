@@ -484,4 +484,254 @@ describe('PersonalCalendarAdapter', () => {
       end: '2026-10-09T10:30:00+07:00',
     });
   });
+
+  it('enriches normalized events with meetLink (hangoutLink or conferenceData), location, and attendeesCount', async () => {
+    const richEvent = {
+      id: 'evt_rich_1',
+      summary: 'Q4 Executive Sync',
+      htmlLink: 'https://www.google.com/calendar/event?eid=rich_1',
+      start: { dateTime: start },
+      end: { dateTime: end },
+      location: 'Phòng họp Tầng 5',
+      hangoutLink: 'https://meet.google.com/xyz-abcd-efg',
+      attendees: [{ email: 'ceo@example.com' }, { email: 'pm@example.com' }, { email: 'lead@example.com' }],
+    };
+
+    const { adapter } = setup({
+      handler: () => json({ items: [richEvent] }),
+    });
+
+    const listed = await adapter.execute('mycalendar.list_events', {
+      calendarId,
+      timeMin: start,
+      timeMax: end,
+    });
+
+    expect(listed.events).toEqual([
+      {
+        id: 'evt_rich_1',
+        title: 'Q4 Executive Sync',
+        start,
+        end,
+        url: 'https://www.google.com/calendar/event?eid=rich_1',
+        location: 'Phòng họp Tầng 5',
+        meetLink: 'https://meet.google.com/xyz-abcd-efg',
+        attendeesCount: 3,
+      },
+    ]);
+  });
+
+  it('allows mycalendar.list_events with only natural language query (without explicit timeMin/timeMax)', async () => {
+    const { adapter, calls } = setup({
+      handler: () => json({ items: [fixtureEvent] }),
+    });
+
+    const listed = await adapter.execute('mycalendar.list_events', {
+      calendarId,
+      query: 'hôm nay',
+    });
+
+    expect(listed.events).toHaveLength(1);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.url.searchParams.get('timeMin')).toMatch(/T00:00:00/);
+    expect(calls[0]!.url.searchParams.get('timeMax')).toMatch(/T23:59:59/);
+  });
+
+  it('supports createMeetLink: true in mycalendar.create_event (conferenceDataVersion=1) and returns meetLink', async () => {
+    const { adapter, calls } = setup({
+      handler: () =>
+        json({
+          ...fixtureEvent,
+          conferenceData: {
+            entryPoints: [{ entryPointType: 'video', uri: 'https://meet.google.com/new-meet-room' }],
+          },
+        }),
+    });
+
+    const created = await adapter.execute('mycalendar.create_event', {
+      ...createArgs,
+      createMeetLink: true,
+    });
+
+    expect(created).toEqual({
+      id: fixtureEvent.id,
+      title: 'Review Meeting',
+      start,
+      end,
+      url: fixtureEvent.htmlLink,
+      meetLink: 'https://meet.google.com/new-meet-room',
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.url.searchParams.get('sendUpdates')).toBe('none');
+    expect(calls[0]!.url.searchParams.get('conferenceDataVersion')).toBe('1');
+    const body = JSON.parse(String(calls[0]!.init.body));
+    expect(body.conferenceData?.createRequest?.conferenceSolutionKey?.type).toBe('hangoutsMeet');
+  });
+
+  it('supports mycalendar.update_event to reschedule or update details and mycalendar.delete_event to cancel an event', async () => {
+    const newStart = '2026-10-28T14:00:00+07:00';
+    const newEnd = '2026-10-28T15:00:00+07:00';
+    const { adapter, calls } = setup({
+      handler: (_url, init) => {
+        if (init.method === 'PATCH') {
+          return json({
+            ...fixtureEvent,
+            summary: 'Rescheduled Review',
+            start: { dateTime: newStart },
+            end: { dateTime: newEnd },
+          });
+        }
+        if (init.method === 'DELETE') {
+          return new Response(null, { status: 204 });
+        }
+        return json(fixtureEvent);
+      },
+    });
+
+    const updated = await adapter.execute('mycalendar.update_event', {
+      calendarId,
+      eventId: 'evt_fixture_personal_1',
+      summary: 'Rescheduled Review',
+      start: newStart,
+      end: newEnd,
+    });
+
+    expect(updated).toEqual({
+      id: 'evt_fixture_personal_1',
+      title: 'Rescheduled Review',
+      start: newStart,
+      end: newEnd,
+      url: fixtureEvent.htmlLink,
+    });
+    expect(calls[0]!.init.method).toBe('PATCH');
+    expect(calls[0]!.url.pathname).toContain(`/calendars/${encodeURIComponent(calendarId)}/events/evt_fixture_personal_1`);
+    expect(calls[0]!.url.searchParams.get('sendUpdates')).toBe('none');
+
+    const deleted = await adapter.execute('mycalendar.delete_event', {
+      calendarId,
+      eventId: 'evt_fixture_personal_1',
+    });
+    expect(deleted).toEqual({ id: 'evt_fixture_personal_1', deleted: true });
+    expect(calls[1]!.init.method).toBe('DELETE');
+    expect(calls[1]!.url.pathname).toContain(`/calendars/${encodeURIComponent(calendarId)}/events/evt_fixture_personal_1`);
+    expect(calls[1]!.url.searchParams.get('sendUpdates')).toBe('none');
+  });
+
+  it('supports recurrence (WEEKDAYS, DAILY, WEEKLY, MONTHLY, or RRULE:...) in create_event and update_event and rejects invalid recurrence', async () => {
+    const { adapter, calls } = setup({
+      handler: (_url, init) => {
+        const parsed = JSON.parse(String(init.body));
+        return json({
+          ...fixtureEvent,
+          recurrence: parsed.recurrence,
+        });
+      },
+    });
+
+    const created = await adapter.execute('mycalendar.create_event', {
+      ...createArgs,
+      recurrence: 'WEEKDAYS',
+    });
+
+    expect(created.recurrence).toBe('RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR');
+    const createBody = JSON.parse(String(calls[0]!.init.body));
+    expect(createBody.recurrence).toEqual(['RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR']);
+
+    const updated = await adapter.execute('mycalendar.update_event', {
+      calendarId,
+      eventId: 'evt_fixture_personal_1',
+      recurrence: 'RRULE:FREQ=WEEKLY;COUNT=8',
+    });
+    expect(updated.recurrence).toBe('RRULE:FREQ=WEEKLY;COUNT=8');
+
+    await expect(
+      adapter.execute('mycalendar.create_event', {
+        ...createArgs,
+        recurrence: 'EVERY_BLUE_MOON;DROP TABLE',
+      }),
+    ).rejects.toMatchObject({ category: 'VALIDATION' });
+  });
+
+  it('supports mycalendar.get_event to fetch full event details including description (agenda), meetLink, location, and recurrence', async () => {
+    const { adapter, calls } = setup({
+      handler: () =>
+        json({
+          ...fixtureEvent,
+          summary: 'Sprint Retrospective',
+          description: 'Agenda:\n1. What went well\n2. Action items for Q4',
+          location: 'Phòng họp VIP 1',
+          hangoutLink: 'https://meet.google.com/ret-ro-123',
+          attendees: [{ email: 'a@example.com' }, { email: 'b@example.com' }],
+          recurrence: ['RRULE:FREQ=WEEKLY;INTERVAL=2'],
+        }),
+    });
+
+    const detail = await adapter.execute('mycalendar.get_event', {
+      calendarId,
+      eventId: 'evt_fixture_personal_1',
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.init.method).toBe('GET');
+    expect(calls[0]!.url.pathname).toContain(`/calendars/${encodeURIComponent(calendarId)}/events/evt_fixture_personal_1`);
+    expect(detail).toEqual({
+      id: 'evt_fixture_personal_1',
+      title: 'Sprint Retrospective',
+      description: 'Agenda:\n1. What went well\n2. Action items for Q4',
+      start,
+      end,
+      url: fixtureEvent.htmlLink,
+      location: 'Phòng họp VIP 1',
+      meetLink: 'https://meet.google.com/ret-ro-123',
+      attendeesCount: 2,
+      recurrence: 'RRULE:FREQ=WEEKLY;INTERVAL=2',
+    });
+  });
+
+  it('supports mycalendar.find_free_slots to proactively compute available slots within workday hours', async () => {
+    const busy1 = {
+      id: 'busy_1',
+      summary: 'Morning Standup',
+      htmlLink: 'https://calendar.google.com/event?eid=b1',
+      start: { dateTime: '2026-10-09T08:00:00+07:00' },
+      end: { dateTime: '2026-10-09T09:30:00+07:00' },
+    };
+    const busy2 = {
+      id: 'busy_2',
+      summary: 'Client Demo',
+      htmlLink: 'https://calendar.google.com/event?eid=b2',
+      start: { dateTime: '2026-10-09T10:30:00+07:00' },
+      end: { dateTime: '2026-10-09T12:00:00+07:00' },
+    };
+
+    const { adapter } = setup({
+      handler: () => json({ items: [busy1, busy2] }),
+    });
+
+    const result = await adapter.execute('mycalendar.find_free_slots', {
+      calendarId,
+      timeMin: '2026-10-09T08:00:00+07:00',
+      timeMax: '2026-10-09T18:00:00+07:00',
+      durationMinutes: 60,
+      workdayStartHour: 8,
+      workdayEndHour: 18,
+      limit: 3,
+    });
+
+    expect(result.calendarId).toBe(calendarId);
+    expect(result.busyCount).toBe(2);
+    expect(result.freeSlots).toHaveLength(3);
+    expect(result.freeSlots[0]).toMatchObject({
+      start: '2026-10-09T09:30:00+07:00',
+      end: '2026-10-09T10:30:00+07:00',
+      durationMinutes: 60,
+      label: '09:30–10:30',
+    });
+    expect(result.freeSlots[1]).toMatchObject({
+      start: '2026-10-09T12:00:00+07:00',
+      end: '2026-10-09T13:00:00+07:00',
+      durationMinutes: 60,
+      label: '12:00–13:00',
+    });
+  });
 });

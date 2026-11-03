@@ -1,6 +1,6 @@
 import {captureScheduleArtifact,guardScheduleArtifact,prelockScheduleArtifacts,registerScheduleFields,scheduleRegistry,scheduleSourceContext,tagScheduleContext} from '../slack/slack-schedule-lineage.js';
 import type pg from 'pg';
-import type { CalendarDigestConfig, GithubDigestConfig, ScheduleKind, ScheduleRecurrence, ScheduleRunMessageMetadata, TelegramDigestConfig } from '@wap/tool-schemas';
+import type { CalendarDigestConfig, GithubDigestConfig, NotionDigestConfig, ScheduleKind, ScheduleRecurrence, ScheduleRunMessageMetadata, TelegramDigestConfig, TrelloDigestConfig } from '@wap/tool-schemas';
 import { MessageRepo } from '../../db/repositories/message-repo.js';
 import type { Queryable, ScheduleRow } from '../../db/repositories/schedule-repo.js';
 import type { DigestRunOutcome as CalendarDigestRunOutcome, RunCalendarDigest } from './calendar-digest-runner.js';
@@ -11,6 +11,8 @@ import type { ScheduleChange } from './schedule-service.js';
 import type { SheetsDigestRunner } from './sheets-digest-runner.js';
 import type { DigestRunOutcome as GithubDigestRunOutcome, RunGithubDigest } from './github-digest-runner.js';
 import { GITHUB_DELIVERY_UNKNOWN } from './github-digest-runner.js';
+import type { TrelloDigestRunOutcome, RunTrelloDigest } from './trello-digest-runner.js';
+import type { NotionDigestRunOutcome, RunNotionDigest } from './notion-digest-runner.js';
 import type { DigestRunInput, DigestRunOutcome } from './telegram-digest-runner.js';
 
 export interface RunToPlan {
@@ -38,6 +40,8 @@ export interface ScheduleRunnerOptions {
   planRun: PlanRun;
   runDigest?: RunCalendarDigest | RunGithubDigest;
   runGithubDigest?: RunGithubDigest;
+  runTrelloDigest?: RunTrelloDigest;
+  runNotionDigest?: RunNotionDigest;
   executeDigestRun?: ExecuteDigestRun;
   timeZone: string;
   /** Writes the state message of a schedule the runner paused or completed (ScheduleService.recordState). */
@@ -264,7 +268,7 @@ export class ScheduleRunner {
               if (moved.status === 'completed') changes.push(await this.options.recordState(client, tagScheduleContext(moved, segments), now));
               continue;
             }
-            if (row.kind !== 'github_digest' && row.kind !== 'telegram_digest' && await this.lastThreeExpired(client, row.id, now)) {
+            if (row.kind !== 'github_digest' && row.kind !== 'trello_digest' && row.kind !== 'notion_digest' && row.kind !== 'telegram_digest' && await this.lastThreeExpired(client, row.id, now)) {
               changes.push(await this.options.recordState(client, tagScheduleContext(await this.pause(client, row.id, UNAPPROVED), segments), now));
               continue;
             }
@@ -378,7 +382,7 @@ export class ScheduleRunner {
         scheduleRow,
         kind: (run.kind ?? 'plan_approval') as ScheduleKind,
         recurrence: run.recurrence as ScheduleRecurrence,
-        digestConfig: (run.digest_config ?? null) as CalendarDigestConfig | GithubDigestConfig | TelegramDigestConfig | null,
+        digestConfig: (run.digest_config ?? null) as CalendarDigestConfig | GithubDigestConfig | TelegramDigestConfig | TrelloDigestConfig | NotionDigestConfig | null,
         digestConfigHash: (run.digest_config_hash ?? null) as string | null,
       };
     });
@@ -402,6 +406,30 @@ export class ScheduleRunner {
         ...started,
         digestConfig: started.digestConfig as GithubDigestConfig | null,
       });
+      return;
+    }
+
+    if (started.kind === 'trello_digest' && this.options.runTrelloDigest) {
+      await this.executeGithubDigestOne(
+        runId,
+        {
+          ...started,
+          digestConfig: started.digestConfig as any,
+        },
+        this.options.runTrelloDigest as any
+      );
+      return;
+    }
+
+    if (started.kind === 'notion_digest' && this.options.runNotionDigest) {
+      await this.executeGithubDigestOne(
+        runId,
+        {
+          ...started,
+          digestConfig: started.digestConfig as any,
+        },
+        this.options.runNotionDigest as any
+      );
       return;
     }
 
@@ -482,36 +510,53 @@ export class ScheduleRunner {
     const { pool } = this.options;
     const controller = new AbortController();
     this.current = controller;
-    const timer = setTimeout(() => controller.abort(), this.planTimeoutMs);
+    if (this.stopping) controller.abort();
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, this.planTimeoutMs);
 
     let outcome: Awaited<ReturnType<SheetsDigestRunner['executeDigest']>>;
     try {
-      outcome = await this.options.sheetsDigestRunner!.executeDigest(
-        started.scheduleRow,
-        started.toPlan.scheduleVersion,
-        async () => {
-          const res = await pool.query('SELECT version, status FROM schedules WHERE id=$1', [
-            started.toPlan.scheduleId,
-          ]);
-          const row = res.rows[0];
-          return Boolean(
-            row &&
-              row.version === started.toPlan.scheduleVersion &&
-              row.status !== 'cancelled' &&
-              row.status !== 'paused'
+      const aborted = controller.signal.aborted
+        ? Promise.reject(new Error('aborted'))
+        : new Promise<never>((_, reject) =>
+            controller.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
           );
-        },
-        controller.signal
-      );
+      outcome = await Promise.race([
+        this.options.sheetsDigestRunner!.executeDigest(
+          started.scheduleRow,
+          started.toPlan.scheduleVersion,
+          async () => {
+            const res = await pool.query('SELECT version, status FROM schedules WHERE id=$1', [
+              started.toPlan.scheduleId,
+            ]);
+            const row = res.rows[0];
+            return Boolean(
+              row &&
+                row.version === started.toPlan.scheduleVersion &&
+                row.status !== 'cancelled' &&
+                row.status !== 'paused'
+            );
+          },
+          controller.signal
+        ),
+        aborted,
+      ]);
     } catch {
-      outcome = { status: 'digest_failed', error: 'Không gửi được báo cáo tự động lúc này.' };
+      outcome = {
+        status: 'digest_failed',
+        error: timedOut ? TIMED_OUT : this.stopping ? STOPPED : 'Không gửi được báo cáo tự động lúc này.',
+      };
     } finally {
       clearTimeout(timer);
       this.current = null;
     }
 
+    const stoppedError = this.stopping && !timedOut && outcome.status === 'digest_failed';
     const now = this.now();
-    const stateChanges = await inTransaction(pool, async (client): Promise<ScheduleChange[]> => {
+    const result = await inTransaction(pool, async (client) => {
       const changes: ScheduleChange[] = [];
       await client.query('SELECT id FROM conversations WHERE id=$1 FOR UPDATE', [started.scheduleRow.conv_id]);
       const schedule = (
@@ -520,9 +565,26 @@ export class ScheduleRunner {
       const run = (
         await client.query('SELECT status FROM schedule_runs WHERE id=$1 FOR UPDATE', [runId])
       ).rows[0];
-      if (!schedule || run?.status !== 'planning') return changes;
+      if (!schedule || run?.status !== 'planning') {
+        return { ended: null as string | null, changes, assistantMessageId: undefined as string | undefined, text: undefined as string | undefined };
+      }
 
       const replyTo = { replyToMessageId: started.messageId };
+
+      if (stoppedError) {
+        await this.messages.createMessage(
+          started.convId,
+          'system',
+          `Lỗi: ${STOPPED}`,
+          { type: 'planning_error', ...replyTo },
+          client
+        );
+        await client.query(
+          "UPDATE schedule_runs SET status='interrupted', error=$2, updated_at=now() WHERE id=$1",
+          [runId, STOPPED]
+        );
+        return { ended: STOPPED, changes, assistantMessageId: undefined, text: undefined };
+      }
 
       if (
         outcome.status === 'discarded' ||
@@ -537,7 +599,7 @@ export class ScheduleRunner {
           client
         );
         await client.query("UPDATE schedule_runs SET status='discarded', updated_at=now() WHERE id=$1", [runId]);
-        return changes;
+        return { ended: DISCARDED, changes, assistantMessageId: undefined, text: undefined };
       }
 
       if (outcome.status === 'blocked') {
@@ -554,7 +616,7 @@ export class ScheduleRunner {
         );
         const paused = await this.pause(client, schedule.id, outcome.pauseReason);
         changes.push(await this.options.recordState(client, paused, now));
-        return changes;
+        return { ended: outcome.pauseReason, changes, assistantMessageId: undefined, text: undefined };
       }
 
       if (outcome.status === 'digest_failed') {
@@ -581,10 +643,10 @@ export class ScheduleRunner {
           );
           changes.push(await this.options.recordState(client, paused, now));
         }
-        return changes;
+        return { ended: outcome.error, changes, assistantMessageId: undefined, text: undefined };
       }
 
-      await this.messages.createMessage(
+      const msg = await this.messages.createMessage(
         started.convId,
         'assistant',
         outcome.text,
@@ -595,10 +657,24 @@ export class ScheduleRunner {
         "UPDATE schedule_runs SET status='digest_sent', delivery=$2::jsonb, updated_at=now() WHERE id=$1",
         [runId, JSON.stringify(outcome.delivery)]
       );
-      return changes;
+      return { ended: 'digest_sent', changes, assistantMessageId: msg.id, text: outcome.text };
     });
 
-    this.announce(stateChanges);
+    this.announce(result.changes);
+    if (result.ended === 'digest_sent') {
+      this.send(started.convId, 'message_complete', {
+        conversationId: started.convId,
+        messageId: result.assistantMessageId,
+        content: result.text,
+        replyToMessageId: started.messageId,
+      });
+    } else if (result.ended) {
+      this.send(started.convId, 'error', {
+        conversationId: started.convId,
+        message: result.ended,
+        replyToMessageId: started.messageId,
+      });
+    }
   }
 
   private async runDigestOne(started: {
@@ -646,6 +722,7 @@ export class ScheduleRunner {
     }
 
     const result = await inTransaction(pool, async (client) => {
+      await client.query('SELECT id FROM conversations WHERE id=$1 FOR UPDATE', [started.convId]);
       const schedule = (await client.query('SELECT * FROM schedules WHERE id=$1 FOR UPDATE', [started.toPlan.scheduleId])).rows[0] as ScheduleRow | undefined;
       const run = (await client.query('SELECT status, delivery_started_at FROM schedule_runs WHERE id=$1 FOR UPDATE', [runId])).rows[0];
       if (run?.status !== 'planning' || !schedule) return { ended: null as string | null, changes: [] as ScheduleChange[], assistantMessageId: undefined as string | undefined };
@@ -680,7 +757,12 @@ export class ScheduleRunner {
       if (outcome.state === 'digest_failed') {
         await this.messages.createMessage(started.convId, 'system', `Lỗi: ${outcome.error}`, { type: 'planning_error', ...replyTo }, client);
         await client.query("UPDATE schedule_runs SET status='digest_failed', error=$2, updated_at=now() WHERE id=$1", [runId, outcome.error]);
-        return { ended: outcome.error, changes: [] as ScheduleChange[], assistantMessageId: undefined };
+        const changes: ScheduleChange[] = [];
+        if (await this.lastThreeDigestFailed(client, schedule.id)) {
+          const paused = await this.pause(client, schedule.id, DIGEST_FAILED_3X);
+          changes.push(await this.options.recordState(client, paused, this.now()));
+        }
+        return { ended: outcome.error, changes, assistantMessageId: undefined };
       }
 
       const msg = await this.messages.createMessage(
@@ -724,6 +806,7 @@ export class ScheduleRunner {
       digestConfig: GithubDigestConfig | null;
       digestConfigHash: string | null;
     },
+    overrideRunner?: RunGithubDigest | RunTrelloDigest | RunNotionDigest,
   ): Promise<void> {
     const { pool } = this.options;
     const controller = new AbortController();
@@ -734,10 +817,10 @@ export class ScheduleRunner {
       controller.abort();
     }, this.planTimeoutMs);
 
-    let outcome: GithubDigestRunOutcome | null = null;
+    let outcome: GithubDigestRunOutcome | TrelloDigestRunOutcome | NotionDigestRunOutcome | null = null;
     let failure: string | null = null;
     try {
-      const githubRunner = (this.options.runGithubDigest ?? this.options.runDigest) as RunGithubDigest | undefined;
+      const githubRunner = (overrideRunner ?? this.options.runGithubDigest ?? this.options.runDigest) as RunGithubDigest | undefined;
       if (!githubRunner) throw new Error('Chưa nối digest runner');
       const aborted = new Promise<never>((_, reject) =>
         controller.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true }),
@@ -897,6 +980,17 @@ export class ScheduleRunner {
             ...started.toPlan,
             digestConfig: started.digestConfig,
             digestConfigHash: started.digestConfigHash,
+            beforeSendCheck: async () => {
+              const checkRes = await pool.query('SELECT version, status FROM schedules WHERE id = $1', [
+                started.toPlan.scheduleId,
+              ]);
+              const current = checkRes.rows[0];
+              return Boolean(
+                current &&
+                  current.version === started.toPlan.scheduleVersion &&
+                  current.status === 'active',
+              );
+            },
           },
           controller.signal,
         ),
@@ -951,7 +1045,10 @@ export class ScheduleRunner {
           "UPDATE schedule_runs SET status='digest_sent', delivery=$2, updated_at=now() WHERE id=$1",
           [runId, JSON.stringify(outcome.delivery)],
         );
-      } else {
+        return;
+      }
+
+      if (outcome.status === 'blocked') {
         await this.messages.createMessage(
           started.convId,
           'system',
@@ -960,19 +1057,36 @@ export class ScheduleRunner {
           client,
         );
         await client.query(
-          "UPDATE schedule_runs SET status='digest_failed', error=$2, updated_at=now() WHERE id=$1",
+          "UPDATE schedule_runs SET status='blocked', error=$2, updated_at=now() WHERE id=$1",
           [runId, outcome.error],
         );
-        const shouldPause =
-          outcome.pauseSchedule === true ||
-          (await this.lastThreeDigestFailed(client, started.toPlan.scheduleId));
-        if (shouldPause && schedule.status === 'active') {
-          const reason = outcome.pauseSchedule
-            ? outcome.error
-            : '3 lượt gửi báo cáo tự động liên tiếp thất bại';
-          const pausedRow = await this.pause(client, schedule.id, reason);
+        if (schedule.status === 'active') {
+          const pausedRow = await this.pause(client, schedule.id, outcome.error);
           pauseChanges.push(await this.options.recordState(client, pausedRow, now));
         }
+        return;
+      }
+
+      await this.messages.createMessage(
+        started.convId,
+        'system',
+        `Lỗi: ${outcome.error}`,
+        { type: 'planning_error', ...replyTo },
+        client,
+      );
+      await client.query(
+        "UPDATE schedule_runs SET status='digest_failed', error=$2, updated_at=now() WHERE id=$1",
+        [runId, outcome.error],
+      );
+      const shouldPause =
+        outcome.pauseSchedule === true ||
+        (await this.lastThreeDigestFailed(client, started.toPlan.scheduleId));
+      if (shouldPause && schedule.status === 'active') {
+        const reason = outcome.pauseSchedule
+          ? outcome.error
+          : '3 lượt gửi báo cáo tự động liên tiếp thất bại';
+        const pausedRow = await this.pause(client, schedule.id, reason);
+        pauseChanges.push(await this.options.recordState(client, pausedRow, now));
       }
     });
 

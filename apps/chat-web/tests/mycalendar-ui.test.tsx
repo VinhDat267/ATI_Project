@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { SettingsPage } from '../src/pages/Settings/SettingsPage';
 import { RefusalMoment } from '../src/pages/Responses/ResponseMoment';
 import { PlanMoment } from '../src/pages/Cockpit/PlanMoment';
+import { PreviewContents } from '../src/pages/Cockpit/PreviewContents';
 import { ReceiptMoment } from '../src/pages/Cockpit/ReceiptMoment';
 import { PrivacyPage } from '../src/pages/Privacy/PrivacyPage';
 import { MyCalendarCallbackView } from '../src/views/MyCalendarCallbackView';
@@ -274,6 +275,15 @@ describe('SettingsPage - mycalendar section', () => {
     expect(within(personal).getByText(/user@gmail.com/i)).toBeTruthy();
     expect(within(personal).getByRole('button', { name: /Kết nối lại Google Calendar/i })).toBeTruthy();
   });
+
+  it('consumes mycalendarConnectionNotice and renders the connected email banner on SettingsPage', async () => {
+    setupServices(mycalendarService('connected'));
+    connection.mycalendarConnectionNotice.set('calendar.user@gmail.com');
+
+    render(<SettingsPage user={member} navigate={() => {}} onLogout={() => {}} />);
+
+    expect(await screen.findByText('Đã kết nối calendar.user@gmail.com')).toBeTruthy();
+  });
 });
 
 describe('Cockpit RefusalMoment', () => {
@@ -413,7 +423,61 @@ describe('Cockpit PlanMoment & ReceiptMoment', () => {
     expect(screen.getByText(/Đích đến: Lịch cá nhân/i)).toBeTruthy();
   });
 
-  it('renders safe outcome url on ReceiptMoment', () => {
+  it('renders Vietnamese operation badges for mycalendar.update_event and mycalendar.delete_event in PlanMoment', () => {
+    const destination = (step: PlanStep, labels?: Record<string, string>) =>
+      labels?.[String(step.args.calendarId)] ?? String(step.args.calendarId);
+
+    const lifecyclePlan: ActivePlan = {
+      ...plan,
+      steps: [
+        {
+          id: 'step-update',
+          tool: 'mycalendar.update_event',
+          description: 'Dời lịch họp sang 15h',
+          args: { calendarId: 'cal-primary', eventId: 'evt-1', start: '2026-10-30T15:00:00Z' },
+        },
+        {
+          id: 'step-delete',
+          tool: 'mycalendar.delete_event',
+          description: 'Huỷ cuộc họp cũ',
+          args: { calendarId: 'cal-primary', eventId: 'evt-2' },
+        },
+        {
+          id: 'step-get',
+          tool: 'mycalendar.get_event',
+          description: 'Đọc chi tiết agenda cuộc họp',
+          args: { calendarId: 'cal-primary', eventId: 'evt-3' },
+        },
+        {
+          id: 'step-free',
+          tool: 'mycalendar.find_free_slots',
+          description: 'Tìm khung giờ trống chiều mai',
+          args: { calendarId: 'cal-primary', durationMinutes: 60 },
+        },
+      ],
+    };
+
+    render(
+      <PlanMoment
+        plan={lifecyclePlan}
+        services={[mycalendarService('connected')]}
+        destination={destination}
+        onPreview={() => {}}
+        onApprove={() => {}}
+        onCancel={() => {}}
+        onEdit={() => {}}
+        inlineComposer={null}
+        runtimeMode="sandbox"
+      />
+    );
+
+    expect(screen.getByText('Dời / cập nhật sự kiện')).toBeTruthy();
+    expect(screen.getByText('Huỷ sự kiện')).toBeTruthy();
+    expect(screen.getByText('Xem chi tiết sự kiện')).toBeTruthy();
+    expect(screen.getByText('Tìm khung giờ trống')).toBeTruthy();
+  });
+
+  it('renders safe outcome url and direct Google Meet join link on ReceiptMoment', () => {
     const destination = (step: PlanStep, labels?: Record<string, string>) =>
       labels?.[String(step.args.calendarId)] ?? String(step.args.calendarId);
 
@@ -426,6 +490,7 @@ describe('Cockpit PlanMoment & ReceiptMoment', () => {
         id: 'evt-123',
         title: 'Họp quý 4',
         url: 'https://calendar.google.com/calendar/event?eid=123',
+        meetLink: 'https://meet.google.com/q4-sync-room',
       },
       duration: '0,5 giây',
     };
@@ -450,6 +515,109 @@ describe('Cockpit PlanMoment & ReceiptMoment', () => {
     const link = screen.getByRole('link', { name: /Mở sự kiện trên Google Calendar/i });
     expect(link).toHaveAttribute('href', 'https://calendar.google.com/calendar/event?eid=123');
     expect(link).toHaveAttribute('target', '_blank');
+
+    const meetBtn = screen.getByRole('link', { name: /Tham gia Google Meet/i });
+    expect(meetBtn).toHaveAttribute('href', 'https://meet.google.com/q4-sync-room');
+    expect(meetBtn).toHaveAttribute('target', '_blank');
+  });
+
+  it('renders rich calendar_event preview in PreviewContents with Vietnamese time, Google Meet badge, recurrence, location, and delete warning', () => {
+    const createStep: PlanStep = {
+      id: 'step-create-rich',
+      tool: 'mycalendar.create_event',
+      description: 'Tạo lịch họp Daily Standup',
+      args: {
+        calendarId: 'cal-primary',
+        summary: 'Daily Standup Kỹ thuật',
+        start: '2026-10-30T09:00:00+07:00',
+        end: '2026-10-30T09:30:00+07:00',
+        location: 'Phòng họp Tầng 5',
+        description: 'Cập nhật tiến độ sprint',
+        createMeetLink: true,
+        recurrence: 'WEEKDAYS',
+      },
+    };
+
+    const { unmount } = render(<PreviewContents step={createStep} destination="Lịch cá nhân" />);
+    const previewBox = screen.getByTestId('calendar-event-preview');
+    expect(within(previewBox).getByText('Daily Standup Kỹ thuật')).toBeTruthy();
+    expect(within(previewBox).getByText(/Tự động tạo phòng họp Google Meet/i)).toBeTruthy();
+    expect(within(previewBox).getByText(/Lặp lại: Thứ 2 – Thứ 6 hàng tuần/i)).toBeTruthy();
+    expect(within(previewBox).getByText(/Phòng họp Tầng 5/i)).toBeTruthy();
+    expect(within(previewBox).getByText(/Cập nhật tiến độ sprint/i)).toBeTruthy();
+    unmount();
+
+    const deleteStep: PlanStep = {
+      id: 'step-del-rich',
+      tool: 'mycalendar.delete_event',
+      description: 'Huỷ cuộc họp cũ',
+      args: {
+        calendarId: 'cal-primary',
+        eventId: 'evt-old-99',
+      },
+    };
+    render(<PreviewContents step={deleteStep} destination="Lịch cá nhân" />);
+    const deletePreview = screen.getByTestId('calendar-event-preview');
+    expect(within(deletePreview).getByText(/Huỷ \/ xoá sự kiện khỏi lịch/i)).toBeTruthy();
+    expect(within(deletePreview).getByText(/Mã sự kiện/i)).toBeTruthy();
+  });
+
+  it('renders quick feature pills on PlanMoment step cards and 1-click free-slot buttons in calendar conflict banner', () => {
+    const destination = (step: PlanStep, labels?: Record<string, string>) =>
+      labels?.[String(step.args.calendarId)] ?? String(step.args.calendarId);
+    const onEdit = vi.fn();
+
+    const conflictPlan: ActivePlan = {
+      ...plan,
+      warnings: [
+        'Sự kiện "Họp quý 4" (2026-10-30T09:00:00+07:00 - 2026-10-30T10:00:00+07:00) trùng giờ với: Daily Sync (09:00 - 09:30). Gợi ý khung giờ trống trong ngày: 10:30–11:30, 11:30–12:30.',
+      ],
+      steps: [
+        {
+          id: 'step-1',
+          tool: 'mycalendar.create_event',
+          description: 'Tạo sự kiện họp quý 4',
+          args: {
+            calendarId: 'cal-primary',
+            summary: 'Họp quý 4',
+            start: '2026-10-30T09:00:00+07:00',
+            end: '2026-10-30T10:00:00+07:00',
+            createMeetLink: true,
+            recurrence: 'WEEKLY',
+            location: 'Phòng họp B2',
+          },
+        },
+      ],
+    };
+
+    render(
+      <PlanMoment
+        plan={conflictPlan}
+        services={[mycalendarService('connected')]}
+        destination={destination}
+        onPreview={() => {}}
+        onApprove={() => {}}
+        onCancel={() => {}}
+        onEdit={onEdit}
+        inlineComposer={null}
+        runtimeMode="sandbox"
+      />
+    );
+
+    // Quick feature pills on step card
+    expect(screen.getByText(/🎥 Google Meet/i)).toBeTruthy();
+    expect(screen.getByText(/🔁 Hàng tuần/i)).toBeTruthy();
+    expect(screen.getByText(/📍 Phòng họp B2/i)).toBeTruthy();
+
+    // Interactive conflict banner with 1-click free slot buttons
+    const banner = screen.getByTestId('calendar-conflict-banner');
+    const slotBtn1 = within(banner).getByRole('button', { name: /Đổi sang 10:30–11:30/i });
+    const slotBtn2 = within(banner).getByRole('button', { name: /Đổi sang 11:30–12:30/i });
+    expect(slotBtn1).toBeTruthy();
+    expect(slotBtn2).toBeTruthy();
+
+    fireEvent.click(slotBtn1);
+    expect(onEdit).toHaveBeenCalledWith('Đổi khung giờ họp sang 10:30–11:30');
   });
 });
 
@@ -465,5 +633,8 @@ describe('PrivacyPage with mycalendarEnabled', () => {
     await waitFor(() => expect(apiClient.getRuntime).toHaveBeenCalled());
 
     expect(await screen.findByRole('region', { name: /Dữ liệu Google Calendar/i })).toBeTruthy();
+    expect(
+      screen.getByText(/ATI chỉ tạo, cập nhật hoặc huỷ sự kiện trên lịch đã chọn sau khi bạn bấm phê duyệt kế hoạch/i)
+    ).toBeTruthy();
   });
 });

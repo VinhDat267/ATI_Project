@@ -11,6 +11,7 @@ const chat = { type: 'object', properties: { id: str, title: str, type: { ...str
 
 export const TELEGRAM_TOOLS: ToolDefinition[] = [
   { name: 'telegram.list_chats', service: 'telegram', sideEffect: 'read', riskLevel: 'low', discovers: 'chat', listable: true,
+    observedFields: ['id', 'title', 'type'],
     description: 'Đọc thông tin chat Telegram trong allowlist bằng getChat; query rỗng liệt kê tối đa 10 chat, query khác lọc tiêu đề.',
     inputSchema: input({ query: { ...str, maxLength: 2000 }, limit: { type: 'integer', minimum: 1, maximum: 10, default: 10 } }, ['query']),
     outputSchema: { type: 'array', items: chat } },
@@ -18,4 +19,42 @@ export const TELEGRAM_TOOLS: ToolDefinition[] = [
     description: 'Sau khi duyệt, gửi 1–4096 ký tự văn bản thuần vào chat Telegram đã tìm thấy; tắt preview link, không dùng parse_mode hoặc broadcast trả phí.',
     inputSchema: input({ chatId: { ...str, pattern: TELEGRAM_CHAT_ID_PATTERN.source, 'x-resource': 'chat' }, text: { ...str, minLength: 1, maxLength: 4096 } }, ['chatId', 'text']),
     outputSchema: { type: 'object', properties: { messageId: { type: 'integer', minimum: 1 }, chatId: str, date: { type: 'integer', minimum: 0 } }, required: ['messageId', 'chatId', 'date'] } },
+];
+
+const telegramMessage = {
+  type: 'object',
+  properties: {
+    id: str,
+    messageId: { type: 'integer', minimum: 1 },
+    chatId: str,
+    senderName: str,
+    text: str,
+    date: { type: 'integer', minimum: 0 },
+  },
+  required: ['id', 'messageId', 'chatId', 'senderName', 'text', 'date'],
+};
+
+export const TELEGRAM_OAUTH_TOOLS: ToolDefinition[] = [
+  {
+    name: 'telegram.read_messages',
+    service: 'telegram',
+    sideEffect: 'read',
+    riskLevel: 'low',
+    description: 'Đọc các tin nhắn văn bản gần đây trong một nhóm hoặc cuộc trò chuyện Telegram đã được cấp quyền để tổng hợp hoặc tạo công việc.',
+    inputSchema: input(
+      {
+        chatId: { ...str, pattern: TELEGRAM_CHAT_ID_PATTERN.source, 'x-resource': 'chat' },
+        query: { ...str, maxLength: 500 },
+        limit: { type: 'integer', minimum: 1, maximum: 20, default: 10 },
+      },
+      ['chatId'],
+    ),
+    outputSchema: {
+      type: 'object',
+      properties: {
+        messages: { type: 'array', items: telegramMessage },
+      },
+      required: ['messages'],
+    },
+  },
 ];

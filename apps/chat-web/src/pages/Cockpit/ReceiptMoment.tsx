@@ -5,10 +5,103 @@ import type { ActivePlan,PlanStep,ServiceInfo } from '../../types';
 import { ServiceLogo } from '../../components/ServiceLogo';
 import { WorkflowFlowCanvas } from '../../components/WorkflowFlowCanvas';
 import { ResultFields, type ExecutionStepInfo } from '../../components/ExecutionProgress';
-import { operation,serviceId,serviceName,servicePalette,statusLabel,resultTitle,outcomeURL,receiptReferences } from './presentation';
+import { operation,serviceId,serviceName,servicePalette,statusLabel,resultTitle,resultObject,outcomeURL,outcomeMeetURL,receiptReferences } from './presentation';
 import { RequestEcho } from './RequestEcho';
-interface CardProps {services:ServiceInfo[];planSteps:PlanStep[];labels?:Record<string,string>;mycalendarConnection?:NonNullable<ActivePlan['connections']>['mycalendar'];mysheetsConnection?:NonNullable<ActivePlan['connections']>['mysheets'];trelloConnection?:NonNullable<ActivePlan['connections']>['trello'];githubConnection?:NonNullable<ActivePlan['connections']>['github'];telegramConnection?:NonNullable<ActivePlan['connections']>['telegram'];destination:(step:PlanStep,labels?:Record<string,string>)=>string}
-function ReceiptCard({step,index,highlighted,services,planSteps,labels,mycalendarConnection,mysheetsConnection,trelloConnection,githubConnection,telegramConnection,destination}:CardProps & {step:ExecutionStepInfo;index:number;highlighted?:boolean}) { const service=serviceId(step.tool),palette=servicePalette(service);return (<div data-highlighted-step={highlighted ? 'true' : undefined} className={`receipt-stagger-${Math.min(index+1,4)} flex-1 bg-white rounded-2xl border ${highlighted ? 'border-brand-primary ring-2 ring-brand-primary/20' : 'border-brand-border'} p-4 sm:p-5 shadow-soft-card flex flex-col justify-between ${palette.receiptHover} transition-all group`} aria-label={serviceName(service,services)}>
+interface CardProps {services:ServiceInfo[];planSteps:PlanStep[];labels?:Record<string,string>;gmailConnection?:NonNullable<ActivePlan['connections']>['gmail'];mycalendarConnection?:NonNullable<ActivePlan['connections']>['mycalendar'];mysheetsConnection?:NonNullable<ActivePlan['connections']>['mysheets'];trelloConnection?:NonNullable<ActivePlan['connections']>['trello'];githubConnection?:NonNullable<ActivePlan['connections']>['github'];notionConnection?:NonNullable<ActivePlan['connections']>['notion'];telegramConnection?:NonNullable<ActivePlan['connections']>['telegram'];destination:(step:PlanStep,labels?:Record<string,string>)=>string}
+function SheetsReceiptMetrics({step}:{step:ExecutionStepInfo}) {
+  if(step.status!=='succeeded') return null;
+  const service=serviceId(step.tool);
+  if(service!=='mysheets' && service!=='sheets') return null;
+  const out=resultObject(step.output);
+  if(!out) return null;
+  const pills: Array<{text:string;warn?:boolean}> = [];
+  const rowsCount=typeof out.updatedRows==='number' ? out.updatedRows : typeof out.appendedRows==='number' ? out.appendedRows : null;
+  if(step.tool.endsWith('.append_rows') && rowsCount!=null && rowsCount>0) {
+    pills.push({text:`Đã ghi ${rowsCount} dòng`});
+  } else if(step.tool.endsWith('.update_rows') && rowsCount!=null) {
+    pills.push({text:`Đã cập nhật ${rowsCount} dòng${typeof out.updatedCells==='number' ? ` (${out.updatedCells} ô)` : ''}`});
+  }
+  if(step.tool.endsWith('.append_rows') && typeof out.updatedCells==='number' && out.updatedCells>0 && (out.updatedRows===0 || out.updatedRows===undefined)) {
+    pills.push({text:`Đã cập nhật ${out.updatedCells} ô`});
+  }
+  if(typeof out.skippedDuplicates==='number' && out.skippedDuplicates>0) {
+    pills.push({text:`Bỏ qua ${out.skippedDuplicates} dòng trùng`});
+  }
+  if(typeof out.totalMatched==='number') {
+    pills.push({text:`Khớp ${out.totalMatched}${typeof out.totalDataRows==='number' ? `/${out.totalDataRows}` : ''} dòng`});
+  }
+  if(step.tool.endsWith('.create_sheet') && typeof out.title==='string' && out.title) {
+    pills.push({text:`Tab mới: ${out.title}`});
+  }
+  if(typeof out.updatedRange==='string' && out.updatedRange) {
+    pills.push({text:`Phạm vi ${out.updatedRange}`});
+  }
+  if(Array.isArray(out.unmatchedKeys) && out.unmatchedKeys.length>0) {
+    pills.push({text:`Chưa tìm thấy khóa: ${out.unmatchedKeys.join(', ')}`,warn:true});
+  }
+  if(pills.length===0) return null;
+  return <div data-testid="sheets-receipt-metrics" className="flex flex-wrap items-center gap-1.5 mt-2">
+    {pills.map((pill,i)=><span key={i} className={`px-2 py-0.5 rounded-md text-[11px] font-medium border ${pill.warn ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200'}`}>{pill.text}</span>)}
+  </div>;
+}
+function NotionReceiptMetrics({step}:{step:ExecutionStepInfo}) {
+  if(step.status!=='succeeded') return null;
+  if(serviceId(step.tool)!=='notion') return null;
+  const out=resultObject(step.output);
+  if(!out) return null;
+  const pills: Array<{text:string;warn?:boolean}> = [];
+  if(Array.isArray(out.updatedProperties) && out.updatedProperties.length>0) {
+    pills.push({text:`Đã cập nhật ${out.updatedProperties.length} thuộc tính (${out.updatedProperties.join(', ')})`});
+  } else if(out.properties && typeof out.properties==='object' && !Array.isArray(out.properties)) {
+    const propKeys=Object.keys(out.properties as Record<string,unknown>);
+    if(propKeys.length>0) {
+      pills.push({text:`Đã cập nhật ${propKeys.length} thuộc tính (${propKeys.join(', ')})`});
+    }
+  }
+  if(typeof out.archived==='boolean') {
+    pills.push({text:out.archived ? '📦 Đã lưu trữ trang' : '📂 Đã khôi phục trang', warn:out.archived});
+  }
+  if(Array.isArray(out.blockIds) && out.blockIds.length>0) {
+    pills.push({text:`Đã nối ${out.blockIds.length} khối văn bản`});
+  }
+  if(Array.isArray(out.blocks) && out.blocks.length>0) {
+    pills.push({text:`Đọc ${out.blocks.length} khối nội dung`});
+  }
+  if(Array.isArray(out.pages)) {
+    pills.push({text:`Khớp ${out.pages.length} trang`});
+  }
+  if(pills.length===0) return null;
+  return <div data-testid="notion-receipt-metrics" className="flex flex-wrap items-center gap-1.5 mt-2">
+    {pills.map((pill,i)=><span key={i} className={`px-2 py-0.5 rounded-md text-[11px] font-medium border ${pill.warn ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200'}`}>{pill.text}</span>)}
+  </div>;
+}
+function TrelloReceiptMetrics({step}:{step:ExecutionStepInfo}) {
+  if(step.status!=='succeeded') return null;
+  if(serviceId(step.tool)!=='trello') return null;
+  const out=resultObject(step.output);
+  if(!out) return null;
+  const pills: Array<{text:string;warn?:boolean}> = [];
+  if(Array.isArray(out.idMembers) && out.idMembers.length>0) {
+    pills.push({text:`👤 Đã gán ${out.idMembers.length} thành viên`});
+  }
+  if(Array.isArray(out.items) && out.items.length>0) {
+    pills.push({text:`☑️ Đã tạo ${out.items.length} mục checklist`});
+  }
+  if(step.tool==='trello.update_checklist_item' && typeof out.state==='string') {
+    pills.push({text:out.state==='complete' ? '☑ Đã đánh dấu hoàn thành' : '☐ Đã mở lại mục việc', warn:out.state!=='complete'});
+  }
+  if(typeof out.dueComplete==='boolean') {
+    pills.push({text:out.dueComplete ? '✓ Đã hoàn thành hạn' : '⏳ Chưa hoàn thành hạn', warn:!out.dueComplete});
+  }
+  if(out.closed===true) {
+    pills.push({text:'📦 Đã lưu trữ thẻ', warn:true});
+  }
+  if(pills.length===0) return null;
+  return <div data-testid="trello-receipt-metrics" className="flex flex-wrap items-center gap-1.5 mt-2">
+    {pills.map((pill,i)=><span key={i} className={`px-2 py-0.5 rounded-md text-[11px] font-medium border ${pill.warn ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200'}`}>{pill.text}</span>)}
+  </div>;
+}
+function ReceiptCard({step,index,highlighted,services,planSteps,labels,gmailConnection,mycalendarConnection,mysheetsConnection,trelloConnection,githubConnection,notionConnection,telegramConnection,destination}:CardProps & {step:ExecutionStepInfo;index:number;highlighted?:boolean}) { const service=serviceId(step.tool),palette=servicePalette(service);return (<div data-highlighted-step={highlighted ? 'true' : undefined} className={`receipt-stagger-${Math.min(index+1,4)} flex-1 bg-white rounded-2xl border ${highlighted ? 'border-brand-primary ring-2 ring-brand-primary/20' : 'border-brand-border'} p-4 sm:p-5 shadow-soft-card flex flex-col justify-between ${palette.receiptHover} transition-all group`} aria-label={serviceName(service,services)}>
                   <div className="v3-space-y-2.5">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2.5 min-w-0">
@@ -28,18 +121,28 @@ function ReceiptCard({step,index,highlighted,services,planSteps,labels,mycalenda
                       <p className="text-xs text-brand-muted mt-1 break-words">
                         {destination(planSteps.find(row=>row.id===step.id) ?? {id:step.id,tool:step.tool,description:step.description,args:{}}, labels)}
                       </p>
+                      {service==='gmail' && gmailConnection?.email && <p className="text-xs text-brand-muted mt-1 break-words">Gửi từ: {gmailConnection.email} (Gmail của bạn)</p>}
                       {service==='mycalendar' && mycalendarConnection?.email && <p className="text-xs text-brand-muted mt-1 break-words">Tài khoản: {mycalendarConnection.email} (Google Calendar của bạn)</p>}
                       {service==='mysheets' && mysheetsConnection?.email && <p className="text-xs text-brand-muted mt-1 break-words">Tài khoản: {mysheetsConnection.email} (Google Sheets của bạn)</p>}
                       {service==='trello' && trelloConnection?.username && <p className="text-xs text-brand-muted mt-1 break-words">Tài khoản: @{trelloConnection.username} (Trello của bạn)</p>}
                       {service==='github' && githubConnection?.login && <p className="text-xs text-brand-muted mt-1 break-words">Tài khoản: @{githubConnection.login} (GitHub của bạn)</p>}
+                      {service==='notion' && notionConnection?.workspaceName && <p className="text-xs text-brand-muted mt-1 break-words">Workspace Notion: {notionConnection.workspaceName}</p>}
                       {service==='telegram' && telegramConnection?.username && <p className="text-xs text-brand-muted mt-1 break-words">Tài khoản: @{telegramConnection.username} (Telegram của bạn)</p>}
+                      <SheetsReceiptMetrics step={step} />
+                      <NotionReceiptMetrics step={step} />
+                      <TrelloReceiptMetrics step={step} />
                     </div>
                   </div>
-                  <div className="pt-3 border-t border-brand-border-subtle mt-4 flex items-center justify-between">
-                    {outcomeURL(step) && <a href={outcomeURL(step)} target="_blank" rel="noopener noreferrer" className={`text-xs font-semibold ${palette.name} hover:underline inline-flex items-center gap-1`}>
-                      <span>{operation(step.tool).link}</span>
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                    </a>}
+                  <div className="pt-3 border-t border-brand-border-subtle mt-4 flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {outcomeURL(step) && <a href={outcomeURL(step)} target="_blank" rel="noopener noreferrer" className={`text-xs font-semibold ${palette.name} hover:underline inline-flex items-center gap-1`}>
+                        <span>{operation(step.tool).link}</span>
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                      </a>}
+                      {outcomeMeetURL(step) && <a href={outcomeMeetURL(step)} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md hover:bg-emerald-100 inline-flex items-center gap-1">
+                        <span>🎥 Tham gia Google Meet</span>
+                      </a>}
+                    </div>
                     {step.status==='succeeded' && step.duration && <span className="text-xs text-neutral-500 font-body">{step.duration}</span>}
 
                   </div>
@@ -92,11 +195,11 @@ function ReceiptBetweenRows({from,to,sourceLabel,targetLabel,field}:{from:string
                   </span>
                 </div>
               </div>);}
-export function ReceiptMoment({request,terminalStatus,steps,planSteps,services,labels,mycalendarConnection,mysheetsConnection,trelloConnection,githubConnection,telegramConnection,destination,totalDuration,onNewConversation,onFollowup,servicePrompt,onSettings,servicesLoading,servicesError}:CardProps & {request?:string;terminalStatus?:string;steps:ExecutionStepInfo[];totalDuration?:string;onNewConversation:()=>void;onFollowup:(text:string)=>void;servicePrompt?:(service:ServiceInfo)=>string;onSettings?:()=>void;servicesLoading?:boolean;servicesError?:string|null}) {
+export function ReceiptMoment({request,terminalStatus,steps,planSteps,services,labels,gmailConnection,mycalendarConnection,mysheetsConnection,trelloConnection,githubConnection,notionConnection,telegramConnection,destination,totalDuration,onNewConversation,onFollowup,servicePrompt,onSettings,servicesLoading,servicesError}:CardProps & {request?:string;terminalStatus?:string;steps:ExecutionStepInfo[];totalDuration?:string;onNewConversation:()=>void;onFollowup:(text:string)=>void;servicePrompt?:(service:ServiceInfo)=>string;onSettings?:()=>void;servicesLoading?:boolean;servicesError?:string|null}) {
  const [selectedService,setSelectedService]=useState<string|null>(null);
  const rows:ExecutionStepInfo[][]=[];for(let index=0;index<steps.length;index+=2) rows.push(steps.slice(index,index+2));
  const ids=new Set(steps.map(step=>step.id)); const refs=receiptReferences(planSteps).filter(edge=>ids.has(edge.from) && ids.has(edge.to));
- const cardProps={services,planSteps,labels,mycalendarConnection,mysheetsConnection,trelloConnection,githubConnection,telegramConnection,destination};
+ const cardProps={services,planSteps,labels,gmailConnection,mycalendarConnection,mysheetsConnection,trelloConnection,githubConnection,notionConnection,telegramConnection,destination};
  const getPrompt = servicePrompt ?? (s => s.name);
  const stepStatuses=Object.fromEntries(steps.map(step=>[step.id,step.status]));
  const canvasSteps:PlanStep[]=planSteps.length ? planSteps : steps.map(step=>({id:step.id,tool:step.tool,description:step.description,args:{}}));

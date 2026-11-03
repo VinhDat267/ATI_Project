@@ -518,4 +518,671 @@ describe('PersonalSheetsAdapter', () => {
       ['JIRA-102', 'New ticket', "'@channel +alert"],
     ]);
   });
+
+  it('mysheets.list_sheets extracts row 1 headers when returned by Google Sheets metadata', async () => {
+    const { adapter, calls } = setup({
+      handler: () =>
+        json({
+          sheets: [
+            {
+              properties: { sheetId: 0, title: 'KPI Tháng 11' },
+              data: [
+                {
+                  rowData: [
+                    {
+                      values: [
+                        { formattedValue: 'Mã việc' },
+                        { formattedValue: 'Tiêu đề' },
+                        { formattedValue: 'Người phụ trách' },
+                        { formattedValue: 'Trạng thái' },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        }),
+    });
+
+    const tabs = await adapter.execute('mysheets.list_sheets', {
+      spreadsheetId,
+      query: '',
+      limit: 10,
+    });
+
+    expect(tabs).toEqual([
+      {
+        id: 0,
+        title: 'KPI Tháng 11',
+        spreadsheetId,
+        headers: ['Mã việc', 'Tiêu đề', 'Người phụ trách', 'Trạng thái'],
+      },
+    ]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.url.searchParams.get('fields')).toContain('sheets.data.rowData.values.formattedValue');
+  });
+
+  it('supports upsert via onDuplicate="update" in mysheets.append_rows, updating matched key rows with formula protection and appending new rows', async () => {
+    const { adapter, calls } = setup({
+      handler: (url, init) => {
+        if (init.method === 'POST' && url.pathname.endsWith('/values:batchUpdate')) {
+          return json({
+            spreadsheetId,
+            totalUpdatedRows: 1,
+            responses: [
+              {
+                spreadsheetId,
+                updatedRange: 'Sheet1!A2:C2',
+                updatedRows: 1,
+              },
+            ],
+          });
+        }
+        if (init.method === 'POST' && url.pathname.includes(':append')) {
+          return json({
+            spreadsheetId,
+            updates: { updatedRange: 'Sheet1!A4:C4', updatedRows: 1 },
+          });
+        }
+        if (url.pathname.includes('/values/')) {
+          return json({
+            range: 'Sheet1!A1:Z500',
+            values: [
+              ['Ticket', 'Status', 'Note'],
+              ['JIRA-101', 'In Progress', 'Working'],
+              ['JIRA-102', 'Done', 'Unchanged row'],
+            ],
+          });
+        }
+        return json({
+          sheets: [{ properties: { sheetId: 0, title: 'Sheet1' } }],
+        });
+      },
+    });
+
+    const res = await adapter.execute('mysheets.append_rows', {
+      spreadsheetId,
+      sheet: 'Sheet1',
+      deduplicate: true,
+      deduplicateColumn: 0,
+      onDuplicate: 'update',
+      rows: [
+        ['JIRA-101', 'Done', '=HYPERLINK("https://evil.example")'], // Changed -> should update row 2
+        ['JIRA-102', 'Done', 'Unchanged row'], // Identical -> should skip
+        ['JIRA-103', 'To Do', '+New task'], // New key -> should append
+      ],
+    });
+
+    expect(res).toEqual({
+      spreadsheetId,
+      updatedRange: 'Sheet1!A4:C4',
+      updatedRows: 2,
+      skippedDuplicates: 1,
+      url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+    });
+
+    const postCalls = calls.filter((c) => c.init.method === 'POST');
+    expect(postCalls).toHaveLength(2);
+    expect(postCalls[0]!.url.pathname).toContain('/values:batchUpdate');
+    expect(JSON.parse(String(postCalls[0]!.init.body))).toEqual({
+      valueInputOption: 'USER_ENTERED',
+      data: [
+        {
+          range: 'Sheet1!A2',
+          majorDimension: 'ROWS',
+          values: [['JIRA-101', 'Done', '\'=HYPERLINK("https://evil.example")']],
+        },
+      ],
+    });
+
+    expect(postCalls[1]!.url.pathname).toContain(':append');
+    expect(JSON.parse(String(postCalls[1]!.init.body)).values).toEqual([
+      ['JIRA-103', 'To Do', "'+New task"],
+    ]);
+  });
+
+  it('mysheets.search_rows scans up to 500 rows, filters by column/operator/query beyond row 50, and returns 1-based rowNumber + record', async () => {
+    const rows: string[][] = [['Mã UV', 'Họ tên', 'Email', 'Trạng thái gửi mail']];
+    for (let i = 1; i <= 120; i++) {
+      rows.push([
+        `UV-${i}`,
+        `Ứng viên ${i}`,
+        `uv${i}@example.com`,
+        i === 85 || i === 112 ? 'Chưa gửi' : 'Đã gửi',
+      ]);
+    }
+
+    const { adapter } = setup({
+      handler: (url) => {
+        if (url.pathname.includes('/values/')) {
+          return json({
+            range: "'Ứng viên'!A1:D121",
+            values: rows,
+          });
+        }
+        return json({
+          sheets: [{ properties: { sheetId: 0, title: 'Ứng viên' } }],
+        });
+      },
+    });
+
+    const result = await adapter.execute('mysheets.search_rows', {
+      spreadsheetId,
+      sheet: 'Ứng viên',
+      column: 'Trạng thái gửi mail',
+      operator: 'equals',
+      value: 'chưa gửi',
+      limit: 10,
+    });
+
+    expect(result).toEqual({
+      sheet: 'Ứng viên',
+      headers: ['Mã UV', 'Họ tên', 'Email', 'Trạng thái gửi mail'],
+      totalMatched: 2,
+      matches: [
+        {
+          rowNumber: 86,
+          values: ['UV-85', 'Ứng viên 85', 'uv85@example.com', 'Chưa gửi'],
+          record: {
+            'Mã UV': 'UV-85',
+            'Họ tên': 'Ứng viên 85',
+            Email: 'uv85@example.com',
+            'Trạng thái gửi mail': 'Chưa gửi',
+          },
+        },
+        {
+          rowNumber: 113,
+          values: ['UV-112', 'Ứng viên 112', 'uv112@example.com', 'Chưa gửi'],
+          record: {
+            'Mã UV': 'UV-112',
+            'Họ tên': 'Ứng viên 112',
+            Email: 'uv112@example.com',
+            'Trạng thái gửi mail': 'Chưa gửi',
+          },
+        },
+      ],
+    });
+  });
+
+  it('mysheets.update_rows updates only target columns by matchColumn or rowNumber, preserving formula columns and escaping formula injection', async () => {
+    const { adapter, calls } = setup({
+      handler: (url, init) => {
+        if (init.method === 'POST' && url.pathname.includes('/values:batchUpdate')) {
+          return json({
+            spreadsheetId,
+            totalUpdatedRows: 2,
+            totalUpdatedCells: 3,
+            responses: [
+              { updatedRange: "'Ứng viên'!E2" },
+              { updatedRange: "'Ứng viên'!F2" },
+              { updatedRange: "'Ứng viên'!E3" },
+            ],
+          });
+        }
+        if (url.pathname.includes('/values/')) {
+          return json({
+            range: "'Ứng viên'!A1:F3",
+            values: [
+              ['Mã UV', 'Họ tên', 'Email', 'Lương dự kiến', 'Trạng thái', 'Ghi chú'],
+              ['UV-1', 'Nguyễn Lan', 'lan@example.com', '=C2*1.2', 'Chưa gửi', ''],
+              ['UV-2', 'Trần Minh', 'minh@example.com', '=C3*1.2', 'Chưa gửi', ''],
+            ],
+          });
+        }
+        return json({
+          sheets: [{ properties: { sheetId: 0, title: 'Ứng viên' } }],
+        });
+      },
+    });
+
+    const res = await adapter.execute('mysheets.update_rows', {
+      spreadsheetId,
+      sheet: 'Ứng viên',
+      updates: [
+        {
+          matchColumn: 'Email',
+          matchValue: 'lan@example.com',
+          values: {
+            'Trạng thái': 'Đã gửi thư mời',
+            'Ghi chú': '=CMD("calc")',
+          },
+        },
+        {
+          rowNumber: 3,
+          values: {
+            E: 'Đã đặt lịch',
+          },
+        },
+      ],
+    });
+
+    expect(res).toEqual({
+      spreadsheetId,
+      updatedRange: "'Ứng viên'!E3",
+      updatedRows: 2,
+      updatedCells: 3,
+      url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+    });
+
+    const postCalls = calls.filter((c) => c.init.method === 'POST');
+    expect(postCalls).toHaveLength(1);
+    expect(JSON.parse(String(postCalls[0]!.init.body))).toEqual({
+      valueInputOption: 'USER_ENTERED',
+      data: [
+        {
+          range: "'Ứng viên'!E2",
+          majorDimension: 'ROWS',
+          values: [['Đã gửi thư mời']],
+        },
+        {
+          range: "'Ứng viên'!F2",
+          majorDimension: 'ROWS',
+          values: [["'=CMD(\"calc\")"]],
+        },
+        {
+          range: "'Ứng viên'!E3",
+          majorDimension: 'ROWS',
+          values: [['Đã đặt lịch']],
+        },
+      ],
+    });
+  });
+
+  it('mysheets.create_sheet creates a new tab via batchUpdate addSheet and initializes row 1 headers with formula protection', async () => {
+    const { adapter, calls } = setup({
+      handler: (url, init) => {
+        if (init.method === 'POST' && url.pathname.endsWith(':batchUpdate') && !url.pathname.includes('/values')) {
+          return json({
+            spreadsheetId,
+            replies: [{ addSheet: { properties: { sheetId: 77, title: 'Sprint 15' } } }],
+          });
+        }
+        if (init.method === 'POST' && url.pathname.includes('/values:batchUpdate')) {
+          return json({
+            spreadsheetId,
+            totalUpdatedRows: 1,
+            responses: [{ updatedRange: "'Sprint 15'!A1:C1" }],
+          });
+        }
+        return json({
+          sheets: [{ properties: { sheetId: 0, title: 'Sheet1' } }],
+        });
+      },
+    });
+
+    const res = await adapter.execute('mysheets.create_sheet', {
+      spreadsheetId,
+      title: 'Sprint 15',
+      headers: ['Mã thẻ', 'Tiêu đề', '=Trạng thái'],
+    });
+
+    expect(res).toEqual({
+      id: 77,
+      title: 'Sprint 15',
+      spreadsheetId,
+      headers: ['Mã thẻ', 'Tiêu đề', '=Trạng thái'],
+      url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+    });
+
+    const postCalls = calls.filter((c) => c.init.method === 'POST');
+    expect(postCalls).toHaveLength(2);
+    expect(JSON.parse(String(postCalls[0]!.init.body))).toEqual({
+      requests: [{ addSheet: { properties: { title: 'Sprint 15' } } }],
+    });
+    expect(JSON.parse(String(postCalls[1]!.init.body))).toEqual({
+      valueInputOption: 'USER_ENTERED',
+      data: [
+        {
+          range: "'Sprint 15'!A1",
+          majorDimension: 'ROWS',
+          values: [['Mã thẻ', 'Tiêu đề', "'=Trạng thái"]],
+        },
+      ],
+    });
+  });
+
+  it('mysheets.append_rows supports header-aware records[] and keyColumn upsert without misaligning intermediate columns', async () => {
+    const { adapter, calls } = setup({
+      handler: (url, init) => {
+        if (init.method === 'POST' && url.pathname.endsWith('/values:batchUpdate')) {
+          return json({
+            spreadsheetId,
+            totalUpdatedRows: 1,
+            responses: [{ updatedRange: 'Sheet1!A2:E2', updatedRows: 1 }],
+          });
+        }
+        if (init.method === 'POST' && url.pathname.includes(':append')) {
+          return json({
+            spreadsheetId,
+            updates: { updatedRange: 'Sheet1!A3:E3', updatedRows: 1 },
+          });
+        }
+        if (url.pathname.includes('/values/')) {
+          return json({
+            range: 'Sheet1!A1:Z500',
+            values: [
+              ['Mã KH', 'Tên khách', 'Email', 'Công thức tự động', 'Trạng thái'],
+              ['KH-01', 'Công ty Cũ', 'abc@example.com', '=B2', 'Đang tư vấn'],
+            ],
+          });
+        }
+        return json({
+          sheets: [{ properties: { sheetId: 0, title: 'Sheet1' } }],
+        });
+      },
+    });
+
+    const res = await adapter.execute('mysheets.append_rows', {
+      spreadsheetId,
+      sheet: 'Sheet1',
+      keyColumn: 'Email',
+      onDuplicate: 'update',
+      records: [
+        {
+          'Mã KH': 'KH-01',
+          'Tên khách': 'Công ty ABC (Đã chốt)',
+          Email: 'abc@example.com',
+          'Trạng thái': 'Hoàn thành',
+        },
+        {
+          'Mã KH': 'KH-02',
+          'Ten khach': 'Công ty XYZ',
+          Email: 'xyz@example.com',
+          'Trang thai': '=Mới',
+        },
+      ],
+    });
+
+    expect(res).toEqual({
+      spreadsheetId,
+      updatedRange: 'Sheet1!A3:E3',
+      updatedRows: 2,
+      skippedDuplicates: 0,
+      url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+    });
+
+    const postCalls = calls.filter((c) => c.init.method === 'POST');
+    expect(postCalls).toHaveLength(2);
+    // First POST: batchUpdate for existing Email abc@example.com
+    expect(JSON.parse(String(postCalls[0]!.init.body))).toEqual({
+      valueInputOption: 'USER_ENTERED',
+      data: [
+        {
+          range: 'Sheet1!A2',
+          majorDimension: 'ROWS',
+          values: [['KH-01', 'Công ty ABC (Đã chốt)', 'abc@example.com', '', 'Hoàn thành']],
+        },
+      ],
+    });
+    // Second POST: append for new Email xyz@example.com with formula protection
+    expect(JSON.parse(String(postCalls[1]!.init.body)).values).toEqual([
+      ['KH-02', 'Công ty XYZ', 'xyz@example.com', '', "'=Mới"],
+    ]);
+  });
+
+  it('mysheets.search_rows supports numeric/currency and date operators (gt, gte, lt, lte) and multi-column filters', async () => {
+    const { adapter } = setup({
+      handler: (url) => {
+        if (url.pathname.includes('/values/')) {
+          return json({
+            range: "'Công nợ'!A1:E5",
+            values: [
+              ['Mã ĐH', 'Khách hàng', 'Số tiền nợ', 'Hạn thanh toán', 'Trạng thái'],
+              ['DH-01', 'Công ty A', '15.000.000 đ', '10/11/2026', 'Chưa thanh toán'],
+              ['DH-02', 'Công ty B', '35.000.000 đ', '01/11/2026', 'Chưa thanh toán'],
+              ['DH-03', 'Công ty C', '50.000.000 đ', '20/11/2026', 'Chưa thanh toán'],
+              ['DH-04', 'Công ty D', '40.000.000 đ', '01/11/2026', 'Đã thanh toán'],
+            ],
+          });
+        }
+        return json({
+          sheets: [{ properties: { sheetId: 0, title: 'Công nợ' } }],
+        });
+      },
+    });
+
+    const res = await adapter.execute('mysheets.search_rows', {
+      spreadsheetId,
+      sheet: 'Công nợ',
+      filters: [
+        { column: 'Số tiền nợ', operator: 'gt', value: '20000000' },
+        { column: 'Hạn thanh toán', operator: 'lte', value: '2026-11-05' },
+        { column: 'Trạng thái', operator: 'equals', value: 'Chưa thanh toán' },
+      ],
+    });
+
+    expect(res.totalMatched).toBe(1);
+    expect(res.matches[0]?.rowNumber).toBe(3);
+    expect(res.matches[0]?.record['Khách hàng']).toBe('Công ty B');
+  });
+
+  it('mysheets.aggregate_rows computes sum, avg, min, max, count grouped by column across rows', async () => {
+    const { adapter } = setup({
+      handler: (url) => {
+        if (url.pathname.includes('/values/')) {
+          return json({
+            range: "'Doanh thu'!A1:D6",
+            values: [
+              ['Mã ĐH', 'Nhân viên', 'Doanh thu', 'Trạng thái'],
+              ['DH-1', 'Minh', '10.000.000 đ', 'Thành công'],
+              ['DH-2', 'Lan', '25.000.000 đ', 'Thành công'],
+              ['DH-3', 'Minh', '30.000.000 đ', 'Thành công'],
+              ['DH-4', 'Minh', '50.000.000 đ', 'Đã huỷ'],
+              ['DH-5', 'Lan', '15.000.000 đ', 'Thành công'],
+            ],
+          });
+        }
+        return json({
+          sheets: [{ properties: { sheetId: 0, title: 'Doanh thu' } }],
+        });
+      },
+    });
+
+    const res = await adapter.execute('mysheets.aggregate_rows', {
+      spreadsheetId,
+      sheet: 'Doanh thu',
+      filters: [{ column: 'Trạng thái', operator: 'equals', value: 'Thành công' }],
+      groupBy: 'Nhân viên',
+      metrics: [
+        { column: 'Doanh thu', fn: 'sum' },
+        { column: 'Doanh thu', fn: 'avg' },
+        { column: 'Doanh thu', fn: 'count' },
+      ],
+    });
+
+    expect(res).toEqual({
+      sheet: 'Doanh thu',
+      totalRowsScanned: 5,
+      matchedRows: 4,
+      groups: [
+        {
+          key: 'Minh',
+          count: 2,
+          metrics: {
+            'Doanh thu_sum': 40_000_000,
+            'Doanh thu_avg': 20_000_000,
+            'Doanh thu_count': 2,
+          },
+        },
+        {
+          key: 'Lan',
+          count: 2,
+          metrics: {
+            'Doanh thu_sum': 40_000_000,
+            'Doanh thu_avg': 20_000_000,
+            'Doanh thu_count': 2,
+          },
+        },
+      ],
+      totals: {
+        'Doanh thu_sum': 80_000_000,
+        'Doanh thu_avg': 20_000_000,
+        'Doanh thu_count': 4,
+      },
+    });
+  });
+
+  it('mysheets.delete_rows deletes matched rows bottom-up via deleteDimension and protects header row 1', async () => {
+    const { adapter, calls } = setup({
+      handler: (url, init) => {
+        if (init.method === 'POST' && url.pathname.endsWith(':batchUpdate')) {
+          return json({ spreadsheetId, replies: [{}, {}] });
+        }
+        if (url.pathname.includes('/values/')) {
+          return json({
+            range: 'Sheet1!A1:C5',
+            values: [
+              ['Mã ĐH', 'Khách hàng', 'Trạng thái'],
+              ['DH-1', 'Khách A', 'Đã huỷ'],
+              ['DH-2', 'Khách B', 'Thành công'],
+              ['DH-3', 'Khách C', 'Đã huỷ'],
+            ],
+          });
+        }
+        return json({
+          sheets: [{ properties: { sheetId: 42, title: 'Sheet1' } }],
+        });
+      },
+    });
+
+    const res = await adapter.execute('mysheets.delete_rows', {
+      spreadsheetId,
+      sheet: 'Sheet1',
+      matchColumn: 'Trạng thái',
+      matchValue: 'Đã huỷ',
+    });
+
+    expect(res).toEqual({
+      spreadsheetId,
+      sheet: 'Sheet1',
+      deletedRows: 2,
+      deletedRowNumbers: [2, 4],
+      url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+    });
+
+    const postCalls = calls.filter((c) => c.init.method === 'POST');
+    expect(postCalls).toHaveLength(1);
+    // Must delete row 4 (index 3..4) BEFORE row 2 (index 1..2) so indices don't shift!
+    expect(JSON.parse(String(postCalls[0]!.init.body))).toEqual({
+      requests: [
+        {
+          deleteDimension: {
+            range: { sheetId: 42, dimension: 'ROWS', startIndex: 3, endIndex: 4 },
+          },
+        },
+        {
+          deleteDimension: {
+            range: { sheetId: 42, dimension: 'ROWS', startIndex: 1, endIndex: 2 },
+          },
+        },
+      ],
+    });
+
+    // Rejects deleting row 1 (header row)
+    await expect(
+      adapter.execute('mysheets.delete_rows', {
+        spreadsheetId,
+        sheet: 'Sheet1',
+        rowNumbers: [1],
+      })
+    ).rejects.toMatchObject({ category: 'VALIDATION' });
+
+    // Rejects combining rowNumbers with matchColumn/matchValue
+    await expect(
+      adapter.execute('mysheets.delete_rows', {
+        spreadsheetId,
+        sheet: 'Sheet1',
+        rowNumbers: [2],
+        matchColumn: 'Trạng thái',
+        matchValue: 'Đã huỷ',
+      })
+    ).rejects.toMatchObject({ category: 'VALIDATION' });
+  });
+
+  it('preserves existing tab headers in create_sheet, skips header row 1 during upsert, parses English decimals accurately, and filters unclipped cells before clipping output', async () => {
+    const longCell = 'a'.repeat(500) + ' needle-target';
+    const { adapter, calls } = setup({
+      handler: (url, init) => {
+        if (init.method === 'POST' && url.pathname.endsWith('/values:batchUpdate')) {
+          return json({
+            spreadsheetId,
+            totalUpdatedRows: 1,
+            responses: [{ updatedRange: 'Tasks!A2:B2', updatedRows: 1 }],
+          });
+        }
+        if (init.method === 'POST' && url.pathname.includes(':append')) {
+          return json({
+            spreadsheetId,
+            updates: { updatedRange: 'Tasks!A2:B2', updatedRows: 1 },
+          });
+        }
+        if (url.pathname.includes('/values/')) {
+          const decoded = decodeURIComponent(url.pathname);
+          if (decoded.endsWith('!A1:Z1')) {
+            return json({
+              range: 'Tasks!A1:B1',
+              values: [['RealHeaderA', 'RealHeaderB']],
+            });
+          }
+          return json({
+            range: 'Tasks!A1:C3',
+            values: [
+              ['ID', 'Rate', 'Notes'],
+              ['row-1', '0.125', longCell],
+              ['row-2', '0.875', 'short note'],
+            ],
+          });
+        }
+        return json({
+          sheets: [{ properties: { sheetId: 10, title: 'Tasks' } }],
+        });
+      },
+    });
+
+    // F5: create_sheet on existing tab preserves RealHeaderA, RealHeaderB without POSTing values:batchUpdate
+    const createdTab = await adapter.execute('mysheets.create_sheet', {
+      spreadsheetId,
+      title: 'Tasks',
+      headers: ['NewA', 'NewB'],
+    });
+    expect(createdTab.headers).toEqual(['RealHeaderA', 'RealHeaderB']);
+    expect(calls.filter((c) => c.init.method === 'POST')).toHaveLength(0);
+
+    // F8: append_rows upsert with row matching header key ('ID') appends as new data row instead of overwriting row 1
+    await adapter.execute('mysheets.append_rows', {
+      spreadsheetId,
+      sheet: 'Tasks',
+      keyColumn: 'ID',
+      onDuplicate: 'update',
+      rows: [['ID', '0.500', 'should-not-overwrite-header']],
+    });
+    expect(
+      calls.filter((c) => c.init.method === 'POST' && c.url.pathname.endsWith('/values:batchUpdate'))
+    ).toHaveLength(0);
+
+    // F9: aggregate_rows parses 0.125 + 0.875 = 1 (avg 0.5), not 1000
+    const agg = await adapter.execute('mysheets.aggregate_rows', {
+      spreadsheetId,
+      sheet: 'Tasks',
+      metrics: [
+        { column: 'Rate', fn: 'sum' },
+        { column: 'Rate', fn: 'avg' },
+      ],
+    });
+    expect(agg.totals).toEqual({
+      Rate_sum: 1,
+      Rate_avg: 0.5,
+    });
+
+    // F10: search_rows finds 'needle-target' beyond char 500, then clips returned cell to 500 chars with truncated: true
+    const searched = await adapter.execute('mysheets.search_rows', {
+      spreadsheetId,
+      sheet: 'Tasks',
+      query: 'needle-target',
+    });
+    expect(searched.totalMatched).toBe(1);
+    expect(searched.truncated).toBe(true);
+    expect(searched.matches[0]?.record.Notes).toHaveLength(500);
+  });
 });

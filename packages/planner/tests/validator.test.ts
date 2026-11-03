@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { validatePlan } from '../src/index.js';
-import { TRELLO_TOOLS, SLACK_TOOLS, GITHUB_TOOLS, SHEETS_TOOLS, NOTION_TOOLS } from '@wap/tool-schemas';
+import { TRELLO_TOOLS, TRELLO_OAUTH_TOOLS, SLACK_TOOLS, GITHUB_TOOLS, SHEETS_TOOLS, NOTION_TOOLS } from '@wap/tool-schemas';
 
 describe('packages/planner (Task 9: 4-Layer Plan Validator with Thinking Precedence)', () => {
   const catalog = [...TRELLO_TOOLS, ...SLACK_TOOLS];
@@ -395,7 +395,7 @@ describe('packages/planner resource grounding layer', () => {
 });
 
 describe('packages/planner member board check', () => {
-  const catalog = [...TRELLO_TOOLS, ...SLACK_TOOLS, ...GITHUB_TOOLS];
+  const catalog = [...TRELLO_TOOLS, ...TRELLO_OAUTH_TOOLS, ...SLACK_TOOLS, ...GITHUB_TOOLS];
   const plan = (...steps: Array<{ tool: string; args: unknown; id?: string; dependsOn?: string[] }>) => JSON.stringify({
     kind: 'plan', thinking: 'Board check', summary: 'Board check', warnings: [],
     steps: steps.map((step, index) => ({
@@ -446,5 +446,57 @@ describe('packages/planner member board check', () => {
     ), catalog, { grounding });
     expect(result.valid).toBe(false);
     if (!result.valid) expect(result.ungrounded).toEqual([{ stepId: 'assign', argument: 'memberId', resource: 'member', value: 'member_be' }]);
+  });
+
+  it('rejects trello.update_checklist_item when checkItemId mismatches itemName or itemName is ambiguous on observed card', () => {
+    const cardMemory = {
+      card: [
+        {
+          id: 'card_1',
+          name: 'Release Card',
+          checklists: [
+            {
+              id: 'chk_1',
+              name: 'Checklist',
+              items: [
+                { id: 'item_staging', name: 'Deploy staging', state: 'incomplete' },
+                { id: 'item_prod', name: 'Deploy production', state: 'incomplete' },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const mismatchResult = validatePlan(
+      plan({
+        tool: 'trello.update_checklist_item',
+        args: { cardId: 'card_1', checkItemId: 'item_staging', itemName: 'Deploy production', state: 'complete' },
+      }),
+      catalog,
+      { grounding: { memory: cardMemory, userTexts: [] } }
+    );
+    expect(mismatchResult.valid).toBe(false);
+    if (!mismatchResult.valid) expect(mismatchResult.layer).toBe('grounding');
+
+    const ambiguousResult = validatePlan(
+      plan({
+        tool: 'trello.update_checklist_item',
+        args: { cardId: 'card_1', itemName: 'Deploy', state: 'complete' },
+      }),
+      catalog,
+      { grounding: { memory: cardMemory, userTexts: [] } }
+    );
+    expect(ambiguousResult.valid).toBe(false);
+    if (!ambiguousResult.valid) expect(ambiguousResult.layer).toBe('grounding');
+
+    const validResult = validatePlan(
+      plan({
+        tool: 'trello.update_checklist_item',
+        args: { cardId: 'card_1', checkItemId: 'item_prod', itemName: 'Deploy production', state: 'complete' },
+      }),
+      catalog,
+      { grounding: { memory: cardMemory, userTexts: [] } }
+    );
+    expect(validResult.valid).toBe(true);
   });
 });

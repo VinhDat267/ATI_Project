@@ -1,4 +1,4 @@
-import { ALL_TOOLS, GMAIL_SERVICE, MYCALENDAR_SERVICE, MYSHEETS_SERVICE, SERVICE_REGISTRY, type AllowedScope } from '@wap/tool-schemas';
+import { ALL_TOOLS, GMAIL_SERVICE, MYCALENDAR_SERVICE, MYSHEETS_SERVICE, NOTION_OAUTH_TOOLS, SERVICE_REGISTRY, type AllowedScope } from '@wap/tool-schemas';
 import { createGmailToolAdapter, createPersonalCalendarAdapter, createPersonalSheetsAdapter, type GmailAccessTokenProvider } from '@wap/tool-adapters';
 import { routeIntent, type ProcessMessageInput } from '@wap/planner';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
@@ -48,11 +48,13 @@ export async function runtimeToolCatalog(
     githubConnection?: (userId: string) => Promise<any>;
     telegramEnabled?: boolean;
     telegramConnection?: (userId: string) => Promise<any>;
+    notionEnabled?: boolean;
+    notionConnection?: (userId: string) => Promise<any>;
   },
 ) {
   const personal = await getToolCatalogFor(repo, key, options);
   if (mode === 'live') return personal;
-  const baseTools = ALL_TOOLS.filter((t) => t.service !== 'trello' && t.service !== 'github' && t.service !== 'telegram');
+  const baseTools = [...ALL_TOOLS.filter((t) => t.service !== 'trello' && t.service !== 'github' && t.service !== 'telegram'), ...NOTION_OAUTH_TOOLS];
   const tools = [
     ...baseTools,
     ...personal.filter(
@@ -62,7 +64,8 @@ export async function runtimeToolCatalog(
         t.service === 'mysheets' ||
         t.service === 'trello' ||
         t.service === 'github' ||
-        t.service === 'telegram'
+        t.service === 'telegram' ||
+        t.service === 'notion'
     ),
   ];
   return Array.from(new Map(tools.map((t) => [t.name, t])).values());

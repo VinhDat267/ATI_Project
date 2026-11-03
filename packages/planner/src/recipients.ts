@@ -18,3 +18,36 @@ export function observedThreads(memory: Record<string, any>): Array<{ id: string
   if (!Array.isArray(threads)) return [];
   return threads.filter(t => t && typeof t.id === 'string' && Array.isArray(t.participants));
 }
+export const WORKSPACE_RECIPIENT_SERVICES: Record<string, string> = {
+  sheets: 'Google Sheets',
+  mysheets: 'Google Sheets của bạn',
+  notion: 'Notion',
+  trello: 'Trello',
+  jira: 'Jira',
+  myjira: 'Jira của bạn',
+};
+export function extractWorkspaceRecipients(service: string, raw: unknown): Array<{ id: string; service: string }> {
+  if (!Object.hasOwn(WORKSPACE_RECIPIENT_SERVICES, service) || raw == null) return [];
+  const texts: string[] = [];
+  const collect = (value: unknown) => {
+    if (typeof value === 'string') texts.push(value);
+    else if (Array.isArray(value)) value.forEach(collect);
+    else if (value && typeof value === 'object') Object.values(value).forEach(collect);
+  };
+  collect(raw);
+  return [...userEmailAddresses(texts)].map(id => ({ id, service }));
+}
+export function observedWorkspaceRecipients(memory: Record<string, any>): Map<string, string> {
+  const recipients = memory.__observed?.recipient;
+  const result = new Map<string, string>();
+  if (!Array.isArray(recipients)) return result;
+  for (const entry of recipients) {
+    if (!entry || typeof entry !== 'object') continue;
+    const address = normalizedRecipient(entry.id);
+    const service = typeof entry.service === 'string' && Object.hasOwn(WORKSPACE_RECIPIENT_SERVICES, entry.service)
+      ? WORKSPACE_RECIPIENT_SERVICES[entry.service]!
+      : undefined;
+    if (address && service) result.set(address, service);
+  }
+  return result;
+}

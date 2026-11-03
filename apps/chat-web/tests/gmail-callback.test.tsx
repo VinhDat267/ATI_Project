@@ -81,3 +81,41 @@ it.each(['https://evil.example/c/11111111-2222-4333-8444-555555555555', '//evil.
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/settings#gmail', true));
     expect(navigate).toHaveBeenCalledTimes(1);
   });
+it.each(['/connections/trello/callback', '/connections/github/callback'])(
+  'scrubs the OAuth query from %s when authenticated', path => {
+    window.history.replaceState({}, '', `${path}?code=SECRET_CODE&state=SECRET_STATE`);
+    function Probe() { const { route } = useRoute(); return <div data-testid="kind">{route.kind}</div>; }
+    render(<Probe />);
+    expect(window.location.pathname).toBe(path);
+    expect(window.location.search).toBe('');
+  });
+it('hops once to the alternate loopback host when landing unauthenticated on a connection callback', () => {
+  authStorage.clearStoredTokens();
+  sessionStorage.clear();
+  window.history.replaceState({}, '', '/connections/trello/callback?code=TRELLO_CODE&state=TRELLO_STATE');
+  const replaceSpy = vi.fn();
+  const origLocation = window.location;
+  Object.defineProperty(window, 'location', {
+    configurable: true,
+    value: {
+      ...origLocation,
+      protocol: 'http:',
+      hostname: 'localhost',
+      port: '5174',
+       host: 'localhost:5174',
+      origin: 'http://localhost:5174',
+      pathname: '/connections/trello/callback',
+      search: '?code=TRELLO_CODE&state=TRELLO_STATE',
+      hash: '',
+      href: 'http://localhost:5174/connections/trello/callback?code=TRELLO_CODE&state=TRELLO_STATE',
+      replace: replaceSpy,
+    },
+  });
+  try {
+    function Probe() { const { route } = useRoute(); return <div>{route.kind}</div>; }
+    render(<Probe />);
+    expect(replaceSpy).toHaveBeenCalledWith('http://127.0.0.1:5174/connections/trello/callback?code=TRELLO_CODE&state=TRELLO_STATE');
+  } finally {
+    Object.defineProperty(window, 'location', { configurable: true, value: origLocation });
+  }
+});

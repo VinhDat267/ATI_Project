@@ -24,7 +24,10 @@ it.each(['not_connected', 'connected', 'reconnect_required'])('shows the persona
   expect(within(personal).getByRole('button', { name: status === 'connected' ? 'Ngắt kết nối' : status === 'reconnect_required' ? 'Kết nối lại' : 'Kết nối Gmail' })).toBeTruthy();
   if (status === 'not_connected') expect(personal.textContent).toContain('không xoá vĩnh viễn');
   if (status === 'reconnect_required') expect(personal.textContent).toContain('7 ngày');
-  if (status === 'connected') expect(personal.textContent).toContain('own@gmail.test');
+  if (status === 'connected') {
+    expect(personal.textContent).toContain('own@gmail.test');
+    expect(within(personal).getByTestId('gmail-capabilities').textContent).toContain('Gắn nhãn hàng loạt');
+  }
 });
 it('keeps Gmail out of the personal group when Gmail is absent from the server catalogue', async () => {
   catalogue([{ id: 'slack', name: 'Slack', connected: true }]); settings();
@@ -88,6 +91,21 @@ it.each(['gmail.send_message', 'gmail.reply', 'gmail.forward', 'gmail.create_dra
   expect(screen.getAllByText('bạn đã gõ')).toHaveLength(2); expect(screen.getByText(/lấy từ luồng thư/)).toBeTruthy();
   expect(screen.getByText(/<b>chỉ văn bản<\/b>/).querySelector('b')).toBeNull();
   expect(screen.queryByRole('alert') !== null).toBe(['gmail.send_message', 'gmail.forward'].includes(tool));
+});
+it('renders workspace service provenance for cross-service recipients without spoofed-header alert', () => {
+  render(<PreviewContents step={{ id: 'g', tool: 'gmail.send_message', description: 'Gửi báo giá', args: { to: ['khachhang@agency.vn'], cc: ['pm@agency.vn'], subject: 'Báo giá', body: 'Chi tiết báo giá' } }} destination="Báo giá" labels={{ 'recipient:khachhang@agency.vn': 'service:Google Sheets', 'recipient:pm@agency.vn': 'service:Notion' }} />);
+  expect(screen.getByTestId('gmail-preview-card')).toBeTruthy();
+  const sheetsBadge = screen.getByText('lấy từ Google Sheets');
+  expect(sheetsBadge.className).toContain('bg-blue-50');
+  expect(screen.getByText('lấy từ Notion')).toBeTruthy();
+  expect(screen.queryByRole('alert')).toBeNull();
+});
+it('renders batch_modify_threads with resolved thread subjects and label names', () => {
+  render(<PreviewContents step={{ id: 'b', tool: 'gmail.batch_modify_threads', description: 'Đánh dấu đã đọc', args: { threadIds: ['gmail-thread-1', 'gmail-thread-2'], removeLabelIds: ['UNREAD'] } }} destination="Đánh dấu đã đọc" labels={{ 'gmail-thread-1': 'Họp nhóm ATI', 'gmail-thread-2': 'Báo cáo tuần', UNREAD: 'UNREAD' }} />);
+  expect(screen.getByText('Các luồng thư')).toBeTruthy();
+  expect(screen.getByText('Họp nhóm ATI')).toBeTruthy();
+  expect(screen.getByText('Báo cáo tuần')).toBeTruthy();
+  expect(screen.getByText('UNREAD')).toBeTruthy();
 });
 it('lets an ordinary member connect their own unavailable Gmail', () => {
   render(<RefusalMoment message={{ id: 'r', role: 'assistant', content: 'Chưa kết nối', metadata: { unavailableServices: [{ id: 'gmail', name: 'Gmail' }] } }} request="Trả lời email" services={[]} canConfigure={false} navigate={() => {}} onEdit={() => {}} />);

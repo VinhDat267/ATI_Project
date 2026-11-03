@@ -9,6 +9,7 @@ import {
   MAX_DIRECTORY_CALLS, MAX_DIRECTORY_PARENTS, MAX_RESULTS_PER_CALL, formatSearchResults, groundingMemory, parseSearchRequest, prepareSearchCall, recordObserved, recordThreadLabels, providerMemory, sanitizeEntities, searchEntities,
   type SearchOutcome,
 } from './search.js';
+import { extractWorkspaceRecipients } from './recipients.js';
 
 export interface AIPlannerOptions {
   provider: LLMProvider;
@@ -430,6 +431,10 @@ export class AIPlanner {
           const labels = memory.getEntity('__labels') ?? {};
           memory.setEntity('__labels', { ...labels, thread: recordThreadLabels(labels.thread, stamped) });
         }
+      }
+      const workspaceRecipients = extractWorkspaceRecipients(tool.service, raw);
+      if (workspaceRecipients.length > 0) {
+        memory.setEntity('__observed', recordObserved(memory.getEntity('__observed'), 'recipient', workspaceRecipients, ['id', 'service']));
       }
       onGatherEvent?.({ tool: tool.name, status: 'completed', output: result });
       return { tool: tool.name, args, result };

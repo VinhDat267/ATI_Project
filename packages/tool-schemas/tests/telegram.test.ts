@@ -1,13 +1,19 @@
 import { expect, it } from 'vitest';
 import { Ajv } from 'ajv';
-import { ALL_TOOLS, getServiceDefinition } from '../src/index.js';
+import { ALL_TOOLS, TELEGRAM_OAUTH_TOOLS, getServiceDefinition, getToolDefinition } from '../src/index.js';
 
 it('publishes only allowlisted chat discovery and a grounded plain-text send contract', () => {
   const tools = ALL_TOOLS.filter(t => t.service === 'telegram');
   expect(tools.map(t => t.name)).toEqual(['telegram.list_chats', 'telegram.send_message']);
   const ajv = new Ajv({ strict: false });
   for (const t of tools) { ajv.compile(t.inputSchema); ajv.compile(t.outputSchema); }
-  expect(tools[0]).toMatchObject({ sideEffect: 'read', riskLevel: 'low', discovers: 'chat', listable: true });
+  expect(tools[0]).toMatchObject({
+    sideEffect: 'read',
+    riskLevel: 'low',
+    discovers: 'chat',
+    listable: true,
+    observedFields: ['id', 'title', 'type'],
+  });
   expect(tools[1]).toMatchObject({ sideEffect: 'write', riskLevel: 'medium' });
   expect(tools[1]!.inputSchema.properties.chatId['x-resource']).toBe('chat');
   const list = ajv.compile(tools[0]!.inputSchema);
@@ -19,6 +25,27 @@ it('publishes only allowlisted chat discovery and a grounded plain-text send con
   const result = ajv.compile(tools[1]!.outputSchema);
   expect(result({ messageId: 42, chatId: '-1001234567890', date: 1791014400 })).toBe(true);
   expect(result({ messageId: 42, chatId: -1001234567890, date: 1791014400 })).toBe(false);
+});
+
+it('exports opt-in TELEGRAM_OAUTH_TOOLS with grounded telegram.read_messages while keeping ALL_TOOLS at 33', () => {
+  expect(ALL_TOOLS).toHaveLength(33);
+  expect(TELEGRAM_OAUTH_TOOLS.map(t => t.name)).toEqual(['telegram.read_messages']);
+  const readTool = getToolDefinition('telegram.read_messages');
+  expect(readTool).toBeDefined();
+  expect(readTool).toMatchObject({
+    name: 'telegram.read_messages',
+    service: 'telegram',
+    sideEffect: 'read',
+    riskLevel: 'low',
+  });
+  expect(readTool!.inputSchema.properties.chatId['x-resource']).toBe('chat');
+  const ajv = new Ajv({ strict: false });
+  const validateInput = ajv.compile(readTool!.inputSchema);
+  expect(validateInput({ chatId: '-1001234567890', query: 'lỗi', limit: 10 })).toBe(true);
+  expect(validateInput({ chatId: '-1001234567890' })).toBe(true);
+  expect(validateInput({ query: 'lỗi' })).toBe(false);
+  expect(validateInput({ chatId: '@invalid_channel' })).toBe(false);
+  expect(validateInput({ chatId: '-1001234567890', limit: 25 })).toBe(false);
 });
 
 it('registers numeric Chat ID scope and only the explicit Telegram keyword', () => {

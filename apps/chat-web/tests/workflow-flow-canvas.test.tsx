@@ -506,7 +506,8 @@ describe('WorkflowFlowCanvas — Make.com Orbital Workflow Visualizer', () => {
 
     render(<SettingsPage user={{ id: 'u-1', email: 'u@example.com', name: 'User', role: 'admin' }} navigate={vi.fn()} onLogout={vi.fn()} />);
 
-    expect(await screen.findByText('2 / 8 dịch vụ đã thiết lập · 2 kết nối tốt')).toBeInTheDocument();
+    expect(await screen.findByText('2 / 2 dịch vụ đã thiết lập · 2 kết nối tốt')).toBeInTheDocument();
+    expect(screen.getByText('Tất cả 2 dịch vụ đều đã được thiết lập.')).toBeInTheDocument();
     expect(screen.getByTestId('settings-oauth-summary')).toBeInTheDocument();
     expect(document.body).toHaveTextContent(/OAuth 1-Click cá nhân \(Gmail, Calendar, Sheets, Trello, GitHub, Telegram\)/i);
   });

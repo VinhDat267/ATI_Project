@@ -94,6 +94,21 @@ function extractScopeBadges(step: WorkflowFlowStep, resourceLabels?: Record<stri
       if (!badges.includes(resolved)) badges.push(resolved);
     }
   }
+  if (Array.isArray(args.threadIds)) {
+    for (const item of args.threadIds) {
+      if (typeof item === 'string' && item.trim()) {
+        const resolved = resourceLabels?.[item] ?? item;
+        if (!badges.includes(resolved)) badges.push(resolved);
+      }
+    }
+  }
+  if (badges.length === 0 && step.tool.startsWith('gmail.') && Array.isArray(args.to)) {
+    for (const item of args.to) {
+      if (typeof item === 'string' && item.trim() && !badges.includes(item)) {
+        badges.push(item);
+      }
+    }
+  }
   return badges;
 }
 

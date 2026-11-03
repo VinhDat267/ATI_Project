@@ -1,13 +1,14 @@
 export * from './myslack-assistant.js';
 import type { ToolDefinition } from './types.js';
-import { TRELLO_TOOLS } from './trello.js';
+import { TRELLO_TOOLS, TRELLO_OAUTH_TOOLS } from './trello.js';
 import { SLACK_TOOLS } from './slack.js';
 import { GITHUB_TOOLS, GITHUB_OAUTH_TOOLS } from './github.js';
-import { SHEETS_TOOLS } from './sheets.js';
+import { SHEETS_TOOLS, SHEETS_EXTENDED_TOOLS } from './sheets.js';
 import { CALENDAR_TOOLS } from './calendar.js';
-import { NOTION_TOOLS } from './notion.js';
-import { TELEGRAM_TOOLS } from './telegram.js';
+import { NOTION_TOOLS, NOTION_OAUTH_TOOLS } from './notion.js';
+import { TELEGRAM_TOOLS, TELEGRAM_OAUTH_TOOLS } from './telegram.js';
 import { JIRA_TOOLS } from './jira.js';
+import { MYSHEETS_TOOLS } from './mysheets.js';
 
 export * from './types.js';
 export * from './trello.js';
@@ -50,6 +51,29 @@ const GITHUB_OAUTH_TOOL_MAP: Record<string, ToolDefinition> = Object.fromEntries
   GITHUB_OAUTH_TOOLS.map((tool) => [tool.name, tool])
 );
 
+const TRELLO_OAUTH_TOOL_MAP: Record<string, ToolDefinition> = Object.fromEntries(
+  TRELLO_OAUTH_TOOLS.map((tool) => [tool.name, tool])
+);
+
+const TELEGRAM_OAUTH_TOOL_MAP: Record<string, ToolDefinition> = Object.fromEntries(
+  TELEGRAM_OAUTH_TOOLS.map((tool) => [tool.name, tool])
+);
+
+const SHEETS_EXTENDED_TOOL_MAP: Record<string, ToolDefinition> = Object.fromEntries(
+  [...SHEETS_EXTENDED_TOOLS, ...MYSHEETS_TOOLS].map((tool) => [tool.name, tool])
+);
+
+const NOTION_OAUTH_TOOL_MAP: Record<string, ToolDefinition> = Object.fromEntries(
+  NOTION_OAUTH_TOOLS.map((tool) => [tool.name, tool])
+);
+
 export function getToolDefinition(name: string): ToolDefinition | undefined {
-  return TOOL_MAP[name] ?? GITHUB_OAUTH_TOOL_MAP[name];
+  return (
+    TOOL_MAP[name] ??
+    GITHUB_OAUTH_TOOL_MAP[name] ??
+    TRELLO_OAUTH_TOOL_MAP[name] ??
+    TELEGRAM_OAUTH_TOOL_MAP[name] ??
+    SHEETS_EXTENDED_TOOL_MAP[name] ??
+    NOTION_OAUTH_TOOL_MAP[name]
+  );
 }

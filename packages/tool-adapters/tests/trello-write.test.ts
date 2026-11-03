@@ -6,7 +6,20 @@ describe('packages/tool-adapters (Task 4c: Trello Write Tools & Unified Adapter)
     const urlStr = url.toString();
     const method = options?.method || 'GET';
 
-    if (method === 'POST' && urlStr.includes('/cards') && !urlStr.includes('/idMembers') && !urlStr.includes('/checklists')) {
+    if (method === 'POST' && urlStr.includes('/lists')) {
+      const body = options?.body ? JSON.parse(options.body as string) : {};
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          id: 'list_sprint_15',
+          name: body.name || 'New List',
+          idBoard: body.idBoard || 'b1',
+        }),
+      };
+    }
+
+    if (method === 'POST' && urlStr.includes('/cards') && !urlStr.includes('/idMembers') && !urlStr.includes('/checklists') && !urlStr.includes('/actions/comments')) {
       const body = options?.body ? JSON.parse(options.body as string) : {};
       return {
         ok: true,
@@ -17,6 +30,19 @@ describe('packages/tool-adapters (Task 4c: Trello Write Tools & Unified Adapter)
           desc: body.desc || '',
           url: 'https://trello.com/c/card_created_1',
           idList: body.idList || 'l1',
+        }),
+      };
+    }
+
+    if (method === 'PUT' && urlStr.includes('/cards/card_created_1/checkItem/item_1')) {
+      const body = options?.body ? JSON.parse(options.body as string) : {};
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          id: 'item_1',
+          name: 'Viết unit test',
+          state: body.state || 'complete',
         }),
       };
     }
@@ -32,7 +58,16 @@ describe('packages/tool-adapters (Task 4c: Trello Write Tools & Unified Adapter)
           desc: body.desc || '',
           url: 'https://trello.com/c/card_created_1',
           idList: body.idList || 'l1',
+          dueComplete: body.dueComplete ?? false,
         }),
+      };
+    }
+
+    if (method === 'DELETE' && urlStr.includes('/cards/card_created_1/idMembers/member_1')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => [{ id: 'member_2' }],
       };
     }
 
@@ -54,6 +89,18 @@ describe('packages/tool-adapters (Task 4c: Trello Write Tools & Unified Adapter)
         json: async () => ({
           id: 'chk_1',
           name: 'Definition of Done',
+        }),
+      };
+    }
+
+    if (method === 'POST' && urlStr.includes('/cards/card_created_1/actions/comments')) {
+      const body = options?.body ? JSON.parse(options.body as string) : {};
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          id: 'comment_1',
+          data: { text: body.text || '' },
         }),
       };
     }
@@ -85,6 +132,24 @@ describe('packages/tool-adapters (Task 4c: Trello Write Tools & Unified Adapter)
         ok: true,
         status: 200,
         json: async () => ({ id: 'l1', idBoard: 'b1' }),
+      };
+    }
+
+    if (method === 'GET' && urlStr.includes('/cards/card_created_1/checklists')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => [
+          {
+            id: 'chk_1',
+            name: 'Definition of Done',
+            checkItems: [
+              { id: 'item_1', name: 'Viết unit test', state: 'incomplete' },
+              { id: 'item_2', name: 'Review code', state: 'incomplete' },
+              { id: 'item_3', name: 'Viết integration test', state: 'incomplete' },
+            ],
+          },
+        ],
       };
     }
 
@@ -176,5 +241,90 @@ describe('packages/tool-adapters (Task 4c: Trello Write Tools & Unified Adapter)
       title: 'Automated card from execute',
     });
     expect(card.id).toBe('card_created_1');
+
+    // Add comment dispatch
+    const comment = await adapter.execute('trello.add_comment', {
+      cardId: 'card_created_1',
+      text: 'PR #228 đã merge thành công',
+    });
+    expect(comment).toEqual({
+      id: 'comment_1',
+      cardId: 'card_created_1',
+      text: 'PR #228 đã merge thành công',
+    });
+
+    // Create list dispatch
+    const newList = await adapter.execute('trello.create_list', {
+      boardId: 'b1',
+      name: 'Sprint 15 - Cần làm',
+      pos: 'top',
+    });
+    expect(newList).toEqual({
+      id: 'list_sprint_15',
+      name: 'Sprint 15 - Cần làm',
+      boardId: 'b1',
+    });
+
+    // Remove member dispatch
+    const afterRemove = await adapter.execute('trello.remove_member', {
+      cardId: 'card_created_1',
+      memberId: 'member_1',
+    });
+    expect(afterRemove).toEqual({
+      id: 'card_created_1',
+      idMembers: ['member_2'],
+    });
+
+    // Update checklist item by itemName dispatch
+    const updatedItem = await adapter.execute('trello.update_checklist_item', {
+      cardId: 'card_created_1',
+      itemName: 'viết unit test',
+      state: 'complete',
+    });
+    expect(updatedItem).toEqual({
+      id: 'item_1',
+      cardId: 'card_created_1',
+      name: 'Viết unit test',
+      state: 'complete',
+    });
+
+    // Set card due complete dispatch
+    const dueCompleted = await adapter.execute('trello.set_card_due_complete', {
+      cardId: 'card_created_1',
+      dueComplete: true,
+    });
+    expect(dueCompleted).toEqual({
+      id: 'card_created_1',
+      name: 'Updated Title',
+      dueComplete: true,
+    });
+
+    // Add checklist with legacy 'name' fallback if 'title' is omitted
+    const fallbackChk = await adapter.execute('trello.add_checklist', {
+      cardId: 'card_created_1',
+      name: 'Definition of Done',
+      items: ['Viết unit test'],
+    });
+    expect(fallbackChk.name).toBe('Definition of Done');
+    expect(fallbackChk.items).toHaveLength(1);
+
+    // Rejects update_checklist_item when checkItemId does not match itemName
+    await expect(
+      adapter.execute('trello.update_checklist_item', {
+        cardId: 'card_created_1',
+        checkItemId: 'item_1',
+        itemName: 'Deploy production',
+        state: 'complete',
+      })
+    ).rejects.toMatchObject({ category: 'VALIDATION', statusCode: 400 });
+
+    // Rejects update_checklist_item when itemName partially matches multiple items (" test" matches both "Viết unit test" and "Chạy integration test")
+    await expect(
+      adapter.execute('trello.update_checklist_item', {
+        cardId: 'card_created_1',
+        itemName: 'test',
+        state: 'complete',
+      })
+    ).rejects.toMatchObject({ category: 'VALIDATION', statusCode: 400 });
   });
 });

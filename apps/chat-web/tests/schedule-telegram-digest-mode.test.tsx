@@ -97,9 +97,13 @@ describe('Task 9: ScheduleMoment auto_digest mode & ScheduleSection digest state
     expect(manualRadio.checked).toBe(true);
     expect(autoDigestRadio.disabled).toBe(false);
     expect(screen.getByText(/Telegram của tôi \(An\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Nguồn đọc:.*Google Calendar, GitHub/)).toBeInTheDocument();
 
     fireEvent.click(autoDigestRadio);
     expect(autoDigestRadio.checked).toBe(true);
+    const scopeBox = document.getElementById('schedule-auto-digest-scope');
+    expect(scopeBox).not.toBeNull();
+    expect(scopeBox).toHaveTextContent(/Google Calendar, GitHub/);
 
     fireEvent.click(screen.getByRole('button', { name: 'Xác nhận' }));
 
@@ -221,6 +225,7 @@ describe('Task 9: ScheduleMoment auto_digest mode & ScheduleSection digest state
 
     expect(await screen.findByText(/Tự gửi Telegram · Telegram của tôi \(An\)/)).toBeInTheDocument();
     expect(screen.getByText('Đã gửi')).toBeInTheDocument();
+    expect(screen.getByText(/Telegram: Telegram của tôi \(An\)/)).toBeInTheDocument();
     expect(await screen.findByText('Gửi thất bại')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Lập lại kế hoạch|Chạy lại/i })).toBeInTheDocument();
   });

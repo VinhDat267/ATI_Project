@@ -62,7 +62,7 @@ export const READ_DIGEST_SOURCE_MAP: Record<string, TelegramDigestSource> = {
   gmail: {
     service: 'gmail',
     tool: 'gmail.search_threads',
-    args: { query: 'is:unread' },
+    args: { query: 'in:inbox is:unread' },
     label: 'Email chưa đọc',
   },
 };
@@ -114,6 +114,47 @@ export function computeTelegramDigestConfigHash(config: TelegramDigestConfig): s
     timeZone: config.timeZone,
   };
   return createHash('sha256').update(JSON.stringify(canonicalize(canonical))).digest('hex');
+}
+
+export function buildTelegramDigestSourceArgs(
+  source: TelegramDigestSource,
+  window: { sinceIso: string; untilIso: string },
+): {
+  callArgs: Record<string, any>;
+  repoSearchTool?: string;
+  sheetListTool?: string;
+  sheetReadTool?: string;
+} {
+  const base = { ...(source.args ?? {}) };
+  if (source.tool === 'calendar.list_events') {
+    return {
+      callArgs: { timeMin: window.sinceIso, timeMax: window.untilIso, maxResults: 20, ...base },
+    };
+  }
+  if (source.tool === 'mycalendar.list_events') {
+    return {
+      callArgs: { calendarId: 'primary', timeMin: window.sinceIso, timeMax: window.untilIso, ...base },
+    };
+  }
+  if (source.tool === 'sheets.read_range') {
+    return {
+      callArgs: { range: 'A1:Z20', ...base },
+      sheetListTool: 'sheets.list_spreadsheets',
+    };
+  }
+  if (source.tool === 'mysheets.list_spreadsheets') {
+    return {
+      callArgs: { query: '', ...base },
+      sheetReadTool: 'mysheets.read_range',
+    };
+  }
+  if (source.tool === 'github.list_issues') {
+    return {
+      callArgs: { state: 'open', ...base },
+      repoSearchTool: 'github.search_repos',
+    };
+  }
+  return { callArgs: base };
 }
 
 export interface EvaluateTelegramDigestInput {
@@ -176,7 +217,12 @@ export function evaluateTelegramDigestCandidate(
   }
 
   const { selectedChats, connection } = telegramLookup;
-  let targetChat = selectedChats[0]!;
+  const privateChat = selectedChats.find(
+    (c) => c.type === 'private' || c.chatId === connection.telegramUserId,
+  );
+  const selectedGroups = selectedChats.filter(
+    (c) => c.type !== 'private' && c.chatId !== connection.telegramUserId,
+  );
 
   const mentionsPersonal =
     foldedRequest.includes('telegram cua toi') ||
@@ -184,27 +230,63 @@ export function evaluateTelegramDigestCandidate(
     foldedRequest.includes('rieng') ||
     foldedRequest.includes('cho toi');
 
+  const mentionsGroupDestination =
+    /\b(?:vao|qua|tren|den|cho|tai)\s+(?:nhom|group|kenh|channel)\b/i.test(foldedRequest) ||
+    /\b(?:nhom|group)\s+telegram\b/i.test(foldedRequest);
+
+  let targetChat = selectedChats[0]!;
+
   if (mentionsPersonal) {
-    const privateChat = selectedChats.find(
-      (c) => c.type === 'private' || c.chatId === connection.telegramUserId,
-    );
-    if (privateChat) targetChat = privateChat;
+    if (privateChat) {
+      targetChat = privateChat;
+    } else if (selectedChats.length === 1) {
+      targetChat = selectedChats[0]!;
+    } else {
+      return {
+        canAutoDigest: false,
+        disabledReason: 'Hãy chọn cuộc trò chuyện Telegram của tôi trong trang Kết nối dịch vụ để bật chế độ tự gửi.',
+      };
+    }
   } else {
-    const matchedGroup = selectedChats.find((c) => {
-      if (c.type === 'private') return false;
+    const matchedGroups = selectedGroups.filter((c) => {
       const foldedTitle = foldVietnamese(c.title);
       return foldedTitle.length > 0 && foldedRequest.includes(foldedTitle);
     });
-    if (matchedGroup) {
-      targetChat = matchedGroup;
+    if (matchedGroups.length === 1) {
+      targetChat = matchedGroups[0]!;
+    } else if (matchedGroups.length > 1) {
+      return {
+        canAutoDigest: false,
+        disabledReason: 'Hãy nêu rõ tên nhóm Telegram nhận bản tin để bật chế độ tự gửi.',
+      };
     } else if (existingDigest) {
       const existingMatch = selectedChats.find((c) => c.chatId === existingDigest.chatId);
-      if (existingMatch) targetChat = existingMatch;
+      if (existingMatch) {
+        targetChat = existingMatch;
+      } else {
+        return {
+          canAutoDigest: false,
+          disabledReason: 'Hãy nêu rõ tên nhóm Telegram nhận bản tin để bật chế độ tự gửi.',
+        };
+      }
+    } else if (mentionsGroupDestination) {
+      if (selectedGroups.length === 1) {
+        targetChat = selectedGroups[0]!;
+      } else {
+        return {
+          canAutoDigest: false,
+          disabledReason: 'Hãy nêu rõ tên nhóm Telegram nhận bản tin để bật chế độ tự gửi.',
+        };
+      }
+    } else if (selectedChats.length === 1) {
+      targetChat = selectedChats[0]!;
+    } else if (privateChat) {
+      targetChat = privateChat;
     } else {
-      const privateChat = selectedChats.find(
-        (c) => c.type === 'private' || c.chatId === connection.telegramUserId,
-      );
-      if (privateChat) targetChat = privateChat;
+      return {
+        canAutoDigest: false,
+        disabledReason: 'Hãy nêu rõ tên nhóm Telegram nhận bản tin để bật chế độ tự gửi.',
+      };
     }
   }
 

@@ -45,6 +45,7 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
       const args = { ...input };
       for (const key of ['threadId', 'name', 'query', 'subject']) if (args[key] != null) safeHeader(args[key]);
       if (args.threadId && !/^[A-Za-z0-9_-]+$/.test(args.threadId)) invalid('Invalid Gmail threadId');
+      if (args.threadIds?.some((id: string) => !/^[A-Za-z0-9_-]+$/.test(id))) invalid('Invalid Gmail threadId');
       for (const key of ['addLabelIds', 'removeLabelIds']) if (args[key]?.some((id: string) => !/^[A-Za-z0-9_-]+$/.test(id))) invalid('Invalid Gmail label id');
       for (const key of ['to', 'cc', 'bcc']) if (args[key]) args[key] = args[key].map(bareAddress);
       if (['to', 'cc', 'bcc'].reduce((n, key) => n + (args[key]?.length ?? 0), 0) > 20) invalid('Gmail allows at most 20 recipients total');
@@ -66,9 +67,14 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
           } catch {
             throw new StepError({ category: write ? 'UNKNOWN' : 'NETWORK', message: write ? 'Gmail write result is unknown; check Sent before continuing' : 'Gmail request interrupted' });
           }
+          // 401 is a definitive rejection: no write occurred. A refresh failure
+          // before the next attempt is known unsent, unlike an ambiguous response.
+          if (response.status === 401 && !refreshed) { refreshed = true; forceRefresh = true; if (write) writeDispatched = false; continue; }
           let data: any;
           try { data = await response.json(); } catch {
-            throw new StepError({ category: write ? 'UNKNOWN' : 'SERVER_ERROR', message: 'Gmail returned an unreadable response' });
+            if (response.ok) {
+              throw new StepError({ category: write ? 'UNKNOWN' : 'SERVER_ERROR', message: 'Gmail returned an unreadable response' });
+            }
           }
           if (response.ok) {
             const id = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
@@ -80,9 +86,6 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
             if (!data || typeof data !== 'object' || invalidWrite) throw new StepError({ category: write ? 'UNKNOWN' : 'SERVER_ERROR', message: 'Gmail returned an invalid response' });
             return data;
           }
-          // 401 is a definitive rejection: no write occurred. A refresh failure
-          // before the next attempt is known unsent, unlike an ambiguous response.
-          if (response.status === 401 && !refreshed) { refreshed = true; forceRefresh = true; if (write) writeDispatched = false; continue; }
           const reasons = data?.error?.errors?.map((e: any) => e.reason) ?? [];
           const quota = response.status === 429 || response.status === 403 && reasons.some((r: string) => /rateLimitExceeded|userRateLimitExceeded|quotaExceeded|dailyLimitExceeded/i.test(r));
           if (quota && !write && retries++ < 2) { await waitWithSignal(Math.min(5000, retryAfterMs(response.headers.get('retry-after'))), signal); continue; }
@@ -93,9 +96,10 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
       const readThread = async (id: string, format = 'full'): Promise<GmailThread> => request(`threads/${encodeURIComponent(id)}?format=${format}`);
       const summary = (thread: GmailThread) => {
         const messages = thread.messages ?? [], latest = messages.at(-1) ?? { id: '' };
+        const files = [...new Set(messages.flatMap(m => attachments(m.payload).map(a => a.filename).filter(Boolean)))];
         return { id: thread.id, subject: cut(header(latest, 'Subject'), 250), from: header(latest, 'From'), to: headerAddresses(header(latest, 'To')), cc: headerAddresses(header(latest, 'Cc')),
           snippet: cut(latest.snippet ?? '', 200), date: header(latest, 'Date'), labels: [...new Set(messages.flatMap(m => m.labelIds ?? []))], messageCount: messages.length,
-          unread: messages.some(m => m.labelIds?.includes('UNREAD')), participants: participants(messages) };
+          unread: messages.some(m => m.labelIds?.includes('UNREAD')), hasAttachment: files.length > 0, attachmentNames: files, participants: participants(messages) };
       };
       switch (toolName) {
         case 'gmail.search_threads': {
@@ -118,8 +122,25 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
           const thread = await request(`threads/${args.threadId}/modify`, { ...(args.addLabelIds ? { addLabelIds: args.addLabelIds } : {}), ...(args.removeLabelIds ? { removeLabelIds: args.removeLabelIds } : {}) });
           return { id: thread.id, labelIds: [...new Set(thread.messages.flatMap((message: GmailMessage) => message.labelIds ?? []))] };
         }
-        case 'gmail.trash_thread': return await request(`threads/${args.threadId}/trash`, {});
-        case 'gmail.create_label': return await request('labels', { name: args.name, labelListVisibility: 'labelShow', messageListVisibility: 'show' });
+        case 'gmail.batch_modify_threads': {
+          const uniqueIds = [...new Set(args.threadIds as string[])];
+          const labelSet = new Set<string>();
+          const ids: string[] = [];
+          for (const id of uniqueIds) {
+            const thread = await request(`threads/${id}/modify`, { ...(args.addLabelIds ? { addLabelIds: args.addLabelIds } : {}), ...(args.removeLabelIds ? { removeLabelIds: args.removeLabelIds } : {}) });
+            ids.push(thread.id);
+            for (const message of thread.messages ?? []) for (const labelId of message.labelIds ?? []) labelSet.add(labelId);
+          }
+          return { ids, labelIds: [...labelSet] };
+        }
+        case 'gmail.trash_thread': {
+          const data = await request(`threads/${args.threadId}/trash`, {});
+          return { id: data.id };
+        }
+        case 'gmail.create_label': {
+          const data = await request('labels', { name: args.name, labelListVisibility: 'labelShow', messageListVisibility: 'show' });
+          return { id: data.id, name: data.name };
+        }
         default: {
           let subject = args.subject ?? '', body = args.body ?? '', inReplyTo: string | undefined, references: string | undefined;
           if (args.threadId) {
@@ -142,7 +163,8 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
           const raw = rawMessage({ to: args.to, cc: args.cc, bcc: args.bcc, subject: cut(subject, 250), body: cut(body, 20000), inReplyTo, references });
           const message = { raw, ...(args.threadId && toolName !== 'gmail.forward' ? { threadId: args.threadId } : {}) };
           if (toolName === 'gmail.create_draft') { const data = await request('drafts', { message }); return { id: data.id, messageId: data.message?.id, threadId: data.message?.threadId }; }
-          return await request('messages/send', message);
+          const sent = await request('messages/send', message);
+          return { id: sent.id, threadId: sent.threadId };
         }
       }
     } catch (error) {

@@ -8,6 +8,7 @@ import { MessageRepo } from '../../src/db/repositories/message-repo.js';
 import { ScheduleRepo } from '../../src/db/repositories/schedule-repo.js';
 import { ScheduleService } from '../../src/services/schedules/schedule-service.js';
 import { ScheduleRunner } from '../../src/services/schedules/schedule-runner.js';
+import { ChatService } from '../../src/services/chat-service.js';
 import {
   analyzeSheetsDigestCandidate,
   computeSheetsDigestHash,
@@ -428,5 +429,382 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
     const pausedAfter3 = await scheduleRepo.ownedSchedule(change.schedule.id, alice.id);
     expect(pausedAfter3?.status).toBe('paused');
     expect(pausedAfter3?.pause_reason).toMatch(/3 lần/i);
+  });
+
+  it('routes mysheets + telegram schedule to SheetsDigestCandidate (not hijacked by telegram_digest) and supports personal Telegram selectedChats', async () => {
+    const tgPersonalConfig = encryptCredentials(
+      {
+        telegramUserId: '777000111',
+        username: 'alice_tg',
+        displayName: 'Alice',
+        selectedChats: [
+          { chatId: '777000111', title: 'Telegram của tôi (Alice)', type: 'private' },
+          { chatId: '-100777888999', title: 'Nhóm KPI Sản Phẩm', type: 'supergroup' },
+        ],
+      },
+      ENC_KEY
+    );
+    await credentialRepo.upsertPersonalCredentials({
+      service: 'telegram',
+      userId: alice.id,
+      config: tgPersonalConfig,
+    });
+
+    const emitted: Array<{ event: string; payload: any }> = [];
+    const service = new ScheduleService({
+      pool: db.pool,
+      timeZone: TZ,
+      credentialRepo,
+      encryptionKey: ENC_KEY,
+      mysheetsEnabled: true,
+    });
+
+    const chatService = new ChatService({
+      msgRepo: messageRepo,
+      convRepo,
+      planner: {
+        processMessage: async () => ({
+          kind: 'schedule' as const,
+          action: 'create' as const,
+          name: 'Báo cáo KPI Telegram',
+          request: 'Đọc tab KPI Tháng 11 từ bảng Báo cáo KPI Q4 và gửi báo cáo vào Nhóm KPI Sản Phẩm trên Telegram',
+          recurrence: { type: 'daily' as const, time: '08:30' },
+          summary: 'Mỗi ngày lúc 08:30 gửi báo cáo KPI vào Nhóm KPI Sản Phẩm trên Telegram.',
+        }),
+        routeSchedule: async () => ({
+          services: ['mysheets', 'telegram'],
+          unavailable: [],
+        }),
+      } as any,
+      eventEmitter: { emit: (event, payload) => emitted.push({ event, payload }) },
+      telegramConnection: async () => ({
+        status: 'connected' as const,
+        selectedChats: [
+          { chatId: '777000111', title: 'Telegram của tôi (Alice)', type: 'private' as const },
+          { chatId: '-100777888999', title: 'Nhóm KPI Sản Phẩm', type: 'supergroup' as const },
+        ],
+        connection: {
+          credentialId: 'tg-cred-1',
+          telegramUserId: '777000111',
+          username: 'alice_tg',
+          chatIds: ['777000111', '-100777888999'],
+        },
+      }),
+      schedules: {
+        repo: service.repo,
+        timeZone: TZ,
+        credentialRepo,
+        encryptionKey: ENC_KEY,
+        mysheetsEnabled: true,
+        now: () => new Date('2026-11-02T00:00:00Z'),
+      },
+    });
+
+    const conv = await convRepo.createConversation(alice.id);
+    await chatService.handleUserMessage({
+      conversationId: conv.id,
+      userId: alice.id,
+      content: 'Mỗi sáng 8h30 đọc tab KPI Tháng 11 từ bảng Báo cáo KPI Q4 và gửi vào Nhóm KPI Sản Phẩm trên Telegram',
+    });
+
+    for (let i = 0; i < 100 && !emitted.some((e) => e.event === 'schedule_proposal' || e.event === 'error'); i++) {
+      await new Promise((r) => setTimeout(r, 15));
+    }
+
+    const proposalEvent = emitted.find((e) => e.event === 'schedule_proposal');
+    expect(proposalEvent).toBeDefined();
+    expect(proposalEvent!.payload.metadata.digestCandidate).toMatchObject({
+      canAutoDigest: true,
+      config: {
+        source: {
+          service: 'mysheets',
+          spreadsheetId: SPREADSHEET_ID,
+          sheetName: 'KPI Tháng 11',
+        },
+        destination: {
+          service: 'telegram',
+          chatId: '-100777888999',
+          chatLabel: 'Nhóm KPI Sản Phẩm',
+        },
+      },
+    });
+
+    const change = await service.confirmProposal({
+      userId: alice.id,
+      convId: conv.id,
+      messageId: proposalEvent!.payload.messageId,
+      now: new Date('2026-11-02T00:00:00Z'),
+      approvalMode: 'auto_digest',
+    });
+    expect(change.schedule.kind).toBe('sheets_digest');
+    expect(change.schedule.approvalMode).toBe('auto_digest');
+
+    const sentTelegram: Array<{ chatId: string; text: string }> = [];
+    const digestRunner = new SheetsDigestRunner({
+      repo: scheduleRepo,
+      credentialRepo,
+      messageRepo,
+      encryptionKey: ENC_KEY,
+      mysheetsEnabled: true,
+      createAdapter: async (serviceId) => {
+        if (serviceId === 'mysheets') {
+          return {
+            execute: async () => ({
+              headers: ['Hạng mục', 'Trạng thái'],
+              records: [{ 'Hạng mục': 'KPI 1', 'Trạng thái': 'Hoàn thành' }],
+              values: [['Hạng mục', 'Trạng thái'], ['KPI 1', 'Hoàn thành']],
+            }),
+          };
+        }
+        return {
+          execute: async (_tool, args) => {
+            sentTelegram.push({ chatId: String(args.chatId), text: String(args.text) });
+            return { ok: true };
+          },
+        };
+      },
+    });
+
+    const row = (await scheduleRepo.ownedSchedule(change.schedule.id, alice.id))!;
+    const outcome = await digestRunner.executeDigest(row, row.version, async () => true);
+    expect(outcome.status).toBe('digest_sent');
+    expect(sentTelegram).toHaveLength(1);
+    expect(sentTelegram[0]!.chatId).toBe('-100777888999');
+  });
+
+  it('emits SSE on sheets_digest completion and marks run as interrupted when ScheduleRunner stops mid-run', async () => {
+    const candidate = await analyzeSheetsDigestCandidate({
+      userId: alice.id,
+      request: 'Đọc bảng Báo cáo KPI Q4 và gửi báo cáo vào Slack',
+      services: ['mysheets', 'slack'],
+      credentialRepo,
+      encryptionKey: ENC_KEY,
+      mysheetsEnabled: true,
+    });
+
+    const conv = await convRepo.createConversation(alice.id);
+    const metadata: ScheduleProposalMetadata = {
+      type: 'schedule_proposal',
+      proposal: {
+        kind: 'schedule',
+        action: 'create',
+        name: 'Báo cáo KPI SSE',
+        request: 'Đọc bảng Báo cáo KPI Q4 và gửi báo cáo vào Slack',
+        recurrence: { type: 'daily', time: '08:00' },
+        summary: 'Báo cáo KPI SSE.',
+      },
+      scheduleId: null,
+      baseVersion: null,
+      services: ['mysheets', 'slack'],
+      nextRuns: ['2026-11-02T01:00:00.000Z'],
+      previous: null,
+      digestCandidate: candidate,
+    };
+    const msg = await messageRepo.createMessage(
+      conv.id,
+      'assistant',
+      metadata.proposal.summary,
+      metadata as unknown as Record<string, unknown>
+    );
+
+    const sseEvents: Array<{ convId: string; event: string; payload: any }> = [];
+    let shouldHangUntilAbort = false;
+
+    const digestRunner = new SheetsDigestRunner({
+      repo: scheduleRepo,
+      credentialRepo,
+      messageRepo,
+      encryptionKey: ENC_KEY,
+      mysheetsEnabled: true,
+      createAdapter: async (serviceId) => ({
+        execute: async (_tool, _args, ctx) => {
+          if (shouldHangUntilAbort) {
+            await new Promise<never>((_, reject) => {
+              ctx?.signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+            });
+          }
+          if (serviceId === 'mysheets') {
+            return {
+              headers: ['Task', 'Status'],
+              records: [{ Task: 'A', Status: 'Done' }],
+              values: [['Task', 'Status'], ['A', 'Done']],
+            };
+          }
+          return { ok: true };
+        },
+      }),
+    });
+
+    let runner!: ScheduleRunner;
+    const service = new ScheduleService({
+      pool: db.pool,
+      timeZone: TZ,
+      runner: { planNow: (runId) => runner.planNow(runId) },
+      credentialRepo,
+      encryptionKey: ENC_KEY,
+      mysheetsEnabled: true,
+    });
+    runner = new ScheduleRunner({
+      pool: db.pool,
+      timeZone: TZ,
+      planRun: vi.fn() as any,
+      recordState: (client, row, now) => service.recordState(client, row, now),
+      sheetsDigestRunner: digestRunner,
+      emit: (convId, event, payload) => sseEvents.push({ convId, event, payload }),
+      now: () => new Date('2026-11-02T01:00:05Z'),
+    });
+
+    const change = await service.confirmProposal({
+      userId: alice.id,
+      convId: conv.id,
+      messageId: msg.id,
+      now: new Date('2026-11-02T00:00:00Z'),
+      approvalMode: 'auto_digest',
+    });
+
+    // 1. Normal run emits message_complete SSE
+    await runner.tick();
+    expect(sseEvents.some((e) => e.event === 'message_complete')).toBe(true);
+
+    // 2. Stopping mid-run marks run as 'interrupted' instead of 'digest_failed'
+    shouldHangUntilAbort = true;
+    const manualRun = await service.startRun({
+      userId: alice.id,
+      scheduleId: change.schedule.id,
+      trigger: 'manual',
+      now: new Date('2026-11-02T01:02:00Z'),
+    });
+    const runPromise = runner.planNow(manualRun.id);
+    await new Promise((r) => setTimeout(r, 30));
+    await runner.stop();
+    await runPromise;
+
+    const dbRun = (await db.pool.query('SELECT status, error FROM schedule_runs WHERE id = $1', [manualRun.id])).rows[0];
+    expect(dbRun.status).toBe('interrupted');
+  });
+
+  it('supports sheets_digest delivery via Gmail and smart fallback from shared sheets to personal mysheets', async () => {
+    // Save personal Gmail credential for Alice
+    const gmailConfig = encryptCredentials(
+      {
+        refreshToken: '1//alice-gmail-refresh',
+        email: 'alice@example.com',
+      },
+      ENC_KEY
+    );
+    const savedGmail = await credentialRepo.saveCredentials('gmail', gmailConfig, alice.id);
+
+    // 1. Smart fallback: services=['sheets', 'gmail'] when shared 'sheets' is not configured falls back to Alice's 'mysheets'
+    const candidate = await analyzeSheetsDigestCandidate({
+      userId: alice.id,
+      request: 'Mỗi sáng thứ Hai 8:00 đọc Google Sheets Báo cáo KPI Q4 và gửi email tổng hợp qua Gmail tới ceo@example.com',
+      services: ['sheets', 'gmail'],
+      credentialRepo,
+      encryptionKey: ENC_KEY,
+      mysheetsEnabled: true,
+    });
+
+    expect(candidate.canAutoDigest).toBe(true);
+    expect(candidate.config?.source.service).toBe('mysheets');
+    expect(candidate.config?.source.spreadsheetId).toBe(SPREADSHEET_ID);
+    expect(candidate.config?.destination).toEqual({
+      service: 'gmail',
+      recipientEmail: 'ceo@example.com',
+      credentialId: savedGmail.id,
+    });
+
+    // 2. Execute digest via SheetsDigestRunner -> calls gmail.send_message
+    const conv = await convRepo.createConversation(alice.id, 'Lịch báo cáo KPI qua Gmail');
+    const metadata: ScheduleProposalMetadata = {
+      type: 'schedule_proposal',
+      proposal: {
+        kind: 'schedule',
+        action: 'create',
+        name: 'Báo cáo KPI tuần qua Gmail',
+        request: 'Mỗi sáng thứ Hai 8:00 đọc Google Sheets Báo cáo KPI Q4 và gửi email tổng hợp qua Gmail tới ceo@example.com',
+        recurrence: { type: 'daily', time: '08:00' },
+        summary: 'Mỗi ngày 08:00 đọc Báo cáo KPI Q4 và gửi Gmail.',
+      },
+      scheduleId: null,
+      baseVersion: null,
+      services: ['mysheets', 'gmail'],
+      nextRuns: ['2026-11-02T01:00:00Z'],
+      previous: null,
+      digestCandidate: candidate,
+    };
+    const msg = await messageRepo.createMessage(
+      conv.id,
+      'assistant',
+      metadata.proposal.summary,
+      metadata as unknown as Record<string, unknown>
+    );
+
+    const gmailSendCalls: Array<{ tool: string; args: any }> = [];
+    const digestRunner = new SheetsDigestRunner({
+      repo: scheduleRepo,
+      credentialRepo,
+      messageRepo,
+      encryptionKey: ENC_KEY,
+      mysheetsEnabled: true,
+      createAdapter: async (serviceId) => ({
+        execute: async (tool, args) => {
+          if (serviceId === 'mysheets') {
+            return {
+              headers: ['Hạng mục', 'Trạng thái', 'Doanh thu'],
+              records: [
+                { 'Hạng mục': 'Tăng trưởng Q4', 'Trạng thái': 'Hoàn thành', 'Doanh thu': '25,000,000 đ' },
+                { 'Hạng mục': 'Hợp đồng Enterprise', 'Trạng thái': 'Hoàn thành', 'Doanh thu': '15.000.000' },
+              ],
+              values: [
+                ['Hạng mục', 'Trạng thái', 'Doanh thu'],
+                ['Tăng trưởng Q4', 'Hoàn thành', '25,000,000 đ'],
+                ['Hợp đồng Enterprise', 'Hoàn thành', '15.000.000'],
+              ],
+            };
+          }
+          if (serviceId === 'gmail') {
+            gmailSendCalls.push({ tool, args });
+            return { id: 'gmail-msg-1', threadId: 'th-1' };
+          }
+          throw new Error(`Unexpected service ${serviceId}`);
+        },
+      }),
+    });
+
+    let runner!: ScheduleRunner;
+    const service = new ScheduleService({
+      pool: db.pool,
+      timeZone: TZ,
+      runner: { planNow: (runId) => runner.planNow(runId) },
+      credentialRepo,
+      encryptionKey: ENC_KEY,
+      mysheetsEnabled: true,
+    });
+    runner = new ScheduleRunner({
+      pool: db.pool,
+      timeZone: TZ,
+      planRun: vi.fn() as any,
+      recordState: (client, row, now) => service.recordState(client, row, now),
+      sheetsDigestRunner: digestRunner,
+      now: () => new Date('2026-11-02T01:00:05Z'),
+    });
+
+    const confirmed = await service.confirmProposal({
+      userId: alice.id,
+      convId: conv.id,
+      messageId: msg.id,
+      now: new Date('2026-11-02T00:00:00Z'),
+      approvalMode: 'auto_digest',
+    });
+
+    expect(confirmed.schedule.kind).toBe('sheets_digest');
+    await runner.tick();
+
+    expect(gmailSendCalls).toHaveLength(1);
+    expect(gmailSendCalls[0]!.tool).toBe('gmail.send_message');
+    expect(gmailSendCalls[0]!.args.to).toEqual(['ceo@example.com']);
+    expect(gmailSendCalls[0]!.args.subject).toContain('Báo cáo KPI tuần qua Gmail');
+    expect(gmailSendCalls[0]!.args.body).toContain('Tăng trưởng Q4');
+    expect(gmailSendCalls[0]!.args.body).toContain('Tổng Doanh thu: 40,000,000');
   });
 });

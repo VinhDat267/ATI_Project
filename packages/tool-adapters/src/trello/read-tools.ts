@@ -113,24 +113,61 @@ export class TrelloReadTools extends TrelloBaseAdapter {
 
   /**
    * Search cards across boards and lists.
+   * Supports empty query ('') by listing open cards directly from allowed boards/lists.
    */
   async searchCards(args: {
     query: string;
     boardId?: string;
     listId?: string;
     limit?: number;
-  }): Promise<Array<{ id: string; name: string; url: string; listId: string }>> {
+  }): Promise<Array<{
+    id: string;
+    name: string;
+    url: string;
+    listId: string;
+    boardId?: string;
+    due?: string | null;
+    dueComplete?: boolean;
+    idMembers?: string[];
+    labels?: string[];
+  }>> {
     if (args.boardId) {
       this.assertAllowedScope('boards', args.boardId);
     }
 
-    const res = await this.request<any>(
-      `/search?query=${encodeURIComponent(args.query)}&modelTypes=cards&card_fields=id,name,url,idList,idBoard`,
-      { signal: (args as any).signal }
-    );
+    const signal = (args as any).signal as AbortSignal | undefined;
+    const queryTrimmed = (args.query ?? '').trim();
+    let rawCards: any[] = [];
 
-    const rawCards: any[] = Array.isArray(res?.cards) ? res.cards : Array.isArray(res) ? res : [];
-    const limit = Math.min(Math.max(args.limit ?? 10, 1), 10);
+    if (!queryTrimmed) {
+      if (args.listId) {
+        const res = await this.request<any[]>(
+          `/lists/${args.listId}/cards?fields=id,name,url,idList,idBoard,due,dueComplete,idMembers,labels,desc`,
+          { signal }
+        );
+        rawCards = Array.isArray(res) ? res : [];
+      } else {
+        const targetBoards = args.boardId ? [args.boardId] : this.allowedBoardIds;
+        for (const bId of targetBoards) {
+          this.assertAllowedScope('boards', bId);
+          const res = await this.request<any[]>(
+            `/boards/${bId}/cards?fields=id,name,url,idList,idBoard,due,dueComplete,idMembers,labels,desc`,
+            { signal }
+          );
+          if (Array.isArray(res)) {
+            rawCards.push(...res.map((c) => ({ ...c, idBoard: c.idBoard || bId })));
+          }
+        }
+      }
+    } else {
+      const res = await this.request<any>(
+        `/search?query=${encodeURIComponent(queryTrimmed)}&modelTypes=cards&card_fields=id,name,url,idList,idBoard,due,dueComplete,idMembers,labels,desc`,
+        { signal }
+      );
+      rawCards = Array.isArray(res?.cards) ? res.cards : Array.isArray(res) ? res : [];
+    }
+
+    const limit = Math.min(Math.max(args.limit ?? 10, 1), 50);
 
     let filtered = rawCards.filter((c) => typeof c.idBoard === 'string' && this.allowedBoardIds.includes(c.idBoard));
     if (args.boardId) {
@@ -140,12 +177,34 @@ export class TrelloReadTools extends TrelloBaseAdapter {
       filtered = filtered.filter((c) => c.idList === args.listId);
     }
 
-    return filtered.slice(0, limit).map((c) => ({
-      id: String(c.id),
-      name: String(c.name),
-      url: String(c.url || ''),
-      listId: String(c.idList || ''),
-    }));
+    return filtered.slice(0, limit).map((c) => {
+      const item: {
+        id: string;
+        name: string;
+        url: string;
+        listId: string;
+        boardId?: string;
+        due?: string | null;
+        dueComplete?: boolean;
+        idMembers?: string[];
+        labels?: string[];
+      } = {
+        id: String(c.id),
+        name: String(c.name),
+        url: String(c.url || ''),
+        listId: String(c.idList || ''),
+      };
+      if (typeof c.idBoard === 'string' && c.idBoard) item.boardId = c.idBoard;
+      if (c.due !== undefined) item.due = c.due ? String(c.due) : null;
+      if (typeof c.dueComplete === 'boolean') item.dueComplete = c.dueComplete;
+      if (Array.isArray(c.idMembers)) item.idMembers = c.idMembers.map(String);
+      if (Array.isArray(c.labels)) {
+        item.labels = c.labels
+          .map((l: any) => (typeof l === 'string' ? l : String(l?.name || l?.color || '')))
+          .filter(Boolean);
+      }
+      return item;
+    });
   }
 
   /**
@@ -160,15 +219,40 @@ export class TrelloReadTools extends TrelloBaseAdapter {
     desc: string;
     url: string;
     listId: string;
+    boardId?: string;
     idMembers: string[];
+    due?: string | null;
+    dueComplete?: boolean;
+    labels?: string[];
+    checklists?: Array<{
+      id: string;
+      name: string;
+      items: Array<{ id: string; name: string; state: string }>;
+    }>;
   }> {
     if (options?.boardId) {
       this.assertBoardInScope(options.boardId);
     }
-    const card = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
+    const card = await this.request<any>(`/cards/${args.cardId}?checklists=all`, { signal: options?.signal });
     this.assertParentBoard(card, options?.boardId);
 
-    return {
+    const result: {
+      id: string;
+      name: string;
+      desc: string;
+      url: string;
+      listId: string;
+      boardId?: string;
+      idMembers: string[];
+      due?: string | null;
+      dueComplete?: boolean;
+      labels?: string[];
+      checklists?: Array<{
+        id: string;
+        name: string;
+        items: Array<{ id: string; name: string; state: string }>;
+      }>;
+    } = {
       id: String(card.id),
       name: String(card.name),
       desc: String(card.desc || ''),
@@ -176,6 +260,28 @@ export class TrelloReadTools extends TrelloBaseAdapter {
       listId: String(card.idList || ''),
       idMembers: Array.isArray(card.idMembers) ? card.idMembers.map(String) : [],
     };
+    if (typeof card.idBoard === 'string' && card.idBoard) result.boardId = card.idBoard;
+    if (card.due !== undefined) result.due = card.due ? String(card.due) : null;
+    if (typeof card.dueComplete === 'boolean') result.dueComplete = card.dueComplete;
+    if (Array.isArray(card.labels)) {
+      result.labels = card.labels
+        .map((l: any) => (typeof l === 'string' ? l : String(l?.name || l?.color || '')))
+        .filter(Boolean);
+    }
+    if (Array.isArray(card.checklists)) {
+      result.checklists = card.checklists.map((chk: any) => ({
+        id: String(chk.id || ''),
+        name: String(chk.name || ''),
+        items: Array.isArray(chk.checkItems || chk.items)
+          ? (chk.checkItems || chk.items).map((it: any) => ({
+              id: String(it.id || ''),
+              name: String(it.name || ''),
+              state: String(it.state || 'incomplete'),
+            }))
+          : [],
+      }));
+    }
+    return result;
   }
 
   override async execute(

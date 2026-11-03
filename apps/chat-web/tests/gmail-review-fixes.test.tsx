@@ -3,9 +3,12 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { GMAIL_TOOLS } from '@wap/tool-schemas';
 import { resourceDestination } from '../src/components/Cockpit';
 import { PlanMoment } from '../src/pages/Cockpit/PlanMoment';
+import { ReceiptMoment } from '../src/pages/Cockpit/ReceiptMoment';
 import { PreviewContents } from '../src/pages/Cockpit/PreviewContents';
+import { PreviewModal } from '../src/pages/Cockpit/PreviewModal';
 import { RecoveryMoment } from '../src/pages/Cockpit/RecoveryMoment';
-import { operation } from '../src/pages/Cockpit/presentation';
+import { operation, servicePalette } from '../src/pages/Cockpit/presentation';
+import { WorkflowFlowCanvas } from '../src/components/WorkflowFlowCanvas';
 import { LandingPage } from '../src/pages/Landing/LandingPage';
 import { PrivacyPage } from '../src/pages/Privacy/PrivacyPage';
 import { SettingsPage } from '../src/pages/Settings/SettingsPage';
@@ -24,6 +27,7 @@ const relabel = step('gmail.modify_thread_labels', { threadId: thread, addLabelI
 it.each([
   ['gmail.send_message', 'Gửi thư', 'Đã gửi thư'], ['gmail.reply', 'Trả lời thư', 'Đã gửi trả lời'], ['gmail.forward', 'Chuyển tiếp thư', 'Đã chuyển tiếp'],
   ['gmail.create_draft', 'Tạo thư nháp', 'Đã tạo thư nháp'], ['gmail.modify_thread_labels', 'Đổi nhãn', 'Đã đổi nhãn'],
+  ['gmail.batch_modify_threads', 'Đổi nhãn hàng loạt', 'Đã đổi nhãn hàng loạt'],
   ['gmail.trash_thread', 'Chuyển vào thùng rác', 'Đã chuyển vào thùng rác'], ['gmail.create_label', 'Tạo nhãn', 'Đã tạo nhãn'],
 ])('names what %s does on the plan card and while it runs', (tool, action, done) => {
   expect(operation(tool)).toMatchObject({ action, done });
@@ -31,13 +35,50 @@ it.each([
 it('declares an action for every Gmail write tool instead of guessing "Cập nhật"', () => {
   for (const tool of GMAIL_TOOLS.filter(t => t.sideEffect === 'write')) expect(operation(tool.name).action, tool.name).not.toBe('Cập nhật');
 });
+it('defines complete Gmail badge, previewBadge and receiptHover tokens without undefined classes', () => {
+  const palette = servicePalette('gmail');
+  expect(palette.badge).toBeTruthy();
+  expect(palette.previewBadge).toBeTruthy();
+  expect(palette.receiptHover).toBeTruthy();
+  render(<PreviewModal step={reply} services={[]} labels={labels} sender="own@gmail.test" destination={resourceDestination} onClose={() => {}} />);
+  expect(document.getElementById('preview-service-tag')?.className).not.toContain('undefined');
+});
 
-it('shows the thread a Gmail step acts on as its destination', () => {
+it('shows the thread a Gmail step acts on as its destination, including batch threadIds and direct recipients', () => {
   expect(resourceDestination(reply, labels)).toBe('Họp nhóm ATI');
   expect(resourceDestination(trash, labels)).toBe('Họp nhóm ATI');
   // Labels are what the step applies, not where it writes.
   expect(resourceDestination(relabel, labels)).toBe('Họp nhóm ATI');
   expect(resourceDestination(trash, {})).toBe('Luồng thư · chưa có tên trong dữ liệu');
+  const batch = step('gmail.batch_modify_threads', { threadIds: ['gmail-thread-1', 'gmail-thread-2'], removeLabelIds: ['UNREAD'] });
+  expect(resourceDestination(batch, { ...labels, 'gmail-thread-2': 'Báo cáo tuần' })).toBe('Họp nhóm ATI, Báo cáo tuần');
+  expect(resourceDestination(batch, {})).toBe('Luồng thư · chưa có tên trong dữ liệu');
+  const send = step('gmail.send_message', { to: ['khachhang@agency.vn', 'pm@agency.vn'], subject: 'Báo giá', body: 'Nội dung' });
+  expect(resourceDestination(send, {})).toBe('khachhang@agency.vn, pm@agency.vn');
+});
+
+it('displays Gmail account attribution in ReceiptMoment (Moment 6) and extracts Gmail scopes in WorkflowFlowCanvas', () => {
+  render(
+    <ReceiptMoment
+      request="Trả lời email"
+      steps={[{ id: reply.id, tool: reply.tool, description: reply.description, status: 'succeeded', duration: '0,4 giây' }]}
+      planSteps={[reply]}
+      services={[]}
+      labels={labels}
+      gmailConnection={{ credentialId: 'c', email: 'own@gmail.test' }}
+      destination={resourceDestination}
+      onNewConversation={() => {}}
+      onFollowup={() => {}}
+    />
+  );
+  expect(screen.getAllByText(/own@gmail\.test \(Gmail của bạn\)/).length).toBeGreaterThanOrEqual(1);
+  cleanup();
+
+  const batch = step('gmail.batch_modify_threads', { threadIds: ['gmail-thread-1', 'gmail-thread-2'], removeLabelIds: ['UNREAD'] });
+  render(<WorkflowFlowCanvas steps={[batch]} resourceLabels={{ ...labels, 'gmail-thread-2': 'Báo cáo tuần' }} mode="preview" />);
+  fireEvent.click(screen.getByTestId('workflow-node-gmail'));
+  expect(screen.getByText('Phạm vi: Họp nhóm ATI')).toBeTruthy();
+  expect(screen.getByText('Phạm vi: Báo cáo tuần')).toBeTruthy();
 });
 
 it('labels reply and trash cards with their real action and thread on the approval screen', () => {

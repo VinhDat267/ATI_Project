@@ -20,7 +20,7 @@ describe('ANS-01 read answers', () => {
     const date = { now: new Date('2026-10-14T00:00:00Z'), timeZone: 'Asia/Ho_Chi_Minh' };
     const hash = (s: string) => createHash('sha256').update(s).digest('hex');
     expect(hash(buildSystemPrompt(ALL_TOOLS, date, { search: true, readAnswers: false } as any)))
-      .toBe('13f3c0ef5f2c64ec28d2eca60db189de04d6aeb81421f62e935b85801e99b840');
+      .toBe('0d80f095ff04d30a26613ae119a4f76d5197579fefd28ba2b21649cefd4ea70e');
     expect(hash(formatSearchResults([{ tool: 'slack.search_channels', args: { query: 'frontend' }, result: [] }])))
       .toBe('1edfb5917d31a91aa046dca5ea220a6c131deed29412fa206df107eb32ef9850');
   });

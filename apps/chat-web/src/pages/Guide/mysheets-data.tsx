@@ -49,6 +49,26 @@ export const MYSHEETS_BASE_PROMPTS: SamplePrompt[] = [
     tools: ['mysheets.read_range', 'slack.send_message'],
     workflow: ['Đọc dữ liệu bảng tính', 'Tóm tắt nội dung', 'Xem trước tin nhắn', 'Duyệt rồi gửi Slack'],
   },
+  {
+    id: 'mysheets-search-update-closed-loop',
+    category: 'mysheets',
+    categoryLabel: 'Bảng tính',
+    title: 'Lọc dòng theo điều kiện & cập nhật trạng thái khép kín',
+    prompt: "Lọc các dòng có cột Trạng thái = 'Chờ duyệt' trong bảng Việc của tôi, báo danh sách lên Slack #ati-test và cập nhật lại cột Trạng thái thành 'Đã nhắc'.",
+    services: ['mysheets', 'slack'],
+    tools: ['mysheets.search_rows', 'slack.send_message', 'mysheets.update_rows'],
+    workflow: ['Tra cứu dòng theo điều kiện cột', 'Xem trước tin nhắn & cột cập nhật', 'Duyệt rồi gửi thông báo và ghi nhận trạng thái'],
+  },
+  {
+    id: 'mysheets-create-sheet-sprint',
+    category: 'mysheets',
+    categoryLabel: 'Bảng tính',
+    title: 'Tạo trang tính (tab) mới kèm tiêu đề cột',
+    prompt: 'Tạo tab mới tên Sprint 15 với các cột Mã thẻ, Tiêu đề, Người phụ trách, Trạng thái trong bảng Việc của tôi.',
+    services: ['mysheets'],
+    tools: ['mysheets.create_sheet'],
+    workflow: ['Chọn bảng tính đích', 'Xem trước tên tab và tiêu đề cột', 'Duyệt rồi khởi tạo trang tính'],
+  },
 ];
 
 export const MYSHEETS_SCHEDULE_PROMPT: SamplePrompt = {
@@ -69,13 +89,14 @@ export const MYSHEETS_CAPABILITY: Capability = {
   name: 'Google Sheets của bạn',
   role: 'Bảng tính riêng',
   canDo: [
-    'Đọc dữ liệu ô trong phạm vi các bảng tính bạn đã chọn',
-    'Thêm dòng mới vào bảng tính sau khi bạn duyệt',
-    'Liệt kê danh sách bảng tính và các trang tính (tab) đã cấp quyền',
+    'Đọc dữ liệu ô và tra cứu/lọc dòng theo điều kiện cột (search_rows) trong phạm vi các bảng tính bạn đã chọn',
+    'Thêm dòng mới hoặc cập nhật dòng trùng khóa (Upsert) sau khi bạn duyệt',
+    'Cập nhật chọn lọc từng cột theo khóa/số dòng (update_rows) mà vẫn bảo toàn công thức ở các cột khác',
+    'Tạo trang tính (tab) mới kèm dòng tiêu đề cột (create_sheet) trong bảng tính đã cấp quyền',
   ],
   cannotDo: [
-    'Sửa hoặc xoá ô tính có sẵn',
-    'Tạo bảng tính mới hoặc xoá bảng tính',
+    'Xoá bảng tính hoặc tự ý chỉnh sửa khi bạn chưa duyệt kế hoạch',
+    'Tạo tệp bảng tính mới ngoài phạm vi đã chọn trên Google Drive',
     'Truy cập các tệp Google Drive khác ngoài bảng tính bạn chọn',
   ],
 };

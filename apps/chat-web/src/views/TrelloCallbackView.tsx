@@ -3,6 +3,7 @@ import type { TrelloCallbackInput } from '../routes';
 import { apiClient } from '../services/api-client';
 import { subscribeAuthTokens } from '../services/auth-storage';
 import { trelloSessionOwner, trelloCallbackError, trelloConnectionNotice, conversationReturnPath } from '../services/trello-connection';
+import { tryLoopbackCallbackHop } from '../hooks/use-route';
 import { usePrototypePage } from '../prototype/usePrototypePage';
 
 const meta = { id: 'trello-callback', title: 'Kết nối Trello — ATI', htmlClass: '', bodyClass: 'min-h-screen bg-[#F8F8F6] text-[#111827] antialiased', css: '' };
@@ -32,7 +33,14 @@ export function TrelloCallbackView({ navigate, input }: { navigate: (path: strin
         if (back) { navigate(back, true); return; }
         trelloConnectionNotice.set(result.username);
         navigate('/settings#trello', true);
-      }).catch(reason => { if (live()) setError(trelloCallbackError(reason?.data?.code)); });
+      }).catch(reason => {
+        if (!live()) return;
+        if (reason?.data?.code === 'TRELLO_STATE_INVALID' && data.code && data.state) {
+          const qs = `?${new URLSearchParams({ code: data.code, state: data.state }).toString()}`;
+          tryLoopbackCallbackHop('/connections/trello/callback', qs);
+        }
+        setError(trelloCallbackError(reason?.data?.code));
+      });
     }
     return () => { mounted = false; unsubscribe(); window.removeEventListener('storage', onStorage); };
   }, [navigate]);

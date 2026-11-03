@@ -12,7 +12,7 @@ describe('compact tool listing', () => {
     expect(text).toContain('title* string');
     expect(text).toContain('idMembers string[] [x-resource: member]');
     expect(text).toMatch(/due string/);
-    expect(text).toContain('returns { id, name, url, listId }');
+    expect(text).toContain('returns { id, name, url, listId, dueComplete }');
     expect(text).not.toContain('"type"');
   });
 

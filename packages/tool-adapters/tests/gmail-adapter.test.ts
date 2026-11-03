@@ -115,6 +115,48 @@ describe('Gmail native HTTP adapter', () => {
     await expect(adapter.execute('gmail.send_message', send)).resolves.toMatchObject({ id: 'sent-2' });
     expect(calls.filter(c => c?.forceRefresh)).toHaveLength(1); expect(server.stats.writes).toBe(2);
   });
+  it('refreshes once on a 401 with a non-JSON body on a write instead of failing with UNKNOWN', async () => {
+    const { adapter, server, calls } = await setup();
+    server.settings.apiResponses = [{ mode: 'invalid_json', status: 401 }];
+    await expect(adapter.execute('gmail.send_message', send)).resolves.toEqual({ id: 'sent-2', threadId: 'new-thread-2' });
+    expect(calls.filter(c => c?.forceRefresh)).toHaveLength(1);
+    expect(server.stats.writes).toBe(2);
+  });
+  it('normalizes send_message, reply, forward, trash_thread and create_label outputs to their outputSchema fields', async () => {
+    const { adapter, server } = await setup();
+    server.settings.apiResponses = [
+      { body: { id: 'sent-1', threadId: 'thread-1', labelIds: ['SENT'], extra: 'ignored' } },
+    ];
+    await expect(adapter.execute('gmail.send_message', send)).resolves.toEqual({ id: 'sent-1', threadId: 'thread-1' });
+
+    server.settings.apiResponses = [
+      { body: server.settings.threads[0] },
+      { body: { id: 'reply-1', threadId: 'thread-1', labelIds: ['SENT'] } },
+    ];
+    await expect(adapter.execute('gmail.reply', { threadId: 'thread-1', to: send.to, body: send.body })).resolves.toEqual({ id: 'reply-1', threadId: 'thread-1' });
+
+    server.settings.apiResponses = [
+      { body: server.settings.threads[0] },
+      { body: { id: 'fwd-1', threadId: 'thread-2', labelIds: ['SENT'] } },
+    ];
+    await expect(adapter.execute('gmail.forward', { threadId: 'thread-1', to: send.to, note: 'Xem nhé' })).resolves.toEqual({ id: 'fwd-1', threadId: 'thread-2' });
+
+    server.settings.apiResponses = [
+      { body: { id: 'thread-1', historyId: '999', messages: [{ id: 'm1' }] } },
+    ];
+    await expect(adapter.execute('gmail.trash_thread', { threadId: 'thread-1' })).resolves.toEqual({ id: 'thread-1' });
+
+    server.settings.apiResponses = [
+      { body: { id: 'Label_1', name: 'Dự án ATI', type: 'user', messageListVisibility: 'show', labelListVisibility: 'labelShow' } },
+    ];
+    await expect(adapter.execute('gmail.create_label', { name: 'Dự án ATI' })).resolves.toEqual({ id: 'Label_1', name: 'Dự án ATI' });
+
+    server.settings.threads[0]!.messages[0]!.payload.parts = [
+      { mimeType: 'application/pdf', filename: 'hop-dong.pdf', body: { size: 450, attachmentId: 'att-1' } },
+    ];
+    const searched = await adapter.execute('gmail.search_threads', { query: 'họp', limit: 1 });
+    expect(searched[0]).toMatchObject({ id: 'thread-1', hasAttachment: true, attachmentNames: ['hop-dong.pdf'] });
+  });
   it('chooses the most recent delivered message even if a later draft exists', async () => {
     const { adapter, server } = await setup(); const original = server.settings.threads[0]!.messages[0];
     server.settings.threads[0]!.messages.push({ ...original, id: 'latest-draft', labelIds: ['DRAFT'], payload: { ...original.payload, headers: [{ name: 'Subject', value: 'DO NOT REPLY TO DRAFT' }] } });
@@ -165,6 +207,20 @@ describe('Gmail native HTTP adapter', () => {
     const result = await adapter.execute('gmail.modify_thread_labels', { threadId: 'thread-1', addLabelIds: ['STARRED'], removeLabelIds: ['UNREAD'] });
     expect(result).toEqual({ id: 'thread-1', labelIds: ['INBOX', 'STARRED'] });
     expect(server.stats.apiRequests.at(-1)).toMatchObject({ path: 'threads/thread-1/modify', method: 'POST', body: { addLabelIds: ['STARRED'], removeLabelIds: ['UNREAD'] } });
+  });
+  it('batch modifies multiple threads and returns deduplicated ids and labelIds', async () => {
+    const { adapter, server } = await setup();
+    const result = await adapter.execute('gmail.batch_modify_threads', {
+      threadIds: ['thread-1', 'thread-1'],
+      addLabelIds: ['STARRED'],
+      removeLabelIds: ['UNREAD'],
+    });
+    expect(result).toEqual({ ids: ['thread-1'], labelIds: ['INBOX', 'STARRED'] });
+    expect(server.stats.apiRequests.at(-1)).toMatchObject({
+      path: 'threads/thread-1/modify',
+      method: 'POST',
+      body: { addLabelIds: ['STARRED'], removeLabelIds: ['UNREAD'] },
+    });
   });
   it('normalizes a message with no labels when Google omits its empty labelIds field', async () => {
     const { adapter, server } = await setup(); server.settings.apiResponses = [{ body: { id: 'thread-1', messages: [{ id: 'message-1' }] } }];

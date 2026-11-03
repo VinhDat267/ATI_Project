@@ -35,6 +35,16 @@ export class TrelloAdapter extends TrelloWriteTools {
         return this.addMember(args as any, opts);
       case 'trello.add_checklist':
         return this.addChecklist(args as any, opts);
+      case 'trello.add_comment':
+        return this.addComment(args as any, opts);
+      case 'trello.create_list':
+        return this.createList(args as any, opts);
+      case 'trello.remove_member':
+        return this.removeMember(args as any, opts);
+      case 'trello.update_checklist_item':
+        return this.updateChecklistItem(args as any, opts);
+      case 'trello.set_card_due_complete':
+        return this.setCardDueComplete(args as any, opts);
 
       default:
         throw new StepError({

@@ -226,3 +226,76 @@ for (const width of [1440, 375]) {
     });
   }
 }
+
+test('MYCALENDAR: Flow 5 - 1-click primary calendar, rich PlanMoment pills, conflict free-slot 1-click, calendar-event-preview modal, and Google Meet join link on ReceiptMoment', async ({ page }) => {
+  const pageErrors: Error[] = [];
+  page.on('pageerror', (err) => pageErrors.push(err));
+
+  await login(page);
+  const token = await page.evaluate(() => localStorage.getItem('wap_access_token'));
+  await page.request.delete('/api/connections/mycalendar', { headers: { Authorization: `Bearer ${token}` } });
+
+  // 1. Connect from Settings and use 1-Click Primary Calendar Quick-Select (#mycalendar-quick-primary)
+  await page.goto('/settings#mycalendar');
+  const row = page.locator('#service-row-mycalendar');
+  await expect(row).toBeVisible();
+  await row.getByRole('button', { name: 'Kết nối Google Calendar', exact: true }).click();
+
+  await expect(page.getByRole('heading', { name: /Chọn lịch Google Calendar/i })).toBeVisible();
+  const quickPrimaryBtn = page.locator('#mycalendar-quick-primary');
+  await expect(quickPrimaryBtn).toBeVisible();
+  await quickPrimaryBtn.click();
+
+  await expect(page).toHaveURL(/.*\/settings.*#mycalendar/);
+  await expect(row).toContainText('Đã kết nối');
+  await expect(row).toContainText('Lịch chính');
+
+  // 2. Request a recurring Daily Standup with Google Meet on personal calendar
+  await page.goto('/');
+  await page.getByRole('textbox').fill('Tạo lịch họp Daily Standup kèm Google Meet lặp lại các ngày trong tuần vào lịch của tôi');
+  await page.getByRole('button', { name: 'Gửi yêu cầu', exact: true }).click();
+
+  await page.waitForURL(/\/c\/[0-9a-f-]{36}/);
+
+  // 3. PlanMoment renders quick feature pills & interactive conflict banner
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tôi sẽ làm 1 việc, theo thứ tự');
+  const stepCard = page.locator('#plan-cards-container article').first();
+  await expect(stepCard).toContainText('🎥 Google Meet');
+  await expect(stepCard).toContainText('🔁 Thứ 2 – Thứ 6 hàng tuần');
+  await expect(stepCard).toContainText('📍 Phòng họp Tầng 5');
+
+  const conflictBanner = page.getByTestId('calendar-conflict-banner');
+  await expect(conflictBanner).toBeVisible();
+  const slotBtn = conflictBanner.getByRole('button', { name: 'Đổi sang 10:30–11:30' });
+  await expect(slotBtn).toBeVisible();
+  await slotBtn.click();
+
+  // Clicking 1-click free slot opens inline composer prefilled with the slot change instruction
+  const inlineTextarea = page.locator('#moment-4-sticky-bar textarea');
+  await expect(inlineTextarea).toBeVisible();
+  await expect(inlineTextarea).toHaveValue('Đổi khung giờ họp sang 10:30–11:30');
+
+  // 4. Click "Xem trước" on the step card -> verify calendar-event-preview modal
+  await stepCard.getByRole('button', { name: 'Xem trước' }).click();
+  const previewCard = page.getByTestId('calendar-event-preview');
+  await expect(previewCard).toBeVisible();
+  await expect(previewCard).toContainText('Daily Standup Kỹ thuật');
+  await expect(previewCard).toContainText('🎥 Tự động tạo phòng họp Google Meet');
+  await expect(previewCard).toContainText('🔁 Lặp lại: Thứ 2 – Thứ 6 hàng tuần');
+  await expect(previewCard).toContainText('📍 Phòng họp Tầng 5');
+  await expect(previewCard).toContainText('Cập nhật tiến độ Sprint');
+
+  // Close PreviewModal
+  await page.getByRole('dialog').getByRole('button', { name: /Đóng/i }).first().click();
+  await expect(previewCard).toHaveCount(0);
+
+  // 5. Approve plan -> ReceiptMoment renders both Google Calendar link & direct Google Meet join button
+  await page.getByRole('button', { name: 'Duyệt kế hoạch', exact: true }).click();
+  await expect(page.locator('#moment-6')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Mở sự kiện trên Google Calendar' })).toBeVisible();
+  const meetJoinLink = page.getByRole('link', { name: /Tham gia Google Meet/i });
+  await expect(meetJoinLink).toBeVisible();
+  await expect(meetJoinLink).toHaveAttribute('href', /https:\/\/meet\.google\.com\/ati-meet-/);
+
+  expect(pageErrors).toEqual([]);
+});

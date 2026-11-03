@@ -55,6 +55,10 @@ export function createSandboxProvider(scenario?: string) {
     mockProvider.generatePlan = async (input) => {
       if (!Array.isArray(input.conversationHistory)) return fallback(input);
       const last = input.conversationHistory.at(-1)?.content ?? '';
+      const allUserText = [
+        (input as any).userMessage ?? '',
+        ...input.conversationHistory.filter((m) => m.role === 'user').map((m) => m.content),
+      ].join('\n');
       if (last.includes('<search_results>')) {
         let calId = 'c_work@group.calendar.google.com';
         if (last.includes('c_work@group.calendar.google.com')) {
@@ -64,6 +68,34 @@ export function createSandboxProvider(scenario?: string) {
         } else {
           const match = last.match(/"id":\s*"([^"]+)"/);
           if (match?.[1]) calId = match[1];
+        }
+        if (/Daily Standup|Google Meet/i.test(allUserText)) {
+          return JSON.stringify({
+            kind: 'plan',
+            thinking: 'Tạo lịch họp Daily Standup định kỳ kèm phòng họp Google Meet.',
+            summary: 'Tạo lịch họp Daily Standup kèm Google Meet',
+            warnings: [
+              'Sự kiện "Daily Standup Kỹ thuật" (2026-10-28T09:00:00+07:00 - 2026-10-28T09:30:00+07:00) trùng giờ với: Họp giao ban (09:00 - 09:30). Gợi ý khung giờ trống trong ngày: 10:30–11:30, 11:30–12:30.',
+            ],
+            steps: [
+              {
+                id: 'create_event',
+                tool: 'mycalendar.create_event',
+                description: 'Tạo lịch họp Daily Standup Kỹ thuật',
+                args: {
+                  calendarId: calId,
+                  summary: 'Daily Standup Kỹ thuật',
+                  start: '2026-10-28T09:00:00+07:00',
+                  end: '2026-10-28T09:30:00+07:00',
+                  location: 'Phòng họp Tầng 5',
+                  description: 'Cập nhật tiến độ Sprint',
+                  createMeetLink: true,
+                  recurrence: 'WEEKDAYS',
+                },
+                dependsOn: [],
+              },
+            ],
+          });
         }
         return JSON.stringify({
           kind: 'plan',
@@ -117,11 +149,81 @@ export function createSandboxProvider(scenario?: string) {
     const fallback = mockProvider.generatePlan.bind(mockProvider);
     mockProvider.generatePlan = async (input) => {
       if (!Array.isArray(input.conversationHistory)) return fallback(input);
+      const userPrompt =
+        input.conversationHistory
+          .filter((m) => m.role === 'user' && !m.content.includes('<search_results>'))
+          .at(-1)?.content ?? '';
+      const isClosedLoop = /quy trình khép kín|Sprint 15/i.test(userPrompt);
       const last = input.conversationHistory.at(-1)?.content ?? '';
       if (last.includes('<search_results>')) {
         let sheetId = 'sheet-personal-1';
         const match = last.match(/"id":\s*"([^"]+)"/);
         if (match?.[1]) sheetId = match[1];
+        if (isClosedLoop) {
+          return JSON.stringify({
+            kind: 'plan',
+            thinking: 'Thực hiện quy trình khép kín 2 chiều trên bảng tính cá nhân.',
+            summary: 'Tra cứu, Upsert, cập nhật cột chọn lọc và tạo tab Sprint 15',
+            warnings: [],
+            steps: [
+              {
+                id: 'search_step',
+                tool: 'mysheets.search_rows',
+                description: 'Lọc các dòng đã hoàn thành trong Sheet1',
+                args: {
+                  spreadsheetId: sheetId,
+                  sheet: 'Sheet1',
+                  column: 'Status',
+                  operator: 'equals',
+                  value: 'Done',
+                  limit: 10,
+                },
+                dependsOn: [],
+              },
+              {
+                id: 'upsert_step',
+                tool: 'mysheets.append_rows',
+                description: 'Đồng bộ dòng công việc (Upsert chống trùng khóa)',
+                args: {
+                  spreadsheetId: sheetId,
+                  sheet: 'Sheet1',
+                  rows: [['Write spec', 'In Review'], ['Slide bảo vệ', '05/11']],
+                  deduplicate: true,
+                  onDuplicate: 'update',
+                },
+                dependsOn: ['search_step'],
+              },
+              {
+                id: 'update_step',
+                tool: 'mysheets.update_rows',
+                description: 'Cập nhật trạng thái dòng Write spec',
+                args: {
+                  spreadsheetId: sheetId,
+                  sheet: 'Sheet1',
+                  updates: [
+                    {
+                      matchColumn: 'Task',
+                      matchValue: 'Write spec',
+                      values: { Status: 'Verified' },
+                    },
+                  ],
+                },
+                dependsOn: ['upsert_step'],
+              },
+              {
+                id: 'create_tab_step',
+                tool: 'mysheets.create_sheet',
+                description: 'Tạo trang tính Sprint 15 mới',
+                args: {
+                  spreadsheetId: sheetId,
+                  title: 'Sprint 15',
+                  headers: ['Mã thẻ', 'Trạng thái'],
+                },
+                dependsOn: ['update_step'],
+              },
+            ],
+          });
+        }
         return JSON.stringify({
           kind: 'plan',
           thinking: 'Thêm dòng vào bảng tính cá nhân.',
@@ -267,6 +369,14 @@ export function createSandboxProvider(scenario?: string) {
       if (text.startsWith('Tạm dừng')) return JSON.stringify({ kind: 'schedule', action: 'pause', summary: 'Tạm dừng lịch họp hằng ngày.' });
       if (text.startsWith('Chạy tiếp')) return JSON.stringify({ kind: 'schedule', action: 'resume', summary: 'Chạy tiếp lịch họp hằng ngày.' });
       if (text.startsWith('Hủy lịch')) return JSON.stringify({ kind: 'schedule', action: 'cancel', summary: 'Hủy lịch họp hằng ngày.' });
+      if (/trello/i.test(text)) return JSON.stringify({
+        kind: 'schedule',
+        action: 'create',
+        name: 'Bản tin Trello sáng',
+        request: 'Gửi bản tin Trello bảng Sprint Board lên Slack #general',
+        recurrence: { type: 'daily', time: '08:00' },
+        summary: 'Mỗi sáng 8 giờ, gửi bản tin Trello bảng Sprint Board lên Slack #general.',
+      });
       if (/github|bản tin/i.test(text)) return JSON.stringify({
         kind: 'schedule',
         action: 'create',

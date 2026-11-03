@@ -63,38 +63,104 @@ export function routeIntent(
       matched.push(personalJira);
     }
   }
+  const mentionsExplicitChannelService =
+    explicitlyNamed.some((s) => s.scopeKey === 'channels') ||
+    ['channel', 'channels', 'kênh'].some((keyword) => mentionsKeyword(intent, keyword)) ||
+    /(?<![\p{L}\p{N}_])#[\p{L}\p{N}_-]+/u.test(intent);
+  if (
+    !mentionsExplicitChannelService &&
+    matched.some((s) => s.scopeKey === 'channels' && !available.has(s.id))
+  ) {
+    const chatSvc = services.find((s) => s.scopeKey === 'chats');
+    if (chatSvc && available.has(chatSvc.id)) {
+      const mappedIds = new Set(
+        matched.map((s) => (s.scopeKey === 'channels' ? chatSvc.id : s.id)),
+      );
+      matched = services.filter((s) => mappedIds.has(s.id));
+    }
+  }
+  const mentionsSharedCalendar =
+    mentionsKeyword(intent, 'lịch chung') ||
+    mentionsKeyword(intent, 'lịch nhóm') ||
+    mentionsKeyword(intent, 'lịch team') ||
+    mentionsKeyword(intent, 'calendar chung') ||
+    mentionsKeyword(intent, 'google calendar chung') ||
+    ['shared calendar', 'team calendar', 'group calendar', 'shared google calendar', 'team google calendar', 'group google calendar']
+      .some(keyword => mentionsKeyword(intent, keyword));
   const hasPersonalCalendar = matched.some((s) => s.connection === 'personal' && s.scopeKey === 'calendars');
   const hasSharedCalendar = matched.some((s) => s.connection !== 'personal' && s.scopeKey === 'calendars');
   if (hasPersonalCalendar && hasSharedCalendar) {
-    const mentionsSharedCalendar =
-      mentionsKeyword(intent, 'lịch chung') ||
-      mentionsKeyword(intent, 'lịch nhóm') ||
-      mentionsKeyword(intent, 'lịch team') ||
-      mentionsKeyword(intent, 'calendar chung') ||
-      mentionsKeyword(intent, 'google calendar chung') ||
-      ['shared calendar', 'team calendar', 'group calendar', 'shared google calendar', 'team google calendar', 'group google calendar']
-        .some(keyword => mentionsKeyword(intent, keyword));
     if (!mentionsSharedCalendar) {
       matched = matched.filter((s) => !(s.connection !== 'personal' && s.scopeKey === 'calendars'));
     }
+  } else if (hasSharedCalendar && !hasPersonalCalendar && !mentionsSharedCalendar) {
+    const personalCal = services.find((s) => s.connection === 'personal' && s.scopeKey === 'calendars');
+    if (
+      personalCal &&
+      available.has(personalCal.id) &&
+      !matched.some((s) => s.scopeKey === 'calendars' && available.has(s.id))
+    ) {
+      matched = matched.map((s) => (s.connection !== 'personal' && s.scopeKey === 'calendars' ? personalCal : s));
+    }
   }
+  const mentionsSharedSheets =
+    mentionsKeyword(intent, 'bảng tính chung') ||
+    mentionsKeyword(intent, 'bảng tính nhóm') ||
+    mentionsKeyword(intent, 'bảng tính team') ||
+    mentionsKeyword(intent, 'sheet chung') ||
+    ['shared spreadsheet', 'team spreadsheet', 'team sheet']
+      .some(keyword => mentionsKeyword(intent, keyword));
   const hasPersonalSheets = matched.some((s) => s.connection === 'personal' && s.scopeKey === 'spreadsheets');
   const hasSharedSheets = matched.some((s) => s.connection !== 'personal' && s.scopeKey === 'spreadsheets');
   if (hasPersonalSheets && hasSharedSheets) {
-    const mentionsSharedSheets =
-      mentionsKeyword(intent, 'bảng tính chung') ||
-      mentionsKeyword(intent, 'bảng tính nhóm') ||
-      mentionsKeyword(intent, 'bảng tính team') ||
-      mentionsKeyword(intent, 'sheet chung') ||
-      ['shared spreadsheet', 'team spreadsheet', 'team sheet']
-        .some(keyword => mentionsKeyword(intent, keyword));
     if (!mentionsSharedSheets) {
       matched = matched.filter((s) => !(s.connection !== 'personal' && s.scopeKey === 'spreadsheets'));
     }
+  } else if (hasSharedSheets && !hasPersonalSheets && !mentionsSharedSheets) {
+    const personalSheets = services.find((s) => s.connection === 'personal' && s.scopeKey === 'spreadsheets');
+    if (personalSheets && available.has(personalSheets.id)) {
+      matched = matched.map((s) => (s.connection !== 'personal' && s.scopeKey === 'spreadsheets' ? personalSheets : s));
+    }
   }
-  const fallback = matched.length > 0 ? matched : services.filter((service) =>
+  let fallback = matched.length > 0 ? matched : services.filter((service) =>
     service.fallbackIntentKeywords?.some((keyword) => mentionsKeyword(intent, keyword))
   );
+  if (
+    !mentionsExplicitChannelService &&
+    fallback.some((s) => s.scopeKey === 'channels' && !available.has(s.id))
+  ) {
+    const chatSvc = services.find((s) => s.scopeKey === 'chats');
+    if (chatSvc && available.has(chatSvc.id)) {
+      const mappedIds = new Set(
+        fallback.map((s) => (s.scopeKey === 'channels' ? chatSvc.id : s.id)),
+      );
+      fallback = services.filter((s) => mappedIds.has(s.id));
+    }
+  }
+  if (
+    !mentionsSharedCalendar &&
+    fallback.some((s) => s.connection !== 'personal' && s.scopeKey === 'calendars') &&
+    !fallback.some((s) => s.scopeKey === 'calendars' && available.has(s.id))
+  ) {
+    const personalCal = services.find((s) => s.connection === 'personal' && s.scopeKey === 'calendars');
+    if (personalCal && available.has(personalCal.id)) {
+      fallback = fallback
+        .map((s) => (s.connection !== 'personal' && s.scopeKey === 'calendars' ? personalCal : s))
+        .filter((s, idx, arr) => arr.findIndex((item) => item.id === s.id) === idx);
+    }
+  }
+  if (
+    !mentionsSharedSheets &&
+    fallback.some((s) => s.connection !== 'personal' && s.scopeKey === 'spreadsheets') &&
+    !fallback.some((s) => s.scopeKey === 'spreadsheets' && available.has(s.id))
+  ) {
+    const personalSheets = services.find((s) => s.connection === 'personal' && s.scopeKey === 'spreadsheets');
+    if (personalSheets && available.has(personalSheets.id)) {
+      fallback = fallback
+        .map((s) => (s.connection !== 'personal' && s.scopeKey === 'spreadsheets' ? personalSheets : s))
+        .filter((s, idx, arr) => arr.findIndex((item) => item.id === s.id) === idx);
+    }
+  }
   // Explicit intent for a registered but unavailable service must not silently
   // fall back to another service's write tools.
   if (fallback.length > 0) {

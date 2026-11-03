@@ -143,7 +143,7 @@ it('integrates Telegram personal encrypted SQL credentials, 1-click connection r
     expect(seen).toHaveLength(2);
     expect(seen[0].conversationHistory[0]).toEqual({ role: 'user', content: notification });
     expect(seen.at(-1).toolCatalog.map((t: any) => t.name)).toEqual(['telegram.list_chats', 'telegram.send_message']);
-    expect(seen.at(-1).workingMemory.__observed.chat).toEqual([{ id, title: 'ATI Test' }]);
+    expect(seen.at(-1).workingMemory.__observed.chat).toEqual([{ id, title: 'ATI Test', type: 'supergroup' }]);
     const fabricated = structuredClone(plan);
     fabricated.steps[0]!.args.chatId = '-1009999999999';
     expect(validatePlan(JSON.stringify(fabricated), catalog, { grounding: { memory: seen.at(-1).workingMemory, userTexts: [] } }).valid).toBe(false);

@@ -189,11 +189,20 @@ export async function evaluateCalendarDigestCandidate(
   }
 
   let destAllowedScope: any = {};
+  let destSelectedChats: Array<{ chatId: string; title?: string }> = [];
   try {
     const decryptedDest = encryptionKey
       ? decryptCredentials(destRow.config, encryptionKey)
       : JSON.parse(destRow.config);
     destAllowedScope = decryptedDest?.allowedScope ?? {};
+    if (Array.isArray(decryptedDest?.selectedChats)) {
+      destSelectedChats = decryptedDest.selectedChats
+        .filter((c: any) => typeof c?.chatId === 'string' && TELEGRAM_CHAT_ID_RE.test(c.chatId))
+        .map((c: any) => ({
+          chatId: String(c.chatId),
+          ...(typeof c?.title === 'string' && c.title.trim() ? { title: c.title.trim() } : {}),
+        }));
+    }
   } catch {
     return {
       candidate: {
@@ -256,10 +265,11 @@ export async function evaluateCalendarDigestCandidate(
     : Array.isArray(destAllowedScope)
       ? destAllowedScope
       : [];
-  const chats: string[] = rawChats.filter(
+  const scopeChats: string[] = rawChats.filter(
     (c: unknown) => typeof c === 'string' && TELEGRAM_CHAT_ID_RE.test(c),
   );
-  if (chats.length !== 1) {
+  const allChatIds = [...new Set([...destSelectedChats.map((c) => c.chatId), ...scopeChats])];
+  if (allChatIds.length !== 1) {
     return {
       candidate: {
         canAutoDigest: false,
@@ -268,14 +278,20 @@ export async function evaluateCalendarDigestCandidate(
       },
     };
   }
-  const chatId = chats[0]!;
+  const chatId = allChatIds[0]!;
+  const matchedSelectedChat = destSelectedChats.find((c) => c.chatId === chatId);
+  const chatTitle = matchedSelectedChat?.title;
   const config: CalendarDigestConfig = {
     version: 1,
     source: 'mycalendar',
     credentialId: mycalRow.id,
     email,
     calendars,
-    destination: { service: 'telegram', chatId },
+    destination: {
+      service: 'telegram',
+      chatId,
+      ...(chatTitle ? { chatTitle } : {}),
+    },
     windowHours: input.windowHours ?? 24,
     includeSummary: input.includeSummary ?? true,
   };
@@ -289,7 +305,7 @@ export async function evaluateCalendarDigestCandidate(
         calendars,
         destinationService: 'telegram',
         destinationId: chatId,
-        destinationLabel: `Telegram (${chatId})`,
+        destinationLabel: chatTitle ?? `Telegram (${chatId})`,
       },
     },
     config,

@@ -5,9 +5,12 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { ALL_TOOLS, MYSHEETS_TOOLS } from '@wap/tool-schemas';
 import { SettingsPage } from '../src/pages/Settings/SettingsPage';
 import { RefusalMoment } from '../src/pages/Responses/ResponseMoment';
+import { resourceDestination } from '../src/components/Cockpit';
 import { PlanMoment } from '../src/pages/Cockpit/PlanMoment';
+import { PreviewContents } from '../src/pages/Cockpit/PreviewContents';
 import { ReceiptMoment } from '../src/pages/Cockpit/ReceiptMoment';
 import { RecoveryMoment } from '../src/pages/Cockpit/RecoveryMoment';
+import { recoveryFieldLabel, recoveryOutputLabel } from '../src/pages/Cockpit/recovery-labels';
 import { ScheduleMoment } from '../src/pages/Cockpit/ScheduleMoment';
 import { runLabel } from '../src/services/schedule-text';
 import { PrivacyPage } from '../src/pages/Privacy/PrivacyPage';
@@ -664,6 +667,44 @@ describe('GuidePage and LandingPage with mysheetsEnabled', () => {
     expect(await screen.findByText('Bảng KPI Q4')).toBeTruthy();
     expect(screen.getByText(/Tabs: KPI Tháng 11, Tasks/i)).toBeTruthy();
     view.unmount();
+
+    // Also verify direct URL paste & connection notice banner in SettingsPage / PersonalMySheets
+    connection.mysheetsConnectionNotice.set('user@gmail.com');
+    vi.spyOn(apiClient, 'getServices').mockResolvedValue({
+      services: [
+        mysheetsService('connected', {
+          selectedSpreadsheets: [
+            {
+              id: 'sheet-1',
+              title: 'Việc của tôi',
+              canEdit: true,
+              sheets: ['Tasks'],
+            },
+          ],
+        }),
+      ],
+      canConfigure: false,
+    });
+    saveSpy.mockClear();
+
+    render(<SettingsPage user={member} navigate={() => {}} onLogout={() => {}} />);
+    expect(await screen.findByRole('status')).toHaveTextContent(/Đã kết nối user@gmail\.com/i);
+
+    const personal = await screen.findByRole('region', { name: 'Của riêng bạn' });
+    const settingsUrlInput = within(personal).getByLabelText(/Dán liên kết hoặc ID Google Sheets/i);
+    fireEvent.change(settingsUrlInput, {
+      target: { value: 'https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit' },
+    });
+    fireEvent.click(within(personal).getByRole('button', { name: /Thêm từ liên kết/i }));
+
+    await waitFor(() => {
+      expect(saveSpy).toHaveBeenCalledWith({
+        spreadsheetIds: [
+          'sheet-1',
+          'https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit',
+        ],
+      });
+    });
   });
 
   it('renders ScheduleMoment mode selector (manual vs auto_digest) for Sheets digest schedules and formats digest run labels', async () => {
@@ -767,5 +808,344 @@ describe('GuidePage and LandingPage with mysheetsEnabled', () => {
         error: 'Lỗi mạng',
       })
     ).toBe('Gửi báo cáo thất bại');
+
+    cleanup();
+
+    // Verify mysheets + telegram schedule with canAutoDigest=false displays digestCandidate.reason (not hijacked by isTelegramCandidate)
+    const msgTelegramIneligible: ChatMessage = {
+      id: 'msg-proposal-tg-ineligible',
+      role: 'assistant',
+      content: 'Đề xuất lịch báo cáo KPI qua Telegram',
+      metadata: {
+        type: 'schedule_proposal',
+        proposal: {
+          kind: 'schedule',
+          action: 'create',
+          name: 'Báo cáo KPI Telegram',
+          request: 'Đọc bảng Báo cáo KPI Q4 và gửi báo cáo vào Telegram',
+          recurrence: { type: 'daily', time: '08:00' },
+          summary: 'Mỗi ngày 08:00 đọc bảng Báo cáo KPI Q4 và gửi vào Telegram.',
+        },
+        scheduleId: null,
+        baseVersion: null,
+        services: ['mysheets', 'telegram'],
+        nextRuns: ['2026-11-03T01:00:00Z'],
+        previous: null,
+        digestCandidate: {
+          canAutoDigest: false,
+          reason: 'Hãy nêu rõ nhóm Telegram nhận báo cáo trong số các nhóm đã cấp quyền.',
+        },
+      },
+    };
+
+    render(<ScheduleMoment message={msgTelegramIneligible} convId={CONV_ID} navigate={() => {}} onEdit={() => {}} />);
+    expect(screen.getByText(/Hãy nêu rõ nhóm Telegram nhận báo cáo trong số các nhóm đã cấp quyền/i)).toBeTruthy();
+  });
+
+  it('renders actual column headers and Upsert badge in PreviewContents for mysheets.append_rows', () => {
+    const appendStep: PlanStep = {
+      id: 'step-append',
+      tool: 'mysheets.append_rows',
+      description: 'Cập nhật trạng thái công việc',
+      args: {
+        spreadsheetId: 'sheet-1',
+        sheet: 'Tasks',
+        rows: [['TASK-01', 'Fix OAuth', 'Hoàn thành']],
+        deduplicate: true,
+        onDuplicate: 'update',
+      },
+    };
+    const labels: Record<string, string> = {
+      'sheet-1': 'Việc của tôi',
+      'sheet_headers:sheet-1:Tasks': JSON.stringify(['Mã việc', 'Tên việc', 'Trạng thái']),
+    };
+
+    render(<PreviewContents step={appendStep} destination="Việc của tôi · Tasks" labels={labels} />);
+
+    expect(screen.getByText('Cột A · Mã việc')).toBeTruthy();
+    expect(screen.getByText('Cột B · Tên việc')).toBeTruthy();
+    expect(screen.getByText('Cột C · Trạng thái')).toBeTruthy();
+    expect(screen.getByText(/Cập nhật dòng trùng khóa \(Upsert\)/i)).toBeTruthy();
+
+    cleanup();
+
+    const updateStep: PlanStep = {
+      id: 'step-update',
+      tool: 'mysheets.update_rows',
+      description: 'Đánh dấu ứng viên đã gửi thư mời',
+      args: {
+        spreadsheetId: 'sheet-1',
+        sheet: 'Ứng viên',
+        updates: [
+          {
+            matchColumn: 'Email',
+            matchValue: 'lan@example.com',
+            values: { 'Trạng thái': 'Đã gửi thư mời' },
+          },
+        ],
+      },
+    };
+    render(<PreviewContents step={updateStep} destination="Tuyển dụng · Ứng viên" />);
+    expect(screen.getByTestId('spreadsheet-update-preview')).toBeTruthy();
+    expect(screen.getByText(/Cập nhật cột chọn lọc \(Bảo toàn công thức\)/i)).toBeTruthy();
+    expect(screen.getByText('Email = lan@example.com')).toBeTruthy();
+    expect(screen.getByText('Đã gửi thư mời')).toBeTruthy();
+
+    cleanup();
+
+    const createStep: PlanStep = {
+      id: 'step-create-sheet',
+      tool: 'mysheets.create_sheet',
+      description: 'Tạo trang tính Sprint 15',
+      args: {
+        spreadsheetId: 'sheet-1',
+        title: 'Sprint 15',
+        headers: ['Mã thẻ', 'Tiêu đề', 'Trạng thái'],
+      },
+    };
+    render(<PreviewContents step={createStep} destination="Việc của tôi" />);
+    expect(screen.getByTestId('spreadsheet-create-preview')).toBeTruthy();
+    expect(screen.getByText('Sprint 15')).toBeTruthy();
+    expect(screen.getByText('Cột A · Mã thẻ')).toBeTruthy();
+
+    cleanup();
+
+    const searchStep: PlanStep = {
+      id: 'step-search-rows',
+      tool: 'mysheets.search_rows',
+      description: 'Lọc ứng viên chờ gửi thư mời',
+      args: {
+        spreadsheetId: 'sheet-1',
+        sheet: 'Ứng viên',
+        filterColumn: 'Trạng thái',
+        filterOperator: 'equals',
+        filterValue: 'Chờ gửi',
+        limit: 20,
+      },
+    };
+    render(<PreviewContents step={searchStep} destination="Tuyển dụng · Ứng viên" />);
+    expect(screen.getByTestId('spreadsheet-search-preview')).toBeTruthy();
+    expect(screen.getByText('Trạng thái')).toBeTruthy();
+    expect(screen.getByText('Bằng (=)')).toBeTruthy();
+    expect(screen.getByText('Chờ gửi')).toBeTruthy();
+    expect(screen.getByText(/Tối đa 20 dòng/i)).toBeTruthy();
+  });
+
+  it('formats resourceDestination cleanly for sheet tabs & create_sheet and renders Receipt metrics, ResultFields, Recovery links, and Refusal scope picker', () => {
+    const labels = { 'sheet-1': 'Việc của tôi' };
+    expect(
+      resourceDestination(
+        {
+          id: 's1',
+          tool: 'mysheets.append_rows',
+          description: 'Ghi vào tab mới',
+          args: { spreadsheetId: 'sheet-1', sheet: 'Sprint 15', rows: [['TASK-1']] },
+        },
+        labels
+      )
+    ).toBe('Việc của tôi · Sprint 15');
+
+    expect(
+      resourceDestination(
+        {
+          id: 's2',
+          tool: 'mysheets.create_sheet',
+          description: 'Tạo tab mới',
+          args: { spreadsheetId: 'sheet-1', title: 'Sprint 15' },
+        },
+        labels
+      )
+    ).toBe('Việc của tôi · Tab mới: Sprint 15');
+
+    // Recovery labels for mysheets
+    expect(recoveryFieldLabel('mysheets.update_rows', 'updates')).toBe('Danh sách cập nhật cột');
+    expect(recoveryOutputLabel(['updatedCells'])).toContain('số ô đã cập nhật');
+
+    // ReceiptMoment metrics & ResultFields for search_rows + update_rows + read_range
+    render(
+      <ReceiptMoment
+        request="Lọc ứng viên và cập nhật trạng thái"
+        steps={[
+          {
+            id: 'step-read',
+            tool: 'mysheets.read_range',
+            description: 'Đọc dữ liệu bảng',
+            status: 'succeeded',
+            output: {
+              spreadsheetId: 'sheet-1',
+              range: 'Tasks!A1:B2',
+              values: [
+                ['Mã việc', 'Trạng thái'],
+                ['TASK-01', 'Đang làm'],
+              ],
+            },
+          },
+          {
+            id: 'step-update',
+            tool: 'mysheets.update_rows',
+            description: 'Cập nhật trạng thái',
+            status: 'succeeded',
+            output: {
+              spreadsheetId: 'sheet-1',
+              sheet: 'Ứng viên',
+              updatedRange: 'Ứng viên!C2:C2',
+              updatedRows: 1,
+              updatedCells: 1,
+              unmatchedKeys: ['missing@example.com'],
+              url: 'https://docs.google.com/spreadsheets/d/sheet-1/edit',
+            },
+          },
+        ]}
+        planSteps={[]}
+        labels={labels}
+        services={[mysheetsService('connected')]}
+        destination={resourceDestination}
+        onNewConversation={() => {}}
+        onFollowup={() => {}}
+      />
+    );
+
+    expect(screen.getByTestId('sheets-read-preview-table')).toBeTruthy();
+    expect(screen.getByText('TASK-01')).toBeTruthy();
+    expect(screen.getByTestId('sheets-receipt-metrics')).toBeTruthy();
+    expect(screen.getByText(/Đã cập nhật 1 dòng \(1 ô\)/i)).toBeTruthy();
+    expect(screen.getByText(/Chưa tìm thấy khóa: missing@example\.com/i)).toBeTruthy();
+
+    cleanup();
+
+    // RecoveryMoment check URL for mysheets.update_rows when status is unknown
+    const updateUnknownSnapshot: ExecutionSnapshot = {
+      execution: { status: 'reconciliation_required', pausedStepId: 'step-u1' },
+      plan: {
+        id: 'plan-u1',
+        convId: CONV_ID,
+        status: 'reconciliation_required',
+        summary: 'Cập nhật dòng trên Google Sheets',
+        connections: {
+          mysheets: {
+            credentialId: 'cred-1',
+            email: 'user@gmail.com',
+            allowedSpreadsheets: [{ id: 'sheet-1', title: 'Việc của tôi', canEdit: true }],
+          },
+        },
+        steps: [
+          {
+            id: 'step-u1',
+            tool: 'mysheets.update_rows',
+            description: 'Cập nhật cột Trạng thái',
+            args: { spreadsheetId: 'sheet-1', sheet: 'Tasks', updates: [] },
+          },
+        ],
+      },
+      steps: [{ stepId: 'step-u1', tool: 'mysheets.update_rows', status: 'unknown' }],
+      recoveryActions: ['skip', 'stop'],
+    };
+    render(
+      <RecoveryMoment
+        moment={8}
+        request="Cập nhật trạng thái"
+        snapshot={updateUnknownSnapshot}
+        steps={[{ id: 'step-u1', tool: 'mysheets.update_rows', status: 'unknown', description: 'Cập nhật cột Trạng thái' }]}
+        services={[mysheetsService('connected')]}
+        controls={null}
+      />
+    );
+    expect(screen.getByRole('link', { name: /Mở Google Sheets/i })).toHaveAttribute(
+      'href',
+      'https://docs.google.com/spreadsheets/d/sheet-1/edit'
+    );
+
+    cleanup();
+
+    // RefusalMoment offers "Chọn lại bảng tính" when mysheets is already connected
+    const navigate = vi.fn();
+    render(
+      <RefusalMoment
+        message={{
+          id: 'msg-ref-scope',
+          role: 'assistant',
+          content: 'Từ chối yêu cầu: Bảng tính ngoài phạm vi đã chọn.',
+          metadata: {
+            type: 'refusal',
+            reason: 'Bảng tính ngoài phạm vi đã chọn.',
+            unavailableServices: [{ id: 'mysheets', name: 'Google Sheets của bạn' }],
+          },
+        }}
+        request="Cập nhật bảng Lương"
+        services={[mysheetsService('connected')]}
+        canConfigure={false}
+        connectFromChat
+        conversationId={CONV_ID}
+        navigate={navigate}
+        onEdit={() => {}}
+        onResend={() => {}}
+      />
+    );
+    const reselectLink = screen.getByRole('link', { name: /Chọn lại bảng tính/i });
+    fireEvent.click(reselectLink);
+    expect(navigate).toHaveBeenCalledWith(`/connections/mysheets/callback?mode=select&returnTo=%2Fc%2F${CONV_ID}`);
+  });
+
+  it('previews named-column records in append_rows, aggregate_rows, delete_rows, numeric/date filters in search_rows, and truthful capability copy', () => {
+    const appendRecordsStep: PlanStep = {
+      id: 'step-append-records',
+      tool: 'mysheets.append_rows',
+      description: 'Ghi khách hàng theo tên cột',
+      args: {
+        spreadsheetId: 'sheet-1',
+        sheet: 'Sales',
+        records: [
+          { 'Mã đơn': 'ORD-09', 'Khách hàng': 'Công ty Minh Long', 'Doanh thu': '45.000.000 đ' },
+        ],
+        deduplicate: true,
+        onDuplicate: 'update',
+        keyColumn: 'Mã đơn',
+      },
+    };
+    render(<PreviewContents step={appendRecordsStep} destination="Báo cáo · Sales" />);
+    expect(screen.getByTestId('spreadsheet-grid-preview')).toBeTruthy();
+    expect(screen.getByText('Cột A · Mã đơn')).toBeTruthy();
+    expect(screen.getByText('Cột B · Khách hàng')).toBeTruthy();
+    expect(screen.getByText('Cột C · Doanh thu')).toBeTruthy();
+    expect(screen.getAllByText('Công ty Minh Long').length).toBeGreaterThan(0);
+    cleanup();
+
+    const aggregateStep: PlanStep = {
+      id: 'step-aggregate',
+      tool: 'mysheets.aggregate_rows',
+      description: 'Thống kê doanh thu theo khu vực',
+      args: {
+        spreadsheetId: 'sheet-1',
+        sheet: 'Sales',
+        groupBy: 'Khu vực',
+        metrics: [
+          { column: 'Doanh thu', op: 'sum' },
+          { op: 'count' },
+        ],
+      },
+    };
+    render(<PreviewContents step={aggregateStep} destination="Báo cáo · Sales" />);
+    expect(screen.getByTestId('spreadsheet-aggregate-preview')).toBeTruthy();
+    expect(screen.getByText(/Nhóm theo cột:/i)).toBeTruthy();
+    expect(screen.getByText('Khu vực')).toBeTruthy();
+    expect(screen.getByText(/SUM\(Doanh thu\)/i)).toBeTruthy();
+    cleanup();
+
+    const deleteStep: PlanStep = {
+      id: 'step-delete',
+      tool: 'mysheets.delete_rows',
+      description: 'Xoá các dòng đơn hàng đã huỷ',
+      args: {
+        spreadsheetId: 'sheet-1',
+        sheet: 'Sales',
+        matchColumn: 'Trạng thái',
+        matchValue: 'Đã huỷ',
+      },
+    };
+    render(<PreviewContents step={deleteStep} destination="Báo cáo · Sales" />);
+    expect(screen.getByTestId('spreadsheet-delete-preview')).toBeTruthy();
+    expect(screen.getByText(/Xoá dòng dữ liệu \(Bảo vệ dòng tiêu đề 1\)/i)).toBeTruthy();
+    expect(screen.getByText(/Trạng thái = Đã huỷ/i)).toBeTruthy();
+    cleanup();
   });
 });

@@ -2,6 +2,7 @@ import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import {
   decryptCredentials,
   GitHubAdapter,
+  NotionAdapter,
   StepError,
   TelegramAdapter,
   TrelloAdapter,
@@ -12,6 +13,9 @@ import type { AdapterExecutor } from '@wap/executor';
 import { getRegisteredService, isServiceAccountService } from './registered-services.js';
 import type { GmailTokenManager } from './gmail/token-manager.js';
 import type { TelegramBotClient } from './telegram/bot-client.js';
+import type { NotionConnectionRepo } from '../db/repositories/notion-connection-repo.js';
+import { NotionOAuthError } from './notion/oauth-client.js';
+import type { NotionTokenManager } from './notion/token-manager.js';
 
 /** Who an adapter is for. Shared services ignore it; Gmail & MyCalendar require it. */
 export interface AdapterContext {
@@ -58,6 +62,13 @@ export interface AdapterFactoryOptions {
     allowedChats: string[];
     knownChats: Array<{ id: string; title: string; type: string }>;
   }) => AdapterExecutor;
+  notionRepo?: NotionConnectionRepo;
+  notionTokens?: NotionTokenManager;
+  createNotionAdapter?: (input: {
+    userId: string;
+    allowedDatabases: string[];
+    knownDatabases: Array<{ id: string; title: string; url?: string }>;
+  }) => AdapterExecutor;
   serviceFetchFn?: typeof fetch;
 }
 
@@ -72,6 +83,8 @@ const trelloError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
 const githubError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
   new StepError({ category, message, retryable: false });
 const telegramError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
+  new StepError({ category, message, retryable: false });
+const notionError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
   new StepError({ category, message, retryable: false });
 
 export class AdapterFactory {
@@ -110,6 +123,7 @@ export class AdapterFactory {
     this.personalCache.delete(`trello:${userId}`);
     this.personalCache.delete(`github:${userId}`);
     this.personalCache.delete(`telegram:${userId}`);
+    this.personalCache.delete(`notion:${userId}`);
     for (const key of Array.from(this.adapterCache.keys())) {
       if (key.startsWith(`personal-shared:${userId}:`)) {
         this.adapterCache.delete(key);
@@ -129,6 +143,13 @@ export class AdapterFactory {
     if (serviceName === 'trello') return this.trelloAdapter(context);
     if (serviceName === 'github') return this.githubAdapter(context);
     if (serviceName === 'telegram') return this.telegramAdapter(context);
+    if (serviceName === 'notion' && this.options.notionRepo && context?.userId) {
+      const hasPreviewed = context.phase === 'execution' && Boolean(context.connections?.notion);
+      const active = await this.options.notionRepo.getActive(context.userId);
+      if (hasPreviewed || active) {
+        return this.notionAdapter(context);
+      }
+    }
 
     let cacheKey = serviceName;
     if (context?.workspaceMode === 'personal' && context.userId) {
@@ -631,5 +652,102 @@ export class AdapterFactory {
       knownChats: selectedChats,
       fetchFn: this.options.serviceFetchFn,
     });
+  }
+
+  /** Only the member's own active Notion OAuth connection; at execution, credentialId, identityVersion, and databaseIds subset match. */
+  private async notionAdapter(context?: AdapterContext): Promise<AdapterExecutor> {
+    const userId = context?.userId;
+    if (!userId) throw notionError('AUTH_ERROR', 'Notion cá nhân chỉ dùng được với kết nối của chính người dùng.');
+    if (!this.options.notionRepo) throw notionError('VALIDATION', 'Notion chưa sẵn sàng trên máy chủ này.');
+
+    const previewed = context?.phase === 'execution' ? context.connections?.notion : undefined;
+    const row = await this.options.notionRepo.getActive(userId, previewed?.credentialId);
+    if (!row || row.status !== 'active' || !row.config) {
+      throw notionError('AUTH_ERROR', 'Notion chưa được kết nối hoặc cần kết nối lại.');
+    }
+
+    if (!Array.isArray(row.allowed_databases) || row.allowed_databases.length === 0) {
+      throw notionError('AUTH_ERROR', 'Bạn chưa chọn database Notion được phép sử dụng.');
+    }
+
+    if (context?.phase === 'execution') {
+      if (
+        !previewed ||
+        row.id !== previewed.credentialId ||
+        row.identity_version !== previewed.identityVersion
+      ) {
+        throw notionError('AUTH_ERROR', 'Kết nối hoặc phạm vi database Notion đã thay đổi, hãy lập lại kế hoạch.');
+      }
+      const currentSet = new Set(row.allowed_databases);
+      if (
+        !Array.isArray(previewed.databaseIds) ||
+        previewed.databaseIds.length === 0 ||
+        !previewed.databaseIds.every((id) => currentSet.has(id))
+      ) {
+        throw notionError('AUTH_ERROR', 'Kết nối hoặc phạm vi database Notion đã thay đổi, hãy lập lại kế hoạch.');
+      }
+    }
+
+    const allowedDatabases =
+      context?.phase === 'execution' && previewed?.databaseIds
+        ? [...previewed.databaseIds]
+        : [...row.allowed_databases];
+    const knownDatabases = Array.isArray(row.selected_databases) ? row.selected_databases : [];
+
+    if (this.options.createNotionAdapter) {
+      return this.options.createNotionAdapter({
+        userId,
+        allowedDatabases,
+        knownDatabases,
+      });
+    }
+
+    const key = `notion:${userId}`;
+    const scopeKey = `${row.identity_version}:${[...allowedDatabases].sort().join(',')}`;
+    const cached = this.personalCache.get(key);
+    if (cached?.credentialId === row.id && cached.scopeKey === scopeKey) {
+      return cached.adapter;
+    }
+
+    const adapter: AdapterExecutor = {
+      execute: async (tool: string, args: Record<string, any>, execContext?: any) => {
+        if (this.options.notionTokens) {
+          return this.options.notionTokens.execute(
+            userId,
+            row.id,
+            row.identity_version,
+            async (accessToken) => {
+              const liveAdapter = new NotionAdapter({
+                credentials: { token: accessToken },
+                allowedScope: { databases: allowedDatabases },
+                fetchFn: this.options.serviceFetchFn,
+              });
+              try {
+                return await liveAdapter.execute(tool, args, execContext);
+              } catch (err: any) {
+                if (
+                  err instanceof StepError &&
+                  err.category === 'AUTH_ERROR' &&
+                  (err.statusCode === 401 || /HTTP 401\b/i.test(err.message))
+                ) {
+                  throw new NotionOAuthError(err.message, true);
+                }
+                throw err;
+              }
+            },
+          );
+        }
+        const cfg = decryptCredentials(row.config!, this.encryptionKey);
+        const liveAdapter = new NotionAdapter({
+          credentials: { token: cfg.accessToken },
+          allowedScope: { databases: allowedDatabases },
+          fetchFn: this.options.serviceFetchFn,
+        });
+        return liveAdapter.execute(tool, args, execContext);
+      },
+    };
+
+    this.personalCache.set(key, { credentialId: row.id, adapter, scopeKey });
+    return adapter;
   }
 }

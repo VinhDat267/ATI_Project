@@ -13,6 +13,7 @@ export const GMAIL_THREADS = [
 ].map(([subject = '', body = ''], index) => ({
   id: `gmail-thread-${index + 1}`, subject, from: 'Lan <lan@example.com>', to: ['gmail-owner@example.test'], cc: ['minh@example.com'],
   snippet: body, date: '2026-10-14T09:00:00+07:00', labels: ['INBOX', 'UNREAD'], messageCount: 1, unread: true,
+  hasAttachment: index === 1, attachmentNames: index === 1 ? ['báo cáo.pdf'] : [],
   participants: ['lan@example.com', 'gmail-owner@example.test', 'minh@example.com'],
   messages: [{ messageId: `gmail-message-${index + 1}`, from: 'lan@example.com', to: ['gmail-owner@example.test'], cc: ['minh@example.com'],
     subject, date: '2026-10-14T09:00:00+07:00', body, attachments: index === 1 ? [{ filename: 'báo cáo.pdf', size: 1200 }] : [] }],
@@ -34,6 +35,11 @@ export const GMAIL_FAKE: { id: string; tools: Record<string, (args: Record<strin
     'gmail.forward': (args: Record<string, any>) => sent('forward', args),
     'gmail.create_draft': (args: Record<string, any>) => ({ ...sent('draft', args), messageId: 'gmail-sandbox-draft-message' }),
     'gmail.modify_thread_labels': (args: Record<string, any>) => ({ id: thread(args.threadId).id, labelIds: [...new Set([...thread(args.threadId).labels.filter(id => !args.removeLabelIds?.includes(id)), ...(args.addLabelIds ?? [])])] }),
+    'gmail.batch_modify_threads': (args: Record<string, any>) => {
+      const threads = (args.threadIds as string[]).map(id => thread(id));
+      const labelIds = [...new Set([...threads.flatMap(t => t.labels).filter(id => !args.removeLabelIds?.includes(id)), ...(args.addLabelIds ?? [])])];
+      return { ids: threads.map(t => t.id), labelIds };
+    },
     'gmail.trash_thread': (args: Record<string, any>) => ({ id: thread(args.threadId).id }),
     'gmail.create_label': (args: Record<string, any>) => ({ id: 'gmail-sandbox-label', name: args.name }),
   },

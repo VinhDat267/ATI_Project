@@ -13,6 +13,10 @@ import type {
   SheetsDigestCandidate,
   TelegramDigestConfig,
   TelegramDigestCandidate,
+  TrelloDigestConfig,
+  TrelloDigestCandidate,
+  NotionDigestConfig,
+  NotionDigestCandidate,
 } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../../db/repositories/credential-repo.js';
 import { MessageRepo } from '../../db/repositories/message-repo.js';
@@ -27,6 +31,8 @@ import type { DerivedSegmentInput } from '../../db/repositories/slack-derived-li
 import { analyzeSheetsDigestCandidate, computeSheetsDigestHash } from './sheets-digest-candidate.js';
 import { canonicalizeDigestConfig, computeDigestConfigHash } from './github-digest-candidate.js';
 import { computeTelegramDigestConfigHash } from './telegram-digest-candidate.js';
+import { canonicalizeTrelloDigestConfig, computeTrelloDigestConfigHash } from './trello-digest-candidate.js';
+import { canonicalizeNotionDigestConfig, computeNotionDigestConfigHash } from './notion-digest-candidate.js';
 
 export const SCHEDULE_CONFLICTS = {
   STALE_PROPOSAL: 'Đề xuất này đã cũ. Hãy xem đề xuất mới nhất.',
@@ -154,7 +160,9 @@ export class ScheduleService {
     segments: DerivedSegmentInput[] = [],
     digestUpdate?:
       | { kind: 'plan' }
-      | { kind: 'github_digest'; config: GithubDigestConfig; configHash: string; approvedAt: Date },
+      | { kind: 'github_digest'; config: GithubDigestConfig; configHash: string; approvedAt: Date }
+      | { kind: 'trello_digest'; config: TrelloDigestConfig; configHash: string; approvedAt: Date }
+      | { kind: 'notion_digest'; config: NotionDigestConfig; configHash: string; approvedAt: Date },
   ): Promise<ScheduleRow> {
     let res: pg.QueryResult<ScheduleRow>;
     if (digestUpdate?.kind === 'plan') {
@@ -165,10 +173,14 @@ export class ScheduleService {
          WHERE id=$1 RETURNING *`,
         [id, fields.name, fields.request, JSON.stringify(fields.recurrence), fields.services, fields.status, fields.pause_reason, fields.next_run_at, proposalId],
       );
-    } else if (digestUpdate?.kind === 'github_digest') {
+    } else if (
+      digestUpdate?.kind === 'github_digest' ||
+      digestUpdate?.kind === 'trello_digest' ||
+      digestUpdate?.kind === 'notion_digest'
+    ) {
       res = await client.query(
         `UPDATE schedules SET name=$2, request=$3, recurrence=$4, services=$5, status=$6, pause_reason=$7, next_run_at=$8,
-           kind='github_digest', digest_config=$10, digest_config_hash=$11, digest_approved_at=$12,
+           kind=$10, digest_config=$11, digest_config_hash=$12, digest_approved_at=$13,
            version=version+1, updated_at=now(), last_proposal_id=COALESCE($9, last_proposal_id)
          WHERE id=$1 RETURNING *`,
         [
@@ -181,6 +193,7 @@ export class ScheduleService {
           fields.pause_reason,
           fields.next_run_at,
           proposalId,
+          digestUpdate.kind,
           JSON.stringify(digestUpdate.config),
           digestUpdate.configHash,
           digestUpdate.approvedAt,
@@ -312,20 +325,77 @@ export class ScheduleService {
         Boolean(candidateConfig) &&
         Array.isArray(candidateConfig.repos) &&
         typeof candidateConfig.staleDays === 'number';
-      const hasTelegramDigestCandidate =
-        Boolean(candidateConfig) && Array.isArray(candidateConfig.sources);
-      const isGithubSchedule =
-        hasGithubDigestCandidate ||
-        (existing?.kind === 'github_digest' && !hasTelegramDigestCandidate) ||
-        (!metadata.services.includes('telegram') &&
-          (metadata.services.includes('github') || existing?.kind === 'github_digest'));
-      const isTelegramSchedule =
-        !isGithubSchedule &&
-        (metadata.services.includes('telegram') || existing?.kind === 'telegram_digest');
+      const hasTrelloDigestCandidate =
+        Boolean(candidateConfig) && Array.isArray(candidateConfig.boards);
+      const hasNotionDigestCandidate =
+        Boolean(candidateConfig) && Array.isArray(candidateConfig.databases);
+      const candidateHasTelegramSources = Boolean(
+        candidateConfig && typeof candidateConfig === 'object' && 'sources' in candidateConfig,
+      );
+      const candidateHasNotionDatabases = Boolean(
+        candidateConfig && typeof candidateConfig === 'object' && 'databases' in candidateConfig,
+      );
       const isCalendarSchedule =
-        !isTelegramSchedule && !isGithubSchedule && (metadata.services.includes('mycalendar') || metadata.services.includes('calendar') || existing?.kind === 'calendar_digest');
+        existing?.kind === 'calendar_digest' ||
+        (!candidateHasTelegramSources &&
+          !hasGithubDigestCandidate &&
+          !hasTrelloDigestCandidate &&
+          !hasNotionDigestCandidate &&
+          existing?.kind !== 'telegram_digest' &&
+          existing?.kind !== 'github_digest' &&
+          existing?.kind !== 'trello_digest' &&
+          existing?.kind !== 'notion_digest' &&
+          (metadata.services.includes('mycalendar') ||
+            (metadata.services.includes('calendar') && !metadata.services.includes('github'))));
+      const isSheetsSchedule =
+        existing?.kind === 'sheets_digest' ||
+        (!candidateHasTelegramSources &&
+          !hasGithubDigestCandidate &&
+          !hasTrelloDigestCandidate &&
+          !hasNotionDigestCandidate &&
+          existing?.kind !== 'telegram_digest' &&
+          existing?.kind !== 'github_digest' &&
+          existing?.kind !== 'trello_digest' &&
+          existing?.kind !== 'notion_digest' &&
+          existing?.kind !== 'calendar_digest' &&
+          (metadata.services.includes('mysheets') || metadata.services.includes('sheets')));
+      const isGithubSchedule =
+        !isCalendarSchedule &&
+        !isSheetsSchedule &&
+        (hasGithubDigestCandidate ||
+          (existing?.kind === 'github_digest' && !candidateHasTelegramSources) ||
+          (!candidateHasTelegramSources &&
+            !metadata.services.includes('telegram') &&
+            (metadata.services.includes('github') || existing?.kind === 'github_digest')));
+      const isTrelloSchedule =
+        !isCalendarSchedule &&
+        !isSheetsSchedule &&
+        !isGithubSchedule &&
+        (hasTrelloDigestCandidate ||
+          (existing?.kind === 'trello_digest' && !candidateHasTelegramSources) ||
+          (!candidateHasTelegramSources &&
+            !metadata.services.includes('telegram') &&
+            (metadata.services.includes('trello') || existing?.kind === 'trello_digest')));
+      const isNotionSchedule =
+        !isCalendarSchedule &&
+        !isSheetsSchedule &&
+        !isGithubSchedule &&
+        !isTrelloSchedule &&
+        (hasNotionDigestCandidate ||
+          candidateHasNotionDatabases ||
+          (existing?.kind === 'notion_digest' && !candidateHasTelegramSources) ||
+          (!candidateHasTelegramSources &&
+            !metadata.services.includes('telegram') &&
+            (metadata.services.includes('notion') || existing?.kind === 'notion_digest')));
+      const isTelegramSchedule =
+        !isCalendarSchedule &&
+        !isSheetsSchedule &&
+        !isGithubSchedule &&
+        !isTrelloSchedule &&
+        !isNotionSchedule &&
+        (metadata.services.includes('telegram') || existing?.kind === 'telegram_digest');
       let digestFields: {
-        kind: 'plan' | 'sheets_digest' | 'calendar_digest' | 'github_digest' | 'telegram_digest';
+        kind: 'plan' | 'sheets_digest' | 'calendar_digest' | 'github_digest' | 'telegram_digest' | 'trello_digest' | 'notion_digest';
         digestConfig: unknown | null;
         digestConfigHash: string | null;
         digestApprovedAt: Date | null;
@@ -338,7 +408,7 @@ export class ScheduleService {
       let telegramDigestConfig: TelegramDigestConfig | null = null;
       let telegramDigestHash: string | null = null;
 
-      if (wantAutoDigest && (proposal.action === 'create' || proposal.action === 'update') && !isGithubSchedule) {
+      if (wantAutoDigest && (proposal.action === 'create' || proposal.action === 'update') && !isGithubSchedule && !isTrelloSchedule && !isNotionSchedule) {
         if (isTelegramSchedule) {
           const candidate = metadata.digestCandidate as TelegramDigestCandidate | undefined;
           if (!candidate || candidate.canAutoDigest !== true || !candidate.config || !candidate.configHash) {
@@ -431,6 +501,82 @@ export class ScheduleService {
                workspace_id, workspace_mode, kind, digest_config, digest_config_hash, digest_approved_at
              )
              VALUES($1, $2, $3, $4, $5, $6, 'active', $7, $8, $9, $10, 'github_digest', $11, $12, $13) RETURNING *`,
+            [
+              userId,
+              convId,
+              proposal.name,
+              proposal.request,
+              JSON.stringify(proposal.recurrence),
+              metadata.services,
+              next,
+              messageId,
+              wsId,
+              wsMode,
+              JSON.stringify(config),
+              configHash,
+              now,
+            ],
+          );
+          await registerScheduleFields(client, this.registry, 'schedules', created.rows[0].id, userId, segments, ['name', 'request', 'recurrence']);
+          return this.recordState(client, tagScheduleContext(created.rows[0], segments), now);
+        }
+        if (isTrelloSchedule && approvalMode === 'auto_digest') {
+          const trelloCandidate = metadata.digestCandidate as TrelloDigestCandidate | undefined;
+          if (!trelloCandidate?.canAutoDigest || !trelloCandidate.config) {
+            throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED', trelloCandidate?.disabledReason);
+          }
+          await this.ensureRoom(client, userId, { workspaceMode: wsMode, workspaceId: wsId });
+          const next = this.next({ recurrence: proposal.recurrence! }, now);
+          const config = canonicalizeTrelloDigestConfig(trelloCandidate.config);
+          const configHash = computeTrelloDigestConfigHash({
+            config,
+            recurrence: proposal.recurrence!,
+            userId,
+          });
+          const created = await client.query(
+            `INSERT INTO schedules(
+               user_id, conv_id, name, request, recurrence, services, status, next_run_at, last_proposal_id,
+               workspace_id, workspace_mode, kind, digest_config, digest_config_hash, digest_approved_at
+             )
+             VALUES($1, $2, $3, $4, $5, $6, 'active', $7, $8, $9, $10, 'trello_digest', $11, $12, $13) RETURNING *`,
+            [
+              userId,
+              convId,
+              proposal.name,
+              proposal.request,
+              JSON.stringify(proposal.recurrence),
+              metadata.services,
+              next,
+              messageId,
+              wsId,
+              wsMode,
+              JSON.stringify(config),
+              configHash,
+              now,
+            ],
+          );
+          await registerScheduleFields(client, this.registry, 'schedules', created.rows[0].id, userId, segments, ['name', 'request', 'recurrence']);
+          return this.recordState(client, tagScheduleContext(created.rows[0], segments), now);
+        }
+        if (isNotionSchedule && approvalMode === 'auto_digest') {
+          const notionCandidate = metadata.digestCandidate as NotionDigestCandidate | undefined;
+          if (!notionCandidate?.canAutoDigest || !notionCandidate.config) {
+            throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED', notionCandidate?.disabledReason);
+          }
+          await this.ensureRoom(client, userId, { workspaceMode: wsMode, workspaceId: wsId });
+          const next = this.next({ recurrence: proposal.recurrence! }, now);
+          const config = canonicalizeNotionDigestConfig(notionCandidate.config);
+          const configHash = computeNotionDigestConfigHash({
+            config,
+            recurrence: proposal.recurrence!,
+            userId,
+          });
+          const created = await client.query(
+            `INSERT INTO schedules(
+               user_id, conv_id, name, request, recurrence, services, status, next_run_at, last_proposal_id,
+               workspace_id, workspace_mode, kind, digest_config, digest_config_hash, digest_approved_at
+             )
+             VALUES($1, $2, $3, $4, $5, $6, 'active', $7, $8, $9, $10, 'notion_digest', $11, $12, $13) RETURNING *`,
             [
               userId,
               convId,
@@ -580,6 +726,82 @@ export class ScheduleService {
             });
             digestUpdate = {
               kind: 'github_digest',
+              config,
+              configHash,
+              approvedAt: now,
+            };
+          }
+        }
+        return this.recordState(client, await this.saveFields(client, existing.id, fields, messageId, segments, digestUpdate), now);
+      }
+      if (proposal.action === 'update' && isTrelloSchedule) {
+        let digestUpdate:
+          | { kind: 'plan' }
+          | { kind: 'trello_digest'; config: TrelloDigestConfig; configHash: string; approvedAt: Date }
+          | undefined;
+        if (approvalMode === 'manual') {
+          if (existing.kind === 'trello_digest') {
+            digestUpdate = { kind: 'plan' };
+          }
+        } else if (approvalMode === 'auto_digest' || existing.kind === 'trello_digest') {
+          const trelloCandidate = metadata.digestCandidate as TrelloDigestCandidate | undefined;
+          const candidateConfig = trelloCandidate?.canAutoDigest && trelloCandidate.config
+            ? trelloCandidate.config
+            : existing.kind === 'trello_digest' && proposal.request === existing.request
+              ? (existing.digest_config as TrelloDigestConfig | undefined)
+              : undefined;
+          if (!candidateConfig) {
+            if (approvalMode === 'auto_digest') {
+              throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED', trelloCandidate?.disabledReason);
+            }
+            digestUpdate = { kind: 'plan' };
+          } else {
+            const config = canonicalizeTrelloDigestConfig(candidateConfig);
+            const configHash = computeTrelloDigestConfigHash({
+              config,
+              recurrence: fields.recurrence,
+              userId,
+            });
+            digestUpdate = {
+              kind: 'trello_digest',
+              config,
+              configHash,
+              approvedAt: now,
+            };
+          }
+        }
+        return this.recordState(client, await this.saveFields(client, existing.id, fields, messageId, segments, digestUpdate), now);
+      }
+      if (proposal.action === 'update' && isNotionSchedule) {
+        let digestUpdate:
+          | { kind: 'plan' }
+          | { kind: 'notion_digest'; config: NotionDigestConfig; configHash: string; approvedAt: Date }
+          | undefined;
+        if (approvalMode === 'manual') {
+          if (existing.kind === 'notion_digest') {
+            digestUpdate = { kind: 'plan' };
+          }
+        } else if (approvalMode === 'auto_digest' || existing.kind === 'notion_digest') {
+          const notionCandidate = metadata.digestCandidate as NotionDigestCandidate | undefined;
+          const candidateConfig = notionCandidate?.canAutoDigest && notionCandidate.config
+            ? notionCandidate.config
+            : existing.kind === 'notion_digest' && proposal.request === existing.request
+              ? (existing.digest_config as NotionDigestConfig | undefined)
+              : undefined;
+          if (!candidateConfig) {
+            if (approvalMode === 'auto_digest') {
+              throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED', notionCandidate?.disabledReason);
+            }
+            digestUpdate = { kind: 'plan' };
+          } else {
+            const config = canonicalizeNotionDigestConfig(candidateConfig);
+            const configHash = computeNotionDigestConfigHash({
+              config,
+              recurrence: fields.recurrence,
+              userId,
+            });
+            digestUpdate = {
+              kind: 'notion_digest',
               config,
               configHash,
               approvedAt: now,

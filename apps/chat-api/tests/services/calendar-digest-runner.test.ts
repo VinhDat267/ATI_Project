@@ -6,6 +6,7 @@ import { computeCalendarDigestHash } from '../../src/services/schedules/calendar
 import {
   createCalendarDigestExecutor,
   escapeDigestText,
+  formatCalendarDigestMessage,
 } from '../../src/services/schedules/calendar-digest-runner.js';
 import { ScheduleRunner } from '../../src/services/schedules/schedule-runner.js';
 import { ScheduleService } from '../../src/services/schedules/schedule-service.js';
@@ -380,9 +381,175 @@ describe('Calendar Digest Runner & ScheduleRunner integration on PostgreSQL 16',
     expect(updatedSched.pause_reason).toBe('3 lượt gửi bản tin liên tiếp thất bại');
   });
 
+  it('passes top-level userId and phase="execution" to getAdapter, supports personal Telegram selectedChats without allowedScope.chats, and respects options.timeZone', async () => {
+    const mycal = await credentials.saveCredentials(
+      'mycalendar',
+      encryptCredentials(
+        {
+          refreshToken: '1//fake-cal-refresh',
+          email: 'owner.calendar@example.test',
+          scopes: ['openid', 'email', 'https://www.googleapis.com/auth/calendar'],
+          selectedCalendars: [{ id: 'owner.calendar@example.test', summary: 'Lịch chính', primary: true }],
+          allowedScope: { calendars: ['owner.calendar@example.test'] },
+          connectedAt: new Date().toISOString(),
+        },
+        key,
+      ),
+      owner.id,
+    );
+    // Personal Telegram connection with selectedChats only (no allowedScope.chats)
+    await credentials.saveCredentials(
+      'telegram',
+      encryptCredentials(
+        {
+          botToken: '123456:ABC',
+          selectedChats: [{ chatId: '-100123456789', title: 'Nhóm Lịch Cá Nhân', type: 'supergroup' }],
+        },
+        key,
+      ),
+      owner.id,
+    );
+
+    const lateUtcNow = new Date('2026-10-25T20:00:30.000Z'); // 20:00 UTC on Oct 25 (which would be Oct 26 in Asia/Ho_Chi_Minh)
+    const { row: sched } = await insertDigestSchedule(mycal.id, 'telegram', '2026-10-25T20:00:00.000Z');
+
+    const capturedContexts: Record<string, any> = {};
+    let capturedListArgs: any = null;
+    const sentTelegram: Array<{ chatId: string; text: string }> = [];
+
+    const runDigest = createCalendarDigestExecutor({
+      pool: db.pool,
+      encryptionKey: key,
+      timeZone: 'UTC',
+      getAdapter: async (serviceName, context) => {
+        capturedContexts[serviceName] = context;
+        // Mirror AdapterFactory check requiring top-level context.userId
+        if (!context?.userId) {
+          throw new Error(`AUTH_ERROR: Missing context.userId for ${serviceName}`);
+        }
+        if (serviceName === 'mycalendar') {
+          return {
+            execute: async (_tool: string, args: any) => {
+              capturedListArgs = args;
+              return { events: [] };
+            },
+          };
+        }
+        if (serviceName === 'telegram') {
+          return {
+            execute: async (_tool: string, args: { chatId: string; text: string }) => {
+              sentTelegram.push(args);
+              return { messageId: 102, chatId: args.chatId, date: 1700000000 };
+            },
+          };
+        }
+        throw new Error(`Unexpected service ${serviceName}`);
+      },
+    });
+
+    const r = new ScheduleRunner({
+      pool: db.pool,
+      timeZone: 'UTC',
+      now: () => lateUtcNow,
+      planRun: async () => {
+        throw new Error('must not be called');
+      },
+      runDigest,
+      recordState: (client, row, at) => service.recordState(client, row, at),
+    });
+    runners.push(r);
+
+    await r.tick();
+
+    expect(capturedContexts.mycalendar).toMatchObject({
+      userId: owner.id,
+      phase: 'execution',
+    });
+    expect(capturedContexts.telegram).toMatchObject({
+      userId: owner.id,
+      phase: 'execution',
+    });
+    expect(capturedListArgs).toBeDefined();
+    expect(capturedListArgs.timeMin).toMatch(/^2026-10-25T00:00:00/);
+    expect(sentTelegram).toHaveLength(1);
+  });
+
+  it('immediately auto-pauses the schedule upon the 3rd consecutive digest_failed run without waiting for a 4th tick', async () => {
+    const credId = await seedConnections('slack');
+    const { row: sched } = await insertDigestSchedule(credId, 'slack');
+
+    // Seed 2 prior digest_failed runs
+    for (let i = 2; i >= 1; i--) {
+      await db.pool.query(
+        `INSERT INTO schedule_runs(schedule_id, schedule_version, trigger, due_at, status, error)
+         VALUES($1, 1, 'scheduled', $2, 'digest_failed', 'Lỗi mạng trước đó')`,
+        [sched.id, new Date(now.getTime() - i * 86_400_000)],
+      );
+    }
+
+    const runDigest = createCalendarDigestExecutor({
+      pool: db.pool,
+      encryptionKey: key,
+      timeZone: VN,
+      getAdapter: async () => ({
+        execute: async () => {
+          throw new Error('Google Calendar 503');
+        },
+      }),
+    });
+
+    const r = new ScheduleRunner({
+      pool: db.pool,
+      timeZone: VN,
+      now: () => now,
+      planRun: async () => {
+        throw new Error('must not be called');
+      },
+      runDigest,
+      recordState: (client, row, at) => service.recordState(client, row, at),
+    });
+    runners.push(r);
+
+    await r.tick();
+
+    const updatedSched = (
+      await db.pool.query('SELECT status, pause_reason, next_run_at FROM schedules WHERE id = $1', [sched.id])
+    ).rows[0];
+    expect(updatedSched.status).toBe('paused');
+    expect(updatedSched.pause_reason).toBe('3 lượt gửi bản tin liên tiếp thất bại');
+    expect(updatedSched.next_run_at).toBeNull();
+  });
+
   it('escapeDigestText neutralizes HTML entities and Slack/Telegram mass mentions', () => {
     expect(escapeDigestText('Hello <!channel> & @here <https://evil.test|click>')).toBe(
       'Hello &lt;!channel&gt; &amp; @\u200bhere &lt;https://evil.test|click&gt;',
     );
+  });
+
+  it('includes meetLink, location, and attendeesCount in formatCalendarDigestMessage event lines', () => {
+    const formatted = formatCalendarDigestMessage({
+      scheduleName: 'Bản tin sáng',
+      dueAt: new Date('2026-10-25T00:30:00.000Z'),
+      timeZone: VN,
+      calendarsChecked: 1,
+      events: [
+        {
+          id: 'ev_meet',
+          title: 'Họp khách hàng Q4',
+          start: '2026-10-25T09:00:00+07:00',
+          end: '2026-10-25T10:00:00+07:00',
+          url: 'https://calendar.google.com/event?eid=meet',
+          calendarId: 'owner@example.test',
+          calendarSummary: 'Lịch chính',
+          meetLink: 'https://meet.google.com/abc-defg-hij',
+          location: 'Phòng họp Tầng 3',
+          attendeesCount: 4,
+        },
+      ],
+    });
+
+    expect(formatted.text).toContain('🎥 Meet: https://meet.google.com/abc-defg-hij');
+    expect(formatted.text).toContain('📍 Phòng họp Tầng 3');
+    expect(formatted.text).toContain('👥 4 người tham dự');
   });
 });

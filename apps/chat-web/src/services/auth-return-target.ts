@@ -2,6 +2,10 @@ const RETURN_TARGET_KEY = 'wap_auth_return_target';
 const ACCOUNT_PATHS = new Set([
   '/login', '/signup', '/verify-email', '/resend-verification',
   '/forgot-password', '/reset-password', '/auth/google/callback',
+  '/connections/gmail/callback', '/connections/mycalendar/callback',
+  '/connections/mysheets/callback', '/connections/trello/callback',
+  '/connections/github/callback', '/connections/notion/callback',
+  '/connections/mynotion/callback', '/connections/telegram/callback',
 ]);
 
 interface StoredReturnTarget {

@@ -270,3 +270,120 @@ it('rejects telegram.send_message when context.chatId mismatches args.chatId bef
   expect(fetchFn).not.toHaveBeenCalled();
 });
 
+it('reads recent and pinned messages for an allowed chat via telegram.read_messages, filtering out other chats, /start pairing commands, and accent-insensitive queries', async () => {
+  const fetchFn = vi.fn(async (url: any) => {
+    if (String(url).endsWith('/getChat')) {
+      return ok({
+        ...chat,
+        pinned_message: {
+          message_id: 10,
+          chat,
+          date: 1791000000,
+          from: { id: 1001, first_name: 'Minh', last_name: 'Lead' },
+          text: 'Quy trình xử lý lỗi thanh toán Sprint 5',
+        },
+      });
+    }
+    if (String(url).endsWith('/getUpdates')) {
+      return ok([
+        {
+          update_id: 1,
+          message: {
+            message_id: 11,
+            chat,
+            date: 1791000100,
+            from: { id: 1002, first_name: 'Lan', last_name: 'QA' },
+            text: '/start ati_1234567890abcdef1234567890abcdef',
+          },
+        },
+        {
+          update_id: 2,
+          message: {
+            message_id: 12,
+            chat: { id: -1009999999999, title: 'Other Group', type: 'supergroup' },
+            date: 1791000200,
+            from: { id: 1003, first_name: 'Outsider' },
+            text: 'Lỗi thanh toán bên nhóm khác',
+          },
+        },
+        {
+          update_id: 3,
+          message: {
+            message_id: 13,
+            chat,
+            date: 1791000300,
+            from: { id: 1002, first_name: 'Lan', last_name: 'QA' },
+            text: 'Khách báo lỗi thanh toán VNPay bị treo lúc 9h sáng',
+          },
+        },
+        {
+          update_id: 4,
+          message: {
+            message_id: 14,
+            chat,
+            date: 1791000400,
+            from: { id: 1004, username: 'dev_tuan' },
+            text: 'Đã kiểm tra log server bình thường',
+          },
+        },
+      ]);
+    }
+    return error(404);
+  });
+
+  const a = make(fetchFn);
+  const allRes = await a.execute('telegram.read_messages', { chatId: id });
+  expect(allRes).toEqual({
+    messages: [
+      {
+        id: '14',
+        messageId: 14,
+        chatId: id,
+        senderName: 'dev_tuan',
+        text: 'Đã kiểm tra log server bình thường',
+        date: 1791000400,
+      },
+      {
+        id: '13',
+        messageId: 13,
+        chatId: id,
+        senderName: 'Lan QA',
+        text: 'Khách báo lỗi thanh toán VNPay bị treo lúc 9h sáng',
+        date: 1791000300,
+      },
+      {
+        id: '10',
+        messageId: 10,
+        chatId: id,
+        senderName: 'Minh Lead',
+        text: 'Quy trình xử lý lỗi thanh toán Sprint 5',
+        date: 1791000000,
+      },
+    ],
+  });
+
+  const filtered = await a.execute('telegram.read_messages', { chatId: id, query: 'loi thanh toan', limit: 1 });
+  expect(filtered).toEqual({
+    messages: [
+      {
+        id: '13',
+        messageId: 13,
+        chatId: id,
+        senderName: 'Lan QA',
+        text: 'Khách báo lỗi thanh toán VNPay bị treo lúc 9h sáng',
+        date: 1791000300,
+      },
+    ],
+  });
+});
+
+it('rejects out-of-scope chatId or invalid arguments on telegram.read_messages before making HTTP calls', async () => {
+  const fetchFn = vi.fn();
+  const a = make(fetchFn);
+  await expect(a.execute('telegram.read_messages', { chatId: '42' })).rejects.toMatchObject({ category: 'AUTH_ERROR', statusCode: 403 });
+  await expect(a.execute('telegram.read_messages', { chatId: '@bad' })).rejects.toMatchObject({ category: 'VALIDATION' });
+  await expect(a.execute('telegram.read_messages', { chatId: id, limit: 25 })).rejects.toMatchObject({ category: 'VALIDATION' });
+  await expect(a.execute('telegram.read_messages', { chatId: id, extra: true })).rejects.toMatchObject({ category: 'VALIDATION' });
+  expect(fetchFn).not.toHaveBeenCalled();
+});
+

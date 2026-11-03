@@ -122,4 +122,38 @@ describe('Trello OAuth configuration', () => {
     expect(() => validateEnv({ ...trello, TRELLO_OAUTH_TOKEN_URL: 'http://user:pass@127.0.0.1:4100/token' })).toThrow('TRELLO_OAUTH_TOKEN_URL');
     expect(() => validateEnv({ ...trello, TRELLO_API_BASE_URL: 'http://127.0.0.1:4100/1#frag' })).toThrow('TRELLO_API_BASE_URL');
   });
+
+  it('allows loopback peer hostnames (localhost vs 127.0.0.1) on the same port but rejects mismatched ports or remote origins', () => {
+    expect(
+      validateEnv({
+        ...live,
+        ...trello,
+        APP_BASE_URL: 'http://localhost:5174',
+        GOOGLE_OAUTH_CLIENT_ID: 'google-client',
+        GOOGLE_OAUTH_CLIENT_SECRET: 'google-secret',
+        GOOGLE_OAUTH_REDIRECT_URI: 'http://localhost:5174/auth/google/callback',
+        TRELLO_OAUTH_REDIRECT_URI: 'http://127.0.0.1:5174/connections/trello/callback',
+      }).TRELLO_OAUTH?.redirectUri
+    ).toBe('http://127.0.0.1:5174/connections/trello/callback');
+
+    expect(() =>
+      validateEnv({
+        ...live,
+        ...trello,
+        APP_BASE_URL: 'http://localhost:5174',
+        TRELLO_OAUTH_REDIRECT_URI: 'http://127.0.0.1:3000/connections/trello/callback',
+      })
+    ).toThrow(/origin mismatch/i);
+
+    expect(() =>
+      validateEnv({
+        ...live,
+        ...trello,
+        GOOGLE_OAUTH_CLIENT_ID: 'google-client',
+        GOOGLE_OAUTH_CLIENT_SECRET: 'google-secret',
+        GOOGLE_OAUTH_REDIRECT_URI: 'https://login.ati.example/auth/google/callback',
+        TRELLO_OAUTH_REDIRECT_URI: 'https://other.ati.example/connections/trello/callback',
+      })
+    ).toThrow(/origin mismatch/i);
+  });
 });

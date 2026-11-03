@@ -1,5 +1,5 @@
 import { isSlackReadTool, type ToolDefinition, type PlannerResponse, type PlanStep } from '@wap/tool-schemas';
-import { normalizedRecipient, observedThreads, userEmailAddresses } from './recipients.js';
+import { normalizedRecipient, observedThreads, observedWorkspaceRecipients, userEmailAddresses } from './recipients.js';
 
 export interface ValidationSuccess {
   valid: true;
@@ -71,6 +71,18 @@ export function validateSchemaValue(value: unknown, schema: Record<string, any>,
     for (const required of schema.required || []) {
       if (value[required] === undefined || value[required] === null) {
         return `${path} is missing required argument '${required}'`;
+      }
+    }
+    if (Array.isArray(schema.anyOf) && schema.anyOf.length > 0) {
+      const anyMatched = schema.anyOf.some((branch: Record<string, any>) => {
+        const reqs = Array.isArray(branch?.required) ? branch.required : [];
+        return reqs.every((reqKey: string) => value[reqKey] !== undefined && value[reqKey] !== null);
+      });
+      if (!anyMatched) {
+        const options = schema.anyOf
+          .flatMap((b: Record<string, any>) => (Array.isArray(b?.required) ? b.required : []))
+          .join(' or ');
+        return `${path} requires at least one of: ${options}`;
       }
     }
     for (const [key, child] of Object.entries(value)) {
@@ -315,20 +327,35 @@ function findUngrounded(steps: PlanStep[], catalog: Map<string, ToolDefinition>,
   const typed = userTokens(grounding.userTexts);
   const typedEmails = userEmailAddresses(grounding.userTexts);
   const seenEmails = new Set(observedThreads(grounding.memory).flatMap(t => t.participants.map(normalizedRecipient).filter((a): a is string => Boolean(a))));
+  const workspaceEmails = new Set(observedWorkspaceRecipients(grounding.memory).keys());
+  const createdSheetsByResource = new Map<string, Set<string>>([
+    ['mysheet', new Set()],
+    ['sheet', new Set()],
+  ]);
   const ungrounded: UngroundedArgument[] = [];
   for (const step of steps) {
+    if (step.tool === 'mysheets.create_sheet' && typeof step.args?.title === 'string' && step.args.title.trim()) {
+      createdSheetsByResource.get('mysheet')!.add(step.args.title.trim());
+    }
+    if (step.tool === 'sheets.create_sheet' && typeof step.args?.title === 'string' && step.args.title.trim()) {
+      createdSheetsByResource.get('sheet')!.add(step.args.title.trim());
+    }
     const properties = catalog.get(step.tool)?.inputSchema.properties ?? {};
     for (const [argument, schema] of Object.entries<Record<string, any>>(properties)) {
       if (schema['x-recipient'] && Array.isArray(step.args[argument])) {
         for (const value of step.args[argument]) {
           const address = normalizedRecipient(value);
-          if (address && !typedEmails.has(address) && !seenEmails.has(address)) ungrounded.push({ stepId: step.id, argument, resource: 'recipient', value: address });
+          if (address && !typedEmails.has(address) && !seenEmails.has(address) && !workspaceEmails.has(address)) ungrounded.push({ stepId: step.id, argument, resource: 'recipient', value: address });
         }
         continue;
       }
       const resource = schema['x-resource'];
       if (typeof resource !== 'string' || step.args[argument] === undefined) continue;
       const known = memoryValues(grounding.memory, resource, schema['x-resource-field'] ?? 'id');
+      const createdInEarlierStep = createdSheetsByResource.get(resource);
+      if (createdInEarlierStep) {
+        for (const createdTitle of createdInEarlierStep) known.add(createdTitle);
+      }
       const values = Array.isArray(step.args[argument]) ? step.args[argument] as unknown[] : [step.args[argument]];
       for (const value of values) {
         // $ref/$template values come from an earlier step's real output.
@@ -386,6 +413,86 @@ function findUngrounded(steps: PlanStep[], catalog: Map<string, ToolDefinition>,
         }
         if (known.has(String(value)) || typed.has(String(value))) continue;
         ungrounded.push({ stepId: step.id, argument, resource, value });
+      }
+    }
+    if (step.tool.endsWith('.update_checklist_item') && typeof step.args?.cardId === 'string') {
+      const cardEntries = [
+        ...(Array.isArray(grounding.memory.card)
+          ? grounding.memory.card
+          : grounding.memory.card
+            ? [grounding.memory.card]
+            : []),
+        ...(isObject(grounding.memory.__observed) && Array.isArray((grounding.memory.__observed as any).card)
+          ? (grounding.memory.__observed as any).card
+          : []),
+      ].filter((c): c is Record<string, unknown> => isObject(c) && String(c.id) === step.args.cardId);
+
+      const allItems: Array<{ id: string; name: string }> = [];
+      for (const card of cardEntries) {
+        if (!Array.isArray(card.checklists)) continue;
+        for (const chk of card.checklists) {
+          if (!isObject(chk)) continue;
+          const items = Array.isArray(chk.checkItems)
+            ? chk.checkItems
+            : Array.isArray(chk.items)
+              ? chk.items
+              : [];
+          for (const it of items) {
+            if (isObject(it) && typeof it.id === 'string' && typeof it.name === 'string') {
+              allItems.push({ id: it.id, name: it.name });
+            }
+          }
+        }
+      }
+
+      if (allItems.length > 0) {
+        const needle = typeof step.args.itemName === 'string' ? step.args.itemName.trim().toLowerCase() : '';
+        const rawCheckItemId =
+          typeof step.args.checkItemId === 'string' && step.args.checkItemId.trim()
+            ? step.args.checkItemId.trim()
+            : undefined;
+        if (rawCheckItemId) {
+          const byId = allItems.find((it) => it.id === rawCheckItemId);
+          const partialMatches = needle
+            ? allItems.filter(
+                (it) => it.name.toLowerCase().includes(needle) || needle.includes(it.name.toLowerCase()),
+              )
+            : [];
+          const matchesName =
+            !needle ||
+            byId?.name.trim().toLowerCase() === needle ||
+            (partialMatches.length === 1 && partialMatches[0]!.id === rawCheckItemId);
+          if (!byId || !matchesName) {
+            ungrounded.push({
+              stepId: step.id,
+              argument: 'checkItemId',
+              resource: 'checkItem',
+              value: rawCheckItemId,
+            });
+          }
+        } else if (needle) {
+          const exactMatches = allItems.filter((it) => it.name.trim().toLowerCase() === needle);
+          if (exactMatches.length === 0) {
+            const partialMatches = allItems.filter(
+              (it) => it.name.toLowerCase().includes(needle) || needle.includes(it.name.toLowerCase()),
+            );
+            if (partialMatches.length !== 1) {
+              ungrounded.push({
+                stepId: step.id,
+                argument: 'itemName',
+                resource: 'checkItem',
+                value: String(step.args.itemName),
+              });
+            }
+          } else if (exactMatches.length > 1) {
+            ungrounded.push({
+              stepId: step.id,
+              argument: 'itemName',
+              resource: 'checkItem',
+              value: String(step.args.itemName),
+            });
+          }
+        }
       }
     }
   }

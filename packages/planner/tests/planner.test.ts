@@ -95,6 +95,26 @@ describe('packages/planner (Task 10: Hierarchical Router & Planner with 1x Autom
     expect(provider.getLastInput()?.workingMemory.board).toEqual({ id: 'board_1', name: 'Frontend' });
   });
 
+  it('gathers an existing quoted card when updating or commenting on it in regex mode', async () => {
+    const provider = new MockLLMProvider();
+    provider.setPlanResponses([{ kind: 'clarification', question: 'What change?', context: 'Card resolved' }]);
+    const memory = new WorkingMemory();
+    const calls: string[] = [];
+    const planner = new AIPlanner({
+      provider,
+      toolCatalog: tools,
+      gatherSearch: async ({ tool, args }) => {
+        calls.push(`${tool}:${args.query}`);
+        return tool === 'trello.search_boards'
+          ? [{ id: 'board_1', name: 'Frontend' }]
+          : [{ id: 'card_99', name: 'Sửa lỗi đăng nhập' }];
+      },
+    });
+    await planner.processMessage({ userMessage: 'Cập nhật thẻ "Sửa lỗi đăng nhập" trên board Frontend', memory });
+    expect(calls).toEqual(['trello.search_boards:Frontend', 'trello.search_cards:Sửa lỗi đăng nhập']);
+    expect(memory.getEntity('card')).toEqual({ id: 'card_99', name: 'Sửa lỗi đăng nhập' });
+  });
+
   it('asks for a board before searching a named member', async () => {
     const provider = new MockLLMProvider();
     const searches: string[] = [];
@@ -252,7 +272,11 @@ describe('packages/planner (Task 10: Hierarchical Router & Planner with 1x Autom
       'Create a task to update the homepage for the frontend team, due Friday, assign Minh, notify Slack',
       'Tạo một task mới cho Minh rồi gửi tin nhắn cho team',
       'Giao việc sửa CSS cho Minh và thông báo kênh frontend',
-    ])('routes a task-creation request to Trello even when another service is named: %s', (message) => {
+      'Kiểm tra các công việc quá hạn và báo lên Slack #general',
+      'Chuyển công việc Sửa lỗi đăng nhập sang cột Đang làm và báo trên Slack',
+      'Cập nhật tiến độ công việc Fix bug rồi gửi tin nhắn lên Slack',
+      'Tổng hợp các việc sắp đến hạn và báo qua Slack',
+    ])('routes a task-creation or task-management request to Trello even when another service is named: %s', (message) => {
       expect(classifyIntent(message, tools)).toEqual(['trello', 'slack']);
     });
 

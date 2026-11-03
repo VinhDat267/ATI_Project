@@ -25,4 +25,42 @@ describe('mysheets router rules', () => {
     expect(result.services).toEqual([]);
     expect(result.unavailable).toEqual([{ id: 'mysheets', name: 'Google Sheets của bạn' }]);
   });
+
+  it('automatically routes generic Google Sheets / bảng tính prompts to mysheets when user connected mysheets without shared sheets', () => {
+    const personalOnlyTools = [
+      ...ALL_TOOLS.filter((t) => t.service !== 'sheets'),
+      ...MYSHEETS_TOOLS,
+    ];
+    expect(
+      routeIntent('Ghi một dòng vào Google Sheets KPI Tháng 11', personalOnlyTools, combinedServices)
+    ).toEqual({
+      services: ['mysheets'],
+      unavailable: [],
+    });
+
+    expect(
+      routeIntent('Lấy các thẻ trên Trello ghi vào bảng tính Báo cáo tuần', personalOnlyTools, combinedServices)
+    ).toEqual({
+      services: ['trello', 'mysheets'],
+      unavailable: [],
+    });
+
+    // Even when both shared sheets and mysheets are in the catalog (e.g. sandbox mode), natural prompts without "của tôi" prefer mysheets unless "bảng tính chung/nhóm" is requested
+    expect(
+      routeIntent('Cập nhật trạng thái trong bảng tính CRM Khách hàng', combinedTools, combinedServices)
+    ).toEqual({
+      services: ['mysheets'],
+      unavailable: [],
+    });
+  });
+
+  it('still refuses with unavailable shared sheets when user explicitly asks for shared spreadsheet but only has mysheets', () => {
+    const personalOnlyTools = [
+      ...ALL_TOOLS.filter((t) => t.service !== 'sheets'),
+      ...MYSHEETS_TOOLS,
+    ];
+    const result = routeIntent('Ghi một dòng vào bảng tính chung của nhóm', personalOnlyTools, combinedServices);
+    expect(result.services).toEqual([]);
+    expect(result.unavailable).toEqual([{ id: 'sheets', name: 'Google Sheets' }]);
+  });
 });

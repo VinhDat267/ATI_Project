@@ -14,6 +14,7 @@ describe('Settings page and drawer semantics (former page/modal cases)', () => {
       if (url === '/api/services') return new Response(JSON.stringify({ services: [slack], canConfigure: true }));
       if (url === '/api/connections/trello') return new Response(JSON.stringify({ status: 'not_connected', boards: [] }));
       if (url === '/api/connections/github') return new Response(JSON.stringify({ status: 'not_connected', repos: [] }));
+      if (url === '/api/connections/notion') return new Response(JSON.stringify({ status: 'not_connected', connections: [] }));
       if (url === '/api/connections/telegram') return new Response(JSON.stringify({ status: 'not_connected', chats: [] }));
       expect(url).toBe('/api/services/slack/credentials'); expect(init?.method).toBe('POST');
       expect(JSON.parse(init?.body as string)).toEqual({ credentials: { botToken: 'submitted' }, allowedScope: ['C01'] }); return response;
@@ -49,6 +50,7 @@ describe('Settings page and drawer semantics (former page/modal cases)', () => {
       if (url === '/api/services') return new Response(JSON.stringify({ services: [{ ...slack, configured }], canConfigure: true }));
       if (url === '/api/connections/trello') return new Response(JSON.stringify({ status: 'not_connected', boards: [] }));
       if (url === '/api/connections/github') return new Response(JSON.stringify({ status: 'not_connected', repos: [] }));
+      if (url === '/api/connections/notion') return new Response(JSON.stringify({ status: 'not_connected', connections: [] }));
       if (url === '/api/connections/telegram') return new Response(JSON.stringify({ status: 'not_connected', chats: [] }));
       if (url === '/api/connections/myjira') return new Response(JSON.stringify({ connected: false, connectionState: 'disconnected', sites: [] }));
       if (url === '/api/jira-workspaces') return new Response(JSON.stringify({ workspaces: [] }));

@@ -4,6 +4,7 @@ import { WorkingMemory } from '@wap/planner';
 import { encryptCredentials } from '@wap/tool-adapters';
 import { ChatService } from '../../src/services/chat-service.js';
 import { AdapterFactory } from '../../src/services/adapter-factory.js';
+import { getToolCatalogFor } from '../../src/services/registered-services.js';
 import { createTelegramConnectionLookup } from '../../src/services/telegram/connection-reference.js';
 import { createMemoryConversationRepositories } from '../../src/db/repositories/memory-conversations.js';
 
@@ -170,6 +171,97 @@ describe('Telegram planning & execution binding (Task 6)', () => {
       createHash('sha256').update(savedPlan.plan_text).digest('hex'),
     );
     expect(savedPlan.resource_labels['-100555666777']).toBe('Đội Sản Phẩm');
+  });
+
+  it('resolves $ref object and $step_N string references from telegram.list_chats when multiple chats are selected', async () => {
+    const selectedChats = [
+      { chatId: '777888999', title: 'Telegram của tôi (Nguyen Van A)', type: 'private' as const },
+      { chatId: '-100555666777', title: 'Đội Sản Phẩm', type: 'supergroup' as const },
+    ];
+    const telegramLookup = async () => ({
+      status: 'connected' as const,
+      selectedChats,
+      connection: {
+        credentialId: 'cred-tg-1',
+        telegramUserId: '777888999',
+        username: 'nguyenvana',
+        chatIds: ['-100555666777', '777888999'],
+      },
+    });
+
+    // Case A: { $ref: 'step_1.output[0].id' } targeting group "Đội Sản Phẩm"
+    const objRefPlan = {
+      kind: 'plan' as const,
+      thinking: 'Lookup group then send message',
+      summary: 'Tìm nhóm Đội Sản Phẩm và gửi báo cáo',
+      warnings: [],
+      steps: [
+        {
+          id: 'step_1',
+          tool: 'telegram.list_chats',
+          description: 'Tìm nhóm Đội Sản Phẩm',
+          args: { query: 'Đội Sản Phẩm' },
+          dependsOn: [],
+        },
+        {
+          id: 'step_2',
+          tool: 'telegram.send_message',
+          description: 'Gửi báo cáo vào Đội Sản Phẩm',
+          args: { chatId: { $ref: 'step_1.output[0].id' }, text: 'Báo cáo sáng' },
+          dependsOn: ['step_1'],
+        },
+      ],
+    };
+    const harnessA = buildTestHarness(telegramLookup, objRefPlan);
+    const convA = await harnessA.convRepo.createConversation('user-1');
+    await harnessA.chatService.handleUserMessage({
+      conversationId: convA.id,
+      userId: 'user-1',
+      content: 'Gửi báo cáo sáng vào nhóm Đội Sản Phẩm',
+    });
+    await new Promise((r) => setTimeout(r, 30));
+
+    const savedPlanA = harnessA.plans.get('plan_tg_test_1');
+    expect(savedPlanA).toBeDefined();
+    expect(savedPlanA.plan_json.steps[1].chatId).toBe('-100555666777');
+    expect(savedPlanA.resource_labels['-100555666777']).toBe('Đội Sản Phẩm');
+
+    // Case B: '$step_1.output[0].id' string reference targeting personal chat "Telegram của tôi"
+    const strRefPlan = {
+      kind: 'plan' as const,
+      thinking: 'Lookup personal chat then send message',
+      summary: 'Tìm Telegram của tôi và gửi báo cáo',
+      warnings: [],
+      steps: [
+        {
+          id: 'step_1',
+          tool: 'telegram.list_chats',
+          description: 'Tìm Telegram của tôi',
+          args: { query: 'Telegram của tôi' },
+          dependsOn: [],
+        },
+        {
+          id: 'step_2',
+          tool: 'telegram.send_message',
+          description: 'Gửi báo cáo vào Telegram của tôi',
+          args: { chatId: '$step_1.output[0].id', text: 'Báo cáo cá nhân' },
+          dependsOn: ['step_1'],
+        },
+      ],
+    };
+    const harnessB = buildTestHarness(telegramLookup, strRefPlan);
+    const convB = await harnessB.convRepo.createConversation('user-1');
+    await harnessB.chatService.handleUserMessage({
+      conversationId: convB.id,
+      userId: 'user-1',
+      content: 'Gửi báo cáo vào Telegram của tôi',
+    });
+    await new Promise((r) => setTimeout(r, 30));
+
+    const savedPlanB = harnessB.plans.get('plan_tg_test_1');
+    expect(savedPlanB).toBeDefined();
+    expect(savedPlanB.plan_json.steps[1].chatId).toBe('777888999');
+    expect(savedPlanB.resource_labels['777888999']).toBe('Telegram của tôi (Nguyen Van A)');
   });
 
   it('refuses when plan targets a chatId outside connection.chatIds', async () => {
@@ -351,5 +443,78 @@ describe('Telegram planning & execution binding (Task 6)', () => {
         },
       }),
     ).rejects.toMatchObject({ category: 'AUTH_ERROR' });
+  });
+
+  it('includes telegram.read_messages in getToolCatalogFor when personal telegramConnection is connected', async () => {
+    const mockRepo: any = {
+      getCredentials: async () => null,
+      getPersonalCredentials: async () => null,
+    };
+    const catalog = await getToolCatalogFor(mockRepo, ENCRYPTION_KEY, {
+      userId: 'user-1',
+      gmailEnabled: false,
+      telegramConnection: async () => ({
+        status: 'connected',
+        selectedChats: [{ chatId: '-100555666777', title: 'Đội Sản Phẩm', type: 'supergroup' }],
+        connection: {
+          credentialId: 'cred-tg-1',
+          telegramUserId: '777888999',
+          username: 'nguyenvana',
+          chatIds: ['-100555666777'],
+        },
+      }),
+    });
+    expect(catalog.map((t) => t.name)).toEqual([
+      'telegram.list_chats',
+      'telegram.send_message',
+      'telegram.read_messages',
+    ]);
+  });
+
+  it('normalizes direct chat title in step.args.chatId to canonical chatId for telegram.read_messages and telegram.send_message', async () => {
+    const plan = {
+      kind: 'plan' as const,
+      thinking: 'Read then send',
+      summary: 'Đọc và gửi tin nhắn vào Đội Sản Phẩm',
+      warnings: [],
+      steps: [
+        {
+          id: 'step_1',
+          tool: 'telegram.read_messages',
+          description: 'Đọc tin nhắn Đội Sản Phẩm',
+          args: { chatId: 'Đội Sản Phẩm', limit: 5 },
+          dependsOn: [],
+        },
+      ],
+    };
+    const { convRepo, plans, chatService } = buildTestHarness(
+      async () => ({
+        status: 'connected',
+        selectedChats: [
+          { chatId: '777888999', title: 'Telegram của tôi (Nguyen Van A)', type: 'private' },
+          { chatId: '-100555666777', title: 'Đội Sản Phẩm', type: 'supergroup' },
+        ],
+        connection: {
+          credentialId: 'cred-tg-1',
+          telegramUserId: '777888999',
+          username: 'nguyenvana',
+          chatIds: ['-100555666777', '777888999'],
+        },
+      }),
+      plan,
+    );
+    const conv = await convRepo.createConversation('user-1');
+    await chatService.handleUserMessage({
+      conversationId: conv.id,
+      userId: 'user-1',
+      content: 'Đọc 5 tin nhắn gần nhất trong nhóm Đội Sản Phẩm',
+    });
+    await new Promise((r) => setTimeout(r, 30));
+
+    const savedPlan = plans.get('plan_tg_test_1');
+    expect(savedPlan).toBeDefined();
+    expect(savedPlan.plan_json.steps[0].chatId).toBe('-100555666777');
+    expect(savedPlan.plan_json.steps[0].args.chatId).toBe('-100555666777');
+    expect(savedPlan.resource_labels['-100555666777']).toBe('Đội Sản Phẩm');
   });
 });

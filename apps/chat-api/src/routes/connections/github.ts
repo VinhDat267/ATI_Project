@@ -89,20 +89,20 @@ export function createGitHubConnectionRoutes(options: GitHubConnectionsOptions):
 
   router.use(auth);
   router.use((req, res, next) => {
-    if (!(req as any).user?.sid) {
-      res.status(401).json({ error: 'Phiên đăng nhập không còn hợp lệ.', code: 'INVALID_SESSION' });
-      return;
-    }
-    next();
-  });
-
-  router.use((req, res, next) => {
     if (!isGitHubConnectAvailable(options)) {
       if (req.method === 'GET' && (req.path === '/' || req.path === '')) {
         res.json({ status: 'unconfigured', repos: [] });
         return;
       }
       res.status(503).json({ error: 'GitHub chưa được cấu hình trên máy chủ.' });
+      return;
+    }
+    next();
+  });
+
+  router.use((req, res, next) => {
+    if (!(req as any).user?.sid) {
+      res.status(401).json({ error: 'Phiên đăng nhập không còn hợp lệ.', code: 'INVALID_SESSION' });
       return;
     }
     next();

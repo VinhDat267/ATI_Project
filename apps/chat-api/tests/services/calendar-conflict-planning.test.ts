@@ -133,12 +133,55 @@ describe('ChatService planning-time conflict warnings for mycalendar.create_even
     expect(row.plan_json.warnings[0]).toContain('Cảnh báo trùng lịch');
     expect(row.plan_json.warnings[0]).toContain('Họp khách hàng Q4');
     expect(row.plan_json.warnings[0]).toContain('Sprint Planning');
+    expect(row.plan_json.warnings[0]).toContain('Gợi ý khung giờ trống');
+    expect(row.plan_json.warnings[0]).toContain('10:30–11:30');
     // Ensure plan.connections.mycalendar only contains the 3 canonical fields
     expect(Object.keys(row.plan_json.connections.mycalendar).sort()).toEqual([
       'allowedCalendars',
       'credentialId',
       'email',
     ]);
+  });
+
+  it('passes top-level userId and phase="planning" in AdapterContext so AdapterFactory.mycalendarAdapter does not throw AUTH_ERROR', async () => {
+    responses.push(makePlan([createMeetingStep]));
+    let capturedContext: any = null;
+
+    const { row } = await runMessage('Đặt lịch họp khách hàng Q4 lúc 9h sáng', async (serviceName, context) => {
+      if (serviceName === 'mycalendar') {
+        capturedContext = context;
+        // Mirror AdapterFactory.mycalendarAdapter check (apps/chat-api/src/services/adapter-factory.ts:209)
+        if (!context?.userId) {
+          throw new Error('AUTH_ERROR: Google Calendar cá nhân chỉ dùng được với kết nối của chính người dùng.');
+        }
+        return {
+          execute: async (tool: string) => {
+            if (tool === 'mycalendar.list_events') {
+              return {
+                events: [
+                  {
+                    id: 'evt_existing_strict',
+                    title: 'Architecture Review',
+                    start: '2026-10-09T09:15:00+07:00',
+                    end: '2026-10-09T09:45:00+07:00',
+                    url: 'https://calendar.google.com/event?eid=strict',
+                  },
+                ],
+              };
+            }
+            return { events: [] };
+          },
+        };
+      }
+      return null;
+    });
+
+    expect(capturedContext).toMatchObject({
+      userId: owner.id,
+      phase: 'planning',
+    });
+    expect(row.plan_json.warnings).toHaveLength(1);
+    expect(row.plan_json.warnings[0]).toContain('Architecture Review');
   });
 
   it('does not add a conflict warning when existing events do not overlap', async () => {

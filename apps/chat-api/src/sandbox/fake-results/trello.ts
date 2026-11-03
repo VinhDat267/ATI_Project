@@ -19,9 +19,55 @@ export const TRELLO_FAKE: FakeService = {
             { id: 'member_minh_tran', name: 'Minh Trần' },
           ]
         : [{ id: 'member_minh_dev', name: 'Minh Dev' }],
-    'trello.search_cards': (args) => [
-      { id: 'card_1', name: 'Thẻ hiện có', idBoard: args.boardId || 'b1', idList: args.listId || 'list_1' },
-    ],
+    'trello.search_cards': (args) => {
+      const boardId = args.boardId || 'b1';
+      const listId = args.listId || 'list_1';
+      const baseCard = {
+        id: 'card_1',
+        name: 'Thẻ hiện có',
+        idBoard: boardId,
+        boardId,
+        idList: listId,
+        listId,
+        url: 'https://trello.com/c/card_1',
+        due: null,
+        dueComplete: false,
+        idMembers: [],
+        labels: ['bug'],
+      };
+      if (args.query === '') {
+        return [
+          baseCard,
+          {
+            id: 'card_overdue',
+            name: 'Vá lỗi bảo mật OAuth',
+            idBoard: boardId,
+            boardId,
+            idList: listId,
+            listId,
+            url: 'https://trello.com/c/card_overdue',
+            due: new Date(Date.now() - 12 * 3600_000).toISOString(),
+            dueComplete: false,
+            idMembers: ['member_minh_dev'],
+            labels: ['security'],
+          },
+          {
+            id: 'card_due_soon',
+            name: 'Hoàn thiện UI Kanban',
+            idBoard: boardId,
+            boardId,
+            idList: listId,
+            listId,
+            url: 'https://trello.com/c/card_due_soon',
+            due: new Date(Date.now() + 6 * 3600_000).toISOString(),
+            dueComplete: false,
+            idMembers: ['member_minh_dev'],
+            labels: ['frontend'],
+          },
+        ];
+      }
+      return [{ id: 'card_1', name: 'Thẻ hiện có', idBoard: boardId, idList: listId }];
+    },
     'trello.get_card': (args) => ({
       id: args.cardId || 'card_1',
       name: 'Thẻ sandbox',
@@ -29,6 +75,20 @@ export const TRELLO_FAKE: FakeService = {
       idBoard: 'b1',
       idList: 'list_1',
       desc: 'Mô tả thẻ sandbox',
+      due: '2026-12-20T09:00:00.000Z',
+      dueComplete: false,
+      idMembers: ['member_minh_dev'],
+      labels: ['bug'],
+      checklists: [
+        {
+          id: 'chk_1',
+          name: 'Checklist Nghiệm Thu',
+          items: [
+            { id: 'item_1', name: 'Kiểm tra unit test', state: 'complete' },
+            { id: 'item_2', name: 'Kiểm tra giao diện', state: 'incomplete' },
+          ],
+        },
+      ],
     }),
     'trello.create_card': (args) => ({
       id: 'card_' + Date.now(),
@@ -36,18 +96,59 @@ export const TRELLO_FAKE: FakeService = {
       url: 'https://trello.com/c/sandbox/card',
       listId: args.listId || 'list_1',
       desc: args.desc,
+      ...(args.due !== undefined ? { due: args.due } : {}),
+      ...(args.dueComplete !== undefined ? { dueComplete: Boolean(args.dueComplete) } : {}),
+      ...(Array.isArray(args.idMembers) ? { idMembers: args.idMembers } : {}),
     }),
     'trello.update_card': (args) => ({
       id: args.cardId || 'card_1',
       name: args.title || 'Thẻ cập nhật',
       desc: args.desc,
       closed: args.closed,
+      ...(args.due !== undefined ? { due: args.due } : {}),
+      ...(args.dueComplete !== undefined ? { dueComplete: Boolean(args.dueComplete) } : {}),
+      url: `https://trello.com/c/${args.cardId || 'card_1'}`,
     }),
     'trello.add_member': (args) => ({ id: args.cardId, idMembers: [args.memberId] }),
+    'trello.remove_member': (args) => ({
+      id: args.cardId || 'card_1',
+      removedMemberId: args.memberId,
+      idMembers: [],
+    }),
     'trello.add_checklist': (args) => ({
       id: 'check_' + Date.now(),
       idCard: args.cardId,
-      name: args.name || 'Checklist',
+      name: args.title || args.name || 'Checklist',
+      items: Array.isArray(args.items)
+        ? args.items.map((itemName: string, idx: number) => ({
+            id: `item_${idx + 1}`,
+            name: itemName,
+            state: 'incomplete',
+          }))
+        : [],
+    }),
+    'trello.update_checklist_item': (args) => ({
+      id: args.checkItemId || 'item_1',
+      name: args.itemName || 'Kiểm tra unit test',
+      state: args.state || 'complete',
+    }),
+    'trello.add_comment': (args) => ({
+      id: 'comment_' + Date.now(),
+      cardId: args.cardId || 'card_1',
+      text: args.text || '',
+      url: `https://trello.com/c/${args.cardId || 'card_1'}#comment-1`,
+    }),
+    'trello.create_list': (args) => ({
+      id: 'list_' + Date.now(),
+      name: args.name || 'Cột mới',
+      idBoard: args.boardId || 'b1',
+      closed: false,
+    }),
+    'trello.set_card_due_complete': (args) => ({
+      id: args.cardId || 'card_1',
+      name: args.name || 'Triển khai Trello OAuth',
+      dueComplete: Boolean(args.dueComplete),
+      url: `https://trello.com/c/${args.cardId || 'card_1'}`,
     }),
   },
 };

@@ -39,7 +39,13 @@ export function computeSheetsDigestHash(input: {
     destination:
       input.config.destination.service === 'slack'
         ? { service: 'slack', channelId: input.config.destination.channelId }
-        : { service: 'telegram', chatId: input.config.destination.chatId },
+        : input.config.destination.service === 'telegram'
+          ? { service: 'telegram', chatId: input.config.destination.chatId }
+          : {
+              service: 'gmail',
+              recipientEmail: input.config.destination.recipientEmail,
+              credentialId: input.config.destination.credentialId ?? null,
+            },
     includeAiSummary: input.config.includeAiSummary,
   });
   return createHash('sha256').update(canonical).digest('hex');
@@ -76,16 +82,16 @@ export async function analyzeSheetsDigestCandidate(
     };
   }
 
-  const destServices = services.filter((s) => s === 'slack' || s === 'telegram');
+  const destServices = services.filter((s) => s === 'slack' || s === 'telegram' || s === 'gmail');
   const otherServices = services.filter(
-    (s) => s !== 'mysheets' && s !== 'sheets' && s !== 'slack' && s !== 'telegram'
+    (s) => s !== 'mysheets' && s !== 'sheets' && s !== 'slack' && s !== 'telegram' && s !== 'gmail'
   );
 
   if (otherServices.length > 0 || destServices.length !== 1) {
     return {
       canAutoDigest: false,
       reason:
-        'Chế độ tự gửi báo cáo chỉ áp dụng khi lịch đọc từ một bảng tính Google Sheets và gửi vào đúng một kênh Slack hoặc nhóm Telegram.',
+        'Chế độ tự gửi báo cáo chỉ áp dụng khi lịch đọc từ một bảng tính Google Sheets và gửi vào đúng một kênh Slack, nhóm Telegram hoặc email Gmail.',
     };
   }
 
@@ -103,11 +109,21 @@ export async function analyzeSheetsDigestCandidate(
     };
   }
 
-  // 1. Resolve source spreadsheet
+  // 1. Resolve source spreadsheet (with smart fallback from unconfigured shared 'sheets' to active personal 'mysheets')
   let sourceConfig: SheetsDigestConfig['source'] | null = null;
   const reqLower = request.toLowerCase();
+  let useMySheets = hasMySheets;
+  if (!useMySheets && hasSharedSheets && mysheetsEnabled && userId) {
+    const sharedRec = await credentialRepo.getCredentials('sheets');
+    if (!sharedRec) {
+      const personalRec = await credentialRepo.getPersonalCredentials('mysheets', userId);
+      if (personalRec && personalRec.status === 'active') {
+        useMySheets = true;
+      }
+    }
+  }
 
-  if (hasMySheets) {
+  if (useMySheets) {
     if (!mysheetsEnabled || !userId) {
       return {
         canAutoDigest: false,
@@ -242,8 +258,8 @@ export async function analyzeSheetsDigestCandidate(
     };
   }
 
-  // 2. Resolve destination (slack or telegram)
-  const destService = destServices[0] as 'slack' | 'telegram';
+  // 2. Resolve destination (slack, telegram, or gmail)
+  const destService = destServices[0] as 'slack' | 'telegram' | 'gmail';
   let destinationConfig: SheetsDigestConfig['destination'] | null = null;
 
   if (destService === 'slack') {
@@ -291,6 +307,58 @@ export async function analyzeSheetsDigestCandidate(
       service: 'slack',
       channelId: chosenChannel,
     };
+  } else if (destService === 'gmail') {
+    if (!userId) {
+      return {
+        canAutoDigest: false,
+        reason: 'Chưa xác định người dùng để gửi báo cáo qua Gmail cá nhân.',
+      };
+    }
+    const gmailRec = await credentialRepo.getPersonalCredentials('gmail', userId);
+    if (!gmailRec || gmailRec.status !== 'active') {
+      return {
+        canAutoDigest: false,
+        reason: 'Hãy kết nối Gmail cá nhân trước khi bật tự gửi báo cáo qua email.',
+      };
+    }
+    let dec: any = {};
+    try {
+      dec = decryptCredentials(gmailRec.config, encryptionKey);
+    } catch {
+      return {
+        canAutoDigest: false,
+        reason: 'Không đọc được cấu hình Gmail cá nhân.',
+      };
+    }
+    const emailMatches = [
+      ...new Set(
+        (request.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) ?? []).map((e) =>
+          e.trim().toLowerCase()
+        )
+      ),
+    ];
+    let recipientEmail: string | undefined;
+    if (emailMatches.length === 1) {
+      recipientEmail = emailMatches[0];
+    } else if (
+      emailMatches.length === 0 &&
+      typeof dec.email === 'string' &&
+      dec.email.includes('@') &&
+      /\b(?:cho\s+tôi|cho\s+mình|email\s+của\s+tôi|gmail\s+của\s+tôi)\b/iu.test(request)
+    ) {
+      recipientEmail = dec.email.trim().toLowerCase();
+    }
+    if (!recipientEmail) {
+      return {
+        canAutoDigest: false,
+        reason: 'Hãy nêu rõ một địa chỉ email nhận báo cáo trong yêu cầu để khóa người nhận.',
+      };
+    }
+    destinationConfig = {
+      service: 'gmail',
+      recipientEmail,
+      credentialId: gmailRec.id,
+    };
   } else {
     const tgRec =
       (userId ? await credentialRepo.getPersonalCredentials('telegram', userId) : null) ??
@@ -310,22 +378,44 @@ export async function analyzeSheetsDigestCandidate(
         reason: 'Không đọc được cấu hình Telegram.',
       };
     }
-    const chats: string[] = Array.isArray(dec.allowedScope?.chats)
+    const scopeChats: string[] = Array.isArray(dec.allowedScope?.chats)
       ? dec.allowedScope.chats
       : Array.isArray(dec.allowedScope)
         ? dec.allowedScope
         : [];
+    const selectedChatItems: Array<{ chatId: string; title?: string }> = Array.isArray(dec.selectedChats)
+      ? dec.selectedChats
+          .filter((c: any) => typeof c?.chatId === 'string' && c.chatId.trim())
+          .map((c: any) => ({
+            chatId: String(c.chatId).trim(),
+            ...(typeof c?.title === 'string' && c.title.trim() ? { title: c.title.trim() } : {}),
+          }))
+      : [];
+    const chatMap = new Map<string, { chatId: string; title?: string }>();
+    for (const item of selectedChatItems) {
+      chatMap.set(item.chatId, item);
+    }
+    for (const id of scopeChats) {
+      if (typeof id === 'string' && id.trim() && !chatMap.has(id.trim())) {
+        chatMap.set(id.trim(), { chatId: id.trim() });
+      }
+    }
+    const chats = Array.from(chatMap.values());
     if (chats.length === 0) {
       return {
         canAutoDigest: false,
         reason: 'Telegram chưa có nhóm/chat nào trong phạm vi được phép gửi.',
       };
     }
-    let chosenChat: string | undefined;
+    let chosenChat: { chatId: string; title?: string } | undefined;
     if (chats.length === 1) {
       chosenChat = chats[0];
     } else {
-      const matched = chats.filter((c) => reqLower.includes(c.toLowerCase()));
+      const matched = chats.filter(
+        (c) =>
+          reqLower.includes(c.chatId.toLowerCase()) ||
+          (c.title && reqLower.includes(c.title.toLowerCase()))
+      );
       if (matched.length === 1) chosenChat = matched[0];
     }
     if (!chosenChat) {
@@ -336,7 +426,8 @@ export async function analyzeSheetsDigestCandidate(
     }
     destinationConfig = {
       service: 'telegram',
-      chatId: chosenChat,
+      chatId: chosenChat.chatId,
+      ...(chosenChat.title ? { chatLabel: chosenChat.title } : {}),
     };
   }
 

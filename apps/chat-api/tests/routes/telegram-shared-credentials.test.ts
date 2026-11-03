@@ -60,6 +60,39 @@ describe('Shared Telegram credentials removal & personal status in GET /api/serv
       .send({ allowedScope: ['-1001234567890'] });
     expect(scopeRes.status).toBe(410);
     expect(scopeRes.body).toEqual({ error: 'Telegram dùng kết nối 1 chạm.' });
+
+    const delRes = await request(app)
+      .delete('/api/services/telegram')
+      .set('Authorization', bearer(admin));
+    expect(delRes.status).toBe(410);
+    expect(delRes.body).toEqual({ error: 'Telegram dùng kết nối 1 chạm.' });
+  });
+
+  it('reports personalStatus = scope_required and connected = false when active personal credential has 0 selectedChats', async () => {
+    await credentials.saveCredentials(
+      'telegram',
+      encryptCredentials(
+        {
+          telegramUserId: '778899',
+          username: 'alice_tg',
+          displayName: 'Alice Nguyễn',
+          selectedChats: [],
+        },
+        key,
+      ),
+      member.id,
+    );
+
+    const app = build();
+    const res = await request(app).get('/api/services').set('Authorization', bearer(member));
+    expect(res.status).toBe(200);
+
+    const telegram = (res.body.services as any[]).find((s) => s.id === 'telegram');
+    expect(telegram).toBeDefined();
+    expect(telegram.personalStatus).toBe('scope_required');
+    expect(telegram.connected).toBe(false);
+    expect(telegram.configured).toBe(false);
+    expect(telegram.username).toBe('alice_tg');
   });
 
   it('populates personal telegram status and username in GET /api/services for caller with active personal credential', async () => {
@@ -83,6 +116,10 @@ describe('Shared Telegram credentials removal & personal status in GET /api/serv
 
     const telegram = (res.body.services as any[]).find((s) => s.id === 'telegram');
     expect(telegram).toBeDefined();
+    expect(telegram.connection).toBe('personal');
+    expect(telegram.configured).toBe(true);
+    expect(telegram.connected).toBe(true);
+    expect(telegram.connectionStatus).toBe('healthy');
     expect(telegram.credentialFields).toEqual([]);
     expect(telegram.personalStatus).toBe('connected');
     expect(telegram.username).toBe('alice_tg');

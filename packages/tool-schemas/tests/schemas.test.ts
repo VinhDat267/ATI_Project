@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   ALL_TOOLS,
   TRELLO_TOOLS,
+  TRELLO_OAUTH_TOOLS,
   SLACK_TOOLS,
   GITHUB_TOOLS,
   GITHUB_OAUTH_TOOLS,
@@ -15,6 +16,8 @@ import {
   type PlannerResponse,
   type GithubDigestConfig,
   type GithubDigestDelivery,
+  type TrelloDigestConfig,
+  type TrelloDigestDelivery,
 } from '../src/index.js';
 
 describe('packages/tool-schemas (Task 2)', () => {
@@ -88,6 +91,42 @@ describe('packages/tool-schemas (Task 2)', () => {
     };
     expect(tgDigestConfig.telegramChatId).toBe('-100123456');
     expect(tgDelivery.telegramChatTitle).toBe('Dev Alerts');
+
+    expect(TRELLO_OAUTH_TOOLS.map((tool) => tool.name)).toEqual([
+      'trello.add_comment',
+      'trello.create_list',
+      'trello.remove_member',
+      'trello.update_checklist_item',
+      'trello.set_card_due_complete',
+    ]);
+    expect(getToolDefinition('trello.add_comment')?.inputSchema.required).toEqual(['cardId', 'text']);
+    expect(getToolDefinition('trello.add_comment')?.sideEffect).toBe('write');
+    expect(getToolDefinition('trello.add_comment')?.riskLevel).toBe('low');
+    expect(getToolDefinition('trello.create_list')?.inputSchema.required).toEqual(['boardId', 'name']);
+    expect(getToolDefinition('trello.remove_member')?.inputSchema.required).toEqual(['cardId', 'memberId']);
+    expect(getToolDefinition('trello.update_checklist_item')?.inputSchema.required).toEqual(['cardId', 'itemName', 'state']);
+    expect(getToolDefinition('trello.set_card_due_complete')?.inputSchema.required).toEqual(['cardId', 'dueComplete']);
+
+    const trelloDigestConfig: TrelloDigestConfig = {
+      credentialId: 'cred-trello-1',
+      trelloMemberId: 'mem-1',
+      username: 'vinhdat_trello',
+      boards: [
+        { id: 'b1', name: 'Sprint Board' },
+        { id: 'b2', name: 'Bug Tracker' },
+      ],
+      channelId: 'C0123456789',
+      channelName: 'frontend',
+      dueSoonHours: 24,
+    };
+    const trelloDigestDelivery: TrelloDigestDelivery = {
+      channelId: 'C0123456789',
+      channelName: 'frontend',
+      ts: '1700000000.000100',
+      counts: { overdueCards: 2, dueSoonCards: 1, unassignedCards: 3 },
+    };
+    expect(trelloDigestConfig.boards.map((b) => b.id)).toEqual(['b1', 'b2']);
+    expect(trelloDigestDelivery.counts.overdueCards).toBe(2);
   });
 
   it('should retrieve tools by name using getToolDefinition', () => {
@@ -220,5 +259,39 @@ describe('search tools declare the resources they discover', () => {
     const consumed = new Set(ALL_TOOLS.flatMap((tool) => Object.values<any>(tool.inputSchema.properties ?? {})
       .map((property) => property['x-resource']).filter(Boolean)));
     for (const tool of searchTools) expect(consumed.has(tool.discovers!), tool.name).toBe(true);
+  });
+
+  it('declares dueComplete on trello.create_card and trello.update_card, and full card fields on trello.search_cards and trello.get_card', () => {
+    const createCard = ALL_TOOLS.find((t) => t.name === 'trello.create_card')!;
+    const updateCard = ALL_TOOLS.find((t) => t.name === 'trello.update_card')!;
+    const searchCards = ALL_TOOLS.find((t) => t.name === 'trello.search_cards')!;
+    const getCard = ALL_TOOLS.find((t) => t.name === 'trello.get_card')!;
+
+    expect(createCard.inputSchema.properties.dueComplete).toEqual(
+      expect.objectContaining({ type: 'boolean' })
+    );
+    expect(updateCard.inputSchema.properties.dueComplete).toEqual(
+      expect.objectContaining({ type: 'boolean' })
+    );
+    expect(updateCard.outputSchema.properties.dueComplete).toEqual(
+      expect.objectContaining({ type: 'boolean' })
+    );
+
+    expect(searchCards.outputSchema.items.properties).toEqual(
+      expect.objectContaining({
+        due: expect.anything(),
+        dueComplete: expect.objectContaining({ type: 'boolean' }),
+        idMembers: expect.objectContaining({ type: 'array' }),
+        labels: expect.objectContaining({ type: 'array' }),
+      })
+    );
+    expect(getCard.outputSchema.properties).toEqual(
+      expect.objectContaining({
+        due: expect.anything(),
+        dueComplete: expect.objectContaining({ type: 'boolean' }),
+        labels: expect.objectContaining({ type: 'array' }),
+        checklists: expect.objectContaining({ type: 'array' }),
+      })
+    );
   });
 });

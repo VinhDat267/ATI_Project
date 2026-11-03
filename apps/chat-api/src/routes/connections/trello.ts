@@ -107,20 +107,20 @@ export function createTrelloConnectionRoutes(options: TrelloConnectionsOptions):
     router.use(createWorkspaceContextMiddleware(options.workspaceRepo));
   }
   router.use((req, res, next) => {
-    if (!(req as any).user?.sid) {
-      res.status(401).json({ error: 'Phiên đăng nhập không còn hợp lệ.', code: 'INVALID_SESSION' });
-      return;
-    }
-    next();
-  });
-
-  router.use((req, res, next) => {
     if (!isTrelloConnectAvailable(options)) {
       if (req.method === 'GET' && (req.path === '/' || req.path === '')) {
         res.json({ status: 'unconfigured', boards: [] });
         return;
       }
       res.status(503).json({ error: 'Trello chưa được cấu hình trên máy chủ.' });
+      return;
+    }
+    next();
+  });
+
+  router.use((req, res, next) => {
+    if (!(req as any).user?.sid) {
+      res.status(401).json({ error: 'Phiên đăng nhập không còn hợp lệ.', code: 'INVALID_SESSION' });
       return;
     }
     next();

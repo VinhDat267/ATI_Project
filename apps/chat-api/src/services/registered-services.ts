@@ -1,5 +1,5 @@
 import { decryptCredentials } from '@wap/tool-adapters';
-import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, GITHUB_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, TELEGRAM_TOOLS, TRELLO_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
+import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, GITHUB_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, NOTION_TOOLS, NOTION_OAUTH_TOOLS, TELEGRAM_TOOLS, TELEGRAM_OAUTH_TOOLS, TRELLO_TOOLS, TRELLO_OAUTH_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import type { ServiceTransport } from './transports/types.js';
 import { TRELLO_TRANSPORT } from './transports/trello.js';
@@ -124,6 +124,8 @@ export async function getToolCatalogFor(
     githubConnection?: (userId: string) => Promise<any>;
     telegramEnabled?: boolean;
     telegramConnection?: (userId: string) => Promise<any>;
+    notionEnabled?: boolean;
+    notionConnection?: (userId: string) => Promise<any>;
   },
 ): Promise<ToolDefinition[]> {
   let catalog = (
@@ -204,7 +206,7 @@ export async function getToolCatalogFor(
         ? await options.trelloConnection(options.userId, trelloScopeId)
         : await options.trelloConnection(options.userId);
       if (trello?.status === 'connected' && trello.connection?.boardIds?.length > 0) {
-        catalog = [...catalog, ...TRELLO_TOOLS];
+        catalog = [...catalog, ...TRELLO_TOOLS, ...TRELLO_OAUTH_TOOLS];
       }
     } catch {
       // ignore
@@ -227,7 +229,7 @@ export async function getToolCatalogFor(
               AbortSignal.timeout(10_000)
             );
             if (scope.boards.some((b: any) => callerBoards.some((cb: any) => cb.id === b.boardId && cb.member === true))) {
-              catalog = [...catalog, ...TRELLO_TOOLS];
+              catalog = [...catalog, ...TRELLO_TOOLS, ...TRELLO_OAUTH_TOOLS];
             }
           }
         }
@@ -292,7 +294,7 @@ export async function getToolCatalogFor(
     try {
       const tg = await options.telegramConnection(options.userId);
       if (tg?.status === 'connected' && tg.connection?.chatIds?.length > 0) {
-        catalog = [...catalog, ...TELEGRAM_TOOLS];
+        catalog = [...catalog, ...TELEGRAM_TOOLS, ...TELEGRAM_OAUTH_TOOLS];
       }
     } catch {
       // ignore
@@ -313,6 +315,16 @@ export async function getToolCatalogFor(
       } catch {
         // stale or unreadable connection does not add tools
       }
+    }
+  }
+  if (options.notionConnection) {
+    try {
+      const notion = await options.notionConnection(options.userId);
+      if (notion?.status === 'connected' && notion.connection?.databaseIds?.length > 0) {
+        catalog = [...catalog.filter((t) => t.service !== 'notion'), ...NOTION_TOOLS, ...NOTION_OAUTH_TOOLS];
+      }
+    } catch {
+      // ignore
     }
   }
   return catalog;

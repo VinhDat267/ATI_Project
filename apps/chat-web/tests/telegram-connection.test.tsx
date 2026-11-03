@@ -6,8 +6,11 @@ import { TelegramConnection } from '../src/pages/Settings/TelegramConnection';
 import { TelegramCallbackView } from '../src/views/TelegramCallbackView';
 import { apiClient } from '../src/services/api-client';
 import { PlanMoment } from '../src/pages/Cockpit/PlanMoment';
+import { PreviewModal } from '../src/pages/Cockpit/PreviewModal';
 import { ResponseMoment } from '../src/pages/Responses/ResponseMoment';
 import { ReceiptMoment } from '../src/pages/Cockpit/ReceiptMoment';
+import { GuidePage } from '../src/pages/Guide/GuidePage';
+import { GUIDE_OAUTH_SHOWCASE_CARDS } from '../src/pages/Guide/data';
 import { resourceDestination } from '../src/components/Cockpit';
 import { SettingsPage } from '../src/pages/Settings/SettingsPage';
 import { telegramConnectionNotice } from '../src/services/telegram-connection';
@@ -253,6 +256,39 @@ describe('Task 9: Telegram 1-Click Pairing UI, Settings & Cockpit Moments', () =
       });
     });
 
+    it('RefusalMoment renders "Chọn chat Telegram" and navigates to /settings#telegram when personalStatus is needs_scope', async () => {
+      const navigateSpy = vi.fn();
+
+      render(
+        <ResponseMoment
+          request="Gửi báo cáo vào Telegram của tôi"
+          conversationId="11111111-2222-3333-4444-555555555555"
+          unavailableServices={[{ id: 'telegram', name: 'Telegram' }]}
+          reason="Bạn chưa chọn cuộc trò chuyện Telegram."
+          services={[
+            {
+              id: 'telegram',
+              name: 'Telegram',
+              configured: false,
+              connected: false,
+              connection: 'personal',
+              personalStatus: 'needs_scope',
+              username: 'an_nguyen',
+              tools: [],
+            } as any,
+          ]}
+          connectFromChat={false}
+          navigate={navigateSpy}
+        />
+      );
+
+      expect(await screen.findByText(/Đã kết nối · Chưa chọn chat · @an_nguyen/)).toBeInTheDocument();
+      const chooseChatBtn = await screen.findByRole('link', { name: /Chọn chat Telegram/i });
+      expect(chooseChatBtn).toHaveAttribute('id', 'telegram-connect');
+      fireEvent.click(chooseChatBtn);
+      expect(navigateSpy).toHaveBeenCalledWith('/settings#telegram');
+    });
+
     it('PlanMoment and ReceiptMoment display @username from connections.telegram and chat title from resourceLabels', () => {
       const plan: ActivePlan = {
         id: 'p-tg-1',
@@ -331,6 +367,144 @@ describe('Task 9: Telegram 1-Click Pairing UI, Settings & Cockpit Moments', () =
 
       expect(screen.getByText(/Tài khoản: @an_nguyen \(Telegram của bạn\)/)).toBeInTheDocument();
       expect(screen.getByText(/Telegram của tôi \(Nguyễn Văn An\)/)).toBeInTheDocument();
+    });
+
+    it('FE-1/FE-2/FE-3/FE-5: auto-verifies on window focus, filters chats with X/10 badge, previews & renders telegram.read_messages results, and updates GuidePage 1-Click UI', async () => {
+      // 1. FE-1: TelegramCallbackView auto-verifies when window regains focus during pendingPairing
+      const completeSpy = vi
+        .spyOn(apiClient, 'completeTelegramConnection')
+        .mockRejectedValueOnce(
+          Object.assign(new Error('Pending'), {
+            status: 409,
+            code: 'TELEGRAM_PAIRING_PENDING',
+          })
+        )
+        .mockResolvedValueOnce({
+          status: 'connected',
+          telegramUserId: '777001',
+          username: 'an_nguyen',
+          displayName: 'An Nguyen',
+          chats: [{ chatId: '777001', title: 'Telegram của tôi (An)', type: 'private', member: true }],
+          selectedChats: [{ chatId: '777001', title: 'Telegram của tôi (An)', type: 'private', member: true }],
+        });
+
+      authStorage.setStoredTokens({ accessToken: 'tok-1', user: memberUser });
+      const navCallback = vi.fn();
+      const { unmount: unmountCb } = render(
+        <TelegramCallbackView
+          navigate={navCallback}
+          input={{
+            state: 'state_focus_1',
+            botUsername: 'ati_cnhn_bot',
+            deepLinkUrl: 'https://t.me/ati_cnhn_bot?start=ati_state_focus_1',
+          }}
+        />
+      );
+
+      expect(await screen.findByText(/@ati_cnhn_bot/)).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: /Tôi đã bấm Start trên Telegram/i })).toBeInTheDocument();
+
+      // Simulate user switching back from Telegram app to browser tab
+      fireEvent(window, new Event('focus'));
+      await waitFor(() => {
+        expect(completeSpy).toHaveBeenCalledTimes(2);
+        expect(navCallback).toHaveBeenCalledWith('/settings#telegram', true);
+      });
+      unmountCb();
+
+      // 2. FE-2: TelegramConnection renders needs_scope badge, X/10 counter, and chat filter input
+      vi.spyOn(apiClient, 'getTelegramConnection').mockResolvedValue({
+        status: 'needs_scope',
+        botUsername: 'ati_cnhn_bot',
+        telegramUserId: '777001',
+        username: 'an_nguyen',
+        chats: [
+          { chatId: '777001', title: 'Telegram của tôi (An)', type: 'private', member: true },
+          { chatId: '-1001', title: 'Nhóm Kỹ Thuật', type: 'supergroup', username: 'eng_team', member: true },
+          { chatId: '-1002', title: 'Nhóm Kinh Doanh', type: 'group', member: true },
+          { chatId: '-1003', title: 'Kênh Thông Báo', type: 'channel', member: true },
+        ],
+        selectedChats: [],
+      });
+
+      const { unmount: unmountConn } = render(
+        <TelegramConnection user={memberUser} refresh={vi.fn()} navigate={vi.fn()} />
+      );
+
+      expect(await screen.findByText('Chưa chọn chat')).toBeInTheDocument();
+      expect(screen.getByText(/Đã chọn 0 \/ 10/)).toBeInTheDocument();
+
+      const filterInput = screen.getByPlaceholderText(/Tìm nhanh chat hoặc nhóm/i);
+      fireEvent.change(filterInput, { target: { value: 'Kỹ Thuật' } });
+      expect(screen.getByText('Nhóm Kỹ Thuật')).toBeInTheDocument();
+      expect(screen.queryByText('Nhóm Kinh Doanh')).not.toBeInTheDocument();
+      unmountConn();
+
+      // 3. FE-3: PlanMoment, PreviewModal, and ReceiptMoment for telegram.read_messages
+      const readStep = {
+        id: 'step_read_tg',
+        tool: 'telegram.read_messages',
+        description: 'Đọc tin nhắn nhóm Kỹ Thuật',
+        args: { chatId: '-1001', query: 'deploy', limit: 5 },
+      };
+
+      const { unmount: unmountPreview } = render(
+        <PreviewModal
+          step={readStep}
+          services={[{ id: 'telegram', name: 'Telegram', configured: true, connected: true, tools: [] } as any]}
+          labels={{ '-1001': 'Nhóm Kỹ Thuật' }}
+          destination={resourceDestination}
+          onClose={vi.fn()}
+        />
+      );
+      expect(screen.getByText('Nhóm Kỹ Thuật')).toBeInTheDocument();
+      expect(screen.getByText('deploy')).toBeInTheDocument();
+      unmountPreview();
+
+      const { unmount: unmountReceipt } = render(
+        <ReceiptMoment
+          request="Đọc tin nhắn nhóm Kỹ Thuật"
+          steps={[
+            {
+              id: 'step_read_tg',
+              tool: 'telegram.read_messages',
+              description: 'Đọc tin nhắn nhóm Kỹ Thuật',
+              status: 'succeeded',
+              duration: '95ms',
+              output: {
+                chatId: '-1001',
+                chatTitle: 'Nhóm Kỹ Thuật',
+                messages: [
+                  {
+                    messageId: 101,
+                    date: '2026-11-03T01:00:00.000Z',
+                    senderName: 'Nguyễn Văn An',
+                    text: 'Đã chốt lịch deploy bản v3.2',
+                    pinned: true,
+                  },
+                ],
+              },
+            },
+          ]}
+          planSteps={[readStep]}
+          labels={{ '-1001': 'Nhóm Kỹ Thuật' }}
+          services={[{ id: 'telegram', name: 'Telegram', configured: true, connected: true, tools: [] } as any]}
+          destination={resourceDestination}
+          onNewConversation={vi.fn()}
+          onFollowup={vi.fn()}
+        />
+      );
+      expect(screen.getByText(/✓ Đã đọc tin nhắn/)).toBeInTheDocument();
+      expect(screen.getByText('Nguyễn Văn An')).toBeInTheDocument();
+      expect(screen.getByText('Đã chốt lịch deploy bản v3.2')).toBeInTheDocument();
+      unmountReceipt();
+
+      // 4. FE-5: GuidePage & GUIDE_OAUTH_SHOWCASE_CARDS include Telegram 1-Click
+      expect(GUIDE_OAUTH_SHOWCASE_CARDS.some((c) => c.service === 'telegram')).toBe(true);
+      window.history.replaceState({}, '', '/guide?service=telegram');
+      const { unmount: unmountGuide } = render(<GuidePage navigate={vi.fn()} user={memberUser} />);
+      expect(screen.getByRole('link', { name: /Kết nối Telegram 1-Click →/i })).toBeInTheDocument();
+      unmountGuide();
     });
   });
 });

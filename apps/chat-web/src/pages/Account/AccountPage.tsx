@@ -56,7 +56,12 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
   const googleOnly = !view.hasPassword, unlinkLocked = !view.hasPassword, linking = busy === 'link';
   const passType = (id: string) => shownPasswords.includes(id) ? 'text' : 'password';
   const modalClass = (_id: string) => 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm';
-  if (!account) return <main className="p-6"><p role={error ? 'alert' : 'status'}>{error ?? 'Đang tải thông tin tài khoản...'}</p></main>;
+  if (!account) return (
+    <>
+      <MainNav user={user} current={null} pageName="Tài khoản" navigate={navigate} onLogout={onLogout} />
+      <main className="p-6"><p role={error ? 'alert' : 'status'}>{error ?? 'Đang tải thông tin tài khoản...'}</p></main>
+    </>
+  );
   return (
     <>
       {/* FE-12: thanh điều hướng chung thay thanh trên của bản mẫu. */}

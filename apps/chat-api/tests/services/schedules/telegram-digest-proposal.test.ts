@@ -138,6 +138,37 @@ describe('Telegram auto_digest schedule proposal & confirmation on PostgreSQL (T
       telegramLookup,
     });
     expect(slackCandidate.canAutoDigest).toBe(false);
+
+    // Ambiguous group target when multiple groups are selected and request says "gửi vào nhóm Telegram" without group name
+    const multiGroupLookup = {
+      status: 'connected' as const,
+      selectedChats: [
+        { chatId: '777888999', title: 'Telegram của tôi (Digest User)', type: 'private' as const },
+        { chatId: '-100555666777', title: 'Đội Sản Phẩm', type: 'supergroup' as const },
+        { chatId: '-100555666888', title: 'Kỹ thuật ATI', type: 'group' as const },
+      ],
+      connection: {
+        credentialId: 'cred-tg-1',
+        telegramUserId: '777888999',
+        username: 'digestuser',
+        chatIds: ['-100555666777', '-100555666888', '777888999'],
+      },
+    };
+    const ambiguousGroupCandidate = evaluateTelegramDigestCandidate({
+      proposal: {
+        kind: 'schedule',
+        action: 'create',
+        name: 'Báo cáo nhóm',
+        request: 'Tổng hợp issue GitHub gửi vào nhóm Telegram',
+        recurrence: { type: 'daily', time: '08:00' },
+        summary: 'Gửi báo cáo vào nhóm Telegram',
+      },
+      services: ['github', 'telegram'],
+      timeZone: 'Asia/Ho_Chi_Minh',
+      telegramLookup: multiGroupLookup,
+    });
+    expect(ambiguousGroupCandidate.canAutoDigest).toBe(false);
+    expect(ambiguousGroupCandidate.disabledReason).toContain('Hãy nêu rõ tên nhóm Telegram');
   });
 
   it('persists kind = telegram_digest, digest_config, digest_config_hash on confirmProposal(auto_digest), recomputes hash on update, and rejects auto_digest when canAutoDigest is false', async () => {

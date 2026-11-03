@@ -45,24 +45,31 @@ export interface CalendarDigestExecutorOptions {
   summaryTimeoutMs?: number;
 }
 
-function buildDayWindow(dueAt: Date, windowHours: number): { timeMin: string; timeMax: string } {
+function buildDayWindow(
+  dueAt: Date,
+  windowHours: number,
+  timeZone = 'Asia/Ho_Chi_Minh',
+): { timeMin: string; timeMax: string } {
+  const safeTz = timeZone || 'Asia/Ho_Chi_Minh';
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'Asia/Ho_Chi_Minh',
+      timeZone: safeTz,
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
+      timeZoneName: 'longOffset',
     })
       .formatToParts(dueAt)
       .map((p) => [p.type, p.value]),
   );
-  const startIso = `${parts.year}-${parts.month}-${parts.day}T00:00:00+07:00`;
+  const startOffset = (parts.timeZoneName ?? 'GMT+07:00').replace(/^GMT/, '') || '+00:00';
+  const startIso = `${parts.year}-${parts.month}-${parts.day}T00:00:00${startOffset}`;
   const startMs = Date.parse(startIso);
   const hours = Math.min(Math.max(1, windowHours || 24), 168);
   const endDate = new Date(startMs + hours * 3_600_000 - 1_000);
   const endParts = Object.fromEntries(
     new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'Asia/Ho_Chi_Minh',
+      timeZone: safeTz,
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -70,11 +77,13 @@ function buildDayWindow(dueAt: Date, windowHours: number): { timeMin: string; ti
       minute: '2-digit',
       second: '2-digit',
       hourCycle: 'h23',
+      timeZoneName: 'longOffset',
     })
       .formatToParts(endDate)
       .map((p) => [p.type, p.value]),
   );
-  const endIso = `${endParts.year}-${endParts.month}-${endParts.day}T${endParts.hour}:${endParts.minute}:${endParts.second}+07:00`;
+  const endOffset = (endParts.timeZoneName ?? 'GMT+07:00').replace(/^GMT/, '') || '+00:00';
+  const endIso = `${endParts.year}-${endParts.month}-${endParts.day}T${endParts.hour}:${endParts.minute}:${endParts.second}${endOffset}`;
   return { timeMin: startIso, timeMax: endIso };
 }
 
@@ -109,8 +118,15 @@ export function formatCalendarDigestMessage(input: {
         ev.conflict && ev.conflictsWith?.length
           ? ` [⚠️ Trùng giờ với: ${ev.conflictsWith.map((t) => escapeDigestText(t)).join(', ')}]`
           : '';
+      const extras: string[] = [];
+      if (ev.meetLink) extras.push(`🎥 Meet: ${escapeDigestText(ev.meetLink)}`);
+      if (ev.location) extras.push(`📍 ${escapeDigestText(ev.location)}`);
+      if (typeof ev.attendeesCount === 'number' && ev.attendeesCount > 0) {
+        extras.push(`👥 ${ev.attendeesCount} người tham dự`);
+      }
+      const extraSuffix = extras.length > 0 ? ` — ${extras.join(' | ')}` : '';
       lines.push(
-        `- [${escapeDigestText(ev.calendarSummary)}] ${escapeDigestText(ev.title)} (${ev.start} → ${ev.end})${conflictNote}`,
+        `- [${escapeDigestText(ev.calendarSummary)}] ${escapeDigestText(ev.title)} (${ev.start} → ${ev.end})${extraSuffix}${conflictNote}`,
       );
     }
   }
@@ -215,12 +231,18 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
           };
         }
       } else {
-        const chats: string[] = Array.isArray(scopeObj?.chats)
+        const scopeChats: string[] = Array.isArray(scopeObj?.chats)
           ? scopeObj.chats
           : Array.isArray(scopeObj)
             ? scopeObj
             : [];
-        if (!chats.includes(config.destination.chatId)) {
+        const selectedChatIds: string[] = Array.isArray(decryptedDest?.selectedChats)
+          ? decryptedDest.selectedChats
+              .map((c: any) => (typeof c?.chatId === 'string' ? c.chatId : ''))
+              .filter(Boolean)
+          : [];
+        const chats = new Set([...scopeChats, ...selectedChatIds]);
+        if (!chats.has(config.destination.chatId)) {
           return {
             state: 'blocked',
             pauseReason: 'Nhóm Telegram nhận bản tin không còn nằm trong phạm vi cho phép.',
@@ -241,8 +263,10 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
 
     const rawEvents: EnrichedDigestEvent[] = [];
     try {
-      const { timeMin, timeMax } = buildDayWindow(run.dueAt, config.windowHours);
+      const { timeMin, timeMax } = buildDayWindow(run.dueAt, config.windowHours, options.timeZone);
       const mycalAdapter = await options.getAdapter('mycalendar', {
+        userId: run.userId,
+        phase: 'execution',
         actor: { userId: run.userId },
         connections: {
           mycalendar: {
@@ -337,7 +361,11 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
     // 6. Send to locked Slack channel or Telegram chat
     let deliveryStarted = false;
     try {
-      const destAdapter = await options.getAdapter(destService, { actor: { userId: run.userId } });
+      const destAdapter = await options.getAdapter(destService, {
+        userId: run.userId,
+        phase: 'execution',
+        actor: { userId: run.userId },
+      });
       if (!destAdapter) {
         return {
           state: 'digest_failed',

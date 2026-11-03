@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { MySheetsCallbackInput } from '../routes';
 import type { MySheetsPickerSession, PersonalSpreadsheetItem } from '../types';
+import { tryLoopbackCallbackHop } from '../hooks/use-route';
 import { apiClient } from '../services/api-client';
 import { subscribeAuthTokens } from '../services/auth-storage';
 import {
@@ -120,7 +121,12 @@ export function MySheetsCallbackView({
           })
           .catch((reason) => {
             if (!live()) return;
-            setError(mysheetsCallbackError(reason?.data?.code ?? reason?.code));
+            const code = reason?.data?.code ?? reason?.code;
+            if (code === 'MYSHEETS_STATE_INVALID' && data?.code && data?.state) {
+              const query = `?code=${encodeURIComponent(data.code)}&state=${encodeURIComponent(data.state)}`;
+              if (tryLoopbackCallbackHop(window.location.pathname, query, '')) return;
+            }
+            setError(mysheetsCallbackError(code));
             setLoading(false);
           });
       }
@@ -282,8 +288,8 @@ export function MySheetsCallbackView({
       {!loading && !error && (
         <>
           <div className="p-3.5 sm:p-4 rounded-xl bg-blue-50 border border-blue-200 text-xs sm:text-sm text-blue-900 leading-relaxed">
-            ATI chỉ thấy những bảng tính bạn chọn trong cửa sổ của Google. ATI đọc các ô và thêm
-            dòng mới, không sửa hay xoá ô có sẵn, không tạo bảng tính mới.
+            ATI chỉ thấy những bảng tính bạn chọn trong cửa sổ của Google. ATI chỉ đọc, thêm
+            dòng, cập nhật cột, xoá dòng hoặc tạo trang tính (tab) sau khi bạn phê duyệt kế hoạch, và không truy cập tệp Drive nào khác.
           </div>
 
           <div className="v3-space-y-3">
@@ -349,6 +355,15 @@ export function MySheetsCallbackView({
                       <span className="font-semibold text-sm text-[#111827] break-words">
                         {sheet.title}
                       </span>
+                      <a
+                        href={`https://docs.google.com/spreadsheets/d/${encodeURIComponent(sheet.id)}/edit`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Mở bảng tính ${sheet.title} trên Google Sheets`}
+                        className="text-xs text-[#188038] hover:underline font-medium inline-flex items-center gap-0.5"
+                      >
+                        Mở bảng tính ↗
+                      </a>
                       {!sheet.canEdit && (
                         <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
                           Chỉ xem

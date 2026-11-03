@@ -264,7 +264,7 @@ export async function startFakeGoogleGmail(options = {}) {
         const scripted = settings.apiResponses.shift();
         if (scripted?.mode === 'hang') return hang(response);
         if (scripted?.mode === 'disconnect') return response.destroy();
-        if (scripted?.mode === 'invalid_json') { response.writeHead(200); return response.end('not json'); }
+        if (scripted?.mode === 'invalid_json') { response.writeHead(scripted.status ?? 200); return response.end('not json'); }
         if (scripted?.mode === 'redirect') { response.writeHead(307, { Location: '/gmail/v1/users/me/profile' }); return response.end(); }
         if (scripted?.mode === 'server_error') return json(response, 503, { error: { code: 503 } });
         if (scripted && Object.hasOwn(scripted, 'body')) return json(response, scripted.status ?? 200, scripted.body);
@@ -280,6 +280,14 @@ export async function startFakeGoogleGmail(options = {}) {
         if (path === 'labels' && request.method === 'POST') return json(response, 200, { id: `label-${stats.writes}`, name: body.name, type: 'user' });
         if (path === 'messages/send') return json(response, 200, { id: `sent-${stats.writes}`, threadId: body.threadId ?? `new-thread-${stats.writes}` });
         if (path === 'drafts') return json(response, 200, { id: `draft-${stats.writes}`, message: { id: `draft-message-${stats.writes}`, threadId: body.message.threadId ?? 'draft-thread' } });
+        if (path === 'threads/batchModify' && request.method === 'POST') {
+          const ids = new Set(Array.isArray(body.ids) ? body.ids : []);
+          settings.threads = settings.threads.map(thread => ids.has(thread.id)
+            ? { ...thread, messages: thread.messages.map(message => ({ ...message, labelIds: [...new Set([...(message.labelIds ?? []).filter(id => !body.removeLabelIds?.includes(id)), ...(body.addLabelIds ?? [])])] })) }
+            : thread);
+          response.writeHead(204);
+          return response.end();
+        }
         const match = /^threads\/([^/]+)(?:\/(modify|trash))?$/.exec(path);
         const thread = match && settings.threads.find(t => t.id === decodeURIComponent(match[1]));
         if (thread) {
@@ -308,16 +316,18 @@ export async function startFakeGoogleGmail(options = {}) {
         const eventsMatch = /^([^/]+)\/events(?:\/(.+))?$/.exec(sub);
         if (eventsMatch) {
           const calId = decodeURIComponent(eventsMatch[1]);
-          if (request.method === 'GET' && !eventsMatch[2]) {
+          const eventId = eventsMatch[2] ? decodeURIComponent(eventsMatch[2]) : null;
+          if (request.method === 'GET' && !eventId) {
             stats.apiRequests.push({ method: 'GET', path: `calendars/${calId}/events`, query: Object.fromEntries(url.searchParams) });
             return json(response, 200, { kind: 'calendar#events', items: settings.calendarEvents ?? [] });
           }
-          if (request.method === 'POST' && !eventsMatch[2]) {
+          if (request.method === 'POST' && !eventId) {
             let raw = ''; for await (const chunk of request) raw += chunk;
             const body = JSON.parse(raw || '{}');
             stats.writes++;
             stats.apiRequests.push({ method: 'POST', path: `calendars/${calId}/events`, query: Object.fromEntries(url.searchParams), body });
             const id = `event-${stats.writes}`;
+            const wantMeet = url.searchParams.get('conferenceDataVersion') === '1' || Boolean(body.conferenceData);
             return json(response, 200, {
               id,
               summary: body.summary,
@@ -325,8 +335,45 @@ export async function startFakeGoogleGmail(options = {}) {
               start: body.start,
               end: body.end,
               location: body.location,
+              ...(Array.isArray(body.recurrence) ? { recurrence: body.recurrence } : {}),
+              ...(wantMeet ? { hangoutLink: `https://meet.google.com/ati-meet-${id}` } : {}),
               htmlLink: `https://calendar.google.com/event?eid=${id}`,
             });
+          }
+          if (request.method === 'GET' && eventId) {
+            stats.apiRequests.push({ method: 'GET', path: `calendars/${calId}/events/${eventId}`, query: Object.fromEntries(url.searchParams) });
+            const existing = (settings.calendarEvents ?? []).find((e) => e.id === eventId);
+            return json(response, 200, existing ?? {
+              id: eventId,
+              summary: 'Họp việc riêng',
+              description: 'Agenda chi tiết cuộc họp',
+              start: { dateTime: '2026-10-28T09:00:00+07:00' },
+              end: { dateTime: '2026-10-28T10:00:00+07:00' },
+              hangoutLink: `https://meet.google.com/ati-meet-${eventId}`,
+              htmlLink: `https://calendar.google.com/event?eid=${eventId}`,
+            });
+          }
+          if (request.method === 'PATCH' && eventId) {
+            let raw = ''; for await (const chunk of request) raw += chunk;
+            const body = JSON.parse(raw || '{}');
+            stats.writes++;
+            stats.apiRequests.push({ method: 'PATCH', path: `calendars/${calId}/events/${eventId}`, query: Object.fromEntries(url.searchParams), body });
+            return json(response, 200, {
+              id: eventId,
+              summary: body.summary ?? 'Họp việc riêng (Đã cập nhật)',
+              description: body.description,
+              start: body.start ?? { dateTime: '2026-10-28T10:30:00+07:00' },
+              end: body.end ?? { dateTime: '2026-10-28T11:30:00+07:00' },
+              location: body.location,
+              ...(Array.isArray(body.recurrence) ? { recurrence: body.recurrence } : {}),
+              htmlLink: `https://calendar.google.com/event?eid=${eventId}`,
+            });
+          }
+          if (request.method === 'DELETE' && eventId) {
+            stats.writes++;
+            stats.apiRequests.push({ method: 'DELETE', path: `calendars/${calId}/events/${eventId}`, query: Object.fromEntries(url.searchParams) });
+            response.writeHead(204);
+            return response.end();
           }
         } else {
           const calId = decodeURIComponent(sub);
@@ -399,10 +446,33 @@ export async function startFakeGoogleGmail(options = {}) {
         if (!entry || entry.expiresAt <= now()) return json(response, 401, { error: { code: 401, message: 'Unauthenticated' } });
 
         const parts = sub.split('/');
-        const fileId = decodeURIComponent(parts[0]);
+        const rawFirstPart = decodeURIComponent(parts[0]);
+        const isSpreadsheetBatchUpdate = parts.length === 1 && rawFirstPart.endsWith(':batchUpdate');
+        const fileId = isSpreadsheetBatchUpdate ? rawFirstPart.slice(0, -':batchUpdate'.length) : rawFirstPart;
         const file = (settings.driveFiles ?? []).find(f => f.id === fileId);
         if (!file || !isFileGranted(entry, fileId)) {
           return json(response, 404, { error: { code: 404, message: 'Requested entity was not found.' } });
+        }
+
+        if (isSpreadsheetBatchUpdate && request.method === 'POST') {
+          let raw = ''; for await (const chunk of request) raw += chunk;
+          const body = JSON.parse(raw || '{}');
+          stats.writes++;
+          if (file.capabilities?.canEdit === false) {
+            return json(response, 403, { error: { code: 403, message: 'The caller does not have permission' } });
+          }
+          const addSheetReq = Array.isArray(body.requests) ? body.requests.find(r => r?.addSheet?.properties?.title) : undefined;
+          const title = addSheetReq?.addSheet?.properties?.title ?? 'NewSheet';
+          file.sheets = file.sheets ?? [{ properties: { sheetId: 0, title: 'Sheet1' } }];
+          if (file.sheets.some(s => s?.properties?.title === title)) {
+            return json(response, 400, { error: { code: 400, message: `A sheet with the name "${title}" already exists.` } });
+          }
+          const sheetId = file.sheets.length;
+          file.sheets.push({ properties: { sheetId, title } });
+          return json(response, 200, {
+            spreadsheetId: file.id,
+            replies: [{ addSheet: { properties: { sheetId, title } } }],
+          });
         }
 
         if (parts.length === 1) {
@@ -410,19 +480,91 @@ export async function startFakeGoogleGmail(options = {}) {
           if (fields.includes('properties.title') && !fields.includes('sheets.properties')) {
             return json(response, 200, { spreadsheetId: file.id, properties: { title: file.name } });
           }
+          const rawSheets = file.sheets ?? [{ properties: { sheetId: 0, title: 'Sheet1' } }];
+          const sheets = fields.includes('sheets.data')
+            ? rawSheets.map((s) => {
+                const title = s?.properties?.title ?? 'Sheet1';
+                const tabKey = Object.keys(file.values ?? {}).find((k) => k.replace(/^'|'$/g, '').startsWith(`${title}!`));
+                const firstRow = tabKey && Array.isArray(file.values[tabKey]?.[0]) ? file.values[tabKey][0] : [];
+                return {
+                  ...s,
+                  ...(firstRow.length > 0
+                    ? { data: [{ rowData: [{ values: firstRow.map((cell) => ({ formattedValue: String(cell) })) }] }] }
+                    : {}),
+                };
+              })
+            : rawSheets;
           if (fields.includes('sheets.properties')) {
-            return json(response, 200, { spreadsheetId: file.id, sheets: file.sheets ?? [{ properties: { sheetId: 0, title: 'Sheet1' } }] });
+            return json(response, 200, { spreadsheetId: file.id, sheets });
           }
-          return json(response, 200, { spreadsheetId: file.id, properties: { title: file.name }, sheets: file.sheets ?? [{ properties: { sheetId: 0, title: 'Sheet1' } }] });
+          return json(response, 200, { spreadsheetId: file.id, properties: { title: file.name }, sheets });
+        }
+
+        if (parts.length === 2 && parts[1] === 'values:batchGet' && request.method === 'GET') {
+          const ranges = url.searchParams.getAll('ranges');
+          const valueRanges = ranges.map((r) => {
+            const tab = r.split('!')[0]?.replace(/^'|'$/g, '') || 'Sheet1';
+            const tabKey = Object.keys(file.values ?? {}).find((k) => k.replace(/^'|'$/g, '').startsWith(`${tab}!`));
+            const firstRow = tabKey && Array.isArray(file.values[tabKey]?.[0]) ? [file.values[tabKey][0]] : [];
+            return { range: `${tab}!A1:Z1`, values: firstRow };
+          });
+          return json(response, 200, { spreadsheetId: file.id, valueRanges });
+        }
+
+        if (parts.length === 2 && parts[1] === 'values:batchUpdate' && request.method === 'POST') {
+          let raw = ''; for await (const chunk of request) raw += chunk;
+          const body = JSON.parse(raw || '{}');
+          stats.writes++;
+          if (file.capabilities?.canEdit === false) {
+            return json(response, 403, { error: { code: 403, message: 'The caller does not have permission' } });
+          }
+          const dataArr = Array.isArray(body.data) ? body.data : [];
+          file.values = file.values ?? {};
+          const responses = dataArr.map((d) => {
+            if (typeof d.range === 'string' && d.range.endsWith('!A1') && Array.isArray(d.values)) {
+              const cleanTab = d.range.split('!')[0]?.replace(/^'|'$/g, '') || 'Sheet1';
+              file.values[`${cleanTab}!A1`] = d.values;
+            }
+            return {
+              updatedRange: d.range ?? 'Sheet1!A2:B2',
+              updatedRows: Array.isArray(d.values) ? d.values.length : 1,
+              updatedCells: Array.isArray(d.values) ? d.values.reduce((acc, r) => acc + (Array.isArray(r) ? r.length : 1), 0) : 1,
+            };
+          });
+          return json(response, 200, {
+            spreadsheetId: file.id,
+            totalUpdatedRows: responses.length,
+            totalUpdatedCells: responses.reduce((acc, r) => acc + r.updatedCells, 0),
+            responses,
+          });
         }
 
         if (parts[1] === 'values' && parts[2]) {
           const rawRangePart = parts.slice(2).join('/');
           if (request.method === 'GET') {
             const range = decodeURIComponent(rawRangePart);
+            const tab = range.split('!')[0]?.replace(/^'|'$/g, '') || 'Sheet1';
+            const tabKey = Object.keys(file.values ?? {}).find((k) => k.startsWith(`${tab}!`));
             return json(response, 200, {
               range,
-              values: file.values?.[range] ?? file.values?.['Sheet1!A1:B2'] ?? [['Cell1', 'Cell2']],
+              values: file.values?.[range] ?? (tabKey ? file.values[tabKey] : undefined) ?? file.values?.['Sheet1!A1:B2'] ?? [['Cell1', 'Cell2']],
+            });
+          }
+          if (request.method === 'PUT') {
+            let raw = ''; for await (const chunk of request) raw += chunk;
+            const body = JSON.parse(raw || '{}');
+            stats.writes++;
+            if (file.capabilities?.canEdit === false) {
+              return json(response, 403, { error: { code: 403, message: 'The caller does not have permission' } });
+            }
+            const range = decodeURIComponent(rawRangePart);
+            file.values = file.values ?? {};
+            file.values[range] = body.values ?? [];
+            return json(response, 200, {
+              spreadsheetId: file.id,
+              updatedRange: range,
+              updatedRows: Array.isArray(body.values) ? body.values.length : 1,
+              updatedCells: Array.isArray(body.values?.[0]) ? body.values[0].length : 1,
             });
           }
           if (request.method === 'POST') {

@@ -4,20 +4,20 @@
 -- 1. OAuth-style state flow: connect_telegram always belongs to one user and one live session.
 ALTER TABLE oauth_states DROP CONSTRAINT IF EXISTS oauth_states_mode_check;
 ALTER TABLE oauth_states ADD CONSTRAINT oauth_states_mode_check CHECK (
-  mode IN ('login', 'link', 'connect_gmail', 'connect_mycalendar', 'connect_mysheets', 'connect_trello', 'connect_github', 'connect_telegram', 'connect_jira_identity', 'connect_jira_sites')
+  mode IN ('login', 'link', 'connect_gmail', 'connect_mycalendar', 'connect_mysheets', 'connect_trello', 'connect_github', 'connect_telegram', 'connect_notion', 'connect_jira_identity', 'connect_jira_sites')
 );
 
 ALTER TABLE oauth_states DROP CONSTRAINT IF EXISTS oauth_states_mode_owner_check;
 ALTER TABLE oauth_states ADD CONSTRAINT oauth_states_mode_owner_check CHECK (
   (mode = 'login' AND user_id IS NULL AND session_id IS NULL)
-  OR (mode IN ('link', 'connect_gmail', 'connect_mycalendar', 'connect_mysheets', 'connect_trello', 'connect_github', 'connect_telegram', 'connect_jira_identity', 'connect_jira_sites') AND user_id IS NOT NULL AND session_id IS NOT NULL)
+  OR (mode IN ('link', 'connect_gmail', 'connect_mycalendar', 'connect_mysheets', 'connect_trello', 'connect_github', 'connect_telegram', 'connect_notion', 'connect_jira_identity', 'connect_jira_sites') AND user_id IS NOT NULL AND session_id IS NOT NULL)
 );
 
 -- 2. Return path support for connect_telegram initiated from conversation view.
 ALTER TABLE oauth_states DROP CONSTRAINT IF EXISTS oauth_states_return_to_check;
 ALTER TABLE oauth_states ADD CONSTRAINT oauth_states_return_to_check CHECK (
   return_to IS NULL
-  OR (mode IN ('connect_gmail', 'connect_mycalendar', 'connect_mysheets', 'connect_trello', 'connect_github', 'connect_telegram', 'connect_jira_identity', 'connect_jira_sites') AND return_to ~ '^/c/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+  OR (mode IN ('connect_gmail', 'connect_mycalendar', 'connect_mysheets', 'connect_trello', 'connect_github', 'connect_telegram', 'connect_notion', 'connect_jira_identity', 'connect_jira_sites') AND return_to ~ '^/c/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 );
 
 -- 3. Remove shared Telegram credentials (user_id IS NULL) and enforce personal ownership.
@@ -79,13 +79,13 @@ ALTER TABLE schedules ADD COLUMN IF NOT EXISTS digest_approved_at TIMESTAMPTZ;
 
 ALTER TABLE schedules DROP CONSTRAINT IF EXISTS schedules_kind_check;
 ALTER TABLE schedules ADD CONSTRAINT schedules_kind_check
-  CHECK (kind IN ('plan', 'sheets_digest', 'calendar_digest', 'github_digest', 'telegram_digest'));
+  CHECK (kind IN ('plan', 'sheets_digest', 'calendar_digest', 'github_digest', 'telegram_digest', 'trello_digest', 'notion_digest'));
 
 ALTER TABLE schedules DROP CONSTRAINT IF EXISTS schedules_kind_digest_check;
 ALTER TABLE schedules ADD CONSTRAINT schedules_kind_digest_check CHECK (
   (kind = 'plan' AND digest_config IS NULL AND digest_config_hash IS NULL AND digest_approved_at IS NULL)
   OR (
-    kind IN ('sheets_digest', 'calendar_digest', 'github_digest', 'telegram_digest')
+    kind IN ('sheets_digest', 'calendar_digest', 'github_digest', 'telegram_digest', 'trello_digest', 'notion_digest')
     AND digest_config IS NOT NULL
     AND jsonb_typeof(digest_config) = 'object'
     AND digest_config_hash IS NOT NULL

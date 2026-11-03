@@ -13,11 +13,17 @@ import { PersonalMySheets } from './PersonalMySheets';
 import { PersonalSlack } from './PersonalSlack';
 import { TrelloConnection } from './TrelloConnection';
 import { GitHubConnection } from './GitHubConnection';
+import { NotionConnection } from './NotionConnection';
 import { TelegramConnection } from './TelegramConnection';
 import { JiraConnection } from './JiraConnection';
-import { gmailConnectionNotice } from '../../services/gmail-connection';
+import {
+  gmailConnectionNotice,
+  mycalendarConnectionNotice,
+  mysheetsConnectionNotice,
+} from '../../services/gmail-connection';
 import { trelloConnectionNotice } from '../../services/trello-connection';
 import { githubConnectionNotice } from '../../services/github-connection';
+import { notionConnectionNotice } from '../../services/notion-connection';
 import { telegramConnectionNotice } from '../../services/telegram-connection';
 import { jiraConnectionNotice } from '../../services/jira-connection';
 import { meta } from './meta';
@@ -105,15 +111,20 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
   const { slackOAuthEnabled, list, personal, personalMyCalendar, personalMySheets, active, draft, selected, loading, loadError, refresh, canEdit, errors, results, busy, keyHelpOpen, actions } = useSettings(user);
   const [connectedEmail, setConnectedEmail] = useState<string>();
   useEffect(() => {
-    const email = gmailConnectionNotice.take(user?.id);
+    const email =
+      gmailConnectionNotice.take(user?.id) ??
+      mycalendarConnectionNotice.take(user?.id) ??
+      mysheetsConnectionNotice.take(user?.id);
     const trelloUser = trelloConnectionNotice.take(user?.id);
     const githubUser = githubConnectionNotice.take(user?.id);
     const telegramUser = telegramConnectionNotice.take(user?.id);
+    const notionWorkspace = notionConnectionNotice.take(user?.id);
     const jiraUser = jiraConnectionNotice.take(user?.id);
     if (email) setConnectedEmail(email);
     else if (trelloUser) setConnectedEmail(`@${trelloUser}`);
     else if (githubUser) setConnectedEmail(`@${githubUser}`);
     else if (telegramUser) setConnectedEmail(`@${telegramUser}`);
+    else if (notionWorkspace) setConnectedEmail(`Notion: ${notionWorkspace}`);
     else if (jiraUser) setConnectedEmail(jiraUser);
   }, [user?.id]);
   const backgroundRef = useRef<HTMLDivElement>(null), containerRef = useRef<HTMLDivElement>(null), closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -180,7 +191,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
               <div className="inline-flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[#16A34A]" />
                 <span id="summary-connected-count" className="text-sm sm:text-base font-semibold text-[#111827]">
-                  {`${configured.length} / 8 dịch vụ đã thiết lập · ${okCount} kết nối tốt`}
+                  {`${configured.length} / ${list.length} dịch vụ đã thiết lập · ${okCount} kết nối tốt`}
                 </span>
               </div>
               <span data-testid="settings-oauth-summary" className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
@@ -218,6 +229,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
             {personalMySheets && <PersonalMySheets key={`mysheets-${user?.id}`} selected={selected} service={personalMySheets} refresh={refresh} navigate={navigate} standalone={false} />}
             <TrelloConnection key={`trello-${user?.id}`} user={user} selected={selected} refresh={refresh} standalone={false} />
             <GitHubConnection key={`github-${user?.id}`} user={user} selected={selected} refresh={refresh} standalone={false} />
+            <NotionConnection key={`notion-${user?.id}`} user={user} selected={selected === 'notion'} refresh={refresh} standalone={false} />
             <TelegramConnection key={`telegram-${user?.id}`} user={user} selected={selected} refresh={refresh} navigate={navigate} standalone={false} />
             <JiraConnection key={`jira-${user?.id}`} user={user} selected={selected} refresh={refresh} navigate={navigate} standalone={false} />
           </div>
@@ -262,7 +274,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
             </div>
             <div id="list-unconnected-services" className="v3-space-y-3" role="list">
               {unconfigured.length === 0
-                ? <div role="listitem" className="p-6 text-center text-xs text-[#6B7280] bg-white rounded-xl border border-[#E7E7E2]">Tất cả 8 dịch vụ đều đã được thiết lập.</div>
+                ? <div role="listitem" className="p-6 text-center text-xs text-[#6B7280] bg-white rounded-xl border border-[#E7E7E2]">{`Tất cả ${list.length} dịch vụ đều đã được thiết lập.`}</div>
                 : unconfigured.map(s => <div key={s.id} role="listitem"><ServiceRow service={s} onOpen={actions.openServiceDrawer} /></div>)}
             </div>
           </section>

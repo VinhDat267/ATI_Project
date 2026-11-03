@@ -1,12 +1,49 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { readRoute, type AppRoute } from '../routes';
+import { authStorage } from '../services/auth-storage';
+
+const CONNECTION_CALLBACK_KINDS = new Set<AppRoute['kind']>([
+  'slack-callback',
+  'gmail-callback',
+  'mycalendar-callback',
+  'mysheets-callback',
+  'trello-callback',
+  'github-callback',
+  'notion-callback',
+  'jira-callback',
+  'telegram-callback',
+]);
+const LOOPBACK_HOP_KEY = 'wap_loopback_callback_hop';
+
+export function tryLoopbackCallbackHop(pathname: string, search: string, hash = ''): boolean {
+  const { protocol, hostname, port } = window.location;
+  if (!search || (hostname !== '127.0.0.1' && hostname !== 'localhost')) return false;
+  if (typeof navigator !== 'undefined' && navigator.userAgent?.includes('jsdom') && !('mock' in window.location.replace)) {
+    return false;
+  }
+  const hopTarget = `${pathname}${search}`;
+  try {
+    if (sessionStorage.getItem(LOOPBACK_HOP_KEY) === hopTarget) return false;
+    sessionStorage.setItem(LOOPBACK_HOP_KEY, hopTarget);
+    const altHost = hostname === '127.0.0.1' ? 'localhost' : '127.0.0.1';
+    const portPart = port ? `:${port}` : '';
+    window.location.replace(`${protocol}//${altHost}${portPart}${pathname}${search}${hash}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export function useRoute(initialView?: 'landing' | 'login') {
   const [route, setRoute] = useState<AppRoute>(() => initialView
     ? { kind: initialView === 'login' ? 'login' : 'home' } : readRoute());
   useLayoutEffect(() => {
-    if (route.kind === 'gmail-callback' || route.kind === 'slack-callback' || route.kind === 'mycalendar-callback' || route.kind === 'mysheets-callback' || route.kind === 'telegram-callback' || route.kind === 'jira-callback') {
-      window.history.replaceState(window.history.state, '', window.location.pathname);
+    if (CONNECTION_CALLBACK_KINDS.has(route.kind)) {
+      const { pathname, search, hash } = window.location;
+      if (!authStorage.getStoredTokens().accessToken && tryLoopbackCallbackHop(pathname, search, hash)) {
+        return;
+      }
+      window.history.replaceState(window.history.state, '', pathname);
       return;
     }
     if (route.kind === 'google-callback') {

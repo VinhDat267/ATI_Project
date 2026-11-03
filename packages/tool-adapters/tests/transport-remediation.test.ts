@@ -144,7 +144,7 @@ describe('Trello read scope', () => {
     const adapter = new TrelloAdapter({ credentials: { accessToken: 't' }, allowedBoardIds: ['board1'], allowedScope: { boards: ['board1'] }, fetchFn: fetchFn as typeof fetch });
 
     await expect(adapter.searchCards({ query: 'card' })).resolves.toEqual([
-      { id: 'allowed', name: 'Visible', url: '', listId: 'list1' },
+      { id: 'allowed', name: 'Visible', url: '', listId: 'list1', boardId: 'board1' },
     ]);
   });
 

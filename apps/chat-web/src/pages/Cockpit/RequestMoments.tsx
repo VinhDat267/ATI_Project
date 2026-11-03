@@ -93,7 +93,7 @@ export function RequestMoment({
             </div>
             <p className="text-[#6B7280] text-[11px] truncate">
               {workspace.id === 'personal'
-                ? '(Lịch, Trang tính, Trello & công cụ riêng của bạn)'
+                ? `(${services.some((s) => s.id === 'gmail') ? 'Gmail, ' : ''}Lịch, Trang tính, Trello & công cụ riêng của bạn)`
                 : '(Sử dụng kết nối chung của nhóm & dịch vụ đã cấp quyền)'}
             </p>
           </div>
@@ -233,7 +233,7 @@ export function RequestMoment({
             </div>
           </div>
 
-          {services.filter((service) => service.configured).length >= 2 && multiServicePlaybooks.length > 0 && (
+          {services.filter((service) => service.configured).length >= 2 && multiServicePlaybooks.filter((pb) => pb.services.filter((svcId) => services.some((s) => s.id === svcId || (svcId === 'calendar' && s.id === 'mycalendar') || (svcId === 'sheets' && s.id === 'mysheets'))).length >= 2).length > 0 && (
             <div className="v3-space-y-3" data-testid="multi-service-playbooks">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-xs font-semibold uppercase tracking-wider text-brand-muted">
@@ -244,7 +244,9 @@ export function RequestMoment({
                 </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {multiServicePlaybooks.map((playbook) => (
+                {multiServicePlaybooks
+                  .filter((pb) => pb.services.filter((svcId) => services.some((s) => s.id === svcId || (svcId === 'calendar' && s.id === 'mycalendar') || (svcId === 'sheets' && s.id === 'mysheets'))).length >= 2)
+                  .map((playbook) => (
                   <button
                     key={playbook.id}
                     type="button"

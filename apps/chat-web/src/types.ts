@@ -49,6 +49,8 @@ export interface PlanStep {
   args: Record<string, unknown>;
   chatId?: string;
   repo?: string;
+  boardId?: string;
+  databaseId?: string;
   dependsOn?: string[];
 }
 
@@ -104,6 +106,15 @@ export interface ActivePlan {
       telegramUserId: string;
       username: string;
       chatIds: string[];
+    };
+    notion?: {
+      credentialId: string;
+      workspaceId: string;
+      workspaceName: string;
+      botId: string;
+      identityVersion: number;
+      databaseIds: string[];
+      databases?: Array<{ id: string; title: string; url?: string }>;
     };
   };
   resourceLabels?: Record<string, string>;
@@ -209,9 +220,11 @@ export interface ServiceInfo {
   email?: string;
   username?: string;
   login?: string;
+  workspaceName?: string;
   connectedAt?: string;
   selectedCalendars?: PersonalCalendarSummary[];
   selectedSpreadsheets?: PersonalSpreadsheetItem[];
+  selectedDatabases?: Array<{ id: string; title: string; url?: string }>;
   statusReason?: string;
   id: string;
   name: string;

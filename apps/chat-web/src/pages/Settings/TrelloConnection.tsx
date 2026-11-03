@@ -50,6 +50,7 @@ export function TrelloConnection({
     Array<{ id: string; name: string; member: boolean }>
   >([]);
   const [selectedBoardIds, setSelectedBoardIds] = useState<string[]>([]);
+  const [boardFilter, setBoardFilter] = useState('');
   const [editingScope, setEditingScope] = useState(false);
 
   const mounted = useRef(false);
@@ -300,7 +301,15 @@ export function TrelloConnection({
                 key={b.boardId}
                 className="flex items-center justify-between p-2.5 bg-neutral-50 rounded-lg text-xs"
               >
-                <span className="font-medium text-[#111827]">{b.boardName}</span>
+                <a
+                  href={`https://trello.com/b/${encodeURIComponent(b.boardId)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-[#111827] hover:text-[#FF5701] inline-flex items-center gap-1 transition-colors"
+                >
+                  <span>{b.boardName}</span>
+                  <span aria-hidden="true" className="text-neutral-400">↗</span>
+                </a>
                 <span
                   className={
                     b.member
@@ -389,31 +398,55 @@ export function TrelloConnection({
 
           {/* Candidate boards list (checkboxes) */}
           <div className="v3-space-y-2">
-            <label className="text-xs font-semibold text-[#111827]">
-              Các bảng được phép dùng (tối đa 10 bảng)
-            </label>
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-xs font-semibold text-[#111827]">
+                Các bảng được phép dùng (tối đa 10 bảng)
+              </label>
+              <span
+                data-testid="trello-scope-counter"
+                className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-white border border-[#E7E7E2] text-[#4B5563]"
+              >
+                Đã chọn {selectedBoardIds.length}/10
+              </span>
+            </div>
+            {candidateBoards.length >= 5 && (
+              <input
+                type="search"
+                value={boardFilter}
+                onChange={(e) => setBoardFilter(e.target.value)}
+                placeholder="Tìm nhanh theo tên bảng Trello..."
+                aria-label="Tìm nhanh bảng Trello"
+                className="w-full px-3 py-1.5 text-xs bg-white border border-[#E7E7E2] rounded-lg text-[#111827] focus:ring-2 focus:ring-[#FF5701] focus:v3-outline-none"
+              />
+            )}
             <div className="v3-space-y-1.5 max-h-48 overflow-y-auto">
-              {candidateBoards.map((b) => {
-                const checked = selectedBoardIds.includes(b.id);
-                const disabled = !checked && selectedBoardIds.length >= 10;
-                return (
-                  <label
-                    key={b.id}
-                    className={`flex items-center gap-2 p-2 rounded-lg text-xs cursor-pointer ${
-                      checked ? 'bg-[#F8F8F6] border border-[#111827]/30' : 'bg-white border border-[#E7E7E2]'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      disabled={disabled}
-                      onChange={() => toggleBoard(b.id)}
-                      className="rounded text-[#111827] focus:ring-[#111827]"
-                    />
-                    <span className="font-medium text-[#111827]">{b.name}</span>
-                  </label>
-                );
-              })}
+              {candidateBoards
+                .filter(
+                  (b) =>
+                    !boardFilter.trim() ||
+                    b.name.toLowerCase().includes(boardFilter.trim().toLowerCase())
+                )
+                .map((b) => {
+                  const checked = selectedBoardIds.includes(b.id);
+                  const disabled = !checked && selectedBoardIds.length >= 10;
+                  return (
+                    <label
+                      key={b.id}
+                      className={`flex items-center gap-2 p-2 rounded-lg text-xs cursor-pointer ${
+                        checked ? 'bg-[#F8F8F6] border border-[#111827]/30' : 'bg-white border border-[#E7E7E2]'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={disabled}
+                        onChange={() => toggleBoard(b.id)}
+                        className="rounded text-[#111827] focus:ring-[#111827]"
+                      />
+                      <span className="font-medium text-[#111827]">{b.name}</span>
+                    </label>
+                  );
+                })}
               {candidateBoards.length === 0 && (
                 <p className="text-xs text-[#6B7280]">Không có bảng nào trong workspace này.</p>
               )}
