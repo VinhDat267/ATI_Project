@@ -39,6 +39,39 @@ select:focus-visible {
 .planora-auth-action-body {
   background-color: var(--planora-canvas);
   color: var(--planora-text);
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Card & Grid containment for long content (F1) */
+.planora-auth-action-body .planora-auth-card,
+#action-card {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.planora-auth-header,
+.planora-auth-subtitle,
+.planora-auth-heading,
+.planora-auth-body,
+.planora-auth-footer {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  box-sizing: border-box;
+}
+
+.user-email-placeholder {
+  display: inline-block;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  word-break: break-all;
+  vertical-align: bottom;
 }
 
 /* Info Card in AuthAction */
@@ -52,6 +85,10 @@ select:focus-visible {
   flex-direction: column;
   gap: 12px;
   box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* Timeline in AuthAction */
@@ -59,6 +96,8 @@ select:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .planora-timeline-step {
@@ -66,6 +105,8 @@ select:focus-visible {
   align-items: flex-start;
   gap: 12px;
   font-size: var(--planora-text-sm);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .planora-timeline-badge {
@@ -198,6 +239,32 @@ select:focus-visible {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* Footer Links (F2: tap target min 44px) */
+.planora-auth-footer {
+  margin-top: 24px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.planora-auth-footer-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.planora-auth-footer-link {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 6px;
+  box-sizing: border-box;
+  text-decoration: none;
 }
 
 /* Ẩn thanh cuộn nhưng vẫn cuộn được */

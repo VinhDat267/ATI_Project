@@ -40,6 +40,19 @@ for (const vp of VIEWPORTS) {
       const submitBox = await submitBtn.boundingBox();
       expect(submitBox?.height).toBeGreaterThanOrEqual(44);
 
+      // Footer links tap targets >= 44px (F2)
+      const homeLink = page.getByRole('link', { name: 'Trang chủ' });
+      await expect(homeLink).toBeVisible();
+      const homeBox = await homeLink.boundingBox();
+      expect(homeBox?.height).toBeGreaterThanOrEqual(44);
+      expect(homeBox?.width).toBeGreaterThanOrEqual(44);
+
+      const privacyLink = page.getByRole('link', { name: 'Chính sách an toàn & Dữ liệu' });
+      await expect(privacyLink).toBeVisible();
+      const privacyBox = await privacyLink.boundingBox();
+      expect(privacyBox?.height).toBeGreaterThanOrEqual(44);
+      expect(privacyBox?.width).toBeGreaterThanOrEqual(44);
+
       // Editorial visibility
       if (vp.width >= 1024) {
         await expect(page.locator('.planora-auth-editorial')).toBeVisible();
@@ -47,11 +60,14 @@ for (const vp of VIEWPORTS) {
         await expect(page.locator('.planora-auth-editorial')).toBeHidden();
       }
 
-      // No horizontal overflow
+      // No horizontal overflow and card containment
       const noOverflow = await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth
       );
       expect(noOverflow).toBe(true);
+
+      const cardBox = await card.boundingBox();
+      expect(cardBox?.width).toBeLessThanOrEqual(vp.width);
 
       if (['1440x900', '375x812'].includes(vp.label)) {
         await page.screenshot({
@@ -88,6 +104,19 @@ for (const vp of VIEWPORTS) {
       const submitBox = await submitBtn.boundingBox();
       expect(submitBox?.height).toBeGreaterThanOrEqual(44);
 
+      // Footer links tap targets >= 44px (F2)
+      const homeLink = page.getByRole('link', { name: 'Trang chủ' });
+      await expect(homeLink).toBeVisible();
+      const homeBox = await homeLink.boundingBox();
+      expect(homeBox?.height).toBeGreaterThanOrEqual(44);
+      expect(homeBox?.width).toBeGreaterThanOrEqual(44);
+
+      const privacyLink = page.getByRole('link', { name: 'Chính sách an toàn & Dữ liệu' });
+      await expect(privacyLink).toBeVisible();
+      const privacyBox = await privacyLink.boundingBox();
+      expect(privacyBox?.height).toBeGreaterThanOrEqual(44);
+      expect(privacyBox?.width).toBeGreaterThanOrEqual(44);
+
       // Strength meter interaction
       await newPass.fill('Short1!');
       await expect(page.locator('#strength-bar-1')).toBeVisible();
@@ -96,11 +125,15 @@ for (const vp of VIEWPORTS) {
       await newPass.fill('SecurePassword123!@#');
       await expect(page.locator('#strength-text')).toHaveText(/Độ mạnh: Tuyệt vời|Rất an toàn/);
 
-      // No horizontal overflow
+      // No horizontal overflow and card containment
       const noOverflow = await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth
       );
       expect(noOverflow).toBe(true);
+
+      const card = page.locator('.planora-auth-card');
+      const cardBox = await card.boundingBox();
+      expect(cardBox?.width).toBeLessThanOrEqual(vp.width);
 
       if (['1440x900', '375x812'].includes(vp.label)) {
         await page.screenshot({

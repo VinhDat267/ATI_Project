@@ -274,7 +274,7 @@ export function AuthActionPage({
           subtitle: (
             <>
               {'Địa chỉ '}
-              <strong className="text-[var(--planora-text)] font-semibold user-email-placeholder">
+              <strong className="text-[var(--planora-text)] font-semibold user-email-placeholder break-all">
                 {email || 'email của bạn'}
               </strong>
               {' đã được xác thực thành công. Yêu cầu của bạn đã sẵn sàng cho bước tiếp theo.'}
@@ -477,10 +477,15 @@ export function AuthActionPage({
                 Bạn cần xác minh địa chỉ email
               </span>
               <span className="text-xs text-[var(--planora-muted)]">
-                {error ||
-                  `Địa chỉ email ${
-                    email || 'của bạn'
-                  } chưa được xác minh. Hãy kiểm tra hộp thư hoặc bấm gửi lại link xác minh mới bên dưới.`}
+                {error || (
+                  <>
+                    {'Địa chỉ email '}
+                    <strong className="text-[var(--planora-text)] font-semibold user-email-placeholder break-all">
+                      {email || 'của bạn'}
+                    </strong>
+                    {' chưa được xác minh. Hãy kiểm tra hộp thư hoặc bấm gửi lại link xác minh mới bên dưới.'}
+                  </>
+                )}
               </span>
             </>
           ),
@@ -588,7 +593,7 @@ export function AuthActionPage({
           subtitle: (
             <>
               {'Địa chỉ '}
-              <strong className="text-[var(--planora-text)] font-semibold user-email-placeholder">
+              <strong className="text-[var(--planora-text)] font-semibold user-email-placeholder break-all">
                 {email || 'địa chỉ email của bạn'}
               </strong>
               {' đã được xác minh thành công trước đó. Bạn không cần xác minh lại địa chỉ email này.'}
@@ -658,7 +663,7 @@ export function AuthActionPage({
           subtitle: (
             <>
               {'Đặt mật khẩu mới cho tài khoản '}
-              <strong className="text-[var(--planora-text)] user-email-placeholder">
+              <strong className="text-[var(--planora-text)] user-email-placeholder break-all">
                 {email || 'địa chỉ email của bạn'}
               </strong>
               {'.'}
@@ -842,7 +847,7 @@ export function AuthActionPage({
           subtitle: (
             <>
               {'Mật khẩu mới của tài khoản '}
-              <strong className="text-[var(--planora-text)] user-email-placeholder">
+              <strong className="text-[var(--planora-text)] user-email-placeholder break-all">
                 {email || 'địa chỉ email của bạn'}
               </strong>
               {' đã được lưu thành công. Các phiên làm việc cũ đã được thu hồi an toàn.'}
@@ -923,7 +928,7 @@ export function AuthActionPage({
           subtitle: (
             <>
               {'Tài khoản Google '}
-              <strong className="text-[var(--planora-text)] font-semibold user-email-placeholder">
+              <strong className="text-[var(--planora-text)] font-semibold user-email-placeholder break-all">
                 {email || 'địa chỉ email của bạn'}
               </strong>
               {' đã được kết nối an toàn với nền tảng Planora.'}
@@ -1176,7 +1181,7 @@ export function AuthActionPage({
           subtitle: (
             <>
               {'Tài khoản '}
-              <strong className="text-[var(--planora-text)] font-semibold user-email-placeholder">
+              <strong className="text-[var(--planora-text)] font-semibold user-email-placeholder break-all">
                 {email || 'địa chỉ email của bạn'}
               </strong>
               {' chưa được kích hoạt vào không gian làm việc. Hãy xác minh email và chờ quản trị viên duyệt.'}
@@ -1299,7 +1304,7 @@ export function AuthActionPage({
           subtitle: (
             <>
               {'Quyền truy cập của '}
-              <strong className="text-[var(--planora-text)] font-semibold user-email-placeholder">
+              <strong className="text-[var(--planora-text)] font-semibold user-email-placeholder break-all">
                 {email || 'địa chỉ email của bạn'}
               </strong>
               {' vào không gian làm việc đã bị tạm dừng bởi quản trị viên.'}
@@ -1383,7 +1388,7 @@ export function AuthActionPage({
           subtitle: (
             <>
               {'Tài khoản '}
-              <strong className="text-[var(--planora-text)] font-semibold user-email-placeholder">
+              <strong className="text-[var(--planora-text)] font-semibold user-email-placeholder break-all">
                 {email || 'địa chỉ email của bạn'}
               </strong>
               {' đã nhập sai mật khẩu '}
@@ -1493,19 +1498,23 @@ export function AuthActionPage({
   const currentConfig = getModeConfig();
 
   const footer = (
-    <footer className="mt-8 text-center text-xs text-[var(--planora-muted)] v3-space-y-2">
+    <footer className="planora-auth-footer mt-8 text-center text-xs text-[var(--planora-muted)] v3-space-y-2">
       <p className="m-0">
         Planora — Nền tảng điều phối luồng làm việc AI · 2026 · Xác thực tài khoản và phân quyền quản trị
       </p>
-      <div className="flex items-center justify-center gap-3 text-xs text-[var(--planora-muted)]">
-        <a onClick={followLink} href="/" className="hover:text-[var(--planora-text)] transition-colors">
+      <div className="planora-auth-footer-links flex flex-wrap items-center justify-center gap-x-2 text-xs text-[var(--planora-muted)]">
+        <a
+          onClick={followLink}
+          href="/"
+          className="planora-auth-footer-link inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-2 py-2 hover:text-[var(--planora-text)] transition-colors"
+        >
           Trang chủ
         </a>
-        <span className="text-[var(--planora-divider)]">·</span>
+        <span className="text-[var(--planora-divider)] select-none" aria-hidden="true">·</span>
         <a
           onClick={followLink}
           href="/privacy"
-          className="text-[var(--planora-primary)] hover:underline font-medium transition-colors"
+          className="planora-auth-footer-link inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-2 py-2 text-[var(--planora-primary)] hover:underline font-medium transition-colors"
         >
           Chính sách an toàn &amp; Dữ liệu
         </a>

@@ -13,6 +13,9 @@
   background-color: var(--planora-canvas);
   color: var(--planora-text);
   box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .planora-auth-top-nav {
@@ -83,14 +86,15 @@
   align-items: center;
   gap: clamp(32px, 5vw, 64px);
   box-sizing: border-box;
+  min-width: 0;
 }
 
 .planora-auth-main.has-editorial {
-  grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
 }
 
 .planora-auth-main.no-editorial {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   max-width: 480px;
 }
 
@@ -248,6 +252,7 @@
   max-width: 460px;
   justify-self: center;
   box-sizing: border-box;
+  min-width: 0;
 }
 
 .planora-auth-kicker {
@@ -279,6 +284,9 @@
   color: var(--planora-text);
   letter-spacing: -0.02em;
   font-weight: 600;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
 }
 
 .planora-auth-subtitle {
@@ -286,6 +294,19 @@
   line-height: 1.6;
   color: var(--planora-muted);
   margin: 0 0 24px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
+}
+
+.user-email-placeholder {
+  display: inline-block;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  word-break: break-all;
+  vertical-align: bottom;
 }
 
 /* Auth Tabs */
@@ -610,16 +631,43 @@
   padding: 0 4px;
 }
 
+/* Footer Links (F2: tap target min 44px) */
+.planora-auth-footer {
+  margin-top: 24px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.planora-auth-footer-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.planora-auth-footer-link {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 6px;
+  box-sizing: border-box;
+  text-decoration: none;
+}
+
 /* Responsive Breakpoints */
 @media (max-width: 1023.98px) {
   .planora-auth-main.has-editorial {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .planora-auth-editorial {
     display: none;
   }
   .planora-auth-card {
-    max-width: 480px;
+    max-width: min(100%, 480px);
+    min-width: 0;
   }
 }
 
@@ -629,10 +677,13 @@
   }
   .planora-auth-main {
     padding: 20px 16px 40px;
+    min-width: 0;
   }
   .planora-auth-card {
     padding: 28px 20px;
     border-radius: var(--planora-radius-xl);
+    max-width: 100%;
+    min-width: 0;
   }
   .planora-auth-heading {
     font-size: 26px;
@@ -640,8 +691,14 @@
 }
 
 @media (max-width: 360px) {
+  .planora-auth-main {
+    padding: 16px 12px 32px;
+    min-width: 0;
+  }
   .planora-auth-card {
     padding: 20px 14px;
+    max-width: 100%;
+    min-width: 0;
   }
   .planora-auth-heading {
     font-size: 22px;

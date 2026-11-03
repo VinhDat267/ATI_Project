@@ -319,4 +319,61 @@ describe('PL-04 Planora AuthAction & Account Lifecycle', () => {
       });
     });
   });
+
+  describe('F1 & F2 regression: Long email containment & Footer tap targets', () => {
+    const longEmail = 'a'.repeat(64) + '@' + 'b'.repeat(63) + '.example.test'; // 141 characters
+
+    it('renders 141-character valid long email with break-all in blocked-locked mode', () => {
+      render(
+        <AuthActionPage
+          mode="blocked-locked"
+          email={longEmail}
+          navigate={vi.fn()}
+        />
+      );
+
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Tài khoản đã bị tạm khóa');
+      const emailEl = document.querySelector('.user-email-placeholder');
+      expect(emailEl).toBeInTheDocument();
+      expect(emailEl).toHaveTextContent(longEmail);
+      expect(emailEl?.className).toContain('user-email-placeholder');
+      expect(emailEl?.className).toContain('break-all');
+    });
+
+    it('renders 141-character email with break-all in blocked-pending, blocked-attempts and email-not-verified', () => {
+      const testModes: AuthActionMode[] = ['blocked-pending', 'blocked-attempts', 'email-not-verified', 'verify-success'];
+      for (const m of testModes) {
+        cleanup();
+        render(
+          <AuthActionPage
+            mode={m}
+            email={longEmail}
+            navigate={vi.fn()}
+          />
+        );
+        const emailEl = document.querySelector('.user-email-placeholder');
+        expect(emailEl).toBeInTheDocument();
+        expect(emailEl).toHaveTextContent(longEmail);
+        expect(emailEl?.className).toContain('break-all');
+      }
+    });
+
+    it('renders footer links with planora-auth-footer-link class and valid targets', () => {
+      render(
+        <AuthActionPage
+          mode="blocked-locked"
+          email={longEmail}
+          navigate={vi.fn()}
+        />
+      );
+
+      const homeLink = screen.getByRole('link', { name: 'Trang chủ' });
+      expect(homeLink).toHaveAttribute('href', '/');
+      expect(homeLink.className).toContain('planora-auth-footer-link');
+
+      const privacyLink = screen.getByRole('link', { name: 'Chính sách an toàn & Dữ liệu' });
+      expect(privacyLink).toHaveAttribute('href', '/privacy');
+      expect(privacyLink.className).toContain('planora-auth-footer-link');
+    });
+  });
 });

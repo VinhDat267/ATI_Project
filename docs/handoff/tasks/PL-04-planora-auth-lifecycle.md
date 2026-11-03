@@ -82,4 +82,25 @@ Di chuyển toàn bộ các màn hình xác thực nâng cao và vòng đời t�
 - **Bằng chứng kiểm tra thực tế:**
   - `npm run typecheck:v3`: PASS (exit code 0).
   - `npm run build:v3`: PASS (exit code 0).
-  - `npm test -w @wap/chat-web`: PASS (99 test files, 1095/1095 tests pass, exit code 0).
+  - `npm test -w @wap/chat-web`: PASS (99 test files, 1098/1098 tests pass, exit code 0).
+
+---
+
+## 6. Khắc phục Codex Review Vòng 1 (F1–F3)
+
+- **Trạng thái:** `STATUS: READY_FOR_CODEX_REVIEW_R2`
+- **Các findings đã khắc phục triệt để:**
+  1. **F1 (P2) · Containment & text wrap cho email hợp lệ dài (141 ký tự):**
+     - Bổ sung `overflow-wrap: anywhere; word-break: break-word; word-break: break-all; min-width: 0; max-width: 100%; display: inline-block;` cho `.user-email-placeholder` và subtitle/card containment trong `page.css` và `auth.css`.
+     - Loại bỏ track minimum `340px` cứng trong grid template `has-editorial` trên desktop (`minmax(0, 0.85fr)`), co dãn card `max-width: min(100%, 480px)` trên mobile.
+     - Thêm unit test regression trong `tests/planora-auth-lifecycle.test.tsx` kiểm chứng render email 141 ký tự không bị tràn và có class `break-all`.
+  2. **F2 (P3) · Hai link footer đáp ứng tap target $\ge 44\text{px}$:**
+     - Tạo class `.planora-auth-footer-link` với `min-height: 44px; min-width: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 8px 6px;`.
+     - Bổ sung assertion kiểm tra chiều cao và chiều rộng của 2 link footer (`Trang chủ` và `Chính sách an toàn & Dữ liệu`) $\ge 44\text{px}$ trong `tests/browser/planora-auth-lifecycle.spec.ts`.
+  3. **F3 (P2) · Nối matcher `PL-04:` vào default scenario runner:**
+     - Bổ sung `|PL-04:` vào grep regex của default scenario và auth02 scenario trong `scripts/test-v3-browser.mjs`.
+     - Giúp `npm run test:browser:v3` tự động chạy toàn bộ 20 tests của PL-04.
+- **Bằng chứng kiểm tra sau review fixes:**
+  - `npm run typecheck:v3`: PASS (exit code 0).
+  - `npm run build:v3`: PASS (exit code 0).
+  - `npm test -w @wap/chat-web`: PASS 99 files, 1098/1098 tests (exit code 0).
