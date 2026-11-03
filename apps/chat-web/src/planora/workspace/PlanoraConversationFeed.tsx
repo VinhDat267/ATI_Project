@@ -50,6 +50,19 @@ export function PlanoraConversationFeed({
     }
   }, [messages.length, streamingText]);
 
+  // Keep near-bottom position when feed dimensions or dynamic padding change (R4)
+  useLayoutEffect(() => {
+    const box = areaRef.current;
+    if (!box) return;
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {
+      if (nearBottom.current) {
+        box.scrollTop = box.scrollHeight;
+      }
+    });
+    observer?.observe(box);
+    return () => observer?.disconnect();
+  }, []);
+
   const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
     const box = event.currentTarget;
     nearBottom.current = box.scrollHeight - box.clientHeight - box.scrollTop < 120;
@@ -63,6 +76,7 @@ export function PlanoraConversationFeed({
       aria-live="polite"
       aria-label="Hội thoại"
       onScroll={handleScroll}
+      style={{ paddingBottom: 'calc(var(--cockpit-bottom-space, 112px) + 24px)' }}
       className="planora-conversation-feed planora-chat-feed flex-1 overflow-y-auto min-h-0 w-full max-w-[var(--planora-chat-max-width)] mx-auto px-4 sm:px-6 pt-6 pb-28 sm:pb-32 space-y-5"
     >
       {messages.map((message) => {

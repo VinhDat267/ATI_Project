@@ -12,9 +12,7 @@
    ========================================================================== */
 
 .planora-shell {
-  height: 100dvh;
-  max-height: 100dvh;
-  min-height: 0;
+  min-height: 100dvh;
   width: 100%;
   background-color: var(--planora-canvas);
   color: var(--planora-text);
@@ -22,7 +20,6 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
 /* Skip link for keyboard / screen reader accessibility */
@@ -50,12 +47,9 @@
 .planora-screen-layout {
   display: flex;
   flex: 1;
-  height: 100%;
-  max-height: 100%;
-  min-height: 0;
+  min-height: 100dvh;
   width: 100%;
   position: relative;
-  overflow: hidden;
 }
 
 /* ==========================================================================
@@ -315,14 +309,10 @@
 .planora-main-work {
   flex: 1;
   min-width: 0;
-  height: 100%;
-  max-height: 100%;
-  min-height: 0;
   display: flex;
   flex-direction: column;
   position: relative;
   background-color: var(--planora-canvas);
-  overflow: hidden;
 }
 
 .planora-mobile-bar {
@@ -371,10 +361,6 @@
   flex-direction: column;
   min-width: 0;
   width: 100%;
-  height: 100%;
-  max-height: 100%;
-  min-height: 0;
-  overflow: hidden;
 }
 
 /* ==========================================================================
@@ -508,6 +494,44 @@
    7. Planora Chat Workspace, Feed & Composer Layout (PL-05)
    ========================================================================== */
 
+/* Shell height containment scoped specifically to chat workspace (PL-05 R1/R3) */
+.planora-shell:has(.planora-chat-workspace) {
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.planora-screen-layout:has(.planora-chat-workspace) {
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.planora-main-work:has(.planora-chat-workspace) {
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.planora-content-body:has(.planora-chat-workspace) {
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Eliminate document scroll padding in Planora Chat so document doesn't scroll (PL-05 R4) */
+:root:has(.planora-chat-workspace) body {
+  padding-bottom: 0 !important;
+}
+
+:root:has(.planora-chat-workspace) {
+  scroll-padding-bottom: 0 !important;
+}
+
 .planora-chat-workspace {
   flex: 1;
   display: flex;
@@ -525,6 +549,7 @@
   min-height: 0;
   overflow-y: auto;
   box-sizing: border-box;
+  padding-bottom: calc(var(--cockpit-bottom-space, 112px) + 24px) !important;
 }
 
 @media (min-width: 1024px) {

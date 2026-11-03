@@ -138,4 +138,25 @@ Khôi phục bố cục không gian làm việc hội thoại Planora (Planora C
     - `npm test -w @wap/chat-web`: PASS 100/100 test files, 1115/1115 tests (exit code 0).
     - `npm run build:v3`: PASS (exit code 0).
     - `node scripts/test-v3-web-build-security.mjs`: PASS (exit code 0).
+
+- **Kết quả đợt sửa findings vòng 3 (R3-R4):**
+  1. `apps/chat-web/src/planora/styles/shell.css`:
+     - **R3 fix:** Hoàn nguyên `.planora-shell`, `.planora-screen-layout`, `.planora-main-work`, `.planora-content-body` về trạng thái không khóa chiều cao/overflow cố định, phục hồi hoàn toàn cuộn trang thông qua document scrolling và chuột wheel cho các trang ngoài chat (`/settings`, `/history`, `/account`, `/guide`).
+     - Áp dụng các quy tắc chiều cao hữu hạn (`height: 100dvh; overflow: hidden;`) độc quyền cho không gian làm việc chat thông qua bộ chọn scoped `:has(.planora-chat-workspace)` trên toàn bộ chuỗi layout cha.
+     - **R4 fix:** Loại bỏ khoảng đệm thừa trên `body` trong chế độ chat qua `:root:has(.planora-chat-workspace) body { padding-bottom: 0 !important; }`, triệt tiêu hoàn toàn thanh cuộn document thứ hai trong chat.
+     - Thiết lập padding động dưới chân feed: `.planora-conversation-feed { padding-bottom: calc(var(--cockpit-bottom-space, 112px) + 24px) !important; }`.
+  2. `apps/chat-web/src/planora/workspace/PlanoraConversationFeed.tsx`:
+     - Gắn `style={{ paddingBottom: 'calc(var(--cockpit-bottom-space, 112px) + 24px)' }}` bảo đảm feed tự động co giãn vùng đệm đáy theo biến `--cockpit-bottom-space` do `ChatComposer` cập nhật theo chiều cao thực của footer.
+     - Bổ sung `ResizeObserver` giữ vị trí cuộn ở sát đáy khi kích thước hoặc padding của feed thay đổi do composer nhiều dòng mở rộng.
+  3. `apps/chat-web/tests/planora-chat.test.tsx`:
+     - Kiểm chứng feed container sở hữu dynamic padding `calc(var(--cockpit-bottom-space, 112px) + 24px)`. Tổng số unit tests: 17/17 PASS.
+  4. `apps/chat-web/tests/browser/planora-chat.spec.ts`:
+     - Bổ sung regression test cho R3: kiểm chứng mouse wheel scrolling trên route `/settings` hoạt động bình thường trên cả desktop (1440x900) và mobile (375x812) ở 2 giao diện light/dark.
+     - Bổ sung regression test cho R4: mở preview có lịch sử dài, nhập draft 14 dòng vào dock composer, xác nhận `#global-bottom-bar` cao >= 180px, cuộn feed tới đáy, xác nhận document scroll = 0, khoảng cách nút `#btn-tech-toggle` nằm hoàn toàn phía trên footer và hit-test tâm nút trả về chính nút, không bị che bởi composer textarea.
+  - **Kiểm tra đã chạy và kết quả vòng 3:**
+    - `npm run typecheck:v3`: PASS (exit code 0).
+    - `npm test -w @wap/chat-web -- tests/planora-chat.test.tsx`: PASS 17/17 tests (exit code 0).
+    - `npm test -w @wap/chat-web`: PASS 100/100 test files, 1115/1115 tests (exit code 0).
+    - `npm run build:v3`: PASS (exit code 0).
+    - `node scripts/test-v3-web-build-security.mjs`: PASS (exit code 0).
 - **Trạng thái:** `STATUS: READY_FOR_CODEX_REVIEW`.

@@ -544,6 +544,8 @@ describe('PL-05: Planora Chat Workspace & One-Composer Policy', () => {
       expect(feed).toHaveClass('flex-1');
       // Must contain sufficient bottom padding to prevent overlap with #global-bottom-bar
       expect(feed.className).toMatch(/pb-(28|32)/);
+      // R4: Dynamic reserve for multiline composer
+      expect(feed.style.paddingBottom).toBe('calc(var(--cockpit-bottom-space, 112px) + 24px)');
     });
   });
 
