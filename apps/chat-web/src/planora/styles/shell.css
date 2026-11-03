@@ -377,19 +377,20 @@
     max-width: 85vw;
     z-index: 60;
     transform: translateX(-100%);
-    transition: transform var(--planora-transition-base), visibility var(--planora-transition-base);
     box-shadow: var(--planora-shadow-lg);
   }
 
   .planora-sidebar:not(.planora-sidebar-open) {
     visibility: hidden;
     pointer-events: none;
+    transition: transform var(--planora-transition-base), visibility 0s var(--planora-transition-base);
   }
 
   .planora-sidebar.planora-sidebar-open {
     transform: translateX(0);
     visibility: visible;
     pointer-events: auto;
+    transition: transform var(--planora-transition-base);
   }
 
   .planora-sidebar-close {

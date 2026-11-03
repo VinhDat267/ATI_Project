@@ -12,6 +12,7 @@ import {
 import { useChatStore } from '../src/store/chat-store';
 import { apiClient } from '../src/services/api-client';
 import { authStorage } from '../src/services/auth-storage';
+import { loadConversationHistory } from '../src/hooks/use-conversation-history';
 import type { User, WorkspaceSummary } from '../src/types';
 
 const memberUser: User = {
@@ -418,8 +419,13 @@ describe('PlanoraShell & PlanoraSidebar (PL-02)', () => {
       useChatStore.getState().setConversationId('conv-alpha');
 
       let resolveAlphaRequest!: (val: any) => void;
-      const delayedAlphaPromise = new Promise((resolve) => {
-        resolveAlphaRequest = resolve;
+      vi.spyOn(apiClient, 'getConversation').mockImplementation((id: string) => {
+        if (id === 'conv-alpha') {
+          return new Promise((resolve) => {
+            resolveAlphaRequest = resolve;
+          });
+        }
+        return Promise.resolve({ conversation: { id }, messages: [] });
       });
 
       render(
@@ -435,6 +441,12 @@ describe('PlanoraShell & PlanoraSidebar (PL-02)', () => {
         </PlanoraShell>
       );
 
+      // Trigger actual conversation history load for Alpha through loadConversationHistory
+      const historyPromise = loadConversationHistory(
+        'conv-alpha',
+        () => getActiveWorkspaceId() === 'ws-team-alpha' && useChatStore.getState().conversationId === 'conv-alpha'
+      );
+
       // User switches to Personal workspace while Alpha request is still in-flight
       setActiveWorkspaceId('personal');
       expect(getActiveWorkspaceId()).toBe('personal');
@@ -446,24 +458,33 @@ describe('PlanoraShell & PlanoraSidebar (PL-02)', () => {
         messages: [{ id: 'm-alpha', role: 'assistant', content: 'Stale Alpha Reply' }],
       };
       resolveAlphaRequest(alphaResponseData);
-      await delayedAlphaPromise;
+      await historyPromise;
 
-      // Ensure that if a handler receives a response belonging to the old workspace,
-      // the active workspace remains 'personal' with clean store
+      // Because workspace switched, isCurrent() returned false and discarded the data.
+      // Active workspace remains 'personal' with clean store!
       expect(getActiveWorkspaceId()).toBe('personal');
       expect(useChatStore.getState().conversationId).toBeNull();
       expect(useChatStore.getState().messages).toHaveLength(0);
     });
   });
 
-  describe('7. Codex Findings Regressions (F1 - F6)', () => {
-    it('F1: Sidebar "Hội thoại mới" preserves pending request lock on c1 when navigating away and back', () => {
+  describe('7. Codex Findings Regressions (F1 - F6, R1 - R4)', () => {
+    it('F1 & R3: Sidebar "Hội thoại mới" preserves pending request lock on c1 when navigating away and back', () => {
       const navigate = vi.fn();
-      useChatStore.getState().setConversationId('c1');
-      useChatStore.getState().setIsPlanning(true, 'c1', 'req-in-flight-1');
+      const handleNewConversation = () => {
+        useChatStore.getState().reset({ preservePlanning: true });
+        navigate('/');
+      };
 
+      // Set up conversation c1 with an in-flight planning request
+      useChatStore.getState().setConversationId('c1');
+      const claimed = useChatStore.getState().beginPlanning('c1', 'req-in-flight-1');
+      expect(claimed).toBe(true);
       expect(useChatStore.getState().isPlanning).toBe(true);
       expect(useChatStore.getState().planningByConversation['c1']?.requestId).toBe('req-in-flight-1');
+
+      // Attempting to claim/send another request in c1 while req-in-flight-1 is pending is rejected
+      expect(useChatStore.getState().beginPlanning('c1', 'req-duplicate')).toBe(false);
 
       render(
         <PlanoraShell
@@ -471,6 +492,7 @@ describe('PlanoraShell & PlanoraSidebar (PL-02)', () => {
           currentTab="workspace"
           navigate={navigate}
           onLogout={vi.fn()}
+          onNewConversation={handleNewConversation}
         >
           <main>
             <h1>Hội thoại c1</h1>
@@ -485,18 +507,26 @@ describe('PlanoraShell & PlanoraSidebar (PL-02)', () => {
       // Navigates to / and conversationId becomes null for new draft
       expect(navigate).toHaveBeenCalledWith('/');
       expect(useChatStore.getState().conversationId).toBeNull();
+      expect(useChatStore.getState().isPlanning).toBe(false);
 
       // Critical invariant: planning record for c1 is NOT wiped out!
       expect(useChatStore.getState().planningByConversation['c1']).toBeDefined();
       expect(useChatStore.getState().planningByConversation['c1']?.requestId).toBe('req-in-flight-1');
 
-      // Return to c1 via history: lock is still active!
+      // Return to c1 via history: chat store automatically restores isPlanning without manual intervention
       useChatStore.getState().setConversationId('c1');
-      useChatStore.setState({ isPlanning: !!useChatStore.getState().planningByConversation['c1'] });
       expect(useChatStore.getState().isPlanning).toBe(true);
+
+      // In c1, sending another request remains blocked
+      expect(useChatStore.getState().beginPlanning('c1', 'req-duplicate-2')).toBe(false);
+
+      // Only once the original in-flight request finishes does c1 unlock
+      useChatStore.getState().setIsPlanning(false, 'c1', 'req-in-flight-1');
+      expect(useChatStore.getState().isPlanning).toBe(false);
+      expect(useChatStore.getState().beginPlanning('c1', 'req-next')).toBe(true);
     });
 
-    it('F2: Mobile drawer isolates focus, traps Tab navigation, applies inert to background, and restores focus on close', async () => {
+    it('F2 & R1: Mobile drawer isolates focus, traps Tab navigation, applies inert to background, and restores focus to opener', async () => {
       render(
         <PlanoraShell
           user={memberUser}
@@ -511,8 +541,9 @@ describe('PlanoraShell & PlanoraSidebar (PL-02)', () => {
       );
 
       const toggleBtn = screen.getByRole('button', { name: /Mở menu điều hướng/i });
+      const wsPill = screen.getByRole('button', { name: /Mở menu không gian làm việc/i });
 
-      // Open drawer
+      // Test 1: Open via hamburger button
       fireEvent.click(toggleBtn);
       expect(toggleBtn).toHaveAttribute('aria-expanded', 'true');
 
@@ -537,12 +568,24 @@ describe('PlanoraShell & PlanoraSidebar (PL-02)', () => {
       await waitFor(() => {
         expect(document.activeElement).toBe(toggleBtn);
       });
-
-      // Background no longer inert
       expect(mainWork).not.toHaveAttribute('inert');
+
+      // Test 2 (R1): Open via workspace pill button
+      fireEvent.click(wsPill);
+      expect(toggleBtn).toHaveAttribute('aria-expanded', 'true');
+      await waitFor(() => {
+        expect(document.activeElement).toBe(closeBtn);
+      });
+
+      // Press Escape: focus must return to wsPill!
+      fireEvent.keyDown(window, { key: 'Escape' });
+      expect(toggleBtn).toHaveAttribute('aria-expanded', 'false');
+      await waitFor(() => {
+        expect(document.activeElement).toBe(wsPill);
+      });
     });
 
-    it('F3 & F4: WorkspaceSwitcher overlays render via Portal, have role="dialog", and Escape closes modal before drawer', async () => {
+    it('F3, F4 & R2: WorkspaceSwitcher overlays render via Portal, trap focus, have role="dialog", and Escape closes modal before drawer', async () => {
       render(
         <PlanoraShell
           user={memberUser}
@@ -573,10 +616,23 @@ describe('PlanoraShell & PlanoraSidebar (PL-02)', () => {
       expect(createModal).toBeInTheDocument();
       expect(createModal.parentElement).toBe(document.body);
 
+      // R2: Initial focus moves to primary input inside modal
+      const orgNameInput = screen.getByLabelText(/Tên tổ chức/i);
+      await waitFor(() => {
+        expect(document.activeElement).toBe(orgNameInput);
+      });
+
+      // R2: Focus trap loops within modal
+      fireEvent.keyDown(window, { key: 'Tab', shiftKey: true });
+      expect(createModal.contains(document.activeElement)).toBe(true);
+
       // Press Escape: closes the create modal first, focus returns to opener, drawer remains open!
       fireEvent.keyDown(window, { key: 'Escape' });
       expect(screen.queryByRole('dialog', { name: 'Tạo không gian tổ chức mới' })).toBeNull();
       expect(toggleBtn).toHaveAttribute('aria-expanded', 'true');
+      await waitFor(() => {
+        expect(document.activeElement).toBe(createOrgBtn);
+      });
     });
 
     it('F5: Route / (home) is recognized as workspace tab and renders active nav link and SidebarHistory', async () => {

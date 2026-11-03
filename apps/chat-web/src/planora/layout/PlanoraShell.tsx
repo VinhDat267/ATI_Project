@@ -29,6 +29,8 @@ export function PlanoraShell({
 }: PlanoraShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const wsPillRef = useRef<HTMLButtonElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
   const prevOpenRef = useRef(false);
@@ -79,10 +81,14 @@ export function PlanoraShell({
     });
   }, [navigate]);
 
-  // Focus restore and initial focus for mobile drawer (F2)
+  // Focus restore and initial focus for mobile drawer (F2, R1)
   useEffect(() => {
     if (prevOpenRef.current && !drawerOpen) {
-      triggerRef.current?.focus();
+      if (openerRef.current && typeof openerRef.current.focus === 'function') {
+        openerRef.current.focus();
+      } else {
+        triggerRef.current?.focus();
+      }
     }
     prevOpenRef.current = drawerOpen;
 
@@ -92,20 +98,34 @@ export function PlanoraShell({
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
-    // Move initial focus into drawer on mobile (F2)
-    queueMicrotask(() => {
-      if (closeBtnRef.current) {
-        closeBtnRef.current.focus();
-      } else if (sidebarRef.current) {
-        const first = sidebarRef.current.querySelector<HTMLElement>(
-          'button:not(:disabled), [href], input:not(:disabled)'
-        );
-        first?.focus();
-      }
-    });
+    // Move initial focus into drawer on mobile (F2, R1)
+    let frameId1: number;
+    let frameId2: number;
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    const performFocus = () => {
+      const nonSidebarModal = document.querySelector('[role="dialog"]:not(.planora-sidebar)');
+      if (nonSidebarModal) return;
+
+      const target = closeBtnRef.current || sidebarRef.current?.querySelector<HTMLElement>(
+        'button:not(:disabled), [href], input:not(:disabled)'
+      );
+      target?.focus();
+    };
+
+    performFocus();
+    if (typeof requestAnimationFrame === 'function') {
+      frameId1 = requestAnimationFrame(() => {
+        frameId2 = requestAnimationFrame(() => {
+          performFocus();
+        });
+      });
+    } else {
+      timeoutId = setTimeout(performFocus, 0);
+    }
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // If a non-sidebar modal dialog is currently open, let that dialog handle Escape (F4)
+      // If a non-sidebar modal dialog is currently open, let that dialog handle Escape and Tab (F4, R2)
       const nonSidebarModal = document.querySelector('[role="dialog"]:not(.planora-sidebar)');
       if (nonSidebarModal) return;
 
@@ -120,10 +140,25 @@ export function PlanoraShell({
           sidebarRef.current.querySelectorAll<HTMLElement>(
             'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
           )
-        );
+        ).filter((el) => {
+          return el.offsetWidth > 0 || el.offsetHeight > 0 || el === closeBtnRef.current || el.getClientRects().length > 0;
+        });
+
         if (focusable.length > 0) {
           const first = focusable[0];
           const last = focusable[focusable.length - 1];
+
+          // If focus is currently outside the sidebar (e.g. initial focus was interrupted), bring it inside (R1)
+          if (!sidebarRef.current.contains(document.activeElement)) {
+            e.preventDefault();
+            if (e.shiftKey) {
+              last.focus();
+            } else {
+              first.focus();
+            }
+            return;
+          }
+
           if (e.shiftKey && document.activeElement === first) {
             e.preventDefault();
             last.focus();
@@ -138,6 +173,11 @@ export function PlanoraShell({
     window.addEventListener('keydown', handleKeyDown);
 
     return () => {
+      if (typeof cancelAnimationFrame === 'function') {
+        cancelAnimationFrame(frameId1);
+        cancelAnimationFrame(frameId2);
+      }
+      clearTimeout(timeoutId);
       document.body.style.overflow = originalOverflow;
       window.removeEventListener('keydown', handleKeyDown);
     };
@@ -182,7 +222,10 @@ export function PlanoraShell({
                 ref={triggerRef}
                 type="button"
                 className="planora-mobile-menu-btn"
-                onClick={() => setDrawerOpen((prev) => !prev)}
+                onClick={(e) => {
+                  openerRef.current = e.currentTarget;
+                  setDrawerOpen((prev) => !prev);
+                }}
                 aria-label="Mở menu điều hướng"
                 aria-expanded={drawerOpen}
               >
@@ -195,9 +238,13 @@ export function PlanoraShell({
 
               <div className="planora-mobile-workspace">
                 <button
+                  ref={wsPillRef}
                   type="button"
                   className="planora-mobile-ws-pill"
-                  onClick={() => setDrawerOpen(true)}
+                  onClick={(e) => {
+                    openerRef.current = e.currentTarget;
+                    setDrawerOpen(true);
+                  }}
                   aria-label="Mở menu không gian làm việc"
                 >
                   <span>{getActiveWorkspaceId() === 'personal' ? '👤' : '🏢'}</span>

@@ -40,36 +40,154 @@ export function WorkspaceSwitcher({ navigate, variant = 'header' }: WorkspaceSwi
   const buttonRef = useRef<HTMLButtonElement>(null);
   const createTriggerRef = useRef<HTMLButtonElement>(null);
   const joinTriggerRef = useRef<HTMLButtonElement>(null);
+  const createModalRef = useRef<HTMLDivElement>(null);
+  const joinModalRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
 
-  // Escape key and focus return for create organization modal (F3 & F4)
+  // Focus lifecycle, trap, and Escape handling for create organization modal (F3, F4, R2)
   useEffect(() => {
     if (!showCreateModal) return;
+
+    let frameId: number;
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const focusInitial = () => {
+      const target =
+        createModalRef.current?.querySelector<HTMLElement>('#create-org-name') ||
+        createModalRef.current?.querySelector<HTMLElement>('input:not(:disabled), button:not(:disabled)');
+      target?.focus();
+    };
+
+    focusInitial();
+    if (typeof requestAnimationFrame === 'function') {
+      frameId = requestAnimationFrame(focusInitial);
+    } else {
+      timeoutId = setTimeout(focusInitial, 0);
+    }
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
         setShowCreateModal(false);
         createTriggerRef.current?.focus();
+        return;
+      }
+
+      if (e.key === 'Tab' && createModalRef.current) {
+        const focusables = Array.from(
+          createModalRef.current.querySelectorAll<HTMLElement>(
+            'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+          )
+        );
+        if (focusables.length > 0) {
+          const first = focusables[0];
+          const last = focusables[focusables.length - 1];
+
+          if (!createModalRef.current.contains(document.activeElement)) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.shiftKey) {
+              last.focus();
+            } else {
+              first.focus();
+            }
+            return;
+          }
+
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            e.stopPropagation();
+            last.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            e.stopPropagation();
+            first.focus();
+          }
+        }
       }
     };
+
     window.addEventListener('keydown', handleKeyDown, true);
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
+    return () => {
+      if (typeof cancelAnimationFrame === 'function') {
+        cancelAnimationFrame(frameId);
+      }
+      clearTimeout(timeoutId);
+      window.removeEventListener('keydown', handleKeyDown, true);
+    };
   }, [showCreateModal]);
 
-  // Escape key and focus return for join organization modal (F3 & F4)
+  // Focus lifecycle, trap, and Escape handling for join organization modal (F3, F4, R2)
   useEffect(() => {
     if (!showJoinModal) return;
+
+    let frameId: number;
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const focusInitial = () => {
+      const target =
+        joinModalRef.current?.querySelector<HTMLElement>('#join-org-code') ||
+        joinModalRef.current?.querySelector<HTMLElement>('input:not(:disabled), button:not(:disabled)');
+      target?.focus();
+    };
+
+    focusInitial();
+    if (typeof requestAnimationFrame === 'function') {
+      frameId = requestAnimationFrame(focusInitial);
+    } else {
+      timeoutId = setTimeout(focusInitial, 0);
+    }
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
         setShowJoinModal(false);
         joinTriggerRef.current?.focus();
+        return;
+      }
+
+      if (e.key === 'Tab' && joinModalRef.current) {
+        const focusables = Array.from(
+          joinModalRef.current.querySelectorAll<HTMLElement>(
+            'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+          )
+        );
+        if (focusables.length > 0) {
+          const first = focusables[0];
+          const last = focusables[focusables.length - 1];
+
+          if (!joinModalRef.current.contains(document.activeElement)) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.shiftKey) {
+              last.focus();
+            } else {
+              first.focus();
+            }
+            return;
+          }
+
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            e.stopPropagation();
+            last.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            e.stopPropagation();
+            first.focus();
+          }
+        }
       }
     };
+
     window.addEventListener('keydown', handleKeyDown, true);
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
+    return () => {
+      if (typeof cancelAnimationFrame === 'function') {
+        cancelAnimationFrame(frameId);
+      }
+      clearTimeout(timeoutId);
+      window.removeEventListener('keydown', handleKeyDown, true);
+    };
   }, [showJoinModal]);
 
   // Subscribe to storage changes
@@ -391,9 +509,10 @@ export function WorkspaceSwitcher({ navigate, variant = 'header' }: WorkspaceSwi
         </div>
       )}
 
-      {/* Modal Tạo Không Gian Tổ Chức (Rendered via Portal to escape transformed sidebar containing block - F3 & F4) */}
+      {/* Modal Tạo Không Gian Tổ Chức (Rendered via Portal to escape transformed sidebar containing block - F3, F4, R2) */}
       {showCreateModal && typeof document !== 'undefined' && createPortal(
         <div
+          ref={createModalRef}
           role="dialog"
           aria-modal="true"
           aria-label="Tạo không gian tổ chức mới"
@@ -479,9 +598,10 @@ export function WorkspaceSwitcher({ navigate, variant = 'header' }: WorkspaceSwi
         document.body
       )}
 
-      {/* Modal Tham Gia Bằng Mã Mời (Rendered via Portal to escape transformed sidebar containing block - F3 & F4) */}
+      {/* Modal Tham Gia Bằng Mã Mời (Rendered via Portal to escape transformed sidebar containing block - F3, F4, R2) */}
       {showJoinModal && typeof document !== 'undefined' && createPortal(
         <div
+          ref={joinModalRef}
           role="dialog"
           aria-modal="true"
           aria-label="Tham gia tổ chức bằng mã mời"

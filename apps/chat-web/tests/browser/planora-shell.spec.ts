@@ -25,25 +25,28 @@ for (const width of VIEWPORTS) {
       await expect(page.getByRole('main')).toHaveCount(1);
       await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
 
-      // Verify single global navigation
+      // Verify global navigation
       const nav = page.getByRole('navigation', { name: 'Điều hướng chính' });
-      await expect(nav).toHaveCount(1);
-
       const sidebar = page.locator('.planora-sidebar');
 
       if (width >= 1024) {
-        // Desktop: sidebar is visible, 248px width
+        // Desktop (>= 1024px): sidebar is permanent, nav is exposed (count = 1), 248px width
+        await expect(nav).toHaveCount(1);
         await expect(sidebar).toBeVisible();
         const box = await sidebar.boundingBox();
         expect(box?.width).toBeCloseTo(248, -1); // ~248px
       } else {
-        // Mobile / Tablet (< 1024px): sidebar is drawer, initially closed
+        // Mobile / Tablet (< 1024px): sidebar is drawer, initially closed and hidden from a11y tree (nav count = 0)
+        await expect(nav).toHaveCount(0);
         const toggleBtn = page.getByRole('button', { name: /Mở menu điều hướng/i });
         await expect(toggleBtn).toBeVisible();
 
         // Open drawer
         await toggleBtn.click();
         await expect(sidebar).toHaveClass(/planora-sidebar-open/);
+        await expect(sidebar).toBeVisible();
+        // Once drawer is open, navigation is exposed to accessibility tree (nav count = 1)
+        await expect(nav).toHaveCount(1);
 
         // Backdrop visible
         const backdrop = page.locator('.planora-drawer-backdrop.open');
@@ -52,6 +55,8 @@ for (const width of VIEWPORTS) {
         // Press Escape to close drawer
         await page.keyboard.press('Escape');
         await expect(sidebar).not.toHaveClass(/planora-sidebar-open/);
+        // Drawer is closed and hidden again (nav count = 0), focus restored to toggle button
+        await expect(nav).toHaveCount(0);
         await expect(toggleBtn).toBeFocused();
       }
 

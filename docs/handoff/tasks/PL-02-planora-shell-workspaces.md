@@ -77,18 +77,18 @@ Khôi phục bố cục shell Planora chuẩn: sidebar 248px cố định từ b
 
 ## 5. Kết quả
 
-- **Trạng thái:** HOÀN THÀNH (`READY_FOR_CODEX_REVIEW` - Đã fix toàn bộ findings từ Codex Review).
+- **Trạng thái:** HOÀN THÀNH (`READY_FOR_CODEX_REVIEW` - Đã fix toàn bộ findings R1-R4 từ Codex Review Vòng 2).
 - **Files tạo mới:**
-  - `apps/chat-web/src/planora/layout/PlanoraShell.tsx`: Shell component quản lý drawer state, Escape listener theo cấp bậc (ưu tiên dialog con), focus trap/restore, body scroll lock, media query crossing tự động đóng drawer, và context reset khi chuyển workspace.
+  - `apps/chat-web/src/planora/layout/PlanoraShell.tsx`: Shell component quản lý drawer state, Escape listener theo cấp bậc (ưu tiên dialog con), focus trap/restore, lưu `actualOpener` (hamburger hoặc workspace pill) để trả focus chính xác, đồng bộ focus với visibility transition, body scroll lock, media query crossing tự động đóng drawer, và context reset khi chuyển workspace.
   - `apps/chat-web/src/planora/layout/PlanoraSidebar.tsx`: Sidebar 248px gồm Brand, WorkspaceSwitcher, CTA "Hội thoại mới" bảo lưu planning ownership lock (`reset({ preservePlanning: true })`), 5 navigation links (Hội thoại, Nhật ký, Kết nối, Cẩm nang, Quản lý người dùng theo quyền), badge pending schedules/users, SidebarHistory tích hợp và footer (thông tin tài khoản, theme toggle, chính sách, đăng xuất).
   - `apps/chat-web/src/planora/layout/PlanoraPublicHeader.tsx`: Header công khai chuẩn nhận diện Planora, theme toggle và nút đăng nhập.
-  - `apps/chat-web/src/planora/styles/shell.css`: Bố cục CSS chuẩn Planora, sidebar desktop 248px, drawer animation, backdrop, mobile bar và badges; ẩn hoàn toàn drawer đóng khỏi tab order và accessibility tree (`visibility: hidden; pointer-events: none`).
-  - `apps/chat-web/tests/planora-shell.test.tsx`: 18 unit tests bao phủ toàn bộ navigation, modifier clicks, org admin vs global role, pending badges, mobile drawer accessibility lifecycle, single landmarks (main, h1, nav), delayed GET/SSE cross-workspace isolation, và 6 regression tests cho các findings F1-F6 của Codex review.
-  - `apps/chat-web/tests/browser/planora-shell.spec.ts`: Playwright browser test cho 1440/1024/768/375px ở cả hai theme Sáng/Tối.
+  - `apps/chat-web/src/planora/styles/shell.css`: Bố cục CSS chuẩn Planora, sidebar desktop 248px, drawer animation, backdrop, mobile bar và badges; đồng bộ `visibility: visible` tức thời khi mở và hoãn `visibility: hidden` khi đóng (`transition: transform var(--planora-transition-base), visibility 0s var(--planora-transition-base)`).
+  - `apps/chat-web/tests/planora-shell.test.tsx`: 18 unit tests bao phủ toàn bộ navigation, modifier clicks, org admin vs global role, pending badges, mobile drawer accessibility lifecycle (opener restore), single landmarks (main, h1, nav), delayed GET/SSE cross-workspace isolation qua API thật (chứng minh RED không guard và GREEN có guard), và các regression tests cho findings F1-F6 và R1-R4.
+  - `apps/chat-web/tests/browser/planora-shell.spec.ts`: Playwright browser test cho 1440/1024/768/375px ở cả hai theme Sáng/Tối, kiểm tra chuẩn xác a11y navigation trên desktop (count = 1), mobile đóng (count = 0), mobile mở (count = 1) và mobile đóng lại (count = 0, focus khôi phục).
 - **Files sửa đổi:**
   - `apps/chat-web/src/App.tsx`: Bọc các protected routes trong `PlanoraShell`, map route `/` (`home`) sang tab `'workspace'`, kết nối `handleNewConversation` với `reset({ preservePlanning: true })`.
   - `apps/chat-web/src/components/layout/MainNav.tsx`: Triệt tiêu duplicate nav/brand/workspaceSwitcher khi nằm trong `PlanoraShell`, duy trì dải action contextual và `UserNavMenu`.
-  - `apps/chat-web/src/components/layout/WorkspaceSwitcher.tsx`: Hỗ trợ `variant="sidebar"`, render create/join overlays qua `createPortal(..., document.body)` thoát khỏi transform containing block của sidebar, gán `role="dialog"`, xử lý phím Escape capture-phase đóng modal trước drawer.
+  - `apps/chat-web/src/components/layout/WorkspaceSwitcher.tsx`: Hỗ trợ `variant="sidebar"`, render create/join overlays qua `createPortal(..., document.body)` thoát khỏi transform containing block của sidebar, gán `role="dialog"`, bổ sung đầy đủ keyboard focus lifecycle (initial focus vào ô input chính, capture-phase focus trap Tab/Shift+Tab cô lập hoàn toàn khỏi sidebar, trả focus về trigger opener).
   - `apps/chat-web/src/components/layout/SidebarHistory.tsx`: Hỗ trợ `planora` prop để phân biệt accessible name và icon với `HistoryDrawer` của Cockpit; cô lập phạm vi trên trang chat workspace.
   - `apps/chat-web/src/index.css`: Import `shell.css`.
   - `scripts/test-v3-browser.mjs`: Thêm `|PL-02:` vào `scenarios[0].grep`.
@@ -97,4 +97,5 @@ Khôi phục bố cục shell Planora chuẩn: sidebar 248px cố định từ b
   - `npm test -w @wap/chat-web`: 98 test files passed (1074 tests passed, exit code 0).
   - `npm test -w @wap/chat-web -- tests/planora-shell.test.tsx`: 18 tests passed (exit code 0).
   - `npm run build:v3`: build thành công (exit code 0).
-  - Browser E2E: script `apps/chat-web/tests/browser/planora-shell.spec.ts` đã viết hoàn chỉnh và đăng ký trong `scripts/test-v3-browser.mjs`.
+  - `node --check scripts/test-v3-browser.mjs`: exit code 0.
+  - `NOT_RUN`: `node scripts/test-v3-browser.mjs planora-shell.spec.ts` (môi trường máy phát triển không có Docker daemon chạy PostgreSQL trên port 55533; script spec đã được tinh chỉnh chuẩn xác và typecheck pass 0 errors, sẵn sàng chạy trong môi trường CI có Docker).
