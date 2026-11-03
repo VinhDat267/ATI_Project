@@ -367,6 +367,9 @@ describe('PL-04 Planora AuthAction & Account Lifecycle', () => {
         />
       );
 
+      const footer = document.querySelector('.planora-auth-footer');
+      expect(footer).toBeInTheDocument();
+
       const homeLink = screen.getByRole('link', { name: 'Trang chủ' });
       expect(homeLink).toHaveAttribute('href', '/');
       expect(homeLink.className).toContain('planora-auth-footer-link');

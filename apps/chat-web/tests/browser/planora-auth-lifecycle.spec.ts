@@ -40,14 +40,15 @@ for (const vp of VIEWPORTS) {
       const submitBox = await submitBtn.boundingBox();
       expect(submitBox?.height).toBeGreaterThanOrEqual(44);
 
-      // Footer links tap targets >= 44px (F2)
-      const homeLink = page.getByRole('link', { name: 'Trang chủ' });
+      // Footer links tap targets >= 44px (F2/R1)
+      const footer = page.locator('.planora-auth-footer');
+      const homeLink = footer.getByRole('link', { name: 'Trang chủ', exact: true });
       await expect(homeLink).toBeVisible();
       const homeBox = await homeLink.boundingBox();
       expect(homeBox?.height).toBeGreaterThanOrEqual(44);
       expect(homeBox?.width).toBeGreaterThanOrEqual(44);
 
-      const privacyLink = page.getByRole('link', { name: 'Chính sách an toàn & Dữ liệu' });
+      const privacyLink = footer.getByRole('link', { name: 'Chính sách an toàn & Dữ liệu', exact: true });
       await expect(privacyLink).toBeVisible();
       const privacyBox = await privacyLink.boundingBox();
       expect(privacyBox?.height).toBeGreaterThanOrEqual(44);
@@ -104,14 +105,15 @@ for (const vp of VIEWPORTS) {
       const submitBox = await submitBtn.boundingBox();
       expect(submitBox?.height).toBeGreaterThanOrEqual(44);
 
-      // Footer links tap targets >= 44px (F2)
-      const homeLink = page.getByRole('link', { name: 'Trang chủ' });
+      // Footer links tap targets >= 44px (F2/R1)
+      const footer = page.locator('.planora-auth-footer');
+      const homeLink = footer.getByRole('link', { name: 'Trang chủ', exact: true });
       await expect(homeLink).toBeVisible();
       const homeBox = await homeLink.boundingBox();
       expect(homeBox?.height).toBeGreaterThanOrEqual(44);
       expect(homeBox?.width).toBeGreaterThanOrEqual(44);
 
-      const privacyLink = page.getByRole('link', { name: 'Chính sách an toàn & Dữ liệu' });
+      const privacyLink = footer.getByRole('link', { name: 'Chính sách an toàn & Dữ liệu', exact: true });
       await expect(privacyLink).toBeVisible();
       const privacyBox = await privacyLink.boundingBox();
       expect(privacyBox?.height).toBeGreaterThanOrEqual(44);

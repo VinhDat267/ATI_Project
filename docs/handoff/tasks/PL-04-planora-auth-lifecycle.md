@@ -86,9 +86,9 @@ Di chuyển toàn bộ các màn hình xác thực nâng cao và vòng đời t�
 
 ---
 
-## 6. Khắc phục Codex Review Vòng 1 (F1–F3)
+## 6. Khắc phục Codex Review Vòng 1 (F1–F3) & Vòng 2 (R1)
 
-- **Trạng thái:** `STATUS: READY_FOR_CODEX_REVIEW_R2`
+- **Trạng thái:** `STATUS: READY_FOR_CODEX_REVIEW_R3`
 - **Các findings đã khắc phục triệt để:**
   1. **F1 (P2) · Containment & text wrap cho email hợp lệ dài (141 ký tự):**
      - Bổ sung `overflow-wrap: anywhere; word-break: break-word; word-break: break-all; min-width: 0; max-width: 100%; display: inline-block;` cho `.user-email-placeholder` và subtitle/card containment trong `page.css` và `auth.css`.
@@ -100,7 +100,12 @@ Di chuyển toàn bộ các màn hình xác thực nâng cao và vòng đời t�
   3. **F3 (P2) · Nối matcher `PL-04:` vào default scenario runner:**
      - Bổ sung `|PL-04:` vào grep regex của default scenario và auth02 scenario trong `scripts/test-v3-browser.mjs`.
      - Giúp `npm run test:browser:v3` tự động chạy toàn bộ 20 tests của PL-04.
+  4. **R1 (P2) · Locator footer trong browser spec vi phạm Playwright strict mode:**
+     - `page.getByRole('link', { name: 'Trang chủ' })` khớp cả nút link quay lại và footer link trong `/resend-verification`.
+     - Đã scope chính xác: `page.locator('.planora-auth-footer').getByRole('link', { name: 'Trang chủ', exact: true })` và link Chính sách an toàn tương ứng trên cả 2 ca test.
+     - Kiểm chứng: 99 files (1098 tests) PASS, typecheck PASS, build PASS.
 - **Bằng chứng kiểm tra sau review fixes:**
   - `npm run typecheck:v3`: PASS (exit code 0).
   - `npm run build:v3`: PASS (exit code 0).
+  - `node scripts/test-v3-web-build-security.mjs`: PASS (exit code 0).
   - `npm test -w @wap/chat-web`: PASS 99 files, 1098/1098 tests (exit code 0).
