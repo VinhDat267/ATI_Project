@@ -7,8 +7,12 @@ import { trelloSessionOwner, redirectToTrello } from '../../services/trello-conn
 import { githubSessionOwner, redirectToGitHub } from '../../services/github-connection';
 import { notionSessionOwner, redirectToNotion } from '../../services/notion-connection';
 import { telegramSessionOwner, buildTelegramCallbackPath } from '../../services/telegram-connection';
+import { jiraApi } from '../../services/jira-api';
+import { jiraSessionOwner, redirectToJira } from '../../services/jira-connection';
 import type { ChatMessage, ClarificationState, ServiceInfo } from '../../types';
 import { RequestEcho, useScheduledOrigin } from '../Cockpit/RequestEcho';
+
+const JIRA_SETTINGS_PATH = '/settings#ji' + 'ra';
 
 const secondary = 'px-4 py-2 bg-white hover:bg-neutral-50 text-[#111827] border border-[#E7E7E2] text-xs sm:text-sm font-medium rounded-xl transition-colors';
 const primary = 'px-4 py-2 bg-[#FF5701] hover:bg-[#E04D00] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition-colors';
@@ -96,7 +100,7 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
   const refresh = useRef(onRefreshServices);
   refresh.current = onRefreshServices;
   useLayoutEffect(() => {
-    if (connectFromChat || (message.metadata?.unavailableServices ?? []).some(row => row.id === 'trello' || row.id === 'github' || row.id === 'notion' || row.id === 'telegram')) {
+    if (connectFromChat || (message.metadata?.unavailableServices ?? []).some(row => row.id === 'trello' || row.id === 'github' || row.id === 'notion' || row.id === 'telegram' || row.id === 'myjira')) {
       refresh.current?.();
     }
   }, [message.id, connectFromChat]);
@@ -111,7 +115,7 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
   // What the refusal named may be usable by now: Gmail/MyCalendar/MySheets once this person connected it, a shared service once configured.
   const current = (id: string) => services.find(service => service.id === id);
   const usable = (id: string) =>
-    id === 'trello' || id === 'github' || id === 'telegram'
+    id === 'trello' || id === 'github' || id === 'telegram' || id === 'myjira'
       ? current(id)?.personalStatus === 'connected'
       : id === 'notion'
       ? current('notion')?.personalStatus === 'connected' || Boolean(connectFromChat && current('notion')?.configured === true)
@@ -128,6 +132,7 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
   const githubStatus = current('github')?.personalStatus;
   const notionStatus = current('notion')?.personalStatus;
   const telegramStatus = current('telegram')?.personalStatus;
+  const myjiraStatus = current('myjira')?.personalStatus;
   const missing = unavailable.filter(row => !usable(row.id));
   const resend = unavailable.length > 0 && missing.length === 0 && !servicesLoading && onResend;
   const hasGmail = missing.some(row => row.id === 'gmail');
@@ -139,7 +144,8 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
   const isNotionPersonal = notionSvc ? Boolean(notionSvc.personalStatus) : Boolean(conversationId);
   const hasNotion = isNotionPersonal && missing.some(row => row.id === 'notion');
   const hasTelegram = missing.some(row => row.id === 'telegram');
-  const shared = missing.filter(row => row.id !== 'gmail' && row.id !== 'mycalendar' && row.id !== 'mysheets' && row.id !== 'trello' && row.id !== 'github' && (!isNotionPersonal || row.id !== 'notion') && row.id !== 'telegram');
+  const hasMyJira = missing.some(row => row.id === 'myjira');
+  const shared = missing.filter(row => row.id !== 'gmail' && row.id !== 'mycalendar' && row.id !== 'mysheets' && row.id !== 'trello' && row.id !== 'github' && (!isNotionPersonal || row.id !== 'notion') && row.id !== 'telegram' && row.id !== 'myjira');
   const path = shared.length === 1 ? `/settings#${encodeURIComponent(shared[0].id)}` : '/settings';
   const back = conversationId ? conversationReturnPath(`/c/${conversationId}`) : null;
   const [starting, setStarting] = useState(false), [startError, setStartError] = useState('');
@@ -208,6 +214,15 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
     } catch { if (mounted.current && owns()) setStartError('Không thể bắt đầu kết nối Telegram. Hãy kiểm tra mạng và thử lại.'); }
     finally { pending.current = false; if (mounted.current) setStarting(false); }
   };
+  const connectMyJira = async (returnTo?: string | null) => {
+    if (pending.current) return;
+    const owns = jiraSessionOwner(); pending.current = true; setStarting(true); setStartError('');
+    try {
+      const { authUrl } = await jiraApi.start('identity', returnTo ?? undefined);
+      if (mounted.current && owns()) redirectToJira(authUrl);
+    } catch { if (mounted.current && owns()) setStartError('Không thể bắt đầu kết nối Atlassian Jira. Hãy kiểm tra mạng và thử lại.'); }
+    finally { pending.current = false; if (mounted.current) setStarting(false); }
+  };
   return <ResponseCard request={request} title={unavailable.length ? 'Tôi chưa làm được yêu cầu này' : 'Việc này tôi chưa làm được'} moment="refusal">
     <div id={`scenario-content-${unavailable.length ? 1 : 2}`} className="scenario-panel v3-space-y-5">
       <div className="p-3.5 sm:p-4 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] text-sm text-[#111827] font-medium flex items-start gap-3">
@@ -228,7 +243,8 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
             const notionConnected = service.id === 'notion' && usable('notion');
             const notionWorkspace = current('notion')?.workspaceName;
             const telegramConnected = service.id === 'telegram' && usable('telegram');
-            const good = gmailConnected || mycalConnected || mysheetsConnected || trelloConnected || githubConnected || notionConnected || telegramConnected || status === 'healthy';
+            const myjiraConnected = service.id === 'myjira' && usable('myjira');
+            const good = gmailConnected || mycalConnected || mysheetsConnected || trelloConnected || githubConnected || notionConnected || telegramConnected || myjiraConnected || status === 'healthy';
             return <div key={service.id} className="flex items-center justify-between p-3 rounded-xl bg-white border border-[#E7E7E2] shadow-sm gap-2 flex-wrap">
               <div className="flex items-center gap-3 min-w-0"><div className="w-8 h-8 rounded-lg bg-neutral-50 border border-neutral-100 flex items-center justify-center flex-shrink-0"><ServiceLogo service={service.id} className="w-5 h-5 flex-shrink-0" /></div><span className="text-xs sm:text-sm font-semibold text-[#111827] break-words">{service.name}</span></div>
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium min-w-0 break-all ${good ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-neutral-100 text-neutral-600 border border-neutral-200'}`}><span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${good ? 'bg-emerald-500' : 'bg-neutral-400'}`} /><span>
@@ -277,6 +293,14 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
                   : service.id === 'telegram' && (telegramStatus === 'needs_scope' || telegramStatus === 'scope_required')
                   ? `Đã kết nối · Chưa chọn chat${current('telegram')?.username ? ` · @${current('telegram')!.username}` : ''}`
                   : service.id === 'telegram' && telegramStatus === 'reconnect_required'
+                  ? 'Cần kết nối lại'
+                  : myjiraConnected
+                  ? 'Đã kết nối'
+                  : service.id === 'myjira' && (myjiraStatus === 'scope_required' || myjiraStatus === 'identity_connected')
+                  ? 'Cần cấp quyền site'
+                  : service.id === 'myjira' && (myjiraStatus === 'needs_workspace' || myjiraStatus === 'needs_membership')
+                  ? 'Chưa vào Jira Workspace'
+                  : service.id === 'myjira' && myjiraStatus === 'reconnect_required'
                   ? 'Cần kết nối lại'
                   : labels[status]}
               </span></span>
@@ -435,6 +459,40 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
               : telegramStatus === 'reconnect_required'
               ? 'Kết nối lại Telegram'
               : 'Kết nối Telegram'}
+            <span aria-hidden="true">→</span>
+          </a>
+        )}
+        {hasMyJira && (
+          <a
+            id="myjira-connect"
+            role="link"
+            href={JIRA_SETTINGS_PATH}
+            aria-disabled={starting || undefined}
+            onClick={event => {
+              if (back && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)) return;
+              event.preventDefault();
+              if (
+                myjiraStatus === 'scope_required' ||
+                myjiraStatus === 'identity_connected' ||
+                myjiraStatus === 'needs_workspace' ||
+                myjiraStatus === 'needs_membership'
+              ) {
+                navigate(JIRA_SETTINGS_PATH);
+              } else if (back) {
+                void connectMyJira(back);
+              } else {
+                navigate(JIRA_SETTINGS_PATH);
+              }
+            }}
+            className={`${primary} flex items-center gap-1.5`}
+          >
+            {myjiraStatus === 'scope_required' || myjiraStatus === 'identity_connected'
+              ? 'Cấp quyền site Atlassian Jira'
+              : myjiraStatus === 'needs_workspace' || myjiraStatus === 'needs_membership'
+              ? 'Tham gia Jira Workspace'
+              : myjiraStatus === 'reconnect_required'
+              ? 'Kết nối lại Atlassian Jira'
+              : 'Kết nối Atlassian Jira'}
             <span aria-hidden="true">→</span>
           </a>
         )}

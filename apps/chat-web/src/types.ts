@@ -1,4 +1,4 @@
-import type { AnswerLookup, CalendarDigestDelivery, ScheduleResponse, ScheduleView, ScheduleProposalMetadata, SlackPlanBindings } from '@wap/tool-schemas';
+import type { AnswerLookup, CalendarDigestDelivery, JiraPlanConnection, ScheduleResponse, ScheduleView, ScheduleProposalMetadata, SlackPlanBindings } from '@wap/tool-schemas';
 export type MessageRole = 'user' | 'assistant' | 'system';
 export interface AuthMessageResponse {
   message: string;
@@ -54,7 +54,7 @@ export interface PlanStep {
   dependsOn?: string[];
 }
 
-export type PersonalStatus = 'not_connected' | 'scope_required' | 'needs_scope' | 'needs_membership' | 'connected' | 'reconnect_required';
+export type PersonalStatus = 'not_connected' | 'disconnected' | 'identity_connected' | 'needs_workspace' | 'scope_required' | 'needs_scope' | 'needs_membership' | 'connected' | 'reconnect_required';
 
 export interface PersonalCalendarSummary {
   id: string;
@@ -116,6 +116,7 @@ export interface ActivePlan {
       databaseIds: string[];
       databases?: Array<{ id: string; title: string; url?: string }>;
     };
+    myjira?: JiraPlanConnection;
   };
   resourceLabels?: Record<string, string>;
   id?: string;

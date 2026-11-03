@@ -38,6 +38,7 @@ export function JiraConnection({
   user,
   refresh,
   selected,
+  navigate,
 }: JiraConnectionProps) {
   const [data, setData] = useState<JiraConnectionStatusResponse | null>(null);
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
@@ -1231,7 +1232,7 @@ export function JiraConnection({
         )}
       </div>
 
-      {/* COCKPIT JIRA CONVERSATION CTA (DISABLED PENDING JIRA-08) */}
+      {/* COCKPIT JIRA CONVERSATION CTA */}
       <div className="mt-6 pt-5 border-t border-[#E7E7E2] dark:border-[#374151]">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl bg-neutral-50 dark:bg-[#1F2937]/30 border border-[#E7E7E2] dark:border-[#374151]">
           <div>
@@ -1239,17 +1240,31 @@ export function JiraConnection({
               Hội thoại Atlassian Jira trong Cockpit
             </h5>
             <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF] mt-0.5">
-              Hội thoại Jira trong Cockpit đang được phát triển và chưa mở trong phiên bản hiện tại (chờ hoàn tất JIRA-08).
+              {data?.connectionState === 'connected' && isWorkspaceActive && (capabilities?.sites?.length ?? 0) > 0
+                ? 'Kết nối cá nhân, Jira workspace và danh mục site/project đã sẵn sàng để tạo kế hoạch trong Cockpit.'
+                : 'Hội thoại Jira trong Cockpit cần kết nối cá nhân, thành viên workspace hoạt động và ít nhất một site đã cấu hình (chờ hoàn tất JIRA-08).'}
             </p>
           </div>
-          <button
-            type="button"
-            disabled
-            aria-disabled="true"
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-neutral-200 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400 cursor-not-allowed whitespace-nowrap shadow-none"
-          >
-            Bắt đầu hội thoại Jira (Chờ JIRA-08)
-          </button>
+          {data?.connectionState === 'connected' && isWorkspaceActive && (capabilities?.sites?.length ?? 0) > 0 ? (
+            <button
+              id="jira-start-conversation"
+              type="button"
+              onClick={() => (navigate ? navigate('/') : window.location.assign('/'))}
+              className={`${buttonPrimary} whitespace-nowrap`}
+            >
+              Bắt đầu hội thoại Jira
+            </button>
+          ) : (
+            <button
+              id="jira-start-conversation"
+              type="button"
+              disabled
+              aria-disabled="true"
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-neutral-200 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400 cursor-not-allowed whitespace-nowrap shadow-none"
+            >
+              Bắt đầu hội thoại Jira (Chờ JIRA-08)
+            </button>
+          )}
         </div>
       </div>
     </div>

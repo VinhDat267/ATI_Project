@@ -232,6 +232,22 @@
         "badgeClass": "bg-blue-50 text-blue-700 border-blue-200"
       }
     },
+    "myjira": {
+      "logoPath": "m12 2 10 10-10 10L2 12zm0 5-5 5 5 5 5-5z",
+      "color": "#0052cc",
+      "prompt": "Tạo công việc mới trên {service}",
+      "suggestion": {
+        "icon": "bg-blue-50 border-blue-100",
+        "decoration": "bg-blue-500/5 group-hover:bg-blue-500/10",
+        "name": "text-blue-600"
+      },
+      "orbital": {
+        "label": "Jira",
+        "ringClass": "ring-[#0052CC]/25 border-[#0052CC]",
+        "strokeHex": "#0052CC",
+        "badgeClass": "bg-blue-50 text-blue-700 border-blue-200"
+      }
+    },
     "gmail": {
       "logoPath": "M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z",
       "color": "#ea4335",
@@ -308,6 +324,9 @@
     "database": "Cơ sở dữ liệu",
     "chat": "Cuộc trò chuyện",
     "project": "Dự án",
+    "jira_site": "Site Jira",
+    "jira_project": "Dự án Jira",
+    "jira_issue": "Issue Jira",
     "thread": "Luồng thư",
     "label": "Nhãn"
   },
@@ -904,6 +923,45 @@
       "link": "Mở bảng tính",
       "titleField": "title",
       "previewStyle": "sheet_create"
+    },
+    "myjira.list_sites": {
+      "action": "Xem danh sách site Jira",
+      "done": "Đã xem",
+      "receipt": "Đã xem danh sách site Jira",
+      "kind": "Danh sách site",
+      "link": "Mở trong Jira"
+    },
+    "myjira.search_projects": {
+      "action": "Tìm dự án Jira",
+      "done": "Đã tìm",
+      "receipt": "Đã tìm dự án Jira",
+      "kind": "Dự án",
+      "link": "Mở trong Jira"
+    },
+    "myjira.search_issues": {
+      "action": "Tìm issue Jira",
+      "done": "Đã tìm",
+      "receipt": "Đã tìm issue Jira",
+      "kind": "Issue",
+      "link": "Mở trong Jira"
+    },
+    "myjira.create_issue": {
+      "action": "Tạo issue Jira",
+      "done": "Đã tạo",
+      "receipt": "Đã tạo issue",
+      "kind": "Issue",
+      "link": "Mở trong Jira",
+      "titleField": "key",
+      "previewStyle": "issue"
+    },
+    "myjira.add_comment": {
+      "action": "Bình luận issue Jira",
+      "done": "Đã bình luận",
+      "receipt": "Đã bình luận",
+      "kind": "Bình luận",
+      "link": "Mở trong Jira",
+      "titleField": "issueKey",
+      "previewStyle": "issue"
     }
   }
 }

@@ -7,7 +7,7 @@ import { WorkflowFlowCanvas } from '../../components/WorkflowFlowCanvas';
 import { ResultFields, type ExecutionStepInfo } from '../../components/ExecutionProgress';
 import { operation,serviceId,serviceName,servicePalette,statusLabel,resultTitle,resultObject,outcomeURL,outcomeMeetURL,receiptReferences } from './presentation';
 import { RequestEcho } from './RequestEcho';
-interface CardProps {services:ServiceInfo[];planSteps:PlanStep[];labels?:Record<string,string>;gmailConnection?:NonNullable<ActivePlan['connections']>['gmail'];mycalendarConnection?:NonNullable<ActivePlan['connections']>['mycalendar'];mysheetsConnection?:NonNullable<ActivePlan['connections']>['mysheets'];trelloConnection?:NonNullable<ActivePlan['connections']>['trello'];githubConnection?:NonNullable<ActivePlan['connections']>['github'];notionConnection?:NonNullable<ActivePlan['connections']>['notion'];telegramConnection?:NonNullable<ActivePlan['connections']>['telegram'];destination:(step:PlanStep,labels?:Record<string,string>)=>string}
+interface CardProps {services:ServiceInfo[];planSteps:PlanStep[];labels?:Record<string,string>;gmailConnection?:NonNullable<ActivePlan['connections']>['gmail'];mycalendarConnection?:NonNullable<ActivePlan['connections']>['mycalendar'];mysheetsConnection?:NonNullable<ActivePlan['connections']>['mysheets'];trelloConnection?:NonNullable<ActivePlan['connections']>['trello'];githubConnection?:NonNullable<ActivePlan['connections']>['github'];notionConnection?:NonNullable<ActivePlan['connections']>['notion'];telegramConnection?:NonNullable<ActivePlan['connections']>['telegram'];myjiraConnection?:NonNullable<ActivePlan['connections']>['myjira'];destination:(step:PlanStep,labels?:Record<string,string>)=>string}
 function SheetsReceiptMetrics({step}:{step:ExecutionStepInfo}) {
   if(step.status!=='succeeded') return null;
   const service=serviceId(step.tool);
@@ -101,7 +101,7 @@ function TrelloReceiptMetrics({step}:{step:ExecutionStepInfo}) {
     {pills.map((pill,i)=><span key={i} className={`px-2 py-0.5 rounded-md text-[11px] font-medium border ${pill.warn ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200'}`}>{pill.text}</span>)}
   </div>;
 }
-function ReceiptCard({step,index,highlighted,services,planSteps,labels,gmailConnection,mycalendarConnection,mysheetsConnection,trelloConnection,githubConnection,notionConnection,telegramConnection,destination}:CardProps & {step:ExecutionStepInfo;index:number;highlighted?:boolean}) { const service=serviceId(step.tool),palette=servicePalette(service);return (<div data-highlighted-step={highlighted ? 'true' : undefined} className={`receipt-stagger-${Math.min(index+1,4)} flex-1 bg-white rounded-2xl border ${highlighted ? 'border-brand-primary ring-2 ring-brand-primary/20' : 'border-brand-border'} p-4 sm:p-5 shadow-soft-card flex flex-col justify-between ${palette.receiptHover} transition-all group`} aria-label={serviceName(service,services)}>
+function ReceiptCard({step,index,highlighted,services,planSteps,labels,gmailConnection,mycalendarConnection,mysheetsConnection,trelloConnection,githubConnection,notionConnection,telegramConnection,myjiraConnection,destination}:CardProps & {step:ExecutionStepInfo;index:number;highlighted?:boolean}) { const service=serviceId(step.tool),palette=servicePalette(service);return (<div data-highlighted-step={highlighted ? 'true' : undefined} className={`receipt-stagger-${Math.min(index+1,4)} flex-1 bg-white rounded-2xl border ${highlighted ? 'border-brand-primary ring-2 ring-brand-primary/20' : 'border-brand-border'} p-4 sm:p-5 shadow-soft-card flex flex-col justify-between ${palette.receiptHover} transition-all group`} aria-label={serviceName(service,services)}>
                   <div className="v3-space-y-2.5">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2.5 min-w-0">
@@ -128,6 +128,8 @@ function ReceiptCard({step,index,highlighted,services,planSteps,labels,gmailConn
                       {service==='github' && githubConnection?.login && <p className="text-xs text-brand-muted mt-1 break-words">Tài khoản: @{githubConnection.login} (GitHub của bạn)</p>}
                       {service==='notion' && notionConnection?.workspaceName && <p className="text-xs text-brand-muted mt-1 break-words">Workspace Notion: {notionConnection.workspaceName}</p>}
                       {service==='telegram' && telegramConnection?.username && <p className="text-xs text-brand-muted mt-1 break-words">Tài khoản: @{telegramConnection.username} (Telegram của bạn)</p>}
+                      {service==='myjira' && myjiraConnection && <p className="text-xs text-brand-muted mt-1 break-words">Tài khoản Atlassian: {myjiraConnection.atlassianAccountId} · Workspace: {myjiraConnection.workspaceId}</p>}
+                      {service==='myjira' && myjiraConnection?.siteSteps?.[step.id] && (()=>{const siteStep=myjiraConnection.siteSteps[step.id],siteLabel=labels?.[siteStep.siteId] ?? labels?.[`jira_site:${siteStep.siteId}`] ?? siteStep.siteId,planStep=planSteps.find(row=>row.id===step.id),projectLabel=(typeof planStep?.args?.projectKey==='string'&&planStep.args.projectKey) || (siteStep.projectId ? (labels?.[siteStep.projectId] ?? labels?.[`jira_project:${siteStep.projectId}`] ?? siteStep.projectId) : undefined);return <p className="text-xs text-brand-muted mt-1 break-words">Site đích: {siteLabel}{projectLabel?` · Dự án: ${projectLabel}`:''}</p>;})()}
                       <SheetsReceiptMetrics step={step} />
                       <NotionReceiptMetrics step={step} />
                       <TrelloReceiptMetrics step={step} />
@@ -195,11 +197,11 @@ function ReceiptBetweenRows({from,to,sourceLabel,targetLabel,field}:{from:string
                   </span>
                 </div>
               </div>);}
-export function ReceiptMoment({request,terminalStatus,steps,planSteps,services,labels,gmailConnection,mycalendarConnection,mysheetsConnection,trelloConnection,githubConnection,notionConnection,telegramConnection,destination,totalDuration,onNewConversation,onFollowup,servicePrompt,onSettings,servicesLoading,servicesError}:CardProps & {request?:string;terminalStatus?:string;steps:ExecutionStepInfo[];totalDuration?:string;onNewConversation:()=>void;onFollowup:(text:string)=>void;servicePrompt?:(service:ServiceInfo)=>string;onSettings?:()=>void;servicesLoading?:boolean;servicesError?:string|null}) {
+export function ReceiptMoment({request,terminalStatus,steps,planSteps,services,labels,gmailConnection,mycalendarConnection,mysheetsConnection,trelloConnection,githubConnection,notionConnection,telegramConnection,myjiraConnection,destination,totalDuration,onNewConversation,onFollowup,servicePrompt,onSettings,servicesLoading,servicesError}:CardProps & {request?:string;terminalStatus?:string;steps:ExecutionStepInfo[];totalDuration?:string;onNewConversation:()=>void;onFollowup:(text:string)=>void;servicePrompt?:(service:ServiceInfo)=>string;onSettings?:()=>void;servicesLoading?:boolean;servicesError?:string|null}) {
  const [selectedService,setSelectedService]=useState<string|null>(null);
  const rows:ExecutionStepInfo[][]=[];for(let index=0;index<steps.length;index+=2) rows.push(steps.slice(index,index+2));
  const ids=new Set(steps.map(step=>step.id)); const refs=receiptReferences(planSteps).filter(edge=>ids.has(edge.from) && ids.has(edge.to));
- const cardProps={services,planSteps,labels,gmailConnection,mycalendarConnection,mysheetsConnection,trelloConnection,githubConnection,notionConnection,telegramConnection,destination};
+ const cardProps={services,planSteps,labels,gmailConnection,mycalendarConnection,mysheetsConnection,trelloConnection,githubConnection,notionConnection,telegramConnection,myjiraConnection,destination};
  const getPrompt = servicePrompt ?? (s => s.name);
  const stepStatuses=Object.fromEntries(steps.map(step=>[step.id,step.status]));
  const canvasSteps:PlanStep[]=planSteps.length ? planSteps : steps.map(step=>({id:step.id,tool:step.tool,description:step.description,args:{}}));
