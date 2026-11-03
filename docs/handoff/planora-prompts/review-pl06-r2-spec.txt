@@ -1,0 +1,33 @@
+BẠN LÀ REVIEWER ĐỘC LẬP (CODEX REALITY CHECKER).
+NHIỆM VỤ: RE-REVIEW PL-06 VÒNG 2 (PLAN, PREVIEW, EXECUTION & RECEIPT CARDS) TRÊN HEAD 514d982fd9fc152290feb305b0d97f2c40dda21a.
+
+1. BỐI CẢNH VÀ PHẠM VI:
+- Base SHA: e97d71862cee773be9e37f9ef9e456ea36975932 (trên branch codex/planora-ui).
+- Head cần review: 514d982fd9fc152290feb305b0d97f2c40dda21a (trên branch longnguyen005/feat-planora-pl-06, worktree review-planora-pl-06-r2).
+- Parent SHA / Round 1 Head: ee5b1814ba1c70490644df4ac87d0339a79847c0.
+- Task card: docs/handoff/tasks/PL-06-planora-workflow-cards.md.
+- Worker log Round 2: docs/handoff/log/2026-11-04-gemini-pl-06-review-fixes.md.
+
+2. CÁC ĐIỂM SỬA CHỮA CẦN ĐỐI CHIẾU (F1–F3):
+- **F1 (Step cards trong các moment):**
+  - Kiểm tra `PlanMoment.tsx`, `ExecutionMoment.tsx`, `ReceiptMoment.tsx` đã bật `PlanoraWorkflowSteps` làm renderer chính (`showStepCards={true}`).
+  - Danh sách thẻ cũ `v3-space-y-3` trong `PlanMoment` đã bị xóa để tránh trùng lặp.
+  - Xác nhận trong PlanMoment: `#plan-cards-container` bọc `[data-testid="planora-step-cards-grid"]`, responsive 2 cột desktop (`md:grid-cols-2`) / 1 cột mobile, có nhãn `Chỉ đọc` vs `Ghi`, nhãn `Phụ thuộc:` khi có dependsOn thuần, badge luồng dữ liệu `[data-testid="plan-step-data-flow-badge"]`.
+- **F2 (Mã băm plan_hash vs UUID):**
+  - Kiểm tra `PlanMoment.tsx`: nếu không có `plan_hash`, hiển thị "Mã định danh kế hoạch: {plan.id}"; chỉ hiển thị "Mã băm ràng buộc kế hoạch (plan_hash)" khi hash thực sự tồn tại. Không gọi UUID là hash.
+- **F3 (Nút đặt lịch theo capability schedulesEnabled):**
+  - Kiểm tra `ReceiptMoment.tsx` và `PlanoraActiveTurn.tsx`: chỉ hiển thị nút `[data-testid="receipt-schedule-workflow-btn"]` khi `schedulesEnabled === true`. Ẩn khi `false` hoặc `undefined`.
+
+3. TIÊU CHUẨN KIỂM CHỨNG BẮT BUỘC (REALITY CHECKER):
+- `npm run typecheck:v3` (phải exit 0).
+- `npm test -w @wap/chat-web` (phải exit 0, 101/101 test files).
+- `npm run build:v3` (phải exit 0).
+- `node scripts/test-v3-web-build-security.mjs` (phải exit 0).
+- Chạy lại các probe độc lập từ Round 1 (đặc biệt là harness kiểm tra F1, F2, F3) để xác nhận tất cả đã GREEN.
+- Kiểm tra các viewport (1440, 1024, 768, 375, 320) và theme (light/dark).
+
+4. KẾT QUẢ VÀ BÀN GIAO:
+- Viết báo cáo review chi tiết vào file: `docs/handoff/log/2026-11-04-codex-review-pl-06-r2.md`.
+- Ghi rõ kết luận: ĐẠT hay CHƯA ĐẠT (kèm bằng chứng lệnh và exit code).
+- Nếu ĐẠT: khuyến nghị fast-forward `codex/planora-ui` lên HEAD đã review.
+- Báo hoàn thành qua Orca với kết luận và đường dẫn báo cáo.
