@@ -71,7 +71,9 @@ describe('DEMO-01: Cross-Service End-to-End Audit & Defense Runbook Contract', (
     expect(content).toContain('## 6. Kịch Bản Xử Lý Sự Cố Khẩn Cấp');
     expect(content).toContain('## 7. Checklist 15 Phút Trước Giờ Bảo Vệ');
 
-    // Verify all 5 feature flags and key scenarios are documented
+    // Verify all 5 feature flags, pinned LLM model, and key scenarios are documented
+    expect(content).toContain('LLM_MODEL=ag/gemini-3.8-flash');
+    expect(content).toContain('LLM_MODEL=cx/gpt-6.1-sol');
     expect(content).toContain('PLANNER_READ_ANSWERS=on');
     expect(content).toContain('SCHEDULES_ENABLED=on');
     expect(content).toContain('GMAIL_ENABLED=on');

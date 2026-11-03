@@ -31,7 +31,7 @@ PORT=3000
 # LLM Gateway (9router)
 LLM_PROVIDER=openai-compatible
 LLM_BASE_URL=http://localhost:20128/v1
-LLM_MODEL=kr/claude-sonnet-4.5
+LLM_MODEL=ag/gemini-3.8-flash
 PLANNER_SEARCH_MODE=llm
 
 # Bật đầy đủ các tính năng v3 đã nghiệm thu
@@ -148,12 +148,12 @@ MYSLACK_ENABLED=off
 
 ## 5. Quy Trình Chuyển Đổi LLM Dự Phòng (`Fallback Drill` < 60 Giây)
 
-Thực hiện ngay khi model chính (`kr/claude-sonnet-4.5`) có độ trễ cao (> 45 giây) hoặc trả lỗi từ upstream provider:
+Thực hiện ngay khi model chính (`ag/gemini-3.8-flash`) có độ trễ cao (> 45 giây) hoặc trả lỗi từ upstream provider:
 
 1. **Mở file `.env` và đổi biến `LLM_MODEL` sang model dự phòng đã kiểm chứng:**
    ```dotenv
    # Phương án dự phòng 1 (trên 9router):
-   LLM_MODEL=cx/gpt-5.4
+   LLM_MODEL=cx/gpt-6.1-sol
 
    # Phương án dự phòng 2 (Gemini trực tiếp không qua 9router):
    LLM_PROVIDER=gemini
