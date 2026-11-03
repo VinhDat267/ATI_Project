@@ -18,6 +18,7 @@ import css from './page.css?inline';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
 import { Brand, ServiceLogo, PlanoraMark } from '../../planora/components/Brand';
 import { PlanoraAuthFrame } from '../../planora/layout/PlanoraAuthFrame';
+import landingPlaybooks from '../../assets/landing-playbooks.json';
 
 type AuthMode = 'login' | 'signup';
 type AuthView = 'form' | 'google' | 'success' | 'forgot';
@@ -328,6 +329,7 @@ export function LandingPage({
   const [googleModalOpen, setGoogleModalOpen] = useState(false);
   const authOpen = Boolean(effectiveMode) || googleModalOpen;
   const [success, setSuccess] = useState<Success | null>(null);
+  const [forgotSent, setForgotSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loginPwdShown, setLoginPwdShown] = useState(false);
@@ -394,6 +396,7 @@ export function LandingPage({
   const changeMode = (mode: AuthMode) => {
     setLocalAuthMode(mode);
     setAuthView('form');
+    setForgotSent(false);
     setError(null);
     navigate(mode === 'signup' ? '/signup' : '/login');
   };
@@ -404,6 +407,7 @@ export function LandingPage({
     setLocalAuthMode(null);
     setGoogleModalOpen(false);
     setAuthView('form');
+    setForgotSent(false);
     setBusy(false);
     setError(null);
     navigate('/');
@@ -482,12 +486,7 @@ export function LandingPage({
       try {
         await apiClient.forgotPassword(forgotEmailRef.current?.value.trim() ?? '');
         if (generation.current === owner) {
-          setSuccess({
-            title: 'Đã gửi liên kết!',
-            desc: 'Nếu email này có tài khoản, bạn sẽ nhận được link đặt lại mật khẩu.',
-            isLogin: false,
-          });
-          setAuthView('success');
+          setForgotSent(true);
         }
       } catch (reason) {
         if (generation.current === owner) setError(userErrorMessage(reason));
@@ -508,6 +507,11 @@ export function LandingPage({
 
   const handleTryPlaybook = () => {
     sessionStorage.setItem('ati_prefill_prompt', 'Tạo issue đăng nhập trên GitHub, thêm thẻ vào Trello rồi thông báo trên Slack.');
+    changeMode('signup');
+  };
+
+  const handleTryDigest = () => {
+    sessionStorage.setItem('ati_prefill_prompt', landingPlaybooks.digestPrompt);
     changeMode('signup');
   };
 
@@ -1020,7 +1024,7 @@ export function LandingPage({
           {/* Auto-Digest Morning Schedule Section */}
           <section
             data-testid="landing-schedule-digest-section"
-            className="planora-principles-section"
+            className="planora-principles-section planora-digest-section"
           >
             <div className="planora-section-header">
               <span className="planora-section-kicker">
@@ -1061,13 +1065,34 @@ export function LandingPage({
                 <button
                   type="button"
                   data-testid="landing-try-digest-btn"
-                  onClick={handleTryPlaybook}
+                  onClick={handleTryDigest}
                   className="planora-btn planora-btn-primary planora-btn-sm"
                 >
                   Dùng thử lịch Auto-Digest 8:00 sáng →
                 </button>
               </div>
-              <div data-testid="workflow-flow-canvas" data-flow-mode="schedule" style={{ display: 'none' }} />
+              <div
+                data-testid="workflow-flow-canvas"
+                data-flow-mode="schedule"
+                className="planora-digest-flow-preview"
+              >
+                <div className="planora-digest-flow-steps">
+                  <div className="planora-digest-step">
+                    <span className="planora-digest-step-badge">08:00 T2–T6</span>
+                    <span className="planora-digest-step-name">Lịch hẹn định kỳ</span>
+                  </div>
+                  <span className="planora-digest-arrow" aria-hidden="true">→</span>
+                  <div className="planora-digest-step">
+                    <span className="planora-digest-step-badge">Chỉ đọc</span>
+                    <span className="planora-digest-step-name">Calendar &amp; Sheets</span>
+                  </div>
+                  <span className="planora-digest-arrow" aria-hidden="true">→</span>
+                  <div className="planora-digest-step">
+                    <span className="planora-digest-step-badge">Đã khóa</span>
+                    <span className="planora-digest-step-name">Slack &amp; Telegram</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -1133,7 +1158,7 @@ export function LandingPage({
               ref={authCardRef}
               title={
                 authView === 'google'
-                  ? 'Chuyển tới Google'
+                  ? 'Đang chuyển sang trang đăng nhập của Google…'
                   : authView === 'success'
                   ? success?.title ?? 'Hoàn tất!'
                   : authView === 'forgot'
@@ -1146,7 +1171,11 @@ export function LandingPage({
                 authView === 'google'
                   ? 'Đang bắt đầu luồng xác thực Google OAuth...'
                   : authView === 'success'
-                  ? success?.desc
+                  ? (
+                    <span id="success-desc" role="status">
+                      {success?.desc ?? 'Kiểm tra email để xác minh tài khoản.'}
+                    </span>
+                  )
                   : authView === 'forgot'
                   ? 'Nhập email của bạn để nhận liên kết đặt lại mật khẩu.'
                   : isLoginView
@@ -1266,6 +1295,24 @@ export function LandingPage({
                     />
                   </div>
 
+                  <div
+                    id="forgot-feedback-box"
+                    role={forgotSent ? 'status' : undefined}
+                    className={`${forgotSent ? '' : 'hidden '}planora-auth-success-box`}
+                    style={{
+                      padding: '12px 14px',
+                      margin: '12px 0',
+                      borderRadius: 'var(--planora-radius-lg)',
+                      backgroundColor: 'var(--planora-sidebar)',
+                      border: '1px solid var(--planora-divider)',
+                      fontSize: 'var(--planora-text-xs)',
+                      color: 'var(--planora-primary)',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    Nếu email này có tài khoản, bạn sẽ nhận được link đặt lại mật khẩu.
+                  </div>
+
                   {error && (
                     <p role="alert" className="planora-auth-error">
                       {error}
@@ -1321,8 +1368,7 @@ export function LandingPage({
                       <button
                         type="button"
                         onClick={actions.showForgotView}
-                        className="planora-auth-link-btn"
-                        style={{ fontSize: 'var(--planora-text-xs)', minHeight: 0, padding: 0 }}
+                        className="planora-auth-link-btn planora-auth-forgot-link"
                       >
                         Quên mật khẩu?
                       </button>
@@ -1546,8 +1592,13 @@ export function LandingPage({
                   </form>
                 ) : (
                   <div style={{ padding: '24px 0', textAlign: 'center' }}>
-                    <p style={{ color: 'var(--planora-muted)', fontSize: 'var(--planora-text-sm)', lineHeight: 1.6, marginBottom: 16 }}>
-                      Đăng ký bằng email hiện chưa khả dụng. Hãy liên hệ quản trị viên hoặc đăng nhập bằng tài khoản hiện có.
+                    <p
+                      id="auth-signup-disabled-notice"
+                      role="status"
+                      className="planora-auth-disabled-notice"
+                      style={{ color: 'var(--planora-muted)', fontSize: 'var(--planora-text-sm)', lineHeight: 1.6, marginBottom: 16 }}
+                    >
+                      Đăng ký bằng email hiện đang đóng. Hãy liên hệ quản trị viên hoặc đăng nhập bằng tài khoản hiện có.
                     </p>
 
                     {error && (

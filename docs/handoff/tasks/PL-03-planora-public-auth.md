@@ -112,6 +112,23 @@ Port giao diện Landing, Đăng nhập (Login), Đăng ký (Signup) và Auth Fr
   4. **Bổ sung browser test spec:**
      - Tạo `apps/chat-web/tests/browser/planora-public.spec.ts` kiểm thử viewports (1440, 1024, 768, 375, 320), Light & Dark themes, không tràn ngang (`scrollWidth <= window.innerWidth`), tap targets >= 44px và reduced motion.
 
+- **Kết quả kiểm thử & Xử lý Findings Review F1–F8:**
+  - **F1 (P2) - Header mobile overflow trên 375px & 320px:** Đã tối ưu padding/gap `.planora-landing-nav-inner`, ẩn subtitle thương hiệu trên màn hình nhỏ (`.planora-brand-sub { display: none; }`), giảm kích thước nút điều hướng. Đo lường xác nhận không còn tràn ngang trên cả 375px và 320px.
+  - **F2 (P2) - Auto-Digest CTA prefill prompt:** Tách biệt `handleTryDigest` nạp đúng `landingPlaybooks.digestPrompt` từ `src/assets/landing-playbooks.json:316` vào `ati_prefill_prompt` khi bấm nút "Dùng thử lịch Auto-Digest 8:00 sáng →", chuyển hướng `/signup`.
+  - **F3 (P2) - Live status của signup/forgot thành công và signup đóng:** Khôi phục `role="status"` đúng ngữ nghĩa cho:
+    - Signup thành công: `<span id="success-desc" role="status">` chứa "Kiểm tra email để xác minh tài khoản.".
+    - Gửi forgot-password: `<div id="forgot-feedback-box" role={forgotSent ? "status" : undefined}>` chứa "Nếu email này có tài khoản, bạn sẽ nhận được link đặt lại mật khẩu.".
+    - Khi đăng ký đóng: `<p id="auth-signup-disabled-notice" role="status">` chứa "Đăng ký bằng email hiện đang đóng. Hãy liên hệ quản trị viên hoặc đăng nhập bằng tài khoản hiện có.".
+  - **F4 (P2) - Hoàn thiện CSS các section Landing:** Bổ sung toàn bộ declaration CSS chuẩn tokens Planora cho `.planora-principles-section`, `.planora-proof-grid`, `.planora-proof-card`, `.planora-proof-num`, `.planora-onboarding-section`, `.planora-onboarding-grid`, `.planora-onboarding-card`, `.planora-onboarding-badge`, `.planora-step-num`, `.planora-digest-section` cùng responsive breakpoints.
+  - **F5 (P2) - Landing dark mode token Planora:** Ghi đè prototype theme bằng selector `html.dark[data-proto-page="index"] body` áp dụng đúng token `--planora-canvas: #171c18` thay vì xanh navy prototype `#0B1020`.
+  - **F6 (P2) - Browser regression và test runner:**
+    - Thay thế dummy marker `display:none` bằng visual preview `.planora-digest-flow-preview` hiển thị minh họa luồng Auto-Digest (08:00 T2–T6 → Lịch họp & Bảng tính → Kênh Slack/Telegram) mang thuộc tính `[data-testid="workflow-flow-canvas"][data-flow-mode="schedule"]`.
+    - Cập nhật tiêu đề Google auth thành `'Đang chuyển sang trang đăng nhập của Google…'`.
+    - Cập nhật assertions `fe-08-landing-auth.spec.ts` từ five moments Make cũ sang 3-step workflow Planora và kiểm tra reduced motion.
+    - Thêm `|PL-03:` vào default grep của `scripts/test-v3-browser.mjs:15`.
+  - **F7 (P3) - Breakpoint auth 1024px:** Điều chỉnh boundary thành `max-width: 1023.98px` trong `auth.css` và `page.css`, đảm bảo tại viewport 1024×768 panel split nghệ thuật giấy Planora luôn hiển thị đúng đặc tả.
+  - **F8 (P3) - Tap target >= 44px trên mọi control:** Tăng kích thước vùng tương tác cho "Quên mật khẩu?" (`.planora-auth-forgot-link` min-height 44px), nút ThemeToggle (44×44px), nút đóng cửa sổ (44×44px), và nút Brand (min-height 44px). Bổ sung assertions kiểm chứng trong `planora-public.spec.ts`.
+
 - **Kết quả kiểm thử:**
   - `npm run typecheck:v3`: PASS (exit code 0).
   - `npm run build:v3`: PASS (exit code 0).

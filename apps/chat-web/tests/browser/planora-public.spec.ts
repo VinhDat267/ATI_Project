@@ -33,6 +33,19 @@ for (const vp of VIEWPORTS) {
       await expect(page.locator('[data-od-id="integrations-section"]')).toBeVisible();
       await expect(page.locator('.roadmap-toggle')).toBeVisible();
 
+      // Principles & Onboarding sections
+      await expect(page.locator('[data-od-id="principles-section"]')).toBeVisible();
+      await expect(page.locator('[data-od-id="onboarding-section"]')).toBeVisible();
+      await expect(page.getByTestId('landing-schedule-digest-section')).toBeVisible();
+      await expect(page.getByTestId('workflow-flow-canvas')).toBeVisible();
+
+      // Header actions fit within viewport without overflow
+      const navSignup = page.locator('.planora-landing-nav-actions button').filter({ hasText: 'Đăng ký' });
+      await expect(navSignup).toBeVisible();
+      const navBox = await navSignup.boundingBox();
+      expect(navBox).not.toBeNull();
+      expect((navBox?.x ?? 0) + (navBox?.width ?? 0)).toBeLessThanOrEqual(vp.width);
+
       // No horizontal overflow across all sections
       const noOverflow = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
       expect(noOverflow).toBe(true);
@@ -55,6 +68,29 @@ for (const vp of VIEWPORTS) {
       await expect(loginBtn).toBeVisible();
       const btnBox = await loginBtn.boundingBox();
       expect(btnBox?.height).toBeGreaterThanOrEqual(44);
+
+      // Tap targets >= 44px for secondary controls (F8)
+      const forgotBtn = page.getByRole('button', { name: 'Quên mật khẩu?', exact: true });
+      await expect(forgotBtn).toBeVisible();
+      const forgotBox = await forgotBtn.boundingBox();
+      expect(forgotBox?.height).toBeGreaterThanOrEqual(44);
+
+      const closeBtn = page.getByRole('button', { name: 'Đóng cửa sổ', exact: true });
+      await expect(closeBtn).toBeVisible();
+      const closeBox = await closeBtn.boundingBox();
+      expect(closeBox?.height).toBeGreaterThanOrEqual(44);
+      expect(closeBox?.width).toBeGreaterThanOrEqual(44);
+
+      const themeToggle = page.locator('.planora-auth-nav-actions .ati-theme-toggle');
+      await expect(themeToggle).toBeVisible();
+      const themeBox = await themeToggle.boundingBox();
+      expect(themeBox?.height).toBeGreaterThanOrEqual(44);
+      expect(themeBox?.width).toBeGreaterThanOrEqual(44);
+
+      const brand = page.locator('.planora-auth-top-nav .planora-brand');
+      await expect(brand).toBeVisible();
+      const brandBox = await brand.boundingBox();
+      expect(brandBox?.height).toBeGreaterThanOrEqual(44);
 
       const editorial = page.locator('.planora-auth-editorial');
       if (vp.width >= 1024) {
@@ -82,4 +118,15 @@ test('PL-03: Planora public landing honors prefers-reduced-motion', async ({ pag
   await expect(floatEl).toBeVisible();
   const animationPlayState = await floatEl.evaluate(el => getComputedStyle(el).animationName);
   expect(animationPlayState).toBe('none');
+});
+
+test('PL-03: Auto-Digest CTA prefills digestPrompt in sessionStorage and opens signup', async ({ page }) => {
+  await page.goto('/');
+  const digestBtn = page.getByTestId('landing-try-digest-btn');
+  await expect(digestBtn).toBeVisible();
+  await digestBtn.click();
+  await expect(page).toHaveURL(/\/signup$/);
+  const prompt = await page.evaluate(() => sessionStorage.getItem('ati_prefill_prompt'));
+  expect(prompt).toContain('Mỗi sáng 08:00');
+  expect(prompt).toContain('Google Calendar');
 });

@@ -24,6 +24,13 @@ body {
   box-sizing: border-box;
 }
 
+html.dark[data-proto-page="index"] body,
+html.dark body.selection\:bg-\[\#FF5701\]\/20,
+html.dark[data-proto-page="index"] {
+  background-color: var(--planora-canvas) !important;
+  color: var(--planora-text) !important;
+}
+
 /* ==========================================================================
    1. Public Navigation Header
    ========================================================================== */
@@ -48,6 +55,12 @@ body {
   box-sizing: border-box;
 }
 
+.planora-landing-nav-inner .planora-brand {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
 .planora-landing-links {
   display: flex;
   align-items: center;
@@ -70,6 +83,13 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.planora-landing-nav-actions .ati-theme-toggle {
+  min-width: 44px;
+  min-height: 44px;
+  width: 44px;
+  height: 44px;
 }
 
 /* ==========================================================================
@@ -527,6 +547,180 @@ body {
 }
 
 /* ==========================================================================
+   5b. Principles & Human-in-the-Loop Section
+   ========================================================================== */
+.planora-principles-section {
+  padding: 80px 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  border-top: 1px solid var(--planora-divider);
+  box-sizing: border-box;
+}
+
+.planora-proof-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+}
+
+.planora-proof-card {
+  background-color: var(--planora-paper);
+  border: 1px solid var(--planora-divider);
+  border-radius: var(--planora-radius-xl);
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  transition: transform var(--planora-transition-fast), box-shadow var(--planora-transition-fast);
+  box-sizing: border-box;
+}
+
+.planora-proof-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--planora-shadow-md);
+}
+
+.planora-proof-num {
+  font-family: var(--planora-font-serif);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--planora-primary);
+  margin-bottom: 12px;
+  line-height: 1;
+}
+
+.planora-proof-card h3 {
+  font-size: var(--planora-text-lg);
+  font-weight: 600;
+  color: var(--planora-text);
+  margin: 0 0 10px 0;
+}
+
+.planora-proof-card p {
+  font-size: var(--planora-text-sm);
+  line-height: 1.6;
+  color: var(--planora-muted);
+  margin: 0;
+}
+
+/* ==========================================================================
+   5c. Onboarding 3-Step Section
+   ========================================================================== */
+.planora-onboarding-section {
+  padding: 80px 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  border-top: 1px solid var(--planora-divider);
+  box-sizing: border-box;
+}
+
+.planora-onboarding-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+}
+
+.planora-onboarding-card {
+  background-color: var(--planora-paper);
+  border: 1px solid var(--planora-divider);
+  border-radius: var(--planora-radius-xl);
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  transition: transform var(--planora-transition-fast), box-shadow var(--planora-transition-fast);
+  box-sizing: border-box;
+}
+
+.planora-onboarding-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--planora-shadow-md);
+}
+
+.planora-step-num {
+  font-family: var(--planora-font-serif);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--planora-primary);
+  margin-bottom: 12px;
+  line-height: 1;
+}
+
+.planora-onboarding-card h3 {
+  font-size: var(--planora-text-lg);
+  font-weight: 600;
+  color: var(--planora-text);
+  margin: 0 0 10px 0;
+}
+
+.planora-onboarding-card p {
+  font-size: var(--planora-text-sm);
+  line-height: 1.6;
+  color: var(--planora-muted);
+  margin: 0 0 16px 0;
+  flex: 1;
+}
+
+.planora-onboarding-badge {
+  background-color: var(--planora-sidebar);
+  border: 1px solid var(--planora-divider);
+  border-radius: var(--planora-radius-md);
+  padding: 8px 12px;
+  font-size: var(--planora-text-xs);
+  color: var(--planora-muted);
+  line-height: 1.4;
+}
+
+/* ==========================================================================
+   5d. Auto-Digest Schedule Preview Section
+   ========================================================================== */
+.planora-digest-section {
+  /* inherited from planora-principles-section */
+}
+
+.planora-digest-flow-preview {
+  margin-top: 20px;
+  padding: 16px 20px;
+  background-color: var(--planora-canvas);
+  border: 1px solid var(--planora-divider);
+  border-radius: var(--planora-radius-lg);
+  box-sizing: border-box;
+}
+
+.planora-digest-flow-steps {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.planora-digest-step {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.planora-digest-step-badge {
+  font-size: var(--planora-text-xs);
+  font-weight: 600;
+  color: var(--planora-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.planora-digest-step-name {
+  font-size: var(--planora-text-sm);
+  font-weight: 500;
+  color: var(--planora-text);
+}
+
+.planora-digest-arrow {
+  color: var(--planora-muted);
+  font-size: 16px;
+  font-weight: 600;
+  user-select: none;
+}
+
+/* ==========================================================================
    6. Bottom CTA Section
    ========================================================================== */
 .planora-bottom-cta {
@@ -605,7 +799,7 @@ body {
 /* ==========================================================================
    8. Responsive Breakpoints
    ========================================================================== */
-@media (max-width: 1024px) {
+@media (max-width: 1023.98px) {
   .planora-hero-grid {
     grid-template-columns: 1fr;
     text-align: center;
@@ -620,7 +814,9 @@ body {
   .planora-hero-note {
     justify-content: center;
   }
-  .planora-workflow-grid {
+  .planora-workflow-grid,
+  .planora-proof-grid,
+  .planora-onboarding-grid {
     grid-template-columns: 1fr;
     max-width: 540px;
     margin-left: auto;
@@ -634,7 +830,21 @@ body {
 
 @media (max-width: 768px) {
   .planora-landing-nav-inner {
-    padding: 14px 16px;
+    padding: 10px 14px;
+    gap: 8px;
+    justify-content: space-between;
+  }
+  .planora-brand .planora-brand-sub {
+    display: none;
+  }
+  .planora-landing-nav-actions {
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .planora-landing-nav-actions .planora-btn-sm {
+    padding: 6px 10px;
+    font-size: 12px;
+    min-width: auto;
   }
   .planora-landing-links {
     display: none;
@@ -644,8 +854,23 @@ body {
   }
   .planora-workflow-section,
   .planora-services-section,
+  .planora-principles-section,
+  .planora-onboarding-section,
   .planora-bottom-cta {
     padding: 56px 16px;
+  }
+  .planora-proof-card,
+  .planora-onboarding-card {
+    padding: 24px 20px;
+  }
+  .planora-digest-flow-steps {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .planora-digest-arrow {
+    transform: rotate(90deg);
+    margin-left: 12px;
   }
   .planora-bottom-cta-box {
     padding: 36px 24px;
@@ -662,14 +887,30 @@ body {
 }
 
 @media (max-width: 360px) {
+  .planora-landing-nav-inner {
+    padding: 8px 10px;
+    gap: 4px;
+  }
+  .planora-brand .planora-brand-word {
+    font-size: 18px;
+  }
+  .planora-landing-nav-actions {
+    gap: 4px;
+  }
+  .planora-landing-nav-actions .planora-btn-sm {
+    padding: 6px 8px;
+    font-size: 11px;
+  }
   .planora-hero-section {
     padding: 32px 12px 48px;
   }
   .planora-hero-heading {
     font-size: 28px;
   }
-  .workflow-step-card {
-    padding: 24px 16px;
+  .workflow-step-card,
+  .planora-proof-card,
+  .planora-onboarding-card {
+    padding: 20px 14px;
   }
 }
 

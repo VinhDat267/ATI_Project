@@ -5,16 +5,15 @@ import { hashPassword } from '../../../chat-api/src/db/repositories/user-repo';
 
 for (const viewport of [{ width: 1440, height: 900 }, { width: 375, height: 812 }]) {
   for (const theme of ['light', 'dark']) {
-    test(`FE-08: landing preserves five moments without horizontal overflow ${viewport.width} ${theme}`, async ({ page }) => {
+    test(`FE-08: landing preserves workflow steps without horizontal overflow ${viewport.width} ${theme}`, async ({ page }) => {
       await page.setViewportSize(viewport);
       await page.addInitScript(value => localStorage.setItem('ati-theme', value), theme);
       await page.goto('/');
-      await expect(page.locator('.moment-trigger')).toHaveCount(5);
+      await expect(page.locator('.workflow-step-card')).toHaveCount(3);
       await expect(page.getByRole('heading', { name: 'Nói một câu. Việc trên nhiều công cụ được làm xong — sau khi bạn duyệt.' })).toBeVisible();
       await expect(page.locator('#email-sim-modal')).toHaveCount(0);
-      for (let moment = 1; moment <= 5; moment++) {
-        if (viewport.width === 1440) await page.locator(`#trigger-moment-${moment}`).scrollIntoViewIfNeeded();
-        else await page.locator('.stage-fallback-list > div').nth(moment - 1).scrollIntoViewIfNeeded();
+      for (const card of await page.locator('.workflow-step-card').all()) {
+        await card.scrollIntoViewIfNeeded();
         await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       }
       await page.goto('/login');
@@ -27,12 +26,14 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 375, height: 812 
   }
 }
 
-test('FE-08: reduced motion uses the vertical story and every panel can be read', async ({ page }) => {
+test('FE-08: reduced motion disables rotator animations and every panel can be read', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ reducedMotion: 'reduce' }); await page.goto('/');
-  await expect(page.locator('.stage-interactive-desktop')).toBeHidden();
-  await expect(page.locator('.stage-fallback-list')).toBeVisible();
-  expect(await page.locator('.stage-fallback-list').evaluate(element => getComputedStyle(element).position)).not.toBe('sticky');
+  const floatEl = page.locator('.hero-float');
+  await expect(floatEl).toBeVisible();
+  const animation = await floatEl.evaluate(element => getComputedStyle(element).animationName);
+  expect(animation).toBe('none');
+  await expect(page.locator('.workflow-step-card')).toHaveCount(3);
 });
 
 test('FE-08: signup blocks short passwords without an API request', async ({ page }) => {

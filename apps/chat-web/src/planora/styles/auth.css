@@ -27,18 +27,31 @@
   box-sizing: border-box;
 }
 
+.planora-auth-top-nav .planora-brand {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
 .planora-auth-nav-actions {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
+.planora-auth-nav-actions .ati-theme-toggle {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+}
+
 .planora-auth-close-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   min-height: 44px;
   min-width: 44px;
   padding: 0;
@@ -590,8 +603,15 @@
   box-sizing: border-box;
 }
 
+.planora-auth-forgot-link {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+}
+
 /* Responsive Breakpoints */
-@media (max-width: 1024px) {
+@media (max-width: 1023.98px) {
   .planora-auth-main.has-editorial {
     grid-template-columns: 1fr;
   }
