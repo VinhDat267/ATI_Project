@@ -1,3 +1,4 @@
+import { fileURLToPath, URL } from 'node:url';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -10,6 +11,11 @@ export default defineConfig(({ command, mode }) => {
     env.SANDBOX_USER_EMAIL !== env.CHAT_ADMIN_EMAIL;
   return {
   plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      '@wap/tool-schemas': fileURLToPath(new URL('../../packages/tool-schemas/src/index.ts', import.meta.url)),
+    },
+  },
   define: {
     'import.meta.env.VITE_SHOW_DEMO_LOGIN': JSON.stringify(demo ? 'true' : 'false'),
     'import.meta.env.VITE_DEMO_EMAIL': JSON.stringify(demo ? env.SANDBOX_USER_EMAIL : ''),

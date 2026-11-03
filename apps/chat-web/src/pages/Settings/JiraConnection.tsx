@@ -1202,7 +1202,7 @@ export function JiraConnection({
                           data-testid="jira-copy-invite-token"
                           onClick={() => {
                             if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-                              void navigator.clipboard.writeText(createdInviteToken);
+                              void navigator.clipboard.writeText(createdInviteToken).catch(() => {});
                             }
                             setCopiedInviteToken(true);
                             setTimeout(() => {

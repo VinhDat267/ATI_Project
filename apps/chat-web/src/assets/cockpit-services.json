@@ -985,6 +985,13 @@
       "kind": "Thành viên",
       "link": "Mở trong Jira"
     },
+    "myjira.list_transitions": {
+      "action": "Xem trạng thái chuyển tiếp Jira",
+      "done": "Đã xem",
+      "receipt": "Đã xem trạng thái chuyển tiếp",
+      "kind": "Trạng thái Issue",
+      "link": "Mở trong Jira"
+    },
     "myjira.transition_issue": {
       "action": "Chuyển trạng thái issue Jira",
       "done": "Đã chuyển trạng thái",

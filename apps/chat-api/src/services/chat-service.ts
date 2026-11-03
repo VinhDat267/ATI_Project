@@ -16,6 +16,7 @@ import { evaluateGithubDigestCandidate } from './schedules/github-digest-candida
 import { evaluateTelegramDigestCandidate } from './schedules/telegram-digest-candidate.js';
 import { evaluateTrelloDigestCandidate } from './schedules/trello-digest-candidate.js';
 import { evaluateNotionDigestCandidate } from './schedules/notion-digest-candidate.js';
+import { evaluateJiraDigestCandidate, type EvaluateJiraDigestInput } from './schedules/jira-digest-candidate.js';
 import { resolveRef } from '@wap/executor';
 import type { SlackWriteRuntime } from './slack/slack-write-runtime.js';
 import type { SlackReadProposalService } from './slack/slack-read-proposals.js';
@@ -162,6 +163,8 @@ export interface ChatServiceOptions {
   telegramConnection?: (userId: string) => Promise<any>;
   /** The caller's active Notion connection lookup; absent when Notion OAuth is off or not connected. */
   notionConnection?: (userId: string) => Promise<any>;
+  /** The caller's active Jira OAuth 3LO read-only digest connection lookup in organization workspace mode. */
+  myjiraDigestConnection?: EvaluateJiraDigestInput['jiraConnection'];
   /** Server-side binder for Jira plans (JIRA-08); absent, personal Jira plans are refused. */
   jiraBinder?: JiraPlanBinder;
   /** Sanitizer for Jira conversation history messages (JIRA-05/08). */
@@ -209,6 +212,7 @@ export class ChatService {
   private githubConnection?: ChatServiceOptions['githubConnection'];
   private telegramConnection?: ChatServiceOptions['telegramConnection'];
   private notionConnection?: ChatServiceOptions['notionConnection'];
+  private myjiraDigestConnection?: ChatServiceOptions['myjiraDigestConnection'];
   private jiraBinder?: JiraPlanBinder;
   private jiraHistorySanitizer?: JiraHistorySanitizer;
   private jiraPolicyService?: JiraPolicyService;
@@ -228,6 +232,7 @@ export class ChatService {
     this.githubConnection = options.githubConnection;
     this.telegramConnection = options.telegramConnection;
     this.notionConnection = options.notionConnection;
+    this.myjiraDigestConnection = options.myjiraDigestConnection;
     this.jiraBinder = options.jiraBinder;
     this.jiraHistorySanitizer = options.jiraHistorySanitizer;
     this.jiraPolicyService = options.jiraPolicyService;
@@ -1372,7 +1377,18 @@ export class ChatService {
       if (!schedule) throw new Error('This conversation has no schedule');
       services = schedule.services;
     }
-    if (services.some((s) => s === 'myjira' || s.startsWith('myjira')) || proposal.request?.toLowerCase().includes('myjira')) {
+    const hasMyJiraService =
+      services.some((s) => s === 'myjira' || s.startsWith('myjira')) ||
+      Boolean(proposal.request?.toLowerCase().includes('myjira'));
+    const canEvaluateMyJiraDigest =
+      hasMyJiraService &&
+      actor.workspaceMode === 'organization' &&
+      Boolean(actor.workspaceId) &&
+      Boolean(this.myjiraDigestConnection) &&
+      Boolean(proposal.request) &&
+      Boolean(proposal.recurrence) &&
+      services.some((s) => s !== 'myjira' && !s.startsWith('myjira'));
+    if (hasMyJiraService && !canEvaluateMyJiraDigest) {
       return {
         kind: 'refusal',
         reason: 'Tính năng lịch tự động chưa hỗ trợ tích hợp Jira cá nhân (myjira).',
@@ -1389,6 +1405,37 @@ export class ChatService {
       ? nextRuns(recurrence, this.schedules.now?.() ?? new Date(), this.schedules.timeZone).map((date) => date.toISOString()) : [];
     const current = proposal.action === 'create' ? null : schedule;
     let digestCandidate: ScheduleProposalMetadata['digestCandidate'] | undefined;
+    if (canEvaluateMyJiraDigest && (proposal.action === 'create' || proposal.action === 'update') && recurrence) {
+      const evaluatedJiraDigest = await evaluateJiraDigestCandidate({
+        userId: actor.userId,
+        workspaceId: actor.workspaceId,
+        request: proposal.request,
+        services,
+        recurrence,
+        jiraConnection: this.myjiraDigestConnection,
+        telegramConnection: this.telegramConnection,
+        getAdapter: this.getAdapter,
+      });
+      if (!evaluatedJiraDigest.canAutoDigest) {
+        return {
+          kind: 'refusal',
+          reason:
+            evaluatedJiraDigest.disabledReason ??
+            'Tính năng lịch tự động chưa hỗ trợ tích hợp Jira cá nhân (myjira).',
+        };
+      }
+      digestCandidate = evaluatedJiraDigest as unknown as ScheduleProposalMetadata['digestCandidate'];
+      return {
+        type: 'schedule_proposal',
+        proposal,
+        services,
+        nextRuns: runs,
+        scheduleId: current?.id ?? null,
+        baseVersion: current?.version ?? null,
+        previous: current ? { name: current.name, request: current.request, recurrence: current.recurrence, status: current.status } : null,
+        digestCandidate,
+      };
+    }
     const uniqueServices = [...new Set(services)];
     const isCalendarDigestProposal =
       (uniqueServices.includes('mycalendar') || uniqueServices.includes('calendar')) &&

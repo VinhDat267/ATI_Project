@@ -42,6 +42,7 @@ export interface ScheduleRunnerOptions {
   runGithubDigest?: RunGithubDigest;
   runTrelloDigest?: RunTrelloDigest;
   runNotionDigest?: RunNotionDigest;
+  runJiraDigest?: (input: any, signal: AbortSignal) => Promise<any>;
   executeDigestRun?: ExecuteDigestRun;
   timeZone: string;
   /** Writes the state message of a schedule the runner paused or completed (ScheduleService.recordState). */
@@ -268,7 +269,7 @@ export class ScheduleRunner {
               if (moved.status === 'completed') changes.push(await this.options.recordState(client, tagScheduleContext(moved, segments), now));
               continue;
             }
-            if (row.kind !== 'github_digest' && row.kind !== 'trello_digest' && row.kind !== 'notion_digest' && row.kind !== 'telegram_digest' && await this.lastThreeExpired(client, row.id, now)) {
+            if (row.kind !== 'github_digest' && row.kind !== 'trello_digest' && row.kind !== 'notion_digest' && row.kind !== 'myjira_digest' && row.kind !== 'telegram_digest' && await this.lastThreeExpired(client, row.id, now)) {
               changes.push(await this.options.recordState(client, tagScheduleContext(await this.pause(client, row.id, UNAPPROVED), segments), now));
               continue;
             }
@@ -429,6 +430,18 @@ export class ScheduleRunner {
           digestConfig: started.digestConfig as any,
         },
         this.options.runNotionDigest as any
+      );
+      return;
+    }
+
+    if (started.kind === 'myjira_digest' && this.options.runJiraDigest) {
+      await this.executeGithubDigestOne(
+        runId,
+        {
+          ...started,
+          digestConfig: started.digestConfig as any,
+        },
+        this.options.runJiraDigest as any
       );
       return;
     }
