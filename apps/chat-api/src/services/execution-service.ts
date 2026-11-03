@@ -286,6 +286,8 @@ export class ExecutionService {
         if (state.status === 'succeeded' && leaseId && this.jiraLeaseManager) {
           const streamBuffer = new JiraStreamBuffer({
             revalidateLease: (id, opts) => this.jiraLeaseManager!.revalidateLease(id),
+            withLockedLease: (id, action, opts) =>
+              this.jiraLeaseManager!.withLockedLease(id, (client, val) => action(val), opts),
           });
           streamBuffer.bufferDelta({
             planId,
@@ -295,19 +297,12 @@ export class ExecutionService {
             error: state.error,
           });
           try {
-            await streamBuffer.flushOnStepComplete(leaseId, (delta) => {
+            await streamBuffer.flushOnStepComplete(leaseId, async (delta) => {
               if (dbId && this.stepRepo) {
-                void this.stepRepo.updateStepStatus(dbId, delta.status, delta.output, delta.error);
+                await this.stepRepo.updateStepStatus(dbId, delta.status, delta.output, delta.error);
               }
               this.sseManager?.emitEvent(convId, 'exec_step', delta);
             });
-            const pool = this.pool ?? (this.planRepo as any)?.pool;
-            if (pool) {
-              await pool.query(
-                `UPDATE jira_authorization_leases SET status = 'released', released_at = clock_timestamp() WHERE lease_id = $1`,
-                [leaseId]
-              );
-            }
           } catch (err: any) {
             if (dbId && this.stepRepo) {
               await this.stepRepo.updateStepStatus(dbId, 'failed', null, {
@@ -565,6 +560,9 @@ export class ExecutionService {
     const controller = this.activeControllers.get(planId);
     if (!controller) {
       return null;
+    }
+    if (controller.isExecuting()) {
+      return { status: 'executing' };
     }
     const states = controller.getAllStepStates();
     const allSteps = Object.values(states);

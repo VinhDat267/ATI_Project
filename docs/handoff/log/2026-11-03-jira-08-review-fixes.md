@@ -44,3 +44,19 @@
     - Trong `chat-service.ts` (`prepareResponse`), nếu câu trả lời sử dụng dữ liệu Jira đã thu thập/quan sát nhưng việc bind lại thất bại (do quyền bị thu hồi), lỗi không còn bị nuốt (swallowed); câu trả lời Jira lập tức bị che mờ (`maskedMetadata`) và thông báo che mờ trước khi lưu DB và phát SSE.
     - Test: `apps/chat-api/tests/services/jira-source-guard.test.ts` (PASS, 12/12 tests).
   - **Đăng ký static guard:** Bổ sung exception cho `jira-dispatch-guard.ts` kiểm tra `product_type = 'jira'` trong `evaluations/generic-plumbing/static-guard.test.ts`.
+- **Khắc phục đợt review thứ ba (2 phát hiện P1, 1 phát hiện P2):**
+  - **1. [P1] Dữ liệu gather Jira vào model trước khi được kiểm lại quyền:**
+    - Đường production dùng `phase: 'planning'` tại `server.ts:439`. Trước đây `adapter-factory.ts` bỏ qua guarded dispatch trong phase planning và không gắn sourceRefs.
+    - Cập nhật `adapter-factory.ts`: thực hiện guarded dispatch cho `myjira.*` (trừ `myjira.list_sites`) ngay cả trong `phase: 'planning'`, tự động phân giải `targetSiteId`, tạo lease, khóa DB và gắn `sourceRef`/`sourceRefs` đầy đủ thông tin binding (`atiUserId`, `jiraAccountId`, `atlassianAccountId`, `grantId`, `membershipVersion`, `identityVersion`).
+    - Nếu membership bị gỡ, grant bị thu hồi hoặc native verifier từ chối quyền browse, guarded dispatch chặn ngay tại ranh giới gather, ngăn dữ liệu chưa kiểm tra/bị thu hồi tiếp cận planner hoặc model prompt.
+    - Test: `apps/chat-api/tests/services/jira-source-guard.test.ts` (16/16 tests PASS).
+  - **2. [P1] Tuyến tính hóa khoảng đua giữa kiểm lease và phát SSE (Check -> Emit -> Release):**
+    - Bổ sung `withLockedLease` trong `JiraLeaseManager`: mở transaction chuyên dụng trên PostgreSQL, khóa hàng lease `SELECT ... FOR UPDATE OF l` và khóa hàng quyền `FOR SHARE` (`ati_workspaces`, `ati_workspace_memberships`, `jira_oauth_grants`).
+    - Nối `withLockedLease` vào `JiraStreamBuffer.flushOnStepComplete`: hành động phát delta (`emit`) và ghi nhận trạng thái bước được thực thi bên trong transaction đang giữ khóa hàng. Sau khi emit thành công, lease được cập nhật thành `released` và COMMIT.
+    - Kiểm thử bằng 2 client PostgreSQL thật: Client 2 thực hiện thu hồi lease đồng thời sẽ bị chặn (blocked) trên khóa hàng cho tới khi Client 1 hoàn tất phát SSE và commit. Nếu lease đã bị thu hồi trước khi nhận khóa, `flushOnStepComplete` hủy toàn bộ buffer và ném lỗi `JiraStreamBufferRevokedError`.
+    - Test: `apps/chat-api/tests/integration/jira-execution.test.ts` (11/11 tests PASS).
+  - **3. [P2] Lưu receipt đồng bộ trước khi phát SSE và phòng ngừa race condition:**
+    - Trong `execution-service.ts` (`onStepUpdate`), chuyển việc gọi `stepRepo.updateStepStatus` vào callback của `flushOnStepComplete` và `await` đồng bộ trước khi gọi `sseManager.emitEvent`.
+    - Nếu ghi DB thất bại, ngoại lệ được ném ra bên trong buffer, rollback transaction và kích hoạt error handler mà không phát ra bất kỳ sự kiện SSE `exec_step` thành công nào.
+    - Trong `getExecutionStatus(planId)`, bổ sung `if (controller.isExecuting()) return { status: 'executing' };` để bảo đảm trạng thái `completed` chỉ được công bố sau khi toàn bộ bước và bản ghi DB đã hoàn tất ghi bền vững.
+    - Test: `apps/chat-api/tests/integration/jira-execution.test.ts` (11/11 tests PASS).

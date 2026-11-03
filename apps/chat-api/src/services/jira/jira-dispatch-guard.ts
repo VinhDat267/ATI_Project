@@ -395,6 +395,12 @@ export class JiraDispatchGuard {
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(result, '_leaseBinding', {
+          value: lease.binding,
+          enumerable: false,
+          writable: true,
+          configurable: true,
+        });
       }
 
       return result;

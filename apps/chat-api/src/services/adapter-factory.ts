@@ -697,16 +697,19 @@ export class AdapterFactory {
 
     return {
       execute: async (tool: string, args: Record<string, any>, callOpts?: any) => {
-        if (!this.options.jiraDispatchGuard || context?.phase !== 'execution' || tool === 'myjira.list_sites') {
+        if (!this.options.jiraDispatchGuard || tool === 'myjira.list_sites') {
           return baseAdapter.execute(tool, args, callOpts);
         }
 
         const stepId = callOpts?.stepId;
         const siteStep = stepId ? context?.connections?.myjira?.siteSteps?.[stepId] : undefined;
-        const targetSiteId = (args?.siteId as string) || siteStep?.siteId;
-        const targetSite = capabilities.sites?.find((s: any) => s.siteId === targetSiteId);
+        const targetSiteId = (args?.siteId as string) || siteStep?.siteId || (capabilities.sites?.length === 1 ? capabilities.sites[0]!.siteId : undefined);
+        const targetSite = targetSiteId
+          ? capabilities.sites?.find((s: any) => s.siteId === targetSiteId)
+          : (args?.cloudId ? capabilities.sites?.find((s: any) => s.cloudId === args.cloudId) : undefined);
+        const resolvedSiteId = targetSiteId || targetSite?.siteId;
         const cloudId = targetSite?.cloudId || siteStep?.cloudId;
-        if (!targetSiteId || !cloudId) {
+        if (!resolvedSiteId || !cloudId) {
           throw new StepError({ category: 'VALIDATION', message: 'Missing target site for Jira dispatch' });
         }
 
@@ -720,7 +723,7 @@ export class AdapterFactory {
         const scope: DispatchScope = {
           userId,
           workspaceId,
-          siteId: targetSiteId,
+          siteId: resolvedSiteId,
           cloudId,
           sitePolicyVersion: siteStep?.sitePolicyVersion ?? (targetSite as any)?.policyVersion ?? 1,
           projectId,
@@ -756,19 +759,21 @@ export class AdapterFactory {
           context.stepLeaseMap.set(callOpts.stepId, leaseId);
         }
 
+        const effectiveBinding = bound ?? (rawOutput as any)?._leaseBinding;
+
         const sourceRef = {
           binding: {
             atiUserId: userId,
-            jiraAccountId: bound?.jiraAccountId ?? '',
-            atlassianAccountId: bound?.atlassianAccountId ?? '',
+            jiraAccountId: effectiveBinding?.jiraAccountId ?? '',
+            atlassianAccountId: effectiveBinding?.atlassianAccountId ?? '',
             workspaceId,
-            membershipVersion: bound?.membershipVersion ?? 1,
-            grantId: bound?.grantId ?? '',
-            identityVersion: bound?.identityVersion ?? 1,
+            membershipVersion: effectiveBinding?.membershipVersion ?? 1,
+            grantId: effectiveBinding?.grantId ?? '',
+            identityVersion: effectiveBinding?.identityVersion ?? 1,
           },
           workspaceId,
-          workspaceVersion: bound?.workspaceVersion ?? 1,
-          siteId: targetSiteId,
+          workspaceVersion: effectiveBinding?.workspaceVersion ?? bound?.workspaceVersion ?? 1,
+          siteId: resolvedSiteId,
           cloudId,
           sitePolicyVersion: siteStep?.sitePolicyVersion ?? (targetSite as any)?.policyVersion ?? 1,
           ...(projectId
@@ -792,9 +797,9 @@ export class AdapterFactory {
         const receipt = {
           ownerId: userId,
           workspaceId,
-          siteId: targetSiteId,
+          siteId: resolvedSiteId,
           projectId: projectId ?? null,
-          connectionLabel: `Jira (${targetSite?.name ?? targetSiteId})`,
+          connectionLabel: `Jira (${targetSite?.name ?? resolvedSiteId})`,
           leaseId,
         };
 
@@ -823,13 +828,13 @@ export class AdapterFactory {
             if (item && typeof item === 'object') {
               Object.defineProperty(item, '_sourceRefs', {
                 value: [sourceRef],
-                enumerable: false,
+                enumerable: true,
                 writable: true,
                 configurable: true,
               });
               Object.defineProperty(item, '_sourceRef', {
                 value: sourceRef,
-                enumerable: false,
+                enumerable: true,
                 writable: true,
                 configurable: true,
               });
@@ -839,7 +844,7 @@ export class AdapterFactory {
         }
 
         if (rawOutput && typeof rawOutput === 'object') {
-          const resultObj = { ...rawOutput, _receipt: receipt };
+          const resultObj = { ...rawOutput, _receipt: receipt, _sourceRef: sourceRef, _sourceRefs: [sourceRef] };
           if (leaseId) {
             Object.defineProperty(resultObj, '_leaseId', {
               value: leaseId,

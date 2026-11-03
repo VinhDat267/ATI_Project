@@ -23,6 +23,9 @@ import { UserRepo } from '../../src/db/repositories/user-repo.js';
 import { SessionRepo } from '../../src/db/repositories/session-repo.js';
 import { WorkspaceRepo } from '../../src/db/repositories/workspace-repo.js';
 import { JiraStreamBuffer, JiraStreamBufferRevokedError } from '../../src/sse/jira-stream-guard.js';
+import { AdapterFactory } from '../../src/services/adapter-factory.js';
+import { JiraLeaseManager } from '../../src/services/jira/jira-lease-manager.js';
+import { JiraDispatchGuard } from '../../src/services/jira/jira-dispatch-guard.js';
 import { createApp } from '../../src/app.js';
 import { generateAccessToken } from '../../src/auth/jwt.js';
 
@@ -841,6 +844,189 @@ describe('JIRA-08 Task 5 Source Guard, Persistence, and Publication Guards', () 
       expect(assistantMsg!.content).toContain('Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi');
       const metadata = typeof assistantMsg!.metadata === 'string' ? JSON.parse(assistantMsg!.metadata) : assistantMsg!.metadata;
       expect(metadata.masked).toBe(true);
+    });
+  });
+
+  // =========================================================================
+  // 7. Gather Path Guarding & Provenance Construction (phase: 'planning')
+  // =========================================================================
+  describe('7. Gather Path Guarding & Provenance Construction (phase: planning)', () => {
+    function createGatherFactory(
+      f: Fixture,
+      options: {
+        verifier?: any;
+        baseAdapterExecute?: (tool: string, args: any) => Promise<any>;
+      } = {}
+    ) {
+      const tokenManager = { getAccessToken: async () => 'test-token-jira-gather' };
+      const leaseManager = new JiraLeaseManager({ pool, tokenManager });
+      const dispatchGuard = new JiraDispatchGuard(pool, leaseManager, tokenManager);
+
+      return new AdapterFactory({
+        credentialRepo: {} as any,
+        encryptionKey: 'test-encryption-key-with-32bytes',
+        jiraTokens: tokenManager,
+        jiraDispatchGuard: dispatchGuard,
+        jiraNativeVerifier: options.verifier ?? {
+          verifyUserPermissions: async () => ({
+            status: 'allowed',
+            canBrowse: true,
+            canCreateIssue: true,
+            canAddComment: true,
+          }),
+        },
+        jiraWorkspaceRepo: {
+          getCapabilities: async () => ({
+            workspaceId: f.workspaceId,
+            sites: [
+              {
+                siteId: f.siteId,
+                cloudId: f.cloudId,
+                name: 'Guard Site',
+                url: 'https://guard.atlassian.net',
+                projects: [{ id: '10001', key: 'GRD', name: 'Guard Project' }],
+              },
+            ],
+          }),
+        },
+        createPersonalJiraAdapter: () => ({
+          execute: options.baseAdapterExecute ?? (async (tool, args) => {
+            if (tool === 'myjira.search_projects') {
+              return [{ id: '10001', key: 'GRD', name: 'Guard Project', siteId: args.siteId }];
+            }
+            return [];
+          }),
+        } as any),
+      });
+    }
+
+    it('gathers Jira data under phase: planning, acquiring lease, locking DB rows, and returning results with complete sourceRefs', async () => {
+      const f = await setupFixture();
+      const factory = createGatherFactory(f);
+
+      const adapter = await factory.getAdapterForService('myjira', {
+        userId: f.userId,
+        workspaceId: f.workspaceId,
+        phase: 'planning',
+      });
+
+      const result = await adapter.execute('myjira.search_projects', { siteId: f.siteId, query: '' });
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveLength(1);
+
+      // Verify array has _sourceRefs attached
+      const refs = (result as any)._sourceRefs;
+      expect(refs).toBeDefined();
+      expect(refs).toHaveLength(1);
+      expect(refs[0].binding.atiUserId).toBe(f.userId);
+      expect(refs[0].binding.jiraAccountId).toBe(f.accountId);
+      expect(refs[0].binding.grantId).toBe(f.grantId);
+      expect(refs[0].binding.atlassianAccountId).toBe(f.atlassianAccountId);
+      expect(refs[0].siteId).toBe(f.siteId);
+      expect(refs[0].cloudId).toBe(f.cloudId);
+
+      // Verify item also has enumerable _sourceRef
+      expect(result[0]._sourceRef).toBeDefined();
+      expect(result[0]._sourceRef.binding.atiUserId).toBe(f.userId);
+      expect(result[0]._sourceRef.binding.grantId).toBe(f.grantId);
+
+      // Verify lease was automatically released in DB since phase is planning (deferRelease: false)
+      const leaseId = (result as any)._leaseId;
+      expect(leaseId).toBeDefined();
+      const leaseRes = await pool.query<{ status: string }>(
+        `SELECT status FROM jira_authorization_leases WHERE lease_id = $1`,
+        [leaseId]
+      );
+      expect(leaseRes.rows[0]!.status).toBe('released');
+    });
+
+    it('rejects gather under phase: planning when user membership is inactive in DB, preventing unauthorized data from reaching planner', async () => {
+      const f = await setupFixture();
+      let baseAdapterCalled = false;
+      const factory = createGatherFactory(f, {
+        baseAdapterExecute: async () => {
+          baseAdapterCalled = true;
+          return [{ id: '10001', key: 'LEAK', name: 'Leaked Data' }];
+        },
+      });
+
+      // Revoke Jira membership in PostgreSQL
+      await pool.query(
+        `UPDATE ati_workspace_memberships SET status = 'removed' WHERE workspace_id = $1 AND user_id = $2`,
+        [f.workspaceId, f.userId]
+      );
+
+      const adapter = await factory.getAdapterForService('myjira', {
+        userId: f.userId,
+        workspaceId: f.workspaceId,
+        phase: 'planning',
+      });
+
+      await expect(
+        adapter.execute('myjira.search_projects', { siteId: f.siteId, query: '' })
+      ).rejects.toThrow(/membership inactive/i);
+
+      // Jira adapter was NEVER called, zero data leaked
+      expect(baseAdapterCalled).toBe(false);
+    });
+
+    it('rejects gather under phase: planning when OAuth grant is revoked in DB, preventing unauthorized data from reaching planner', async () => {
+      const f = await setupFixture();
+      let baseAdapterCalled = false;
+      const factory = createGatherFactory(f, {
+        baseAdapterExecute: async () => {
+          baseAdapterCalled = true;
+          return [{ id: '10001', key: 'LEAK', name: 'Leaked Data' }];
+        },
+      });
+
+      // Revoke OAuth grant in PostgreSQL
+      await pool.query(
+        `UPDATE jira_oauth_grants SET status = 'revoked' WHERE id = $1`,
+        [f.grantId]
+      );
+
+      const adapter = await factory.getAdapterForService('myjira', {
+        userId: f.userId,
+        workspaceId: f.workspaceId,
+        phase: 'planning',
+      });
+
+      await expect(
+        adapter.execute('myjira.search_projects', { siteId: f.siteId, query: '' })
+      ).rejects.toThrow(/site grant unavailable/i);
+
+      expect(baseAdapterCalled).toBe(false);
+    });
+
+    it('rejects gather under phase: planning when native verifier denies browse permission', async () => {
+      const f = await setupFixture();
+      let baseAdapterCalled = false;
+      const factory = createGatherFactory(f, {
+        verifier: {
+          verifyUserPermissions: async () => ({
+            status: 'denied',
+            canBrowse: false,
+            reason: 'User lacks BROWSE_PROJECTS permission on target Jira cloud site',
+          }),
+        },
+        baseAdapterExecute: async () => {
+          baseAdapterCalled = true;
+          return [{ id: '10001', key: 'LEAK', name: 'Leaked Data' }];
+        },
+      });
+
+      const adapter = await factory.getAdapterForService('myjira', {
+        userId: f.userId,
+        workspaceId: f.workspaceId,
+        phase: 'planning',
+      });
+
+      await expect(
+        adapter.execute('myjira.search_projects', { siteId: f.siteId, query: '' })
+      ).rejects.toThrow(/Native Jira permission denied/i);
+
+      expect(baseAdapterCalled).toBe(false);
     });
   });
 });

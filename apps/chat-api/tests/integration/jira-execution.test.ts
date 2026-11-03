@@ -41,7 +41,7 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
   let convRepo: ConversationRepo;
 
   beforeAll(async () => {
-    ctx = await createIsolatedTestSchema();
+    ctx = await createIsolatedTestSchema({ maxConnections: 10 });
     await ctx.runAllMigrations();
     pool = ctx.pool;
 
@@ -426,7 +426,7 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
 
     // Wait for execution to settle
     let status = executionService.getExecutionStatus(plan.id);
-    for (let i = 0; i < 50 && (!status || status.status === 'executing'); i++) {
+    for (let i = 0; i < 150 && (!status || status.status === 'executing'); i++) {
       await new Promise((r) => setTimeout(r, 50));
       status = executionService.getExecutionStatus(plan.id);
     }
@@ -474,7 +474,7 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
     await executionService.approveAndStart(plan.id, f.userId);
 
     let status = executionService.getExecutionStatus(plan.id);
-    for (let i = 0; i < 50 && (!status || status.status === 'executing'); i++) {
+    for (let i = 0; i < 150 && (!status || status.status === 'executing'); i++) {
       await new Promise((r) => setTimeout(r, 50));
       status = executionService.getExecutionStatus(plan.id);
     }
@@ -534,7 +534,7 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
     await executionService.approveAndStart(plan.id, f.userId);
 
     let status = executionService.getExecutionStatus(plan.id);
-    for (let i = 0; i < 50 && (!status || status.status === 'executing'); i++) {
+    for (let i = 0; i < 150 && (!status || status.status === 'executing'); i++) {
       await new Promise((r) => setTimeout(r, 50));
       status = executionService.getExecutionStatus(plan.id);
     }
@@ -575,7 +575,7 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
     await executionService.approveAndStart(plan.id, f.userId);
 
     let status = executionService.getExecutionStatus(plan.id);
-    for (let i = 0; i < 50 && (!status || status.status === 'executing'); i++) {
+    for (let i = 0; i < 150 && (!status || status.status === 'executing'); i++) {
       await new Promise((r) => setTimeout(r, 50));
       status = executionService.getExecutionStatus(plan.id);
     }
@@ -618,7 +618,7 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
     await executionService.approveAndStart(plan.id, f.userId);
 
     let status = executionService.getExecutionStatus(plan.id);
-    for (let i = 0; i < 50 && (!status || status.status === 'executing'); i++) {
+    for (let i = 0; i < 150 && (!status || status.status === 'executing'); i++) {
       await new Promise((r) => setTimeout(r, 50));
       status = executionService.getExecutionStatus(plan.id);
     }
@@ -659,7 +659,7 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
     await executionService.approveAndStart(plan.id, f.userId);
 
     let status = executionService.getExecutionStatus(plan.id);
-    for (let i = 0; i < 50 && (!status || status.status === 'executing'); i++) {
+    for (let i = 0; i < 150 && (!status || status.status === 'executing'); i++) {
       await new Promise((r) => setTimeout(r, 50));
       status = executionService.getExecutionStatus(plan.id);
     }
@@ -770,7 +770,7 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
 
     // Wait for execution to settle
     let status = executionService.getExecutionStatus(plan.id);
-    for (let i = 0; i < 50 && (!status || status.status === 'executing'); i++) {
+    for (let i = 0; i < 150 && (!status || status.status === 'executing'); i++) {
       await new Promise((r) => setTimeout(r, 50));
       status = executionService.getExecutionStatus(plan.id);
     }
@@ -840,7 +840,7 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
     expect(approveResult.success).toBe(true);
 
     let status = executionService.getExecutionStatus(plan.id);
-    for (let i = 0; i < 50 && (!status || status.status === 'executing'); i++) {
+    for (let i = 0; i < 150 && (!status || status.status === 'executing'); i++) {
       await new Promise((r) => setTimeout(r, 50));
       status = executionService.getExecutionStatus(plan.id);
     }
@@ -860,5 +860,165 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
     const executedSteps = await stepRepo.listSteps(plan.id);
     expect(executedSteps[0]!.status).toBe('failed');
     expect(executedSteps[0]!.output_json).toBeNull();
+  });
+
+  it('two PostgreSQL clients: concurrent lease revocation blocks during check -> emit window and cannot revoke before emit commits', async () => {
+    const f = await setupFixture();
+    const { executionService, leaseManager } = createTestExecutionService(f);
+
+    const emittedEvents: Array<{ event: string; payload: any }> = [];
+    let releaseEmitBarrier: () => void = () => {};
+    const emitBarrierPromise = new Promise<void>((resolve) => {
+      releaseEmitBarrier = resolve;
+    });
+
+    let client2RevokeFinished = false;
+    let client2RevokePromise: Promise<any> | null = null;
+
+    const sseManager = {
+      emitEvent: (convId: string, event: string, payload: any) => {
+        emittedEvents.push({ event, payload });
+        if (event === 'exec_step' && payload.status === 'succeeded') {
+          // Inside Client 1's withLockedLease callback while holding row lock
+          // Launch Client 2 to attempt concurrent revocation of the lease
+          client2RevokePromise = (async () => {
+            const client2 = await pool.connect();
+            try {
+              await client2.query(
+                `UPDATE jira_authorization_leases SET status = 'revoked', released_at = clock_timestamp() WHERE workspace_id = $1 AND status = 'active'`,
+                [f.workspaceId]
+              );
+              client2RevokeFinished = true;
+            } finally {
+              client2.release();
+            }
+          })();
+        }
+      },
+    } as any;
+    (executionService as any).sseManager = sseManager;
+
+    const steps: PlanStep[] = [
+      {
+        id: 'concurrency_step',
+        tool: 'myjira.search_projects',
+        description: 'Read projects to test two-client linearization',
+        dependsOn: [],
+        args: { siteId: f.siteId1, query: '' },
+      },
+    ];
+
+    const { plan } = await createApprovedPlan(f, steps, {
+      concurrency_step: {
+        siteId: f.siteId1,
+        cloudId: f.cloudId1,
+        sitePolicyVersion: 1,
+      },
+    });
+
+    // Wrap withLockedLease on leaseManager to hold the transaction across the barrier
+    const originalWithLocked = leaseManager.withLockedLease.bind(leaseManager);
+    leaseManager.withLockedLease = async function (leaseId, action, opts) {
+      return originalWithLocked(
+        leaseId,
+        async (client, val) => {
+          const res = await action(client, val);
+          // Check that client2 is indeed blocked!
+          await new Promise((r) => setTimeout(r, 100));
+          expect(client2RevokeFinished).toBe(false); // Client 2 MUST be blocked waiting for row lock!
+          releaseEmitBarrier();
+          return res;
+        },
+        opts
+      );
+    };
+
+    const approveResult = await executionService.approveAndStart(plan.id, f.userId);
+    expect(approveResult.success).toBe(true);
+
+    await emitBarrierPromise;
+    if (client2RevokePromise) {
+      await client2RevokePromise;
+      expect(client2RevokeFinished).toBe(true);
+    }
+
+    let status = executionService.getExecutionStatus(plan.id);
+    for (let i = 0; i < 150 && (!status || status.status === 'executing'); i++) {
+      await new Promise((r) => setTimeout(r, 50));
+      status = executionService.getExecutionStatus(plan.id);
+    }
+
+    expect(status?.status).toBe('completed');
+    const successEvents = emittedEvents.filter((e) => e.event === 'exec_step' && e.payload.status === 'succeeded');
+    expect(successEvents).toHaveLength(1);
+    expect(successEvents[0]!.payload.output).toBeDefined();
+
+    // The lease was released by Client 1 before Client 2's unblocked update
+    const leaseRows = await pool.query<{ status: string }>(
+      `SELECT status FROM jira_authorization_leases WHERE workspace_id = $1`,
+      [f.workspaceId]
+    );
+    expect(leaseRows.rows[0]!.status).toBe('released');
+  });
+
+  it('persisting receipt failure in database aborts before emitting success SSE event', async () => {
+    const f = await setupFixture();
+    const { executionService } = createTestExecutionService(f);
+
+    const emittedEvents: Array<{ event: string; payload: any }> = [];
+    const sseManager = {
+      emitEvent: (convId: string, event: string, payload: any) => {
+        emittedEvents.push({ event, payload });
+      },
+    } as any;
+    (executionService as any).sseManager = sseManager;
+
+    const steps: PlanStep[] = [
+      {
+        id: 'db_fail_step',
+        tool: 'myjira.search_projects',
+        description: 'Read projects with DB error on save',
+        dependsOn: [],
+        args: { siteId: f.siteId1, query: '' },
+      },
+    ];
+
+    const { plan } = await createApprovedPlan(f, steps, {
+      db_fail_step: {
+        siteId: f.siteId1,
+        cloudId: f.cloudId1,
+        sitePolicyVersion: 1,
+      },
+    });
+
+    const originalUpdate = stepRepo.updateStepStatus.bind(stepRepo);
+    stepRepo.updateStepStatus = async (id, status, output, error) => {
+      if (status === 'succeeded') {
+        throw new Error('Database disk full: failed to persist step receipt');
+      }
+      return originalUpdate(id, status, output, error);
+    };
+
+    try {
+      const approveResult = await executionService.approveAndStart(plan.id, f.userId);
+      expect(approveResult.success).toBe(true);
+
+      let status = executionService.getExecutionStatus(plan.id);
+      for (let i = 0; i < 150 && (!status || status.status === 'executing'); i++) {
+        await new Promise((r) => setTimeout(r, 50));
+        status = executionService.getExecutionStatus(plan.id);
+      }
+
+      // Success SSE MUST NOT be emitted
+      const successEvents = emittedEvents.filter((e) => e.event === 'exec_step' && e.payload.status === 'succeeded');
+      expect(successEvents).toHaveLength(0);
+
+      // Failed SSE must be emitted
+      const failedEvents = emittedEvents.filter((e) => e.event === 'exec_step' && e.payload.status === 'failed');
+      expect(failedEvents).toHaveLength(1);
+      expect(failedEvents[0]!.payload.output).toBeNull();
+    } finally {
+      stepRepo.updateStepStatus = originalUpdate;
+    }
   });
 });

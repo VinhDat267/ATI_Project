@@ -436,11 +436,25 @@ async function bootstrap() {
     const serviceName = tool.split('.')[0]!;
     // Lookups during planning use the planning member's own connection and active workspace context.
     const defaultMode = workspaceRepo ? ('personal' as const) : undefined;
+    let activeWorkspaceId = actor?.workspaceId;
+    if (!activeWorkspaceId && actor?.userId && pool && tool.startsWith('myjira.')) {
+      try {
+        const memRes = await pool.query<{ workspace_id: string }>(
+          `SELECT workspace_id FROM ati_workspace_memberships WHERE user_id = $1 AND status = 'active' LIMIT 1`,
+          [actor.userId]
+        );
+        if (memRes.rows[0]) {
+          activeWorkspaceId = memRes.rows[0].workspace_id;
+        }
+      } catch {
+        // ignore
+      }
+    }
     const adapter = await gatherAdapterFactory.getAdapterForService(serviceName, {
       userId: actor?.userId,
       phase: 'planning',
       workspaceMode: actor?.workspaceMode ?? defaultMode,
-      ...(actor?.workspaceId !== undefined ? { workspaceId: actor.workspaceId } : {}),
+      ...(activeWorkspaceId !== undefined && activeWorkspaceId !== null ? { workspaceId: activeWorkspaceId } : {}),
     });
     return adapter.execute(tool, args, { signal });
   };
