@@ -29,6 +29,12 @@
       "title": "Biên bản họp Notion & giao việc",
       "services": ["notion", "trello", "slack"],
       "prompt": "Đọc trang biên bản họp mới nhất trên Notion, bóc tách các đầu việc cần làm để tạo thẻ trên bảng Trello và gửi tóm tắt vào kênh Slack của nhóm."
+    },
+    {
+      "id": "playbook-jira-triage-slack",
+      "title": "Xử lý lỗi khách hàng & điều phối Jira Sprint",
+      "services": ["gmail", "myjira", "slack"],
+      "prompt": "Đọc email báo lỗi mới nhất trên Gmail, tạo issue Bug ưu tiên High trên Jira của nhóm và gửi thông báo kèm link issue vào kênh Slack."
     }
   ],
   "services": {
@@ -961,6 +967,47 @@
       "kind": "Bình luận",
       "link": "Mở trong Jira",
       "titleField": "issueKey",
+      "previewStyle": "issue"
+    },
+    "myjira.get_issue": {
+      "action": "Đọc chi tiết issue Jira",
+      "done": "Đã đọc",
+      "receipt": "Đã đọc chi tiết issue",
+      "kind": "Issue",
+      "link": "Mở trong Jira",
+      "titleField": "key",
+      "previewStyle": "issue"
+    },
+    "myjira.search_users": {
+      "action": "Tìm thành viên dự án Jira",
+      "done": "Đã tìm",
+      "receipt": "Đã tìm thành viên",
+      "kind": "Thành viên",
+      "link": "Mở trong Jira"
+    },
+    "myjira.list_transitions": {
+      "action": "Xem trạng thái chuyển tiếp Jira",
+      "done": "Đã xem",
+      "receipt": "Đã xem trạng thái chuyển tiếp",
+      "kind": "Trạng thái Issue",
+      "link": "Mở trong Jira"
+    },
+    "myjira.transition_issue": {
+      "action": "Chuyển trạng thái issue Jira",
+      "done": "Đã chuyển trạng thái",
+      "receipt": "Đã chuyển trạng thái",
+      "kind": "Trạng thái Issue",
+      "link": "Mở trong Jira",
+      "titleField": "key",
+      "previewStyle": "issue"
+    },
+    "myjira.update_issue": {
+      "action": "Cập nhật issue Jira",
+      "done": "Đã cập nhật",
+      "receipt": "Đã cập nhật issue",
+      "kind": "Issue",
+      "link": "Mở trong Jira",
+      "titleField": "key",
       "previewStyle": "issue"
     }
   }

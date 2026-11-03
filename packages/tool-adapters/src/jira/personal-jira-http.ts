@@ -151,7 +151,7 @@ export class PersonalJiraHttpTransport {
 
       let value: any;
       try {
-        value = await response.json();
+        value = response.status === 204 ? {} : await response.json();
       } catch {
         if (response.ok) {
           throw createJiraStepError(writing ? 'UNKNOWN' : 'SERVER_ERROR', response.status);

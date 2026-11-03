@@ -1,15 +1,31 @@
+/** @vitest-environment jsdom */
+import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { toolDefinition } from '../src/services/tool-definitions';
 import { resourceDestination } from '../src/components/Cockpit';
 import { PlanMoment } from '../src/pages/Cockpit/PlanMoment';
 import { ReceiptMoment } from '../src/pages/Cockpit/ReceiptMoment';
 import { PreviewContents } from '../src/pages/Cockpit/PreviewContents';
+import { RequestMoment } from '../src/pages/Cockpit/RequestMoments';
+import { RecoveryMoment } from '../src/pages/Cockpit/RecoveryMoment';
+import { ScheduleMoment } from '../src/pages/Cockpit/ScheduleMoment';
+import { recoveryFieldLabel } from '../src/pages/Cockpit/recovery-labels';
+import { ExecutionProgress } from '../src/components/ExecutionProgress';
 import { RefusalMoment } from '../src/pages/Responses/ResponseMoment';
 import { JiraConnection } from '../src/pages/Settings/JiraConnection';
+import { GUIDE_OAUTH_SHOWCASE_CARDS, SERVICE_GUIDES } from '../src/pages/Guide/data';
 import { jiraApi } from '../src/services/jira-api';
+import { apiClient } from '../src/services/api-client';
 import * as jiraConn from '../src/services/jira-connection';
 import { authStorage } from '../src/services/auth-storage';
+import {
+  getActiveWorkspaceId,
+  getActiveWorkspaceSummary,
+  resetWorkspaceStorage,
+  setActiveWorkspaceId,
+  setCachedOrganizations,
+} from '../src/services/workspace-storage';
 import type { ActivePlan, PlanStep, User } from '../src/types';
 
 describe('JIRA-09B: Jira Cockpit UI integration', () => {
@@ -31,6 +47,8 @@ describe('JIRA-09B: Jira Cockpit UI integration', () => {
   });
 
   afterEach(() => {
+    cleanup();
+    resetWorkspaceStorage();
     authStorage.clearStoredTokens();
     vi.restoreAllMocks();
   });
@@ -352,7 +370,284 @@ describe('JIRA-09B: Jira Cockpit UI integration', () => {
       expect(cta).not.toBeDisabled();
     });
 
+    expect(screen.getByTestId('jira-setup-steps')).toBeInTheDocument();
+    expect(screen.getByText(/Bước 1: Tài khoản Atlassian/i)).toBeInTheDocument();
+    expect(screen.getByText(/Bước 2: Jira Workspace/i)).toBeInTheDocument();
+    expect(screen.getByText(/Bước 3: Site & Projects/i)).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('button', { name: /bắt đầu hội thoại jira/i }));
+    expect(getActiveWorkspaceId()).toBe('ws-active-1');
+    expect(getActiveWorkspaceSummary().name).toBe('Dev Team');
     expect(navSpy).toHaveBeenCalledWith('/');
+  });
+
+  it('sends jiraContext: true in apiClient.createConversation and falls back cleanly on 400', async () => {
+    const reqSpy = vi
+      .spyOn(apiClient as any, 'request')
+      .mockRejectedValueOnce(Object.assign(new Error('Invalid Jira context'), { status: 400 }))
+      .mockResolvedValueOnce({ conversation: { id: 'conv-fallback-1' } });
+
+    const res = await apiClient.createConversation(undefined, { jiraContext: true });
+    expect(res.conversation.id).toBe('conv-fallback-1');
+    expect(reqSpy).toHaveBeenNthCalledWith(1, '/api/conversations', {
+      method: 'POST',
+      body: JSON.stringify({ jiraContext: true }),
+    });
+    expect(reqSpy).toHaveBeenNthCalledWith(2, '/api/conversations', {
+      method: 'POST',
+      body: undefined,
+    });
+  });
+
+  it('renders jira-context-ready-pill and multi-service playbooks for myjira in RequestMoment', () => {
+    setCachedOrganizations([{ id: 'ws-eng-1', name: 'Engineering Org', role: 'admin', status: 'active' }]);
+    setActiveWorkspaceId('ws-eng-1');
+
+    render(
+      <RequestMoment
+        services={[
+          { id: 'myjira', name: 'Atlassian Jira', connected: true, configured: true, personalStatus: 'connected' },
+          { id: 'gmail', name: 'Gmail', connected: true, configured: true, personalStatus: 'connected' },
+          { id: 'slack', name: 'Slack', connected: true, configured: true },
+        ]}
+        loading={false}
+        error={null}
+        draft=""
+        planning={false}
+        input={{ current: null }}
+        onDraft={() => {}}
+        onSend={() => {}}
+        onKeyDown={() => {}}
+        onSettings={() => {}}
+        navigate={() => {}}
+        servicePrompt={(s) => s.name}
+      />
+    );
+
+    expect(screen.getByTestId('jira-context-ready-pill')).toHaveTextContent('Jira OAuth 3LO: Sẵn sàng');
+    expect(screen.getByTestId('multi-service-playbooks')).toBeInTheDocument();
+    expect(screen.getByText(/Xử lý lỗi khách hàng & điều phối Jira Sprint/i)).toBeInTheDocument();
+  });
+
+  it('renders inline myjira-step-pills on PlanMoment cards', () => {
+    const plan: ActivePlan = {
+      id: 'plan-jira-pills',
+      summary: 'Cập nhật và chuyển trạng thái Jira',
+      steps: [
+        {
+          id: 's1',
+          tool: 'myjira.create_issue',
+          description: 'Tạo bug ưu tiên cao',
+          args: {
+            siteId: 'site-1',
+            projectKey: 'ENG',
+            issueType: 'Bug',
+            priority: 'High',
+            assigneeAccountId: 'acc-alice',
+            dueDate: '2026-11-15',
+            parentKey: 'ENG-10',
+            summary: 'Sửa lỗi memory leak',
+          },
+        },
+        {
+          id: 's2',
+          tool: 'myjira.transition_issue',
+          description: 'Chuyển ENG-42 sang In Progress',
+          args: {
+            siteId: 'site-1',
+            issueKey: 'ENG-42',
+            targetStatus: 'In Progress',
+          },
+        },
+      ],
+      resourceLabels: {
+        'acc-alice': 'Alice Nguyễn',
+      },
+    };
+
+    render(
+      <PlanMoment
+        runtimeMode="sandbox"
+        plan={plan}
+        services={[{ id: 'myjira', name: 'Atlassian Jira', connected: true, configured: true }]}
+        destination={resourceDestination}
+        onPreview={() => {}}
+        onApprove={() => {}}
+        onCancel={() => {}}
+        onEdit={() => {}}
+        inlineComposer={null}
+      />
+    );
+
+    const pillGroups = screen.getAllByTestId('myjira-step-pills');
+    expect(pillGroups).toHaveLength(2);
+    expect(screen.getByText(/⚡ Ưu tiên: High/i)).toBeInTheDocument();
+    expect(screen.getByText(/🏷️ Bug/i)).toBeInTheDocument();
+    expect(screen.getByText(/👤 Phụ trách: Alice Nguyễn/i)).toBeInTheDocument();
+    expect(screen.getByText(/📅 Hạn: 2026-11-15/i)).toBeInTheDocument();
+    expect(screen.getByText(/🔗 Epic: ENG-10/i)).toBeInTheDocument();
+    expect(screen.getByText(/🎫 ENG-42/i)).toBeInTheDocument();
+    expect(screen.getByText(/🔄 → In Progress/i)).toBeInTheDocument();
+  });
+
+  it('renders rich Jira output fields in ExecutionProgress and ReceiptMoment', () => {
+    const { unmount } = render(
+      <ExecutionProgress
+        steps={[
+          {
+            id: 's1',
+            tool: 'myjira.get_issue',
+            description: 'Đọc chi tiết ENG-42',
+            status: 'succeeded',
+            output: {
+              id: '10042',
+              key: 'ENG-42',
+              summary: 'Khắc phục lỗi OAuth callback',
+              status: 'In Progress',
+              priority: 'High',
+              issueType: 'Bug',
+              assignee: 'Alice Nguyễn',
+              dueDate: '2026-11-20',
+              comments: [{ id: 'c1', author: 'Bob', body: 'Đã kiểm tra', createdAt: '2026-11-01' }],
+              subtasks: [],
+              url: 'https://acme.atlassian.net/browse/ENG-42',
+            },
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByText('Khắc phục lỗi OAuth callback')).toBeInTheDocument();
+    expect(screen.getByText('In Progress')).toBeInTheDocument();
+    expect(screen.getByText('High')).toBeInTheDocument();
+    expect(screen.getByText('Alice Nguyễn')).toBeInTheDocument();
+    expect(screen.getByText('2026-11-20')).toBeInTheDocument();
+    expect(screen.getByText('1 bình luận')).toBeInTheDocument();
+    unmount();
+
+    render(
+      <ReceiptMoment
+        request="Chuyển trạng thái ENG-42"
+        steps={[
+          {
+            id: 's1',
+            tool: 'myjira.transition_issue',
+            description: 'Chuyển ENG-42 sang Done',
+            status: 'succeeded',
+            output: {
+              issueKey: 'ENG-42',
+              previousStatus: 'In Progress',
+              newStatus: 'Done',
+              url: 'https://acme.atlassian.net/browse/ENG-42',
+            },
+          },
+        ]}
+        planSteps={[
+          {
+            id: 's1',
+            tool: 'myjira.transition_issue',
+            description: 'Chuyển ENG-42 sang Done',
+            args: { siteId: 'site-1', issueKey: 'ENG-42', targetStatus: 'Done' },
+          },
+        ]}
+        services={[{ id: 'myjira', name: 'Atlassian Jira', connected: true, configured: true }]}
+        destination={resourceDestination}
+        onNewConversation={() => {}}
+        onFollowup={() => {}}
+      />
+    );
+
+    expect(screen.getByTestId('myjira-receipt-metrics')).toHaveTextContent('🔄 Trạng thái: In Progress → Done');
+  });
+
+  it('supports Vietnamese recovery labels, Moment 8 check link, ScheduleMoment myjira_digest, and Guide OAuth card', () => {
+    expect(recoveryFieldLabel('myjira.transition_issue', 'targetStatus')).toBe('Trạng thái chuyển tới');
+    expect(recoveryFieldLabel('myjira.create_issue', 'assigneeAccountId')).toBe('Người phụ trách (Account ID)');
+
+    const { unmount } = render(
+      <RecoveryMoment
+        moment={8}
+        snapshot={{
+          execution: { id: 'ex-1', planId: 'p-1', status: 'paused', pausedStepId: 's1' } as any,
+          plan: {
+            id: 'p-1',
+            convId: 'conv-1',
+            status: 'paused',
+            summary: 'Tạo issue Jira',
+            steps: [
+              {
+                id: 's1',
+                tool: 'myjira.create_issue',
+                description: 'Tạo issue ENG',
+                args: { siteId: 'site-1', projectKey: 'ENG', summary: 'Task 1' },
+              },
+            ],
+            connections: {
+              myjira: {
+                atiUserId: 'user-1',
+                jiraAccountId: 'jira-1',
+                atlassianAccountId: 'atl-alice',
+                workspaceId: 'ws-1',
+                workspaceVersion: 1,
+                membershipVersion: 1,
+                grantId: 'g-1',
+                identityVersion: 1,
+                siteSteps: {},
+              },
+            },
+          },
+          steps: [{ stepId: 's1', status: 'unknown' } as any],
+          recoveryActions: ['skip', 'stop'],
+        }}
+        steps={[
+          {
+            id: 's1',
+            tool: 'myjira.create_issue',
+            description: 'Tạo issue ENG',
+            status: 'unknown',
+          },
+        ]}
+        services={[{ id: 'myjira', name: 'Atlassian Jira', connected: true, configured: true }]}
+        controls={{
+          busy: false,
+          error: null,
+          onRetry: () => {},
+          onSkip: () => {},
+          onStop: () => {},
+          onContinue: () => {},
+          onEdit: () => {},
+        }}
+      />
+    );
+
+    expect(screen.getByRole('link', { name: /Mở Jira kiểm tra/i })).toHaveAttribute(
+      'href',
+      'https://www.atlassian.com/software/jira'
+    );
+    unmount();
+
+    render(
+      <ScheduleMoment
+        digestCandidate={{
+          kind: 'myjira_digest',
+          canAutoDigest: true,
+          summary: 'Bản tin Standup Jira mỗi sáng',
+          config: {
+            workspaceId: 'ws-1',
+            grantId: 'g-1',
+            atlassianAccountId: 'atl-alice',
+            projects: [{ siteId: 'site-1', siteName: 'Acme Jira', projectKey: 'ENG' }],
+            channelId: 'C123',
+            channelName: 'eng-standup',
+          },
+        }}
+      />
+    );
+
+    expect(screen.getByText(/Tự gửi bản tin Standup & Blocker Jira, không cần duyệt lại/i)).toBeInTheDocument();
+    expect(screen.getByText(/Dự án Jira: Acme Jira · ENG/i)).toBeInTheDocument();
+
+    expect(GUIDE_OAUTH_SHOWCASE_CARDS.some((c) => c.service === 'jira')).toBe(true);
+    expect(SERVICE_GUIDES.jira.keys.join(' ')).toContain('Site URL');
   });
 });

@@ -63,6 +63,22 @@ export function plainTextToAdf(value: string): { version: number; type: string; 
   };
 }
 
+export function adfToPlainText(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (!record(value)) return '';
+  if (value.type === 'text' && typeof value.text === 'string') return value.text;
+  if (value.type === 'hardBreak') return '\n';
+  if (Array.isArray(value.content)) {
+    const joiner = value.type === 'doc' ? '\n' : '';
+    return value.content.map((child) => adfToPlainText(child)).join(joiner);
+  }
+  return '';
+}
+
+const VALID_PRIORITIES = new Set(['Highest', 'High', 'Medium', 'Low', 'Lowest']);
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const LABEL_PATTERN = /^[^\s]{1,100}$/;
+
 export class PersonalJiraAdapter extends BaseAdapter {
   readonly service = 'myjira';
   private readonly userId: string;
@@ -207,7 +223,19 @@ export class PersonalJiraAdapter extends BaseAdapter {
     issue: any,
     site: ScopedSite,
     projectKey: string
-  ): { siteId: string; id: string; key: string; url: string; title: string; status: string } {
+  ): {
+    siteId: string;
+    id: string;
+    key: string;
+    url: string;
+    title: string;
+    status: string;
+    priority?: string;
+    assignee?: string | null;
+    issueType?: string;
+    updatedAt?: string;
+    dueDate?: string | null;
+  } {
     const idn = this.identity(issue, site, projectKey);
     if (
       issue.fields?.project?.key !== projectKey ||
@@ -216,7 +244,19 @@ export class PersonalJiraAdapter extends BaseAdapter {
     ) {
       throw fail('SERVER_ERROR');
     }
-    return {
+    const row: {
+      siteId: string;
+      id: string;
+      key: string;
+      url: string;
+      title: string;
+      status: string;
+      priority?: string;
+      assignee?: string | null;
+      issueType?: string;
+      updatedAt?: string;
+      dueDate?: string | null;
+    } = {
       siteId: site.siteId,
       id: idn.id,
       key: idn.key,
@@ -224,6 +264,25 @@ export class PersonalJiraAdapter extends BaseAdapter {
       title: issue.fields.summary,
       status: issue.fields.status.name,
     };
+    if (typeof issue.fields?.priority?.name === 'string') {
+      row.priority = issue.fields.priority.name;
+    }
+    if (issue.fields && 'assignee' in issue.fields) {
+      row.assignee =
+        typeof issue.fields.assignee?.displayName === 'string'
+          ? issue.fields.assignee.displayName
+          : null;
+    }
+    if (typeof issue.fields?.issuetype?.name === 'string') {
+      row.issueType = issue.fields.issuetype.name;
+    }
+    if (typeof issue.fields?.updated === 'string') {
+      row.updatedAt = issue.fields.updated;
+    }
+    if (issue.fields && 'duedate' in issue.fields) {
+      row.dueDate = typeof issue.fields.duedate === 'string' ? issue.fields.duedate : null;
+    }
+    return row;
   }
 
   private async issueByKey(
@@ -361,12 +420,16 @@ export class PersonalJiraAdapter extends BaseAdapter {
     }
 
     if (tool === 'myjira.search_issues') {
-      this.input(args, ['siteId', 'projectKey'], ['query', 'limit']);
+      this.input(args, ['siteId', 'projectKey'], ['query', 'status', 'priority', 'issueType', 'limit']);
       const site = this.resolveSite(args.siteId);
       const proj = this.resolveProject(site, args.projectKey);
       const limit = this.limit(args.limit, 20);
       if (args.query !== undefined && !text(args.query, 0, 2000)) throw fail('VALIDATION');
+      if (args.status !== undefined && !text(args.status, 1, 100)) throw fail('VALIDATION');
+      if (args.priority !== undefined && !text(args.priority, 1, 100)) throw fail('VALIDATION');
+      if (args.issueType !== undefined && !text(args.issueType, 1, 100)) throw fail('VALIDATION');
 
+      const escapeJqlString = (raw: string) => raw.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
       const query = (args.query ?? '').trim();
       const lucene = query.replace(/[+\-&|!(){}\[\]^~*?:\\\/"]/g, '\\$&');
       const escaped = lucene.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
@@ -374,7 +437,13 @@ export class PersonalJiraAdapter extends BaseAdapter {
       const isDirectKey = JIRA_ISSUE_PATTERN.test(directKey) && directKey.split('-')[0] === proj.key;
       const direct = isDirectKey ? await this.issueByKey(site, directKey, proj.key, callOpts) : null;
 
-      const jql = 'project = "' + proj.key + '"' + (query ? ' AND text ~ "' + escaped + '"' : '') + ' ORDER BY updated DESC';
+      let jql = 'project = "' + proj.key + '"';
+      if (query) jql += ' AND text ~ "' + escaped + '"';
+      if (args.status !== undefined) jql += ' AND status = "' + escapeJqlString(args.status.trim()) + '"';
+      if (args.priority !== undefined) jql += ' AND priority = "' + escapeJqlString(args.priority.trim()) + '"';
+      if (args.issueType !== undefined) jql += ' AND issuetype = "' + escapeJqlString(args.issueType.trim()) + '"';
+      jql += ' ORDER BY updated DESC';
+
       const value = await this.transport.request(site.cloudId, '/search/jql', false, {
         ...callOpts,
         method: 'POST',
@@ -394,16 +463,37 @@ export class PersonalJiraAdapter extends BaseAdapter {
     }
 
     if (tool === 'myjira.create_issue') {
-      this.input(args, ['siteId', 'projectKey', 'summary'], ['description', 'issueType']);
+      this.input(
+        args,
+        ['siteId', 'projectKey', 'summary'],
+        ['description', 'issueType', 'priority', 'labels', 'dueDate', 'assigneeAccountId', 'parentKey']
+      );
       const site = this.resolveSite(args.siteId);
       const proj = this.resolveProject(site, args.projectKey);
 
       if (
         !text(args.summary, 1, 255) ||
         (args.description !== undefined && !text(args.description, 0, 4000)) ||
-        (args.issueType !== undefined && !text(args.issueType, 1, 255))
+        (args.issueType !== undefined && !text(args.issueType, 1, 255)) ||
+        (args.priority !== undefined && (typeof args.priority !== 'string' || !VALID_PRIORITIES.has(args.priority))) ||
+        (args.dueDate !== undefined && (typeof args.dueDate !== 'string' || !DATE_PATTERN.test(args.dueDate))) ||
+        (args.assigneeAccountId !== undefined && !text(args.assigneeAccountId, 1, 128)) ||
+        (args.parentKey !== undefined &&
+          (typeof args.parentKey !== 'string' ||
+            !JIRA_ISSUE_PATTERN.test(args.parentKey) ||
+            args.parentKey.split('-')[0] !== proj.key))
       ) {
         throw fail('VALIDATION');
+      }
+
+      if (args.labels !== undefined) {
+        if (
+          !Array.isArray(args.labels) ||
+          args.labels.length > 20 ||
+          !args.labels.every((lbl: unknown) => typeof lbl === 'string' && LABEL_PATTERN.test(lbl))
+        ) {
+          throw fail('VALIDATION');
+        }
       }
 
       const types = await this.issueTypes(site.cloudId, proj.key, callOpts);
@@ -431,6 +521,11 @@ export class PersonalJiraAdapter extends BaseAdapter {
             summary: args.summary,
             issuetype: { id: selected.id },
             ...(args.description !== undefined ? { description: plainTextToAdf(args.description) } : {}),
+            ...(args.priority !== undefined ? { priority: { name: args.priority } } : {}),
+            ...(args.labels !== undefined ? { labels: args.labels } : {}),
+            ...(args.dueDate !== undefined ? { duedate: args.dueDate } : {}),
+            ...(args.assigneeAccountId !== undefined ? { assignee: { id: args.assigneeAccountId } } : {}),
+            ...(args.parentKey !== undefined ? { parent: { key: args.parentKey } } : {}),
           },
         },
       });
@@ -489,6 +584,277 @@ export class PersonalJiraAdapter extends BaseAdapter {
         id: value.id,
         issueKey: idn.key,
         url: idn.url + '?focusedCommentId=' + value.id,
+      };
+    }
+
+    if (tool === 'myjira.get_issue') {
+      this.input(args, ['siteId', 'issueKey']);
+      const site = this.resolveSite(args.siteId);
+      if (typeof args.issueKey !== 'string' || !JIRA_ISSUE_PATTERN.test(args.issueKey)) {
+        throw fail('VALIDATION');
+      }
+      const initialProjectKey = args.issueKey.split('-')[0];
+      this.resolveProject(site, initialProjectKey);
+
+      const issue = await this.transport.request(
+        site.cloudId,
+        '/issue/' +
+          args.issueKey +
+          '?fields=summary,status,project,description,priority,assignee,issuetype,labels,duedate,comment',
+        false,
+        callOpts
+      );
+
+      if (
+        !record(issue) ||
+        !record(issue.fields?.project) ||
+        typeof issue.fields.project.key !== 'string' ||
+        !text(issue.fields?.summary, 1, 255) ||
+        !text(issue.fields?.status?.name, 1, 255)
+      ) {
+        throw fail('SERVER_ERROR');
+      }
+
+      const currentProjectKey = issue.fields.project.key;
+      this.resolveProject(site, currentProjectKey);
+      const idn = this.identity(issue, site, currentProjectKey);
+
+      const rawComments = Array.isArray(issue.fields?.comment?.comments)
+        ? issue.fields.comment.comments.slice(-5)
+        : [];
+      const comments = rawComments
+        .filter((c: unknown): c is Record<string, any> => record(c) && typeof c.id === 'string')
+        .map((c: Record<string, any>) => ({
+          id: String(c.id),
+          author:
+            typeof c.author?.displayName === 'string' && c.author.displayName.trim()
+              ? c.author.displayName
+              : 'Unknown',
+          body: adfToPlainText(c.body),
+          createdAt: typeof c.created === 'string' ? c.created : '',
+        }));
+
+      return {
+        siteId: site.siteId,
+        id: idn.id,
+        key: idn.key,
+        url: idn.url,
+        title: issue.fields.summary,
+        status: issue.fields.status.name,
+        description: adfToPlainText(issue.fields.description),
+        ...(typeof issue.fields?.priority?.name === 'string' ? { priority: issue.fields.priority.name } : {}),
+        assignee:
+          typeof issue.fields?.assignee?.displayName === 'string'
+            ? issue.fields.assignee.displayName
+            : null,
+        ...(typeof issue.fields?.issuetype?.name === 'string' ? { issueType: issue.fields.issuetype.name } : {}),
+        labels: Array.isArray(issue.fields?.labels)
+          ? issue.fields.labels.filter((l: unknown): l is string => typeof l === 'string')
+          : [],
+        dueDate: typeof issue.fields?.duedate === 'string' ? issue.fields.duedate : null,
+        comments,
+      };
+    }
+
+    if (tool === 'myjira.search_users') {
+      this.input(args, ['siteId', 'projectKey', 'query'], ['limit']);
+      const site = this.resolveSite(args.siteId);
+      const proj = this.resolveProject(site, args.projectKey);
+      if (!text(args.query, 0, 200)) throw fail('VALIDATION');
+      const limit = this.limit(args.limit, 20);
+      const query = args.query.trim();
+
+      const value = await this.transport.request(
+        site.cloudId,
+        '/user/assignable/search?project=' +
+          encodeURIComponent(proj.key) +
+          '&query=' +
+          encodeURIComponent(query) +
+          '&maxResults=' +
+          limit,
+        false,
+        callOpts
+      );
+
+      if (!Array.isArray(value)) throw fail('SERVER_ERROR');
+
+      return value
+        .filter(
+          (u: unknown): u is Record<string, any> =>
+            record(u) && text(u.accountId, 1, 128) && text(u.displayName, 1, 255)
+        )
+        .slice(0, limit)
+        .map((u) => ({
+          id: String(u.accountId),
+          siteId: site.siteId,
+          accountId: String(u.accountId),
+          displayName: String(u.displayName),
+        }));
+    }
+
+    if (tool === 'myjira.transition_issue') {
+      this.input(args, ['siteId', 'issueKey', 'status'], ['comment']);
+      const site = this.resolveSite(args.siteId);
+      if (
+        typeof args.issueKey !== 'string' ||
+        !JIRA_ISSUE_PATTERN.test(args.issueKey) ||
+        !text(args.status, 1, 100) ||
+        (args.comment !== undefined && !text(args.comment, 1, 4000))
+      ) {
+        throw fail('VALIDATION');
+      }
+
+      const initialProjectKey = args.issueKey.split('-')[0];
+      this.resolveProject(site, initialProjectKey);
+
+      const issue = await this.transport.request(
+        site.cloudId,
+        '/issue/' + args.issueKey + '?fields=project,status',
+        false,
+        callOpts
+      );
+      if (!record(issue) || !record(issue.fields?.project) || typeof issue.fields.project.key !== 'string') {
+        throw fail('SERVER_ERROR');
+      }
+      const currentProjectKey = issue.fields.project.key;
+      this.resolveProject(site, currentProjectKey);
+      const idn = this.identity(issue, site, currentProjectKey);
+
+      const transitionsRes = await this.transport.request(
+        site.cloudId,
+        '/issue/' + idn.key + '/transitions',
+        false,
+        callOpts
+      );
+      if (!record(transitionsRes) || !Array.isArray(transitionsRes.transitions)) {
+        throw fail('SERVER_ERROR');
+      }
+
+      const targetNorm = args.status.trim().toLowerCase();
+      const matched = transitionsRes.transitions.find(
+        (t: any) =>
+          record(t) &&
+          identifier(t.id) &&
+          (String(t.to?.name ?? '').trim().toLowerCase() === targetNorm ||
+            String(t.name ?? '').trim().toLowerCase() === targetNorm)
+      );
+
+      if (!matched) {
+        const available = transitionsRes.transitions
+          .filter((t: any) => record(t) && typeof (t.to?.name ?? t.name) === 'string')
+          .map((t: any) => String(t.to?.name ?? t.name));
+        throw new StepError({
+          category: 'VALIDATION',
+          message:
+            `Không tìm thấy trạng thái chuyển tiếp "${args.status}" cho issue ${idn.key}. Các trạng thái hợp lệ: ` +
+            available.join(', '),
+        });
+      }
+
+      await this.transport.request(site.cloudId, '/issue/' + idn.key + '/transitions', true, {
+        ...callOpts,
+        method: 'POST',
+        body: {
+          transition: { id: String(matched.id) },
+          ...(args.comment !== undefined
+            ? { update: { comment: [{ add: { body: plainTextToAdf(args.comment) } }] } }
+            : {}),
+        },
+      });
+
+      const resolvedStatus = String(matched.to?.name ?? matched.name ?? args.status);
+      return {
+        siteId: site.siteId,
+        id: idn.id,
+        key: idn.key,
+        status: resolvedStatus,
+        url: idn.url,
+      };
+    }
+
+    if (tool === 'myjira.update_issue') {
+      this.input(
+        args,
+        ['siteId', 'issueKey'],
+        ['summary', 'description', 'priority', 'assigneeAccountId', 'labels', 'dueDate']
+      );
+      const site = this.resolveSite(args.siteId);
+      if (typeof args.issueKey !== 'string' || !JIRA_ISSUE_PATTERN.test(args.issueKey)) {
+        throw fail('VALIDATION');
+      }
+
+      const hasMutationField =
+        args.summary !== undefined ||
+        args.description !== undefined ||
+        args.priority !== undefined ||
+        args.assigneeAccountId !== undefined ||
+        args.labels !== undefined ||
+        args.dueDate !== undefined;
+      if (!hasMutationField) {
+        throw fail('VALIDATION');
+      }
+
+      if (
+        (args.summary !== undefined && !text(args.summary, 1, 255)) ||
+        (args.description !== undefined && !text(args.description, 0, 4000)) ||
+        (args.priority !== undefined && (typeof args.priority !== 'string' || !VALID_PRIORITIES.has(args.priority))) ||
+        (args.assigneeAccountId !== undefined &&
+          args.assigneeAccountId !== null &&
+          !text(args.assigneeAccountId, 1, 128)) ||
+        (args.dueDate !== undefined &&
+          args.dueDate !== null &&
+          (typeof args.dueDate !== 'string' || !DATE_PATTERN.test(args.dueDate)))
+      ) {
+        throw fail('VALIDATION');
+      }
+
+      if (args.labels !== undefined) {
+        if (
+          !Array.isArray(args.labels) ||
+          args.labels.length > 20 ||
+          !args.labels.every((lbl: unknown) => typeof lbl === 'string' && LABEL_PATTERN.test(lbl))
+        ) {
+          throw fail('VALIDATION');
+        }
+      }
+
+      const initialProjectKey = args.issueKey.split('-')[0];
+      this.resolveProject(site, initialProjectKey);
+
+      const issue = await this.transport.request(
+        site.cloudId,
+        '/issue/' + args.issueKey + '?fields=project',
+        false,
+        callOpts
+      );
+      if (!record(issue) || !record(issue.fields?.project) || typeof issue.fields.project.key !== 'string') {
+        throw fail('SERVER_ERROR');
+      }
+      const currentProjectKey = issue.fields.project.key;
+      this.resolveProject(site, currentProjectKey);
+      const idn = this.identity(issue, site, currentProjectKey);
+
+      const fields: Record<string, any> = {};
+      if (args.summary !== undefined) fields.summary = args.summary;
+      if (args.description !== undefined) fields.description = plainTextToAdf(args.description);
+      if (args.priority !== undefined) fields.priority = { name: args.priority };
+      if (args.assigneeAccountId !== undefined) {
+        fields.assignee = args.assigneeAccountId === null ? null : { id: args.assigneeAccountId };
+      }
+      if (args.labels !== undefined) fields.labels = args.labels;
+      if (args.dueDate !== undefined) fields.duedate = args.dueDate;
+
+      await this.transport.request(site.cloudId, '/issue/' + idn.key, true, {
+        ...callOpts,
+        method: 'PUT',
+        body: { fields },
+      });
+
+      return {
+        siteId: site.siteId,
+        id: idn.id,
+        key: idn.key,
+        url: idn.url,
       };
     }
 

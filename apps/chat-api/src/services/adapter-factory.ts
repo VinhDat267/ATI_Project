@@ -935,8 +935,11 @@ export class AdapterFactory {
 
         let projectId = siteStep?.projectId;
         let projectPolicyVersion = siteStep?.projectPolicyVersion;
-        if (!projectId && args?.projectKey && targetSite) {
-          const proj = targetSite.projects?.find((p: any) => p.key === args.projectKey);
+        const resolvedProjectKey =
+          (typeof args?.projectKey === 'string' && args.projectKey.trim() ? args.projectKey.trim() : undefined) ||
+          (typeof args?.issueKey === 'string' && args.issueKey.trim() ? args.issueKey.trim().split('-')[0] : undefined);
+        if (!projectId && resolvedProjectKey && targetSite) {
+          const proj = targetSite.projects?.find((p: any) => p.key === resolvedProjectKey);
           if (proj) projectId = proj.id;
         }
 

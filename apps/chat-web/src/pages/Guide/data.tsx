@@ -285,31 +285,31 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
       jira: {
         id: 'jira',
         name: 'Jira',
-        category: 'Quản lý dự án phát triển phần mềm',
-        keys: ['Site URL', 'Email Atlassian', 'API token'],
+        category: 'Quản lý dự án & Điều phối Sprint (OAuth 3LO 1-Click)',
+        keys: ['Kết nối OAuth 2.0 (3LO) 1-Click', 'Tự đồng bộ Site URL & Project'],
         scopeLabel: 'Project key',
         sampleScope: 'ATI',
-        timeEstimate: 'Khoảng 3 phút',
-        summary: 'Tìm project, tạo issue task/bug mới và thêm bình luận vào issue của nhóm.',
-        importantNotice: 'Site URL bắt buộc phải có dạng https://ten-site.atlassian.net. Không điền link phụ.',
+        timeEstimate: 'Khoảng 30 giây (OAuth 1-Click)',
+        summary: 'Kết nối Atlassian Jira 1 chạm, tạo/cập nhật issue, chuyển trạng thái workflow (In Progress/Done), gán thành viên, đặt ưu tiên và nhận Bản tin Standup mỗi sáng.',
+        importantNotice: 'Khuyên dùng Kết nối Jira OAuth 1-Click trong Workspace để tự động liệt kê Site URL & Dự án mà không cần tạo API Token thủ công.',
         steps: [
           {
             num: 1,
-            title: 'Tạo Atlassian API Token',
-            desc: 'Đăng nhập tài khoản Atlassian của bạn tại <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" rel="noopener noreferrer" class="text-[#0052CC] font-medium underline">id.atlassian.com/manage-profile/security/api-tokens</a>. Bấm "Create API token", đặt nhãn "ATI Automation" và bấm Create.',
-            callout: 'Sao chép chuỗi token được sinh ra và dán vào ô "API token" trên ATI.'
+            title: 'Khuyên dùng: Tạo Jira Workspace & Kết nối OAuth 2.0 (3LO) 1-Click',
+            desc: 'Trong trang Cài đặt dịch vụ, tại mục Atlassian Jira bấm <strong>Tạo Jira Workspace</strong> (nếu chưa có), sau đó bấm <strong>Kết nối Jira</strong> và nhấn <strong>Accept</strong> trên màn hình Atlassian để cấp quyền.',
+            callout: 'ATI tự động đồng bộ danh sách Site (.atlassian.net) và các Project bạn có quyền truy cập.'
           },
           {
             num: 2,
-            title: 'Điền Site URL & Email tài khoản',
-            desc: 'Điền địa chỉ website Jira của công ty bạn (dạng: <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">https://ten-cong-ty.atlassian.net</code>) vào ô "Site URL", và email đăng nhập Atlassian vào ô "Email Atlassian".',
-            callout: 'Hệ thống tự động kiểm tra định dạng .atlassian.net hợp lệ.'
+            title: 'Tích chọn Dự án (Project) & Cấp quyền thao tác',
+            desc: 'Chọn các dự án Jira cho phép sử dụng trong Workspace. Bạn có thể tạo issue kèm Priority/Assignee/Due Date, chuyển trạng thái (<code>myjira.transition_issue</code>), cập nhật issue (<code>myjira.update_issue</code>) hoặc đọc chi tiết issue (<code>myjira.get_issue</code>).',
+            callout: 'Mọi bước ghi đều hiển thị thẻ xem trước (Preview) rõ ràng trước khi bạn bấm Phê duyệt.'
           },
           {
             num: 3,
-            title: 'Lấy Project Key của dự án',
-            desc: 'Mở dự án của bạn trên Jira. Project key chính là mã chữ in hoa viết tắt đứng trước các số issue (ví dụ issue có mã là <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">ATI-42</code> thì Project key là <code class="bg-neutral-100 px-1 py-0.5 rounded font-mono">ATI</code>).',
-            callout: 'Thêm mã Project key này vào danh sách nơi được phép trên ATI.'
+            title: 'Lên lịch Bản tin Tiến độ & Blocker Jira (Read-Only Standup Digest)',
+            desc: 'Yêu cầu ATI tổng hợp các issue Blocker/High Priority và tiến độ Sprint định kỳ mỗi sáng để gửi thẳng vào kênh Slack hoặc nhóm Telegram của đội.',
+            callout: 'Bản tin tự động chỉ thực hiện truy vấn chỉ đọc (read-only) và kiểm tra quyền truy cập thực tế ở mỗi lượt chạy.'
           }
         ]
       }
@@ -480,6 +480,36 @@ export const SAMPLE_PROMPTS: SamplePrompt[] = [
           'Telegram: Gửi bản tổng hợp tiến độ vào đúng nhóm Telegram Vận hành đã cấp quyền'
         ],
         badge: 'Liên dịch vụ'
+      },
+      {
+        id: 'p13',
+        category: 'sprint-bug',
+        categoryLabel: 'Lỗi Sprint & Kỹ thuật',
+        title: 'Ứng cứu sự cố P1: Tạo Bug Jira, đặt lịch War-room Calendar và báo Slack',
+        prompt: 'Tạo issue Bug khẩn cấp trong project Jira ATI cho sự cố thanh toán, đặt lịch họp War-room trên Google Calendar và gửi cảnh báo kèm link vào kênh Slack #ati-test',
+        services: ['jira', 'calendar', 'slack'],
+        tools: ['jira.search_projects', 'jira.create_issue', 'calendar.list_calendars', 'calendar.create_event', 'slack.search_channels', 'slack.send_message'],
+        workflow: [
+          'Jira: Tạo issue Bug mới trong dự án ATI và lấy đường dẫn trực tiếp',
+          'Google Calendar: Tạo lịch họp khẩn cấp để đội kỹ thuật xử lý sự cố',
+          'Slack: Gửi thông báo vào kênh #ati-test kèm link issue Jira và lịch họp'
+        ],
+        badge: 'Điều phối sự cố'
+      },
+      {
+        id: 'p14',
+        category: 'reporting',
+        categoryLabel: 'Báo cáo & Giao tiếp',
+        title: 'Tổng hợp các issue Jira trong Sprint sang trang báo cáo Notion và Slack',
+        prompt: 'Tìm các issue trong project Jira ATI, tạo trang báo cáo Sprint Review trên Notion và gửi thông báo tóm tắt vào kênh Slack #ati-test',
+        services: ['jira', 'notion', 'slack'],
+        tools: ['jira.search_projects', 'jira.search_issues', 'notion.search_databases', 'notion.create_page', 'slack.search_channels', 'slack.send_message'],
+        workflow: [
+          'Jira: Tìm và đọc danh sách các issue trong dự án ATI',
+          'Notion: Tạo trang tổng kết Sprint Review với danh sách đầu việc từ Jira',
+          'Slack: Đăng thông báo kèm liên kết báo cáo Notion vào kênh #ati-test'
+        ],
+        badge: 'Tự động hoá PM'
       }
     ];
 
@@ -596,15 +626,17 @@ export const CAPABILITIES_DATA: Capability[] = [
       {
         id: 'jira',
         name: 'Jira',
-        role: 'Quản lý dự án & Quy trình phát triển',
+        role: 'Quản lý dự án, Điều phối Sprint & Vòng đời Issue (OAuth 3LO)',
         canDo: [
-          'Tìm project và issue trong phạm vi cấp phép',
-          'Tạo issue mới (loại Task, Bug, Story)',
-          'Thêm bình luận (comment) cập nhật tiến độ vào issue'
+          'Kết nối OAuth 2.0 (3LO) 1-Click và tự khởi tạo Jira Workspace ngay trên giao diện',
+          'Tìm project, lọc issue theo trạng thái/độ ưu tiên/loại và đọc chi tiết toàn văn issue (myjira.get_issue)',
+          'Tạo issue mới (Task, Bug, Story) kèm Priority, Labels, Due Date, Assignee và Epic/Parent',
+          'Chuyển trạng thái workflow (myjira.transition_issue: To Do → In Progress → Done) và cập nhật trường issue (myjira.update_issue)',
+          'Thêm bình luận tiến độ và đặt lịch Bản tin Standup/Blocker chỉ đọc gửi sang Slack/Telegram'
         ],
         cannotDo: [
-          'Chuyển trạng thái issue',
-          'Xoá issue'
+          'Xoá vĩnh viễn issue hoặc xoá project',
+          'Thao tác trên site hoặc project ngoài phạm vi Workspace đã cấp phép'
         ]
       }
     ];
@@ -660,6 +692,14 @@ export const GUIDE_OAUTH_SHOWCASE_CARDS: GuideOAuthShowcaseCard[] = [
     badgeStyle: 'oauth',
     iconClassName: 'w-4 h-4 text-[#111827]',
     description: 'Kết nối 1 chạm, đọc/cập nhật trang database và nhận Bản tin tiến độ mỗi sáng.',
+  },
+  {
+    service: 'jira',
+    title: 'Atlassian Jira Cloud',
+    badge: 'OAuth 3LO · 1-Click',
+    badgeStyle: 'oauth',
+    iconClassName: 'w-4 h-4 text-[#0052CC]',
+    description: 'Kết nối Atlassian 3LO, tạo/chuyển cột issue và nhận Bản tin Standup sáng.',
   },
   {
     service: 'slack',

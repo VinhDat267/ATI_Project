@@ -145,6 +145,111 @@ export class WorkspaceCoreRepo {
     });
   }
 
+  async createSelfServiceWorkspace(
+    actorUserId: string,
+    input: { name: string; slug?: string }
+  ): Promise<CreateWorkspaceResponse> {
+    if (!isUuid(actorUserId)) {
+      throw new WorkspaceRepoError(401, 'UNAUTHORIZED', 'Invalid actor ID');
+    }
+    const trimmedName = input.name?.trim() ?? '';
+    if (trimmedName.length < 1 || trimmedName.length > 100) {
+      throw new WorkspaceRepoError(
+        400,
+        'INVALID_NAME',
+        'Workspace name must be between 1 and 100 characters'
+      );
+    }
+
+    const baseSlug =
+      typeof input.slug === 'string' && input.slug.trim()
+        ? input.slug.trim()
+        : `${trimmedName
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[đĐ]/g, 'd')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .slice(0, 40) || 'jira-ws'}-${crypto.randomBytes(3).toString('hex')}`;
+
+    if (baseSlug.length < 1 || baseSlug.length > 100) {
+      throw new WorkspaceRepoError(400, 'INVALID_SLUG', 'Valid slug is required');
+    }
+
+    return withTransaction(this.pool, async (client) => {
+      const userRes = await client.query<{ id: string; status: string }>(
+        `SELECT id, status FROM users WHERE id = $1 FOR SHARE`,
+        [actorUserId]
+      );
+      const actorRow = userRes.rows[0];
+      if (!actorRow || actorRow.status !== 'active') {
+        throw new WorkspaceRepoError(403, 'USER_NOT_ACTIVE', 'Only active users can create a Jira workspace');
+      }
+
+      const rawCode = crypto.randomBytes(4).toString('hex').toUpperCase();
+      const inviteCode = `ATI-${rawCode.slice(0, 4)}-${rawCode.slice(4, 8) || '0001'}`;
+
+      const genericWsRes = await client.query<{ id: string; name: string }>(
+        `INSERT INTO workspaces (name, invite_code, require_approval, created_by, created_at, updated_at)
+         VALUES ($1, $2, true, $3, clock_timestamp(), clock_timestamp())
+         RETURNING id, name`,
+        [trimmedName, inviteCode, actorUserId]
+      );
+      const genericWs = genericWsRes.rows[0];
+      if (!genericWs) {
+        throw new WorkspaceRepoError(500, 'WORKSPACE_CREATE_FAILED', 'Failed to create workspace');
+      }
+      const unifiedId = genericWs.id;
+
+      await client.query(
+        `INSERT INTO workspace_members (workspace_id, user_id, role, status, created_at, updated_at)
+         VALUES ($1, $2, 'admin', 'active', clock_timestamp(), clock_timestamp())`,
+        [unifiedId, actorUserId]
+      );
+
+      const wsRes = await client.query<{ id: string; slug: string; version: number }>(
+        `INSERT INTO ati_workspaces (id, slug, created_by, status, version, created_at, updated_at)
+         VALUES ($1, $2, $3, 'active', 1, clock_timestamp(), clock_timestamp())
+         RETURNING id, slug, version`,
+        [unifiedId, baseSlug, actorUserId]
+      );
+      const ws = wsRes.rows[0];
+      if (!ws) {
+        throw new WorkspaceRepoError(500, 'WORKSPACE_CREATE_FAILED', 'Failed to create Jira workspace policy');
+      }
+
+      await client.query(
+        `INSERT INTO ati_workspace_memberships (workspace_id, user_id, role, status, version, requested_at, decided_at, created_at, updated_at)
+         VALUES ($1, $2, 'admin', 'active', 1, clock_timestamp(), clock_timestamp(), clock_timestamp(), clock_timestamp())`,
+        [unifiedId, actorUserId]
+      );
+
+      await this.auditRepo.log(client, {
+        actorId: actorUserId,
+        workspaceId: unifiedId,
+        action: 'create_workspace',
+        decision: 'allow',
+        version: 1,
+        details: {
+          slug: ws.slug,
+          name: trimmedName,
+          bootstrapAdminUserId: actorUserId,
+          selfService: true,
+        },
+      });
+
+      return {
+        workspace: {
+          id: unifiedId,
+          name: trimmedName,
+          slug: ws.slug,
+          version: ws.version,
+        },
+      };
+    });
+  }
+
   async enableExistingWorkspace(
     actorUserId: string,
     workspaceId: string,

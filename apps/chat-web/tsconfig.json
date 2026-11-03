@@ -15,7 +15,11 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "types": ["vitest/globals"]
+    "types": ["vitest/globals"],
+    "baseUrl": ".",
+    "paths": {
+      "@wap/tool-schemas": ["../../packages/tool-schemas/src/index.ts"]
+    }
   },
   "include": ["src/**/*", "tests/**/*"]
 }

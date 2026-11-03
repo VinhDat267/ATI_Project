@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Ajv } from 'ajv';
 import {
   MYJIRA_TOOLS,
+  MYJIRA_CORE_TOOLS,
   MYJIRA_SCOPES,
   JIRA_SITE_ID_PATTERN,
   JIRA_CLOUD_ID_PATTERN,
@@ -10,8 +11,9 @@ import {
 describe('myjira tool schemas', () => {
   const ajv = new Ajv({ strict: false });
 
-  it('exports exactly 5 myjira tools with correct service and side-effect properties', () => {
-    expect(MYJIRA_TOOLS).toHaveLength(5);
+  it('exports 9 myjira tools (and 5 core tools) with correct service and side-effect properties', () => {
+    expect(MYJIRA_CORE_TOOLS).toHaveLength(5);
+    expect(MYJIRA_TOOLS).toHaveLength(9);
     const names = MYJIRA_TOOLS.map((t) => t.name);
     expect(names).toEqual([
       'myjira.list_sites',
@@ -19,6 +21,10 @@ describe('myjira tool schemas', () => {
       'myjira.search_issues',
       'myjira.create_issue',
       'myjira.add_comment',
+      'myjira.get_issue',
+      'myjira.search_users',
+      'myjira.transition_issue',
+      'myjira.update_issue',
     ]);
 
     for (const tool of MYJIRA_TOOLS) {
@@ -223,6 +229,72 @@ describe('myjira tool schemas', () => {
       url: 'https://site.net/browse/PROJ-1?focusedCommentId=20001',
     })).toBe(true);
     expect(validateOutput({ id: '20001', issueKey: 'PROJ-1' })).toBe(false); // missing siteId and url
+  });
+
+  it('configures myjira.get_issue, search_users, transition_issue and update_issue schemas', () => {
+    const getIssue = MYJIRA_TOOLS.find((t) => t.name === 'myjira.get_issue')!;
+    expect(getIssue.sideEffect).toBe('read');
+    expect(ajv.compile(getIssue.inputSchema)({ siteId: 'site-1', issueKey: 'PROJ-1' })).toBe(true);
+    expect(
+      ajv.compile(getIssue.outputSchema)({
+        siteId: 'site-1',
+        id: '10001',
+        key: 'PROJ-1',
+        url: 'https://site.net/browse/PROJ-1',
+        title: 'Bug title',
+        status: 'In Progress',
+        description: 'Detailed bug description',
+        priority: 'High',
+        assignee: 'Minh Nguyen',
+        issueType: 'Bug',
+        labels: ['production', 'auth'],
+        dueDate: '2026-11-10',
+        comments: [{ id: '1', author: 'Lan', body: 'Investigating', createdAt: '2026-11-03T10:00:00Z' }],
+      })
+    ).toBe(true);
+
+    const searchUsers = MYJIRA_TOOLS.find((t) => t.name === 'myjira.search_users')!;
+    expect(searchUsers.sideEffect).toBe('read');
+    expect(searchUsers.discovers).toBe('jira_user');
+    expect(ajv.compile(searchUsers.inputSchema)({ siteId: 'site-1', projectKey: 'PROJ', query: 'Minh' })).toBe(true);
+    expect(
+      ajv.compile(searchUsers.outputSchema)([
+        { id: 'acc-1', siteId: 'site-1', accountId: 'acc-1', displayName: 'Minh Nguyen' },
+      ])
+    ).toBe(true);
+
+    const transitionIssue = MYJIRA_TOOLS.find((t) => t.name === 'myjira.transition_issue')!;
+    expect(transitionIssue.sideEffect).toBe('write');
+    expect(
+      ajv.compile(transitionIssue.inputSchema)({
+        siteId: 'site-1',
+        issueKey: 'PROJ-1',
+        status: 'In Progress',
+        comment: 'Starting work now',
+      })
+    ).toBe(true);
+    expect(
+      ajv.compile(transitionIssue.outputSchema)({
+        siteId: 'site-1',
+        id: '10001',
+        key: 'PROJ-1',
+        status: 'In Progress',
+        url: 'https://site.net/browse/PROJ-1',
+      })
+    ).toBe(true);
+
+    const updateIssue = MYJIRA_TOOLS.find((t) => t.name === 'myjira.update_issue')!;
+    expect(updateIssue.sideEffect).toBe('write');
+    expect(
+      ajv.compile(updateIssue.inputSchema)({
+        siteId: 'site-1',
+        issueKey: 'PROJ-1',
+        priority: 'Highest',
+        assigneeAccountId: 'acc-1',
+        labels: ['urgent'],
+        dueDate: '2026-11-15',
+      })
+    ).toBe(true);
   });
 
   it('enforces strict additionalProperties: false on all tool schemas to prevent arbitrary URL or JQL injection', () => {

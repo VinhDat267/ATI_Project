@@ -84,6 +84,7 @@ function extractScopeBadges(step: WorkflowFlowStep, resourceLabels?: Record<stri
     'repo',
     'chatId',
     'projectKey',
+    'issueKey',
     'databaseId',
     'threadId',
   ];

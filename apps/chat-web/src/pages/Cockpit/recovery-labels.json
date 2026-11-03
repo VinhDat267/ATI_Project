@@ -11,7 +11,8 @@
     "calendar": { "calendarId": "ID lịch", "summary": "Tiêu đề sự kiện", "start": "Thời gian bắt đầu", "end": "Thời gian kết thúc", "location": "Địa điểm", "timeMin": "Thời gian bắt đầu tìm kiếm", "timeMax": "Thời gian kết thúc tìm kiếm" },
     "notion": { "databaseId": "ID cơ sở dữ liệu Notion", "pageId": "ID trang Notion", "content": "Nội dung văn bản", "text": "Đoạn văn bản nối thêm", "archived": "Lưu trữ trang", "status": "Lọc theo trạng thái" },
     "telegram": { "chatId": "ID cuộc trò chuyện Telegram" },
-    "jira": { "projectKey": "Mã dự án Jira", "issueKey": "Mã công việc Jira", "summary": "Tiêu đề công việc", "issueType": "Loại công việc", "body": "Nội dung bình luận" },
+    "jira": { "siteId": "Site Jira", "projectKey": "Mã dự án Jira", "issueKey": "Mã công việc Jira", "summary": "Tiêu đề công việc", "description": "Mô tả chi tiết", "issueType": "Loại công việc", "body": "Nội dung bình luận", "targetStatus": "Trạng thái chuyển tới", "priority": "Độ ưu tiên", "dueDate": "Hạn hoàn thành", "assigneeAccountId": "Người phụ trách (Account ID)", "parentKey": "Mã Epic / Issue cha", "labels": "Các nhãn", "status": "Lọc theo trạng thái" },
+    "myjira": { "siteId": "Site Jira", "projectKey": "Mã dự án Jira", "issueKey": "Mã công việc Jira", "summary": "Tiêu đề công việc", "description": "Mô tả chi tiết", "issueType": "Loại công việc", "body": "Nội dung bình luận", "targetStatus": "Trạng thái chuyển tới", "priority": "Độ ưu tiên", "dueDate": "Hạn hoàn thành", "assigneeAccountId": "Người phụ trách (Account ID)", "parentKey": "Mã Epic / Issue cha", "labels": "Các nhãn", "status": "Lọc theo trạng thái" },
     "github": { "repo": "Kho mã nguồn GitHub", "issueNumber": "Số công việc GitHub", "body": "Nội dung công việc", "labels": "Các nhãn", "label": "Nhãn", "assignees": "Người phụ trách", "state": "Trạng thái", "query": "Từ khóa tìm kiếm" },
     "gmail": { "threadId": "Luồng thư", "threadIds": "Các luồng thư", "to": "Người nhận (Tới)", "cc": "Người nhận bản sao (Cc)", "bcc": "Người nhận ẩn danh (Bcc)", "subject": "Tiêu đề thư", "body": "Nội dung thư", "note": "Lời nhắn chuyển tiếp", "addLabelIds": "Thêm nhãn", "removeLabelIds": "Bỏ nhãn", "name": "Tên nhãn" }
   },
@@ -28,6 +29,6 @@
     "boardId": "ID bảng Trello", "listId": "ID danh sách Trello", "cardId": "ID thẻ Trello",
     "memberId": "ID thành viên", "username": "tên người dùng", "email": "địa chỉ email",
     "items": "các mục", "pages": "các trang", "events": "các sự kiện", "issues": "các công việc",
-    "labels": "các nhãn", "assignees": "người phụ trách", "state": "trạng thái", "repo": "kho mã nguồn", "status": "trạng thái", "type": "loại"
+    "labels": "các nhãn", "assignees": "người phụ trách", "assignee": "người phụ trách", "state": "trạng thái", "repo": "kho mã nguồn", "status": "trạng thái", "newStatus": "trạng thái mới", "priority": "độ ưu tiên", "issueType": "loại công việc", "dueDate": "hạn hoàn thành", "projectKey": "mã dự án", "parentKey": "mã Epic / Issue cha", "summary": "tiêu đề công việc", "displayName": "tên thành viên", "accountId": "mã tài khoản", "updatedFields": "các trường đã cập nhật", "comments": "các bình luận", "subtasks": "các công việc con", "type": "loại"
   }
 }

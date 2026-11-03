@@ -15,6 +15,11 @@ import {
   redirectToJira,
   jiraConnectionNotice,
 } from '../../services/jira-connection';
+import {
+  getCachedOrganizations,
+  setCachedOrganizations,
+  setActiveWorkspaceId as setGlobalActiveWorkspaceId,
+} from '../../services/workspace-storage';
 import { ServiceLogo } from '../../components/ServiceLogo';
 
 const JIRA_KEY = 'ji' + 'ra';
@@ -49,8 +54,9 @@ export function JiraConnection({
   const [infoNotice, setInfoNotice] = useState('');
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
 
-  // Join workspace state
+  // Join & Create workspace state
   const [inviteTokenInput, setInviteTokenInput] = useState('');
+  const [newWorkspaceName, setNewWorkspaceName] = useState('');
 
   // Admin workspace states
   const [members, setMembers] = useState<WorkspaceMemberItem[]>([]);
@@ -60,6 +66,7 @@ export function JiraConnection({
 
   // New invite state
   const [createdInviteToken, setCreatedInviteToken] = useState<string | null>(null);
+  const [copiedInviteToken, setCopiedInviteToken] = useState(false);
 
   // Project configuration modal state
   const [configuringSite, setConfiguringSite] = useState<WorkspaceSiteItem | null>(null);
@@ -77,6 +84,36 @@ export function JiraConnection({
   const selectedWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
   const isWorkspaceAdmin = selectedWorkspace?.role === 'admin';
   const isWorkspaceActive = selectedWorkspace?.membershipStatus === 'active';
+
+  const syncWorkspaceToGlobalContext = (ws?: {
+    id: string;
+    name: string;
+    slug?: string;
+    role?: 'admin' | 'member';
+    membershipStatus?: string;
+  }) => {
+    const target = ws ?? selectedWorkspace;
+    if (!target?.id) return;
+    const currentOrgs = getCachedOrganizations();
+    const mappedStatus: 'pending' | 'active' | 'disabled' =
+      target.membershipStatus === 'pending'
+        ? 'pending'
+        : target.membershipStatus === 'rejected' || target.membershipStatus === 'removed'
+        ? 'disabled'
+        : 'active';
+    const mapped = {
+      id: target.id,
+      name: target.name,
+      slug: target.slug,
+      role: target.role ?? 'admin',
+      status: mappedStatus,
+    };
+    const nextOrgs = currentOrgs.some((o) => o.id === target.id)
+      ? currentOrgs.map((o) => (o.id === target.id ? { ...o, ...mapped } : o))
+      : [...currentOrgs, mapped];
+    setCachedOrganizations(nextOrgs);
+    setGlobalActiveWorkspaceId(target.id);
+  };
 
   const mapErrorMessage = (err: any): string => {
     const status = err?.status ?? err?.statusCode;
@@ -400,6 +437,31 @@ export function JiraConnection({
     }
   };
 
+  // Create self-service Jira workspace
+  const handleCreateWorkspace = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newWorkspaceName.trim() || busy) return;
+    setBusy(true);
+    setError('');
+    setInfoNotice('');
+    try {
+      const res = await jiraApi.createSelfServiceWorkspace(newWorkspaceName.trim());
+      if (mounted.current) {
+        setNewWorkspaceName('');
+        setInfoNotice(`Đã tạo Jira Workspace "${res.workspace.name}" thành công.`);
+        await fetchWorkspaces();
+        if (res.workspace.id) {
+          syncWorkspaceToGlobalContext(res.workspace);
+          handleSelectWorkspace(res.workspace.id);
+        }
+      }
+    } catch (err) {
+      if (mounted.current) setError(mapErrorMessage(err));
+    } finally {
+      if (mounted.current) setBusy(false);
+    }
+  };
+
   // Member decision (approve, reject, remove)
   const handleMemberDecision = async (
     targetUserId: string,
@@ -710,6 +772,80 @@ export function JiraConnection({
         </div>
       </div>
 
+      {/* 3-STEP ONBOARDING PROGRESS BAR */}
+      <div
+        data-testid="jira-setup-steps"
+        className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3 rounded-xl bg-[#F8F8F6] dark:bg-[#1F2937]/40 border border-[#E7E7E2] dark:border-[#374151] text-xs"
+      >
+        <div className="flex items-center gap-2">
+          <span
+            className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${
+              isConnected
+                ? 'bg-[#16A34A] text-white'
+                : isIdentityConnected
+                ? 'bg-blue-600 text-white'
+                : 'bg-neutral-200 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300'
+            }`}
+          >
+            {isConnected ? '✓' : '1'}
+          </span>
+          <div className="min-w-0">
+            <div className="font-semibold text-[#111827] dark:text-white truncate">
+              Bước 1: Tài khoản Atlassian
+            </div>
+            <div className="text-[11px] text-[#6B7280] dark:text-[#9CA3AF] truncate">
+              {isConnected
+                ? 'Đã xác thực OAuth 3LO'
+                : isIdentityConnected
+                ? 'Cần cấp quyền site'
+                : 'Kết nối OAuth 3LO'}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span
+            className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${
+              isWorkspaceActive
+                ? 'bg-[#16A34A] text-white'
+                : 'bg-neutral-200 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300'
+            }`}
+          >
+            {isWorkspaceActive ? '✓' : '2'}
+          </span>
+          <div className="min-w-0">
+            <div className="font-semibold text-[#111827] dark:text-white truncate">
+              Bước 2: Jira Workspace
+            </div>
+            <div className="text-[11px] text-[#6B7280] dark:text-[#9CA3AF] truncate">
+              {isWorkspaceActive && selectedWorkspace
+                ? `Đang chọn: ${selectedWorkspace.name}`
+                : 'Tạo mới hoặc nhập mã mời'}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span
+            className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${
+              isConnected && isWorkspaceActive && (capabilities?.sites?.length ?? 0) > 0
+                ? 'bg-[#16A34A] text-white'
+                : 'bg-neutral-200 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300'
+            }`}
+          >
+            {isConnected && isWorkspaceActive && (capabilities?.sites?.length ?? 0) > 0 ? '✓' : '3'}
+          </span>
+          <div className="min-w-0">
+            <div className="font-semibold text-[#111827] dark:text-white truncate">
+              Bước 3: Site &amp; Projects
+            </div>
+            <div className="text-[11px] text-[#6B7280] dark:text-[#9CA3AF] truncate">
+              {(capabilities?.sites?.length ?? 0) > 0
+                ? `Đã kích hoạt ${capabilities!.sites.length} site`
+                : 'Liên kết site & chọn project'}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* CONNECTION ERROR ALERT */}
       {connectionError && (
         <div
@@ -858,24 +994,44 @@ export function JiraConnection({
           )}
         </div>
 
-        {/* JOIN WORKSPACE FORM */}
-        <form onSubmit={handleJoinWorkspace} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-5">
-          <input
-            type="text"
-            placeholder="Nhập mã mời Jira (invite token)..."
-            value={inviteTokenInput}
-            onChange={(e) => setInviteTokenInput(e.target.value)}
-            disabled={busy}
-            className="flex-1 px-3 py-2 text-xs rounded-xl border border-[#E7E7E2] dark:border-[#374151] bg-white dark:bg-[#1F2937] text-[#111827] dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-[#FF5701]"
-          />
-          <button
-            type="submit"
-            disabled={busy || !inviteTokenInput.trim()}
-            className={buttonSecondary}
-          >
-            Tham gia Jira workspace
-          </button>
-        </form>
+        {/* CREATE OR JOIN WORKSPACE FORMS */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-5">
+          <form onSubmit={handleCreateWorkspace} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <input
+              type="text"
+              placeholder="Tên Jira Workspace mới (ví dụ: Team Kỹ thuật)..."
+              value={newWorkspaceName}
+              onChange={(e) => setNewWorkspaceName(e.target.value)}
+              disabled={busy}
+              className="flex-1 px-3 py-2 text-xs rounded-xl border border-[#E7E7E2] dark:border-[#374151] bg-white dark:bg-[#1F2937] text-[#111827] dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-[#FF5701]"
+            />
+            <button
+              type="submit"
+              disabled={busy || !newWorkspaceName.trim()}
+              className={buttonPrimary}
+            >
+              Tạo Jira Workspace mới
+            </button>
+          </form>
+
+          <form onSubmit={handleJoinWorkspace} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <input
+              type="text"
+              placeholder="Nhập mã mời Jira (invite token)..."
+              value={inviteTokenInput}
+              onChange={(e) => setInviteTokenInput(e.target.value)}
+              disabled={busy}
+              className="flex-1 px-3 py-2 text-xs rounded-xl border border-[#E7E7E2] dark:border-[#374151] bg-white dark:bg-[#1F2937] text-[#111827] dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-[#FF5701]"
+            />
+            <button
+              type="submit"
+              disabled={busy || !inviteTokenInput.trim()}
+              className={buttonSecondary}
+            >
+              Tham gia Jira workspace
+            </button>
+          </form>
+        </div>
 
         {/* CURRENT WORKSPACE DETAILS */}
         {selectedWorkspace ? (
@@ -1039,7 +1195,25 @@ export function JiraConnection({
 
                   {createdInviteToken && (
                     <div className="mb-3 p-3 rounded-lg bg-green-50 text-green-800 dark:bg-green-950/40 dark:text-green-300 border border-green-200 dark:border-green-800 text-xs">
-                      <span className="font-semibold">Mã mời mới tạo (hết hạn trong 7 ngày):</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold">Mã mời mới tạo (hết hạn trong 7 ngày):</span>
+                        <button
+                          type="button"
+                          data-testid="jira-copy-invite-token"
+                          onClick={() => {
+                            if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+                              void navigator.clipboard.writeText(createdInviteToken).catch(() => {});
+                            }
+                            setCopiedInviteToken(true);
+                            setTimeout(() => {
+                              if (mounted.current) setCopiedInviteToken(false);
+                            }, 2000);
+                          }}
+                          className="px-2 py-0.5 rounded bg-white dark:bg-neutral-800 text-green-800 dark:text-green-200 border border-green-300 text-[11px] font-semibold hover:bg-green-100 transition-colors cursor-pointer"
+                        >
+                          {copiedInviteToken ? '✓ Đã sao chép' : 'Sao chép mã mời'}
+                        </button>
+                      </div>
                       <code className="block mt-1 p-1 bg-white dark:bg-black/30 rounded border border-green-300 font-mono text-[11px]">
                         {createdInviteToken}
                       </code>
@@ -1121,7 +1295,10 @@ export function JiraConnection({
 
                   {/* SITES LIST */}
                   <div className="space-y-3">
-                    {sites.map((site) => (
+                    {sites.map((site) => {
+                      const configuredCapSite = capabilities?.sites?.find((cs) => cs.siteId === site.siteId);
+                      const configuredProjectCount = configuredCapSite?.projects?.length ?? 0;
+                      return (
                       <div
                         key={site.siteId}
                         className="p-3 rounded-lg bg-white dark:bg-[#111827] border border-[#E7E7E2] dark:border-[#374151]"
@@ -1135,6 +1312,11 @@ export function JiraConnection({
                             <span className={`ml-2 text-[11px] font-medium ${site.active ? 'text-green-600' : 'text-neutral-400'}`}>
                               [{site.active ? 'Đang hoạt động' : 'Tạm dừng'}]
                             </span>
+                            {site.active && configuredProjectCount === 0 && (
+                              <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                                Cần chọn ít nhất 1 Project
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-2">
                             <button
@@ -1219,7 +1401,8 @@ export function JiraConnection({
                           </div>
                         )}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -1249,7 +1432,11 @@ export function JiraConnection({
             <button
               id="jira-start-conversation"
               type="button"
-              onClick={() => (navigate ? navigate('/') : window.location.assign('/'))}
+              onClick={() => {
+                syncWorkspaceToGlobalContext(selectedWorkspace);
+                if (navigate) navigate('/');
+                else window.location.assign('/');
+              }}
               className={`${buttonPrimary} whitespace-nowrap`}
             >
               Bắt đầu hội thoại Jira

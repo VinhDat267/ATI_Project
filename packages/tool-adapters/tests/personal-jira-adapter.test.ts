@@ -806,11 +806,243 @@ describe('PersonalJiraAdapter', () => {
       ['myjira.add_comment', { siteId: 'opaque_1', issueKey: 'ATI-1', body: '' }],
       ['myjira.add_comment', { siteId: 'opaque_1', issueKey: 'ATI-1', body: 'x'.repeat(4001) }],
       ['myjira.add_comment', { siteId: 'opaque_1', issueKey: 'ATI-1', body: 'ok', extra: true }],
+      ['myjira.get_issue', { siteId: 'opaque_1', issueKey: 'bad' }],
+      ['myjira.search_users', { siteId: 'opaque_1', projectKey: 'ATI', query: 'x'.repeat(201) }],
+      ['myjira.transition_issue', { siteId: 'opaque_1', issueKey: 'ATI-1', status: '' }],
+      ['myjira.update_issue', { siteId: 'opaque_1', issueKey: 'ATI-1', dueDate: 'invalid-date' }],
       ['unknown_tool', {}],
     ])('rejects invalid args for %s before transport', async (tool, args) => {
       seen = [];
       await expect(make().execute(tool, args as any)).rejects.toMatchObject({ category: 'VALIDATION' });
       expect(seen).toEqual([]);
+    });
+  });
+
+  describe('Business-ready tools: get_issue, search_users, transition_issue, update_issue, and enriched filters', () => {
+    it('supports status, priority, and issueType filters in myjira.search_issues and returns enriched fields', async () => {
+      reply = () => ({
+        body: {
+          issues: [
+            {
+              id: '10042',
+              key: 'ATI-42',
+              fields: {
+                summary: 'Login bug',
+                status: { name: 'In Progress' },
+                priority: { name: 'High' },
+                assignee: { displayName: 'Vinh Dat', accountId: 'acc-1' },
+                issuetype: { name: 'Bug' },
+                updated: '2026-11-03T10:00:00.000Z',
+                duedate: '2026-11-10',
+                project,
+              },
+            },
+          ],
+        },
+      });
+
+      const res = await make().execute('myjira.search_issues', {
+        siteId: 'opaque_1',
+        projectKey: 'ATI',
+        status: 'In Progress',
+        priority: 'High',
+        issueType: 'Bug',
+      });
+
+      expect(seen[0]!.body.jql).toBe(
+        'project = "ATI" AND status = "In Progress" AND priority = "High" AND issuetype = "Bug" ORDER BY updated DESC'
+      );
+      expect(res.issues[0]).toEqual({
+        siteId: 'opaque_1',
+        id: '10042',
+        key: 'ATI-42',
+        title: 'Login bug',
+        status: 'In Progress',
+        priority: 'High',
+        assignee: 'Vinh Dat',
+        issueType: 'Bug',
+        updatedAt: '2026-11-03T10:00:00.000Z',
+        dueDate: '2026-11-10',
+        url: 'https://company.atlassian.net/browse/ATI-42',
+      });
+    });
+
+    it('reads full issue details with ADF-to-text conversion via myjira.get_issue', async () => {
+      reply = () => ({
+        body: {
+          id: '10042',
+          key: 'ATI-42',
+          fields: {
+            summary: 'Checkout error',
+            description: {
+              type: 'doc',
+              version: 1,
+              content: [
+                { type: 'paragraph', content: [{ type: 'text', text: 'Customer reported HTTP 500' }] },
+              ],
+            },
+            status: { name: 'In Progress' },
+            priority: { name: 'Highest' },
+            assignee: { displayName: 'Alice' },
+            issuetype: { name: 'Bug' },
+            labels: ['urgent', 'checkout'],
+            duedate: '2026-11-05',
+            comment: {
+              comments: [
+                {
+                  id: '501',
+                  author: { displayName: 'Alice' },
+                  body: {
+                    type: 'doc',
+                    version: 1,
+                    content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Investigating logs' }] }],
+                  },
+                  created: '2026-11-03T11:05:00.000Z',
+                },
+              ],
+            },
+            project,
+          },
+        },
+      });
+
+      const detail = await make().execute('myjira.get_issue', {
+        siteId: 'opaque_1',
+        issueKey: 'ATI-42',
+      });
+
+      expect(detail).toEqual({
+        siteId: 'opaque_1',
+        id: '10042',
+        key: 'ATI-42',
+        title: 'Checkout error',
+        description: 'Customer reported HTTP 500',
+        status: 'In Progress',
+        priority: 'Highest',
+        assignee: 'Alice',
+        issueType: 'Bug',
+        labels: ['urgent', 'checkout'],
+        dueDate: '2026-11-05',
+        url: 'https://company.atlassian.net/browse/ATI-42',
+        comments: [
+          {
+            id: '501',
+            author: 'Alice',
+            body: 'Investigating logs',
+            createdAt: '2026-11-03T11:05:00.000Z',
+          },
+        ],
+      });
+    });
+
+    it('searches assignable users for a scoped project via myjira.search_users', async () => {
+      reply = ({ url }) => {
+        if (url.includes('/user/assignable/search')) {
+          return {
+            body: [
+              { accountId: '5b10ac8d82e05b22cc7d4ef5', displayName: 'Nguyen Van A', active: true },
+            ],
+          };
+        }
+        return { status: 404, body: {} };
+      };
+
+      const res = await make().execute('myjira.search_users', {
+        siteId: 'opaque_1',
+        projectKey: 'ATI',
+        query: 'Nguyen',
+      });
+
+      expect(res).toEqual([
+        {
+          id: '5b10ac8d82e05b22cc7d4ef5',
+          siteId: 'opaque_1',
+          accountId: '5b10ac8d82e05b22cc7d4ef5',
+          displayName: 'Nguyen Van A',
+        },
+      ]);
+    });
+
+    it('transitions an issue status and optionally posts a comment via myjira.transition_issue', async () => {
+      reply = ({ url, method }) => {
+        if (url.endsWith('/transitions') && method === 'GET') {
+          return {
+            body: {
+              transitions: [
+                { id: '21', name: 'Start Progress', to: { name: 'In Progress' } },
+                { id: '31', name: 'Resolve Issue', to: { name: 'Done' } },
+              ],
+            },
+          };
+        }
+        if (url.endsWith('/transitions') && method === 'POST') {
+          return { status: 204, rawBody: '' };
+        }
+        return { body: issue };
+      };
+
+      const res = await make().execute('myjira.transition_issue', {
+        siteId: 'opaque_1',
+        issueKey: 'ATI-42',
+        status: 'Done',
+        comment: 'Fixed in PR #272',
+      });
+
+      expect(res).toEqual({
+        siteId: 'opaque_1',
+        id: '10042',
+        key: 'ATI-42',
+        status: 'Done',
+        url: 'https://company.atlassian.net/browse/ATI-42',
+      });
+      const postTransition = seen.find((s) => s.url.endsWith('/transitions') && s.method === 'POST');
+      expect(postTransition?.body).toEqual({
+        transition: { id: '31' },
+        update: {
+          comment: [{ add: { body: plainTextToAdf('Fixed in PR #272') } }],
+        },
+      });
+    });
+
+    it('updates issue fields via myjira.update_issue and rejects empty update payload', async () => {
+      await expect(
+        make().execute('myjira.update_issue', {
+          siteId: 'opaque_1',
+          issueKey: 'ATI-42',
+        })
+      ).rejects.toMatchObject({ category: 'VALIDATION' });
+
+      reply = ({ url, method }) => {
+        if (url.endsWith('/issue/ATI-42') && method === 'PUT') {
+          return { status: 204, rawBody: '' };
+        }
+        return { body: issue };
+      };
+
+      const res = await make().execute('myjira.update_issue', {
+        siteId: 'opaque_1',
+        issueKey: 'ATI-42',
+        priority: 'High',
+        assigneeAccountId: 'acc-99',
+        labels: ['sprint-4', 'backend'],
+        dueDate: '2026-11-15',
+      });
+
+      expect(res).toEqual({
+        siteId: 'opaque_1',
+        id: '10042',
+        key: 'ATI-42',
+        url: 'https://company.atlassian.net/browse/ATI-42',
+      });
+      const putReq = seen.find((s) => s.method === 'PUT');
+      expect(putReq?.body).toEqual({
+        fields: {
+          priority: { name: 'High' },
+          assignee: { id: 'acc-99' },
+          labels: ['sprint-4', 'backend'],
+          duedate: '2026-11-15',
+        },
+      });
     });
   });
 });

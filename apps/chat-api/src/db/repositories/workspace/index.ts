@@ -63,6 +63,13 @@ export class WorkspaceRepo {
     return this.coreRepo.createWorkspaceWithBootstrapAdmin(actorUserId, input);
   }
 
+  createSelfServiceWorkspace(
+    actorUserId: string,
+    input: { name: string; slug?: string }
+  ): Promise<CreateWorkspaceResponse> {
+    return this.coreRepo.createSelfServiceWorkspace(actorUserId, input);
+  }
+
   enableExistingWorkspace(
     actorUserId: string,
     workspaceId: string,

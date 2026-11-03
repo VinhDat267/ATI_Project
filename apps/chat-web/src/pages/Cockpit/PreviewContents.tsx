@@ -23,6 +23,8 @@ const names: Record<string,string> = {
   due:'Hạn chót', dueComplete:'Hoàn thành hạn chót', closed:'Lưu trữ (Archive)', pos:'Vị trí',
   items:'Các mục công việc', itemName:'Mục checklist', idMembers:'Thành viên được gán', memberId:'Thành viên',
   status:'Lọc theo trạng thái', archived:'Lưu trữ trang Notion',
+  targetStatus:'Trạng thái chuyển tới', priority:'Mức độ ưu tiên', assigneeAccountId:'Người phụ trách (Account ID)',
+  dueDate:'Hạn hoàn thành (Due date)', parentKey:'Epic / Issue cha', comment:'Bình luận kèm theo',
 };
 const operatorLabels: Record<string,string> = {
   equals:'Bằng (=)',
@@ -723,10 +725,31 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
   const ghState = step.tool.startsWith('github.') && (step.args.state === 'open' || step.args.state === 'closed')
     ? step.args.state
     : null;
+  const isMyJira = step.tool.startsWith('myjira.');
+  const jiraTargetStatus = isMyJira && typeof step.args.targetStatus === 'string' && step.args.targetStatus.trim()
+    ? step.args.targetStatus.trim()
+    : null;
+  const jiraPriority = isMyJira && typeof step.args.priority === 'string' && step.args.priority.trim()
+    ? step.args.priority.trim()
+    : null;
+  const jiraDueDate = isMyJira && typeof step.args.dueDate === 'string' && step.args.dueDate.trim()
+    ? step.args.dueDate.trim()
+    : null;
+  const jiraAssignee = isMyJira && typeof step.args.assigneeAccountId === 'string' && step.args.assigneeAccountId.trim()
+    ? (labels?.[step.args.assigneeAccountId.trim()] ?? step.args.assigneeAccountId.trim())
+    : null;
+  const jiraParentKey = isMyJira && typeof step.args.parentKey === 'string' && step.args.parentKey.trim()
+    ? step.args.parentKey.trim()
+    : null;
   const badgeExcluded = [
     ...(ghLabels.length > 0 ? ['labels', 'label'] : []),
     ...(ghAssignees.length > 0 ? ['assignees'] : []),
     ...(ghState ? ['state'] : []),
+    ...(jiraTargetStatus ? ['targetStatus'] : []),
+    ...(jiraPriority ? ['priority'] : []),
+    ...(jiraDueDate ? ['dueDate'] : []),
+    ...(jiraAssignee ? ['assigneeAccountId'] : []),
+    ...(jiraParentKey ? ['parentKey'] : []),
   ];
   return <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 v3-space-y-3">
     <div>
@@ -737,6 +760,35 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
       <span className="text-[11px] text-neutral-400 uppercase font-semibold">{names[key]}:</span>
       <div className="text-sm font-bold text-neutral-900 mt-0.5">{text(value)}</div>
     </div>)}
+    {(jiraTargetStatus || jiraPriority || jiraDueDate || jiraAssignee || jiraParentKey) && (
+      <div className="flex flex-wrap items-center gap-1.5" data-testid="myjira-preview-badges">
+        {jiraTargetStatus && (
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-800 border border-blue-200">
+            🔄 Chuyển sang: {jiraTargetStatus}
+          </span>
+        )}
+        {jiraPriority && (
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-800 border border-rose-200">
+            ⚡ Ưu tiên: {jiraPriority}
+          </span>
+        )}
+        {jiraDueDate && (
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-900 border border-amber-200">
+            📅 Hạn: {jiraDueDate}
+          </span>
+        )}
+        {jiraAssignee && (
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-800 border border-indigo-200">
+            👤 Phụ trách: {jiraAssignee}
+          </span>
+        )}
+        {jiraParentKey && (
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-neutral-100 text-neutral-800 border border-neutral-200">
+            🔗 Epic/Parent: {jiraParentKey}
+          </span>
+        )}
+      </div>
+    )}
     {(ghState || ghLabels.length > 0 || ghAssignees.length > 0) && (
       <div className="flex flex-wrap items-center gap-1.5" data-testid="github-preview-badges">
         {ghState && (

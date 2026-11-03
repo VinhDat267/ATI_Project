@@ -98,7 +98,7 @@ export function RequestMoment({
             </p>
           </div>
         </div>
-        {workspace.id === 'personal' && (
+        {workspace.id === 'personal' ? (
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
               type="button"
@@ -111,7 +111,17 @@ export function RequestMoment({
               Kết nối công cụ cá nhân
             </button>
           </div>
-        )}
+        ) : services.some((s) => s.id === 'myjira' && s.configured) ? (
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span
+              data-testid="jira-context-ready-pill"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 text-[#0052CC] border border-blue-200"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-[#0052CC]" />
+              <span>Jira OAuth 3LO: Sẵn sàng</span>
+            </span>
+          </div>
+        ) : null}
       </div>
 
       <div className="v3-space-y-3 text-center sm:text-left">
@@ -233,7 +243,7 @@ export function RequestMoment({
             </div>
           </div>
 
-          {services.filter((service) => service.configured).length >= 2 && multiServicePlaybooks.filter((pb) => pb.services.filter((svcId) => services.some((s) => s.id === svcId || (svcId === 'calendar' && s.id === 'mycalendar') || (svcId === 'sheets' && s.id === 'mysheets'))).length >= 2).length > 0 && (
+          {services.filter((service) => service.configured).length >= 2 && multiServicePlaybooks.filter((pb) => pb.services.filter((svcId) => services.some((s) => s.id === svcId || (svcId === 'calendar' && s.id === 'mycalendar') || (svcId === 'sheets' && s.id === 'mysheets') || (svcId === 'jira' && s.id === 'myjira') || (svcId === 'myjira' && s.id === 'jira'))).length >= 2).length > 0 && (
             <div className="v3-space-y-3" data-testid="multi-service-playbooks">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-xs font-semibold uppercase tracking-wider text-brand-muted">
@@ -245,7 +255,7 @@ export function RequestMoment({
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {multiServicePlaybooks
-                  .filter((pb) => pb.services.filter((svcId) => services.some((s) => s.id === svcId || (svcId === 'calendar' && s.id === 'mycalendar') || (svcId === 'sheets' && s.id === 'mysheets'))).length >= 2)
+                  .filter((pb) => pb.services.filter((svcId) => services.some((s) => s.id === svcId || (svcId === 'calendar' && s.id === 'mycalendar') || (svcId === 'sheets' && s.id === 'mysheets') || (svcId === 'jira' && s.id === 'myjira') || (svcId === 'myjira' && s.id === 'jira'))).length >= 2)
                   .map((playbook) => (
                   <button
                     key={playbook.id}

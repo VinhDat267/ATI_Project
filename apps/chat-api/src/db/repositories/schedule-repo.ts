@@ -58,7 +58,9 @@ export class ScheduleRepo {
                 ? 'trello_digest'
                 : row.kind === 'notion_digest'
                   ? 'notion_digest'
-                  : 'plan';
+                  : row.kind === 'myjira_digest'
+                    ? 'myjira_digest'
+                    : 'plan';
     const base: ScheduleView = {
       id: row.id,
       convId: row.conv_id,
@@ -88,6 +90,11 @@ export class ScheduleRepo {
     } else if (row.kind === 'notion_digest' && row.digest_config && row.digest_approved_at) {
       base.digest = {
         config: row.digest_config as NotionDigestConfig,
+        approvedAt: new Date(row.digest_approved_at).toISOString(),
+      };
+    } else if (row.kind === 'myjira_digest' && row.digest_config && row.digest_approved_at) {
+      base.digest = {
+        config: row.digest_config as unknown as Record<string, unknown>,
         approvedAt: new Date(row.digest_approved_at).toISOString(),
       };
     } else if (row.kind === 'telegram_digest' && row.digest_config) {

@@ -8,6 +8,7 @@ import { CALENDAR_TOOLS } from './calendar.js';
 import { NOTION_TOOLS, NOTION_OAUTH_TOOLS } from './notion.js';
 import { TELEGRAM_TOOLS, TELEGRAM_OAUTH_TOOLS } from './telegram.js';
 import { JIRA_TOOLS } from './jira.js';
+import { MYJIRA_TOOLS } from './myjira.js';
 import { MYSHEETS_TOOLS } from './mysheets.js';
 
 export * from './types.js';
@@ -67,6 +68,10 @@ const NOTION_OAUTH_TOOL_MAP: Record<string, ToolDefinition> = Object.fromEntries
   NOTION_OAUTH_TOOLS.map((tool) => [tool.name, tool])
 );
 
+const MYJIRA_TOOL_MAP: Record<string, ToolDefinition> = Object.fromEntries(
+  MYJIRA_TOOLS.map((tool) => [tool.name, tool])
+);
+
 export function getToolDefinition(name: string): ToolDefinition | undefined {
   return (
     TOOL_MAP[name] ??
@@ -74,6 +79,7 @@ export function getToolDefinition(name: string): ToolDefinition | undefined {
     TRELLO_OAUTH_TOOL_MAP[name] ??
     TELEGRAM_OAUTH_TOOL_MAP[name] ??
     SHEETS_EXTENDED_TOOL_MAP[name] ??
-    NOTION_OAUTH_TOOL_MAP[name]
+    NOTION_OAUTH_TOOL_MAP[name] ??
+    MYJIRA_TOOL_MAP[name]
   );
 }
