@@ -200,32 +200,39 @@ describe('evaluations/golden/cases-myjira.json schema and routing', () => {
     expect(file.version).toBe(1);
     expect(file.clock).toBe('2026-11-02T10:00:00+07:00');
     expect(file.timeZone).toBe('Asia/Ho_Chi_Minh');
-    expect(cases).toHaveLength(8);
+    expect(cases).toHaveLength(24);
 
     const ids = cases.map((c) => c.id);
-    expect(new Set(ids).size).toBe(8);
+    expect(new Set(ids).size).toBe(24);
   });
 
-  it('contains create_issue, add_comment, cross-service, clarification and injection cases', () => {
+  it('contains create_issue, add_comment, multi_step, cross-service, clarification, refusal, read_only and injection cases', () => {
     const singleSteps = cases.filter((c) => c.category === 'single_step' && c.primaryService === 'myjira');
-    expect(singleSteps).toHaveLength(3);
-    expect(singleSteps.map((c) => c.id)).toEqual(['mj01', 'mj02', 'mj03']);
+    expect(singleSteps).toHaveLength(7);
+    expect(singleSteps.map((c) => c.id)).toEqual(['mj01', 'mj02', 'mj03', 'mj07', 'mj08', 'mj09', 'mj10']);
 
-    const clarificationCases = cases.filter((c) => c.category === 'clarification' || c.category === 'read_only');
-    expect(clarificationCases).toHaveLength(2);
-    expect(clarificationCases.map((c) => c.id)).toEqual(['mj04', 'mj06']);
+    const multiSteps = cases.filter((c) => c.category === 'multi_step');
+    expect(multiSteps).toHaveLength(2);
+    expect(multiSteps.map((c) => c.id)).toEqual(['mj14', 'mj15']);
+
+    const clarificationAndReadOnly = cases.filter((c) => c.category === 'clarification' || c.category === 'read_only');
+    expect(clarificationAndReadOnly).toHaveLength(8);
+    expect(clarificationAndReadOnly.map((c) => c.id)).toEqual(['mj04', 'mj06', 'mj11', 'mj12', 'mj13', 'mj17', 'mj18', 'mj19']);
+
+    const refusals = cases.filter((c) => c.category === 'refusal');
+    expect(refusals).toHaveLength(1);
+    expect(refusals.map((c) => c.id)).toEqual(['mj16']);
 
     const crossService = cases.filter((c) => c.category === 'cross_service');
-    expect(crossService).toHaveLength(1);
-    expect(crossService[0].id).toBe('mj05');
+    expect(crossService).toHaveLength(2);
+    expect(crossService.map((c) => c.id)).toEqual(['mj05', 'mj20']);
 
     const injections = cases.filter((c) => c.category === 'injection');
-    expect(injections).toHaveLength(2);
-    expect(injections.map((c) => c.id)).toEqual(['mi01', 'mi02']);
+    expect(injections).toHaveLength(4);
+    expect(injections.map((c) => c.id)).toEqual(['mi01', 'mi02', 'mi03', 'mi04']);
     for (const injection of injections) {
       expect(injection.expect.acceptKinds).toContain('clarification');
       expect(injection.expect.acceptKinds).toContain('refusal');
-      expect(injection.expect.acceptKinds).toContain('plan');
     }
   });
 
