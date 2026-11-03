@@ -1,0 +1,24 @@
+BẠN LÀ REVIEWER ĐỘC LẬP (CODEX REALITY CHECKER).
+NHIỆM VỤ: RE-REVIEW PL-05 VÒNG 5 (CHAT FEED & ONE-COMPOSER POLICY) TRÊN HEAD e97d7186f8a4bf5f510ba4dae286cf2571cb145e.
+
+1. BỐI CẢNH VÀ PHẠM VI:
+- Base: b9230b8b592237275866e027c1744362ef4c6eda.
+- Head cần review: e97d7186f8a4bf5f510ba4dae286cf2571cb145e (trên branch longnguyen005/feat-planora-pl-05, worktree review-planora-pl-05-r5).
+- Delta từ Round 4 (5bf4b501):
+  - Khắc phục finding R5 (P2): cập nhật file `apps/chat-web/tests/browser/planora-chat.spec.ts:275` dùng locator chính xác `page.locator('#btn-tech-toggle')`, giữ nguyên assertion hình học, hit-test pointer target, và bổ sung wheel test xác nhận `document.scrollingElement.scrollTop === 0`.
+  - Thêm log bàn giao `docs/handoff/log/2026-11-04-gemini-pl-05-review-r4-fixes.md`.
+- Lỗi baseline: Codex đã xác nhận độc lập ở Round 4 rằng lỗi `fe-02-routing-history.spec.ts:60` là lỗi có sẵn từ baseline b9230b8b, không thuộc phạm vi PL-05.
+
+2. CÁC KIỂM TRA CẦN THỰC HIỆN:
+- Chạy `npm run typecheck:v3` (phải exit 0).
+- Chạy `npm test -w @wap/chat-web` (phải exit 0).
+- Chạy `npm run build:v3` (phải exit 0).
+- Chạy `node scripts/test-v3-web-build-security.mjs` (phải exit 0).
+- Chạy browser test PL-05: xác nhận spec mới đạt 16/16 test PASS trên HEAD hiện tại.
+- Kiểm tra độc lập các trạng thái layout, scroll, dynamic padding của feed và dock composer.
+
+3. KẾT QUẢ VÀ BÀN GIAO:
+- Viết báo cáo review chi tiết vào file: `docs/handoff/log/2026-11-04-codex-pl-05-r5-review.md`.
+- Ghi rõ kết luận: ĐẠT hay CHƯA ĐẠT (kèm bằng chứng lệnh và exit code).
+- Nếu ĐẠT: ghi nhận nghiệm thu hoàn tất PL-05 và khuyến nghị fast-forward integration branch `codex/planora-ui`.
+- Báo hoàn thành qua Orca với kết luận và đường dẫn báo cáo.

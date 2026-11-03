@@ -1,0 +1,40 @@
+NHIỆM VỤ: SỬA FINDING R5 (P2) TỪ CODEX RE-REVIEW VÒNG 4 (PL-05)
+
+1. MÔ TẢ VẤN ĐỀ (FINDING R5 - P2):
+- Vị trí: `apps/chat-web/tests/browser/planora-chat.spec.ts:275`.
+- Vấn đề: Selector kết hợp:
+  `page.locator('#btn-tech-toggle, button:has-text("Chi tiết kỹ thuật"), button:has-text("Duyệt kế hoạch")').first()`
+  Trên mobile, thứ tự DOM khiến locator chọn nhầm nút `#btn-approve-plan` (nằm ở trên cùng của action card) thay vì nút `#btn-tech-toggle` (nằm ở đáy active card). Khi composer che phần dưới active card, nút duyệt kế hoạch không bị che nên test PASS sai ý nghĩa (test sensitivity = false).
+
+2. HƯỚNG DẪN SỬA CHỮA:
+Trong `apps/chat-web/tests/browser/planora-chat.spec.ts`:
+- Thay selector thành chính xác nút `#btn-tech-toggle`:
+  ```typescript
+  const techToggle = page.locator('#btn-tech-toggle');
+  await expect(techToggle).toBeVisible();
+  ```
+- Giữ nguyên các assertions hình học:
+  `const toggleBox = (await techToggle.boundingBox())!;`
+  `expect(toggleBox.y + toggleBox.height).toBeLessThan(footerBox.y);`
+- Giữ nguyên hit-test pointer target:
+  ```typescript
+  const hitTarget = await techToggle.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const target = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+    return target === el || el.contains(target);
+  });
+  expect(hitTarget).toBe(true);
+  ```
+- Có thể bổ sung dispatch wheel event lên document / feed để đảm bảo `document.scrollingElement?.scrollTop === 0`.
+
+3. TIÊU CHUẨN KIỂM CHỨNG:
+- Chạy typecheck: `npm run typecheck:v3` (phải exit 0).
+- Chạy unit tests: `npm test -w @wap/chat-web` (phải exit 0).
+- Chạy security build test: `node scripts/test-v3-web-build-security.mjs` (phải exit 0).
+- Chạy browser test PL-05: `node scripts/test-v3-browser.mjs planora-chat.spec.ts` (16/16 test PASS, exit 0).
+
+4. BÀN GIAO:
+- Thêm log: `docs/handoff/log/2026-11-04-gemini-pl-05-review-r4-fixes.md` ghi nhận việc khắc phục finding R5, kèm output và exit code.
+- Commit vào nhánh `longnguyen005/feat-planora-pl-05` trong worktree `C:\Users\Admin\orca\workspaces\ATI_Project\feat-planora-pl-05`.
+- Chỉ `git add` đúng các file thay đổi (`planora-chat.spec.ts` và file log).
+- Gửi thông báo hoàn thành với HEAD SHA mới.

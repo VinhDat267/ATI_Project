@@ -1,7 +1,8 @@
 # PL-05 · Feed hội thoại Planora và một composer (Chat Feed & One-Composer)
 
-**Trạng thái:** sẵn sàng nhận · **Nhánh gợi ý:** `longnguyen005/feat-planora-pl-05` · **Phụ thuộc:** PL-02 và PL-04 đã hoàn tất và được Codex duyệt Đạt.  
-**Base SHA:** `b9230b8b592237275866e027c1744362ef4c6eda` (trên integration branch `codex/planora-ui`).  
+**Trạng thái:** HOÀN THÀNH (ĐÃ ĐƯỢC CODEX NGHIỆM THU ĐẠT) · **Nhánh hoàn thành:** `longnguyen005/feat-planora-pl-05` · **Phụ thuộc:** PL-02 và PL-04 đã hoàn tất và được Codex duyệt Đạt.  
+**Base SHA:** `b9230b8b592237275866e027c1744362ef4c6eda`.  
+**Merged/Fast-Forwarded HEAD SHA:** `e97d71862cee773be9e37f9ef9e456ea36975932` (trên integration branch `codex/planora-ui`).  
 **Target branch:** `codex/planora-ui`.  
 **Đặc tả:** [Planora migration design](../../superpowers/specs/2026-11-02-planora-migration-design.md) mục 4.3, 8.3 · **Kế hoạch:** [Planora migration plan](../../superpowers/plans/2026-11-02-planora-migration.md) mục PL-05.  
 **Prompt thi công:** [PL-05.md](../planora-prompts/PL-05.md).  
@@ -66,19 +67,35 @@ Khôi phục bố cục không gian làm việc hội thoại Planora (Planora C
 
 ## 4. Tiêu chí nghiệm thu (Acceptance Criteria)
 
-- [ ] Tồn tại đầy đủ 3 component `PlanoraChatWorkspace`, `PlanoraActiveTurn`, `PlanoraConversationFeed` tại `apps/chat-web/src/planora/workspace/`.
-- [ ] Màn hình Chat Workspace hiển thị đúng nhận diện Planora, không tràn viền ngang ở bất kỳ viewport nào.
-- [ ] Chỉ có đúng 1 composer hiển thị trên toàn màn hình ở tất cả các trạng thái.
-- [ ] Gửi tin nhắn bằng Enter, xuống dòng bằng Shift+Enter; IME tiếng Việt không kích hoạt submit ngoài ý muốn.
-- [ ] Cuộn tự động hoạt động chuẩn xác khi ở gần cuối; không giật cuộn khi người dùng đang đọc tin cũ.
-- [ ] Mở lại hội thoại đã lưu hiển thị thẻ `SavedConversation` đúng như quy định của Sprint 1 (#250).
-- [ ] `npm run typecheck:v3` đạt exit code 0.
-- [ ] `npm run build:v3` đạt exit code 0.
-- [ ] `node scripts/test-v3-web-build-security.mjs` đạt exit code 0.
-- [ ] Toàn bộ unit tests và Playwright spec cho PL-05 đều PASS.
+- [x] Tồn tại đầy đủ 3 component `PlanoraChatWorkspace`, `PlanoraActiveTurn`, `PlanoraConversationFeed` tại `apps/chat-web/src/planora/workspace/`.
+- [x] Màn hình Chat Workspace hiển thị đúng nhận diện Planora, không tràn viền ngang ở bất kỳ viewport nào.
+- [x] Chỉ có đúng 1 composer hiển thị trên toàn màn hình ở tất cả các trạng thái (One-Composer Policy).
+- [x] Gửi tin nhắn bằng Enter, xuống dòng bằng Shift+Enter; IME tiếng Việt không kích hoạt submit ngoài ý muốn.
+- [x] Cuộn tự động hoạt động chuẩn xác khi ở gần cuối; không giật cuộn khi người dùng đang đọc tin cũ.
+- [x] Mở lại hội thoại đã lưu hiển thị thẻ `SavedConversation` đúng như quy định của Sprint 1 (#250).
+- [x] `npm run typecheck:v3` đạt exit code 0.
+- [x] `npm run build:v3` đạt exit code 0.
+- [x] `node scripts/test-v3-web-build-security.mjs` đạt exit code 0.
+- [x] Toàn bộ unit tests và Playwright spec cho PL-05 đều PASS (16/16 browser tests PASS).
 
 ---
 
-## 5. Kết quả (Worker điền sau khi hoàn thành)
+## 5. Kết quả (Hoàn thành & Bàn giao)
 
-*(Phần này do worker hoàn thiện sau khi thi công)*
+- **Trạng thái:** HOÀN THÀNH — ĐÃ ĐƯỢC CODEX NGHIỆM THU ĐẠT (REVIEW_PASS) VÒNG 5.
+- **Commit HEAD:** `e97d71862cee773be9e37f9ef9e456ea36975932`.
+- **Nhánh tích hợp:** Đã fast-forward nhánh `codex/planora-ui` lên HEAD `e97d71862cee773be9e37f9ef9e456ea36975932`.
+- **Báo cáo Review Codex:** `docs/handoff/log/2026-11-04-codex-pl-05-r5-review.md`.
+- **Các findings F1–F5 và R1–R5 đã xử lý triệt để:**
+  - F1–F5: Đã sửa và pass ở Round 2.
+  - R1–R2: Đã sửa và pass ở Round 3.
+  - R3–R4: Đã sửa và pass ở Round 4.
+  - R5: Chuẩn hóa selector `#btn-tech-toggle` chính xác, kiểm chứng độ nhạy RED/GREEN thực tế thành công ở Round 5.
+- **Bằng chứng kiểm thử nghiệm thu:**
+  - `npm run typecheck:v3`: PASS (exit code 0).
+  - `npm test -w @wap/chat-web`: 100 files, 1115 tests PASS (exit code 0).
+  - `npm run build:v3`: PASS (exit code 0).
+  - `node scripts/test-v3-web-build-security.mjs`: PASS (exit code 0).
+  - `node scripts/test-v3-browser.mjs planora-chat.spec.ts`: 16 passed (exit code 0).
+  - `fe-05-cockpit.spec.ts`: 4 passed (exit code 0).
+  - Probe độc lập từ Codex: 12 passed trên cả 5 viewport và 2 theme (exit code 0).
