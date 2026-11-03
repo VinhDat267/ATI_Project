@@ -1,0 +1,37 @@
+BẠN LÀ REVIEWER ĐỘC LẬP (CODEX REALITY CHECKER).
+NHIỆM VỤ: REVIEW ĐỘC LẬP PL-06 (KẾ HOẠCH, THỰC THI, PREVIEW VÀ BIÊN NHẬN) TRÊN HEAD ee5b1814ba1c70490644df4ac87d0339a79847c0.
+
+1. BỐI CẢNH VÀ PHẠM VI:
+- Base SHA: e97d71862cee773be9e37f9ef9e456ea36975932 (trên branch codex/planora-ui).
+- Head cần review: ee5b1814ba1c70490644df4ac87d0339a79847c0 (trên branch longnguyen005/feat-planora-pl-06, worktree review-planora-pl-06).
+- Task card: docs/handoff/tasks/PL-06-planora-workflow-cards.md.
+- Worker log: docs/handoff/log/2026-11-04-gemini-pl-06.md.
+
+2. NỘI DUNG THAY ĐỔI CẦN KIỂM CHỨNG:
+- `PlanoraWorkflowSteps` (mới): Thay thế orbital canvas thành hệ thống step cards Planora, hỗ trợ đầy đủ 5 mode: `preview`, `executing`, `receipt`, `schedule`, `blueprint`.
+  - Hiển thị thứ tự, dependsOn, nhãn Read/Write theo `toolDefinition`, trạng thái thực thi thời gian thực, và các liên kết data-flow mappings.
+  - Bố cục responsive: 2 cột trên desktop (`min-w-[768px]`), 1 cột trên mobile (`<768px`).
+- Tích hợp các moment:
+  - `PlanMoment.tsx`: Bảo toàn test IDs (`#moment-4`, `#heading-moment-4`, `[data-request-echo]`, `#plan-cards-container`, `[data-od-id]`, `#btn-preview-step-N`). Busy locking chống click đúp nút Duyệt kế hoạch, ràng buộc mã băm `data-testid="plan-hash-binding"`.
+  - `ExecutionMoment.tsx`: Giữ nguyên tiến trình thực thi thời gian thực (`#exec-progress-bar`, `#exec-timeline`), đồng bộ semantic tokens Planora.
+  - `ReceiptMoment.tsx`: Giữ nguyên bảng tóm tắt kết quả, liên kết đích an toàn (`safe result links`), nút đặt lịch quy trình 1-click.
+- Rich previews:
+  - `PreviewContents.tsx`: Bảng biểu và văn bản dài không gây tràn ngang layout ở bất kỳ viewport nào (đặc biệt là 320px và 375px).
+  - `GmailPreview.tsx`: Bảo vệ chống giả mạo email, hiển thị người gửi/nhận/tiêu đề và nội dung an toàn.
+  - `PreviewModal.tsx`: Hộp thoại xem trước chuẩn Planora với focus trap và xử lý phím Escape.
+
+3. TIÊU CHUẨN KIỂM CHỨNG BẮT BUỘC (REALITY CHECKER):
+- `npm run typecheck:v3` (phải exit 0).
+- `npm test -w @wap/chat-web` (phải exit 0, 101/101 test files).
+- `npm run build:v3` (phải exit 0).
+- `node scripts/test-v3-web-build-security.mjs` (phải exit 0).
+- Chạy Playwright browser tests trên sandbox riêng:
+  `node scripts/test-v3-browser.mjs planora-chat.spec.ts fe-05-cockpit.spec.ts`.
+- Thực hiện các probe độc lập kiểm tra layout thẻ, rich previews, cuộn trong card, không tràn ngang ở cả 5 viewports (1440, 1024, 768, 375, 320) và cả hai theme (light/dark).
+- Chú ý: Lỗi strict-mode violation tại `fe-02-routing-history.spec.ts:60` là lỗi baseline có sẵn từ b9230b8b đã được xác nhận độc lập ở vòng trước.
+
+4. KẾT QUẢ VÀ BÀN GIAO:
+- Viết báo cáo review chi tiết vào file: `docs/handoff/log/2026-11-04-codex-review-pl-06.md`.
+- Ghi rõ kết luận: ĐẠT hay CHƯA ĐẠT (kèm bằng chứng lệnh và exit code).
+- Nếu CHƯA ĐẠT: ghi rõ từng finding (P1/P2/P3) và hướng dẫn sửa cụ thể.
+- Báo hoàn thành qua Orca với kết luận và đường dẫn báo cáo.
