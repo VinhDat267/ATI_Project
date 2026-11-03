@@ -44,6 +44,22 @@ export function WorkspaceSwitcher({ navigate, variant = 'header' }: WorkspaceSwi
   const joinModalRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
 
+  const restoreCreateFocus = () => {
+    if (createTriggerRef.current && document.body.contains(createTriggerRef.current)) {
+      createTriggerRef.current.focus();
+    } else if (buttonRef.current && document.body.contains(buttonRef.current)) {
+      buttonRef.current.focus();
+    }
+  };
+
+  const restoreJoinFocus = () => {
+    if (joinTriggerRef.current && document.body.contains(joinTriggerRef.current)) {
+      joinTriggerRef.current.focus();
+    } else if (buttonRef.current && document.body.contains(buttonRef.current)) {
+      buttonRef.current.focus();
+    }
+  };
+
   // Focus lifecycle, trap, and Escape handling for create organization modal (F3, F4, R2)
   useEffect(() => {
     if (!showCreateModal) return;
@@ -69,7 +85,7 @@ export function WorkspaceSwitcher({ navigate, variant = 'header' }: WorkspaceSwi
         e.preventDefault();
         e.stopPropagation();
         setShowCreateModal(false);
-        createTriggerRef.current?.focus();
+        restoreCreateFocus();
         return;
       }
 
@@ -142,7 +158,7 @@ export function WorkspaceSwitcher({ navigate, variant = 'header' }: WorkspaceSwi
         e.preventDefault();
         e.stopPropagation();
         setShowJoinModal(false);
-        joinTriggerRef.current?.focus();
+        restoreJoinFocus();
         return;
       }
 
@@ -226,13 +242,21 @@ export function WorkspaceSwitcher({ navigate, variant = 'header' }: WorkspaceSwi
   useEffect(() => {
     if (!open) return;
     const handleOutside = (e: MouseEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) {
+      if (showCreateModal || showJoinModal) return;
+      const target = e.target as Node | null;
+      if (
+        (target && createModalRef.current?.contains(target)) ||
+        (target && joinModalRef.current?.contains(target))
+      ) {
+        return;
+      }
+      if (!menuRef.current?.contains(target as Node)) {
         setOpen(false);
       }
     };
     document.addEventListener('mousedown', handleOutside);
     return () => document.removeEventListener('mousedown', handleOutside);
-  }, [open]);
+  }, [open, showCreateModal, showJoinModal]);
 
   // PBI-04: a conversation belongs to exactly one workspace, so only /c/:id leaves for "/".
   // Workspace-scoped views (/, /history conversations + ScheduleSection, /settings + TrelloConnection,
@@ -528,7 +552,7 @@ export function WorkspaceSwitcher({ navigate, variant = 'header' }: WorkspaceSwi
                 type="button"
                 onClick={() => {
                   setShowCreateModal(false);
-                  createTriggerRef.current?.focus();
+                  restoreCreateFocus();
                 }}
                 className="text-[#9CA3AF] hover:text-[#111827] text-sm font-semibold"
                 aria-label="Đóng biểu mẫu"
@@ -578,7 +602,7 @@ export function WorkspaceSwitcher({ navigate, variant = 'header' }: WorkspaceSwi
                   type="button"
                   onClick={() => {
                     setShowCreateModal(false);
-                    createTriggerRef.current?.focus();
+                    restoreCreateFocus();
                   }}
                   className="px-4 py-2 rounded-xl text-xs font-medium text-[#4B5563] hover:bg-neutral-100"
                 >
@@ -617,7 +641,7 @@ export function WorkspaceSwitcher({ navigate, variant = 'header' }: WorkspaceSwi
                 type="button"
                 onClick={() => {
                   setShowJoinModal(false);
-                  joinTriggerRef.current?.focus();
+                  restoreJoinFocus();
                 }}
                 className="text-[#9CA3AF] hover:text-[#111827] text-sm font-semibold"
                 aria-label="Đóng biểu mẫu"
@@ -662,7 +686,7 @@ export function WorkspaceSwitcher({ navigate, variant = 'header' }: WorkspaceSwi
                   type="button"
                   onClick={() => {
                     setShowJoinModal(false);
-                    joinTriggerRef.current?.focus();
+                    restoreJoinFocus();
                   }}
                   className="px-4 py-2 rounded-xl text-xs font-medium text-[#4B5563] hover:bg-neutral-100"
                 >

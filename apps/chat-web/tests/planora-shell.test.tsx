@@ -1,9 +1,11 @@
 /** @vitest-environment jsdom */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { PlanoraShell } from '../src/planora/layout/PlanoraShell';
 import { PlanoraPublicHeader } from '../src/planora/layout/PlanoraPublicHeader';
 import { MainNav } from '../src/components/layout/MainNav';
+import { App } from '../src/App';
+import { handleSSEEvent } from '../src/hooks/use-sse';
 import {
   getActiveWorkspaceId,
   setActiveWorkspaceId,
@@ -56,10 +58,17 @@ beforeEach(() => {
   });
   vi.spyOn(apiClient, 'getSchedulePendingCount').mockResolvedValue({ count: 2 });
   vi.spyOn(apiClient, 'getConversations').mockResolvedValue({ conversations: [], nextCursor: null });
+  vi.spyOn(apiClient, 'getMe').mockResolvedValue({ user: memberUser });
+  vi.spyOn(apiClient, 'getAuthConfig').mockResolvedValue({ signupEnabled: false, googleEnabled: false });
+  vi.spyOn(apiClient, 'getServices').mockResolvedValue({ services: [], canConfigure: false });
+  vi.spyOn(apiClient, 'getActivePlan').mockResolvedValue(null);
+  vi.spyOn(apiClient, 'getExecutionStatus').mockResolvedValue(null);
 });
 
 afterEach(() => {
   cleanup();
+  authStorage.clearStoredTokens();
+  window.history.replaceState({}, '', '/');
   vi.restoreAllMocks();
 });
 
@@ -452,6 +461,10 @@ describe('PlanoraShell & PlanoraSidebar (PL-02)', () => {
       expect(getActiveWorkspaceId()).toBe('personal');
       expect(useChatStore.getState().conversationId).toBeNull();
 
+      // Late SSE events arrive from previous workspace/conversation (conv-alpha)
+      handleSSEEvent('clarification', JSON.stringify({ question: 'Stale Question' }), undefined, 'conv-alpha');
+      handleSSEEvent('plan', JSON.stringify({ plan: { id: 'p-stale', title: 'Stale Plan' } }), undefined, 'conv-alpha');
+
       // Later, the delayed response from Alpha arrives
       const alphaResponseData = {
         conversation: { id: 'conv-alpha', title: 'Stale Alpha' },
@@ -461,68 +474,99 @@ describe('PlanoraShell & PlanoraSidebar (PL-02)', () => {
       await historyPromise;
 
       // Because workspace switched, isCurrent() returned false and discarded the data.
-      // Active workspace remains 'personal' with clean store!
+      // Active workspace remains 'personal' with clean store and zero state leakage!
       expect(getActiveWorkspaceId()).toBe('personal');
       expect(useChatStore.getState().conversationId).toBeNull();
       expect(useChatStore.getState().messages).toHaveLength(0);
+      expect(useChatStore.getState().activeClarification).toBeNull();
+      expect(useChatStore.getState().activePlan).toBeNull();
     });
   });
 
   describe('7. Codex Findings Regressions (F1 - F6, R1 - R4)', () => {
-    it('F1 & R3: Sidebar "Hội thoại mới" preserves pending request lock on c1 when navigating away and back', () => {
-      const navigate = vi.fn();
-      const handleNewConversation = () => {
-        useChatStore.getState().reset({ preservePlanning: true });
-        navigate('/');
-      };
+    it('F1 & R3: App preserves pending request lock on c1 when navigating away via "Hội thoại mới" and back', async () => {
+      authStorage.setStoredTokens({ accessToken: 'test-token', user: memberUser });
+      window.history.replaceState({}, '', '/c/c1');
 
-      // Set up conversation c1 with an in-flight planning request
-      useChatStore.getState().setConversationId('c1');
-      const claimed = useChatStore.getState().beginPlanning('c1', 'req-in-flight-1');
-      expect(claimed).toBe(true);
+      let resolveSend!: (val: any) => void;
+      vi.spyOn(apiClient, 'sendMessage').mockImplementation(() => {
+        return new Promise((resolve) => {
+          resolveSend = resolve;
+        });
+      });
+      vi.spyOn(apiClient, 'getConversation').mockImplementation((id: string) => {
+        if (id === 'c1') {
+          return Promise.resolve({
+            conversation: { id: 'c1', title: 'Hội thoại c1' },
+            messages: [{ id: 'm0', role: 'user', content: 'Tin nhắn c1 đầu tiên' }],
+          });
+        }
+        return Promise.resolve({ conversation: { id }, messages: [] });
+      });
+
+      render(<App />);
+
+      // Wait for conversation c1 and composer to hydrate
+      const input = await screen.findByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhắn cho ATI/i });
+      fireEvent.change(input, { target: { value: 'Chạy phân tích c1' } });
+
+      const sendBtn = screen.getByRole('button', { name: /Gửi yêu cầu|Gửi tin nhắn|Gửi/i });
+      expect(sendBtn).not.toBeDisabled();
+
+      // Submit message on c1 (triggers apiClient.sendMessage and sets isPlanning)
+      fireEvent.click(sendBtn);
+
+      // Verify c1 entered planning state
       expect(useChatStore.getState().isPlanning).toBe(true);
-      expect(useChatStore.getState().planningByConversation['c1']?.requestId).toBe('req-in-flight-1');
+      expect(useChatStore.getState().planningByConversation['c1']).toBeDefined();
 
-      // Attempting to claim/send another request in c1 while req-in-flight-1 is pending is rejected
+      // Attempting to begin planning on c1 again is rejected
       expect(useChatStore.getState().beginPlanning('c1', 'req-duplicate')).toBe(false);
 
-      render(
-        <PlanoraShell
-          user={memberUser}
-          currentTab="workspace"
-          navigate={navigate}
-          onLogout={vi.fn()}
-          onNewConversation={handleNewConversation}
-        >
-          <main>
-            <h1>Hội thoại c1</h1>
-          </main>
-        </PlanoraShell>
-      );
-
-      // Click "Hội thoại mới" on sidebar
+      // Click actual sidebar "Hội thoại mới" button inside <App /> (calls App.tsx:handleNewConversation)
       const newChatBtn = screen.getByRole('button', { name: /Hội thoại mới/i });
       fireEvent.click(newChatBtn);
 
-      // Navigates to / and conversationId becomes null for new draft
-      expect(navigate).toHaveBeenCalledWith('/');
+      // Verify route navigated to / and draft conversation is initialized
+      expect(window.location.pathname).toBe('/');
       expect(useChatStore.getState().conversationId).toBeNull();
       expect(useChatStore.getState().isPlanning).toBe(false);
 
-      // Critical invariant: planning record for c1 is NOT wiped out!
+      // Critical invariant: App.tsx reset({ preservePlanning: true }) preserved c1 lock!
       expect(useChatStore.getState().planningByConversation['c1']).toBeDefined();
-      expect(useChatStore.getState().planningByConversation['c1']?.requestId).toBe('req-in-flight-1');
 
-      // Return to c1 via history: chat store automatically restores isPlanning without manual intervention
-      useChatStore.getState().setConversationId('c1');
+      // Navigate back to /c/c1 via browser history / popstate
+      act(() => {
+        window.history.pushState({}, '', '/c/c1');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      });
+
+      await waitFor(() => {
+        expect(useChatStore.getState().conversationId).toBe('c1');
+      });
+
+      // Assert isPlanning is restored on c1
       expect(useChatStore.getState().isPlanning).toBe(true);
 
-      // In c1, sending another request remains blocked
+      // Even with text typed in composer, send button remains disabled while in-flight planning is active
+      const c1Input = await screen.findByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhắn cho ATI/i });
+      fireEvent.change(c1Input, { target: { value: 'Tin nhắn thứ hai khi c1 đang planning' } });
+      const c1SendBtn = screen.getByRole('button', { name: /Gửi yêu cầu|Gửi tin nhắn|Gửi/i });
+      expect(c1SendBtn).toBeDisabled();
+
+      // Concurrency lock remains enforced
       expect(useChatStore.getState().beginPlanning('c1', 'req-duplicate-2')).toBe(false);
 
-      // Only once the original in-flight request finishes does c1 unlock
-      useChatStore.getState().setIsPlanning(false, 'c1', 'req-in-flight-1');
-      expect(useChatStore.getState().isPlanning).toBe(false);
+      // Once the pending in-flight request finishes and planner settles
+      resolveSend({ messageId: 'm1' });
+      act(() => {
+        useChatStore.getState().setIsPlanning(false, 'c1');
+      });
+
+      await waitFor(() => {
+        expect(useChatStore.getState().isPlanning).toBe(false);
+      });
+      // Invariant: after in-flight request settles, c1 unlocks for new planning requests
       expect(useChatStore.getState().beginPlanning('c1', 'req-next')).toBe(true);
     });
 
@@ -626,6 +670,11 @@ describe('PlanoraShell & PlanoraSidebar (PL-02)', () => {
       fireEvent.keyDown(window, { key: 'Tab', shiftKey: true });
       expect(createModal.contains(document.activeElement)).toBe(true);
 
+      // R2: Clicking mouse on input inside modal portal does NOT close dropdown or unmount trigger button
+      fireEvent.mouseDown(orgNameInput);
+      expect(screen.getByRole('dialog', { name: 'Tạo không gian tổ chức mới' })).toBeInTheDocument();
+      expect(document.body.contains(createOrgBtn)).toBe(true);
+
       // Press Escape: closes the create modal first, focus returns to opener, drawer remains open!
       fireEvent.keyDown(window, { key: 'Escape' });
       expect(screen.queryByRole('dialog', { name: 'Tạo không gian tổ chức mới' })).toBeNull();
@@ -633,6 +682,52 @@ describe('PlanoraShell & PlanoraSidebar (PL-02)', () => {
       await waitFor(() => {
         expect(document.activeElement).toBe(createOrgBtn);
       });
+      expect(document.activeElement).not.toBe(document.body);
+    });
+
+    it('R2 regression: If trigger button unmounts while modal is open, closing modal falls back to WorkspaceSwitcher button and never drops to document.body', async () => {
+      render(
+        <PlanoraShell
+          user={memberUser}
+          currentTab="workspace"
+          navigate={vi.fn()}
+          onLogout={vi.fn()}
+        >
+          <main>
+            <h1>Trang làm việc</h1>
+          </main>
+        </PlanoraShell>
+      );
+
+      // Open mobile drawer
+      const toggleBtn = screen.getByRole('button', { name: /Mở menu điều hướng/i });
+      fireEvent.click(toggleBtn);
+
+      // Open workspace switcher dropdown in sidebar
+      const switcherBtn = screen.getByRole('button', { name: /Không gian làm việc:/i });
+      fireEvent.click(switcherBtn);
+
+      // Click "Tạo không gian tổ chức mới"
+      const createOrgBtn = screen.getByRole('button', { name: /Tạo không gian tổ chức mới/i });
+      fireEvent.click(createOrgBtn);
+
+      // Modal is open
+      const createModal = screen.getByRole('dialog', { name: 'Tạo không gian tổ chức mới' });
+      expect(createModal).toBeInTheDocument();
+
+      // Simulate trigger button getting detached from DOM
+      createOrgBtn.remove();
+      expect(document.body.contains(createOrgBtn)).toBe(false);
+
+      // Close modal via Escape
+      fireEvent.keyDown(window, { key: 'Escape' });
+      expect(screen.queryByRole('dialog', { name: 'Tạo không gian tổ chức mới' })).toBeNull();
+
+      // Focus falls back safely to switcherBtn, NEVER document.body!
+      await waitFor(() => {
+        expect(document.activeElement).toBe(switcherBtn);
+      });
+      expect(document.activeElement).not.toBe(document.body);
     });
 
     it('F5: Route / (home) is recognized as workspace tab and renders active nav link and SidebarHistory', async () => {
