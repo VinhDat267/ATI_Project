@@ -23,12 +23,15 @@ export class JiraPolicyService {
     this.verifier = options.verifier;
   }
 
-  async revalidateSource(userId: string, rawSource: JiraSourceRef, options?: { signal?: AbortSignal }): Promise<JiraRevalidationResult> {
+  async revalidateSource(userId: string, rawSource: JiraSourceRef, options?: { signal?: AbortSignal; expectedWorkspaceId?: string }): Promise<JiraRevalidationResult> {
     let source: JiraSourceRef;
     try { source = validateJiraSourceRef(rawSource); }
     catch { return { allowed: false, reason: 'invalid_evidence' }; }
     if (options?.signal?.aborted) return { allowed: false, reason: 'provider_unavailable' };
     if (source.binding.atiUserId !== userId) return { allowed: false, reason: 'identity_changed' };
+    if (options?.expectedWorkspaceId && (source.workspaceId !== options.expectedWorkspaceId || source.binding.workspaceId !== options.expectedWorkspaceId)) {
+      return { allowed: false, reason: 'source_mismatch' };
+    }
 
     try {
       const [workspace, membership, account, site, project] = await Promise.all([

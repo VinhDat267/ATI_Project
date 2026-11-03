@@ -110,7 +110,7 @@ export class JiraGuardedProvider implements LLMProvider {
       }
     }
 
-    const validateEntity = async (entity: unknown): Promise<{ valid: boolean; reason?: string }> => {
+    const validateEntity = async (entity: unknown, isExplicitJira = false): Promise<{ valid: boolean; reason?: string }> => {
       if (!entity || typeof entity !== 'object') return { valid: true };
       const rec = entity as Record<string, unknown>;
 
@@ -123,7 +123,13 @@ export class JiraGuardedProvider implements LLMProvider {
           } catch {
             return { valid: false, reason: 'invalid_evidence' };
           }
-          const decision = await policyService.revalidateSource(actor.userId, ref, { signal: input.signal });
+          if (ref.workspaceId !== actor.workspaceId || ref.binding.workspaceId !== actor.workspaceId) {
+            return { valid: false, reason: 'source_mismatch' };
+          }
+          const decision = await policyService.revalidateSource(actor.userId, ref, {
+            signal: input.signal,
+            expectedWorkspaceId: actor.workspaceId,
+          });
           if (!decision.allowed) {
             return { valid: false, reason: decision.reason };
           }
@@ -131,37 +137,10 @@ export class JiraGuardedProvider implements LLMProvider {
         return { valid: true };
       }
 
-      // If it is a Jira entity but has no sourceRefs attached directly:
+      // Reject any unprovenanced Jira entity
       const hasJiraId = Boolean(rec.cloudId || rec.siteId);
-      if (hasJiraId) {
-        if (this.options.pool) {
-          try {
-            const productType = ['ji', 'ra'].join('');
-            const siteIdent = String(rec.cloudId || rec.siteId);
-            const check = await this.options.pool.query(
-              `SELECT s.id, s.active, p.selected
-               FROM ati_workspace_jira_sites s
-               JOIN jira_grant_sites gs ON gs.cloud_id = s.cloud_id AND gs.product_type = $3
-               JOIN jira_oauth_grants g ON g.id = gs.grant_id AND g.status = 'active'
-               JOIN jira_accounts a ON a.id = g.account_id AND a.user_id = $2 AND a.status = 'connected'
-               JOIN users u ON u.id = $2 AND u.status = 'active'
-               JOIN workspace_members wm ON wm.workspace_id = s.workspace_id AND wm.user_id = $2 AND wm.status = 'active'
-               JOIN ati_workspace_memberships jm ON jm.workspace_id = s.workspace_id AND jm.user_id = $2 AND jm.status = 'active'
-               LEFT JOIN ati_workspace_jira_projects p ON p.site_id = s.id AND (p.numeric_project_id = $5 OR p.project_key = $5)
-               WHERE s.workspace_id = $1 AND (s.id = $4 OR s.cloud_id = $4)`,
-              [actor.workspaceId, actor.userId, productType, siteIdent, String(rec.id || rec.key || '')]
-            );
-            if (check.rows.length > 0) {
-              const row = check.rows[0]!;
-              if (!row.active) return { valid: false, reason: 'site_disabled' };
-              if (rec.key && row.selected === false) return { valid: false, reason: 'project_denied' };
-              return { valid: true };
-            }
-            return { valid: false, reason: 'site_disabled' };
-          } catch {
-            return { valid: false, reason: 'invalid_evidence' };
-          }
-        }
+      const hasJiraKey = typeof rec.key === 'string' && /^[A-Z][A-Z0-9_]+-\d+$/.test(rec.key);
+      if (isExplicitJira || hasJiraId || hasJiraKey) {
         return { valid: false, reason: 'invalid_evidence' };
       }
 
@@ -199,10 +178,11 @@ export class JiraGuardedProvider implements LLMProvider {
             sanitizedObserved[res] = list;
             continue;
           }
-          if (res.startsWith('jira_') || list.some((item) => extractEntitySourceRefs(item).length > 0)) {
+          const isJiraResource = res.startsWith('jira_');
+          if (isJiraResource || list.some((item) => extractEntitySourceRefs(item).length > 0 || Boolean((item as any)?.siteId || (item as any)?.cloudId))) {
             const keptList: unknown[] = [];
             for (const item of list) {
-              const check = await validateEntity(item);
+              const check = await validateEntity(item, isJiraResource);
               if (check.valid) {
                 keptList.push(item);
               }
@@ -221,14 +201,14 @@ export class JiraGuardedProvider implements LLMProvider {
           if (Array.isArray(val)) {
             const kept: unknown[] = [];
             for (const item of val) {
-              const check = await validateEntity(item);
+              const check = await validateEntity(item, true);
               if (check.valid) {
                 kept.push(item);
               }
             }
             sanitizedWorkingMemory[key] = kept;
           } else if (val && typeof val === 'object') {
-            const check = await validateEntity(val);
+            const check = await validateEntity(val, true);
             if (!check.valid) {
               delete sanitizedWorkingMemory[key];
             }
@@ -278,7 +258,15 @@ export class JiraGuardedProvider implements LLMProvider {
             blockReason = 'invalid_evidence';
             break;
           }
-          const decision = await policyService.revalidateSource(actor.userId, ref, { signal: input.signal });
+          if (ref.workspaceId !== actor.workspaceId || ref.binding.workspaceId !== actor.workspaceId) {
+            messageAllowed = false;
+            blockReason = 'source_mismatch';
+            break;
+          }
+          const decision = await policyService.revalidateSource(actor.userId, ref, {
+            signal: input.signal,
+            expectedWorkspaceId: actor.workspaceId,
+          });
           if (!decision.allowed) {
             messageAllowed = false;
             blockReason = decision.reason;
@@ -346,7 +334,7 @@ export class JiraGuardedProvider implements LLMProvider {
               const keptItems: any[] = [];
               let dropped = 0;
               for (const item of outcome.result) {
-                const check = await validateEntity(item);
+                const check = await validateEntity(item, isJiraTool);
                 if (check.valid) {
                   keptItems.push(item);
                   anyJiraOutcomeKept = true;
@@ -376,7 +364,7 @@ export class JiraGuardedProvider implements LLMProvider {
                 anyJiraOutcomeKept = true;
               }
             } else if (outcome.result && typeof outcome.result === 'object') {
-              const check = await validateEntity(outcome.result);
+              const check = await validateEntity(outcome.result, isJiraTool);
               if (check.valid) {
                 filteredOutcomes.push(outcome);
                 anyJiraOutcomeKept = true;
