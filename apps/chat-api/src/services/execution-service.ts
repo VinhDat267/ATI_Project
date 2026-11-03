@@ -8,6 +8,11 @@ import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { readableRecoveryPlan, recoveryConflict, restoredProgress, validateRecoveryAction, verifiedRecoveryPlan, verifiedRecoverySteps } from './execution-recovery.js';
 import type { AdapterContext } from './adapter-factory.js';
+import { validateJiraApprovalBinding } from './jira/jira-approval-guard.js';
+import type { PlanJiraGuard } from '../db/repositories/plan-repo.js';
+import { JiraStreamBuffer, JiraStreamBufferRevokedError } from '../sse/jira-stream-guard.js';
+import type { JiraLeaseManager } from './jira/jira-lease-manager.js';
+import type pg from 'pg';
 import { isSlackSourceArtifact } from './slack/slack-plan-lineage.js';
 import type {SlackWriteRuntime} from './slack/slack-write-runtime.js';
 import {isBoundSlackWritePlan,isBoundSlackExecutableWritePlan} from './slack/slack-write-plan.js';
@@ -31,6 +36,7 @@ export interface ExecutionServiceOptions {
   };
   credentialRepo?: CredentialRepo;
   workspaceRepo?: WorkspaceRepo;
+  pool?: pg.Pool;
   adapterFactory: {
     getAdapterForService: (serviceName: string, context?: AdapterContext) => Promise<any> | any;
   };
@@ -38,6 +44,8 @@ export interface ExecutionServiceOptions {
     emitEvent: (convId: string, eventName: string, data: any) => void;
     clearPlanEvents?: (convId: string, planId?: string) => void;
   };
+  jiraLeaseManager?: JiraLeaseManager;
+  jiraNativeVerifier?: any;
 }
 
 export class ExecutionService {
@@ -47,6 +55,9 @@ export class ExecutionService {
   private workspaceRepo?: WorkspaceRepo;
   private adapterFactory: ExecutionServiceOptions['adapterFactory'];
   private sseManager?: ExecutionServiceOptions['sseManager'];
+  private pool?: pg.Pool;
+  private jiraLeaseManager?: JiraLeaseManager;
+  private jiraNativeVerifier?: any;
   private activeControllers = new Map<string, ExecutionController>();
   private activeRuns = new Map<string, Promise<unknown>>();
   private queuedStarts = new Set<string>();
@@ -64,6 +75,9 @@ export class ExecutionService {
     this.workspaceRepo = options.workspaceRepo;
     this.adapterFactory = options.adapterFactory;
     this.sseManager = options.sseManager;
+    this.pool = options.pool ?? (options.planRepo as any).pool;
+    this.jiraLeaseManager = options.jiraLeaseManager;
+    this.jiraNativeVerifier = options.jiraNativeVerifier;
   }
 
   private emitExecution(convId:string,event:string,payload:any):void{
@@ -93,8 +107,8 @@ export class ExecutionService {
       userId: ownerId,
       phase: 'execution',
       connections,
-      workspaceId: conversation?.workspace_id ?? null,
-      workspaceMode: conversation?.workspace_mode ?? (this.workspaceRepo ? 'personal' : 'legacy'),
+      workspaceId: conversation?.workspace_id ?? connections?.myjira?.workspaceId ?? null,
+      workspaceMode: conversation?.workspace_mode ?? (connections?.myjira ? 'organization' : (this.workspaceRepo ? 'personal' : 'legacy')),
     };
   }
 
@@ -166,6 +180,41 @@ export class ExecutionService {
 
     // Everything that can fail is done before the approval CAS commits.
     const context = this.executionContext(userId, planJson?.connections, planRow.conversation);
+    const steps: PlanStep[] = planJson?.steps || [];
+    const requiredPermissions = {
+      browse: true,
+      createIssue: steps.some((s) => s.tool === 'myjira.create_issue'),
+      addComment: steps.some((s) => s.tool === 'myjira.add_comment'),
+    };
+
+    // Recheck Jira connection authority if present
+    let jiraGuard: PlanJiraGuard | undefined;
+    if (planJson?.connections?.myjira) {
+      const pool = this.pool ?? (this.planRepo as any).pool;
+      if (!pool) {
+        return { success: false, status: 503, error: 'Database authority unavailable' };
+      }
+      const jiraCheck = await validateJiraApprovalBinding(pool, planJson.connections.myjira, {
+        verifier: this.jiraNativeVerifier,
+        requiredPermissions,
+      });
+      if (!jiraCheck.valid) {
+        return {
+          success: false,
+          status: jiraCheck.status,
+          error: jiraCheck.reason,
+        };
+      }
+      const myjira = planJson.connections.myjira;
+      jiraGuard = {
+        workspaceId: myjira.workspaceId,
+        workspaceVersion: myjira.workspaceVersion,
+        membershipVersion: myjira.membershipVersion,
+        identityVersion: myjira.identityVersion,
+        grantId: myjira.grantId,
+      };
+    }
+
     if (planJson?.connections?.myslack) {
       const runtime = isBoundSlackExecutableWritePlan(planJson, userId) ? this.slackWrite : this.slackRead;
       if (!runtime || !this.stepRepo) return { success: false, status: 409, error: 'SLACK_READ_UNAVAILABLE' };
@@ -177,17 +226,16 @@ export class ExecutionService {
     }
 
     // 1. Optimistic Locking: only succeeds if current status is 'pending' and not expired
-    const approved = await this.planRepo.approvePlan(planId, planRow.plan_hash, userId);
+    const approved = await this.planRepo.approvePlan(planId, planRow.plan_hash, userId, jiraGuard);
     if (!approved) {
       return {
         success: false,
         status: 409,
-        error: 'Plan is already approved, rejected, or expired',
+        error: 'Plan is already approved, rejected, expired, or Jira authority conflict',
       };
     }
 
     const convId = planRow.conv_id;
-    const steps: PlanStep[] = planJson?.steps || [];
 
     this.clearPlanEvents(convId, planId);
 
@@ -196,7 +244,22 @@ export class ExecutionService {
 
     // Launch background execution
     this.queuedStarts.add(planId);
-    setImmediate(() => {
+    setImmediate(async () => {
+      if (context.connections?.myjira) {
+        const pool = this.pool ?? (this.planRepo as any).pool;
+        if (pool) {
+          const startCheck = await validateJiraApprovalBinding(pool, context.connections.myjira, {
+            verifier: this.jiraNativeVerifier,
+            requiredPermissions,
+          });
+          if (!startCheck.valid) {
+            this.queuedStarts.delete(planId);
+            await this.markExecutionFailed(planId, convId, new Error(`Queued execution aborted: ${startCheck.reason}`));
+            return;
+          }
+        }
+      }
+
       const run = this.executePlan(convId, planId, steps, userId, context, planRow.plan_hash);
       this.activeRuns.set(planId, run);
       this.queuedStarts.delete(planId);
@@ -219,6 +282,8 @@ export class ExecutionService {
   }
 
   private buildController(convId: string, planId: string, steps: PlanStep[], dbIds: Map<string, string>, context: AdapterContext, initialStates?: Record<string, StepState>, dispatch?: {userId: string; planHash: string}) {
+    const stepLeaseMap = context.stepLeaseMap ?? new Map<string, string>();
+    context.stepLeaseMap = stepLeaseMap;
     const writePlan=dispatch&&isBoundSlackExecutableWritePlan({kind:'plan',thinking:'',summary:'',warnings:[],steps,connections:context.connections},dispatch.userId);
     const writeSnapshot:SlackExecutionSnapshot|undefined=writePlan&&dispatch?{planId,planHash:dispatch.planHash,userId:dispatch.userId,steps,bindings:context.connections!.myslack!}:undefined;
     const slackSnapshot:SlackExecutionSnapshot|undefined=!writePlan&&context.connections?.myslack&&dispatch?{planId,planHash:dispatch.planHash,userId:dispatch.userId,steps,bindings:context.connections.myslack,
@@ -230,7 +295,8 @@ export class ExecutionService {
           if(!this.slackRead||!slackSnapshot)throw new Error('SLACK_READ_UNAVAILABLE');
           return this.slackRead.adapter(slackSnapshot.userId);
         }
-        const adapter=await this.adapterFactory.getAdapterForService(serviceName,context),source=this.sourceSnapshots.get(planId);
+        const stepContext = typeof (step as any).repo === 'string' ? { ...context, repo: (step as any).repo } : context;
+        const adapter=await this.adapterFactory.getAdapterForService(serviceName,stepContext),source=this.sourceSnapshots.get(planId);
         if(!source && !(dispatch && typeof this.planRepo.assertSourceDispatchAllowed === 'function'))return adapter;
         return {execute:async(tool:string,args:any,options?:{signal?:AbortSignal})=>{
           const detached=structuredClone(args);
@@ -243,6 +309,71 @@ export class ExecutionService {
       steps, initialStates,
       onStepUpdate: async (stepId, state) => {
         const dbId = dbIds.get(stepId);
+        const leaseId =
+          stepLeaseMap.get(stepId) ??
+          (state.output as any)?._leaseId ??
+          (state.output as any)?._receipt?.leaseId;
+
+        const stepDef = steps.find((s) => s.id === stepId);
+        const isGuardedJiraStep = Boolean(
+          (stepDef?.tool.startsWith('myjira.') && stepDef?.tool !== 'myjira.list_sites') ||
+          (context.connections?.myjira && stepDef?.tool.includes('jira.') && !stepDef?.tool.includes('list_sites'))
+        );
+
+        if (isGuardedJiraStep && state.status === 'succeeded' && !leaseId) {
+          if (dbId && this.stepRepo) {
+            await this.stepRepo.updateStepStatus(dbId, 'failed', null, {
+              message: 'Không tìm thấy lease ủy quyền Jira cho bước thực thi',
+            });
+          }
+          this.emitExecution(convId, 'exec_step', {
+            planId,
+            stepId,
+            status: 'failed',
+            output: null,
+            error: { message: 'Không tìm thấy lease ủy quyền Jira cho bước thực thi' },
+          });
+          throw new Error('Missing authorization lease for Jira execution step');
+        }
+
+        if (state.status === 'succeeded' && leaseId && this.jiraLeaseManager) {
+          const streamBuffer = new JiraStreamBuffer({
+            revalidateLease: (id, opts) => this.jiraLeaseManager!.revalidateLease(id),
+            withLockedLease: (id, action, opts) =>
+              this.jiraLeaseManager!.withLockedLease(id, (client, val) => action(val), opts),
+          });
+          streamBuffer.bufferDelta({
+            planId,
+            stepId,
+            status: state.status,
+            output: state.output,
+            error: state.error,
+          });
+          try {
+            await streamBuffer.flushOnStepComplete(leaseId, async (delta) => {
+              if (dbId && this.stepRepo) {
+                await this.stepRepo.updateStepStatus(dbId, delta.status, delta.output, delta.error);
+              }
+              this.emitExecution(convId, 'exec_step', delta);
+            });
+          } catch (err: any) {
+            if (dbId && this.stepRepo) {
+              await this.stepRepo.updateStepStatus(dbId, 'failed', null, {
+                message: 'Quyền Jira đã bị thu hồi sau khi thực thi',
+              });
+            }
+            this.emitExecution(convId, 'exec_step', {
+              planId,
+              stepId,
+              status: 'failed',
+              output: null,
+              error: { message: 'Quyền Jira đã bị thu hồi sau khi thực thi' },
+            });
+            throw err;
+          }
+          return;
+        }
+
         if (dbId && this.stepRepo) {
           const saved=slackSnapshot&&state.status==='succeeded'&&steps.find(s=>s.id===stepId)?.tool.startsWith('myslack.')
             ? await this.slackRead!.persist(dbId,state.output,slackSnapshot,stepId)
@@ -261,6 +392,23 @@ export class ExecutionService {
       throw recoveryConflict('Reconciliation required: execution controller is unavailable');
     }
     const { steps, connections } = verifiedRecoveryPlan(plan);
+    if (connections?.myjira) {
+      const pool = this.pool ?? (this.planRepo as any).pool;
+      if (pool) {
+        const requiredPermissions = {
+          browse: true,
+          createIssue: steps.some((s) => s.tool === 'myjira.create_issue'),
+          addComment: steps.some((s) => s.tool === 'myjira.add_comment'),
+        };
+        const recoveryCheck = await validateJiraApprovalBinding(pool, connections.myjira, {
+          verifier: this.jiraNativeVerifier,
+          requiredPermissions,
+        });
+        if (!recoveryCheck.valid) {
+          throw recoveryConflict(`Recovery denied: ${recoveryCheck.reason}`);
+        }
+      }
+    }
     if (plan.plan_json?.connections?.myslack) {
       const runtime = isBoundSlackExecutableWritePlan(plan.plan_json, userId) ? this.slackWrite : this.slackRead;
       if (!runtime) throw recoveryConflict('SLACK_READ_UNAVAILABLE');
@@ -502,6 +650,9 @@ export class ExecutionService {
     const controller = this.activeControllers.get(planId);
     if (!controller) {
       return null;
+    }
+    if (controller.isExecuting()) {
+      return { status: 'executing' };
     }
     const states = controller.getAllStepStates();
     const allSteps = Object.values(states);

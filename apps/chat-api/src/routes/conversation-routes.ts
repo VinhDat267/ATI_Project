@@ -9,6 +9,7 @@ import type { MessageRepo } from '../db/repositories/message-repo.js';
 import type { PlanRepo } from '../db/repositories/plan-repo.js';
 import type { ChatService } from '../services/chat-service.js';
 import type { JiraHistorySanitizer } from '../services/jira/jira-history-sanitizer.js';
+import { validateJiraApprovalBinding } from '../services/jira/jira-approval-guard.js';
 import { HistoryValidationError, validateConversationTitle } from '../db/repositories/conversation-history.js';
 import {
   assertConversationAccessWithFallback,
@@ -277,6 +278,13 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
         typeof planRow.plan_json === 'string'
           ? JSON.parse(planRow.plan_json)
           : planRow.plan_json;
+      if (parsed?.connections?.myjira && pool) {
+        const jiraCheck = await validateJiraApprovalBinding(pool, parsed.connections.myjira);
+        if (!jiraCheck.valid) {
+          res.status(404).json({ error: 'No active pending plan found' });
+          return;
+        }
+      }
       res.status(200).json({
         id: planRow.id,
         convId: planRow.conv_id,

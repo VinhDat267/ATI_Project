@@ -297,6 +297,12 @@ export class ScheduleService {
       if (!guarded.allowed) throw new ScheduleConflict('SCHEDULE_SOURCE_PURGED');
       const metadata = guarded.row.metadata as ScheduleProposalMetadata;
       if (metadata?.type !== 'schedule_proposal') throw new ScheduleNotFound();
+      if (metadata.services?.some((s) => s === 'myjira' || s.startsWith('myjira')) || metadata.proposal?.request?.toLowerCase().includes('myjira')) {
+        throw new ScheduleConflict('DIGEST_NOT_ELIGIBLE', 'Lịch tự động không hỗ trợ Jira cá nhân (myjira).');
+      }
+      if (scope?.workspaceMode === 'personal' && (metadata.services?.includes('jira') || metadata.proposal?.request?.toLowerCase().includes('jira'))) {
+        throw new ScheduleConflict('DIGEST_NOT_ELIGIBLE', 'Dịch vụ Jira chung (jira) không khả dụng ở không gian cá nhân.');
+      }
       if (!saved) {
         const arrived = (await client.query('SELECT id FROM schedules WHERE conv_id=$1', [convId])).rows[0];
         if (arrived) {

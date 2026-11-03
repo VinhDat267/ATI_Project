@@ -1,4 +1,4 @@
-import { ALL_TOOLS, GMAIL_SERVICE, MYCALENDAR_SERVICE, MYSHEETS_SERVICE, NOTION_OAUTH_TOOLS, SERVICE_REGISTRY, type AllowedScope } from '@wap/tool-schemas';
+import { ALL_TOOLS, GMAIL_SERVICE, MYCALENDAR_SERVICE, MYJIRA_SERVICE, MYSHEETS_SERVICE, NOTION_OAUTH_TOOLS, SERVICE_REGISTRY, type AllowedScope } from '@wap/tool-schemas';
 import { createGmailToolAdapter, createPersonalCalendarAdapter, createPersonalSheetsAdapter, type GmailAccessTokenProvider } from '@wap/tool-adapters';
 import { routeIntent, type ProcessMessageInput } from '@wap/planner';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
@@ -7,14 +7,20 @@ import { getToolCatalogFor } from '../services/registered-services.js';
 import { createSandboxAdapter } from '../sandbox/index.js';
 import { createRuntimeAdapterFactory, type RuntimeMode } from './runtime-policy.js';
 
-export const serviceRegistryForRuntime = (gmailEnabled: boolean, mycalendarEnabled: boolean = false, mysheetsEnabled: boolean = false) => [
-  ...SERVICE_REGISTRY,
+export const serviceRegistryForRuntime = (
+  gmailEnabled: boolean,
+  mycalendarEnabled: boolean = false,
+  mysheetsEnabled: boolean = false,
+  myjiraEnabled: boolean = false,
+) => [
+  ...SERVICE_REGISTRY.filter((s) => !myjiraEnabled || s.id !== 'jira'),
   ...(gmailEnabled ? [GMAIL_SERVICE] : []),
   ...(mycalendarEnabled ? [MYCALENDAR_SERVICE] : []),
   ...(mysheetsEnabled ? [MYSHEETS_SERVICE] : []),
+  ...(myjiraEnabled ? [MYJIRA_SERVICE] : []),
 ];
 
-export const gmailServiceRegistry = (enabled: boolean) => serviceRegistryForRuntime(enabled, false, false);
+export const gmailServiceRegistry = (enabled: boolean) => serviceRegistryForRuntime(enabled, false, false, false);
 
 /**
  * The Gmail fixture explicitly searches before planning, unlike regex canned plans.
@@ -50,11 +56,25 @@ export async function runtimeToolCatalog(
     telegramConnection?: (userId: string) => Promise<any>;
     notionEnabled?: boolean;
     notionConnection?: (userId: string) => Promise<any>;
+    myjiraEnabled?: boolean;
+    jiraWorkspaceRepo?: {
+      getCapabilities: (workspaceId: string, userId: string) => Promise<{ sites?: unknown[] } | null>;
+    };
+    myjiraConnection?: (userId: string, workspaceId?: string | null) => Promise<any>;
   },
 ) {
   const personal = await getToolCatalogFor(repo, key, options);
   if (mode === 'live') return personal;
-  const baseTools = [...ALL_TOOLS.filter((t) => t.service !== 'trello' && t.service !== 'github' && t.service !== 'telegram'), ...NOTION_OAUTH_TOOLS];
+  const baseTools = [
+    ...ALL_TOOLS.filter(
+      (t) =>
+        t.service !== 'trello' &&
+        t.service !== 'github' &&
+        t.service !== 'telegram' &&
+        (!options.myjiraEnabled || t.service !== 'jira')
+    ),
+    ...NOTION_OAUTH_TOOLS,
+  ];
   const tools = [
     ...baseTools,
     ...personal.filter(
@@ -65,7 +85,8 @@ export async function runtimeToolCatalog(
         t.service === 'trello' ||
         t.service === 'github' ||
         t.service === 'telegram' ||
-        t.service === 'notion'
+        t.service === 'notion' ||
+        t.service === 'myjira'
     ),
   ];
   return Array.from(new Map(tools.map((t) => [t.name, t])).values());
@@ -121,28 +142,31 @@ export function createToolRuntimeFactory(
   sandbox = createSandboxAdapter,
 ) {
   return createRuntimeAdapterFactory<AdapterContext>(mode, personal,
-    (name, context) => (name === 'gmail' || name === 'mycalendar' || name === 'mysheets' || name === 'myslack' || name === 'trello' || name === 'github' || name === 'telegram') ? personal(name, context) : sandbox(name));
+    (name, context) => (name === 'gmail' || name === 'mycalendar' || name === 'mysheets' || name === 'myslack' || name === 'trello' || name === 'github' || name === 'telegram' || name === 'myjira') ? personal(name, context) : sandbox(name));
 }
 
-/** A failed Gmail, MyCalendar, MySheets, Trello, GitHub or Telegram request must not become a canned shared-service write. */
+/** A failed Gmail, MyCalendar, MySheets, Trello, GitHub, Telegram or MyJira request must not become a canned shared-service write. */
 export function mayFallbackToShared(
   input: ProcessMessageInput,
   gmailEnabled: boolean,
   mycalendarEnabled: boolean = false,
   mysheetsEnabled: boolean = false,
+  myjiraEnabled: boolean = false,
 ): boolean {
   const texts = [...(input.history ?? []).filter((m) => m.role === 'user').map((m) => m.content), input.userMessage];
   const catalog = [
-    ...ALL_TOOLS,
+    ...ALL_TOOLS.filter((t) => !myjiraEnabled || t.service !== 'jira'),
     ...(gmailEnabled ? [{ name: 'gmail.intent', service: 'gmail' } as typeof ALL_TOOLS[number]] : []),
     ...(mycalendarEnabled ? [{ name: 'mycalendar.intent', service: 'mycalendar' } as typeof ALL_TOOLS[number]] : []),
     ...(mysheetsEnabled ? [{ name: 'mysheets.intent', service: 'mysheets' } as typeof ALL_TOOLS[number]] : []),
+    ...(myjiraEnabled ? [{ name: 'myjira.intent', service: 'myjira' } as typeof ALL_TOOLS[number]] : []),
   ];
-  const registry = serviceRegistryForRuntime(gmailEnabled, mycalendarEnabled, mysheetsEnabled);
+  const registry = serviceRegistryForRuntime(gmailEnabled, mycalendarEnabled, mysheetsEnabled, myjiraEnabled);
   const routed = routeIntent(texts.join('\n'), catalog, registry).services;
   if (routed.includes('trello') || routed.includes('github') || routed.includes('telegram')) return false;
   if (gmailEnabled && routed.includes('gmail')) return false;
   if (mycalendarEnabled && routed.includes('mycalendar')) return false;
   if (mysheetsEnabled && routed.includes('mysheets')) return false;
+  if (myjiraEnabled && routed.includes('myjira')) return false;
   return true;
 }

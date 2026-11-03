@@ -7,15 +7,28 @@ import {
   TelegramAdapter,
   TrelloAdapter,
   type GmailAccessTokenProvider,
+  createPersonalJiraAdapter,
+  type PersonalJiraAdapterConfig,
+  type JiraAccessTokenProvider,
 } from '@wap/tool-adapters';
-import { normalizeTelegramChatId, TELEGRAM_CHAT_ID_PATTERN, type AllowedScope, type PlanConnections } from '@wap/tool-schemas';
-import type { AdapterExecutor } from '@wap/executor';
+import {
+  normalizeTelegramChatId,
+  TELEGRAM_CHAT_ID_PATTERN,
+  type AllowedScope,
+  type PlanConnections,
+  type WorkspaceJiraCapabilitiesResponse,
+  validateJiraSourceRef,
+  type JiraSourceRef,
+} from '@wap/tool-schemas';
+import { isWriteTool, type AdapterExecutor } from '@wap/executor';
 import { getRegisteredService, isServiceAccountService } from './registered-services.js';
 import type { GmailTokenManager } from './gmail/token-manager.js';
 import type { TelegramBotClient } from './telegram/bot-client.js';
 import type { NotionConnectionRepo } from '../db/repositories/notion-connection-repo.js';
 import { NotionOAuthError } from './notion/oauth-client.js';
 import type { NotionTokenManager } from './notion/token-manager.js';
+import type { JiraDispatchGuard, DispatchScope } from './jira/jira-dispatch-guard.js';
+import type { JiraLeaseManager } from './jira/jira-lease-manager.js';
 
 /** Who an adapter is for. Shared services ignore it; Gmail & MyCalendar require it. */
 export interface AdapterContext {
@@ -25,6 +38,11 @@ export interface AdapterContext {
   phase: 'planning' | 'execution';
   /** Required when phase is 'execution' and the service is personal: the connection the plan was previewed with. */
   connections?: PlanConnections;
+  actorId?: string;
+  conversationId?: string;
+  planId?: string;
+  stepLeaseMap?: Map<string, string>;
+  gatheredSourceRefs?: any[];
   repo?: string;
 }
 
@@ -70,7 +88,17 @@ export interface AdapterFactoryOptions {
     knownDatabases: Array<{ id: string; title: string; url?: string }>;
   }) => AdapterExecutor;
   serviceFetchFn?: typeof fetch;
+  createPersonalJiraAdapter?: (input: PersonalJiraAdapterConfig) => AdapterExecutor;
+  jiraTokens?: JiraAccessTokenProvider;
+  jiraWorkspaceRepo?: any;
+  jiraLeaseManager?: JiraLeaseManager;
+  jiraDispatchGuard?: JiraDispatchGuard;
+  jiraNativeVerifier?: any;
+  jiraApiBaseUrl?: string;
 }
+
+const myjiraError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
+  new StepError({ category, message, retryable: false });
 
 const gmailError = (category: 'AUTH_ERROR' | 'VALIDATION', message: string) =>
   new StepError({ category, message, retryable: false });
@@ -124,6 +152,7 @@ export class AdapterFactory {
     this.personalCache.delete(`github:${userId}`);
     this.personalCache.delete(`telegram:${userId}`);
     this.personalCache.delete(`notion:${userId}`);
+    this.personalCache.delete(`myjira:${userId}`);
     for (const key of Array.from(this.adapterCache.keys())) {
       if (key.startsWith(`personal-shared:${userId}:`)) {
         this.adapterCache.delete(key);
@@ -137,6 +166,16 @@ export class AdapterFactory {
   }
 
   async getAdapterForService(serviceName: string, context?: AdapterContext): Promise<any> {
+    if (serviceName === 'jira') {
+      if (context?.workspaceMode === 'personal' || context?.connections?.myjira) {
+        throw new StepError({
+          category: 'AUTH_ERROR',
+          message: 'Dịch vụ Jira chung (jira) không khả dụng ở không gian cá nhân; hãy dùng myjira.',
+          retryable: false,
+        });
+      }
+    }
+    if (serviceName === 'myjira') return this.myjiraAdapter(context);
     if (serviceName === 'gmail') return this.gmailAdapter(context);
     if (serviceName === 'mycalendar') return this.mycalendarAdapter(context);
     if (serviceName === 'mysheets') return this.mysheetsAdapter(context);
@@ -749,5 +788,301 @@ export class AdapterFactory {
 
     this.personalCache.set(key, { credentialId: row.id, adapter, scopeKey });
     return adapter;
+  }
+
+  private async myjiraAdapter(context?: AdapterContext): Promise<AdapterExecutor> {
+    const userId = context?.userId;
+    if (!userId) throw myjiraError('AUTH_ERROR', 'Jira cá nhân chỉ dùng được với kết nối của chính người dùng.');
+
+    const workspaceId = context?.workspaceId;
+    if (!workspaceId) throw myjiraError('AUTH_ERROR', 'Jira cá nhân yêu cầu không gian làm việc.');
+
+    const bound = context?.connections?.myjira;
+    if (context.phase === 'execution') {
+      if (!bound) {
+        throw myjiraError('AUTH_ERROR', 'Kế hoạch không có kết nối Jira cá nhân được gắn kết.');
+      }
+      if (bound.atiUserId !== userId) {
+        throw myjiraError('AUTH_ERROR', 'Người thực thi không khớp với kết nối Jira được duyệt.');
+      }
+      if (bound.workspaceId !== workspaceId) {
+        throw myjiraError('AUTH_ERROR', 'Không gian làm việc không khớp với kết nối Jira được duyệt.');
+      }
+    }
+
+    let capabilities: WorkspaceJiraCapabilitiesResponse;
+    if (this.options.jiraWorkspaceRepo) {
+      capabilities = await this.options.jiraWorkspaceRepo.getCapabilities(workspaceId, userId);
+    } else {
+      capabilities = { workspaceId, sites: [] };
+    }
+
+    const baseAdapter = (this.options.createPersonalJiraAdapter ?? createPersonalJiraAdapter)({
+      userId,
+      workspaceId,
+      capabilities,
+      tokens: this.options.jiraTokens ?? { getAccessToken: async () => '' },
+      apiBaseUrl: this.options.jiraApiBaseUrl,
+      fetchFn: this.options.serviceFetchFn,
+    });
+
+    return {
+      execute: async (tool: string, args: Record<string, any>, callOpts?: any) => {
+        if (!this.options.jiraDispatchGuard) {
+          return baseAdapter.execute(tool, args, callOpts);
+        }
+
+        if (tool === 'myjira.list_sites') {
+          let currentCapabilities = capabilities;
+          if (this.options.jiraWorkspaceRepo) {
+            currentCapabilities = await this.options.jiraWorkspaceRepo.getCapabilities(workspaceId, userId);
+          }
+
+          const leaseManager = this.options.jiraLeaseManager ?? this.options.jiraDispatchGuard.leaseManager;
+          const allSourceRefs: any[] = [];
+          const siteLeaseMap = new Map<string, { lease: any; siteSourceRef: any }>();
+          let primaryLeaseId: string | undefined;
+
+          // Verify authority and acquire lease for candidate sites BEFORE invoking baseAdapter
+          if (leaseManager && currentCapabilities.sites && currentCapabilities.sites.length > 0) {
+            for (const site of currentCapabilities.sites) {
+              const lease = await leaseManager.acquireLease({
+                userId,
+                workspaceId,
+                cloudId: site.cloudId,
+                ttlMs: callOpts?.timeoutMs ?? 15000,
+                signal: callOpts?.signal,
+              });
+              if (!primaryLeaseId) {
+                primaryLeaseId = lease.leaseId;
+              }
+              const workspaceVersion = (lease as any).workspaceVersion ?? bound?.workspaceVersion ?? (currentCapabilities as any)?.workspaceVersion ?? 1;
+              const sitePolicyVersion = (lease as any).sitePolicyVersion ?? (site as any)?.policyVersion ?? 1;
+              const siteSourceRef: JiraSourceRef = {
+                binding: {
+                  atiUserId: userId,
+                  jiraAccountId: lease.binding.jiraAccountId,
+                  atlassianAccountId: lease.binding.atlassianAccountId,
+                  workspaceId,
+                  membershipVersion: lease.binding.membershipVersion,
+                  grantId: lease.binding.grantId,
+                  identityVersion: lease.binding.identityVersion,
+                },
+                workspaceId,
+                workspaceVersion,
+                siteId: site.siteId ?? (lease as any).siteId,
+                cloudId: site.cloudId,
+                sitePolicyVersion,
+                resourceType: 'site',
+                providerResourceId: site.cloudId,
+                revision: String(sitePolicyVersion),
+              };
+              validateJiraSourceRef(siteSourceRef);
+              siteLeaseMap.set(site.siteId, { lease, siteSourceRef });
+              allSourceRefs.push(siteSourceRef);
+            }
+          }
+
+          // Execute baseAdapter now that authority has been verified in PostgreSQL
+          const rawOutput = await baseAdapter.execute(tool, args, callOpts);
+          let list = Array.isArray(rawOutput) ? rawOutput : [];
+          if (this.options.jiraWorkspaceRepo && currentCapabilities.sites) {
+            const activeCloudIds = new Set(currentCapabilities.sites.map((s: any) => s.cloudId));
+            list = list.filter((item: any) => activeCloudIds.has(item.cloudId));
+          }
+
+          if (leaseManager && siteLeaseMap.size > 0) {
+            for (const siteItem of list) {
+              const matched = siteLeaseMap.get(siteItem.siteId);
+              if (matched) {
+                Object.defineProperty(siteItem, '_leaseId', { value: matched.lease.leaseId, writable: true, configurable: true, enumerable: false });
+                Object.defineProperty(siteItem, '_sourceRef', { value: matched.siteSourceRef, writable: true, configurable: true, enumerable: true });
+                Object.defineProperty(siteItem, '_sourceRefs', { value: [matched.siteSourceRef], writable: true, configurable: true, enumerable: true });
+              }
+            }
+          }
+
+          if (context?.gatheredSourceRefs) {
+            context.gatheredSourceRefs.push(...allSourceRefs);
+          }
+
+          if (primaryLeaseId && context?.stepLeaseMap && callOpts?.stepId) {
+            context.stepLeaseMap.set(callOpts.stepId, primaryLeaseId);
+          }
+
+          if (allSourceRefs.length > 0) {
+            Object.defineProperty(list, '_sourceRefs', { value: allSourceRefs, writable: true, configurable: true, enumerable: false });
+            Object.defineProperty(list, '_sourceRef', { value: allSourceRefs[0], writable: true, configurable: true, enumerable: false });
+            if (primaryLeaseId) {
+              Object.defineProperty(list, '_leaseId', { value: primaryLeaseId, writable: true, configurable: true, enumerable: false });
+            }
+          }
+
+          return list;
+        }
+
+        const stepId = callOpts?.stepId;
+        const siteStep = stepId ? context?.connections?.myjira?.siteSteps?.[stepId] : undefined;
+        const targetSiteId = (args?.siteId as string) || siteStep?.siteId || (capabilities.sites?.length === 1 ? capabilities.sites[0]!.siteId : undefined);
+        const targetSite = targetSiteId
+          ? capabilities.sites?.find((s: any) => s.siteId === targetSiteId)
+          : (args?.cloudId ? capabilities.sites?.find((s: any) => s.cloudId === args.cloudId) : undefined);
+        const resolvedSiteId = targetSiteId || targetSite?.siteId;
+        const cloudId = targetSite?.cloudId || siteStep?.cloudId;
+        if (!resolvedSiteId || !cloudId) {
+          throw new StepError({ category: 'VALIDATION', message: 'Missing target site for Jira dispatch' });
+        }
+
+        let projectId = siteStep?.projectId;
+        let projectPolicyVersion = siteStep?.projectPolicyVersion;
+        if (!projectId && args?.projectKey && targetSite) {
+          const proj = targetSite.projects?.find((p: any) => p.key === args.projectKey);
+          if (proj) projectId = proj.id;
+        }
+
+        const scope: DispatchScope = {
+          userId,
+          workspaceId,
+          siteId: resolvedSiteId,
+          cloudId,
+          sitePolicyVersion: siteStep?.sitePolicyVersion ?? (targetSite as any)?.policyVersion ?? 1,
+          projectId,
+          projectPolicyVersion,
+          expectedGrantId: bound?.grantId,
+          expectedAccountId: bound?.jiraAccountId,
+          expectedAtlassianAccountId: bound?.atlassianAccountId,
+          expectedMembershipVersion: bound?.membershipVersion,
+          expectedIdentityVersion: bound?.identityVersion,
+          expectedWorkspaceVersion: bound?.workspaceVersion,
+        };
+
+        const isWrite = isWriteTool(tool);
+        const timeoutMs = callOpts?.timeoutMs ?? (isWrite ? 30000 : 15000);
+
+        const rawOutput = await this.options.jiraDispatchGuard.executeGuardedDispatch(
+          scope,
+          {
+            isWrite,
+            timeoutMs,
+            signal: callOpts?.signal,
+            verifier: this.options.jiraNativeVerifier,
+            tool,
+            deferRelease: Boolean(context?.connections?.myjira),
+          },
+          async (token, signal) => {
+            return baseAdapter.execute(tool, args, { ...callOpts, signal });
+          }
+        );
+
+        const leaseId = (rawOutput as any)?._leaseId;
+        if (leaseId && context?.stepLeaseMap && callOpts?.stepId) {
+          context.stepLeaseMap.set(callOpts.stepId, leaseId);
+        }
+
+        const effectiveBinding = bound ?? (rawOutput as any)?._leaseBinding;
+
+        const sourceRef = {
+          binding: {
+            atiUserId: userId,
+            jiraAccountId: effectiveBinding?.jiraAccountId ?? '',
+            atlassianAccountId: effectiveBinding?.atlassianAccountId ?? '',
+            workspaceId,
+            membershipVersion: effectiveBinding?.membershipVersion ?? 1,
+            grantId: effectiveBinding?.grantId ?? '',
+            identityVersion: effectiveBinding?.identityVersion ?? 1,
+          },
+          workspaceId,
+          workspaceVersion: effectiveBinding?.workspaceVersion ?? bound?.workspaceVersion ?? 1,
+          siteId: resolvedSiteId,
+          cloudId,
+          sitePolicyVersion: siteStep?.sitePolicyVersion ?? (targetSite as any)?.policyVersion ?? 1,
+          ...(projectId
+            ? {
+                projectId,
+                projectPolicyVersion: projectPolicyVersion ?? 1,
+                resourceType: (tool.includes('issue') ? 'issue' : 'project') as any,
+                providerResourceId: projectId,
+              }
+            : {
+                resourceType: 'site' as any,
+                providerResourceId: cloudId,
+              }),
+          revision: '1',
+        };
+
+        if (context?.gatheredSourceRefs) {
+          context.gatheredSourceRefs.push(sourceRef);
+        }
+
+        const receipt = {
+          ownerId: userId,
+          workspaceId,
+          siteId: resolvedSiteId,
+          projectId: projectId ?? null,
+          connectionLabel: `Jira (${targetSite?.name ?? resolvedSiteId})`,
+          leaseId,
+        };
+
+        if (Array.isArray(rawOutput)) {
+          Object.defineProperty(rawOutput, '_receipt', {
+            value: receipt,
+            enumerable: false,
+            writable: true,
+            configurable: true,
+          });
+          if (leaseId) {
+            Object.defineProperty(rawOutput, '_leaseId', {
+              value: leaseId,
+              enumerable: false,
+              writable: true,
+              configurable: true,
+            });
+          }
+          Object.defineProperty(rawOutput, '_sourceRefs', {
+            value: [sourceRef],
+            enumerable: false,
+            writable: true,
+            configurable: true,
+          });
+          for (const item of rawOutput) {
+            if (item && typeof item === 'object') {
+              Object.defineProperty(item, '_sourceRefs', {
+                value: [sourceRef],
+                enumerable: true,
+                writable: true,
+                configurable: true,
+              });
+              Object.defineProperty(item, '_sourceRef', {
+                value: sourceRef,
+                enumerable: true,
+                writable: true,
+                configurable: true,
+              });
+            }
+          }
+          return rawOutput;
+        }
+
+        if (rawOutput && typeof rawOutput === 'object') {
+          const resultObj = { ...rawOutput, _receipt: receipt, _sourceRef: sourceRef, _sourceRefs: [sourceRef] };
+          if (leaseId) {
+            Object.defineProperty(resultObj, '_leaseId', {
+              value: leaseId,
+              enumerable: false,
+              writable: true,
+              configurable: true,
+            });
+          }
+          Object.defineProperty(resultObj, '_sourceRefs', {
+            value: [sourceRef],
+            enumerable: false,
+            writable: true,
+            configurable: true,
+          });
+          return resultObj;
+        }
+        return rawOutput;
+      },
+    };
   }
 }

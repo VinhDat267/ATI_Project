@@ -1,4 +1,4 @@
-import { getToolDefinition, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, type PlanResponse } from '@wap/tool-schemas';
+import { getToolDefinition, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYJIRA_TOOLS, MYSHEETS_TOOLS, type PlanResponse } from '@wap/tool-schemas';
 import { groundingMemory, normalizedRecipient, observedThreads, observedWorkspaceRecipients, userEmailAddresses, type WorkingMemory } from '@wap/planner';
 
 /** Display-only projection of actual lookups; never part of the approved payload. */
@@ -32,7 +32,7 @@ export function resourceLabels(
   const threads = observedThreads(memory.getAll());
   const workspaceRecipients = observedWorkspaceRecipients(memory.getAll());
   for (const step of plan.steps) {
-    const properties = (getToolDefinition(step.tool) ?? GMAIL_TOOLS.find(t => t.name === step.tool) ?? MYCALENDAR_TOOLS.find(t => t.name === step.tool) ?? MYSHEETS_TOOLS.find(t => t.name === step.tool))?.inputSchema.properties ?? {};
+    const properties = (getToolDefinition(step.tool) ?? GMAIL_TOOLS.find(t => t.name === step.tool) ?? MYCALENDAR_TOOLS.find(t => t.name === step.tool) ?? MYSHEETS_TOOLS.find(t => t.name === step.tool) ?? MYJIRA_TOOLS.find(t => t.name === step.tool))?.inputSchema.properties ?? {};
     for (const [argument, schema] of Object.entries(properties)) {
       const annotation = schema as Record<string, any>;
       if (annotation['x-recipient'] && Array.isArray(step.args[argument])) for (const value of step.args[argument]) {
@@ -58,7 +58,7 @@ export function resourceLabels(
         if (typeof value !== 'string' && typeof value !== 'number') continue;
         if (key === 'thread' && typeof subjects[String(value)] === 'string') { labels[String(value)] = subjects[String(value)]; continue; }
         const candidates = entries(key).filter(item =>
-          String(item[annotation['x-resource-field'] ?? 'id']) === String(value) &&
+          String(item[annotation['x-resource-field'] ?? 'id'] ?? item.id) === String(value) &&
           parents.every(([parent]) => {
             const scope = step.args[parent];
             return !Object.hasOwn(item, parent) ||

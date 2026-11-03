@@ -1,0 +1,78 @@
+# JIRA-08 — Jira binding, execution và source guard
+
+## 1. Mục tiêu và điều kiện đầu vào
+
+Nối JIRA-03–07 thành luồng Jira cá nhân qua API → planner → preview → approve → executor → receipt. Backend gắn `JiraPlanConnection` từ trạng thái PostgreSQL hiện hành **trước** khi tạo `plan_hash`; không tin `connections`, version hay site do model/browser tự khai. Cờ `MYJIRA_ENABLED` tiếp tục tắt mặc định. Task bắt đầu từ `main` đã merge #255, #257, #258; theo thiết kế `docs/superpowers/specs/2026-10-30-jira-personal-workspaces-design.md` mục 7–9, 11–12 và amendment workspace chung ngày 02/11.
+
+## 2. Phạm vi
+
+- Backend/executor: `apps/chat-api/`, `packages/executor/`, migration additive trong `db/v3/` nếu thật sự cần. Không sửa catalog `packages/tool-schemas/`, adapter JIRA-06, planner JIRA-07 hoặc UI JIRA-09A; nếu contract thiếu, làm PR contract riêng và chờ owner review.
+- Gắn `connections.myjira` với owner, workspace, membership/account/identity/grant version, workspace version và map `stepId → site/cloud/project/policyVersion`; không chứa token. Kiểm binding và nguồn ở lúc plan được lưu, duyệt, khởi chạy, trước từng outbound step và trên recovery.
+- Với outbound Jira: lấy token ngoài transaction, chứng minh ranh giới tuyến tính với thu hồi quyền bằng hai client PostgreSQL thật; không coi lease đã commit là quyền giữ tới lúc HTTP nếu revocation có thể commit trước dispatch. Chốt khóa/deadline và test race trước khi cho lệnh ghi chạy.
+- Adapter cá nhân chỉ nhận context đã xác minh; không fallback sang `jira.*` chung. Không retry lệnh ghi có kết quả `UNKNOWN`. Bước đã hoàn tất giữ receipt, bước chưa chạy dừng khi quyền đổi.
+- Gắn source refs qua gather, model input, plan/message persistence, API/SSE/receipt; dữ liệu Jira bị thu hồi hoặc không xác minh được phải che trước persist/publish. Nối `JiraStreamBuffer` vào producer, chỉ phát progress an toàn trước revalidation.
+- Chặn lịch mới chứa `myjira` và đường scheduler không có actor/workspace; rà soát lịch cũ `jira.*` trước bật cờ. Mở `jiraContext: true` production chỉ sau các guard và tests của task; cờ mặc định vẫn tắt.
+
+## 3. Tiêu chí nghiệm thu
+
+- [x] Model/browser giả `connections.myjira` hoặc version không ảnh hưởng binding/hash; token rotation không đổi hash. Preview và receipt chỉ rõ user, workspace, site/project, service connection theo từng bước.
+- [x] Plan nhiều site cùng workspace giữ map `stepId`; site/project mơ hồ bị hỏi lại; site/project bị move hoặc thu hồi không đổi đích âm thầm.
+- [x] `approve`, start, từng step và recovery đều kiểm owner, hai lớp membership, grant/site/project/version/native permission; 404 hidden pattern cho resource không được biết; CAS pending thật.
+- [x] PostgreSQL hai client chứng minh revoke-vs-dispatch và lock order; khi revoke commit không có outbound mới theo quyền cũ. Không giữ token refresh transaction qua HTTP, không deadlock; deadline/hủy thật bằng `AbortSignal`.
+- [x] Đọc/writes Jira qua adapter cá nhân; không dùng legacy `jira.*` cho personal plan. Write timeout/5xx sau dispatch là nonretryable `UNKNOWN`, không replay khi recovery.
+- [x] Revoked/invalid source không vào model, plan, history, raw API, SSE hay receipt; kết quả model về muộn được chặn trước persist và publish. Có test mutation bỏ guard để test fail.
+- [x] Lịch mới có `myjira` bị từ chối; scheduler thiếu workspace/actor từ chối. Kế hoạch kiểm kê lịch legacy được ghi nhận, không tự sửa lịch người dùng.
+- [x] Cờ off giữ hành vi cũ; production opt-in Jira chỉ mở sau khi đầy đủ guard. Test API → executor thật, PostgreSQL thật + loopback Atlassian, typecheck, `npm run check`, browser gate; review độc lập và CI xanh.
+
+## 4. Bàn giao
+
+Triển khai trên một nhánh riêng, TDD theo `docs/superpowers/plans/2026-11-02-jira-08-binding-executor.md`. Điền kết quả tại đây, thêm đúng một file mới trong `docs/handoff/log/`, mô tả PR theo template, không sửa `CURRENT-STATE.md`/`ROADMAP.md`. Chủ dự án review và merge; reviewer cập nhật trạng thái sau merge.
+
+## 5. Kết quả
+
+Hoàn thành toàn diện cả 6 nhiệm vụ theo kế hoạch `docs/superpowers/plans/2026-11-02-jira-08-binding-executor.md`.
+
+- **Nhánh:** `longnguyen005/jira-08-execution`
+- **Commits:**
+  - `96f2c7a`: `feat(jira): bind personal Jira from PostgreSQL before plan hash (Task 1)`
+  - `be1b01c`: `feat(jira): recheck binding and enforce SQL CAS guard during approval and start (Task 2)`
+  - `d0ecd4e`: `feat(jira): implement dispatch guard and revocation linearization (Task 3)`
+  - `7e79681`: `feat(jira): execute bound steps, reject legacy fallback and preserve receipts (Task 4)`
+  - `5190aa0`: `feat(jira): guard source, persistence and SSE publication (Task 5)`
+  - `2a77753`: `feat(jira): reject Jira schedules, enforce workspace authority, and gate production opt-in (Task 6)`
+  - `fbd99a9`: `test(eval): register JIRA-08 guard exceptions in static guard`
+- **Các thành phần triển khai:**
+  - `apps/chat-api/src/services/jira/jira-plan-binding.ts`: Gắn `connections.myjira` từ PostgreSQL trước khi hash plan, lọc bỏ mọi connection/version giả mạo do model tự sinh.
+  - `apps/chat-api/src/services/jira/jira-approval-guard.ts`: Tái kiểm tra binding toàn diện khi phê duyệt và khởi chạy; `apps/chat-api/src/db/repositories/plan-repo.ts` bổ sung SQL CAS `WHERE status = 'pending'` bảo đảm an toàn tranh chấp concurrency.
+  - `apps/chat-api/src/services/jira/jira-dispatch-guard.ts`: Tuyến tính hóa thu hồi và dispatch bằng hai client PostgreSQL 18 thật, giữ khóa `FOR UPDATE` trên lease và `FOR SHARE` trên site/project trong suốt quá trình dispatch; ngắt kết nối bằng `AbortSignal`.
+  - `apps/chat-api/src/services/adapter-factory.ts`: Xây dựng `myjiraAdapter` với `JiraDispatchGuard`, từ chối fallback sang `jira.*` legacy trong personal context, sinh receipt chuẩn và giữ trạng thái `UNKNOWN` không thể retry cho lệnh ghi gặp lỗi sau dispatch.
+  - `apps/chat-api/src/services/jira/jira-history-sanitizer.ts`: Che mờ lịch sử Jira đã bị thu hồi trước khi đưa vào context model, che mờ response model về muộn trước khi ghi DB/SSE, lọc bỏ output khỏi `gather_progress`, và trả 404 hidden pattern cho endpoint `GET /api/conversations/:id/plans/active` khi quyền bị hủy.
+  - `apps/chat-api/src/services/schedules/schedule-service.ts` & `apps/chat-api/src/services/chat-service.ts`: Từ chối đề xuất và xác nhận lịch có `myjira`, từ chối chạy scheduler khi thiếu actor/workspace, và chặn production opt-in `enableWorkspaceConversations` nếu `MYJIRA_ENABLED` chưa bật hoặc thiếu cấu hình Atlassian.
+  - Kiểm kê lịch legacy: `SELECT id, name, user_id, status, services, workspace_id, workspace_mode, created_at FROM schedules WHERE 'jira' = ANY(services) OR 'myjira' = ANY(services);` trả về 0 dòng.
+  - Cờ `MYJIRA_ENABLED` tiếp tục giữ nguyên giá trị mặc định là tắt (`off`).
+- **Bằng chứng kiểm thử thực tế:**
+  - `npx vitest run apps/chat-api/tests/services/jira-*.test.ts apps/chat-api/tests/integration/jira-execution.test.ts apps/chat-api/tests/services/schedules/jira-schedule-refusal.test.ts`: 7 test files PASS (68/68 tests PASS, exit code 0).
+  - `npm test -w @wap/executor`: 5 test files PASS (42/42 tests PASS, exit code 0).
+  - `npx vitest run evaluations/generic-plumbing/static-guard.test.ts`: 1 test file PASS (2/2 tests PASS, exit code 0).
+  - `npm run typecheck:v3`: PASS (exit code 0).
+  - `npm run check`: PASS (toàn bộ tool-schemas 347 tests, tool-adapters 520 tests, probes 66 tests, planner, executor, chat-api, web build security, launcher; exit code 0).
+  - `npm run test:browser:v3`: PASS (toàn bộ 16 scenarios bao gồm `default` 96 passed, `auth02`, `auth04`, `clarification`, `partial_failure`, `three_service`, `sheets_slack`, `calendar_slack`, `notion_slack`, `telegram_slack`, `jira_slack`, `answer`, `gmail`, `mycalendar`, `mysheets`, `schedule`; exit code 0).
+- **Khắc phục các phát hiện review P1 & P2 (2026-11-03):**
+  - **[P1] Đối chiếu grantId, account, versions:** `jira-dispatch-guard.ts` kiểm tra chặt chẽ `expectedGrantId`, `expectedAccountId`, `expectedAtlassianAccountId`, `expectedMembershipVersion`, `expectedIdentityVersion`, `expectedWorkspaceVersion` trước và trong khóa hàng; `adapter-factory.ts` truyền toàn bộ scope mong đợi.
+  - **[P1] Kiểm soát phát SSE bằng JiraStreamBuffer:** `execution-service.ts` lưu đệm output trong `JiraStreamBuffer`, revalidate lease trước khi phát SSE và chuyển lease thành `released`; hủy delta và chuyển step sang failed nếu quyền bị thu hồi.
+  - **[P1] Hoàn thiện trọn đường truyền sourceRefs & sửa sanitizer:** `chat-service.ts` lưu `sourceRefs` vào metadata của tin nhắn câu trả lời và kế hoạch; `jira-history-sanitizer.ts` chỉ kiểm tra và che mờ các tin nhắn liên quan Jira, giữ nguyên vẹn các tin nhắn thông thường.
+  - **[P1] Kiểm tra quyền Jira native lúc duyệt và trước outbound:** `jira-approval-guard.ts` và `execution-service.ts` kiểm tra quyền browse/createIssue/addComment qua `JiraNativeVerifier` tại duyệt, queued start và recovery; `jira-dispatch-guard.ts` kiểm tra quyền native trước khi gửi request tới Jira API.
+  - **[P1] Khóa hai lớp membership, account và grant-site tại ranh giới dispatch:** `jira-dispatch-guard.ts` khóa `FOR SHARE` và kiểm tra hai lớp membership (`ati_workspace_memberships` + `workspace_members` + `users`), tài khoản Jira, OAuth grant và grant site; từ chối gọi outbound HTTP ngay cả khi membership bị thu hồi sau `acquireLease`.
+  - **[P1] Mang lease ID ngoài payload cho mọi kiểu kết quả (bao gồm dạng mảng):** `AdapterContext.stepLeaseMap` lưu trữ lease ID độc lập với cấu trúc kết quả; `jira-dispatch-guard.ts` gắn `_leaseId`, `_receipt` và `_sourceRefs` lên cả mảng lẫn object qua `Object.defineProperty`.
+  - **[P1] Dữ liệu gather Jira được bảo vệ ngay tại ranh giới gather (phase: planning):** `adapter-factory.ts` thực hiện guarded dispatch và gắn `sourceRefs` với đầy đủ binding ngay cả trong `phase: 'planning'`, chặn hoàn toàn dữ liệu chưa được xác thực hoặc đã bị thu hồi quyền tiếp cận planner/model prompt.
+  - **[P1] Tuyến tính hóa khoảng đua kiểm tra và phát SSE qua PostgreSQL row lock:** `JiraLeaseManager.withLockedLease` mở transaction, khóa hàng lease `SELECT ... FOR UPDATE OF l` và khóa hàng quyền `FOR SHARE`, thực hiện phát SSE bên trong khóa trước khi chuyển lease sang `released` và COMMIT. Chứng minh bằng 2 client PostgreSQL thật: client thu hồi bị chặn cho tới khi client phát SSE hoàn tất.
+  - **[P2] Persist receipt đồng bộ trước khi phát SSE:** `stepRepo.updateStepStatus` được `await` đồng bộ trong `flushOnStepComplete` trước `sseManager.emitEvent`; lỗi ghi DB sẽ rollback và phát sự kiện failed; `getExecutionStatus` kiểm tra `controller.isExecuting()` để tránh race condition trạng thái completed.
+  - **[P1] Khóa và kiểm tra toàn diện hàng quyền trong withLockedLease:** `withLockedLease` khóa `FOR SHARE` và kiểm tra toàn bộ hàng quyền (`workspaces`, `ati_workspaces`, `workspace_members`, `ati_workspace_memberships`, `users`, `jira_accounts`, `jira_oauth_grants`, `jira_grant_sites`, `ati_workspace_jira_sites`, `ati_workspace_jira_projects`) trước khi lưu/phát; chứng minh bằng 2 client PostgreSQL thật rằng client deactivate site bị chặn trên khóa hàng cho tới khi phát SSE hoàn tất.
+  - **[P1] Bảo vệ và gắn sourceRefs cho myjira.list_sites:** `adapter-factory.ts` lấy snapshot capabilities tươi mới và acquire lease xác minh quyền trên PostgreSQL trước khi chạy base adapter; gắn đầy đủ `_sourceRef` và `_sourceRefs` lên mảng và từng item site; fail closed khi membership/grant/site bị thu hồi.
+  - **[P2] Bắt buộc workspaceId cho Jira gather search:** Loại bỏ truy vấn `LIMIT 1` tự ý chọn workspace trong `server.ts`; từ chối rõ ràng khi actor thiếu workspace ID để ngăn chặn rò rỉ chéo workspace.
+  - **[P1] list_sites tạo source ref đầy đủ và hợp lệ theo schema:** `jira-lease-manager.ts` (`ExtendedJiraAuthorizationLease`) trả về `workspaceVersion`, `sitePolicyVersion`, `siteId` lấy từ PostgreSQL trong cùng transaction; `adapter-factory.ts` sinh `JiraSourceRef` chuẩn với `resourceType: 'site'`, `providerResourceId: site.cloudId`, `revision: String(sitePolicyVersion)`, `workspaceVersion` và `sitePolicyVersion` từ DB; xác thực chặt chẽ qua `validateJiraSourceRef(siteSourceRef)`; xóa bỏ việc release lease sớm để lease giữ nguyên hiệu lực trong suốt phiên planning.
+  - **[P1] Đóng khoảng trống giữa gather và model:** Xây dựng `JiraGuardedProvider` bọc `LLMProvider` trong `jira-provider-guard.ts` và tích hợp tại `server.ts:plannerFor`. Ngay trước khi dựng prompt cho model (`generatePlan`), guard kiểm tra lại toàn bộ quyền Jira trong PostgreSQL (`ati_workspaces`, `workspace_members`, `ati_workspace_memberships`, `users`, `jira_accounts`, `jira_oauth_grants`, `ati_workspace_jira_sites`). Nếu quyền bị thu hồi sau khi gather hoàn thành, guard tự động dọn sạch các thực thể Jira bị thu hồi khỏi `workingMemory`, che mờ nội dung trong `conversationHistory`, và gỡ bỏ công cụ `myjira.` khỏi `toolCatalog`. Kiểm thử tích hợp bằng 2 client PostgreSQL thật chứng minh: sau khi adapter trả kết quả, client 2 thu hồi quyền thành viên hoặc tắt active của site thì model prompt tuyệt đối không nhận dữ liệu Jira bí mật.
+  - **[P1] Xác thực từng sourceRef theo đúng grant, phiên bản policy và quyền project:** Cập nhật `jira-policy-service.ts` lọc chính xác `g.id = source.binding.grantId` và `a.id = source.binding.jiraAccountId` khi revalidate sourceRef. Loại bỏ kiểm tra quyền tổng hợp rộng (`overallValid`) trong `jira-provider-guard.ts`; thay bằng việc kiểm tra tính hợp lệ của từng thực thể trong `workingMemory` và từng tin nhắn trong `conversationHistory` qua `policyService.revalidateSource`. Khi người dùng sở hữu nhiều grant và grant cũ bị thu hồi trong khi grant mới vẫn active, thực thể và tin nhắn của grant cũ bị purge và che mờ ngay lập tức, trong khi thực thể của grant active tiếp tục được sử dụng.
+  - **[P1] Gắn và xác thực nguồn của tin nhắn thay cho dò chuỗi nội dung:** Cập nhật `chat-service.ts` chuyển tiếp `sourceRefs` từ metadata sang đối tượng `ChatMessage` trong `history`. Cập nhật `jira-provider-guard.ts` loại bỏ hoàn toàn cơ chế quét chuỗi (`content.includes(siteId)`), thay bằng kiểm tra đối chiếu nguồn gốc (`sourceRefs`) của tin nhắn trực tiếp qua PostgreSQL `revalidateSource`. Một tin nhắn thảo luận chi tiết issue mà không hề chứa site ID hay cloud ID vẫn được bảo đảm che mờ chuẩn xác khi site bị vô hiệu hóa hoặc quyền bị thu hồi.
+  - **[Runtime Wiring & Merge Main]** Nối đầy đủ `MYJIRA_SERVICE` / `MYJIRA_TOOLS` vào `serviceRegistryForRuntime`, `getToolCatalogFor`, `runtimeToolCatalog`, `createToolRuntimeFactory`, `mayFallbackToShared`, `resourceLabels` và khoá các đường cấu hình shared legacy `/api/services/jira/*` (HTTP 410) khi `myjiraAvailable = true` (`apps/chat-api/tests/services/jira-runtime-catalog.test.ts`: 6/6 tests PASS).
+  - Toàn bộ 8 suites Jira focused (113 tests) PASS 100%. Executor (55 tests), static guard (2 tests), Typecheck v3 PASS 100%.

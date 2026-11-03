@@ -2,7 +2,7 @@ import {createPersonalSlackAssistantRuntime} from './config/slack-assistant-runt
 import {SlackDerivedExpiryFanout} from './services/slack/slack-derived-expiry.js';
 import { EventEmitter } from 'node:events';
 import { createMemoryConversationRepositories } from './db/repositories/memory-conversations.js';
-import { validateEnv } from './config/env.js';
+import { validateEnv, JIRA_ENDPOINTS } from './config/env.js';
 import { getPool } from './db/pool.js';
 import {
   ConversationRepo,
@@ -71,6 +71,10 @@ import { JiraTokenManager } from './services/jira/jira-token-manager.js';
 import { JiraNativeVerifier } from './services/jira/jira-native-verifier.js';
 import { JiraPolicyService } from './services/jira/jira-policy-service.js';
 import { JiraHistorySanitizer } from './services/jira/jira-history-sanitizer.js';
+import { JiraPlanBinder } from './services/jira/jira-plan-binding.js';
+import { JiraLeaseManager } from './services/jira/jira-lease-manager.js';
+import { JiraDispatchGuard } from './services/jira/jira-dispatch-guard.js';
+import { createJiraGuardedProvider } from './services/jira/jira-provider-guard.js';
 import {
   AIPlanner,
   createProviderFromEnv,
@@ -498,8 +502,20 @@ async function bootstrap() {
   if (pool && jiraNativeVerifier) {
     jiraWorkspaceRepo = new JiraWorkspaceRepo(pool, { verifier: jiraNativeVerifier });
   }
-  const jiraHistorySanitizer = pool && jiraNativeVerifier
-    ? new JiraHistorySanitizer(new JiraPolicyService({ pool, verifier: jiraNativeVerifier }))
+  const jiraPolicyService = pool && jiraNativeVerifier
+    ? new JiraPolicyService({ pool, verifier: jiraNativeVerifier })
+    : undefined;
+  const jiraHistorySanitizer = jiraPolicyService
+    ? new JiraHistorySanitizer(jiraPolicyService)
+    : undefined;
+  const jiraBinder = jiraAvailable && pool
+    ? new JiraPlanBinder({ pool })
+    : undefined;
+  const jiraLeaseManager = jiraAvailable && pool && jiraTokens
+    ? new JiraLeaseManager({ pool, tokenManager: jiraTokens })
+    : undefined;
+  const jiraDispatchGuard = jiraAvailable && pool && jiraTokens && jiraLeaseManager
+    ? new JiraDispatchGuard(pool, jiraLeaseManager, jiraTokens)
     : undefined;
 
   // 2. Initialize LLM Provider
@@ -533,11 +549,14 @@ async function bootstrap() {
     const serviceName = tool.split('.')[0]!;
     // Lookups during planning use the planning member's own connection and active workspace context.
     const defaultMode = workspaceRepo ? ('personal' as const) : undefined;
+    if (tool.startsWith('myjira.') && !actor?.workspaceId) {
+      throw new Error('Workspace ID is required for Jira gather search');
+    }
     const adapter = await gatherAdapterFactory.getAdapterForService(serviceName, {
       userId: actor?.userId,
       phase: 'planning',
       workspaceMode: actor?.workspaceMode ?? defaultMode,
-      ...(actor?.workspaceId !== undefined ? { workspaceId: actor.workspaceId } : {}),
+      ...(actor?.workspaceId !== undefined && actor?.workspaceId !== null ? { workspaceId: actor.workspaceId } : {}),
     });
     return adapter.execute(tool, args, { signal });
   };
@@ -555,8 +574,19 @@ async function bootstrap() {
     userId: string;
     workspaceId?: string | null;
     workspaceMode?: 'legacy' | 'personal' | 'organization';
-  }) => new AIPlanner({
-    provider: env.RUNTIME_MODE === 'sandbox' && (process.env.SANDBOX_SCENARIO === 'gmail' || process.env.SANDBOX_SCENARIO === 'mycalendar' || process.env.SANDBOX_SCENARIO === 'mysheets') ? createSandboxProvider(process.env.SANDBOX_SCENARIO) : provider,
+  }) => {
+    const rawProvider = env.RUNTIME_MODE === 'sandbox' && (process.env.SANDBOX_SCENARIO === 'gmail' || process.env.SANDBOX_SCENARIO === 'mycalendar' || process.env.SANDBOX_SCENARIO === 'mysheets') ? createSandboxProvider(process.env.SANDBOX_SCENARIO) : provider;
+    const guardedProvider = (pool && actor?.userId && actor?.workspaceId)
+      ? createJiraGuardedProvider(rawProvider, {
+          pool,
+          jiraPolicyService,
+          jiraLeaseManager,
+          actor,
+        })
+      : rawProvider;
+
+    return new AIPlanner({
+      provider: guardedProvider,
     toolCatalog: await runtimeToolCatalog(env.RUNTIME_MODE, credRepo, env.ENCRYPTION_KEY, {
       userId: actor?.userId,
       workspaceMode: actor?.workspaceMode ?? (workspaceRepo ? 'personal' : undefined),
@@ -578,8 +608,10 @@ async function bootstrap() {
       telegramConnection,
       notionEnabled: notionAvailable,
       notionConnection,
+      myjiraEnabled: jiraAvailable,
+      jiraWorkspaceRepo: jiraWorkspaceRepo ?? undefined,
     }),
-    serviceRegistry: serviceRegistryForRuntime(gmailAvailable, mycalendarAvailable, mysheetsAvailable),
+    serviceRegistry: serviceRegistryForRuntime(gmailAvailable, mycalendarAvailable, mysheetsAvailable, jiraAvailable),
     gatherSearch,
     requireGroundedResources: env.RUNTIME_MODE === 'live',
     timeZone: env.APP_TIME_ZONE,
@@ -587,11 +619,12 @@ async function bootstrap() {
     readAnswers: env.PLANNER_READ_ANSWERS,
     schedules: Boolean(schedules),
   });
+};
   const planner = {
     ...createRuntimePlanner(env.RUNTIME_MODE,
       async (input: any) => (await plannerFor(input?.actor)).processMessage(input),
       (input: any) => {
-        if (!mayFallbackToShared(input, gmailAvailable, mycalendarAvailable, mysheetsAvailable)) throw new Error('Personal service planning failed');
+        if (!mayFallbackToShared(input, gmailAvailable, mycalendarAvailable, mysheetsAvailable, jiraAvailable)) throw new Error('Personal service planning failed');
         return backupPlanner.processMessage(input);
       }),
     routeSchedule: async (
@@ -633,6 +666,9 @@ async function bootstrap() {
     githubConnection,
     telegramConnection,
     notionConnection,
+    jiraBinder,
+    jiraHistorySanitizer,
+    jiraPolicyService,
     getAdapter: (serviceName, context) => (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(serviceName, context),
     schedules: schedules
       ? {
@@ -700,6 +736,11 @@ async function bootstrap() {
     telegramBotClient,
     notionRepo,
     notionTokens,
+    jiraTokens,
+    jiraWorkspaceRepo: jiraWorkspaceRepo ?? undefined,
+    jiraDispatchGuard,
+    jiraNativeVerifier: jiraNativeVerifier ?? undefined,
+    jiraApiBaseUrl: env.JIRA_OAUTH?.fixtureBaseUrl ?? JIRA_ENDPOINTS.apiBaseUrl,
     createTrelloAdapter: env.RUNTIME_MODE === 'sandbox' ? ({ allowedBoardIds }) => {
       const sandbox = createSandboxAdapter('trello');
       return {
@@ -847,6 +888,9 @@ async function bootstrap() {
     workspaceRepo,
     adapterFactory,
     sseManager,
+    pool: pool ?? undefined,
+    jiraLeaseManager: jiraLeaseManager ?? undefined,
+    jiraNativeVerifier: jiraNativeVerifier ?? undefined,
   });
 
   if (!env.EMAIL_ENABLED) console.warn('\x1b[33m[chat-api] Chưa cấu hình SMTP: đăng ký, xác minh email và quên mật khẩu tạm tắt (503).\x1b[0m');
@@ -915,6 +959,7 @@ async function bootstrap() {
     convRepo,
     msgRepo,
     planRepo,
+    enableWorkspaceConversations: Boolean(env.MYJIRA_ENABLED && jiraAvailable),
     credentialRepo: credRepo,
     encryptionKey: env.ENCRYPTION_KEY,
     serviceAdminUserIds: (process.env.SERVICE_ADMIN_USER_IDS || '').split(',').map((id) => id.trim()).filter(Boolean),

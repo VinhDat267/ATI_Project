@@ -41,10 +41,11 @@ export class JiraPolicyService {
         ),
         this.pool.query<{ id: string; atlassian_account_id: string; identity_version: number; grant_id: string }>(
           `SELECT a.id, a.atlassian_account_id, a.identity_version, g.id AS grant_id
-           FROM jira_accounts a JOIN jira_oauth_grants g ON g.account_id = a.id AND g.status = 'active'
+           FROM jira_accounts a 
+           JOIN jira_oauth_grants g ON g.account_id = a.id AND g.status = 'active' AND g.id = $3
            JOIN jira_grant_sites gs ON gs.grant_id = g.id AND gs.cloud_id = $2 AND gs.product_type = 'jira'
-           WHERE a.user_id = $1 AND a.status = 'connected'
-           ORDER BY g.created_at DESC LIMIT 1`, [userId, source.cloudId]
+           WHERE a.user_id = $1 AND a.id = $4 AND a.status = 'connected'`,
+          [userId, source.cloudId, source.binding.grantId, source.binding.jiraAccountId]
         ),
         this.pool.query<{ id: string; active: boolean; policy_version: number }>(
           'SELECT id, active, policy_version FROM ati_workspace_jira_sites WHERE workspace_id = $1 AND cloud_id = $2', [source.workspaceId, source.cloudId]
