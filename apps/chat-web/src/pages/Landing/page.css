@@ -542,8 +542,10 @@ html.dark[data-proto-page="index"] {
 .roadmap-toggle {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  padding: 8px 16px;
+  min-height: 44px;
+  padding: 10px 18px;
   border-radius: var(--planora-radius-pill);
   border: 1px solid var(--planora-divider);
   background-color: var(--planora-paper);
@@ -551,6 +553,7 @@ html.dark[data-proto-page="index"] {
   font-size: var(--planora-text-xs);
   font-weight: 500;
   cursor: pointer;
+  box-sizing: border-box;
 }
 
 .roadmap-unfold {

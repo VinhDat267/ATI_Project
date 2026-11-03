@@ -53,7 +53,7 @@ for (const vp of VIEWPORTS) {
       expect(navLoginBox).not.toBeNull();
       expect(navLoginBox?.height).toBeGreaterThanOrEqual(44);
 
-      // Landing CTA tap targets >= 44px (R3)
+      // Landing CTA and toggle tap targets >= 44px (R3, C1)
       const playbookBtn = page.getByTestId('landing-try-playbook-btn');
       await expect(playbookBtn).toBeVisible();
       const playbookBox = await playbookBtn.boundingBox();
@@ -63,6 +63,21 @@ for (const vp of VIEWPORTS) {
       await expect(digestBtn).toBeVisible();
       const digestBox = await digestBtn.boundingBox();
       expect(digestBox?.height).toBeGreaterThanOrEqual(44);
+
+      const roadmapToggle = page.locator('.roadmap-toggle');
+      await expect(roadmapToggle).toBeVisible();
+      const roadmapBox = await roadmapToggle.boundingBox();
+      expect(roadmapBox).not.toBeNull();
+      expect(roadmapBox?.height).toBeGreaterThanOrEqual(44);
+
+      // Roadmap accordion interaction
+      await expect(page.locator('.roadmap-unfold')).toBeHidden();
+      await roadmapToggle.click();
+      await expect(roadmapToggle).toHaveAttribute('aria-expanded', 'true');
+      await expect(page.locator('.roadmap-unfold')).toBeVisible();
+      await roadmapToggle.click();
+      await expect(roadmapToggle).toHaveAttribute('aria-expanded', 'false');
+      await expect(page.locator('.roadmap-unfold')).toBeHidden();
 
       // No horizontal overflow across all sections
       const noOverflow = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
