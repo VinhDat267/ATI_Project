@@ -1,0 +1,6360 @@
+{
+  "evidence": "provider_observed",
+  "complete": true,
+  "provider": "openai-compatible",
+  "model": "ag/gemini-3.8-flash",
+  "gateway": "http://localhost:20128/v1",
+  "servedModels": [
+    "gemini-3.8-flash-n"
+  ],
+  "set": "schedule",
+  "searchMode": "llm",
+  "readAnswers": false,
+  "schedules": true,
+  "labels": {
+    "file": "cases-schedule.json",
+    "commit": "80621466706541559b4b2dec2878c5fa8c050bd3",
+    "sha256": "c33ec2ad521d22bd585354228f06d7309c882d6007c536b07608bd3d4ced3d27",
+    "version": 1,
+    "cases": 16,
+    "selectedCases": 16
+  },
+  "sourceCommit": "80621466706541559b4b2dec2878c5fa8c050bd3",
+  "sourceTrees": {
+    "packages/planner": "42a1015a59a290ac0788af03fc127b0a7d224bb2",
+    "packages/tool-schemas": "e23d6843345b96fb45d99ef7a5c9234f61fa62ab"
+  },
+  "fixtureSha256": "b8bcd784b40f47ba9a78105b71809f63e19530901277a44f57faa28b14281d55",
+  "catalogSha256": "81931aec7ab39ffdb50f64e9b33978b1dadcd5cc96c3b4d820ec5806477667a0",
+  "catalog": {
+    "tools": 33,
+    "services": [
+      "trello",
+      "slack",
+      "github",
+      "sheets",
+      "calendar",
+      "notion",
+      "telegram",
+      "jira"
+    ]
+  },
+  "clock": "2026-09-29T10:00:00+07:00",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "requestedRuns": 3,
+  "completedRuns": 3,
+  "attemptedCaseRuns": 48,
+  "plannedCaseRuns": 48,
+  "concurrency": 2,
+  "startedAt": "2026-11-03T15:55:41.605Z",
+  "runAt": "2026-11-03T16:06:10.595Z",
+  "stopped": false,
+  "pendingIds": [],
+  "timedOutCases": [
+    {
+      "id": "sc_create01",
+      "run": 2
+    },
+    {
+      "id": "sc_plan03",
+      "run": 2
+    },
+    {
+      "id": "sc_clar02",
+      "run": 3
+    }
+  ],
+  "scope": "Planning only; search results/memory are synthetic fixtures; no plan executed. Read-only: clarification, exactly one model call, zero model-opened search rounds (phase search). Platform directory listing (phase prefetch) is allowed under the owner clarification of 08/10.",
+  "thresholds": {
+    "toolSelectionAccuracy": 0.85,
+    "argumentQuality": 0.75
+  },
+  "gate": {
+    "toolSelectionAccuracy": true,
+    "argumentQuality": true
+  },
+  "serviceGate": {
+    "calendar": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "slack": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "trello": {
+      "toolSelectionAccuracy": false,
+      "argumentQuality": true
+    },
+    "sheets": {
+      "toolSelectionAccuracy": false,
+      "argumentQuality": false
+    },
+    "jira": {
+      "toolSelectionAccuracy": false,
+      "argumentQuality": false
+    },
+    "telegram": {
+      "toolSelectionAccuracy": false,
+      "argumentQuality": false
+    },
+    "github": {
+      "toolSelectionAccuracy": false,
+      "argumentQuality": false
+    }
+  },
+  "qualityGate": "incomplete",
+  "aggregate": {
+    "runs": [
+      {
+        "kindAccuracy": 1,
+        "toolSelectionAccuracy": 1,
+        "argumentQuality": 1,
+        "argumentMatcherRate": 1,
+        "strictPassRate": 1
+      },
+      {
+        "kindAccuracy": 0.875,
+        "toolSelectionAccuracy": 0.75,
+        "argumentQuality": 1,
+        "argumentMatcherRate": 0.7692307692307693,
+        "strictPassRate": 0.875
+      },
+      {
+        "kindAccuracy": 0.9375,
+        "toolSelectionAccuracy": 1,
+        "argumentQuality": 1,
+        "argumentMatcherRate": 1,
+        "strictPassRate": 0.9375
+      }
+    ],
+    "mean": {
+      "kindAccuracy": 0.9375,
+      "toolSelectionAccuracy": 0.9166666666666666,
+      "argumentQuality": 1,
+      "argumentMatcherRate": 0.923076923076923,
+      "strictPassRate": 0.9375
+    },
+    "byCategory": {
+      "schedule": {
+        "cases": 9,
+        "strictPassRate": 0.9629629629629629
+      },
+      "single_step": {
+        "cases": 4,
+        "strictPassRate": 0.9166666666666666
+      },
+      "clarification": {
+        "cases": 2,
+        "strictPassRate": 0.8333333333333334
+      },
+      "read_only": {
+        "cases": 1,
+        "strictPassRate": 1
+      }
+    },
+    "byService": {
+      "calendar": {
+        "cases": 9,
+        "attempts": 27,
+        "scoredAttempts": 6,
+        "argumentAttempts": 6,
+        "runs": [
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          },
+          {
+            "kindAccuracy": 0.8888888888888888,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 0.8888888888888888
+          },
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 0.9629629629629629,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 0.9629629629629629
+        },
+        "latencyMs": {
+          "p50": 11312,
+          "p95": 44616
+        }
+      },
+      "slack": {
+        "cases": 11,
+        "attempts": 33,
+        "scoredAttempts": 3,
+        "argumentAttempts": 3,
+        "runs": [
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          },
+          {
+            "kindAccuracy": 0.9090909090909091,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 0.9090909090909091
+          },
+          {
+            "kindAccuracy": 0.9090909090909091,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 0.9090909090909091
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 0.9393939393939394,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 0.9393939393939394
+        },
+        "latencyMs": {
+          "p50": 27589,
+          "p95": 60027
+        }
+      },
+      "trello": {
+        "cases": 2,
+        "attempts": 6,
+        "scoredAttempts": 3,
+        "argumentAttempts": 2,
+        "runs": [
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          },
+          {
+            "kindAccuracy": 0.5,
+            "toolSelectionAccuracy": 0,
+            "argumentQuality": null,
+            "argumentMatcherRate": 0,
+            "strictPassRate": 0.5
+          },
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 0.8333333333333334,
+          "toolSelectionAccuracy": 0.6666666666666666,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 0.6666666666666666,
+          "strictPassRate": 0.8333333333333334
+        },
+        "latencyMs": {
+          "p50": 12960,
+          "p95": 60020
+        }
+      },
+      "sheets": {
+        "cases": 1,
+        "attempts": 3,
+        "scoredAttempts": 0,
+        "argumentAttempts": 0,
+        "runs": [
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": null,
+            "argumentQuality": null,
+            "argumentMatcherRate": null,
+            "strictPassRate": 1
+          },
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": null,
+            "argumentQuality": null,
+            "argumentMatcherRate": null,
+            "strictPassRate": 1
+          },
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": null,
+            "argumentQuality": null,
+            "argumentMatcherRate": null,
+            "strictPassRate": 1
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 1,
+          "toolSelectionAccuracy": null,
+          "argumentQuality": null,
+          "argumentMatcherRate": null,
+          "strictPassRate": 1
+        },
+        "latencyMs": {
+          "p50": 39929,
+          "p95": 40300
+        }
+      },
+      "jira": {
+        "cases": 1,
+        "attempts": 3,
+        "scoredAttempts": 0,
+        "argumentAttempts": 0,
+        "runs": [
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": null,
+            "argumentQuality": null,
+            "argumentMatcherRate": null,
+            "strictPassRate": 1
+          },
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": null,
+            "argumentQuality": null,
+            "argumentMatcherRate": null,
+            "strictPassRate": 1
+          },
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": null,
+            "argumentQuality": null,
+            "argumentMatcherRate": null,
+            "strictPassRate": 1
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 1,
+          "toolSelectionAccuracy": null,
+          "argumentQuality": null,
+          "argumentMatcherRate": null,
+          "strictPassRate": 1
+        },
+        "latencyMs": {
+          "p50": 12997,
+          "p95": 16052
+        }
+      },
+      "telegram": {
+        "cases": 1,
+        "attempts": 3,
+        "scoredAttempts": 0,
+        "argumentAttempts": 0,
+        "runs": [
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": null,
+            "argumentQuality": null,
+            "argumentMatcherRate": null,
+            "strictPassRate": 1
+          },
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": null,
+            "argumentQuality": null,
+            "argumentMatcherRate": null,
+            "strictPassRate": 1
+          },
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": null,
+            "argumentQuality": null,
+            "argumentMatcherRate": null,
+            "strictPassRate": 1
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 1,
+          "toolSelectionAccuracy": null,
+          "argumentQuality": null,
+          "argumentMatcherRate": null,
+          "strictPassRate": 1
+        },
+        "latencyMs": {
+          "p50": 12997,
+          "p95": 16052
+        }
+      },
+      "github": {
+        "cases": 1,
+        "attempts": 3,
+        "scoredAttempts": 0,
+        "argumentAttempts": 0,
+        "runs": [
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": null,
+            "argumentQuality": null,
+            "argumentMatcherRate": null,
+            "strictPassRate": 1
+          },
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": null,
+            "argumentQuality": null,
+            "argumentMatcherRate": null,
+            "strictPassRate": 1
+          },
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": null,
+            "argumentQuality": null,
+            "argumentMatcherRate": null,
+            "strictPassRate": 1
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 1,
+          "toolSelectionAccuracy": null,
+          "argumentQuality": null,
+          "argumentMatcherRate": null,
+          "strictPassRate": 1
+        },
+        "latencyMs": {
+          "p50": 39851,
+          "p95": 47233
+        }
+      }
+    },
+    "stability": {
+      "sc_create01": "2/3",
+      "sc_create02": "3/3",
+      "sc_create03": "3/3",
+      "sc_create04": "3/3",
+      "sc_create05": "3/3",
+      "sc_create06": "3/3",
+      "sc_plan01": "3/3",
+      "sc_plan02": "3/3",
+      "sc_plan03": "2/3",
+      "sc_plan04": "3/3",
+      "sc_clar01": "3/3",
+      "sc_clar02": "2/3",
+      "sc_clar03": "3/3",
+      "sc_turn01": "3/3",
+      "sc_turn02": "3/3",
+      "sc_turn03": "3/3"
+    },
+    "latencyMs": {
+      "p50": 15928,
+      "p95": 60020,
+      "max": 60061
+    },
+    "usablePlanRate": null
+  },
+  "timing": {
+    "calls": 48,
+    "attempts": 68,
+    "timeouts": 23,
+    "searchRounds": 0,
+    "directoryCalls": 126,
+    "attemptDistribution": {
+      "1": 28,
+      "2": 20
+    },
+    "retryReasons": {
+      "timeout": 20
+    },
+    "timeMs": {
+      "total": 1186780,
+      "model": 1186223.9169999994,
+      "prefetch": 59.966299999993225,
+      "search": 0,
+      "gather": 0,
+      "other": 496.116700000573
+    },
+    "timeShare": {
+      "model": 0.9995314354808805,
+      "prefetch": 0.00005052857311379803,
+      "search": 0,
+      "gather": 0,
+      "other": 0.00041803594600563963
+    },
+    "under15Seconds": {
+      "count": 23,
+      "total": 48,
+      "rate": 0.4791666666666667
+    }
+  },
+  "responses": {
+    "answers": {
+      "count": 0,
+      "latencyMs": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "modelCalls": {
+        "mean": null,
+        "max": 0,
+        "distribution": {}
+      },
+      "withoutLookups": 0
+    },
+    "plans": {
+      "count": 11,
+      "latencyMs": {
+        "p50": 8968,
+        "p95": 39923,
+        "max": 39923
+      }
+    },
+    "schedules": {
+      "count": 26,
+      "latencyMs": {
+        "p50": 16052,
+        "p95": 42191,
+        "max": 47233
+      }
+    },
+    "answeredActionCases": [],
+    "scheduledNonScheduleCases": [],
+    "gmailPromptChars": {
+      "calls": 0,
+      "p50": 0,
+      "p95": 0,
+      "max": 0
+    }
+  },
+  "results": [
+    {
+      "run": 1,
+      "cases": [
+        {
+          "id": "sc_create01",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 42191,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "create",
+            "name": "Gửi sự kiện lịch Team lên Slack frontend",
+            "request": "Lấy các sự kiện trong Google Calendar Team rồi gửi lên kênh Slack #frontend",
+            "recurrence": {
+              "type": "once",
+              "date": "2026-09-30",
+              "time": "09:00"
+            },
+            "summary": "Vào 9:00 ngày 30/09/2026, lấy các sự kiện trong Google Calendar Team và gửi lên kênh Slack #frontend."
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 41974.2866,
+              "attempts": [
+                {
+                  "startedAtMs": 0.003499999999803549,
+                  "durationMs": 30011.6573,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30011.6699,
+                  "durationMs": 11962.336799999997,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6423,
+                "completionTokens": 108,
+                "reasoningTokens": 719
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 216.96820000000002,
+              "promptChars": 13205
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 189.75170000000026,
+              "durationMs": 26.48849999999993
+            }
+          ]
+        },
+        {
+          "id": "sc_create02",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 12960,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "create",
+            "name": "Tạo card Release checklist và thông báo Slack",
+            "request": "Create a card \"Release checklist\" in list To Do of Trello board Frontend and post its link to Slack #release",
+            "recurrence": {
+              "type": "once",
+              "date": "2026-09-30",
+              "time": "14:30"
+            },
+            "summary": "Lên lịch lúc 14:30 ngày 2026-09-30 tạo thẻ \"Release checklist\" trên Trello và chia sẻ vào kênh Slack #release."
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 12929.1584,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0018000000000029104,
+                  "durationMs": 12928.952700000002,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 8176,
+                "completionTokens": 121,
+                "reasoningTokens": 698
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 29.11959999999999,
+              "promptChars": 19763
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 21.71849999999995,
+              "durationMs": 7.227899999999863
+            }
+          ]
+        },
+        {
+          "id": "sc_create03",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 9513,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "create",
+            "name": "Gửi lịch họp Team hằng ngày lên Slack frontend",
+            "request": "Gửi lịch họp hôm nay từ Google Calendar Team lên kênh Slack #frontend",
+            "recurrence": {
+              "type": "daily",
+              "time": "08:00"
+            },
+            "summary": "Mỗi ngày lúc 08:00, gửi lịch họp hôm nay từ Google Calendar Team lên kênh Slack #frontend."
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 9444.0918,
+              "attempts": [
+                {
+                  "startedAtMs": 0.00120000000060827,
+                  "durationMs": 9443.986299999999,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6200,
+                "completionTokens": 86,
+                "reasoningTokens": 495
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 68.53670000000056,
+              "promptChars": 13199
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 67.45420000000013,
+              "durationMs": 0.9004000000004453
+            }
+          ]
+        },
+        {
+          "id": "sc_create04",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 39929,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "create",
+            "name": "Báo cáo dữ liệu Frontend lên Slack",
+            "request": "Read cells Tasks!A1:B2 from the Google Sheets spreadsheet Frontend and post a summary to Slack #general",
+            "recurrence": {
+              "type": "daily",
+              "time": "17:00"
+            },
+            "summary": "Mỗi ngày lúc 17:00, đọc vùng Tasks!A1:B2 từ bảng tính Frontend và gửi tóm tắt vào kênh Slack #general."
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 39908.812099999996,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0018999999992956873,
+                  "durationMs": 30008.719699999998,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30008.730599999995,
+                  "durationMs": 9899.962200000002,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6659,
+                "completionTokens": 101,
+                "reasoningTokens": 730
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 20.575800000002346,
+              "promptChars": 14516
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 19.445599999999104,
+              "durationMs": 0.9292999999997846
+            }
+          ]
+        },
+        {
+          "id": "sc_create05",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 10325,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "create",
+            "name": "Tổng hợp issue FE thứ Hai và thứ Sáu",
+            "request": "Tổng hợp các issue đang mở của dự án Jira FE rồi gửi vào nhóm Telegram frontend",
+            "recurrence": {
+              "type": "weekly",
+              "time": "09:00",
+              "days": [
+                1,
+                5
+              ]
+            },
+            "summary": "Mỗi thứ Hai và thứ Sáu lúc 9:00, tổng hợp các issue đang mở của dự án Jira FE rồi gửi vào nhóm Telegram frontend."
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "repo_web",
+                  "name": "web",
+                  "fullName": "acme/web",
+                  "url": "https://github.com/acme/web"
+                },
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                },
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "jira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "10001",
+                  "key": "FE",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "10002",
+                  "key": "API",
+                  "name": "Backend"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 10286.180100000005,
+              "attempts": [
+                {
+                  "startedAtMs": 0.002099999997881241,
+                  "durationMs": 10286.032700000003,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 7054,
+                "completionTokens": 100,
+                "reasoningTokens": 468
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 37.95090000000346,
+              "promptChars": 17120
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 37.23490000000311,
+              "durationMs": 0.5648000000001048
+            }
+          ]
+        },
+        {
+          "id": "sc_create06",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 38854,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "create",
+            "name": "Thông báo open issues acme/web lên Slack",
+            "request": "Check open issues in GitHub repo acme/web and post them to Slack #frontend",
+            "recurrence": {
+              "type": "weekly",
+              "time": "08:30",
+              "days": [
+                1,
+                3,
+                5
+              ]
+            },
+            "summary": "Vào 08:30 các ngày thứ Hai, thứ Tư và thứ Sáu hằng tuần, kiểm tra open issues từ repo acme/web và gửi vào kênh Slack #frontend."
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "repo_web",
+                  "name": "web",
+                  "fullName": "acme/web",
+                  "url": "https://github.com/acme/web"
+                },
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 38846.0566,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0012999999962630682,
+                  "durationMs": 30004.1765,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30004.1846,
+                  "durationMs": 8841.749500000005,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6160,
+                "completionTokens": 110,
+                "reasoningTokens": 460
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 7.5578999999997905,
+              "promptChars": 14118
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 6.937099999995553,
+              "durationMs": 0.4558000000033644
+            }
+          ]
+        },
+        {
+          "id": "sc_plan01",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 7537,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use calendar.create_event to schedule the sprint meeting.",
+            "summary": "Tạo sự kiện 'Họp Sprint' vào ngày mai từ 09:00 đến 10:00 trên lịch Team.",
+            "steps": [
+              {
+                "id": "create_sprint_meeting",
+                "tool": "calendar.create_event",
+                "description": "Tạo sự kiện Họp Sprint",
+                "args": {
+                  "calendarId": "team@example.test",
+                  "summary": "Họp Sprint",
+                  "start": "2026-09-30T09:00:00+07:00",
+                  "end": "2026-09-30T10:00:00+07:00"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 7521.437299999998,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0025000000023283064,
+                  "durationMs": 7521.325199999999,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5693,
+                "completionTokens": 166,
+                "reasoningTokens": 367
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 12.256700000005367,
+              "promptChars": 11803
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 11.64310000000114,
+              "durationMs": 0.43709999999555293
+            }
+          ]
+        },
+        {
+          "id": "sc_plan02",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 39923,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use calendar.create_event to schedule the Architecture sync meeting.",
+            "summary": "Tạo sự kiện Architecture sync trên lịch Team vào ngày mai từ 15:00 đến 16:00.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "calendar.create_event",
+                "description": "Create Architecture sync event in Team calendar",
+                "args": {
+                  "calendarId": "team@example.test",
+                  "summary": "Architecture sync",
+                  "start": "2026-09-30T15:00:00+07:00",
+                  "end": "2026-09-30T16:00:00+07:00"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 39916.94609999999,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0010000000038417056,
+                  "durationMs": 30004.2359,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30004.246700000003,
+                  "durationMs": 9912.535999999993,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5827,
+                "completionTokens": 158,
+                "reasoningTokens": 518
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 5.69999999999709,
+              "promptChars": 11789
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 5.141200000012759,
+              "durationMs": 0.42349999998987187
+            }
+          ]
+        },
+        {
+          "id": "sc_plan03",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 8421,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Dùng trello.create_card để tạo thẻ mới với hạn chót.",
+            "summary": "Tạo card 'Hoàn thiện báo cáo' trong danh sách To Do của bảng Frontend với hạn chót thứ Sáu lúc 17:00.",
+            "steps": [
+              {
+                "id": "create_report_card",
+                "tool": "trello.create_card",
+                "description": "Tạo card Hoàn thiện báo cáo",
+                "args": {
+                  "listId": "list_fe_todo",
+                  "title": "Hoàn thiện báo cáo",
+                  "due": "2026-10-02T17:00:00+07:00"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 8418.810999999987,
+              "attempts": [
+                {
+                  "startedAtMs": 0.003000000011525117,
+                  "durationMs": 8418.685099999988,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 7112,
+                "completionTokens": 147,
+                "reasoningTokens": 322
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.7599999999947613,
+              "promptChars": 17482
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.7517999999981839,
+              "durationMs": 0.8276999999943655
+            }
+          ]
+        },
+        {
+          "id": "sc_plan04",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 34871,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Send deployment announcement to Slack general channel using slack.send_message.",
+            "summary": "Gửi tin nhắn bắt đầu triển khai v3.1 vào kênh #general trên Slack.",
+            "steps": [
+              {
+                "id": "step1",
+                "tool": "slack.send_message",
+                "description": "Gửi thông báo tới kênh #general",
+                "args": {
+                  "channel": "C_GEN",
+                  "text": "Deployment v3.1 has started"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 34869.8882,
+              "attempts": [
+                {
+                  "startedAtMs": 0.001600000003236346,
+                  "durationMs": 30006.763699999996,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30006.800000000017,
+                  "durationMs": 4863.007099999988,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4975,
+                "completionTokens": 97,
+                "reasoningTokens": 268
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.9315999999962514,
+              "promptChars": 10298
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.5212000000028638,
+              "durationMs": 0.25639999999839347
+            }
+          ]
+        },
+        {
+          "id": "sc_clar01",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 11849,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Bạn muốn gửi lịch họp hằng ngày vào lúc mấy giờ?",
+            "options": [
+              "08:00",
+              "08:30",
+              "09:00"
+            ]
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 11848.194499999998,
+              "attempts": [
+                {
+                  "startedAtMs": 0.001600000003236346,
+                  "durationMs": 11848.1158,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6432,
+                "completionTokens": 42,
+                "reasoningTokens": 733
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.7969000000011874,
+              "promptChars": 13184
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.4618999999947846,
+              "durationMs": 0.2495000000053551
+            }
+          ]
+        },
+        {
+          "id": "sc_clar02",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 50636,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "thinking": "Monthly schedules are unsupported; requesting choice among once, daily, or weekly schedules.",
+            "question": "Monthly recurrence is not supported. We only support schedules that run once, daily, or weekly on chosen weekdays. How would you like to schedule this?",
+            "options": [
+              "Daily at 09:00",
+              "Weekly on chosen weekdays at 09:00",
+              "Once on a specific date"
+            ]
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 50633.85260000001,
+              "attempts": [
+                {
+                  "startedAtMs": 0.001600000003236346,
+                  "durationMs": 30000.56379999999,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30000.569300000003,
+                  "durationMs": 20633.151899999997,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 8350,
+                "completionTokens": 87,
+                "reasoningTokens": 882
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.6105999999999767,
+              "promptChars": 19720
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.9052999999985332,
+              "durationMs": 0.5903000000107568
+            }
+          ]
+        },
+        {
+          "id": "sc_clar03",
+          "category": "read_only",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 15928,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "reason": "read_only",
+            "thinking": "No tools chosen because scheduled tasks require a write action.",
+            "question": "Tác vụ chạy định kỳ tự động cần một hành động ghi (như tạo sự kiện trên lịch) do không có người nhận kết quả trực tiếp. Bạn muốn thực hiện thao tác gì với danh sách sự kiện này?"
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 15926.666900000011,
+              "attempts": [
+                {
+                  "startedAtMs": 0.004599999985657632,
+                  "durationMs": 15926.568300000014,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6557,
+                "completionTokens": 75,
+                "reasoningTokens": 1244
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.2283999999926891,
+              "promptChars": 11790
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.7315999999991618,
+              "durationMs": 0.3951000000233762
+            }
+          ]
+        },
+        {
+          "id": "sc_turn01",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 35740,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "update",
+            "name": "Lịch họp hằng ngày",
+            "request": "Gửi lịch họp hôm nay từ Google Calendar Team lên kênh Slack #frontend",
+            "recurrence": {
+              "type": "daily",
+              "time": "08:30"
+            },
+            "summary": "Đổi sang 8 giờ 30 sáng mỗi ngày, gửi lịch họp hôm nay từ Google Calendar Team lên kênh Slack #frontend."
+          },
+          "searches": [],
+          "prefetches": [],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 35714.69199999998,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0010999999940395355,
+                  "durationMs": 30008.502600000007,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30008.507299999997,
+                  "durationMs": 5706.102100000018,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5679,
+                "completionTokens": 83,
+                "reasoningTokens": 58
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 25.8695000000007,
+              "promptChars": 13037
+            }
+          ],
+          "phases": []
+        },
+        {
+          "id": "sc_turn02",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 7443,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "update",
+            "name": "Lịch họp ngày làm việc",
+            "request": "Gửi lịch họp hôm nay từ Google Calendar Team lên kênh Slack #frontend",
+            "recurrence": {
+              "type": "weekly",
+              "time": "08:30",
+              "days": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ]
+            },
+            "summary": "Đổi sang 8 giờ 30 sáng từ thứ Hai đến thứ Sáu, gửi lịch họp lên Slack #frontend."
+          },
+          "searches": [],
+          "prefetches": [],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 7426.043999999994,
+              "attempts": [
+                {
+                  "startedAtMs": 0.002199999988079071,
+                  "durationMs": 7425.921000000002,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5843,
+                "completionTokens": 93,
+                "reasoningTokens": 216
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 16.390099999989616,
+              "promptChars": 13056
+            }
+          ],
+          "phases": []
+        },
+        {
+          "id": "sc_turn03",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 1,
+              "total": 1
+            },
+            "failures": []
+          },
+          "latencyMs": 38969,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "pause",
+            "summary": "Tạm dừng lịch gửi lịch họp hằng ngày lên kênh Slack #frontend."
+          },
+          "searches": [],
+          "prefetches": [],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 38968.22289999999,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0033999999868683517,
+                  "durationMs": 30008.852199999994,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30008.86969999998,
+                  "durationMs": 8959.155900000012,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6248,
+                "completionTokens": 28,
+                "reasoningTokens": 636
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.7159999999857973,
+              "promptChars": 13014
+            }
+          ],
+          "phases": []
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "cases": [
+        {
+          "id": "sc_create01",
+          "category": "schedule",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 4
+            },
+            "failures": [
+              "kind: expected schedule, got error",
+              "action: expected create, got none",
+              "recurrence.type: expected once, got none",
+              "recurrence.time: expected 09:00, got none",
+              "recurrence.date: expected 2026-09-30, got none"
+            ]
+          },
+          "latencyMs": 60061,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "Model request timed out",
+          "providerError": "Model request timed out",
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 60046.14679999999,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0020000000076834112,
+                  "durationMs": 30029.8572,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30029.862300000008,
+                  "durationMs": 30016.070299999992,
+                  "outcome": "timeout"
+                }
+              ],
+              "usage": {
+                "promptTokens": null,
+                "completionTokens": null,
+                "reasoningTokens": null
+              },
+              "startedAtMs": 2.3583999999973457,
+              "promptChars": 13205
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.7140000000072177,
+              "durationMs": 1.4268999999912921
+            }
+          ]
+        },
+        {
+          "id": "sc_create02",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 27589,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "create",
+            "name": "Tạo card Release checklist và gửi Slack",
+            "request": "Create a card \"Release checklist\" in list To Do of Trello board Frontend and post its link to Slack #release",
+            "recurrence": {
+              "type": "once",
+              "date": "2026-09-30",
+              "time": "14:30"
+            },
+            "summary": "Vào 14:30 ngày 30/09/2026, tạo thẻ \"Release checklist\" trên Trello và gửi link vào Slack #release."
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 27579.052800000005,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0015999999886844307,
+                  "durationMs": 27578.88280000002,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 8932,
+                "completionTokens": 117,
+                "reasoningTokens": 1454
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 3.580099999991944,
+              "promptChars": 19763
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.3533999999926891,
+              "durationMs": 2.353400000021793
+            }
+          ]
+        },
+        {
+          "id": "sc_create03",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 8026,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "create",
+            "name": "Gửi lịch họp Team hằng ngày lên Slack #frontend",
+            "request": "Gửi lịch họp hôm nay từ Google Calendar Team lên kênh Slack #frontend",
+            "recurrence": {
+              "type": "daily",
+              "time": "08:00"
+            },
+            "summary": "Mỗi sáng lúc 08:00, gửi lịch họp hôm nay từ Google Calendar Team lên kênh Slack #frontend."
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 8010.634399999981,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0019000000029336661,
+                  "durationMs": 8010.405599999998,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6091,
+                "completionTokens": 87,
+                "reasoningTokens": 386
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 16.471000000019558,
+              "promptChars": 13199
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 12.136199999978999,
+              "durationMs": 3.129400000005262
+            }
+          ]
+        },
+        {
+          "id": "sc_create04",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 11356,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "create",
+            "name": "Gửi tóm tắt Tasks Frontend lên Slack",
+            "request": "Read cells Tasks!A1:B2 from Google Sheets Frontend and post a summary to Slack #general",
+            "recurrence": {
+              "type": "daily",
+              "time": "17:00"
+            },
+            "summary": "Mỗi ngày lúc 17:00, đọc vùng Tasks!A1:B2 từ bảng tính Frontend và gửi tóm tắt lên kênh Slack #general."
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 11353.986300000019,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0008000000088941306,
+                  "durationMs": 11353.889999999985,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6733,
+                "completionTokens": 99,
+                "reasoningTokens": 804
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 2.2005000000062864,
+              "promptChars": 14516
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 1.1775000000197906,
+              "durationMs": 0.8892999999807216
+            }
+          ]
+        },
+        {
+          "id": "sc_create05",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 16052,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "create",
+            "name": "Tổng hợp issue Jira FE gửi Telegram",
+            "request": "Tổng hợp các issue đang mở của dự án Jira FE rồi gửi vào nhóm Telegram frontend",
+            "recurrence": {
+              "type": "weekly",
+              "time": "09:00",
+              "days": [
+                1,
+                5
+              ]
+            },
+            "summary": "Thứ Hai và thứ Sáu hằng tuần lúc 09:00, tổng hợp các issue đang mở của dự án Jira FE rồi gửi vào nhóm Telegram frontend."
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "repo_web",
+                  "name": "web",
+                  "fullName": "acme/web",
+                  "url": "https://github.com/acme/web"
+                },
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                },
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "jira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "10001",
+                  "key": "FE",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "10002",
+                  "key": "API",
+                  "name": "Backend"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 16048.42300000001,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0008999999845400453,
+                  "durationMs": 16048.31150000001,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 7961,
+                "completionTokens": 100,
+                "reasoningTokens": 1375
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 2.382400000002235,
+              "promptChars": 17120
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 1.6955999999772757,
+              "durationMs": 0.5712000000057742
+            }
+          ]
+        },
+        {
+          "id": "sc_create06",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 47233,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "create",
+            "name": "Thông báo open issues repo acme/web lên Slack #frontend",
+            "request": "Check open issues in GitHub repo acme/web and post them to Slack #frontend",
+            "recurrence": {
+              "type": "weekly",
+              "time": "08:30",
+              "days": [
+                1,
+                3,
+                5
+              ]
+            },
+            "summary": "Vào 08:30 mỗi thứ Hai, thứ Tư và thứ Sáu, kiểm tra open issues từ repo acme/web và gửi thông báo lên Slack #frontend."
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "repo_web",
+                  "name": "web",
+                  "fullName": "acme/web",
+                  "url": "https://github.com/acme/web"
+                },
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 47232.30489999999,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0010999999940395355,
+                  "durationMs": 30004.059899999993,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30004.063599999994,
+                  "durationMs": 17228.043599999975,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6316,
+                "completionTokens": 110,
+                "reasoningTokens": 616
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.5691000000224449,
+              "promptChars": 14118
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.9219000000157394,
+              "durationMs": 0.49270000000251457
+            }
+          ]
+        },
+        {
+          "id": "sc_plan01",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 8968,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "calendar.create_event",
+            "summary": "Tạo sự kiện Họp Sprint trên lịch Team vào ngày mai từ 09:00 đến 10:00.",
+            "steps": [
+              {
+                "id": "create_event_1",
+                "tool": "calendar.create_event",
+                "description": "Tạo sự kiện Họp Sprint",
+                "args": {
+                  "calendarId": "team@example.test",
+                  "summary": "Họp Sprint",
+                  "start": "2026-09-30T09:00:00+07:00",
+                  "end": "2026-09-30T10:00:00+07:00"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 8948.66710000002,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0007999999797903001,
+                  "durationMs": 8948.525900000008,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5851,
+                "completionTokens": 155,
+                "reasoningTokens": 525
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.0129999999771826,
+              "promptChars": 11803
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.6307999999844469,
+              "durationMs": 0.2844000000040978
+            }
+          ]
+        },
+        {
+          "id": "sc_plan02",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 8266,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use calendar.create_event to schedule the event.",
+            "summary": "Tạo sự kiện Architecture sync vào lịch Team từ 15:00 đến 16:00 ngày mai.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "calendar.create_event",
+                "description": "Create Architecture sync event in Team calendar",
+                "args": {
+                  "calendarId": "team@example.test",
+                  "summary": "Architecture sync",
+                  "start": "2026-09-30T15:00:00+07:00",
+                  "end": "2026-09-30T16:00:00+07:00"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 8265.308699999994,
+              "attempts": [
+                {
+                  "startedAtMs": 0.001400000008288771,
+                  "durationMs": 8265.224199999997,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5707,
+                "completionTokens": 155,
+                "reasoningTokens": 398
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.1595999999553896,
+              "promptChars": 11789
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.6945000000414439,
+              "durationMs": 0.34259999997448176
+            }
+          ]
+        },
+        {
+          "id": "sc_plan03",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 60020,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "Model request timed out",
+          "providerError": "Model request timed out",
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 60018.924100000004,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0025000000023283064,
+                  "durationMs": 30010.17069999996,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30010.176899999962,
+                  "durationMs": 30007.038900000043,
+                  "outcome": "timeout"
+                }
+              ],
+              "usage": {
+                "promptTokens": null,
+                "completionTokens": null,
+                "reasoningTokens": null
+              },
+              "startedAtMs": 1.6539999999804422,
+              "promptChars": 17482
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.8285000000032596,
+              "durationMs": 0.7285000000265427
+            }
+          ]
+        },
+        {
+          "id": "sc_plan04",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 9441,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Send message to Slack #general using slack.send_message.",
+            "summary": "Gửi thông báo bắt đầu triển khai v3.1 vào kênh Slack #general.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "slack.send_message",
+                "description": "Gửi thông báo triển khai lên Slack",
+                "args": {
+                  "channel": "C_GEN",
+                  "text": "Deployment v3.1 has started"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 9439.473699999973,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0007000000332482159,
+                  "durationMs": 9439.344400000002,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4837,
+                "completionTokens": 96,
+                "reasoningTokens": 130
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.1317999999737367,
+              "promptChars": 10298
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.56160000001546,
+              "durationMs": 0.46899999998277053
+            }
+          ]
+        },
+        {
+          "id": "sc_clar01",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 9289,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Bạn muốn gửi lịch họp vào lúc mấy giờ mỗi ngày?",
+            "options": [
+              "08:00",
+              "08:30",
+              "09:00"
+            ]
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 9288.697799999965,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0007000000332482159,
+                  "durationMs": 9288.629399999976,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6017,
+                "completionTokens": 41,
+                "reasoningTokens": 318
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.1218999999691732,
+              "promptChars": 13184
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.6794999999692664,
+              "durationMs": 0.36460000002989545
+            }
+          ]
+        },
+        {
+          "id": "sc_clar02",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 13125,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "thinking": "Clarify unsupported monthly schedule recurrence.",
+            "question": "Monthly schedules are not supported. Only once, daily, or weekly on chosen weekdays are supported. Would you like to adjust the frequency?",
+            "options": [
+              "Daily at 09:00",
+              "Weekly on Mondays at 09:00",
+              "Run once on a specific date"
+            ]
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 13123.814700000046,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0013000000035390258,
+                  "durationMs": 13123.000100000005,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 8585,
+                "completionTokens": 75,
+                "reasoningTokens": 1117
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.4861999999848194,
+              "promptChars": 19720
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.582799999974668,
+              "durationMs": 0.7865999999921769
+            }
+          ]
+        },
+        {
+          "id": "sc_clar03",
+          "category": "read_only",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 44616,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "reason": "read_only",
+            "thinking": "Không sử dụng công cụ nào do yêu cầu chỉ đọc.",
+            "question": "Tác vụ tự động định kỳ cần có một hành động ghi hoặc gửi kết quả. Bạn có muốn thực hiện hành động nào với thông tin sự kiện này không?"
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 44615.0846,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0009999999892897904,
+                  "durationMs": 30008.839399999997,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30008.8431,
+                  "durationMs": 14606.156100000022,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6581,
+                "completionTokens": 64,
+                "reasoningTokens": 1268
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.9041999999899417,
+              "promptChars": 11790
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.5094999999855645,
+              "durationMs": 0.334900000016205
+            }
+          ]
+        },
+        {
+          "id": "sc_turn01",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 6644,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "update",
+            "name": "Lịch họp hằng ngày",
+            "request": "Gửi lịch họp hôm nay từ Google Calendar Team lên kênh Slack #frontend",
+            "recurrence": {
+              "type": "daily",
+              "time": "08:30"
+            },
+            "summary": "Đổi lịch chạy sang 8 giờ 30 sáng mỗi ngày."
+          },
+          "searches": [],
+          "prefetches": [],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 6642.143199999991,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0011999999987892807,
+                  "durationMs": 6642.063300000038,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5866,
+                "completionTokens": 70,
+                "reasoningTokens": 245
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.611399999994319,
+              "promptChars": 13037
+            }
+          ],
+          "phases": []
+        },
+        {
+          "id": "sc_turn02",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 6796,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "update",
+            "name": "Lịch họp ngày làm việc",
+            "request": "Gửi lịch họp hôm nay từ Google Calendar Team lên kênh Slack #frontend",
+            "recurrence": {
+              "type": "weekly",
+              "time": "08:30",
+              "days": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ]
+            },
+            "summary": "Đổi lịch chạy sang 8 giờ 30 sáng từ thứ Hai đến thứ Sáu."
+          },
+          "searches": [],
+          "prefetches": [],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 6795.374600000039,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0017000000225380063,
+                  "durationMs": 6795.278499999957,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5903,
+                "completionTokens": 87,
+                "reasoningTokens": 276
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.9935999999870546,
+              "promptChars": 13056
+            }
+          ],
+          "phases": []
+        },
+        {
+          "id": "sc_turn03",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 1,
+              "total": 1
+            },
+            "failures": []
+          },
+          "latencyMs": 41207,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "pause",
+            "summary": "Tạm dừng lịch gửi lịch họp hằng ngày lên kênh Slack #frontend."
+          },
+          "searches": [],
+          "prefetches": [],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 41206.669999999984,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0017000000225380063,
+                  "durationMs": 30011.09719999996,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30011.102599999984,
+                  "durationMs": 11195.483300000022,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6452,
+                "completionTokens": 28,
+                "reasoningTokens": 840
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.0837000000174157,
+              "promptChars": 13014
+            }
+          ],
+          "phases": []
+        }
+      ]
+    },
+    {
+      "run": 3,
+      "cases": [
+        {
+          "id": "sc_create01",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 41638,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "create",
+            "name": "Gửi sự kiện lịch Team lên Slack frontend",
+            "request": "Lấy các sự kiện trong Google Calendar Team rồi gửi lên kênh Slack #frontend",
+            "recurrence": {
+              "type": "once",
+              "date": "2026-09-30",
+              "time": "09:00"
+            },
+            "summary": "Vào 9:00 ngày 30/09/2026, lấy các sự kiện trong Google Calendar Team và gửi vào kênh Slack #frontend."
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 41636.149399999995,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0007999999797903001,
+                  "durationMs": 30015.576,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30015.579299999983,
+                  "durationMs": 11620.479900000035,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6374,
+                "completionTokens": 108,
+                "reasoningTokens": 670
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.7510999999940395,
+              "promptChars": 13205
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.5065000000176951,
+              "durationMs": 1.1546000000089407
+            }
+          ]
+        },
+        {
+          "id": "sc_create02",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 19906,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "create",
+            "name": "Tạo card Release checklist và thông báo Slack",
+            "request": "Create a card \"Release checklist\" in list To Do of Trello board Frontend and post its link to Slack #release",
+            "recurrence": {
+              "type": "once",
+              "date": "2026-09-30",
+              "time": "14:30"
+            },
+            "summary": "Vào lúc 14:30 ngày 30/09/2026, tạo thẻ \"Release checklist\" trên danh sách To Do của bảng Frontend và gửi liên kết vào Slack #release."
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 19904.031399999978,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0008999999845400453,
+                  "durationMs": 19903.925800000026,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 9135,
+                "completionTokens": 125,
+                "reasoningTokens": 1657
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.7127000000327826,
+              "promptChars": 19763
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.3264999999664724,
+              "durationMs": 1.321300000010524
+            }
+          ]
+        },
+        {
+          "id": "sc_create03",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 8903,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "create",
+            "name": "Gửi lịch họp Team hằng ngày",
+            "request": "Gửi lịch họp hôm nay từ Google Calendar Team lên kênh Slack #frontend",
+            "recurrence": {
+              "type": "daily",
+              "time": "08:00"
+            },
+            "summary": "[redacted case prompt]"
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 8902.355699999956,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0008999999845400453,
+                  "durationMs": 8902.290500000003,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6249,
+                "completionTokens": 79,
+                "reasoningTokens": 544
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.9149000000325032,
+              "promptChars": 13199
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.5368000000016764,
+              "durationMs": 0.2886999999755062
+            }
+          ]
+        },
+        {
+          "id": "sc_create04",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 40300,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "create",
+            "name": "Gửi tóm tắt Tasks Frontend hằng ngày",
+            "request": "Read cells Tasks!A1:B2 from the Google Sheets spreadsheet Frontend and post a summary to Slack #general",
+            "recurrence": {
+              "type": "daily",
+              "time": "17:00"
+            },
+            "summary": "Mỗi ngày lúc 17:00, đọc ô Tasks!A1:B2 từ bảng tính Frontend và gửi tóm tắt lên Slack #general."
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "sheets.list_spreadsheets",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "spreadsheet_frontend_2026",
+                  "title": "Frontend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit"
+                },
+                {
+                  "id": "spreadsheet_backend_2026",
+                  "title": "Backend",
+                  "url": "https://docs.google.com/spreadsheets/d/spreadsheet_backend_2026/edit"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_frontend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                },
+                {
+                  "id": 1,
+                  "title": "History",
+                  "spreadsheetId": "spreadsheet_frontend_2026"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "sheets.list_sheets",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "spreadsheetId": "spreadsheet_backend_2026"
+              },
+              "result": [
+                {
+                  "id": 0,
+                  "title": "Tasks",
+                  "spreadsheetId": "spreadsheet_backend_2026"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 40298.217000000004,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0004999999655410647,
+                  "durationMs": 30005.320999999996,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30005.323600000003,
+                  "durationMs": 10292.818900000013,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6714,
+                "completionTokens": 101,
+                "reasoningTokens": 785
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.0912999999709427,
+              "promptChars": 14516
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.5619999999762513,
+              "durationMs": 0.45270000002346933
+            }
+          ]
+        },
+        {
+          "id": "sc_create05",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 12997,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "create",
+            "name": "Tổng hợp issue Jira FE",
+            "request": "Tổng hợp các issue đang mở của dự án Jira FE rồi gửi vào nhóm Telegram frontend",
+            "recurrence": {
+              "type": "weekly",
+              "time": "09:00",
+              "days": [
+                1,
+                5
+              ]
+            },
+            "summary": "Thứ Hai và thứ Sáu hằng tuần lúc 09:00, tổng hợp các issue đang mở của dự án Jira FE và gửi vào nhóm Telegram frontend."
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "repo_web",
+                  "name": "web",
+                  "fullName": "acme/web",
+                  "url": "https://github.com/acme/web"
+                },
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "telegram.list_chats",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "-1001234567890",
+                  "title": "frontend",
+                  "type": "supergroup"
+                },
+                {
+                  "id": "-1009876543210",
+                  "title": "release",
+                  "type": "group"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "jira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "10001",
+                  "key": "FE",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "10002",
+                  "key": "API",
+                  "name": "Backend"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 12995.354099999997,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0008999999845400453,
+                  "durationMs": 12995.2451,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 7461,
+                "completionTokens": 98,
+                "reasoningTokens": 875
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.2962999999872409,
+              "promptChars": 17120
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.8430000000516884,
+              "durationMs": 0.37469999998575076
+            }
+          ]
+        },
+        {
+          "id": "sc_create06",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 39851,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "create",
+            "name": "Báo cáo issue open từ acme/web lên Slack frontend",
+            "request": "Check open issues in GitHub repo acme/web and post them to Slack #frontend",
+            "recurrence": {
+              "type": "weekly",
+              "time": "08:30",
+              "days": [
+                1,
+                3,
+                5
+              ]
+            },
+            "summary": "Mỗi thứ Hai, thứ Tư và thứ Sáu lúc 08:30, kiểm tra issue đang mở từ repo acme/web và gửi vào Slack #frontend."
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "github.search_repos",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "repo_web",
+                  "name": "web",
+                  "fullName": "acme/web",
+                  "url": "https://github.com/acme/web"
+                },
+                {
+                  "id": "repo_api",
+                  "name": "api",
+                  "fullName": "acme/api",
+                  "url": "https://github.com/acme/api"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 39849.532400000026,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0008999999845400453,
+                  "durationMs": 30009.2696,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30009.273800000024,
+                  "durationMs": 9840.16459999996,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6293,
+                "completionTokens": 109,
+                "reasoningTokens": 593
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.0670999999856576,
+              "promptChars": 14118
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.6392000000341795,
+              "durationMs": 0.34649999998509884
+            }
+          ]
+        },
+        {
+          "id": "sc_plan01",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 8425,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Sử dụng calendar.create_event để tạo sự kiện họp sprint.",
+            "summary": "Tạo sự kiện \"Họp Sprint\" vào ngày mai từ 09:00 đến 10:00 trên lịch Team.",
+            "steps": [
+              {
+                "id": "create_event_1",
+                "tool": "calendar.create_event",
+                "description": "Tạo sự kiện Họp Sprint",
+                "args": {
+                  "calendarId": "team@example.test",
+                  "summary": "Họp Sprint",
+                  "start": "2026-09-30T09:00:00+07:00",
+                  "end": "2026-09-30T10:00:00+07:00"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 8423.723200000008,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0016000000177882612,
+                  "durationMs": 8423.629200000025,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5813,
+                "completionTokens": 168,
+                "reasoningTokens": 487
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.1625999999814667,
+              "promptChars": 11803
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.6611999999731779,
+              "durationMs": 0.39079999999376014
+            }
+          ]
+        },
+        {
+          "id": "sc_plan02",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 39086,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use calendar.create_event to add the meeting to the Team calendar.",
+            "summary": "Tạo sự kiện \"Architecture sync\" vào lịch Team từ 15:00 đến 16:00 ngày mai.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "calendar.create_event",
+                "description": "Tạo sự kiện Architecture sync",
+                "args": {
+                  "calendarId": "team@example.test",
+                  "summary": "Architecture sync",
+                  "start": "2026-09-30T15:00:00+07:00",
+                  "end": "2026-09-30T16:00:00+07:00"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 39084.16910000006,
+              "attempts": [
+                {
+                  "startedAtMs": 0.001400000008288771,
+                  "durationMs": 30005.132999999973,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30005.137300000002,
+                  "durationMs": 9078.934600000037,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5811,
+                "completionTokens": 160,
+                "reasoningTokens": 502
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.9971000000368804,
+              "promptChars": 11789
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.6449000000138767,
+              "durationMs": 0.2771000000066124
+            }
+          ]
+        },
+        {
+          "id": "sc_plan03",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 6703,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Tạo card mới trên list To Do bằng trello.create_card.",
+            "summary": "Tạo card \"Hoàn thiện báo cáo\" trong danh sách To Do của bảng Frontend với hạn chót 17:00 thứ Sáu.",
+            "steps": [
+              {
+                "id": "create_card_1",
+                "tool": "trello.create_card",
+                "description": "Tạo card Hoàn thiện báo cáo",
+                "args": {
+                  "listId": "list_fe_todo",
+                  "title": "Hoàn thiện báo cáo",
+                  "due": "2026-10-02T17:00:00+07:00"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 6701.770699999994,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0004999999655410647,
+                  "durationMs": 6701.684300000023,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 7131,
+                "completionTokens": 145,
+                "reasoningTokens": 341
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.244200000015553,
+              "promptChars": 17482
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.5621999999857508,
+              "durationMs": 0.5999000000301749
+            }
+          ]
+        },
+        {
+          "id": "sc_plan04",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 2,
+              "total": 2
+            },
+            "failures": []
+          },
+          "latencyMs": 35787,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "thinking": "Send notification to Slack #general using slack.send_message.",
+            "kind": "plan",
+            "summary": "Gửi tin nhắn thông báo triển khai vào kênh #general trên Slack.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "slack.send_message",
+                "description": "Gửi tin nhắn vào kênh Slack #general",
+                "args": {
+                  "channel": "C_GEN",
+                  "text": "Deployment v3.1 has started"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 35786.06549999997,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0006000000284984708,
+                  "durationMs": 30010.547300000035,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30010.552900000068,
+                  "durationMs": 5775.44709999999,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 4820,
+                "completionTokens": 94,
+                "reasoningTokens": 113
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.9090999999898486,
+              "promptChars": 10298
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.5869999999995343,
+              "durationMs": 0.2494000000297092
+            }
+          ]
+        },
+        {
+          "id": "sc_clar01",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 11312,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Bạn muốn gửi lịch họp vào thời gian nào mỗi ngày?",
+            "options": [
+              "08:00",
+              "08:30",
+              "09:00"
+            ]
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 11309.926099999924,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0006000000284984708,
+                  "durationMs": 11309.821499999962,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6448,
+                "completionTokens": 41,
+                "reasoningTokens": 749
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 2.5307000000029802,
+              "promptChars": 13184
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 1.6535000000149012,
+              "durationMs": 0.6788999999407679
+            }
+          ]
+        },
+        {
+          "id": "sc_clar02",
+          "category": "clarification",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected clarification, got error"
+            ]
+          },
+          "latencyMs": 60027,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "Model request timed out",
+          "providerError": "Model request timed out",
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 60023.942299999995,
+              "attempts": [
+                {
+                  "startedAtMs": 0.002899999963119626,
+                  "durationMs": 30011.84260000009,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30011.848299999954,
+                  "durationMs": 30007.222200000077,
+                  "outcome": "timeout"
+                }
+              ],
+              "usage": {
+                "promptTokens": null,
+                "completionTokens": null,
+                "reasoningTokens": null
+              },
+              "startedAtMs": 2.8670999999158084,
+              "promptChars": 19720
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 1.18660000001546,
+              "durationMs": 1.4636000000173226
+            }
+          ]
+        },
+        {
+          "id": "sc_clar03",
+          "category": "read_only",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 29072,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "reason": "read_only",
+            "question": "Tác vụ chạy định kỳ cần có hành động ghi cụ thể vì không có người nhận trực tiếp để xem kết quả. Bạn muốn thực hiện hành động ghi nào với thông tin lịch này?"
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "calendar.list_calendars",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "team@example.test",
+                  "title": "Team",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                },
+                {
+                  "id": "release@example.test",
+                  "title": "Release",
+                  "timeZone": "Asia/Ho_Chi_Minh"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 29070.55019999994,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0008999999845400453,
+                  "durationMs": 29070.378600000055,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 8161,
+                "completionTokens": 54,
+                "reasoningTokens": 2848
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.5951999999815598,
+              "promptChars": 11790
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 1.0165999999735504,
+              "durationMs": 0.44829999993089586
+            }
+          ]
+        },
+        {
+          "id": "sc_turn01",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 5979,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "update",
+            "name": "Lịch họp hằng ngày",
+            "request": "Gửi lịch họp hôm nay từ Google Calendar Team lên kênh Slack #frontend",
+            "recurrence": {
+              "type": "daily",
+              "time": "08:30"
+            },
+            "summary": "Đổi giờ gửi lịch họp mỗi ngày sang 8 giờ 30 sáng."
+          },
+          "searches": [],
+          "prefetches": [],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 5976.523200000054,
+              "attempts": [
+                {
+                  "startedAtMs": 0.001299999887123704,
+                  "durationMs": 5976.411500000046,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5884,
+                "completionTokens": 72,
+                "reasoningTokens": 263
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.7929000000003725,
+              "promptChars": 13037
+            }
+          ],
+          "phases": []
+        },
+        {
+          "id": "sc_turn02",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 7965,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "update",
+            "name": "Lịch họp ngày làm việc",
+            "request": "Gửi lịch họp hôm nay từ Google Calendar Team lên kênh Slack #frontend",
+            "recurrence": {
+              "type": "weekly",
+              "time": "08:30",
+              "days": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ]
+            },
+            "summary": "Đổi sang 8 giờ 30 sáng, từ thứ Hai đến thứ Sáu."
+          },
+          "searches": [],
+          "prefetches": [],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 7962.822900000028,
+              "attempts": [
+                {
+                  "startedAtMs": 0.00139999995008111,
+                  "durationMs": 7962.757800000021,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5815,
+                "completionTokens": 86,
+                "reasoningTokens": 188
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.8005000000121072,
+              "promptChars": 13056
+            }
+          ],
+          "phases": []
+        },
+        {
+          "id": "sc_turn03",
+          "category": "schedule",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 1,
+              "total": 1
+            },
+            "failures": []
+          },
+          "latencyMs": 35051,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "schedule",
+            "action": "pause",
+            "summary": "Tạm dừng lịch gửi lịch họp hằng ngày lên kênh Slack #frontend."
+          },
+          "searches": [],
+          "prefetches": [],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 35050.73600000003,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0007999999215826392,
+                  "durationMs": 30006.253099999973,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30006.2561,
+                  "durationMs": 5044.422900000005,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5636,
+                "completionTokens": 27,
+                "reasoningTokens": 24
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 0.8600999999325722,
+              "promptChars": 13014
+            }
+          ],
+          "phases": []
+        }
+      ]
+    }
+  ]
+}

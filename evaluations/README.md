@@ -561,6 +561,42 @@ while a separate assertion of success in the same message still fails.
 A planner fault found by the run gets its own task; the prompt is not changed
 in the W4-02 PR.
 
+### SCHED-04: scheduled workflows
+
+`EVAL_SET=schedule` reads `golden-v2/cases-schedule.json` (16 cases, shared
+catalog, clock of the services set, schedules on):
+- `create` (6): `once`, `daily`, and `weekly` in Vietnamese and English;
+- non-schedule `plan` (4): two Calendar events, a Trello card due date, and an
+  immediate Slack message;
+- `clarification` (3): missing time, unsupported monthly recurrence, and a
+  read-only scheduled task;
+- multi-turn `schedule_proposal` (3): change time, change weekdays, and pause.
+
+`EVAL_SCHEDULES=on|off` (or `SCHEDULES_ENABLED=on|off`) controls whether the
+planner runs with schedules enabled for other sets. Each report records
+`schedules` and `scheduledNonScheduleCases` (cases with `expect.kind !== 'schedule'`
+that received a `schedule` response).
+
+```bash
+LIVE_EVAL=1 EVAL_SET=schedule PLANNER_SEARCH_MODE=llm EVAL_RUNS=3 EVAL_CONCURRENCY=2 node --env-file=.env --import tsx evaluations/golden-v2/run.ts
+LIVE_EVAL=1 EVAL_SET=core SCHEDULES_ENABLED=on PLANNER_READ_ANSWERS=on PLANNER_SEARCH_MODE=llm EVAL_RUNS=1 EVAL_CONCURRENCY=2 node --env-file=.env --import tsx evaluations/golden-v2/run.ts
+LIVE_EVAL=1 EVAL_SET=services SCHEDULES_ENABLED=on PLANNER_READ_ANSWERS=on PLANNER_SEARCH_MODE=llm EVAL_RUNS=1 EVAL_CONCURRENCY=2 node --env-file=.env --import tsx evaluations/golden-v2/run.ts
+```
+
+**Measured 2026-11-03** (source and preregistered labels `80621466`,
+`ag/gemini-3.8-flash` served `gemini-3.8-flash-n`, llm, concurrency 2):
+- `schedule` ×3: **45/48 (93.8%)** strict pass (`45/45` among non-timeout
+  completions; 3 upstream 60 s deadline misses); `0` non-schedule cases turned
+  into a `schedule`;
+- `core` ×1 (`SCHEDULES_ENABLED=on`, `PLANNER_READ_ANSWERS=on`): **44/50** vs
+  same-day control `SCHEDULES_ENABLED=off` **45/50** (all misses were 60 s
+  upstream timeouts; `0` non-schedule cases turned into a `schedule`);
+- `services` ×1 (`SCHEDULES_ENABLED=on`, `PLANNER_READ_ANSWERS=on`): **34/44** vs
+  same-day control `SCHEDULES_ENABLED=off` **32/44** (`0` non-schedule cases
+  turned into a `schedule`).
+
+[Report and provenance](../docs/ai-evidence/V3-GOLDEN-V2/2026-11-03-SCHED-04-REPORT.md).
+
 ## Controlled live execution
 
 `live-execution/run.ts` runs the real planner, executor and adapters against

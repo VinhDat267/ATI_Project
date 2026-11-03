@@ -138,7 +138,7 @@ export interface EnvConfig {
   /** The MYJIRA_ENABLED flag (default off). */
   MYJIRA_ENABLED: boolean;
   JIRA_OAUTH?: JiraOAuthConfig;
-  /** The SCHEDULES_ENABLED flag (default off). Schedules also need PostgreSQL. */
+  /** The SCHEDULES_ENABLED flag (default on). Schedules also need PostgreSQL. */
   SCHEDULES_ENABLED: boolean;
   /** False only in live without SMTP: signup and every email route answer 503 (AUTH-02b). Sandbox uses the outbox. */
   EMAIL_ENABLED: boolean;
@@ -274,7 +274,7 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
   const MYSHEETS_PICKER = MYSHEETS_ENABLED ? mysheetsPicker(env, isLive) : undefined;
   if (isLive && (MYCALENDAR_ENABLED || MYSHEETS_ENABLED)) validatePersonalGoogleProjects(env);
   if (env.SCHEDULES_ENABLED && !['on', 'off'].includes(env.SCHEDULES_ENABLED)) throw new Error('SCHEDULES_ENABLED must be on or off');
-  const SCHEDULES_ENABLED = env.SCHEDULES_ENABLED === 'on';
+  const SCHEDULES_ENABLED = env.SCHEDULES_ENABLED !== 'off';
   const TRELLO_OAUTH = trelloOAuth(env, isLive);
   const GITHUB_OAUTH = githubOAuth(env, isLive);
   const TELEGRAM_BOT = telegramBotConfig(env, isLive);
