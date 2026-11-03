@@ -34,6 +34,38 @@ describe('Jira source hygiene and revoked sources', () => {
     expect(safeGrounding.jira_issue[0].key).toBe('ATI-1');
   });
 
+  it('preserves provenance (_sourceRef and _sourceRefs) across recordObserved reduction', () => {
+    const dummyRef = {
+      binding: { atiUserId: 'user-1', grantId: 'grant-1' },
+      resourceType: 'site',
+      siteId: 'site-1',
+    };
+    let observed: Record<string, Array<Record<string, unknown>>> = {};
+    observed = recordObserved(
+      observed,
+      'jira_site',
+      [
+        {
+          id: 'site-1',
+          siteId: 'site-1',
+          cloudId: 'cloud-1',
+          name: 'Site 1',
+          secretToken: 'do-not-leak',
+          _sourceRef: dummyRef,
+          _sourceRefs: [dummyRef],
+        },
+      ],
+      ['id', 'siteId', 'cloudId', 'name', 'url']
+    );
+    expect(observed.jira_site).toHaveLength(1);
+    const site = observed.jira_site[0];
+    expect(site.id).toBe('site-1');
+    expect(site.name).toBe('Site 1');
+    expect(site.secretToken).toBeUndefined();
+    expect(site._sourceRef).toEqual(dummyRef);
+    expect(site._sourceRefs).toEqual([dummyRef]);
+  });
+
   it('does not leak status into observed entity when not part of requested fields', () => {
     let observed: Record<string, Array<Record<string, unknown>>> = {};
     observed = recordObserved(observed, 'jira_issue', [

@@ -110,7 +110,7 @@ export class JiraGuardedProvider implements LLMProvider {
       }
     }
 
-    const validateEntity = async (entity: unknown): Promise<{ valid: boolean; reason?: string }> => {
+    const validateEntity = async (entity: unknown, isExplicitJira = false): Promise<{ valid: boolean; reason?: string }> => {
       if (!entity || typeof entity !== 'object') return { valid: true };
       const rec = entity as Record<string, unknown>;
 
@@ -123,7 +123,13 @@ export class JiraGuardedProvider implements LLMProvider {
           } catch {
             return { valid: false, reason: 'invalid_evidence' };
           }
-          const decision = await policyService.revalidateSource(actor.userId, ref, { signal: input.signal });
+          if (ref.workspaceId !== actor.workspaceId || ref.binding.workspaceId !== actor.workspaceId) {
+            return { valid: false, reason: 'source_mismatch' };
+          }
+          const decision = await policyService.revalidateSource(actor.userId, ref, {
+            signal: input.signal,
+            expectedWorkspaceId: actor.workspaceId,
+          });
           if (!decision.allowed) {
             return { valid: false, reason: decision.reason };
           }
@@ -131,9 +137,10 @@ export class JiraGuardedProvider implements LLMProvider {
         return { valid: true };
       }
 
-      // If it is a Jira entity but has no sourceRefs: fail-closed
+      // Reject any unprovenanced Jira entity
       const hasJiraId = Boolean(rec.cloudId || rec.siteId);
-      if (hasJiraId) {
+      const hasJiraKey = typeof rec.key === 'string' && /^[A-Z][A-Z0-9_]+-\d+$/.test(rec.key);
+      if (isExplicitJira || hasJiraId || hasJiraKey) {
         return { valid: false, reason: 'invalid_evidence' };
       }
 
@@ -147,12 +154,8 @@ export class JiraGuardedProvider implements LLMProvider {
       : {};
 
     const observed = sanitizedWorkingMemory.__observed as Record<string, unknown[]> | undefined;
-    let anyRevokedGathered = false;
-    let revokedGatherReason: string | undefined;
 
     if (!hasAnyActiveJiraSite) {
-      anyRevokedGathered = true;
-      revokedGatherReason = 'site_disabled';
       if (observed && typeof observed === 'object') {
         const sanitizedObserved: Record<string, unknown[]> = {};
         for (const [res, list] of Object.entries(observed)) {
@@ -175,15 +178,13 @@ export class JiraGuardedProvider implements LLMProvider {
             sanitizedObserved[res] = list;
             continue;
           }
-          if (res.startsWith('jira_') || list.some((item) => extractEntitySourceRefs(item).length > 0)) {
+          const isJiraResource = res.startsWith('jira_');
+          if (isJiraResource || list.some((item) => extractEntitySourceRefs(item).length > 0 || Boolean((item as any)?.siteId || (item as any)?.cloudId))) {
             const keptList: unknown[] = [];
             for (const item of list) {
-              const check = await validateEntity(item);
+              const check = await validateEntity(item, isJiraResource);
               if (check.valid) {
                 keptList.push(item);
-              } else {
-                anyRevokedGathered = true;
-                revokedGatherReason = check.reason;
               }
             }
             sanitizedObserved[res] = keptList;
@@ -200,20 +201,15 @@ export class JiraGuardedProvider implements LLMProvider {
           if (Array.isArray(val)) {
             const kept: unknown[] = [];
             for (const item of val) {
-              const check = await validateEntity(item);
+              const check = await validateEntity(item, true);
               if (check.valid) {
                 kept.push(item);
-              } else {
-                anyRevokedGathered = true;
-                revokedGatherReason = check.reason;
               }
             }
             sanitizedWorkingMemory[key] = kept;
           } else if (val && typeof val === 'object') {
-            const check = await validateEntity(val);
+            const check = await validateEntity(val, true);
             if (!check.valid) {
-              anyRevokedGathered = true;
-              revokedGatherReason = check.reason;
               delete sanitizedWorkingMemory[key];
             }
           }
@@ -262,7 +258,15 @@ export class JiraGuardedProvider implements LLMProvider {
             blockReason = 'invalid_evidence';
             break;
           }
-          const decision = await policyService.revalidateSource(actor.userId, ref, { signal: input.signal });
+          if (ref.workspaceId !== actor.workspaceId || ref.binding.workspaceId !== actor.workspaceId) {
+            messageAllowed = false;
+            blockReason = 'source_mismatch';
+            break;
+          }
+          const decision = await policyService.revalidateSource(actor.userId, ref, {
+            signal: input.signal,
+            expectedWorkspaceId: actor.workspaceId,
+          });
           if (!decision.allowed) {
             messageAllowed = false;
             blockReason = decision.reason;
@@ -291,14 +295,130 @@ export class JiraGuardedProvider implements LLMProvider {
       }
 
       // If it's a search results turn from tool gather in the planning loop:
-      if (
+      const searchResultsMatch = msg.role === 'user' ? msg.content.match(/<search_results>([\s\S]*?)<\/search_results>/) : null;
+      if (searchResultsMatch && typeof searchResultsMatch[1] === 'string') {
+        let outcomes: any[] | null = null;
+        try {
+          outcomes = JSON.parse(searchResultsMatch[1]);
+        } catch {
+          outcomes = null;
+        }
+
+        if (Array.isArray(outcomes) && outcomes.length > 0) {
+          let modified = false;
+          let anyJiraOutcomeKept = false;
+          let lastDropReason = 'site_disabled';
+
+          const filteredOutcomes: any[] = [];
+          for (const outcome of outcomes) {
+            const toolName = typeof outcome?.tool === 'string' ? outcome.tool : '';
+            const isJiraTool = toolName.startsWith('myjira.') || toolName.startsWith('jira.');
+
+            if (!isJiraTool) {
+              filteredOutcomes.push(outcome);
+              continue;
+            }
+
+            if (!hasAnyActiveJiraSite) {
+              modified = true;
+              filteredOutcomes.push({
+                tool: outcome.tool,
+                args: outcome.args,
+                result: Array.isArray(outcome.result) ? [] : undefined,
+                error: `[Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi: site_disabled]`,
+              });
+              continue;
+            }
+
+            if (Array.isArray(outcome.result)) {
+              const keptItems: any[] = [];
+              let dropped = 0;
+              for (const item of outcome.result) {
+                const check = await validateEntity(item, isJiraTool);
+                if (check.valid) {
+                  keptItems.push(item);
+                  anyJiraOutcomeKept = true;
+                } else {
+                  dropped++;
+                  lastDropReason = check.reason || lastDropReason;
+                }
+              }
+
+              if (dropped > 0) {
+                modified = true;
+                if (keptItems.length === 0) {
+                  filteredOutcomes.push({
+                    tool: outcome.tool,
+                    args: outcome.args,
+                    result: [],
+                    error: `[Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi: ${lastDropReason}]`,
+                  });
+                } else {
+                  filteredOutcomes.push({
+                    ...outcome,
+                    result: keptItems,
+                  });
+                }
+              } else {
+                filteredOutcomes.push(outcome);
+                anyJiraOutcomeKept = true;
+              }
+            } else if (outcome.result && typeof outcome.result === 'object') {
+              const check = await validateEntity(outcome.result, isJiraTool);
+              if (check.valid) {
+                filteredOutcomes.push(outcome);
+                anyJiraOutcomeKept = true;
+              } else {
+                modified = true;
+                lastDropReason = check.reason || lastDropReason;
+                const { result: _droppedResult, ...rest } = outcome;
+                filteredOutcomes.push({
+                  ...rest,
+                  error: `[Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi: ${check.reason || 'site_disabled'}]`,
+                });
+              }
+            } else {
+              filteredOutcomes.push(outcome);
+              if (outcome.result !== undefined) {
+                anyJiraOutcomeKept = true;
+              }
+            }
+          }
+
+          if (modified) {
+            const allOutcomesAreJira = outcomes.every((o) => {
+              const t = typeof o?.tool === 'string' ? o.tool : '';
+              return t.startsWith('myjira.') || t.startsWith('jira.');
+            });
+
+            if (allOutcomesAreJira && !anyJiraOutcomeKept) {
+              sanitizedConversationHistory.push({
+                ...msg,
+                content: `[Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi: ${lastDropReason}]`,
+              });
+              continue;
+            }
+
+            const newBody = JSON.stringify(filteredOutcomes, null, 2);
+            const newContent = msg.content.replace(
+              /<search_results>[\s\S]*?<\/search_results>/,
+              `<search_results>\n${newBody}\n</search_results>`
+            );
+            sanitizedConversationHistory.push({
+              ...msg,
+              content: newContent,
+            });
+            continue;
+          }
+        }
+      } else if (
         msg.role === 'user' &&
         (msg.content.includes('Search results.') || msg.content.includes('myjira.'))
       ) {
-        if (!hasAnyActiveJiraSite || anyRevokedGathered) {
+        if (!hasAnyActiveJiraSite) {
           sanitizedConversationHistory.push({
             ...msg,
-            content: `[Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi: ${revokedGatherReason || 'site_disabled'}]`,
+            content: `[Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi: site_disabled]`,
           });
           continue;
         }

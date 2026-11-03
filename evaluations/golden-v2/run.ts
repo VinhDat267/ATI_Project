@@ -212,9 +212,12 @@ export async function runCase(golden: GoldenCase, file: GoldenFile, dryRun: bool
   });
   const memory = new WorkingMemory();
   memory.fromJSON(buildMemory(golden.memory));
+  const actor = catalog.tools.some(t => t.service === 'myjira')
+    ? { userId: 'eval-user', workspaceId: 'ws-eval', workspaceMode: 'organization' as const }
+    : undefined;
   const started = Date.now();
   let response: PlannerResponse | undefined, error: string | undefined;
-  try { response = await planner.processMessage({ userMessage: golden.prompt, history: historyOf(golden), memory, signal: options.signal, onTiming: metrics => {
+  try { response = await planner.processMessage({ userMessage: golden.prompt, history: historyOf(golden), memory, actor, signal: options.signal, onTiming: metrics => {
     phases.push(metrics);
     // Planner phases are sequential; each callback closes the current batch,
     // including parallel directory calls. Tool names alone cannot identify origin.

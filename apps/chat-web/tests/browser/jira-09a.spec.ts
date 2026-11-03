@@ -80,7 +80,14 @@ test.describe('JIRA-09A: Jira UI Foundation Browser Tests', () => {
     let onInviteHeld: () => void = () => {};
     let onInviteRelease: () => void = () => {};
 
-    // Route mocks
+    // Route mocks (register fallback first so specific routes below take precedence)
+    await page.route('**/api/**', async (route) => {
+      return route.fulfill({
+        status: 200,
+        json: { connected: false, workspaces: [], services: [], schedulesEnabled: false, runtimeMode: 'sandbox' },
+      });
+    });
+
     await page.route('**/api/connections/myjira', async (route) => {
       if (route.request().method() === 'GET') {
         if (jiraConnectionStatus === 503) {
@@ -473,6 +480,317 @@ test.describe('JIRA-09A: Jira UI Foundation Browser Tests', () => {
     await expect(page.locator('#jira')).toBeVisible();
 
     // Verify external network boundary was respected
+    expect(externalRequests).toEqual([]);
+  });
+
+  test('JIRA-10C: exercises #jira-start-conversation -> Cockpit preview -> approve -> receipt with myjira binding', async ({
+    page,
+  }) => {
+    const externalRequests: string[] = [];
+    await page.route(/atlassian\.com|api\.atlassian\.com/, (route) => {
+      externalRequests.push(route.request().url());
+      return route.abort('blockedbyclient');
+    });
+
+    const adminJwtPayload = btoa(JSON.stringify({ type: 'access', sub: 'admin-user-uuid', sid: 'session-uuid-1' }));
+    const adminToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${adminJwtPayload}.sig`;
+
+    await page.addInitScript(
+      ({ token }) => {
+        window.localStorage.setItem('wap_access_token', token);
+        window.localStorage.setItem('wap_refresh_token', 'fake-refresh-token-jira');
+        window.localStorage.setItem(
+          'wap_user',
+          JSON.stringify({
+            id: 'admin-user-uuid',
+            email: 'admin@ati.test',
+            name: 'ATI Admin',
+            role: 'admin',
+            status: 'active',
+          })
+        );
+      },
+      { token: adminToken }
+    );
+
+    const convId = '11111111-1111-4111-8111-111111111111';
+    const planId = 'plan-jira-e2e-1';
+    let planApproved = false;
+
+    const myjiraBinding = {
+      atiUserId: 'admin-user-uuid',
+      jiraAccountId: 'jira-acc-prod-1',
+      atlassianAccountId: 'atl-acc-prod-1',
+      workspaceId: 'workspace-uuid-1',
+      workspaceVersion: 1,
+      membershipVersion: 1,
+      grantId: 'grant-e2e-1',
+      identityVersion: 1,
+      siteSteps: {
+        s1: {
+          siteId: 'site-uuid-linked-1',
+          cloudId: 'cloud-site-1',
+          sitePolicyVersion: 1,
+          projectId: '10001',
+          projectPolicyVersion: 1,
+        },
+      },
+    };
+
+    const planStep = {
+      id: 's1',
+      tool: 'myjira.create_issue',
+      description: 'Tạo issue sửa lỗi OAuth 3LO trên dự án ATI',
+      args: {
+        siteId: 'site-uuid-linked-1',
+        projectKey: 'ATI',
+        issueType: 'Bug',
+        summary: 'Sửa lỗi OAuth 3LO',
+        description: 'Chi tiết lỗi đăng nhập Atlassian',
+      },
+    };
+
+    const activePlanPayload = {
+      id: planId,
+      status: 'pending',
+      summary: 'Tạo issue trên dự án ATI',
+      steps: [planStep],
+      resourceLabels: {
+        'jira_site:site-uuid-linked-1': 'Atlassian Production',
+        'jira_project:ATI': 'ATI Platform (ATI)',
+      },
+      connections: {
+        myjira: myjiraBinding,
+      },
+    };
+
+    await page.route('**/api/**', async (route) => {
+      return route.fulfill({
+        status: 200,
+        json: { connected: false, workspaces: [], services: [], schedulesEnabled: false, runtimeMode: 'sandbox' },
+      });
+    });
+
+    await page.route('**/api/connections/myjira', async (route) => {
+      return route.fulfill({
+        json: {
+          connected: true,
+          connectionState: 'connected',
+          jiraAccountId: 'jira-acc-prod-1',
+          atlassianAccountId: 'atl-acc-prod-1',
+          displayName: 'Jira Administrator',
+          sites: [{ cloudId: 'cloud-site-1', name: 'Atlassian Production', url: 'https://ati-prod.atlassian.net' }],
+        },
+      });
+    });
+
+    await page.route('**/api/jira-workspaces', async (route) => {
+      return route.fulfill({
+        json: {
+          workspaces: [
+            {
+              id: 'workspace-uuid-1',
+              name: 'Platform Engineering',
+              slug: 'platform-eng',
+              role: 'admin',
+              membershipStatus: 'active',
+              workspaceVersion: 1,
+              membershipVersion: 1,
+            },
+          ],
+        },
+      });
+    });
+
+    await page.route('**/api/jira-workspaces/*/members', async (route) => {
+      return route.fulfill({ json: { members: [] } });
+    });
+
+    await page.route('**/api/jira-workspaces/*/invites', async (route) => {
+      return route.fulfill({ json: { invites: [] } });
+    });
+
+    await page.route('**/api/jira-workspaces/*/jira-sites', async (route) => {
+      return route.fulfill({
+        json: {
+          sites: [
+            {
+              siteId: 'site-uuid-linked-1',
+              cloudId: 'cloud-site-1',
+              name: 'Atlassian Production',
+              url: 'https://ati-prod.atlassian.net',
+              active: true,
+              policyVersion: 1,
+            },
+          ],
+        },
+      });
+    });
+
+    await page.route('**/api/jira-workspaces/*/jira-capabilities', async (route) => {
+      return route.fulfill({
+        json: {
+          workspaceId: 'workspace-uuid-1',
+          sites: [
+            {
+              siteId: 'site-uuid-linked-1',
+              cloudId: 'cloud-site-1',
+              name: 'Atlassian Production',
+              url: 'https://ati-prod.atlassian.net',
+              projects: [{ id: '10001', key: 'ATI', name: 'ATI Platform' }],
+            },
+          ],
+        },
+      });
+    });
+
+    await page.route('**/api/services', async (route) => {
+      return route.fulfill({
+        json: {
+          services: [
+            {
+              id: 'myjira',
+              name: 'Atlassian Jira',
+              connected: true,
+              configured: true,
+              personalStatus: 'connected',
+            },
+          ],
+          canConfigure: true,
+          personalOAuth: ['myjira'],
+        },
+      });
+    });
+
+    await page.route('**/api/runtime', async (route) => {
+      return route.fulfill({
+        json: {
+          runtimeMode: 'sandbox',
+          myjiraEnabled: true,
+        },
+      });
+    });
+
+    await page.route('**/api/conversations', async (route) => {
+      return route.fulfill({
+        json: {
+          conversations: [{ id: convId, title: 'Tạo issue Jira', updatedAt: new Date().toISOString() }],
+        },
+      });
+    });
+
+    await page.route(`**/api/conversations/${convId}`, async (route) => {
+      return route.fulfill({
+        json: {
+          conversation: { id: convId, title: 'Tạo issue Jira', updatedAt: new Date().toISOString() },
+          messages: [
+            {
+              id: 'msg-user-1',
+              role: 'user',
+              content: 'Tạo issue Bug sửa lỗi OAuth 3LO trên dự án ATI',
+              createdAt: new Date().toISOString(),
+            },
+            {
+              id: 'msg-plan-1',
+              role: 'assistant',
+              content: 'Kế hoạch Tạo issue trên dự án ATI sẵn sàng',
+              createdAt: new Date().toISOString(),
+              metadata: {
+                type: 'plan',
+                planId,
+                plan: activePlanPayload,
+              },
+            },
+          ],
+        },
+      });
+    });
+
+    await page.route(`**/api/conversations/${convId}/plans/active`, async (route) => {
+      if (planApproved) {
+        return route.fulfill({ status: 404, json: { error: 'Not found' } });
+      }
+      return route.fulfill({ json: activePlanPayload });
+    });
+
+    await page.route(`**/api/conversations/${convId}/executions/latest`, async (route) => {
+      if (!planApproved) {
+        return route.fulfill({ status: 404, json: { error: 'Not found' } });
+      }
+      return route.fulfill({
+        json: {
+          plan: {
+            ...activePlanPayload,
+            status: 'completed',
+          },
+          execution: {
+            status: 'completed',
+          },
+          steps: [
+            {
+              stepId: 's1',
+              tool: 'myjira.create_issue',
+              status: 'succeeded',
+              durationMs: 420,
+              startedAt: new Date(Date.now() - 420).toISOString(),
+              completedAt: new Date().toISOString(),
+              output: {
+                id: '20001',
+                key: 'ATI-101',
+                url: 'https://ati-prod.atlassian.net/browse/ATI-101',
+              },
+            },
+          ],
+          recoveryActions: [],
+        },
+      });
+    });
+
+    await page.route(`**/api/conversations/${convId}/stream`, async (route) => {
+      const body = planApproved
+        ? `id: 1:1\nevent: exec_done\ndata: ${JSON.stringify({ planId, status: 'completed' })}\n\n`
+        : ': connected\n\n';
+      return route.fulfill({
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' },
+        body,
+      });
+    });
+
+    await page.route(`**/api/plans/${planId}/approve`, async (route) => {
+      planApproved = true;
+      return route.fulfill({ json: { status: 'approved', planId } });
+    });
+
+    // 1. Start at /settings#jira and click #jira-start-conversation
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/settings#jira');
+    const startCta = page.locator('#jira-start-conversation');
+    await expect(startCta).toBeEnabled();
+    await startCta.click();
+    await page.waitForURL('http://127.0.0.1:5174/');
+
+    // 2. Open conversation in Cockpit Moment 4 (Plan preview)
+    await page.goto(`/c/${convId}`);
+    await expect(page.locator('#moment-4')).toBeVisible();
+    await expect(page.getByText(/Tài khoản Atlassian: atl-acc-prod-1 · Workspace: workspace-uuid-1/i)).toBeVisible();
+    await expect(page.getByText(/Site đích: Atlassian Production · Dự án: ATI/i)).toBeVisible();
+
+    // 3. Open step preview modal and verify myjira details
+    await page.locator('#preview-s1').click();
+    await expect(page.getByText('Sửa lỗi OAuth 3LO', { exact: true })).toBeVisible();
+    await expect(page.getByText('Chi tiết lỗi đăng nhập Atlassian', { exact: true })).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    // 4. Approve plan and verify Moment 6 (Receipt) with Jira deep link
+    await page.locator('#btn-approve-plan').click();
+    await expect(page.getByText('ATI-101', { exact: true })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/Tài khoản Atlassian: atl-acc-prod-1 · Workspace: workspace-uuid-1/i)).toBeVisible();
+    await expect(page.getByText(/Site đích: Atlassian Production · Dự án: ATI/i)).toBeVisible();
+    const jiraLink = page.getByRole('link', { name: /Mở trong Jira/i });
+    await expect(jiraLink).toBeVisible();
+    await expect(jiraLink).toHaveAttribute('href', 'https://ati-prod.atlassian.net/browse/ATI-101');
+
     expect(externalRequests).toEqual([]);
   });
 });
