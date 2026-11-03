@@ -358,9 +358,7 @@ export class TelegramDigestRunner {
 
     for (const source of digestConfig.sources) {
       const allowed = READ_DIGEST_SOURCE_MAP[source.service];
-      const isLegacyGithubListIssues =
-        source.service === 'github' && source.tool === 'github.list_issues';
-      if (!allowed || (allowed.tool !== source.tool && !isLegacyGithubListIssues)) {
+      if (!allowed || allowed.tool !== source.tool) {
         return {
           status: 'blocked',
           error: `Công cụ nguồn "${source.tool}" không nằm trong danh sách chỉ đọc được phép.`,

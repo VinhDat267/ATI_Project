@@ -417,7 +417,7 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
       chatTitle: 'Đội Sản Phẩm',
       sources: [
         { service: 'mycalendar', tool: 'mycalendar.list_events', label: 'Google Calendar của bạn hôm nay' },
-        { service: 'github', tool: 'github.list_issues', args: { state: 'open' }, label: 'GitHub Issues đang mở' },
+        { service: 'github', tool: 'github.search_issues', args: { repo: 'acme/ati', query: 'open' }, label: 'GitHub Issues đang mở' },
       ],
       recurrence: { type: 'daily', time: '08:00' },
       timeZone: 'Asia/Ho_Chi_Minh',
