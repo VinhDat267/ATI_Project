@@ -463,7 +463,7 @@ async function bootstrap() {
   const notionTokens = notionAvailable && notionRepo && notionOAuthClient
     ? new NotionTokenManager(notionRepo, notionOAuthClient, env.ENCRYPTION_KEY, (userId) => realAdapterFactory.clearPersonal(userId))
     : undefined;
-  const notionConnection = notionRepo ? createNotionConnectionLookup({ repo: notionRepo }) : undefined;
+  const notionConnection = notionAvailable && notionRepo ? createNotionConnectionLookup({ repo: notionRepo }) : undefined;
 
   const jiraAvailable = Boolean(env.MYJIRA_ENABLED && env.JIRA_OAUTH && pool);
   const jiraOAuthClient = jiraAvailable ? new JiraOAuthClient(env.JIRA_OAUTH!) : undefined;
