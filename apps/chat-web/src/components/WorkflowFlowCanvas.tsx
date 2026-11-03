@@ -4,6 +4,9 @@ import assets from '../assets/cockpit-services.json';
 import type { PlanStep, StepState } from '../types';
 import { ServiceLogo } from './ServiceLogo';
 import { operation, planStepDataFlows, serviceId } from '../pages/Cockpit/presentation';
+import { PlanoraWorkflowSteps } from '../planora/workspace/PlanoraWorkflowSteps';
+
+export { PlanoraWorkflowSteps };
 
 export type WorkflowFlowMode = 'preview' | 'executing' | 'receipt' | 'schedule' | 'blueprint';
 
@@ -29,6 +32,8 @@ export interface WorkflowFlowCanvasProps {
   onSelectService?: (service: string | null) => void;
   onStepPreview?: (step: PlanStep) => void;
   className?: string;
+  variant?: 'orbital' | 'planora';
+  showStepCards?: boolean;
 }
 
 interface OrbitalServiceMeta {
@@ -296,7 +301,28 @@ export function WorkflowFlowCanvas({
   onSelectService,
   onStepPreview,
   className = '',
+  variant,
+  showStepCards,
 }: WorkflowFlowCanvasProps) {
+  if (variant === 'planora') {
+    return (
+      <PlanoraWorkflowSteps
+        steps={steps}
+        services={services}
+        stepStatuses={stepStatuses}
+        resourceLabels={resourceLabels}
+        mode={mode}
+        isAutoDigest={isAutoDigest}
+        compact={compact}
+        selectedService={controlledSelectedService}
+        onSelectService={onSelectService}
+        onStepPreview={onStepPreview}
+        className={className}
+        showStepCards={showStepCards}
+      />
+    );
+  }
+
   const [internalSelectedService, setInternalSelectedService] = useState<string | null>(null);
   const selectedService =
     controlledSelectedService !== undefined ? controlledSelectedService : internalSelectedService;
