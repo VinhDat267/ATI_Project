@@ -91,14 +91,18 @@ describe('PL-05: Planora Chat Workspace & One-Composer Policy', () => {
         />
       );
 
-      // In Moment 4 preview, composer is suppressed until user chooses to edit
-      expect(screen.queryAllByRole('textbox')).toHaveLength(0);
+      // In Moment 4 preview, exactly 1 textbox is rendered (One-Composer Policy)
+      expect(screen.getAllByRole('textbox')).toHaveLength(1);
       // Main action buttons exist
       expect(screen.getByRole('button', { name: 'Duyệt kế hoạch' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Hủy|Từ chối/ })).toBeInTheDocument();
 
-      // Clicking "Sửa qua Chat" reveals exactly 1 inline composer
+      // Clicking "Sửa qua Chat" switches to inline composer while maintaining exactly 1 textbox
       fireEvent.click(screen.getByRole('button', { name: 'Sửa qua Chat' }));
+      expect(screen.getAllByRole('textbox')).toHaveLength(1);
+
+      // Closing inline composer returns to dock composer, still exactly 1 textbox
+      fireEvent.click(screen.getByRole('button', { name: 'Đóng ô sửa' }));
       expect(screen.getAllByRole('textbox')).toHaveLength(1);
     });
 
@@ -154,6 +158,108 @@ describe('PL-05: Planora Chat Workspace & One-Composer Policy', () => {
       const textbox = screen.getByRole('textbox');
       expect(textbox).toHaveValue('Tạo issue mới trên GitHub');
       expect(onSendMessage).not.toHaveBeenCalled();
+    });
+
+    it('F1 regression: clicking "Sửa yêu cầu" after planning error preserves exactly 1 composer and allows editing and resending without auto-sending', () => {
+      const onSendMessage = vi.fn();
+      const userMessage: ChatMessage = {
+        id: 'user-req-1',
+        role: 'user',
+        content: 'Tạo thẻ Trello',
+        created_at: '2026-11-04T07:00:00.000Z',
+      };
+      const errorMessage: ChatMessage = {
+        id: 'sys-err-1',
+        role: 'system',
+        content: 'Không thể lập kế hoạch',
+        metadata: { type: 'planning_error' },
+        created_at: '2026-11-04T07:00:05.000Z',
+      };
+
+      useChatStore.setState({
+        conversationId: 'c1',
+        messages: [userMessage, errorMessage],
+        activePlan: null,
+        planStatus: 'idle',
+      });
+
+      render(
+        <PlanoraChatWorkspace
+          services={sampleServices}
+          servicesLoading={false}
+          servicesError={null}
+          onSendMessage={onSendMessage}
+          onNewConversation={vi.fn()}
+          onSelectConversation={vi.fn()}
+          onSettings={vi.fn()}
+          onApprove={vi.fn()}
+          onCancel={vi.fn()}
+          recovery={null}
+        />
+      );
+
+      // Before edit: exactly 1 composer (in bottom dock)
+      expect(screen.getAllByRole('textbox')).toHaveLength(1);
+      const editBtn = screen.getByRole('button', { name: 'Sửa yêu cầu' });
+      expect(editBtn).toBeInTheDocument();
+
+      // Click "Sửa yêu cầu"
+      fireEvent.click(editBtn);
+
+      // Does NOT auto-send
+      expect(onSendMessage).not.toHaveBeenCalled();
+
+      // Exactly 1 composer remains visible (now inside RequestMoment on stage)
+      const textboxes = screen.getAllByRole('textbox');
+      expect(textboxes).toHaveLength(1);
+      const input = textboxes[0];
+      // Input is pre-filled with the request
+      expect(input).toHaveValue('Tạo thẻ Trello');
+
+      // Edit content and send
+      fireEvent.change(input, { target: { value: 'Tạo thẻ Trello trên bảng Marketing' } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+
+      // Sent with edited text
+      expect(onSendMessage).toHaveBeenCalledWith('Tạo thẻ Trello trên bảng Marketing');
+    });
+
+    it('F3 regression: renders exactly one composer across all moments and states', () => {
+      const user: ChatMessage = { id: 'u1', role: 'user', content: 'Tạo thẻ', created_at: '2026-11-04T07:00:00.000Z' };
+      const states: [string, Record<string, any>][] = [
+        ['idle (m1)', { messages: [] }],
+        ['planning (m2)', { messages: [user], isPlanning: true }],
+        ['clarification (m3)', { messages: [user], activeClarification: { question: 'Chọn nơi', options: ['A'] } }],
+        ['preview (m4)', { messages: [user], activePlan: samplePlan, planStatus: 'preview' }],
+        ['executing (m5)', { messages: [user], activePlan: samplePlan, planStatus: 'executing' }],
+        ['completed (m6)', { messages: [user], activePlan: samplePlan, planStatus: 'completed' }],
+        ['recovery (m7)', { messages: [user], activePlan: samplePlan, planStatus: 'partial', stepStatuses: { 'step-1': 'failed' } }],
+        ['refusal', { messages: [user, { id: 'r1', role: 'assistant', content: 'Từ chối', metadata: { type: 'refusal' } }] }],
+        ['unsuccessful', { messages: [user], planStatus: 'stopped' }],
+        ['answer', { messages: [user, { id: 'a1', role: 'assistant', content: 'Trả lời', metadata: { type: 'answer' } }] }],
+        ['schedule', { conversationId: 's1', messages: [user, { id: 's1', role: 'assistant', content: '', metadata: { type: 'schedule_state', schedule: { id: 'sch-1', convId: 's1', name: 'Lịch', request: 'Tạo thẻ', recurrence: { type: 'daily', time: '08:00' }, services: ['trello'], status: 'active', version: 1, nextRuns: [], lastRun: null, pauseReason: null } } }] }],
+      ];
+
+      for (const [name, st] of states) {
+        useChatStore.getState().reset();
+        useChatStore.setState(st);
+        const { unmount } = render(
+          <PlanoraChatWorkspace
+            services={sampleServices}
+            servicesLoading={false}
+            servicesError={null}
+            onSendMessage={vi.fn()}
+            onNewConversation={vi.fn()}
+            onSelectConversation={vi.fn()}
+            onSettings={vi.fn()}
+            onApprove={vi.fn()}
+            onCancel={vi.fn()}
+            recovery={null}
+          />
+        );
+        expect(screen.getAllByRole('textbox'), `Failed for state ${name}`).toHaveLength(1);
+        unmount();
+      }
     });
   });
 
@@ -355,6 +461,73 @@ describe('PL-05: Planora Chat Workspace & One-Composer Policy', () => {
       // Scroll position should NOT jump to bottom!
       expect(container.scrollTop).toBe(100);
     });
+
+    it('F2 regression: moment transition does not reset scroll position when user is reading history', () => {
+      const messages: ChatMessage[] = Array.from({ length: 40 }, (_, i) => ({
+        id: `msg-${i}`,
+        role: i % 2 === 0 ? 'user' : 'assistant',
+        content: `Nội dung hội thoại kiểm tra cuộn tin ${i}`,
+      }));
+
+      useChatStore.setState({
+        conversationId: 'c1',
+        messages,
+        isPlanning: true,
+        planningByConversation: { c1: { startedAt: new Date().toISOString() } },
+      });
+
+      const { rerender } = render(
+        <PlanoraChatWorkspace
+          services={sampleServices}
+          servicesLoading={false}
+          servicesError={null}
+          onSendMessage={vi.fn()}
+          onNewConversation={vi.fn()}
+          onSelectConversation={vi.fn()}
+          onSettings={vi.fn()}
+          onApprove={vi.fn()}
+          onCancel={vi.fn()}
+          recovery={null}
+        />
+      );
+
+      // Verify the chat feed container has the required contract classes
+      const feed = document.querySelector('.planora-conversation-feed');
+      expect(feed).toBeInTheDocument();
+      expect(feed).toHaveClass('planora-chat-feed');
+
+      // Set scroll position
+      if (document.scrollingElement) {
+        document.scrollingElement.scrollTop = 500;
+      }
+
+      // Transition from moment 2 (planning) to moment 4 (preview)
+      useChatStore.setState({
+        isPlanning: false,
+        activePlan: samplePlan,
+        planStatus: 'preview',
+      });
+
+      rerender(
+        <PlanoraChatWorkspace
+          services={sampleServices}
+          servicesLoading={false}
+          servicesError={null}
+          onSendMessage={vi.fn()}
+          onNewConversation={vi.fn()}
+          onSelectConversation={vi.fn()}
+          onSettings={vi.fn()}
+          onApprove={vi.fn()}
+          onCancel={vi.fn()}
+          recovery={null}
+        />
+      );
+
+      // Moment transition MUST NOT forcibly reset document scroll to 0
+      if (document.scrollingElement) {
+        expect(document.scrollingElement.scrollTop).toBe(500);
+      }
+    });
   });
 
   describe('5. Reopening saved conversation (PBI-03)', () => {
@@ -390,6 +563,36 @@ describe('PL-05: Planora Chat Workspace & One-Composer Policy', () => {
       expect(savedRegion).toBeInTheDocument();
       expect(within(savedRegion).getByText('Yêu cầu cũ đã lưu')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Dùng lại yêu cầu này' })).toBeInTheDocument();
+    });
+  });
+
+  describe('6. Viewport responsiveness and desktop sidebar offset (F5)', () => {
+    it('F5 regression: composer bottom bar includes desktop sidebar offset', () => {
+      useChatStore.setState({
+        conversationId: 'c1',
+        messages: [{ id: 'u1', role: 'user', content: 'Tạo task' }],
+        isPlanning: true,
+      });
+
+      render(
+        <PlanoraChatWorkspace
+          services={sampleServices}
+          servicesLoading={false}
+          servicesError={null}
+          onSendMessage={vi.fn()}
+          onNewConversation={vi.fn()}
+          onSelectConversation={vi.fn()}
+          onSettings={vi.fn()}
+          onApprove={vi.fn()}
+          onCancel={vi.fn()}
+          recovery={null}
+        />
+      );
+
+      const bottomBar = document.getElementById('global-bottom-bar');
+      expect(bottomBar).toBeInTheDocument();
+      expect(bottomBar).toHaveClass('fixed', 'bottom-0');
+      expect(bottomBar?.className).toContain('lg:left-');
     });
   });
 });

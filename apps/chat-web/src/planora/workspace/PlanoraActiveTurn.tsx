@@ -56,6 +56,7 @@ export interface PlanoraActiveTurnProps {
   onCloseEdit?: () => void;
   drawer?: 'history' | 'conversation' | null;
   onDismissWait?: () => void;
+  responseEditing?: boolean;
 }
 
 export function PlanoraActiveTurn(props: PlanoraActiveTurnProps) {
@@ -134,7 +135,7 @@ export function PlanoraActiveTurn(props: PlanoraActiveTurnProps) {
   const variant = clarificationVariant(state.activeClarification, request ?? '');
   const expanded = moment === 3 && variant !== null;
   const slow = moment === 2 && milliseconds > 15_000;
-  const planningError = moment === 1 && terminalError?.metadata?.type === 'planning_error';
+  const planningError = moment === 1 && terminalError?.metadata?.type === 'planning_error' && !props.responseEditing;
 
   return (
     <div className="planora-active-turn w-full">

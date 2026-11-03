@@ -64,6 +64,6 @@ export function resourceDestination(step: PlanStep, labels: Record<string, strin
 }
 
 export function Cockpit(props: CockpitProps) {
-  return <PlanoraChatWorkspace {...props} />;
+  return <PlanoraChatWorkspace legacyCockpit {...props} />;
 }
 export default Cockpit;

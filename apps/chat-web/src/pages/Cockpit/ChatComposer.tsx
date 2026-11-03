@@ -66,7 +66,7 @@ export function ChatComposer({
       <footer
         ref={footer}
         id="global-bottom-bar"
-        className="fixed bottom-0 left-0 right-0 z-30 bg-[#F8F8F6]/95 dark:bg-[#202820]/95 backdrop-blur-md border-t border-[#E7E7E2] dark:border-[#394638] px-4 py-3"
+        className="fixed bottom-0 left-0 right-0 lg:left-[var(--planora-sidebar-width,248px)] z-30 bg-[#F8F8F6]/95 dark:bg-[#202820]/95 backdrop-blur-md border-t border-[#E7E7E2] dark:border-[#394638] px-4 py-3"
       >
         <div className="max-w-3xl mx-auto">
           <form
@@ -191,7 +191,7 @@ export function ChatComposer({
     <footer
       ref={footer}
       id="global-bottom-bar"
-      className={`fixed bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-[#F8F8F6] via-[#F8F8F6]/95 to-transparent dark:from-[#171c18] dark:via-[#171c18]/95 pt-6 pb-4 px-4 sm:px-6 pointer-events-none`}
+      className={`fixed bottom-0 left-0 right-0 lg:left-[var(--planora-sidebar-width,248px)] z-20 bg-gradient-to-t from-[#F8F8F6] via-[#F8F8F6]/95 to-transparent dark:from-[#171c18] dark:via-[#171c18]/95 pt-6 pb-4 px-4 sm:px-6 pointer-events-none`}
     >
       <div className="max-w-3xl mx-auto pointer-events-auto">
         <form

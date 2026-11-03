@@ -43,6 +43,7 @@ export interface PlanoraChatWorkspaceProps {
   networkError?: boolean;
   contentOverride?: ReactNode;
   canConfigureServices?: boolean;
+  legacyCockpit?: boolean;
 }
 
 const prompts: Record<string, string> = Object.fromEntries(
@@ -107,14 +108,16 @@ export function PlanoraChatWorkspace(props: PlanoraChatWorkspaceProps) {
   useLayoutEffect(() => {
     if (previousMoment.current === moment) return;
     previousMoment.current = moment;
-    const scroller = document.scrollingElement ?? document.documentElement;
-    scroller.scrollTop = 0;
-    document.body.scrollTop = 0;
+    if (props.legacyCockpit) {
+      const scroller = document.scrollingElement ?? document.documentElement;
+      scroller.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
     if (drawer || preview || document.activeElement?.closest('[role="dialog"], [role="alertdialog"], dialog[open]'))
       return;
     if (editing.current && input.current && input.current.isConnected) input.current.focus({ preventScroll: true });
     else stage.current?.querySelector<HTMLHeadingElement>('h1')?.focus({ preventScroll: true });
-  }, [moment, drawer, preview]);
+  }, [moment, drawer, preview, props.legacyCockpit]);
 
   const input = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
@@ -256,7 +259,7 @@ export function PlanoraChatWorkspace(props: PlanoraChatWorkspaceProps) {
     <>
       <div
         data-cockpit-background
-        className="planora-chat-main w-full flex-1 flex flex-col min-w-0"
+        className="planora-chat-workspace planora-chat-main w-full flex-1 flex flex-col min-w-0 h-full max-h-full overflow-hidden"
         onFocusCapture={(event) => {
           editing.current =
             (event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement) &&
@@ -291,7 +294,7 @@ export function PlanoraChatWorkspace(props: PlanoraChatWorkspaceProps) {
           ref={stage}
           id="stage-container"
           role="main"
-          className="flex-1 w-full min-w-0 flex flex-col overflow-y-auto"
+          className="flex-1 w-full min-w-0 flex flex-col min-h-0 overflow-hidden"
         >
           {state.isPlanning && <span role="status" className="sr-only">Đang lập kế hoạch…</span>}
 
@@ -347,16 +350,24 @@ export function PlanoraChatWorkspace(props: PlanoraChatWorkspaceProps) {
                   document.getElementById('btn-edit-plan')?.focus();
                 }}
                 drawer={drawer}
+                responseEditing={responseEditing}
               />
             </PlanoraConversationFeed>
           )}
         </main>
 
-        {!props.contentOverride && (![1, 3, 4].includes(moment as number) || expanded || planningError) && drawer !== 'conversation' && (
-          <div className="planora-chat-composer-dock">
-            <ChatComposer variant={moment === 'refusal' || moment === 'answer' || expanded ? 'response' : 'bottom'} {...composerProps} />
-          </div>
-        )}
+        {!props.contentOverride &&
+          (![1, 3].includes(moment as number) || expanded || planningError) &&
+          !(props.legacyCockpit && moment === 4) &&
+          !(moment === 4 && editOpen) &&
+          drawer !== 'conversation' && (
+            <div className="planora-chat-composer-dock">
+              <ChatComposer
+                variant={moment === 'refusal' || moment === 'answer' || expanded ? 'response' : 'bottom'}
+                {...composerProps}
+              />
+            </div>
+          )}
       </div>
 
       {drawer && <DrawerBackdrop onClose={() => setDrawer(null)} />}

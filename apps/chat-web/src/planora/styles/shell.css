@@ -489,3 +489,14 @@
   outline: 2px solid var(--planora-primary);
   outline-offset: 1px;
 }
+
+/* ==========================================================================
+   7. Planora Chat Workspace, Feed & Composer Layout (PL-05)
+   ========================================================================== */
+
+@media (min-width: 1024px) {
+  #global-bottom-bar,
+  #response-bottom-bar {
+    left: var(--planora-sidebar-width, 248px) !important;
+  }
+}

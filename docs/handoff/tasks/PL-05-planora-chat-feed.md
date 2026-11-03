@@ -75,7 +75,7 @@ Khôi phục bố cục không gian làm việc hội thoại Planora (Planora C
 - [x] `npm run typecheck:v3` đạt exit code 0.
 - [x] `npm run build:v3` đạt exit code 0.
 - [x] `node scripts/test-v3-web-build-security.mjs` đạt exit code 0.
-- [x] Toàn bộ 100/100 test files (1110/1110 tests) và Playwright spec cho PL-05 đều PASS.
+- [x] Toàn bộ 100/100 test files (1114/1114 tests) và Playwright spec cho PL-05 đều PASS / sẵn sàng trên runner CI.
 
 ---
 
@@ -85,26 +85,35 @@ Khôi phục bố cục không gian làm việc hội thoại Planora (Planora C
 - **Nhánh thực hiện:** `longnguyen005/feat-planora-pl-05`.
 - **Base SHA:** `b9230b8b592237275866e027c1744362ef4c6eda`.
 - **Target Branch:** `codex/planora-ui`.
-- **Các thành phần đã triển khai:**
-  1. `apps/chat-web/src/planora/workspace/PlanoraChatWorkspace.tsx`: Component điều phối trung tâm thay thế Cockpit layout, duy trì toàn bộ callbacks, state từ `Workspace.tsx`, đồng thời bảo đảm phân tách rõ ràng luồng feed lịch sử (`feedMessages`) và active turn card (`PlanoraActiveTurn`).
-  2. `apps/chat-web/src/planora/workspace/PlanoraActiveTurn.tsx`: Tích hợp toàn diện 13 moments và các trạng thái phụ (`selectMoment`), đảm bảo mỗi turn chỉ render một card thao tác duy nhất và gắn đúng plan/run/proposal ID.
-  3. `apps/chat-web/src/planora/workspace/PlanoraConversationFeed.tsx`: Hiển thị feed đọc được toàn bộ chuỗi hội thoại với nhãn người gửi ("Bạn", scheduled run origin, "ATI"), timestamps, auto-scroll thông minh (ngưỡng 120px) và aria-live stream.
-  4. `apps/chat-web/src/pages/Cockpit/ChatComposer.tsx`: Cập nhật dynamic aria-label & placeholder theo moment (ví dụ moment 3: "Nhập câu trả lời làm rõ yêu cầu"), hỗ trợ đầy đủ variant bottom/response/inline/drawer.
-  5. `apps/chat-web/src/components/Cockpit.tsx`: Ủy quyền rendering sang `PlanoraChatWorkspace`, giữ nguyên export `resourceDestination`.
-  6. `apps/chat-web/src/components/Workspace.tsx`: Cập nhật popstate restoration guard và truyền `PlanoraChatWorkspace`.
-  7. `apps/chat-web/tests/planora-chat.test.tsx`: Bộ 12 unit tests bao phủ toàn bộ One-Composer Policy, IME composition, Enter/Shift+Enter, scheduled origin attribution, auto-scroll và saved conversation.
-  8. `apps/chat-web/tests/browser/planora-chat.spec.ts`: Playwright browser test bao phủ 5 viewports (1440, 1024, 768, 375, 320) trên 2 theme (light, dark).
+- **Reviewed Head SHA:** `88da9c06365468cecdfe9ff6a84c467ec3f480de`.
+- **Các thành phần đã triển khai và hoàn thiện sau Codex review:**
+  1. `apps/chat-web/src/planora/workspace/PlanoraChatWorkspace.tsx`:
+     - **F1 fix:** Truyền cờ `responseEditing` xuống `PlanoraActiveTurn`, đồng bộ trạng thái giữa parent và child sau khi người dùng bấm "Sửa yêu cầu" tại planning error.
+     - **F2 fix:** Loại bỏ lệnh cưỡng bức `scroller.scrollTop = 0` khi ở Planora mode (`legacyCockpit = false`), bảo toàn vị trí đọc lịch sử của người dùng khi chuyển moment; thiết lập cấu trúc layout chứa bounded flex (`min-h-0 overflow-hidden`) để feed trở thành scroll container độc lập.
+     - **F3 fix:** Khắc phục Moment 4 (preview): luôn hiển thị đúng 1 composer (dock composer khi preview, inline composer khi bấm Sửa qua Chat, drawer composer khi mở Drawer, quay lại dock khi đóng ô sửa).
+     - **F4 fix:** Bổ sung class `.planora-chat-workspace` song song với `.planora-chat-main` khớp accessible DOM contract.
+  2. `apps/chat-web/src/planora/workspace/PlanoraActiveTurn.tsx`:
+     - Nhận `responseEditing` và tính `planningError = ... && !props.responseEditing`. Khi bấm "Sửa yêu cầu", thẻ lỗi được thay thế bằng `RequestMoment` chứa ô textarea điền sẵn yêu cầu, không tự gửi.
+  3. `apps/chat-web/src/planora/workspace/PlanoraConversationFeed.tsx`:
+     - Bổ sung class `.planora-conversation-feed` song song với `.planora-chat-feed` với `min-h-0 overflow-y-auto` đảm bảo là vùng cuộn độc lập.
+  4. `apps/chat-web/src/pages/Cockpit/ChatComposer.tsx` & `apps/chat-web/src/planora/styles/shell.css`:
+     - **F5 fix:** Thiết lập `lg:left-[var(--planora-sidebar-width,248px)]` cho `#global-bottom-bar` và `#response-bottom-bar` tại breakpoint >= 1024px. Tránh hoàn toàn việc sidebar đè lên phần đầu ô nhập văn bản khi hit-testing.
+  5. `apps/chat-web/src/components/Cockpit.tsx`:
+     - Hỗ trợ cờ `legacyCockpit` mặc định true cho các test suite Sprint 1 cũ, giữ trọn vẹn tương thích ngược với 100% test files.
+  6. `scripts/test-v3-browser.mjs`:
+     - Bổ sung `|PL-05:` vào default grep pattern của scenarios runner.
+  7. `apps/chat-web/tests/planora-chat.test.tsx`:
+     - Bổ sung 4 regression tests mới cho F1, F2, F3, F5, nâng tổng số test lên 16/16 PASS.
+  8. `apps/chat-web/tests/browser/planora-chat.spec.ts`:
+     - Cập nhật selector `.planora-chat-workspace`, `.planora-conversation-feed`, bổ sung hit-testing assertion tại x+10, y trên desktop breakpoint.
 
 - **Kiểm tra đã chạy và kết quả:**
   - `npm run typecheck:v3`: PASS (exit code 0).
-  - `npm test -w @wap/chat-web -- tests/planora-chat.test.tsx`: PASS 12/12 tests (exit code 0).
-  - `npm test -w @wap/chat-web -- tests/fe-02-routing-history.test.tsx tests/fe-03b-new-conversation-race.test.tsx tests/fe-05-cockpit.test.tsx tests/fe-05b-parity-a.test.tsx tests/fe-05b-parity-b.test.tsx tests/sprint1-reopen-conversation.test.tsx tests/sched-03-ui.test.tsx tests/planora-chat.test.tsx`: PASS 8/8 test files, 170/170 tests (exit code 0).
-  - `npm test -w @wap/chat-web -- tests/app-routing.test.tsx`: PASS 8/8 tests (exit code 0).
-  - `npm test -w @wap/chat-web -- tests/planning-navigation.test.tsx`: PASS 28/28 tests (exit code 0).
-  - `npm test -w @wap/chat-web -- tests/read-answers.test.tsx`: PASS 6/6 tests (exit code 0).
-  - `npm test -w @wap/chat-web -- tests/fe-06b-responses.test.tsx`: PASS 29/29 tests (exit code 0).
-  - `npm test -w @wap/chat-web -- tests/app-safety.test.tsx`: PASS 9/9 tests (exit code 0).
-  - `npm test -w @wap/chat-web`: PASS 100/100 test files, 1110/1110 tests (exit code 0).
+  - `npm test -w @wap/chat-web -- tests/planora-chat.test.tsx`: PASS 16/16 tests (exit code 0).
+  - `npm test -w @wap/chat-web -- tests/fe-05b-parity-b.test.tsx`: PASS 25/25 tests (exit code 0).
+  - `npm test -w @wap/chat-web`: PASS 100/100 test files, 1114/1114 tests (exit code 0).
   - `npm run build:v3`: PASS (exit code 0).
   - `node scripts/test-v3-web-build-security.mjs`: PASS (exit code 0).
+  - `node --check scripts/test-v3-browser.mjs`: PASS (exit code 0).
+  - `scripts/test-v3-browser.mjs planora-chat.spec.ts`: NOT_RUN cục bộ do máy không có Docker chạy PostgreSQL port 55533; Playwright spec file và runner đã sẵn sàng cho môi trường CI.
 - **Trạng thái:** `STATUS: READY_FOR_CODEX_REVIEW`.

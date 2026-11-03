@@ -46,6 +46,18 @@ for (const vp of VIEWPORTS) {
       });
       await expect(composer).toBeVisible();
 
+      // F5 regression: hit-test at start of composer textarea must not hit sidebar
+      if (vp.width >= 1024) {
+        const inputReceivesClick = await page.evaluate(() => {
+          const t = document.querySelector('textarea');
+          if (!t) return false;
+          const r = t.getBoundingClientRect();
+          const at = document.elementFromPoint(r.x + 10, r.y + r.height / 2);
+          return at === t || t.contains(at);
+        });
+        expect(inputReceivesClick).toBe(true);
+      }
+
       // No horizontal overflow
       const noOverflow = await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth
