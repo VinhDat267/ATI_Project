@@ -26,7 +26,7 @@ describe('LandingPage — Make.com Orbital & OAuth 1-Click Redesign', () => {
     window.history.replaceState({}, '', '/');
   });
 
-  it('Item #1: renders Hero Orbital Flow Showcase with trust pills, 3 interactive playbook tabs, Router node, and no dangling dot', () => {
+  it('Item #1: renders Planora Hero Rotator with trust pills, 14 paper edge layers, and no dangling dot', () => {
     const navigate = vi.fn();
     const { container } = render(
       <LandingPage navigate={navigate} authConfig={{ signupEnabled: true, googleEnabled: true }} />,
@@ -39,69 +39,28 @@ describe('LandingPage — Make.com Orbital & OAuth 1-Click Redesign', () => {
     );
     expect(heroSection.textContent).not.toContain('Tài khoản mới cần quản trị viên duyệt. ·');
 
-    const preview = within(heroSection).getByTestId('landing-hero-orbital-preview');
-    expect(preview).toBeInTheDocument();
-
-    const tab0 = within(preview).getByTestId('landing-playbook-tab-0');
-    const tab1 = within(preview).getByTestId('landing-playbook-tab-1');
-    const tab2 = within(preview).getByTestId('landing-playbook-tab-2');
-    expect(tab0).toHaveTextContent(/Đồng bộ lỗi liên công cụ/i);
-    expect(tab1).toHaveTextContent(/Báo cáo lịch họp & Auto-Digest mỗi sáng/i);
-    expect(tab2).toHaveTextContent(/Điều phối công việc & lịch biểu/i);
-
-    const canvas = within(preview).getByTestId('workflow-flow-canvas');
-    expect(canvas).toHaveAttribute('data-flow-mode', 'preview');
-    expect(within(canvas).getByTestId('workflow-router-node')).toHaveAttribute('data-router-node', 'true');
-    expect(within(preview).getByText(/Dữ liệu từ Việc 1 → Việc 2/i)).toBeInTheDocument();
-
-    fireEvent.click(tab1);
-    expect(preview).toHaveTextContent(/Google Calendar/i);
-    expect(preview).toHaveTextContent(/Telegram/i);
-
-    fireEvent.click(tab2);
-    expect(preview).toHaveTextContent(/Trello/i);
-    expect(preview).toHaveTextContent(/Google Calendar/i);
+    const rotator = heroSection.querySelector('.planora-hero-rotator') as HTMLElement;
+    expect(rotator).toBeInTheDocument();
+    expect(rotator.querySelectorAll('.hero-edge-layer')).toHaveLength(14);
+    expect(heroSection.querySelector('.hero-front')).toBeInTheDocument();
+    expect(heroSection.querySelector('.hero-back')).toBeInTheDocument();
   });
 
-  it('Item #2: synchronizes the 5 interactive storytelling moments with Cockpit (Orbital Canvas, Horizontal Sheets Grid, Schedule CTA, and 5 fallback children)', () => {
+  it('Item #2: renders Planora 3-step workflow illustration (VÍ DỤ: MỘT YÊU CẦU, BA BƯỚC) replacing Make orbital canvas', () => {
     const navigate = vi.fn();
     const { container } = render(
       <LandingPage navigate={navigate} authConfig={{ signupEnabled: true, googleEnabled: true }} />,
     );
 
-    const panel1 = container.querySelector('#stage-panel-1') as HTMLElement;
-    expect(panel1).toHaveTextContent('Trello');
-    expect(panel1).toHaveTextContent('Slack');
-    expect(panel1).toHaveTextContent('GitHub');
-    expect(panel1).toHaveTextContent('Google Sheets');
-    expect(panel1).toHaveTextContent('Google Calendar');
-    expect(panel1).toHaveTextContent('Telegram');
+    const workflowSection = container.querySelector('#how') as HTMLElement;
+    expect(workflowSection).not.toBeNull();
+    expect(workflowSection).toHaveTextContent(/VÍ DỤ: MỘT YÊU CẦU, BA BƯỚC/i);
+    expect(workflowSection).toHaveTextContent(/GitHub/i);
+    expect(workflowSection).toHaveTextContent(/Trello/i);
+    expect(workflowSection).toHaveTextContent(/Slack/i);
 
-    const stage3Canvas = screen.getByTestId('landing-stage3-orbital-canvas');
-    expect(within(stage3Canvas).getByTestId('workflow-flow-canvas')).toHaveAttribute('data-flow-mode', 'preview');
-
-    const sheetsGrid = screen.getByTestId('landing-stage3-sheets-grid');
-    expect(sheetsGrid).toHaveTextContent('Cột A');
-    expect(sheetsGrid).toHaveTextContent('Cột B');
-    expect(sheetsGrid).toHaveTextContent('Cột C');
-    expect(sheetsGrid).toHaveTextContent('Cột D');
-    expect(sheetsGrid).toHaveTextContent('29/09/2026');
-    expect(sheetsGrid).toHaveTextContent('Lỗi thanh toán #42');
-    expect(sheetsGrid).toHaveTextContent('Cao');
-    expect(sheetsGrid).toHaveTextContent('Đã mở Issue #42');
-
-    const stage4Canvas = screen.getByTestId('landing-stage4-orbital-canvas');
-    expect(within(stage4Canvas).getByTestId('workflow-flow-canvas')).toHaveAttribute('data-flow-mode', 'executing');
-
-    const stage5Canvas = screen.getByTestId('landing-stage5-orbital-canvas');
-    expect(within(stage5Canvas).getByTestId('workflow-flow-canvas')).toHaveAttribute('data-flow-mode', 'receipt');
-    expect(screen.getByTestId('landing-stage5-schedule-cta')).toHaveTextContent(
-      /Đặt lịch chạy định kỳ quy trình này/i,
-    );
-
-    const fallbackList = container.querySelector('.stage-fallback-list') as HTMLElement;
-    expect(fallbackList).not.toBeNull();
-    expect(fallbackList.querySelectorAll(':scope > div')).toHaveLength(5);
+    const stepCards = workflowSection.querySelectorAll('.workflow-step-card');
+    expect(stepCards).toHaveLength(3);
   });
 
   it('Item #3 & #4: renders Auto-Digest Morning Schedule section and 3-Layer Safety Architecture proof while preserving WCAG principles copy', () => {
