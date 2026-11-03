@@ -271,8 +271,8 @@ test('PL-05: R4 multiline composer reserves feed bottom padding and prevents ove
     const docScroll = await page.evaluate(() => document.scrollingElement?.scrollTop || 0);
     expect(docScroll).toBe(0);
 
-    // Locate the technical details toggle or action button in the active card
-    const techToggle = page.locator('#btn-tech-toggle, button:has-text("Chi tiết kỹ thuật"), button:has-text("Duyệt kế hoạch")').first();
+    // Locate the technical details toggle button at the bottom of the active plan card (Finding R5)
+    const techToggle = page.locator('#btn-tech-toggle');
     await expect(techToggle).toBeVisible();
 
     const toggleBox = (await techToggle.boundingBox())!;
@@ -286,6 +286,11 @@ test('PL-05: R4 multiline composer reserves feed bottom padding and prevents ove
       return target === el || el.contains(target);
     });
     expect(hitTarget).toBe(true);
+
+    // Wheel over feed and verify document does not scroll (locking secondary scrollbar)
+    await page.mouse.wheel(0, 1000);
+    const docScrollAfterWheel = await page.evaluate(() => document.scrollingElement?.scrollTop || 0);
+    expect(docScrollAfterWheel).toBe(0);
   } finally {
     await pool.end();
   }
