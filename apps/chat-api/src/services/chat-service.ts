@@ -1242,9 +1242,13 @@ export class ChatService {
 
     // Retrieve previous messages for conversation context
     const conv = this.convRepo ? await this.convRepo.getConversation(conversationId) : null;
+    const hasJiraContext = Boolean(conv?.jira_context);
     const rawPreviousMessages = await this.msgRepo.listMessages(conversationId);
     const previousMessages = this.jiraHistorySanitizer
-      ? await this.jiraHistorySanitizer.sanitizeMessages(userId, rawPreviousMessages, conv?.workspace_id ?? undefined)
+      ? await this.jiraHistorySanitizer.sanitizeMessages(userId, rawPreviousMessages, {
+          expectedWorkspaceId: conv?.workspace_id ?? undefined,
+          hasJiraContext,
+        })
       : rawPreviousMessages;
     const lastMemory = [...previousMessages].reverse().find((m: any) => m.metadata?.type === 'working_memory');
     const history: ChatMessage[] = previousMessages

@@ -20,7 +20,7 @@ import { JiraPolicyService } from '../../src/services/jira/jira-policy-service.j
 import { JiraHistorySanitizer } from '../../src/services/jira/jira-history-sanitizer.js';
 import { ChatService } from '../../src/services/chat-service.js';
 import { ConversationRepo } from '../../src/db/repositories/conversation-repo.js';
-import { MessageRepo } from '../../src/db/repositories/message-repo.js';
+import { MessageRepo, type MessageRow } from '../../src/db/repositories/message-repo.js';
 import { PlanRepo } from '../../src/db/repositories/plan-repo.js';
 import { UserRepo } from '../../src/db/repositories/user-repo.js';
 import { SessionRepo } from '../../src/db/repositories/session-repo.js';
@@ -1976,6 +1976,161 @@ Continue: search again if a resource is still unresolved, otherwise return a pla
       } finally {
         client2.release();
       }
+    });
+
+    it('fails closed when jiraPolicyService is unavailable, even when PostgreSQL has active grant and site rows', async () => {
+      const f = await setupFixture();
+
+      // Ensure PostgreSQL has active workspace, membership, user, account, grant, site, and project rows
+      const siteCheck = await pool.query(
+        `SELECT s.id, s.active, g.status as grant_status FROM ati_workspace_jira_sites s
+         JOIN jira_grant_sites gs ON gs.cloud_id = s.cloud_id
+         JOIN jira_oauth_grants g ON g.id = gs.grant_id
+         WHERE s.id = $1`,
+        [f.siteId]
+      );
+      expect(siteCheck.rowCount).toBeGreaterThan(0);
+      expect(siteCheck.rows[0].active).toBe(true);
+      expect(siteCheck.rows[0].grant_status).toBe('active');
+
+      // Setup JiraGuardedProvider with jiraPolicyService: undefined (e.g. MYJIRA_ENABLED off or OAuth unconfigured)
+      let receivedInput: any;
+      const baseProvider = {
+        name: 'recording-provider',
+        async generatePlan(input: any) {
+          receivedInput = input;
+          return JSON.stringify({ kind: 'clarification', question: 'Done' });
+        },
+      };
+
+      const guardedProvider = new JiraGuardedProvider(baseProvider, {
+        pool,
+        jiraPolicyService: undefined, // Real verifier is unavailable
+        actor: { userId: f.userId, workspaceId: f.workspaceId },
+      });
+
+      const provenancedSiteEntity = {
+        id: f.siteId,
+        siteId: f.siteId,
+        cloudId: f.cloudId,
+        name: 'Active Jira Site In PostgreSQL',
+        _sourceRef: f.sourceRef,
+      };
+
+      const assistantMessageWithJiraSource = {
+        role: 'assistant' as const,
+        content: 'Active Jira site details from PostgreSQL that must not reach model when verifier unavailable',
+        sourceRefs: [f.sourceRef],
+        metadata: { sourceRefs: [f.sourceRef] },
+      };
+
+      await guardedProvider.generatePlan({
+        systemPrompt: 'system prompt',
+        conversationHistory: [
+          { role: 'user', content: 'What are my Jira sites?' },
+          assistantMessageWithJiraSource,
+        ],
+        toolCatalog: [...ALL_TOOLS, ...MYJIRA_TOOLS],
+        workingMemory: {
+          jira_site: [provenancedSiteEntity],
+          __observed: {
+            jira_site: [provenancedSiteEntity],
+          },
+        },
+      });
+
+      // 1. workingMemory: Jira entities MUST be completely purged
+      const observedSites = receivedInput.workingMemory.__observed?.jira_site;
+      expect(observedSites === undefined || observedSites.length === 0).toBe(true);
+      expect(receivedInput.workingMemory.jira_site).toBeUndefined();
+      expect(JSON.stringify(receivedInput.workingMemory)).not.toContain('Active Jira Site In PostgreSQL');
+
+      // 2. conversationHistory: Jira message MUST be masked with provider_unavailable
+      expect(receivedInput.conversationHistory[1].content).toContain(
+        '[Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi: provider_unavailable]'
+      );
+      expect(receivedInput.conversationHistory[1].content).not.toContain('Active Jira site details');
+
+      // 3. toolCatalog: all myjira.* tools MUST be removed
+      const remainingJiraTools = receivedInput.toolCatalog.filter((t: any) => t.name.startsWith('myjira.'));
+      expect(remainingJiraTools.length).toBe(0);
+    });
+
+    it('sanitizer strictly masks Jira assistant messages lacking source evidence when conversation has jira_context', async () => {
+      const f = await setupFixture();
+      const verifier = {
+        verifyUserPermissions: async () => ({
+          status: 'granted' as const,
+          canBrowse: true,
+          canCreateIssue: true,
+          canAddComment: true,
+        }),
+      };
+      const policyService = new JiraPolicyService({ pool, verifier });
+      const sanitizer = new JiraHistorySanitizer(policyService);
+
+      const messageWithEmptyMetadata: MessageRow = {
+        id: randomUUID(),
+        conv_id: f.conversationId,
+        role: 'assistant',
+        content: 'Revoked Jira issue details that must never leak without sourceRefs',
+        metadata: { type: 'answer' },
+        created_at: new Date(),
+      };
+
+      const messageWithNullMetadata: MessageRow = {
+        id: randomUUID(),
+        conv_id: f.conversationId,
+        role: 'assistant',
+        content: 'Another revoked Jira secret with null metadata',
+        metadata: null,
+        created_at: new Date(),
+      };
+
+      // 1. In a non-Jira conversation (hasJiraContext: false), generic non-Jira answers are preserved
+      const preserved = await sanitizer.sanitizeMessage(f.userId, {
+        id: randomUUID(),
+        conv_id: f.conversationId,
+        role: 'assistant',
+        content: 'General non-Jira text',
+        metadata: { type: 'answer' },
+        created_at: new Date(),
+      }, { expectedWorkspaceId: f.workspaceId, hasJiraContext: false });
+      expect(preserved.content).toBe('General non-Jira text');
+      expect((preserved.metadata as any)?.masked).toBeUndefined();
+
+      // 2. In a Jira conversation (hasJiraContext: true), assistant messages with empty or answer-only metadata MUST be masked with invalid_evidence
+      const sanitized1 = await sanitizer.sanitizeMessage(f.userId, messageWithEmptyMetadata, {
+        expectedWorkspaceId: f.workspaceId,
+        hasJiraContext: true,
+      });
+      expect(sanitized1.content).not.toContain('Revoked Jira issue details');
+      expect(sanitized1.content).toContain('[Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi: invalid_evidence]');
+      expect(sanitized1.metadata).toEqual({ masked: true, maskReason: 'invalid_evidence' });
+
+      const sanitized2 = await sanitizer.sanitizeMessage(f.userId, messageWithNullMetadata, {
+        expectedWorkspaceId: f.workspaceId,
+        hasJiraContext: true,
+      });
+      expect(sanitized2.content).not.toContain('Another revoked Jira secret');
+      expect(sanitized2.content).toContain('[Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi: invalid_evidence]');
+      expect(sanitized2.metadata).toEqual({ masked: true, maskReason: 'invalid_evidence' });
+
+      // 3. User messages in Jira conversation are NEVER masked
+      const userMsg: MessageRow = {
+        id: randomUUID(),
+        conv_id: f.conversationId,
+        role: 'user',
+        content: 'What is the status of PROJ-123?',
+        metadata: null,
+        created_at: new Date(),
+      };
+      const sanitizedUser = await sanitizer.sanitizeMessage(f.userId, userMsg, {
+        expectedWorkspaceId: f.workspaceId,
+        hasJiraContext: true,
+      });
+      expect(sanitizedUser.content).toBe('What is the status of PROJ-123?');
+      expect(sanitizedUser.metadata).toBeNull();
     });
   });
 });

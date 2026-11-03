@@ -14,6 +14,7 @@ export interface JiraGuardedProviderOptions {
     workspaceId?: string | null;
     workspaceMode?: 'legacy' | 'personal' | 'organization';
   };
+  hasJiraContext?: boolean;
 }
 
 function extractEntitySourceRefs(entity: unknown): JiraSourceRef[] {
@@ -66,29 +67,12 @@ export class JiraGuardedProvider implements LLMProvider {
       return input;
     }
 
-    const policyService = this.options.jiraPolicyService ?? (
-      this.options.pool
-        ? new JiraPolicyService({
-            pool: this.options.pool,
-            verifier: {
-              verifyUserPermissions: async () => ({
-                status: 'granted' as const,
-                canBrowse: true,
-                canCreateIssue: true,
-                canAddComment: true,
-              }),
-            },
-          })
-        : undefined
-    );
-
-    if (!policyService) {
-      return input;
-    }
+    const policyService = this.options.jiraPolicyService;
 
     // Check if the user has at least one active Jira site with an active grant in this workspace (for toolCatalog)
+    // Only perform the database check if a valid policyService (with real verifier) is available; otherwise fail closed.
     let hasAnyActiveJiraSite = false;
-    if (this.options.pool) {
+    if (policyService && this.options.pool) {
       try {
         const productType = ['ji', 'ra'].join('');
         const activeCheck = await this.options.pool.query(
@@ -116,6 +100,9 @@ export class JiraGuardedProvider implements LLMProvider {
 
       const refs = extractEntitySourceRefs(entity);
       if (refs.length > 0) {
+        if (!policyService) {
+          return { valid: false, reason: 'provider_unavailable' };
+        }
         for (const rawRef of refs) {
           let ref: JiraSourceRef;
           try {
@@ -249,28 +236,33 @@ export class JiraGuardedProvider implements LLMProvider {
       if (msgSourceRefs.length > 0) {
         let messageAllowed = true;
         let blockReason = 'invalid_evidence';
-        for (const rawRef of msgSourceRefs) {
-          let ref: JiraSourceRef;
-          try {
-            ref = validateJiraSourceRef(rawRef);
-          } catch {
-            messageAllowed = false;
-            blockReason = 'invalid_evidence';
-            break;
-          }
-          if (ref.workspaceId !== actor.workspaceId || ref.binding.workspaceId !== actor.workspaceId) {
-            messageAllowed = false;
-            blockReason = 'source_mismatch';
-            break;
-          }
-          const decision = await policyService.revalidateSource(actor.userId, ref, {
-            signal: input.signal,
-            expectedWorkspaceId: actor.workspaceId,
-          });
-          if (!decision.allowed) {
-            messageAllowed = false;
-            blockReason = decision.reason;
-            break;
+        if (!policyService) {
+          messageAllowed = false;
+          blockReason = 'provider_unavailable';
+        } else {
+          for (const rawRef of msgSourceRefs) {
+            let ref: JiraSourceRef;
+            try {
+              ref = validateJiraSourceRef(rawRef);
+            } catch {
+              messageAllowed = false;
+              blockReason = 'invalid_evidence';
+              break;
+            }
+            if (ref.workspaceId !== actor.workspaceId || ref.binding.workspaceId !== actor.workspaceId) {
+              messageAllowed = false;
+              blockReason = 'source_mismatch';
+              break;
+            }
+            const decision = await policyService.revalidateSource(actor.userId, ref, {
+              signal: input.signal,
+              expectedWorkspaceId: actor.workspaceId,
+            });
+            if (!decision.allowed) {
+              messageAllowed = false;
+              blockReason = decision.reason;
+              break;
+            }
           }
         }
         if (!messageAllowed) {
@@ -284,7 +276,7 @@ export class JiraGuardedProvider implements LLMProvider {
 
       // If an assistant message is Jira-related but has NO sourceRefs:
       if (msg.role === 'assistant') {
-        const isJira = isJiraRelatedMessage(msg, meta);
+        const isJira = Boolean(this.options.hasJiraContext) || isJiraRelatedMessage(msg, meta);
         if (isJira && msgSourceRefs.length === 0) {
           sanitizedConversationHistory.push({
             ...msg,

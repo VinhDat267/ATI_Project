@@ -247,14 +247,20 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
         return;
       }
       const rawLatest = messages[messages.length - 1];
-      const latest = conversation?.jira_context && rawLatest
+      const hasJiraContext = Boolean(conversation?.jira_context);
+      const latest = rawLatest
         ? options.jiraHistorySanitizer
-          ? await options.jiraHistorySanitizer.sanitizeMessage(userId, rawLatest, conversation.workspace_id ?? undefined)
-          : rawLatest.role === 'user' ? rawLatest : {
-              ...rawLatest,
-              content: '[Nội dung Jira đã bị ẩn do quyền truy cập không khả dụng]',
-              metadata: { masked: true, maskReason: 'provider_unavailable' },
-            }
+          ? await options.jiraHistorySanitizer.sanitizeMessage(userId, rawLatest, {
+              expectedWorkspaceId: conversation?.workspace_id ?? undefined,
+              hasJiraContext,
+            })
+          : hasJiraContext && rawLatest.role !== 'user'
+            ? {
+                ...rawLatest,
+                content: '[Nội dung Jira đã bị ẩn do quyền truy cập không khả dụng]',
+                metadata: { masked: true, maskReason: 'provider_unavailable' },
+              }
+            : rawLatest
         : rawLatest;
       res.status(200).json(latest);
     } catch (err: any) {
@@ -292,15 +298,19 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
       }
 
       const rawMessages = await msgRepo.listMessages(conversationId);
-      const messages = conversation?.jira_context
-        ? options.jiraHistorySanitizer
-          ? await options.jiraHistorySanitizer.sanitizeMessages(userId, rawMessages, conversation.workspace_id ?? undefined)
-          : rawMessages.map((message) => message.role === 'user' ? message : {
+      const hasJiraContext = Boolean(conversation?.jira_context);
+      const messages = options.jiraHistorySanitizer
+        ? await options.jiraHistorySanitizer.sanitizeMessages(userId, rawMessages, {
+            expectedWorkspaceId: conversation?.workspace_id ?? undefined,
+            hasJiraContext,
+          })
+        : hasJiraContext
+          ? rawMessages.map((message) => message.role === 'user' ? message : {
               ...message,
               content: '[Nội dung Jira đã bị ẩn do quyền truy cập không khả dụng]',
               metadata: { masked: true, maskReason: 'provider_unavailable' },
             })
-        : rawMessages;
+          : rawMessages;
       res.status(200).json({ conversation, messages });
     } catch (err: any) {
       res.status(500).json({ error: err?.message || 'Failed to fetch conversation' });

@@ -15,6 +15,11 @@ export function isJiraRelatedMessage(message: { role: string; content?: string }
   return false;
 }
 
+export interface JiraSanitizeOptions {
+  expectedWorkspaceId?: string;
+  hasJiraContext?: boolean;
+}
+
 export class JiraHistorySanitizer {
   constructor(private readonly policy: Pick<JiraPolicyService, 'revalidateSource'>) {}
 
@@ -26,26 +31,58 @@ export class JiraHistorySanitizer {
     };
   }
 
-  async sanitizeMessage(userId: string, message: MessageRow, expectedWorkspaceId?: string): Promise<MessageRow> {
+  async sanitizeMessage(
+    userId: string,
+    message: MessageRow,
+    optionsOrWorkspaceId?: string | JiraSanitizeOptions,
+    legacyHasJiraContext?: boolean
+  ): Promise<MessageRow> {
     if (message.role === 'user' || message.role === 'system') return message;
 
-    let metadata: unknown;
-    try { metadata = typeof message.metadata === 'string' ? JSON.parse(message.metadata) : message.metadata; }
-    catch { return message; }
+    let expectedWorkspaceId: string | undefined;
+    let hasJiraContext = false;
+    if (typeof optionsOrWorkspaceId === 'string') {
+      expectedWorkspaceId = optionsOrWorkspaceId;
+      hasJiraContext = Boolean(legacyHasJiraContext);
+    } else if (optionsOrWorkspaceId && typeof optionsOrWorkspaceId === 'object') {
+      expectedWorkspaceId = optionsOrWorkspaceId.expectedWorkspaceId;
+      hasJiraContext = Boolean(optionsOrWorkspaceId.hasJiraContext);
+    }
 
-    if (metadata == null || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    let metadata: Record<string, unknown> | null = null;
+    if (message.metadata) {
+      if (typeof message.metadata === 'string') {
+        try {
+          const parsed = JSON.parse(message.metadata);
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            metadata = parsed as Record<string, unknown>;
+          }
+        } catch {
+          metadata = null;
+        }
+      } else if (typeof message.metadata === 'object' && !Array.isArray(message.metadata)) {
+        metadata = message.metadata as Record<string, unknown>;
+      }
+    }
+
+    if (metadata?.masked === true) {
       return message;
     }
 
-    const metaObj = metadata as Record<string, unknown>;
-    if (!isJiraRelatedMessage(message, metaObj)) {
+    const isJira = hasJiraContext || isJiraRelatedMessage(message, metadata);
+    if (!isJira) {
       return message;
     }
 
-    const sourceRefs = metaObj.sourceRefs;
+    const sourceRefs = metadata?.sourceRefs;
     if (!Array.isArray(sourceRefs) || sourceRefs.length === 0) {
       return this.masked(message, 'invalid_evidence');
     }
+
+    if (!this.policy || typeof this.policy.revalidateSource !== 'function') {
+      return this.masked(message, 'provider_unavailable');
+    }
+
     for (const rawRef of sourceRefs) {
       let ref;
       try { ref = validateJiraSourceRef(rawRef); }
@@ -59,7 +96,12 @@ export class JiraHistorySanitizer {
     return message;
   }
 
-  async sanitizeMessages(userId: string, messages: MessageRow[], expectedWorkspaceId?: string): Promise<MessageRow[]> {
-    return Promise.all(messages.map((message) => this.sanitizeMessage(userId, message, expectedWorkspaceId)));
+  async sanitizeMessages(
+    userId: string,
+    messages: MessageRow[],
+    optionsOrWorkspaceId?: string | JiraSanitizeOptions,
+    legacyHasJiraContext?: boolean
+  ): Promise<MessageRow[]> {
+    return Promise.all(messages.map((message) => this.sanitizeMessage(userId, message, optionsOrWorkspaceId, legacyHasJiraContext)));
   }
 }

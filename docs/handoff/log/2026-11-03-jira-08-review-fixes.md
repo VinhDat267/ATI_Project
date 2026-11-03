@@ -247,3 +247,30 @@
   - Tool schemas & adapters: **38/38 files PASS**, **867/867 tests PASS** (exit code 0).
   - Typecheck v3: **0 errors** (exit code 0).
   - Evaluator test suites: **26/26 files PASS**, **412/412 tests PASS** (exit code 0).
+
+- **Khắc phục đợt review thứ chín (2 phát hiện P1):**
+  - **1. [P1] Fail closed khi Jira verifier thật không khả dụng:**
+    - Cập nhật `apps/chat-api/src/services/jira/jira-provider-guard.ts`:
+      - Loại bỏ hoàn toàn khối khởi tạo fallback `JiraPolicyService` với dummy verifier luôn trả `status: 'granted'`.
+      - Khi `MYJIRA_ENABLED` tắt hoặc OAuth thiếu cấu hình, `server.ts` không tạo policy service và truyền `jiraPolicyService: undefined` vào `JiraGuardedProvider`.
+      - `JiraGuardedProvider` chuyển sang chế độ fail-closed: `hasAnyActiveJiraSite` là `false`, toàn bộ thực thể Jira trong `workingMemory` (`__observed` và các khóa gốc `jira_site`, `jira_project`, `jira_issue`) bị xóa sạch; toàn bộ tin nhắn Jira trong `conversationHistory` bị che mờ với `provider_unavailable`; toàn bộ công cụ `myjira.*` bị gỡ khỏi `toolCatalog`.
+      - Dữ liệu Jira cũ còn sót trong PostgreSQL không còn bất kỳ đường nào để tới model prompt khi không kiểm tra được quyền Atlassian hiện tại.
+    - Test: `apps/chat-api/tests/services/jira-source-guard.test.ts` bổ sung test tích hợp `fails closed when jiraPolicyService is unavailable, even when PostgreSQL has active grant and site rows` — chứng minh ngay cả khi DB có grant và site active, việc thiếu verifier thật khiến toàn bộ dữ liệu Jira bị dọn sạch khỏi `workingMemory`, tin nhắn bị che mờ và `myjira.*` bị loại khỏi catalog.
+  - **2. [P1] Truyền ngữ cảnh Jira vào sanitizer và che assistant message thiếu bằng chứng nguồn:**
+    - Cập nhật `apps/chat-api/src/services/jira/jira-history-sanitizer.ts`:
+      - Mở rộng `JiraSanitizeOptions` với `hasJiraContext?: boolean`.
+      - Trong cuộc hội thoại có `jira_context`: mọi assistant message có metadata rỗng, null, hoặc chỉ có `{ type: "answer" }` (thiếu `sourceRefs` hợp lệ) đều lập tức bị che mờ với `invalid_evidence` (`[Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi: invalid_evidence]`).
+    - Cập nhật `apps/chat-api/src/routes/conversation-routes.ts` (`GET /api/conversations/:id` và `GET /api/conversations/:id/messages/latest`):
+      - Truyền `hasJiraContext: Boolean(conversation?.jira_context)` vào `sanitizeMessages` và `sanitizeMessage`.
+    - Cập nhật `apps/chat-api/src/services/chat-service.ts` (`executePlannerPipeline`):
+      - Truyền `hasJiraContext: Boolean(conv?.jira_context)` vào `sanitizeMessages` trước khi đưa lịch sử vào planner model prompt.
+    - Tests:
+      - `apps/chat-api/tests/services/jira-source-guard.test.ts` bổ sung test tích hợp `sanitizer strictly masks Jira assistant messages lacking source evidence when conversation has jira_context`.
+      - `apps/chat-api/tests/routes/jira-shared-conversations.test.ts` bổ sung test route HTTP `masks Jira assistant history with metadata { type: "answer" } when conversation has jira_context` — xác nhận tin nhắn chứa nội dung bí mật bị che mờ hoàn toàn trên cả 2 endpoints `/api/conversations/:id` và `/api/conversations/:id/messages/latest`.
+- **Tổng kết kiểm thử sau đợt sửa thứ chín:**
+  - Toàn bộ 7 suites Jira focused: **137/137 tests PASS** (Duration: 2.84s, exit code 0).
+  - Routes tests Jira conversations: **18/18 tests PASS** (exit code 0).
+  - Planner test suites: **31/31 files PASS**, **452/452 tests PASS** (exit code 0).
+  - Executor test suites: **5/5 files PASS**, **42/42 tests PASS** (exit code 0).
+  - Typecheck v3: **0 errors** (exit code 0).
+  - Evaluator test suites: **26/26 files PASS**, **412/412 tests PASS** (exit code 0).

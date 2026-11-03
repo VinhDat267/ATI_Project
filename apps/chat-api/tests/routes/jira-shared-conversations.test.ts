@@ -16,6 +16,7 @@ import { SSEManager } from '../../src/sse/sse-manager.js';
 import type { ChatService } from '../../src/services/chat-service.js';
 import type { ExecutionService } from '../../src/services/execution-service.js';
 import type { ScheduleService } from '../../src/services/schedules/schedule-service.js';
+import { JiraHistorySanitizer } from '../../src/services/jira/jira-history-sanitizer.js';
 import {
   createIsolatedTestSchema,
   createSyntheticUser,
@@ -145,6 +146,7 @@ describe('apps/chat-api — JIRA-03 Shared Organization Workspace Conversations 
   let prodApp: ReturnType<typeof createApp>;
   let fixtureApp: ReturnType<typeof createApp>;
   let unavailApp: ReturnType<typeof createApp>;
+  let baseOptions: AppOptions;
 
   let alice: TestUser;   // Active in Org + Active in Jira
   let bob: TestUser;     // Active in Org ONLY (No Jira membership)
@@ -338,7 +340,7 @@ describe('apps/chat-api — JIRA-03 Shared Organization Workspace Conversations 
       listRuns: vi.fn().mockResolvedValue([]),
     };
 
-    const baseOptions: AppOptions = {
+    baseOptions = {
       jwtSecret,
       userRepo: rawUserRepo,
       sessionRepo: rawSessionRepo,
@@ -562,6 +564,43 @@ describe('apps/chat-api — JIRA-03 Shared Organization Workspace Conversations 
         .set('X-Workspace-Id', orgId);
       expect(latest.status).toBe(200);
       expect(JSON.stringify(latest.body)).not.toContain(secret);
+    });
+
+    it('masks Jira assistant history with metadata { type: "answer" } when conversation has jira_context', async () => {
+      const secret = 'Revoked Jira issue details';
+      const messageId = await seedMessage(scopedJiraConvId, 'assistant', secret);
+      await pool.query(
+        `UPDATE messages SET metadata = $1 WHERE id = $2`,
+        [JSON.stringify({ type: 'answer' }), messageId]
+      );
+
+      const sanitizer = new JiraHistorySanitizer({
+        revalidateSource: async () => ({ allowed: true }),
+      });
+      const appWithSanitizer = createApp({
+        ...baseOptions,
+        enableWorkspaceConversations: true,
+        jiraHistorySanitizer: sanitizer,
+      });
+
+      const detail = await request(appWithSanitizer)
+        .get(`/api/conversations/${scopedJiraConvId}`)
+        .set('Authorization', `Bearer ${alice.token}`)
+        .set('X-Workspace-Id', orgId);
+      expect(detail.status).toBe(200);
+      expect(JSON.stringify(detail.body)).not.toContain(secret);
+      expect(detail.body.messages.find((m: { id: string }) => m.id === messageId).content)
+        .toContain('[Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi: invalid_evidence]');
+      expect(detail.body.messages.find((m: { id: string }) => m.id === messageId).metadata)
+        .toEqual({ masked: true, maskReason: 'invalid_evidence' });
+
+      const latest = await request(appWithSanitizer)
+        .get(`/api/conversations/${scopedJiraConvId}/messages/latest`)
+        .set('Authorization', `Bearer ${alice.token}`)
+        .set('X-Workspace-Id', orgId);
+      expect(latest.status).toBe(200);
+      expect(JSON.stringify(latest.body)).not.toContain(secret);
+      expect(latest.body.content).toContain('[Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi: invalid_evidence]');
     });
 
     it('allows active dual-member Alice access across conversation, stream, execution, and schedule routes', async () => {
