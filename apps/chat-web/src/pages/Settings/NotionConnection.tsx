@@ -281,7 +281,7 @@ export function NotionConnection({
   };
 
   if (loading) return null;
-  if (!standalone && !data) return null;
+  if (!standalone && (!data || data.status === 'unconfigured')) return null;
 
   const status = data?.status ?? 'not_connected';
   const workspaceName = data?.workspaceName;
