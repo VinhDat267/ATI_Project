@@ -1,0 +1,32 @@
+Bạn là subagent Antigravity sử dụng Gemini, chỉ phụ trách PL-07: Answer, clarification, refusal, errors và recovery. Codex review độc lập kết quả; bạn không tự cấp nghiệm thu thay Codex.
+
+Đọc trước: AGENTS.md; docs/handoff/planora-prompts/COMMON.md; docs/handoff/PLANORA-MIGRATION-HANDOFF.md; spec và plan Planora ngày 02/11/2026; CURRENT-STATE/README và ba log mới nhất.
+
+TASK CARD: docs/handoff/tasks/PL-07-planora-responses-recovery.md
+BRANCH GỢI Ý: longnguyen005/feat-planora-pl-07
+WORKTREE: C:/Users/Admin/orca/workspaces/ATI_Project/feat-planora-pl-07
+BASE SHA: 514d982fd9fc152290feb305b0d97f2c40dda21a (trên branch codex/planora-ui)
+DEPENDENCIES: PL-05 và PL-06 đã hoàn tất và được Codex duyệt Đạt (log: docs/handoff/log/2026-11-04-codex-review-pl-06-r2.md).
+
+PHẠM VI FILE:
+- apps/chat-web/src/pages/Responses/{ResponseMoment.tsx,page.css}
+- apps/chat-web/src/pages/Errors/{PlanningErrors.tsx,page.css}
+- apps/chat-web/src/pages/Cockpit/{ClarificationMoment,RequestMoments,RecoveryMoment,RecoveryEditor,RequestEcho}.tsx
+- apps/chat-web/src/components/CockpitDialog.tsx
+- tests tương ứng trong apps/chat-web/tests/.
+
+THỰC HIỆN:
+1. Chuyển đổi card ResponseMoment (Answer có nguồn tham chiếu sources), ClarificationMoment (Moment 3), RefusalMoment (Moment 2 thiếu dịch vụ/scope/quyền kèm CTA kết nối thật).
+2. Chuyển đổi slow planning notice, planning errors, offline/auth notices và recovery moments 7, 8, 9, unsuccessful theo state hiện tại sang chuẩn CSS tokens Planora.
+3. Giữ nguyên RecoveryControls, snapshot.recoveryActions và rule edit recovery chỉ gửi sau khi Stop đúng plan thành công.
+4. Giữ connect-from-chat và nút gửi lại do người dùng chủ động bấm (không tự submit sau OAuth).
+5. Trạng thái unknown TUYỆT ĐỐI KHÔNG hiện nút Retry; Stop có modal xác nhận; Escape chỉ đóng modal, không hủy execution; handler lỗi không giả thành công.
+
+KIỂM CHỨNG BẮT BUỘC:
+- `npm run typecheck:v3` (phải exit 0).
+- `npm test -w @wap/chat-web` (phải exit 0, 101/101 test files).
+- `npm run build:v3` (phải exit 0).
+- `node scripts/test-v3-web-build-security.mjs` (phải exit 0).
+
+KẾT THÚC:
+Điền Kết quả của task card, thêm log mới YYYY-MM-DD-gemini-pl-07.md, commit đúng file (`git add <file>`, không `git add -A`). Trả packet đầy đủ theo COMMON.md với BASE_SHA/HEAD_SHA, output/exit code, ảnh và NOT_RUN. STATUS: READY_FOR_CODEX_REVIEW.
