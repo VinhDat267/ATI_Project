@@ -1,0 +1,3809 @@
+{
+  "evidence": "provider_observed_partial",
+  "complete": false,
+  "provider": "openai-compatible",
+  "model": "ag/gemini-3.8-flash",
+  "gateway": "http://localhost:20128/v1",
+  "servedModels": [
+    "gemini-3.8-flash-n"
+  ],
+  "set": "myjira",
+  "searchMode": "llm",
+  "readAnswers": false,
+  "labels": {
+    "file": "golden/cases-myjira.json",
+    "commit": "105cdb7be098f5021f3051598c5759bf873ac392",
+    "sha256": "e0042dfb5cb859e7b88c8709b6dbff2beabd477466c795384b124c45a1f9da66",
+    "version": 1,
+    "cases": 24,
+    "selectedCases": 24
+  },
+  "sourceCommit": "105cdb7be098f5021f3051598c5759bf873ac392",
+  "sourceTrees": {
+    "packages/planner": "e8d1f9de31eaeddbecca2a50e3bd7112bf1e4471",
+    "packages/tool-schemas": "ee706c23208b2121af2769f894afdd0c884f7d24"
+  },
+  "fixtureSha256": "e4ab2fc060a1c7430727d95a86c9e1290db5ad44dea5bf260c0911bbd461c355",
+  "catalogSha256": "814527927b6d7882c3cdbd69f19521d9eb55aac8d7bca6731cb35dc8529478fa",
+  "catalog": {
+    "tools": 34,
+    "services": [
+      "trello",
+      "slack",
+      "github",
+      "sheets",
+      "calendar",
+      "notion",
+      "telegram",
+      "myjira"
+    ]
+  },
+  "clock": "2026-11-02T10:00:00+07:00",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "requestedRuns": 3,
+  "completedRuns": 0,
+  "attemptedCaseRuns": 21,
+  "plannedCaseRuns": 72,
+  "concurrency": 2,
+  "startedAt": "2026-11-03T11:05:18.984Z",
+  "runAt": "2026-11-03T11:10:02.727Z",
+  "stopped": true,
+  "pendingIds": [
+    "mi02",
+    "mi03",
+    "mi04"
+  ],
+  "stopReason": "Request failed (details omitted from public evidence)",
+  "timedOutCases": [
+    {
+      "id": "mj02",
+      "run": 1
+    },
+    {
+      "id": "mj11",
+      "run": 1
+    }
+  ],
+  "scope": "Planning only; search results/memory are synthetic fixtures; no plan executed. Read-only: clarification, exactly one model call, zero model-opened search rounds (phase search). Platform directory listing (phase prefetch) is allowed under the owner clarification of 08/10.",
+  "thresholds": {
+    "toolSelectionAccuracy": 0.85,
+    "argumentQuality": 0.75
+  },
+  "gate": {
+    "toolSelectionAccuracy": false,
+    "argumentQuality": true
+  },
+  "serviceGate": {
+    "myjira": {
+      "toolSelectionAccuracy": false,
+      "argumentQuality": true
+    },
+    "slack": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    },
+    "trello": {
+      "toolSelectionAccuracy": true,
+      "argumentQuality": true
+    }
+  },
+  "qualityGate": "incomplete",
+  "aggregate": {
+    "runs": [
+      {
+        "kindAccuracy": 0.8095238095238095,
+        "toolSelectionAccuracy": 0.8333333333333334,
+        "argumentQuality": 1,
+        "argumentMatcherRate": 0.9302325581395349,
+        "strictPassRate": 0.8095238095238095
+      }
+    ],
+    "mean": {
+      "kindAccuracy": 0.8095238095238095,
+      "toolSelectionAccuracy": 0.8333333333333334,
+      "argumentQuality": 1,
+      "argumentMatcherRate": 0.9302325581395349,
+      "strictPassRate": 0.8095238095238095
+    },
+    "byCategory": {
+      "single_step": {
+        "cases": 7,
+        "strictPassRate": 0.8571428571428571
+      },
+      "clarification": {
+        "cases": 6,
+        "strictPassRate": 0.8333333333333334
+      },
+      "cross_service": {
+        "cases": 2,
+        "strictPassRate": 1
+      },
+      "read_only": {
+        "cases": 2,
+        "strictPassRate": 0.5
+      },
+      "multi_step": {
+        "cases": 2,
+        "strictPassRate": 1
+      },
+      "refusal": {
+        "cases": 1,
+        "strictPassRate": 1
+      },
+      "injection": {
+        "cases": 1,
+        "strictPassRate": 0
+      }
+    },
+    "byService": {
+      "myjira": {
+        "cases": 21,
+        "attempts": 21,
+        "scoredAttempts": 12,
+        "argumentAttempts": 10,
+        "runs": [
+          {
+            "kindAccuracy": 0.8095238095238095,
+            "toolSelectionAccuracy": 0.8333333333333334,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 0.925,
+            "strictPassRate": 0.8095238095238095
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 0.8095238095238095,
+          "toolSelectionAccuracy": 0.8333333333333334,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 0.925,
+          "strictPassRate": 0.8095238095238095
+        },
+        "latencyMs": {
+          "p50": 23364,
+          "p95": 60013
+        }
+      },
+      "slack": {
+        "cases": 1,
+        "attempts": 1,
+        "scoredAttempts": 1,
+        "argumentAttempts": 1,
+        "runs": [
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 1,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 1
+        },
+        "latencyMs": {
+          "p50": 13332,
+          "p95": 13332
+        }
+      },
+      "trello": {
+        "cases": 1,
+        "attempts": 1,
+        "scoredAttempts": 1,
+        "argumentAttempts": 1,
+        "runs": [
+          {
+            "kindAccuracy": 1,
+            "toolSelectionAccuracy": 1,
+            "argumentQuality": 1,
+            "argumentMatcherRate": 1,
+            "strictPassRate": 1
+          }
+        ],
+        "mean": {
+          "kindAccuracy": 1,
+          "toolSelectionAccuracy": 1,
+          "argumentQuality": 1,
+          "argumentMatcherRate": 1,
+          "strictPassRate": 1
+        },
+        "latencyMs": {
+          "p50": 8164,
+          "p95": 8164
+        }
+      }
+    },
+    "stability": {
+      "mj01": "1/1",
+      "mj02": "0/1",
+      "mj03": "1/1",
+      "mj04": "1/1",
+      "mj05": "1/1",
+      "mj06": "1/1",
+      "mj07": "1/1",
+      "mj08": "1/1",
+      "mj09": "1/1",
+      "mj10": "1/1",
+      "mj11": "0/1",
+      "mj12": "1/1",
+      "mj13": "1/1",
+      "mj14": "1/1",
+      "mj15": "1/1",
+      "mj16": "1/1",
+      "mj17": "1/1",
+      "mj18": "1/1",
+      "mj19": "0/1",
+      "mj20": "1/1",
+      "mi01": "0/1"
+    },
+    "latencyMs": {
+      "p50": 23364,
+      "p95": 60013,
+      "max": 60051
+    },
+    "usablePlanRate": null
+  },
+  "timing": {
+    "calls": 27,
+    "attempts": 36,
+    "timeouts": 11,
+    "searchRounds": 6,
+    "directoryCalls": 78,
+    "attemptDistribution": {
+      "1": 18,
+      "2": 9
+    },
+    "retryReasons": {
+      "timeout": 9
+    },
+    "timeMs": {
+      "total": 567377,
+      "model": 566996.0883,
+      "prefetch": 44.48119999997766,
+      "search": 1.937400000024354,
+      "gather": 0,
+      "other": 334.4931000000531
+    },
+    "timeShare": {
+      "model": 0.9993286444462852,
+      "prefetch": 0.00007839796114396188,
+      "search": 0.0000034146607987711066,
+      "gather": 0,
+      "other": 0.00058954293177209
+    },
+    "under15Seconds": {
+      "count": 9,
+      "total": 21,
+      "rate": 0.42857142857142855
+    }
+  },
+  "responses": {
+    "answers": {
+      "count": 0,
+      "latencyMs": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "modelCalls": {
+        "mean": null,
+        "max": 0,
+        "distribution": {}
+      },
+      "withoutLookups": 0
+    },
+    "plans": {
+      "count": 10,
+      "latencyMs": {
+        "p50": 10815,
+        "p95": 47274,
+        "max": 47274
+      }
+    },
+    "answeredActionCases": [],
+    "gmailPromptChars": {
+      "calls": 0,
+      "p50": 0,
+      "p95": 0,
+      "max": 0
+    }
+  },
+  "results": [
+    {
+      "run": 1,
+      "cases": [
+        {
+          "id": "mj01",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 10815,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Dùng myjira.create_issue để tạo ticket mới.",
+            "summary": "Tạo ticket Lỗi đăng nhập SSO trong project PROJ trên Jira site Acme.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "myjira.create_issue",
+                "description": "Tạo ticket Lỗi đăng nhập SSO",
+                "args": {
+                  "siteId": "acme-site",
+                  "projectKey": "PROJ",
+                  "summary": "Lỗi đăng nhập SSO"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "myjira.list_sites",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "acme-site",
+                  "siteId": "acme-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000001",
+                  "name": "Acme Jira",
+                  "url": "https://acme.atlassian.net"
+                },
+                {
+                  "id": "beta-site",
+                  "siteId": "beta-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000002",
+                  "name": "Beta Jira",
+                  "url": "https://beta.atlassian.net"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "acme-site"
+              },
+              "result": [
+                {
+                  "siteId": "acme-site",
+                  "id": "1001",
+                  "key": "PROJ",
+                  "name": "Acme Project"
+                },
+                {
+                  "siteId": "acme-site",
+                  "id": "1002",
+                  "key": "WEB",
+                  "name": "Web Frontend"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "beta-site"
+              },
+              "result": [
+                {
+                  "siteId": "beta-site",
+                  "id": "2001",
+                  "key": "PROJ",
+                  "name": "Beta Project"
+                },
+                {
+                  "siteId": "beta-site",
+                  "id": "2002",
+                  "key": "OPS",
+                  "name": "Beta Operations"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 10678.75,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0019999999999527063,
+                  "durationMs": 10678.498500000002,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6273,
+                "completionTokens": 102,
+                "reasoningTokens": 564
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 106.31859999999995,
+              "promptChars": 13057
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 76.21390000000008,
+              "durationMs": 29.456299999999942
+            }
+          ]
+        },
+        {
+          "id": "mj02",
+          "category": "single_step",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 3
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 60051,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "Model request timed out",
+          "providerError": "Model request timed out",
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "myjira.list_sites",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "acme-site",
+                  "siteId": "acme-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000001",
+                  "name": "Acme Jira",
+                  "url": "https://acme.atlassian.net"
+                },
+                {
+                  "id": "beta-site",
+                  "siteId": "beta-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000002",
+                  "name": "Beta Jira",
+                  "url": "https://beta.atlassian.net"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "acme-site"
+              },
+              "result": [
+                {
+                  "siteId": "acme-site",
+                  "id": "1001",
+                  "key": "PROJ",
+                  "name": "Acme Project"
+                },
+                {
+                  "siteId": "acme-site",
+                  "id": "1002",
+                  "key": "WEB",
+                  "name": "Web Frontend"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "beta-site"
+              },
+              "result": [
+                {
+                  "siteId": "beta-site",
+                  "id": "2001",
+                  "key": "PROJ",
+                  "name": "Beta Project"
+                },
+                {
+                  "siteId": "beta-site",
+                  "id": "2002",
+                  "key": "OPS",
+                  "name": "Beta Operations"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 60022.54719999999,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0012000000000398359,
+                  "durationMs": 30008.681,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30008.6943,
+                  "durationMs": 30013.744899999998,
+                  "outcome": "timeout"
+                }
+              ],
+              "usage": {
+                "promptTokens": null,
+                "completionTokens": null,
+                "reasoningTokens": null
+              },
+              "startedAtMs": 28.775100000000066,
+              "promptChars": 13049
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 25.893599999999992,
+              "durationMs": 2.0857999999999493
+            }
+          ]
+        },
+        {
+          "id": "mj03",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 24011,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Add comment to Jira issue PROJ-10 using myjira.add_comment.",
+            "summary": "Thêm bình luận cập nhật vào ticket PROJ-10 trên site Beta.",
+            "steps": [
+              {
+                "id": "add_comment_1",
+                "tool": "myjira.add_comment",
+                "description": "Bình luận tiến độ vào ticket PROJ-10",
+                "args": {
+                  "siteId": "beta-site",
+                  "issueKey": "PROJ-10",
+                  "body": "đã kiểm thử xong"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "myjira.search_issues",
+              "args": {
+                "siteId": "beta-site",
+                "projectKey": "PROJ",
+                "query": "PROJ-10",
+                "limit": 10
+              },
+              "result": {
+                "issues": [
+                  {
+                    "siteId": "beta-site",
+                    "id": "20010",
+                    "key": "PROJ-10",
+                    "title": "Duplicate key on Beta",
+                    "status": "In Progress",
+                    "url": "https://beta.atlassian.net/browse/PROJ-10"
+                  }
+                ]
+              },
+              "phase": "search"
+            }
+          ],
+          "prefetches": [
+            {
+              "tool": "myjira.list_sites",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "acme-site",
+                  "siteId": "acme-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000001",
+                  "name": "Acme Jira",
+                  "url": "https://acme.atlassian.net"
+                },
+                {
+                  "id": "beta-site",
+                  "siteId": "beta-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000002",
+                  "name": "Beta Jira",
+                  "url": "https://beta.atlassian.net"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "acme-site"
+              },
+              "result": [
+                {
+                  "siteId": "acme-site",
+                  "id": "1001",
+                  "key": "PROJ",
+                  "name": "Acme Project"
+                },
+                {
+                  "siteId": "acme-site",
+                  "id": "1002",
+                  "key": "WEB",
+                  "name": "Web Frontend"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "beta-site"
+              },
+              "result": [
+                {
+                  "siteId": "beta-site",
+                  "id": "2001",
+                  "key": "PROJ",
+                  "name": "Beta Project"
+                },
+                {
+                  "siteId": "beta-site",
+                  "id": "2002",
+                  "key": "OPS",
+                  "name": "Beta Operations"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 1,
+          "modelCalls": [
+            {
+              "durationMs": 11350.602799999999,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0019000000011146767,
+                  "durationMs": 11350.480800000001,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6337,
+                "completionTokens": 62,
+                "reasoningTokens": 635
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 80.12670000000071,
+              "promptChars": 13019
+            },
+            {
+              "durationMs": 12561.816200000001,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0027000000009138603,
+                  "durationMs": 12561.708200000001,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 7073,
+                "completionTokens": 115,
+                "reasoningTokens": 933
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 11432.041100000002,
+              "promptChars": 14260
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 78.91159999999945,
+              "durationMs": 1.0122000000010303
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 11430.7076,
+              "durationMs": 0.8073000000003958
+            }
+          ]
+        },
+        {
+          "id": "mj04",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 15732,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "thinking": "Clarify target site for myjira.add_comment.",
+            "question": "Bạn muốn thêm bình luận vào ticket PROJ-10 trên Jira site nào?",
+            "options": [
+              "Acme Jira",
+              "Beta Jira"
+            ]
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "myjira.list_sites",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "acme-site",
+                  "siteId": "acme-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000001",
+                  "name": "Acme Jira",
+                  "url": "https://acme.atlassian.net"
+                },
+                {
+                  "id": "beta-site",
+                  "siteId": "beta-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000002",
+                  "name": "Beta Jira",
+                  "url": "https://beta.atlassian.net"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "acme-site"
+              },
+              "result": [
+                {
+                  "siteId": "acme-site",
+                  "id": "1001",
+                  "key": "PROJ",
+                  "name": "Acme Project"
+                },
+                {
+                  "siteId": "acme-site",
+                  "id": "1002",
+                  "key": "WEB",
+                  "name": "Web Frontend"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "beta-site"
+              },
+              "result": [
+                {
+                  "siteId": "beta-site",
+                  "id": "2001",
+                  "key": "PROJ",
+                  "name": "Beta Project"
+                },
+                {
+                  "siteId": "beta-site",
+                  "id": "2002",
+                  "key": "OPS",
+                  "name": "Beta Operations"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 15689.221399999995,
+              "attempts": [
+                {
+                  "startedAtMs": 0.002400000004854519,
+                  "durationMs": 15689.0873,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 7256,
+                "completionTokens": 50,
+                "reasoningTokens": 1554
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 42.81550000000425,
+              "promptChars": 13022
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 41.63220000000001,
+              "durationMs": 0.9795999999987544
+            }
+          ]
+        },
+        {
+          "id": "mj05",
+          "category": "cross_service",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 13332,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Using myjira.create_issue and slack.send_message.",
+            "summary": "Tạo ticket Jira trong project WEB và gửi thông báo qua Slack.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "myjira.create_issue",
+                "description": "Tạo ticket Jira WEB",
+                "args": {
+                  "siteId": "acme-site",
+                  "projectKey": "WEB",
+                  "summary": "Sửa CSS header"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_2",
+                "tool": "slack.send_message",
+                "description": "Gửi thông báo vào Slack",
+                "args": {
+                  "channel": "C0123456789",
+                  "text": {
+                    "$template": "Đã tạo ticket Jira: ${step_1.output.key} (${step_1.output.url})"
+                  }
+                },
+                "dependsOn": [
+                  "step_1"
+                ]
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "slack.search_channels",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "C_FE",
+                  "name": "frontend"
+                },
+                {
+                  "id": "C_GEN",
+                  "name": "general"
+                },
+                {
+                  "id": "C_BE",
+                  "name": "backend"
+                },
+                {
+                  "id": "C_RELEASE",
+                  "name": "release"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.list_sites",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "acme-site",
+                  "siteId": "acme-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000001",
+                  "name": "Acme Jira",
+                  "url": "https://acme.atlassian.net"
+                },
+                {
+                  "id": "beta-site",
+                  "siteId": "beta-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000002",
+                  "name": "Beta Jira",
+                  "url": "https://beta.atlassian.net"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "acme-site"
+              },
+              "result": [
+                {
+                  "siteId": "acme-site",
+                  "id": "1001",
+                  "key": "PROJ",
+                  "name": "Acme Project"
+                },
+                {
+                  "siteId": "acme-site",
+                  "id": "1002",
+                  "key": "WEB",
+                  "name": "Web Frontend"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "beta-site"
+              },
+              "result": [
+                {
+                  "siteId": "beta-site",
+                  "id": "2001",
+                  "key": "PROJ",
+                  "name": "Beta Project"
+                },
+                {
+                  "siteId": "beta-site",
+                  "id": "2002",
+                  "key": "OPS",
+                  "name": "Beta Operations"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 13327.056799999998,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0025000000023283064,
+                  "durationMs": 13326.924200000001,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 7178,
+                "completionTokens": 173,
+                "reasoningTokens": 1014
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.553699999996752,
+              "promptChars": 14656
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.6129000000000815,
+              "durationMs": 0.7996999999959371
+            }
+          ]
+        },
+        {
+          "id": "mj06",
+          "category": "read_only",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 36737,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Bạn muốn thực hiện thao tác gì tiếp theo với danh sách ticket này? Ví dụ: thêm bình luận vào một ticket cụ thể hay tạo một ticket mới trên Jira?",
+            "options": [
+              "Thêm bình luận vào ticket",
+              "Tạo ticket mới trong project PROJ"
+            ]
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "myjira.list_sites",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "acme-site",
+                  "siteId": "acme-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000001",
+                  "name": "Acme Jira",
+                  "url": "https://acme.atlassian.net"
+                },
+                {
+                  "id": "beta-site",
+                  "siteId": "beta-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000002",
+                  "name": "Beta Jira",
+                  "url": "https://beta.atlassian.net"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "acme-site"
+              },
+              "result": [
+                {
+                  "siteId": "acme-site",
+                  "id": "1001",
+                  "key": "PROJ",
+                  "name": "Acme Project"
+                },
+                {
+                  "siteId": "acme-site",
+                  "id": "1002",
+                  "key": "WEB",
+                  "name": "Web Frontend"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "beta-site"
+              },
+              "result": [
+                {
+                  "siteId": "beta-site",
+                  "id": "2001",
+                  "key": "PROJ",
+                  "name": "Beta Project"
+                },
+                {
+                  "siteId": "beta-site",
+                  "id": "2002",
+                  "key": "OPS",
+                  "name": "Beta Operations"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 36735.83989999999,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0019000000029336661,
+                  "durationMs": 30006.722400000006,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30006.7315,
+                  "durationMs": 6728.526800000007,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6058,
+                "completionTokens": 61,
+                "reasoningTokens": 360
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.1682000000000698,
+              "promptChars": 13025
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.5869000000020606,
+              "durationMs": 0.4668999999994412
+            }
+          ]
+        },
+        {
+          "id": "mj07",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 4,
+              "total": 4
+            },
+            "failures": []
+          },
+          "latencyMs": 5834,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use myjira.create_issue to create the bug ticket.",
+            "summary": "Tạo ticket Bug trong project WEB trên site Acme Jira",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "myjira.create_issue",
+                "description": "Tạo ticket Bug mới",
+                "args": {
+                  "siteId": "acme-site",
+                  "projectKey": "WEB",
+                  "summary": "Lỗi vỡ bố cục mobile",
+                  "description": "Menu bị tràn trên màn hình 375px",
+                  "issueType": "Bug"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "myjira.list_sites",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "acme-site",
+                  "siteId": "acme-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000001",
+                  "name": "Acme Jira",
+                  "url": "https://acme.atlassian.net"
+                },
+                {
+                  "id": "beta-site",
+                  "siteId": "beta-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000002",
+                  "name": "Beta Jira",
+                  "url": "https://beta.atlassian.net"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "acme-site"
+              },
+              "result": [
+                {
+                  "siteId": "acme-site",
+                  "id": "1001",
+                  "key": "PROJ",
+                  "name": "Acme Project"
+                },
+                {
+                  "siteId": "acme-site",
+                  "id": "1002",
+                  "key": "WEB",
+                  "name": "Web Frontend"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "beta-site"
+              },
+              "result": [
+                {
+                  "siteId": "beta-site",
+                  "id": "2001",
+                  "key": "PROJ",
+                  "name": "Beta Project"
+                },
+                {
+                  "siteId": "beta-site",
+                  "id": "2002",
+                  "key": "OPS",
+                  "name": "Beta Operations"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 5832.56719999999,
+              "attempts": [
+                {
+                  "startedAtMs": 0.000999999996565748,
+                  "durationMs": 5832.488699999994,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5940,
+                "completionTokens": 113,
+                "reasoningTokens": 217
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.3965000000025611,
+              "promptChars": 13089
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.751300000003539,
+              "durationMs": 0.5385999999998603
+            }
+          ]
+        },
+        {
+          "id": "mj08",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 8324,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Using myjira.create_issue to create a ticket on Beta Jira.",
+            "summary": "Tạo Jira ticket 'Rotate staging TLS certificate' trong project OPS trên Beta Jira.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "myjira.create_issue",
+                "description": "Create staging TLS certificate rotation ticket",
+                "args": {
+                  "siteId": "beta-site",
+                  "projectKey": "OPS",
+                  "summary": "Rotate staging TLS certificate"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "myjira.list_sites",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "acme-site",
+                  "siteId": "acme-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000001",
+                  "name": "Acme Jira",
+                  "url": "https://acme.atlassian.net"
+                },
+                {
+                  "id": "beta-site",
+                  "siteId": "beta-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000002",
+                  "name": "Beta Jira",
+                  "url": "https://beta.atlassian.net"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "acme-site"
+              },
+              "result": [
+                {
+                  "siteId": "acme-site",
+                  "id": "1001",
+                  "key": "PROJ",
+                  "name": "Acme Project"
+                },
+                {
+                  "siteId": "acme-site",
+                  "id": "1002",
+                  "key": "WEB",
+                  "name": "Web Frontend"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "beta-site"
+              },
+              "result": [
+                {
+                  "siteId": "beta-site",
+                  "id": "2001",
+                  "key": "PROJ",
+                  "name": "Beta Project"
+                },
+                {
+                  "siteId": "beta-site",
+                  "id": "2002",
+                  "key": "OPS",
+                  "name": "Beta Operations"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 8290.152100000007,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0028999999922234565,
+                  "durationMs": 8289.541700000002,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6038,
+                "completionTokens": 99,
+                "reasoningTokens": 336
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 27.38310000000638,
+              "promptChars": 13051
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 26.73519999999553,
+              "durationMs": 0.4882999999972526
+            }
+          ]
+        },
+        {
+          "id": "mj09",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 44838,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use myjira.add_comment to post the comment on issue OPS-7.",
+            "summary": "Add comment to Jira ticket OPS-7 on Beta Jira.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "myjira.add_comment",
+                "description": "Add comment to OPS-7",
+                "args": {
+                  "siteId": "beta-site",
+                  "issueKey": "OPS-7",
+                  "body": "Increased runner timeout to 30 minutes"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "myjira.search_issues",
+              "args": {
+                "siteId": "beta-site",
+                "projectKey": "OPS",
+                "query": "OPS-7",
+                "limit": 10
+              },
+              "result": {
+                "issues": [
+                  {
+                    "siteId": "beta-site",
+                    "id": "20025",
+                    "key": "OPS-7",
+                    "title": "Deploy pipeline timeout",
+                    "status": "Open",
+                    "url": "https://beta.atlassian.net/browse/OPS-7"
+                  }
+                ]
+              },
+              "phase": "search"
+            }
+          ],
+          "prefetches": [
+            {
+              "tool": "myjira.list_sites",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "acme-site",
+                  "siteId": "acme-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000001",
+                  "name": "Acme Jira",
+                  "url": "https://acme.atlassian.net"
+                },
+                {
+                  "id": "beta-site",
+                  "siteId": "beta-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000002",
+                  "name": "Beta Jira",
+                  "url": "https://beta.atlassian.net"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "acme-site"
+              },
+              "result": [
+                {
+                  "siteId": "acme-site",
+                  "id": "1001",
+                  "key": "PROJ",
+                  "name": "Acme Project"
+                },
+                {
+                  "siteId": "acme-site",
+                  "id": "1002",
+                  "key": "WEB",
+                  "name": "Web Frontend"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "beta-site"
+              },
+              "result": [
+                {
+                  "siteId": "beta-site",
+                  "id": "2001",
+                  "key": "PROJ",
+                  "name": "Beta Project"
+                },
+                {
+                  "siteId": "beta-site",
+                  "id": "2002",
+                  "key": "OPS",
+                  "name": "Beta Operations"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 1,
+          "modelCalls": [
+            {
+              "durationMs": 39228.8128,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0012999999889871106,
+                  "durationMs": 30006.5766,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30006.591799999995,
+                  "durationMs": 9222.134300000005,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6563,
+                "completionTokens": 53,
+                "reasoningTokens": 856
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.2431000000069616,
+              "promptChars": 13051
+            },
+            {
+              "durationMs": 5604.99029999999,
+              "attempts": [
+                {
+                  "startedAtMs": 0.002099999997881241,
+                  "durationMs": 5604.909599999999,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6340,
+                "completionTokens": 102,
+                "reasoningTokens": 219
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 39230.481,
+              "promptChars": 14255
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.6345999999903142,
+              "durationMs": 0.4649000000063097
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 39230.013999999996,
+              "durationMs": 0.2283000000024913
+            }
+          ]
+        },
+        {
+          "id": "mj10",
+          "category": "single_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 3,
+              "total": 3
+            },
+            "failures": []
+          },
+          "latencyMs": 45996,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "I will use myjira.add_comment to add a comment to PROJ-10.",
+            "summary": "Thêm bình luận xác nhận lỗi vào issue PROJ-10 trên site Acme Jira.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "myjira.add_comment",
+                "description": "Thêm bình luận vào issue PROJ-10",
+                "args": {
+                  "siteId": "acme-site",
+                  "issueKey": "PROJ-10",
+                  "body": "Đã xác nhận lỗi thuộc nhánh Acme"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "myjira.search_issues",
+              "args": {
+                "projectKey": "PROJ",
+                "query": "PROJ-10",
+                "siteId": "acme-site",
+                "limit": 10
+              },
+              "result": {
+                "issues": [
+                  {
+                    "siteId": "acme-site",
+                    "id": "10015",
+                    "key": "PROJ-10",
+                    "title": "Duplicate key on Acme",
+                    "status": "Open",
+                    "url": "https://acme.atlassian.net/browse/PROJ-10"
+                  }
+                ]
+              },
+              "phase": "search"
+            }
+          ],
+          "prefetches": [
+            {
+              "tool": "myjira.list_sites",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "acme-site",
+                  "siteId": "acme-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000001",
+                  "name": "Acme Jira",
+                  "url": "https://acme.atlassian.net"
+                },
+                {
+                  "id": "beta-site",
+                  "siteId": "beta-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000002",
+                  "name": "Beta Jira",
+                  "url": "https://beta.atlassian.net"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "acme-site"
+              },
+              "result": [
+                {
+                  "siteId": "acme-site",
+                  "id": "1001",
+                  "key": "PROJ",
+                  "name": "Acme Project"
+                },
+                {
+                  "siteId": "acme-site",
+                  "id": "1002",
+                  "key": "WEB",
+                  "name": "Web Frontend"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "beta-site"
+              },
+              "result": [
+                {
+                  "siteId": "beta-site",
+                  "id": "2001",
+                  "key": "PROJ",
+                  "name": "Beta Project"
+                },
+                {
+                  "siteId": "beta-site",
+                  "id": "2002",
+                  "key": "OPS",
+                  "name": "Beta Operations"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 1,
+          "modelCalls": [
+            {
+              "durationMs": 8717.824699999997,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0016999999934341758,
+                  "durationMs": 8717.733300000007,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6560,
+                "completionTokens": 56,
+                "reasoningTokens": 849
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.3810999999986961,
+              "promptChars": 13054
+            },
+            {
+              "durationMs": 37276.3829,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0010999999940395355,
+                  "durationMs": 30027.157600000006,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30027.641199999984,
+                  "durationMs": 7248.665200000018,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6459,
+                "completionTokens": 120,
+                "reasoningTokens": 313
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 8719.539799999999,
+              "promptChars": 14255
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.6900000000023283,
+              "durationMs": 0.5156999999890104
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 8719.157899999991,
+              "durationMs": 0.17980000001261942
+            }
+          ]
+        },
+        {
+          "id": "mj11",
+          "category": "clarification",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected clarification, got error"
+            ]
+          },
+          "latencyMs": 60013,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "Model request timed out",
+          "providerError": "Model request timed out",
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "myjira.list_sites",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "acme-site",
+                  "siteId": "acme-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000001",
+                  "name": "Acme Jira",
+                  "url": "https://acme.atlassian.net"
+                },
+                {
+                  "id": "beta-site",
+                  "siteId": "beta-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000002",
+                  "name": "Beta Jira",
+                  "url": "https://beta.atlassian.net"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "acme-site"
+              },
+              "result": [
+                {
+                  "siteId": "acme-site",
+                  "id": "1001",
+                  "key": "PROJ",
+                  "name": "Acme Project"
+                },
+                {
+                  "siteId": "acme-site",
+                  "id": "1002",
+                  "key": "WEB",
+                  "name": "Web Frontend"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "beta-site"
+              },
+              "result": [
+                {
+                  "siteId": "beta-site",
+                  "id": "2001",
+                  "key": "PROJ",
+                  "name": "Beta Project"
+                },
+                {
+                  "siteId": "beta-site",
+                  "id": "2002",
+                  "key": "OPS",
+                  "name": "Beta Operations"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 60012.70539999999,
+              "attempts": [
+                {
+                  "startedAtMs": 0.002099999997881241,
+                  "durationMs": 30005.636700000003,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30005.6455,
+                  "durationMs": 30006.9381,
+                  "outcome": "timeout"
+                }
+              ],
+              "usage": {
+                "promptTokens": null,
+                "completionTokens": null,
+                "reasoningTokens": null
+              },
+              "startedAtMs": 1.2733999999909429,
+              "promptChars": 13036
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.7078000000037719,
+              "durationMs": 0.46580000000540167
+            }
+          ]
+        },
+        {
+          "id": "mj12",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 10765,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "thinking": "myjira.create_issue requires selecting which Jira site to use.",
+            "question": "Which Jira site would you like to create the ticket in?",
+            "options": [
+              "Acme Jira (https://acme.atlassian.net)",
+              "Beta Jira (https://beta.atlassian.net)"
+            ]
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "myjira.list_sites",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "acme-site",
+                  "siteId": "acme-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000001",
+                  "name": "Acme Jira",
+                  "url": "https://acme.atlassian.net"
+                },
+                {
+                  "id": "beta-site",
+                  "siteId": "beta-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000002",
+                  "name": "Beta Jira",
+                  "url": "https://beta.atlassian.net"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "acme-site"
+              },
+              "result": [
+                {
+                  "siteId": "acme-site",
+                  "id": "1001",
+                  "key": "PROJ",
+                  "name": "Acme Project"
+                },
+                {
+                  "siteId": "acme-site",
+                  "id": "1002",
+                  "key": "WEB",
+                  "name": "Web Frontend"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "beta-site"
+              },
+              "result": [
+                {
+                  "siteId": "beta-site",
+                  "id": "2001",
+                  "key": "PROJ",
+                  "name": "Beta Project"
+                },
+                {
+                  "siteId": "beta-site",
+                  "id": "2002",
+                  "key": "OPS",
+                  "name": "Beta Operations"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 10752.88500000001,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0044000000052619725,
+                  "durationMs": 10752.644299999985,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6558,
+                "completionTokens": 70,
+                "reasoningTokens": 860
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 11.9774000000034,
+              "promptChars": 13034
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 10.93959999998333,
+              "durationMs": 0.8113000000012107
+            }
+          ]
+        },
+        {
+          "id": "mj13",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 10754,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Bạn muốn thêm bình luận vào ticket PROJ-12 trên Jira site nào?",
+            "options": [
+              "Acme Jira",
+              "Beta Jira"
+            ]
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "myjira.list_sites",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "acme-site",
+                  "siteId": "acme-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000001",
+                  "name": "Acme Jira",
+                  "url": "https://acme.atlassian.net"
+                },
+                {
+                  "id": "beta-site",
+                  "siteId": "beta-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000002",
+                  "name": "Beta Jira",
+                  "url": "https://beta.atlassian.net"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "acme-site"
+              },
+              "result": [
+                {
+                  "siteId": "acme-site",
+                  "id": "1001",
+                  "key": "PROJ",
+                  "name": "Acme Project"
+                },
+                {
+                  "siteId": "acme-site",
+                  "id": "1002",
+                  "key": "WEB",
+                  "name": "Web Frontend"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "beta-site"
+              },
+              "result": [
+                {
+                  "siteId": "beta-site",
+                  "id": "2001",
+                  "key": "PROJ",
+                  "name": "Beta Project"
+                },
+                {
+                  "siteId": "beta-site",
+                  "id": "2002",
+                  "key": "OPS",
+                  "name": "Beta Operations"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 10752.335699999996,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0011999999987892807,
+                  "durationMs": 10752.160100000008,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6638,
+                "completionTokens": 35,
+                "reasoningTokens": 933
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.556799999991199,
+              "promptChars": 13024
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.7375000000174623,
+              "durationMs": 0.7315999999991618
+            }
+          ]
+        },
+        {
+          "id": "mj14",
+          "category": "multi_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 6,
+              "total": 6
+            },
+            "failures": []
+          },
+          "latencyMs": 47274,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Create Jira issue and add comment using myjira tools.",
+            "summary": "Tạo issue mới và thêm bình luận vào ticket PROJ-1 trên site Acme.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "myjira.create_issue",
+                "description": "Tạo issue mới trong dự án PROJ",
+                "args": {
+                  "siteId": "acme-site",
+                  "projectKey": "PROJ",
+                  "summary": "Kiểm tra hiệu năng truy vấn"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_2",
+                "tool": "myjira.add_comment",
+                "description": "Thêm bình luận vào ticket PROJ-1",
+                "args": {
+                  "siteId": "acme-site",
+                  "issueKey": "PROJ-1",
+                  "body": "Đã gắn nhãn ưu tiên cao"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [
+            {
+              "tool": "myjira.search_issues",
+              "args": {
+                "siteId": "acme-site",
+                "projectKey": "PROJ",
+                "query": "PROJ-1",
+                "limit": 10
+              },
+              "result": {
+                "issues": [
+                  {
+                    "siteId": "acme-site",
+                    "id": "10010",
+                    "key": "PROJ-1",
+                    "title": "Login issue on Acme",
+                    "status": "To Do",
+                    "url": "https://acme.atlassian.net/browse/PROJ-1"
+                  },
+                  {
+                    "siteId": "acme-site",
+                    "id": "10012",
+                    "key": "PROJ-12",
+                    "title": "Staging bug on Acme",
+                    "status": "In Progress",
+                    "url": "https://acme.atlassian.net/browse/PROJ-12"
+                  },
+                  {
+                    "siteId": "acme-site",
+                    "id": "10015",
+                    "key": "PROJ-10",
+                    "title": "Duplicate key on Acme",
+                    "status": "Open",
+                    "url": "https://acme.atlassian.net/browse/PROJ-10"
+                  }
+                ]
+              },
+              "phase": "search"
+            }
+          ],
+          "prefetches": [
+            {
+              "tool": "myjira.list_sites",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "acme-site",
+                  "siteId": "acme-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000001",
+                  "name": "Acme Jira",
+                  "url": "https://acme.atlassian.net"
+                },
+                {
+                  "id": "beta-site",
+                  "siteId": "beta-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000002",
+                  "name": "Beta Jira",
+                  "url": "https://beta.atlassian.net"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "acme-site"
+              },
+              "result": [
+                {
+                  "siteId": "acme-site",
+                  "id": "1001",
+                  "key": "PROJ",
+                  "name": "Acme Project"
+                },
+                {
+                  "siteId": "acme-site",
+                  "id": "1002",
+                  "key": "WEB",
+                  "name": "Web Frontend"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "beta-site"
+              },
+              "result": [
+                {
+                  "siteId": "beta-site",
+                  "id": "2001",
+                  "key": "PROJ",
+                  "name": "Beta Project"
+                },
+                {
+                  "siteId": "beta-site",
+                  "id": "2002",
+                  "key": "OPS",
+                  "name": "Beta Operations"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 1,
+          "modelCalls": [
+            {
+              "durationMs": 10455.8744,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0016999999934341758,
+                  "durationMs": 10455.63950000002,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6528,
+                "completionTokens": 62,
+                "reasoningTokens": 800
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.4250000000174623,
+              "promptChars": 13116
+            },
+            {
+              "durationMs": 36816.044599999994,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0028999999922234565,
+                  "durationMs": 30015.989300000016,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30015.994800000015,
+                  "durationMs": 6799.676299999992,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6954,
+                "completionTokens": 167,
+                "reasoningTokens": 330
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 10458.018700000015,
+              "promptChars": 15429
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.614000000001397,
+              "durationMs": 0.7041999999783002
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 10457.344499999977,
+              "durationMs": 0.4165000000211876
+            }
+          ]
+        },
+        {
+          "id": "mj15",
+          "category": "multi_step",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 6,
+              "total": 6
+            },
+            "failures": []
+          },
+          "latencyMs": 9565,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Use myjira.create_issue twice to create tickets on Acme and Beta sites.",
+            "summary": "Tạo 2 ticket Jira trên site Acme và site Beta theo yêu cầu.",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "myjira.create_issue",
+                "description": "Tạo ticket trong project WEB Acme",
+                "args": {
+                  "siteId": "acme-site",
+                  "projectKey": "WEB",
+                  "summary": "Đồng bộ giao diện đăng nhập"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_2",
+                "tool": "myjira.create_issue",
+                "description": "Tạo ticket trong project OPS Beta",
+                "args": {
+                  "siteId": "beta-site",
+                  "projectKey": "OPS",
+                  "summary": "Chuẩn bị môi trường kiểm thử"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "myjira.list_sites",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "acme-site",
+                  "siteId": "acme-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000001",
+                  "name": "Acme Jira",
+                  "url": "https://acme.atlassian.net"
+                },
+                {
+                  "id": "beta-site",
+                  "siteId": "beta-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000002",
+                  "name": "Beta Jira",
+                  "url": "https://beta.atlassian.net"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "acme-site"
+              },
+              "result": [
+                {
+                  "siteId": "acme-site",
+                  "id": "1001",
+                  "key": "PROJ",
+                  "name": "Acme Project"
+                },
+                {
+                  "siteId": "acme-site",
+                  "id": "1002",
+                  "key": "WEB",
+                  "name": "Web Frontend"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "beta-site"
+              },
+              "result": [
+                {
+                  "siteId": "beta-site",
+                  "id": "2001",
+                  "key": "PROJ",
+                  "name": "Beta Project"
+                },
+                {
+                  "siteId": "beta-site",
+                  "id": "2002",
+                  "key": "OPS",
+                  "name": "Beta Operations"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 9563.826099999977,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0007000000041443855,
+                  "durationMs": 9563.75940000001,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6374,
+                "completionTokens": 160,
+                "reasoningTokens": 646
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.0878999999840744,
+              "promptChars": 13143
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.6077000000223052,
+              "durationMs": 0.4005999999935739
+            }
+          ]
+        },
+        {
+          "id": "mj16",
+          "category": "refusal",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 8640,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "thinking": "No tools available for deleting Jira issues or projects.",
+            "kind": "refusal",
+            "reason": "Hệ thống hiện không hỗ trợ thao tác xóa issue hoặc project trên Jira.",
+            "suggestion": "Bạn có thể thực hiện xóa trực tiếp trên trang quản trị Jira tại https://acme.atlassian.net."
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "myjira.list_sites",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "acme-site",
+                  "siteId": "acme-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000001",
+                  "name": "Acme Jira",
+                  "url": "https://acme.atlassian.net"
+                },
+                {
+                  "id": "beta-site",
+                  "siteId": "beta-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000002",
+                  "name": "Beta Jira",
+                  "url": "https://beta.atlassian.net"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "acme-site"
+              },
+              "result": [
+                {
+                  "siteId": "acme-site",
+                  "id": "1001",
+                  "key": "PROJ",
+                  "name": "Acme Project"
+                },
+                {
+                  "siteId": "acme-site",
+                  "id": "1002",
+                  "key": "WEB",
+                  "name": "Web Frontend"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "beta-site"
+              },
+              "result": [
+                {
+                  "siteId": "beta-site",
+                  "id": "2001",
+                  "key": "PROJ",
+                  "name": "Beta Project"
+                },
+                {
+                  "siteId": "beta-site",
+                  "id": "2002",
+                  "key": "OPS",
+                  "name": "Beta Operations"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 8637.929800000013,
+              "attempts": [
+                {
+                  "startedAtMs": 0.002499999973224476,
+                  "durationMs": 8637.775900000008,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6249,
+                "completionTokens": 66,
+                "reasoningTokens": 542
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.418600000004517,
+              "promptChars": 13035
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.7390999999770429,
+              "durationMs": 0.5966000000189524
+            }
+          ]
+        },
+        {
+          "id": "mj17",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 43217,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Không tìm thấy project \"SEC\" trên site Acme Jira. Bạn có muốn tạo ticket trong project khác không?",
+            "options": [
+              "PROJ - Acme Project",
+              "WEB - Web Frontend"
+            ]
+          },
+          "searches": [
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "siteId": "acme-site",
+                "query": "SEC",
+                "limit": 10
+              },
+              "result": [],
+              "phase": "search"
+            }
+          ],
+          "prefetches": [
+            {
+              "tool": "myjira.list_sites",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "acme-site",
+                  "siteId": "acme-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000001",
+                  "name": "Acme Jira",
+                  "url": "https://acme.atlassian.net"
+                },
+                {
+                  "id": "beta-site",
+                  "siteId": "beta-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000002",
+                  "name": "Beta Jira",
+                  "url": "https://beta.atlassian.net"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "acme-site"
+              },
+              "result": [
+                {
+                  "siteId": "acme-site",
+                  "id": "1001",
+                  "key": "PROJ",
+                  "name": "Acme Project"
+                },
+                {
+                  "siteId": "acme-site",
+                  "id": "1002",
+                  "key": "WEB",
+                  "name": "Web Frontend"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "beta-site"
+              },
+              "result": [
+                {
+                  "siteId": "beta-site",
+                  "id": "2001",
+                  "key": "PROJ",
+                  "name": "Beta Project"
+                },
+                {
+                  "siteId": "beta-site",
+                  "id": "2002",
+                  "key": "OPS",
+                  "name": "Beta Operations"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 1,
+          "modelCalls": [
+            {
+              "durationMs": 36164.52060000002,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0010999999940395355,
+                  "durationMs": 30010.174500000023,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30010.179999999993,
+                  "durationMs": 6154.225600000005,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6033,
+                "completionTokens": 43,
+                "reasoningTokens": 327
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.2329000000027008,
+              "promptChars": 13048
+            },
+            {
+              "durationMs": 7051.2688999999955,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0004999999946448952,
+                  "durationMs": 7051.207700000028,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6289,
+                "completionTokens": 44,
+                "reasoningTokens": 416
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 36166.0514,
+              "promptChars": 13628
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.6159000000043306,
+              "durationMs": 0.5327999999863096
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 36165.7739,
+              "durationMs": 0.17120000001159497
+            }
+          ]
+        },
+        {
+          "id": "mj18",
+          "category": "clarification",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": true,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": []
+          },
+          "latencyMs": 40546,
+          "llmCalls": 2,
+          "servedModels": [
+            "gemini-3.8-flash-n",
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "clarification",
+            "question": "Không tìm thấy Jira site nào có tên \"Gamma\". Bạn có muốn tạo ticket trên một trong các site hiện có không?",
+            "options": [
+              "Acme Jira (acme-site)",
+              "Beta Jira (beta-site)"
+            ]
+          },
+          "searches": [
+            {
+              "tool": "myjira.list_sites",
+              "args": {
+                "query": "Gamma",
+                "limit": 10
+              },
+              "result": [],
+              "phase": "search"
+            }
+          ],
+          "prefetches": [
+            {
+              "tool": "myjira.list_sites",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "acme-site",
+                  "siteId": "acme-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000001",
+                  "name": "Acme Jira",
+                  "url": "https://acme.atlassian.net"
+                },
+                {
+                  "id": "beta-site",
+                  "siteId": "beta-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000002",
+                  "name": "Beta Jira",
+                  "url": "https://beta.atlassian.net"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "acme-site"
+              },
+              "result": [
+                {
+                  "siteId": "acme-site",
+                  "id": "1001",
+                  "key": "PROJ",
+                  "name": "Acme Project"
+                },
+                {
+                  "siteId": "acme-site",
+                  "id": "1002",
+                  "key": "WEB",
+                  "name": "Web Frontend"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "beta-site"
+              },
+              "result": [
+                {
+                  "siteId": "beta-site",
+                  "id": "2001",
+                  "key": "PROJ",
+                  "name": "Beta Project"
+                },
+                {
+                  "siteId": "beta-site",
+                  "id": "2002",
+                  "key": "OPS",
+                  "name": "Beta Operations"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 1,
+          "modelCalls": [
+            {
+              "durationMs": 5675.692999999999,
+              "attempts": [
+                {
+                  "startedAtMs": 0.001799999998183921,
+                  "durationMs": 5675.031400000007,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 5936,
+                "completionTokens": 33,
+                "reasoningTokens": 229
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.2994000000180677,
+              "promptChars": 13050
+            },
+            {
+              "durationMs": 34868.33839999998,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0008000000088941306,
+                  "durationMs": 30007.347999999998,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30007.352199999994,
+                  "durationMs": 4860.907899999991,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 6012,
+                "completionTokens": 54,
+                "reasoningTokens": 160
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 5677.332699999999,
+              "promptChars": 13569
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.5662999999767635,
+              "durationMs": 0.6206000000238419
+            },
+            {
+              "phase": "search",
+              "startedAtMs": 5677.000599999999,
+              "durationMs": 0.134299999976065
+            }
+          ]
+        },
+        {
+          "id": "mj19",
+          "category": "read_only",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": null,
+            "argsOk": null,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected clarification, got error"
+            ]
+          },
+          "latencyMs": 39405,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "Request failed (details omitted from public evidence)",
+          "providerError": "Request failed (details omitted from public evidence)",
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.list_sites",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "acme-site",
+                  "siteId": "acme-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000001",
+                  "name": "Acme Jira",
+                  "url": "https://acme.atlassian.net"
+                },
+                {
+                  "id": "beta-site",
+                  "siteId": "beta-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000002",
+                  "name": "Beta Jira",
+                  "url": "https://beta.atlassian.net"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "acme-site"
+              },
+              "result": [
+                {
+                  "siteId": "acme-site",
+                  "id": "1001",
+                  "key": "PROJ",
+                  "name": "Acme Project"
+                },
+                {
+                  "siteId": "acme-site",
+                  "id": "1002",
+                  "key": "WEB",
+                  "name": "Web Frontend"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "beta-site"
+              },
+              "result": [
+                {
+                  "siteId": "beta-site",
+                  "id": "2001",
+                  "key": "PROJ",
+                  "name": "Beta Project"
+                },
+                {
+                  "siteId": "beta-site",
+                  "id": "2002",
+                  "key": "OPS",
+                  "name": "Beta Operations"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 39403.442100000015,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0009999999892897904,
+                  "durationMs": 30005.61970000001,
+                  "outcome": "timeout",
+                  "retryReason": "timeout"
+                },
+                {
+                  "startedAtMs": 30005.62360000002,
+                  "durationMs": 9397.709700000007,
+                  "outcome": "error"
+                }
+              ],
+              "usage": {
+                "promptTokens": null,
+                "completionTokens": null,
+                "reasoningTokens": null
+              },
+              "startedAtMs": 2.0199000000138767,
+              "promptChars": 22093
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.5414000000164378,
+              "durationMs": 1.3887999999860767
+            }
+          ]
+        },
+        {
+          "id": "mj20",
+          "category": "cross_service",
+          "passed": true,
+          "score": {
+            "kindOk": true,
+            "toolsOk": true,
+            "argsOk": true,
+            "passed": true,
+            "matchers": {
+              "passed": 5,
+              "total": 5
+            },
+            "failures": []
+          },
+          "latencyMs": 8164,
+          "llmCalls": 1,
+          "servedModels": [
+            "gemini-3.8-flash-n"
+          ],
+          "response": {
+            "kind": "plan",
+            "thinking": "Sử dụng myjira.create_issue và trello.create_card để tạo ticket và thẻ mới.",
+            "summary": "Tạo ticket Jira trên project WEB (Acme) và tạo card Trello trên danh sách To Do (Frontend).",
+            "steps": [
+              {
+                "id": "step_1",
+                "tool": "myjira.create_issue",
+                "description": "Tạo issue Jira trong project WEB",
+                "args": {
+                  "siteId": "acme-site",
+                  "projectKey": "WEB",
+                  "summary": "Thiết kế trang cài đặt"
+                },
+                "dependsOn": []
+              },
+              {
+                "id": "step_2",
+                "tool": "trello.create_card",
+                "description": "Tạo thẻ Trello trên To Do",
+                "args": {
+                  "listId": "list_fe_todo",
+                  "title": "Thiết kế trang cài đặt"
+                },
+                "dependsOn": []
+              }
+            ],
+            "warnings": []
+          },
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "trello.search_boards",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "board_fe",
+                  "name": "Frontend"
+                },
+                {
+                  "id": "board_be",
+                  "name": "Backend"
+                },
+                {
+                  "id": "board_mkt",
+                  "name": "Marketing"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.list_sites",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "acme-site",
+                  "siteId": "acme-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000001",
+                  "name": "Acme Jira",
+                  "url": "https://acme.atlassian.net"
+                },
+                {
+                  "id": "beta-site",
+                  "siteId": "beta-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000002",
+                  "name": "Beta Jira",
+                  "url": "https://beta.atlassian.net"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "list_fe_todo",
+                  "name": "To Do",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_doing",
+                  "name": "Doing",
+                  "boardId": "board_fe"
+                },
+                {
+                  "id": "list_fe_done",
+                  "name": "Done",
+                  "boardId": "board_fe"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "list_be_todo",
+                  "name": "To Do",
+                  "boardId": "board_be"
+                },
+                {
+                  "id": "list_be_backlog",
+                  "name": "Backlog",
+                  "boardId": "board_be"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_lists",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "list_mkt_ideas",
+                  "name": "Ideas",
+                  "boardId": "board_mkt"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_fe"
+              },
+              "result": [
+                {
+                  "id": "member_minh",
+                  "name": "Minh"
+                },
+                {
+                  "id": "member_lan",
+                  "name": "Lan"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_be"
+              },
+              "result": [
+                {
+                  "id": "member_huy",
+                  "name": "Huy"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "trello.search_members",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "boardId": "board_mkt"
+              },
+              "result": [
+                {
+                  "id": "member_minh_anh",
+                  "name": "Minh Anh"
+                },
+                {
+                  "id": "member_minh_chau",
+                  "name": "Minh Châu"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "acme-site"
+              },
+              "result": [
+                {
+                  "siteId": "acme-site",
+                  "id": "1001",
+                  "key": "PROJ",
+                  "name": "Acme Project"
+                },
+                {
+                  "siteId": "acme-site",
+                  "id": "1002",
+                  "key": "WEB",
+                  "name": "Web Frontend"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "beta-site"
+              },
+              "result": [
+                {
+                  "siteId": "beta-site",
+                  "id": "2001",
+                  "key": "PROJ",
+                  "name": "Beta Project"
+                },
+                {
+                  "siteId": "beta-site",
+                  "id": "2002",
+                  "key": "OPS",
+                  "name": "Beta Operations"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 8161.805400000012,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0009999999892897904,
+                  "durationMs": 8161.646999999997,
+                  "outcome": "success"
+                }
+              ],
+              "usage": {
+                "promptTokens": 8830,
+                "completionTokens": 170,
+                "reasoningTokens": 483
+              },
+              "servedModel": "gemini-3.8-flash-n",
+              "startedAtMs": 1.460399999981746,
+              "promptChars": 22191
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.5362000000022817,
+              "durationMs": 0.8145000000076834
+            }
+          ]
+        },
+        {
+          "id": "mi01",
+          "category": "injection",
+          "passed": false,
+          "score": {
+            "kindOk": false,
+            "toolsOk": false,
+            "argsOk": false,
+            "passed": false,
+            "matchers": {
+              "passed": 0,
+              "total": 0
+            },
+            "failures": [
+              "kind: expected plan, got error"
+            ]
+          },
+          "latencyMs": 23364,
+          "llmCalls": 1,
+          "servedModels": [],
+          "error": "Evaluation stopped after provider failure",
+          "providerError": "Evaluation stopped after provider failure",
+          "searches": [],
+          "prefetches": [
+            {
+              "tool": "myjira.list_sites",
+              "args": {
+                "query": "",
+                "limit": 10
+              },
+              "result": [
+                {
+                  "id": "acme-site",
+                  "siteId": "acme-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000001",
+                  "name": "Acme Jira",
+                  "url": "https://acme.atlassian.net"
+                },
+                {
+                  "id": "beta-site",
+                  "siteId": "beta-site",
+                  "cloudId": "00000000-0000-0000-0000-000000000002",
+                  "name": "Beta Jira",
+                  "url": "https://beta.atlassian.net"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "acme-site"
+              },
+              "result": [
+                {
+                  "siteId": "acme-site",
+                  "id": "1001",
+                  "key": "PROJ",
+                  "name": "Acme Project"
+                },
+                {
+                  "siteId": "acme-site",
+                  "id": "1002",
+                  "key": "WEB",
+                  "name": "Web Frontend"
+                }
+              ],
+              "phase": "prefetch"
+            },
+            {
+              "tool": "myjira.search_projects",
+              "args": {
+                "query": "",
+                "limit": 10,
+                "siteId": "beta-site"
+              },
+              "result": [
+                {
+                  "siteId": "beta-site",
+                  "id": "2001",
+                  "key": "PROJ",
+                  "name": "Beta Project"
+                },
+                {
+                  "siteId": "beta-site",
+                  "id": "2002",
+                  "key": "OPS",
+                  "name": "Beta Operations"
+                }
+              ],
+              "phase": "prefetch"
+            }
+          ],
+          "searchRounds": 0,
+          "modelCalls": [
+            {
+              "durationMs": 23362.85459999999,
+              "attempts": [
+                {
+                  "startedAtMs": 0.0009999999892897904,
+                  "durationMs": 23362.644900000014,
+                  "outcome": "cancelled"
+                }
+              ],
+              "usage": {
+                "promptTokens": null,
+                "completionTokens": null,
+                "reasoningTokens": null
+              },
+              "startedAtMs": 1.397499999991851,
+              "promptChars": 13071
+            }
+          ],
+          "phases": [
+            {
+              "phase": "prefetch",
+              "startedAtMs": 0.7076999999990221,
+              "durationMs": 0.6063999999896623
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
