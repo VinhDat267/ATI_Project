@@ -323,6 +323,9 @@ Bắt buộc dùng **1 model duy nhất** cho dev, eval, và production để tr
 - **50 golden prompts** phủ 5 danh mục: single-step, multi-step, cross-service, clarification, refusal.
 - Đánh giá tự động: tool selection accuracy, argument quality, validation pass rate.
 - **Quality Gate:** Usable plan rate ≥ 70%, tool accuracy ≥ 85%.
+- **SLACK-07 (3-Mode Slack Triage Benchmark — 52 pre-labelled cases × 3 runs/mode):**
+  - Frozen dataset `evaluations/slack/fixtures/slack-eval-cases.json` (`SHA-256: dd5820a42bb44134241393c4d417b6fb0321a58d034031f47f0916e8fbed2998`) và `slack-eval-labels.json` (`SHA-256: 06ca1c5a8d8f9a4806a039efc30d1654b46208403a51d88ebec9e90cf7eb6c05`).
+  - Kết quả ngoại tuyến (Cấp độ 1 — `eval-synthetic-fixture-v1`, xem [`evaluations/reports/slack-triage-report.md`](../evaluations/reports/slack-triage-report.md)): Mode `rules` đạt Precision 84.4% / Recall 96.4%; Mode `ai` đạt Precision 100.0% / Recall 100.0%; Mode `hybrid` đạt **Precision 100.0% (≥ 90%) / Recall 96.9% (≥ 85%)**, tiết kiệm 40.4% model calls, với **Unapproved Writes = 0** và **Cross-User Leaks = 0** trên toàn bộ 9 lượt đo. Nghiệm thu Cấp độ 3 (P-LIVE trên Slack thật) giữ trạng thái `NOT_RUN`.
 
 ---
 

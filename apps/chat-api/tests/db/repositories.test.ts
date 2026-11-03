@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterAll,beforeAll,describe, it, expect, vi } from 'vitest';
+import { createMigratedSchema } from '../helpers/gmail-test-db.js';
 import {
   PlanRepo,
   ConversationRepo,
@@ -8,6 +9,14 @@ import {
 } from '../../src/db/repositories/index.js';
 
 describe('apps/chat-api (Task 7: Database Repositories with Optimistic Locking)', () => {
+  let db:Awaited<ReturnType<typeof createMigratedSchema>>;
+  beforeAll(async()=>{db=await createMigratedSchema('repo_atomic_guards');});
+  afterAll(async()=>{await db?.close();});
+  async function realPlan(){
+    const owner=await db.person(),conv=await new ConversationRepo(db.pool).createConversation(owner.id),repo=new PlanRepo(db.pool);
+    const plan=await repo.createPlan({convId:conv.id,planJson:{steps:[]},planText:'{"steps":[]}',planHash:'hash123',expiresAt:new Date(Date.now()+600000)});
+    return {owner,plan,repo};
+  }
   describe('PlanRepo', () => {
     it('treats a malformed PostgreSQL UUID plan id as not found without querying', async () => {
       const query = vi.fn();
@@ -15,30 +24,23 @@ describe('apps/chat-api (Task 7: Database Repositories with Optimistic Locking)'
       await expect(repo.getPlan('khong-ton-tai')).resolves.toBeNull();
       expect(query).not.toHaveBeenCalled();
     });
-    it('approves plan with optimistic locking query condition', async () => {
-      const mockQuery = vi.fn().mockResolvedValue({
-        rowCount: 1,
-        rows: [{ id: 'plan-1', status: 'approved' }],
-      });
-      const repo = new PlanRepo({ query: mockQuery } as any);
-
-      const approved = await repo.approvePlan('plan-1', 'hash123', 'u1');
-      expect(approved).toBe(true);
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining("WHERE id = $1 AND plan_hash = $2 AND status = 'pending'"),
-        ['plan-1', 'hash123', 'u1']
-      );
+    it('approves exactly once with real pending/hash/owner predicates under concurrent clients', async () => {
+      const {owner,plan,repo}=await realPlan(),other=await db.person();
+      expect(await repo.approvePlan(plan.id,'wrong-hash',owner.id)).toBe(false);
+      expect(await repo.approvePlan(plan.id,'hash123',other.id)).toBe(false);
+      const results=await Promise.all([repo.approvePlan(plan.id,'hash123',owner.id),repo.approvePlan(plan.id,'hash123',owner.id)]);
+      expect(results.sort()).toEqual([false,true]);
+      expect((await db.pool.query('SELECT status FROM plans WHERE id=$1',[plan.id])).rows[0].status).toBe('approved');
     });
 
     it('returns false when plan is already approved or not pending (optimistic lock protection)', async () => {
-      const mockQuery = vi.fn().mockResolvedValue({
-        rowCount: 0,
-        rows: [],
-      });
-      const repo = new PlanRepo({ query: mockQuery } as any);
-
-      const approved = await repo.approvePlan('plan-already-processed', 'hash123', 'u1');
-      expect(approved).toBe(false);
+      const {owner,plan,repo}=await realPlan();
+      for(const status of ['approved','rejected','superseded']){
+        await db.pool.query('UPDATE plans SET status=$2 WHERE id=$1',[plan.id,status]);
+        expect(await repo.approvePlan(plan.id,'hash123',owner.id)).toBe(false);
+      }
+      await db.pool.query("UPDATE plans SET status='pending',expires_at=now()-interval '1 second' WHERE id=$1",[plan.id]);
+      expect(await repo.approvePlan(plan.id,'hash123',owner.id)).toBe(false);
     });
 
     it('creates a plan with deterministic hash and expiration', async () => {
@@ -76,65 +78,41 @@ describe('apps/chat-api (Task 7: Database Repositories with Optimistic Locking)'
       expect(query).not.toHaveBeenCalled();
     });
     it('creates and lists conversations for user', async () => {
-      const mockQuery = vi.fn().mockImplementation(async (sql: string) => {
-        if (sql.includes('INSERT INTO conversations')) {
-          return { rowCount: 1, rows: [{ id: 'conv-1', user_id: validUserId, status: 'chatting' }] };
-        }
-        return { rowCount: 1, rows: [{ id: 'conv-1', user_id: validUserId, status: 'chatting' }] };
-      });
-      const repo = new ConversationRepo({ query: mockQuery } as any);
-
-      const created = await repo.createConversation(validUserId);
-      expect(created.id).toBe('conv-1');
-
-      const list = await repo.listConversations(validUserId);
-      expect(list).toHaveLength(1);
+      const owner=await db.person(),other=await db.person(),repo=new ConversationRepo(db.pool);
+      const created=await repo.createConversation(owner.id);await repo.createConversation(other.id);
+      await repo.renameConversation(created.id,owner.id,'Human title');
+      const list=await repo.listConversations(owner.id);
+      expect(list).toHaveLength(1);expect(list[0]).toMatchObject({id:created.id,user_id:owner.id,title:'Human title'});
+      expect(await repo.renameConversation(created.id,other.id,'Wrong owner')).toBeNull();
     });
   });
 
   describe('MessageRepo', () => {
     it('creates and retrieves messages for conversation in chronological order', async () => {
-      const mockQuery = vi.fn().mockImplementation(async (sql: string) => {
-        if (sql.includes('INSERT INTO messages')) {
-          return { rowCount: 1, rows: [{ id: 'm1', role: 'user', content: 'hello' }] };
-        }
-        return { rowCount: 1, rows: [{ id: 'm1', role: 'user', content: 'hello' }] };
-      });
-      const repo = new MessageRepo({ query: mockQuery } as any);
-
-      const msg = await repo.createMessage('c1', 'user', 'hello', { source: 'test' });
-      expect(msg.id).toBe('m1');
-
-      const history = await repo.listMessages('c1');
-      expect(history).toHaveLength(1);
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('ORDER BY created_at DESC, id DESC'),
-        ['c1', 100]
-      );
+      const owner=await db.person(),conv=await new ConversationRepo(db.pool).createConversation(owner.id),repo=new MessageRepo(db.pool);
+      const first=await repo.createMessage(conv.id,'user','hello',{source:'test'});
+      const second=await repo.createMessage(conv.id,'assistant','reply');
+      const history=await repo.listMessages(conv.id);
+      expect(history.map(row=>[row.id,row.content])).toEqual([[first.id,'hello'],[second.id,'reply']]);
+      expect(history[0]!.metadata).toEqual({source:'test'});
     });
   });
 
   describe('StepRepo', () => {
     it('creates and updates execution step status', async () => {
-      const mockQuery = vi.fn().mockImplementation(async (sql: string) => {
-        if (sql.includes('INSERT INTO execution_steps')) {
-          return { rowCount: 1, rows: [{ id: 's1', step_id: 'step_1', status: 'pending' }] };
-        }
-        return { rowCount: 1, rows: [{ id: 's1', status: 'succeeded' }] };
-      });
-      const repo = new StepRepo({ query: mockQuery } as any);
+      const {owner,plan}=await realPlan(),repo = new StepRepo(db.pool);
 
       const step = await repo.createStep({
-        planId: 'p1',
+        planId: plan.id,
         stepId: 'step_1',
         tool: 'trello.create_card',
         argsJson: { title: 'Test' },
-        requestedBy: 'u1',
+        requestedBy: owner.id,
       });
-      expect(step.id).toBe('s1');
+      expect(step.status).toBe('pending');expect(step.args_json).toEqual({title:'Test'});
 
-      const updated = await repo.updateStepStatus('s1', 'succeeded', { id: 'card-1' });
-      expect(updated.status).toBe('succeeded');
+      const updated = await repo.updateStepStatus(step.id, 'succeeded', { id: 'card-1' });
+      expect(updated.status).toBe('succeeded');expect((await repo.listSteps(plan.id))[0]?.output_json).toEqual({id:'card-1'});
     });
   });
 

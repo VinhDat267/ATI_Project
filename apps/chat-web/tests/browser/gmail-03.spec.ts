@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import pg from 'pg';
+import { certifyFixturePlan } from './persisted-artifacts.fixture.js';
 
 async function login(page: Page) {
   await page.goto('/login');
@@ -78,7 +79,9 @@ for (const width of [1440, 375]) for (const theme of ['light', 'dark']) {
     const conversationPath = new URL(page.url()).pathname;
     const labelsDb = new pg.Pool({ connectionString: process.env.DATABASE_URL });
     try {
-      expect((await labelsDb.query("UPDATE plans SET resource_labels = resource_labels || jsonb_build_object('gmail-thread-1', $1::text) WHERE conv_id = $2 AND status = 'pending' AND resource_labels->>'gmail-thread-1' = 'Họp nhóm ATI' RETURNING id", [longTitle, new URL(page.url()).pathname.split('/').pop()])).rowCount).toBe(1);
+      const updated = await labelsDb.query("UPDATE plans SET resource_labels = resource_labels || jsonb_build_object('gmail-thread-1', $1::text) WHERE conv_id = $2 AND status = 'pending' AND resource_labels->>'gmail-thread-1' = 'Họp nhóm ATI' RETURNING id", [longTitle, new URL(page.url()).pathname.split('/').pop()]);
+      expect(updated.rowCount).toBe(1);
+      await certifyFixturePlan(labelsDb, updated.rows[0].id);
     } finally { await labelsDb.end(); }
     // Reopen within the app: the SQL-only fixture edit does not change the SSE
     // buffer. A full reload replays its old label and races the updated plan read.

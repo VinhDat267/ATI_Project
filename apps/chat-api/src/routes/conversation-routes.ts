@@ -29,6 +29,91 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
   const router = Router();
   const { convRepo, msgRepo, chatService, planRepo, enableWorkspaceConversations } = options;
   const pool = options.pool ?? convRepo.getPool?.();
+  if (chatService.hasSlackReads?.()) {
+    router.post('/:id/slack-read-plans', async (req: Request, res: Response) => {
+      try {
+        const userId = (req as any).user?.id;
+        const conversationId = req.params.id as string;
+        if (!userId) {
+          res.status(401).json({ error: 'Unauthorized' });
+          return;
+        }
+        const conversation = await convRepo.getConversation(conversationId);
+        if (!conversation || conversation.user_id !== userId) {
+          res.status(404).json({ error: 'Conversation not found' });
+          return;
+        }
+        const body = req.body;
+        if (
+          !body ||
+          Object.keys(body).some((k) => !['content', 'connectionId', 'tempId'].includes(k)) ||
+          typeof body.content !== 'string' ||
+          !body.content.trim() ||
+          body.content.length > 4000 ||
+          typeof body.connectionId !== 'string' ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.connectionId) ||
+          (body.tempId !== undefined && (typeof body.tempId !== 'string' || body.tempId.length > 128))
+        ) {
+          res.status(400).json({ error: 'Yêu cầu đọc Slack không hợp lệ.' });
+          return;
+        }
+        const result = await chatService.handleSlackReadProposal({
+          conversationId,
+          userId,
+          content: body.content.trim(),
+          connectionId: body.connectionId,
+          ...(body.tempId ? { requestId: body.tempId } : {}),
+        });
+        res.status(202).json(result);
+      } catch {
+        res.status(503).json({ error: 'Không lập được yêu cầu đọc Slack. Hãy thử lại.' });
+      }
+    });
+  }
+  if (chatService.hasSlackWrites?.()) {
+    router.post('/:id/slack-write-plans', async (req: Request, res: Response) => {
+      try {
+        const userId = (req as any).user?.id;
+        const conversationId = req.params.id as string;
+        if (!userId) {
+          res.status(401).json({ error: 'Unauthorized' });
+          return;
+        }
+        const conversation = await convRepo.getConversation(conversationId);
+        if (!conversation || conversation.user_id !== userId) {
+          res.status(404).json({ error: 'Conversation not found' });
+          return;
+        }
+        const body = req.body;
+        if (
+          !body ||
+          Object.keys(body).some((k) => !['content', 'connectionId', 'channel', 'tempId'].includes(k)) ||
+          typeof body.content !== 'string' ||
+          !body.content.trim() ||
+          body.content.length > 4000 ||
+          typeof body.channel !== 'string' ||
+          !/^([CG][A-Za-z0-9_-]{1,63})$/.test(body.channel) ||
+          typeof body.connectionId !== 'string' ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.connectionId) ||
+          (body.tempId !== undefined && (typeof body.tempId !== 'string' || body.tempId.length > 128))
+        ) {
+          res.status(400).json({ error: 'Yêu cầu đọc Slack không hợp lệ.' });
+          return;
+        }
+        const result = await chatService.handleSlackWriteProposal({
+          conversationId,
+          userId,
+          content: body.content,
+          channel: body.channel,
+          connectionId: body.connectionId,
+          ...(body.tempId ? { requestId: body.tempId } : {}),
+        });
+        res.status(202).json(result);
+      } catch {
+        res.status(503).json({ error: 'Không lập được yêu cầu gửi Slack. Hãy thử lại.' });
+      }
+    });
+  }
 
   // POST /api/conversations
   router.post('/', async (req: Request, res: Response): Promise<void> => {
@@ -283,6 +368,7 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
         throw err;
       }
 
+      const safeConversation = (await convRepo.getConversation(conversationId)) ?? conversation;
       const rawMessages = await msgRepo.listMessages(conversationId);
       const messages = conversation?.jira_context
         ? options.jiraHistorySanitizer
@@ -293,7 +379,7 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
               metadata: { masked: true, maskReason: 'provider_unavailable' },
             })
         : rawMessages;
-      res.status(200).json({ conversation, messages });
+      res.status(200).json({ conversation: safeConversation, messages });
     } catch (err: any) {
       res.status(500).json({ error: err?.message || 'Failed to fetch conversation' });
     }

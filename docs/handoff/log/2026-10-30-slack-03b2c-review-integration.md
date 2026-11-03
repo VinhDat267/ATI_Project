@@ -1,0 +1,7 @@
+# SLACK-03B2C accepted into staging
+
+[PR208](https://github.com/VinhDat267/ATI_Project/pull/208), head `145a6016a49a33df15310c7bc46db15ed82568b1`, [CI41042072139](https://github.com/VinhDat267/ATI_Project/actions/runs/41042072139) SUCCESS including browser. Merge `2821d426863b294f045d8ff507763700761e3ea1`; `git diff --quiet <head> <merge>` exit0, identical trees.
+
+Independent review found failed-job starvation and valid registered successor misclassification. Direct fixes reproduced RED2→GREEN, with an additional batch-limit regression RED1→GREEN. Targeted73PASS plus actual sandbox bootstrap1PASS; final product fullcheck3625PASS, exit0. Initial CI failed an inherited PostgreSQL microsecond/application millisecond due-fixture assumption. Final head seeds initially due fixture metadata explicitly in the past; three fresh6/6 suites and exact-head CI passed. Scheduling/fences were not weakened.
+
+Native invalidation sweeps now consume registered `messages.content` obligations independently of content flags. Actual sandbox server reached health200 and physically erased a registered copy without Slack configuration or HTTP requests. Raw+message jobs completed; six other derived kinds remained pending. This closes the bounded consumer slice only. Other selectors/kinds, unregistered/backfill, reader/writer/executor integration, generic TTL, fullF3/F4 and native Slack Free/Pro/two-user/model acceptance remain open. No main merge or live flag enable.

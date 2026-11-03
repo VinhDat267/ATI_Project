@@ -118,7 +118,7 @@ export function createToolRuntimeFactory(
   sandbox = createSandboxAdapter,
 ) {
   return createRuntimeAdapterFactory<AdapterContext>(mode, personal,
-    (name, context) => (name === 'gmail' || name === 'mycalendar' || name === 'mysheets' || name === 'trello' || name === 'github' || name === 'telegram') ? personal(name, context) : sandbox(name));
+    (name, context) => (name === 'gmail' || name === 'mycalendar' || name === 'mysheets' || name === 'myslack' || name === 'trello' || name === 'github' || name === 'telegram') ? personal(name, context) : sandbox(name));
 }
 
 /** A failed Gmail, MyCalendar, MySheets, Trello, GitHub or Telegram request must not become a canned shared-service write. */

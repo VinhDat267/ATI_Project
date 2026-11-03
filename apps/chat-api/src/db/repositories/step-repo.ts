@@ -1,4 +1,16 @@
 import type pg from 'pg';
+import { isDeepStrictEqual } from 'node:util';
+import { SlackDerivedLineageRepo } from './slack-derived-lineage-repo.js';
+import { SlackPolicyService } from '../../services/slack/policy-service.js';
+import { guardPlanInTransaction,guardStepRowsInTransaction,tagSlackSourceArtifact,uniqueSegments,planSelectors } from '../../services/slack/slack-plan-lineage.js';
+import type { DerivedSegmentInput } from './slack-derived-lineage-repo.js';
+import { isBoundSlackReadPlan } from '../../services/slack/slack-read-plan.js';
+import { JSON_TOMBSTONE } from '../../services/slack/slack-artifact-targets.js';
+import { hasSlackMarker } from '../../services/slack/slack-message-selectors.js';
+import { sealPlanOrigin,planOriginAllowed } from '../../services/slack/slack-plan-origin.js';
+import {isBoundSlackWritePlan,isBoundSlackSourceReplyPlan} from '../../services/slack/slack-write-plan.js';
+import {validateSlackPostPlan} from '@wap/tool-schemas';
+import {slackWriteHash,resolveCertifiedSourceReplyParams} from './slack-write-outbox-repo.js';
 
 export interface ExecutionStepRow {
   id: string;
@@ -16,7 +28,55 @@ export interface ExecutionStepRow {
 }
 
 export class StepRepo {
-  constructor(private pool: pg.Pool) {}
+  /** Reconcile only the private confirmed outbox evidence; a concurrent Stop wins.
+   * Metadata-only receipt is origin-certified in the same transaction as completion. */
+  async completeSlackPostReconciliation(planId:string,stepId:string,userId:string,planHash:string,output:any,authorize:(client:pg.PoolClient)=>Promise<void>):Promise<void>{
+    await this.transaction(async client=>{
+      const owned=(await client.query("SELECT pg_try_advisory_xact_lock(hashtext('ati-slack-owner'),hashtext($1)) locked",[userId])).rows[0]?.locked;
+      if(!owned)throw new Error('SLACK_WRITE_UNKNOWN');
+      await authorize(client);
+      const located=(await client.query('SELECT conv_id FROM plans WHERE id=$1',[planId])).rows[0];if(!located)throw new Error('SLACK_WRITE_UNKNOWN');
+      await client.query('SELECT id FROM conversations WHERE id=$1 FOR UPDATE',[located.conv_id]);
+      const plan=(await client.query('SELECT * FROM plans WHERE id=$1 FOR UPDATE',[planId])).rows[0];
+      const checked=await guardPlanInTransaction(client,this.slack,planId,'planning');
+      const owner=(await client.query('SELECT user_id FROM conversations WHERE id=$1',[located.conv_id])).rows[0]?.user_id;
+      const isSourceReply=isBoundSlackSourceReplyPlan(plan.plan_json,userId);
+      const isManualWrite=isBoundSlackWritePlan(plan.plan_json,userId);
+      if(!checked.allowed||(isManualWrite&&checked.source)||(isSourceReply&&!checked.source)||(!isManualWrite&&!isSourceReply)||owner!==userId||plan.plan_hash!==planHash||!['partial','reconciliation_required'].includes(plan.status))throw new Error('SLACK_WRITE_UNKNOWN');
+      const {step:approved,binding,params}=isSourceReply
+        ? await resolveCertifiedSourceReplyParams(client,planId,plan.plan_json,userId).then(r=>({step:r.step,binding:r.binding,params:r.resolvedParams}))
+        : validateSlackPostPlan(plan.plan_json,userId);
+      const current=(await client.query('SELECT * FROM execution_steps WHERE plan_id=$1 AND step_id=$2 FOR UPDATE',[planId,stepId])).rows[0];
+      const stepOriginOk=isSourceReply
+        ? (await guardStepRowsInTransaction(client,this.slack,checked,current?[current]:[],'planning')).length===1
+        : (current&&await planOriginAllowed(client,'execution_steps',current,userId));
+      if(!current||current.status!=='unknown'||current.tool!==approved.tool||current.requested_by!==userId||
+        !isDeepStrictEqual(current.args_json,approved.args)||!stepOriginOk)throw new Error('SLACK_WRITE_UNKNOWN');
+      const evidence=(await client.query(`SELECT * FROM slack_write_outbox WHERE operation_id=$1 AND plan_id=$2 AND step_id=$3
+        AND user_id=$4 AND plan_hash=$5 AND status='confirmed' FOR SHARE`,[output.operationId,planId,stepId,userId,planHash])).rows[0];
+      if(!evidence||evidence.connection_id!==binding.connectionId||evidence.workspace_id!==binding.workspaceId||evidence.slack_user_id!==binding.slackUserId||
+        evidence.identity_version!==binding.identityVersion||evidence.request_hash!==slackWriteHash(params)||(evidence.thread_ts??undefined)!==(params as {thread_ts?:string}).thread_ts||
+        output.status!=='confirmed'||output.channel!==evidence.channel_id||output.ts!==evidence.provider_ts||Object.keys(output).sort().join(',')!=='channel,operationId,status,ts')throw new Error('SLACK_WRITE_UNKNOWN');
+      const step=(await client.query("UPDATE execution_steps SET status='succeeded',output_json=$3,error_json=NULL,completed_at=clock_timestamp() WHERE plan_id=$1 AND step_id=$2 AND status='unknown' RETURNING *",[planId,stepId,JSON.stringify(output)])).rows[0];
+      if(!step)throw new Error('SLACK_WRITE_UNKNOWN');
+      if(isSourceReply){
+        await client.query(`UPDATE slack_derived_copies SET status='retired',retired_at=clock_timestamp(),retired_reason='superseded',updated_at=clock_timestamp()
+          WHERE target_id=$1 AND target_kind='audit_log_entry' AND target_sub_id IN ('output_json','error_json') AND status='active'`,[step.id]);
+        await this.slack.registerDerivedCopyInTransaction(client,{atiUserId:userId,targetKind:'audit_log_entry',targetId:step.id,targetSubId:'output_json',segments:checked.segments});
+        await client.query('UPDATE execution_steps SET slack_lineage_manifest=$2 WHERE id=$1',[step.id,JSON.stringify(['args_json','output_json'])]);
+      }else{
+        await sealPlanOrigin(client,'execution_steps',step.id,'step_status');
+      }
+      await client.query("UPDATE plans SET status='completed' WHERE id=$1",[planId]);
+      await client.query("UPDATE slack_assistant_artifacts SET status='completed',revision=revision+1,updated_at=clock_timestamp() WHERE active_plan_id=$1 AND status NOT IN ('rejected','stale')",[planId]);
+    });
+  }
+  private readonly slack:SlackDerivedLineageRepo;
+  constructor(private pool: pg.Pool,slack?:SlackDerivedLineageRepo) {this.slack=slack??new SlackDerivedLineageRepo(pool,new SlackPolicyService(pool));}
+  private async transaction<T>(work:(client:pg.PoolClient)=>Promise<T>):Promise<T>{
+    const c=await this.pool.connect();try{await c.query('BEGIN');await c.query("SET LOCAL statement_timeout='5s'");const result=await work(c);await c.query('COMMIT');return result;}
+    catch(error){await c.query('ROLLBACK').catch(()=>{});throw error;}finally{c.release();}
+  }
 
   async createStep(data: {
     planId: string;
@@ -25,19 +85,33 @@ export class StepRepo {
     argsJson?: any;
     requestedBy?: string;
   }): Promise<ExecutionStepRow> {
-    const res = await this.pool.query(
+    const snapshot=structuredClone(data);
+    return this.transaction(async client=>{
+    const context=await guardPlanInTransaction(client,this.slack,snapshot.planId,'planning');
+    if(!context.allowed)throw new Error('SLACK_SOURCE_UNAVAILABLE');
+    if(context.source){
+      const approved=context.row.plan_json.steps?.find((s:any)=>s.id===snapshot.stepId);
+      if(!approved||approved.tool!==snapshot.tool||!isDeepStrictEqual(approved.args??{},snapshot.argsJson??{})||
+        snapshot.requestedBy!==context.segments[0]!.sourceRef.binding.atiUserId)throw new Error('SLACK_STEP_SNAPSHOT_MISMATCH');
+    }else if(hasSlackMarker(snapshot.argsJson))throw new Error('SLACK_PROVENANCE_REQUIRED');
+    const res = await client.query(
       `INSERT INTO execution_steps (plan_id, step_id, tool, args_json, status, requested_by)
        VALUES ($1, $2, $3, $4, 'pending', $5)
        RETURNING *`,
       [
-        data.planId,
-        data.stepId,
-        data.tool,
-        JSON.stringify(data.argsJson ?? {}),
-        data.requestedBy || 'system',
+        snapshot.planId,
+        snapshot.stepId,
+        snapshot.tool,
+        JSON.stringify(snapshot.argsJson ?? {}),
+        snapshot.requestedBy || 'system',
       ]
     );
-    return res.rows[0];
+    const row=res.rows[0];
+    if(context.source){await this.slack.registerDerivedCopyInTransaction(client,{atiUserId:context.segments[0]!.sourceRef.binding.atiUserId,targetKind:'plan_step_arg',targetId:row.id,targetSubId:'args_json',segments:context.segments});
+      await client.query('UPDATE execution_steps SET slack_lineage_manifest=$2 WHERE id=$1',[row.id,JSON.stringify(['args_json'])]);tagSlackSourceArtifact(row);}
+    else await sealPlanOrigin(client,'execution_steps',row.id,'step_writer');
+    delete row.slack_lineage_manifest;return row;
+    });
   }
 
   async updateStepStatus(
@@ -47,9 +121,17 @@ export class StepRepo {
     errorJson?: any,
     durationMs?: number
   ): Promise<ExecutionStepRow> {
+    const snapshot=structuredClone({status,outputJson,errorJson,durationMs});
+    return this.transaction(async client=>{
+    const found=(await client.query('SELECT plan_id FROM execution_steps WHERE id=$1',[id])).rows[0];
+    if(!found)throw new Error('STEP_NOT_FOUND');
+    const context=await guardPlanInTransaction(client,this.slack,found.plan_id,'planning');
+    let writeOutput=snapshot.outputJson,writeError=snapshot.errorJson;
+    if(context.source&&!context.allowed){writeOutput=writeOutput==null?null:JSON_TOMBSTONE;writeError=writeError==null?null:JSON_TOMBSTONE;}
+    else if(!context.source&&(hasSlackMarker(writeOutput)||hasSlackMarker(writeError)))throw new Error('SLACK_PROVENANCE_REQUIRED');
     // Timing comes from the database clock: a step starts when it turns running
     // (again, on retry) and its duration runs from that start to the terminal status.
-    const res = await this.pool.query(
+    const res = await client.query(
       `UPDATE execution_steps
        SET status = $2,
            output_json = COALESCE($3, output_json),
@@ -67,22 +149,75 @@ export class StepRepo {
        RETURNING *`,
       [
         id,
-        status,
-        outputJson ? JSON.stringify(outputJson) : null,
-        errorJson ? JSON.stringify(errorJson) : null,
-        durationMs ?? null,
+        snapshot.status,
+        writeOutput==null ? null : JSON.stringify(writeOutput),
+        writeError==null ? null : JSON.stringify(writeError),
+        snapshot.durationMs ?? null,
       ]
     );
-    return res.rows[0];
+    let row=res.rows[0];
+    if(context.source){
+      const selectors=['args_json'];
+      for(const field of ['output_json','error_json'] as const){
+        await client.query(`UPDATE slack_derived_copies SET status='retired',retired_at=clock_timestamp(),retired_reason='superseded',updated_at=clock_timestamp()
+          WHERE target_id=$1 AND target_kind='audit_log_entry' AND target_sub_id=$2 AND status='active'`,[id,field]);
+        if(context.allowed && row[field]!=null){await this.slack.registerDerivedCopyInTransaction(client,{atiUserId:context.segments[0]!.sourceRef.binding.atiUserId,targetKind:'audit_log_entry',targetId:id,targetSubId:field,segments:context.segments});selectors.push(field);}
+      }
+      if(!context.allowed)row=(await client.query(`UPDATE execution_steps SET status='unknown',
+        output_json=CASE WHEN output_json IS NOT NULL THEN $2::jsonb ELSE NULL END,
+        error_json=$2::jsonb WHERE id=$1 RETURNING *`,[id,JSON.stringify(JSON_TOMBSTONE)])).rows[0];
+      await client.query('UPDATE execution_steps SET slack_lineage_manifest=$2 WHERE id=$1',[id,JSON.stringify(selectors)]);tagSlackSourceArtifact(row);
+    } else await sealPlanOrigin(client,'execution_steps',id,'step_status');
+    delete row.slack_lineage_manifest;return row;
+    });
   }
 
-  async listSteps(planId: string): Promise<ExecutionStepRow[]> {
-    const res = await this.pool.query(
+  async listSteps(planId: string,purpose:'manual_lookup'|'planning'='manual_lookup'): Promise<ExecutionStepRow[]> {
+    return this.transaction(async client=>{
+    const context=await guardPlanInTransaction(client,this.slack,planId,purpose);
+    const res = await client.query(
       `SELECT * FROM execution_steps
        WHERE plan_id = $1
-       ORDER BY step_id ASC`,
+       ORDER BY step_id ASC FOR SHARE`,
       [planId]
     );
-    return res.rows;
+    return guardStepRowsInTransaction(client,this.slack,context,res.rows,purpose);
+    });
+  }
+
+  /** Called only with private wrapper evidence. Fresh output and its complete lineage commit together. */
+  async updateSlackReadResult(id:string,output:unknown,segments:DerivedSegmentInput[],expected:{userId:string;planHash:string;stepId:string},signal?:AbortSignal):Promise<ExecutionStepRow>{
+    const data=structuredClone({output,segments,expected});
+    return this.transaction(async client=>{
+      signal?.throwIfAborted();
+      const first=(await client.query('SELECT p.id,p.conv_id FROM execution_steps s JOIN plans p ON p.id=s.plan_id WHERE s.id=$1',[id])).rows[0];
+      if(!first)throw new Error('SLACK_READ_SNAPSHOT_CHANGED');
+      const copies=(await client.query(`SELECT c.* FROM slack_derived_copies c WHERE c.status='active' AND
+        (c.target_id=$1 OR c.target_id IN (SELECT id::text FROM execution_steps WHERE plan_id=$1::uuid)) ORDER BY c.id`,[first.id])).rows;
+      const inherited:DerivedSegmentInput[]=[];for(const copy of copies)inherited.push(...await this.slack.segmentsInTransaction(client,copy.id));
+      const union=uniqueSegments([...inherited,...data.segments]);
+      await this.slack.prepareConversationWriteInTransaction(client,first.conv_id,data.expected.userId,union,'planning');
+      const checked=await guardPlanInTransaction(client,this.slack,first.id,'planning');
+      const plan=(await client.query('SELECT * FROM plans WHERE id=$1 FOR UPDATE',[first.id])).rows[0];
+      if(!checked.allowed||!isBoundSlackReadPlan(plan.plan_json,data.expected.userId)||plan.plan_hash!==data.expected.planHash||!['approved','executing'].includes(plan.status))throw new Error('SLACK_READ_SNAPSHOT_CHANGED');
+      const rows=(await client.query('SELECT * FROM execution_steps WHERE plan_id=$1 ORDER BY step_id FOR UPDATE',[first.id])).rows;
+      const step=rows.find(s=>s.id===id),approved=plan.plan_json.steps.find((s:any)=>s.id===data.expected.stepId);
+      if(!step||step.step_id!==data.expected.stepId||step.tool!==approved?.tool||!isDeepStrictEqual(step.args_json,approved.args)||!['pending','running'].includes(step.status))throw new Error('SLACK_READ_SNAPSHOT_CHANGED');
+      const current=(await client.query(`SELECT id FROM slack_derived_copies WHERE status='active' AND
+        (target_id=$1 OR target_id IN (SELECT id::text FROM execution_steps WHERE plan_id=$1::uuid)) ORDER BY id`,[first.id])).rows;
+      if(JSON.stringify(current.map(r=>r.id))!==JSON.stringify(copies.map(c=>c.id)))throw new Error('SLACK_READ_SNAPSHOT_CHANGED');
+      const saved=(await client.query("UPDATE execution_steps SET output_json=$2,status='succeeded',error_json=NULL,completed_at=clock_timestamp() WHERE id=$1 RETURNING *",[id,JSON.stringify(data.output)])).rows[0];
+      Object.assign(step,saved);
+      const selectors=planSelectors({resourceLabels:plan.resource_labels});
+      for(const selector of selectors)await this.slack.registerDerivedCopyInTransaction(client,{atiUserId:data.expected.userId,targetKind:'plan_step_arg',targetId:first.id,targetSubId:selector,segments:union});
+      await client.query('UPDATE plans SET slack_lineage_manifest=$2 WHERE id=$1',[first.id,JSON.stringify(selectors)]);
+      for(const row of rows){
+        const manifest=['args_json',...(row.output_json==null?[]:['output_json']),...(row.error_json==null?[]:['error_json'])];
+        for(const selector of manifest)await this.slack.registerDerivedCopyInTransaction(client,{atiUserId:data.expected.userId,targetKind:selector==='args_json'?'plan_step_arg':'audit_log_entry',targetId:row.id,targetSubId:selector,segments:union});
+        await client.query('UPDATE execution_steps SET slack_lineage_manifest=$2 WHERE id=$1',[row.id,JSON.stringify(manifest)]);
+      }
+      await client.query("DELETE FROM slack_plan_origins WHERE (artifact_table='plans' AND artifact_id=$1) OR (artifact_table='execution_steps' AND plan_id=$1)",[first.id]);
+      signal?.throwIfAborted();delete saved.slack_lineage_manifest;return tagSlackSourceArtifact(saved);
+    });
   }
 }
