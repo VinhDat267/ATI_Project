@@ -68,7 +68,7 @@ describe('Shared Telegram credentials removal & personal status in GET /api/serv
     expect(delRes.body).toEqual({ error: 'Telegram dùng kết nối 1 chạm.' });
   });
 
-  it('reports personalStatus = needs_scope and connected = false when active personal credential has 0 selectedChats', async () => {
+  it('reports personalStatus = scope_required and connected = false when active personal credential has 0 selectedChats', async () => {
     await credentials.saveCredentials(
       'telegram',
       encryptCredentials(
@@ -89,7 +89,7 @@ describe('Shared Telegram credentials removal & personal status in GET /api/serv
 
     const telegram = (res.body.services as any[]).find((s) => s.id === 'telegram');
     expect(telegram).toBeDefined();
-    expect(telegram.personalStatus).toBe('needs_scope');
+    expect(telegram.personalStatus).toBe('scope_required');
     expect(telegram.connected).toBe(false);
     expect(telegram.configured).toBe(false);
     expect(telegram.username).toBe('alice_tg');

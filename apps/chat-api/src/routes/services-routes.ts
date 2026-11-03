@@ -483,7 +483,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
                     const allowedIds = hasAllowedChats ? dec.allowedScope.chats : [];
                     const scopeIds = allowedIds.length > 0 ? allowedIds : selectedIds;
                     if (scopeIds.length === 0) {
-                      personalStatus = 'needs_scope';
+                      personalStatus = 'scope_required';
                     } else {
                       personalAllowedScope = scopeIds;
                     }
