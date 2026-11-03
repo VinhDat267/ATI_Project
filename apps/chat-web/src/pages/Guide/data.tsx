@@ -286,12 +286,12 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
         id: 'jira',
         name: 'Jira',
         category: 'Quản lý dự án & Điều phối Sprint (OAuth 3LO 1-Click)',
-        keys: ['Kết nối OAuth 2.0 (3LO) 1-Click hoặc API Token'],
+        keys: ['Kết nối OAuth 2.0 (3LO) 1-Click', 'Tự đồng bộ Site URL & Project'],
         scopeLabel: 'Project key',
         sampleScope: 'ATI',
         timeEstimate: 'Khoảng 30 giây (OAuth 1-Click)',
         summary: 'Kết nối Atlassian Jira 1 chạm, tạo/cập nhật issue, chuyển trạng thái workflow (In Progress/Done), gán thành viên, đặt ưu tiên và nhận Bản tin Standup mỗi sáng.',
-        importantNotice: 'Khuyên dùng Kết nối Jira OAuth 1-Click trong Workspace để tự động liệt kê Site & Dự án mà không cần tạo API Token thủ công.',
+        importantNotice: 'Khuyên dùng Kết nối Jira OAuth 1-Click trong Workspace để tự động liệt kê Site URL & Dự án mà không cần tạo API Token thủ công.',
         steps: [
           {
             num: 1,
@@ -692,6 +692,14 @@ export const GUIDE_OAUTH_SHOWCASE_CARDS: GuideOAuthShowcaseCard[] = [
     badgeStyle: 'oauth',
     iconClassName: 'w-4 h-4 text-[#111827]',
     description: 'Kết nối 1 chạm, đọc/cập nhật trang database và nhận Bản tin tiến độ mỗi sáng.',
+  },
+  {
+    service: 'jira',
+    title: 'Atlassian Jira Cloud',
+    badge: 'OAuth 3LO · 1-Click',
+    badgeStyle: 'oauth',
+    iconClassName: 'w-4 h-4 text-[#0052CC]',
+    description: 'Kết nối Atlassian 3LO, tạo/chuyển cột issue và nhận Bản tin Standup sáng.',
   },
   {
     service: 'slack',

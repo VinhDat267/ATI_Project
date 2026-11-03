@@ -57,7 +57,9 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
       !Array.isArray(digestCandidate?.config?.repos) &&
       !Array.isArray(digestCandidate?.config?.boards) &&
       !Array.isArray(digestCandidate?.config?.databases) &&
+      !Array.isArray(digestCandidate?.config?.projects) &&
       digestCandidate?.kind !== 'notion_digest' &&
+      digestCandidate?.kind !== 'myjira_digest' &&
       (Array.isArray(digestCandidate?.config?.sources) ||
         typeof digestCandidate?.config?.telegramUserId === 'string' ||
         (metadata.services?.includes('telegram') &&
@@ -69,6 +71,8 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
           !metadata.services?.includes('github') &&
           !metadata.services?.includes('trello') &&
           !metadata.services?.includes('notion') &&
+          !metadata.services?.includes('myjira') &&
+          !metadata.services?.includes('jira') &&
           !metadata.services?.includes('mycalendar') &&
           !metadata.services?.includes('calendar') &&
           !metadata.services?.includes('mysheets') &&
@@ -97,11 +101,23 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
         Array.isArray(digestCandidate?.config?.databases) ||
         metadata.services?.includes('notion'))
   );
+  const isJiraCandidate = Boolean(
+    !isTelegramCandidate &&
+      !isGithubCandidate &&
+      !isTrelloCandidate &&
+      !isNotionCandidate &&
+      digestCandidate &&
+      (digestCandidate?.kind === 'myjira_digest' ||
+        Array.isArray(digestCandidate?.config?.projects) ||
+        metadata.services?.includes('myjira') ||
+        metadata.services?.includes('jira'))
+  );
   const isCalendarCandidate = Boolean(
     !isTelegramCandidate &&
       !isGithubCandidate &&
       !isTrelloCandidate &&
       !isNotionCandidate &&
+      !isJiraCandidate &&
       digestCandidate &&
       ('configPreview' in digestCandidate ||
         'disabledReason' in digestCandidate ||
@@ -128,7 +144,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
     if (locked.current) return;
     locked.current = true; setBusy(true); setError('');
     try {
-      const result = isGithubCandidate || isTrelloCandidate || isNotionCandidate
+      const result = isGithubCandidate || isTrelloCandidate || isNotionCandidate || isJiraCandidate
         ? await apiClient.confirmSchedule(
             convId,
             message.id,
@@ -152,7 +168,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
   const manage = proposal && ['pause', 'resume', 'cancel'].includes(proposal.action);
   const title = schedule?.name ?? (manage ? `${proposal.action === 'pause' ? 'Tạm dừng' : proposal.action === 'resume' ? 'Chạy tiếp' : 'Hủy'} lịch "${previous?.name ?? ''}"?` : proposal?.name);
   const scheduleServices = schedule?.services ?? metadata.services ?? [];
-  const isAutoDigestActive = approvalMode === 'auto_digest' || schedule?.kind === 'calendar_digest' || schedule?.kind === 'sheets_digest' || schedule?.kind === 'github_digest' || schedule?.kind === 'trello_digest' || schedule?.kind === 'notion_digest' || schedule?.kind === 'telegram_digest';
+  const isAutoDigestActive = approvalMode === 'auto_digest' || schedule?.kind === 'calendar_digest' || schedule?.kind === 'sheets_digest' || schedule?.kind === 'github_digest' || schedule?.kind === 'trello_digest' || schedule?.kind === 'notion_digest' || (schedule?.kind as string) === 'myjira_digest' || schedule?.kind === 'telegram_digest';
   return <section data-moment="schedule" className="w-full min-w-0 max-w-3xl mx-auto v3-space-y-5">
     <p className="text-xs uppercase tracking-wider text-[#6B7280]">ATI · Lịch chạy workflow</p>
     <h1 tabIndex={-1} className="font-display text-3xl sm:text-4xl font-bold text-[#111827] [overflow-wrap:anywhere]">{title}</h1>
@@ -163,7 +179,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
       {schedule ? <>
         <div className="flex flex-wrap items-center gap-2">
           <p role="status" className="text-sm font-semibold text-[#111827]">{scheduleLabel(schedule)}</p>
-          {(schedule.kind === 'calendar_digest' || schedule.kind === 'github_digest' || schedule.kind === 'trello_digest' || schedule.kind === 'notion_digest' || schedule.kind === 'sheets_digest') && (
+          {(schedule.kind === 'calendar_digest' || schedule.kind === 'github_digest' || schedule.kind === 'trello_digest' || schedule.kind === 'notion_digest' || (schedule.kind as string) === 'myjira_digest' || schedule.kind === 'sheets_digest') && (
             <span data-schedule-kind={schedule.kind} className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
               Tự gửi
             </span>
@@ -386,6 +402,51 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                 </div>
               </label>
             </fieldset>
+          ) : isJiraCandidate ? (
+            <fieldset className="v3-space-y-2 border-t border-[#E7E7E2] pt-3">
+              <legend className="text-xs font-semibold text-[#6B7280] mb-1">Chế độ khi tới giờ</legend>
+              <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm cursor-pointer ${approvalMode === 'manual' ? 'border-[#FF5701] bg-[#FFF6EE]/40' : 'border-[#E7E7E2] bg-white'}`}>
+                <input
+                  id="schedule-mode-manual"
+                  type="radio"
+                  name={`schedule-mode-${message.id}`}
+                  checked={approvalMode === 'manual'}
+                  onChange={() => setApprovalMode('manual')}
+                  className="mt-0.5 text-[#FF5701] focus:ring-[#FF5701]"
+                />
+                <div className="v3-space-y-0.5">
+                  <p className="font-semibold text-[#111827]">Chờ tôi duyệt mỗi lượt</p>
+                  <p className="text-xs text-[#4B5563]">Tới giờ, ATI lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.</p>
+                </div>
+              </label>
+              <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm ${!canAutoDigest ? 'opacity-60 cursor-not-allowed border-[#E7E7E2] bg-neutral-50' : approvalMode === 'auto_digest' ? 'cursor-pointer border-[#FF5701] bg-[#FFF6EE]/40' : 'cursor-pointer border-[#E7E7E2] bg-white'}`}>
+                <input
+                  id="schedule-mode-auto-digest"
+                  type="radio"
+                  name={`schedule-mode-${message.id}`}
+                  checked={approvalMode === 'auto_digest'}
+                  disabled={!canAutoDigest}
+                  onChange={() => { if (canAutoDigest) setApprovalMode('auto_digest'); }}
+                  className="mt-0.5 text-[#FF5701] focus:ring-[#FF5701]"
+                />
+                <div className="v3-space-y-1 min-w-0">
+                  <p className="font-semibold text-[#111827]">Tự gửi bản tin Standup &amp; Blocker Jira, không cần duyệt lại</p>
+                  {canAutoDigest && digestCandidate?.config ? (
+                    <p className="text-xs text-[#4B5563] break-words">
+                      {`Dự án Jira: ${Array.isArray(digestCandidate.config.projects) ? digestCandidate.config.projects.map((p: any) => typeof p === 'string' ? p : `${p?.siteName ? `${p.siteName} · ` : ''}${p?.projectKey ?? p?.projectName ?? ''}`).join(', ') : ''} · ${
+                        digestCandidate.config.telegramChatId || digestCandidate.config.telegramChatTitle
+                          ? `Telegram: ${digestCandidate.config.telegramChatTitle || digestCandidate.config.telegramChatId}`
+                          : `Kênh Slack: #${String(digestCandidate.config.channelName ?? '').replace(/^#/, '')}`
+                      } · Nội dung: Blocker/High Priority, Đang xử lý (In Progress), Mới hoàn thành (+ tóm tắt AI)`}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-[#6B7280] break-words">
+                      {digestCandidate?.disabledReason || 'Chỉ bật được khi lịch chỉ đọc Jira (myjira.search_issues) và gửi báo cáo vào 1 kênh Slack hoặc nhóm Telegram đã chọn.'}
+                    </p>
+                  )}
+                </div>
+              </label>
+            </fieldset>
           ) : isCalendarCandidate ? (
             <>
               {isEligible ? (
@@ -482,7 +543,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
             </>
           )}
         </>}
-        <div className="flex flex-wrap gap-2"><button type="button" disabled={busy} className={primaryScheduleButton} onClick={() => void confirm()}>{(isGithubCandidate || isTrelloCandidate) && !manage && approvalMode === 'auto_digest' ? 'Xác nhận và bật tự gửi' : 'Xác nhận'}</button><button type="button" disabled={busy} className={scheduleButton} onClick={() => { try { if (proposal?.request) sessionStorage.setItem('ati_prefill_prompt', proposal.request); } catch { /* ignore */ } onEdit(); }}>Sửa</button><button type="button" disabled={busy} className={scheduleButton} onClick={() => setIgnored(true)}>Bỏ qua</button></div>
+        <div className="flex flex-wrap gap-2"><button type="button" disabled={busy} className={primaryScheduleButton} onClick={() => void confirm()}>{(isGithubCandidate || isTrelloCandidate || isJiraCandidate) && !manage && approvalMode === 'auto_digest' ? 'Xác nhận và bật tự gửi' : 'Xác nhận'}</button><button type="button" disabled={busy} className={scheduleButton} onClick={() => { try { if (proposal?.request) sessionStorage.setItem('ati_prefill_prompt', proposal.request); } catch { /* ignore */ } onEdit(); }}>Sửa</button><button type="button" disabled={busy} className={scheduleButton} onClick={() => setIgnored(true)}>Bỏ qua</button></div>
       </>}
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     </div>

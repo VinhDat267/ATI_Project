@@ -59,16 +59,16 @@ function ServiceGuideDetail({ serviceId, navigate, guides = SERVICE_GUIDES }: { 
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <a href={`/settings#${s.id}`} onClick={appLink(navigate, `/settings#${s.id}`)} className="px-3.5 py-2 rounded-xl bg-[#FF5701] hover:bg-[#E04D00] text-white text-xs font-semibold shadow-sm transition-all inline-flex items-center gap-1.5" title={s.id === 'gmail' ? 'Mở kết nối Gmail' : s.id === 'mysheets' ? 'Mở kết nối Google Sheets' : s.id === 'telegram' ? 'Mở kết nối Telegram 1-Click' : s.id === 'notion' ? 'Mở kết nối Notion 1-Click' : 'Mở trang cài đặt để dán khoá'}>
-          <span>{s.id === 'gmail' ? 'Kết nối Gmail →' : s.id === 'mysheets' ? 'Kết nối Google Sheets →' : s.id === 'telegram' ? 'Kết nối Telegram 1-Click →' : s.id === 'notion' ? 'Kết nối Notion 1-Click →' : 'Đi tới Cài đặt khoá →'}</span>
+        <a href={`/settings#${s.id}`} onClick={appLink(navigate, `/settings#${s.id}`)} className="px-3.5 py-2 rounded-xl bg-[#FF5701] hover:bg-[#E04D00] text-white text-xs font-semibold shadow-sm transition-all inline-flex items-center gap-1.5" title={s.id === 'gmail' ? 'Mở kết nối Gmail' : s.id === 'mysheets' ? 'Mở kết nối Google Sheets' : s.id === 'telegram' ? 'Mở kết nối Telegram 1-Click' : s.id === 'notion' ? 'Mở kết nối Notion 1-Click' : s.id === 'jira' ? 'Mở kết nối Jira OAuth 1-Click' : 'Mở trang cài đặt để dán khoá'}>
+          <span>{s.id === 'gmail' ? 'Kết nối Gmail →' : s.id === 'mysheets' ? 'Kết nối Google Sheets →' : s.id === 'telegram' ? 'Kết nối Telegram 1-Click →' : s.id === 'notion' ? 'Kết nối Notion 1-Click →' : s.id === 'jira' ? 'Kết nối Jira 1-Click →' : 'Đi tới Cài đặt khoá →'}</span>
         </a>
       </div>
     </div>
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
       <div className="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2]">
-        <div className="text-[11px] text-[#6B7280] font-medium">{['gmail', 'mysheets', 'telegram', 'notion'].includes(s.id) ? 'Cách kết nối:' : 'Khoá cần lấy:'}</div>
+        <div className="text-[11px] text-[#6B7280] font-medium">{['gmail', 'mysheets', 'telegram', 'notion', 'jira'].includes(s.id) ? 'Cách kết nối:' : 'Khoá cần lấy:'}</div>
         <div className="font-semibold text-xs text-[#111827] mt-1 flex flex-wrap gap-1">
-          {['gmail', 'mysheets'].includes(s.id) && <span>Google OAuth · không nhập khoá</span>}{s.id === 'notion' && <span>Notion OAuth · không nhập khoá</span>}{s.keys.map(k => <span key={k} className="bg-white px-2 py-0.5 rounded border border-[#E7E7E2] text-neutral-800">{k}</span>)}
+          {['gmail', 'mysheets'].includes(s.id) && <span>Google OAuth · không nhập khoá</span>}{s.id === 'notion' && <span>Notion OAuth · không nhập khoá</span>}{s.id === 'jira' && <span>Atlassian OAuth 3LO · không nhập khoá</span>}{s.keys.map(k => <span key={k} className="bg-white px-2 py-0.5 rounded border border-[#E7E7E2] text-neutral-800">{k}</span>)}
         </div>
       </div>
       <div className="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2]">
@@ -94,7 +94,7 @@ function ServiceGuideDetail({ serviceId, navigate, guides = SERVICE_GUIDES }: { 
     </div>
     <div className="v3-space-y-4 pt-2">
       <h4 className="text-sm font-bold text-[#111827] uppercase tracking-wider">
-        {s.id === 'gmail' ? 'Các bước kết nối hộp thư:' : s.id === 'mysheets' ? 'Các bước kết nối bảng tính:' : s.id === 'telegram' ? 'Các bước kết nối & sử dụng nhanh:' : s.id === 'notion' ? 'Các bước kết nối & chọn Database:' : 'Các bước lấy khoá chi tiết từng thao tác:'}
+        {s.id === 'gmail' ? 'Các bước kết nối hộp thư:' : s.id === 'mysheets' ? 'Các bước kết nối bảng tính:' : s.id === 'telegram' ? 'Các bước kết nối & sử dụng nhanh:' : s.id === 'notion' ? 'Các bước kết nối & chọn Database:' : s.id === 'jira' ? 'Các bước kết nối Jira OAuth 1-Click & chọn Project:' : 'Các bước lấy khoá chi tiết từng thao tác:'}
       </h4>
       <div className="v3-space-y-3">
         {s.steps.map(st => (

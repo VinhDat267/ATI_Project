@@ -831,12 +831,28 @@ export class ApiClient {
   }
 
   async createConversation(
-    title?: string
+    title?: string,
+    options?: { jiraContext?: boolean }
   ): Promise<{ conversation: Conversation }> {
-    return this.request<{ conversation: Conversation }>('/api/conversations', {
-      method: 'POST',
-      body: title ? JSON.stringify({ title }) : undefined,
-    });
+    const payload: Record<string, unknown> = {};
+    if (title) payload.title = title;
+    if (options?.jiraContext === true) payload.jiraContext = true;
+    const hasPayload = Object.keys(payload).length > 0;
+    try {
+      return await this.request<{ conversation: Conversation }>('/api/conversations', {
+        method: 'POST',
+        body: hasPayload ? JSON.stringify(payload) : undefined,
+      });
+    } catch (error: any) {
+      const status = error?.status ?? error?.statusCode;
+      if (options?.jiraContext === true && (status === 400 || status === 403 || status === 404 || status === 503)) {
+        return this.request<{ conversation: Conversation }>('/api/conversations', {
+          method: 'POST',
+          body: title ? JSON.stringify({ title }) : undefined,
+        });
+      }
+      throw error;
+    }
   }
 
   // --- Messages ---

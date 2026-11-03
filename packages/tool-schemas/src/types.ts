@@ -173,7 +173,7 @@ export interface ScheduleResponse {
 export type PlannerResponse = PlanResponse | ClarificationResponse | RefusalResponse | AnswerResponse | ScheduleResponse;
 
 export type ScheduleStatus = 'active' | 'paused' | 'cancelled' | 'completed';
-export type ScheduleKind = 'plan' | 'plan_approval' | 'sheets_digest' | 'calendar_digest' | 'github_digest' | 'telegram_digest' | 'trello_digest' | 'notion_digest';
+export type ScheduleKind = 'plan' | 'plan_approval' | 'sheets_digest' | 'calendar_digest' | 'github_digest' | 'telegram_digest' | 'trello_digest' | 'notion_digest' | 'myjira_digest';
 export type ScheduleApprovalMode = 'manual' | 'auto_digest';
 
 export interface SheetsDigestConfig {

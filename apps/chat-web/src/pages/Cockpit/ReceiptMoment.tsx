@@ -110,15 +110,26 @@ function MyJiraReceiptMetrics({step}:{step:ExecutionStepInfo}) {
   if(step.tool==='myjira.transition_issue' && typeof out.newStatus==='string' && out.newStatus) {
     const prev=typeof out.previousStatus==='string' && out.previousStatus ? `${out.previousStatus} → ` : '';
     pills.push({text:`🔄 Trạng thái: ${prev}${out.newStatus}`});
+  } else if(typeof out.status==='string' && out.status) {
+    pills.push({text:`🏷️ Trạng thái: ${out.status}`});
   }
   if(step.tool==='myjira.update_issue' && Array.isArray(out.updatedFields) && out.updatedFields.length>0) {
     pills.push({text:`✏️ Đã cập nhật: ${out.updatedFields.join(', ')}`});
+  }
+  if(typeof out.issueType==='string' && out.issueType) {
+    pills.push({text:`📌 Loại: ${out.issueType}`});
   }
   if(typeof out.priority==='string' && out.priority) {
     pills.push({text:`⚡ Ưu tiên: ${out.priority}`});
   }
   if(typeof out.assignee==='string' && out.assignee) {
     pills.push({text:`👤 Phụ trách: ${out.assignee}`});
+  }
+  if(typeof out.dueDate==='string' && out.dueDate) {
+    pills.push({text:`📅 Hạn: ${out.dueDate}`});
+  }
+  if(Array.isArray(out.comments) && out.comments.length>0) {
+    pills.push({text:`💬 ${out.comments.length} bình luận`});
   }
   if(pills.length===0) return null;
   return <div data-testid="myjira-receipt-metrics" className="flex flex-wrap items-center gap-1.5 mt-2">

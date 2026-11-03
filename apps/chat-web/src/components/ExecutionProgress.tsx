@@ -22,7 +22,7 @@ export interface ExecutionProgressProps {
   status?: PlanStatus;
 }
 
-const resultNames: Record<string, string> = { name: 'Tên', title: 'Tiêu đề', fullName: 'Tên đầy đủ', repo: 'Kho mã', state: 'Trạng thái', body: 'Nội dung', desc: 'Mô tả', description: 'Mô tả / Agenda', text: 'Nội dung', content: 'Nội dung trang', due: 'Hạn chót', idList: 'Mã cột', idBoard: 'Mã bảng', senderName: 'Người gửi', chatTitle: 'Cuộc trò chuyện', chatId: 'Mã chat', issueNumber: 'Số issue', url: 'Liên kết', html_url: 'Liên kết', meetLink: 'Phòng họp Meet', location: 'Địa điểm', attendeesCount: 'Số người tham dự', recurrence: 'Lặp lại', busyCount: 'Số sự kiện bận', durationMinutes: 'Thời lượng (phút)', label: 'Khung giờ', id: 'Mã', key: 'Mã', number: 'Số', messageId: 'Mã tin nhắn', createdAt: 'Thời gian', updatedAt: 'Cập nhật', lastEditedTime: 'Cập nhật lần cuối', date: 'Thời gian', start: 'Bắt đầu', end: 'Kết thúc', sheet: 'Trang tính', range: 'Vùng đọc', updatedRange: 'Phạm vi cập nhật', updatedRows: 'Số dòng cập nhật', updatedCells: 'Số ô cập nhật', skippedDuplicates: 'Số dòng trùng bỏ qua', totalMatched: 'Số dòng khớp', totalDataRows: 'Tổng số dòng dữ liệu', rowNumber: 'Dòng số' };
+const resultNames: Record<string, string> = { name: 'Tên', title: 'Tiêu đề', summary: 'Tiêu đề công việc', fullName: 'Tên đầy đủ', displayName: 'Tên thành viên', accountId: 'Mã tài khoản', repo: 'Kho mã', projectKey: 'Mã dự án', issueKey: 'Mã công việc', parentKey: 'Epic / Issue cha', state: 'Trạng thái', status: 'Trạng thái', newStatus: 'Trạng thái mới', priority: 'Độ ưu tiên', issueType: 'Loại công việc', assignee: 'Người phụ trách', dueDate: 'Hạn hoàn thành', body: 'Nội dung', desc: 'Mô tả', description: 'Mô tả / Agenda', text: 'Nội dung', content: 'Nội dung trang', due: 'Hạn chót', idList: 'Mã cột', idBoard: 'Mã bảng', senderName: 'Người gửi', chatTitle: 'Cuộc trò chuyện', chatId: 'Mã chat', issueNumber: 'Số issue', url: 'Liên kết', html_url: 'Liên kết', meetLink: 'Phòng họp Meet', location: 'Địa điểm', attendeesCount: 'Số người tham dự', recurrence: 'Lặp lại', busyCount: 'Số sự kiện bận', durationMinutes: 'Thời lượng (phút)', label: 'Khung giờ', id: 'Mã', key: 'Mã', number: 'Số', messageId: 'Mã tin nhắn', createdAt: 'Thời gian', updatedAt: 'Cập nhật', lastEditedTime: 'Cập nhật lần cuối', date: 'Thời gian', start: 'Bắt đầu', end: 'Kết thúc', sheet: 'Trang tính', range: 'Vùng đọc', updatedRange: 'Phạm vi cập nhật', updatedRows: 'Số dòng cập nhật', updatedCells: 'Số ô cập nhật', skippedDuplicates: 'Số dòng trùng bỏ qua', totalMatched: 'Số dòng khớp', totalDataRows: 'Tổng số dòng dữ liệu', rowNumber: 'Dòng số' };
 const timeFields = new Set(['createdAt', 'updatedAt', 'lastEditedTime', 'start', 'end', 'date', 'due']);
 const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 const safeURL = (text: string) => { try { const url = new URL(text); return url.protocol === 'https:' && !url.username && !url.password; } catch { return false; } };
@@ -60,6 +60,12 @@ function FieldList({ value }: { value: Record<string, unknown> }) {
     )}
     {checklistSummaries.length > 0 && (
       <div className="flex gap-2 min-w-0"><dt className="shrink-0">Checklist:</dt><dd className="min-w-0 flex-1 [overflow-wrap:anywhere]">{checklistSummaries.join(', ')}</dd></div>
+    )}
+    {Array.isArray(value.updatedFields) && value.updatedFields.length > 0 && (
+      <div className="flex gap-2 min-w-0"><dt className="shrink-0">Trường cập nhật:</dt><dd className="min-w-0 flex-1 [overflow-wrap:anywhere]">{value.updatedFields.join(', ')}</dd></div>
+    )}
+    {Array.isArray(value.comments) && value.comments.length > 0 && (
+      <div className="flex gap-2 min-w-0"><dt className="shrink-0">Bình luận:</dt><dd className="min-w-0 flex-1 [overflow-wrap:anywhere]">{value.comments.length} bình luận</dd></div>
     )}
     {recordEntries.map(([colKey, colVal]) => (
       <div key={`rec-${colKey}`} className="flex gap-2 min-w-0"><dt className="shrink-0 font-medium">{colKey}:</dt><dd className="min-w-0 flex-1 [overflow-wrap:anywhere]">{String(colVal)}</dd></div>

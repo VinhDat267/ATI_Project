@@ -191,6 +191,64 @@ export function PlanMoment({request,runtimeMode,plan,services,destination,onPrev
                         </div>
                       );
                     })()}
+                    {service === 'myjira' && (() => {
+                      const issueKey = typeof step.args.issueKey === 'string' && step.args.issueKey.trim() ? step.args.issueKey.trim() : null;
+                      const targetStatus = typeof step.args.targetStatus === 'string' && step.args.targetStatus.trim() ? step.args.targetStatus.trim() : null;
+                      const priority = typeof step.args.priority === 'string' && step.args.priority.trim() ? step.args.priority.trim() : null;
+                      const issueType = typeof step.args.issueType === 'string' && step.args.issueType.trim() ? step.args.issueType.trim() : null;
+                      const assigneeId = typeof step.args.assigneeAccountId === 'string' && step.args.assigneeAccountId.trim() ? step.args.assigneeAccountId.trim() : null;
+                      const assigneeLabel = assigneeId ? (plan.resourceLabels?.[assigneeId] ?? assigneeId) : null;
+                      const dueDate = typeof step.args.dueDate === 'string' && step.args.dueDate.trim() ? step.args.dueDate.trim() : null;
+                      const parentKey = typeof step.args.parentKey === 'string' && step.args.parentKey.trim() ? step.args.parentKey.trim() : null;
+                      const filterStatus = typeof step.args.status === 'string' && step.args.status.trim() ? step.args.status.trim() : null;
+                      if (!issueKey && !targetStatus && !priority && !issueType && !assigneeLabel && !dueDate && !parentKey && !filterStatus) {
+                        return null;
+                      }
+                      return (
+                        <div data-testid="myjira-step-pills" className="flex flex-wrap items-center gap-1.5 mt-2">
+                          {issueKey && (
+                            <span className="text-[11px] font-semibold px-2 py-0.5 bg-blue-50 text-[#0052CC] border border-blue-200 rounded-full">
+                              🎫 {issueKey}
+                            </span>
+                          )}
+                          {targetStatus && (
+                            <span className="text-[11px] font-semibold px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full">
+                              🔄 → {targetStatus}
+                            </span>
+                          )}
+                          {priority && (
+                            <span className="text-[11px] font-semibold px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-full">
+                              ⚡ Ưu tiên: {priority}
+                            </span>
+                          )}
+                          {issueType && (
+                            <span className="text-[11px] font-medium px-2 py-0.5 bg-sky-50 text-sky-800 border border-sky-200 rounded-full">
+                              🏷️ {issueType}
+                            </span>
+                          )}
+                          {assigneeLabel && (
+                            <span className="text-[11px] font-medium px-2 py-0.5 bg-indigo-50 text-indigo-800 border border-indigo-200 rounded-full">
+                              👤 Phụ trách: {assigneeLabel}
+                            </span>
+                          )}
+                          {dueDate && (
+                            <span className="text-[11px] font-medium px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 rounded-full">
+                              📅 Hạn: {dueDate}
+                            </span>
+                          )}
+                          {parentKey && (
+                            <span className="text-[11px] font-medium px-2 py-0.5 bg-purple-50 text-purple-800 border border-purple-200 rounded-full">
+                              🔗 Epic: {parentKey}
+                            </span>
+                          )}
+                          {filterStatus && (
+                            <span className="text-[11px] font-medium px-2 py-0.5 bg-neutral-100 text-neutral-700 border border-neutral-200 rounded-full">
+                              🔍 Trạng thái: {filterStatus}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
                 <button id={`preview-${step.id}`} type="button" onClick={() => onPreview(step)} className="flex-shrink-0 px-3 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-brand-text text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1.5" aria-label="Xem trước">

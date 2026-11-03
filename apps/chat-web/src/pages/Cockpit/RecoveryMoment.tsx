@@ -76,6 +76,9 @@ export function RecoveryMoment({request,moment,snapshot,steps,services,controls}
   const trelloUsername = snapshot?.plan.connections?.trello?.username;
   const trelloCheckUrl = moment === 8 && paused?.status === 'unknown' && Boolean(trelloUsername) && ['trello.create_card', 'trello.update_card', 'trello.add_member', 'trello.remove_member', 'trello.add_checklist', 'trello.update_checklist_item', 'trello.add_comment', 'trello.create_list', 'trello.set_card_due_complete'].includes(planStep?.tool ?? '')
     ? (typeof planStep?.args.boardId === 'string' && planStep.args.boardId ? `https://trello.com/b/${encodeURIComponent(planStep.args.boardId)}` : 'https://trello.com') : undefined;
+  const myjiraAccount = snapshot?.plan.connections?.myjira?.atlassianAccountId;
+  const myjiraCheckUrl = moment === 8 && paused?.status === 'unknown' && ['myjira.create_issue', 'myjira.update_issue', 'myjira.transition_issue', 'myjira.add_comment'].includes(planStep?.tool ?? '')
+    ? 'https://www.atlassian.com/software/jira' : undefined;
   const canRetry=moment===7 && !hasUnknown && paused?.status==='failed' && actions.includes('retry');
   const canContinue=moment===9 && !hasUnknown && !steps.some(step=>['failed','running'].includes(step.status)) && actions.includes('continue');
   const error=paused?.error ?? 'Dịch vụ không thể hoàn thành việc này.';
@@ -113,6 +116,7 @@ export function RecoveryMoment({request,moment,snapshot,steps,services,controls}
     {spreadsheetCheckUrl && <p className="text-sm text-brand-text">Hãy tự kiểm tra trên Google Sheets{mysheetsEmail ? ` của ${mysheetsEmail}` : ''} rồi chọn Bỏ qua hoặc Dừng. <a href={spreadsheetCheckUrl} target="_blank" rel="noopener noreferrer" className="text-brand-primary underline">Mở Google Sheets</a></p>}
     {notionCheckUrl && <p className="text-sm text-brand-text">Hãy tự kiểm tra trên Notion{notionWorkspace ? ` (${notionWorkspace})` : ''} rồi chọn Bỏ qua hoặc Dừng. <a href={notionCheckUrl} target="_blank" rel="noopener noreferrer" className="text-brand-primary underline">Mở Notion kiểm tra</a></p>}
     {trelloCheckUrl && <p className="text-sm text-brand-text">Hãy tự kiểm tra trên Trello{trelloUsername ? ` (@${trelloUsername})` : ''} rồi chọn Bỏ qua hoặc Dừng. <a href={trelloCheckUrl} target="_blank" rel="noopener noreferrer" className="text-brand-primary underline">Mở Trello kiểm tra</a></p>}
+    {myjiraCheckUrl && <p className="text-sm text-brand-text">Hãy tự kiểm tra trên Jira{myjiraAccount ? ` (${myjiraAccount})` : ''} rồi chọn Bỏ qua hoặc Dừng. <a href={myjiraCheckUrl} target="_blank" rel="noopener noreferrer" className="text-brand-primary underline">Mở Jira kiểm tra</a></p>}
     {controls?.error && <p role="alert" className="text-sm text-brand-danger">{controls.error}</p>}
     <div className="flex flex-wrap items-center gap-3">
       {paused&&actions.includes('slack-reconcile')&&<button type="button" disabled={busy} onClick={()=>controls?.onSlackReconcile?.(paused.id)} className={primary}>Đối soát Slack</button>}

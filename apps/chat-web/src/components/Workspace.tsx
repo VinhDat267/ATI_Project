@@ -110,6 +110,10 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
 
   // A message sent before "Cuộc hội thoại mới" gets its ID belongs to that conversation (FE-03b).
   const newConversation = useRef<Promise<string | null> | null>(null);
+  const createWorkspaceConversation = () =>
+    getActiveWorkspaceId() !== 'personal' && services.some((s) => s.id === 'myjira')
+      ? apiClient.createConversation(undefined, { jiraContext: true })
+      : apiClient.createConversation();
   const handleNewConversation = async () => {
     if (newConversation.current) return;
     const previous = useChatStore.getState();
@@ -119,7 +123,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
     setConversationId(null);
     navigate('/');
     const request = (async () => {
-      const data = await apiClient.createConversation();
+      const data = await createWorkspaceConversation();
       if (!workspaceMounted.current) return null;
       const newConv = data.conversation;
       if (!newConv?.id) throw new Error('Máy chủ không trả về phiên hội thoại hợp lệ.');
@@ -166,7 +170,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
       unsentDraftRequest.current = tempId;
       try {
         if (pendingConversation) currentConvId = await pendingConversation;
-        else currentConvId = (await apiClient.createConversation()).conversation?.id;
+        else currentConvId = (await createWorkspaceConversation()).conversation?.id;
         if (!workspaceMounted.current) return;
         if (currentConvId) {
           useChatStore.getState().transferPlanning(null, currentConvId, tempId);
