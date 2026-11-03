@@ -135,6 +135,14 @@ export class JiraLeaseManager {
     return result.rowCount ?? 0;
   }
 
+  async releaseLease(leaseId: string): Promise<void> {
+    await this.pool.query(
+      `UPDATE jira_authorization_leases SET status = 'released', released_at = clock_timestamp()
+       WHERE lease_id = $1 AND status = 'active'`,
+      [leaseId]
+    );
+  }
+
   async revalidateLease(leaseId: string): Promise<RevalidateLeaseResult> {
     const result = await this.pool.query<{ status: RevalidateLeaseResult['status']; expired: boolean; authority_valid: boolean | null }>(
       `SELECT l.status, l.expires_at <= clock_timestamp() AS expired,
@@ -194,77 +202,144 @@ export class JiraLeaseManager {
     let committed = false;
     try {
       await client.query('BEGIN');
-      const result = await client.query<{
+      const leaseRes = await client.query<{
         status: RevalidateLeaseResult['status'];
         expired: boolean;
-        authority_valid: boolean | null;
         workspace_id: string;
         ati_user_id: string;
+        jira_account_id: string;
+        atlassian_account_id: string;
         grant_id: string;
+        cloud_id: string;
+        project_id: string | null;
+        workspace_version: number;
+        membership_version: number;
+        identity_version: number;
+        site_policy_version: number;
+        project_policy_version: number | null;
       }>(
-        `SELECT l.status, l.expires_at <= clock_timestamp() AS expired,
-          l.workspace_id, l.ati_user_id, l.grant_id,
-          (w.status = 'active' AND w.version = l.workspace_version
-           AND wm.status = 'active' AND jm.status = 'active' AND jm.version = l.membership_version
-           AND u.status = 'active' AND a.status = 'connected' AND a.identity_version = l.identity_version
-           AND a.atlassian_account_id = l.atlassian_account_id
-           AND g.status = 'active' AND gs.cloud_id IS NOT NULL
-           AND s.active = true AND s.policy_version = l.site_policy_version
-           AND (l.project_id IS NULL OR (p.selected = true AND p.policy_version = l.project_policy_version))) AS authority_valid
-         FROM jira_authorization_leases l
-         LEFT JOIN ati_workspaces w ON w.id = l.workspace_id
-         LEFT JOIN workspace_members wm ON wm.workspace_id = l.workspace_id AND wm.user_id = l.ati_user_id
-         LEFT JOIN ati_workspace_memberships jm ON jm.workspace_id = l.workspace_id AND jm.user_id = l.ati_user_id
-         LEFT JOIN users u ON u.id = l.ati_user_id
-         LEFT JOIN jira_accounts a ON a.id = l.jira_account_id AND a.user_id = l.ati_user_id
-         LEFT JOIN jira_oauth_grants g ON g.id = l.grant_id AND g.account_id = l.jira_account_id
-         LEFT JOIN jira_grant_sites gs ON gs.grant_id = l.grant_id AND gs.cloud_id = l.cloud_id AND gs.product_type = 'jira'
-         LEFT JOIN ati_workspace_jira_sites s ON s.workspace_id = l.workspace_id AND s.cloud_id = l.cloud_id
-         LEFT JOIN ati_workspace_jira_projects p ON p.workspace_id = l.workspace_id AND p.site_id = s.id AND p.numeric_project_id = l.project_id
-         WHERE l.lease_id = $1
-         FOR UPDATE OF l`,
+        `SELECT status, expires_at <= clock_timestamp() AS expired,
+          workspace_id, ati_user_id, jira_account_id, atlassian_account_id,
+          grant_id, cloud_id, project_id,
+          workspace_version, membership_version, identity_version,
+          site_policy_version, project_policy_version
+        FROM jira_authorization_leases
+        WHERE lease_id = $1
+        FOR UPDATE`,
         [leaseId]
       );
 
-      const row = result.rows[0];
-      let validation: RevalidateLeaseResult;
-      if (!row) {
-        validation = { valid: false };
-      } else if (row.expired && row.status === 'active') {
+      const lease = leaseRes.rows[0];
+      if (!lease) {
+        await client.query('ROLLBACK');
+        return action(client, { valid: false });
+      }
+
+      if (lease.expired && lease.status === 'active') {
         await client.query(
           `UPDATE jira_authorization_leases SET status = 'expired', released_at = clock_timestamp() WHERE lease_id = $1`,
           [leaseId]
         );
-        validation = { valid: false, status: 'expired' };
-      } else if (row.status === 'active' && row.authority_valid !== true) {
+        await client.query('COMMIT');
+        committed = true;
+        return action(client, { valid: false, status: 'expired' });
+      }
+
+      if (lease.status !== 'active') {
+        await client.query('ROLLBACK');
+        return action(client, { valid: false, status: lease.status });
+      }
+
+      // Lock and recheck all authority rows FOR SHARE before persisting receipt or emitting SSE
+      const authRes = await client.query<{
+        workspace_valid: boolean;
+        general_member_valid: boolean;
+        jira_member_valid: boolean;
+        user_valid: boolean;
+        account_valid: boolean;
+        grant_valid: boolean;
+        site_id: string;
+        site_valid: boolean;
+      }>(
+        `SELECT
+          (w.status = 'active' AND w.version = $2) AS workspace_valid,
+          (wm.status = 'active') AS general_member_valid,
+          (jm.status = 'active' AND jm.version = $3) AS jira_member_valid,
+          (u.status = 'active') AS user_valid,
+          (a.status = 'connected' AND a.identity_version = $4 AND a.atlassian_account_id = $5) AS account_valid,
+          (g.status = 'active') AS grant_valid,
+          s.id AS site_id,
+          (s.active = true AND s.policy_version = $6) AS site_valid
+        FROM workspaces ws
+        JOIN ati_workspaces w ON w.id = ws.id
+        JOIN workspace_members wm ON wm.workspace_id = ws.id AND wm.user_id = $7
+        JOIN ati_workspace_memberships jm ON jm.workspace_id = ws.id AND jm.user_id = $7
+        JOIN users u ON u.id = $7
+        JOIN jira_accounts a ON a.id = $8 AND a.user_id = $7
+        JOIN jira_oauth_grants g ON g.id = $9 AND g.account_id = a.id
+        JOIN jira_grant_sites gs ON gs.grant_id = g.id AND gs.cloud_id = $10 AND gs.product_type = 'jira'
+        JOIN ati_workspace_jira_sites s ON s.workspace_id = ws.id AND s.cloud_id = $10
+        WHERE ws.id = $1
+        FOR SHARE OF ws, w, wm, jm, u, a, g, gs, s`,
+        [
+          lease.workspace_id,
+          lease.workspace_version,
+          lease.membership_version,
+          lease.identity_version,
+          lease.atlassian_account_id,
+          lease.site_policy_version,
+          lease.ati_user_id,
+          lease.jira_account_id,
+          lease.grant_id,
+          lease.cloud_id,
+        ]
+      );
+
+      const authRow = authRes.rows[0];
+      let authorityValid = Boolean(
+        authRow &&
+        authRow.workspace_valid &&
+        authRow.general_member_valid &&
+        authRow.jira_member_valid &&
+        authRow.user_valid &&
+        authRow.account_valid &&
+        authRow.grant_valid &&
+        authRow.site_valid
+      );
+
+      if (authorityValid && lease.project_id && authRow) {
+        const projRes = await client.query<{ project_valid: boolean }>(
+          `SELECT (selected = true AND policy_version = $4) AS project_valid
+           FROM ati_workspace_jira_projects
+           WHERE workspace_id = $1 AND site_id = $2 AND numeric_project_id = $3
+           FOR SHARE`,
+          [lease.workspace_id, authRow.site_id, lease.project_id, lease.project_policy_version]
+        );
+        const projRow = projRes.rows[0];
+        if (!projRow || !projRow.project_valid) {
+          authorityValid = false;
+        }
+      }
+
+      if (!authorityValid) {
         await client.query(
           `UPDATE jira_authorization_leases SET status = 'revoked', released_at = clock_timestamp() WHERE lease_id = $1`,
           [leaseId]
         );
-        validation = { valid: false, status: 'revoked' };
-      } else {
-        validation = { valid: row.status === 'active', status: row.status };
+        await client.query('COMMIT');
+        committed = true;
+        return action(client, { valid: false, status: 'revoked' });
       }
 
-      if (validation.valid && row) {
-        await client.query(`SELECT id FROM ati_workspaces WHERE id = $1 FOR SHARE`, [row.workspace_id]);
-        await client.query(
-          `SELECT user_id FROM ati_workspace_memberships WHERE workspace_id = $1 AND user_id = $2 FOR SHARE`,
-          [row.workspace_id, row.ati_user_id]
-        );
-        await client.query(`SELECT id FROM jira_oauth_grants WHERE id = $1 FOR SHARE`, [row.grant_id]);
-      }
-
+      const validation: RevalidateLeaseResult = { valid: true, status: 'active' };
       if (options?.signal?.aborted) throw options.signal.reason ?? new Error('Aborted');
 
       const actionResult = await action(client, validation);
 
-      if (validation.valid && validation.status === 'active') {
-        await client.query(
-          `UPDATE jira_authorization_leases SET status = 'released', released_at = clock_timestamp() WHERE lease_id = $1 AND status = 'active'`,
-          [leaseId]
-        );
-      }
+      await client.query(
+        `UPDATE jira_authorization_leases SET status = 'released', released_at = clock_timestamp() WHERE lease_id = $1 AND status = 'active'`,
+        [leaseId]
+      );
 
       await client.query('COMMIT');
       committed = true;

@@ -1028,5 +1028,86 @@ describe('JIRA-08 Task 5 Source Guard, Persistence, and Publication Guards', () 
 
       expect(baseAdapterCalled).toBe(false);
     });
+
+    it('gathers myjira.list_sites under phase: planning, acquiring lease, locking DB rows, and returning results with complete sourceRefs', async () => {
+      const f = await setupFixture();
+      const factory = createGatherFactory(f, {
+        baseAdapterExecute: async (tool) => {
+          if (tool === 'myjira.list_sites') {
+            return [{ siteId: f.siteId, cloudId: f.cloudId, displayName: 'Guard Site', url: 'https://guard.atlassian.net' }];
+          }
+          return [];
+        },
+      });
+
+      const adapter = await factory.getAdapterForService('myjira', {
+        userId: f.userId,
+        workspaceId: f.workspaceId,
+        phase: 'planning',
+      });
+
+      const result = await adapter.execute('myjira.list_sites', {});
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveLength(1);
+
+      // Verify array has _sourceRefs attached
+      const arrayRefs = (result as any)._sourceRefs;
+      expect(arrayRefs).toBeDefined();
+      expect(arrayRefs).toHaveLength(1);
+      expect(arrayRefs[0].siteId).toBe(f.siteId);
+      expect(arrayRefs[0].cloudId).toBe(f.cloudId);
+
+      // Verify item has _sourceRef attached with complete binding
+      const siteItem = result[0];
+      const itemRef = siteItem._sourceRef;
+      expect(itemRef).toBeDefined();
+      expect(itemRef.binding.atiUserId).toBe(f.userId);
+      expect(itemRef.binding.jiraAccountId).toBe(f.accountId);
+      expect(itemRef.binding.atlassianAccountId).toBe(f.atlassianAccountId);
+      expect(itemRef.binding.grantId).toBe(f.grantId);
+      expect(itemRef.binding.membershipVersion).toBe(1);
+      expect(itemRef.binding.identityVersion).toBe(1);
+    });
+
+    it('rejects myjira.list_sites under phase: planning when user membership is removed in DB', async () => {
+      const f = await setupFixture();
+      let baseAdapterCalled = false;
+      const factory = createGatherFactory(f, {
+        baseAdapterExecute: async () => {
+          baseAdapterCalled = true;
+          return [{ siteId: f.siteId, cloudId: f.cloudId, displayName: 'Leaked Site', url: 'https://leak.atlassian.net' }];
+        },
+      });
+
+      // Revoke membership in PostgreSQL
+      await pool.query(
+        `UPDATE ati_workspace_memberships SET status = 'removed' WHERE workspace_id = $1 AND user_id = $2`,
+        [f.workspaceId, f.userId]
+      );
+
+      const adapter = await factory.getAdapterForService('myjira', {
+        userId: f.userId,
+        workspaceId: f.workspaceId,
+        phase: 'planning',
+      });
+
+      await expect(
+        adapter.execute('myjira.list_sites', {})
+      ).rejects.toThrow();
+
+      expect(baseAdapterCalled).toBe(false);
+    });
+
+    it('rejects gather when workspaceId is missing, preventing arbitrary workspace selection', async () => {
+      const f = await setupFixture();
+      const factory = createGatherFactory(f);
+
+      await expect(
+        factory.getAdapterForService('myjira', {
+          userId: f.userId,
+          phase: 'planning',
+        })
+      ).rejects.toThrow(/không gian làm việc|Missing user or workspace/i);
+    });
   });
 });

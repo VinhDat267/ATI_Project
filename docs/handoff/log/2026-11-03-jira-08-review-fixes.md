@@ -60,3 +60,24 @@
     - Nếu ghi DB thất bại, ngoại lệ được ném ra bên trong buffer, rollback transaction và kích hoạt error handler mà không phát ra bất kỳ sự kiện SSE `exec_step` thành công nào.
     - Trong `getExecutionStatus(planId)`, bổ sung `if (controller.isExecuting()) return { status: 'executing' };` để bảo đảm trạng thái `completed` chỉ được công bố sau khi toàn bộ bước và bản ghi DB đã hoàn tất ghi bền vững.
     - Test: `apps/chat-api/tests/integration/jira-execution.test.ts` (11/11 tests PASS).
+- **Khắc phục đợt review thứ tư (2 phát hiện P1, 1 phát hiện P2):**
+  - **1. [P1] Khóa và kiểm tra toàn bộ hàng quyền (workspaces, memberships, accounts, grants, sites, projects) trong withLockedLease:**
+    - Cập nhật `withLockedLease` trong `apps/chat-api/src/services/jira/jira-lease-manager.ts`:
+      - Khóa hàng lease `FOR UPDATE` trên `jira_authorization_leases`.
+      - Khóa `FOR SHARE` và kiểm tra toàn bộ hàng quyền: `workspaces`, `ati_workspaces`, `workspace_members`, `ati_workspace_memberships`, `users`, `jira_accounts`, `jira_oauth_grants`, `jira_grant_sites`, `ati_workspace_jira_sites` (và `ati_workspace_jira_projects` khi có `project_id`).
+      - Tái kiểm tra tính hợp lệ của từng trạng thái và phiên bản quyền (`workspace_version`, `membership_version`, `identity_version`, `site_policy_version`, `project_policy_version`, `general_member_status`, `account_status`, `grant_status`, `site_active`, `project_selected`) ngay dưới khóa hàng.
+      - Nếu bất kỳ hàng quyền nào bị thu hồi hoặc phiên bản không khớp, lập tức chuyển lease sang `revoked`, commit và hủy bỏ stream flush (ném `JiraStreamBufferRevokedError`).
+      - Hành động lưu receipt và phát SSE chỉ được thực thi khi đang nắm giữ khóa `FOR SHARE` trên toàn bộ các hàng quyền.
+      - Kiểm thử thực tế bằng 2 client PostgreSQL: Client 2 cố gắng deactivate site (`ati_workspace_jira_sites.active = false`) đồng thời trong lúc Client 1 đang chạy `withLockedLease` sẽ bị chặn (blocked) trên row lock cho tới khi Client 1 phát SSE và commit xong. Kiểm tra phát hiện site deactivated, account disconnected và project unselected dưới khóa hàng.
+      - Test: `apps/chat-api/tests/integration/jira-execution.test.ts` (14/14 tests PASS).
+  - **2. [P1] Gather guard và source refs cho myjira.list_sites:**
+    - Cập nhật `apps/chat-api/src/services/adapter-factory.ts`:
+      - Khi gọi `myjira.list_sites`, thực hiện lấy snapshot `capabilities` tươi mới từ database repo.
+      - Trước khi gọi base adapter, thực hiện acquire lease qua `JiraLeaseManager` trên các site ứng viên để xác minh quyền trên PostgreSQL (bảo đảm membership, account, grant, site đều đang active). Nếu quyền đã bị thu hồi/gỡ bỏ, quy trình lập tức từ chối và fail closed trước khi dữ liệu site chạm tới base adapter hay model.
+      - Gắn đầy đủ `_sourceRef` và `_sourceRefs` lên từng item site và lên mảng kết quả, mang trọn vẹn thông tin binding (`atiUserId`, `jiraAccountId`, `atlassianAccountId`, `grantId`, `membershipVersion`, `identityVersion`).
+      - Nếu trong phase execution (`deferRelease: true`), lease được giữ lại để `flushOnStepComplete` tuyến tính hóa; nếu trong phase planning, lease được giải phóng ngay sau khi ghi nhận bằng chứng nguồn.
+      - Test: `apps/chat-api/tests/services/jira-source-guard.test.ts` (19/19 tests PASS).
+  - **3. [P2] Từ chối khi actor thiếu workspace ID thay vì tự chọn:**
+    - Cập nhật `apps/chat-api/src/server.ts` (`gatherSearch`): loại bỏ hoàn toàn câu lệnh `SELECT ... LIMIT 1` tự ý chọn một workspace membership ngẫu nhiên.
+    - Với mọi công cụ `myjira.*`, nếu `actor.workspaceId` bị thiếu hoặc null, ném lỗi rõ ràng (`Workspace ID is required for Jira gather search`), ngăn ngừa nguy cơ rò rỉ hoặc truy vấn chéo giữa các workspace khác nhau của cùng một người dùng.
+    - Test: `apps/chat-api/tests/services/jira-source-guard.test.ts` (19/19 tests PASS).

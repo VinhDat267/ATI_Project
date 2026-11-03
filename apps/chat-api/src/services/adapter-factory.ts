@@ -22,6 +22,7 @@ import { getRegisteredService, isServiceAccountService } from './registered-serv
 import type { GmailTokenManager } from './gmail/token-manager.js';
 import type { TelegramBotClient } from './telegram/bot-client.js';
 import type { JiraDispatchGuard, DispatchScope } from './jira/jira-dispatch-guard.js';
+import type { JiraLeaseManager } from './jira/jira-lease-manager.js';
 
 /** Who an adapter is for. Shared services ignore it; Gmail & MyCalendar require it. */
 export interface AdapterContext {
@@ -76,6 +77,7 @@ export interface AdapterFactoryOptions {
   createPersonalJiraAdapter?: (input: PersonalJiraAdapterConfig) => AdapterExecutor;
   jiraTokens?: JiraAccessTokenProvider;
   jiraWorkspaceRepo?: any;
+  jiraLeaseManager?: JiraLeaseManager;
   jiraDispatchGuard?: JiraDispatchGuard;
   jiraNativeVerifier?: any;
   jiraApiBaseUrl?: string;
@@ -697,8 +699,93 @@ export class AdapterFactory {
 
     return {
       execute: async (tool: string, args: Record<string, any>, callOpts?: any) => {
-        if (!this.options.jiraDispatchGuard || tool === 'myjira.list_sites') {
+        if (!this.options.jiraDispatchGuard) {
           return baseAdapter.execute(tool, args, callOpts);
+        }
+
+        if (tool === 'myjira.list_sites') {
+          let currentCapabilities = capabilities;
+          if (this.options.jiraWorkspaceRepo) {
+            currentCapabilities = await this.options.jiraWorkspaceRepo.getCapabilities(workspaceId, userId);
+          }
+
+          const leaseManager = this.options.jiraLeaseManager ?? this.options.jiraDispatchGuard.leaseManager;
+          const allSourceRefs: any[] = [];
+          const siteLeaseMap = new Map<string, { lease: any; siteSourceRef: any }>();
+          let primaryLeaseId: string | undefined;
+
+          // Verify authority and acquire lease for candidate sites BEFORE invoking baseAdapter
+          if (leaseManager && currentCapabilities.sites && currentCapabilities.sites.length > 0) {
+            for (const site of currentCapabilities.sites) {
+              const lease = await leaseManager.acquireLease({
+                userId,
+                workspaceId,
+                cloudId: site.cloudId,
+                ttlMs: callOpts?.timeoutMs ?? 15000,
+                signal: callOpts?.signal,
+              });
+              if (!primaryLeaseId) {
+                primaryLeaseId = lease.leaseId;
+              }
+              const siteSourceRef = {
+                binding: {
+                  atiUserId: userId,
+                  jiraAccountId: lease.binding.jiraAccountId,
+                  atlassianAccountId: lease.binding.atlassianAccountId,
+                  workspaceId,
+                  membershipVersion: lease.binding.membershipVersion,
+                  grantId: lease.binding.grantId,
+                  identityVersion: lease.binding.identityVersion,
+                },
+                workspaceId,
+                workspaceVersion: bound?.workspaceVersion ?? 1,
+                siteId: site.siteId,
+                cloudId: site.cloudId,
+                sitePolicyVersion: (site as any)?.policyVersion ?? 1,
+              };
+              siteLeaseMap.set(site.siteId, { lease, siteSourceRef });
+              allSourceRefs.push(siteSourceRef);
+            }
+          }
+
+          // Execute baseAdapter now that authority has been verified in PostgreSQL
+          const rawOutput = await baseAdapter.execute(tool, args, callOpts);
+          let list = Array.isArray(rawOutput) ? rawOutput : [];
+          if (this.options.jiraWorkspaceRepo && currentCapabilities.sites) {
+            const activeCloudIds = new Set(currentCapabilities.sites.map((s: any) => s.cloudId));
+            list = list.filter((item: any) => activeCloudIds.has(item.cloudId));
+          }
+
+          const deferRelease = Boolean(context?.connections?.myjira);
+          if (leaseManager && siteLeaseMap.size > 0) {
+            for (const siteItem of list) {
+              const matched = siteLeaseMap.get(siteItem.siteId);
+              if (matched) {
+                Object.defineProperty(siteItem, '_leaseId', { value: matched.lease.leaseId, writable: true, configurable: true, enumerable: false });
+                Object.defineProperty(siteItem, '_sourceRef', { value: matched.siteSourceRef, writable: true, configurable: true, enumerable: true });
+                Object.defineProperty(siteItem, '_sourceRefs', { value: [matched.siteSourceRef], writable: true, configurable: true, enumerable: true });
+              }
+            }
+            if (!deferRelease) {
+              for (const { lease } of siteLeaseMap.values()) {
+                await leaseManager.releaseLease(lease.leaseId);
+              }
+            }
+          }
+
+          if (primaryLeaseId && context?.stepLeaseMap && callOpts?.stepId) {
+            context.stepLeaseMap.set(callOpts.stepId, primaryLeaseId);
+          }
+
+          if (allSourceRefs.length > 0) {
+            Object.defineProperty(list, '_sourceRefs', { value: allSourceRefs, writable: true, configurable: true, enumerable: false });
+            Object.defineProperty(list, '_sourceRef', { value: allSourceRefs[0], writable: true, configurable: true, enumerable: false });
+            if (primaryLeaseId) {
+              Object.defineProperty(list, '_leaseId', { value: primaryLeaseId, writable: true, configurable: true, enumerable: false });
+            }
+          }
+
+          return list;
         }
 
         const stepId = callOpts?.stepId;

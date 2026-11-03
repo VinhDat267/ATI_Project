@@ -961,6 +961,187 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
     expect(leaseRows.rows[0]!.status).toBe('released');
   });
 
+  it('two PostgreSQL clients: concurrent site deactivation blocks during check -> emit window and cannot revoke before emit commits', async () => {
+    const f = await setupFixture();
+    const { executionService, leaseManager } = createTestExecutionService(f);
+
+    const emittedEvents: Array<{ event: string; payload: any }> = [];
+    const sseManager = {
+      emitEvent: (convId: string, event: string, payload: any) => {
+        emittedEvents.push({ event, payload });
+      },
+    } as any;
+    (executionService as any).sseManager = sseManager;
+
+    // Open Client 2 on real PostgreSQL pool
+    const client2 = await pool.connect();
+    let client2DeactivateFinished = false;
+    let client2DeactivatePromise: Promise<void> | null = null;
+    let releaseEmitBarrier: () => void = () => {};
+    const emitBarrierPromise = new Promise<void>((resolve) => {
+      releaseEmitBarrier = resolve;
+    });
+
+    const steps: PlanStep[] = [
+      {
+        id: 'site_concurrency_step',
+        tool: 'myjira.search_projects',
+        description: 'Read projects with concurrent site deactivation during locked lease',
+        dependsOn: [],
+        args: { siteId: f.siteId1, query: '' },
+      },
+    ];
+
+    const { plan } = await createApprovedPlan(f, steps, {
+      site_concurrency_step: {
+        siteId: f.siteId1,
+        cloudId: f.cloudId1,
+        sitePolicyVersion: 1,
+      },
+    });
+
+    // Wrap withLockedLease on leaseManager: when Client 1 enters withLockedLease, launch Client 2's UPDATE
+    const originalWithLocked = leaseManager.withLockedLease.bind(leaseManager);
+    leaseManager.withLockedLease = async function (leaseId, action, opts) {
+      return originalWithLocked(
+        leaseId,
+        async (client, val) => {
+          // Launch Client 2 attempting to deactivate the site
+          client2DeactivatePromise = (async () => {
+            try {
+              await client2.query(
+                `UPDATE ati_workspace_jira_sites SET active = false WHERE id = $1`,
+                [f.siteId1]
+              );
+            } finally {
+              client2DeactivateFinished = true;
+              client2.release();
+            }
+          })();
+
+          // Wait 100ms: Client 2 MUST be blocked waiting for FOR SHARE lock on ati_workspace_jira_sites
+          await new Promise((r) => setTimeout(r, 100));
+          expect(client2DeactivateFinished).toBe(false);
+
+          const res = await action(client, val);
+          releaseEmitBarrier();
+          return res;
+        },
+        opts
+      );
+    };
+
+    const approveResult = await executionService.approveAndStart(plan.id, f.userId);
+    expect(approveResult.success).toBe(true);
+
+    await emitBarrierPromise;
+    if (client2DeactivatePromise) {
+      await client2DeactivatePromise;
+      expect(client2DeactivateFinished).toBe(true);
+    }
+
+    let status = executionService.getExecutionStatus(plan.id);
+    for (let i = 0; i < 150 && (!status || status.status === 'executing'); i++) {
+      await new Promise((r) => setTimeout(r, 50));
+      status = executionService.getExecutionStatus(plan.id);
+    }
+
+    expect(status?.status).toBe('completed');
+    const successEvents = emittedEvents.filter((e) => e.event === 'exec_step' && e.payload.status === 'succeeded');
+    expect(successEvents).toHaveLength(1);
+    expect(successEvents[0]!.payload.output).toBeDefined();
+
+    // Verify lease was released under valid rights before Client 2's deactivation
+    const leaseRows = await pool.query<{ status: string }>(
+      `SELECT status FROM jira_authorization_leases WHERE workspace_id = $1`,
+      [f.workspaceId]
+    );
+    expect(leaseRows.rows[0]!.status).toBe('released');
+  });
+
+  it('withLockedLease detects site deactivation before emit and aborts stream flush', async () => {
+    const f = await setupFixture();
+    const { leaseManager } = createTestExecutionService(f);
+
+    // Acquire a valid lease while authority is fully active
+    const lease = await leaseManager.acquireLease({
+      userId: f.userId,
+      workspaceId: f.workspaceId,
+      cloudId: f.cloudId1,
+      ttlMs: 15000,
+    });
+
+    // Deactivate the site in PostgreSQL
+    await pool.query(
+      `UPDATE ati_workspace_jira_sites SET active = false WHERE id = $1`,
+      [f.siteId1]
+    );
+
+    // withLockedLease MUST lock authority rows FOR SHARE and detect site_valid = false
+    let actionRun = false;
+    const result = await leaseManager.withLockedLease(lease.leaseId, async (client, validation) => {
+      actionRun = true;
+      return validation;
+    });
+
+    expect(actionRun).toBe(true);
+    expect(result.valid).toBe(false);
+    expect(result.status).toBe('revoked');
+
+    // Lease in DB is marked revoked
+    const leaseRow = await pool.query<{ status: string }>(
+      `SELECT status FROM jira_authorization_leases WHERE lease_id = $1`,
+      [lease.leaseId]
+    );
+    expect(leaseRow.rows[0]!.status).toBe('revoked');
+  });
+
+  it('withLockedLease detects account disconnection and unselected project under lock', async () => {
+    const f = await setupFixture();
+    const { leaseManager } = createTestExecutionService(f);
+
+    // 1. Test account disconnection
+    const lease1 = await leaseManager.acquireLease({
+      userId: f.userId,
+      workspaceId: f.workspaceId,
+      cloudId: f.cloudId1,
+      ttlMs: 15000,
+    });
+
+    await pool.query(
+      `UPDATE jira_accounts SET status = 'disconnected' WHERE id = $1`,
+      [f.accountId]
+    );
+
+    const result1 = await leaseManager.withLockedLease(lease1.leaseId, async (client, validation) => validation);
+    expect(result1.valid).toBe(false);
+    expect(result1.status).toBe('revoked');
+
+    // Restore account status
+    await pool.query(
+      `UPDATE jira_accounts SET status = 'connected' WHERE id = $1`,
+      [f.accountId]
+    );
+
+    // 2. Test project unselected
+    const lease2 = await leaseManager.acquireLease({
+      userId: f.userId,
+      workspaceId: f.workspaceId,
+      cloudId: f.cloudId1,
+      projectId: '10001',
+      ttlMs: 15000,
+    });
+
+    await pool.query(
+      `UPDATE ati_workspace_jira_projects SET selected = false WHERE workspace_id = $1 AND numeric_project_id = '10001'`,
+      [f.workspaceId]
+    );
+
+    const result2 = await leaseManager.withLockedLease(lease2.leaseId, async (client, validation) => validation);
+    expect(result2.valid).toBe(false);
+    expect(result2.status).toBe('revoked');
+  });
+
   it('persisting receipt failure in database aborts before emitting success SSE event', async () => {
     const f = await setupFixture();
     const { executionService } = createTestExecutionService(f);

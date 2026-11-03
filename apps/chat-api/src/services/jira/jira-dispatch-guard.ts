@@ -52,7 +52,7 @@ export interface JiraDispatchTokenManager {
 export class JiraDispatchGuard {
   constructor(
     private readonly pool: Pool,
-    private readonly leaseManager: JiraLeaseManager,
+    public readonly leaseManager: JiraLeaseManager,
     private readonly tokenManager: JiraDispatchTokenManager
   ) {}
 
