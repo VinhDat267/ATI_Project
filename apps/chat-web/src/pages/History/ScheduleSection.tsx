@@ -41,8 +41,12 @@ function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: Sche
   return <article className="bg-white rounded-2xl border border-[#E7E7E2] p-4 sm:p-5 v3-space-y-3 min-w-0">
     <h3 className="text-base font-semibold text-[#111827] [overflow-wrap:anywhere] flex flex-wrap items-center gap-2">
       <span>{schedule.name}</span>
-      {(schedule.kind === 'calendar_digest' || schedule.kind === 'github_digest' || schedule.kind === 'trello_digest' || schedule.kind === 'sheets_digest') && (
-        <span data-schedule-kind={schedule.kind} className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+      {schedule.kind === 'plan' ? (
+        <span data-schedule-kind="plan" data-schedule-mode="manual" className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+          Mỗi lượt cần bạn duyệt
+        </span>
+      ) : (
+        <span data-schedule-kind={schedule.kind} data-schedule-mode="auto_digest" className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
           Tự gửi
         </span>
       )}
@@ -52,7 +56,24 @@ function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: Sche
         Tự gửi Telegram{schedule.digest && 'chatTitle' in schedule.digest && schedule.digest.chatTitle ? ` · ${schedule.digest.chatTitle}` : ''}
       </p>
     )}
+    {schedule.kind !== 'plan' && schedule.kind !== 'telegram_digest' && (
+      <p data-schedule-kind={schedule.kind} className="text-xs font-semibold text-emerald-700">
+        Tự gửi theo phạm vi đã xác nhận
+      </p>
+    )}
     <p className="text-sm text-[#4B5563]">{describeRecurrence(schedule.recurrence)}</p><p className="text-xs text-[#6B7280]">{scheduleLabel(schedule)}</p>
+    {schedule.lastRun?.state === 'needs_attention' && (
+      <div role="alert" className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 v3-space-y-1">
+        <p className="font-semibold">Lượt chạy cần bạn xem:</p>
+        <p>{schedule.lastRun.error || 'Chưa xác định kết quả gửi. Để tránh gửi trùng, lượt này không tự động gửi lại.'}</p>
+      </div>
+    )}
+    {schedule.lastRun?.state === 'awaiting_approval' && (
+      <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-900 v3-space-y-1">
+        <p className="font-semibold">Lượt chạy chờ duyệt:</p>
+        <p>Kế hoạch đã sẵn sàng, cần bạn xem và xác nhận trước khi gửi.</p>
+      </div>
+    )}
     {schedule.services && schedule.services.length > 0 && (
       <WorkflowFlowCanvas
         services={schedule.services}
