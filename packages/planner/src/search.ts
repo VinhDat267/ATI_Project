@@ -252,6 +252,52 @@ export function groundingMemory(
       merged[k] = Array.isArray(v) ? v.filter(item => !isEntityRevoked(item)) : v;
     }
   }
+  const addDefaultEntity = (resource: string, entity: Record<string, unknown>) => {
+    const existing = merged[resource];
+    const list = Array.isArray(existing) ? existing : existing ? [existing] : [];
+    if (!list.some((item: any) => item && String(item.id ?? item.key ?? item.siteId) === String(entity.id ?? entity.key ?? entity.siteId))) {
+      merged[resource] = [...list, entity];
+    }
+  };
+  const defaults = memory?.workflow_resource_defaults;
+  if (isObject(defaults)) {
+    if (isObject(defaults.github) && typeof defaults.github.repo === 'string' && defaults.github.repo) {
+      const repo = defaults.github.repo;
+      addDefaultEntity('repository', { id: repo, fullName: repo, name: repo.split('/')[1] || repo });
+    }
+    if (isObject(defaults.trello) && typeof defaults.trello.boardId === 'string' && defaults.trello.boardId) {
+      addDefaultEntity('board', { id: defaults.trello.boardId, name: defaults.trello.boardId });
+      if (typeof defaults.trello.listId === 'string' && defaults.trello.listId) {
+        addDefaultEntity('list', { id: defaults.trello.listId, name: defaults.trello.listId, boardId: defaults.trello.boardId });
+      }
+    }
+    if (isObject(defaults.slack) && typeof defaults.slack.channelId === 'string' && defaults.slack.channelId) {
+      addDefaultEntity('channel', {
+        id: defaults.slack.channelId,
+        name: typeof defaults.slack.channelName === 'string' && defaults.slack.channelName ? defaults.slack.channelName : defaults.slack.channelId,
+      });
+    }
+    if (isObject(defaults.myjira) && typeof defaults.myjira.siteId === 'string' && defaults.myjira.siteId) {
+      addDefaultEntity('jira_site', { id: defaults.myjira.siteId, siteId: defaults.myjira.siteId });
+      if (typeof defaults.myjira.projectKey === 'string' && defaults.myjira.projectKey) {
+        addDefaultEntity('jira_project', { id: defaults.myjira.projectKey, key: defaults.myjira.projectKey, siteId: defaults.myjira.siteId });
+      }
+    }
+    if (isObject(defaults.mycalendar) && typeof defaults.mycalendar.calendarId === 'string' && defaults.mycalendar.calendarId) {
+      addDefaultEntity('mycalendar', { id: defaults.mycalendar.calendarId, name: defaults.mycalendar.calendarId });
+    }
+    if (isObject(defaults.mysheets)) {
+      if (typeof defaults.mysheets.spreadsheetId === 'string' && defaults.mysheets.spreadsheetId) {
+        addDefaultEntity('myspreadsheet', {
+          id: defaults.mysheets.spreadsheetId,
+          title: typeof defaults.mysheets.sheetName === 'string' && defaults.mysheets.sheetName ? defaults.mysheets.sheetName : defaults.mysheets.spreadsheetId,
+        });
+      }
+      if (typeof defaults.mysheets.folderId === 'string' && defaults.mysheets.folderId) {
+        addDefaultEntity('drive_folder', { id: defaults.mysheets.folderId, title: defaults.mysheets.folderId });
+      }
+    }
+  }
   for (const [resource, entities] of Object.entries(observed ?? {})) {
     const resolved = merged[resource];
     const activeObserved = entities.filter(item => !isEntityRevoked(item));

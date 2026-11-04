@@ -4,12 +4,14 @@
  */
 
 import { createHash } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import type { PlanResponse, ReportEvidence } from '@wap/tool-schemas';
 
 export interface ReportEvidenceValidationOptions {
   userId: string;
   workspaceId: string;
   expectedPlanHash?: string;
+  planText?: string;
   observedArtifact?: {
     id: string;
     ownerUserId: string;
@@ -56,8 +58,17 @@ export async function validateReportEvidenceBinding(
 
   // 2. If canonical plan hash was provided, verify plan content has not been tampered with
   if (options.expectedPlanHash) {
-    const currentHash = createHash('sha256').update(JSON.stringify(plan)).digest('hex');
-    if (currentHash !== options.expectedPlanHash) {
+    const serialized = options.planText || JSON.stringify(plan);
+    const currentHash = createHash('sha256').update(serialized).digest('hex');
+    let structurallyEqual = true;
+    if (options.planText) {
+      try {
+        structurallyEqual = isDeepStrictEqual(JSON.parse(options.planText), plan);
+      } catch {
+        structurallyEqual = false;
+      }
+    }
+    if (currentHash !== options.expectedPlanHash || !structurallyEqual) {
       return {
         valid: false,
         error: `Plan hash mismatch: content altered or tampered. Expected ${options.expectedPlanHash}, calculated ${currentHash}`,

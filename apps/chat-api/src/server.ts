@@ -77,6 +77,7 @@ import { JiraDispatchGuard } from './services/jira/jira-dispatch-guard.js';
 import { createJiraGuardedProvider } from './services/jira/jira-provider-guard.js';
 import {
   AIPlanner,
+  ReportArtifactStore,
   createProviderFromEnv,
 } from '@wap/planner';
 import { ALL_TOOLS } from '@wap/tool-schemas';
@@ -569,11 +570,13 @@ async function bootstrap() {
   };
   // Sandbox providers return canned plans without reading working memory, so
   // resource grounding would reject every plan; live planning always enforces it.
+  const reportEvidenceStore = new ReportArtifactStore();
   const backupPlanner = new AIPlanner({
     provider: backupMockProvider,
     toolCatalog: ALL_TOOLS,
     gatherSearch,
     requireGroundedResources: false,
+    reportEvidenceStore,
   });
 
   // One planner per call: the member's own catalog decides which services are configured.
@@ -625,6 +628,7 @@ async function bootstrap() {
     searchMode: runtimePlannerSearchMode(env.RUNTIME_MODE, env.PLANNER_SEARCH_MODE, process.env.SANDBOX_SCENARIO),
     readAnswers: env.PLANNER_READ_ANSWERS,
     schedules: Boolean(schedules),
+    reportEvidenceStore,
   });
 };
   const planner = {
@@ -676,6 +680,7 @@ async function bootstrap() {
     jiraBinder,
     jiraHistorySanitizer,
     jiraPolicyService,
+    reportEvidenceStore,
     getAdapter: (serviceName, context) => (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(serviceName, context),
     schedules: schedules
       ? {
@@ -899,6 +904,7 @@ async function bootstrap() {
     pool: pool ?? undefined,
     jiraLeaseManager: jiraLeaseManager ?? undefined,
     jiraNativeVerifier: jiraNativeVerifier ?? undefined,
+    reportEvidenceStore,
   });
 
   if (!env.EMAIL_ENABLED) console.warn('\x1b[33m[chat-api] Chưa cấu hình SMTP: đăng ký, xác minh email và quên mật khẩu tạm tắt (503).\x1b[0m');

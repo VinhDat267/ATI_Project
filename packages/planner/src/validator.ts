@@ -879,24 +879,12 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
 
   if (isReportIntent && hasFactualReportContent) {
     if (!parsed.reportEvidence) {
-      const hasReadStep = steps.some((s) => {
-        const def = catalogMap.get(s.tool);
-        return def?.sideEffect === 'read' && (
-          s.tool.includes('pull_request') ||
-          s.tool.includes('issue') ||
-          s.tool.includes('range') ||
-          s.tool.includes('aggregate') ||
-          s.tool.includes('search_issues')
-        );
-      });
-      if (!hasReadStep) {
-        return {
-          valid: false,
-          layer: 'grounding',
-          error:
-            'Report content must be grounded in verified read observations via reportEvidence: unverified report data in notification text without read observations',
-        };
-      }
+      return {
+        valid: false,
+        layer: 'grounding',
+        error:
+          'Report content must be grounded in verified read observations via reportEvidence: unverified report data in notification text without read observations',
+      };
     }
   }
 

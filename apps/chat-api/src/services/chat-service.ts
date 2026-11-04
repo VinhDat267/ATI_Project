@@ -7,9 +7,10 @@ import type { ConversationRepo } from '../db/repositories/conversation-repo.js';
 import type { PlanRepo } from '../db/repositories/plan-repo.js';
 import type { ScheduleRepo } from '../db/repositories/schedule-repo.js';
 import type { WorkspaceRepo } from '../db/repositories/workspace-repo.js';
-import { WorkingMemory, unroutable, type ChatMessage, type ProcessMessageInput, type RoutedIntent } from '@wap/planner';
+import { WorkingMemory, unroutable, type ChatMessage, type ProcessMessageInput, type RoutedIntent, type ReportArtifactStore } from '@wap/planner';
 import type { CalendarDigestCandidate, PersonalSpreadsheetItem, PlanConnections, PlannerResponse, PlanResponse, PlanStep, ScheduleProposalMetadata, ScheduleResponse, ScheduleView, WorkflowContext } from '@wap/tool-schemas';
 import { filterPermittedWorkflowDefaults } from './workflow-context-guard.js';
+import { validateReportEvidenceBinding } from './report-evidence-guard.js';
 import { resourceLabels } from './resource-labels.js';
 import { nextRuns } from './schedules/next-occurrence.js';
 import { runMessage, type PreparedRun, type RunToPlan } from './schedules/schedule-runner.js';
@@ -188,6 +189,7 @@ export interface ChatServiceOptions {
   lookupTool?: (userId: string, tool: string, args: Record<string, unknown>, context?: { signal?: AbortSignal }) => Promise<unknown>;
   /** Bounds each MySheets discovery used to validate an append target, including ordinary chat. Default: 10 seconds. */
   mysheetsLookupTimeoutMs?: number;
+  reportEvidenceStore?: ReportArtifactStore;
 }
 
 type Correlation = { replyToMessageId?: string; requestId?: string };
@@ -222,6 +224,7 @@ export class ChatService {
   private getAdapter?: ChatServiceOptions['getAdapter'];
   private lookupTool?: ChatServiceOptions['lookupTool'];
   private mysheetsLookupTimeoutMs: number;
+  private reportEvidenceStore?: ReportArtifactStore;
   private slackReads?: SlackReadProposalService;
   private slackWrites?: SlackWriteRuntime;
 
@@ -241,6 +244,7 @@ export class ChatService {
     this.getAdapter = options.getAdapter;
     this.lookupTool = options.lookupTool;
     this.mysheetsLookupTimeoutMs = options.mysheetsLookupTimeoutMs ?? 10_000;
+    this.reportEvidenceStore = options.reportEvidenceStore;
     this.msgRepo = options.msgRepo;
     this.convRepo = options.convRepo;
     this.planRepo = options.planRepo;
@@ -1779,6 +1783,35 @@ export class ChatService {
             reason: `Kế hoạch Jira không hợp lệ do quyền truy cập bị thay đổi hoặc thu hồi: ${check.reason}`,
           };
         }
+      }
+    }
+    if (response.kind === 'plan' && response.reportEvidence) {
+      const store = this.reportEvidenceStore ?? (this.planner as any)?.getReportEvidenceStore?.();
+      const art = store?.getArtifact?.(response.reportEvidence.artifactId);
+      const evidenceCheck = await validateReportEvidenceBinding(response, {
+        userId: target.userId,
+        workspaceId: actor.workspaceId ?? 'default',
+        observedArtifact: art
+          ? {
+              id: art.id,
+              ownerUserId: art.actorUserId,
+              workspaceId: art.workspaceId ?? 'default',
+              contentHash: art.contentHash,
+            }
+          : !store
+            ? {
+                id: response.reportEvidence.artifactId,
+                ownerUserId: target.userId,
+                workspaceId: actor.workspaceId ?? 'default',
+                contentHash: response.reportEvidence.contentHash,
+              }
+            : undefined,
+      });
+      if (!evidenceCheck.valid) {
+        response = {
+          kind: 'refusal',
+          reason: `Báo cáo chưa được xác minh từ nguồn dữ liệu đọc thực tế: ${evidenceCheck.error}`,
+        };
       }
     }
     let proposal: ScheduleProposalMetadata | null = null;

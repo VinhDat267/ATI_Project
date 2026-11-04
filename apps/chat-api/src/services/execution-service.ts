@@ -9,6 +9,8 @@ import { isDeepStrictEqual } from 'node:util';
 import { readableRecoveryPlan, recoveryConflict, restoredProgress, validateRecoveryAction, verifiedRecoveryPlan, verifiedRecoverySteps } from './execution-recovery.js';
 import type { AdapterContext } from './adapter-factory.js';
 import { validateJiraApprovalBinding } from './jira/jira-approval-guard.js';
+import { validateReportEvidenceBinding } from './report-evidence-guard.js';
+import type { ReportArtifactStore } from '@wap/planner';
 import type { PlanJiraGuard } from '../db/repositories/plan-repo.js';
 import { JiraStreamBuffer, JiraStreamBufferRevokedError } from '../sse/jira-stream-guard.js';
 import type { JiraLeaseManager } from './jira/jira-lease-manager.js';
@@ -46,6 +48,8 @@ export interface ExecutionServiceOptions {
   };
   jiraLeaseManager?: JiraLeaseManager;
   jiraNativeVerifier?: any;
+  reportEvidenceStore?: ReportArtifactStore;
+  enforceReportGrounding?: boolean;
 }
 
 export class ExecutionService {
@@ -58,6 +62,8 @@ export class ExecutionService {
   private pool?: pg.Pool;
   private jiraLeaseManager?: JiraLeaseManager;
   private jiraNativeVerifier?: any;
+  private reportEvidenceStore?: ReportArtifactStore;
+  private enforceReportGrounding?: boolean;
   private activeControllers = new Map<string, ExecutionController>();
   private activeRuns = new Map<string, Promise<unknown>>();
   private queuedStarts = new Set<string>();
@@ -78,6 +84,8 @@ export class ExecutionService {
     this.pool = options.pool ?? (options.planRepo as any).pool;
     this.jiraLeaseManager = options.jiraLeaseManager;
     this.jiraNativeVerifier = options.jiraNativeVerifier;
+    this.reportEvidenceStore = options.reportEvidenceStore;
+    this.enforceReportGrounding = options.enforceReportGrounding;
   }
 
   private emitExecution(convId:string,event:string,payload:any):void{
@@ -180,6 +188,40 @@ export class ExecutionService {
 
     // Everything that can fail is done before the approval CAS commits.
     const context = this.executionContext(userId, planJson?.connections, planRow.conversation);
+    if (planJson?.reportEvidence || this.enforceReportGrounding) {
+      const art = planJson?.reportEvidence && this.reportEvidenceStore
+        ? this.reportEvidenceStore.getArtifact(planJson.reportEvidence.artifactId)
+        : undefined;
+      const evidenceCheck = await validateReportEvidenceBinding(planJson, {
+        userId,
+        workspaceId: context.workspaceId ?? 'default',
+        expectedPlanHash: planRow.plan_hash,
+        planText: planRow.plan_text || undefined,
+        enforceReportGrounding: this.enforceReportGrounding,
+        observedArtifact: art
+          ? {
+              id: art.id,
+              ownerUserId: art.actorUserId,
+              workspaceId: art.workspaceId ?? 'default',
+              contentHash: art.contentHash,
+            }
+          : planJson?.reportEvidence && !this.reportEvidenceStore
+            ? {
+                id: planJson.reportEvidence.artifactId,
+                ownerUserId: userId,
+                workspaceId: context.workspaceId ?? 'default',
+                contentHash: planJson.reportEvidence.contentHash,
+              }
+            : undefined,
+      });
+      if (!evidenceCheck.valid) {
+        return {
+          success: false,
+          status: 409,
+          error: evidenceCheck.error || 'Report evidence verification failed',
+        };
+      }
+    }
     const steps: PlanStep[] = planJson?.steps || [];
     const requiredPermissions = {
       browse: true,

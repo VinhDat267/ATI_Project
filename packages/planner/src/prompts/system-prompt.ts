@@ -85,7 +85,7 @@ ${toolList}
 5. Use \`kind: "refusal"\` for unsupported, unavailable or unsafe actions, with \`reason\` and optional \`suggestion\`.
 6. Only use tools listed above. Never assume a user-named service is connected or authorized.
 7. For a previous step's output use { "$ref": "step_id.output.propertyName" }, or { "$template": "See \${step_id.output.url}" }. Declare that step first and list it in \`dependsOn\`.
-8. Never invent resource identifiers. An input marked \`x-resource\` must be the matching Working Memory entity's value (its \`x-resource-field\`, default \`id\`), an identifier the user typed, or a \`$ref\` to an earlier step. If it is unknown, return a clarification asking which resource to use. IDs in examples are placeholders.${myjiraRules}
+8. Never invent resource identifiers. An input marked \`x-resource\` must be the matching Working Memory entity's value (its \`x-resource-field\`, default \`id\`), an identifier the user typed, or a \`$ref\` to an earlier step. If Working Memory contains \`workflow_resource_defaults\`, use those pre-authorized default resource IDs when the user's message does not explicitly specify a different resource. If it is unknown, return a clarification asking which resource to use. IDs in examples are placeholders.${myjiraRules}
 ${options.search ? searchProtocol(tools) : ''}${mysheetsRules}${mycalendarRules}${dateContext ? `\n${buildDateContext(dateContext)}\n` : ''}${crossServiceExample}`;
   const prompt = options.schedules ? base + scheduleRules() : base;
   if (!options.readAnswers) return prompt;

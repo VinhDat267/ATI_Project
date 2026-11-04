@@ -5,7 +5,9 @@ import { createIsolatedTestSchema, createSyntheticUser, type IsolatedTestContext
 import { PlanRepo } from '../../src/db/repositories/plan-repo.js';
 import { ConversationRepo } from '../../src/db/repositories/conversation-repo.js';
 import type { PlanResponse, ReportEvidence } from '@wap/tool-schemas';
+import { ReportArtifactStore } from '@wap/planner';
 import { validateReportEvidenceBinding } from '../../src/services/report-evidence-guard.js';
+import { ExecutionService } from '../../src/services/execution-service.js';
 
 describe('Report Evidence Integration & Dispatch Guard (FLOW-01, F1)', () => {
   let ctx: IsolatedTestContext;
@@ -243,5 +245,88 @@ describe('Report Evidence Integration & Dispatch Guard (FLOW-01, F1)', () => {
 
     expect(check.valid).toBe(false);
     expect(check.error).toMatch(/missing report evidence|unverified report plan/i);
+  });
+
+  it('ExecutionService.approveAndStart blocks unverified report plans and allows verified report plans with ReportArtifactStore', async () => {
+    const userId = await createSyntheticUser(pool, 'User Exec Guard', 'execguard');
+    const reportEvidenceStore = new ReportArtifactStore();
+
+    const execService = new ExecutionService({
+      planRepo,
+      convRepo,
+      pool,
+      adapterFactory: {
+        getAdapterForService: () => ({
+          execute: async () => ({ status: 'success', data: { ok: true } }),
+        }),
+      },
+      reportEvidenceStore,
+      enforceReportGrounding: true,
+    });
+
+    const unverifiedPlan: PlanResponse = {
+      kind: 'plan',
+      thinking: 'Gửi báo cáo PR',
+      summary: 'Gửi báo cáo PR',
+      warnings: [],
+      steps: [
+        {
+          id: 'step_post',
+          tool: 'slack.chat_postMessage',
+          description: 'Gửi báo cáo PR',
+          args: { channel: 'C_DEV', text: 'Báo cáo PR #128 tự bịa không có nguồn' },
+          dependsOn: [],
+        },
+      ],
+    };
+
+    const createdUnverified = await createTestPlan(userId, unverifiedPlan, 'pending');
+    const blockedRes = await execService.approveAndStart(createdUnverified.planId, userId);
+    expect(blockedRes.success).toBe(false);
+    expect(blockedRes.status).toBe(409);
+    expect(blockedRes.error).toMatch(/missing report evidence|unverified report plan/i);
+
+    const verifiedText = '📊 **Báo cáo Pull Requests — acme/web**\nTổng số: 1 PR (#128)';
+    const artifact = reportEvidenceStore.createArtifact({
+      kind: 'github_prs',
+      sourceTool: 'github.list_pull_requests',
+      sourceLabel: 'acme/web',
+      items: [{ number: 128, title: 'Fix oauth' }],
+      renderedText: verifiedText,
+      actor: { userId, workspaceId: null },
+    });
+
+    const verifiedPlan: PlanResponse = {
+      kind: 'plan',
+      thinking: 'Gửi báo cáo PR đã kiểm chứng',
+      summary: 'Gửi báo cáo PR',
+      warnings: [],
+      steps: [
+        {
+          id: 'step_post',
+          tool: 'slack.chat_postMessage',
+          description: 'Gửi báo cáo PR',
+          args: { channel: 'C_DEV', text: verifiedText },
+          dependsOn: [],
+        },
+      ],
+      reportEvidence: {
+        artifactId: artifact.id,
+        kind: artifact.kind,
+        stepId: 'step_post',
+        argument: 'text',
+        sourceTool: artifact.sourceTool,
+        sourceLabel: artifact.sourceLabel,
+        readAt: artifact.createdAt,
+        itemCount: 1,
+        coverage: 'complete',
+        contentHash: artifact.contentHash,
+      },
+    };
+
+    const createdVerified = await createTestPlan(userId, verifiedPlan, 'pending');
+    const allowedRes = await execService.approveAndStart(createdVerified.planId, userId);
+    expect(allowedRes.success).toBe(true);
+    expect(allowedRes.status).toBe(200);
   });
 });
