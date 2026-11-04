@@ -381,4 +381,76 @@ describe('1-Click Parameterized Playbooks & Extended Slack/GitHub Catalog', () =
     );
     expect(screen.getByTestId('mycalendar-ecosystem-badges')).toBeDefined();
   });
+
+  it('FLOW-03: preserves customized template edits and prevents sending when variables are unfilled', () => {
+    const services: ServiceInfo[] = [
+      { id: 'mycalendar', name: 'Google Calendar', configured: true, connected: true, connectionStatus: 'healthy' },
+      { id: 'mysheets', name: 'Google Sheets', configured: true, connected: true, connectionStatus: 'healthy' },
+    ];
+    let currentDraft = '';
+    const onDraft = vi.fn((val: string) => {
+      currentDraft = val;
+    });
+    const onSend = vi.fn();
+    const inputRef = createRef<HTMLTextAreaElement>();
+
+    render(
+      <RequestMoment
+        services={services}
+        loading={false}
+        error={null}
+        draft={currentDraft}
+        planning={false}
+        input={inputRef}
+        onDraft={onDraft}
+        onSend={onSend}
+        onKeyDown={() => {}}
+        onSettings={() => {}}
+        navigate={() => {}}
+        servicePrompt={(s) => `Dùng ${s.name}`}
+      />,
+    );
+
+    // Select the parameterized Google Workspace playbook
+    const googlePlaybookBtn = screen.getByRole('button', {
+      name: /Hệ sinh thái Google Workspace/i,
+    });
+    fireEvent.click(googlePlaybookBtn);
+
+    // User switches to template mode or types into textarea to add customized instruction
+    const textarea = screen.getByLabelText('Mô tả công việc bạn muốn thực hiện');
+    fireEvent.change(textarea, {
+      target: {
+        value: `${textarea.textContent || currentDraft} CHỈ GỬI HẠNH, KHÔNG GỬI KHÁCH`,
+      },
+    });
+
+    // Save as a custom playbook
+    const saveBtn = screen.getByTestId('btn-save-playbook');
+    fireEvent.click(saveBtn);
+
+    const titleInput = screen.getByLabelText('Tên Playbook 1-Click');
+    fireEvent.change(titleInput, { target: { value: 'Mẫu riêng của Hạnh' } });
+    fireEvent.keyDown(titleInput, { key: 'Enter' });
+
+    // The saved playbook must contain the edited note AND the variable placeholders
+    expect(screen.getByText('Mẫu riêng của Hạnh')).toBeDefined();
+
+    // Now try to send while variables are unfilled -> must block onSend
+    const form = screen.getByRole('form', { name: 'Nhập yêu cầu' });
+    fireEvent.submit(form);
+    expect(onSend).not.toHaveBeenCalled();
+
+    // Fill the required variables
+    const projectInput = screen.getByLabelText('Biến số tên_dự_án');
+    fireEvent.change(projectInput, { target: { value: 'Dự án Hạnh Q4' } });
+
+    const guestInput = screen.getByLabelText('Biến số email_khách');
+    fireEvent.change(guestInput, { target: { value: 'hanh@example.com' } });
+
+    // Now submit form -> onSend is called with filled text containing the customized note
+    fireEvent.submit(form);
+    expect(onSend).toHaveBeenCalledWith(expect.stringContaining('Dự án Hạnh Q4'));
+    expect(onSend).toHaveBeenCalledWith(expect.stringContaining('CHỈ GỬI HẠNH, KHÔNG GỬI KHÁCH'));
+  });
 });
