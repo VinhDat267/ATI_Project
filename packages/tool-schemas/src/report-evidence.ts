@@ -44,7 +44,7 @@ export function requiresReportEvidence(userTexts: readonly string[]): boolean {
   const report = /\b(?:bao cao|tong hop|thong ke|tom tat|reports?|digest|summary|summari[sz]e|progress|aging)\b/;
   const read = /\b(?:danh sach|liet ke|doc|xem|kiem tra|lay|dem|bao nhieu|may|hien co|co nhung|tim|list|read|show|find|fetch|which|how many|what)\b/;
   const send = /(?<![\p{L}\p{N}_])(?:gửi|nhắn|gui|send|post|notify)(?![\p{L}\p{N}_])/iu;
-  const sourceMutation = /\b(?:tao|them|cap nhat|sua|dong|gan|mo|create|add|update|close|assign|delete)\s+(?:(?:moi|mot|cac|a|an|the|new|github|google|nhan|bug|cho)\s+)*(?:prs?|pull requests?|issues?|tickets?|jira|sprints?|sheets?|spreadsheets?|bang tinh)\b/;
+  const sourceMutation = /\b(?:tao|them|ghi|cap nhat|sua|dong|gan|mo|create|add|append|update|close|assign|delete)\s+(?:(?:moi|mot|cac|a|an|the|new|github|google|nhan|bug|cho)\s+)*(?:prs?|pull requests?|issues?|tickets?|jira|sprints?|sheets?|spreadsheets?|bang tinh|dong|rows?|cells?)\b/;
   const latest = fold(userTexts.at(-1) ?? '');
   const outsideQuotes = latest.replace(/"[^"\n]*"|“[^”\n]*”|'[^'\n]*'/g, '');
   // A user may send their own literal words, including numbers or the word "report".
@@ -64,8 +64,9 @@ export function requiresReportEvidence(userTexts: readonly string[]): boolean {
     const mutation = sourceMutation.exec(value);
     if (mutation) {
       const before = value.slice(0, mutation.index);
-      const separateReport = /(?:^|[.;!?]\s*|\b(?:va|roi|and|then|de)\s+)(?:(?:gui|send|post)\s+(?:a\s+)?)?(?:bao cao|tong hop|thong ke|tom tat|reports?|digest|summary|summari[sz]e|dem|count|danh sach|list|find|read)\b/;
-      return (topic.test(before) && (report.test(before) || read.test(before))) || separateReport.test(value);
+      const after = value.slice(mutation.index + mutation[0].length);
+      const separateReport = /(?:^|[.;!?]\s*|\b(?:va|roi|and|then|de)\s+)(?:(?:gui|send|post)\s+(?:a\s+)?)?(?:bao cao|tong hop|thong ke|tom tat|reports?|digest|summary|summari[sz]e|dem|count|danh sach|list)\b/;
+      return (topic.test(before) && report.test(before)) || separateReport.test(before) || separateReport.test(after);
     }
     // Reading a contact table solely to address an ordinary email is not a data report.
     if (!report.test(value) && !/\b(?:dem|bao nhieu|tong so|ket qua|count|results?|how many)\b/.test(value) && /\b(?:khach hang|dia chi|nguoi nhan|recipients?|contacts?)\b/.test(value) &&

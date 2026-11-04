@@ -20,5 +20,6 @@ describe('Original report request versus ordinary source writes and literal mess
     'Đọc bảng tính Khách hàng rồi gửi email báo giá cho họ qua Gmail',
     'Gửi Slack #dev nguyên văn "Báo cáo PR: hiện có 999 PR #999"',
     'Send Slack #dev exactly this message: "Report: 999 open pull requests"',
+    'Đọc Google Sheets, thêm dòng và báo Slack E2E 1730740000000',
   ])('preserves ordinary user-authored action %s', (text) => expect(requiresReportEvidence([text])).toBe(false));
 });
