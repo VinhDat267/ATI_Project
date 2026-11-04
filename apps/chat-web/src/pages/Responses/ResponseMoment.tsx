@@ -69,10 +69,10 @@ function ResponseCard({ request, title, children, moment }: { request: string; t
       <div aria-hidden="true" className="w-9 h-9 rounded-full bg-[#111827] text-white flex items-center justify-center text-xs font-bold flex-shrink-0 shadow-sm mt-0.5">B</div>
     </div>}
     <div className="flex items-start gap-3">
-      <div aria-hidden="true" className="w-9 h-9 rounded-xl bg-[#FF5701] text-white flex items-center justify-center font-display font-bold text-base shadow-sm flex-shrink-0 mt-0.5">A</div>
+      <div aria-hidden="true" className="w-9 h-9 rounded-xl bg-[#FF5701] text-white flex items-center justify-center font-display font-bold text-base shadow-sm flex-shrink-0 mt-0.5">P</div>
       <div className="flex-1 bg-white border border-[#E7E7E2] rounded-2xl rounded-tl-sm p-5 sm:p-7 shadow-sm v3-space-y-5 min-w-0">
         <div className="flex items-center justify-between text-xs text-[#6B7280] pb-2 border-b border-[#F3F4F6] gap-2 flex-wrap">
-          <div className="flex items-center gap-2"><span className="font-semibold text-[#111827]">ATI</span><span className="text-[#9CA3AF]">·</span><span>Trợ lý điều phối</span></div>
+          <div className="flex items-center gap-2"><span className="font-semibold text-[#111827]">Planora</span><span className="text-[#9CA3AF]">·</span><span>Trợ lý điều phối</span></div>
           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[#F3F4F6] text-[#4B5563]"><span className="w-1.5 h-1.5 rounded-full bg-[#9CA3AF]" />Chưa lập kế hoạch</span>
         </div>
         <h1 id="response-card-title" tabIndex={-1} className="font-display font-bold text-2xl sm:text-3xl text-[#111827] tracking-tight focus:v3-outline-none focus:ring-2 focus:ring-[#FF5701]/20 rounded-lg break-words">{title}</h1>

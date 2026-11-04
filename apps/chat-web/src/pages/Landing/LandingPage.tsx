@@ -78,7 +78,7 @@ function K2Badge({ found }: { found: boolean }) {
 
 const meta: PageMeta = {
   id: "index",
-  title: "ATI — AI Workflow Automation Platform",
+  title: "Planora — AI Workflow Automation Platform",
   htmlClass: "scroll-smooth",
   bodyClass: "selection:bg-[#FF5701]/20 selection:text-[#111827]",
   css,
@@ -281,13 +281,13 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
       <header className="sticky top-0 z-50 bg-[#F8F8F6]/90 backdrop-blur-md border-b border-[#E7E7E2] transition-colors" data-od-id="nav-header">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 sm:h-[72px] flex items-center justify-between">
           {/* Logo: ô cam bo góc + chữ Playfair Display */}
-          <a href="#" className="group flex items-center gap-3 focus-visible:rounded-lg" aria-label="ATI — Trang chủ">
+          <a href="#" className="group flex items-center gap-3 focus-visible:rounded-lg" aria-label="Planora — Trang chủ">
             <div className="w-9 h-9 rounded-xl bg-[#FF5701] text-white flex items-center justify-center font-display font-bold text-lg shadow-sm transition-transform group-hover:scale-105">
-              A
+              P
             </div>
             <div className="flex flex-col">
               <span className="font-display font-bold text-xl sm:text-2xl tracking-tight text-[#111827] leading-none">
-                ATI
+                Planora
               </span>
             </div>
           </a>
@@ -324,7 +324,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
             </h1>
             {/* Dòng phụ đời thường, rõ nghĩa */}
             <p className="text-base sm:text-xl text-[#4B5563] max-w-2xl mx-auto leading-relaxed mb-10 font-normal">
-              ATI đọc yêu cầu tiếng Việt, lên kế hoạch trên Trello, Slack, GitHub, Google Sheets… và chỉ làm khi bạn đồng ý.
+              Planora đọc yêu cầu tiếng Việt, lên kế hoạch trên Trello, Slack, GitHub, Google Sheets… và chỉ làm khi bạn đồng ý.
             </p>
             {/* Ba nút: Đăng ký (cam), Tiếp tục với Google (trắng), Đăng nhập (liên kết) */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 sm:gap-4 mb-4">
@@ -379,7 +379,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                     Sơ đồ luồng liên dịch vụ trực quan
                   </span>
                   <h2 className="font-display text-lg sm:text-xl font-semibold text-[#111827]">
-                    Chọn kịch bản mẫu để xem cách ATI chia luồng &amp; truyền dữ liệu
+                    Chọn kịch bản mẫu để xem cách Planora chia luồng &amp; truyền dữ liệu
                   </h2>
                 </div>
                 <div
@@ -506,7 +506,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                     Tôi tự tìm đúng chỗ
                   </h3>
                   <p className="text-base text-[#4B5563] leading-relaxed">
-                    ATI đối chiếu yêu cầu với các công cụ nhóm đã liên kết để tìm chính xác bảng việc, kho mã, bảng tính hay kênh trao đổi — bạn không cần nhớ link hay ID.
+                    Planora đối chiếu yêu cầu với các công cụ nhóm đã liên kết để tìm chính xác bảng việc, kho mã, bảng tính hay kênh trao đổi — bạn không cần nhớ link hay ID.
                   </p>
                 </div>
                 {/* Khoảnh khắc 3 Trigger */}
@@ -523,7 +523,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                     Bạn xem trước, rồi mới duyệt
                   </h3>
                   <p className="text-base text-[#4B5563] leading-relaxed">
-                    Trước khi bất kỳ dữ liệu nào được ghi, ATI lập một kế hoạch rõ ràng để bạn kiểm tra. Bạn đọc đúng từng chữ sẽ gửi đi và chỉ bắt đầu khi bạn bấm duyệt.
+                    Trước khi bất kỳ dữ liệu nào được ghi, Planora lập một kế hoạch rõ ràng để bạn kiểm tra. Bạn đọc đúng từng chữ sẽ gửi đi và chỉ bắt đầu khi bạn bấm duyệt.
                   </p>
                 </div>
                 {/* Khoảnh khắc 4 Trigger */}
@@ -563,7 +563,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
               </div>
               {/* CỘT PHẢI: SÂN KHẤU DÍNH (STICKY STAGE MOCKUP) */}
               <div className="lg:col-span-7 sticky top-24 self-start py-8">
-                <div className="bg-white rounded-2xl border border-[#E7E7E2] shadow-[0_1px_3px_rgba(0,0,0,0.02),0_16px_40px_-6px_rgba(0,0,0,0.07)] overflow-hidden transition-all" aria-live="polite" aria-label="Mô phỏng sân khấu làm việc của ATI">
+                <div className="bg-white rounded-2xl border border-[#E7E7E2] shadow-[0_1px_3px_rgba(0,0,0,0.02),0_16px_40px_-6px_rgba(0,0,0,0.07)] overflow-hidden transition-all" aria-live="polite" aria-label="Mô phỏng sân khấu làm việc của Planora">
                   {/* Thanh điều khiển đỉnh sân khấu + 5 chấm tiến độ */}
                   <div className="px-5 py-3.5 bg-[#FAFAF8] border-b border-[#E7E7E2] flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -571,7 +571,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                       <span className="w-3 h-3 rounded-full bg-[#E7E7E2]" />
                       <span className="w-3 h-3 rounded-full bg-[#E7E7E2]" />
                       <span className="ml-2 text-xs font-medium text-[#6B7280]">
-                        ATI
+                        Planora
                       </span>
                     </div>
                     {/* 5 chấm tiến độ có thể bấm chuyển nhanh */}
@@ -667,7 +667,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                       {/* Chân panel 1 */}
                       <div className="pt-6 border-t border-[#F0F0EB] flex items-center justify-between text-xs text-[#6B7280]">
                         <span>
-                          Nhấn Enter hoặc gửi để ATI phân tích
+                          Nhấn Enter hoặc gửi để Planora phân tích
                         </span>
                         <span className="text-[#FF5701] font-medium">
                           Đang lắng nghe...
@@ -1248,7 +1248,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                   Tôi tự tìm đúng chỗ
                 </h3>
                 <p className="text-sm text-[#4B5563] mb-4">
-                  ATI tự tìm đúng bảng việc, kho mã, bảng tính hay kênh trao đổi mà bạn không cần điền link hay mã ID.
+                  Planora tự tìm đúng bảng việc, kho mã, bảng tính hay kênh trao đổi mà bạn không cần điền link hay mã ID.
                 </p>
                 <div className="v3-space-y-2 text-xs">
                   <div className="p-2.5 rounded-lg border border-[#E7E7E2] bg-[#FAFAF8] flex items-center justify-between">
@@ -1708,7 +1708,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                 Dùng với công cụ nhóm bạn đang có
               </h2>
               <p className="text-sm sm:text-base text-[#6B7280] mt-3">
-                Không cần chuyển đổi phần mềm làm việc. ATI liên kết trực tiếp với các dịch vụ quen thuộc của bạn.
+                Không cần chuyển đổi phần mềm làm việc. Planora liên kết trực tiếp với các dịch vụ quen thuộc của bạn.
               </p>
             </div>
             {/* Lưới 8 dịch vụ dùng chung, mỗi dịch vụ 1 card trang nhã; Gmail của riêng từng người thêm vào khi được bật */}
@@ -1966,7 +1966,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
                   </span>
                 </div>
                 <h3 className="font-display text-lg font-semibold text-[#111827]">Google Sheets · Của riêng bạn</h3>
-                <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">Chọn bảng tính trong cửa sổ của Google, ATI chỉ thêm dòng sau khi bạn duyệt.</p>
+                <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">Chọn bảng tính trong cửa sổ của Google, Planora chỉ thêm dòng sau khi bạn duyệt.</p>
                 <a href="/guide?service=mysheets" className="text-xs text-[#FF5701] underline">Cách kết nối và mẫu câu Google Sheets</a>
               </div>}
             </div>
@@ -2074,10 +2074,10 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#6B7280]">
           <div className="flex items-center gap-2">
             <span className="w-5 h-5 rounded-md bg-[#FF5701] text-white flex items-center justify-center font-display font-bold text-[10px]">
-              A
+              P
             </span>
             <span className="font-medium text-[#111827]">
-              ATI · 2026
+              Planora · 2026
             </span>
             <span className="text-[#D1D5DB]">
               ·
@@ -2114,19 +2114,19 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
             </svg>
           </button>
           {(error || authError) && <p role="alert" className="p-3.5 mb-4 bg-[#FEF2F2] border border-[#FECACA] rounded-xl text-xs text-[#DC2626]">{error || authError}</p>}
-          {/* Logo thương hiệu ATI */}
+          {/* Logo thương hiệu Planora */}
           <div className="flex items-center gap-2.5 mb-4">
             <div className="w-8 h-8 rounded-xl bg-[#FF5701] text-white flex items-center justify-center font-display font-bold text-base shadow-sm">
-              A
+              P
             </div>
             <span className="font-display font-bold text-xl text-[#111827] tracking-tight">
-              ATI
+              Planora
             </span>
           </div>
           {/* VIEW 1: FORM CHÍNH (Đăng nhập / Đăng ký) */}
           {authView === 'form' && <div id="auth-form-view" className={authView === 'form' ? undefined : 'hidden'}>
             <h1 id="auth-modal-title" className="font-display font-medium text-2xl sm:text-[26px] text-[#111827] tracking-tight mb-1.5">
-              {isLoginView ? 'Chào mừng bạn quay lại' : 'Bắt đầu với ATI'}
+              {isLoginView ? 'Chào mừng bạn quay lại' : 'Bắt đầu với Planora'}
             </h1>
             <p id="auth-modal-subtitle" className="text-xs sm:text-sm text-[#4B5563] leading-relaxed mb-5">
               {isLoginView ? 'Đăng nhập để vào không gian điều phối công việc của nhóm.' : 'Điều phối tự động trên nhiều công cụ sau khi bạn duyệt.'}
@@ -2163,7 +2163,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
               <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-[#FF5701] hover:underline font-medium">
                 Chính sách an toàn &amp; Dữ liệu
               </a>
-              {" của ATI."}
+              {" của Planora."}
             </p>
             {/* Divider phân tách */}
             <div className="relative my-4 flex items-center justify-center">
@@ -2206,7 +2206,7 @@ export function LandingPage({ navigate, initialMode, email = '', setEmail = () =
               </div>
               <button type="submit" disabled={busy || isLoggingIn} className="w-full py-3 px-4 bg-[#FF5701] hover:bg-[#E04C00] text-white text-sm font-semibold rounded-xl shadow-md shadow-[#FF5701]/20 transition-all v3-transform active:scale-[0.99] flex items-center justify-center gap-2" aria-label={isLoggingIn ? "Đang đăng nhập..." : "Đăng nhập"} data-od-id="btn-submit-login">
                 <span>
-                  Đăng nhập vào ATI
+                  Đăng nhập vào Planora
                 </span>
               </button>
               {authConfig?.signupEnabled && <p className="text-center text-xs text-[#6B7280] pt-1">

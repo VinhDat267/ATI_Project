@@ -491,7 +491,7 @@ export function TelegramConnection({
           >
             <div className="p-5 v3-space-y-4">
               <p className="text-sm">
-                ATI sẽ xoá liên kết Telegram cá nhân của bạn. Các lịch tự động gửi bản tin Telegram sẽ tạm dừng cho tới khi bạn kết nối lại.
+                Planora sẽ xoá liên kết Telegram cá nhân của bạn. Các lịch tự động gửi bản tin Telegram sẽ tạm dừng cho tới khi bạn kết nối lại.
               </p>
               <div className="flex justify-end gap-2">
                 <button className={secondary} disabled={busy} onClick={() => setConfirm(false)}>

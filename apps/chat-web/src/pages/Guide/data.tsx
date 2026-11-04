@@ -76,12 +76,12 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
         sampleScope: '5f1a2b3c4d5e6f7a8b9c0d1e',
         timeEstimate: 'Khoảng 2 phút',
         summary: 'Tạo và cập nhật card, gán thành viên, thêm checklist trên bảng công việc của nhóm.',
-        importantNotice: 'ATI chỉ đọc và ghi trên đúng Board ID bạn cấp. Card đã xong được lưu trữ chứ không bao giờ bị xoá mất.',
+        importantNotice: 'Planora chỉ đọc và ghi trên đúng Board ID bạn cấp. Card đã xong được lưu trữ chứ không bao giờ bị xoá mất.',
         steps: [
           {
             num: 1,
             title: 'Khuyên dùng: Kết nối OAuth 1-Click & Chọn Bảng trực tiếp',
-            desc: 'Mở trang Cài đặt dịch vụ trên ATI, tại mục Trello cá nhân bấm nút <strong>Kết nối OAuth 1-Click</strong>, bấm "Allow" trên màn hình Trello và tích chọn các bảng (Board) bạn muốn cho phép ngay trên giao diện trực quan.',
+            desc: 'Mở trang Cài đặt dịch vụ trên Planora, tại mục Trello cá nhân bấm nút <strong>Kết nối OAuth 1-Click</strong>, bấm "Allow" trên màn hình Trello và tích chọn các bảng (Board) bạn muốn cho phép ngay trên giao diện trực quan.',
             callout: 'Không cần tự tạo Power-Up hay thêm đuôi .json để tìm Board ID thủ công.'
           },
           {
@@ -101,12 +101,12 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
         sampleScope: 'C07DEMO9X1 (#ati-test)',
         timeEstimate: 'Khoảng 3 phút',
         summary: 'Gửi tin nhắn thông báo vào các kênh công khai hoặc riêng tư khi việc trên các công cụ khác hoàn thành.',
-        importantNotice: 'Bắt buộc mời bot vào kênh trước! Sau khi tạo, hãy gõ lệnh /invite @ATI trong kênh bạn muốn gửi tin.',
+        importantNotice: 'Bắt buộc mời bot vào kênh trước! Sau khi tạo, hãy gõ lệnh /invite @Planora trong kênh bạn muốn gửi tin.',
         steps: [
           {
             num: 1,
             title: 'Tạo ứng dụng Slack mới',
-            desc: 'Truy cập trang nhà phát triển Slack tại <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer" class="text-[#36C5F0] font-medium underline">api.slack.com/apps</a>. Bấm nút "Create New App" > chọn "From scratch". Đặt tên "ATI Bot" và chọn Workspace nhóm.',
+            desc: 'Truy cập trang nhà phát triển Slack tại <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer" class="text-[#36C5F0] font-medium underline">api.slack.com/apps</a>. Bấm nút "Create New App" > chọn "From scratch". Đặt tên "Planora Bot" và chọn Workspace nhóm.',
             callout: 'Chọn đúng không gian làm việc của công ty bạn.'
           },
           {
@@ -120,13 +120,13 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
             num: 3,
             title: 'Cài đặt vào Workspace & lấy Bot Token',
             desc: 'Cuộn lên đầu trang "OAuth & Permissions", bấm nút "Install to Workspace" và bấm "Allow". Sau đó sao chép chuỗi "Bot User OAuth Token" bắt đầu bằng chữ "xoxb-".',
-            callout: 'Dán chuỗi bắt đầu bằng xoxb- vào ô "Bot token" trong ATI.'
+            callout: 'Dán chuỗi bắt đầu bằng xoxb- vào ô "Bot token" trong Planora.'
           },
           {
             num: 4,
             title: 'Lấy Channel ID & Mời bot vào kênh',
             desc: 'Mở ứng dụng Slack trên máy tính, chuột phải vào tên kênh (ví dụ #ati-test) > chọn "View channel details" (Xem chi tiết kênh). Cuộn xuống đáy cùng để thấy "Channel ID" (bắt đầu bằng chữ C, ví dụ C07DEMO9X1).',
-            callout: 'Đừng quên: Gõ lệnh /invite @ATI Bot trong kênh đó để bot có quyền gửi tin!'
+            callout: 'Đừng quên: Gõ lệnh /invite @Planora Bot trong kênh đó để bot có quyền gửi tin!'
           }
         ]
       },
@@ -139,7 +139,7 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
         sampleScope: 'VinhDat267/ati-test',
         timeEstimate: 'Khoảng 2 phút',
         summary: 'Tìm kho mã, đọc và tạo issue lỗi, gắn nhãn (bug, defect), liên kết chéo với card Trello.',
-        importantNotice: 'ATI không bao giờ xoá repository, không merge code, và chỉ thao tác trên issue thuộc kho bạn cho phép.',
+        importantNotice: 'Planora không bao giờ xoá repository, không merge code, và chỉ thao tác trên issue thuộc kho bạn cho phép.',
         steps: [
           {
             num: 1,
@@ -150,14 +150,14 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
           {
             num: 2,
             title: 'Tạo mã truy cập mới (Token)',
-            desc: 'Bấm nút "Generate new token" (chọn Generate new token classic). Đặt tên ghi chú (Note) là "ATI Automation". Chọn thời hạn (Expiration) theo nhu cầu.',
+            desc: 'Bấm nút "Generate new token" (chọn Generate new token classic). Đặt tên ghi chú (Note) là "Planora Automation". Chọn thời hạn (Expiration) theo nhu cầu.',
             callout: 'Tích chọn đúng phạm vi quyền duy nhất: "repo" (toàn quyền quản lý issue và đọc kho mã).'
           },
           {
             num: 3,
             title: 'Sao chép mã ghp_...',
             desc: 'Cuộn xuống cuối trang bấm "Generate token". GitHub sẽ hiển thị chuỗi mã bắt đầu bằng "ghp_". Hãy sao chép ngay lập tức.',
-            callout: 'GitHub chỉ hiển thị mã này MỘT LẦN duy nhất. Dán ngay vào ô "Personal access token" trên ATI.'
+            callout: 'GitHub chỉ hiển thị mã này MỘT LẦN duy nhất. Dán ngay vào ô "Personal access token" trên Planora.'
           },
           {
             num: 4,
@@ -208,7 +208,7 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
           {
             num: 1,
             title: 'Khuyên dùng: Kết nối OAuth 1-Click & Chọn Lịch họp trực tiếp',
-            desc: 'Mở trang Cài đặt dịch vụ, tại thẻ Google Calendar của bạn bấm nút <strong>Kết nối OAuth 1-Click</strong>, uỷ quyền tài khoản Google và tích chọn các lịch (Calendar) cho phép ATI tra cứu hoặc đặt lịch họp.',
+            desc: 'Mở trang Cài đặt dịch vụ, tại thẻ Google Calendar của bạn bấm nút <strong>Kết nối OAuth 1-Click</strong>, uỷ quyền tài khoản Google và tích chọn các lịch (Calendar) cho phép Planora tra cứu hoặc đặt lịch họp.',
             callout: 'Tự động liệt kê các lịch của bạn mà không cần tìm Calendar ID thủ công.'
           },
           {
@@ -228,25 +228,25 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
         sampleScope: 'Roadmap 2026 · Biên bản họp (1–20 database)',
         timeEstimate: 'Khoảng 30 giây',
         summary: 'Kết nối 1 chạm qua Notion OAuth 2.0, truy vấn database, đọc chi tiết trang, tạo/cập nhật trạng thái trang và tự gửi Bản tin mỗi sáng.',
-        importantNotice: 'Khi cấp quyền trên Notion OAuth, hãy tích chọn các trang/database bạn muốn ATI truy cập. ATI tự động khoá phạm vi an toàn vào đúng các database đó!',
+        importantNotice: 'Khi cấp quyền trên Notion OAuth, hãy tích chọn các trang/database bạn muốn Planora truy cập. Planora tự động khoá phạm vi an toàn vào đúng các database đó!',
         steps: [
           {
             num: 1,
             title: 'Khuyên dùng: Kết nối OAuth 1-Click trong 30 giây',
-            desc: 'Mở trang Cài đặt dịch vụ trên ATI, tại mục Notion bấm nút <strong>Kết nối Notion</strong>. Đăng nhập Notion, bấm <strong>Select pages</strong> để tích chọn các Database cần dùng rồi nhấn <strong>Allow access</strong>.',
-            callout: 'Nếu bạn chia sẻ từ 1 đến 20 database, ATI tự động kích hoạt ngay mà không cần thao tác thêm.'
+            desc: 'Mở trang Cài đặt dịch vụ trên Planora, tại mục Notion bấm nút <strong>Kết nối Notion</strong>. Đăng nhập Notion, bấm <strong>Select pages</strong> để tích chọn các Database cần dùng rồi nhấn <strong>Allow access</strong>.',
+            callout: 'Nếu bạn chia sẻ từ 1 đến 20 database, Planora tự động kích hoạt ngay mà không cần thao tác thêm.'
           },
           {
             num: 2,
             title: 'Tích chọn hoặc Dán nhanh Link / ID Database Notion',
             desc: 'Bạn có thể bấm nút <strong>Đổi database</strong> bất cứ lúc nào để tích chọn lại danh sách Database (tối đa 20 database) hoặc dán trực tiếp đường dẫn URL của Database Notion vào ô nhập nhanh:',
             urlSample: 'https://www.notion.so/workspace/Roadmap-11111111222233334444555555555555',
-            callout: 'ATI tự động bóc tách mã UUID 32 ký tự từ đường dẫn Notion bạn dán vào.'
+            callout: 'Planora tự động bóc tách mã UUID 32 ký tự từ đường dẫn Notion bạn dán vào.'
           },
           {
             num: 3,
             title: 'Đọc/Cập nhật thuộc tính & Lên lịch Bản tin Notion (Auto-Digest)',
-            desc: 'Yêu cầu ATI lọc các trang theo <code>Status</code>, đọc toàn văn nội dung trang (<code>notion.get_page</code>), cập nhật tiến độ/trạng thái trang (<code>notion.update_page</code>) hoặc bật <strong>Bản tin Notion tự động</strong> gửi sang Telegram/Slack mỗi sáng.',
+            desc: 'Yêu cầu Planora lọc các trang theo <code>Status</code>, đọc toàn văn nội dung trang (<code>notion.get_page</code>), cập nhật tiến độ/trạng thái trang (<code>notion.update_page</code>) hoặc bật <strong>Bản tin Notion tự động</strong> gửi sang Telegram/Slack mỗi sáng.',
             callout: 'Bản tin tự động ưu tiên phân nhóm các mục Quá hạn/Bị chặn (Overdue/Blocked) lên đầu để bạn xử lý ngay.'
           }
         ]
@@ -259,20 +259,20 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
         scopeLabel: 'Chat / Nhóm được chọn',
         sampleScope: 'Telegram của tôi · Đội Sản Phẩm (-1002489102931)',
         timeEstimate: 'Khoảng 30 giây',
-        summary: 'Kết nối 1 chạm với bot chính thức của ATI, đọc tin nhắn gần đây trong nhóm, gửi thông báo tiến độ và nhận bản tin tổng hợp tự động mỗi ngày.',
-        importantNotice: 'Không cần tự tạo bot với @BotFather hay tra cứu Chat ID thủ công. ATI chỉ truy cập đúng cuộc trò chuyện và nhóm bạn tích chọn.',
+        summary: 'Kết nối 1 chạm với bot chính thức của Planora, đọc tin nhắn gần đây trong nhóm, gửi thông báo tiến độ và nhận bản tin tổng hợp tự động mỗi ngày.',
+        importantNotice: 'Không cần tự tạo bot với @BotFather hay tra cứu Chat ID thủ công. Planora chỉ truy cập đúng cuộc trò chuyện và nhóm bạn tích chọn.',
         steps: [
           {
             num: 1,
             title: 'Khuyên dùng: Kết nối Telegram 1-Click trong 15 giây',
-            desc: 'Mở trang Cài đặt dịch vụ trên ATI, tại mục Telegram bấm nút <strong>Kết nối Telegram</strong>. Hệ thống sẽ mở ứng dụng Telegram tới bot chính thức của ATI — bạn chỉ cần nhấn nút <strong>Start</strong> rồi quay lại bấm xác nhận.',
+            desc: 'Mở trang Cài đặt dịch vụ trên Planora, tại mục Telegram bấm nút <strong>Kết nối Telegram</strong>. Hệ thống sẽ mở ứng dụng Telegram tới bot chính thức của Planora — bạn chỉ cần nhấn nút <strong>Start</strong> rồi quay lại bấm xác nhận.',
             callout: 'Tự động nhận diện tài khoản và kích hoạt ngay cuộc trò chuyện "Telegram của tôi" mà không cần nhập khoá API.'
           },
           {
             num: 2,
             title: 'Thêm Bot vào Nhóm công việc (Group / Supergroup)',
-            desc: 'Nếu muốn ATI gửi báo cáo hoặc đọc tin nhắn trong nhóm làm việc, bấm nút <strong>Thêm Bot vào Nhóm Telegram</strong> ngay trên trang Kết nối (hoặc mời bot của ATI vào nhóm).',
-            callout: 'ATI tự động phát hiện các nhóm mới mà bạn là thành viên và hiển thị ngay trong danh sách chọn phạm vi.'
+            desc: 'Nếu muốn Planora gửi báo cáo hoặc đọc tin nhắn trong nhóm làm việc, bấm nút <strong>Thêm Bot vào Nhóm Telegram</strong> ngay trên trang Kết nối (hoặc mời bot của Planora vào nhóm).',
+            callout: 'Planora tự động phát hiện các nhóm mới mà bạn là thành viên và hiển thị ngay trong danh sách chọn phạm vi.'
           },
           {
             num: 3,
@@ -297,7 +297,7 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
             num: 1,
             title: 'Khuyên dùng: Tạo Jira Workspace & Kết nối OAuth 2.0 (3LO) 1-Click',
             desc: 'Trong trang Cài đặt dịch vụ, tại mục Atlassian Jira bấm <strong>Tạo Jira Workspace</strong> (nếu chưa có), sau đó bấm <strong>Kết nối Jira</strong> và nhấn <strong>Accept</strong> trên màn hình Atlassian để cấp quyền.',
-            callout: 'ATI tự động đồng bộ danh sách Site (.atlassian.net) và các Project bạn có quyền truy cập.'
+            callout: 'Planora tự động đồng bộ danh sách Site (.atlassian.net) và các Project bạn có quyền truy cập.'
           },
           {
             num: 2,
@@ -308,7 +308,7 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
           {
             num: 3,
             title: 'Lên lịch Bản tin Tiến độ & Blocker Jira (Read-Only Standup Digest)',
-            desc: 'Yêu cầu ATI tổng hợp các issue Blocker/High Priority và tiến độ Sprint định kỳ mỗi sáng để gửi thẳng vào kênh Slack hoặc nhóm Telegram của đội.',
+            desc: 'Yêu cầu Planora tổng hợp các issue Blocker/High Priority và tiến độ Sprint định kỳ mỗi sáng để gửi thẳng vào kênh Slack hoặc nhóm Telegram của đội.',
             callout: 'Bản tin tự động chỉ thực hiện truy vấn chỉ đọc (read-only) và kiểm tra quyền truy cập thực tế ở mỗi lượt chạy.'
           }
         ]

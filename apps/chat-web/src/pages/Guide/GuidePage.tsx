@@ -72,7 +72,7 @@ function ServiceGuideDetail({ serviceId, navigate, guides = SERVICE_GUIDES }: { 
         </div>
       </div>
       <div className="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2]">
-        <div className="text-[11px] text-[#6B7280] font-medium">Nơi ATI được phép dùng:</div>
+        <div className="text-[11px] text-[#6B7280] font-medium">Nơi Planora được phép dùng:</div>
         <div className="font-semibold text-xs text-[#111827] mt-1 flex items-center gap-1">
           <span className="bg-white px-2 py-0.5 rounded border border-[#E7E7E2] text-neutral-800">{s.scopeLabel}</span>
           <span className="text-[11px] text-[#6B7280] font-normal truncate">{`(${s.sampleScope})`}</span>
@@ -176,7 +176,7 @@ function PromptCard({ p, copied, onCopy, navigate }: { p: typeof SAMPLE_PROMPTS[
         </div>
       </div>
       <div className="v3-space-y-1 pt-1 border-t border-[#E7E7E2]">
-        <div className="text-[11px] text-[#6B7280] font-semibold uppercase tracking-wider">ATI sẽ làm lần lượt sau khi bạn duyệt:</div>
+        <div className="text-[11px] text-[#6B7280] font-semibold uppercase tracking-wider">Planora sẽ làm lần lượt sau khi bạn duyệt:</div>
         <ul className="text-xs text-neutral-600 v3-space-y-1 list-disc list-inside">
           {p.workflow.map(w => <li key={w} className="truncate">{w}</li>)}
         </ul>
@@ -233,7 +233,7 @@ function CapabilityCard({ c, navigate }: { c: typeof CAPABILITIES_DATA[number]; 
       <div className="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-200/60 v3-space-y-2">
         <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
           <svg className="w-4 h-4 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-          <span>Việc ATI LÀM ĐƯỢC:</span>
+          <span>Việc Planora LÀM ĐƯỢC:</span>
         </div>
         <ul className="text-xs text-emerald-950 v3-space-y-1.5">
           {c.canDo.map(item => (
@@ -247,7 +247,7 @@ function CapabilityCard({ c, navigate }: { c: typeof CAPABILITIES_DATA[number]; 
       <div className="p-3.5 rounded-xl bg-neutral-50 border border-neutral-200 v3-space-y-2">
         <div className="flex items-center gap-1.5 text-xs font-bold text-neutral-700">
           <svg className="w-4 h-4 text-neutral-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-          <span>Việc ATI CHƯA LÀM ĐƯỢC:</span>
+          <span>Việc Planora CHƯA LÀM ĐƯỢC:</span>
         </div>
         <ul className="text-xs text-neutral-600 v3-space-y-1.5">
           {c.cannotDo.map(item => (
@@ -264,7 +264,7 @@ function CapabilityCard({ c, navigate }: { c: typeof CAPABILITIES_DATA[number]; 
 
 export const meta: PageMeta = {
   id: "guide",
-  title: "Cẩm nang kết nối & Mẫu câu lệnh — ATI",
+  title: "Cẩm nang kết nối & Mẫu câu lệnh — Planora",
   htmlClass: "h-full",
   bodyClass: "min-h-full flex flex-col antialiased selection:bg-[#FF5701]/10 selection:text-[#FF5701]",
   css,
@@ -328,7 +328,7 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
         return;
       }
       navigator.clipboard.writeText(p.prompt).then(() => {
-        showToast('Đã sao chép câu lệnh vào bộ nhớ tạm! Dán vào ô nhập của ATI để bắt đầu.');
+        showToast('Đã sao chép câu lệnh vào bộ nhớ tạm! Dán vào ô nhập của Planora để bắt đầu.');
         setCopied(state => ({ ...state, [promptId]: true }));
         later(2000, () => setCopied(state => ({ ...state, [promptId]: false })));
       }).catch(() => showToast('Không thể sao chép tự động. Bạn hãy bôi đen câu lệnh để chép tay nhé.'));
@@ -350,10 +350,10 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
             <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
               <a href="/" onClick={appLink(navigate, '/')} className="flex items-center gap-2.5 group flex-shrink-0" title="Về không gian làm việc">
                 <div className="w-8 h-8 rounded-lg bg-[#FF5701] flex items-center justify-center text-white font-display font-bold text-lg shadow-sm group-hover:scale-105 transition-transform">
-                  A
+                  P
                 </div>
                 <span className="font-display font-bold text-lg tracking-tight text-[#111827]">
-                  ATI
+                  Planora
                 </span>
               </a>
               <div className="h-4 w-px bg-[#E7E7E2] flex-shrink-0" />
@@ -413,7 +413,7 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
               </div>
               {' '}
               <h1 className="text-2xl sm:text-3xl md:text-4xl font-display font-bold text-[#111827] tracking-tight">
-                Cẩm nang kết nối &amp; Mẫu câu lệnh ATI
+                Cẩm nang kết nối &amp; Mẫu câu lệnh Planora
               </h1>
               <p className="text-sm sm:text-base text-[#4B5563] leading-relaxed">
                 Dành cho quản lý dự án, vận hành và người dùng phi kỹ thuật. Kết nối nhanh bằng OAuth 2.0 1-Click, trực quan hoá luồng dữ liệu đa dịch vụ kiểu Make.com và sử dụng ngay thư viện mẫu câu lệnh tiếng Việt hiệu quả cao.
@@ -449,15 +449,15 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
             </div>
           </div>
 
-          {/* Bắt đầu sử dụng ATI + Make.com Orbital Pipeline Showcase */}
+          {/* Bắt đầu sử dụng Planora + Make.com Orbital Pipeline Showcase */}
           <div className="p-4 sm:p-5 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] v3-space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <h2 className="text-base sm:text-lg font-bold text-[#111827]">
-                  Bắt đầu sử dụng ATI
+                  Bắt đầu sử dụng Planora
                 </h2>
                 <p className="text-xs sm:text-sm text-[#4B5563]">
-                  Mọi yêu cầu phức tạp đều được ATI lập thành sơ đồ Orbital Pipeline trực quan, tự động rẽ nhánh qua Router và chờ bạn duyệt trước khi chạy.
+                  Mọi yêu cầu phức tạp đều được Planora lập thành sơ đồ Orbital Pipeline trực quan, tự động rẽ nhánh qua Router và chờ bạn duyệt trước khi chạy.
                 </p>
               </div>
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 self-start sm:self-center">
@@ -612,7 +612,7 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
               </div>
             ) : prompts.map(p => <PromptCard key={p.id} p={p} copied={!!copied[p.id]} onCopy={actions.copyPromptText} navigate={navigate} />)}
           </div>
-          {/* 4 Nguyên tắc vàng viết câu lệnh cho ATI */}
+          {/* 4 Nguyên tắc vàng viết câu lệnh cho Planora */}
           <div className="bg-gradient-to-r from-amber-50/80 via-white to-amber-50/40 rounded-2xl border border-amber-200/80 p-6 shadow-sm v3-space-y-3">
             <div className="flex items-center gap-2 text-amber-900 font-semibold text-sm">
               <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -667,7 +667,7 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
                   <em>
                     tab Tasks
                   </em>
-                  {" để ATI tìm đúng chỗ."}
+                  {" để Planora tìm đúng chỗ."}
                 </p>
               </div>
               <div className="p-3 bg-white/80 rounded-xl border border-amber-200/60 v3-space-y-1">
@@ -687,7 +687,7 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
                   <em>
                     "và báo kênh..."
                   </em>
-                  {" để ATI tự động móc nối các liên kết."}
+                  {" để Planora tự động móc nối các liên kết."}
                 </p>
               </div>
               <div className="p-3 bg-white/80 rounded-xl border border-amber-200/60 v3-space-y-1">
@@ -695,7 +695,7 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
                   4. Luôn an tâm khi bấm duyệt
                 </div>
                 <p className="text-neutral-600">
-                  ATI luôn cho bạn xem trước nguyên văn nội dung sẽ gửi đi. Không có gì bị ghi khi bạn chưa bấm Duyệt.
+                  Planora luôn cho bạn xem trước nguyên văn nội dung sẽ gửi đi. Không có gì bị ghi khi bạn chưa bấm Duyệt.
                 </p>
               </div>
             </div>
@@ -709,10 +709,10 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
           <div className="bg-white rounded-2xl border border-[#E7E7E2] p-5 shadow-sm flex items-start sm:items-center justify-between gap-4">
             <div className="v3-space-y-1">
               <h2 className="text-base sm:text-lg font-bold text-[#111827]">
-                Bảng minh bạch năng lực của ATI trên 8 công cụ
+                Bảng minh bạch năng lực của Planora trên 8 công cụ
               </h2>
               <p className="text-xs sm:text-sm text-[#4B5563]">
-                {"ATI tuân thủ nguyên tắc kiểm soát: "}
+                {"Planora tuân thủ nguyên tắc kiểm soát: "}
                 <span className="font-medium text-[#111827]">
                   không bao giờ tự ý xoá vĩnh viễn dữ liệu cũ
                 </span>
@@ -748,10 +748,10 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#6B7280]">
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 rounded bg-[#FF5701] text-white flex items-center justify-center font-display font-bold text-[10px]">
-              A
+              P
             </div>
             <span className="font-semibold text-[#111827]">
-              ATI
+              Planora
             </span>
             <span>
               — AI Workflow Automation Platform · 2026

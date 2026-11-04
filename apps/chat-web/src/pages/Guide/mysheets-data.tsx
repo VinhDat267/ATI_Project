@@ -9,11 +9,11 @@ export const MYSHEETS_GUIDE: ServiceGuide = {
   sampleScope: 'Bảng tính bạn chọn trong cửa sổ Google',
   timeEstimate: '2 phút',
   summary: 'Tự kết nối Google Sheets của bạn bằng Google, không cần nhập khoá.',
-  importantNotice: 'ATI chỉ đọc và thêm dòng mới vào các bảng tính bạn chọn trong cửa sổ Google Picker. Không xoá, không sửa ô có sẵn. Nội dung ô tính đi qua 9router để lập kế hoạch. Chỉ bạn dùng được kết nối này.',
+  importantNotice: 'Planora chỉ đọc và thêm dòng mới vào các bảng tính bạn chọn trong cửa sổ Google Picker. Không xoá, không sửa ô có sẵn. Nội dung ô tính đi qua 9router để lập kế hoạch. Chỉ bạn dùng được kết nối này.',
   steps: [
-    { num: 1, title: 'Mở Kết nối dịch vụ', desc: 'Đăng nhập ATI, mở nhóm Của riêng bạn và chọn Kết nối Google Sheets.' },
+    { num: 1, title: 'Mở Kết nối dịch vụ', desc: 'Đăng nhập Planora, mở nhóm Của riêng bạn và chọn Kết nối Google Sheets.' },
     { num: 2, title: 'Cấp quyền Google', desc: 'Chọn tài khoản Google của bạn và đồng ý cấp quyền truy cập tệp Drive (drive.file).' },
-    { num: 3, title: 'Chọn bảng tính trong cửa sổ Google', desc: 'Mở Google Picker, đánh dấu chọn các bảng tính bạn muốn ATI dùng và bấm Chọn.' },
+    { num: 3, title: 'Chọn bảng tính trong cửa sổ Google', desc: 'Mở Google Picker, đánh dấu chọn các bảng tính bạn muốn Planora dùng và bấm Chọn.' },
     { num: 4, title: 'Kiểm tra trước khi duyệt', desc: 'Trước khi thêm dòng, kiểm tra kỹ tên bảng tính, tab và dữ liệu từng cột tại màn duyệt.' },
   ],
 };

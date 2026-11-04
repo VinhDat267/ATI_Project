@@ -13,7 +13,7 @@ import { usePrototypePage } from '../prototype/usePrototypePage';
 
 const meta = {
   id: 'mycalendar-callback',
-  title: 'Chọn lịch Google Calendar — ATI',
+  title: 'Chọn lịch Google Calendar — Planora',
   htmlClass: '',
   bodyClass: 'min-h-screen bg-[#F8F8F6] text-[#111827] antialiased',
   css: '',
@@ -207,7 +207,7 @@ export function MyCalendarCallbackView({
     <main className="max-w-xl mx-auto px-4 py-16 text-[#111827] v3-space-y-6">
       <div className="v3-space-y-2">
         <h1 className="font-display text-2xl sm:text-3xl font-semibold">
-          Chọn lịch Google Calendar cho phép ATI sử dụng
+          Chọn lịch Google Calendar cho phép Planora sử dụng
         </h1>
         {email && (
           <p className="text-sm text-[#4B5563]">
@@ -237,7 +237,7 @@ export function MyCalendarCallbackView({
       {!loading && !error && (
         <>
           <div className="p-3.5 sm:p-4 rounded-xl bg-blue-50 border border-blue-200 text-xs sm:text-sm text-blue-900 leading-relaxed">
-            ATI chỉ đọc sự kiện, tìm khung giờ trống và tạo, cập nhật hoặc huỷ sự kiện trên những
+            Planora chỉ đọc sự kiện, tìm khung giờ trống và tạo, cập nhật hoặc huỷ sự kiện trên những
             lịch bạn chọn dưới đây sau khi bạn duyệt kế hoạch (không tự ý gửi lời mời cho người
             khác).
           </div>

@@ -509,7 +509,7 @@ export function TrelloConnection({
           >
             <div className="p-5 v3-space-y-4">
               <p className="text-sm">
-                ATI sẽ xoá token kết nối Trello của bạn. Kế hoạch cũ sẽ không thể thực thi
+                Planora sẽ xoá token kết nối Trello của bạn. Kế hoạch cũ sẽ không thể thực thi
                 bằng kết nối đã ngắt.
               </p>
               <div className="flex justify-end gap-2">

@@ -15,7 +15,7 @@ test('FE-04: saved dark bootstrap paints before React and public routes need no 
   expect(await page.locator('html').evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgb(11, 16, 32)');
   await page.screenshot({ path: info.outputPath('FE04-dark-before-react.png'), fullPage: true });
   await page.unroute('**/src/main.tsx'); await page.reload();
-  await expect(page.getByRole('heading', { name: 'Cẩm nang kết nối & Mẫu câu lệnh ATI', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Cẩm nang kết nối & Mẫu câu lệnh Planora', level: 1 })).toBeVisible();
   await page.goto('/privacy'); await expect(page.getByRole('heading', { name: 'Dữ liệu và quyền quyết định luôn thuộc về bạn và nhóm của bạn.', level: 1 })).toBeVisible();
   await expect(page.getByLabel('Mật khẩu', { exact: true })).toHaveCount(0);
 });

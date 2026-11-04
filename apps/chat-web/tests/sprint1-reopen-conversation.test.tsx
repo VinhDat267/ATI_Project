@@ -168,7 +168,7 @@ describe('PBI-03: luồng lùi về Moment 1 giữ yêu cầu đã lưu và ô n
     const saved = await within(main).findByRole('region', { name: 'Hội thoại đã lưu' });
     expect(within(saved).getByText(REQUEST)).toBeInTheDocument();
     expect(within(saved).queryByText(/đã hết hạn duyệt hoặc đã bị huỷ/)).toBeNull();
-    expect(within(saved).getByText('Yêu cầu này không có kế hoạch nào đang chờ duyệt. Gửi lại yêu cầu nếu bạn vẫn muốn ATI xử lý.')).toBeInTheDocument();
+    expect(within(saved).getByText('Yêu cầu này không có kế hoạch nào đang chờ duyệt. Gửi lại yêu cầu nếu bạn vẫn muốn Planora xử lý.')).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Mô tả công việc bạn muốn thực hiện' })).toHaveValue(REQUEST);
   });
 
@@ -210,7 +210,7 @@ describe('PBI-03: luồng lùi về Moment 1 giữ yêu cầu đã lưu và ô n
     const saved = await within(main).findByRole('region', { name: 'Hội thoại đã lưu' });
     expect(within(saved).getByText(scheduleRequest)).toBeInTheDocument();
     expect(within(saved).queryByText(/đã hết hạn duyệt hoặc đã bị huỷ/)).toBeNull();
-    expect(within(saved).getByText('Yêu cầu này không có kế hoạch nào đang chờ duyệt. Gửi lại yêu cầu nếu bạn vẫn muốn ATI xử lý.')).toBeInTheDocument();
+    expect(within(saved).getByText('Yêu cầu này không có kế hoạch nào đang chờ duyệt. Gửi lại yêu cầu nếu bạn vẫn muốn Planora xử lý.')).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Mô tả công việc bạn muốn thực hiện' })).toHaveValue(scheduleRequest);
   });
 });

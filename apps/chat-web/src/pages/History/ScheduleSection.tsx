@@ -78,7 +78,7 @@ function ScheduleEmptyState({ navigate }: { navigate: (path: string) => void }) 
       <h3 className="text-base font-semibold text-[#111827]">Chưa có lịch chạy nào</h3>
       <p className="text-sm text-[#4B5563] leading-relaxed [overflow-wrap:anywhere]">
         Lịch chạy được tạo trong Không gian làm việc: mô tả việc cần lặp lại kèm thời điểm, ví dụ “Mỗi sáng 08:00, gửi lịch họp hôm nay lên Slack”.
-        Khi ATI đưa ra đề xuất lịch chạy, lịch chỉ được lưu sau khi bạn bấm Xác nhận trên đề xuất đó.
+        Khi Planora đưa ra đề xuất lịch chạy, lịch chỉ được lưu sau khi bạn bấm Xác nhận trên đề xuất đó.
       </p>
       <a href="/" onClick={event => { if (event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); navigate('/'); }}
         className="inline-flex items-center gap-1.5 mt-1 px-4 py-2 rounded-xl text-sm font-semibold bg-[#111827] text-white hover:opacity-90 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5701] focus-visible:ring-offset-2">

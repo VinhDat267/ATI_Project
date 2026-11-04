@@ -84,7 +84,7 @@ function RequestCard({ req, isEditing, actions, title, saving }: { req: HistoryR
 
 export const meta: PageMeta = {
   id: "history",
-  title: "Nhật ký điều phối & Lịch sử yêu cầu — ATI",
+  title: "Nhật ký điều phối & Lịch sử yêu cầu — Planora",
   htmlClass: "",
   bodyClass: "min-h-screen flex flex-col bg-[#F8F8F6] text-[#111827]",
   css,
@@ -166,7 +166,7 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
             <strong className="text-[#111827] font-semibold">
               Minh bạch &amp; An toàn dữ liệu:
             </strong>
-            {" ATI chỉ ghi khi bạn duyệt kế hoạch. Trang này chỉ hiển thị hội thoại của chính bạn; mở hội thoại để xem kế hoạch và kết quả đã lưu."}
+            {" Planora chỉ ghi khi bạn duyệt kế hoạch. Trang này chỉ hiển thị hội thoại của chính bạn; mở hội thoại để xem kế hoạch và kết quả đã lưu."}
           </div>
         </div>
         <ScheduleSection user={user} navigate={navigate} />
@@ -271,7 +271,7 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#6B7280]">
           <div className="flex items-center gap-2">
             <span className="font-display font-bold text-[#111827]">
-              ATI
+              Planora
             </span>
             <span>
               · 2026

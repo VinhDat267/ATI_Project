@@ -634,7 +634,7 @@ describe('PrivacyPage with mycalendarEnabled', () => {
 
     expect(await screen.findByRole('region', { name: /Dữ liệu Google Calendar/i })).toBeTruthy();
     expect(
-      screen.getByText(/ATI chỉ tạo, cập nhật hoặc huỷ sự kiện trên lịch đã chọn sau khi bạn bấm phê duyệt kế hoạch/i)
+      screen.getByText(/Planora chỉ tạo, cập nhật hoặc huỷ sự kiện trên lịch đã chọn sau khi bạn bấm phê duyệt kế hoạch/i)
     ).toBeTruthy();
   });
 });

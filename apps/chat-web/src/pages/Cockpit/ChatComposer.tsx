@@ -15,11 +15,11 @@ export function ChatComposer({variant,draft,planning,input,onDraft,onSend,onKeyD
  if(variant==='response') return <footer ref={footer} id="global-bottom-bar" className="fixed bottom-0 left-0 right-0 z-30 bg-[#F8F8F6]/95 backdrop-blur-md border-t border-[#E7E7E2] px-4 py-3">
    <div className="max-w-3xl mx-auto">
      <form id="chat-input-form" aria-label="Nhập yêu cầu" aria-busy={planning} onSubmit={submit} className="relative flex items-center gap-2">
-       <label htmlFor="chat-prompt-input" className="sr-only">Nhắn cho ATI</label>
-       <textarea ref={input} rows={1} id="chat-prompt-input" value={draft} onChange={event=>onDraft(event.target.value)} onKeyDown={onKeyDown} aria-label="Mô tả công việc bạn muốn thực hiện" placeholder="Nhắn cho ATI…" autoComplete="off" className="w-full bg-white border border-[#E7E7E2] rounded-xl px-4 py-3 pr-24 text-xs sm:text-sm text-[#111827] placeholder-[#9CA3AF] shadow-sm focus:v3-outline-none focus:border-[#FF5701] focus:ring-2 focus:ring-[#FF5701]/20 transition-all resize-none" />
+       <label htmlFor="chat-prompt-input" className="sr-only">Nhắn cho Planora</label>
+       <textarea ref={input} rows={1} id="chat-prompt-input" value={draft} onChange={event=>onDraft(event.target.value)} onKeyDown={onKeyDown} aria-label="Mô tả công việc bạn muốn thực hiện" placeholder="Nhắn cho Planora…" autoComplete="off" className="w-full bg-white border border-[#E7E7E2] rounded-xl px-4 py-3 pr-24 text-xs sm:text-sm text-[#111827] placeholder-[#9CA3AF] shadow-sm focus:v3-outline-none focus:border-[#FF5701] focus:ring-2 focus:ring-[#FF5701]/20 transition-all resize-none" />
        <button type="submit" id="btn-submit-chat" aria-label="Gửi tin nhắn" disabled={!draft.trim() || planning} className="absolute right-2 px-3.5 py-1.5 bg-[#FF5701] hover:bg-[#E04D00] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center gap-1.5"><span>Gửi</span><svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg></button>
      </form>
-     <p className="text-[11px] text-[#6B7280] text-center mt-1.5">ATI chỉ đọc và ghi ở những nơi bạn cho phép. Chưa duyệt thì chưa làm. · <a href="/privacy" className="text-[#FF5701] hover:underline font-medium">Chính sách an toàn &amp; Dữ liệu</a></p>
+     <p className="text-[11px] text-[#6B7280] text-center mt-1.5">Planora chỉ đọc và ghi ở những nơi bạn cho phép. Chưa duyệt thì chưa làm. · <a href="/privacy" className="text-[#FF5701] hover:underline font-medium">Chính sách an toàn &amp; Dữ liệu</a></p>
    </div>
  </footer>;
  if(variant==='inline') return (<form aria-label="Nhập yêu cầu" onSubmit={submit} id="moment-4-inline-chat" className={`mb-3 p-2 bg-white rounded-xl border border-brand-border shadow-soft-card flex items-center gap-2 transition-all`}>

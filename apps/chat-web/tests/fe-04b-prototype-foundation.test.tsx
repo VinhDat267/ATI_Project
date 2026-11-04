@@ -38,7 +38,7 @@ it('FE-04b: a signed-out unknown path shows the prototype 404 inside its page sc
   await heading();
   expect(screen.getByText('/khong-co-trang?x=1')).toBeInTheDocument();
   expect(pageScope()).toEqual({ page: '404', body: PAGE_BODY, theme: 1, css: 1 });
-  expect(document.title).toBe('404 — Không tìm thấy trang · ATI');
+  expect(document.title).toBe('404 — Không tìm thấy trang · Planora');
 
   fireEvent.click(within(screen.getByRole('main')).getByRole('link', { name: 'Về trang chủ' }));
   expect(window.location.pathname).toBe('/');

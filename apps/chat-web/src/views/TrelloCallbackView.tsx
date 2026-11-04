@@ -6,7 +6,7 @@ import { trelloSessionOwner, trelloCallbackError, trelloConnectionNotice, conver
 import { tryLoopbackCallbackHop } from '../hooks/use-route';
 import { usePrototypePage } from '../prototype/usePrototypePage';
 
-const meta = { id: 'trello-callback', title: 'Kết nối Trello — ATI', htmlClass: '', bodyClass: 'min-h-screen bg-[#F8F8F6] text-[#111827] antialiased', css: '' };
+const meta = { id: 'trello-callback', title: 'Kết nối Trello — Planora', htmlClass: '', bodyClass: 'min-h-screen bg-[#F8F8F6] text-[#111827] antialiased', css: '' };
 
 export function TrelloCallbackView({ navigate, input }: { navigate: (path: string, replace?: boolean) => void; input?: TrelloCallbackInput }) {
   usePrototypePage(meta);

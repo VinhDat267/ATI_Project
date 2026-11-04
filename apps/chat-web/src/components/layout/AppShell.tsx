@@ -18,7 +18,7 @@ export function SandboxBanner({ runtimeMode }: { runtimeMode: 'sandbox' | 'live'
       <span className="sm:hidden">Thử nghiệm · không gọi dịch vụ thật</span><span className="hidden sm:inline">Chế độ thử nghiệm: kế hoạch mẫu, không gọi dịch vụ thật</span>
       <button type="button" aria-expanded={explain} aria-controls="sandbox-explanation" onClick={() => setExplain(!explain)} className="min-h-10 shrink-0 font-semibold underline">Là gì?</button>
     </div>
-    {explain && <p id="sandbox-explanation" className="border-t border-border px-4 sm:px-8 py-2">Máy chủ đang chạy thử: ATI dùng kế hoạch soạn sẵn và không ghi gì lên Trello, Slack hay các công cụ khác. Chế độ do máy chủ quyết định khi khởi động.</p>}
+    {explain && <p id="sandbox-explanation" className="border-t border-border px-4 sm:px-8 py-2">Máy chủ đang chạy thử: Planora dùng kế hoạch soạn sẵn và không ghi gì lên Trello, Slack hay các công cụ khác. Chế độ do máy chủ quyết định khi khởi động.</p>}
   </div>;
 }
 export function AppShell({ user, onLogout, navigate, children }: { user: User | null; onLogout: () => void; navigate: (path: string) => void; children: ReactNode }) {
@@ -31,7 +31,7 @@ export function AppShell({ user, onLogout, navigate, children }: { user: User | 
   return <div className="app-shell min-h-dvh bg-bg-page text-text flex flex-col">
     <header className="shrink-0 border-b border-border bg-surface">
       <nav aria-label="Điều hướng chính" className="flex h-16 items-center justify-between gap-4 px-4 sm:px-8">
-        <a href="/" onClick={event => { event.preventDefault(); navigate('/'); }} className="font-display text-2xl font-semibold tracking-tight">ATI<span className="text-primary-text">.</span></a>
+        <a href="/" onClick={event => { event.preventDefault(); navigate('/'); }} className="font-display text-2xl font-semibold tracking-tight">Planora<span className="text-primary-text">.</span></a>
         <div className="flex items-center gap-2 sm:gap-3">
           <button type="button" aria-label="Nhật ký điều phối" onClick={() => navigate('/history')} className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border hover:bg-surface-raised"><History aria-hidden="true" size={18} /></button>
           <ThemeToggle />

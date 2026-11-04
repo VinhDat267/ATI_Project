@@ -92,7 +92,7 @@ export function PersonalSlack() {
         setNotice(
           result.revoked
             ? 'Đã ngắt kết nối và thu hồi quyền Slack.'
-            : 'Đã ngắt trong ATI. Chưa xác nhận thu hồi ở Slack; hãy gỡ quyền ứng dụng trong Slack.'
+            : 'Đã ngắt trong Planora. Chưa xác nhận thu hồi ở Slack; hãy gỡ quyền ứng dụng trong Slack.'
         );
         setDisconnectTarget(null);
       }
@@ -276,10 +276,10 @@ export function PersonalSlack() {
           >
             <div className="p-5 v3-space-y-4">
               <p className="text-sm text-[#111827] dark:text-white">
-                Bạn có chắc chắn muốn ngắt kết nối workspace <strong>{disconnectTarget.workspaceName}</strong> ({disconnectTarget.workspaceId}) khỏi tài khoản ATI?
+                Bạn có chắc chắn muốn ngắt kết nối workspace <strong>{disconnectTarget.workspaceName}</strong> ({disconnectTarget.workspaceId}) khỏi tài khoản Planora?
               </p>
               <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
-                Sau khi ngắt, ATI sẽ không thể tương tác với workspace này cho tới khi bạn kết nối lại.
+                Sau khi ngắt, Planora sẽ không thể tương tác với workspace này cho tới khi bạn kết nối lại.
               </p>
               <div className="flex justify-end gap-3 pt-3 border-t border-[#E7E7E2] dark:border-[#333333]">
                 <button

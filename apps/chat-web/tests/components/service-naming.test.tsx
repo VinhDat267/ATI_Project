@@ -20,10 +20,10 @@ it('labels the allowlist from the API scopeLabel, with a neutral fallback instea
   vi.spyOn(apiClient, 'getServices').mockResolvedValue({ services: [demo, unlabelled], canConfigure: true });
   render(<SettingsPage {...settingsProps} />);
   fireEvent.click(await screen.findByRole('button', { name: /Demo Hub —/ }));
-  expect(screen.getByText('ATI chỉ đọc và ghi ở những không gian Demo trong danh sách này.')).toBeInTheDocument();
+  expect(screen.getByText('Planora chỉ đọc và ghi ở những không gian Demo trong danh sách này.')).toBeInTheDocument();
   fireEvent.keyDown(window, { key: 'Escape' });
   fireEvent.click(screen.getByRole('button', { name: /Boardlike —/ }));
-  expect(screen.getByText('ATI chỉ đọc và ghi ở những tài nguyên trong danh sách này.')).toBeInTheDocument();
+  expect(screen.getByText('Planora chỉ đọc và ghi ở những tài nguyên trong danh sách này.')).toBeInTheDocument();
 });
 
 it('names the service to check by its API display name', () => {

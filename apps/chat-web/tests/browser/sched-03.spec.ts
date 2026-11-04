@@ -49,7 +49,7 @@ for (const width of [1440, 375]) for (const theme of ['light', 'dark'] as const)
       await page.setViewportSize({ width, height: 900 }); await login(page, db);
       await page.evaluate(value => { localStorage.setItem('ati-theme', value); document.documentElement.classList.toggle('dark', value === 'dark'); }, theme);
       await send(page, 'Mỗi sáng 8 giờ, gửi lịch họp hôm nay lên Slack #ati-test');
-      await expect(page.getByText('Tới giờ, ATI lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.')).toBeVisible();
+      await expect(page.getByText('Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.')).toBeVisible();
       await shot(page, 'proposal-create', info);
       await page.getByRole('button', { name: 'Sửa', exact: true }).click(); await expect(requestBox(page)).toBeFocused();
       await page.getByRole('button', { name: 'Xác nhận', exact: true }).click(); await expect(page.getByText(/^Đang bật/)).toBeVisible();
