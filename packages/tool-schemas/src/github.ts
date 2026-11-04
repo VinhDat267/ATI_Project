@@ -149,6 +149,7 @@ export const GITHUB_OAUTH_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'github.list_pull_requests', service: 'github', discovers: 'issue', sideEffect: 'read', riskLevel: 'low',
+    observedFields: ['id', 'number', 'title', 'url', 'repo', 'state', 'author', 'draft'],
     description: 'List and filter pull requests (PRs) by state (open, closed, all) or keyword across allowed GitHub repositories or within one allowed repository.',
     inputSchema: {
       type: 'object',
