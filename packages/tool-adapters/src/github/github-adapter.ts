@@ -383,6 +383,62 @@ export class GitHubAdapter extends BaseAdapter {
     return collected.slice(0, max);
   }
 
+  async listPullRequests(
+    args: { repo?: string; state?: 'open' | 'closed' | 'all'; query?: string; limit?: number },
+    options?: { signal?: AbortSignal; repo?: string },
+  ) {
+    const state = args.state ?? 'open';
+    if (state !== 'open' && state !== 'closed' && state !== 'all') {
+      validation('GitHub pull request state must be open, closed, or all');
+    }
+    const max = limit(args.limit);
+    const queryLower = typeof args.query === 'string' ? args.query.trim().toLowerCase() : '';
+    const targetRepos =
+      args.repo !== undefined ? [this.checkedRepo(args.repo, options?.repo)] : this.allowedRepositories();
+
+    const collected: Array<{
+      id: string;
+      number: number;
+      title: string;
+      url: string;
+      repo: string;
+      state: string;
+      author?: string;
+      draft?: boolean;
+    }> = [];
+
+    for (const repo of targetRepos) {
+      const remaining = max - collected.length;
+      if (remaining <= 0) break;
+      const params = new URLSearchParams({ state, per_page: String(Math.max(remaining, 10)) });
+      const items = await this.request<any[]>(`/repos/${repo}/pulls?${params}`, options?.signal);
+      if (!Array.isArray(items)) {
+        throw new StepError({
+          message: 'GitHub returned an invalid pull requests response',
+          category: 'SERVER_ERROR',
+          retryable: false,
+        });
+      }
+      for (const item of items) {
+        const normalized = githubIssue(item, repo, false, true);
+        const prState = typeof item.state === 'string' ? item.state : state === 'all' ? 'open' : state;
+        const author = typeof item.user?.login === 'string' ? item.user.login : undefined;
+        if (queryLower) {
+          const hay = `${normalized.title} ${item.body ?? ''} ${author ?? ''}`.toLowerCase();
+          if (!hay.includes(queryLower)) continue;
+        }
+        collected.push({
+          ...normalized,
+          state: prState,
+          ...(author ? { author } : {}),
+          ...(typeof item.draft === 'boolean' ? { draft: item.draft } : {}),
+        });
+        if (collected.length >= max) break;
+      }
+    }
+    return collected.slice(0, max);
+  }
+
   async addLabel(args: { repo: string; issueNumber: number; label: string }, options?: { signal?: AbortSignal; repo?: string }) {
     const repo = this.checkedRepo(args.repo, options?.repo);
     const number = issueNumber(args.issueNumber);
@@ -403,6 +459,7 @@ export class GitHubAdapter extends BaseAdapter {
       case 'github.search_repos': return this.searchRepos(args as any, context);
       case 'github.search_issues': return this.searchIssues(args as any, context);
       case 'github.list_issues': return this.listIssues(args as any, context);
+      case 'github.list_pull_requests': return this.listPullRequests(args as any, context);
       case 'github.get_issue': return this.getIssue(args as any, context);
       case 'github.get_pull_request': return this.getPullRequest(args as any, context);
       case 'github.create_issue': return this.createIssue(args as any, context);

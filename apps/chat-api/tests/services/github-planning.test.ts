@@ -66,7 +66,7 @@ describe('Task 6: GitHub personal OAuth planning, catalog, refusal, and executio
       expect(catalog.some((t) => t.service === 'github')).toBe(false);
     });
 
-    it('includes all 9 github.* tools (GITHUB_TOOLS + GITHUB_OAUTH_TOOLS) when caller is connected and has access to at least one team repo', async () => {
+    it('includes all 10 github.* tools (GITHUB_TOOLS + GITHUB_OAUTH_TOOLS) when caller is connected and has access to at least one team repo', async () => {
       const repo = mockCredRepo({ id: 'cred-1', status: 'active', config: 'dummy' });
       const catalog = await getToolCatalogFor(repo, encryptionKey, {
         userId,
@@ -79,7 +79,7 @@ describe('Task 6: GitHub personal OAuth planning, catalog, refusal, and executio
         }),
       });
       const githubTools = catalog.filter((t) => t.service === 'github');
-      expect(githubTools.length).toBe(9);
+      expect(githubTools.length).toBe(10);
       expect(githubTools.map((t) => t.name).sort()).toEqual(
         [...GITHUB_TOOLS, ...GITHUB_OAUTH_TOOLS].map((t) => t.name).sort(),
       );
@@ -144,7 +144,7 @@ describe('Task 6: GitHub personal OAuth planning, catalog, refusal, and executio
         },
       });
       const githubTools = catalog.filter((t) => t.service === 'github');
-      expect(githubTools.length).toBe(9);
+      expect(githubTools.length).toBe(10);
     });
 
     it('runtimeToolCatalog in sandbox mode omits github.* when caller is ineligible and includes them when eligible', async () => {
@@ -167,7 +167,7 @@ describe('Task 6: GitHub personal OAuth planning, catalog, refusal, and executio
           memberRepos: [{ repoId: '101', fullName: 'nhom/ati', name: 'ati' }],
         }),
       });
-      expect(catalogEligible.filter((t) => t.service === 'github').length).toBe(9);
+      expect(catalogEligible.filter((t) => t.service === 'github').length).toBe(10);
     });
 
     it('mayFallbackToShared returns false when user message routes to github', () => {

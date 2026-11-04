@@ -205,6 +205,44 @@ export class SlackAdapter extends BaseAdapter {
     };
   }
 
+  /**
+   * Read recent messages from an allowed Slack channel via conversations.history.
+   */
+  async readMessages(
+    args: { channel: string; query?: string; limit?: number },
+    options?: { signal?: AbortSignal }
+  ): Promise<{ channel: string; messages: Array<{ ts: string; user: string; text: string }> }> {
+    if (typeof args.channel !== 'string' || !args.channel.trim()) {
+      throw new StepError({
+        message: 'Slack channel must be a non-empty string',
+        category: 'VALIDATION',
+        retryable: false,
+      });
+    }
+    this.assertAllowedScope('channels', args.channel);
+    const limit = Math.min(Math.max(Number.isInteger(args.limit) ? Number(args.limit) : 15, 1), 25);
+    const queryLower = typeof args.query === 'string' ? args.query.trim().toLowerCase() : '';
+
+    const data = await this.request<any>(
+      `/conversations.history?channel=${encodeURIComponent(args.channel)}&limit=${limit}`,
+      { signal: options?.signal }
+    );
+
+    const rawMessages: any[] = Array.isArray(data?.messages) ? data.messages : [];
+    const filtered = queryLower
+      ? rawMessages.filter((m) => String(m?.text ?? '').toLowerCase().includes(queryLower))
+      : rawMessages;
+
+    return {
+      channel: args.channel,
+      messages: filtered.slice(0, limit).map((m) => ({
+        ts: String(m?.ts ?? ''),
+        user: String(m?.user ?? m?.username ?? 'unknown'),
+        text: String(m?.text ?? ''),
+      })),
+    };
+  }
+
   override async execute(
     toolName: string,
     args: Record<string, any>,
@@ -216,6 +254,8 @@ export class SlackAdapter extends BaseAdapter {
         return this.searchChannels(args as any, opts);
       case 'slack.send_message':
         return this.sendMessage(args as any, opts);
+      case 'slack.read_messages':
+        return this.readMessages(args as any, opts);
       default:
         throw new StepError({
           message: `Tool '${toolName}' is not supported by SlackAdapter`,

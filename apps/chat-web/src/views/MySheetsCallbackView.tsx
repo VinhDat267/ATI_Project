@@ -248,6 +248,32 @@ export function MySheetsCallbackView({
     navigate(target, true);
   };
 
+  const handleQuickCreate = async () => {
+    if (saving || openingPicker || !mounted.current || invalidated.current || !owns.current()) return;
+    setSaving(true);
+    setSaveError('');
+    try {
+      const result = await apiClient.quickCreateMySheetsSpreadsheet();
+      if (!mounted.current || invalidated.current || !owns.current()) return;
+      setSpreadsheets(result.selectedSpreadsheets ?? []);
+      if (result.email || email) {
+        mysheetsConnectionNotice.set(result.email || email);
+      }
+      const target = returnToRef.current ?? '/settings?mysheets=connected#mysheets';
+      navigate(target, true);
+    } catch (err: any) {
+      if (mounted.current && !invalidated.current && owns.current()) {
+        setSaveError(
+          err?.data?.error ||
+            err?.message ||
+            'Không thể tạo nhanh bảng tính mặc định. Vui lòng thử lại.'
+        );
+      }
+    } finally {
+      if (mounted.current) setSaving(false);
+    }
+  };
+
   const handleLater = () => {
     navigate('/settings#mysheets', true);
   };
@@ -293,21 +319,32 @@ export function MySheetsCallbackView({
           </div>
 
           <div className="v3-space-y-3">
-            <button
-              type="button"
-              disabled={openingPicker || saving || spreadsheets.length >= 10}
-              onClick={handleOpenPicker}
-              className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-white text-[#111827] border border-[#E7E7E2] hover:bg-neutral-50 disabled:opacity-50 transition-colors shadow-sm inline-flex items-center gap-2"
-            >
-              <svg className="w-4 h-4 text-[#188038]" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z" />
-              </svg>
-              <span>
-                {spreadsheets.length === 0
-                  ? 'Chọn bảng tính trong Google Drive'
-                  : 'Thêm bảng tính'}
-              </span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                type="button"
+                id="mysheets-quick-create"
+                disabled={openingPicker || saving || spreadsheets.length >= 10}
+                onClick={() => void handleQuickCreate()}
+                className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-[#188038] text-white hover:bg-[#136c2e] disabled:opacity-50 transition-colors shadow-sm inline-flex items-center gap-2"
+              >
+                <span>⚡ Tạo nhanh Bảng tính ATI &amp; kích hoạt Google Docs / Drive (1-Click)</span>
+              </button>
+              <button
+                type="button"
+                disabled={openingPicker || saving || spreadsheets.length >= 10}
+                onClick={handleOpenPicker}
+                className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-white text-[#111827] border border-[#E7E7E2] hover:bg-neutral-50 disabled:opacity-50 transition-colors shadow-sm inline-flex items-center gap-2"
+              >
+                <svg className="w-4 h-4 text-[#188038]" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z" />
+                </svg>
+                <span>
+                  {spreadsheets.length === 0
+                    ? 'Chọn bảng tính trong Google Drive'
+                    : 'Thêm bảng tính'}
+                </span>
+              </button>
+            </div>
 
             {email && (
               <p className="text-xs text-[#6B7280]">

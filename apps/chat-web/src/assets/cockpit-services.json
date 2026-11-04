@@ -64,7 +64,13 @@
       "id": "playbook-google-workspace-suite",
       "title": "Hệ sinh thái Google Workspace (Meet + Drive + Docs + Sheets + Gmail)",
       "services": ["calendar", "sheets", "gmail"],
-      "prompt": "Tạo cuộc họp Google Meet Khởi động Dự án Q4 vào 09:00 ngày mai mời khách tham dự, tạo thư mục Dự án Q4 trên Google Drive, soạn tài liệu Biên bản & Đề xuất Q4 trên Google Docs lưu vào thư mục đó, ghi nhật ký vào Google Sheets và gửi email thông báo kèm link Google Meet + Google Docs qua Gmail."
+      "prompt": "Tạo cuộc họp Google Meet Khởi động {{tên_dự_án}} vào 09:00 ngày mai mời {{email_khách}} tham dự, tạo thư mục {{tên_dự_án}} trên Google Drive, soạn tài liệu Biên bản & Đề xuất {{tên_dự_án}} trên Google Docs lưu vào thư mục đó, ghi nhật ký vào Google Sheets và gửi email thông báo kèm link Google Meet + Google Docs tới {{email_khách}} qua Gmail."
+    },
+    {
+      "id": "playbook-slack-github-pr-triage",
+      "title": "Đọc tin nhắn Slack & Rà soát Pull Request GitHub",
+      "services": ["slack", "github"],
+      "prompt": "Đọc các tin nhắn gần đây trong kênh Slack {{kênh_slack}}, kiểm tra danh sách Pull Request đang mở trên kho GitHub {{kho_github}} và gửi bản tổng hợp tiến độ review vào kênh Slack {{kênh_slack}}."
     }
   ],
   "services": {
@@ -428,6 +434,14 @@
       "titlePrefix": "PR #",
       "previewStyle": "issue"
     },
+    "github.list_pull_requests": {
+      "action": "Liệt kê Pull Request",
+      "done": "Đã liệt kê PR",
+      "receipt": "Đã liệt kê Pull Request",
+      "kind": "Danh sách PR",
+      "link": "Mở trên GitHub",
+      "previewStyle": "issue"
+    },
     "github.search_issues": {
       "action": "Tìm issue & PR",
       "done": "Đã tìm",
@@ -652,6 +666,13 @@
       "kind": "Tin nhắn",
       "link": "Xem tin",
       "previewStyle": "message"
+    },
+    "slack.read_messages": {
+      "action": "Đọc tin nhắn kênh",
+      "done": "Đã đọc tin nhắn",
+      "receipt": "Đã đọc tin nhắn Slack",
+      "kind": "Tin nhắn kênh",
+      "link": "Xem kênh Slack"
     },
     "telegram.send_message": {
       "action": "Gửi tin",

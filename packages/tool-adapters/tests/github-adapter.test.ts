@@ -389,4 +389,58 @@ describe('GitHub adapter', () => {
       { id: '12', number: 7, title: 'Fix login', url: issue.html_url, repo },
     ]);
   });
+
+  it('lists pull requests from allowed repository with state and keyword filtering', async () => {
+    const fetchFn = vi.fn(async (url: string) => {
+      if (url.includes('/repos/team/project/pulls')) {
+        return json([
+          {
+            id: 501,
+            number: 88,
+            title: 'Feat: Google Meet & Drive integration',
+            body: 'Adds Google Workspace tools',
+            state: 'open',
+            draft: false,
+            html_url: 'https://github.com/team/project/pull/88',
+            user: { login: 'vinhdat' },
+          },
+          {
+            id: 502,
+            number: 89,
+            title: 'Chore: bump deps',
+            body: 'Routine update',
+            state: 'open',
+            draft: true,
+            html_url: 'https://github.com/team/project/pull/89',
+            user: { login: 'dependabot' },
+          },
+        ]);
+      }
+      return json({ message: 'Not Found' }, 404);
+    });
+    const adapter = new GitHubAdapter({
+      credentials: { token: 'test' },
+      allowedScope,
+      fetchFn: fetchFn as typeof fetch,
+    });
+
+    const prs = await adapter.execute('github.list_pull_requests', {
+      repo,
+      state: 'open',
+      query: 'Google Meet',
+      limit: 5,
+    });
+    expect(prs).toEqual([
+      {
+        id: '501',
+        number: 88,
+        title: 'Feat: Google Meet & Drive integration',
+        url: 'https://github.com/team/project/pull/88',
+        repo,
+        state: 'open',
+        author: 'vinhdat',
+        draft: false,
+      },
+    ]);
+  });
 });

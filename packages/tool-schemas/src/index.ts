@@ -1,7 +1,7 @@
 export * from './myslack-assistant.js';
 import type { ToolDefinition } from './types.js';
 import { TRELLO_TOOLS, TRELLO_OAUTH_TOOLS } from './trello.js';
-import { SLACK_TOOLS } from './slack.js';
+import { SLACK_TOOLS, SLACK_EXTENDED_TOOLS } from './slack.js';
 import { GITHUB_TOOLS, GITHUB_OAUTH_TOOLS } from './github.js';
 import { SHEETS_TOOLS, SHEETS_EXTENDED_TOOLS } from './sheets.js';
 import { CALENDAR_TOOLS } from './calendar.js';
@@ -72,6 +72,10 @@ const MYJIRA_TOOL_MAP: Record<string, ToolDefinition> = Object.fromEntries(
   MYJIRA_TOOLS.map((tool) => [tool.name, tool])
 );
 
+const SLACK_EXTENDED_TOOL_MAP: Record<string, ToolDefinition> = Object.fromEntries(
+  SLACK_EXTENDED_TOOLS.map((tool) => [tool.name, tool])
+);
+
 export function getToolDefinition(name: string): ToolDefinition | undefined {
   return (
     TOOL_MAP[name] ??
@@ -80,6 +84,7 @@ export function getToolDefinition(name: string): ToolDefinition | undefined {
     TELEGRAM_OAUTH_TOOL_MAP[name] ??
     SHEETS_EXTENDED_TOOL_MAP[name] ??
     NOTION_OAUTH_TOOL_MAP[name] ??
-    MYJIRA_TOOL_MAP[name]
+    MYJIRA_TOOL_MAP[name] ??
+    SLACK_EXTENDED_TOOL_MAP[name]
   );
 }

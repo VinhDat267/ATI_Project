@@ -58,12 +58,15 @@ describe('packages/tool-schemas (Task 2)', () => {
       'github.update_issue',
       'github.add_comment',
       'github.list_issues',
+      'github.list_pull_requests',
     ]);
     expect(getToolDefinition('github.update_issue')?.inputSchema.required).toEqual(['repo', 'issueNumber']);
     expect(getToolDefinition('github.update_issue')?.inputSchema.properties.state.enum).toEqual(['open', 'closed']);
     expect(getToolDefinition('github.add_comment')?.inputSchema.required).toEqual(['repo', 'issueNumber', 'body']);
     expect(getToolDefinition('github.get_pull_request')?.sideEffect).toBe('read');
     expect(getToolDefinition('github.list_issues')?.sideEffect).toBe('read');
+    expect(getToolDefinition('github.list_pull_requests')?.sideEffect).toBe('read');
+    expect(getToolDefinition('slack.read_messages')?.sideEffect).toBe('read');
 
     const repoPattern = github?.gatherRules?.[0]?.pattern;
     expect(repoPattern?.exec('Tạo issue trong repo nhom/ati')?.[1]).toBe('nhom/ati');

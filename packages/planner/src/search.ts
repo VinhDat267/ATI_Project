@@ -84,6 +84,10 @@ const KEPT_FIELDS = [
   'properties',
   'content',
   'lastEditedTime',
+  'repo',
+  'state',
+  'author',
+  'draft',
   ...PROVENANCE_FIELDS,
 ];
 

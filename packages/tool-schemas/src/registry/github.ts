@@ -5,6 +5,6 @@ export const GITHUB_SERVICE: ServiceDefinition = {
     scopes: ['metadata:read', 'issues:read', 'issues:write'], scopeKey: 'repos', scopeLabel: 'Repository',
     scopePattern: /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/,
     credentialFields: [],
-    intentKeywords: ['github', 'issue', 'issues', 'repository', 'repositories', 'repo', 'mã nguồn'],
+    intentKeywords: ['github', 'issue', 'issues', 'pull request', 'pull requests', 'repository', 'repositories', 'repo', 'mã nguồn'],
     gatherRules: [{ entityKey: 'repository', tool: 'github.search_repos', pattern: /\b(?:repository|repo)\s+["']?([\p{L}\p{N}_.-]+(?:\/[\p{L}\p{N}_.-]+)?)["']?/iu, nameField: 'fullName' }],
   };
