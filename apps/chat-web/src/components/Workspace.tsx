@@ -161,7 +161,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
     finally { newConversation.current = null; }
   };
 
-  const handleSendMessage = async (content: string, options?: { slackConnectionId: string;slackChannel?:string }) => {
+  const handleSendMessage = async (content: string, options?: { slackConnectionId?: string; slackChannel?: string; workflowContext?: { templateId?: string; resourceDefaults?: Record<string, Record<string, string>> } }) => {
     const tempId = `temp-${crypto.randomUUID()}`;
     const pendingConversation = newConversation.current;
     let currentConvId = route.kind === 'conversation' ? route.conversationId : null;
@@ -199,10 +199,11 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
     if (useChatStore.getState().conversationId === currentConvId) addOptimisticMessage({ id: tempId, content });
 
     try {
-      const result = options?.slackChannel ? await apiClient.sendSlackWriteMessage(currentConvId,content,tempId,options.slackConnectionId,options.slackChannel) : options?.slackConnectionId ? await apiClient.sendSlackReadMessage(currentConvId, content, tempId, options.slackConnectionId) : await apiClient.sendMessage(
+      const result = options?.slackChannel && options?.slackConnectionId ? await apiClient.sendSlackWriteMessage(currentConvId,content,tempId,options.slackConnectionId,options.slackChannel) : options?.slackConnectionId ? await apiClient.sendSlackReadMessage(currentConvId, content, tempId, options.slackConnectionId) : await apiClient.sendMessage(
         currentConvId,
         content,
-        tempId
+        tempId,
+        options?.workflowContext
       );
       const store = useChatStore.getState();
       store.confirmPlanningRequest(currentConvId, tempId, result?.messageId || tempId);

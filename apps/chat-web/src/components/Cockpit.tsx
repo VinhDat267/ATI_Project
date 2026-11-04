@@ -37,7 +37,7 @@ const errorMeta = { ...meta, id: 'errors', css: meta.css + errorCss };
 interface Props {
   user?: User | null; onLogout?: () => void; navigate?: (path: string) => void;
   services: ServiceInfo[]; servicesLoading: boolean; servicesError: string | null; onRefreshServices?: () => void;
-  onSendMessage: (text: string, options?: { slackConnectionId: string;slackChannel?:string }) => void; onNewConversation: () => void;
+  onSendMessage: (text: string, options?: { slackConnectionId?: string; slackChannel?: string; workflowContext?: { templateId?: string; resourceDefaults?: Record<string, Record<string, string>> } }) => void; onNewConversation: () => void;
   onSelectConversation: (id: string) => void; onSettings: () => void;
   onApprove: () => void; onCancel: () => void; recovery: RecoveryControls | null;
   networkError?: boolean;
@@ -185,11 +185,12 @@ export function Cockpit(props: Props) {
     window.addEventListener('chat:prefill', prefill); return () => window.removeEventListener('chat:prefill', prefill);
   }, []);
   useEffect(() => { setPreview(null); }, [state.conversationId, state.activePlan?.id]);
-  const send = (text: string) => {
+  const send = (text: string, workflowContext?: { templateId?: string; resourceDefaults?: Record<string, Record<string, string>> }) => {
     if (!text.trim() || state.isPlanning || slackSelection === '' || slackWriteSelection==='' || (slackWriteSelection!==null&&!/^[CG][A-Za-z0-9_-]{1,63}$/.test(slackChannel))) return;
     setEditingResponse(null);
     if(slackWriteSelection)props.onSendMessage(text,{slackConnectionId:slackWriteSelection,slackChannel});
     else if (slackSelection) props.onSendMessage(text.trim(), { slackConnectionId: slackSelection });
+    else if (workflowContext && (workflowContext.templateId || (workflowContext.resourceDefaults && Object.keys(workflowContext.resourceDefaults).length > 0))) props.onSendMessage(text.trim(), { workflowContext });
     else props.onSendMessage(text.trim());
     setDraft('');
     if (state.activeClarification) state.setClarification(null);

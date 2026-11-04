@@ -24,6 +24,11 @@ describe('1-Click Parameterized Playbooks & Extended Slack/GitHub Catalog', () =
     localStorage.clear();
     sessionStorage.clear();
     vi.restoreAllMocks();
+    authStorage.setStoredTokens({
+      accessToken: 'access-u1',
+      refreshToken: 'refresh-u1',
+      user: { id: 'u1', email: 'hanh@example.com', name: 'Hạnh', role: 'member' },
+    });
   });
 
   afterEach(() => {
@@ -457,5 +462,126 @@ describe('1-Click Parameterized Playbooks & Extended Slack/GitHub Catalog', () =
     fireEvent.submit(form);
     expect(onSend).toHaveBeenCalledWith(expect.stringContaining('Dự án Hạnh Q4'));
     expect(onSend).toHaveBeenCalledWith(expect.stringContaining('CHỈ GỬI HẠNH, KHÔNG GỬI KHÁCH'));
+  });
+
+  it('FLOW-02/04: closes save playbook modal on account switch, forwards workflowContext with resourceDefaults, and renders OFF-02 sharing notice & reportEvidence readAt', async () => {
+    const services: ServiceInfo[] = [
+      { id: 'github', name: 'GitHub', configured: true, connected: true, connectionStatus: 'healthy' },
+      { id: 'myslack', name: 'Slack', configured: true, connected: true, connectionStatus: 'healthy' },
+      { id: 'mycalendar', name: 'Google Calendar', configured: true, connected: true, connectionStatus: 'healthy' },
+      { id: 'mysheets', name: 'Google Sheets', configured: true, connected: true, connectionStatus: 'healthy' },
+      { id: 'gmail', name: 'Gmail', configured: true, connected: true, connectionStatus: 'healthy' },
+    ];
+    let currentDraft = 'Tổng hợp PR repo acme/web gửi kênh #dev';
+    const onDraft = vi.fn((val: string) => {
+      currentDraft = val;
+    });
+    const onSend = vi.fn();
+    const inputRef = createRef<HTMLTextAreaElement>();
+
+    render(
+      <RequestMoment
+        services={services}
+        loading={false}
+        error={null}
+        draft={currentDraft}
+        planning={false}
+        input={inputRef}
+        onDraft={onDraft}
+        onSend={onSend}
+        onKeyDown={() => {}}
+        onSettings={() => {}}
+        navigate={() => {}}
+        servicePrompt={(s) => `Dùng ${s.name}`}
+      />,
+    );
+
+    // Open save modal as u1
+    fireEvent.click(screen.getByTestId('btn-save-playbook'));
+    expect(screen.getByTestId('save-playbook-modal')).toBeDefined();
+
+    // Switch account to u2 while modal is open -> modal must close immediately
+    authStorage.setStoredTokens({
+      accessToken: 'access-u2',
+      refreshToken: 'refresh-u2',
+      user: { id: 'u2', email: 'minh@example.com', name: 'Minh', role: 'member' },
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId('save-playbook-modal')).toBeNull();
+    });
+
+    // Configure default resources as u2 and select DEV-02 core job
+    fireEvent.click(screen.getByTestId('btn-open-workflow-defaults'));
+    fireEvent.change(screen.getByLabelText('GitHub Repository mặc định'), {
+      target: { value: 'acme/platform' },
+    });
+    fireEvent.change(screen.getByLabelText('Kênh Slack mặc định'), {
+      target: { value: 'C01DEV' },
+    });
+    fireEvent.click(screen.getByTestId('btn-save-workflow-defaults'));
+    expect(screen.getByTestId('workflow-active-defaults')).toBeDefined();
+
+    const dev02Btn = screen.getByRole('button', { name: /Quy trình DEV-02/i });
+    fireEvent.click(dev02Btn);
+    fireEvent.change(screen.getByLabelText('Biến số tên_repo'), {
+      target: { value: 'acme/platform' },
+    });
+    fireEvent.change(screen.getByLabelText('Biến số kênh_slack'), {
+      target: { value: 'C01DEV' },
+    });
+    fireEvent.submit(screen.getByRole('form', { name: 'Nhập yêu cầu' }));
+
+    expect(onSend).toHaveBeenCalledWith(
+      expect.stringContaining('acme/platform'),
+      expect.objectContaining({
+        templateId: 'DEV-02',
+        resourceDefaults: {
+          github: { repo: 'acme/platform' },
+          slack: { channelId: 'C01DEV' },
+        },
+      }),
+    );
+
+    cleanup();
+
+    // Verify PlanMoment renders reportEvidence readAt and OFF-02 Google Docs sharing notice
+    const off02Plan: ActivePlan = {
+      id: 'plan-off-02',
+      summary: 'Họp Kickoff + Docs + Gmail',
+      steps: [
+        { id: 's1', tool: 'mycalendar.schedule_meet', description: 'Tạo Meet', args: { calendarId: 'primary', title: 'Kickoff', start: '2026-11-05T09:00:00Z', end: '2026-11-05T10:00:00Z' } },
+        { id: 's2', tool: 'mysheets.create_doc', description: 'Tạo Docs', args: { title: 'Biên bản', content: 'Nội dung' } },
+        { id: 's3', tool: 'gmail.send_message', description: 'Gửi Gmail', args: { to: ['khach@example.com'], subject: 'Biên bản', body: 'Link' } },
+      ],
+      reportEvidence: {
+        artifactId: 'art_1',
+        kind: 'github_prs',
+        stepId: 's3',
+        argument: 'body',
+        sourceTool: 'github.list_pull_requests',
+        sourceLabel: 'acme/platform',
+        readAt: '2026-11-04T12:00:00.000Z',
+        itemCount: 2,
+        coverage: 'complete',
+        contentHash: 'hash123',
+      },
+    };
+
+    render(
+      <PlanMoment
+        runtimeMode="live"
+        plan={off02Plan}
+        services={services}
+        destination={(step) => resourceDestination(step)}
+        onPreview={() => {}}
+        onApprove={() => {}}
+        onCancel={() => {}}
+        onEdit={() => {}}
+        inlineComposer={null}
+      />,
+    );
+
+    expect(screen.getByTestId('verified-report-evidence-badge').textContent).toContain('2026-11-04T12:00:00.000Z');
+    expect(screen.getByTestId('google-docs-sharing-notice')).toBeDefined();
   });
 });

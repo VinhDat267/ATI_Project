@@ -380,6 +380,14 @@ export function ReceiptMoment({request,terminalStatus,steps,planSteps,services,l
           </div>
           {/* NHÓM 7: Chuỗi 4 biên nhận dạng lưới 2x2 trên desktop (1->2 ở hàng trên, chuyển Z xuống 3, 3->4 ở hàng dưới), 1 cột trên mobile */}
           <div className="v3-space-y-3">
+            {canvasSteps.some(s => s.tool === 'mysheets.create_doc') && canvasSteps.some(s => s.tool === 'gmail.send_message' || s.tool === 'mycalendar.schedule_meet' || s.tool === 'mycalendar.create_event') && (
+              <div data-testid="google-docs-sharing-notice" className="flex items-start gap-2.5 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs leading-relaxed">
+                <span className="text-base shrink-0">🔒</span>
+                <div>
+                  <strong>Lưu ý quyền truy cập Google Docs (drive.file):</strong> Tài liệu vừa tạo thuộc phạm vi cá nhân của bạn và không tự động mở quyền xem cho người nhận email. Hãy mở liên kết Google Docs và nhấn <em>Chia sẻ (Share)</em> nếu cần cấp quyền đọc cho người nhận.
+                </div>
+              </div>
+            )}
             <WorkflowFlowCanvas steps={canvasSteps} stepStatuses={stepStatuses} resourceLabels={labels} selectedService={selectedService} onSelectService={setSelectedService} mode="receipt" />
             <div id="receipt-chain" className="flex flex-col gap-3">
               {rows.map((row,rowIndex)=>{const horizontal=row.length===2 ? refs.filter(edge=>edge.from===row[0].id && edge.to===row[1].id):[];

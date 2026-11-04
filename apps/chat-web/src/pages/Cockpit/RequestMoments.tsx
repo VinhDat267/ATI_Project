@@ -1,5 +1,5 @@
 // Source: AppStagePage.tsx moments 1–2. Content comes from the registered catalog and gatherState.
-import { useState, useEffect, type KeyboardEvent, type RefObject, type ReactNode } from 'react';
+import { useState, useEffect, useRef, type KeyboardEvent, type RefObject, type ReactNode } from 'react';
 import { getServiceDefinition } from '@wap/tool-schemas';
 import { toolDefinition } from '../../services/tool-definitions';
 import { ServiceLogo } from '../../components/ServiceLogo';
@@ -18,9 +18,14 @@ import {
 import { CORE_JOBS, evaluateJobReadiness } from '../../services/job-readiness';
 import {
   loadWorkflowDefaults,
+  saveWorkflowDefaults,
   clearWorkflowDefaults,
   type WorkflowResourceDefaults,
 } from '../../services/workflow-defaults-storage';
+export interface SendWorkflowContext {
+  templateId?: string;
+  resourceDefaults?: Record<string, Record<string, string>>;
+}
 interface Props {
   services: ServiceInfo[];
   loading: boolean;
@@ -33,7 +38,7 @@ interface Props {
   /** PBI-03: thẻ hội thoại đã lưu; khi có, tiêu đề mời tiếp tục thay vì bắt đầu mới. */
   resume?: ReactNode;
   onDraft: (value: string) => void;
-  onSend: (value: string) => void;
+  onSend: (value: string, workflowContext?: SendWorkflowContext) => void;
   onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
   onSettings: () => void;
   navigate: (path: string) => void;
@@ -99,9 +104,10 @@ export function RequestMoment({
   servicePrompt,
 }: Props) {
   const [workspace, setWorkspace] = useState(getActiveWorkspaceSummary());
-  const currentUser = authStorage.getStoredTokens().user;
+  const [currentUser, setCurrentUser] = useState(() => authStorage.getStoredTokens().user);
   const userId = currentUser?.id ?? 'anonymous';
   const workspaceKey = workspace?.id || 'personal';
+  const saveModalScopeRef = useRef<{ userId: string; workspaceKey: string } | null>(null);
 
   const [customPlaybooks, setCustomPlaybooks] = useState<CustomPlaybook[]>(() =>
     loadPlaybooks(userId, workspaceKey)
@@ -109,6 +115,10 @@ export function RequestMoment({
   const [activeDefaults, setActiveDefaults] = useState<WorkflowResourceDefaults | null>(() =>
     loadWorkflowDefaults(userId, workspaceKey)
   );
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [defaultsEditorOpen, setDefaultsEditorOpen] = useState(false);
+  const [defaultRepoInput, setDefaultRepoInput] = useState('');
+  const [defaultSlackInput, setDefaultSlackInput] = useState('');
   const [templateText, setTemplateText] = useState<string>(() => draft);
   const [composerTab, setComposerTab] = useState<'template' | 'preview'>('template');
   const [variableValues, setVariableValues] = useState<Record<string, string>>({});
@@ -118,18 +128,50 @@ export function RequestMoment({
   const [savedToast, setSavedToast] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = subscribeWorkspace(() => {
+    const unsubscribeWs = subscribeWorkspace(() => {
       const nextWs = getActiveWorkspaceSummary();
+      const nextWsKey = nextWs?.id || 'personal';
       setWorkspace(nextWs);
       const user = authStorage.getStoredTokens().user;
-      setCustomPlaybooks(loadPlaybooks(user?.id ?? 'anonymous', nextWs?.id || 'personal'));
+      const nextUserId = user?.id ?? 'anonymous';
+      setCustomPlaybooks(loadPlaybooks(nextUserId, nextWsKey));
+      if (
+        saveModalScopeRef.current &&
+        (saveModalScopeRef.current.userId !== nextUserId ||
+          saveModalScopeRef.current.workspaceKey !== nextWsKey)
+      ) {
+        setSavingPlaybookOpen(false);
+        saveModalScopeRef.current = null;
+      }
     });
-    return unsubscribe;
+    const unsubscribeAuth = authStorage.subscribeAuthTokens((tokens) => {
+      setCurrentUser(tokens.user);
+      const nextUserId = tokens.user?.id ?? 'anonymous';
+      if (
+        saveModalScopeRef.current &&
+        saveModalScopeRef.current.userId !== nextUserId
+      ) {
+        setSavingPlaybookOpen(false);
+        saveModalScopeRef.current = null;
+      }
+    });
+    return () => {
+      unsubscribeWs();
+      unsubscribeAuth();
+    };
   }, []);
 
   useEffect(() => {
     setCustomPlaybooks(loadPlaybooks(userId, workspaceKey));
     setActiveDefaults(loadWorkflowDefaults(userId, workspaceKey));
+    if (
+      saveModalScopeRef.current &&
+      (saveModalScopeRef.current.userId !== userId ||
+        saveModalScopeRef.current.workspaceKey !== workspaceKey)
+    ) {
+      setSavingPlaybookOpen(false);
+      saveModalScopeRef.current = null;
+    }
   }, [userId, workspaceKey]);
 
   useEffect(() => {
@@ -156,8 +198,9 @@ export function RequestMoment({
 
   const templateVariables = extractPlaybookVariables(templateText || draft);
 
-  const handleSelectPlaybook = (promptText: string) => {
+  const handleSelectPlaybook = (promptText: string, templateId?: string) => {
     setTemplateText(promptText);
+    setSelectedTemplateId(templateId ?? null);
     setVariableValues({});
     setValidationError(null);
     setComposerTab('template');
@@ -197,7 +240,15 @@ export function RequestMoment({
     }
     setValidationError(null);
     const rendered = applyPlaybookVariables(currentTemplate, variableValues);
-    onSend(rendered);
+    const hasDefaults = Boolean(activeDefaults && Object.keys(activeDefaults).length > 0);
+    if (selectedTemplateId || hasDefaults) {
+      onSend(rendered, {
+        ...(selectedTemplateId ? { templateId: selectedTemplateId } : {}),
+        ...(hasDefaults ? { resourceDefaults: activeDefaults as Record<string, Record<string, string>> } : {}),
+      });
+    } else {
+      onSend(rendered);
+    }
   };
 
   const handleOpenSavePlaybook = () => {
@@ -205,11 +256,23 @@ export function RequestMoment({
     if (!sourceText) return;
     const defaultTitle =
       sourceText.length > 42 ? `${sourceText.slice(0, 42).trim()}…` : sourceText;
+    saveModalScopeRef.current = { userId, workspaceKey };
     setNewPlaybookTitle(defaultTitle);
     setSavingPlaybookOpen(true);
   };
 
   const handleConfirmSavePlaybook = () => {
+    if (
+      saveModalScopeRef.current &&
+      (saveModalScopeRef.current.userId !== userId ||
+        saveModalScopeRef.current.workspaceKey !== workspaceKey)
+    ) {
+      setSavingPlaybookOpen(false);
+      saveModalScopeRef.current = null;
+      setSavedToast('Phiên làm việc hoặc tài khoản đã thay đổi. Vui lòng thử lưu lại.');
+      setTimeout(() => setSavedToast(null), 5000);
+      return;
+    }
     const sourceText = (templateText || draft).trim();
     const title = newPlaybookTitle.trim();
     if (!sourceText || !title) return;
@@ -624,14 +687,89 @@ export function RequestMoment({
 
       {/* FLOW-04: 6 Core Jobs prioritized at the top of recommendations */}
       <div className="v3-space-y-3" data-testid="core-jobs-section">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="text-xs font-semibold uppercase tracking-wider text-brand-muted">
             6 Quy trình trọng tâm sẵn dùng (Chuẩn hoá theo đầu ra)
           </div>
-          <span className="text-[11px] font-medium text-brand-primary bg-[#FFF6EE] border border-[#FFDFC6] px-2 py-0.5 rounded-full">
-            Core Production Workflows
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              data-testid="btn-open-workflow-defaults"
+              onClick={() => {
+                setDefaultRepoInput(activeDefaults?.github?.repo ?? '');
+                setDefaultSlackInput(activeDefaults?.slack?.channelId ?? '');
+                setDefaultsEditorOpen((prev) => !prev);
+              }}
+              className="text-[11px] font-medium text-neutral-700 hover:text-brand-primary bg-white border border-neutral-200 px-2.5 py-0.5 rounded-full transition-colors"
+            >
+              ⚙️ Đặt tài nguyên mặc định
+            </button>
+            <span className="text-[11px] font-medium text-brand-primary bg-[#FFF6EE] border border-[#FFDFC6] px-2 py-0.5 rounded-full">
+              Core Production Workflows
+            </span>
+          </div>
         </div>
+
+        {defaultsEditorOpen && (
+          <div
+            data-testid="workflow-defaults-editor"
+            className="p-3 rounded-xl bg-white border border-brand-border shadow-xs v3-space-y-2.5"
+          >
+            <div className="text-xs font-semibold text-brand-text">
+              Cấu hình tài nguyên mặc định cho quy trình (lưu theo tài khoản &amp; workspace)
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <label className="flex flex-col gap-1 text-xs">
+                <span className="font-medium text-neutral-700">GitHub Repository mặc định</span>
+                <input
+                  type="text"
+                  aria-label="GitHub Repository mặc định"
+                  placeholder="vd: acme/web"
+                  value={defaultRepoInput}
+                  onChange={(e) => setDefaultRepoInput(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-lg text-xs border border-neutral-300"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs">
+                <span className="font-medium text-neutral-700">Kênh Slack mặc định (Channel ID)</span>
+                <input
+                  type="text"
+                  aria-label="Kênh Slack mặc định"
+                  placeholder="vd: C01GENERAL"
+                  value={defaultSlackInput}
+                  onChange={(e) => setDefaultSlackInput(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-lg text-xs border border-neutral-300"
+                />
+              </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                data-testid="btn-save-workflow-defaults"
+                onClick={() => {
+                  const nextDefaults: WorkflowResourceDefaults = {
+                    ...(activeDefaults ?? {}),
+                    ...(defaultRepoInput.trim() ? { github: { repo: defaultRepoInput.trim() } } : {}),
+                    ...(defaultSlackInput.trim() ? { slack: { channelId: defaultSlackInput.trim() } } : {}),
+                  };
+                  saveWorkflowDefaults(userId, workspaceKey, nextDefaults);
+                  setActiveDefaults(loadWorkflowDefaults(userId, workspaceKey));
+                  setDefaultsEditorOpen(false);
+                }}
+                className="px-3 py-1 rounded-lg text-xs font-semibold bg-brand-primary text-white hover:bg-brand-primary-hover"
+              >
+                Lưu mặc định
+              </button>
+              <button
+                type="button"
+                onClick={() => setDefaultsEditorOpen(false)}
+                className="px-2.5 py-1 rounded-lg text-xs text-neutral-500 hover:text-neutral-800"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        )}
 
         {activeDefaults && (
           <div
@@ -720,7 +858,7 @@ export function RequestMoment({
                     type="button"
                     aria-label={`Quy trình ${job.id}: ${job.title}`}
                     disabled={planning}
-                    onClick={() => handleSelectPlaybook(job.prompt)}
+                    onClick={() => handleSelectPlaybook(job.prompt, job.id)}
                     className="text-left w-full"
                   >
                     <div className="text-xs font-bold text-brand-text group-hover:text-brand-primary transition-colors flex items-center gap-1.5">
