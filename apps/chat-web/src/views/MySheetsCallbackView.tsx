@@ -16,7 +16,7 @@ import { usePrototypePage } from '../prototype/usePrototypePage';
 
 const meta = {
   id: 'mysheets-callback',
-  title: 'Chọn bảng tính Google Sheets — ATI',
+  title: 'Chọn bảng tính Google Sheets — Planora',
   htmlClass: '',
   bodyClass: 'min-h-screen bg-[#F8F8F6] text-[#111827] antialiased',
   css: '',
@@ -284,7 +284,7 @@ export function MySheetsCallbackView({
     <main className="max-w-xl mx-auto px-4 py-16 text-[#111827] v3-space-y-6">
       <div className="v3-space-y-2">
         <h1 className="font-display text-2xl sm:text-3xl font-semibold">
-          Chọn bảng tính cho ATI
+          Chọn bảng tính cho Planora
         </h1>
         {email && (
           <p className="text-sm text-[#4B5563]">
@@ -314,7 +314,7 @@ export function MySheetsCallbackView({
       {!loading && !error && (
         <>
           <div className="p-3.5 sm:p-4 rounded-xl bg-blue-50 border border-blue-200 text-xs sm:text-sm text-blue-900 leading-relaxed">
-            ATI chỉ thấy những bảng tính bạn chọn trong cửa sổ của Google. ATI chỉ đọc, thêm
+            Planora chỉ thấy những bảng tính bạn chọn trong cửa sổ của Google. Planora chỉ đọc, thêm
             dòng, cập nhật cột, xoá dòng hoặc tạo trang tính (tab) sau khi bạn phê duyệt kế hoạch, và không truy cập tệp Drive nào khác.
           </div>
 
@@ -327,7 +327,7 @@ export function MySheetsCallbackView({
                 onClick={() => void handleQuickCreate()}
                 className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-[#188038] text-white hover:bg-[#136c2e] disabled:opacity-50 transition-colors shadow-sm inline-flex items-center gap-2"
               >
-                <span>⚡ Tạo nhanh Bảng tính ATI &amp; kích hoạt Google Docs / Drive (1-Click)</span>
+                <span>⚡ Tạo nhanh Bảng tính Planora &amp; kích hoạt Google Docs / Drive (1-Click)</span>
               </button>
               <button
                 type="button"

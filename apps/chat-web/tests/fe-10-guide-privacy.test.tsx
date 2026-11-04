@@ -25,7 +25,7 @@ afterEach(() => {
 
 describe('FE-10 public guide and privacy routes', () => {
   it.each([
-    ['/guide', 'Cẩm nang kết nối & Mẫu câu lệnh ATI', 'guide'],
+    ['/guide', 'Cẩm nang kết nối & Mẫu câu lệnh Planora', 'guide'],
     ['/privacy', 'Dữ liệu và quyền quyết định luôn thuộc về bạn và nhóm của bạn.', 'privacy'],
   ])('renders %s without a session in its prototype scope', async (path, heading, scope) => {
     window.history.replaceState({}, '', path);
@@ -44,7 +44,7 @@ describe('FE-10 public guide and privacy routes', () => {
     window.history.replaceState({}, '', '/guide');
     render(<App />);
 
-    await screen.findByRole('heading', { level: 1, name: 'Cẩm nang kết nối & Mẫu câu lệnh ATI' });
+    await screen.findByRole('heading', { level: 1, name: 'Cẩm nang kết nối & Mẫu câu lệnh Planora' });
     const promptsTab = document.querySelector<HTMLButtonElement>('#tab-btn-prompts')!;
     expect(promptsTab).toHaveAttribute('role', 'tab');
     fireEvent.click(promptsTab);

@@ -193,7 +193,7 @@ describe('Trello Automated Digest (Task 3: trello_digest & Telegram Trello enric
             unassignedCards: 1,
           },
         });
-        expect(outcome.text).toContain('Bản tin Trello tự động của ATI');
+        expect(outcome.text).toContain('Bản tin Trello tự động của Planora');
         expect(outcome.text).toContain('Nhận xét AI:');
         expect(outcome.text).toContain('Fix OAuth redirect bug');
         expect(outcome.text).toContain('Release v3.2 staging');

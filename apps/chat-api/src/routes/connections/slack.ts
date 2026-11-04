@@ -58,7 +58,7 @@ export function createSlackConnectionRoutes(options: SlackConnectionsOptions): R
   const user = (req: any) => req.user as AuthUser;
   const browser = (req: any) => req.headers.cookie?.split(';').map((s: string) => s.trim()).find((s: string) => s.startsWith(cookieName + '='))?.slice(cookieName.length + 1);
   const fail = (res: any, code: string) => res.status(400).json({ code, error: code === 'SLACK_IDENTITY_CONFLICT'
-    ? 'Tài khoản Slack này đang liên kết với một tài khoản ATI khác. Hãy ngắt liên kết cũ trước.'
+    ? 'Tài khoản Slack này đang liên kết với một tài khoản Planora khác. Hãy ngắt liên kết cũ trước.'
     : code === 'SLACK_DENIED' ? 'Bạn đã hủy kết nối Slack.' : 'Không hoàn tất được kết nối Slack. Hãy bắt đầu lại từ Kết nối dịch vụ.' });
   const ownConversation = async (value: unknown, userId: string): Promise<string | null> => {
     const id = typeof value === 'string' ? CONVERSATION_PATH.exec(value)?.[1]?.toLowerCase() : undefined;

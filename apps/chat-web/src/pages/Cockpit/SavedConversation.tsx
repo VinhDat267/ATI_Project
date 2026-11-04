@@ -23,9 +23,9 @@ function outcome(messages: ChatMessage[], request: ChatMessage, statusLoadError?
   if (plan) {
     const summary = plan.metadata?.plan?.summary ?? plan.content.replace(/^Kế hoạch:\s*/, '');
     const count = plan.metadata?.plan?.steps?.length;
-    return `Kế hoạch “${summary}”${count ? ` (${count} việc)` : ''} không còn chờ duyệt: kế hoạch đã hết hạn duyệt hoặc đã bị huỷ. Gửi lại yêu cầu nếu bạn vẫn muốn ATI lập kế hoạch mới.`;
+    return `Kế hoạch “${summary}”${count ? ` (${count} việc)` : ''} không còn chờ duyệt: kế hoạch đã hết hạn duyệt hoặc đã bị huỷ. Gửi lại yêu cầu nếu bạn vẫn muốn Planora lập kế hoạch mới.`;
   }
-  return 'Yêu cầu này không có kế hoạch nào đang chờ duyệt. Gửi lại yêu cầu nếu bạn vẫn muốn ATI xử lý.';
+  return 'Yêu cầu này không có kế hoạch nào đang chờ duyệt. Gửi lại yêu cầu nếu bạn vẫn muốn Planora xử lý.';
 }
 
 export function SavedConversation({ messages, request, statusLoadError, onOpenConversation, onResend }: {

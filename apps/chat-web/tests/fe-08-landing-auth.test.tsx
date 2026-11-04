@@ -172,7 +172,7 @@ it('does not restore a modal opener on an unrelated route change', async () => {
   fireEvent.click(container.querySelector('[data-od-id="btn-header-login"]')!);
   await waitFor(() => expect(screen.getByLabelText('Email', { exact: true })).toHaveFocus());
   window.history.replaceState({}, '', '/guide'); fireEvent.popState(window);
-  expect(await screen.findByRole('heading', { name: 'Cẩm nang kết nối & Mẫu câu lệnh ATI', level: 1 })).toBeVisible();
+  expect(await screen.findByRole('heading', { name: 'Cẩm nang kết nối & Mẫu câu lệnh Planora', level: 1 })).toBeVisible();
   window.history.replaceState({}, '', '/'); fireEvent.popState(window);
   expect(container.querySelector('[data-od-id="btn-header-login"]')).not.toHaveFocus();
 });

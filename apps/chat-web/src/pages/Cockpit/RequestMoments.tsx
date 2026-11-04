@@ -786,7 +786,7 @@ export function DiscoveryMoment({
           className="font-display text-2xl sm:text-3xl text-brand-text font-normal leading-snug"
           tabIndex={-1}
         >
-          <span id="moment-2-query-display">{origin ? 'ATI đang lập kế hoạch cho lượt này' : `“${request}”`}</span>
+          <span id="moment-2-query-display">{origin ? 'Planora đang lập kế hoạch cho lượt này' : `“${request}”`}</span>
         </h1>
       </div>
       <div className="bg-white rounded-2xl border border-brand-border p-6 shadow-soft-card v3-space-y-4">

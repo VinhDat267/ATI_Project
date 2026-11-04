@@ -39,7 +39,7 @@ function SessionCard({ card, onRevoke, busy }: { card: AccountSession; busy: boo
 
 export const meta: PageMeta = {
   id: "account",
-  title: "Tài khoản của bạn — ATI",
+  title: "Tài khoản của bạn — Planora",
   htmlClass: "",
   bodyClass: "min-h-screen flex flex-col bg-[#F8F8F6] text-[#111827]",
   css,
@@ -152,7 +152,7 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
                 <input ref={fullNameRef} type="text" id="input-full-name" name="fullName" value={name} onChange={event => setName(event.target.value)} maxLength={100} autoComplete="name" required className="w-full text-sm sm:text-base px-3.5 py-2.5 bg-white border border-[#E7E7E2] rounded-xl text-[#111827] placeholder-[#9CA3AF] focus:border-[#FF5701] focus:ring-1 focus:ring-[#FF5701] transition-all" placeholder="Nhập họ và tên đầy đủ" />
                 {' '}
                 <p className="text-xs text-[#6B7280] mt-1.5">
-                  Tên này sẽ hiển thị ở góc thanh điều khiển và đại diện cho bạn khi duyệt các kế hoạch của ATI.
+                  Tên này sẽ hiển thị ở góc thanh điều khiển và đại diện cho bạn khi duyệt các kế hoạch của Planora.
                 </p>
               </div>
               {/* Trường Email (Khóa, chỉ hiển thị) */}
@@ -328,7 +328,7 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
                   3. Các phiên đang đăng nhập
                 </h2>
                 <p className="text-xs sm:text-sm text-[#6B7280] mt-1">
-                  Danh sách các thiết bị và trình duyệt đang truy cập tài khoản ATI của bạn.
+                  Danh sách các thiết bị và trình duyệt đang truy cập tài khoản Planora của bạn.
                 </p>
               </div>
               {/* Nút Thu hồi tất cả các phiên khác. Bản mẫu thêm hidden vào nút đang có inline-flex: v3 cho hidden thắng
@@ -399,7 +399,7 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
                 4. Liên kết tài khoản Google
               </h2>
               <p className="text-xs sm:text-sm text-[#6B7280] mt-1">
-                Dùng tài khoản Google để đăng nhập một chạm vào ATI nhanh chóng và an toàn mà không cần nhớ mật khẩu.
+                Dùng tài khoản Google để đăng nhập một chạm vào Planora nhanh chóng và an toàn mà không cần nhớ mật khẩu.
               </p>
             </div>
             {/* Trạng thái 1: ĐÃ LIÊN KẾT (Mặc định) */}
@@ -435,7 +435,7 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
                     {view.googleEmail}
                   </p>
                   <p className="text-xs text-[#6B7280] mt-1">
-                    Bạn có thể bấm nút "Tiếp tục với Google" trên trang đăng nhập để vào thẳng ATI.
+                    Bạn có thể bấm nút "Tiếp tục với Google" trên trang đăng nhập để vào thẳng Planora.
                   </p>
                 </div>
               </div>
@@ -479,7 +479,7 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
                     </span>
                   </div>
                   <p className="text-xs sm:text-sm text-[#6B7280] mt-1">
-                    Hiện bạn chưa liên kết tài khoản Google với tài khoản ATI này.
+                    Hiện bạn chưa liên kết tài khoản Google với tài khoản Planora này.
                   </p>
                 </div>
               </div>
@@ -510,7 +510,7 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#6B7280]">
           <div className="text-center sm:text-left">
             <span className="font-display font-bold text-[#111827]">
-              ATI
+              Planora
             </span>
             {" — AI Workflow Automation Platform · 2026"}
           </div>
@@ -577,7 +577,7 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
             Gỡ liên kết tài khoản Google?
           </h3>
           <p className="text-xs sm:text-sm text-[#4B5563] mt-2 leading-relaxed">
-            Sau khi gỡ liên kết, bạn sẽ không thể dùng nút "Tiếp tục với Google" để đăng nhập nữa. Bạn sẽ cần nhập địa chỉ email và mật khẩu của ATI để truy cập vào hệ thống.
+            Sau khi gỡ liên kết, bạn sẽ không thể dùng nút "Tiếp tục với Google" để đăng nhập nữa. Bạn sẽ cần nhập địa chỉ email và mật khẩu của Planora để truy cập vào hệ thống.
           </p>
           {/* Trường Mật khẩu hiện tại (Bắt buộc) */}
           <div className="mt-4 text-left">

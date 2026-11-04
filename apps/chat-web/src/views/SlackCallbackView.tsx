@@ -18,7 +18,7 @@ export function SlackCallbackView({
 }) {
   usePrototypePage({
     id: 'slack-callback',
-    title: 'Kết nối Slack — ATI',
+    title: 'Kết nối Slack — Planora',
     htmlClass: '',
     bodyClass: 'min-h-screen bg-[#F8F8F6] text-[#111827] antialiased',
     css: '',
@@ -92,7 +92,7 @@ export function SlackCallbackView({
           setError('Bạn đã hủy kết nối Slack.');
         } else if (code === 'SLACK_IDENTITY_CONFLICT') {
           setError(
-            'Tài khoản Slack này đang liên kết với một tài khoản ATI khác. Hãy ngắt liên kết cũ trước.'
+            'Tài khoản Slack này đang liên kết với một tài khoản Planora khác. Hãy ngắt liên kết cũ trước.'
           );
         } else if (code === 'SLACK_STATE_INVALID') {
           setError('Phiên kết nối đã hết hạn hoặc không hợp lệ. Vui lòng thử lại.');

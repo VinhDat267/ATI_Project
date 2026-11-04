@@ -34,7 +34,7 @@ export const MYSHEETS_TOOLS: ToolDefinition[] = [
     riskLevel: 'low',
     discovers: 'myspreadsheet',
     listable: true,
-    description: 'Liệt kê các bảng tính cá nhân bạn đã chọn cho ATI, lọc theo tên; query rỗng để lấy danh sách.',
+    description: 'Liệt kê các bảng tính cá nhân bạn đã chọn cho Planora, lọc theo tên; query rỗng để lấy danh sách.',
     inputSchema: input(listInputs, ['query']),
     outputSchema: { type: 'array', items: output({ id: str, title: str, url: str }, ['id', 'title', 'url']) },
   },

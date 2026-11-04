@@ -27,7 +27,7 @@ function strength(password: string): { bars: string[]; text: string; className: 
 }
 const meta: PageMeta = {
   id: "auth-action",
-  title: "Xác thực & Hành động tài khoản — ATI",
+  title: "Xác thực & Hành động tài khoản — Planora",
   htmlClass: "",
   bodyClass: "min-h-screen flex flex-col bg-[#F8F8F6] text-[#111827]",
   css,
@@ -79,12 +79,12 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
           {/* Cụm Logo & Điều hướng quay lại */}
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-            <a onClick={followLink} href="/" className="flex items-center gap-2.5 group flex-shrink-0" title="Về trang chủ ATI">
+            <a onClick={followLink} href="/" className="flex items-center gap-2.5 group flex-shrink-0" title="Về trang chủ Planora">
               <div className="w-8 h-8 rounded-lg bg-[#FF5701] flex items-center justify-center text-white font-display font-bold text-lg shadow-sm group-hover:scale-105 transition-transform">
-                A
+                P
               </div>
               <span className="font-display font-bold text-lg tracking-tight text-[#111827]">
-                ATI
+                Planora
               </span>
             </a>
             <div className="h-4 w-px bg-[#E7E7E2] flex-shrink-0" />
@@ -195,7 +195,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
               <div className="v3-space-y-2.5 pt-1">
                 <a onClick={followLink} href="/" className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#FF5701] hover:bg-[#E04C00] text-white font-medium text-sm transition-colors shadow-sm focus-visible:v3-outline-none">
                   <span>
-                    Về trang chủ ATI
+                    Về trang chủ Planora
                   </span>
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
@@ -460,7 +460,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                   Link đặt lại mật khẩu có hiệu lực 30 phút và chỉ dùng được một lần.
                 </p>
                 <p>
-                  Sau khi đổi mật khẩu, bạn sẽ dùng mật khẩu mới này để đăng nhập vào ATI trên mọi thiết bị.
+                  Sau khi đổi mật khẩu, bạn sẽ dùng mật khẩu mới này để đăng nhập vào Planora trên mọi thiết bị.
                 </p>
               </div>
             </section>}
@@ -514,7 +514,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                   </svg>
                 </a>
                 <a onClick={followLink} href="/" className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl border border-[#E7E7E2] hover:bg-neutral-50 text-[#4B5563] hover:text-[#111827] font-medium text-xs sm:text-sm transition-colors">
-                  Về trang chủ ATI
+                  Về trang chủ Planora
                 </a>
               </div>
             </section>}
@@ -550,7 +550,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                   <strong className="text-[#111827] font-semibold user-email-placeholder">
                     {email || "địa chỉ email của bạn"}
                   </strong>
-                  {" đã được kết nối an toàn với nền tảng ATI."}
+                  {" đã được kết nối an toàn với nền tảng Planora."}
                 </p>
               </div>
               {/* Giải thích quy định an toàn */}
@@ -609,7 +609,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                   </svg>
                 </a>
                 <a onClick={followLink} href="/" className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl border border-[#E7E7E2] hover:bg-neutral-50 text-[#4B5563] hover:text-[#111827] font-medium text-xs sm:text-sm transition-colors">
-                  Về trang chủ ATI
+                  Về trang chủ Planora
                 </a>
               </div>
             </section>}
@@ -771,7 +771,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                   </span>
                 </div>
                 <p className="text-xs text-[#4B5563] leading-relaxed">
-                  {"ATI điều phối trực tiếp các công cụ dùng chung của nhóm (Trello, Slack, GitHub, Google Sheets). Để bảo đảm an toàn dữ liệu, tài khoản cần được "}
+                  {"Planora điều phối trực tiếp các công cụ dùng chung của nhóm (Trello, Slack, GitHub, Google Sheets). Để bảo đảm an toàn dữ liệu, tài khoản cần được "}
                   <strong className="text-[#111827]">
                     Quản trị viên nhóm xem xét và phê duyệt
                   </strong>
@@ -831,7 +831,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                   </svg>
                 </a>
                 <a onClick={followLink} href="/" className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl border border-[#E7E7E2] hover:bg-neutral-50 text-[#4B5563] hover:text-[#111827] font-medium text-xs sm:text-sm transition-colors">
-                  ← Về trang chủ ATI
+                  ← Về trang chủ Planora
                 </a>
               </div>
             </section>}
@@ -861,7 +861,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                   <strong className="text-[#111827] font-semibold user-email-placeholder">
                     {email || "địa chỉ email của bạn"}
                   </strong>
-                  {" vào không gian làm việc ATI đã bị tạm dừng bởi quản trị viên."}
+                  {" vào không gian làm việc Planora đã bị tạm dừng bởi quản trị viên."}
                 </p>
               </div>
               {/* Chi tiết về việc khóa */}
@@ -905,7 +905,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                   Đăng nhập bằng tài khoản khác
                 </a>
                 <a onClick={followLink} href="/" className="w-full flex items-center justify-center py-2 px-4 text-[#6B7280] hover:text-[#111827] font-medium text-xs transition-colors">
-                  Quay về trang chủ ATI
+                  Quay về trang chủ Planora
                 </a>
               </div>
             </section>}
@@ -1000,7 +1000,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
           {/* Chân trang nhỏ */}
           <footer className="mt-8 text-center text-xs text-[#9CA3AF] v3-space-y-2">
             <p>
-              ATI — AI Workflow Automation Platform · 2026 · Xác thực tài khoản và phân quyền quản trị
+              Planora — AI Workflow Automation Platform · 2026 · Xác thực tài khoản và phân quyền quản trị
             </p>
             <div className="flex items-center justify-center gap-3 text-xs text-[#6B7280]">
               <a onClick={followLink} href="/" className="hover:text-[#111827] transition-colors">

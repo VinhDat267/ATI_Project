@@ -47,8 +47,8 @@ describe('AUTH-02b: email-sending routes do not wait for SMTP', () => {
   };
 
   it.each([
-    ['forgot-password', 'active', true, 'Đặt lại mật khẩu ATI'],
-    ['resend-verification', 'pending', false, 'Xác minh email tài khoản ATI'],
+    ['forgot-password', 'active', true, 'Đặt lại mật khẩu Planora'],
+    ['resend-verification', 'pending', false, 'Xác minh email tài khoản Planora'],
   ])('%s answers known and unknown emails in the same time and still sends one email per known account', async (path, status, verified, subject) => {
     const known: number[] = [], unknown: number[] = [], knownEmails: string[] = [];
     for (let i = 0; i < 5; i++) {

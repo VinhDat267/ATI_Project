@@ -189,7 +189,7 @@ export function PersonalMyCalendar({
         Google Calendar của bạn
       </h3>
       <p className="text-xs text-[#6B7280]">
-        ATI chỉ đọc sự kiện, tìm khung giờ trống và tạo, cập nhật hoặc huỷ sự kiện trên các lịch bạn
+        Planora chỉ đọc sự kiện, tìm khung giờ trống và tạo, cập nhật hoặc huỷ sự kiện trên các lịch bạn
         đã chọn sau khi bạn duyệt kế hoạch (không tự ý gửi lời mời cho người khác).
       </p>
       <div data-testid="mycalendar-ecosystem-badges" className="flex flex-wrap items-center gap-1.5 pt-0.5">
@@ -375,7 +375,7 @@ export function PersonalMyCalendar({
           >
             <div className="p-5 v3-space-y-4">
               <p className="text-sm">
-                ATI sẽ xoá token và thu hồi quyền truy cập. Hội thoại cũ vẫn còn; kế hoạch cũ không
+                Planora sẽ xoá token và thu hồi quyền truy cập. Hội thoại cũ vẫn còn; kế hoạch cũ không
                 thể dùng kết nối đã ngắt.
               </p>
               <div className="flex items-center gap-3">
@@ -423,7 +423,7 @@ export function PersonalMyCalendar({
               ) : (
                 <>
                   <p className="text-xs text-[#6B7280]">
-                    Chọn ít nhất 1 lịch mà bạn cho phép ATI đọc và tạo sự kiện:
+                    Chọn ít nhất 1 lịch mà bạn cho phép Planora đọc và tạo sự kiện:
                   </p>
                   <div className="v3-space-y-2">
                     {calendars.map((cal) => (

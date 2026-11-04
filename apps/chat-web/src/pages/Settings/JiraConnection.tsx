@@ -967,7 +967,7 @@ export function JiraConnection({
               Không gian làm việc Jira (Jira Workspaces)
             </h4>
             <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
-              Quyền Jira được kiểm soát theo từng workspace độc lập với quyền tổ chức ATI.
+              Quyền Jira được kiểm soát theo từng workspace độc lập với quyền tổ chức Planora.
             </p>
           </div>
 

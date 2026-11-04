@@ -13,7 +13,7 @@ import { ServiceLogo } from '../components/ServiceLogo';
 
 const meta = {
   id: 'telegram-callback',
-  title: 'Kết nối Telegram — ATI',
+  title: 'Kết nối Telegram — Planora',
   htmlClass: '',
   bodyClass: 'min-h-screen bg-[#F8F8F6] text-[#111827] antialiased',
   css: '',
@@ -161,7 +161,7 @@ export function TelegramCallbackView({
       </div>
       <div className="bg-white border border-[#E7E7E2] rounded-2xl p-6 v3-space-y-4 shadow-sm">
         <p className="text-sm text-[#4B5563] leading-relaxed">
-          Mở ứng dụng Telegram, bấm <strong>Start</strong> với bot của ATI để liên kết tài khoản cá nhân của bạn trong 1 chạm (không cần tạo BotFather token hay nhập mã số Chat ID).
+          Mở ứng dụng Telegram, bấm <strong>Start</strong> với bot của Planora để liên kết tài khoản cá nhân của bạn trong 1 chạm (không cần tạo BotFather token hay nhập mã số Chat ID).
         </p>
 
         {deepLinkUrl && (

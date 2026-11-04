@@ -141,7 +141,7 @@ export function CockpitHeader({
               id="test-mode-explanation"
               className={`${testExplainOpen ? '' : 'hidden '}px-4 sm:px-6 pb-2 text-[11px] sm:text-xs text-amber-800 leading-relaxed border-t border-amber-200/60 pt-1.5 max-w-5xl mx-auto`}
             >
-              Máy chủ đang chạy thử: ATI dùng kế hoạch soạn sẵn và không ghi gì
+              Máy chủ đang chạy thử: Planora dùng kế hoạch soạn sẵn và không ghi gì
               lên Trello, Slack hay các công cụ khác. Chế độ do máy chủ quyết
               định khi khởi động.
             </div>

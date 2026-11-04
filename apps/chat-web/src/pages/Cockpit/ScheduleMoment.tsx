@@ -170,7 +170,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
   const scheduleServices = schedule?.services ?? metadata.services ?? [];
   const isAutoDigestActive = approvalMode === 'auto_digest' || schedule?.kind === 'calendar_digest' || schedule?.kind === 'sheets_digest' || schedule?.kind === 'github_digest' || schedule?.kind === 'trello_digest' || schedule?.kind === 'notion_digest' || (schedule?.kind as string) === 'myjira_digest' || schedule?.kind === 'telegram_digest';
   return <section data-moment="schedule" className="w-full min-w-0 max-w-3xl mx-auto v3-space-y-5">
-    <p className="text-xs uppercase tracking-wider text-[#6B7280]">ATI · Lịch chạy workflow</p>
+    <p className="text-xs uppercase tracking-wider text-[#6B7280]">Planora · Lịch chạy workflow</p>
     <h1 tabIndex={-1} className="font-display text-3xl sm:text-4xl font-bold text-[#111827] [overflow-wrap:anywhere]">{title}</h1>
     <div className="bg-white border border-[#E7E7E2] rounded-2xl shadow-soft-card p-5 sm:p-6 v3-space-y-5 min-w-0">
       {!manage && scheduleServices.length > 0 && (
@@ -214,7 +214,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                     className="mt-1 text-[#FF5701] focus:ring-[#FF5701]"
                   />
                   <span>
-                    <strong className="font-semibold">Chờ tôi duyệt mỗi lượt</strong> (Mặc định) — Tới giờ, ATI lập kế hoạch mới và chờ bạn duyệt.
+                    <strong className="font-semibold">Chờ tôi duyệt mỗi lượt</strong> (Mặc định) — Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt.
                   </span>
                 </label>
                 <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm transition-colors ${!digestCandidate.canAutoDigest ? 'text-[#6B7280] opacity-70 cursor-not-allowed border-[#E7E7E2] bg-neutral-50' : approvalMode === 'auto_digest' ? 'text-[#111827] cursor-pointer border-[#FF5701] bg-[#FFF6EE]/40' : 'text-[#111827] cursor-pointer border-[#E7E7E2] bg-white'}`}>
@@ -263,8 +263,8 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
               )}
               <p className="text-sm text-[#4B5563] leading-relaxed">
                 {approvalMode === 'auto_digest'
-                  ? 'Tới giờ, ATI chỉ đọc dữ liệu từ các dịch vụ nguồn đã chọn và tự động gửi bản tin về đúng cuộc trò chuyện Telegram đã khóa.'
-                  : 'Tới giờ, ATI lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.'}
+                  ? 'Tới giờ, Planora chỉ đọc dữ liệu từ các dịch vụ nguồn đã chọn và tự động gửi bản tin về đúng cuộc trò chuyện Telegram đã khóa.'
+                  : 'Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.'}
               </p>
             </>
           ) : isGithubCandidate ? (
@@ -281,7 +281,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                 />
                 <div className="v3-space-y-0.5">
                   <p className="font-semibold text-[#111827]">Chờ tôi duyệt mỗi lượt</p>
-                  <p className="text-xs text-[#4B5563]">Tới giờ, ATI lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.</p>
+                  <p className="text-xs text-[#4B5563]">Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.</p>
                 </div>
               </label>
               <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm ${!canAutoDigest ? 'opacity-60 cursor-not-allowed border-[#E7E7E2] bg-neutral-50' : approvalMode === 'auto_digest' ? 'cursor-pointer border-[#FF5701] bg-[#FFF6EE]/40' : 'cursor-pointer border-[#E7E7E2] bg-white'}`}>
@@ -326,7 +326,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                 />
                 <div className="v3-space-y-0.5">
                   <p className="font-semibold text-[#111827]">Chờ tôi duyệt mỗi lượt</p>
-                  <p className="text-xs text-[#4B5563]">Tới giờ, ATI lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.</p>
+                  <p className="text-xs text-[#4B5563]">Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.</p>
                 </div>
               </label>
               <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm ${!canAutoDigest ? 'opacity-60 cursor-not-allowed border-[#E7E7E2] bg-neutral-50' : approvalMode === 'auto_digest' ? 'cursor-pointer border-[#FF5701] bg-[#FFF6EE]/40' : 'cursor-pointer border-[#E7E7E2] bg-white'}`}>
@@ -371,7 +371,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                 />
                 <div className="v3-space-y-0.5">
                   <p className="font-semibold text-[#111827]">Chờ tôi duyệt mỗi lượt</p>
-                  <p className="text-xs text-[#4B5563]">Tới giờ, ATI lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.</p>
+                  <p className="text-xs text-[#4B5563]">Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.</p>
                 </div>
               </label>
               <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm ${!canAutoDigest ? 'opacity-60 cursor-not-allowed border-[#E7E7E2] bg-neutral-50' : approvalMode === 'auto_digest' ? 'cursor-pointer border-[#FF5701] bg-[#FFF6EE]/40' : 'cursor-pointer border-[#E7E7E2] bg-white'}`}>
@@ -416,7 +416,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                 />
                 <div className="v3-space-y-0.5">
                   <p className="font-semibold text-[#111827]">Chờ tôi duyệt mỗi lượt</p>
-                  <p className="text-xs text-[#4B5563]">Tới giờ, ATI lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.</p>
+                  <p className="text-xs text-[#4B5563]">Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.</p>
                 </div>
               </label>
               <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm ${!canAutoDigest ? 'opacity-60 cursor-not-allowed border-[#E7E7E2] bg-neutral-50' : approvalMode === 'auto_digest' ? 'cursor-pointer border-[#FF5701] bg-[#FFF6EE]/40' : 'cursor-pointer border-[#E7E7E2] bg-white'}`}>
@@ -489,7 +489,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
               ) : ineligibleReason ? (
                 <p className="text-xs text-[#6B7280]">{ineligibleReason}</p>
               ) : null}
-              <p className="text-sm text-[#4B5563] leading-relaxed">Tới giờ, ATI lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.</p>
+              <p className="text-sm text-[#4B5563] leading-relaxed">Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.</p>
             </>
           ) : (
             <>
@@ -537,8 +537,8 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
               )}
               <p className="text-sm text-[#4B5563] leading-relaxed">
                 {approvalMode === 'auto_digest'
-                  ? 'Tới giờ, ATI tự đọc bảng tính đã khóa và gửi báo cáo tới kênh đích đã khóa mà không ghi thêm dữ liệu.'
-                  : 'Tới giờ, ATI lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.'}
+                  ? 'Tới giờ, Planora tự đọc bảng tính đã khóa và gửi báo cáo tới kênh đích đã khóa mà không ghi thêm dữ liệu.'
+                  : 'Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.'}
               </p>
             </>
           )}

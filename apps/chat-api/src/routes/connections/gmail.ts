@@ -69,7 +69,7 @@ export function createGmailConnectionRoutes(options: GmailConnectionsOptions): R
   const fail = (res: Response, code: 'GMAIL_STATE_INVALID' | 'GMAIL_SCOPE_MISSING' | 'GMAIL_REFRESH_TOKEN_MISSING' | 'GMAIL_CONNECT_FAILED') => {
     const messages = {
       GMAIL_STATE_INVALID: 'Yêu cầu kết nối Gmail đã hết hạn hoặc không còn hợp lệ. Hãy bấm "Kết nối Gmail" lại.',
-      GMAIL_SCOPE_MISSING: 'Google chưa cấp quyền đọc và gửi thư cho ATI. Hãy kết nối lại và đồng ý quyền Gmail.',
+      GMAIL_SCOPE_MISSING: 'Google chưa cấp quyền đọc và gửi thư cho Planora. Hãy kết nối lại và đồng ý quyền Gmail.',
       GMAIL_REFRESH_TOKEN_MISSING: 'Google không trả quyền truy cập lâu dài. Hãy kết nối lại.',
       GMAIL_CONNECT_FAILED: 'Không kết nối được Gmail. Vui lòng thử lại.',
     };

@@ -209,7 +209,7 @@ export function SlackReadControls({
           <p className="text-xs text-brand-muted">
             {purpose === 'write'
               ? 'Chọn workspace và mã kênh. Nội dung bạn nhập sẽ được gửi nguyên văn sau khi duyệt.'
-              : 'ATI chỉ đọc sau khi bạn duyệt. Kết quả được lưu tối đa 1 ngày, trong phạm vi workspace cho phép.'}
+              : 'Planora chỉ đọc sau khi bạn duyệt. Kết quả được lưu tối đa 1 ngày, trong phạm vi workspace cho phép.'}
           </p>
           {!loading && connections.length > 1 && !value && (
             <p role="status" className="text-xs">

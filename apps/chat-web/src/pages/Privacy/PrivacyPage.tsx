@@ -18,7 +18,7 @@ function appLink(navigate: Navigate, path: string) {
 
 export const meta: PageMeta = {
   id: "privacy",
-  title: "Chính sách an toàn & Dữ liệu — ATI",
+  title: "Chính sách an toàn & Dữ liệu — Planora",
   htmlClass: "scroll-smooth",
   bodyClass: "min-h-screen flex flex-col bg-[#F8F8F6] text-[#111827] antialiased selection:bg-[#FF5701]/10 selection:text-[#FF5701]",
   css,
@@ -35,14 +35,14 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
       {user ? <MainNav user={user} current={null} pageName="Chính sách an toàn" navigate={navigate} onLogout={onLogout} /> : (
         <header className="sticky top-0 z-40 bg-[#F8F8F6]/95 backdrop-blur-md border-b border-[#E7E7E2]" data-od-id="privacy-header">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
-            {/* Cụm trái: Logo ATI & Nhãn trang */}
+            {/* Cụm trái: Logo Planora & Nhãn trang */}
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <a href="/" onClick={appLink(navigate, '/')} className="flex items-center gap-2 group focus-visible:v3-outline-none focus-visible:ring-2 focus-visible:ring-[#FF5701] rounded-lg flex-shrink-0" aria-label="Về trang chủ ATI">
+              <a href="/" onClick={appLink(navigate, '/')} className="flex items-center gap-2 group focus-visible:v3-outline-none focus-visible:ring-2 focus-visible:ring-[#FF5701] rounded-lg flex-shrink-0" aria-label="Về trang chủ Planora">
                 <div className="w-8 h-8 rounded-xl bg-[#FF5701] text-white flex items-center justify-center font-display font-bold text-base shadow-sm group-hover:bg-[#E04D00] transition-colors">
-                  A
+                  P
                 </div>
                 <span className="font-display font-bold text-xl text-[#111827] tracking-tight">
-                  ATI
+                  Planora
                 </span>
               </a>
               <span className="text-[#E7E7E2] select-none flex-shrink-0" aria-hidden="true">
@@ -116,7 +116,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
             Dữ liệu và quyền quyết định luôn thuộc về bạn và nhóm của bạn.
           </h1>
           <p className="text-base sm:text-lg text-[#4B5563] leading-relaxed max-w-3xl mb-4 font-normal">
-            {"ATI được thiết kế từ đầu với một ranh giới rõ ràng: "}
+            {"Planora được thiết kế từ đầu với một ranh giới rõ ràng: "}
             <strong className="text-[#111827] font-semibold">
               không tự ý hành động khi chưa có lệnh duyệt, không hiển thị lại khoá truy cập đã lưu, chỉ hoạt động trong phạm vi được quản trị viên cấp phép
             </strong>
@@ -129,7 +129,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                 {' '}
               </svg>
-              {" Áp dụng cho toàn bộ không gian làm việc ATI"}
+              {" Áp dụng cho toàn bộ không gian làm việc Planora"}
             </span>
           </div>
           {/* Quick Anchor Pills */}
@@ -164,7 +164,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                 1. Bốn cam kết an toàn cốt lõi
               </h2>
               <p className="text-sm text-[#6B7280] mt-1">
-                Đây là những nguyên tắc bất di bất dịch định hình toàn bộ kiến trúc sản phẩm của ATI.
+                Đây là những nguyên tắc bất di bất dịch định hình toàn bộ kiến trúc sản phẩm của Planora.
               </p>
             </div>
           </div>
@@ -188,7 +188,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                   Không ghi gì khi chưa được duyệt
                 </h3>
                 <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed mb-4">
-                  {"ATI phân tách rạch ròi giữa việc "}
+                  {"Planora phân tách rạch ròi giữa việc "}
                   <strong className="text-[#111827]">
                     lên kế hoạch
                   </strong>
@@ -207,7 +207,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                 <strong className="text-[#FF5701]">
                   “Duyệt kế hoạch ✓”
                 </strong>
-                , ATI mới bắt đầu tạo thẻ hay gửi tin. Nếu bạn huỷ bỏ hoặc đóng trang, không có bất kỳ ký tự nào bị ghi lên công cụ của bạn.
+                , Planora mới bắt đầu tạo thẻ hay gửi tin. Nếu bạn huỷ bỏ hoặc đóng trang, không có bất kỳ ký tự nào bị ghi lên công cụ của bạn.
               </div>
             </article>
             {/* Cam kết 2: Khoá lưu trữ an toàn, không hiển thị lại */}
@@ -262,7 +262,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                   Chỉ hoạt động trong phạm vi được cấp phép
                 </h3>
                 <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed mb-4">
-                  ATI không có quyền lục soát tài khoản của bạn. Hệ thống bị giới hạn nghiêm ngặt, chỉ được phép đọc và ghi trên đúng những bảng Trello, kênh Slack, kho mã GitHub, bảng tính Sheets mà Quản trị viên đã chỉ định rõ ràng.
+                  Planora không có quyền lục soát tài khoản của bạn. Hệ thống bị giới hạn nghiêm ngặt, chỉ được phép đọc và ghi trên đúng những bảng Trello, kênh Slack, kho mã GitHub, bảng tính Sheets mà Quản trị viên đã chỉ định rõ ràng.
                 </p>
               </div>
               <div className="pt-3 border-t border-[#F3F4F6] text-xs text-[#6B7280] bg-[#F8F8F6]/60 p-3 rounded-xl border border-[#E7E7E2]/50">
@@ -277,7 +277,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                 <code className="font-mono text-[#111827]">
                   #ati-test
                 </code>
-                , ATI sẽ hỏi lại bạn muốn gửi vào kênh nào trong các kênh được phép, không tự gửi nhầm chỗ.
+                , Planora sẽ hỏi lại bạn muốn gửi vào kênh nào trong các kênh được phép, không tự gửi nhầm chỗ.
               </div>
             </article>
             {/* Cam kết 4: Dừng lại hỏi người dùng khi mạng gián đoạn */}
@@ -299,14 +299,14 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                   Dừng lại hỏi người dùng khi mạng gián đoạn
                 </h3>
                 <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed mb-4">
-                  Nếu đường truyền bị ngắt đúng vào thời điểm ATI đang gửi lệnh ghi (ví dụ: đang ghi dòng vào Sheets), hệ thống không thể chắc chắn dữ liệu đã vào hay chưa. Thay vì tự ý thử lại để tránh trùng lặp, ATI dừng lại ngay lập tức và hỏi ý kiến bạn.
+                  Nếu đường truyền bị ngắt đúng vào thời điểm Planora đang gửi lệnh ghi (ví dụ: đang ghi dòng vào Sheets), hệ thống không thể chắc chắn dữ liệu đã vào hay chưa. Thay vì tự ý thử lại để tránh trùng lặp, Planora dừng lại ngay lập tức và hỏi ý kiến bạn.
                 </p>
               </div>
               <div className="pt-3 border-t border-[#F3F4F6] text-xs text-[#6B7280] bg-[#F8F8F6]/60 p-3 rounded-xl border border-[#E7E7E2]/50">
                 <span className="font-semibold text-[#111827]">
                   Hành vi thực tế:
                 </span>
-                {" ATI hiển thị màn hình cảnh báo rõ ràng những việc đã hoàn tất, việc đang làm dở, và để bạn bấm kiểm tra công cụ thực tế trước khi quyết định tiếp tục hay bỏ qua."}
+                {" Planora hiển thị màn hình cảnh báo rõ ràng những việc đã hoàn tất, việc đang làm dở, và để bạn bấm kiểm tra công cụ thực tế trước khi quyết định tiếp tục hay bỏ qua."}
               </div>
             </article>
           </div>
@@ -328,7 +328,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
             </h2>
           </div>
           <p className="text-sm sm:text-base text-[#4B5563] leading-relaxed mb-6 font-normal">
-            Trong ATI, các khoá kết nối là tài sản bảo mật chung của cả nhóm. Chúng tôi áp dụng quy chế nghiêm ngặt trong việc tiếp nhận, lưu trữ và sử dụng khoá:
+            Trong Planora, các khoá kết nối là tài sản bảo mật chung của cả nhóm. Chúng tôi áp dụng quy chế nghiêm ngặt trong việc tiếp nhận, lưu trữ và sử dụng khoá:
           </p>
           <div className="v3-space-y-4 text-xs sm:text-sm text-[#4B5563]">
             <div className="flex items-start gap-3 p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2]">
@@ -403,10 +403,10 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
             </h2>
           </div>
           <p className="text-sm sm:text-base text-[#4B5563] leading-relaxed mb-6 font-normal">
-            ATI cung cấp tuỳ chọn “Tiếp tục với Google” nhằm mang lại trải nghiệm đăng nhập thuận tiện, an toàn và không cần ghi nhớ thêm mật khẩu. Chúng tôi cam kết minh bạch tuyệt đối về việc sử dụng thông tin từ Google:
+            Planora cung cấp tuỳ chọn “Tiếp tục với Google” nhằm mang lại trải nghiệm đăng nhập thuận tiện, an toàn và không cần ghi nhớ thêm mật khẩu. Chúng tôi cam kết minh bạch tuyệt đối về việc sử dụng thông tin từ Google:
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-            {/* Nhóm thông tin ATI nhận */}
+            {/* Nhóm thông tin Planora nhận */}
             <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100">
               <div className="flex items-center gap-2 mb-2 text-emerald-800 font-semibold text-xs uppercase tracking-wider">
                 <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -415,7 +415,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                   {' '}
                 </svg>
                 <span>
-                  Dữ liệu ATI nhận từ Google
+                  Dữ liệu Planora nhận từ Google
                 </span>
               </div>
               <ul className="v3-space-y-1.5 text-xs sm:text-sm text-[#374151]">
@@ -443,7 +443,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                 </li>
               </ul>
             </div>
-            {/* Nhóm thông tin ATI KHÔNG BAO GIỜ chạm tới */}
+            {/* Nhóm thông tin Planora KHÔNG BAO GIỜ chạm tới */}
             <div className="p-4 rounded-2xl bg-rose-50/60 border border-rose-100">
               <div className="flex items-center gap-2 mb-2 text-rose-800 font-semibold text-xs uppercase tracking-wider">
                 <svg className="w-4 h-4 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -456,38 +456,38 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-[#374151] leading-relaxed">
-                Đăng nhập Google chỉ dùng để xác định bạn là ai. ATI chỉ đọc hộp thư bạn tự kết nối, và chỉ hộp thư đó. ATI không truy cập Drive hay lịch cá nhân. Google Sheets và Google Calendar của nhóm được kết nối riêng bằng tài khoản dịch vụ do quản trị viên cấu hình.
+                Đăng nhập Google chỉ dùng để xác định bạn là ai. Planora chỉ đọc hộp thư bạn tự kết nối, và chỉ hộp thư đó. Planora không truy cập Drive hay lịch cá nhân. Google Sheets và Google Calendar của nhóm được kết nối riêng bằng tài khoản dịch vụ do quản trị viên cấu hình.
               </p>
             </div>
           </div>
           {gmailEnabled && <section aria-label="Dữ liệu Gmail" className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm v3-space-y-3">
               <h3 className="font-semibold text-[#111827]">Hộp thư Gmail bạn kết nối</h3>
               <p>Nội dung và tiêu đề thư đi qua 9router tới tài khoản model bên thứ ba để lập kế hoạch hoặc trả lời.</p>
-              <p>Token được mã hoá trong cơ sở dữ liệu. Nội dung thư nằm trong kết quả tra cứu và trong lời gọi model; câu trả lời, hội thoại và kế hoạch có nội dung thư được giữ lại. Tham số và kết quả bước đã chạy giữ người nhận, tiêu đề và nội dung thư ATI gửi. Nội dung tệp đính kèm không gửi cho model. Bộ nhớ làm việc giữ ID và người tham gia; tiêu đề luồng còn ở nhãn tài nguyên, không gửi trong bộ nhớ cho model. Nhãn xem trước giữ tiêu đề luồng và nguồn người nhận.</p>
-              <p>Ngắt kết nối chỉ xoá token và thu hồi quyền Google; hội thoại, câu trả lời và kế hoạch cũ vẫn còn. Hiện chưa có chức năng xoá hội thoại. ATI không xoá vĩnh viễn thư.</p>
+              <p>Token được mã hoá trong cơ sở dữ liệu. Nội dung thư nằm trong kết quả tra cứu và trong lời gọi model; câu trả lời, hội thoại và kế hoạch có nội dung thư được giữ lại. Tham số và kết quả bước đã chạy giữ người nhận, tiêu đề và nội dung thư Planora gửi. Nội dung tệp đính kèm không gửi cho model. Bộ nhớ làm việc giữ ID và người tham gia; tiêu đề luồng còn ở nhãn tài nguyên, không gửi trong bộ nhớ cho model. Nhãn xem trước giữ tiêu đề luồng và nguồn người nhận.</p>
+              <p>Ngắt kết nối chỉ xoá token và thu hồi quyền Google; hội thoại, câu trả lời và kế hoạch cũ vẫn còn. Hiện chưa có chức năng xoá hội thoại. Planora không xoá vĩnh viễn thư.</p>
             </section>}
           {mycalendarEnabled && <section aria-label="Dữ liệu Google Calendar của bạn" className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm v3-space-y-3">
               <h3 className="font-semibold text-[#111827]">Dữ liệu Google Calendar của bạn</h3>
-              <p>ATI chỉ đọc danh sách lịch và các sự kiện trong khoảng thời gian truy vấn của những lịch mà bạn đã tick chọn. Dữ liệu văn bản cần thiết được gửi qua 9router để model lập kế hoạch.</p>
-              <p>Phạm vi quyền truy cập bao gồm xem danh sách lịch (calendar.calendarlist.readonly) và quản lý sự kiện (calendar.events). ATI chỉ tạo, cập nhật hoặc huỷ sự kiện trên lịch đã chọn sau khi bạn bấm phê duyệt kế hoạch và không tự ý gửi lời mời cho người khác.</p>
+              <p>Planora chỉ đọc danh sách lịch và các sự kiện trong khoảng thời gian truy vấn của những lịch mà bạn đã tick chọn. Dữ liệu văn bản cần thiết được gửi qua 9router để model lập kế hoạch.</p>
+              <p>Phạm vi quyền truy cập bao gồm xem danh sách lịch (calendar.calendarlist.readonly) và quản lý sự kiện (calendar.events). Planora chỉ tạo, cập nhật hoặc huỷ sự kiện trên lịch đã chọn sau khi bạn bấm phê duyệt kế hoạch và không tự ý gửi lời mời cho người khác.</p>
               <p>Bạn có thể thay đổi danh sách lịch được dùng hoặc ngắt kết nối bất cứ lúc nào tại <a href="/settings#mycalendar" onClick={appLink(navigate, '/settings#mycalendar')} className="text-[#FF5701] underline font-medium">Kết nối dịch vụ</a>. Khi ngắt kết nối, token và quyền truy cập sẽ bị thu hồi hoàn toàn.</p>
             </section>}
           {mysheetsEnabled && <section aria-label="Bảng tính Google Sheets của bạn" className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm v3-space-y-3">
               <h3 className="font-semibold text-[#111827]">Bảng tính Google Sheets của bạn</h3>
-              <p>ATI chỉ truy cập các bảng tính mà bạn chủ động chọn trong cửa sổ Google Picker (phạm vi drive.file và spreadsheets). Dữ liệu ô tính được đọc đi qua 9router để model lập kế hoạch và trả lời.</p>
-              <p>ATI chỉ thêm dòng, cập nhật cột, xoá dòng hoặc tạo trang tính (tab) sau khi bạn xem trước và phê duyệt kế hoạch. ATI không tự ý sửa đổi khi chưa duyệt, không xoá tệp bảng tính và không truy cập vào bất kỳ tệp Drive nào khác của bạn.</p>
+              <p>Planora chỉ truy cập các bảng tính mà bạn chủ động chọn trong cửa sổ Google Picker (phạm vi drive.file và spreadsheets). Dữ liệu ô tính được đọc đi qua 9router để model lập kế hoạch và trả lời.</p>
+              <p>Planora chỉ thêm dòng, cập nhật cột, xoá dòng hoặc tạo trang tính (tab) sau khi bạn xem trước và phê duyệt kế hoạch. Planora không tự ý sửa đổi khi chưa duyệt, không xoá tệp bảng tính và không truy cập vào bất kỳ tệp Drive nào khác của bạn.</p>
               <p>Bạn có thể thay đổi danh sách bảng tính hoặc ngắt kết nối bất cứ lúc nào tại <a href="/settings#mysheets" onClick={appLink(navigate, '/settings#mysheets')} className="text-[#FF5701] underline font-medium">Kết nối dịch vụ</a> hoặc thu hồi quyền trực tiếp tại Google. Khi ngắt kết nối, token và quyền truy cập sẽ bị thu hồi.</p>
             </section>}
           <section aria-label="Không gian Notion của bạn" className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm v3-space-y-3 mt-4">
             <h3 className="font-semibold text-[#111827]">Không gian Notion bạn kết nối</h3>
-            <p>Khi kết nối Notion qua OAuth 2.0 1-Click, ATI chỉ đọc, truy vấn, tạo hoặc cập nhật trang trong đúng danh sách Database (tối đa 20 database) mà bạn đã cấp quyền trong Workspace đang kích hoạt.</p>
+            <p>Khi kết nối Notion qua OAuth 2.0 1-Click, Planora chỉ đọc, truy vấn, tạo hoặc cập nhật trang trong đúng danh sách Database (tối đa 20 database) mà bạn đã cấp quyền trong Workspace đang kích hoạt.</p>
             <p>Mọi thao tác tạo trang mới, cập nhật thuộc tính trang hoặc nối văn bản đều phải hiển thị bản xem trước và được bạn bấm phê duyệt trước khi thực thi. Bạn có thể đổi phạm vi database, chuyển đổi Workspace hoặc ngắt kết nối bất cứ lúc nào tại <a href="/settings#notion" onClick={appLink(navigate, '/settings#notion')} className="text-[#FF5701] underline font-medium">Kết nối dịch vụ</a>.</p>
           </section>
           <section aria-label="Tài khoản Jira Cloud bạn kết nối" className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm v3-space-y-3 mt-4">
             <h3 className="font-semibold text-[#111827]">Tài khoản Jira Cloud bạn kết nối</h3>
-            <p>Khi bạn kết nối Jira Cloud qua Atlassian OAuth 2.0 (3LO), ATI chỉ truy cập đúng các site và project mà bạn đã chọn cấp quyền trong Workspace hiện tại. Dữ liệu Jira đọc được (danh sách site, project, tiêu đề và mô tả issue) được gửi tới nhà cung cấp mô hình AI bên thứ ba đã cấu hình để lập kế hoạch hoặc trả lời.</p>
-            <p>ATI chỉ tạo issue hoặc thêm bình luận sau khi bạn xem trước đích ghi và bấm phê duyệt kế hoạch. Các bảng hội thoại, kế hoạch và bước thực thi vẫn giữ lại nội dung và tham số đã chạy kể cả sau khi bạn ngắt kết nối Jira.</p>
-            <p>Ngắt kết nối trên ATI chỉ xoá token cục bộ và phạm vi project đã lưu, không tự xoá lịch sử hội thoại đã lưu và không tự thu hồi grant phía Atlassian nếu bạn chưa thu hồi quyền trực tiếp trong trang cài đặt tài khoản Atlassian.</p>
+            <p>Khi bạn kết nối Jira Cloud qua Atlassian OAuth 2.0 (3LO), Planora chỉ truy cập đúng các site và project mà bạn đã chọn cấp quyền trong Workspace hiện tại. Dữ liệu Jira đọc được (danh sách site, project, tiêu đề và mô tả issue) được gửi tới nhà cung cấp mô hình AI bên thứ ba đã cấu hình để lập kế hoạch hoặc trả lời.</p>
+            <p>Planora chỉ tạo issue hoặc thêm bình luận sau khi bạn xem trước đích ghi và bấm phê duyệt kế hoạch. Các bảng hội thoại, kế hoạch và bước thực thi vẫn giữ lại nội dung và tham số đã chạy kể cả sau khi bạn ngắt kết nối Jira.</p>
+            <p>Ngắt kết nối trên Planora chỉ xoá token cục bộ và phạm vi project đã lưu, không tự xoá lịch sử hội thoại đã lưu và không tự thu hồi grant phía Atlassian nếu bạn chưa thu hồi quyền trực tiếp trong trang cài đặt tài khoản Atlassian.</p>
           </section>
             {/* Quy định duyệt tài khoản Google mới */}
           <div className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm text-[#4B5563]">
@@ -531,7 +531,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                 </span>
               </div>
               <p className="text-xs text-[#6B7280] mb-4">
-                Dành cho các thành viên trong nhóm dùng ATI để điều phối công việc hằng ngày.
+                Dành cho các thành viên trong nhóm dùng Planora để điều phối công việc hằng ngày.
               </p>
               <ul className="v3-space-y-2.5 text-xs sm:text-sm text-[#374151]">
                 <li className="flex items-start gap-2">
@@ -631,7 +631,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                     ✓
                   </span>
                   <span>
-                    Thêm hoặc xoá nơi ATI được phép truy cập (Board, Channel, Repo...).
+                    Thêm hoặc xoá nơi Planora được phép truy cập (Board, Channel, Repo...).
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
@@ -684,7 +684,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                 Mạng ngắt giữa chừng khi đang ghi dữ liệu
               </h3>
               <p className="leading-relaxed">
-                Nếu kết nối mạng của bạn hoặc kết nối giữa ATI và dịch vụ bên thứ ba (Slack, GitHub, Sheets...) bị ngắt trong lúc việc đang thực hiện, hệ thống không tự ý phát lệnh lại. Thay vào đó, giao diện làm việc sẽ hiển thị thông báo chi tiết: liệt kê chính xác các việc đã hoàn tất kèm đường dẫn kết quả, việc đang dở dang và việc chưa làm, để bạn có thể kiểm tra thực tế trên công cụ rồi mới quyết định tiếp tục hay dừng lại.
+                Nếu kết nối mạng của bạn hoặc kết nối giữa Planora và dịch vụ bên thứ ba (Slack, GitHub, Sheets...) bị ngắt trong lúc việc đang thực hiện, hệ thống không tự ý phát lệnh lại. Thay vào đó, giao diện làm việc sẽ hiển thị thông báo chi tiết: liệt kê chính xác các việc đã hoàn tất kèm đường dẫn kết quả, việc đang dở dang và việc chưa làm, để bạn có thể kiểm tra thực tế trên công cụ rồi mới quyết định tiếp tục hay dừng lại.
               </p>
             </div>
             <div className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2]">
@@ -730,7 +730,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
               <strong className="text-[#111827]">
                 Nhật ký điều phối:
               </strong>
-              {" ATI lưu trong cơ sở dữ liệu của nhóm: các tin nhắn trong hội thoại, kế hoạch bạn đã duyệt và kết quả từng bước (kể cả dữ liệu ATI đọc được khi tra cứu, như tên bảng, tiêu đề issue, nội dung ô). Khoá dịch vụ được mã hoá khi lưu."}
+              {" Planora lưu trong cơ sở dữ liệu của nhóm: các tin nhắn trong hội thoại, kế hoạch bạn đã duyệt và kết quả từng bước (kể cả dữ liệu Planora đọc được khi tra cứu, như tên bảng, tiêu đề issue, nội dung ô). Khoá dịch vụ được mã hoá khi lưu."}
             </p>
             <p className="leading-relaxed">
               <strong className="text-[#111827]">
@@ -773,10 +773,10 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-[#6B7280]">
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 rounded bg-[#FF5701] text-white flex items-center justify-center font-display font-bold text-[10px]">
-              A
+              P
             </div>
             <span className="font-semibold text-[#111827]">
-              ATI
+              Planora
             </span>
             <span>
               — AI Workflow Automation Platform · 2026

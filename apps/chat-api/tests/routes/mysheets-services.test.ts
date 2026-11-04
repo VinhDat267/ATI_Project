@@ -427,7 +427,7 @@ describe('GET /api/services, AdapterFactory, ChatService, and health check for M
 
       const result = await (chatService as any).bindConnections(plan, alice.id);
       expect(result.kind).toBe('refusal');
-      expect(result.reason).toBe('Bảng tính "Bảng Điểm Danh (Chỉ xem)" chỉ cho xem, ATI không thêm dòng được.');
+      expect(result.reason).toBe('Bảng tính "Bảng Điểm Danh (Chỉ xem)" chỉ cho xem, Planora không thêm dòng được.');
       expect(result.unavailableServices).toEqual([{ id: 'mysheets', name: 'Google Sheets của bạn' }]);
     });
 
@@ -523,7 +523,7 @@ describe('GET /api/services, AdapterFactory, ChatService, and health check for M
 
       const result = await (chatService as any).bindConnections(plan, alice.id);
       expect(result.kind).toBe('refusal');
-      expect(result.reason).toBe('Bảng tính "Report read only" chỉ cho xem, ATI không thêm dòng được.');
+      expect(result.reason).toBe('Bảng tính "Report read only" chỉ cho xem, Planora không thêm dòng được.');
       expect(result.unavailableServices).toEqual([{ id: 'mysheets', name: 'Google Sheets của bạn' }]);
     });
 
@@ -610,7 +610,7 @@ describe('GET /api/services, AdapterFactory, ChatService, and health check for M
 
       const result = await (chatService as any).bindConnections(plan, alice.id);
       expect(result.kind).toBe('refusal');
-      expect(result.reason).toBe('Bảng tính "Báo cáo mật (Chỉ xem)" chỉ cho xem, ATI không thêm dòng được.');
+      expect(result.reason).toBe('Bảng tính "Báo cáo mật (Chỉ xem)" chỉ cho xem, Planora không thêm dòng được.');
     });
 
     it('ChatService.bindConnections prevents false approval when writable sheet was renamed on Google after connection', async () => {
@@ -660,7 +660,7 @@ describe('GET /api/services, AdapterFactory, ChatService, and health check for M
 
       const result = await (chatService as any).bindConnections(plan, alice.id);
       expect(result.kind).toBe('refusal');
-      expect(result.reason).toBe('Bảng tính "Report read only" chỉ cho xem, ATI không thêm dòng được.');
+      expect(result.reason).toBe('Bảng tính "Report read only" chỉ cho xem, Planora không thêm dòng được.');
       expect(result.unavailableServices).toEqual([{ id: 'mysheets', name: 'Google Sheets của bạn' }]);
     });
 

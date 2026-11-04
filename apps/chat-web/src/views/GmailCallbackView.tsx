@@ -5,7 +5,7 @@ import { apiClient } from '../services/api-client';
 import { subscribeAuthTokens } from '../services/auth-storage';
 import { gmailSessionOwner, gmailCallbackError, gmailConnectionNotice, conversationReturnPath } from '../services/gmail-connection';
 import { usePrototypePage } from '../prototype/usePrototypePage';
-const meta = { id: 'gmail-callback', title: 'Kết nối Gmail — ATI', htmlClass: '', bodyClass: 'min-h-screen bg-[#F8F8F6] text-[#111827] antialiased', css: '' };
+const meta = { id: 'gmail-callback', title: 'Kết nối Gmail — Planora', htmlClass: '', bodyClass: 'min-h-screen bg-[#F8F8F6] text-[#111827] antialiased', css: '' };
 
 export function GmailCallbackView({ navigate, input }: { navigate: (path: string, replace?: boolean) => void; input?: GoogleCallbackInput }) {
   usePrototypePage(meta);

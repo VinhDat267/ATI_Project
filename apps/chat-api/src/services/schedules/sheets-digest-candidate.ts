@@ -156,7 +156,7 @@ export async function analyzeSheetsDigestCandidate(
     if (allowedIds.length === 0) {
       return {
         canAutoDigest: false,
-        reason: 'Bạn chưa chọn bảng tính Google Sheets nào cho ATI.',
+        reason: 'Bạn chưa chọn bảng tính Google Sheets nào cho Planora.',
       };
     }
 

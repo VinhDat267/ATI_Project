@@ -23,8 +23,8 @@ export function SlowPlanningMoment({ request, seconds, gather, services, onDismi
         <div className="v3-space-y-1.5 flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap"><span className="px-2 py-0.5 rounded text-[11px] font-bold bg-orange-100 text-orange-800 uppercase tracking-wide">Đang lập kế hoạch</span><span className="text-xs font-mono text-[#FF5701] font-bold">Thời gian chờ: <span id="timer-seconds-display">{seconds}</span>s</span></div>
           <RequestEcho request={request} />
-          <h1 tabIndex={-1} className="font-display font-bold text-xl sm:text-2xl text-[#111827]">ATI đang suy nghĩ lâu hơn thường lệ</h1>
-          <p className="text-sm text-[#4B5563] leading-relaxed">ATI chưa lập xong kế hoạch. Tiến trình bên dưới là thông tin máy chủ đã gửi.</p>
+          <h1 tabIndex={-1} className="font-display font-bold text-xl sm:text-2xl text-[#111827]">Planora đang suy nghĩ lâu hơn thường lệ</h1>
+          <p className="text-sm text-[#4B5563] leading-relaxed">Planora chưa lập xong kế hoạch. Tiến trình bên dưới là thông tin máy chủ đã gửi.</p>
         </div>
       </div>
       <div className="p-4 bg-[#F8F8F6] rounded-xl border border-[#E7E7E2] v3-space-y-3">

@@ -31,7 +31,7 @@ export const telegramCallbackError = (code?: string) =>
     TELEGRAM_STATE_INVALID:
       'Yêu cầu kết nối Telegram đã hết hạn hoặc không còn hợp lệ. Hãy bấm "Kết nối Telegram" lại.',
     TELEGRAM_PAIRING_PENDING:
-      'Chưa nhận được tín hiệu nhấn Start từ Telegram. Hãy mở Telegram, bấm Start với bot của ATI rồi bấm xác nhận lại.',
+      'Chưa nhận được tín hiệu nhấn Start từ Telegram. Hãy mở Telegram, bấm Start với bot của Planora rồi bấm xác nhận lại.',
     TELEGRAM_CONNECT_FAILED: 'Không kết nối được Telegram. Vui lòng thử lại.',
     INVALID_SESSION: 'Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại rồi kết nối Telegram.',
   }[code ?? ''] ?? 'Không thể hoàn tất kết nối Telegram. Hãy trở về trang dịch vụ để kết nối lại.');

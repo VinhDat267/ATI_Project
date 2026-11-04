@@ -386,7 +386,7 @@ it('represents actual metadata in headline without claiming tools are live now w
   await screen.findByText('Ready Workspace');
   expect(screen.getByText('Đã sẵn sàng xử lý')).toBeInTheDocument();
   // Unconditional pending claim should NOT be shown
-  expect(screen.queryByText(/Chờ cho phép xử lý dữ liệu: ATI chưa đọc tin/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Chờ cho phép xử lý dữ liệu: Planora chưa đọc tin/)).not.toBeInTheDocument();
   expect(screen.getByText('Tất cả workspace đã được cấp quyền xử lý dữ liệu.')).toBeInTheDocument();
 });
 

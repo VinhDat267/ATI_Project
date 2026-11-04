@@ -210,7 +210,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
               <strong className="text-[#111827] font-semibold">
                 Nguyên tắc an toàn của nhóm:
               </strong>
-              {" ATI chỉ đọc và ghi ở những nơi bạn chọn bên dưới. Khoá được mã hoá khi lưu và không hiển thị lại."}
+              {" Planora chỉ đọc và ghi ở những nơi bạn chọn bên dưới. Khoá được mã hoá khi lưu và không hiển thị lại."}
             </div>
           </div>
         </div>
@@ -283,7 +283,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
         <div className="mt-12 pt-6 border-t border-[#E7E7E2] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#6B7280]">
           <div>
             <p>
-              ATI — Nền tảng điều phối công việc liên dịch vụ · 2026
+              Planora — Nền tảng điều phối công việc liên dịch vụ · 2026
             </p>
             <p className="text-[11px] text-[#9CA3AF] mt-0.5">
               {personal ? 'Dịch vụ dùng chung: chỉ quản trị viên cập nhật khoá. OAuth 1-Click cá nhân (Gmail, Calendar, Sheets, Trello, GitHub, Notion, Jira Cloud, Telegram) do mỗi người tự kết nối.' : 'Khoá dịch vụ là tài nguyên dùng chung của cả nhóm · Chỉ quản trị viên có quyền cập nhật'}
@@ -424,7 +424,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
                   })}
                 </div>
               </section>
-              {/* PHẦN 2: NƠI ATI ĐƯỢC PHÉP DÙNG */}
+              {/* PHẦN 2: NƠI Planora ĐƯỢC PHÉP DÙNG */}
               <section aria-labelledby="section-scope-title" className="v3-space-y-4">
                 <div className="border-b border-[#E7E7E2] pb-2">
                   <h3 id="section-scope-title" className="text-sm font-bold uppercase tracking-wider text-[#111827] flex items-center gap-2">
@@ -432,11 +432,11 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
                       2
                     </span>
                     <span>
-                      Nơi ATI được phép dùng
+                      Nơi Planora được phép dùng
                     </span>
                   </h3>
                   <p className="text-xs text-[#6B7280] mt-1" id="scope-description-text">
-                    {scopeLabel ? `ATI chỉ đọc và ghi ở những ${scopeLabel} trong danh sách này.` : 'ATI chỉ đọc và ghi ở những nơi trong danh sách này.'}
+                    {scopeLabel ? `Planora chỉ đọc và ghi ở những ${scopeLabel} trong danh sách này.` : 'Planora chỉ đọc và ghi ở những nơi trong danh sách này.'}
                   </p>
                 </div>
                 {/* Danh sách Chip các nơi được phép dùng, renderScopeChips */}

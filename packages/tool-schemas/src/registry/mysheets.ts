@@ -4,7 +4,7 @@ import { MYSHEETS_SCOPE } from '../mysheets.js';
 export const MYSHEETS_SERVICE: ServiceDefinition = {
   id: 'mysheets',
   name: 'Google Sheets của bạn',
-  description: 'Đọc và thêm dòng vào các bảng tính Google Sheets cá nhân mà bạn đã chọn cho ATI',
+  description: 'Đọc và thêm dòng vào các bảng tính Google Sheets cá nhân mà bạn đã chọn cho Planora',
   connection: 'personal',
   scopes: [MYSHEETS_SCOPE],
   scopeKey: 'spreadsheets',

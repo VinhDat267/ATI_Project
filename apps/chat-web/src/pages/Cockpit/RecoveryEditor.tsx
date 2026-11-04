@@ -37,7 +37,7 @@ if(!result || typeof result!=='object' || Array.isArray(result))throw new Error(
       }}/></label>) : <label className="block v3-space-y-1"><span>Tham số thực thi (JSON)</span><textarea aria-label="Tham số thực thi" value={json} disabled={busy || confirm} onChange={event=>setJson(event.target.value)} className="block w-full rounded-xl border border-brand-border p-3 font-mono bg-white text-brand-text"/></label>}
       <label className="block v3-space-y-1"><span>Ghi chú thêm (không bắt buộc)</span><textarea value={promptText} disabled={busy || confirm} onChange={event=>setPrompt(event.target.value)} className="block w-full rounded-xl border border-brand-border p-3 bg-white text-brand-text"/></label>
       {error && <p role="alert" className="text-brand-danger">{error}</p>}
-      {confirm && <p role="status">Không thể chạy tiếp kế hoạch cũ sau khi dừng. Gửi nội dung sửa để ATI lập kế hoạch mới?</p>}
+      {confirm && <p role="status">Không thể chạy tiếp kế hoạch cũ sau khi dừng. Gửi nội dung sửa để Planora lập kế hoạch mới?</p>}
       <div className="flex flex-wrap gap-3"><button type="button" disabled={busy} onClick={()=>confirm?setConfirm(false):onClose()} className="px-5 py-3 bg-white border border-brand-border rounded-xl">{confirm?'Quay lại sửa':'Hủy sửa'}</button><button type="submit" disabled={busy} className="px-6 py-3 bg-brand-primary text-white font-semibold rounded-xl">{confirm?'Dừng và gửi yêu cầu sửa':'Xem lại nội dung sửa'}</button></div>
     </form>
   </CockpitDialog>;

@@ -47,22 +47,22 @@ function tokenLink(baseUrl: string, view: string, token: string): string {
   const url = new URL('/', baseUrl); url.searchParams.set('view', view); url.searchParams.set('token', token); return url.href;
 }
 export function verificationEmail(to: string, name: string, baseUrl: string, token: string): EmailMessage {
-  return email(to, 'Xác minh email tài khoản ATI', `Chào ${name},\nBấm link để xác minh email. Link có hiệu lực 24 giờ và chỉ dùng được một lần.\n${tokenLink(baseUrl, 'verify-email', token)}\nSau khi xác minh, tài khoản cần quản trị viên duyệt. Nếu bạn không yêu cầu, hãy bỏ qua thư này.`);
+  return email(to, 'Xác minh email tài khoản Planora', `Chào ${name},\nBấm link để xác minh email. Link có hiệu lực 24 giờ và chỉ dùng được một lần.\n${tokenLink(baseUrl, 'verify-email', token)}\nSau khi xác minh, tài khoản cần quản trị viên duyệt. Nếu bạn không yêu cầu, hãy bỏ qua thư này.`);
 }
 export function resetPasswordEmail(to: string, name: string, baseUrl: string, token: string): EmailMessage {
-  return email(to, 'Đặt lại mật khẩu ATI', `Chào ${name},\nBấm link để đặt lại mật khẩu. Link có hiệu lực 30 phút và chỉ dùng được một lần.\n${tokenLink(baseUrl, 'reset-password', token)}\nNếu bạn không yêu cầu, hãy bỏ qua thư này.`);
+  return email(to, 'Đặt lại mật khẩu Planora', `Chào ${name},\nBấm link để đặt lại mật khẩu. Link có hiệu lực 30 phút và chỉ dùng được một lần.\n${tokenLink(baseUrl, 'reset-password', token)}\nNếu bạn không yêu cầu, hãy bỏ qua thư này.`);
 }
 export function duplicateSignupEmail(to: string): EmailMessage {
-  return email(to, 'Có người thử đăng ký bằng email của bạn', 'Có người vừa thử đăng ký tài khoản ATI bằng email của bạn. Tài khoản và mật khẩu hiện tại không thay đổi. Nếu đó là bạn, hãy đăng nhập hoặc dùng chức năng quên mật khẩu.');
+  return email(to, 'Có người thử đăng ký bằng email của bạn', 'Có người vừa thử đăng ký tài khoản Planora bằng email của bạn. Tài khoản và mật khẩu hiện tại không thay đổi. Nếu đó là bạn, hãy đăng nhập hoặc dùng chức năng quên mật khẩu.');
 }
 export function pendingApprovalEmail(to: string, name: string, userEmail: string): EmailMessage {
   return email(to, 'Có tài khoản mới chờ duyệt', `Tài khoản ${name} (${userEmail}) đã xác minh email và đang chờ duyệt. Hãy mở trang quản trị tài khoản để xem xét.`);
 }
 export function approvalEmail(to: string, name: string): EmailMessage {
-  return email(to, 'Tài khoản ATI đã được duyệt', `Chào ${name},\nTài khoản của bạn đã được quản trị viên duyệt. Bạn có thể đăng nhập và sử dụng ATI.`);
+  return email(to, 'Tài khoản Planora đã được duyệt', `Chào ${name},\nTài khoản của bạn đã được quản trị viên duyệt. Bạn có thể đăng nhập và sử dụng Planora.`);
 }
 export function googleLinkedEmail(to: string): EmailMessage {
-  return email(to, 'Tài khoản ATI đã liên kết Google', 'Tài khoản ATI của bạn vừa được liên kết với Google. Nếu bạn không yêu cầu việc này, hãy liên hệ quản trị viên.');
+  return email(to, 'Tài khoản Planora đã liên kết Google', 'Tài khoản Planora của bạn vừa được liên kết với Google. Nếu bạn không yêu cầu việc này, hãy liên hệ quản trị viên.');
 }
 
 export function workspaceJoinRequestEmail(to: string, adminName: string, requesterName: string, requesterEmail: string, workspaceName: string): EmailMessage {

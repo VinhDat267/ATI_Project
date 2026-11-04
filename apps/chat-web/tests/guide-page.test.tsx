@@ -23,13 +23,13 @@ afterEach(() => {
 });
 
 describe('GuidePage — OAuth-First AI Automation Playbook & Make.com Orbital Showcase', () => {
-  it('renders Bắt đầu sử dụng ATI, Cài đặt dịch vụ headings, Mở Cài đặt dịch vụ link, and Quay lại trò chuyện link', async () => {
+  it('renders Bắt đầu sử dụng Planora, Cài đặt dịch vụ headings, Mở Cài đặt dịch vụ link, and Quay lại trò chuyện link', async () => {
     const navigate = vi.fn();
     render(<GuidePage navigate={navigate} />);
     await waitFor(() => expect(apiClient.getRuntime).toHaveBeenCalled());
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Cẩm nang kết nối & Mẫu câu lệnh ATI' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Bắt đầu sử dụng ATI/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Cẩm nang kết nối & Mẫu câu lệnh Planora' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Bắt đầu sử dụng Planora/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Cài đặt dịch vụ/i })).toBeInTheDocument();
 
     const openSettingsLinks = screen.getAllByRole('link', { name: /Mở Cài đặt dịch vụ/i });

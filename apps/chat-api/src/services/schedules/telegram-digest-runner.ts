@@ -598,7 +598,7 @@ export class TelegramDigestRunner {
     }
 
     const timeLabel = localLabel(run.dueAt, this.options.timeZone);
-    const header = `📋 Bản tin tự động của ATI · thiết lập bởi @${digestConfig.username}\n📌 ${run.name} · 🕒 ${timeLabel}\n\n`;
+    const header = `📋 Bản tin tự động của Planora · thiết lập bởi @${digestConfig.username}\n📌 ${run.name} · 🕒 ${timeLabel}\n\n`;
     const footer =
       failedLabels.length > 0
         ? `\n\n⚠️ Tạm thời chưa lấy được dữ liệu từ: ${failedLabels.join(', ')}.`

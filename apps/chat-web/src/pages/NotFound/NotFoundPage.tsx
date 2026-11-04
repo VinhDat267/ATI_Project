@@ -17,7 +17,7 @@ function badPath() {
 
 export const meta: PageMeta = {
   id: '404',
-  title: '404 — Không tìm thấy trang · ATI',
+  title: '404 — Không tìm thấy trang · Planora',
   htmlClass: '',
   bodyClass: 'min-h-screen flex flex-col bg-[#F8F8F6] text-[#111827]',
   css,
@@ -47,10 +47,10 @@ export function NotFoundPage({ signedIn, navigate }: { signedIn: boolean; naviga
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <a href="/" onClick={go('/')} className="flex items-center gap-2.5 group flex-shrink-0" title={home.logo}>
               <div className="w-8 h-8 rounded-lg bg-[#FF5701] flex items-center justify-center text-white font-display font-bold text-lg shadow-sm group-hover:scale-105 transition-transform">
-                A
+                P
               </div>
               <span className="font-display font-bold text-lg tracking-tight text-[#111827]">
-                ATI
+                Planora
               </span>
             </a>
             <div className="h-4 w-px bg-[#E7E7E2] flex-shrink-0" />
@@ -107,7 +107,7 @@ export function NotFoundPage({ signedIn, navigate }: { signedIn: boolean; naviga
           </div>
           {' '}
           <p className="text-sm text-[#4B5563] leading-relaxed">
-            Đường dẫn bạn vừa truy cập không tồn tại trên hệ thống ATI, đã được đổi tên hoặc chuyển sang vị trí khác. Lỗi điều hướng này không thay đổi dữ liệu công việc của bạn.
+            Đường dẫn bạn vừa truy cập không tồn tại trên hệ thống Planora, đã được đổi tên hoặc chuyển sang vị trí khác. Lỗi điều hướng này không thay đổi dữ liệu công việc của bạn.
           </p>
           {/* Hành động điều hướng chính */}
           <div className="flex flex-wrap items-center justify-center gap-3 pt-3">
@@ -129,7 +129,7 @@ export function NotFoundPage({ signedIn, navigate }: { signedIn: boolean; naviga
       <footer className="mt-auto border-t border-[#E7E7E2] py-4 px-4 text-center text-xs text-[#6B7280]">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>
-            ATI · 2026 — Hệ thống điều phối tác vụ an toàn &amp; minh bạch
+            Planora · 2026 — Hệ thống điều phối tác vụ an toàn &amp; minh bạch
           </span>
           <div className="flex items-center gap-3">
             <a href="/" onClick={go('/')} className="hover:text-[#111827] transition-colors">

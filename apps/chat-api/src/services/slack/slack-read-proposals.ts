@@ -13,7 +13,7 @@ export class SlackReadProposalService{
   if(!row||row.status!=='active')return deny('Workspace Slack này chưa sẵn sàng hoặc cần kết nối lại.');
   const binding=validateSlackBinding({atiUserId:input.userId,connectionId:row.id,workspaceId:row.workspace_id,slackUserId:row.actor_id,identityVersion:row.identity_version});
   const planning=await this.options.policy.resolveSlackModelPolicy({binding,purpose:'planning',requestedRetentionDays:0});
-  if(!planning.allowed)return deny('Workspace chưa cho phép ATI lập yêu cầu đọc Slack.');
+  if(!planning.allowed)return deny('Workspace chưa cho phép Planora lập yêu cầu đọc Slack.');
   for(const purpose of ['manual_lookup','storage'] as const){
    const ready=await this.options.policy.resolveSlackModelPolicy({binding,purpose,requestedRetentionDays:purpose==='storage'?1:0});
    if(!ready.allowed)return deny('Tra cứu có lịch sử cần workspace cho phép đọc và lưu kết quả tối đa 1 ngày.');

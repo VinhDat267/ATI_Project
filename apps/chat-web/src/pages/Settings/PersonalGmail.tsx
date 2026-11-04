@@ -66,7 +66,7 @@ export function PersonalGmail({ service, refresh, selected, standalone = true }:
           <span>{status === 'connected' ? 'Đã kết nối' : status === 'reconnect_required' ? 'Cần kết nối lại' : 'Chưa kết nối'}</span>
         </span>
       </div>
-      <p className="text-xs text-[#6B7280]">Chỉ bạn dùng được hộp thư này. ATI được đọc, soạn, gửi, gắn nhãn và chuyển thư vào thùng rác; không xoá vĩnh viễn.</p>
+      <p className="text-xs text-[#6B7280]">Chỉ bạn dùng được hộp thư này. Planora được đọc, soạn, gửi, gắn nhãn và chuyển thư vào thùng rác; không xoá vĩnh viễn.</p>
       <p className="text-sm text-[#111827] break-words">{status === 'connected' ? 'Đã kết nối' : status === 'reconnect_required' ? 'Cần kết nối lại' : 'Chưa kết nối'}{service.email && <> · {service.email}</>}</p>
       {status === 'connected' && (
         <div data-testid="gmail-capabilities" className="flex flex-wrap gap-1.5 pt-0.5">
@@ -95,7 +95,7 @@ export function PersonalGmail({ service, refresh, selected, standalone = true }:
       </section>
     ) : rowContent}
     {confirm && createPortal(<CockpitDialog title="Ngắt kết nối Gmail?" returnFocusId="gmail-action" onClose={() => { if (!busy) setConfirm(false); }}>
-      <div className="p-5 v3-space-y-4"><p className="text-sm">ATI sẽ xoá token và thu hồi quyền truy cập. Hội thoại cũ vẫn còn; kế hoạch cũ không thể dùng kết nối đã ngắt.</p><button className={secondary} disabled={busy} onClick={() => setConfirm(false)}>Giữ kết nối</button>{' '}<button className={button} disabled={busy} onClick={() => void act(true)}>Xác nhận ngắt kết nối</button>{error && <p role="alert">{error}</p>}</div>
+      <div className="p-5 v3-space-y-4"><p className="text-sm">Planora sẽ xoá token và thu hồi quyền truy cập. Hội thoại cũ vẫn còn; kế hoạch cũ không thể dùng kết nối đã ngắt.</p><button className={secondary} disabled={busy} onClick={() => setConfirm(false)}>Giữ kết nối</button>{' '}<button className={button} disabled={busy} onClick={() => void act(true)}>Xác nhận ngắt kết nối</button>{error && <p role="alert">{error}</p>}</div>
     </CockpitDialog>, document.body)}
   </>;
 }

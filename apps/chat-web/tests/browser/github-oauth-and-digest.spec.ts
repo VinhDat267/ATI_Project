@@ -211,7 +211,7 @@ test('GITHUB-DIGEST: admin selects team repos, member connects from refusal card
     // Run now and verify the digest is sent automatically without waiting for manual approval
     await page.getByRole('button', { name: 'Chạy lượt này ngay' }).click();
     await expect(page.getByRole('status').filter({ hasText: 'Đã gửi · 3 mục' })).toBeVisible();
-    await expect(page.getByText(/Bản tin GitHub tự động của ATI/)).toBeVisible();
+    await expect(page.getByText(/Bản tin GitHub tự động của Planora/)).toBeVisible();
 
     // Verify in /history that the schedule shows "Tự gửi" and the latest run shows "Đã gửi" + destination (#general)
     await page.goto('/history');

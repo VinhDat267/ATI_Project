@@ -161,7 +161,7 @@ function MemberCard({ m, isAdmin, onRole, onLock }: { m: Member; isAdmin: boolea
 
 export const meta: PageMeta = {
   id: "users",
-  title: "Quản lý người dùng & Duyệt tài khoản — ATI",
+  title: "Quản lý người dùng & Duyệt tài khoản — Planora",
   htmlClass: "",
   bodyClass: "min-h-screen flex flex-col bg-[#F8F8F6] text-[#111827]",
   css,
@@ -206,7 +206,7 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
                 Quản lý người dùng &amp; Duyệt tài khoản
               </h1>
               <p className="text-sm text-[#6B7280] mt-1">
-                Kiểm soát ai được quyền sử dụng ATI trong nhóm và phê duyệt các đăng ký mới.
+                Kiểm soát ai được quyền sử dụng Planora trong nhóm và phê duyệt các đăng ký mới.
               </p>
             </div>
             {/* Hướng dẫn tự đăng ký cho thành viên mới */}
@@ -230,7 +230,7 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
               <strong className="text-[#111827] font-semibold">
                 Quy tắc nhóm:
               </strong>
-              {" ATI chỉ đọc và ghi theo yêu cầu của các thành viên đã được duyệt kích hoạt. Quản trị viên toàn quyền quyết định ai được tham gia nhóm và phạm vi tài nguyên công cụ được phép sử dụng."}
+              {" Planora chỉ đọc và ghi theo yêu cầu của các thành viên đã được duyệt kích hoạt. Quản trị viên toàn quyền quyết định ai được tham gia nhóm và phạm vi tài nguyên công cụ được phép sử dụng."}
             </p>
           </div>
         </section>
@@ -482,7 +482,7 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
       <footer className="mt-auto border-t border-[#E7E7E2] py-6 text-center text-xs text-[#6B7280]">
         <div className="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <span>
-            ATI — AI Workflow Automation Platform · 2026
+            Planora — AI Workflow Automation Platform · 2026
           </span>
           <div className="flex items-center gap-4 text-xs">
             <a href="/" onClick={event => { event.preventDefault(); navigate("/"); }} className="hover:text-[#111827] transition-colors">
@@ -525,7 +525,7 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
               <span id="approve-user-email" className="text-[#6B7280]">
                 {approveUser ? approveUser.email : '...'}
               </span>
-              ) tham gia vào nhóm ATI.
+              ) tham gia vào nhóm Planora.
             </p>
           </div>
 

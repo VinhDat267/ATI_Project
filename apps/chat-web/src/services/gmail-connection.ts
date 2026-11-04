@@ -45,7 +45,7 @@ export const mycalendarConnectionNotice = {
 
 export const mycalendarCallbackError = (code?: string) => ({
   MYCALENDAR_STATE_INVALID: 'Yêu cầu kết nối Google Calendar đã hết hạn hoặc không còn hợp lệ. Hãy bắt đầu kết nối lại.',
-  MYCALENDAR_SCOPE_MISSING: 'Google chưa cấp quyền quản lý sự kiện lịch cho ATI. Hãy kết nối lại và đồng ý quyền Google Calendar.',
+  MYCALENDAR_SCOPE_MISSING: 'Google chưa cấp quyền quản lý sự kiện lịch cho Planora. Hãy kết nối lại và đồng ý quyền Google Calendar.',
   MYCALENDAR_REFRESH_TOKEN_MISSING: 'Google không trả quyền truy cập lâu dài. Hãy kết nối lại.',
   MYCALENDAR_CONNECT_FAILED: 'Không thể hoàn tất kết nối Google Calendar. Hãy thử kết nối lại từ trang dịch vụ.',
   MYCALENDAR_FETCH_FAILED: 'Không tải được danh sách lịch từ Google Calendar. Hãy thử lại.',
@@ -65,7 +65,7 @@ export const mysheetsConnectionNotice = {
 
 export const mysheetsCallbackError = (code?: string) => ({
   MYSHEETS_STATE_INVALID: 'Yêu cầu kết nối Google Sheets đã hết hạn hoặc không còn hợp lệ. Hãy bắt đầu kết nối lại.',
-  MYSHEETS_SCOPE_MISSING: 'Google chưa cấp quyền quản lý bảng tính cho ATI. Hãy kết nối lại và đồng ý quyền Google Drive / Sheets.',
+  MYSHEETS_SCOPE_MISSING: 'Google chưa cấp quyền quản lý bảng tính cho Planora. Hãy kết nối lại và đồng ý quyền Google Drive / Sheets.',
   MYSHEETS_REFRESH_TOKEN_MISSING: 'Google không trả quyền truy cập lâu dài. Hãy kết nối lại.',
   MYSHEETS_CONNECT_FAILED: 'Không thể hoàn tất kết nối Google Sheets. Hãy thử kết nối lại từ trang dịch vụ.',
   MYSHEETS_FETCH_FAILED: 'Không tải được thông tin bảng tính từ Google. Hãy thử lại.',

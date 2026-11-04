@@ -168,7 +168,7 @@ export function PersonalMySheets({
         Google Sheets của bạn
       </h3>
       <p className="text-xs text-[#6B7280]">
-        ATI chỉ thấy những bảng tính bạn chọn trong cửa sổ của Google. ATI chỉ đọc, thêm dòng,
+        Planora chỉ thấy những bảng tính bạn chọn trong cửa sổ của Google. Planora chỉ đọc, thêm dòng,
         cập nhật cột, xoá dòng hoặc tạo trang tính (tab) sau khi bạn phê duyệt kế hoạch, và không truy cập tệp Drive nào khác.
       </p>
       <div data-testid="mysheets-ecosystem-badges" className="flex flex-wrap items-center gap-1.5 pt-0.5">
@@ -176,10 +176,10 @@ export function PersonalMySheets({
           📊 Google Sheets
         </span>
         <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-800 border border-blue-200">
-          📝 Google Docs (tài liệu ATI tạo)
+          📝 Google Docs (tài liệu Planora tạo)
         </span>
         <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-800 border border-amber-200">
-          📁 Google Drive (thư mục ATI tạo)
+          📁 Google Drive (thư mục Planora tạo)
         </span>
       </div>
 
@@ -407,7 +407,7 @@ export function PersonalMySheets({
           >
             <div className="p-4 sm:p-5 v3-space-y-4 text-xs sm:text-sm text-[#4B5563]">
               <p>
-                ATI sẽ không thể truy cập các bảng tính này nữa. Bạn có thể kết nối lại bất cứ lúc
+                Planora sẽ không thể truy cập các bảng tính này nữa. Bạn có thể kết nối lại bất cứ lúc
                 nào.
               </p>
               <div className="flex items-center justify-end gap-3 pt-2">

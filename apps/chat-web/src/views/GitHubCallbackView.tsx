@@ -6,7 +6,7 @@ import { subscribeAuthTokens } from '../services/auth-storage';
 import { githubSessionOwner, githubCallbackError, githubConnectionNotice, conversationReturnPath } from '../services/github-connection';
 import { usePrototypePage } from '../prototype/usePrototypePage';
 
-const meta = { id: 'github-callback', title: 'Kết nối GitHub — ATI', htmlClass: '', bodyClass: 'min-h-screen bg-[#F8F8F6] text-[#111827] antialiased', css: '' };
+const meta = { id: 'github-callback', title: 'Kết nối GitHub — Planora', htmlClass: '', bodyClass: 'min-h-screen bg-[#F8F8F6] text-[#111827] antialiased', css: '' };
 
 export function GitHubCallbackView({ navigate, input }: { navigate: (path: string, replace?: boolean) => void; input?: GitHubCallbackInput }) {
   usePrototypePage(meta);
