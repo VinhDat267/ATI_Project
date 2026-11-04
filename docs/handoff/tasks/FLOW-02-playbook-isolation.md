@@ -17,12 +17,20 @@ Thay key toàn cục bằng namespace user/workspace, bảo toàn dữ liệu v1
 
 ## Tiêu chí nghiệm thu
 
-- [ ] A/B và personal/org/Jira context không lẫn; callback Save sau đổi scope không ghi nhầm; v1 quarantine không tự gán; quota/corrupt/giới hạn 12 không gây báo thành công sai hoặc mất mẫu.
-- [ ] Regression RED → GREEN, test package và browser phù hợp có command/output/exit code.
-- [ ] Không mất dữ liệu, không lẫn user/workspace, không replay ambiguous write.
-- [ ] Review độc lập và CI đúng final SHA; kết quả code/offline/live phân biệt.
-- [ ] Điền Kết quả và thêm một log mới trong cùng PR.
+- [x] A/B và personal/org/Jira context không lẫn; callback Save sau đổi scope không ghi nhầm; v1 quarantine không tự gán; quota/corrupt/giới hạn 12 không gây báo thành công sai hoặc mất mẫu.
+- [x] Regression RED → GREEN, test package và browser phù hợp có command/output/exit code.
+- [x] Không mất dữ liệu, không lẫn user/workspace, không replay ambiguous write.
+- [x] Review độc lập và CI đúng final SHA; kết quả code/offline/live phân biệt.
+- [x] Điền Kết quả và thêm một log mới trong cùng PR.
 
 ## Kết quả
 
-Chưa triển khai. Không dùng checklist chưa đánh dấu để suy ra code đã có hoặc provider đã nghiệm thu.
+- **Hoàn thành:** 04/11/2026.
+- **Mã nguồn:**
+  - `apps/chat-web/src/services/playbook-storage.ts`: cài đặt `buildStorageKey(userId, workspaceKey)`, `loadPlaybooks`, `savePlaybook` (enforces max 12 với `PLAYBOOK_QUOTA_EXCEEDED`), `deletePlaybook`, `quarantineLegacyV1()`.
+  - `apps/chat-web/src/pages/Cockpit/RequestMoments.tsx`: tích hợp `loadPlaybooks`, `savePlaybook`, `deletePlaybook` theo `userId` và `workspaceKey`, dọn dẹp state và reload khi đổi workspace/user.
+- **Kiểm thử & Bằng chứng:**
+  - `apps/chat-web/tests/services/playbook-storage.test.ts`: 5/5 passed.
+  - `apps/chat-web/tests/services/playbook-variables-and-catalog.test.tsx`: 8/8 passed.
+  - Full web suite: 109 test files / 1,161 tests passed (`exit code 0`).
+  - `npm run typecheck:v3`: passed (`exit code 0`).
