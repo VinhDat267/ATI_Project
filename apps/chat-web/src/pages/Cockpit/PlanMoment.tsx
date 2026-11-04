@@ -173,7 +173,7 @@ export function PlanMoment({request,runtimeMode,plan,services,destination,onPrev
                         </div>
                       );
                     })()}
-                    {step.tool === 'github.list_pull_requests' && (
+                    {step.tool.endsWith('.list_pull_requests') && (
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
                         <span className="text-[11px] font-semibold px-2 py-0.5 bg-purple-50 text-purple-800 border border-purple-200 rounded-full">
                           🔀 Pull Requests ({typeof step.args.state === 'string' ? step.args.state : 'open'})
@@ -185,7 +185,7 @@ export function PlanMoment({request,runtimeMode,plan,services,destination,onPrev
                         )}
                       </div>
                     )}
-                    {step.tool === 'slack.read_messages' && (
+                    {step.tool.endsWith('.read_messages') && (
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
                         <span className="text-[11px] font-semibold px-2 py-0.5 bg-fuchsia-50 text-fuchsia-800 border border-fuchsia-200 rounded-full">
                           💬 Đọc {typeof step.args.limit === 'number' ? step.args.limit : 10} tin nhắn gần nhất

@@ -162,7 +162,7 @@ function GitHubReceiptMetrics({step}:{step:ExecutionStepInfo}) {
   if(step.status!=='succeeded') return null;
   if(serviceId(step.tool)!=='github') return null;
   const pills: Array<{text:string;warn?:boolean}> = [];
-  if(step.tool==='github.list_pull_requests' && Array.isArray(step.output)) {
+  if(step.tool.endsWith('.list_pull_requests') && Array.isArray(step.output)) {
     pills.push({text:`🔀 ${step.output.length} Pull Requests`});
   }
   const out=resultObject(step.output);
@@ -187,11 +187,11 @@ function GitHubReceiptMetrics({step}:{step:ExecutionStepInfo}) {
 }
 function SlackReceiptMetrics({step}:{step:ExecutionStepInfo}) {
   if(step.status!=='succeeded') return null;
-  if(serviceId(step.tool)!=='slack') return null;
+  if(!step.tool.endsWith('.read_messages')) return null;
   const out=resultObject(step.output);
   if(!out) return null;
   const pills: Array<{text:string}> = [];
-  if(step.tool==='slack.read_messages' && Array.isArray(out.messages)) {
+  if(Array.isArray(out.messages)) {
     pills.push({text:`💬 Đã đọc ${out.messages.length} tin nhắn`});
   }
   if(pills.length===0) return null;
