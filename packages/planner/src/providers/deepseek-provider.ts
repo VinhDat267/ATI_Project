@@ -147,7 +147,10 @@ export class DeepSeekProvider implements LLMProvider {
           const confirmedDeepSeekAlias =
             (baseModel(this.model) === 'deepseek-chat' && served === 'deepseek-flash') ||
             (baseModel(this.model) === 'deepseek-reasoner' &&
-              (served === 'deepseek-reasoner' || served === 'deepseek-r1' || served === 'deepseek-v3.2-reasoner'));
+              (served === 'deepseek-flash' ||
+                served === 'deepseek-reasoner' ||
+                served === 'deepseek-r1' ||
+                served === 'deepseek-v3.2-reasoner'));
           if (served && baseModel(served) !== baseModel(this.model) && !confirmedDeepSeekAlias) {
             throw new Error(
               `Completion was served by ${served}, not the configured ${this.model}; disable gateway fallback for this model`,
