@@ -84,6 +84,9 @@ export const SHEETS = [
   { id: 0, title: 'Tasks', spreadsheetId: SPREADSHEETS[0]!.id },
   { id: 1, title: 'History', spreadsheetId: SPREADSHEETS[0]!.id },
   { id: 0, title: 'Tasks', spreadsheetId: SPREADSHEETS[1]!.id },
+];
+export const MYSHEETS_TABS = [
+  ...SHEETS,
   { id: 0, title: 'Sheet1', spreadsheetId: 'spreadsheet_sales_q4' },
 ];
 export const CALENDARS = [
@@ -199,7 +202,7 @@ const GRIDS: Record<string, string[][]> = {
 const ENTITIES: Record<string, Array<{ id: string | number }>> = {
   board: BOARDS, list: LISTS, member: MEMBERS, card: CARDS, channel: CHANNELS, repository: REPOS, issue: ISSUES,
   spreadsheet: SPREADSHEETS, myspreadsheet: MYSPREADSHEETS, drive_folder: DRIVE_FOLDERS, google_doc: GOOGLE_DOCS,
-  sheet: SHEETS, mysheet: SHEETS, calendar: CALENDARS, mycalendar: MYCALENDARS, database: DATABASES, page: PAGES,
+  sheet: SHEETS, mysheet: MYSHEETS_TABS, calendar: CALENDARS, mycalendar: MYCALENDARS, database: DATABASES, page: PAGES,
   chat: CHATS, project: PROJECTS, jira_site: MYJIRA_SITES, jira_project: PROJECTS, jira_issue: JIRA_ISSUES, myjira_project: MYJIRA_PROJECTS, myjira_issue: MYJIRA_ISSUES, thread: GMAIL_THREADS, label: GMAIL_LABELS,
 };
 
@@ -237,16 +240,19 @@ export async function fixtureSearch({ tool, args }: { tool: string; args: Record
     case 'sheets.list_spreadsheets': return bounded(SPREADSHEETS.filter(item => matches(item.title, args.query)), 10);
     case 'mysheets.list_spreadsheets': return bounded(MYSPREADSHEETS.filter(item => matches(item.title, args.query)), 10);
     case 'sheets.list_sheets':
-    case 'mysheets.list_sheets':
-      requireParent(tool.startsWith('mysheets.') ? 'myspreadsheet' : 'spreadsheet', args.spreadsheetId);
+      requireParent('spreadsheet', args.spreadsheetId);
       return bounded(SHEETS.filter(item => item.spreadsheetId === args.spreadsheetId && matches(item.title, args.query)), 10);
+    case 'mysheets.list_sheets':
+      requireParent('myspreadsheet', args.spreadsheetId);
+      return bounded(MYSHEETS_TABS.filter(item => item.spreadsheetId === args.spreadsheetId && matches(item.title, args.query)), 10);
     case 'sheets.read_range':
     case 'mysheets.read_range': {
       requireParent(tool.startsWith('mysheets.') ? 'myspreadsheet' : 'spreadsheet', args.spreadsheetId);
       const range = String(args.range);
       const parts = /^(?:(?:'((?:[^']|'')+)'|([^!]+))!)?([A-Z]+)([1-9]\d*)(?::([A-Z]+)([1-9]\d*))?$/.exec(range);
       if (!parts) throw new Error('Fixture range must be bounded A1 notation');
-      const title = parts[1]?.replaceAll("''", "'") ?? parts[2] ?? SHEETS.find(item => item.spreadsheetId === args.spreadsheetId)?.title ?? 'Sheet1';
+      const tabSource = tool.startsWith('mysheets.') ? MYSHEETS_TABS : SHEETS;
+      const title = parts[1]?.replaceAll("''", "'") ?? parts[2] ?? tabSource.find(item => item.spreadsheetId === args.spreadsheetId)?.title ?? 'Sheet1';
       const grid = GRIDS[`${String(args.spreadsheetId)}:${title}`];
       if (!grid) throw new Error(`Unknown fixture tab ${title}`);
       const column = (letters: string) => [...letters].reduce((value, letter) => value * 26 + letter.charCodeAt(0) - 64, 0) - 1;
