@@ -854,13 +854,13 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
     }
   }
 
-  // Layer 5b: Report Grounding (FLOW-01, F1) — factual reports must have verified reportEvidence
+  // Layer 5b: Report Grounding (FLOW-01 & FLOW-05, F1) — factual reports must have verified reportEvidence
   const isReportIntent =
     options.grounding?.userTexts?.some((t) =>
-      /báo cáo.*(?:pr|pull request|issue|tiến độ|sheet)|tổng hợp.*(?:pr|pull request|issue)/i.test(t)
+      /báo cáo.*(?:pr|pull request|issue|tiến độ|jira|sprint|sheet|bảng tính|số liệu)|tổng hợp.*(?:pr|pull request|issue|tiến độ|jira|sprint|sheet|bảng tính|số liệu)/i.test(t)
     ) ||
-    /báo cáo.*(?:pr|pull request|issue|tiến độ|sheet)/i.test(parsed.summary || '') ||
-    /báo cáo.*(?:pr|pull request|issue|tiến độ|sheet)/i.test(parsed.thinking || '');
+    /báo cáo.*(?:pr|pull request|issue|tiến độ|jira|sprint|sheet|bảng tính|số liệu)/i.test(parsed.summary || '') ||
+    /báo cáo.*(?:pr|pull request|issue|tiến độ|jira|sprint|sheet|bảng tính|số liệu)/i.test(parsed.thinking || '');
 
   const hasFactualReportContent = steps.some((s) => {
     const text =
@@ -870,8 +870,9 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
           ? s.args.body
           : '';
     return (
-      /báo cáo.*(?:pr|pull request|issue)/i.test(text) ||
-      /hiện có \d+ (?:pr|pull request|issue)/i.test(text) ||
+      /báo cáo.*(?:pr|pull request|issue|jira|sprint|tiến độ|sheet|bảng tính|số liệu)/i.test(text) ||
+      /hiện có \d+ (?:pr|pull request|issue|ticket|dòng)/i.test(text) ||
+      /tổng số \d+ (?:ticket|dòng|issue)/i.test(text) ||
       /#\d+/i.test(text)
     );
   });
@@ -880,7 +881,13 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
     if (!parsed.reportEvidence) {
       const hasReadStep = steps.some((s) => {
         const def = catalogMap.get(s.tool);
-        return def?.sideEffect === 'read' && (s.tool.includes('pull_request') || s.tool.includes('issue'));
+        return def?.sideEffect === 'read' && (
+          s.tool.includes('pull_request') ||
+          s.tool.includes('issue') ||
+          s.tool.includes('range') ||
+          s.tool.includes('aggregate') ||
+          s.tool.includes('search_issues')
+        );
       });
       if (!hasReadStep) {
         return {
