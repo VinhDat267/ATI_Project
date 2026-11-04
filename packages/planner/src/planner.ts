@@ -297,7 +297,7 @@ export class AIPlanner {
     });
     if (!writeStep) return rawOutput;
 
-    const argument: string =
+    const argument: 'text' | 'body' | 'content' =
       typeof writeStep.args?.text === 'string'
         ? 'text'
         : typeof writeStep.args?.body === 'string'
@@ -397,7 +397,7 @@ export class AIPlanner {
           : typeof readArgs.sheet === 'string'
             ? readArgs.sheet
             : 'Sheet1';
-      rendered = renderSheetSummaryReport(sheetData, { sheetTitle });
+      rendered = renderSheetSummaryReport(sheetData, { sheetName: sheetTitle });
       sourceLabel = `${typeof readArgs.spreadsheetId === 'string' ? readArgs.spreadsheetId : 'Spreadsheet'} (${sheetTitle})`;
       artifactItems = Array.isArray(rawResult) ? rawResult : [rawResult];
     }

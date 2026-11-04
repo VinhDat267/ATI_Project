@@ -278,9 +278,24 @@ export function groundingMemory(
       });
     }
     if (isObject(defaults.myjira) && typeof defaults.myjira.siteId === 'string' && defaults.myjira.siteId) {
-      addDefaultEntity('jira_site', { id: defaults.myjira.siteId, siteId: defaults.myjira.siteId });
+      const siteId = defaults.myjira.siteId;
+      const cloudId =
+        typeof defaults.myjira.cloudId === 'string' && defaults.myjira.cloudId
+          ? defaults.myjira.cloudId
+          : `cloud-${siteId}`;
+      const workspaceId =
+        typeof defaults.myjira.workspaceId === 'string' && defaults.myjira.workspaceId
+          ? defaults.myjira.workspaceId
+          : 'default';
+      addDefaultEntity('jira_site', { id: siteId, siteId, cloudId, workspaceId });
       if (typeof defaults.myjira.projectKey === 'string' && defaults.myjira.projectKey) {
-        addDefaultEntity('jira_project', { id: defaults.myjira.projectKey, key: defaults.myjira.projectKey, siteId: defaults.myjira.siteId });
+        addDefaultEntity('jira_project', {
+          id: defaults.myjira.projectKey,
+          key: defaults.myjira.projectKey,
+          siteId,
+          cloudId,
+          workspaceId,
+        });
       }
     }
     if (isObject(defaults.mycalendar) && typeof defaults.mycalendar.calendarId === 'string' && defaults.mycalendar.calendarId) {
@@ -295,6 +310,11 @@ export function groundingMemory(
       }
       if (typeof defaults.mysheets.folderId === 'string' && defaults.mysheets.folderId) {
         addDefaultEntity('drive_folder', { id: defaults.mysheets.folderId, title: defaults.mysheets.folderId });
+        addDefaultEntity('mydrive_file', {
+          id: defaults.mysheets.folderId,
+          title: defaults.mysheets.folderId,
+          mimeType: 'application/vnd.google-apps.folder',
+        });
       }
     }
   }

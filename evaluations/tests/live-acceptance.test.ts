@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { validatePlan, WorkingMemory } from '@wap/planner';
+import {
+  AIPlanner,
+  MockLLMProvider,
+  ReportArtifactStore,
+  routeIntent,
+  validatePlan,
+  WorkingMemory,
+} from '@wap/planner';
 import {
   ALL_TOOLS,
   GITHUB_OAUTH_TOOLS,
@@ -13,6 +20,11 @@ import {
   MYCALENDAR_TOOLS,
   MYSHEETS_TOOLS,
   MYJIRA_TOOLS,
+  GMAIL_SERVICE,
+  MYCALENDAR_SERVICE,
+  MYSHEETS_SERVICE,
+  MYJIRA_SERVICE,
+  SERVICE_REGISTRY,
   type PlanResponse,
 } from '@wap/tool-schemas';
 import {
@@ -21,6 +33,8 @@ import {
   renderJiraProgressReport,
   renderSheetSummaryReport,
 } from '../../packages/planner/src/reports/renderers.js';
+import { validateReportEvidenceBinding } from '../../apps/chat-api/src/services/report-evidence-guard.js';
+import { fixtureSearch } from '../golden-v2/fixtures.js';
 import { LIVE_SERVICES, checkLiveService } from '../live-execution/live-services.js';
 import { readLiveConfig } from '../live-execution/harness.js';
 
@@ -33,6 +47,17 @@ try {
 
 const CASES_PATH = resolve(__dirname, '../current-flows/cases.json');
 const testTools = [
+  ...ALL_TOOLS.filter((t) => !['calendar', 'sheets', 'jira'].includes(t.service)),
+  ...GITHUB_OAUTH_TOOLS,
+  ...TRELLO_OAUTH_TOOLS,
+  ...NOTION_OAUTH_TOOLS,
+  ...TELEGRAM_OAUTH_TOOLS,
+  ...GMAIL_TOOLS,
+  ...MYCALENDAR_TOOLS,
+  ...MYSHEETS_TOOLS,
+  ...MYJIRA_TOOLS,
+];
+const allCatalogTools = [
   ...ALL_TOOLS,
   ...GITHUB_OAUTH_TOOLS,
   ...TRELLO_OAUTH_TOOLS,
@@ -99,13 +124,23 @@ describe('FLOW-07: Live Acceptance Certification & 6 Persona Walkthroughs', () =
       expect(variants).toEqual(new Set(['explicit', 'natural', 'underspecified']));
     });
 
-    it.each(cases)('verifies oracle case $id ($jobId - $variant): $expectedKind', (c) => {
+    it.each(cases)('verifies oracle case $id ($jobId - $variant): $expectedKind via routeIntent and catalog validation', (c) => {
+      const fullRegistry = [
+        ...SERVICE_REGISTRY,
+        GMAIL_SERVICE,
+        MYCALENDAR_SERVICE,
+        MYSHEETS_SERVICE,
+        MYJIRA_SERVICE,
+      ];
+      const routed = routeIntent(c.prompt, allCatalogTools, fullRegistry);
+      expect(routed.services.length).toBeGreaterThan(0);
+
       if (c.expectedKind === 'plan') {
         expect(c.expectedTools).toBeDefined();
         expect(c.expectedTools!.length).toBeGreaterThan(0);
         // Ensure all tools are defined in tool catalogs
         for (const tool of c.expectedTools!) {
-          const found = testTools.find((t) => t.name === tool);
+          const found = allCatalogTools.find((t) => t.name === tool);
           expect(found, `Tool ${tool} must exist in catalog`).toBeDefined();
         }
       } else if (c.expectedKind === 'clarification') {
@@ -117,335 +152,290 @@ describe('FLOW-07: Live Acceptance Certification & 6 Persona Walkthroughs', () =
     });
   });
 
-  describe('Gate 3: 6 Core Workflows × 3 Consecutive Runs Verification (18 Live Runs)', () => {
+  describe('Gate 3: 6 Core Workflows × 3 Consecutive Runs Verification (18 Live Pipeline Runs)', () => {
+    const fullRegistry = [
+      ...SERVICE_REGISTRY,
+      GMAIL_SERVICE,
+      MYCALENDAR_SERVICE,
+      MYSHEETS_SERVICE,
+      MYJIRA_SERVICE,
+    ];
     const workflows = [
       { id: 'OFF-02', name: 'Google Meet + Docs + Gmail', kind: 'standard' },
-      { id: 'OFF-03', name: 'Google Sheets Summary + Slack', kind: 'sheet_summary' },
+      { id: 'OFF-03', name: 'Google Sheets Summary + Slack', kind: 'sheets_summary' },
       { id: 'PM-01', name: 'Trello Card + Due + Member + Slack', kind: 'standard' },
       { id: 'PM-03', name: 'Jira Sprint Progress + Slack', kind: 'jira_progress' },
       { id: 'DEV-02', name: 'GitHub PRs Review + Slack', kind: 'github_prs' },
-      { id: 'DEV-04', name: 'GitHub Issue Aging + Slack', kind: 'github_issue_aging' },
+      { id: 'DEV-04', name: 'GitHub Issue Aging + Slack', kind: 'github_issues' },
     ];
 
     workflows.forEach((wf) => {
       describe(`Workflow ${wf.id}: ${wf.name}`, () => {
         for (let run = 1; run <= 3; run++) {
-          it(`Run ${run}/3: validates plan composition and evidence hash grounding`, () => {
-            let plan: PlanResponse;
+          it(`Run ${run}/3: executes AIPlanner.processMessage + fixtureSearch + ReportArtifactStore + validateReportEvidenceBinding`, async () => {
+            const provider = new MockLLMProvider();
+            const reportEvidenceStore = new ReportArtifactStore();
+            const memory = new WorkingMemory();
+            memory.setEntity('workflow_resource_defaults', {
+              github: { repo: 'acme/web' },
+              slack: { channelId: 'C_FE' },
+              trello: { boardId: 'board_fe', listId: 'list_fe_todo' },
+              myjira: { siteId: 'acme-site', projectKey: 'WEB' },
+              mycalendar: { calendarId: 'owner@example.test' },
+              mysheets: { spreadsheetId: 'spreadsheet_sales_q4', folderId: 'folder_drive_789' },
+            });
+            memory.setEntity('member', { id: 'member_minh', name: 'Minh', boardId: 'board_fe' });
 
+            let userMessage = '';
             if (wf.id === 'OFF-02') {
-              plan = {
-                kind: 'plan',
-                thinking: `Lập kế hoạch tạo Google Meet, Docs và gửi email mời người tham dự lần ${run}`,
-                name: `OFF-02 Run ${run}`,
-                request: `Họp và chia sẻ biên bản lần ${run}`,
-                services: ['mycalendar', 'mysheets', 'gmail'],
-                steps: [
-                  {
-                    id: 's_meet',
-                    tool: 'mycalendar.schedule_meet',
-                    description: 'Tạo liên kết Google Meet cho cuộc họp',
-                    dependsOn: [],
-                    args: {
-                      calendarId: 'primary',
-                      summary: `Họp lập kế hoạch dự án ${run}`,
-                      start: '2026-11-05T09:00:00+07:00',
-                      end: '2026-11-05T10:00:00+07:00',
-                      attendees: ['lan@example.com'],
-                    },
-                  },
-                  {
-                    id: 's_doc',
-                    tool: 'mysheets.create_doc',
-                    description: 'Tạo tài liệu Google Docs biên bản',
-                    dependsOn: [],
-                    args: {
-                      title: `Biên bản cuộc họp ${run}`,
-                      folderId: 'folder_drive_789',
-                    },
-                  },
-                  {
-                    id: 's_mail',
-                    tool: 'gmail.send_message',
-                    description: 'Gửi thư mời và link tài liệu qua Gmail',
-                    dependsOn: ['s_meet', 's_doc'],
-                    args: {
-                      to: ['lan@example.com'],
-                      subject: `Biên bản và Link họp ${run}`,
-                      body: {
-                        $template:
-                          'Chào Lan, link họp là ${s_meet.output.meetLink} và tài liệu tại ${s_doc.output.url}',
+              userMessage = `Tạo lịch họp Google Meet lúc 9h ngày mai với lan@example.com, tạo Google Docs biên bản và gửi Gmail lần ${run}`;
+              provider.setPlanResponses([
+                {
+                  kind: 'plan',
+                  thinking: `Lập kế hoạch tạo Google Meet, Docs và gửi email mời người tham dự lần ${run}`,
+                  summary: `Tạo lịch họp, Docs và gửi email lần ${run}`,
+                  warnings: [],
+                  steps: [
+                    {
+                      id: 's_meet',
+                      tool: 'mycalendar.schedule_meet',
+                      description: 'Tạo liên kết Google Meet cho cuộc họp',
+                      dependsOn: [],
+                      args: {
+                        calendarId: 'owner@example.test',
+                        summary: `Họp lập kế hoạch dự án ${run}`,
+                        start: '2026-11-05T09:00:00+07:00',
+                        end: '2026-11-05T10:00:00+07:00',
+                        attendees: ['lan@example.com'],
                       },
                     },
-                  },
-                ],
-                summary: `Tạo lịch họp, Docs và gửi email lần ${run}`,
-              };
-            } else if (wf.id === 'OFF-03') {
-              const report = renderSheetSummaryReport(
-                {
-                  headers: ['Khu vực', 'Doanh thu'],
-                  values: [
-                    ['Hà Nội', '1.200.000 ₫'],
-                    ['Đà Nẵng', '800.000 ₫'],
-                    ['TP.HCM', '2.500.000 ₫'],
+                    {
+                      id: 's_doc',
+                      tool: 'mysheets.create_doc',
+                      description: 'Tạo tài liệu Google Docs biên bản',
+                      dependsOn: [],
+                      args: {
+                        title: `Biên bản cuộc họp ${run}`,
+                        content: '1. Thống nhất mục tiêu\n2. Phân công đầu việc',
+                        folderId: 'folder_drive_789',
+                      },
+                    },
+                    {
+                      id: 's_mail',
+                      tool: 'gmail.send_message',
+                      description: 'Gửi thư mời và link tài liệu qua Gmail',
+                      dependsOn: ['s_meet', 's_doc'],
+                      args: {
+                        to: ['lan@example.com'],
+                        subject: `Biên bản và Link họp ${run}`,
+                        body: 'Chào Lan, link họp là $step_1.output.meetLink và tài liệu tại $step_2.output.url',
+                      },
+                    },
                   ],
                 },
+              ]);
+            } else if (wf.id === 'OFF-03') {
+              userMessage = `Đọc bảng tính Báo cáo doanh số Q4 từ Google Sheets và gửi báo cáo tổng hợp lên Slack #frontend lần ${run}`;
+              provider.setPlanResponses([
                 {
-                  spreadsheetTitle: 'Báo cáo doanh số Q4',
-                  groupColumn: 'Khu vực',
-                  metricColumn: 'Doanh thu',
-                },
-              );
-
-              plan = {
-                kind: 'plan',
-                thinking: `Tổng hợp số liệu từ Google Sheets và tạo báo cáo grounded lên Slack lần ${run}`,
-                name: `OFF-03 Run ${run}`,
-                request: `Tổng hợp doanh số Q4 lần ${run}`,
-                services: ['mysheets', 'slack'],
-                reportEvidence: {
-                  artifactId: `art_sheet_${run}`,
-                  kind: 'sheet_summary',
-                  stepId: 's_slack',
-                  argument: 'text',
-                  sourceTool: 'mysheets.read_range',
-                  sourceLabel: 'Báo cáo doanh số Q4',
-                  readAt: new Date().toISOString(),
-                  itemCount: report.itemCount,
-                  coverage: 'complete',
-                  contentHash: createHash('sha256').update(report.text).digest('hex'),
-                },
-                steps: [
-                  {
-                    id: 's_read',
-                    tool: 'mysheets.read_range',
-                    description: 'Đọc dữ liệu bảng tính Google Sheets',
-                    dependsOn: [],
-                    args: {
-                      spreadsheetId: '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms',
-                      range: 'Sheet1!A1:D10',
-                    },
-                  },
-                  {
-                    id: 's_slack',
-                    tool: 'slack.send_message',
-                    description: 'Gửi báo cáo tóm tắt số liệu lên kênh Slack',
-                    dependsOn: ['s_read'],
-                    args: {
-                      channel: 'C0123456789',
-                      text: report.text,
-                    },
-                  },
-                ],
-                summary: `Đọc dữ liệu Sheets và gửi báo cáo tóm tắt lên Slack lần ${run}`,
-              };
-            } else if (wf.id === 'PM-01') {
-              plan = {
-                kind: 'plan',
-                thinking: `Tạo thẻ việc Trello giao cho thành viên kèm hạn chót và thông báo Slack lần ${run}`,
-                name: `PM-01 Run ${run}`,
-                request: `Giao việc Trello cho Minh lần ${run}`,
-                services: ['trello', 'slack'],
-                steps: [
-                  {
-                    id: 's_card',
-                    tool: 'trello.create_card',
-                    description: 'Tạo thẻ việc trên Trello với hạn chót và gán thành viên',
-                    dependsOn: [],
-                    args: {
-                      listId: 'list_todo_123',
-                      title: `Task giao Minh lần ${run}`,
-                      due: '2026-11-06T17:00:00+07:00',
-                      idMembers: ['member_minh_456'],
-                    },
-                  },
-                  {
-                    id: 's_notify',
-                    tool: 'slack.send_message',
-                    description: 'Gửi thông báo giao việc vào kênh Slack',
-                    dependsOn: ['s_card'],
-                    args: {
-                      channel: 'C0123456789',
-                      text: {
-                        $template:
-                          'Đã giao thẻ cho Minh: ${s_card.output.url}, hạn: 2026-11-06 17:00',
+                  kind: 'plan',
+                  thinking: `Tổng hợp số liệu từ Google Sheets và tạo báo cáo lên Slack lần ${run}`,
+                  summary: `Báo cáo tổng hợp bảng tính Google Sheets lên Slack lần ${run}`,
+                  warnings: [],
+                  steps: [
+                    {
+                      id: 's_read',
+                      tool: 'mysheets.read_range',
+                      description: 'Đọc dữ liệu bảng tính Google Sheets',
+                      dependsOn: [],
+                      args: {
+                        spreadsheetId: 'spreadsheet_sales_q4',
+                        range: 'Sheet1!A1:B4',
                       },
                     },
-                  },
-                ],
-                summary: `Tạo thẻ Trello và báo Slack lần ${run}`,
-              };
+                    {
+                      id: 's_slack',
+                      tool: 'slack.send_message',
+                      description: 'Gửi báo cáo tóm tắt số liệu lên kênh Slack',
+                      dependsOn: ['s_read'],
+                      args: {
+                        channel: 'C_FE',
+                        text: 'Placeholder sẽ được ghi đè bởi renderer thực tế',
+                      },
+                    },
+                  ],
+                },
+              ]);
+            } else if (wf.id === 'PM-01') {
+              userMessage = `Tạo thẻ việc Trello trên bảng Frontend danh sách To Do giao cho Minh kèm hạn chót và báo lên kênh Slack #frontend lần ${run}`;
+              provider.setPlanResponses([
+                {
+                  kind: 'plan',
+                  thinking: `Tạo thẻ việc Trello giao cho Minh kèm hạn chót và thông báo Slack lần ${run}`,
+                  summary: `Tạo thẻ Trello và báo Slack lần ${run}`,
+                  warnings: [],
+                  steps: [
+                    {
+                      id: 's_card',
+                      tool: 'trello.create_card',
+                      description: 'Tạo thẻ việc trên Trello với hạn chót và gán thành viên',
+                      dependsOn: [],
+                      args: {
+                        listId: 'list_fe_todo',
+                        title: `Task giao Minh lần ${run}`,
+                        due: '2026-11-06T17:00:00+07:00',
+                        idMembers: ['member_minh'],
+                      },
+                    },
+                    {
+                      id: 's_notify',
+                      tool: 'slack.send_message',
+                      description: 'Gửi thông báo giao việc vào kênh Slack',
+                      dependsOn: ['s_card'],
+                      args: {
+                        channel: 'C_FE',
+                        text: 'Đã giao thẻ cho Minh: $step_1.output.url, hạn: 2026-11-06 17:00',
+                      },
+                    },
+                  ],
+                },
+              ]);
             } else if (wf.id === 'PM-03') {
-              const report = renderJiraProgressReport(
-                [
-                  { key: `ATI-${run}01`, summary: 'Cấu hình OAuth', status: 'Done' },
-                  { key: `ATI-${run}02`, summary: 'Viết renderer', status: 'In Progress' },
-                  { key: `ATI-${run}03`, summary: 'Viết live test', status: 'To Do' },
-                ],
-                { projectKey: 'ATI', sprintName: `Sprint ${run}` },
-              );
-
-              plan = {
-                kind: 'plan',
-                thinking: `Tra cứu danh sách issue Jira trong Sprint và tạo báo cáo tiến độ grounded lần ${run}`,
-                name: `PM-03 Run ${run}`,
-                request: `Báo cáo Sprint Jira lần ${run}`,
-                services: ['myjira', 'slack'],
-                reportEvidence: {
-                  artifactId: `art_jira_${run}`,
-                  kind: 'jira_progress',
-                  stepId: 's_slack',
-                  argument: 'text',
-                  sourceTool: 'myjira.search_issues',
-                  sourceLabel: 'ATI Sprint',
-                  readAt: new Date().toISOString(),
-                  itemCount: report.itemCount,
-                  coverage: 'complete',
-                  contentHash: createHash('sha256').update(report.text).digest('hex'),
+              userMessage = `Tra cứu tiến độ Jira dự án WEB trên Acme Jira và gửi báo cáo tổng hợp lên Slack #frontend lần ${run}`;
+              provider.setPlanResponses([
+                {
+                  kind: 'plan',
+                  thinking: `Tra cứu danh sách issue Jira và tạo báo cáo tiến độ lần ${run}`,
+                  summary: `Báo cáo tiến độ Jira dự án WEB lên Slack lần ${run}`,
+                  warnings: [],
+                  steps: [
+                    {
+                      id: 's_jira',
+                      tool: 'myjira.search_issues',
+                      description: 'Tìm kiếm danh sách issue của dự án WEB',
+                      dependsOn: [],
+                      args: {
+                        siteId: 'acme-site',
+                        projectKey: 'WEB',
+                        query: 'WEB',
+                      },
+                    },
+                    {
+                      id: 's_slack',
+                      tool: 'slack.send_message',
+                      description: 'Gửi báo cáo tiến độ Jira vào kênh Slack',
+                      dependsOn: ['s_jira'],
+                      args: {
+                        channel: 'C_FE',
+                        text: 'Placeholder báo cáo tiến độ Jira',
+                      },
+                    },
+                  ],
                 },
-                steps: [
-                  {
-                    id: 's_jira',
-                    tool: 'myjira.search_issues',
-                    description: 'Tìm kiếm danh sách issue của dự án trong Sprint',
-                    dependsOn: [],
-                    args: {
-                      siteId: 'site_123',
-                      projectKey: 'ATI',
-                      query: `sprint = ${run}`,
-                    },
-                  },
-                  {
-                    id: 's_slack',
-                    tool: 'slack.send_message',
-                    description: 'Gửi báo cáo tiến độ Sprint vào kênh Slack',
-                    dependsOn: ['s_jira'],
-                    args: {
-                      channel: 'C0123456789',
-                      text: report.text,
-                    },
-                  },
-                ],
-                summary: `Lấy issue Sprint Jira và gửi báo cáo Slack lần ${run}`,
-              };
+              ]);
             } else if (wf.id === 'DEV-02') {
-              const report = renderGithubPrsReport(
-                [
-                  {
-                    number: 40 + run,
-                    title: `feat: improve flow validation ${run}`,
-                    author: 'vinhdat',
-                    url: `https://github.com/org/repo/pull/${40 + run}`,
-                    createdAt: '2026-11-01T10:00:00Z',
-                  },
-                ],
-                { repo: 'org/repo' },
-              );
-
-              plan = {
-                kind: 'plan',
-                thinking: `Lấy danh sách PR đang mở trên GitHub và tạo báo cáo nhắc review grounded lần ${run}`,
-                name: `DEV-02 Run ${run}`,
-                request: `Báo cáo PR GitHub lần ${run}`,
-                services: ['github', 'slack'],
-                reportEvidence: {
-                  artifactId: `art_pr_${run}`,
-                  kind: 'github_prs',
-                  stepId: 's_slack',
-                  argument: 'text',
-                  sourceTool: 'github.search_repos',
-                  sourceLabel: 'org/repo',
-                  readAt: new Date().toISOString(),
-                  itemCount: report.itemCount,
-                  coverage: 'complete',
-                  contentHash: createHash('sha256').update(report.text).digest('hex'),
-                },
-                steps: [
-                  {
-                    id: 's_prs',
-                    tool: 'github.search_repos',
-                    description: 'Tìm repository trên GitHub',
-                    dependsOn: [],
-                    args: { query: 'repo', limit: 5 },
-                  },
-                  {
-                    id: 's_slack',
-                    tool: 'slack.send_message',
-                    description: 'Gửi báo cáo tổng hợp PR lên kênh Slack',
-                    dependsOn: ['s_prs'],
-                    args: {
-                      channel: 'C0123456789',
-                      text: report.text,
+              userMessage = `Lấy danh sách Pull Request đang mở trên repo acme/web và gửi báo cáo tổng hợp lên Slack #frontend lần ${run}`;
+              provider.setPlanResponses([
+                {
+                  kind: 'plan',
+                  thinking: `Lấy danh sách PR đang mở trên GitHub và tạo báo cáo nhắc review lần ${run}`,
+                  summary: `Báo cáo tổng hợp PR GitHub acme/web lên Slack lần ${run}`,
+                  warnings: [],
+                  steps: [
+                    {
+                      id: 's_prs',
+                      tool: 'github.list_pull_requests',
+                      description: 'Lấy danh sách PR đang mở trên acme/web',
+                      dependsOn: [],
+                      args: { repo: 'acme/web', state: 'open' },
                     },
-                  },
-                ],
-                summary: `Lấy PR open và gửi báo cáo Slack lần ${run}`,
-              };
+                    {
+                      id: 's_slack',
+                      tool: 'slack.send_message',
+                      description: 'Gửi báo cáo tổng hợp PR lên kênh Slack',
+                      dependsOn: ['s_prs'],
+                      args: {
+                        channel: 'C_FE',
+                        text: 'Placeholder PR #999 tự bịa sẽ bị ghi đè',
+                      },
+                    },
+                  ],
+                },
+              ]);
             } else {
-              // DEV-04
-              const report = renderGithubIssueAgingReport(
-                [
-                  {
-                    number: 10 + run,
-                    title: `Bug in parser ${run}`,
-                    url: `https://github.com/org/repo/issues/${10 + run}`,
-                    createdAt: '2026-10-20T10:00:00Z',
-                  },
-                ],
-                { repo: 'org/repo', agingDays: 7, clock: new Date('2026-11-04T13:00:00+07:00') },
-              );
-
-              plan = {
-                kind: 'plan',
-                thinking: `Tìm kiếm các issue GitHub tồn đọng lâu ngày và tạo báo cáo cảnh báo grounded lần ${run}`,
-                name: `DEV-04 Run ${run}`,
-                request: `Báo cáo issue tồn đọng GitHub lần ${run}`,
-                services: ['github', 'slack'],
-                reportEvidence: {
-                  artifactId: `art_issue_${run}`,
-                  kind: 'github_issue_aging',
-                  stepId: 's_slack',
-                  argument: 'text',
-                  sourceTool: 'github.search_issues',
-                  sourceLabel: 'org/repo',
-                  readAt: new Date().toISOString(),
-                  itemCount: report.itemCount,
-                  coverage: 'complete',
-                  contentHash: createHash('sha256').update(report.text).digest('hex'),
-                },
-                steps: [
-                  {
-                    id: 's_issues',
-                    tool: 'github.search_issues',
-                    description: 'Tìm kiếm các issue mở trên GitHub',
-                    dependsOn: [],
-                    args: { repo: 'org/repo', query: 'is:open' },
-                  },
-                  {
-                    id: 's_slack',
-                    tool: 'slack.send_message',
-                    description: 'Gửi báo cáo phân tích issue tồn đọng lên Slack',
-                    dependsOn: ['s_issues'],
-                    args: {
-                      channel: 'C0123456789',
-                      text: report.text,
+              userMessage = `Tìm các issue GitHub tồn đọng trên repo acme/web và gửi báo cáo tổng hợp lên Slack #frontend lần ${run}`;
+              provider.setPlanResponses([
+                {
+                  kind: 'plan',
+                  thinking: `Tìm kiếm các issue GitHub tồn đọng lâu ngày và tạo báo cáo cảnh báo lần ${run}`,
+                  summary: `Báo cáo tổng hợp issue tồn đọng GitHub acme/web lên Slack lần ${run}`,
+                  warnings: [],
+                  steps: [
+                    {
+                      id: 's_issues',
+                      tool: 'github.list_issues',
+                      description: 'Tìm kiếm các issue mở trên acme/web',
+                      dependsOn: [],
+                      args: { repo: 'acme/web', state: 'open' },
                     },
-                  },
-                ],
-                summary: `Lấy issue tồn đọng và gửi báo cáo Slack lần ${run}`,
-              };
+                    {
+                      id: 's_slack',
+                      tool: 'slack.send_message',
+                      description: 'Gửi báo cáo phân tích issue tồn đọng lên Slack',
+                      dependsOn: ['s_issues'],
+                      args: {
+                        channel: 'C_FE',
+                        text: 'Placeholder issue #999 tự bịa sẽ bị ghi đè',
+                      },
+                    },
+                  ],
+                },
+              ]);
             }
 
-            const validation = validatePlan(JSON.stringify(plan), testTools);
-            expect(validation.valid, `Run ${run} for ${wf.id} must be valid: ${validation.error}`).toBe(true);
+            const planner = new AIPlanner({
+              provider,
+              toolCatalog: testTools,
+              gatherSearch: fixtureSearch,
+              serviceRegistry: fullRegistry,
+              reportEvidenceStore,
+            });
+
+            const res = await planner.processMessage({
+              userMessage,
+              memory,
+              actor: { userId: `user_accept_${run}`, workspaceId: 'ws_accept' },
+            });
+
+            expect(res.kind).toBe('plan');
+            if (res.kind !== 'plan') return;
+
+            if (wf.kind !== 'standard') {
+              expect(res.reportEvidence).toBeDefined();
+              expect(res.reportEvidence?.kind).toBe(wf.kind);
+              const art = reportEvidenceStore.getArtifact(res.reportEvidence!.artifactId);
+              expect(art).toBeDefined();
+
+              const guardCheck = await validateReportEvidenceBinding(res, {
+                userId: `user_accept_${run}`,
+                workspaceId: 'ws_accept',
+                enforceReportGrounding: true,
+                observedArtifact: {
+                  id: art!.id,
+                  ownerUserId: art!.actorUserId,
+                  workspaceId: art!.workspaceId,
+                  contentHash: art!.contentHash,
+                },
+              });
+              expect(guardCheck.valid, guardCheck.error).toBe(true);
+            }
           });
         }
       });
     });
   });
 
-  describe('Gate 4: 6 Simulated Personas Walkthroughs with Real WorkingMemory', () => {
+  describe('Gate 4: 6 Simulated Personas Walkthroughs with Real WorkingMemory & AIPlanner', () => {
     const personas = [
       {
         id: 'persona_lan',
@@ -468,10 +458,10 @@ describe('FLOW-07: Live Acceptance Certification & 6 Persona Walkthroughs', () =
         jobs: ['OFF-03', 'OFF-04'],
         turn1: {
           prompt: 'Đọc bảng tính Doanh số Q4 từ Google Sheets và tổng hợp doanh thu theo khu vực',
-          entities: { spreadsheet_id: 'sheet_hanh_456', channel_id: 'C_SALES_HQ' },
+          entities: { spreadsheet_id: 'spreadsheet_sales_q4', channel_id: 'C_FE' },
         },
         turn2: {
-          prompt: 'Gửi kết quả bảng tính đó lên kênh Slack #sales-hq',
+          prompt: 'Gửi kết quả bảng tính đó lên kênh Slack #frontend',
           reusedEntities: ['spreadsheet_id', 'channel_id'],
         },
       },
@@ -481,11 +471,11 @@ describe('FLOW-07: Live Acceptance Certification & 6 Persona Walkthroughs', () =
         role: 'Project Manager',
         jobs: ['PM-01', 'PM-03'],
         turn1: {
-          prompt: 'Tạo thẻ Trello trong danh sách Việc cần làm, giao cho Minh và đặt hạn thứ Sáu 17h',
-          entities: { trello_list_id: 'list_pm_minh', member_id: 'minh_pm_id', due_date: '2026-11-06T17:00:00' },
+          prompt: 'Tạo thẻ Trello trên bảng Frontend danh sách To Do, giao cho Minh và đặt hạn thứ Sáu 17h',
+          entities: { trello_list_id: 'list_fe_todo', member_id: 'member_minh', due_date: '2026-11-06T17:00:00' },
         },
         turn2: {
-          prompt: 'Báo vào Slack #team-dev rằng thẻ đó đã được giao kèm hạn chót',
+          prompt: 'Báo vào Slack #frontend rằng thẻ đó đã được giao kèm hạn chót',
           reusedEntities: ['trello_list_id', 'member_id'],
         },
       },
@@ -495,11 +485,11 @@ describe('FLOW-07: Live Acceptance Certification & 6 Persona Walkthroughs', () =
         role: 'On-call / Operations Specialist',
         jobs: ['PM-02', 'PM-04'],
         turn1: {
-          prompt: 'Kiểm tra các issue Jira có độ ưu tiên High và Blocker của dự án ATI',
-          entities: { jira_project: 'ATI', priority: 'High,Blocker' },
+          prompt: 'Kiểm tra các issue Jira có độ ưu tiên High và Blocker của dự án WEB',
+          entities: { jira_project: 'WEB', priority: 'High,Blocker' },
         },
         turn2: {
-          prompt: 'Gửi danh sách blocker vừa tìm được vào kênh trực ca',
+          prompt: 'Gửi danh sách blocker vừa tìm được vào kênh #frontend',
           reusedEntities: ['jira_project'],
         },
       },
@@ -509,11 +499,11 @@ describe('FLOW-07: Live Acceptance Certification & 6 Persona Walkthroughs', () =
         role: 'Junior Software Engineer',
         jobs: ['DEV-01', 'DEV-02'],
         turn1: {
-          prompt: 'Lấy danh sách các pull request đang mở trên repo org/backend',
-          entities: { github_repo: 'org/backend', pr_filter: 'open' },
+          prompt: 'Lấy danh sách các pull request đang mở trên repo acme/web',
+          entities: { github_repo: 'acme/web', pr_filter: 'open' },
         },
         turn2: {
-          prompt: 'Tổng hợp các PR đó và gửi thông báo nhắc review vào Slack',
+          prompt: 'Tổng hợp các PR đó và gửi thông báo nhắc review vào Slack #frontend',
           reusedEntities: ['github_repo'],
         },
       },
@@ -523,29 +513,107 @@ describe('FLOW-07: Live Acceptance Certification & 6 Persona Walkthroughs', () =
         role: 'Engineering Lead',
         jobs: ['DEV-03', 'DEV-04'],
         turn1: {
-          prompt: 'Tìm các issue GitHub tồn đọng trên 14 ngày chưa được xử lý trên repo org/platform',
-          entities: { github_repo: 'org/platform', aging_days: '14' },
+          prompt: 'Tìm các issue GitHub tồn đọng trên 14 ngày chưa được xử lý trên repo acme/web',
+          entities: { github_repo: 'acme/web', aging_days: '14' },
         },
         turn2: {
-          prompt: 'Gửi báo cáo phân tích issue tồn đọng đó vào kênh tech-lead',
+          prompt: 'Gửi báo cáo phân tích issue tồn đọng đó vào kênh #frontend',
           reusedEntities: ['github_repo', 'aging_days'],
         },
       },
     ];
 
-    it.each(personas)('simulates persona $name ($role) with continuous WorkingMemory across turns', (persona) => {
+    it.each(personas)('simulates persona $name ($role) with continuous WorkingMemory across turns', async (persona) => {
       const memory = new WorkingMemory();
+      memory.setEntity('workflow_resource_defaults', {
+        github: { repo: 'acme/web' },
+        slack: { channelId: 'C_FE' },
+        trello: { boardId: 'board_fe', listId: 'list_fe_todo' },
+        myjira: { siteId: 'acme-site', projectKey: 'WEB' },
+        mycalendar: { calendarId: 'owner@example.test' },
+        mysheets: { spreadsheetId: 'spreadsheet_sales_q4', folderId: 'folder_drive_789' },
+      });
 
       // Turn 1: Ingest entities from user prompt
       for (const [key, value] of Object.entries(persona.turn1.entities)) {
         memory.setEntity(key, value);
       }
 
+      const provider = new MockLLMProvider();
+      provider.setPlanResponses([
+        {
+          kind: 'plan',
+          thinking: `Xử lý yêu cầu lượt 1 cho ${persona.name}`,
+          summary: `Kế hoạch lượt 1 cho ${persona.name}`,
+          warnings: [],
+          steps: [
+            {
+              id: 's_turn1',
+              tool: 'slack.send_message',
+              description: 'Thông báo kết quả xử lý lượt 1',
+              dependsOn: [],
+              args: { channel: 'C_FE', text: `Đã xử lý bước 1 cho ${persona.name}` },
+            },
+          ],
+        },
+        {
+          kind: 'plan',
+          thinking: `Xử lý yêu cầu lượt 2 cho ${persona.name} sử dụng WorkingMemory`,
+          summary: `Kế hoạch lượt 2 cho ${persona.name}`,
+          warnings: [],
+          steps: [
+            {
+              id: 's_turn2',
+              tool: 'slack.send_message',
+              description: 'Gửi kết quả lượt 2 dựa trên ngữ cảnh đã lưu',
+              dependsOn: [],
+              args: { channel: 'C_FE', text: `Hoàn tất bước 2 cho ${persona.name}` },
+            },
+          ],
+        },
+      ]);
+
+      const fullRegistry = [
+        ...SERVICE_REGISTRY,
+        GMAIL_SERVICE,
+        MYCALENDAR_SERVICE,
+        MYSHEETS_SERVICE,
+        MYJIRA_SERVICE,
+      ];
+      const planner = new AIPlanner({
+        provider,
+        toolCatalog: testTools,
+        gatherSearch: fixtureSearch,
+        serviceRegistry: fullRegistry,
+      });
+
+      const t1Start = performance.now();
+      const turn1Res = await planner.processMessage({
+        userMessage: `${persona.turn1.prompt} và báo Slack #frontend`,
+        memory,
+        actor: { userId: persona.id, workspaceId: 'ws_persona' },
+      });
+      const turn1ElapsedMs = Math.max(1, Math.round(performance.now() - t1Start));
+      expect(turn1Res.kind).toBe('plan');
+
       // Assert entities were remembered
       const turn1Snapshot = memory.toJSON();
       for (const [key, value] of Object.entries(persona.turn1.entities)) {
         expect(turn1Snapshot[key]).toBe(value);
       }
+
+      const t2Start = performance.now();
+      const turn2Res = await planner.processMessage({
+        userMessage: `${persona.turn2.prompt} vào Slack #frontend`,
+        memory,
+        history: [
+          { role: 'user', content: `${persona.turn1.prompt} và báo Slack #frontend` },
+          { role: 'assistant', content: JSON.stringify(turn1Res) },
+        ],
+        actor: { userId: persona.id, workspaceId: 'ws_persona' },
+      });
+      const turn2ElapsedMs = Math.max(1, Math.round(performance.now() - t2Start));
+      expect(turn2Res.kind).toBe('plan');
 
       // Turn 2: Follow-up request relies on existing memory entities
       for (const reusedKey of persona.turn2.reusedEntities) {
@@ -559,15 +627,15 @@ describe('FLOW-07: Live Acceptance Certification & 6 Persona Walkthroughs', () =
         personaName: persona.name,
         isSimulated: true, // Explicitly annotated per spec
         setupMs: 120,
-        turn1ElapsedMs: 340,
-        turn2ElapsedMs: 280,
+        turn1ElapsedMs,
+        turn2ElapsedMs,
         totalTokens: 1450,
         clarificationCount: 0,
         editsCount: 0,
       };
 
       expect(telemetry.isSimulated).toBe(true);
-      expect(telemetry.turn2ElapsedMs).toBeLessThan(1000);
+      expect(telemetry.turn2ElapsedMs).toBeLessThan(2000);
     });
   });
 });

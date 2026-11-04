@@ -6,8 +6,10 @@
 export type ReportKind =
   | 'github_prs'
   | 'github_issue_aging'
+  | 'github_issues'
   | 'jira_progress'
-  | 'sheet_summary';
+  | 'sheet_summary'
+  | 'sheets_summary';
 
 export interface ReportEvidence {
   artifactId: string;

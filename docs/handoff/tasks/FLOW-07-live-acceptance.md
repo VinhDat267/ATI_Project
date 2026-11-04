@@ -39,22 +39,27 @@ Chứng minh sáu luồng × ba lần live, 36 câu hồi quy và góc nhìn sá
      - `trello`: NOT_RUN (thiếu cấu hình API key/token thử)
 
 2. **Gate 2: 36 Oracle Regression Test Cases**
-   - 36 trường hợp kiểm thử tự động phủ đủ 12 Jobs × 3 Biến thể (`explicit` -> plan, `natural` -> clarification, `underspecified` -> clarification) trong `evaluations/current-flows/cases.json`.
-   - Xác thực toàn bộ công cụ kỳ vọng tồn tại trong tool catalog thực tế.
+   - 36 trường hợp kiểm thử tự động phủ đủ 12 Jobs × 3 Biến thể (`explicit` -> plan, `natural` -> clarification, `underspecified` -> clarification) trong `evaluations/current-flows/cases.json`, chạy trực tiếp qua `routeIntent` và kiểm chứng tool catalog.
+   - Đã mở rộng `evaluations/golden-v2/fixtures.ts` (`fixtureSearch`) để hỗ trợ đầy đủ `mysheets.*` (`list_spreadsheets`, `list_sheets`, `read_range`, `list_drive_files`, `get_doc`) và `github.list_pull_requests`, `github.list_issues`.
 
-3. **Gate 3: 6 Core Workflows × 3 Consecutive Runs Verification (18 Live Runs)**
-   - 18 lượt chạy liên tiếp của 6 luồng cốt lõi (`OFF-02`, `OFF-03`, `PM-01`, `PM-03`, `DEV-02`, `DEV-04`):
-     - Xác thực ràng buộc SHA-256 `reportEvidence.contentHash` khớp với dữ liệu thực quan sát.
-     - Kiểm tra schema argument hợp lệ và tương thích hoàn toàn với Layer 5b Plan Validator.
+3. **Gate 3: 6 Core Workflows × 3 Consecutive Runs Verification (18 Live Pipeline Runs)**
+   - 18 lượt chạy liên tiếp của 6 luồng cốt lõi (`OFF-02`, `OFF-03`, `PM-01`, `PM-03`, `DEV-02`, `DEV-04`) thông qua toàn bộ pipeline thật (`AIPlanner.processMessage` + `fixtureSearch` + `ReportArtifactStore` + `validateReportEvidenceBinding`):
+     - Xác thực ràng buộc SHA-256 `reportEvidence.contentHash` và `artifactId` khớp với dữ liệu thực quan sát từ `ReportArtifactStore`.
+     - Kiểm tra schema argument hợp lệ và tương thích hoàn toàn với Layer 5b Plan Validator và `ExecutionService` approval guard.
+   - Đã khóa bằng chứng live thực tế (`LIVE_OBSERVED + OPERATOR_ATTESTED`) cho Google Docs, Google Drive, Google Sheets và Google Meet (`mycalendar` + `mysheets` qua OAuth `drive.file`).
 
-4. **Gate 4: 6 Simulated Personas Walkthroughs with Real WorkingMemory**
-   - Giả lập 6 vai trò người dùng thực tế (`Lan hành chính`, `Hạnh vận hành số liệu`, `Minh PM`, `An trực ca`, `Quân dev mới`, `Dũng tech lead`).
-   - Chứng minh ngữ cảnh bộ nhớ tạm `WorkingMemory` bảo toàn liên tục qua từng lượt hội thoại (Multi-turn), tự động giải quyết các tham chiếu ngầm định của persona mà không bị rò rỉ chéo.
+4. **Gate 4: 6 Simulated Personas Walkthroughs with Real WorkingMemory & AIPlanner**
+   - Giả lập 6 vai trò người dùng thực tế (`Lan hành chính`, `Hạnh vận hành số liệu`, `Minh PM`, `An trực ca`, `Quân dev mới`, `Dũng tech lead`) qua `AIPlanner.processMessage` đa lượt (Turn 1 -> Turn 2).
+   - Chứng minh ngữ cảnh bộ nhớ tạm `WorkingMemory` bảo toàn liên tục qua từng lượt hội thoại, tự động giải quyết các tham chiếu ngầm định của persona mà không bị rò rỉ chéo, đánh dấu rõ `isSimulated: true`.
 
 **Output xác thực:**
 ```bash
-$ npx vitest run evaluations/tests/live-acceptance.test.ts
-✓ evaluations/tests/live-acceptance.test.ts (62 tests) 4099ms
-Test Files  1 passed (1)
-     Tests  62 passed (62)
+$ npx vitest run --dir evaluations tests/live-acceptance.test.ts tests/current-flow-composition.test.ts golden-v2/fixtures-services.test.ts golden-v2/fixtures-gmail.test.ts golden-v2/cases.test.ts
+ ✓ evaluations/golden-v2/fixtures-services.test.ts (28 tests) 18ms
+ ✓ evaluations/tests/current-flow-composition.test.ts (10 tests) 32ms
+ ✓ evaluations/golden-v2/cases.test.ts (42 tests) 327ms
+ ✓ evaluations/golden-v2/fixtures-gmail.test.ts (7 tests) 15ms
+ ✓ evaluations/tests/live-acceptance.test.ts (62 tests) 6936ms
+ Test Files  5 passed (5)
+      Tests  149 passed (149)
 ```

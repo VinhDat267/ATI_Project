@@ -3,7 +3,7 @@
  * real adapters (case-insensitive name match, lists and members scoped to a
  * board) so gather resolves names exactly as it would against live services.
  */
-import { ALL_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYJIRA_TOOLS } from '@wap/tool-schemas';
+import { ALL_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, MYJIRA_TOOLS, GITHUB_OAUTH_TOOLS } from '@wap/tool-schemas';
 import { validateSchemaValue } from '@wap/planner';
 
 export const BOARDS = [
@@ -48,6 +48,31 @@ export const REPOS = [
 export const ISSUES = [
   { id: 'issue_api_42', number: 42, title: 'Webhook retries drop events', url: 'https://github.com/acme/api/issues/42', repo: 'acme/api', body: 'Retries after a 5xx are not re-queued.', labels: [] as string[] },
   { id: 'issue_web_42', number: 42, title: 'Footer overlaps on small screens', url: 'https://github.com/acme/web/issues/42', repo: 'acme/web', body: 'The footer covers the last form field.', labels: [] as string[] },
+];
+
+export const PULL_REQUESTS = [
+  { id: 'pr_web_128', number: 128, title: 'Fix OAuth callback redirect', state: 'open', author: 'lan', url: 'https://github.com/acme/web/pull/128', repo: 'acme/web', createdAt: '2026-10-28T08:00:00Z' },
+  { id: 'pr_web_131', number: 131, title: 'Add deterministic report evidence guard', state: 'open', author: 'minh', url: 'https://github.com/acme/web/pull/131', repo: 'acme/web', createdAt: '2026-10-30T10:00:00Z' },
+  { id: 'pr_api_88', number: 88, title: 'Harden webhook retry queue', state: 'open', author: 'huy', url: 'https://github.com/acme/api/pull/88', repo: 'acme/api', createdAt: '2026-10-29T09:00:00Z' },
+];
+
+export const AGING_ISSUES = [
+  { id: 'issue_web_12', number: 12, title: 'Safari login cookie lost on refresh', state: 'open', url: 'https://github.com/acme/web/issues/12', repo: 'acme/web', createdAt: '2026-10-01T08:00:00Z', labels: ['bug'] },
+  { id: 'issue_web_19', number: 19, title: 'Slow table render on 500 rows', state: 'open', url: 'https://github.com/acme/web/issues/19', repo: 'acme/web', createdAt: '2026-10-10T09:30:00Z', labels: ['performance'] },
+  { id: 'issue_api_15', number: 15, title: 'Rate limit headers missing on /api/plans', state: 'open', url: 'https://github.com/acme/api/issues/15', repo: 'acme/api', createdAt: '2026-10-05T14:00:00Z', labels: ['security'] },
+];
+
+export const MYSPREADSHEETS = [
+  { id: 'spreadsheet_frontend_2026', title: 'Frontend', url: 'https://docs.google.com/spreadsheets/d/spreadsheet_frontend_2026/edit' },
+  { id: 'spreadsheet_sales_q4', title: 'Báo cáo doanh số Q4', url: 'https://docs.google.com/spreadsheets/d/spreadsheet_sales_q4/edit' },
+];
+
+export const DRIVE_FOLDERS = [
+  { id: 'folder_drive_789', title: 'Biên bản họp Q4', mimeType: 'application/vnd.google-apps.folder', url: 'https://drive.google.com/drive/folders/folder_drive_789' },
+];
+
+export const GOOGLE_DOCS = [
+  { id: 'doc_kickoff_01', title: 'Biên bản Kickoff Q4', content: '1. Thống nhất mục tiêu Q4\n2. Phân công đầu việc', url: 'https://docs.google.com/document/d/doc_kickoff_01/edit' },
 ];
 
 export const SPREADSHEETS = [
@@ -167,10 +192,12 @@ const GRIDS: Record<string, string[][]> = {
   'spreadsheet_frontend_2026:Tasks': [['Task', 'Status'], ['Fix footer', 'To Do']],
   'spreadsheet_frontend_2026:History': [['Event', 'Link']],
   'spreadsheet_backend_2026:Tasks': [['Task', 'Status'], ['Retry webhook', 'Doing']],
+  'spreadsheet_sales_q4:Sheet1': [['Khu vực', 'Doanh thu'], ['Hà Nội', '1200'], ['Đà Nẵng', '800'], ['TP.HCM', '2500']],
 };
 const ENTITIES: Record<string, Array<{ id: string | number }>> = {
   board: BOARDS, list: LISTS, member: MEMBERS, card: CARDS, channel: CHANNELS, repository: REPOS, issue: ISSUES,
-  spreadsheet: SPREADSHEETS, sheet: SHEETS, calendar: CALENDARS, mycalendar: MYCALENDARS, database: DATABASES, page: PAGES,
+  spreadsheet: SPREADSHEETS, myspreadsheet: MYSPREADSHEETS, drive_folder: DRIVE_FOLDERS, google_doc: GOOGLE_DOCS,
+  sheet: SHEETS, calendar: CALENDARS, mycalendar: MYCALENDARS, database: DATABASES, page: PAGES,
   chat: CHATS, project: PROJECTS, jira_site: MYJIRA_SITES, jira_project: PROJECTS, jira_issue: JIRA_ISSUES, myjira_project: MYJIRA_PROJECTS, myjira_issue: MYJIRA_ISSUES, thread: GMAIL_THREADS, label: GMAIL_LABELS,
 };
 
@@ -193,10 +220,10 @@ const matches = (name: string, query: unknown) =>
 
 /** Fixture implementation of the planner's gather search; get_* tools return one object like the adapters. */
 export async function fixtureSearch({ tool, args }: { tool: string; args: Record<string, unknown> }): Promise<any> {
-  const definition = [...ALL_TOOLS, ...GMAIL_TOOLS, ...MYCALENDAR_TOOLS, ...MYJIRA_TOOLS].find(candidate => candidate.name === tool);
+  const definition = [...ALL_TOOLS, ...GMAIL_TOOLS, ...MYCALENDAR_TOOLS, ...MYSHEETS_TOOLS, ...MYJIRA_TOOLS, ...GITHUB_OAUTH_TOOLS].find(candidate => candidate.name === tool);
   if (!definition || definition.sideEffect !== 'read') throw new Error(`Fixture search does not support ${tool}`);
   // Preserve legacy search behavior; validate every new-service call at the real schema boundary.
-  if (['sheets', 'calendar', 'notion', 'telegram', 'jira', 'gmail', 'mycalendar', 'myjira'].includes(definition.service)) {
+  if (['sheets', 'mysheets', 'calendar', 'notion', 'telegram', 'jira', 'gmail', 'mycalendar', 'myjira'].includes(definition.service)) {
     const error = validateSchemaValue(args, definition.inputSchema, 'args');
     if (error) throw new Error(error);
   }
@@ -206,15 +233,18 @@ export async function fixtureSearch({ tool, args }: { tool: string; args: Record
   };
   switch (tool) {
     case 'sheets.list_spreadsheets': return bounded(SPREADSHEETS.filter(item => matches(item.title, args.query)), 10);
+    case 'mysheets.list_spreadsheets': return bounded(MYSPREADSHEETS.filter(item => matches(item.title, args.query)), 10);
     case 'sheets.list_sheets':
-      requireParent('spreadsheet', args.spreadsheetId);
+    case 'mysheets.list_sheets':
+      requireParent(tool.startsWith('mysheets.') ? 'myspreadsheet' : 'spreadsheet', args.spreadsheetId);
       return bounded(SHEETS.filter(item => item.spreadsheetId === args.spreadsheetId && matches(item.title, args.query)), 10);
-    case 'sheets.read_range': {
-      requireParent('spreadsheet', args.spreadsheetId);
+    case 'sheets.read_range':
+    case 'mysheets.read_range': {
+      requireParent(tool.startsWith('mysheets.') ? 'myspreadsheet' : 'spreadsheet', args.spreadsheetId);
       const range = String(args.range);
       const parts = /^(?:(?:'((?:[^']|'')+)'|([^!]+))!)?([A-Z]+)([1-9]\d*)(?::([A-Z]+)([1-9]\d*))?$/.exec(range);
       if (!parts) throw new Error('Fixture range must be bounded A1 notation');
-      const title = parts[1]?.replaceAll("''", "'") ?? parts[2] ?? SHEETS.find(item => item.spreadsheetId === args.spreadsheetId)!.title;
+      const title = parts[1]?.replaceAll("''", "'") ?? parts[2] ?? SHEETS.find(item => item.spreadsheetId === args.spreadsheetId)?.title ?? 'Sheet1';
       const grid = GRIDS[`${String(args.spreadsheetId)}:${title}`];
       if (!grid) throw new Error(`Unknown fixture tab ${title}`);
       const column = (letters: string) => [...letters].reduce((value, letter) => value * 26 + letter.charCodeAt(0) - 64, 0) - 1;
@@ -222,6 +252,13 @@ export async function fixtureSearch({ tool, args }: { tool: string; args: Record
       const left = column(parts[3]!), right = column(parts[5] ?? parts[3]!) + 1;
       if (last <= first || right <= left) throw new Error('Fixture range is reversed');
       return { range, values: bounded(grid.slice(first, last).map(row => row.slice(left, right)), 50) };
+    }
+    case 'mysheets.list_drive_files':
+      return { files: bounded([...DRIVE_FOLDERS, ...GOOGLE_DOCS].filter(item => matches(item.title, args.query)), 20) };
+    case 'mysheets.get_doc': {
+      const doc = GOOGLE_DOCS.find(d => d.id === args.documentId);
+      if (!doc) throw new Error(`Unknown fixture google_doc=${String(args.documentId)}`);
+      return structuredClone(doc);
     }
     case 'calendar.list_calendars': return bounded(CALENDARS.filter(item => matches(item.title, args.query)), 10);
     case 'calendar.list_events': {
@@ -278,6 +315,10 @@ export async function fixtureSearch({ tool, args }: { tool: string; args: Record
     case 'trello.search_cards': return CARDS.filter((c) => matches(c.name, args.query));
     case 'slack.search_channels': return CHANNELS.filter((c) => matches(c.name, args.query));
     case 'github.search_repos': return REPOS.filter((r) => matches(r.fullName, args.query));
+    case 'github.list_pull_requests':
+      return bounded(PULL_REQUESTS.filter((pr) => pr.repo === args.repo && (!args.state || args.state === 'all' || pr.state === args.state) && matches(pr.title, args.query)), 20);
+    case 'github.list_issues':
+      return bounded(AGING_ISSUES.filter((i) => i.repo === args.repo && (!args.state || args.state === 'all' || i.state === args.state) && matches(i.title, args.query)), 20);
     case 'github.search_issues': return ISSUES
       .filter((i) => i.repo === args.repo && (matches(i.title, args.query) || String(i.number) === String(args.query).replace('#', '')))
       .map(({ body: _body, labels: _labels, ...issue }) => issue);
