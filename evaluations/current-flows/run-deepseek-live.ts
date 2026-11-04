@@ -107,13 +107,30 @@ class RecordingDeepSeekProvider implements LLMProvider {
   }
 }
 
+function resolveDirectDeepSeekEnv(): Record<string, string | undefined> {
+  const directBaseUrl =
+    process.env.FLOW_07_USE_9ROUTER === '1'
+      ? process.env.DEEPSEEK_BASE_URL || 'http://localhost:20128/v1'
+      : process.env.LLM_BASE_URL && !process.env.LLM_BASE_URL.includes('20128')
+        ? process.env.LLM_BASE_URL
+        : 'https://api.deepseek.com';
+  const apiKey = process.env.LLM_API_KEY || process.env.DEEPSEEK_API_KEY;
+  const model = process.env.DEEPSEEK_MODEL || process.env.LLM_MODEL || 'deepseek-chat';
+  return {
+    ...process.env,
+    LLM_PROVIDER: 'deepseek',
+    DEEPSEEK_BASE_URL: directBaseUrl,
+    DEEPSEEK_API_KEY: apiKey,
+    DEEPSEEK_MODEL: model,
+  };
+}
+
 function buildDeepSeekProvider(): LLMProvider & {
   model: string;
   lastServedModel?: string;
   lastCallMetrics?: ModelCallMetrics;
 } {
-  const env = { ...process.env, LLM_PROVIDER: 'deepseek' };
-  return createProviderFromEnv(env) as DeepSeekProvider;
+  return createProviderFromEnv(resolveDirectDeepSeekEnv()) as DeepSeekProvider;
 }
 
 async function verifyDeepSeekConnectivity(): Promise<{
@@ -123,7 +140,8 @@ async function verifyDeepSeekConnectivity(): Promise<{
   baseUrl: string;
   error?: string;
 }> {
-  const baseUrl = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com';
+  const resolved = resolveDirectDeepSeekEnv();
+  const baseUrl = resolved.DEEPSEEK_BASE_URL || 'https://api.deepseek.com';
   const provider = buildDeepSeekProvider();
   try {
     await provider.generatePlan({
@@ -174,7 +192,7 @@ async function runSixWorkflowsThreeTimes() {
       name: 'Google Meet + Docs + Gmail',
       kind: 'standard',
       prompt: (run: number) =>
-        `Tạo lịch họp Google Meet lúc 09:00 ngày 2026-11-05 trên lịch owner@example.test với lan@example.com, tạo Google Docs biên bản trong thư mục folder_drive_789 và gửi link qua Gmail tới lan@example.com (lần ${run})`,
+        `Tạo lịch họp Google Meet từ 09:00 đến 10:00 ngày 2026-11-05 trên lịch owner@example.test với lan@example.com, tạo Google Docs biên bản trong thư mục folder_drive_789 và gửi link qua Gmail tới lan@example.com (lần ${run})`,
     },
     {
       id: 'OFF-03',
@@ -188,7 +206,7 @@ async function runSixWorkflowsThreeTimes() {
       name: 'Trello Card + Due + Member + Slack',
       kind: 'standard',
       prompt: (run: number) =>
-        `Tạo thẻ việc trên bảng Trello Frontend danh sách To Do giao cho Minh kèm hạn chót 2026-11-06T17:00:00+07:00 và gửi thông báo kèm link thẻ vào kênh Slack #frontend (lần ${run})`,
+        `Tạo thẻ "Sửa lỗi đăng nhập" trên bảng Trello Frontend danh sách To Do giao cho Minh kèm hạn chót 2026-11-06T17:00:00+07:00 và gửi thông báo kèm link thẻ vào kênh Slack #frontend (lần ${run})`,
     },
     {
       id: 'PM-03',
@@ -229,12 +247,17 @@ async function runSixWorkflowsThreeTimes() {
       });
       memory.setEntity('member', { id: 'member_minh', name: 'Minh', boardId: 'board_fe' });
 
+      const searches: string[] = [];
       const planner = new AIPlanner({
         provider,
         toolCatalog: runtimeTools,
-        gatherSearch: fixtureSearch,
+        gatherSearch: async (req) => {
+          searches.push(req.tool);
+          return fixtureSearch(req);
+        },
         serviceRegistry: fullRegistry,
         reportEvidenceStore,
+        searchMode: 'llm',
         now: () => new Date('2026-11-04T06:00:00Z'),
         timeZone: 'Asia/Ho_Chi_Minh',
       });
@@ -278,6 +301,13 @@ async function runSixWorkflowsThreeTimes() {
         guardError = guardCheck.error;
       }
 
+      const stepTools = response?.kind === 'plan' ? response.steps.map((s) => s.tool) : [];
+      const sourceTool =
+        response?.kind === 'plan' && response.reportEvidence?.sourceTool
+          ? [response.reportEvidence.sourceTool]
+          : [];
+      const allToolsUsed = [...new Set([...sourceTool, ...stepTools])];
+
       const item = {
         workflowId: wf.id,
         run,
@@ -286,8 +316,11 @@ async function runSixWorkflowsThreeTimes() {
         elapsedMs: Date.now() - started,
         llmCalls: provider.calls,
         kind: response?.kind ?? 'error',
-        tools: response?.kind === 'plan' ? response.steps.map((s) => s.tool) : [],
+        tools: allToolsUsed,
+        stepTools,
+        searches,
         reportEvidence: response?.kind === 'plan' ? response.reportEvidence ?? null : null,
+        clarificationQuestion: response?.kind === 'clarification' ? response.question : undefined,
         guardValid,
         guardError,
         planHash,
@@ -322,24 +355,29 @@ async function run36OracleCases() {
     const provider = new RecordingDeepSeekProvider(buildDeepSeekProvider());
     const reportEvidenceStore = new ReportArtifactStore();
     const memory = new WorkingMemory();
-    if (c.variant === 'explicit') {
+    if (c.variant === 'explicit' && c.expectedKind === 'plan') {
       memory.setEntity('workflow_resource_defaults', {
         github: { repo: 'acme/web' },
-        slack: { channelId: 'C01GENERAL' },
+        slack: { channelId: 'C_GEN' },
         trello: { boardId: 'board_fe', listId: 'list_fe_todo' },
         myjira: { siteId: 'acme-site', projectKey: 'WEB' },
         mycalendar: { calendarId: 'owner@example.test' },
-        mysheets: { spreadsheetId: 'spreadsheet_fe', folderId: 'folder_ati' },
+        mysheets: { spreadsheetId: 'spreadsheet_frontend_2026', folderId: 'folder_ati' },
       });
       memory.setEntity('member', { id: 'member_minh', name: 'Minh', boardId: 'board_fe' });
     }
 
+    const searches: string[] = [];
     const planner = new AIPlanner({
       provider,
       toolCatalog: runtimeTools,
-      gatherSearch: c.variant === 'explicit' ? fixtureSearch : async () => [],
+      gatherSearch: async (req) => {
+        searches.push(req.tool);
+        return fixtureSearch(req);
+      },
       serviceRegistry: fullRegistry,
       reportEvidenceStore,
+      searchMode: 'llm',
       now: () => new Date('2026-11-04T06:00:00Z'),
       timeZone: 'Asia/Ho_Chi_Minh',
     });
@@ -358,8 +396,16 @@ async function run36OracleCases() {
     }
 
     const actualKind = response?.kind ?? 'error';
-    const actualTools = response?.kind === 'plan' ? response.steps.map((s) => s.tool) : [];
+    const stepTools = response?.kind === 'plan' ? response.steps.map((s) => s.tool) : [];
+    const sourceTool =
+      response?.kind === 'plan' && response.reportEvidence?.sourceTool
+        ? [response.reportEvidence.sourceTool]
+        : [];
+    const actualTools = [...new Set([...sourceTool, ...searches, ...stepTools])];
     const kindMatched = actualKind === c.expectedKind;
+    const toolsMatched =
+      c.expectedKind !== 'plan' ||
+      (c.expectedTools ?? []).every((expected) => actualTools.includes(expected));
     const row = {
       id: c.id,
       jobId: c.jobId,
@@ -367,11 +413,14 @@ async function run36OracleCases() {
       expectedKind: c.expectedKind,
       actualKind,
       kindMatched,
+      toolsMatched,
       expectedTools: c.expectedTools ?? [],
       actualTools,
+      stepTools,
       elapsedMs: Date.now() - started,
       servedModel: provider.calls.find((call) => call.servedModel)?.servedModel ?? null,
       llmCallsCount: provider.calls.length,
+      clarificationQuestion: response?.kind === 'clarification' ? response.question : undefined,
       error,
     };
     console.log(

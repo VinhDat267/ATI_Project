@@ -69,6 +69,7 @@ export const MYSPREADSHEETS = [
 
 export const DRIVE_FOLDERS = [
   { id: 'folder_drive_789', title: 'Biên bản họp Q4', mimeType: 'application/vnd.google-apps.folder', url: 'https://drive.google.com/drive/folders/folder_drive_789' },
+  { id: 'folder_ati', title: 'ATI', mimeType: 'application/vnd.google-apps.folder', url: 'https://drive.google.com/drive/folders/folder_ati' },
 ];
 
 export const GOOGLE_DOCS = [
@@ -83,6 +84,7 @@ export const SHEETS = [
   { id: 0, title: 'Tasks', spreadsheetId: SPREADSHEETS[0]!.id },
   { id: 1, title: 'History', spreadsheetId: SPREADSHEETS[0]!.id },
   { id: 0, title: 'Tasks', spreadsheetId: SPREADSHEETS[1]!.id },
+  { id: 0, title: 'Sheet1', spreadsheetId: 'spreadsheet_sales_q4' },
 ];
 export const CALENDARS = [
   { id: 'team@example.test', title: 'Team', timeZone: 'Asia/Ho_Chi_Minh' },
@@ -197,7 +199,7 @@ const GRIDS: Record<string, string[][]> = {
 const ENTITIES: Record<string, Array<{ id: string | number }>> = {
   board: BOARDS, list: LISTS, member: MEMBERS, card: CARDS, channel: CHANNELS, repository: REPOS, issue: ISSUES,
   spreadsheet: SPREADSHEETS, myspreadsheet: MYSPREADSHEETS, drive_folder: DRIVE_FOLDERS, google_doc: GOOGLE_DOCS,
-  sheet: SHEETS, calendar: CALENDARS, mycalendar: MYCALENDARS, database: DATABASES, page: PAGES,
+  sheet: SHEETS, mysheet: SHEETS, calendar: CALENDARS, mycalendar: MYCALENDARS, database: DATABASES, page: PAGES,
   chat: CHATS, project: PROJECTS, jira_site: MYJIRA_SITES, jira_project: PROJECTS, jira_issue: JIRA_ISSUES, myjira_project: MYJIRA_PROJECTS, myjira_issue: MYJIRA_ISSUES, thread: GMAIL_THREADS, label: GMAIL_LABELS,
 };
 
@@ -260,11 +262,59 @@ export async function fixtureSearch({ tool, args }: { tool: string; args: Record
       return { range, values };
     }
     case 'mysheets.list_drive_files':
-      return { files: bounded([...DRIVE_FOLDERS, ...GOOGLE_DOCS].filter(item => matches(item.title, args.query)), 20) };
+      return bounded([...DRIVE_FOLDERS, ...GOOGLE_DOCS].filter(item => matches(item.title, args.query)), 20);
     case 'mysheets.get_doc': {
       const doc = GOOGLE_DOCS.find(d => d.id === args.documentId);
       if (!doc) throw new Error(`Unknown fixture google_doc=${String(args.documentId)}`);
       return structuredClone(doc);
+    }
+    case 'mysheets.search_rows': {
+      requireParent('myspreadsheet', args.spreadsheetId);
+      const sheet = String(args.sheet ?? 'Sheet1');
+      const grid = GRIDS[`${String(args.spreadsheetId)}:${sheet}`];
+      if (!grid) throw new Error(`Unknown fixture tab ${sheet}`);
+      const headers = (grid[0] ?? []).map(String);
+      const dataRows = grid.slice(1);
+      const matchesList = dataRows
+        .map((row, idx) => ({
+          rowNumber: idx + 2,
+          values: row.map(String),
+          record: Object.fromEntries(headers.map((h, i) => [h, String(row[i] ?? '')])),
+        }))
+        .filter((item) => matches(item.values.join(' '), args.query));
+      return {
+        sheet,
+        headers,
+        totalMatched: matchesList.length,
+        matches: bounded(matchesList, 20),
+      };
+    }
+    case 'mysheets.aggregate_rows': {
+      requireParent('myspreadsheet', args.spreadsheetId);
+      const sheet = String(args.sheet ?? 'Sheet1');
+      const grid = GRIDS[`${String(args.spreadsheetId)}:${sheet}`];
+      if (!grid) throw new Error(`Unknown fixture tab ${sheet}`);
+      const headers = (grid[0] ?? []).map(String);
+      const dataRows = grid.slice(1);
+      const groupBy = typeof args.groupBy === 'string' ? args.groupBy : headers[1] ?? headers[0] ?? 'Status';
+      const colIdx = Math.max(0, headers.findIndex((h) => h.toLocaleLowerCase('vi') === groupBy.toLocaleLowerCase('vi')));
+      const counts = new Map<string, number>();
+      for (const row of dataRows) {
+        const key = String(row[colIdx] ?? 'Khác');
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+      }
+      const groups = [...counts.entries()].map(([key, count]) => ({
+        key,
+        count,
+        metrics: { count },
+      }));
+      return {
+        sheet,
+        totalRowsScanned: dataRows.length,
+        matchedRows: dataRows.length,
+        groups,
+        totals: { count: dataRows.length },
+      };
     }
     case 'calendar.list_calendars': return bounded(CALENDARS.filter(item => matches(item.title, args.query)), 10);
     case 'calendar.list_events': {

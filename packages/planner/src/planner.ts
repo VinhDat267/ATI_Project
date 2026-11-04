@@ -264,9 +264,10 @@ export class AIPlanner {
     } catch {
       return rawOutput;
     }
-    if (!parsed || parsed.kind !== 'plan' || !Array.isArray(parsed.steps) || parsed.reportEvidence) {
+    if (!parsed || parsed.kind !== 'plan' || !Array.isArray(parsed.steps)) {
       return rawOutput;
     }
+    delete parsed.reportEvidence;
 
     if (!requiresReportEvidence(groundingUserTexts.length ? groundingUserTexts : [parsed.summary || '', parsed.thinking || ''])) return rawOutput;
     if (parsed.steps.some((s: any) => !s || typeof s.id !== 'string' || typeof s.tool !== 'string' || !s.args || typeof s.args !== 'object')) return rawOutput;
@@ -306,6 +307,16 @@ export class AIPlanner {
 
     if (!readTool || rawResult === undefined || rawResult === null) {
       return rawOutput;
+    }
+    if (
+      Array.isArray(rawResult) &&
+      rawResult.length === 1 &&
+      rawResult[0] &&
+      typeof rawResult[0] === 'object' &&
+      !Array.isArray(rawResult[0]) &&
+      ('values' in rawResult[0] || 'records' in rawResult[0] || 'groups' in rawResult[0] || 'headers' in rawResult[0])
+    ) {
+      rawResult = rawResult[0];
     }
 
     if (readTool.endsWith('.read_range') && Array.isArray((rawResult as any)?.values) &&

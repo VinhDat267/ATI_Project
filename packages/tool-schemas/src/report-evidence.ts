@@ -40,11 +40,11 @@ export interface ReportObservationRecord {
 /** Original user context is authoritative; model-written summaries are only a fallback. */
 export function requiresReportEvidence(userTexts: readonly string[]): boolean {
   const fold = (text: string) => text.normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
-  const topic = /\b(?:prs?|pull requests?|issues?|jira|sprints?|sheets?|spreadsheets?|bang tinh|so lieu)\b/;
+  const topic = /\b(?:prs?|pull requests?|issues?|jira|sprints?|sheets?|spreadsheets?|bang tinh|so lieu|ban phat hanh|cac thay doi)\b/;
   const report = /\b(?:bao cao|tong hop|thong ke|tom tat|reports?|digest|summary|summari[sz]e|progress|aging)\b/;
   const read = /\b(?:danh sach|liet ke|doc|xem|kiem tra|lay|dem|bao nhieu|may|hien co|co nhung|tim|list|read|show|find|fetch|which|how many|what)\b/;
   const send = /(?<![\p{L}\p{N}_])(?:gửi|nhắn|gui|send|post|notify)(?![\p{L}\p{N}_])/iu;
-  const sourceMutation = /\b(?:tao|them|ghi|cap nhat|sua|dong|gan|mo|create|add|append|update|close|assign|delete)\s+(?:(?:moi|mot|cac|a|an|the|new|github|google|nhan|bug|cho)\s+)*(?:prs?|pull requests?|issues?|tickets?|jira|sprints?|sheets?|spreadsheets?|bang tinh|dong|rows?|cells?)\b/;
+  const sourceMutation = /\b(?:tao|them|ghi|cap nhat|sua|dong|gan|mo|create|add|append|update|close|assign|delete)\s+(?:(?:moi|mot|cac|a|an|the|new|github|google|nhan|bug|cho)\s+)*(?:prs?|pull requests?|issues?|tickets?|jira|sprints?|sheets?|spreadsheets?|bang tinh|dong|rows?|cells?|the|cards?|trello)\b/;
   const latest = fold(userTexts.at(-1) ?? '');
   const outsideQuotes = latest.replace(/"[^"\n]*"|“[^”\n]*”|'[^'\n]*'/g, '');
   // A user may send their own literal words, including numbers or the word "report".

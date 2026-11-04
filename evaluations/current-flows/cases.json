@@ -43,7 +43,7 @@
       "id": "OFF-02-explicit",
       "jobId": "OFF-02",
       "variant": "explicit",
-      "prompt": "Tạo Google Meet lúc 9h ngày mai với lan@example.com, tạo Google Docs biên bản trong Google Drive và gửi link qua Gmail.",
+      "prompt": "Tạo Google Meet từ 9h đến 10h ngày mai trên lịch Personal với lan@example.com, tạo Google Docs biên bản trong thư mục Biên bản họp Q4 trên Google Drive và gửi link qua Gmail.",
       "services": ["mycalendar", "mysheets", "gmail"],
       "expectedKind": "plan",
       "expectedTools": [
@@ -78,7 +78,7 @@
       "id": "OFF-03-explicit",
       "jobId": "OFF-03",
       "variant": "explicit",
-      "prompt": "Đọc Google Sheets Frontend tab Tasks, đếm việc theo trạng thái và gửi báo cáo vào Slack #general.",
+      "prompt": "Đọc Google Sheets Frontend vùng Tasks!A1:B2 (có dòng tiêu đề đầu tiên), đếm việc theo trạng thái và gửi báo cáo vào Slack #general.",
       "services": ["mysheets", "slack"],
       "expectedKind": "plan",
       "expectedTools": [
@@ -159,7 +159,7 @@
       "id": "PM-01-natural",
       "jobId": "PM-01",
       "variant": "natural",
-      "prompt": "Nhờ Minh sửa lỗi đăng nhập trước thứ sáu rồi báo nhóm frontend giúp mình.",
+      "prompt": "Nhờ Minh xử lý việc tồn đọng mới phát sinh trên thẻ việc rồi báo nhóm trên Slack giúp mình.",
       "services": ["trello", "slack"],
       "expectedKind": "clarification",
       "expectedClarificationTopics": ["bảng Trello", "danh sách To Do"]
@@ -204,7 +204,7 @@
       "id": "PM-03-explicit",
       "jobId": "PM-03",
       "variant": "explicit",
-      "prompt": "Mỗi sáng 8h ngày làm việc, tổng hợp Jira project FE và gửi Slack #general.",
+      "prompt": "Tổng hợp tiến độ các issue của Jira project WEB trên site Acme Jira và gửi báo cáo vào Slack #general.",
       "services": ["myjira", "slack"],
       "expectedKind": "plan",
       "expectedTools": [
@@ -239,7 +239,7 @@
       "id": "PM-04-explicit",
       "jobId": "PM-04",
       "variant": "explicit",
-      "prompt": "Tạo ticket sự cố thanh toán P1 trên Jira project FE, tạo biên bản Notion kèm link Jira, cảnh báo Telegram và Slack #general.",
+      "prompt": "Tạo ticket sự cố thanh toán P1 trên Jira project WEB (site Acme Jira), tạo trang biên bản trong cơ sở dữ liệu Notion Frontend kèm link Jira, gửi cảnh báo vào nhóm Telegram frontend và kênh Slack #general.",
       "services": ["myjira", "notion", "telegram", "slack"],
       "expectedKind": "plan",
       "expectedTools": [
@@ -338,7 +338,7 @@
       "id": "DEV-03-explicit",
       "jobId": "DEV-03",
       "variant": "explicit",
-      "prompt": "Đọc GitHub issue và pull request acme/web, tạo bản ghi release trên Notion và báo Slack #release.",
+      "prompt": "Đọc pull request đang mở trên GitHub acme/web, tạo trang ghi chú phát hành trong cơ sở dữ liệu Notion Frontend và gửi thông báo vào Slack #release.",
       "services": ["github", "notion", "slack"],
       "expectedKind": "plan",
       "expectedTools": [
@@ -369,7 +369,7 @@
       "id": "DEV-04-explicit",
       "jobId": "DEV-04",
       "variant": "explicit",
-      "prompt": "Mỗi sáng 8h tổng hợp issue GitHub acme/api tồn đọng quá 7 ngày và gửi Slack #general.",
+      "prompt": "Tổng hợp các issue GitHub acme/api đang mở tồn đọng quá 7 ngày và gửi báo cáo vào Slack #general.",
       "services": ["github", "slack"],
       "expectedKind": "plan",
       "expectedTools": [

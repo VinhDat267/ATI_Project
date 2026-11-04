@@ -232,7 +232,12 @@ function applyWorkflowResourceDefaults(target: Record<string, any>, defaults: un
   const addDefaultEntity = (resource: string, entity: Record<string, unknown>) => {
     const existing = target[resource];
     const list = Array.isArray(existing) ? existing : existing ? [existing] : [];
-    if (!list.some((item: any) => item && String(item.id ?? item.key ?? item.siteId) === String(entity.id ?? entity.key ?? entity.siteId))) {
+    const observedList =
+      isObject(target.__observed) && Array.isArray(target.__observed[resource])
+        ? (target.__observed[resource] as unknown[])
+        : [];
+    const combined = [...list, ...observedList];
+    if (!combined.some((item: any) => item && String(item.id ?? item.key ?? item.siteId) === String(entity.id ?? entity.key ?? entity.siteId))) {
       target[resource] = [...list, entity];
     }
   };
@@ -320,12 +325,12 @@ export function groundingMemory(
       merged[k] = Array.isArray(v) ? v.filter(item => !isEntityRevoked(item)) : v;
     }
   }
-  applyWorkflowResourceDefaults(merged, memory?.workflow_resource_defaults);
   for (const [resource, entities] of Object.entries(observed ?? {})) {
     const resolved = merged[resource];
     const activeObserved = entities.filter(item => !isEntityRevoked(item));
     merged[resource] = [...(Array.isArray(resolved) ? resolved : resolved ? [resolved] : []), ...activeObserved];
   }
+  applyWorkflowResourceDefaults(merged, memory?.workflow_resource_defaults);
   return merged;
 }
 

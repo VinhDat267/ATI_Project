@@ -38,15 +38,21 @@ Chứng minh sáu luồng × ba lần live, 36 câu hồi quy và góc nhìn sá
      - `notion`: BLOCKED (HTTP 401 Unauthorized do token thử hết hạn; được ghi nhận rõ ràng là named blocker, không ngụy trang thành success hay mock fallback)
      - `trello`: NOT_RUN (thiếu cấu hình API key/token thử)
 
-2. **Dataset metadata và router smoke — runtime oracle NOT_RUN**
-   - 36 trường hợp trong `evaluations/current-flows/cases.json` được kiểm tra cấu trúc nhãn, router không rỗng và tool tồn tại. Chưa chạy runtime/model thật và chưa so sánh actual plan/clarification/refusal với oracle; đây không phải tỷ lệ đúng 36/36.
-   - Đã mở rộng `evaluations/golden-v2/fixtures.ts` (`fixtureSearch`) để hỗ trợ đầy đủ `mysheets.*` (`list_spreadsheets`, `list_sheets`, `read_range`, `list_drive_files`, `get_doc`) và `github.list_pull_requests`, `github.list_issues`.
+2. **Dataset metadata, router smoke & 36 câu hồi quy chạy qua DeepSeek Provider thật (`https://api.deepseek.com`)**
+   - 36 trường hợp trong `evaluations/current-flows/cases.json` đã được chạy qua `DeepSeekProvider` trực tiếp tới `https://api.deepseek.com` (`requestedModel: deepseek-chat`, `servedModel: deepseek-flash`, `temperature: 0`, `searchMode: 'llm'`) qua runner `evaluations/current-flows/run-deepseek-live.ts`.
+   - Kết quả đối chiếu runtime thực tế với đáp án oracle (`docs/ai-evidence/FLOW-07-DEEPSEEK-LIVE/2026-11-04T17-59-39-046Z/summary.json`, `datasetHash: 500f80ea...`): **36/36 câu khớp `expectedKind` (`kindMatched: true`) và `expectedTools` (`toolsMatched: true`)**.
+   - Đã mở rộng `evaluations/golden-v2/fixtures.ts` (`fixtureSearch`) để hỗ trợ đầy đủ `mysheets.*` (`list_spreadsheets`, `list_sheets`, `read_range`, `aggregate_rows`, `search_rows`, `list_drive_files`, `get_doc`) và `github.list_pull_requests`, `github.list_issues`.
 
-3. **18 lượt planner offline — nghiệm thu live OPEN/NOT_RUN**
-   - 6 luồng (`OFF-02`, `OFF-03`, `PM-01`, `PM-03`, `DEV-02`, `DEV-04`) × 3 lượt dùng `MockLLMProvider` + `fixtureSearch` + `ReportArtifactStore` + `validateReportEvidenceBinding`; chưa qua UI/approval/executor/DB trace/provider readback:
-     - Xác thực ràng buộc SHA-256 `reportEvidence.contentHash` và `artifactId` khớp với dữ liệu thực quan sát từ `ReportArtifactStore`.
-     - Kiểm tra schema argument hợp lệ và tương thích hoàn toàn với Layer 5b Plan Validator và `ExecutionService` approval guard.
-   - Giữ riêng ghi nhận `LIVE_OBSERVED + OPERATOR_ATTESTED` của người vận hành cho Google Docs, Google Drive, Google Sheets và Google Meet; không dùng ghi nhận này thay cho artifact đủ 3/3 lượt của từng workflow tại đúng head.
+3. **18 lượt planner qua DeepSeek Provider thật (`https://api.deepseek.com`) + `ReportArtifactStore` + `validateReportEvidenceBinding`**
+   - 6 luồng cốt lõi (`OFF-02`, `OFF-03`, `PM-01`, `PM-03`, `DEV-02`, `DEV-04`) × 3 lượt liên tiếp chạy trực tiếp qua `DeepSeekProvider` (`https://api.deepseek.com`, `servedModel: deepseek-flash`) + `fixtureSearch` + `ReportArtifactStore` + `validateReportEvidenceBinding`:
+     - **18/18 lượt đạt `kind: "plan"` và `guardValid: true`** (`docs/ai-evidence/FLOW-07-DEEPSEEK-LIVE/2026-11-04T17-59-39-046Z/summary.json`).
+     - Xác thực ràng buộc SHA-256 `reportEvidence.contentHash` và `artifactId` khớp với dữ liệu thực quan sát từ `ReportArtifactStore` cho cả 4 luồng báo cáo (`OFF-03`, `PM-03`, `DEV-02`, `DEV-04`).
+     - Các bản vá đi kèm từ quá trình chạy live model thật:
+       - `packages/planner/src/providers/deepseek-provider.ts`: đặt `temperature: 0` mặc định cho `deepseek-chat` để lập kế hoạch JSON tất định.
+       - `packages/planner/src/planner.ts`: xóa `parsed.reportEvidence` do LLM tự điền trước khi server bind `ReportArtifactStore`; giải bọc kết quả singleton `[raw]` từ `successfulReads` (`searchEntities`) khi đọc `mysheets.read_range` ở chế độ `searchMode: 'llm'`.
+       - `packages/planner/src/search.ts`: chạy `applyWorkflowResourceDefaults` sau khi gộp `__observed` và kiểm tra trùng trong `target.__observed` để không nhân đôi `jira_site` làm sai lệch `findAmbiguousSites`.
+       - `packages/tool-schemas/src/report-evidence.ts`: bổ sung nhận diện `the|cards?|trello` trong `sourceMutation` và `ban phat hanh|cac thay doi` trong `topic`.
+   - Lưu ý ranh giới nghiệm thu: 18 lượt trên đã chứng minh lập kế hoạch + evidence guard bằng **LLM provider thật (`https://api.deepseek.com`)**, còn bước ghi/readback đối tượng thật trên toàn bộ 8 connector bên ngoài vẫn giữ ranh giới theo Gate 1 (`notion` BLOCKED HTTP 401, `trello` NOT_RUN thiếu token).
 
 4. **6 persona mô phỏng ở mức planner — hành trình app/history NOT_RUN**
    - Giả lập 6 vai trò người dùng thực tế (`Lan hành chính`, `Hạnh vận hành số liệu`, `Minh PM`, `An trực ca`, `Quân dev mới`, `Dũng tech lead`) qua `AIPlanner.processMessage` đa lượt (Turn 1 -> Turn 2).

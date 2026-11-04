@@ -11,6 +11,7 @@ describe('Original report request versus ordinary source writes and literal mess
     'Đếm PR đang mở trên GitHub acme/web rồi gửi Slack',
     'Tạo issue trên GitHub rồi tổng hợp PR đang mở vào Slack',
     'Tổng hợp PR đang mở và tạo issue GitHub',
+    'Chuẩn bị báo cáo bản phát hành tuần này từ các thay đổi rồi gửi nhóm release giúp mình.',
   ])('requires verified source for %s', (text) => expect(requiresReportEvidence([text])).toBe(true));
   it.each([
     'Create GitHub issue, Trello card and notify Slack',
