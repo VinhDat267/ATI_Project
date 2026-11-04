@@ -429,6 +429,70 @@ describe('Routes: /api/connections/mysheets', () => {
         },
       ]);
     });
+
+    it('uses sheetsBase (oauth.apiBaseUrl) for /v4/spreadsheets tab discovery and driveBase (www.googleapis.com) for Drive files.get when driveApiBaseUrl is omitted', async () => {
+      const requestedUrls: string[] = [];
+      const customFetch: typeof fetch = async (input, init) => {
+        const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+        requestedUrls.push(urlStr);
+        if (urlStr.startsWith('https://www.googleapis.com/drive/v3/about')) {
+          return new Response(
+            JSON.stringify({ user: { emailAddress: 'owner.sheets@example.test' } }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        if (urlStr.startsWith('https://www.googleapis.com/drive/v3/files/')) {
+          return new Response(
+            JSON.stringify({
+              id: validSpreadsheetId,
+              name: 'Bảng tính Live',
+              mimeType: 'application/vnd.google-apps.spreadsheet',
+              trashed: false,
+              capabilities: { canEdit: true },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        if (urlStr.startsWith('https://sheets.googleapis.com/v4/spreadsheets/')) {
+          return new Response(
+            JSON.stringify({
+              sheets: [{ properties: { sheetId: 0, title: 'Tổng hợp' } }],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        return fetch(input, init);
+      };
+
+      const app = build({
+        mysheets: {
+          enabled: true,
+          oauth: { ...oauth(), apiBaseUrl: 'https://sheets.googleapis.com' },
+          repo,
+          fetchFn: customFetch,
+          fakePickerBaseUrl: google.origin,
+          picker: { apiKey: 'test-picker-key', appId: '123456789' },
+        },
+      });
+      await connect(app, alice);
+
+      const r = await request(app)
+        .put('/api/connections/mysheets/scope')
+        .set('Authorization', bearer(alice))
+        .send({ spreadsheetIds: [`https://docs.google.com/spreadsheets/d/${validSpreadsheetId}/edit`] });
+
+      expect(r.status).toBe(200);
+      expect(r.body.selectedSpreadsheets).toEqual([
+        {
+          id: validSpreadsheetId,
+          title: 'Bảng tính Live',
+          canEdit: true,
+          sheets: ['Tổng hợp'],
+        },
+      ]);
+      expect(requestedUrls.some((u) => u.startsWith('https://www.googleapis.com/drive/v3/files/'))).toBe(true);
+      expect(requestedUrls.some((u) => u.startsWith('https://sheets.googleapis.com/v4/spreadsheets/'))).toBe(true);
+    });
   });
 
   describe('DELETE /', () => {
