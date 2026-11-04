@@ -79,6 +79,8 @@ describe('DEMO-01: Cross-Service End-to-End Audit & Defense Runbook Contract', (
     expect(content).toContain('GMAIL_ENABLED=on');
     expect(content).toContain('MYCALENDAR_ENABLED=on');
     expect(content).toContain('MYSHEETS_ENABLED=on');
+    expect(content).toContain('MYNOTION_ENABLED=on');
+    expect(content).toContain('MYJIRA_ENABLED=on');
     expect(content).toContain('SANDBOX_SCENARIO=nine_service');
 
     // Verify no real tokens/secrets are accidentally committed in the runbook
