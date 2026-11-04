@@ -49,7 +49,7 @@ describe('FLOW-06 Web: Schedule approval modes, timezone, next run, and recovery
     expect(screen.getByText(/lần chạy tới/)).toBeInTheDocument();
   });
 
-  it('renders "Tự gửi" badge and "Tự gửi theo phạm vi đã xác nhận" on auto-digest schedules in ScheduleSection', async () => {
+  it('renders "Tự gửi" badge and "Gửi định kỳ theo phạm vi đã xác nhận" on auto-digest schedules in ScheduleSection', async () => {
     vi.spyOn(useSchedulesHook, 'useSchedulesEnabled').mockReturnValue(true);
     vi.spyOn(apiClient, 'getSchedules').mockResolvedValue({
       schedules: [
@@ -74,7 +74,7 @@ describe('FLOW-06 Web: Schedule approval modes, timezone, next run, and recovery
 
     expect(await screen.findByText('Bản tin GitHub mỗi sáng')).toBeInTheDocument();
     expect(screen.getByText('Tự gửi')).toBeInTheDocument();
-    expect(screen.getByText(/Tự gửi theo phạm vi đã xác nhận/)).toBeInTheDocument();
+    expect(screen.getByText(/Gửi định kỳ theo phạm vi đã xác nhận/)).toBeInTheDocument();
   });
 
   it('displays alert for needs_attention run and prevents replan in ScheduleRunRecovery', async () => {

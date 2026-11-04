@@ -183,11 +183,11 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
             <span data-schedule-kind="plan" data-schedule-mode="manual" className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
               Mỗi lượt cần bạn duyệt
             </span>
-          ) : (
+          ) : schedule.kind !== 'telegram_digest' ? (
             <span data-schedule-kind={schedule.kind} data-schedule-mode="auto_digest" className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
               Tự gửi
             </span>
-          )}
+          ) : null}
         </div>
         {schedule.kind === 'telegram_digest' && (
           <p data-schedule-kind={schedule.kind} className="text-xs font-semibold text-[#0369A1]">
@@ -195,8 +195,8 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
           </p>
         )}
         {schedule.kind !== 'plan' && schedule.kind !== 'telegram_digest' && (
-          <p data-schedule-kind={schedule.kind} className="text-xs font-semibold text-emerald-700">
-            Tự gửi theo phạm vi đã xác nhận
+          <p className="text-xs font-semibold text-emerald-700">
+            Gửi định kỳ theo phạm vi đã xác nhận
           </p>
         )}
         <p className="text-sm text-[#4B5563]">{describeRecurrence(schedule.recurrence)}</p>
