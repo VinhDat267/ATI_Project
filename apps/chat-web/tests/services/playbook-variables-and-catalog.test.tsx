@@ -584,4 +584,29 @@ describe('1-Click Parameterized Playbooks & Extended Slack/GitHub Catalog', () =
     expect(screen.getByTestId('verified-report-evidence-badge').textContent).toContain('2026-11-04T12:00:00.000Z');
     expect(screen.getByTestId('google-docs-sharing-notice')).toBeDefined();
   });
+
+  it('GMAIL-03 off compatibility: renders zero /Gmail/ matches in RequestMoment when gmail is disabled', () => {
+    const inputRef = createRef<HTMLTextAreaElement>();
+    render(
+      <RequestMoment
+        services={[
+          { id: 'trello', name: 'Trello', configured: false, connected: false, connectionStatus: 'unconfigured' },
+          { id: 'slack', name: 'Slack', configured: true, connected: true, connectionStatus: 'healthy' },
+        ]}
+        loading={false}
+        error={null}
+        draft=""
+        planning={false}
+        input={inputRef}
+        onDraft={() => {}}
+        onSend={() => {}}
+        onKeyDown={() => {}}
+        onSettings={() => {}}
+        navigate={() => {}}
+        servicePrompt={(s) => `Dùng ${s.name}`}
+      />,
+    );
+
+    expect(screen.queryAllByText(/Gmail/)).toHaveLength(0);
+  });
 });

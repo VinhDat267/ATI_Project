@@ -12,7 +12,7 @@ export interface CoreJob {
 export const CORE_JOBS: CoreJob[] = [
   {
     id: 'OFF-02',
-    title: 'Google Meet, biên bản Docs & email Gmail',
+    title: 'Google Meet, biên bản Docs & gửi email',
     description: 'Tạo phòng họp Google Meet, lưu tài liệu Docs vào thư mục đã chọn và gửi link qua email',
     outputDescription: 'Meet link + file Google Docs + email gửi người tham gia',
     requiredServices: ['mycalendar', 'mysheets', 'gmail'],

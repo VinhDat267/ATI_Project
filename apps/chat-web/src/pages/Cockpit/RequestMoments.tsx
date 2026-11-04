@@ -936,7 +936,7 @@ export function RequestMoment({
             </div>
           </div>
 
-          {multiServicePlaybooks.length > 0 && (
+          {multiServicePlaybooks.filter((pb) => services.some((s) => s.id === 'gmail') || !pb.services.includes('gmail')).length > 0 && (
             <div className="v3-space-y-3" data-testid="multi-service-playbooks">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-xs font-semibold uppercase tracking-wider text-brand-muted">
@@ -947,7 +947,9 @@ export function RequestMoment({
                 </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {multiServicePlaybooks.map((playbook) => {
+                {multiServicePlaybooks
+                  .filter((pb) => services.some((s) => s.id === 'gmail') || !pb.services.includes('gmail'))
+                  .map((playbook) => {
                   const pbReadiness = evaluateJobReadiness(playbook.services, services);
                   return (
                     <button
