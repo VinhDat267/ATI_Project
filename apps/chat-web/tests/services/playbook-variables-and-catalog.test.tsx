@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { createRef } from 'react';
 import {
   RequestMoment,
@@ -24,6 +24,10 @@ describe('1-Click Parameterized Playbooks & Extended Slack/GitHub Catalog', () =
     localStorage.clear();
     sessionStorage.clear();
     vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   it('extracts and applies {{biến_số}} placeholders cleanly', () => {
@@ -386,6 +390,7 @@ describe('1-Click Parameterized Playbooks & Extended Slack/GitHub Catalog', () =
     const services: ServiceInfo[] = [
       { id: 'mycalendar', name: 'Google Calendar', configured: true, connected: true, connectionStatus: 'healthy' },
       { id: 'mysheets', name: 'Google Sheets', configured: true, connected: true, connectionStatus: 'healthy' },
+      { id: 'gmail', name: 'Gmail', configured: true, connected: true, connectionStatus: 'healthy' },
     ];
     let currentDraft = '';
     const onDraft = vi.fn((val: string) => {

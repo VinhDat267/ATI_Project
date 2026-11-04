@@ -15,6 +15,12 @@ import {
   deletePlaybook,
   type CustomPlaybook,
 } from '../../services/playbook-storage';
+import { CORE_JOBS, evaluateJobReadiness } from '../../services/job-readiness';
+import {
+  loadWorkflowDefaults,
+  clearWorkflowDefaults,
+  type WorkflowResourceDefaults,
+} from '../../services/workflow-defaults-storage';
 interface Props {
   services: ServiceInfo[];
   loading: boolean;
@@ -100,6 +106,9 @@ export function RequestMoment({
   const [customPlaybooks, setCustomPlaybooks] = useState<CustomPlaybook[]>(() =>
     loadPlaybooks(userId, workspaceKey)
   );
+  const [activeDefaults, setActiveDefaults] = useState<WorkflowResourceDefaults | null>(() =>
+    loadWorkflowDefaults(userId, workspaceKey)
+  );
   const [templateText, setTemplateText] = useState<string>(() => draft);
   const [composerTab, setComposerTab] = useState<'template' | 'preview'>('template');
   const [variableValues, setVariableValues] = useState<Record<string, string>>({});
@@ -120,6 +129,7 @@ export function RequestMoment({
 
   useEffect(() => {
     setCustomPlaybooks(loadPlaybooks(userId, workspaceKey));
+    setActiveDefaults(loadWorkflowDefaults(userId, workspaceKey));
   }, [userId, workspaceKey]);
 
   useEffect(() => {
@@ -612,6 +622,136 @@ export function RequestMoment({
         </div>
       )}
 
+      {/* FLOW-04: 6 Core Jobs prioritized at the top of recommendations */}
+      <div className="v3-space-y-3" data-testid="core-jobs-section">
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-xs font-semibold uppercase tracking-wider text-brand-muted">
+            6 Quy trình trọng tâm sẵn dùng (Chuẩn hoá theo đầu ra)
+          </div>
+          <span className="text-[11px] font-medium text-brand-primary bg-[#FFF6EE] border border-[#FFDFC6] px-2 py-0.5 rounded-full">
+            Core Production Workflows
+          </span>
+        </div>
+
+        {activeDefaults && (
+          <div
+            data-testid="workflow-active-defaults"
+            className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs text-neutral-600"
+          >
+            <span className="font-semibold text-neutral-800">Tài nguyên mặc định:</span>
+            {activeDefaults.github?.repo && (
+              <span className="px-2 py-0.5 rounded bg-white border font-mono text-[11px]">
+                Repo: {activeDefaults.github.repo}
+              </span>
+            )}
+            {activeDefaults.slack?.channelId && (
+              <span className="px-2 py-0.5 rounded bg-white border font-mono text-[11px]">
+                Slack: #{activeDefaults.slack.channelId}
+              </span>
+            )}
+            {activeDefaults.trello?.boardId && (
+              <span className="px-2 py-0.5 rounded bg-white border font-mono text-[11px]">
+                Trello: {activeDefaults.trello.boardId}
+              </span>
+            )}
+            {activeDefaults.myjira?.projectKey && (
+              <span className="px-2 py-0.5 rounded bg-white border font-mono text-[11px]">
+                Jira: {activeDefaults.myjira.projectKey}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                clearWorkflowDefaults(userId, workspaceKey);
+                setActiveDefaults(null);
+              }}
+              className="text-[11px] text-neutral-500 hover:text-red-600 ml-auto underline"
+            >
+              Xoá mặc định
+            </button>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {CORE_JOBS.map((job) => {
+            const readiness = evaluateJobReadiness(job.requiredServices, services);
+            return (
+              <div
+                key={job.id}
+                className="relative p-3.5 bg-white hover:bg-neutral-50 rounded-2xl border border-brand-border hover:border-brand-primary/50 shadow-soft-card transition-all group flex flex-col justify-between gap-3"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-1.5 mb-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {job.requiredServices.map((svcId, idx) => (
+                        <span key={svcId} className="inline-flex items-center gap-1">
+                          <span className="w-6 h-6 rounded-full bg-white border border-brand-border shadow-2xs flex items-center justify-center">
+                            <ServiceLogo service={svcId} className="w-3.5 h-3.5" />
+                          </span>
+                          {idx < job.requiredServices.length - 1 && (
+                            <span className="text-[10px] font-mono text-neutral-400">+</span>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                    <span
+                      data-testid={`readiness-badge-${job.id}`}
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                        readiness.isReady
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : readiness.status === 'needs_reauth'
+                          ? 'bg-rose-50 text-rose-700 border-rose-200'
+                          : readiness.status === 'needs_resource'
+                          ? 'bg-amber-50 text-amber-800 border-amber-200'
+                          : 'bg-orange-50 text-orange-800 border-orange-200'
+                      }`}
+                    >
+                      {readiness.isReady
+                        ? '✓ Sẵn sàng'
+                        : readiness.status === 'needs_reauth'
+                        ? '⚠️ Cấp lại quyền'
+                        : readiness.status === 'needs_resource'
+                        ? '📁 Chọn tài nguyên'
+                        : `⚡ Thiếu ${readiness.missingServices.join(', ')}`}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    aria-label={`Quy trình ${job.id}: ${job.title}`}
+                    disabled={planning}
+                    onClick={() => handleSelectPlaybook(job.prompt)}
+                    className="text-left w-full"
+                  >
+                    <div className="text-xs font-bold text-brand-text group-hover:text-brand-primary transition-colors flex items-center gap-1.5">
+                      <span className="font-mono text-[10px] text-brand-primary font-semibold">[{job.id}]</span>
+                      <span>{job.title}</span>
+                    </div>
+                    <p className="text-[11px] text-brand-muted line-clamp-2 mt-1 leading-relaxed">
+                      {job.description}
+                    </p>
+                    <div className="mt-2 text-[10px] text-neutral-500 bg-neutral-50 p-1.5 rounded-lg border border-neutral-100 flex items-center gap-1">
+                      <span className="font-semibold text-neutral-700">Đầu ra:</span>
+                      <span className="truncate">{job.outputDescription}</span>
+                    </div>
+                  </button>
+                </div>
+
+                {!readiness.isReady && (
+                  <button
+                    type="button"
+                    onClick={() => navigate(readiness.ctaPath)}
+                    className="w-full py-1 text-center text-xs font-semibold text-brand-primary bg-[#FFF6EE] hover:bg-[#FFEDD5] border border-[#FFDFC6] rounded-lg transition-colors"
+                  >
+                    {readiness.ctaLabel} →
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {services.some((service) => service.configured) ? (
         <>
           <div className="v3-space-y-3">
@@ -658,63 +798,75 @@ export function RequestMoment({
             </div>
           </div>
 
-          {services.filter((service) => service.configured).length >= 2 && multiServicePlaybooks.filter((pb) => pb.services.filter((svcId) => services.some((s) => s.id === svcId || (svcId === 'calendar' && s.id === 'mycalendar') || (svcId === 'sheets' && s.id === 'mysheets') || (svcId === 'jira' && s.id === 'myjira') || (svcId === 'myjira' && s.id === 'jira'))).length >= 2).length > 0 && (
+          {multiServicePlaybooks.length > 0 && (
             <div className="v3-space-y-3" data-testid="multi-service-playbooks">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-xs font-semibold uppercase tracking-wider text-brand-muted">
-                  Kịch bản tự động hoá liên dịch vụ
+                  Kịch bản tự động hoá nâng cao (Đa dịch vụ)
                 </div>
-                <span className="text-[11px] font-medium text-brand-primary bg-[#FFF6EE] border border-[#FFDFC6] px-2 py-0.5 rounded-full">
-                  Make.com Orbital Flow
+                <span className="text-[11px] font-medium text-neutral-600 bg-neutral-100 border border-neutral-200 px-2 py-0.5 rounded-full">
+                  Advanced Multi-Service Flow
                 </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {multiServicePlaybooks
-                  .filter((pb) => pb.services.filter((svcId) => services.some((s) => s.id === svcId || (svcId === 'calendar' && s.id === 'mycalendar') || (svcId === 'sheets' && s.id === 'mysheets') || (svcId === 'jira' && s.id === 'myjira') || (svcId === 'myjira' && s.id === 'jira'))).length >= 2)
-                  .map((playbook) => (
-                  <button
-                    key={playbook.id}
-                    type="button"
-                    aria-label={`Kịch bản liên dịch vụ: ${playbook.title}`}
-                    disabled={planning}
-                    onClick={() => handleSelectPlaybook(playbook.prompt)}
-                    className="text-left p-3.5 bg-white hover:bg-neutral-50 rounded-2xl border border-brand-border hover:border-brand-primary/50 shadow-soft-card transition-all group flex flex-col justify-between gap-2.5"
-                  >
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {playbook.services.map((svcId, idx) => (
-                        <span key={svcId} className="inline-flex items-center gap-1">
-                          <span className="w-7 h-7 rounded-full bg-white border border-brand-border shadow-2xs flex items-center justify-center">
-                            <ServiceLogo service={svcId} className="w-3.5 h-3.5" />
-                          </span>
-                          {idx < playbook.services.length - 1 && (
-                            <span className="text-[10px] font-mono text-neutral-400">→</span>
-                          )}
-                        </span>
-                      ))}
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-brand-text group-hover:text-brand-primary transition-colors">
-                        {playbook.title}
-                      </div>
-                      <p className="text-[11px] text-brand-muted line-clamp-2 mt-1 leading-relaxed">
-                        {playbook.prompt}
-                      </p>
-                      {extractPlaybookVariables(playbook.prompt).length > 0 && (
-                        <div className="flex flex-wrap items-center gap-1 mt-1.5">
-                          {extractPlaybookVariables(playbook.prompt).map((v) => (
-                            <span
-                              key={v}
-                              data-testid="playbook-var-chip"
-                              className="px-1.5 py-0.5 rounded bg-[#FFF6EE] text-[#C2410C] border border-[#FFDFC6] font-mono text-[10px]"
-                            >
-                              {`{{${v}}}`}
+                {multiServicePlaybooks.map((playbook) => {
+                  const pbReadiness = evaluateJobReadiness(playbook.services, services);
+                  return (
+                    <button
+                      key={playbook.id}
+                      type="button"
+                      aria-label={`Kịch bản liên dịch vụ: ${playbook.title}`}
+                      disabled={planning}
+                      onClick={() => handleSelectPlaybook(playbook.prompt)}
+                      className="text-left p-3.5 bg-white hover:bg-neutral-50 rounded-2xl border border-brand-border hover:border-brand-primary/50 shadow-soft-card transition-all group flex flex-col justify-between gap-2.5"
+                    >
+                      <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {playbook.services.map((svcId, idx) => (
+                            <span key={svcId} className="inline-flex items-center gap-1">
+                              <span className="w-6 h-6 rounded-full bg-white border border-brand-border shadow-2xs flex items-center justify-center">
+                                <ServiceLogo service={svcId} className="w-3 h-3" />
+                              </span>
+                              {idx < playbook.services.length - 1 && (
+                                <span className="text-[9px] font-mono text-neutral-400">→</span>
+                              )}
                             </span>
                           ))}
                         </div>
-                      )}
-                    </div>
-                  </button>
-                ))}
+                        <span
+                          className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border ${
+                            pbReadiness.isReady
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-neutral-100 text-neutral-600 border-neutral-200'
+                          }`}
+                        >
+                          {pbReadiness.isReady ? '✓ Sẵn sàng' : `Thiếu ${pbReadiness.missingServices.length} dịch vụ`}
+                        </span>
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-brand-text group-hover:text-brand-primary transition-colors">
+                          {playbook.title}
+                        </div>
+                        <p className="text-[11px] text-brand-muted line-clamp-2 mt-1 leading-relaxed">
+                          {playbook.prompt}
+                        </p>
+                        {extractPlaybookVariables(playbook.prompt).length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                            {extractPlaybookVariables(playbook.prompt).map((v) => (
+                              <span
+                                key={v}
+                                data-testid="playbook-var-chip"
+                                className="px-1.5 py-0.5 rounded bg-[#FFF6EE] text-[#C2410C] border border-[#FFDFC6] font-mono text-[10px]"
+                              >
+                                {`{{${v}}}`}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

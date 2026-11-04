@@ -8,7 +8,8 @@ import type { PlanRepo } from '../db/repositories/plan-repo.js';
 import type { ScheduleRepo } from '../db/repositories/schedule-repo.js';
 import type { WorkspaceRepo } from '../db/repositories/workspace-repo.js';
 import { WorkingMemory, unroutable, type ChatMessage, type ProcessMessageInput, type RoutedIntent } from '@wap/planner';
-import type { CalendarDigestCandidate, PersonalSpreadsheetItem, PlanConnections, PlannerResponse, PlanResponse, PlanStep, ScheduleProposalMetadata, ScheduleResponse, ScheduleView } from '@wap/tool-schemas';
+import type { CalendarDigestCandidate, PersonalSpreadsheetItem, PlanConnections, PlannerResponse, PlanResponse, PlanStep, ScheduleProposalMetadata, ScheduleResponse, ScheduleView, WorkflowContext } from '@wap/tool-schemas';
+import { filterPermittedWorkflowDefaults } from './workflow-context-guard.js';
 import { resourceLabels } from './resource-labels.js';
 import { nextRuns } from './schedules/next-occurrence.js';
 import { runMessage, type PreparedRun, type RunToPlan } from './schedules/schedule-runner.js';
@@ -120,6 +121,7 @@ export interface HandleUserMessageInput {
   userId: string;
   content: string;
   requestId?: string;
+  workflowContext?: WorkflowContext;
 }
 
 export interface IngestionResult {
@@ -268,7 +270,7 @@ export class ChatService {
 
     // 2. Schedule async planner pipeline execution
     setImmediate(() => {
-      this.executePlannerPipeline(conversationId, userId, content, message.id, requestId).catch(async () => {
+      this.executePlannerPipeline(conversationId, userId, content, message.id, requestId, input.workflowContext).catch(async () => {
         const text = 'Không thể lập kế hoạch lúc này. Hãy thử lại.';
         try {
           await this.msgRepo.createMessage(conversationId, 'system', `Lỗi: ${text}`, { type: 'planning_error', ...correlation });
@@ -1899,12 +1901,35 @@ export class ChatService {
     return { write, announce };
   }
 
+  private async loadActiveConnections(userId: string): Promise<PlanConnections> {
+    const [gmail, mycalendar, mysheets, trello, github, telegram, notion] = await Promise.all([
+      this.gmailConnection?.(userId).catch(() => null),
+      this.mycalendarConnection?.(userId).catch(() => null),
+      this.mysheetsConnection?.(userId).catch(() => null),
+      this.trelloConnection?.(userId).catch(() => null),
+      this.githubConnection?.(userId).catch(() => null),
+      this.telegramConnection?.(userId).catch(() => null),
+      this.notionConnection?.(userId).catch(() => null),
+    ]);
+    const connections: PlanConnections = {};
+    if (gmail) connections.gmail = gmail;
+    if (mycalendar) connections.mycalendar = mycalendar;
+    if (mysheets) connections.mysheets = mysheets;
+    if (trello) connections.trello = trello;
+    if (github) connections.github = github;
+    if (telegram) connections.telegram = telegram;
+    if (notion) connections.notion = notion;
+    if (this.slackWrites) connections.myslack = { credentialId: 'slack', scopes: [] } as any;
+    return connections;
+  }
+
   private async executePlannerPipeline(
     conversationId: string,
     userId: string,
     content: string,
     currentMessageId: string,
-    requestId?: string
+    requestId?: string,
+    workflowContext?: WorkflowContext
   ): Promise<void> {
     const correlation = { replyToMessageId: currentMessageId, ...(requestId ? { requestId } : {}) };
     // Emit agent_state: planning
@@ -1954,6 +1979,15 @@ export class ChatService {
     const previousState = structuredClone(memory.toJSON());
     if (slackContext) await this.msgRepo.inSlackTransaction(conversationId, slackContext, async () => undefined, undefined, 'planning');
     const actor = await this.actorForConversation(conversationId, userId);
+
+    // FLOW-04: Validate workflowContext defaults against user's actual connections and seed into memory
+    if (workflowContext) {
+      const activeConnections = await this.loadActiveConnections(userId);
+      const filtered = filterPermittedWorkflowDefaults(workflowContext, activeConnections);
+      if (filtered.resourceDefaults) {
+        memory.setEntity('workflow_resource_defaults', filtered.resourceDefaults);
+      }
+    }
     const gatheredJiraSourceRefs: any[] = [];
     const plannerResponse: PlannerResponse = await this.planner.processMessage({
       userMessage: content,

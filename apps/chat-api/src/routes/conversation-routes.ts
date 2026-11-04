@@ -463,7 +463,7 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
         throw err;
       }
 
-      const { content, tempId } = req.body || {};
+      const { content, tempId, workflowContext } = req.body || {};
 
       if (!content || typeof content !== 'string') {
         res.status(400).json({ error: 'content string is required' });
@@ -475,6 +475,7 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
         userId,
         content,
         ...(typeof tempId === 'string' && tempId.length <= 128 ? { requestId: tempId } : {}),
+        workflowContext,
       });
 
       res.status(202).json(result);
