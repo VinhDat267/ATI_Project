@@ -23,7 +23,7 @@ export function isWriteTool(toolName: string): boolean {
   if (def) {
     return def.sideEffect === 'write';
   }
-  return /(create|update|add|send|delete|post|put|patch)/i.test(toolName);
+  return /(create|update|add|send|delete|post|put|patch|schedule|append|move)/i.test(toolName);
 }
 
 function combineSignals(s1: AbortSignal, s2?: AbortSignal): AbortSignal {

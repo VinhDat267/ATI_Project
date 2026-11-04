@@ -22,5 +22,7 @@ export const MYCALENDAR_SERVICE: ServiceDefinition = {
     'my google calendar',
     'calendar của tôi',
     'lịch google của tôi',
+    'google meet của tôi',
+    'phòng họp meet của tôi',
   ],
 };

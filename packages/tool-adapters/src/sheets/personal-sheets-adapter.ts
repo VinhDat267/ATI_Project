@@ -33,8 +33,25 @@ export interface PersonalSheetsAdapterConfig extends BaseAdapterConfig {
   fetchFn?: typeof fetch;
 }
 
+const DRIVE_API_DEFAULT_BASE = 'https://www.googleapis.com/drive/v3/files';
+const DRIVE_UPLOAD_DEFAULT_BASE = 'https://www.googleapis.com/upload/drive/v3/files';
+const DRIVE_ID_PATTERN = /^[A-Za-z0-9_-]{10,128}$/;
+
+function driveFileUrl(id: string, mimeType?: string): string {
+  if (mimeType === 'application/vnd.google-apps.document') {
+    return `https://docs.google.com/document/d/${id}/edit`;
+  }
+  if (mimeType === 'application/vnd.google-apps.spreadsheet') {
+    return spreadsheetUrl(id);
+  }
+  if (mimeType === 'application/vnd.google-apps.folder') {
+    return `https://drive.google.com/drive/folders/${id}`;
+  }
+  return `https://drive.google.com/file/d/${id}/view`;
+}
+
 /**
- * Personal Google Sheets v4 adapter (OAuth 2.0 user credentials via drive.file scope);
+ * Personal Google Sheets v4 + Google Docs & Google Drive v3 adapter (OAuth 2.0 user credentials via drive.file scope);
  * explicit spreadsheet allowlist; indeterminate writes are never replayed.
  */
 export class PersonalSheetsAdapter extends BaseAdapter {
@@ -42,6 +59,8 @@ export class PersonalSheetsAdapter extends BaseAdapter {
   private readonly userId: string;
   private readonly tokens: GmailAccessTokenProvider;
   private readonly apiBase: string;
+  private readonly driveApiBase: string;
+  private readonly driveUploadBase: string;
   private readonly fetchFn: typeof fetch;
 
   constructor(config: PersonalSheetsAdapterConfig) {
@@ -58,6 +77,14 @@ export class PersonalSheetsAdapter extends BaseAdapter {
     this.apiBase = rawBase.includes('/v4/spreadsheets')
       ? rawBase.replace(/\/+$/, '') + '/'
       : `${rawBase.replace(/\/+$/, '')}/v4/spreadsheets/`;
+    if (config.apiBaseUrl) {
+      const host = config.apiBaseUrl.replace(/\/v4\/spreadsheets\/?$/, '').replace(/\/+$/, '');
+      this.driveApiBase = `${host}/drive/v3/files`;
+      this.driveUploadBase = `${host}/upload/drive/v3/files`;
+    } else {
+      this.driveApiBase = DRIVE_API_DEFAULT_BASE;
+      this.driveUploadBase = DRIVE_UPLOAD_DEFAULT_BASE;
+    }
     this.fetchFn = config.fetchFn ?? globalThis.fetch;
   }
 
@@ -74,6 +101,132 @@ export class PersonalSheetsAdapter extends BaseAdapter {
     this.allowedSpreadsheets();
     this.assertAllowedScope('spreadsheets', value);
     return value;
+  }
+
+  private checkedDriveId(value: unknown, fieldName: string): string {
+    if (typeof value !== 'string' || !DRIVE_ID_PATTERN.test(value.trim())) {
+      invalid(`${fieldName} is invalid`);
+    }
+    return value.trim();
+  }
+
+  private async driveRequest(
+    options: {
+      url: string;
+      method?: 'GET' | 'POST' | 'PATCH';
+      headers?: Record<string, string>;
+      body?: string;
+      responseType?: 'json' | 'text';
+      writing?: boolean;
+    },
+    signal?: AbortSignal,
+    onDispatch?: (dispatched: boolean) => void
+  ): Promise<any> {
+    if (signal?.aborted) throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK' });
+    const writing = Boolean(options.writing);
+    const method = options.method ?? (writing ? 'POST' : 'GET');
+    let networkRetries = 0;
+    let serverRetries = 0;
+    let rateRetries = 0;
+    let refreshed = false;
+    let forceRefresh = false;
+
+    for (;;) {
+      if (signal?.aborted) throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK' });
+      try {
+        await this.waitForTransportSlot(this.rateLimiter ?? sharedLimiter, 'mysheets:' + this.userId, signal);
+      } catch (error) {
+        throw new StepError({
+          message: 'Sheets request stopped before dispatch',
+          category: error instanceof StepError ? error.category : 'NETWORK',
+        });
+      }
+      if (signal?.aborted) throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK' });
+
+      const token = await this.tokens.getAccessToken({ signal, ...(forceRefresh ? { forceRefresh: true } : {}) });
+      forceRefresh = false;
+
+      if (signal?.aborted) throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK' });
+
+      let response: Response;
+      try {
+        if (writing) onDispatch?.(true);
+        response = await this.fetchFn(options.url, {
+          method,
+          signal,
+          redirect: 'error',
+          headers: {
+            Authorization: 'Bearer ' + token,
+            ...(options.headers ?? {}),
+          },
+          ...(options.body !== undefined ? { body: options.body } : {}),
+        });
+      } catch {
+        if (!writing && !signal?.aborted && networkRetries++ < 2) continue;
+        throw new StepError({
+          message: 'Sheets transport failed',
+          category: writing ? 'UNKNOWN' : 'NETWORK',
+          retryable: !writing,
+        });
+      }
+
+      if (response.status === 401 && !refreshed) {
+        refreshed = true;
+        forceRefresh = true;
+        if (writing) onDispatch?.(false);
+        continue;
+      }
+
+      if (response.status === 429 && rateRetries++ === 0) {
+        try {
+          await this.waitForRetryAfter(response.headers.get('Retry-After'), signal);
+        } catch {
+          throw new StepError({
+            message: 'Sheets rate-limit retry cancelled',
+            category: 'RATE_LIMIT',
+            statusCode: 429,
+            retryable: false,
+          });
+        }
+        if (writing) onDispatch?.(false);
+        continue;
+      }
+
+      if (!writing && response.status >= 500 && serverRetries++ === 0) continue;
+
+      if (!response.ok) {
+        const status = response.status;
+        const category =
+          status === 401 || status === 403
+            ? 'AUTH_ERROR'
+            : status === 404
+            ? 'NOT_FOUND'
+            : status === 429
+            ? 'RATE_LIMIT'
+            : status >= 400 && status < 500
+            ? 'VALIDATION'
+            : writing
+            ? 'UNKNOWN'
+            : 'SERVER_ERROR';
+
+        throw new StepError({
+          message: 'Sheets request failed with HTTP ' + status,
+          category,
+          statusCode: status,
+          retryable: !writing && (status === 429 || status >= 500),
+          ...(writing && status === 401 ? { details: { requestSent: false } } : {}),
+        });
+      }
+
+      try {
+        if (options.responseType === 'text') {
+          return await response.text();
+        }
+        return await response.json();
+      } catch {
+        return badResponse(writing);
+      }
+    }
   }
 
   private async request(
@@ -198,7 +351,11 @@ export class PersonalSheetsAdapter extends BaseAdapter {
       toolName === 'mysheets.append_rows' ||
       toolName === 'mysheets.update_rows' ||
       toolName === 'mysheets.delete_rows' ||
-      toolName === 'mysheets.create_sheet';
+      toolName === 'mysheets.create_sheet' ||
+      toolName === 'mysheets.create_drive_folder' ||
+      toolName === 'mysheets.create_doc' ||
+      toolName === 'mysheets.append_doc_text' ||
+      toolName === 'mysheets.move_drive_file';
     let writeDispatched = false;
 
     try {
@@ -568,6 +725,240 @@ export class PersonalSheetsAdapter extends BaseAdapter {
           spreadsheetId: id,
           ...(finalHeaders && finalHeaders.length > 0 ? { headers: finalHeaders } : {}),
           url: spreadsheetUrl(id),
+        };
+      }
+
+      if (toolName === 'mysheets.list_drive_files') {
+        if (args.query !== undefined && (typeof args.query !== 'string' || args.query.length > 100)) {
+          invalid('query must be a string up to 100 chars');
+        }
+        const query = typeof args.query === 'string' ? args.query.trim() : '';
+        const mimeTypeFilter = args.mimeType === undefined ? 'all' : args.mimeType;
+        if (
+          mimeTypeFilter !== 'doc' &&
+          mimeTypeFilter !== 'sheet' &&
+          mimeTypeFilter !== 'folder' &&
+          mimeTypeFilter !== 'all'
+        ) {
+          invalid('mimeType must be doc, sheet, folder, or all');
+        }
+        const limit = bounded(args.limit, 20);
+        const clauses: string[] = ['trashed = false'];
+        if (mimeTypeFilter === 'doc') {
+          clauses.push("mimeType = 'application/vnd.google-apps.document'");
+        } else if (mimeTypeFilter === 'sheet') {
+          clauses.push("mimeType = 'application/vnd.google-apps.spreadsheet'");
+        } else if (mimeTypeFilter === 'folder') {
+          clauses.push("mimeType = 'application/vnd.google-apps.folder'");
+        }
+        if (query) {
+          const escaped = query.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+          clauses.push(`name contains '${escaped}'`);
+        }
+        const q = clauses.join(' and ');
+        const res = await this.driveRequest(
+          {
+            url: `${this.driveApiBase}?q=${encodeURIComponent(q)}&pageSize=${limit}&fields=${encodeURIComponent('files(id,name,mimeType,webViewLink)')}`,
+          },
+          signal
+        );
+        if (!Array.isArray(res?.files)) badResponse();
+        return res.files.slice(0, limit).map((f: any) => {
+          const fileId = typeof f?.id === 'string' ? f.id : '';
+          const fileName = typeof f?.name === 'string' ? f.name : '';
+          const fileMime = typeof f?.mimeType === 'string' ? f.mimeType : '';
+          if (!fileId) badResponse();
+          return {
+            id: fileId,
+            title: fileName,
+            mimeType: fileMime,
+            url: typeof f?.webViewLink === 'string' && f.webViewLink ? f.webViewLink : driveFileUrl(fileId, fileMime),
+          };
+        });
+      }
+
+      if (toolName === 'mysheets.create_drive_folder') {
+        if (typeof args.name !== 'string' || !args.name.trim() || args.name.length > 200) {
+          invalid('name must be a non-empty string up to 200 chars');
+        }
+        const name = args.name.trim();
+        const parentFolderId =
+          args.parentFolderId !== undefined ? this.checkedDriveId(args.parentFolderId, 'parentFolderId') : undefined;
+        const body = {
+          name,
+          mimeType: 'application/vnd.google-apps.folder',
+          ...(parentFolderId ? { parents: [parentFolderId] } : {}),
+        };
+        const res = await this.driveRequest(
+          {
+            url: `${this.driveApiBase}?fields=${encodeURIComponent('id,name,mimeType,webViewLink')}`,
+            method: 'POST',
+            writing: true,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          },
+          signal,
+          (dispatched) => {
+            writeDispatched = dispatched;
+          }
+        );
+        if (typeof res?.id !== 'string' || !res.id) badResponse(true);
+        return {
+          id: res.id,
+          title: typeof res.name === 'string' && res.name ? res.name : name,
+          mimeType: 'application/vnd.google-apps.folder',
+          url:
+            typeof res.webViewLink === 'string' && res.webViewLink
+              ? res.webViewLink
+              : driveFileUrl(res.id, 'application/vnd.google-apps.folder'),
+        };
+      }
+
+      if (toolName === 'mysheets.create_doc') {
+        if (typeof args.title !== 'string' || !args.title.trim() || args.title.length > 200) {
+          invalid('title must be a non-empty string up to 200 chars');
+        }
+        const title = args.title.trim();
+        if (args.content !== undefined && (typeof args.content !== 'string' || args.content.length > 12000)) {
+          invalid('content must be a string up to 12000 chars');
+        }
+        const content = typeof args.content === 'string' ? args.content : '';
+        const folderId = args.folderId !== undefined ? this.checkedDriveId(args.folderId, 'folderId') : undefined;
+
+        const boundary = '-------ati_doc_boundary_v3';
+        const metadata = {
+          name: title,
+          mimeType: 'application/vnd.google-apps.document',
+          ...(folderId ? { parents: [folderId] } : {}),
+        };
+        const multipartBody =
+          `--${boundary}\r\n` +
+          `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
+          `${JSON.stringify(metadata)}\r\n` +
+          `--${boundary}\r\n` +
+          `Content-Type: text/plain; charset=UTF-8\r\n\r\n` +
+          `${content}\r\n` +
+          `--${boundary}--`;
+
+        const res = await this.driveRequest(
+          {
+            url: `${this.driveUploadBase}?uploadType=multipart&fields=${encodeURIComponent('id,name,mimeType,webViewLink')}`,
+            method: 'POST',
+            writing: true,
+            headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+            body: multipartBody,
+          },
+          signal,
+          (dispatched) => {
+            writeDispatched = dispatched;
+          }
+        );
+        if (typeof res?.id !== 'string' || !res.id) badResponse(true);
+        return {
+          id: res.id,
+          title: typeof res.name === 'string' && res.name ? res.name : title,
+          url:
+            typeof res.webViewLink === 'string' && res.webViewLink
+              ? res.webViewLink
+              : driveFileUrl(res.id, 'application/vnd.google-apps.document'),
+          ...(folderId ? { folderId } : {}),
+        };
+      }
+
+      if (toolName === 'mysheets.get_doc') {
+        const documentId = this.checkedDriveId(args.documentId, 'documentId');
+        const meta = await this.driveRequest(
+          {
+            url: `${this.driveApiBase}/${encodeURIComponent(documentId)}?fields=${encodeURIComponent('id,name,mimeType,webViewLink')}`,
+          },
+          signal
+        );
+        if (typeof meta?.id !== 'string' || !meta.id) badResponse();
+        const rawText = await this.driveRequest(
+          {
+            url: `${this.driveApiBase}/${encodeURIComponent(documentId)}/export?mimeType=${encodeURIComponent('text/plain')}`,
+            responseType: 'text',
+          },
+          signal
+        );
+        if (typeof rawText !== 'string') badResponse();
+        const clipped = clipText(rawText, 12000);
+        return {
+          id: meta.id,
+          title: typeof meta.name === 'string' && meta.name ? meta.name : documentId,
+          content: clipped.text,
+          url:
+            typeof meta.webViewLink === 'string' && meta.webViewLink
+              ? meta.webViewLink
+              : driveFileUrl(meta.id, 'application/vnd.google-apps.document'),
+          ...(clipped.clipped ? { truncated: true } : {}),
+        };
+      }
+
+      if (toolName === 'mysheets.append_doc_text') {
+        const documentId = this.checkedDriveId(args.documentId, 'documentId');
+        if (typeof args.text !== 'string' || !args.text.trim() || args.text.length > 8000) {
+          invalid('text must be a non-empty string up to 8000 chars');
+        }
+        const existingText = await this.driveRequest(
+          {
+            url: `${this.driveApiBase}/${encodeURIComponent(documentId)}/export?mimeType=${encodeURIComponent('text/plain')}`,
+            responseType: 'text',
+          },
+          signal
+        );
+        if (typeof existingText !== 'string') badResponse();
+        const baseText = existingText.replace(/\r?\n$/, '');
+        const combined = baseText.length > 0 ? `${baseText}\n\n${args.text}` : args.text;
+
+        const res = await this.driveRequest(
+          {
+            url: `${this.driveUploadBase}/${encodeURIComponent(documentId)}?uploadType=media&fields=${encodeURIComponent('id,name,webViewLink')}`,
+            method: 'PATCH',
+            writing: true,
+            headers: { 'Content-Type': 'text/plain; charset=UTF-8' },
+            body: combined,
+          },
+          signal,
+          (dispatched) => {
+            writeDispatched = dispatched;
+          }
+        );
+        if (typeof res?.id !== 'string' || !res.id) badResponse(true);
+        return {
+          id: res.id,
+          title: typeof res.name === 'string' && res.name ? res.name : documentId,
+          url:
+            typeof res.webViewLink === 'string' && res.webViewLink
+              ? res.webViewLink
+              : driveFileUrl(res.id, 'application/vnd.google-apps.document'),
+        };
+      }
+
+      if (toolName === 'mysheets.move_drive_file') {
+        const fileId = this.checkedDriveId(args.fileId, 'fileId');
+        const folderId = this.checkedDriveId(args.folderId, 'folderId');
+        const res = await this.driveRequest(
+          {
+            url: `${this.driveApiBase}/${encodeURIComponent(fileId)}?addParents=${encodeURIComponent(folderId)}&fields=${encodeURIComponent('id,name,mimeType,webViewLink')}`,
+            method: 'PATCH',
+            writing: true,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+          },
+          signal,
+          (dispatched) => {
+            writeDispatched = dispatched;
+          }
+        );
+        if (typeof res?.id !== 'string' || !res.id) badResponse(true);
+        return {
+          id: res.id,
+          folderId,
+          url:
+            typeof res.webViewLink === 'string' && res.webViewLink
+              ? res.webViewLink
+              : driveFileUrl(res.id, res.mimeType),
         };
       }
 

@@ -1,11 +1,19 @@
 import type { ToolDefinition } from './types.js';
 import { CALENDAR_ID_PATTERN, CALENDAR_TIME_PATTERN } from './calendar.js';
+import { GMAIL_ADDRESS_PATTERN, GMAIL_MAX_RECIPIENTS } from './gmail.js';
 
 export const MYCALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
 
 const str = { type: 'string' };
 const time = { type: 'string', pattern: CALENDAR_TIME_PATTERN };
 const calendarId = { type: 'string', pattern: CALENDAR_ID_PATTERN.source, 'x-resource': 'mycalendar' };
+const attendeesSchema = {
+  type: 'array',
+  minItems: 1,
+  maxItems: GMAIL_MAX_RECIPIENTS,
+  items: { type: 'string', pattern: GMAIL_ADDRESS_PATTERN.source, maxLength: 320 },
+  description: 'Danh sách email người tham dự cuộc họp (tối đa 20 địa chỉ email user@domain)',
+};
 const input = (properties: object, required: string[]) => ({ type: 'object', properties, required, additionalProperties: false });
 const output = (properties: object, required: string[]) => ({ type: 'object', properties, required });
 const event = output(
@@ -17,6 +25,7 @@ const event = output(
     url: str,
     location: str,
     meetLink: str,
+    attendees: { type: 'array', items: str },
     attendeesCount: { type: 'integer', minimum: 0 },
     recurrence: str,
   },
@@ -31,6 +40,7 @@ const eventObservedFields = [
   'url',
   'location',
   'meetLink',
+  'attendees',
   'attendeesCount',
   'recurrence',
   'calendarId',
@@ -134,7 +144,7 @@ export const MYCALENDAR_TOOLS: ToolDefinition[] = [
     service: 'mycalendar',
     sideEffect: 'write',
     riskLevel: 'medium',
-    description: 'Sau khi duyệt, tạo sự kiện tối đa 24 giờ trong lịch cá nhân đã tìm thấy; ISO có múi giờ, hỗ trợ tạo phòng họp Google Meet (createMeetLink: true) và lặp lại định kỳ (recurrence: "DAILY" | "WEEKDAYS" | "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "RRULE:..."), không mời người khác hay gửi thông báo.',
+    description: 'Sau khi duyệt, tạo sự kiện tối đa 24 giờ trong lịch cá nhân đã tìm thấy; ISO có múi giờ, hỗ trợ tạo phòng họp Google Meet (createMeetLink: true), mời danh sách email người tham dự (attendees), gửi lời mời (sendInvites) và lặp lại định kỳ (recurrence: "DAILY" | "WEEKDAYS" | "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "RRULE:...").',
     inputSchema: input(
       {
         calendarId,
@@ -144,6 +154,8 @@ export const MYCALENDAR_TOOLS: ToolDefinition[] = [
         end: time,
         location: { type: 'string', maxLength: 1000 },
         createMeetLink: { type: 'boolean' },
+        attendees: attendeesSchema,
+        sendInvites: { type: 'boolean' },
         recurrence: { type: 'string', maxLength: 500 },
       },
       ['calendarId', 'summary', 'start', 'end'],
@@ -155,7 +167,7 @@ export const MYCALENDAR_TOOLS: ToolDefinition[] = [
     service: 'mycalendar',
     sideEffect: 'write',
     riskLevel: 'medium',
-    description: 'Sau khi duyệt, cập nhật hoặc dời giờ một sự kiện đã có trong lịch cá nhân theo eventId; hỗ trợ bật Google Meet (createMeetLink: true) và cập nhật quy tắc lặp lại (recurrence).',
+    description: 'Sau khi duyệt, cập nhật hoặc dời giờ một sự kiện đã có trong lịch cá nhân theo eventId; hỗ trợ bật Google Meet (createMeetLink: true), cập nhật khách mời (attendees) và quy tắc lặp lại (recurrence).',
     inputSchema: input(
       {
         calendarId,
@@ -166,6 +178,8 @@ export const MYCALENDAR_TOOLS: ToolDefinition[] = [
         end: time,
         location: { type: 'string', maxLength: 1000 },
         createMeetLink: { type: 'boolean' },
+        attendees: attendeesSchema,
+        sendInvites: { type: 'boolean' },
         recurrence: { type: 'string', maxLength: 500 },
       },
       ['calendarId', 'eventId'],
@@ -186,5 +200,26 @@ export const MYCALENDAR_TOOLS: ToolDefinition[] = [
       ['calendarId', 'eventId'],
     ),
     outputSchema: output({ id: str, deleted: { type: 'boolean' } }, ['id', 'deleted']),
+  },
+  {
+    name: 'mycalendar.schedule_meet',
+    service: 'mycalendar',
+    sideEffect: 'write',
+    riskLevel: 'medium',
+    description: 'Sau khi duyệt, tạo nhanh cuộc họp trực tuyến Google Meet trên lịch cá nhân: tự động khởi tạo phòng họp Google Meet (trả về meetLink), hỗ trợ đính kèm chương trình họp (description), mời danh sách email người tham dự (attendees), gửi lời mời (sendInvites) và cài đặt lịch lặp lại (recurrence).',
+    inputSchema: input(
+      {
+        calendarId,
+        summary: { type: 'string', minLength: 1, maxLength: 200 },
+        description: { type: 'string', maxLength: 4000 },
+        start: time,
+        end: time,
+        attendees: attendeesSchema,
+        sendInvites: { type: 'boolean' },
+        recurrence: { type: 'string', maxLength: 500 },
+      },
+      ['calendarId', 'summary', 'start', 'end'],
+    ),
+    outputSchema: event,
   },
 ];

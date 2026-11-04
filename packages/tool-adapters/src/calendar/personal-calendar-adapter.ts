@@ -1,4 +1,4 @@
-import { CALENDAR_ID_PATTERN } from '@wap/tool-schemas';
+import { CALENDAR_ID_PATTERN, GMAIL_ADDRESS_PATTERN, GMAIL_MAX_RECIPIENTS } from '@wap/tool-schemas';
 import { BaseAdapter, StepError, type BaseAdapterConfig } from '../base-adapter.js';
 import type { GmailAccessTokenProvider } from '../gmail/token-provider.js';
 import {
@@ -69,6 +69,26 @@ function normalizeRecurrenceRule(raw: unknown): string[] | undefined {
     invalid('recurrence must be DAILY, WEEKDAYS, WEEKLY, BIWEEKLY, MONTHLY, or a valid RFC 5545 RRULE');
   }
   return [normalized];
+}
+
+function normalizeAttendees(raw: unknown): Array<{ email: string }> | undefined {
+  if (raw === undefined) return undefined;
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > GMAIL_MAX_RECIPIENTS) {
+    invalid('attendees must be a non-empty array of at most 20 email addresses');
+  }
+  const seen = new Set<string>();
+  const out: Array<{ email: string }> = [];
+  for (const item of raw) {
+    if (typeof item !== 'string' || !GMAIL_ADDRESS_PATTERN.test(item)) {
+      invalid('attendees must contain valid bare email addresses');
+    }
+    const clean = item.trim().toLowerCase();
+    if (!seen.has(clean)) {
+      seen.add(clean);
+      out.push({ email: clean });
+    }
+  }
+  return out;
 }
 
 export interface PersonalCalendarAdapterConfig extends BaseAdapterConfig {
@@ -282,7 +302,8 @@ export class PersonalCalendarAdapter extends BaseAdapter {
     const isWrite =
       toolName === 'mycalendar.create_event' ||
       toolName === 'mycalendar.update_event' ||
-      toolName === 'mycalendar.delete_event';
+      toolName === 'mycalendar.delete_event' ||
+      toolName === 'mycalendar.schedule_meet';
     let writeDispatched = false;
 
     try {
@@ -495,21 +516,33 @@ export class PersonalCalendarAdapter extends BaseAdapter {
         };
       }
 
-      if (toolName === 'mycalendar.create_event') {
-        only(args, ['calendarId', 'summary', 'description', 'start', 'end', 'location', 'createMeetLink', 'recurrence']);
+      if (toolName === 'mycalendar.create_event' || toolName === 'mycalendar.schedule_meet') {
+        const isScheduleMeet = toolName === 'mycalendar.schedule_meet';
+        only(
+          args,
+          isScheduleMeet
+            ? ['calendarId', 'summary', 'description', 'start', 'end', 'attendees', 'sendInvites', 'recurrence']
+            : ['calendarId', 'summary', 'description', 'start', 'end', 'location', 'createMeetLink', 'attendees', 'sendInvites', 'recurrence'],
+        );
         const id = this.checkedId(args.calendarId);
         windowSize(args.start, args.end, 1);
-        if (args.createMeetLink !== undefined && typeof args.createMeetLink !== 'boolean') {
+        if (!isScheduleMeet && args.createMeetLink !== undefined && typeof args.createMeetLink !== 'boolean') {
           invalid('createMeetLink must be a boolean');
         }
+        if (args.sendInvites !== undefined && typeof args.sendInvites !== 'boolean') {
+          invalid('sendInvites must be a boolean');
+        }
         const recurrence = normalizeRecurrenceRule(args.recurrence);
-        const wantMeet = args.createMeetLink === true;
+        const attendees = normalizeAttendees(args.attendees);
+        const wantMeet = isScheduleMeet || args.createMeetLink === true;
+        const sendUpdates = args.sendInvites === true ? 'all' : 'none';
         const body = {
           summary: text(args.summary, 200, true),
           start: { dateTime: args.start },
           end: { dateTime: args.end },
           ...(args.description !== undefined ? { description: plainDescription(text(args.description, 4000)) } : {}),
-          ...(args.location !== undefined ? { location: text(args.location, 1000) } : {}),
+          ...(!isScheduleMeet && args.location !== undefined ? { location: text(args.location, 1000) } : {}),
+          ...(attendees ? { attendees } : {}),
           ...(recurrence ? { recurrence } : {}),
           ...(wantMeet
             ? {
@@ -522,7 +555,7 @@ export class PersonalCalendarAdapter extends BaseAdapter {
               }
             : {}),
         };
-        const querySuffix = wantMeet ? '?sendUpdates=none&conferenceDataVersion=1' : '?sendUpdates=none';
+        const querySuffix = wantMeet ? `?sendUpdates=${sendUpdates}&conferenceDataVersion=1` : `?sendUpdates=${sendUpdates}`;
         const { clipped: _clipped, ...created } = normalizedEvent(
           await this.request(
             encodeURIComponent(id) + '/events' + querySuffix,
@@ -536,7 +569,7 @@ export class PersonalCalendarAdapter extends BaseAdapter {
       }
 
       if (toolName === 'mycalendar.update_event') {
-        only(args, ['calendarId', 'eventId', 'summary', 'description', 'start', 'end', 'location', 'createMeetLink', 'recurrence']);
+        only(args, ['calendarId', 'eventId', 'summary', 'description', 'start', 'end', 'location', 'createMeetLink', 'attendees', 'sendInvites', 'recurrence']);
         const id = this.checkedId(args.calendarId);
         const eventId = text(args.eventId, 256, true).trim();
         if (eventId === '.' || eventId === '..' || eventId.includes('/')) {
@@ -551,8 +584,13 @@ export class PersonalCalendarAdapter extends BaseAdapter {
         if (args.createMeetLink !== undefined && typeof args.createMeetLink !== 'boolean') {
           invalid('createMeetLink must be a boolean');
         }
+        if (args.sendInvites !== undefined && typeof args.sendInvites !== 'boolean') {
+          invalid('sendInvites must be a boolean');
+        }
         const recurrence = normalizeRecurrenceRule(args.recurrence);
+        const attendees = normalizeAttendees(args.attendees);
         const wantMeet = args.createMeetLink === true;
+        const sendUpdates = args.sendInvites === true ? 'all' : 'none';
         const body: Record<string, any> = {
           ...(args.summary !== undefined ? { summary: text(args.summary, 200, true) } : {}),
           ...(args.start !== undefined && args.end !== undefined
@@ -560,6 +598,7 @@ export class PersonalCalendarAdapter extends BaseAdapter {
             : {}),
           ...(args.description !== undefined ? { description: plainDescription(text(args.description, 4000)) } : {}),
           ...(args.location !== undefined ? { location: text(args.location, 1000) } : {}),
+          ...(attendees ? { attendees } : {}),
           ...(recurrence ? { recurrence } : {}),
           ...(wantMeet
             ? {
@@ -575,7 +614,7 @@ export class PersonalCalendarAdapter extends BaseAdapter {
         if (Object.keys(body).length === 0) {
           invalid('update_event requires at least one field to update');
         }
-        const querySuffix = wantMeet ? '?sendUpdates=none&conferenceDataVersion=1' : '?sendUpdates=none';
+        const querySuffix = wantMeet ? `?sendUpdates=${sendUpdates}&conferenceDataVersion=1` : `?sendUpdates=${sendUpdates}`;
         const { clipped: _clipped, ...updated } = normalizedEvent(
           await this.request(
             `${encodeURIComponent(id)}/events/${encodeURIComponent(eventId)}${querySuffix}`,

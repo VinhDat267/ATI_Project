@@ -6,6 +6,6 @@ export const CALENDAR_SERVICE: ServiceDefinition = {
   scopes: ['https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.readonly'],
   scopeKey: 'calendars', scopeLabel: 'Calendar ID', scopePattern: CALENDAR_ID_PATTERN,
   credentialFields: [{ key: 'clientEmail', label: 'Email service account', type: 'text' }, { key: 'privateKey', label: 'Private key (PEM)', type: 'multiline' }],
-  intentKeywords: ['calendar', 'google calendar', 'lịch họp', 'lên lịch', 'đặt lịch'],
-  fallbackIntentKeywords: ['cuộc họp', 'họp', 'meeting', 'sự kiện', 'event'],
+  intentKeywords: ['calendar', 'google calendar', 'lịch họp', 'lên lịch', 'đặt lịch', 'google meet', 'phòng họp meet', 'link meet', 'họp meet', 'tạo meet'],
+  fallbackIntentKeywords: ['cuộc họp', 'họp', 'meeting', 'sự kiện', 'event', 'họp trực tuyến', 'họp online'],
 };

@@ -22,5 +22,9 @@ export const MYSHEETS_SERVICE: ServiceDefinition = {
     'my sheet',
     'my google sheet',
     'spreadsheet của tôi',
+    'google docs của tôi',
+    'google drive của tôi',
+    'drive của tôi',
+    'docs của tôi',
   ],
 };

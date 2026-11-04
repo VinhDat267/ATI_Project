@@ -59,6 +59,12 @@
       "title": "Xử lý lỗi khách hàng & điều phối Jira Sprint",
       "services": ["gmail", "myjira", "slack"],
       "prompt": "Đọc email báo lỗi mới nhất trên Gmail, tạo issue Bug ưu tiên High trên Jira của nhóm và gửi thông báo kèm link issue vào kênh Slack."
+    },
+    {
+      "id": "playbook-google-workspace-suite",
+      "title": "Hệ sinh thái Google Workspace (Meet + Drive + Docs + Sheets + Gmail)",
+      "services": ["calendar", "sheets", "gmail"],
+      "prompt": "Tạo cuộc họp Google Meet Khởi động Dự án Q4 vào 09:00 ngày mai mời khách tham dự, tạo thư mục Dự án Q4 trên Google Drive, soạn tài liệu Biên bản & Đề xuất Q4 trên Google Docs lưu vào thư mục đó, ghi nhật ký vào Google Sheets và gửi email thông báo kèm link Google Meet + Google Docs qua Gmail."
     }
   ],
   "services": {
@@ -357,6 +363,7 @@
     "jira_site": "Site Jira",
     "jira_project": "Dự án Jira",
     "jira_issue": "Issue Jira",
+    "mydrive_file": "Tài liệu / Thư mục Drive",
     "thread": "Luồng thư",
     "label": "Nhãn"
   },
@@ -865,6 +872,15 @@
       "titleField": "title",
       "previewStyle": "calendar_event"
     },
+    "mycalendar.schedule_meet": {
+      "action": "Đặt lịch họp Google Meet",
+      "done": "Đã tạo cuộc họp Meet",
+      "receipt": "Đã tạo cuộc họp Google Meet",
+      "kind": "Google Meet",
+      "link": "Mở trên Google Calendar",
+      "titleField": "title",
+      "previewStyle": "calendar_event"
+    },
     "mycalendar.update_event": {
       "action": "Dời / cập nhật sự kiện",
       "done": "Đã cập nhật",
@@ -953,6 +969,52 @@
       "link": "Mở bảng tính",
       "titleField": "title",
       "previewStyle": "sheet_create"
+    },
+    "mysheets.list_drive_files": {
+      "action": "Tìm tệp / thư mục Google Drive",
+      "done": "Đã tìm trên Drive",
+      "receipt": "Đã tìm tệp trên Google Drive",
+      "kind": "Google Drive",
+      "link": "Mở trên Google Drive"
+    },
+    "mysheets.create_drive_folder": {
+      "action": "Tạo thư mục Google Drive",
+      "done": "Đã tạo thư mục Drive",
+      "receipt": "Đã tạo thư mục trên Google Drive",
+      "kind": "Thư mục Drive",
+      "link": "Mở thư mục trên Google Drive",
+      "titleField": "title"
+    },
+    "mysheets.create_doc": {
+      "action": "Tạo tài liệu Google Docs",
+      "done": "Đã tạo Google Docs",
+      "receipt": "Đã tạo tài liệu Google Docs",
+      "kind": "Google Docs",
+      "link": "Mở tài liệu trên Google Docs",
+      "titleField": "title"
+    },
+    "mysheets.get_doc": {
+      "action": "Đọc tài liệu Google Docs",
+      "done": "Đã đọc Google Docs",
+      "receipt": "Đã đọc tài liệu Google Docs",
+      "kind": "Google Docs",
+      "link": "Mở tài liệu trên Google Docs",
+      "titleField": "title"
+    },
+    "mysheets.append_doc_text": {
+      "action": "Ghi nối vào Google Docs",
+      "done": "Đã cập nhật Google Docs",
+      "receipt": "Đã nối nội dung vào Google Docs",
+      "kind": "Google Docs",
+      "link": "Mở tài liệu trên Google Docs",
+      "titleField": "title"
+    },
+    "mysheets.move_drive_file": {
+      "action": "Lưu tệp vào thư mục Google Drive",
+      "done": "Đã di chuyển trên Drive",
+      "receipt": "Đã lưu vào thư mục Google Drive",
+      "kind": "Google Drive",
+      "link": "Mở trên Google Drive"
     },
     "myjira.list_sites": {
       "action": "Xem danh sách site Jira",

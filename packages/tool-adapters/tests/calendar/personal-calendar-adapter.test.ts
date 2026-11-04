@@ -517,6 +517,7 @@ describe('PersonalCalendarAdapter', () => {
         location: 'Phòng họp Tầng 5',
         meetLink: 'https://meet.google.com/xyz-abcd-efg',
         attendeesCount: 3,
+        attendees: ['ceo@example.com', 'pm@example.com', 'lead@example.com'],
       },
     ]);
   });
@@ -684,8 +685,53 @@ describe('PersonalCalendarAdapter', () => {
       location: 'Phòng họp VIP 1',
       meetLink: 'https://meet.google.com/ret-ro-123',
       attendeesCount: 2,
+      attendees: ['a@example.com', 'b@example.com'],
       recurrence: 'RRULE:FREQ=WEEKLY;INTERVAL=2',
     });
+  });
+
+  it('supports mycalendar.schedule_meet with conferenceDataVersion=1, attendees array, and sendInvites=true', async () => {
+    const { adapter, calls } = setup({
+      handler: (_url, init) => {
+        const parsed = JSON.parse(String(init.body));
+        return json({
+          ...fixtureEvent,
+          summary: parsed.summary,
+          description: parsed.description,
+          attendees: parsed.attendees,
+          conferenceData: {
+            entryPoints: [{ entryPointType: 'video', uri: 'https://meet.google.com/pro-meet-789' }],
+          },
+        });
+      },
+    });
+
+    const meet = await adapter.execute('mycalendar.schedule_meet', {
+      calendarId,
+      summary: 'Q4 Kickoff Google Meet',
+      start,
+      end,
+      description: 'Agenda: Q4 OKRs & Roadmap',
+      attendees: ['alice@example.com', 'bob@example.com'],
+      sendInvites: true,
+    });
+
+    expect(meet).toEqual({
+      id: fixtureEvent.id,
+      title: 'Q4 Kickoff Google Meet',
+      start,
+      end,
+      url: fixtureEvent.htmlLink,
+      meetLink: 'https://meet.google.com/pro-meet-789',
+      attendeesCount: 2,
+      attendees: ['alice@example.com', 'bob@example.com'],
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.url.searchParams.get('conferenceDataVersion')).toBe('1');
+    expect(calls[0]!.url.searchParams.get('sendUpdates')).toBe('all');
+    const body = JSON.parse(String(calls[0]!.init.body));
+    expect(body.attendees).toEqual([{ email: 'alice@example.com' }, { email: 'bob@example.com' }]);
+    expect(body.conferenceData?.createRequest?.conferenceSolutionKey?.type).toBe('hangoutsMeet');
   });
 
   it('supports mycalendar.find_free_slots to proactively compute available slots within workday hours', async () => {
