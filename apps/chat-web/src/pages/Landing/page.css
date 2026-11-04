@@ -1,115 +1,1001 @@
-/* <style> của index.html, giữ nguyên thứ tự (biến --font-* đổi thành --page-font-*). */
-    :root {
-      --bg: #F8F8F6;
-      --surface: #FFFFFF;
-      --border: #E7E7E2;
-      --accent: #FF5701;
-      --text: #111827;
-      --page-font-display: 'Playfair Display', serif;
-      --page-font-body: 'Be Vietnam Pro', sans-serif;
-    }
+/**
+ * Planora Landing Page Styles (PL-03)
+ * Phong cách giấy/kem, typography serif/sans, 3D Hero rotator, minh họa 3 bước quy trình,
+ * nhận diện thương hiệu Planora và chuẩn tiếp cận WCAG AA.
+ */
 
-    body {
-      background-color: var(--bg);
-      color: var(--text);
-      font-family: var(--page-font-body);
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-      overflow-x: hidden;
-    }
+:root {
+  --bg: var(--planora-canvas);
+  --surface: var(--planora-paper);
+  --border: var(--planora-divider);
+  --accent: var(--planora-primary);
+  --text: var(--planora-text);
+  --page-font-display: var(--planora-font-serif);
+  --page-font-body: var(--planora-font-sans);
+}
 
-    /* Tương tác focus rõ nét chuẩn WCAG AA */
-    a:focus-visible, button:focus-visible, input:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 2px;
-    }
+body {
+  background-color: var(--planora-canvas);
+  color: var(--planora-text);
+  font-family: var(--planora-font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
 
-    /* Hiệu ứng chuyển động mượt mà cho sân khấu bằng CSS Grid Overlay */
-    .stage-panels-container {
-      display: grid;
-      grid-template-columns: 1fr;
-      grid-template-rows: 1fr;
-    }
+html.dark[data-proto-page="index"] body,
+html.dark body.selection\:bg-\[\#FF5701\]\/20,
+html.dark[data-proto-page="index"] {
+  background-color: var(--planora-canvas) !important;
+  color: var(--planora-text) !important;
+}
 
-    .stage-card-panel {
-      grid-area: 1 / 1 / 2 / 2;
-      width: 100%;
-      transition: opacity 250ms cubic-bezier(0.16, 1, 0.3, 1), visibility 250ms cubic-bezier(0.16, 1, 0.3, 1);
-    }
+/* ==========================================================================
+   1. Public Navigation Header
+   ========================================================================== */
+.planora-landing-nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background-color: var(--planora-paper);
+  border-bottom: 1px solid var(--planora-divider);
+  transition: background-color var(--planora-transition-fast);
+  width: 100%;
+}
 
-    .stage-card-panel.is-hidden {
-      opacity: 0;
-      visibility: hidden;
-      pointer-events: none;
-    }
+.planora-landing-nav-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  box-sizing: border-box;
+}
 
-    .stage-card-panel.is-active {
-      opacity: 1;
-      visibility: visible;
-      pointer-events: auto;
-    }
+.planora-landing-nav-inner .planora-brand {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
 
-    /* Đường nối SVG vẽ dần ở khoảnh khắc 5 */
-    @keyframes drawConnector {
-      from { stroke-dashoffset: 80; }
-      to { stroke-dashoffset: 0; }
-    }
-    .connector-line-anim {
-      stroke-dasharray: 80;
-      stroke-dashoffset: 80;
-      animation: drawConnector 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
+.planora-landing-links {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  font-size: var(--planora-text-sm);
+}
 
-    /* Con trỏ nhấp nháy gõ chữ ở khoảnh khắc 1 */
-    @keyframes blinkCursor {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0; }
-    }
-    .typing-cursor {
-      display: inline-block;
-      width: 2px;
-      height: 1.15em;
-      vertical-align: text-bottom;
-      background-color: #FF5701;
-      animation: blinkCursor 0.9s infinite;
-    }
+.planora-landing-links a {
+  color: var(--planora-muted);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color var(--planora-transition-fast);
+}
 
-    /* Chấm sóng lan tỏa nhẹ nhàng */
-    @keyframes pulseRing {
-      0% { transform: scale(0.95); opacity: 0.8; }
-      50% { transform: scale(1.15); opacity: 0.3; }
-      100% { transform: scale(0.95); opacity: 0.8; }
-    }
-    .pulse-ring-active {
-      animation: pulseRing 2s infinite ease-in-out;
-    }
+.planora-landing-links a:hover {
+  color: var(--planora-text);
+}
 
-    /* Chế độ giảm chuyển động cho người dùng nhạy cảm */
-    @media (prefers-reduced-motion: reduce) {
-      *, ::before, ::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-        scroll-behavior: auto !important;
-      }
-      .stage-card-panel {
-        transition: none !important;
-      }
-      .typing-cursor {
-        display: none !important;
-      }
-      .connector-line-anim {
-        animation: none !important;
-        stroke-dashoffset: 0 !important;
-      }
-      .pulse-ring-active {
-        animation: none !important;
-      }
-      /* Ẩn phần stage sticky desktop và thay bằng danh sách các thẻ dọc tương tự mobile */
-      .stage-interactive-desktop {
-        display: none !important;
-      }
-      .stage-fallback-list {
-        display: block !important;
-      }
-    }
+.planora-landing-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.planora-landing-nav-actions .ati-theme-toggle {
+  min-width: 44px;
+  min-height: 44px;
+  width: 44px;
+  height: 44px;
+}
+
+.planora-landing-nav-actions .planora-btn-sm {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+[data-testid="landing-try-playbook-btn"],
+[data-testid="landing-try-digest-btn"] {
+  min-height: 44px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+}
+
+/* ==========================================================================
+   2. Hero Section
+   ========================================================================== */
+.planora-hero-section {
+  padding: 64px 24px 80px;
+  max-width: 1200px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.planora-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
+  gap: clamp(36px, 5vw, 64px);
+  align-items: center;
+}
+
+.planora-hero-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: var(--planora-radius-pill);
+  background-color: var(--planora-primary-soft);
+  color: var(--planora-primary);
+  font-size: var(--planora-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 24px;
+  border: 1px solid var(--planora-success-border);
+}
+
+.planora-hero-heading {
+  font-family: var(--planora-font-serif);
+  font-size: clamp(34px, 4.2vw, 56px);
+  line-height: 1.12;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--planora-text);
+  margin: 0 0 20px 0;
+}
+
+.planora-hero-heading em {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--planora-primary);
+}
+
+.planora-hero-copy {
+  font-size: var(--planora-text-md);
+  line-height: 1.65;
+  color: var(--planora-muted);
+  margin: 0 0 32px 0;
+  max-width: 580px;
+}
+
+.planora-hero-cta-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.planora-hero-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--planora-text-xs);
+  color: var(--planora-muted);
+  margin-bottom: 24px;
+}
+
+.planora-hero-trust-pills {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 18px;
+  border-radius: var(--planora-radius-pill);
+  background-color: var(--planora-paper);
+  border: 1px solid var(--planora-divider);
+  font-size: var(--planora-text-xs);
+  font-weight: 500;
+  color: var(--planora-text);
+  box-shadow: var(--planora-shadow-sm);
+}
+
+/* ==========================================================================
+   3. 3D Hero Perspective & Visual Rotator
+   ========================================================================== */
+.hero-perspective {
+  perspective: 1200px;
+  min-width: 0;
+  width: 100%;
+}
+
+.hero-float {
+  transform-style: preserve-3d;
+  animation: planora-hero-float 4s ease-in-out infinite;
+}
+
+.hero-rotator {
+  --hero-depth: 14px;
+  --hero-roll: -1deg;
+  position: relative;
+  transform-style: preserve-3d;
+  will-change: transform;
+  cursor: grab;
+  touch-action: pan-y pinch-zoom;
+}
+
+.hero-rotator:focus-visible {
+  outline: 2px solid var(--planora-primary);
+  outline-offset: 6px;
+  border-radius: var(--planora-radius-2xl);
+}
+
+.hero-rotator[data-dragging],
+.hero-rotator[data-dragging] * {
+  cursor: grabbing;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hero-edge-layer {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--planora-radius-2xl);
+  background: var(--planora-sidebar);
+  border: 1px solid var(--planora-divider);
+  backface-visibility: visible;
+  pointer-events: none;
+}
+
+.hero-visual {
+  border-radius: var(--planora-radius-2xl);
+  border: 1px solid var(--planora-divider);
+  box-shadow:
+    0 6px 16px rgba(46, 56, 45, 0.05),
+    0 22px 42px -16px rgba(46, 56, 45, 0.15);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.hero-front {
+  background-color: var(--planora-paper);
+  padding: 24px 28px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hero-back {
+  position: absolute;
+  inset: 0;
+  transform: rotateZ(var(--hero-roll)) translateZ(calc(-1 * var(--hero-depth))) rotateY(180deg);
+  background-color: var(--planora-sidebar);
+  border: 1px solid var(--planora-divider);
+  border-radius: var(--planora-radius-2xl);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  text-align: center;
+  color: var(--planora-primary);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.hero-visual-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--planora-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  color: var(--planora-muted);
+}
+
+.mini-request {
+  padding: 14px 18px;
+  background-color: var(--planora-canvas);
+  border-radius: var(--planora-radius-lg);
+  border: 1px solid var(--planora-divider);
+  font-size: var(--planora-text-sm);
+  line-height: 1.5;
+  color: var(--planora-text);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.mini-request-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: var(--planora-primary);
+  color: var(--planora-on-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.mini-plan {
+  padding: 16px;
+  background-color: var(--planora-paper);
+  border: 1px solid var(--planora-divider);
+  border-radius: var(--planora-radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mini-plan-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mini-plan-heading h2 {
+  font-family: var(--planora-font-serif);
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--planora-text);
+}
+
+.mini-step-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mini-step-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--planora-radius-md);
+  background-color: var(--planora-canvas);
+  font-size: var(--planora-text-xs);
+  color: var(--planora-text);
+}
+
+.mini-step-row span.service-name {
+  font-weight: 600;
+  color: var(--planora-text);
+}
+
+.mini-step-row span.resource-name {
+  color: var(--planora-muted);
+}
+
+.mini-plan-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--planora-text-xs);
+  color: var(--planora-muted);
+}
+
+@keyframes planora-hero-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+/* ==========================================================================
+   4. Workflow 3-Step Section
+   ========================================================================== */
+.planora-workflow-section {
+  padding: 80px 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  border-top: 1px solid var(--planora-divider);
+  box-sizing: border-box;
+}
+
+.planora-section-header {
+  text-align: center;
+  max-width: 680px;
+  margin: 0 auto 56px;
+}
+
+.planora-section-kicker {
+  font-size: var(--planora-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+  color: var(--planora-primary);
+  display: inline-block;
+  margin-bottom: 12px;
+}
+
+.planora-section-title {
+  font-family: var(--planora-font-serif);
+  font-size: clamp(28px, 3.5vw, 40px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--planora-text);
+  margin: 0 0 16px 0;
+}
+
+.planora-section-desc {
+  font-size: var(--planora-text-md);
+  line-height: 1.6;
+  color: var(--planora-muted);
+  margin: 0;
+}
+
+.planora-workflow-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+}
+
+.workflow-step-card {
+  background-color: var(--planora-paper);
+  border: 1px solid var(--planora-divider);
+  border-radius: var(--planora-radius-xl);
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  transition: transform var(--planora-transition-fast), box-shadow var(--planora-transition-fast);
+  box-sizing: border-box;
+}
+
+.workflow-step-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--planora-shadow-md);
+}
+
+.workflow-step-num {
+  font-family: var(--planora-font-serif);
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--planora-primary);
+  margin-bottom: 12px;
+  line-height: 1;
+}
+
+.workflow-step-card h3 {
+  font-size: var(--planora-text-lg);
+  font-weight: 600;
+  color: var(--planora-text);
+  margin: 0 0 10px 0;
+}
+
+.workflow-step-card p {
+  font-size: var(--planora-text-sm);
+  line-height: 1.6;
+  color: var(--planora-muted);
+  margin: 0 0 24px 0;
+  flex: 1;
+}
+
+.workflow-step-illustration {
+  background-color: var(--planora-canvas);
+  border: 1px solid var(--planora-divider);
+  border-radius: var(--planora-radius-lg);
+  padding: 16px;
+  font-size: var(--planora-text-xs);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ==========================================================================
+   5. Integrated Services Section
+   ========================================================================== */
+.planora-services-section {
+  padding: 80px 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  border-top: 1px solid var(--planora-divider);
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.planora-services-chips {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 36px;
+}
+
+.planora-service-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border-radius: var(--planora-radius-pill);
+  background-color: var(--planora-paper);
+  border: 1px solid var(--planora-divider);
+  font-size: var(--planora-text-sm);
+  font-weight: 500;
+  color: var(--planora-text);
+  box-shadow: var(--planora-shadow-sm);
+  transition: transform var(--planora-transition-fast);
+}
+
+.planora-service-chip:hover {
+  transform: translateY(-2px);
+  border-color: var(--planora-border-strong);
+}
+
+/* Roadmap Accordion */
+.planora-roadmap-wrap {
+  margin-top: 48px;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: left;
+}
+
+.roadmap-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 18px;
+  border-radius: var(--planora-radius-pill);
+  border: 1px solid var(--planora-divider);
+  background-color: var(--planora-paper);
+  color: var(--planora-text);
+  font-size: var(--planora-text-xs);
+  font-weight: 500;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.roadmap-unfold {
+  margin-top: 16px;
+  padding: 20px 24px;
+  background-color: var(--planora-paper);
+  border: 1px solid var(--planora-divider);
+  border-radius: var(--planora-radius-lg);
+  font-size: var(--planora-text-xs);
+  line-height: 1.6;
+}
+
+/* ==========================================================================
+   5b. Principles & Human-in-the-Loop Section
+   ========================================================================== */
+.planora-principles-section {
+  padding: 80px 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  border-top: 1px solid var(--planora-divider);
+  box-sizing: border-box;
+}
+
+.planora-proof-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+}
+
+.planora-proof-card {
+  background-color: var(--planora-paper);
+  border: 1px solid var(--planora-divider);
+  border-radius: var(--planora-radius-xl);
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  transition: transform var(--planora-transition-fast), box-shadow var(--planora-transition-fast);
+  box-sizing: border-box;
+}
+
+.planora-proof-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--planora-shadow-md);
+}
+
+.planora-proof-num {
+  font-family: var(--planora-font-serif);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--planora-primary);
+  margin-bottom: 12px;
+  line-height: 1;
+}
+
+.planora-proof-card h3 {
+  font-size: var(--planora-text-lg);
+  font-weight: 600;
+  color: var(--planora-text);
+  margin: 0 0 10px 0;
+}
+
+.planora-proof-card p {
+  font-size: var(--planora-text-sm);
+  line-height: 1.6;
+  color: var(--planora-muted);
+  margin: 0;
+}
+
+/* ==========================================================================
+   5c. Onboarding 3-Step Section
+   ========================================================================== */
+.planora-onboarding-section {
+  padding: 80px 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  border-top: 1px solid var(--planora-divider);
+  box-sizing: border-box;
+}
+
+.planora-onboarding-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+}
+
+.planora-onboarding-card {
+  background-color: var(--planora-paper);
+  border: 1px solid var(--planora-divider);
+  border-radius: var(--planora-radius-xl);
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  transition: transform var(--planora-transition-fast), box-shadow var(--planora-transition-fast);
+  box-sizing: border-box;
+}
+
+.planora-onboarding-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--planora-shadow-md);
+}
+
+.planora-step-num {
+  font-family: var(--planora-font-serif);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--planora-primary);
+  margin-bottom: 12px;
+  line-height: 1;
+}
+
+.planora-onboarding-card h3 {
+  font-size: var(--planora-text-lg);
+  font-weight: 600;
+  color: var(--planora-text);
+  margin: 0 0 10px 0;
+}
+
+.planora-onboarding-card p {
+  font-size: var(--planora-text-sm);
+  line-height: 1.6;
+  color: var(--planora-muted);
+  margin: 0 0 16px 0;
+  flex: 1;
+}
+
+.planora-onboarding-badge {
+  background-color: var(--planora-sidebar);
+  border: 1px solid var(--planora-divider);
+  border-radius: var(--planora-radius-md);
+  padding: 8px 12px;
+  font-size: var(--planora-text-xs);
+  color: var(--planora-muted);
+  line-height: 1.4;
+}
+
+/* ==========================================================================
+   5d. Auto-Digest Schedule Preview Section
+   ========================================================================== */
+.planora-digest-section {
+  /* inherited from planora-principles-section */
+}
+
+.planora-digest-flow-preview {
+  margin-top: 20px;
+  padding: 16px 20px;
+  background-color: var(--planora-canvas);
+  border: 1px solid var(--planora-divider);
+  border-radius: var(--planora-radius-lg);
+  box-sizing: border-box;
+}
+
+.planora-digest-flow-steps {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.planora-digest-step {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.planora-digest-step-badge {
+  font-size: var(--planora-text-xs);
+  font-weight: 600;
+  color: var(--planora-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.planora-digest-step-name {
+  font-size: var(--planora-text-sm);
+  font-weight: 500;
+  color: var(--planora-text);
+}
+
+.planora-digest-arrow {
+  color: var(--planora-muted);
+  font-size: 16px;
+  font-weight: 600;
+  user-select: none;
+}
+
+/* ==========================================================================
+   6. Bottom CTA Section
+   ========================================================================== */
+.planora-bottom-cta {
+  padding: 80px 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.planora-bottom-cta-box {
+  background-color: var(--planora-sidebar);
+  border: 1px solid var(--planora-divider);
+  border-radius: var(--planora-radius-2xl);
+  padding: 56px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.planora-bottom-cta-text h2 {
+  font-family: var(--planora-font-serif);
+  font-size: clamp(28px, 3.5vw, 36px);
+  font-weight: 600;
+  color: var(--planora-text);
+  margin: 0 0 10px 0;
+  letter-spacing: -0.02em;
+}
+
+.planora-bottom-cta-text p {
+  font-size: var(--planora-text-md);
+  color: var(--planora-muted);
+  margin: 0;
+}
+
+/* ==========================================================================
+   7. Footer
+   ========================================================================== */
+.planora-public-footer {
+  border-top: 1px solid var(--planora-divider);
+  background-color: var(--planora-paper);
+  padding: 32px 24px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.planora-public-footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  font-size: var(--planora-text-xs);
+  color: var(--planora-muted);
+}
+
+.planora-footer-links {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.planora-footer-links a {
+  color: var(--planora-muted);
+  text-decoration: none;
+}
+
+.planora-footer-links a:hover {
+  color: var(--planora-text);
+  text-decoration: underline;
+}
+
+/* ==========================================================================
+   8. Responsive Breakpoints
+   ========================================================================== */
+@media (max-width: 1023.98px) {
+  .planora-hero-grid {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+  .planora-hero-copy {
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .planora-hero-cta-group {
+    justify-content: center;
+  }
+  .planora-hero-note {
+    justify-content: center;
+  }
+  .planora-workflow-grid,
+  .planora-proof-grid,
+  .planora-onboarding-grid {
+    grid-template-columns: 1fr;
+    max-width: 540px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .hero-perspective {
+    max-width: 520px;
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .planora-landing-nav-inner {
+    padding: 8px 12px;
+    gap: 8px;
+    justify-content: space-between;
+  }
+  .planora-landing-nav .planora-brand .planora-brand-sub {
+    display: none !important;
+  }
+  .planora-landing-nav .planora-brand-symbol svg {
+    width: 22px !important;
+    height: 22px !important;
+  }
+  .planora-landing-nav .planora-brand.planora-brand-md,
+  .planora-landing-nav .planora-brand {
+    gap: 6px !important;
+    min-height: 44px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+  }
+  .planora-landing-nav .planora-brand.planora-brand-md .planora-brand-word,
+  .planora-landing-nav .planora-brand .planora-brand-word {
+    font-size: 18px !important;
+    line-height: 1 !important;
+  }
+  .planora-landing-nav-actions {
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .planora-landing-nav-actions .ati-theme-toggle {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+  .planora-landing-nav-actions .planora-btn-sm {
+    min-height: 44px !important;
+    height: 44px !important;
+    padding: 0 10px !important;
+    font-size: 12px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+  }
+  .planora-landing-links {
+    display: none;
+  }
+  .planora-hero-section {
+    padding: 40px 16px 56px;
+  }
+  .planora-workflow-section,
+  .planora-services-section,
+  .planora-principles-section,
+  .planora-onboarding-section,
+  .planora-bottom-cta {
+    padding: 56px 16px;
+  }
+  .planora-proof-card,
+  .planora-onboarding-card {
+    padding: 24px 20px;
+  }
+  .planora-digest-flow-steps {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .planora-digest-arrow {
+    transform: rotate(90deg);
+    margin-left: 12px;
+  }
+  .planora-bottom-cta-box {
+    padding: 36px 24px;
+    text-align: center;
+    flex-direction: column;
+  }
+  .hero-front,
+  .hero-back {
+    padding: 20px 18px;
+  }
+  .hero-rotator {
+    --hero-depth: 10px;
+  }
+}
+
+@media (max-width: 360px) {
+  .planora-landing-nav-inner {
+    padding: 6px 8px;
+    gap: 4px;
+  }
+  .planora-landing-nav .planora-brand-symbol svg {
+    width: 20px !important;
+    height: 20px !important;
+  }
+  .planora-landing-nav .planora-brand.planora-brand-md,
+  .planora-landing-nav .planora-brand {
+    gap: 4px !important;
+    min-height: 44px !important;
+  }
+  .planora-landing-nav .planora-brand.planora-brand-md .planora-brand-word,
+  .planora-landing-nav .planora-brand .planora-brand-word {
+    font-size: 16px !important;
+    line-height: 1 !important;
+  }
+  .planora-landing-nav-actions {
+    gap: 4px;
+  }
+  .planora-landing-nav-actions .ati-theme-toggle {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+  .planora-landing-nav-actions .planora-btn-sm {
+    min-height: 44px !important;
+    height: 44px !important;
+    padding: 0 6px !important;
+    font-size: 11px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  .planora-hero-section {
+    padding: 32px 12px 48px;
+  }
+  .planora-hero-heading {
+    font-size: 28px;
+  }
+  .workflow-step-card,
+  .planora-proof-card,
+  .planora-onboarding-card {
+    padding: 20px 14px;
+  }
+}
+
+/* ==========================================================================
+   9. Reduced Motion
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .hero-float {
+    animation: none !important;
+  }
+}

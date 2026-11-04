@@ -1,0 +1,165 @@
+import { test, expect } from '@playwright/test';
+
+const VIEWPORTS = [
+  { width: 1440, height: 900, label: '1440x900' },
+  { width: 1024, height: 768, label: '1024x768' },
+  { width: 768, height: 1024, label: '768x1024' },
+  { width: 375, height: 812, label: '375x812' },
+  { width: 320, height: 568, label: '320x568' },
+];
+const THEMES = ['light', 'dark'] as const;
+
+for (const vp of VIEWPORTS) {
+  for (const theme of THEMES) {
+    test(`PL-03: Planora public landing responsive without overflow ${vp.label} ${theme}`, async ({ page }) => {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await page.addInitScript(val => localStorage.setItem('ati-theme', val), theme);
+      await page.goto('/');
+
+      // Single h1 heading and main landmark
+      await expect(page.getByRole('main')).toHaveCount(1);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
+
+      // Hero 3D Rotator & Trust Pills
+      await expect(page.locator('.planora-hero-rotator')).toBeVisible();
+      await expect(page.locator('.hero-edge-layer')).toHaveCount(14);
+      await expect(page.getByTestId('landing-hero-trust-pills')).toBeVisible();
+
+      // 3-step workflow illustration (replacing Make orbital graphic)
+      await expect(page.locator('#how')).toBeVisible();
+      await expect(page.locator('.workflow-step-card')).toHaveCount(3);
+
+      // Integrated services & Roadmap
+      await expect(page.locator('[data-od-id="integrations-section"]')).toBeVisible();
+      await expect(page.locator('.roadmap-toggle')).toBeVisible();
+
+      // Principles & Onboarding sections
+      await expect(page.locator('[data-od-id="principles-section"]')).toBeVisible();
+      await expect(page.locator('[data-od-id="onboarding-section"]')).toBeVisible();
+      await expect(page.getByTestId('landing-schedule-digest-section')).toBeVisible();
+      await expect(page.getByTestId('workflow-flow-canvas')).toBeVisible();
+
+      // Header actions fit within viewport without overflow (R1, R2, R3)
+      const navSignup = page.locator('.planora-landing-nav-actions [data-od-id="btn-header-signup"]');
+      await expect(navSignup).toBeVisible();
+      const navBox = await navSignup.boundingBox();
+      expect(navBox).not.toBeNull();
+      expect((navBox?.x ?? 0) + (navBox?.width ?? 0)).toBeLessThanOrEqual(vp.width);
+      expect(navBox?.height).toBeGreaterThanOrEqual(44);
+
+      const navLogin = page.locator('.planora-landing-nav-actions [data-od-id="btn-header-login"]');
+      await expect(navLogin).toBeVisible();
+      const navLoginBox = await navLogin.boundingBox();
+      expect(navLoginBox).not.toBeNull();
+      expect(navLoginBox?.height).toBeGreaterThanOrEqual(44);
+
+      // Landing CTA and toggle tap targets >= 44px (R3, C1)
+      const playbookBtn = page.getByTestId('landing-try-playbook-btn');
+      await expect(playbookBtn).toBeVisible();
+      const playbookBox = await playbookBtn.boundingBox();
+      expect(playbookBox?.height).toBeGreaterThanOrEqual(44);
+
+      const digestBtn = page.getByTestId('landing-try-digest-btn');
+      await expect(digestBtn).toBeVisible();
+      const digestBox = await digestBtn.boundingBox();
+      expect(digestBox?.height).toBeGreaterThanOrEqual(44);
+
+      const roadmapToggle = page.locator('.roadmap-toggle');
+      await expect(roadmapToggle).toBeVisible();
+      const roadmapBox = await roadmapToggle.boundingBox();
+      expect(roadmapBox).not.toBeNull();
+      expect(roadmapBox?.height).toBeGreaterThanOrEqual(44);
+
+      // Roadmap accordion interaction
+      await expect(page.locator('.roadmap-unfold')).toBeHidden();
+      await roadmapToggle.click();
+      await expect(roadmapToggle).toHaveAttribute('aria-expanded', 'true');
+      await expect(page.locator('.roadmap-unfold')).toBeVisible();
+      await roadmapToggle.click();
+      await expect(roadmapToggle).toHaveAttribute('aria-expanded', 'false');
+      await expect(page.locator('.roadmap-unfold')).toBeHidden();
+
+      // No horizontal overflow across all sections
+      const noOverflow = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+      expect(noOverflow).toBe(true);
+    });
+
+    test(`PL-03: Planora AuthFrame split layout and tap targets ${vp.label} ${theme}`, async ({ page }) => {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await page.addInitScript(val => localStorage.setItem('ati-theme', val), theme);
+      await page.goto('/login');
+
+      const modal = page.locator('#auth-modal');
+      await expect(modal).toBeVisible();
+
+      const emailInput = page.getByLabel('Email', { exact: true });
+      await expect(emailInput).toBeVisible();
+      const emailBox = await emailInput.boundingBox();
+      expect(emailBox?.height).toBeGreaterThanOrEqual(40);
+
+      const loginBtn = page.getByRole('button', { name: 'Đăng nhập', exact: true });
+      await expect(loginBtn).toBeVisible();
+      const btnBox = await loginBtn.boundingBox();
+      expect(btnBox?.height).toBeGreaterThanOrEqual(44);
+
+      // Tap targets >= 44px for secondary controls (F8)
+      const forgotBtn = page.getByRole('button', { name: 'Quên mật khẩu?', exact: true });
+      await expect(forgotBtn).toBeVisible();
+      const forgotBox = await forgotBtn.boundingBox();
+      expect(forgotBox?.height).toBeGreaterThanOrEqual(44);
+
+      const closeBtn = page.getByRole('button', { name: 'Đóng cửa sổ', exact: true });
+      await expect(closeBtn).toBeVisible();
+      const closeBox = await closeBtn.boundingBox();
+      expect(closeBox?.height).toBeGreaterThanOrEqual(44);
+      expect(closeBox?.width).toBeGreaterThanOrEqual(44);
+
+      const themeToggle = page.locator('.planora-auth-nav-actions .ati-theme-toggle');
+      await expect(themeToggle).toBeVisible();
+      const themeBox = await themeToggle.boundingBox();
+      expect(themeBox?.height).toBeGreaterThanOrEqual(44);
+      expect(themeBox?.width).toBeGreaterThanOrEqual(44);
+
+      const brand = page.locator('.planora-auth-top-nav .planora-brand');
+      await expect(brand).toBeVisible();
+      const brandBox = await brand.boundingBox();
+      expect(brandBox?.height).toBeGreaterThanOrEqual(44);
+
+      const editorial = page.locator('.planora-auth-editorial');
+      if (vp.width >= 1024) {
+        // Desktop split layout reveals editorial paper art SVG panel
+        await expect(editorial).toBeVisible();
+      } else {
+        // Mobile / Tablet collapses to clean focused card
+        await expect(editorial).toBeHidden();
+      }
+
+      // Escape key closes modal and restores URL
+      await page.keyboard.press('Escape');
+      await expect(page).toHaveURL(/\/$/);
+      await expect(modal).toHaveCount(0);
+    });
+  }
+}
+
+test('PL-03: Planora public landing honors prefers-reduced-motion', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+
+  const floatEl = page.locator('.hero-float');
+  await expect(floatEl).toBeVisible();
+  const animationPlayState = await floatEl.evaluate(el => getComputedStyle(el).animationName);
+  expect(animationPlayState).toBe('none');
+});
+
+test('PL-03: Auto-Digest CTA prefills digestPrompt in sessionStorage and opens signup', async ({ page }) => {
+  await page.goto('/');
+  const digestBtn = page.getByTestId('landing-try-digest-btn');
+  await expect(digestBtn).toBeVisible();
+  await digestBtn.click();
+  await expect(page).toHaveURL(/\/signup$/);
+  const prompt = await page.evaluate(() => sessionStorage.getItem('ati_prefill_prompt'));
+  expect(prompt).toContain('Mỗi sáng 08:00');
+  expect(prompt).toContain('Google Calendar');
+});

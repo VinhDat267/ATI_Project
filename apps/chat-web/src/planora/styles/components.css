@@ -1,0 +1,542 @@
+/**
+ * Planora Foundation Component Styles
+ *
+ * Brand, Button, Field, StatusBadge và các khối xây dựng cơ bản.
+ */
+
+/* ==========================================================================
+   1. Brand Component
+   ========================================================================== */
+.planora-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--planora-space-3);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--planora-text);
+  text-align: left;
+  cursor: pointer;
+  text-decoration: none;
+  border-radius: var(--planora-radius-md);
+  transition: opacity var(--planora-transition-fast);
+}
+
+.planora-brand:hover {
+  opacity: 0.9;
+}
+
+.planora-brand:focus-visible {
+  outline: 2px solid var(--planora-primary);
+  outline-offset: 4px;
+}
+
+.planora-brand-symbol {
+  display: grid;
+  place-items: center;
+  background-color: var(--planora-primary);
+  color: var(--planora-on-primary);
+  border-radius: var(--planora-radius-pill);
+  flex-shrink: 0;
+  transition: background-color var(--planora-transition-fast);
+}
+
+.planora-brand-sm .planora-brand-symbol {
+  width: 28px;
+  height: 28px;
+}
+
+.planora-brand-sm .planora-brand-symbol svg {
+  width: 18px;
+  height: 18px;
+}
+
+.planora-brand-md .planora-brand-symbol {
+  width: 38px;
+  height: 38px;
+}
+
+.planora-brand-md .planora-brand-symbol svg {
+  width: 25px;
+  height: 25px;
+}
+
+.planora-brand-lg .planora-brand-symbol {
+  width: 48px;
+  height: 48px;
+}
+
+.planora-brand-lg .planora-brand-symbol svg {
+  width: 32px;
+  height: 32px;
+}
+
+.planora-brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.planora-brand-word {
+  font-family: var(--planora-font-serif);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  color: var(--planora-text);
+  line-height: 0.95;
+}
+
+.planora-brand-sm .planora-brand-word {
+  font-size: 24px;
+}
+
+.planora-brand-md .planora-brand-word {
+  font-size: 32px;
+}
+
+.planora-brand-lg .planora-brand-word {
+  font-size: 40px;
+}
+
+.planora-brand-sub {
+  font-size: var(--planora-text-xs);
+  color: var(--planora-muted);
+  letter-spacing: 0.02em;
+  margin-top: 3px;
+  font-family: var(--planora-font-sans);
+}
+
+/* ==========================================================================
+   2. Button Component
+   ========================================================================== */
+.planora-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--planora-space-2);
+  font-family: var(--planora-font-sans);
+  font-weight: 500;
+  line-height: 1.25;
+  border-radius: var(--planora-radius-pill);
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  text-decoration: none;
+  min-height: 44px; /* Chuẩn tiếp cận vùng chạm mobile ≥ 44px */
+  padding: 10px 20px;
+  font-size: var(--planora-text-sm);
+  transition:
+    background-color var(--planora-transition-fast),
+    border-color var(--planora-transition-fast),
+    color var(--planora-transition-fast),
+    transform 0.12s ease;
+}
+
+.planora-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.planora-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Variants */
+.planora-btn-primary {
+  background-color: var(--planora-primary);
+  color: var(--planora-on-primary);
+  border-color: var(--planora-primary);
+}
+
+.planora-btn-primary:hover:not(:disabled) {
+  background-color: var(--planora-primary-hover);
+  border-color: var(--planora-primary-hover);
+}
+
+.planora-btn-secondary {
+  background-color: var(--planora-paper);
+  color: var(--planora-text);
+  border-color: var(--planora-divider);
+}
+
+.planora-btn-secondary:hover:not(:disabled) {
+  background-color: var(--planora-surface-hover);
+  border-color: var(--planora-border-strong);
+}
+
+.planora-btn-ghost {
+  background-color: transparent;
+  color: var(--planora-muted);
+  border-color: transparent;
+}
+
+.planora-btn-ghost:hover:not(:disabled) {
+  background-color: var(--planora-surface-hover);
+  color: var(--planora-text);
+}
+
+.planora-btn-danger {
+  background-color: var(--planora-error-bg);
+  color: var(--planora-error-text);
+  border-color: var(--planora-error-border);
+}
+
+.planora-btn-danger:hover:not(:disabled) {
+  filter: brightness(0.96);
+}
+
+/* Sizes */
+.planora-btn-sm {
+  min-height: 36px;
+  padding: 6px 14px;
+  font-size: var(--planora-text-xs);
+}
+
+.planora-btn-md {
+  min-height: 44px;
+  padding: 10px 20px;
+  font-size: var(--planora-text-sm);
+}
+
+.planora-btn-lg {
+  min-height: 50px;
+  padding: 13px 26px;
+  font-size: var(--planora-text-base);
+}
+
+.planora-btn-square {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: var(--planora-radius-md);
+}
+
+/* ==========================================================================
+   3. Field Component (Input / Textarea wrapper)
+   ========================================================================== */
+.planora-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--planora-space-1);
+  width: 100%;
+}
+
+.planora-field-label {
+  font-size: var(--planora-text-xs);
+  font-weight: 600;
+  color: var(--planora-text);
+  letter-spacing: 0.01em;
+  display: flex;
+  align-items: center;
+  gap: var(--planora-space-1);
+}
+
+.planora-field-required {
+  color: var(--planora-error-text);
+}
+
+.planora-field-control-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.planora-field-input,
+.planora-field-textarea {
+  width: 100%;
+  font-family: var(--planora-font-sans);
+  font-size: var(--planora-text-sm);
+  color: var(--planora-text);
+  background-color: var(--planora-paper);
+  border: 1px solid var(--planora-divider);
+  border-radius: var(--planora-radius-md);
+  padding: 10px 14px;
+  min-height: 44px;
+  box-sizing: border-box;
+  transition:
+    border-color var(--planora-transition-fast),
+    box-shadow var(--planora-transition-fast);
+}
+
+.planora-field-input:focus,
+.planora-field-textarea:focus {
+  outline: none;
+  border-color: var(--planora-primary);
+  box-shadow: 0 0 0 3px var(--planora-primary-soft);
+}
+
+.planora-field-input::placeholder,
+.planora-field-textarea::placeholder {
+  color: var(--planora-placeholder);
+}
+
+.planora-field-input:disabled,
+.planora-field-textarea:disabled {
+  background-color: var(--planora-surface-inset);
+  color: var(--planora-muted);
+  cursor: not-allowed;
+}
+
+.planora-field-error-state {
+  border-color: var(--planora-error-text);
+}
+
+.planora-field-error-state:focus {
+  border-color: var(--planora-error-text);
+  box-shadow: 0 0 0 3px var(--planora-error-bg);
+}
+
+.planora-field-textarea {
+  min-height: 84px;
+  resize: vertical;
+  line-height: var(--planora-lh-normal);
+}
+
+.planora-field-error {
+  font-size: var(--planora-text-xs);
+  color: var(--planora-error-text);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.planora-field-helper {
+  font-size: var(--planora-text-xs);
+  color: var(--planora-muted);
+}
+
+/* ==========================================================================
+   4. StatusBadge Component
+   ========================================================================== */
+.planora-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--planora-radius-pill);
+  font-family: var(--planora-font-sans);
+  font-size: var(--planora-text-xs);
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.planora-badge-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.planora-badge-success {
+  background-color: var(--planora-success-bg);
+  color: var(--planora-success-text);
+  border-color: var(--planora-success-border);
+}
+
+.planora-badge-pending {
+  background-color: var(--planora-pending-bg);
+  color: var(--planora-pending-text);
+  border-color: var(--planora-pending-border);
+}
+
+.planora-badge-error {
+  background-color: var(--planora-error-bg);
+  color: var(--planora-error-text);
+  border-color: var(--planora-error-border);
+}
+
+.planora-badge-unknown {
+  background-color: var(--planora-unknown-bg);
+  color: var(--planora-unknown-text);
+  border-color: var(--planora-unknown-border);
+}
+
+/* ==========================================================================
+   5. Card & Panel Layout Helpers
+   ========================================================================== */
+.planora-card {
+  background-color: var(--planora-paper);
+  border: 1px solid var(--planora-divider);
+  border-radius: var(--planora-radius-xl);
+  box-shadow: var(--planora-shadow-sm);
+  padding: var(--planora-space-6);
+  box-sizing: border-box;
+}
+
+.planora-card-interactive {
+  transition:
+    transform var(--planora-transition-fast),
+    box-shadow var(--planora-transition-fast),
+    border-color var(--planora-transition-fast);
+}
+
+.planora-card-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--planora-shadow-md);
+  border-color: var(--planora-border-strong);
+}
+
+/* Demo / Sample Banner */
+.planora-sample-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--planora-space-3);
+  padding: var(--planora-space-2) var(--planora-space-4);
+  background-color: var(--planora-pending-bg);
+  color: var(--planora-pending-text);
+  border-bottom: 1px solid var(--planora-pending-border);
+  font-size: var(--planora-text-xs);
+  font-weight: 500;
+}
+
+.planora-sample-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background-color: var(--planora-pending-text);
+  color: var(--planora-pending-bg);
+  padding: 2px 7px;
+  border-radius: var(--planora-radius-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 10px;
+}
+
+/* ==========================================================================
+   6. Responsive Chat Sample & Feed Layout
+   ========================================================================== */
+.planora-chat-plan-sample {
+  height: calc(100vh - 60px);
+  max-height: calc(100vh - 60px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.planora-chat-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.planora-chat-sidebar {
+  width: var(--planora-sidebar-width);
+  background-color: var(--planora-sidebar);
+  border-right: 1px solid var(--planora-divider);
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.planora-chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--planora-canvas);
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.planora-chat-header {
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--planora-divider);
+  background-color: var(--planora-paper);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.planora-chat-feed {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  max-width: var(--planora-chat-max-width);
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.planora-chat-composer-dock {
+  padding: 14px 24px;
+  border-top: 1px solid var(--planora-divider);
+  background-color: var(--planora-paper);
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.planora-mobile-nav-toggle {
+  display: none;
+}
+
+.planora-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 1023px) {
+  .planora-chat-plan-sample {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .planora-chat-layout {
+    flex-direction: column;
+    height: auto;
+    overflow: visible;
+  }
+
+  .planora-chat-sidebar {
+    display: none;
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--planora-divider);
+    max-height: 220px;
+    flex-shrink: 0;
+  }
+
+  .planora-chat-sidebar.planora-sidebar-open {
+    display: flex;
+  }
+
+  .planora-mobile-nav-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background-color: var(--planora-sidebar);
+    border-bottom: 1px solid var(--planora-divider);
+    font-size: var(--planora-text-xs);
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .planora-chat-header {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .planora-chat-feed {
+    padding: 16px 12px;
+  }
+
+  .planora-chat-composer-dock {
+    padding: 12px 14px;
+  }
+}

@@ -103,7 +103,7 @@ test('FE-02: messages follow near bottom and preserve reading above', async ({ p
     await page.getByRole('textbox',{name:'Mô tả công việc bạn muốn thực hiện'}).press('Enter');
     await expect(page.getByRole('button',{name:'Duyệt kế hoạch',exact:true})).toBeVisible();
     await page.getByRole('button',{name:'Xem hội thoại',exact:true}).click(); const area = page.getByRole('log',{name:'Hội thoại'});
-    await expect(page.getByText(/Saved message 24:/)).toBeAttached();
+    await expect(area.getByText(/Saved message 24:/)).toBeAttached();
     // Programmatic positioning must deliver the scroll input before a planner
     // response can append another message; native event delivery is asynchronous.
     await area.evaluate(element => { element.scrollTop = element.scrollHeight; element.dispatchEvent(new Event('scroll')); });

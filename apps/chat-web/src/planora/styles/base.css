@@ -1,0 +1,99 @@
+/**
+ * Planora Base Styles & Typography
+ *
+ * Tự host font Be Vietnam Pro (OFL), Times New Roman / Georgia cho tiêu đề và Consolas cho mono.
+ * Đảm bảo hỗ trợ prefers-reduced-motion và focus-visible toàn diện.
+ */
+
+/* Self-hosted Be Vietnam Pro Fonts */
+@font-face {
+  font-family: 'Be Vietnam Pro';
+  src: url("/fonts/be-vietnam-pro-regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Be Vietnam Pro';
+  src: url("/fonts/be-vietnam-pro-medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Be Vietnam Pro';
+  src: url("/fonts/be-vietnam-pro-semibold.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Biệt danh Be cho font Planora cũ */
+@font-face {
+  font-family: 'Be';
+  src: url("/fonts/be-vietnam-pro-regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Be';
+  src: url("/fonts/be-vietnam-pro-medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Be';
+  src: url("/fonts/be-vietnam-pro-semibold.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Base Typography Classes */
+.planora-font-sans {
+  font-family: var(--planora-font-sans);
+}
+
+.planora-font-serif {
+  font-family: var(--planora-font-serif);
+}
+
+.planora-font-mono {
+  font-family: var(--planora-font-mono);
+}
+
+/* Planora Root Scope Container */
+.planora-root {
+  font-family: var(--planora-font-sans);
+  background-color: var(--planora-canvas);
+  color: var(--planora-text);
+  line-height: var(--planora-lh-normal);
+  font-size: var(--planora-text-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Focus Visible */
+.planora-root :focus-visible {
+  outline: 2px solid var(--planora-primary);
+  outline-offset: 2px;
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .planora-root,
+  .planora-root *,
+  .planora-root *::before,
+  .planora-root *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

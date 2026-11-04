@@ -1,0 +1,719 @@
+/**
+ * Planora Authentication & Public Layout Styles (PL-03)
+ *
+ * Khung đăng nhập, đăng ký, xác thực và các phần tử form theo nhận diện Planora.
+ * Hỗ trợ giao diện sáng/tối và chuẩn tiếp cận WCAG AA (tap target >= 44px).
+ */
+
+.planora-auth-frame {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--planora-canvas);
+  color: var(--planora-text);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.planora-auth-top-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background-color: var(--planora-paper);
+  border-bottom: 1px solid var(--planora-divider);
+  flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.planora-auth-top-nav .planora-brand {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.planora-auth-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.planora-auth-nav-actions .ati-theme-toggle {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.planora-auth-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0;
+  border-radius: var(--planora-radius-md);
+  border: 1px solid var(--planora-divider);
+  background-color: var(--planora-paper);
+  color: var(--planora-muted);
+  cursor: pointer;
+  transition: all var(--planora-transition-fast);
+}
+
+.planora-auth-close-btn:hover {
+  background-color: var(--planora-surface-hover);
+  color: var(--planora-text);
+}
+
+.planora-auth-close-btn:focus-visible {
+  outline: 2px solid var(--planora-primary);
+  outline-offset: 2px;
+}
+
+.planora-auth-main {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  flex: 1;
+  padding: 36px 24px 64px;
+  display: grid;
+  align-items: center;
+  gap: clamp(32px, 5vw, 64px);
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.planora-auth-main.has-editorial {
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+}
+
+.planora-auth-main.no-editorial {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 480px;
+}
+
+/* Editorial Panel (Left Side on Desktop) */
+.planora-auth-editorial {
+  display: flex;
+  flex-direction: column;
+  padding: 36px 36px 32px;
+  min-height: 560px;
+  background-color: var(--planora-sidebar);
+  border: 1px solid var(--planora-divider);
+  border-radius: var(--planora-radius-2xl);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.planora-editorial-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.planora-editorial-eyebrow {
+  font-size: var(--planora-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+  color: var(--planora-primary);
+}
+
+.planora-editorial-edition {
+  font-size: var(--planora-text-xs);
+  color: var(--planora-muted);
+  letter-spacing: 0.06em;
+}
+
+.planora-auth-editorial h2 {
+  font-family: var(--planora-font-serif);
+  font-size: 38px;
+  line-height: 1.15;
+  margin: 0 0 20px;
+  color: var(--planora-text);
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+
+.planora-auth-editorial h2 em {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--planora-primary);
+}
+
+.planora-paper-art {
+  position: relative;
+  width: 100%;
+  margin: 0 auto;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.planora-paper-art > svg {
+  width: 100%;
+  max-width: 440px;
+  height: auto;
+  overflow: visible;
+}
+
+.paper-art-stack {
+  animation: planora-paper-float 6s ease-in-out infinite;
+}
+
+.paper-art-seal {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: planora-seal-drift 6s ease-in-out infinite;
+}
+
+@keyframes planora-paper-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes planora-seal-drift {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-3px) rotate(2deg); }
+}
+
+.paper-art-caption {
+  position: relative;
+  margin-top: -10px;
+  font-family: var(--planora-font-serif);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--planora-muted);
+  letter-spacing: 0.01em;
+}
+
+.planora-editorial-quiet-note {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 24px 0;
+}
+
+.planora-quiet-note-line {
+  width: 28px;
+  height: 1px;
+  background-color: var(--planora-divider);
+  flex-shrink: 0;
+}
+
+.planora-editorial-quiet-note p {
+  font-size: var(--planora-text-xs);
+  line-height: 1.7;
+  color: var(--planora-muted);
+  margin: 0;
+}
+
+.planora-editorial-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--planora-divider);
+}
+
+.planora-editorial-bottom .planora-brand-word {
+  font-family: var(--planora-font-serif);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  color: var(--planora-text);
+}
+
+.planora-editorial-bottom span:last-child {
+  font-size: var(--planora-text-xs);
+  color: var(--planora-muted);
+}
+
+/* Auth Card (Right Side / Form) */
+.planora-auth-card {
+  background-color: var(--planora-paper);
+  border: 1px solid var(--planora-divider);
+  border-radius: var(--planora-radius-2xl);
+  padding: 36px 32px;
+  box-shadow: var(--planora-shadow-md);
+  width: 100%;
+  max-width: 460px;
+  justify-self: center;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.planora-auth-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.planora-kicker-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--planora-primary);
+}
+
+.planora-kicker-text {
+  font-size: var(--planora-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+  color: var(--planora-muted);
+}
+
+.planora-auth-heading {
+  font-size: 30px;
+  line-height: 1.15;
+  margin: 0 0 10px;
+  color: var(--planora-text);
+  letter-spacing: -0.02em;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
+}
+
+.planora-auth-subtitle {
+  font-size: var(--planora-text-sm);
+  line-height: 1.6;
+  color: var(--planora-muted);
+  margin: 0 0 24px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
+}
+
+.user-email-placeholder {
+  display: inline-block;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  word-break: break-all;
+  vertical-align: bottom;
+}
+
+/* Auth Tabs */
+.planora-auth-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  background-color: var(--planora-canvas);
+  border-radius: var(--planora-radius-lg);
+  margin-bottom: 24px;
+  border: 1px solid var(--planora-divider);
+}
+
+.planora-auth-tab {
+  flex: 1;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--planora-muted);
+  font-size: var(--planora-text-sm);
+  font-weight: 500;
+  border-radius: var(--planora-radius-md);
+  cursor: pointer;
+  transition: all var(--planora-transition-fast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.planora-auth-tab:hover {
+  color: var(--planora-text);
+}
+
+.planora-auth-tab.active {
+  background-color: var(--planora-paper);
+  color: var(--planora-text);
+  font-weight: 600;
+  box-shadow: var(--planora-shadow-sm);
+}
+
+.planora-auth-tab:focus-visible {
+  outline: 2px solid var(--planora-primary);
+  outline-offset: 2px;
+}
+
+/* Auth Form Controls */
+.planora-auth-field {
+  margin-bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.planora-auth-field label {
+  font-size: var(--planora-text-sm);
+  font-weight: 500;
+  color: var(--planora-text);
+}
+
+.planora-auth-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.planora-auth-input {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 14px;
+  font-size: var(--planora-text-base);
+  font-family: inherit;
+  color: var(--planora-text);
+  background-color: var(--planora-paper);
+  border: 1px solid var(--planora-divider);
+  border-radius: var(--planora-radius-md);
+  box-sizing: border-box;
+  transition: border-color var(--planora-transition-fast), box-shadow var(--planora-transition-fast);
+}
+
+.planora-auth-input:focus {
+  outline: none;
+  border-color: var(--planora-primary);
+  box-shadow: var(--planora-shadow-focus);
+}
+
+.planora-auth-input[aria-invalid="true"] {
+  border-color: var(--planora-error-text);
+}
+
+.planora-auth-password-toggle {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--planora-muted);
+  border-radius: var(--planora-radius-sm);
+  cursor: pointer;
+  transition: color var(--planora-transition-fast);
+}
+
+.planora-auth-password-toggle:hover {
+  color: var(--planora-text);
+}
+
+.planora-auth-password-toggle:focus-visible {
+  outline: 2px solid var(--planora-primary);
+  outline-offset: 2px;
+}
+
+/* Submit and Action Buttons */
+.planora-auth-submit {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  font-size: var(--planora-text-sm);
+  font-weight: 600;
+  color: var(--planora-on-primary);
+  background-color: var(--planora-primary);
+  border: 0;
+  border-radius: var(--planora-radius-pill);
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: background-color var(--planora-transition-fast), opacity var(--planora-transition-fast);
+}
+
+.planora-auth-submit:hover:not(:disabled) {
+  background-color: var(--planora-primary-hover);
+}
+
+.planora-auth-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.planora-auth-submit:focus-visible {
+  outline: 2px solid var(--planora-primary);
+  outline-offset: 3px;
+}
+
+.planora-auth-google-btn {
+  width: 100%;
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 20px;
+  font-size: var(--planora-text-sm);
+  font-weight: 500;
+  color: var(--planora-text);
+  background-color: var(--planora-paper);
+  border: 1px solid var(--planora-divider);
+  border-radius: var(--planora-radius-pill);
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: background-color var(--planora-transition-fast), border-color var(--planora-transition-fast);
+}
+
+.planora-auth-google-btn:hover:not(:disabled) {
+  background-color: var(--planora-surface-hover);
+  border-color: var(--planora-border-strong);
+}
+
+.planora-auth-google-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.planora-auth-google-btn:focus-visible {
+  outline: 2px solid var(--planora-primary);
+  outline-offset: 3px;
+}
+
+.planora-auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+  color: var(--planora-muted);
+  font-size: var(--planora-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.planora-auth-divider::before,
+.planora-auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background-color: var(--planora-divider);
+}
+
+/* Feedback & Alerts */
+.planora-auth-error {
+  padding: 12px 16px;
+  border-radius: var(--planora-radius-md);
+  background-color: var(--planora-error-bg);
+  color: var(--planora-error-text);
+  border: 1px solid var(--planora-error-border);
+  font-size: var(--planora-text-sm);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.planora-auth-success {
+  padding: 12px 16px;
+  border-radius: var(--planora-radius-md);
+  background-color: var(--planora-success-bg);
+  color: var(--planora-success-text);
+  border: 1px solid var(--planora-success-border);
+  font-size: var(--planora-text-sm);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.planora-auth-caps-lock {
+  font-size: var(--planora-text-xs);
+  color: var(--planora-pending-text);
+  margin-top: 4px;
+}
+
+.planora-auth-password-hint {
+  font-size: var(--planora-text-xs);
+  color: var(--planora-muted);
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
+/* Auth Switch & Footer */
+.planora-auth-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--planora-divider);
+  font-size: var(--planora-text-sm);
+  color: var(--planora-muted);
+  flex-wrap: wrap;
+}
+
+.planora-auth-link-btn {
+  background: none;
+  border: 0;
+  padding: 6px 0;
+  font-size: var(--planora-text-sm);
+  font-weight: 600;
+  color: var(--planora-primary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+}
+
+.planora-auth-link-btn:hover {
+  text-decoration: underline;
+}
+
+.planora-auth-link-btn:focus-visible {
+  outline: 2px solid var(--planora-primary);
+  outline-offset: 2px;
+}
+
+.planora-auth-endnote {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  font-size: var(--planora-text-xs);
+  color: var(--planora-muted);
+}
+
+/* Modal Overlay Wrapper for Auth */
+.planora-auth-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background-color: rgba(46, 56, 45, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  opacity: 0;
+  transition: opacity var(--planora-transition-fast);
+}
+
+.planora-auth-modal-overlay.opacity-100 {
+  opacity: 1;
+}
+
+.planora-auth-modal-container {
+  width: 100%;
+  max-width: 960px;
+  margin: auto;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.planora-auth-forgot-link {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+}
+
+/* Footer Links (F2: tap target min 44px) */
+.planora-auth-footer {
+  margin-top: 24px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.planora-auth-footer-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.planora-auth-footer-link {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 6px;
+  box-sizing: border-box;
+  text-decoration: none;
+}
+
+/* Responsive Breakpoints */
+@media (max-width: 1023.98px) {
+  .planora-auth-main.has-editorial {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .planora-auth-editorial {
+    display: none;
+  }
+  .planora-auth-card {
+    max-width: min(100%, 480px);
+    min-width: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .planora-auth-top-nav {
+    padding: 12px 16px;
+  }
+  .planora-auth-main {
+    padding: 20px 16px 40px;
+    min-width: 0;
+  }
+  .planora-auth-card {
+    padding: 28px 20px;
+    border-radius: var(--planora-radius-xl);
+    max-width: 100%;
+    min-width: 0;
+  }
+  .planora-auth-heading {
+    font-size: 26px;
+  }
+}
+
+@media (max-width: 360px) {
+  .planora-auth-main {
+    padding: 16px 12px 32px;
+    min-width: 0;
+  }
+  .planora-auth-card {
+    padding: 20px 14px;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .planora-auth-heading {
+    font-size: 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paper-art-stack,
+  .paper-art-seal {
+    animation: none !important;
+  }
+  .planora-auth-input,
+  .planora-auth-submit,
+  .planora-auth-tab,
+  .planora-auth-modal-overlay {
+    transition: none !important;
+  }
+}

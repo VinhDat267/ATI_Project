@@ -3,13 +3,14 @@
 // để prototype/theme.css lo chế độ tối như ở các trang khác.
 // Tab hiện từ 900 px: ở 768–899 px, cockpit của admin không đủ chỗ đặt 5 tab ở giữa thanh
 // (review #162, nhóm trưởng chốt 20/10/2026).
-import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
+import { useContext, useEffect, useState, type MouseEvent, type ReactNode } from 'react';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
 import type { User } from '../../types';
 import { UserNavMenu } from './UserNavMenu';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { useSchedulePendingCount } from '../../hooks/use-schedules';
 import { getActiveWorkspaceSummary, subscribeWorkspace } from '../../services/workspace-storage';
+import { PlanoraShellContext } from '../../planora/layout/PlanoraShell';
 
 export type NavTab = 'workspace' | 'history' | 'settings' | 'guide' | 'users';
 const TABS: { id: NavTab; path: string; name: string; short: string; adminOnly?: boolean }[] = [
@@ -40,9 +41,37 @@ export interface MainNavProps {
 }
 
 export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pageName, actions, children }: MainNavProps) {
+  const { inPlanoraShell } = useContext(PlanoraShellContext);
   const pendingCount = useSchedulePendingCount(user);
   const [activeWorkspace, setActiveWorkspace] = useState(getActiveWorkspaceSummary());
   useEffect(() => subscribeWorkspace(() => setActiveWorkspace(getActiveWorkspaceSummary())), []);
+
+  if (inPlanoraShell) {
+    return (
+      <div data-main-nav-actions className="planora-header-actions-strip flex items-center justify-between px-4 py-2 border-b border-[#E7E7E2] bg-white/80 dark:bg-[#202820]/90">
+        <div className="flex items-center gap-2">
+          {actions}
+        </div>
+        <div className="flex items-center gap-2">
+          {children}
+          {user && (
+            <UserNavMenu
+              user={user}
+              pendingScheduleCount={pendingCount}
+              variant="prototype"
+              triggerClassName={AVATAR}
+              menuItemClassName={MENU_ITEM}
+              navigate={navigate}
+              onOpenSettings={onOpenSettings ?? (() => navigate('/settings'))}
+              onOpenAccount={() => navigate('/account')}
+              onManageUsers={() => navigate('/admin/users')}
+              onLogout={onLogout}
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
 
   // Bấm kèm phím bổ trợ hoặc chuột giữa thì để trình duyệt mở tab mới như link thường.
   const follow = (path: string) => (event: MouseEvent<HTMLAnchorElement>) => {
@@ -65,7 +94,7 @@ export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pag
               ATI
             </span>
           </a>
-          <div className="hidden sm:inline-block flex-shrink-0">
+          <div className="inline-block flex-shrink-0">
             <WorkspaceSwitcher navigate={navigate} />
           </div>
           {pageName && <span data-nav-page-name className="min-[900px]:hidden text-sm font-medium text-[#4B5563] truncate">{pageName}</span>}

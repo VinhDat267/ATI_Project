@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { apiClient } from '../../services/api-client';
 import {
   getActiveWorkspaceId,
@@ -14,9 +15,10 @@ import type { WorkspaceSummary } from '../../types';
 
 export interface WorkspaceSwitcherProps {
   navigate?: (path: string) => void;
+  variant?: 'header' | 'sidebar';
 }
 
-export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
+export function WorkspaceSwitcher({ navigate, variant = 'header' }: WorkspaceSwitcherProps) {
   const [open, setOpen] = useState(false);
   const [activeSummary, setActiveSummary] = useState(getActiveWorkspaceSummary());
   const [organizations, setOrganizations] = useState<WorkspaceSummary[]>(getCachedOrganizations());
@@ -36,7 +38,173 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
 
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const createTriggerRef = useRef<HTMLButtonElement>(null);
+  const joinTriggerRef = useRef<HTMLButtonElement>(null);
+  const createModalRef = useRef<HTMLDivElement>(null);
+  const joinModalRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
+
+  const restoreCreateFocus = () => {
+    if (createTriggerRef.current && document.body.contains(createTriggerRef.current)) {
+      createTriggerRef.current.focus();
+    } else if (buttonRef.current && document.body.contains(buttonRef.current)) {
+      buttonRef.current.focus();
+    }
+  };
+
+  const restoreJoinFocus = () => {
+    if (joinTriggerRef.current && document.body.contains(joinTriggerRef.current)) {
+      joinTriggerRef.current.focus();
+    } else if (buttonRef.current && document.body.contains(buttonRef.current)) {
+      buttonRef.current.focus();
+    }
+  };
+
+  // Focus lifecycle, trap, and Escape handling for create organization modal (F3, F4, R2)
+  useEffect(() => {
+    if (!showCreateModal) return;
+
+    let frameId: number;
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const focusInitial = () => {
+      const target =
+        createModalRef.current?.querySelector<HTMLElement>('#create-org-name') ||
+        createModalRef.current?.querySelector<HTMLElement>('input:not(:disabled), button:not(:disabled)');
+      target?.focus();
+    };
+
+    focusInitial();
+    if (typeof requestAnimationFrame === 'function') {
+      frameId = requestAnimationFrame(focusInitial);
+    } else {
+      timeoutId = setTimeout(focusInitial, 0);
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setShowCreateModal(false);
+        restoreCreateFocus();
+        return;
+      }
+
+      if (e.key === 'Tab' && createModalRef.current) {
+        const focusables = Array.from(
+          createModalRef.current.querySelectorAll<HTMLElement>(
+            'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+          )
+        );
+        if (focusables.length > 0) {
+          const first = focusables[0];
+          const last = focusables[focusables.length - 1];
+
+          if (!createModalRef.current.contains(document.activeElement)) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.shiftKey) {
+              last.focus();
+            } else {
+              first.focus();
+            }
+            return;
+          }
+
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            e.stopPropagation();
+            last.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            e.stopPropagation();
+            first.focus();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      if (typeof cancelAnimationFrame === 'function') {
+        cancelAnimationFrame(frameId);
+      }
+      clearTimeout(timeoutId);
+      window.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [showCreateModal]);
+
+  // Focus lifecycle, trap, and Escape handling for join organization modal (F3, F4, R2)
+  useEffect(() => {
+    if (!showJoinModal) return;
+
+    let frameId: number;
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const focusInitial = () => {
+      const target =
+        joinModalRef.current?.querySelector<HTMLElement>('#join-org-code') ||
+        joinModalRef.current?.querySelector<HTMLElement>('input:not(:disabled), button:not(:disabled)');
+      target?.focus();
+    };
+
+    focusInitial();
+    if (typeof requestAnimationFrame === 'function') {
+      frameId = requestAnimationFrame(focusInitial);
+    } else {
+      timeoutId = setTimeout(focusInitial, 0);
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setShowJoinModal(false);
+        restoreJoinFocus();
+        return;
+      }
+
+      if (e.key === 'Tab' && joinModalRef.current) {
+        const focusables = Array.from(
+          joinModalRef.current.querySelectorAll<HTMLElement>(
+            'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+          )
+        );
+        if (focusables.length > 0) {
+          const first = focusables[0];
+          const last = focusables[focusables.length - 1];
+
+          if (!joinModalRef.current.contains(document.activeElement)) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.shiftKey) {
+              last.focus();
+            } else {
+              first.focus();
+            }
+            return;
+          }
+
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            e.stopPropagation();
+            last.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            e.stopPropagation();
+            first.focus();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      if (typeof cancelAnimationFrame === 'function') {
+        cancelAnimationFrame(frameId);
+      }
+      clearTimeout(timeoutId);
+      window.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [showJoinModal]);
 
   // Subscribe to storage changes
   useEffect(() => {
@@ -74,13 +242,21 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
   useEffect(() => {
     if (!open) return;
     const handleOutside = (e: MouseEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) {
+      if (showCreateModal || showJoinModal) return;
+      const target = e.target as Node | null;
+      if (
+        (target && createModalRef.current?.contains(target)) ||
+        (target && joinModalRef.current?.contains(target))
+      ) {
+        return;
+      }
+      if (!menuRef.current?.contains(target as Node)) {
         setOpen(false);
       }
     };
     document.addEventListener('mousedown', handleOutside);
     return () => document.removeEventListener('mousedown', handleOutside);
-  }, [open]);
+  }, [open, showCreateModal, showJoinModal]);
 
   // PBI-04: a conversation belongs to exactly one workspace, so only /c/:id leaves for "/".
   // Workspace-scoped views (/, /history conversations + ScheduleSection, /settings + TrelloConnection,
@@ -168,41 +344,71 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
   const isPersonal = activeSummary.id === 'personal';
 
   return (
-    <div ref={menuRef} className="relative inline-block text-left">
-      <button
-        ref={buttonRef}
-        type="button"
-        aria-label={`Không gian làm việc: ${activeSummary.name}`}
-        aria-haspopup="true"
-        aria-expanded={open}
-        aria-controls={open ? menuId : undefined}
-        onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border border-[#E7E7E2] bg-white hover:bg-[#F8F8F6] text-[#111827] shadow-sm transition-colors focus:outline-none focus:ring-1 focus:ring-[#FF5701]"
-      >
-        <span className="truncate max-w-[140px] sm:max-w-[180px] flex items-center gap-1">
-          <span>{isPersonal ? '👤' : '🏢'}</span>
-          <span className="font-semibold hidden xl:inline">{activeSummary.name}</span>
-        </span>
-        {!isPersonal && (
-          <span
-            className={`hidden xl:inline px-1.5 py-0.2 rounded text-[10px] font-medium ${
-              activeSummary.role === 'admin'
-                ? 'bg-amber-100 text-amber-800'
-                : 'bg-neutral-100 text-neutral-600'
-            }`}
-          >
-            {activeSummary.role === 'admin' ? 'Quản trị viên' : 'Thành viên'}
-          </span>
-        )}
-        <svg
-          className={`w-3.5 h-3.5 text-[#6B7280] transition-transform ${open ? 'rotate-180' : ''}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
+    <div ref={menuRef} className={`relative ${variant === 'sidebar' ? 'w-full' : 'inline-block text-left'}`}>
+      {variant === 'sidebar' ? (
+        <button
+          ref={buttonRef}
+          type="button"
+          aria-label={`Không gian làm việc: ${activeSummary.name}`}
+          aria-haspopup="true"
+          aria-expanded={open}
+          aria-controls={open ? menuId : undefined}
+          onClick={() => setOpen(!open)}
+          className="planora-ws-switcher-sidebar-btn"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-base flex-shrink-0">{isPersonal ? '👤' : '🏢'}</span>
+            <div className="min-w-0 text-left">
+              <div className="text-xs font-semibold truncate text-[var(--planora-text)]">
+                {activeSummary.name}
+              </div>
+              <div className="text-[10px] text-[var(--planora-muted)] truncate">
+                {isPersonal
+                  ? 'Cá nhân'
+                  : `Tổ chức · ${activeSummary.role === 'admin' ? 'Quản trị viên' : 'Thành viên'}`}
+              </div>
+            </div>
+          </div>
+          <span className="text-xs text-[var(--planora-muted)] flex-shrink-0 ml-1">
+            {open ? '▲' : '▼'}
+          </span>
+        </button>
+      ) : (
+        <button
+          ref={buttonRef}
+          type="button"
+          aria-label={`Không gian làm việc: ${activeSummary.name}`}
+          aria-haspopup="true"
+          aria-expanded={open}
+          aria-controls={open ? menuId : undefined}
+          onClick={() => setOpen(!open)}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border border-[#E7E7E2] bg-white hover:bg-[#F8F8F6] text-[#111827] shadow-sm transition-colors focus:outline-none focus:ring-1 focus:ring-[#FF5701]"
+        >
+          <span className="truncate max-w-[140px] sm:max-w-[180px] flex items-center gap-1">
+            <span>{isPersonal ? '👤' : '🏢'}</span>
+            <span className="font-semibold">{activeSummary.name}</span>
+          </span>
+          {!isPersonal && (
+            <span
+              className={`hidden sm:inline px-1.5 py-0.2 rounded text-[10px] font-medium ${
+                activeSummary.role === 'admin'
+                  ? 'bg-amber-100 text-amber-800'
+                  : 'bg-neutral-100 text-neutral-600'
+              }`}
+            >
+              {activeSummary.role === 'admin' ? 'Quản trị viên' : 'Thành viên'}
+            </span>
+          )}
+          <svg
+            className={`w-3.5 h-3.5 text-[#6B7280] transition-transform ${open ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      )}
 
       {/* Dropdown Menu */}
       {open && (
@@ -210,7 +416,11 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
           id={menuId}
           role="menu"
           aria-label="Danh sách không gian làm việc"
-          className="absolute left-0 top-full mt-1.5 w-72 sm:w-80 bg-white rounded-xl border border-[#E7E7E2] shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100"
+          className={`absolute top-full mt-1.5 bg-white rounded-xl border border-[#E7E7E2] shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100 ${
+            variant === 'sidebar'
+              ? 'left-0 right-0 w-full min-w-[220px] max-w-[calc(100vw-32px)]'
+              : 'left-0 w-72 sm:w-80 max-w-[calc(100vw-32px)]'
+          }`}
         >
           <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-[#6B7280]">
             Không gian làm việc
@@ -294,6 +504,7 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
           {/* Action buttons */}
           <div className="mt-2 border-t border-[#E7E7E2] pt-1.5 px-2 v3-space-y-1">
             <button
+              ref={createTriggerRef}
               type="button"
               onClick={() => {
                 setShowCreateModal(true);
@@ -306,6 +517,7 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
             </button>
 
             <button
+              ref={joinTriggerRef}
               type="button"
               onClick={() => {
                 setShowJoinModal(true);
@@ -321,9 +533,15 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
         </div>
       )}
 
-      {/* Modal Tạo Không Gian Tổ Chức */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      {/* Modal Tạo Không Gian Tổ Chức (Rendered via Portal to escape transformed sidebar containing block - F3, F4, R2) */}
+      {showCreateModal && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={createModalRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Tạo không gian tổ chức mới"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+        >
           <div className="w-full max-w-md bg-white rounded-2xl border border-[#E7E7E2] shadow-2xl p-6 v3-space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-[#111827] flex items-center gap-2">
@@ -332,8 +550,12 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
               </h3>
               <button
                 type="button"
-                onClick={() => setShowCreateModal(false)}
+                onClick={() => {
+                  setShowCreateModal(false);
+                  restoreCreateFocus();
+                }}
                 className="text-[#9CA3AF] hover:text-[#111827] text-sm font-semibold"
+                aria-label="Đóng biểu mẫu"
               >
                 ✕
               </button>
@@ -378,7 +600,10 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E7E7E2]">
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    restoreCreateFocus();
+                  }}
                   className="px-4 py-2 rounded-xl text-xs font-medium text-[#4B5563] hover:bg-neutral-100"
                 >
                   Hủy
@@ -393,12 +618,19 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Modal Tham Gia Bằng Mã Mời */}
-      {showJoinModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      {/* Modal Tham Gia Bằng Mã Mời (Rendered via Portal to escape transformed sidebar containing block - F3, F4, R2) */}
+      {showJoinModal && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={joinModalRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Tham gia tổ chức bằng mã mời"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+        >
           <div className="w-full max-w-md bg-white rounded-2xl border border-[#E7E7E2] shadow-2xl p-6 v3-space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-[#111827] flex items-center gap-2">
@@ -407,8 +639,12 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
               </h3>
               <button
                 type="button"
-                onClick={() => setShowJoinModal(false)}
+                onClick={() => {
+                  setShowJoinModal(false);
+                  restoreJoinFocus();
+                }}
                 className="text-[#9CA3AF] hover:text-[#111827] text-sm font-semibold"
+                aria-label="Đóng biểu mẫu"
               >
                 ✕
               </button>
@@ -448,7 +684,10 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E7E7E2]">
                 <button
                   type="button"
-                  onClick={() => setShowJoinModal(false)}
+                  onClick={() => {
+                    setShowJoinModal(false);
+                    restoreJoinFocus();
+                  }}
                   className="px-4 py-2 rounded-xl text-xs font-medium text-[#4B5563] hover:bg-neutral-100"
                 >
                   Đóng
@@ -463,7 +702,8 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

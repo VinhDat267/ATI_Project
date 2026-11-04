@@ -7,6 +7,12 @@
 @import "./prototype/styles/tokens.css";
 @import "./prototype/styles/v3-palette.css";
 @import "./prototype/styles/v3-compat.css";
+/* Planora Design Tokens, Base Typography & Components (PL-01, PL-02, PL-03) */
+@import "./planora/styles/tokens.css";
+@import "./planora/styles/base.css";
+@import "./planora/styles/components.css";
+@import "./planora/styles/shell.css";
+@import "./planora/styles/auth.css";
 @import "tailwindcss/preflight.css";
 @import "./prototype/styles/v3-base.css";
 @import "tailwindcss/utilities.css";

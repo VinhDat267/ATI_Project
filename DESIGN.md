@@ -159,6 +159,12 @@ components:
     height: "32px"
 ---
 
+> [!IMPORTANT]
+> **Cập nhật Design Authority (03/11/2026 — Planora Migration):**
+> Theo quyết định của chủ dự án và kế hoạch chuyển đổi Planora ([PL-01](docs/handoff/tasks/PL-01-planora-foundation.md), [Planora Migration Spec](docs/superpowers/specs/2026-11-02-planora-migration-design.md)), giao diện thị giác toàn bộ sản phẩm chuyển sang phong cách và bố cục Planora (nền kem ấm `#f8f4eb`, giấy sáng `#fffdf7`, sidebar xanh kem `#eee9dd`, chữ than tự nhiên `#2e382d`, điểm nhấn xanh rừng `#3c5741`, font Be Vietnam Pro tự host).
+> Chuẩn tắc thiết kế thị giác của hệ thống hiện tại được quy định tại **[`apps/chat-web/DESIGN.md`](apps/chat-web/DESIGN.md)**.
+> Tài liệu này được giữ lại để đối chiếu các bản mẫu prototype cam Agentic lịch sử. Mọi logic nghiệp vụ, backend, API contract, router 22 route entries, hash binding và quyền hạn tiếp tục tuân thủ theo đặc tả v3.
+
 # Design System: ATI · Sân khấu điều phối
 
 Design system **Agentic** (Open Design) đúng như 12 bản mẫu trong [`docs/design/prototypes/`](docs/design/prototypes/README.md) thể hiện, và như bản React của chúng ([`docs/design/prototypes/react/`](docs/design/prototypes/react/README.md)) mà app chép vào từ FE-04b. Số liệu sử dụng, bảng chế độ tối đầy đủ, chỗ tham chiếu từng thành phần và các chỗ lệch giữa trang ở [`docs/design/design-system.md`](docs/design/design-system.md). Phần đầu YAML là chuẩn; phần chữ giải thích.

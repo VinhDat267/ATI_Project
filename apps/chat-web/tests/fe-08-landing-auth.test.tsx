@@ -40,10 +40,10 @@ it.each([
   expect(await screen.findByLabelText(label, { exact: true })).toHaveFocus();
 });
 
-it('ports five landing moments and eight services with source classes and no demo controls', async () => {
+it('ports Planora landing with hero rotator and three workflow step cards with no demo controls', async () => {
   const { container } = open('/');
-  expect(container.querySelectorAll('.moment-trigger')).toHaveLength(5);
-  expect(container.querySelector('.stage-interactive-desktop')).not.toBeNull();
+  expect(container.querySelector('.planora-hero-rotator')).not.toBeNull();
+  expect(container.querySelectorAll('.workflow-step-card')).toHaveLength(3);
   expect(container.querySelector('#email-sim-modal')).toBeNull();
   expect(container.querySelector('#btn-hero-email-preview')).toBeNull();
 });
