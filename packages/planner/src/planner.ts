@@ -268,12 +268,12 @@ export class AIPlanner {
       return rawOutput;
     }
 
+    const reportTopicPattern =
+      /(?:báo cáo|tổng hợp)\s+[^\n]*?(?<![\p{L}\p{N}_])(?:prs?|pull requests?|issues?|tiến độ|jira|sprints?|sheets?|bảng tính|số liệu)(?![\p{L}\p{N}_])/iu;
     const isReportIntent =
-      groundingUserTexts.some((t) =>
-        /báo cáo.*(?:pr|pull request|issue|tiến độ|jira|sprint|sheet|bảng tính|số liệu)|tổng hợp.*(?:pr|pull request|issue|tiến độ|jira|sprint|sheet|bảng tính|số liệu)/i.test(t)
-      ) ||
-      /báo cáo.*(?:pr|pull request|issue|tiến độ|jira|sprint|sheet|bảng tính|số liệu)/i.test(parsed.summary || '') ||
-      /báo cáo.*(?:pr|pull request|issue|tiến độ|jira|sprint|sheet|bảng tính|số liệu)/i.test(parsed.thinking || '');
+      groundingUserTexts.some((t) => reportTopicPattern.test(t)) ||
+      reportTopicPattern.test(parsed.summary || '') ||
+      reportTopicPattern.test(parsed.thinking || '');
 
     if (!isReportIntent) return rawOutput;
 

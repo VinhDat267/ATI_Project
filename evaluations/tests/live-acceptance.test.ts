@@ -90,17 +90,27 @@ describe('FLOW-07: Live Acceptance Certification & 6 Persona Walkthroughs', () =
         }
       }
 
-      // Assert that healthy services are verified
-      expect(results['slack']?.status).toBe('OK');
-      expect(results['github']?.status).toBe('OK');
-      expect(results['calendar']?.status).toBe('OK');
-      expect(results['sheets']?.status).toBe('OK');
-      expect(results['jira']?.status).toBe('OK');
-      expect(results['telegram']?.status).toBe('OK');
+      if (Object.keys(config.services).length > 0) {
+        // Assert that healthy configured live services are verified
+        if (config.services['slack']) expect(results['slack']?.status).toBe('OK');
+        if (config.services['github']) expect(results['github']?.status).toBe('OK');
+        if (config.services['calendar']) expect(results['calendar']?.status).toBe('OK');
+        if (config.services['sheets']) expect(results['sheets']?.status).toBe('OK');
+        if (config.services['jira']) expect(results['jira']?.status).toBe('OK');
+        if (config.services['telegram']) expect(results['telegram']?.status).toBe('OK');
 
-      // Assert that failing services are explicitly marked as named blockers and NOT masked
-      expect(results['notion']?.status).toBe('BLOCKED');
-      expect(results['notion']?.detail).toMatch(/401|unauthorized|failed/i);
+        // Assert that failing services are explicitly marked as named blockers and NOT masked
+        if (config.services['notion']) {
+          expect(results['notion']?.status).toBe('BLOCKED');
+          expect(results['notion']?.detail).toMatch(/401|unauthorized|failed/i);
+        }
+      } else {
+        // In CI sandbox without live .env credentials, unconfigured connectors must remain NOT_RUN (never faked as OK)
+        for (const def of LIVE_SERVICES) {
+          expect(results[def.id]?.status).toBe('NOT_RUN');
+          expect(results[def.id]?.detail).toBeTruthy();
+        }
+      }
     }, 30000);
   });
 

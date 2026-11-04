@@ -855,12 +855,12 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
   }
 
   // Layer 5b: Report Grounding (FLOW-01 & FLOW-05, F1) — factual reports must have verified reportEvidence
+  const reportTopicPattern =
+    /(?:báo cáo|tổng hợp)\s+[^\n]*?(?<![\p{L}\p{N}_])(?:prs?|pull requests?|issues?|tiến độ|jira|sprints?|sheets?|bảng tính|số liệu)(?![\p{L}\p{N}_])/iu;
   const isReportIntent =
-    options.grounding?.userTexts?.some((t) =>
-      /báo cáo.*(?:pr|pull request|issue|tiến độ|jira|sprint|sheet|bảng tính|số liệu)|tổng hợp.*(?:pr|pull request|issue|tiến độ|jira|sprint|sheet|bảng tính|số liệu)/i.test(t)
-    ) ||
-    /báo cáo.*(?:pr|pull request|issue|tiến độ|jira|sprint|sheet|bảng tính|số liệu)/i.test(parsed.summary || '') ||
-    /báo cáo.*(?:pr|pull request|issue|tiến độ|jira|sprint|sheet|bảng tính|số liệu)/i.test(parsed.thinking || '');
+    options.grounding?.userTexts?.some((t) => reportTopicPattern.test(t)) ||
+    reportTopicPattern.test(parsed.summary || '') ||
+    reportTopicPattern.test(parsed.thinking || '');
 
   const hasFactualReportContent = steps.some((s) => {
     const text =
@@ -870,7 +870,7 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
           ? s.args.body
           : '';
     return (
-      /báo cáo.*(?:pr|pull request|issue|jira|sprint|tiến độ|sheet|bảng tính|số liệu)/i.test(text) ||
+      reportTopicPattern.test(text) ||
       /hiện có \d+ (?:pr|pull request|issue|ticket|dòng)/i.test(text) ||
       /tổng số \d+ (?:ticket|dòng|issue)/i.test(text) ||
       /#\d+/i.test(text)
