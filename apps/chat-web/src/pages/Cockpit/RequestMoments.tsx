@@ -339,20 +339,39 @@ export function RequestMoment({
             data-testid="playbook-variables-bar"
             className="mt-2 p-2.5 sm:p-3 rounded-xl bg-[#FFF9F4] border border-[#FFDFC6] v3-space-y-2"
           >
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-semibold text-[#C2410C] uppercase tracking-wider">
-                ⚡ Điền nhanh biến số 1-Click
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTemplate(null);
-                  setVariableValues({});
-                }}
-                className="text-[11px] text-[#9A3412] hover:underline"
-              >
-                Ẩn thanh biến số
-              </button>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-semibold text-[#C2410C] uppercase tracking-wider">
+                  ⚡ Điền nhanh biến số 1-Click
+                </span>
+                <span className="text-[11px] font-medium text-[#9A3412] bg-[#FFEDD5] px-1.5 py-0.5 rounded">
+                  Đã điền {templateVariables.filter((v) => Boolean(variableValues[v]?.trim())).length}/{templateVariables.length}
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  data-testid="btn-reset-playbook-variables"
+                  onClick={() => {
+                    const base = activeTemplate ?? draft;
+                    setVariableValues({});
+                    onDraft(base);
+                  }}
+                  className="text-[11px] font-medium text-[#C2410C] hover:underline"
+                >
+                  Đặt lại mẫu gốc
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTemplate(null);
+                    setVariableValues({});
+                  }}
+                  className="text-[11px] text-[#9A3412] hover:underline"
+                >
+                  Ẩn thanh biến số
+                </button>
+              </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {templateVariables.map((varName) => (
@@ -384,6 +403,15 @@ export function RequestMoment({
               placeholder="Đặt tên cho Playbook 1-Click..."
               value={newPlaybookTitle}
               onChange={(e) => setNewPlaybookTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleConfirmSavePlaybook();
+                } else if (e.key === 'Escape') {
+                  e.preventDefault();
+                  setSavingPlaybookOpen(false);
+                }
+              }}
               className="flex-1 px-2.5 py-1.5 rounded-lg text-xs bg-white border border-brand-border text-brand-text focus:outline-none focus:ring-2 focus:ring-brand-primary"
             />
             <div className="flex items-center gap-1.5">
@@ -513,6 +541,19 @@ export function RequestMoment({
                   <p className="text-[11px] text-brand-muted line-clamp-2 mt-1 leading-relaxed">
                     {playbook.prompt}
                   </p>
+                  {extractPlaybookVariables(playbook.prompt).length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                      {extractPlaybookVariables(playbook.prompt).map((v) => (
+                        <span
+                          key={v}
+                          data-testid="playbook-var-chip"
+                          className="px-1.5 py-0.5 rounded bg-[#FFF6EE] text-[#C2410C] border border-[#FFDFC6] font-mono text-[10px]"
+                        >
+                          {`{{${v}}}`}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </button>
               </div>
             ))}
@@ -607,6 +648,19 @@ export function RequestMoment({
                       <p className="text-[11px] text-brand-muted line-clamp-2 mt-1 leading-relaxed">
                         {playbook.prompt}
                       </p>
+                      {extractPlaybookVariables(playbook.prompt).length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                          {extractPlaybookVariables(playbook.prompt).map((v) => (
+                            <span
+                              key={v}
+                              data-testid="playbook-var-chip"
+                              className="px-1.5 py-0.5 rounded bg-[#FFF6EE] text-[#C2410C] border border-[#FFDFC6] font-mono text-[10px]"
+                            >
+                              {`{{${v}}}`}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </button>
                 ))}

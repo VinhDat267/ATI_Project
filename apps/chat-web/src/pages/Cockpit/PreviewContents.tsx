@@ -25,6 +25,9 @@ const names: Record<string,string> = {
   status:'Lọc theo trạng thái', archived:'Lưu trữ trang Notion',
   targetStatus:'Trạng thái chuyển tới', priority:'Mức độ ưu tiên', assigneeAccountId:'Người phụ trách (Account ID)',
   dueDate:'Hạn hoàn thành (Due date)', parentKey:'Epic / Issue cha', comment:'Bình luận kèm theo',
+  docId:'Tài liệu Google Docs', documentId:'Tài liệu Google Docs', fileId:'Tệp Google Drive',
+  folderId:'Thư mục Google Drive đích', parentFolderId:'Thư mục cha trên Drive', mimeType:'Loại tệp Google Drive',
+  sendInvites:'Gửi email mời họp', author:'Tác giả', draft:'Bản nháp (Draft)', channel:'Kênh Slack',
 };
 const operatorLabels: Record<string,string> = {
   equals:'Bằng (=)',
@@ -130,7 +133,7 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
   if(style==='calendar_event') {
     const isDelete = step.tool.endsWith('.delete_event');
     const recurrenceLabel = formatRecurrenceLabel(step.args.recurrence);
-    const hasMeetLink = step.args.createMeetLink === true;
+    const hasMeetLink = step.tool === 'mycalendar.schedule_meet' || step.args.createMeetLink === true;
     const locationText = typeof step.args.location === 'string' && step.args.location.trim().length > 0 ? step.args.location.trim() : null;
     const attendees = Array.isArray(step.args.attendees)
       ? step.args.attendees.filter((a): a is string => typeof a === 'string' && a.trim().length > 0)
@@ -596,6 +599,135 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
       )}
       <OtherArguments step={step} except={['rowNumbers','matchColumn','matchValue']}/>
     </div>;
+  }
+  if (
+    style === 'doc_create' ||
+    style === 'doc_append' ||
+    style === 'doc_read' ||
+    step.tool === 'mysheets.create_doc' ||
+    step.tool === 'mysheets.append_doc_text' ||
+    step.tool === 'mysheets.get_doc'
+  ) {
+    const docBody =
+      step.args.content != null
+        ? text(step.args.content)
+        : step.args.text != null
+          ? text(step.args.text)
+          : '';
+    const rawFolderId = step.args.folderId;
+    const folderLabel =
+      typeof rawFolderId === 'string' && rawFolderId.trim()
+        ? (labels?.[rawFolderId] ?? rawFolderId)
+        : rawFolderId != null
+          ? text(rawFolderId)
+          : null;
+    const docBadge =
+      step.tool === 'mysheets.create_doc'
+        ? '📝 Tạo tài liệu Google Docs mới'
+        : step.tool === 'mysheets.append_doc_text'
+          ? '✏️ Nối thêm nội dung vào Google Docs'
+          : '📖 Đọc nội dung tài liệu Google Docs';
+    return (
+      <div
+        data-testid="google-doc-preview"
+        className="p-4 bg-neutral-50 rounded-xl border border-blue-200 v3-space-y-3"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-600">
+          <span>
+            {'Đích Google Docs: '}
+            <strong>{destination}</strong>
+          </span>
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-800 border border-blue-200">
+            {docBadge}
+          </span>
+        </div>
+        {step.args.title != null && (
+          <div>
+            <span className="text-[11px] text-neutral-400 uppercase font-semibold">
+              Tiêu đề tài liệu Google Docs:
+            </span>
+            <div className="text-sm font-bold text-neutral-900 mt-0.5 flex items-center gap-1.5">
+              <span aria-hidden="true">📄</span>
+              <span>{text(step.args.title)}</span>
+            </div>
+          </div>
+        )}
+        {folderLabel && (
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-[11px] text-neutral-400 uppercase font-semibold">
+              Thư mục lưu trữ:
+            </span>
+            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-amber-50 text-amber-900 border border-amber-200">
+              📁 {folderLabel}
+            </span>
+          </div>
+        )}
+        {docBody && (
+          <div>
+            <span className="text-[11px] text-neutral-400 uppercase font-semibold">
+              {step.tool === 'mysheets.append_doc_text'
+                ? 'Nội dung sẽ nối thêm vào cuối tài liệu:'
+                : 'Xem trước trang văn bản Google Docs:'}
+            </span>
+            <div className="mt-1 p-3.5 bg-white rounded-lg border border-blue-100 shadow-2xs text-xs text-neutral-800 whitespace-pre-wrap leading-relaxed font-sans">
+              {docBody}
+            </div>
+          </div>
+        )}
+        <OtherArguments step={step} except={['title', 'content', 'text', 'folderId']} />
+      </div>
+    );
+  }
+  if (
+    style === 'drive_folder' ||
+    style === 'drive_move' ||
+    style === 'drive_search' ||
+    step.tool === 'mysheets.create_drive_folder' ||
+    step.tool === 'mysheets.move_drive_file' ||
+    step.tool === 'mysheets.list_drive_files'
+  ) {
+    const driveBadge =
+      step.tool === 'mysheets.create_drive_folder'
+        ? '📁 Tạo thư mục Google Drive mới'
+        : step.tool === 'mysheets.move_drive_file'
+          ? '📦 Di chuyển tệp vào thư mục Drive'
+          : '🔎 Tìm kiếm tệp & thư mục Google Drive';
+    return (
+      <div
+        data-testid="google-drive-preview"
+        className="p-4 bg-neutral-50 rounded-xl border border-amber-200 v3-space-y-3"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-600">
+          <span>
+            {'Đích Google Drive: '}
+            <strong>{destination}</strong>
+          </span>
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-900 border border-amber-200">
+            {driveBadge}
+          </span>
+        </div>
+        {(step.args.name != null || step.args.title != null) && (
+          <div>
+            <span className="text-[11px] text-neutral-400 uppercase font-semibold">
+              Tên thư mục Google Drive:
+            </span>
+            <div className="text-sm font-bold text-neutral-900 mt-0.5 flex items-center gap-1.5">
+              <span aria-hidden="true">📁</span>
+              <span>{text(step.args.name ?? step.args.title)}</span>
+            </div>
+          </div>
+        )}
+        {step.args.mimeType != null && (
+          <div className="text-xs text-neutral-700">
+            <span>Loại tệp lọc: </span>
+            <strong className="px-2 py-0.5 rounded bg-white border border-neutral-200 font-mono">
+              {text(step.args.mimeType)}
+            </strong>
+          </div>
+        )}
+        <OtherArguments step={step} except={['name', 'title', 'mimeType']} />
+      </div>
+    );
   }
   if(style==='notion_page' || step.tool.startsWith('notion.')) {
     const rawProps = step.args.properties && typeof step.args.properties === 'object' && !Array.isArray(step.args.properties)

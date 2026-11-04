@@ -33,6 +33,24 @@ function SheetsReceiptMetrics({step}:{step:ExecutionStepInfo}) {
   if(step.tool.endsWith('.create_sheet') && typeof out.title==='string' && out.title) {
     pills.push({text:`Tab mới: ${out.title}`});
   }
+  if(step.tool==='mysheets.create_doc' && typeof out.title==='string' && out.title) {
+    pills.push({text:`📝 Tài liệu Docs: ${out.title}`});
+  }
+  if(step.tool==='mysheets.append_doc_text') {
+    pills.push({text:'✏️ Đã nối thêm nội dung vào Docs'});
+  }
+  if(step.tool==='mysheets.get_doc' && typeof out.content==='string') {
+    pills.push({text:'📖 Đã đọc nội dung tài liệu'});
+  }
+  if(step.tool==='mysheets.create_drive_folder' && typeof out.title==='string' && out.title) {
+    pills.push({text:`📁 Thư mục Drive: ${out.title}`});
+  }
+  if(step.tool==='mysheets.move_drive_file') {
+    pills.push({text:'📦 Đã chuyển tệp vào thư mục'});
+  }
+  if(step.tool==='mysheets.list_drive_files' && Array.isArray(out.files)) {
+    pills.push({text:`📂 Tìm thấy ${out.files.length} tệp trên Drive`});
+  }
   if(typeof out.updatedRange==='string' && out.updatedRange) {
     pills.push({text:`Phạm vi ${out.updatedRange}`});
   }
@@ -143,24 +161,42 @@ function MyJiraReceiptMetrics({step}:{step:ExecutionStepInfo}) {
 function GitHubReceiptMetrics({step}:{step:ExecutionStepInfo}) {
   if(step.status!=='succeeded') return null;
   if(serviceId(step.tool)!=='github') return null;
-  const out=resultObject(step.output);
-  if(!out) return null;
   const pills: Array<{text:string;warn?:boolean}> = [];
-  if(typeof out.number==='number') {
-    pills.push({text:`🐙 Issue #${out.number}`});
+  if(step.tool==='github.list_pull_requests' && Array.isArray(step.output)) {
+    pills.push({text:`🔀 ${step.output.length} Pull Requests`});
   }
-  if(typeof out.state==='string' && out.state) {
-    pills.push({text:`Trạng thái: ${out.state}`});
-  }
-  if(Array.isArray(out.labels) && out.labels.length>0) {
-    pills.push({text:`🏷️ Nhãn: ${out.labels.join(', ')}`});
-  }
-  if(Array.isArray(out.assignees) && out.assignees.length>0) {
-    pills.push({text:`👤 Phụ trách: ${out.assignees.join(', ')}`});
+  const out=resultObject(step.output);
+  if(out) {
+    if(typeof out.number==='number') {
+      pills.push({text:`🐙 Issue #${out.number}`});
+    }
+    if(typeof out.state==='string' && out.state) {
+      pills.push({text:`Trạng thái: ${out.state}`});
+    }
+    if(Array.isArray(out.labels) && out.labels.length>0) {
+      pills.push({text:`🏷️ Nhãn: ${out.labels.join(', ')}`});
+    }
+    if(Array.isArray(out.assignees) && out.assignees.length>0) {
+      pills.push({text:`👤 Phụ trách: ${out.assignees.join(', ')}`});
+    }
   }
   if(pills.length===0) return null;
   return <div data-testid="github-receipt-metrics" className="flex flex-wrap items-center gap-1.5 mt-2">
     {pills.map((pill,i)=><span key={i} className={`px-2 py-0.5 rounded-md text-[11px] font-medium border ${pill.warn ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200'}`}>{pill.text}</span>)}
+  </div>;
+}
+function SlackReceiptMetrics({step}:{step:ExecutionStepInfo}) {
+  if(step.status!=='succeeded') return null;
+  if(serviceId(step.tool)!=='slack') return null;
+  const out=resultObject(step.output);
+  if(!out) return null;
+  const pills: Array<{text:string}> = [];
+  if(step.tool==='slack.read_messages' && Array.isArray(out.messages)) {
+    pills.push({text:`💬 Đã đọc ${out.messages.length} tin nhắn`});
+  }
+  if(pills.length===0) return null;
+  return <div data-testid="slack-receipt-metrics" className="flex flex-wrap items-center gap-1.5 mt-2">
+    {pills.map((pill,i)=><span key={i} className="px-2 py-0.5 rounded-md text-[11px] font-medium border bg-emerald-50 text-emerald-800 border-emerald-200">{pill.text}</span>)}
   </div>;
 }
 function TelegramReceiptMetrics({step}:{step:ExecutionStepInfo}) {
@@ -186,6 +222,12 @@ function CalendarReceiptMetrics({step}:{step:ExecutionStepInfo}) {
   const pills: Array<{text:string}> = [];
   if(typeof out.start==='string' && out.start) {
     pills.push({text:`📅 Bắt đầu: ${out.start}`});
+  }
+  if(typeof out.meetLink==='string' && out.meetLink) {
+    pills.push({text:'🎥 Đã tạo phòng họp Google Meet'});
+  }
+  if(typeof out.attendeesCount==='number' && out.attendeesCount>0) {
+    pills.push({text:`👥 ${out.attendeesCount} khách mời`});
   }
   if(pills.length===0) return null;
   return <div data-testid="calendar-receipt-metrics" className="flex flex-wrap items-center gap-1.5 mt-2">
@@ -240,6 +282,7 @@ function ReceiptCard({step,index,highlighted,services,planSteps,labels,gmailConn
                       <TrelloReceiptMetrics step={step} />
                       <MyJiraReceiptMetrics step={step} />
                       <GitHubReceiptMetrics step={step} />
+                      <SlackReceiptMetrics step={step} />
                       <TelegramReceiptMetrics step={step} />
                       <CalendarReceiptMetrics step={step} />
                       <GmailReceiptMetrics step={step} />
