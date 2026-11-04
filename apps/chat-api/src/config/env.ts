@@ -105,7 +105,7 @@ export interface EnvConfig {
   JWT_SECRET: string;
   ENCRYPTION_KEY: string;
   GEMINI_API_KEY: string;
-  LLM_PROVIDER: 'gemini' | 'openai-compatible';
+  LLM_PROVIDER: 'gemini' | 'openai-compatible' | 'deepseek';
   /** 'llm': the model calls search tools itself; 'regex': registry gather rules resolve names first. */
   PLANNER_SEARCH_MODE: 'llm' | 'regex';
   PLANNER_READ_ANSWERS: boolean;
@@ -160,8 +160,8 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
     throw new Error('RUNTIME_MODE=live is required in production');
   }
   const LLM_PROVIDER = env.LLM_PROVIDER || 'gemini';
-  if (LLM_PROVIDER !== 'gemini' && LLM_PROVIDER !== 'openai-compatible') {
-    throw new Error('LLM_PROVIDER must be gemini or openai-compatible');
+  if (LLM_PROVIDER !== 'gemini' && LLM_PROVIDER !== 'openai-compatible' && LLM_PROVIDER !== 'deepseek') {
+    throw new Error('LLM_PROVIDER must be gemini, openai-compatible, or deepseek');
   }
   const PLANNER_SEARCH_MODE = env.PLANNER_SEARCH_MODE || (isLive ? 'llm' : 'regex');
   const readAnswers = env.PLANNER_READ_ANSWERS ?? 'off';
@@ -194,6 +194,8 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
     if (LLM_PROVIDER === 'openai-compatible') {
       if (!env.LLM_BASE_URL) throw new Error('LLM_BASE_URL must be provided for LLM_PROVIDER=openai-compatible');
       if (!env.LLM_MODEL) throw new Error('LLM_MODEL must be provided for LLM_PROVIDER=openai-compatible');
+    } else if (LLM_PROVIDER === 'deepseek') {
+      if (!env.DEEPSEEK_API_KEY?.trim()) throw new Error('DEEPSEEK_API_KEY must be provided for LLM_PROVIDER=deepseek');
     } else if (!env.GEMINI_API_KEY) {
       throw new Error('GEMINI_API_KEY must be provided in production/live mode');
     }

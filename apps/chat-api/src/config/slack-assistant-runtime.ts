@@ -63,7 +63,7 @@ export function createPersonalSlackAssistantRuntime(input:Options){
  }:undefined;
  if(!available)return {repo,artifacts,proposals,digests,directory,runner:undefined};
  // A dedicated provider is created from the very same frozen environment used by F1; never the canned sandbox planner.
- const provider=createProviderFromEnv({...env,LLM_PROVIDER:env.LLM_PROVIDER?.trim().toLowerCase(),LLM_MODEL:identity.model,GEMINI_MODEL:identity.model});
+ const provider=createProviderFromEnv({...env,LLM_PROVIDER:env.LLM_PROVIDER?.trim().toLowerCase(),LLM_MODEL:identity.model,GEMINI_MODEL:identity.model,DEEPSEEK_MODEL:identity.model});
  const worker=new SlackTriageWorker({repo,wrapper:wrapper!,policy,planner:new SlackTriagePlanner(provider),workerId:input.workerId??'slack-assistant'});
  const runner=new SlackLifecycleValidationRunner({runOnce:async(limit?:number,signal?:AbortSignal)=>{const stats=await worker.runOnce(limit,signal);await digests.runDueDigests(new Date(),signal).catch(()=>{});return stats;}},{intervalMs:input.intervalMs});return {repo,artifacts,proposals,digests,directory,runner};
 }

@@ -159,7 +159,11 @@ Thực hiện ngay khi model chính (`ag/gemini-3.8-flash`) có độ trễ cao 
    # Phương án dự phòng 1 (trên 9router):
    LLM_MODEL=cx/gpt-6.1-sol
 
-   # Phương án dự phòng 2 (Gemini trực tiếp không qua 9router):
+   # Phương án dự phòng 2 (DeepSeek API trực tiếp không qua 9router):
+   LLM_PROVIDER=deepseek
+   DEEPSEEK_MODEL=deepseek-chat
+
+   # Phương án dự phòng 3 (Gemini trực tiếp không qua 9router):
    LLM_PROVIDER=gemini
    GEMINI_MODEL=gemini-2.5-flash
    ```
