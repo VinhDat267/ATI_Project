@@ -97,7 +97,7 @@ describe('AUTH-03 admin users via HTTP and real PostgreSQL transactions', () => 
     expect((await pool.query('SELECT status FROM users WHERE id=$1', [target])).rows[0].status).toBe('active');
     const mail = (await pool.query('SELECT to_address,subject,body_text,body_html FROM email_outbox')).rows;
     expect(mail).toHaveLength(1);
-    expect(mail[0]).toMatchObject({ to_address: `${target}@example.test`, subject: 'Tài khoản ATI đã được duyệt' });
+    expect(mail[0]).toMatchObject({ to_address: `${target}@example.test`, subject: 'Tài khoản Planora đã được duyệt' });
     expect(mail[0].body_text).toContain('đã được quản trị viên duyệt');
   });
 

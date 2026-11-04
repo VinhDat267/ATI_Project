@@ -98,7 +98,7 @@ export function createMySheetsConnectionRoutes(options: MySheetsConnectionsOptio
       MYSHEETS_STATE_INVALID:
         'Yêu cầu kết nối Google Sheets đã hết hạn hoặc không còn hợp lệ. Hãy bấm "Kết nối Google Sheets" lại.',
       MYSHEETS_SCOPE_MISSING:
-        'Google chưa cấp quyền truy cập file cho ATI. Hãy kết nối lại và đồng ý quyền Google Sheets.',
+        'Google chưa cấp quyền truy cập file cho Planora. Hãy kết nối lại và đồng ý quyền Google Sheets.',
       MYSHEETS_REFRESH_TOKEN_MISSING: 'Google không trả quyền truy cập lâu dài. Hãy kết nối lại.',
       MYSHEETS_CONNECT_FAILED: 'Không kết nối được Google Sheets. Vui lòng thử lại.',
     };
@@ -616,7 +616,7 @@ export function createMySheetsConnectionRoutes(options: MySheetsConnectionsOptio
 
       const rawTitle = typeof req.body?.title === 'string' && req.body.title.trim()
         ? req.body.title.trim().slice(0, 120)
-        : 'Bảng tính ATI Tự động hoá';
+        : 'Bảng tính Planora Tự động hoá';
 
       let createRes: globalThis.Response;
       try {

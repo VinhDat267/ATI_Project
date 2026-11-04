@@ -392,7 +392,7 @@ export class ChatService {
           const calId = String(forbiddenStep.args.calendarId);
           return {
             kind: 'refusal',
-            reason: `Lịch "${calId}" không nằm trong danh sách lịch Google Calendar bạn đã cho phép ATI sử dụng.`,
+            reason: `Lịch "${calId}" không nằm trong danh sách lịch Google Calendar bạn đã cho phép Planora sử dụng.`,
             suggestion: 'Hãy chọn thêm lịch này trong phần Cài đặt hoặc chọn một trong các lịch đã được cấp quyền.',
             unavailableServices: [{ id: 'mycalendar', name: 'Google Calendar của bạn' }],
           };
@@ -522,7 +522,7 @@ export class ChatService {
           const sId = String(forbiddenStep.args.spreadsheetId);
           return {
             kind: 'refusal',
-            reason: `Bảng tính "${sId}" không nằm trong danh sách bảng tính Google Sheets bạn đã cho phép ATI sử dụng.`,
+            reason: `Bảng tính "${sId}" không nằm trong danh sách bảng tính Google Sheets bạn đã cho phép Planora sử dụng.`,
             suggestion: 'Hãy chọn thêm bảng tính này bằng Google Picker hoặc chọn một trong các bảng tính đã được cấp quyền.',
             unavailableServices: [{ id: 'mysheets', name: 'Google Sheets của bạn' }],
           };
@@ -592,7 +592,7 @@ export class ChatService {
           const title = readOnlyAppendInfo.sheet.title;
           return {
             kind: 'refusal',
-            reason: `Bảng tính "${title}" chỉ cho xem, ATI không thêm dòng được.`,
+            reason: `Bảng tính "${title}" chỉ cho xem, Planora không thêm dòng được.`,
             suggestion: 'Hãy chọn bảng tính bạn có quyền chỉnh sửa, hoặc cấp quyền chỉnh sửa cho tài khoản Google của bạn rồi chọn lại.',
             unavailableServices: [{ id: 'mysheets', name: 'Google Sheets của bạn' }],
           };

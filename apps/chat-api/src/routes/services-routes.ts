@@ -70,7 +70,7 @@ export interface ServicesRoutesOptions {
 const PERSONAL_ONLY = 'Gmail do mỗi người tự kết nối ở mục "Của riêng bạn"; không có khoá chung để quản trị viên cấu hình.';
 const MYCALENDAR_PERSONAL_ONLY = 'Google Calendar cá nhân do mỗi người tự kết nối ở mục "Của riêng bạn"; không có khoá chung để quản trị viên cấu hình.';
 const MYSHEETS_PERSONAL_ONLY = 'Google Sheets cá nhân do mỗi người tự kết nối ở mục "Của riêng bạn"; không có khoá chung để quản trị viên cấu hình.';
-const MYJIRA_PERSONAL_ONLY = 'Jira dùng đăng nhập OAuth cá nhân và ATI Workspace.';
+const MYJIRA_PERSONAL_ONLY = 'Jira dùng đăng nhập OAuth cá nhân và Planora Workspace.';
 
 async function verifyService(
   service: string,

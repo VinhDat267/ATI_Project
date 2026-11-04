@@ -351,7 +351,7 @@ export class AdapterFactory {
         ? config.selectedSpreadsheets.map((s: any) => s.id)
         : [];
     if (!allowedSpreadsheets.length) {
-      throw mysheetsError('AUTH_ERROR', 'Bạn chưa chọn bảng tính Google Sheets cho ATI.');
+      throw mysheetsError('AUTH_ERROR', 'Bạn chưa chọn bảng tính Google Sheets cho Planora.');
     }
 
     if (context?.phase === 'execution') {

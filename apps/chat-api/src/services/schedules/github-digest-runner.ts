@@ -460,7 +460,7 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
 
     // 5. Build escaped Slack message (<= 3,500 chars)
     const lines: string[] = [
-      `*Bản tin GitHub tự động của ATI* · thiết lập bởi @${escapeSlackMrkdwn(config.login)}`,
+      `*Bản tin GitHub tự động của Planora* · thiết lập bởi @${escapeSlackMrkdwn(config.login)}`,
     ];
     if (aiSummary) {
       lines.push(`> 💡 *Nhận xét AI:* ${aiSummary}`);

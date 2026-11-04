@@ -90,7 +90,7 @@ export function createMyCalendarConnectionRoutes(options: MyCalendarConnectionsO
       MYCALENDAR_STATE_INVALID:
         'Yêu cầu kết nối Google Calendar đã hết hạn hoặc không còn hợp lệ. Hãy bấm "Kết nối Google Calendar" lại.',
       MYCALENDAR_SCOPE_MISSING:
-        'Google chưa cấp quyền quản lý sự kiện lịch cho ATI. Hãy kết nối lại và đồng ý quyền Google Calendar.',
+        'Google chưa cấp quyền quản lý sự kiện lịch cho Planora. Hãy kết nối lại và đồng ý quyền Google Calendar.',
       MYCALENDAR_REFRESH_TOKEN_MISSING: 'Google không trả quyền truy cập lâu dài. Hãy kết nối lại.',
       MYCALENDAR_CONNECT_FAILED: 'Không kết nối được Google Calendar. Vui lòng thử lại.',
     };

@@ -558,7 +558,7 @@ export function createNotionDigestRunner(options: NotionDigestRunnerOptions): Ru
 
     // 4. Build escaped message (<= 3,500 chars)
     const lines: string[] = [
-      `*Bản tin Notion tự động của ATI* · Workspace: ${escapeSlackMrkdwn(config.workspaceName)}`,
+      `*Bản tin Notion tự động của Planora* · Workspace: ${escapeSlackMrkdwn(config.workspaceName)}`,
     ];
     if (aiSummary) {
       lines.push(`> 💡 *Nhận xét AI:* ${aiSummary}`);

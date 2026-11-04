@@ -179,7 +179,7 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
 
     expect(sentMessages).toHaveLength(1);
     expect(sentMessages[0]!.chatId).toBe('-100555666777');
-    expect(sentMessages[0]!.text).toContain('Bản tin tự động của ATI · thiết lập bởi @runneruser');
+    expect(sentMessages[0]!.text).toContain('Bản tin tự động của Planora · thiết lập bởi @runneruser');
     expect(sentMessages[0]!.text).toContain('Sửa lỗi OAuth Telegram');
     expect(sentMessages[0]!.text).toContain('Lịch nhóm hôm nay');
 

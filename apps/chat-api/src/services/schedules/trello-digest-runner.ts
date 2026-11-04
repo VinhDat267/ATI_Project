@@ -429,7 +429,7 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
 
     // 4. Build escaped message (<= 3,500 chars)
     const lines: string[] = [
-      `*Bản tin Trello tự động của ATI* · thiết lập bởi @${escapeSlackMrkdwn(config.username)}`,
+      `*Bản tin Trello tự động của Planora* · thiết lập bởi @${escapeSlackMrkdwn(config.username)}`,
     ];
     if (aiSummary) {
       lines.push(`> 💡 *Nhận xét AI:* ${aiSummary}`);

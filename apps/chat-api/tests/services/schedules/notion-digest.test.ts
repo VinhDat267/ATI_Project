@@ -195,7 +195,7 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
             totalPages: 2,
           },
         });
-        expect(outcome.text).toContain('Bản tin Notion tự động của ATI');
+        expect(outcome.text).toContain('Bản tin Notion tự động của Planora');
         expect(outcome.text).toContain('Nhận xét AI:');
         expect(outcome.text).toContain('Thiết kế kiến trúc OAuth Notion');
         expect(outcome.text).toContain('Viết kiểm thử E2E');
@@ -419,7 +419,7 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
           ts: '1700000000.009',
           counts: { databasesChecked: 1, totalPages: 3 },
         },
-        text: '*Bản tin Notion tự động của ATI*',
+        text: '*Bản tin Notion tự động của Planora*',
       });
 
       const runner = new ScheduleRunner({
