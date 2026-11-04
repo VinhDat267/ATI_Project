@@ -141,4 +141,18 @@ describe('Playbook Storage Isolation (FLOW-02, F2)', () => {
       expect(list).toEqual([]);
     }).not.toThrow();
   });
+
+  it('rejects anonymous or empty userId to prevent shared unauthenticated storage leakage', () => {
+    const resAnon = savePlaybook('anonymous', 'personal', samplePlaybook);
+    expect(resAnon.success).toBe(false);
+    expect(resAnon.error).toMatch(/PLAYBOOK_AUTH_REQUIRED/i);
+
+    const resEmpty = savePlaybook('   ', 'personal', samplePlaybook);
+    expect(resEmpty.success).toBe(false);
+    expect(resEmpty.error).toMatch(/PLAYBOOK_AUTH_REQUIRED/i);
+
+    expect(loadPlaybooks('anonymous', 'personal')).toEqual([]);
+    expect(loadPlaybooks('', 'personal')).toEqual([]);
+    expect(deletePlaybook('anonymous', 'personal', 'pb-1')).toBe(false);
+  });
 });

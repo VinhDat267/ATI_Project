@@ -16,6 +16,11 @@ export interface CustomPlaybook {
   isCustom?: boolean;
 }
 
+function isValidUserId(userId?: string | null): userId is string {
+  const trimmed = userId?.trim();
+  return Boolean(trimmed && trimmed !== 'anonymous');
+}
+
 export function buildStorageKey(userId?: string | null, workspaceKey?: string | null): string {
   const u = userId?.trim() || 'anonymous';
   const w = workspaceKey?.trim() || 'personal';
@@ -43,6 +48,7 @@ export function loadPlaybooks(
   try {
     if (typeof window === 'undefined') return [];
     quarantineLegacyV1();
+    if (!isValidUserId(userId)) return [];
     const key = buildStorageKey(userId, workspaceKey);
     const raw = window.localStorage.getItem(key);
     if (!raw) return [];
@@ -73,6 +79,12 @@ export function savePlaybook(
       return { success: false, error: 'Storage unavailable in server environment' };
     }
     quarantineLegacyV1();
+    if (!isValidUserId(userId)) {
+      return {
+        success: false,
+        error: 'PLAYBOOK_AUTH_REQUIRED: Vui lòng đăng nhập tài khoản xác thực để lưu Playbook.',
+      };
+    }
     const existing = loadPlaybooks(userId, workspaceKey);
     const index = existing.findIndex((p) => p.id === playbook.id);
 
@@ -105,6 +117,7 @@ export function deletePlaybook(
 ): boolean {
   try {
     if (typeof window === 'undefined') return false;
+    if (!isValidUserId(userId)) return false;
     const existing = loadPlaybooks(userId, workspaceKey);
     const filtered = existing.filter((p) => p.id !== playbookId);
     if (filtered.length === existing.length) return false;
