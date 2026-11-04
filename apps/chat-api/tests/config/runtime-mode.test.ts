@@ -29,6 +29,9 @@ describe('runtime mode fail-closed boundaries', () => {
     expect(validateEnv(gateway).LLM_PROVIDER).toBe('openai-compatible');
     expect(() => validateEnv({ ...gateway, LLM_MODEL: '' })).toThrow(/LLM_MODEL/);
     expect(() => validateEnv({ ...gateway, LLM_BASE_URL: '' })).toThrow(/LLM_BASE_URL/);
+    const deepseek = { ...live, LLM_PROVIDER: 'deepseek', DEEPSEEK_API_KEY: 'ds-live-key' };
+    expect(validateEnv(deepseek).LLM_PROVIDER).toBe('deepseek');
+    expect(() => validateEnv({ ...deepseek, DEEPSEEK_API_KEY: '' })).toThrow(/DEEPSEEK_API_KEY/);
     expect(() => validateEnv({ ...live, LLM_PROVIDER: 'mystery', GEMINI_API_KEY: 'k' })).toThrow(/LLM_PROVIDER/);
   });
 

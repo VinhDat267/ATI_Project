@@ -64,6 +64,11 @@ export function normalizedEvent(value: any, writing = false) {
             (ep: any) => ep?.entryPointType === 'video' && typeof ep?.uri === 'string' && ep.uri.startsWith('https://'),
           )?.uri
         : undefined;
+  const attendeesList = Array.isArray(value?.attendees)
+    ? value.attendees
+        .map((a: any) => (typeof a?.email === 'string' ? a.email.trim() : ''))
+        .filter((email: string) => email.length > 0)
+    : [];
   const attendeesCount =
     Array.isArray(value?.attendees) && value.attendees.length > 0 ? value.attendees.length : undefined;
   const recurrence =
@@ -80,6 +85,7 @@ export function normalizedEvent(value: any, writing = false) {
     url: value.htmlLink,
     ...(location ? { location } : {}),
     ...(meetLink ? { meetLink } : {}),
+    ...(attendeesList.length > 0 ? { attendees: attendeesList } : {}),
     ...(attendeesCount !== undefined ? { attendeesCount } : {}),
     ...(recurrence ? { recurrence } : {}),
     ...(title.clipped ? { clipped: true } : {}),

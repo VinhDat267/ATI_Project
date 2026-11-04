@@ -90,12 +90,27 @@ export function resourceDestination(step: PlanStep, labels: Record<string, strin
     if ((step.tool === 'mysheets.create_sheet' || step.tool === 'sheets.create_sheet') && typeof mergedArgs?.title === 'string' && mergedArgs.title.trim().length > 0) {
       return `${resolved} · Tab mới: ${mergedArgs.title.trim()}`;
     }
+    if (step.tool === 'mysheets.create_doc' && typeof mergedArgs?.title === 'string' && mergedArgs.title.trim().length > 0) {
+      return `${resolved} · Tài liệu mới: ${mergedArgs.title.trim()}`;
+    }
+    if (step.tool === 'mysheets.create_drive_folder' && typeof mergedArgs?.name === 'string' && mergedArgs.name.trim().length > 0) {
+      return `${resolved} · Thư mục mới: ${mergedArgs.name.trim()}`;
+    }
     if (boardLabel && !resolved.includes(boardLabel)) {
       return `${boardLabel} · ${resolved}`;
     }
     return resolved;
   }
   if (boardLabel) return boardLabel;
+  if (step.tool === 'mysheets.create_doc' && typeof mergedArgs?.title === 'string' && mergedArgs.title.trim().length > 0) {
+    return `Google Docs · ${mergedArgs.title.trim()}`;
+  }
+  if (step.tool === 'mysheets.create_drive_folder' && typeof mergedArgs?.name === 'string' && mergedArgs.name.trim().length > 0) {
+    return `Google Drive · Thư mục mới: ${mergedArgs.name.trim()}`;
+  }
+  if (step.tool === 'mysheets.list_drive_files') {
+    return 'Google Drive của bạn';
+  }
   if (step.tool.startsWith('gmail.') && Array.isArray(mergedArgs?.to)) {
     const recipients = mergedArgs.to.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
     if (recipients.length > 0) return recipients.join(', ');

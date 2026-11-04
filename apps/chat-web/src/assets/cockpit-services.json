@@ -1,6 +1,30 @@
 {
   "playbooks": [
     {
+      "id": "playbook-all-nine-services",
+      "title": "Điều phối liên thông toàn diện 9 dịch vụ",
+      "services": ["calendar", "jira", "github", "trello", "notion", "sheets", "gmail", "telegram", "slack"],
+      "prompt": "Tạo lịch họp khẩn trên Google Calendar, tạo ticket sự cố trên Jira kèm link lịch họp, mở issue trên GitHub tham chiếu mã Jira, tạo thẻ theo dõi trên Trello, lập trang biên bản sự cố trên Notion tổng hợp các liên kết, ghi dòng nhật ký vào bảng tính Google Sheets, gửi email báo cáo qua Gmail tới oncall@ati.local, gửi cảnh báo trực ca qua Telegram và đăng tổng hợp toàn bộ vào kênh Slack #general"
+    },
+    {
+      "id": "playbook-five-service-release",
+      "title": "Đồng bộ phát hành Sprint qua 5 dịch vụ",
+      "services": ["jira", "github", "trello", "sheets", "slack"],
+      "prompt": "Tạo ticket phát hành trên Jira, mở issue checklist trên GitHub tham chiếu mã Jira, tạo thẻ triển khai trên Trello đính kèm link GitHub, ghi nhật ký phát hành vào bảng tính Google Sheets và gửi thông báo tổng hợp vào kênh Slack #general"
+    },
+    {
+      "id": "playbook-four-service-incident",
+      "title": "Ứng cứu sự cố P1 qua 4 dịch vụ",
+      "services": ["jira", "notion", "telegram", "slack"],
+      "prompt": "Tạo ticket sự cố thanh toán P1 trên Jira, lập trang biên bản sự cố trên Notion kèm mã và liên kết Jira, gửi cảnh báo trực ca qua Telegram kèm liên kết biên bản và đăng tổng hợp vào kênh Slack #general"
+    },
+    {
+      "id": "playbook-scheduled-calendar-slack",
+      "title": "Đặt lịch điểm danh lịch họp mỗi sáng 08:00",
+      "services": ["calendar", "slack"],
+      "prompt": "Mỗi sáng 08:00 từ thứ 2 đến thứ 6, kiểm tra lịch họp Google Calendar trong ngày và gửi bản tóm tắt vào kênh Slack #general"
+    },
+    {
       "id": "playbook-bug-triage",
       "title": "Đồng bộ lỗi liên công cụ",
       "services": ["trello", "github", "slack"],
@@ -35,6 +59,18 @@
       "title": "Xử lý lỗi khách hàng & điều phối Jira Sprint",
       "services": ["gmail", "myjira", "slack"],
       "prompt": "Đọc email báo lỗi mới nhất trên Gmail, tạo issue Bug ưu tiên High trên Jira của nhóm và gửi thông báo kèm link issue vào kênh Slack."
+    },
+    {
+      "id": "playbook-google-workspace-suite",
+      "title": "Hệ sinh thái Google Workspace (Meet + Drive + Docs + Sheets + Gmail)",
+      "services": ["calendar", "sheets", "gmail"],
+      "prompt": "Tạo cuộc họp Google Meet Khởi động {{tên_dự_án}} vào 09:00 ngày mai mời {{email_khách}} tham dự, tạo thư mục {{tên_dự_án}} trên Google Drive, soạn tài liệu Biên bản & Đề xuất {{tên_dự_án}} trên Google Docs lưu vào thư mục đó, ghi nhật ký vào Google Sheets và gửi email thông báo kèm link Google Meet + Google Docs tới {{email_khách}} qua Gmail."
+    },
+    {
+      "id": "playbook-slack-github-pr-triage",
+      "title": "Đọc tin nhắn Slack & Rà soát Pull Request GitHub",
+      "services": ["slack", "github"],
+      "prompt": "Đọc các tin nhắn gần đây trong kênh Slack {{kênh_slack}}, kiểm tra danh sách Pull Request đang mở trên kho GitHub {{kho_github}} và gửi bản tổng hợp tiến độ review vào kênh Slack {{kênh_slack}}."
     }
   ],
   "services": {
@@ -333,6 +369,7 @@
     "jira_site": "Site Jira",
     "jira_project": "Dự án Jira",
     "jira_issue": "Issue Jira",
+    "mydrive_file": "Tài liệu / Thư mục Drive",
     "thread": "Luồng thư",
     "label": "Nhãn"
   },
@@ -395,6 +432,14 @@
       "link": "Mở PR",
       "titleField": "number",
       "titlePrefix": "PR #",
+      "previewStyle": "issue"
+    },
+    "github.list_pull_requests": {
+      "action": "Liệt kê Pull Request",
+      "done": "Đã liệt kê PR",
+      "receipt": "Đã liệt kê Pull Request",
+      "kind": "Danh sách PR",
+      "link": "Mở trên GitHub",
       "previewStyle": "issue"
     },
     "github.search_issues": {
@@ -622,6 +667,13 @@
       "link": "Xem tin",
       "previewStyle": "message"
     },
+    "slack.read_messages": {
+      "action": "Đọc tin nhắn kênh",
+      "done": "Đã đọc tin nhắn",
+      "receipt": "Đã đọc tin nhắn Slack",
+      "kind": "Tin nhắn kênh",
+      "link": "Xem kênh Slack"
+    },
     "telegram.send_message": {
       "action": "Gửi tin",
       "done": "Đã gửi",
@@ -841,6 +893,15 @@
       "titleField": "title",
       "previewStyle": "calendar_event"
     },
+    "mycalendar.schedule_meet": {
+      "action": "Đặt lịch họp Google Meet",
+      "done": "Đã tạo cuộc họp Meet",
+      "receipt": "Đã tạo cuộc họp Google Meet",
+      "kind": "Google Meet",
+      "link": "Mở trên Google Calendar",
+      "titleField": "title",
+      "previewStyle": "calendar_event"
+    },
     "mycalendar.update_event": {
       "action": "Dời / cập nhật sự kiện",
       "done": "Đã cập nhật",
@@ -929,6 +990,52 @@
       "link": "Mở bảng tính",
       "titleField": "title",
       "previewStyle": "sheet_create"
+    },
+    "mysheets.list_drive_files": {
+      "action": "Tìm tệp / thư mục Google Drive",
+      "done": "Đã tìm trên Drive",
+      "receipt": "Đã tìm tệp trên Google Drive",
+      "kind": "Google Drive",
+      "link": "Mở trên Google Drive"
+    },
+    "mysheets.create_drive_folder": {
+      "action": "Tạo thư mục Google Drive",
+      "done": "Đã tạo thư mục Drive",
+      "receipt": "Đã tạo thư mục trên Google Drive",
+      "kind": "Thư mục Drive",
+      "link": "Mở thư mục trên Google Drive",
+      "titleField": "title"
+    },
+    "mysheets.create_doc": {
+      "action": "Tạo tài liệu Google Docs",
+      "done": "Đã tạo Google Docs",
+      "receipt": "Đã tạo tài liệu Google Docs",
+      "kind": "Google Docs",
+      "link": "Mở tài liệu trên Google Docs",
+      "titleField": "title"
+    },
+    "mysheets.get_doc": {
+      "action": "Đọc tài liệu Google Docs",
+      "done": "Đã đọc Google Docs",
+      "receipt": "Đã đọc tài liệu Google Docs",
+      "kind": "Google Docs",
+      "link": "Mở tài liệu trên Google Docs",
+      "titleField": "title"
+    },
+    "mysheets.append_doc_text": {
+      "action": "Ghi nối vào Google Docs",
+      "done": "Đã cập nhật Google Docs",
+      "receipt": "Đã nối nội dung vào Google Docs",
+      "kind": "Google Docs",
+      "link": "Mở tài liệu trên Google Docs",
+      "titleField": "title"
+    },
+    "mysheets.move_drive_file": {
+      "action": "Lưu tệp vào thư mục Google Drive",
+      "done": "Đã di chuyển trên Drive",
+      "receipt": "Đã lưu vào thư mục Google Drive",
+      "kind": "Google Drive",
+      "link": "Mở trên Google Drive"
     },
     "myjira.list_sites": {
       "action": "Xem danh sách site Jira",

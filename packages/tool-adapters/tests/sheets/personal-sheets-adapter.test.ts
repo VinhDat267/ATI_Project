@@ -1185,4 +1185,142 @@ describe('PersonalSheetsAdapter', () => {
     expect(searched.truncated).toBe(true);
     expect(searched.matches[0]?.record.Notes).toHaveLength(500);
   });
+
+  it('supports Google Drive & Google Docs tools: list_drive_files, create_drive_folder, create_doc, get_doc, append_doc_text, and move_drive_file', async () => {
+    const { adapter, calls } = setup({
+      handler: (url, init) => {
+        if (init.method === 'GET' && url.pathname === '/drive/v3/files') {
+          return json({
+            files: [
+              {
+                id: 'doc_1234567890',
+                name: 'Biên bản họp Q4',
+                mimeType: 'application/vnd.google-apps.document',
+                webViewLink: 'https://docs.google.com/document/d/doc_1234567890/edit',
+              },
+            ],
+          });
+        }
+        if (init.method === 'POST' && url.pathname === '/drive/v3/files') {
+          const body = JSON.parse(String(init.body));
+          return json({
+            id: 'folder_1234567890',
+            name: body.name,
+            mimeType: 'application/vnd.google-apps.folder',
+            webViewLink: 'https://drive.google.com/drive/folders/folder_1234567890',
+          });
+        }
+        if (init.method === 'POST' && url.pathname === '/upload/drive/v3/files') {
+          return json({
+            id: 'doc_created_987654',
+            name: 'Báo cáo tuần 45',
+            mimeType: 'application/vnd.google-apps.document',
+            webViewLink: 'https://docs.google.com/document/d/doc_created_987654/edit',
+          });
+        }
+        if (init.method === 'GET' && url.pathname === '/drive/v3/files/doc_created_987654') {
+          return json({
+            id: 'doc_created_987654',
+            name: 'Báo cáo tuần 45',
+            mimeType: 'application/vnd.google-apps.document',
+            webViewLink: 'https://docs.google.com/document/d/doc_created_987654/edit',
+          });
+        }
+        if (init.method === 'GET' && url.pathname === '/drive/v3/files/doc_created_987654/export') {
+          return new Response('Nội dung ban đầu của tài liệu.', {
+            status: 200,
+            headers: { 'Content-Type': 'text/plain; charset=UTF-8' },
+          });
+        }
+        if (init.method === 'PATCH' && url.pathname === '/upload/drive/v3/files/doc_created_987654') {
+          return json({
+            id: 'doc_created_987654',
+            name: 'Báo cáo tuần 45',
+            webViewLink: 'https://docs.google.com/document/d/doc_created_987654/edit',
+          });
+        }
+        if (init.method === 'PATCH' && url.pathname === '/drive/v3/files/doc_created_987654') {
+          return json({
+            id: 'doc_created_987654',
+            name: 'Báo cáo tuần 45',
+            mimeType: 'application/vnd.google-apps.document',
+            webViewLink: 'https://docs.google.com/document/d/doc_created_987654/edit',
+          });
+        }
+        return json({});
+      },
+    });
+
+    const files = await adapter.execute('mysheets.list_drive_files', {
+      query: 'Biên bản',
+      mimeType: 'doc',
+      limit: 5,
+    });
+    expect(files).toEqual([
+      {
+        id: 'doc_1234567890',
+        title: 'Biên bản họp Q4',
+        mimeType: 'application/vnd.google-apps.document',
+        url: 'https://docs.google.com/document/d/doc_1234567890/edit',
+      },
+    ]);
+
+    const folder = await adapter.execute('mysheets.create_drive_folder', {
+      name: 'Dự án Q4',
+    });
+    expect(folder).toEqual({
+      id: 'folder_1234567890',
+      title: 'Dự án Q4',
+      mimeType: 'application/vnd.google-apps.folder',
+      url: 'https://drive.google.com/drive/folders/folder_1234567890',
+    });
+
+    const doc = await adapter.execute('mysheets.create_doc', {
+      title: 'Báo cáo tuần 45',
+      content: 'Nội dung ban đầu của tài liệu.',
+      folderId: 'folder_1234567890',
+    });
+    expect(doc).toEqual({
+      id: 'doc_created_987654',
+      title: 'Báo cáo tuần 45',
+      url: 'https://docs.google.com/document/d/doc_created_987654/edit',
+      folderId: 'folder_1234567890',
+    });
+
+    const readDoc = await adapter.execute('mysheets.get_doc', {
+      documentId: 'doc_created_987654',
+    });
+    expect(readDoc).toEqual({
+      id: 'doc_created_987654',
+      title: 'Báo cáo tuần 45',
+      content: 'Nội dung ban đầu của tài liệu.',
+      url: 'https://docs.google.com/document/d/doc_created_987654/edit',
+    });
+
+    const appended = await adapter.execute('mysheets.append_doc_text', {
+      documentId: 'doc_created_987654',
+      text: 'Action Item 1: Hoàn tất tích hợp Google Workspace.',
+    });
+    expect(appended).toEqual({
+      id: 'doc_created_987654',
+      title: 'Báo cáo tuần 45',
+      url: 'https://docs.google.com/document/d/doc_created_987654/edit',
+    });
+    const appendPatchCall = calls.find(
+      (c) => c.init.method === 'PATCH' && c.url.pathname === '/upload/drive/v3/files/doc_created_987654'
+    );
+    expect(String(appendPatchCall?.init.body)).toBe(
+      'Nội dung ban đầu của tài liệu.\n\nAction Item 1: Hoàn tất tích hợp Google Workspace.'
+    );
+
+    const moved = await adapter.execute('mysheets.move_drive_file', {
+      fileId: 'doc_created_987654',
+      folderId: 'folder_1234567890',
+    });
+    expect(moved).toEqual({
+      id: 'doc_created_987654',
+      folderId: 'folder_1234567890',
+      url: 'https://docs.google.com/document/d/doc_created_987654/edit',
+    });
+  });
 });

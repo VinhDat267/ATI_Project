@@ -23,6 +23,8 @@ const scenarios = [
   { name: 'clarification', grep: 'clarification before plan|W4-04 clarification' },
   { name: 'partial_failure', grep: 'partial failure and skip' },
   { name: 'three_service', grep: 'three-service workflow resolves prior outputs' },
+  { name: 'four_service', grep: 'approved four-service workflow resolves prior outputs' },
+  { name: 'nine_service', grep: 'approved nine-service workflow resolves prior outputs across all 9 services' },
   { name: 'sheets_slack', grep: 'approved Sheets workflow carries updatedRange to Slack' },
   { name: 'calendar_slack', grep: 'approved Calendar workflow carries event url and start to Slack' },
   { name: 'notion_slack', grep: 'approved Notion workflow carries page url to Slack' },

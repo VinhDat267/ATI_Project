@@ -18,16 +18,18 @@ describe('MYCALENDAR_TOOLS and MYCALENDAR_SERVICE', () => {
       'mycalendar.create_event',
       'mycalendar.update_event',
       'mycalendar.delete_event',
+      'mycalendar.schedule_meet',
     ]);
     const listEvents = MYCALENDAR_TOOLS.find(t => t.name === 'mycalendar.list_events')!;
     expect(listEvents.discovers).toBe('myevent');
-    expect(listEvents.observedFields).toEqual(expect.arrayContaining(['id', 'title', 'start', 'end', 'meetLink', 'location', 'recurrence', 'calendarId']));
+    expect(listEvents.observedFields).toEqual(expect.arrayContaining(['id', 'title', 'start', 'end', 'meetLink', 'attendees', 'location', 'recurrence', 'calendarId']));
   });
 
-  it('marks mycalendar.create_event, update_event and delete_event as write tools in executor and separates x-resource mycalendar from shared calendar', () => {
+  it('marks mycalendar.create_event, update_event, delete_event and schedule_meet as write tools in executor and separates x-resource mycalendar from shared calendar', () => {
     expect(isWriteTool('mycalendar.create_event')).toBe(true);
     expect(isWriteTool('mycalendar.update_event')).toBe(true);
     expect(isWriteTool('mycalendar.delete_event')).toBe(true);
+    expect(isWriteTool('mycalendar.schedule_meet')).toBe(true);
     expect(isWriteTool('mycalendar.list_events')).toBe(false);
     expect(isWriteTool('mycalendar.get_event')).toBe(false);
     expect(isWriteTool('mycalendar.find_free_slots')).toBe(false);
@@ -61,5 +63,33 @@ describe('MYCALENDAR_TOOLS and MYCALENDAR_SERVICE', () => {
       grounding: { memory: { mycalendar: [{ id: 'shared_team@group.calendar.google.com', title: 'My Cal' }] }, userTexts: [] },
     });
     expect(grounded.valid).toBe(true);
+
+    const meetPlanJson = JSON.stringify({
+      kind: 'plan',
+      thinking: 'Tạo phòng họp Google Meet có danh sách người tham dự',
+      summary: 'Đặt lịch họp Google Meet',
+      steps: [{
+        id: 's1',
+        tool: 'mycalendar.schedule_meet',
+        description: 'Tạo phòng họp Google Meet',
+        dependsOn: [],
+        args: {
+          calendarId: 'shared_team@group.calendar.google.com',
+          summary: 'Họp Sprint Review trên Google Meet',
+          description: 'Review kết quả Sprint 15',
+          start: '2026-10-30T15:00:00+07:00',
+          end: '2026-10-30T16:00:00+07:00',
+          attendees: ['lan@example.com', 'minh@example.com'],
+          sendInvites: true,
+        },
+      }],
+    });
+    const meetGrounded = validatePlan(meetPlanJson, [...ALL_TOOLS, ...MYCALENDAR_TOOLS], {
+      grounding: {
+        memory: { mycalendar: [{ id: 'shared_team@group.calendar.google.com', title: 'My Cal' }] },
+        userTexts: ['Mời lan@example.com và minh@example.com họp Google Meet'],
+      },
+    });
+    expect(meetGrounded.valid).toBe(true);
   });
 });

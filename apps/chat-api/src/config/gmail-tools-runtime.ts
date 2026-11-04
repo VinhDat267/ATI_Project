@@ -1,4 +1,4 @@
-import { ALL_TOOLS, GMAIL_SERVICE, MYCALENDAR_SERVICE, MYJIRA_SERVICE, MYSHEETS_SERVICE, NOTION_OAUTH_TOOLS, SERVICE_REGISTRY, type AllowedScope } from '@wap/tool-schemas';
+import { ALL_TOOLS, GMAIL_SERVICE, GMAIL_TOOLS, MYCALENDAR_SERVICE, MYJIRA_SERVICE, MYSHEETS_SERVICE, NOTION_OAUTH_TOOLS, SERVICE_REGISTRY, SHEETS_EXTENDED_TOOLS, SLACK_EXTENDED_TOOLS, type AllowedScope } from '@wap/tool-schemas';
 import { createGmailToolAdapter, createPersonalCalendarAdapter, createPersonalSheetsAdapter, type GmailAccessTokenProvider } from '@wap/tool-adapters';
 import { routeIntent, type ProcessMessageInput } from '@wap/planner';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
@@ -28,7 +28,7 @@ export const gmailServiceRegistry = (enabled: boolean) => serviceRegistryForRunt
  * sandbox Slack that has no channels, asking back before the model runs.
  */
 export function runtimePlannerSearchMode(mode: RuntimeMode, configured: 'llm' | 'regex', scenario?: string): 'llm' | 'regex' {
-  return mode === 'sandbox' && (scenario === 'gmail' || scenario === 'schedule' || scenario === 'mycalendar' || scenario === 'mysheets') ? 'llm' : configured;
+  return mode === 'sandbox' && (scenario === 'gmail' || scenario === 'schedule' || scenario === 'mycalendar' || scenario === 'mysheets' || scenario === 'nine_service' || scenario === 'five_service' || scenario === 'four_service') ? 'llm' : configured;
 }
 
 export async function runtimeToolCatalog(
@@ -64,16 +64,36 @@ export async function runtimeToolCatalog(
   },
 ) {
   const personal = await getToolCatalogFor(repo, key, options);
-  if (mode === 'live') return personal;
+  const hasMyCalendar = personal.some((t) => t.service === 'mycalendar');
+  const hasMySheets = personal.some((t) => t.service === 'mysheets');
+  if (mode === 'live') {
+    const hasSlack = personal.some((t) => t.service === 'slack');
+    const hasSheets = personal.some((t) => t.service === 'sheets');
+    const unified = [
+      ...personal.filter(
+        (t) =>
+          (!hasMyCalendar || t.service !== 'calendar') &&
+          (!hasMySheets || t.service !== 'sheets')
+      ),
+      ...(hasSlack ? SLACK_EXTENDED_TOOLS : []),
+      ...(hasSheets && !hasMySheets ? SHEETS_EXTENDED_TOOLS : []),
+    ];
+    return Array.from(new Map(unified.map((t) => [t.name, t])).values());
+  }
   const baseTools = [
     ...ALL_TOOLS.filter(
       (t) =>
         t.service !== 'trello' &&
         t.service !== 'github' &&
         t.service !== 'telegram' &&
-        (!options.myjiraEnabled || t.service !== 'jira')
+        (!options.myjiraEnabled || t.service !== 'jira') &&
+        (!hasMyCalendar || t.service !== 'calendar') &&
+        (!hasMySheets || t.service !== 'sheets')
     ),
+    ...SLACK_EXTENDED_TOOLS,
+    ...(!hasMySheets ? SHEETS_EXTENDED_TOOLS : []),
     ...NOTION_OAUTH_TOOLS,
+    ...(process.env.SANDBOX_SCENARIO === 'nine_service' ? GMAIL_TOOLS : []),
   ];
   const tools = [
     ...baseTools,

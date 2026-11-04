@@ -33,6 +33,24 @@ function SheetsReceiptMetrics({step}:{step:ExecutionStepInfo}) {
   if(step.tool.endsWith('.create_sheet') && typeof out.title==='string' && out.title) {
     pills.push({text:`Tab mới: ${out.title}`});
   }
+  if(step.tool==='mysheets.create_doc' && typeof out.title==='string' && out.title) {
+    pills.push({text:`📝 Tài liệu Docs: ${out.title}`});
+  }
+  if(step.tool==='mysheets.append_doc_text') {
+    pills.push({text:'✏️ Đã nối thêm nội dung vào Docs'});
+  }
+  if(step.tool==='mysheets.get_doc' && typeof out.content==='string') {
+    pills.push({text:'📖 Đã đọc nội dung tài liệu'});
+  }
+  if(step.tool==='mysheets.create_drive_folder' && typeof out.title==='string' && out.title) {
+    pills.push({text:`📁 Thư mục Drive: ${out.title}`});
+  }
+  if(step.tool==='mysheets.move_drive_file') {
+    pills.push({text:'📦 Đã chuyển tệp vào thư mục'});
+  }
+  if(step.tool==='mysheets.list_drive_files' && Array.isArray(out.files)) {
+    pills.push({text:`📂 Tìm thấy ${out.files.length} tệp trên Drive`});
+  }
   if(typeof out.updatedRange==='string' && out.updatedRange) {
     pills.push({text:`Phạm vi ${out.updatedRange}`});
   }
@@ -103,10 +121,14 @@ function TrelloReceiptMetrics({step}:{step:ExecutionStepInfo}) {
 }
 function MyJiraReceiptMetrics({step}:{step:ExecutionStepInfo}) {
   if(step.status!=='succeeded') return null;
-  if(serviceId(step.tool)!=='myjira') return null;
+  const service=serviceId(step.tool);
+  if(service!=='myjira' && service!=='jira') return null;
   const out=resultObject(step.output);
   if(!out) return null;
   const pills: Array<{text:string;warn?:boolean}> = [];
+  if(typeof out.key==='string' && out.key) {
+    pills.push({text:`🎫 Mã: ${out.key}`});
+  }
   if(step.tool==='myjira.transition_issue' && typeof out.newStatus==='string' && out.newStatus) {
     const prev=typeof out.previousStatus==='string' && out.previousStatus ? `${out.previousStatus} → ` : '';
     pills.push({text:`🔄 Trạng thái: ${prev}${out.newStatus}`});
@@ -134,6 +156,96 @@ function MyJiraReceiptMetrics({step}:{step:ExecutionStepInfo}) {
   if(pills.length===0) return null;
   return <div data-testid="myjira-receipt-metrics" className="flex flex-wrap items-center gap-1.5 mt-2">
     {pills.map((pill,i)=><span key={i} className={`px-2 py-0.5 rounded-md text-[11px] font-medium border ${pill.warn ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200'}`}>{pill.text}</span>)}
+  </div>;
+}
+function GitHubReceiptMetrics({step}:{step:ExecutionStepInfo}) {
+  if(step.status!=='succeeded') return null;
+  if(serviceId(step.tool)!=='github') return null;
+  const pills: Array<{text:string;warn?:boolean}> = [];
+  if(step.tool.endsWith('.list_pull_requests') && Array.isArray(step.output)) {
+    pills.push({text:`🔀 ${step.output.length} Pull Requests`});
+  }
+  const out=resultObject(step.output);
+  if(out) {
+    if(typeof out.number==='number') {
+      pills.push({text:`🐙 Issue #${out.number}`});
+    }
+    if(typeof out.state==='string' && out.state) {
+      pills.push({text:`Trạng thái: ${out.state}`});
+    }
+    if(Array.isArray(out.labels) && out.labels.length>0) {
+      pills.push({text:`🏷️ Nhãn: ${out.labels.join(', ')}`});
+    }
+    if(Array.isArray(out.assignees) && out.assignees.length>0) {
+      pills.push({text:`👤 Phụ trách: ${out.assignees.join(', ')}`});
+    }
+  }
+  if(pills.length===0) return null;
+  return <div data-testid="github-receipt-metrics" className="flex flex-wrap items-center gap-1.5 mt-2">
+    {pills.map((pill,i)=><span key={i} className={`px-2 py-0.5 rounded-md text-[11px] font-medium border ${pill.warn ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200'}`}>{pill.text}</span>)}
+  </div>;
+}
+function SlackReceiptMetrics({step}:{step:ExecutionStepInfo}) {
+  if(step.status!=='succeeded') return null;
+  if(!step.tool.endsWith('.read_messages')) return null;
+  const out=resultObject(step.output);
+  if(!out) return null;
+  const pills: Array<{text:string}> = [];
+  if(Array.isArray(out.messages)) {
+    pills.push({text:`💬 Đã đọc ${out.messages.length} tin nhắn`});
+  }
+  if(pills.length===0) return null;
+  return <div data-testid="slack-receipt-metrics" className="flex flex-wrap items-center gap-1.5 mt-2">
+    {pills.map((pill,i)=><span key={i} className="px-2 py-0.5 rounded-md text-[11px] font-medium border bg-emerald-50 text-emerald-800 border-emerald-200">{pill.text}</span>)}
+  </div>;
+}
+function TelegramReceiptMetrics({step}:{step:ExecutionStepInfo}) {
+  if(step.status!=='succeeded') return null;
+  if(serviceId(step.tool)!=='telegram') return null;
+  const out=resultObject(step.output);
+  if(!out) return null;
+  const pills: Array<{text:string;warn?:boolean}> = [];
+  if(typeof out.messageId==='number' || (typeof out.messageId==='string' && out.messageId)) {
+    pills.push({text:`📨 Tin nhắn #${out.messageId}`});
+  }
+  if(pills.length===0) return null;
+  return <div data-testid="telegram-receipt-metrics" className="flex flex-wrap items-center gap-1.5 mt-2">
+    {pills.map((pill,i)=><span key={i} className="px-2 py-0.5 rounded-md text-[11px] font-medium border bg-emerald-50 text-emerald-800 border-emerald-200">{pill.text}</span>)}
+  </div>;
+}
+function CalendarReceiptMetrics({step}:{step:ExecutionStepInfo}) {
+  if(step.status!=='succeeded') return null;
+  const service=serviceId(step.tool);
+  if(service!=='calendar' && service!=='mycalendar') return null;
+  const out=resultObject(step.output);
+  if(!out) return null;
+  const pills: Array<{text:string}> = [];
+  if(typeof out.start==='string' && out.start) {
+    pills.push({text:`📅 Bắt đầu: ${out.start}`});
+  }
+  if(typeof out.meetLink==='string' && out.meetLink) {
+    pills.push({text:'🎥 Đã tạo phòng họp Google Meet'});
+  }
+  if(typeof out.attendeesCount==='number' && out.attendeesCount>0) {
+    pills.push({text:`👥 ${out.attendeesCount} khách mời`});
+  }
+  if(pills.length===0) return null;
+  return <div data-testid="calendar-receipt-metrics" className="flex flex-wrap items-center gap-1.5 mt-2">
+    {pills.map((pill,i)=><span key={i} className="px-2 py-0.5 rounded-md text-[11px] font-medium border bg-emerald-50 text-emerald-800 border-emerald-200">{pill.text}</span>)}
+  </div>;
+}
+function GmailReceiptMetrics({step}:{step:ExecutionStepInfo}) {
+  if(step.status!=='succeeded') return null;
+  if(serviceId(step.tool)!=='gmail') return null;
+  const out=resultObject(step.output);
+  if(!out) return null;
+  const pills: Array<{text:string}> = [];
+  if(typeof out.id==='string' && out.id) {
+    pills.push({text:`✉️ Mã thư: ${out.id}`});
+  }
+  if(pills.length===0) return null;
+  return <div data-testid="gmail-receipt-metrics" className="flex flex-wrap items-center gap-1.5 mt-2">
+    {pills.map((pill,i)=><span key={i} className="px-2 py-0.5 rounded-md text-[11px] font-medium border bg-emerald-50 text-emerald-800 border-emerald-200">{pill.text}</span>)}
   </div>;
 }
 function ReceiptCard({step,index,highlighted,services,planSteps,labels,gmailConnection,mycalendarConnection,mysheetsConnection,trelloConnection,githubConnection,notionConnection,telegramConnection,myjiraConnection,destination}:CardProps & {step:ExecutionStepInfo;index:number;highlighted?:boolean}) { const service=serviceId(step.tool),palette=servicePalette(service);return (<div data-highlighted-step={highlighted ? 'true' : undefined} className={`receipt-stagger-${Math.min(index+1,4)} flex-1 bg-white rounded-2xl border ${highlighted ? 'border-brand-primary ring-2 ring-brand-primary/20' : 'border-brand-border'} p-4 sm:p-5 shadow-soft-card flex flex-col justify-between ${palette.receiptHover} transition-all group`} aria-label={serviceName(service,services)}>
@@ -169,6 +281,11 @@ function ReceiptCard({step,index,highlighted,services,planSteps,labels,gmailConn
                       <NotionReceiptMetrics step={step} />
                       <TrelloReceiptMetrics step={step} />
                       <MyJiraReceiptMetrics step={step} />
+                      <GitHubReceiptMetrics step={step} />
+                      <SlackReceiptMetrics step={step} />
+                      <TelegramReceiptMetrics step={step} />
+                      <CalendarReceiptMetrics step={step} />
+                      <GmailReceiptMetrics step={step} />
                     </div>
                   </div>
                   <div className="pt-3 border-t border-brand-border-subtle mt-4 flex items-center justify-between flex-wrap gap-2">

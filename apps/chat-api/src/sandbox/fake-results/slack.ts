@@ -34,5 +34,15 @@ export const SLACK_FAKE: FakeService = {
       if (scenario === 'partial_failure') throw Object.assign(new Error('Sandbox: invalid Slack channel before send'), { category: 'VALIDATION' });
       return { ok: true, channel: args.channel, text: args.text, ts: Date.now() + '.000100' };
     },
+    'slack.read_messages': (args) => ({
+      channel: args.channel || 'C_GENERAL',
+      messages: [
+        {
+          ts: '1700000001.000100',
+          user: 'U_LEAD',
+          text: 'Cần ưu tiên xử lý các PR tồn đọng và cập nhật biên bản họp Q4.',
+        },
+      ],
+    }),
   },
 };

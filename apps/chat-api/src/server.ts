@@ -476,6 +476,13 @@ async function bootstrap() {
       })
     : undefined;
   const telegramConnection = telegramLookup ?? sandboxTelegramConnection;
+  const isNineServiceSandbox = env.RUNTIME_MODE === 'sandbox' && process.env.SANDBOX_SCENARIO === 'nine_service';
+  const sandboxGmailConnection = isNineServiceSandbox && !gmailAvailable
+    ? async () => ({
+        credentialId: 'sandbox-gmail',
+        email: 'sandbox@example.test',
+      })
+    : undefined;
 
   const notionAvailable = Boolean(env.NOTION_OAUTH && pool);
   const notionRepo = pool ? new NotionConnectionRepo(pool) : undefined;
@@ -591,7 +598,7 @@ async function bootstrap() {
       userId: actor?.userId,
       workspaceMode: actor?.workspaceMode ?? (workspaceRepo ? 'personal' : undefined),
       workspaceId: actor?.workspaceId,
-      gmailEnabled: gmailAvailable,
+      gmailEnabled: gmailAvailable || isNineServiceSandbox,
       mycalendarEnabled: mycalendarAvailable,
       mysheetsEnabled: mysheetsAvailable,
       trelloEnabled: trelloAvailable,
@@ -611,7 +618,7 @@ async function bootstrap() {
       myjiraEnabled: jiraAvailable,
       jiraWorkspaceRepo: jiraWorkspaceRepo ?? undefined,
     }),
-    serviceRegistry: serviceRegistryForRuntime(gmailAvailable, mycalendarAvailable, mysheetsAvailable, jiraAvailable),
+    serviceRegistry: serviceRegistryForRuntime(gmailAvailable || isNineServiceSandbox, mycalendarAvailable, mysheetsAvailable, jiraAvailable),
     gatherSearch,
     requireGroundedResources: env.RUNTIME_MODE === 'live',
     timeZone: env.APP_TIME_ZONE,
@@ -655,7 +662,7 @@ async function bootstrap() {
     workspaceRepo,
     planner: planner as any,
     eventEmitter: chatEventEmitter,
-    gmailConnection: gmailAvailable ? createGmailConnectionLookup(credRepo, env.ENCRYPTION_KEY) : undefined,
+    gmailConnection: gmailAvailable ? createGmailConnectionLookup(credRepo, env.ENCRYPTION_KEY) : sandboxGmailConnection,
     mycalendarConnection: mycalendarAvailable ? createMyCalendarConnectionLookup(credRepo, env.ENCRYPTION_KEY) : undefined,
     mysheetsConnection: mysheetsAvailable
       ? createMySheetsConnectionLookup(credRepo, env.ENCRYPTION_KEY, (userId) =>
@@ -789,6 +796,7 @@ async function bootstrap() {
       if (sandboxTrelloConnection && serviceName === 'trello') return Promise.resolve(createSandboxAdapter('trello'));
       if (sandboxGitHubConnection && serviceName === 'github') return Promise.resolve(createSandboxAdapter('github'));
       if (sandboxTelegramConnection && serviceName === 'telegram') return Promise.resolve(createSandboxAdapter('telegram'));
+      if (sandboxGmailConnection && serviceName === 'gmail') return Promise.resolve(createSandboxAdapter('gmail'));
       return realAdapterFactory.getAdapterForService(serviceName, context);
     },
     (serviceName) => createSandboxAdapter(serviceName));

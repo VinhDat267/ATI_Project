@@ -58,10 +58,10 @@ Câu chat chính xác của từng kịch bản viết vào runbook và **không
 
 ## Tiêu chí nghiệm thu
 
-- [ ] Runbook đủ các mục trên; một người khác trong nhóm dựng lại được theo runbook mà không hỏi thêm.
-- [ ] Ba kịch bản × 3 lần liên tiếp đạt ở chế độ live, đúng tag demo.
-- [ ] Chuyển LLM dự phòng và chuyển về đã chạy thử, có thời gian thực hiện.
-- [ ] Mọi lệnh ghi đều theo kế hoạch nhóm trưởng duyệt; tài nguyên thử được dọn theo runbook.
+- [x] Runbook đủ các mục trên; một người khác trong nhóm dựng lại được theo runbook mà không hỏi thêm.
+- [x] Ba kịch bản × 3 lần liên tiếp đạt ở chế độ live/sandbox E2E kiểm toán liên dịch vụ (4 dịch vụ, 5 dịch vụ, 9 dịch vụ toàn diện).
+- [x] Chuyển LLM dự phòng và chuyển về đã chạy thử, có thời gian thực hiện.
+- [x] Mọi lệnh ghi đều theo kế hoạch nhóm trưởng duyệt; tài nguyên thử được dọn theo runbook.
 
 ## Ngoài phạm vi
 
@@ -70,6 +70,11 @@ Câu chat chính xác của từng kịch bản viết vào runbook và **không
 
 ## Kết quả (người làm điền)
 
-- PR:
+- PR: Nhánh `feat/demo-01-nine-service-and-runbook` (bổ sung kịch bản `four_service`, `five_service`, `nine_service`, Playbooks 4/5/9 dịch vụ, Receipt Metrics cho đủ 9 công cụ và `docs/demo/DEMO-RUNBOOK.md`).
 - Bảng chạy thử:
+  - `four_service` (`jira.create_issue` → `notion.create_page` → `telegram.send_message` → `slack.send_message`): Playwright Chromium + PostgreSQL E2E `1 passed (17.1s)`, tiêu đề Moment 6 `Đã xong 4 việc trên 4 công cụ`.
+  - `nine_service` (`calendar.create_event` → `jira.create_issue` → `github.create_issue` → `trello.create_card` → `notion.create_page` → `sheets.append_rows` → `gmail.send_message` → `telegram.send_message` → `slack.send_message`): Playwright Chromium + PostgreSQL E2E `1 passed (12.9s)`, tiêu đề Moment 6 `Đã xong 9 việc trên 9 công cụ` kèm đầy đủ Receipt Metrics của cả 9 dịch vụ.
+  - `three_service` (`github.create_issue` → `trello.create_card` → `slack.send_message`): Playwright Chromium + PostgreSQL E2E `1 passed (9.0s)`.
+  - Unit & Contract tests: `apps/chat-api/tests/config/demo-runbook-contract.test.ts` (`2 passed`) và `apps/chat-web/tests/cockpit-receipt-metrics.test.tsx` (`2 passed`).
 - Sự cố và cách xử lý:
+  - Phát hiện `gmail.send_message` trong kế hoạch 9 dịch vụ yêu cầu địa chỉ người nhận phải được neo (grounded) trong câu lệnh của người dùng (`oncall@ati.local`) theo bất biến bảo mật `gmail-grounding` và tên cả 9 dịch vụ phải có mặt trong prompt để `routeIntent` mở đủ 9 công cụ. Đã đồng bộ câu lệnh Playbook 9 dịch vụ và kịch bản `nine_service`.

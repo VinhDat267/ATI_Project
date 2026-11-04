@@ -103,6 +103,31 @@ export function PersonalMySheets({
     }
   };
 
+  const quickCreateSpreadsheet = async () => {
+    if (pending.current || busy) return;
+    const owns = mysheetsSessionOwner();
+    pending.current = true;
+    setBusy(true);
+    setError('');
+    try {
+      await apiClient.quickCreateMySheetsSpreadsheet();
+      if (mounted.current && owns()) {
+        await refresh();
+      }
+    } catch (err: any) {
+      if (mounted.current && owns()) {
+        setError(
+          err?.data?.error ||
+            err?.message ||
+            'Không thể tạo nhanh bảng tính mặc định. Vui lòng thử lại.'
+        );
+      }
+    } finally {
+      pending.current = false;
+      if (mounted.current) setBusy(false);
+    }
+  };
+
   const addByUrl = async () => {
     const trimmed = urlInput.trim();
     if (!trimmed || pending.current) return;
@@ -146,6 +171,17 @@ export function PersonalMySheets({
         ATI chỉ thấy những bảng tính bạn chọn trong cửa sổ của Google. ATI chỉ đọc, thêm dòng,
         cập nhật cột, xoá dòng hoặc tạo trang tính (tab) sau khi bạn phê duyệt kế hoạch, và không truy cập tệp Drive nào khác.
       </p>
+      <div data-testid="mysheets-ecosystem-badges" className="flex flex-wrap items-center gap-1.5 pt-0.5">
+        <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
+          📊 Google Sheets
+        </span>
+        <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-800 border border-blue-200">
+          📝 Google Docs (tài liệu ATI tạo)
+        </span>
+        <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-800 border border-amber-200">
+          📁 Google Drive (thư mục ATI tạo)
+        </span>
+      </div>
 
       <p className="text-sm text-[#111827] break-words">
         <span>
@@ -248,6 +284,16 @@ export function PersonalMySheets({
         {status === 'scope_required' && (
           <>
             <button
+              id="mysheets-settings-quick-create"
+              data-testid="mysheets-settings-quick-create"
+              type="button"
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#188038] text-white hover:bg-[#136c2e] disabled:opacity-50 transition-colors shadow-sm"
+              disabled={busy}
+              onClick={() => void quickCreateSpreadsheet()}
+            >
+              ⚡ Tạo mới &amp; Kích hoạt tự động (1 chạm)
+            </button>
+            <button
               id="mysheets-action"
               type="button"
               className={button}
@@ -269,6 +315,16 @@ export function PersonalMySheets({
 
         {status === 'connected' && (
           <>
+            <button
+              id="mysheets-settings-quick-create"
+              data-testid="mysheets-settings-quick-create"
+              type="button"
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#188038] text-white hover:bg-[#136c2e] disabled:opacity-50 transition-colors shadow-sm"
+              disabled={busy}
+              onClick={() => void quickCreateSpreadsheet()}
+            >
+              ⚡ Tạo mới &amp; Kích hoạt tự động (1 chạm)
+            </button>
             <button
               id="mysheets-action"
               type="button"

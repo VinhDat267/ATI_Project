@@ -47,6 +47,21 @@ describe('packages/tool-adapters (Task 5: Slack Adapter & Allowed Channels Filte
       };
     }
 
+    if (urlStr.includes('/conversations.history')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          messages: [
+            { ts: '1700000001.000100', user: 'U1', text: 'Deploy staging failed on login' },
+            { ts: '1700000002.000200', user: 'U2', text: 'All green on production' },
+            { ts: '1700000003.000300', subtype: 'channel_join', user: 'U3', text: 'U3 joined' },
+          ],
+        }),
+      };
+    }
+
     return {
       ok: false,
       status: 404,
@@ -126,5 +141,21 @@ describe('packages/tool-adapters (Task 5: Slack Adapter & Allowed Channels Filte
       text: 'Notification from execute',
     });
     expect(msg.ts).toBe('1234567890.123456');
+
+    const history = await adapter.execute('slack.read_messages', {
+      channel: 'C1',
+      query: 'staging',
+      limit: 5,
+    });
+    expect(history).toEqual({
+      channel: 'C1',
+      messages: [
+        {
+          ts: '1700000001.000100',
+          user: 'U1',
+          text: 'Deploy staging failed on login',
+        },
+      ],
+    });
   });
 });

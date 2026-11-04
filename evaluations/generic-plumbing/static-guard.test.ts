@@ -64,7 +64,7 @@ const exceptions = [
   { file: 'apps/chat-api/src/services/notion/token-manager.ts', pattern: /^notion(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal Notion OAuth names that service.' },
   { file: 'apps/chat-web/src/pages/Cockpit/PlanMoment.tsx', pattern: /^(?:calendar|notion|trello)(?:\.[A-Za-z_][\w]*)?$/, reason: 'Cockpit plan step preview pills for personal OAuth services.' },
   { file: 'apps/chat-web/src/pages/Cockpit/PreviewContents.tsx', pattern: /^(?:trello|notion|sheets|calendar)(?:\.[A-Za-z_][\w]*)?$/, reason: 'Cockpit step preview cards for domain tools.' },
-  { file: 'apps/chat-web/src/pages/Cockpit/ReceiptMoment.tsx', pattern: /^(?:trello|github|telegram|notion|sheets)(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal OAuth receipt displays account and execution metrics.' },
+  { file: 'apps/chat-web/src/pages/Cockpit/ReceiptMoment.tsx', pattern: /^(?:trello|github|telegram|notion|sheets|jira|calendar)(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal OAuth receipt displays account and execution metrics.' },
   { file: 'apps/chat-web/src/pages/Cockpit/RecoveryMoment.tsx', pattern: /^(?:sheets|notion|trello)(?:\.[A-Za-z_][\w]*)?$/, reason: 'Cockpit recovery helper links for write steps.' },
   { file: 'apps/chat-web/src/pages/Cockpit/RequestMoments.tsx', pattern: /^(?:calendar|sheets|jira)(?:\.[A-Za-z_][\w]*)?$/, reason: 'Cockpit request status chips.' },
   { file: 'apps/chat-web/src/pages/Cockpit/ScheduleMoment.tsx', pattern: /^(?:sheets|calendar|github|slack|telegram|trello|notion|jira)(?:\.[A-Za-z_][\w]*)?$/, reason: 'Digest schedule confirmation displays destination service.' },

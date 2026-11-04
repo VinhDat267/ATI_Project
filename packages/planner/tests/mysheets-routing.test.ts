@@ -63,4 +63,17 @@ describe('mysheets router rules', () => {
     expect(result.services).toEqual([]);
     expect(result.unavailable).toEqual([{ id: 'sheets', name: 'Google Sheets' }]);
   });
+
+  it('routes Google Docs and Google Drive prompts (biên bản họp, thư mục Drive, Google Docs) to mysheets', () => {
+    const personalOnlyTools = [
+      ...ALL_TOOLS.filter((t) => t.service !== 'sheets'),
+      ...MYSHEETS_TOOLS,
+    ];
+    expect(
+      routeIntent('Tạo một thư mục trên Google Drive và soạn biên bản họp trong Google Docs', personalOnlyTools, combinedServices)
+    ).toEqual({
+      services: ['mysheets'],
+      unavailable: [],
+    });
+  });
 });

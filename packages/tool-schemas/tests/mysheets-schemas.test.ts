@@ -29,6 +29,12 @@ describe('MYSHEETS_TOOLS and MYSHEETS_SERVICE', () => {
       'mysheets.update_rows',
       'mysheets.delete_rows',
       'mysheets.create_sheet',
+      'mysheets.list_drive_files',
+      'mysheets.create_drive_folder',
+      'mysheets.create_doc',
+      'mysheets.get_doc',
+      'mysheets.append_doc_text',
+      'mysheets.move_drive_file',
     ]);
     expect(SHEETS_EXTENDED_TOOLS.map((t) => t.name)).toEqual([
       'sheets.search_rows',
@@ -39,6 +45,12 @@ describe('MYSHEETS_TOOLS and MYSHEETS_SERVICE', () => {
     ]);
     expect(getToolDefinition('mysheets.aggregate_rows')?.sideEffect).toBe('read');
     expect(getToolDefinition('mysheets.delete_rows')?.sideEffect).toBe('write');
+    expect(getToolDefinition('mysheets.list_drive_files')?.sideEffect).toBe('read');
+    expect(getToolDefinition('mysheets.get_doc')?.sideEffect).toBe('read');
+    expect(getToolDefinition('mysheets.create_drive_folder')?.sideEffect).toBe('write');
+    expect(getToolDefinition('mysheets.create_doc')?.sideEffect).toBe('write');
+    expect(getToolDefinition('mysheets.append_doc_text')?.sideEffect).toBe('write');
+    expect(getToolDefinition('mysheets.move_drive_file')?.sideEffect).toBe('write');
     expect(getToolDefinition('sheets.aggregate_rows')?.sideEffect).toBe('read');
     expect(getToolDefinition('sheets.delete_rows')?.sideEffect).toBe('write');
   });
@@ -202,5 +214,57 @@ describe('MYSHEETS_TOOLS and MYSHEETS_SERVICE', () => {
       },
     });
     expect(res.valid).toBe(true);
+  });
+
+  it('validates Google Drive folder creation and Google Docs creation/appending chained via $ref', () => {
+    expect(isWriteTool('mysheets.create_drive_folder')).toBe(true);
+    expect(isWriteTool('mysheets.create_doc')).toBe(true);
+    expect(isWriteTool('mysheets.append_doc_text')).toBe(true);
+    expect(isWriteTool('mysheets.move_drive_file')).toBe(true);
+    expect(isWriteTool('mysheets.list_drive_files')).toBe(false);
+    expect(isWriteTool('mysheets.get_doc')).toBe(false);
+
+    const driveDocsPlan = JSON.stringify({
+      kind: 'plan',
+      thinking: 'Tạo thư mục Google Drive rồi tạo tài liệu Google Docs lưu vào thư mục đó',
+      summary: 'Khởi tạo thư mục Drive và tài liệu biên bản họp Google Docs',
+      steps: [
+        {
+          id: 's1',
+          tool: 'mysheets.create_drive_folder',
+          description: 'Tạo thư mục Dự án Q4 trên Drive',
+          dependsOn: [],
+          args: {
+            name: 'Dự án Q4 - Biên bản họp',
+          },
+        },
+        {
+          id: 's2',
+          tool: 'mysheets.create_doc',
+          description: 'Tạo tài liệu biên bản họp Google Docs',
+          dependsOn: ['s1'],
+          args: {
+            title: 'Biên bản họp Sprint 15',
+            content: '1. Tiến độ dự án\n2. Các đầu việc tiếp theo',
+            folderId: { $ref: 's1.output.id' },
+          },
+        },
+        {
+          id: 's3',
+          tool: 'mysheets.append_doc_text',
+          description: 'Nối thêm ghi chú vào tài liệu Docs',
+          dependsOn: ['s2'],
+          args: {
+            documentId: { $ref: 's2.output.id' },
+            text: 'Ghi chú bổ sung sau cuộc họp.',
+          },
+        },
+      ],
+    });
+
+    const validated = validatePlan(driveDocsPlan, [...ALL_TOOLS, ...MYSHEETS_TOOLS], {
+      grounding: { memory: {}, userTexts: [] },
+    });
+    expect(validated.valid).toBe(true);
   });
 });

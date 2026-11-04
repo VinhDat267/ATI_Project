@@ -192,6 +192,17 @@ export function PersonalMyCalendar({
         ATI chỉ đọc sự kiện, tìm khung giờ trống và tạo, cập nhật hoặc huỷ sự kiện trên các lịch bạn
         đã chọn sau khi bạn duyệt kế hoạch (không tự ý gửi lời mời cho người khác).
       </p>
+      <div data-testid="mycalendar-ecosystem-badges" className="flex flex-wrap items-center gap-1.5 pt-0.5">
+        <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-800 border border-blue-200">
+          📅 Google Calendar
+        </span>
+        <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
+          🎥 Phòng họp Google Meet
+        </span>
+        <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-800 border border-indigo-200">
+          👥 Mời khách theo phê duyệt
+        </span>
+      </div>
 
       <p className="text-sm text-[#111827] break-words">
         <span>

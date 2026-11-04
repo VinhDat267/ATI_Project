@@ -435,3 +435,100 @@ test('real browser and PostgreSQL: approved Notion workflow carries page url to 
     await page.screenshot({ path: testInfo.outputPath('notion-slack-approved.png'), fullPage: true });
   } finally { await pool.end(); }
 });
+
+test('real browser and PostgreSQL: approved four-service workflow resolves prior outputs', async ({ page }, testInfo) => {
+  test.skip(process.env.SANDBOX_SCENARIO !== 'four_service', 'requires the explicit four-service sandbox scenario');
+  const pool = new pg.Pool({ connectionString });
+  try {
+    await login(page);
+    const prompt = `Tạo ticket sự cố thanh toán P1 trên Jira, lập biên bản trên Notion, gửi cảnh báo Telegram và đăng tổng hợp vào kênh Slack E2E ${Date.now()}`;
+    await page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }).fill(prompt);
+    await composerSend(page).click();
+    await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toBeVisible();
+    const planId = (await pool.query('SELECT p.id FROM plans p JOIN messages m ON p.conv_id = m.conv_id WHERE m.content = $1', [prompt])).rows[0]?.id;
+    expect(planId).toBeTruthy();
+    const preview = (await pool.query('SELECT plan_json FROM plans WHERE id = $1', [planId])).rows[0].plan_json;
+    expect(preview.steps.map((step: any) => step.tool)).toEqual([
+      'jira.create_issue',
+      'notion.create_page',
+      'telegram.send_message',
+      'slack.send_message',
+    ]);
+    await page.getByRole('button', { name: /Duyệt kế hoạch/ }).click();
+    await expect.poll(async () => (await pool.query('SELECT status FROM plans WHERE id = $1', [planId])).rows[0]?.status).toBe('completed');
+    const steps = (await pool.query('SELECT step_id, tool, status, output_json FROM execution_steps WHERE plan_id = $1 ORDER BY step_id', [planId])).rows;
+    expect(steps.map(step => step.status)).toEqual(['succeeded', 'succeeded', 'succeeded', 'succeeded']);
+    const jiraKey = steps[0].output_json.key;
+    const jiraUrl = steps[0].output_json.url;
+    const notionUrl = steps[1].output_json.url;
+    const telegramMsgId = String(steps[2].output_json.messageId);
+    expect(jiraKey).toBe('ATI-42');
+    expect(notionUrl).toMatch(/^https:\/\/www\.notion\.so\//);
+    expect(steps[3].output_json.text).toContain(jiraKey);
+    expect(steps[3].output_json.text).toContain(jiraUrl);
+    expect(steps[3].output_json.text).toContain(notionUrl);
+    expect(steps[3].output_json.text).toContain(telegramMsgId);
+    await expect(page.getByRole('heading', { level: 1, name: /^Đã xong 4 việc trên 4 công cụ/ })).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('four-service-approved.png'), fullPage: true });
+  } finally {
+    await pool.end();
+  }
+});
+
+test('real browser and PostgreSQL: approved nine-service workflow resolves prior outputs across all 9 services', async ({ page }, testInfo) => {
+  test.skip(process.env.SANDBOX_SCENARIO !== 'nine_service', 'requires the explicit nine-service sandbox scenario');
+  const pool = new pg.Pool({ connectionString });
+  try {
+    await login(page);
+    const prompt = `Tạo lịch họp khẩn trên Google Calendar, tạo ticket sự cố trên Jira kèm link lịch họp, mở issue trên GitHub tham chiếu mã Jira, tạo thẻ theo dõi trên Trello, lập trang biên bản sự cố trên Notion tổng hợp các liên kết, ghi dòng nhật ký vào bảng tính Google Sheets, gửi email báo cáo qua Gmail tới oncall@ati.local, gửi cảnh báo trực ca qua Telegram và đăng tổng hợp toàn bộ vào kênh Slack #general E2E ${Date.now()}`;
+    await page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }).fill(prompt);
+    await composerSend(page).click();
+    await expect(page.getByRole('button', { name: /Duyệt kế hoạch/ })).toBeVisible();
+    const planId = (await pool.query('SELECT p.id FROM plans p JOIN messages m ON p.conv_id = m.conv_id WHERE m.content = $1', [prompt])).rows[0]?.id;
+    expect(planId).toBeTruthy();
+    const preview = (await pool.query('SELECT plan_json FROM plans WHERE id = $1', [planId])).rows[0].plan_json;
+    expect(preview.steps.map((step: any) => step.tool)).toEqual([
+      'calendar.create_event',
+      'jira.create_issue',
+      'github.create_issue',
+      'trello.create_card',
+      'notion.create_page',
+      'sheets.append_rows',
+      'gmail.send_message',
+      'telegram.send_message',
+      'slack.send_message',
+    ]);
+    await page.getByRole('button', { name: /Duyệt kế hoạch/ }).click();
+    await expect.poll(async () => (await pool.query('SELECT status FROM plans WHERE id = $1', [planId])).rows[0]?.status).toBe('completed');
+    const steps = (await pool.query('SELECT step_id, tool, status, output_json FROM execution_steps WHERE plan_id = $1 ORDER BY step_id', [planId])).rows;
+    expect(steps).toHaveLength(9);
+    expect(steps.map(step => step.status)).toEqual(Array(9).fill('succeeded'));
+    const calendarUrl = steps[0].output_json.url;
+    const jiraKey = steps[1].output_json.key;
+    const githubUrl = steps[2].output_json.url;
+    const trelloUrl = steps[3].output_json.url;
+    const notionUrl = steps[4].output_json.url;
+    const sheetsRange = steps[5].output_json.updatedRange;
+    const gmailId = steps[6].output_json.id;
+    const telegramMsgId = String(steps[7].output_json.messageId);
+    const slackText = steps[8].output_json.text;
+    expect(slackText).toContain(calendarUrl);
+    expect(slackText).toContain(jiraKey);
+    expect(slackText).toContain(githubUrl);
+    expect(slackText).toContain(trelloUrl);
+    expect(slackText).toContain(notionUrl);
+    expect(slackText).toContain(sheetsRange);
+    expect(slackText).toContain(gmailId);
+    expect(slackText).toContain(telegramMsgId);
+    await expect(page.getByRole('heading', { level: 1, name: /^Đã xong 9 việc trên 9 công cụ/ })).toBeVisible();
+    await expect(page.getByTestId('calendar-receipt-metrics')).toBeVisible();
+    await expect(page.getByTestId('myjira-receipt-metrics')).toBeVisible();
+    await expect(page.getByTestId('github-receipt-metrics')).toBeVisible();
+    await expect(page.getByTestId('sheets-receipt-metrics')).toBeVisible();
+    await expect(page.getByTestId('gmail-receipt-metrics')).toBeVisible();
+    await expect(page.getByTestId('telegram-receipt-metrics')).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('nine-service-approved.png'), fullPage: true });
+  } finally {
+    await pool.end();
+  }
+});

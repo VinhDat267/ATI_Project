@@ -75,12 +75,18 @@ const KEPT_FIELDS = [
   'end',
   'location',
   'meetLink',
+  'attendees',
+  'attendeesCount',
   'recurrence',
   'calendarId',
+  'mimeType',
   'schema',
   'properties',
   'content',
   'lastEditedTime',
+  'state',
+  'author',
+  'draft',
   ...PROVENANCE_FIELDS,
 ];
 

@@ -28,6 +28,11 @@ export function resolveRuntimeProviderIdentity(
     name = 'OpenAI Compatible';
     model = (env?.LLM_MODEL || '').trim();
     endpoint = (env?.LLM_BASE_URL || '').trim().replace(/\/+$/, '');
+  } else if (kind === 'deepseek') {
+    providerId = 'deepseek';
+    name = 'DeepSeek';
+    model = (env?.DEEPSEEK_MODEL || 'deepseek-chat').trim();
+    endpoint = (env?.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').trim().replace(/\/+$/, '');
   } else if (kind === 'gemini') {
     providerId = 'gemini';
     name = 'Google Gemini';
@@ -43,6 +48,7 @@ export function resolveRuntimeProviderIdentity(
   const accountIdentifier = (
     env?.RUNTIME_ACCOUNT_ID ||
     env?.LLM_ACCOUNT_ID ||
+    env?.DEEPSEEK_ACCOUNT_ID ||
     env?.GEMINI_ACCOUNT_ID ||
     env?.SLACK_POLICY_ACCOUNT_ID ||
     ''

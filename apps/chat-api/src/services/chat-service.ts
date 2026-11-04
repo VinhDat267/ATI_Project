@@ -405,7 +405,9 @@ export class ChatService {
 
         const createEventSteps = bound.steps.filter(
           (step) =>
-            (step.tool === 'mycalendar.create_event' || step.tool === 'mycalendar.update_event') &&
+            (step.tool === 'mycalendar.create_event' ||
+              step.tool === 'mycalendar.update_event' ||
+              step.tool === 'mycalendar.schedule_meet') &&
             typeof step.args?.calendarId === 'string' &&
             typeof step.args?.start === 'string' &&
             typeof step.args?.end === 'string'

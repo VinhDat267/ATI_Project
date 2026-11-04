@@ -99,6 +99,21 @@ export const GITHUB_FAKE: FakeService = {
         repo,
       };
     },
+    'github.list_pull_requests': (args) => {
+      const repo = args.repo || 'owner/repo';
+      return [
+        {
+          id: 'pr_12',
+          number: 12,
+          title: 'Feat: OAuth PKCE',
+          state: args.state || 'open',
+          author: 'octo',
+          draft: false,
+          url: 'https://github.com/' + repo + '/pull/12',
+          repo,
+        },
+      ];
+    },
     'github.create_issue': (args) => {
       const repo = args.repo || 'owner/repo';
       return {

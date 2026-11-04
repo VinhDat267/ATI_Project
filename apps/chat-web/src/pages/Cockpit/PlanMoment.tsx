@@ -75,23 +75,121 @@ export function PlanMoment({request,runtimeMode,plan,services,destination,onPrev
                     </p>
                     {service==='myjira' && plan.connections?.myjira?.siteSteps?.[step.id] && (()=>{const siteStep=plan.connections!.myjira!.siteSteps[step.id],siteLabel=plan.resourceLabels?.[siteStep.siteId] ?? plan.resourceLabels?.[`jira_site:${siteStep.siteId}`] ?? siteStep.siteId,projectLabel=(typeof step.args.projectKey==='string'&&step.args.projectKey) || (siteStep.projectId ? (plan.resourceLabels?.[siteStep.projectId] ?? plan.resourceLabels?.[`jira_project:${siteStep.projectId}`] ?? siteStep.projectId) : undefined);return <p className="text-xs text-brand-muted mt-1 break-words">Site đích: {siteLabel}{projectLabel?` · Dự án: ${projectLabel}`:''}</p>;})()}
                     {step.tool==='myslack.chat_postMessage'&&<div className="mt-3 whitespace-pre-wrap break-words text-sm text-brand-text"><span className="font-semibold">Nội dung gửi:</span><p>{String(step.args.text)}</p></div>}
-                    {(service === 'mycalendar' || service === 'calendar') && (step.args.createMeetLink === true || Boolean(formatRecurrenceLabel(step.args.recurrence)) || (typeof step.args.location === 'string' && step.args.location.trim().length > 0)) && (
+                    {(service === 'mycalendar' || service === 'calendar') && (() => {
+                      const hasMeet = step.tool === 'mycalendar.schedule_meet' || step.args.createMeetLink === true;
+                      const attendees = Array.isArray(step.args.attendees)
+                        ? step.args.attendees.filter((a): a is string => typeof a === 'string' && a.trim().length > 0)
+                        : [];
+                      const sendInvites = attendees.length > 0 && step.args.sendInvites !== false;
+                      const recurrence = formatRecurrenceLabel(step.args.recurrence);
+                      const loc = typeof step.args.location === 'string' && step.args.location.trim().length > 0 ? step.args.location.trim() : null;
+                      if (!hasMeet && attendees.length === 0 && !recurrence && !loc) return null;
+                      return (
+                        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                          {hasMeet && (
+                            <span className="text-[11px] font-semibold px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full">
+                              🎥 Google Meet
+                            </span>
+                          )}
+                          {attendees.length > 0 && (
+                            <span className="text-[11px] font-semibold px-2 py-0.5 bg-blue-50 text-blue-800 border border-blue-200 rounded-full">
+                              👥 {attendees.length} khách mời
+                            </span>
+                          )}
+                          {sendInvites && (
+                            <span className="text-[11px] font-medium px-2 py-0.5 bg-sky-50 text-sky-800 border border-sky-200 rounded-full">
+                              📨 Gửi email mời họp
+                            </span>
+                          )}
+                          {recurrence && (
+                            <span className="text-[11px] font-semibold px-2 py-0.5 bg-indigo-50 text-indigo-800 border border-indigo-200 rounded-full">
+                              🔁 {recurrence}
+                            </span>
+                          )}
+                          {loc && (
+                            <span className="text-[11px] font-medium px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 rounded-full">
+                              📍 {loc}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
+                    {service === 'mysheets' && (() => {
+                      const isDocCreate = step.tool === 'mysheets.create_doc';
+                      const isDocAppend = step.tool === 'mysheets.append_doc_text';
+                      const isDocRead = step.tool === 'mysheets.get_doc';
+                      const isFolderCreate = step.tool === 'mysheets.create_drive_folder';
+                      const isDriveMove = step.tool === 'mysheets.move_drive_file';
+                      const isDriveList = step.tool === 'mysheets.list_drive_files';
+                      if (!isDocCreate && !isDocAppend && !isDocRead && !isFolderCreate && !isDriveMove && !isDriveList) {
+                        return null;
+                      }
+                      const hasFolderTarget = Boolean(step.args.folderId || step.args.parentFolderId);
+                      const mimeLabel =
+                        step.args.mimeType === 'document'
+                          ? 'Google Docs'
+                          : step.args.mimeType === 'spreadsheet'
+                            ? 'Google Sheets'
+                            : step.args.mimeType === 'folder'
+                              ? 'Thư mục'
+                              : 'Tất cả tệp';
+                      return (
+                        <div data-testid="google-workspace-step-pills" className="flex flex-wrap items-center gap-1.5 mt-2">
+                          {isDocCreate && (
+                            <span className="text-[11px] font-semibold px-2 py-0.5 bg-blue-50 text-blue-800 border border-blue-200 rounded-full">
+                              📝 Tài liệu Google Docs
+                            </span>
+                          )}
+                          {isDocAppend && (
+                            <span className="text-[11px] font-semibold px-2 py-0.5 bg-blue-50 text-blue-800 border border-blue-200 rounded-full">
+                              ✏️ Nối văn bản Google Docs
+                            </span>
+                          )}
+                          {isDocRead && (
+                            <span className="text-[11px] font-semibold px-2 py-0.5 bg-blue-50 text-blue-800 border border-blue-200 rounded-full">
+                              📖 Đọc tài liệu Google Docs
+                            </span>
+                          )}
+                          {isFolderCreate && (
+                            <span className="text-[11px] font-semibold px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 rounded-full">
+                              📁 Thư mục Google Drive mới
+                            </span>
+                          )}
+                          {isDriveMove && (
+                            <span className="text-[11px] font-semibold px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 rounded-full">
+                              📦 Di chuyển vào thư mục Drive
+                            </span>
+                          )}
+                          {isDriveList && (
+                            <span className="text-[11px] font-medium px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full">
+                              🔎 Tìm tệp Drive ({mimeLabel})
+                            </span>
+                          )}
+                          {hasFolderTarget && !isDriveMove && (
+                            <span className="text-[11px] font-medium px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-full">
+                              📁 Lưu vào thư mục Drive
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
+                    {step.tool.endsWith('.list_pull_requests') && (
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                        {step.args.createMeetLink === true && (
-                          <span className="text-[11px] font-semibold px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full">
-                            🎥 Google Meet
+                        <span className="text-[11px] font-semibold px-2 py-0.5 bg-purple-50 text-purple-800 border border-purple-200 rounded-full">
+                          🔀 Pull Requests ({typeof step.args.state === 'string' ? step.args.state : 'open'})
+                        </span>
+                        {typeof step.args.query === 'string' && step.args.query.trim().length > 0 && (
+                          <span className="text-[11px] font-medium px-2 py-0.5 bg-neutral-100 text-neutral-700 border border-neutral-200 rounded-full">
+                            🔍 “{step.args.query.trim()}”
                           </span>
                         )}
-                        {formatRecurrenceLabel(step.args.recurrence) && (
-                          <span className="text-[11px] font-semibold px-2 py-0.5 bg-indigo-50 text-indigo-800 border border-indigo-200 rounded-full">
-                            🔁 {formatRecurrenceLabel(step.args.recurrence)}
-                          </span>
-                        )}
-                        {typeof step.args.location === 'string' && step.args.location.trim().length > 0 && (
-                          <span className="text-[11px] font-medium px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 rounded-full">
-                            📍 {step.args.location.trim()}
-                          </span>
-                        )}
+                      </div>
+                    )}
+                    {step.tool.endsWith('.read_messages') && (
+                      <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                        <span className="text-[11px] font-semibold px-2 py-0.5 bg-fuchsia-50 text-fuchsia-800 border border-fuchsia-200 rounded-full">
+                          💬 Đọc {typeof step.args.limit === 'number' ? step.args.limit : 10} tin nhắn gần nhất
+                        </span>
                       </div>
                     )}
                     {service === 'notion' && (() => {

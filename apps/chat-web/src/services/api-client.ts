@@ -308,6 +308,17 @@ export class ApiClient {
       body: JSON.stringify(body),
     });
   }
+  quickCreateMySheetsSpreadsheet(title?: string) {
+    return this.request<{
+      email: string;
+      selectedSpreadsheets: PersonalSpreadsheetItem[];
+      createdSpreadsheet: PersonalSpreadsheetItem;
+    }>('/api/connections/mysheets/quick-create-spreadsheet', {
+      method: 'POST',
+      credentials: 'include',
+      body: JSON.stringify(title ? { title } : {}),
+    });
+  }
   disconnectMySheets() {
     return this.request<{ ok: boolean }>('/api/connections/mysheets', {
       method: 'DELETE',

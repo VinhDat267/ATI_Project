@@ -571,6 +571,142 @@ export function createMySheetsConnectionRoutes(options: MySheetsConnectionsOptio
     }
   });
 
+  router.post('/quick-create-spreadsheet', async (req, res) => {
+    const user = (req as any).user as AuthUser;
+    try {
+      const record = await options.credentialRepo!.getPersonalCredentials('mysheets', user.id);
+      if (!record) {
+        res.status(409).json({
+          error: 'Google Sheets của bạn chưa được kết nối hoặc cần kết nối lại.',
+          code: 'MYSHEETS_NOT_CONNECTED',
+        });
+        return;
+      }
+      let decrypted: any;
+      try {
+        decrypted = decryptCredentials(record.config, options.encryptionKey!);
+      } catch {
+        res.status(409).json({
+          error: 'Google Sheets của bạn chưa được kết nối hoặc cần kết nối lại.',
+          code: 'MYSHEETS_NOT_CONNECTED',
+        });
+        return;
+      }
+      let accessToken: string;
+      try {
+        accessToken = await getAccessToken(user.id, record.id, decrypted.refreshToken);
+      } catch (error: any) {
+        if ((error instanceof GmailOAuthError && error.kind === 'invalid_grant') || error?.category === 'AUTH_ERROR') {
+          try {
+            await options.credentialRepo!.markReconnectRequired('mysheets', user.id, record.id);
+          } catch {}
+          options.onConnectionChanged?.(user.id);
+          res.status(409).json({
+            error: 'Google Sheets của bạn chưa được kết nối hoặc cần kết nối lại.',
+            code: 'MYSHEETS_NOT_CONNECTED',
+          });
+          return;
+        }
+        res.status(502).json({
+          error: 'Không lấy được quyền truy cập Google Drive. Hãy thử lại.',
+          code: 'MYSHEETS_FETCH_FAILED',
+        });
+        return;
+      }
+
+      const rawTitle = typeof req.body?.title === 'string' && req.body.title.trim()
+        ? req.body.title.trim().slice(0, 120)
+        : 'Bảng tính ATI Tự động hoá';
+
+      let createRes: globalThis.Response;
+      try {
+        createRes = await fetchFn(
+          `${driveBase}/drive/v3/files?fields=id,name,mimeType`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              name: rawTitle,
+              mimeType: 'application/vnd.google-apps.spreadsheet',
+            }),
+            signal: AbortSignal.timeout(googleTimeoutMs),
+            redirect: 'manual',
+          }
+        );
+      } catch {
+        res.status(502).json({
+          error: 'Không tạo được bảng tính mới trên Google Drive. Vui lòng thử lại.',
+          code: 'MYSHEETS_FETCH_FAILED',
+        });
+        return;
+      }
+
+      if (!createRes.ok) {
+        res.status(502).json({
+          error: 'Không tạo được bảng tính mới trên Google Drive. Vui lòng thử lại.',
+          code: 'MYSHEETS_FETCH_FAILED',
+        });
+        return;
+      }
+
+      const created = (await createRes.json()) as any;
+      if (typeof created?.id !== 'string' || !created.id.trim()) {
+        res.status(502).json({
+          error: 'Phản hồi tạo bảng tính từ Google Drive không hợp lệ.',
+          code: 'MYSHEETS_FETCH_FAILED',
+        });
+        return;
+      }
+
+      const newItem: PersonalSpreadsheetItem = {
+        id: created.id,
+        title: typeof created.name === 'string' && created.name.trim() ? created.name.trim() : rawTitle,
+        canEdit: true,
+        sheets: ['Sheet1'],
+      };
+
+      const existing: PersonalSpreadsheetItem[] = Array.isArray(decrypted.selectedSpreadsheets)
+        ? decrypted.selectedSpreadsheets
+        : [];
+      const merged = [
+        ...existing.filter((item) => item.id !== newItem.id),
+        newItem,
+      ].slice(-10);
+
+      const updated = await options.repo!.updateConfigIfActive(user.id, record.id, (oldConfig) => {
+        const prev = decryptCredentials(oldConfig, options.encryptionKey!);
+        return encryptCredentials(
+          {
+            ...prev,
+            selectedSpreadsheets: merged,
+            allowedScope: { spreadsheets: merged.map((s) => s.id) },
+          },
+          options.encryptionKey!
+        );
+      });
+
+      if (!updated) {
+        res.status(409).json({
+          error: 'Kết nối Google Sheets đã thay đổi. Hãy thử lại.',
+          code: 'MYSHEETS_NOT_CONNECTED',
+        });
+        return;
+      }
+
+      options.onConnectionChanged?.(user.id);
+      res.json({
+        email: decrypted.email,
+        selectedSpreadsheets: merged,
+        createdSpreadsheet: newItem,
+      });
+    } catch {
+      res.status(500).json({ error: 'Không tạo được bảng tính mặc định. Vui lòng thử lại.' });
+    }
+  });
+
   router.delete('/', async (req, res) => {
     const user = (req as any).user as AuthUser;
     try {
