@@ -29,3 +29,18 @@
   - `apps/chat-api/tests/config/demo-runbook-contract.test.ts`: `2 passed`.
   - `apps/chat-web/tests/cockpit-receipt-metrics.test.tsx`: `2 passed`.
   - `apps/chat-web/tests/fe-10-guide-privacy.test.tsx`: `6 passed`.
+
+## 4. Mở rộng trong PR #275 & Nghiệm thu Merge (`93bf47d9`, head `d3fc515b`)
+- **DeepSeek Provider (`4a23891d`, `59d7d74a`, `2c1e8842`):** Bổ sung `DeepSeekProvider` (`packages/planner/src/providers/deepseek-provider.ts`) hỗ trợ `deepseek-chat`, `deepseek-reasoner` và alias `deepseek-flash` từ 9router.
+- **Hệ sinh thái Google Workspace (`93c3bd12`):**
+  - Mở rộng `mycalendar.create_event` (`attendees`, `sendInvites`) và thêm `mycalendar.schedule_meet` (`conferenceDataVersion=1`, trả về `meetLink` + `attendeesCount`).
+  - Mở rộng `mysheets` thêm 6 công cụ tận dụng chung scope `drive.file`: `list_drive_files`, `create_drive_folder`, `move_drive_file`, `create_doc`, `get_doc`, `append_doc_text`.
+- **Ba Trụ cột Sản phẩm (`0f85f308`, `a82a32fb`, `f21a4d39`):**
+  - Thêm `slack.read_messages` và `github.list_pull_requests`.
+  - Hợp nhất `runtimeToolCatalog` trong `gmail-tools-runtime.ts` và bổ sung `POST /api/connections/mysheets/quick-create-spreadsheet` (tạo nhanh bảng tính 1 chạm không cần Google Picker).
+  - Thêm tính năng **Lưu Playbook 1-Click có biến số `{{biến_số}}`** trên giao diện Cockpit.
+- **Đồng bộ toàn diện Frontend UI/UX — Phase 6 (`465b1b3c`, `d3fc515b`):**
+  - Bổ sung huy hiệu `google-workspace-step-pills`, `🔀 Pull Requests`, `💬 Đọc N tin nhắn gần nhất` trên `PlanMoment.tsx`; khung xem trước `google-doc-preview` & `google-drive-preview` trên `PreviewContents.tsx`; huy hiệu biên nhận Docs/Drive/Meet/GitHub PR và `SlackReceiptMetrics` trên `ReceiptMoment.tsx`; nút `⚡ Tạo mới & Kích hoạt tự động (1 chạm)` tại `PersonalMySheets.tsx`; chip biến số `{{...}}` và nút `Đặt lại mẫu gốc` cho Playbook trên `RequestMoments.tsx`.
+- **Bằng chứng CI & Merge:**
+  - GitHub Actions `v3 check` [Run #41780084084](https://github.com/VinhDat267/ATI_Project/actions/runs/41780084084): **`SUCCESS`** đúng head `d3fc515b53c08bce08861be8a6233288c29b022d`.
+  - Merge vào `main` tại `93bf47d9240adde933d092d14237d51e42448730` lúc `2026-11-04T05:59:42Z`.
