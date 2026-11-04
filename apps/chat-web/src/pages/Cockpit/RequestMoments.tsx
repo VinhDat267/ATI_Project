@@ -108,6 +108,7 @@ export function RequestMoment({
   const userId = currentUser?.id ?? 'anonymous';
   const workspaceKey = workspace?.id || 'personal';
   const saveModalScopeRef = useRef<{ userId: string; workspaceKey: string } | null>(null);
+  const defaultsEditorScopeRef = useRef<{ userId: string; workspaceKey: string } | null>(null);
 
   const [customPlaybooks, setCustomPlaybooks] = useState<CustomPlaybook[]>(() =>
     loadPlaybooks(userId, workspaceKey)
@@ -134,6 +135,11 @@ export function RequestMoment({
       setWorkspace(nextWs);
       const user = authStorage.getStoredTokens().user;
       const nextUserId = user?.id ?? 'anonymous';
+      if (defaultsEditorScopeRef.current && (defaultsEditorScopeRef.current.userId !== nextUserId || defaultsEditorScopeRef.current.workspaceKey !== nextWsKey)) {
+        setDefaultsEditorOpen(false);
+        setDefaultRepoInput(''); setDefaultSlackInput('');
+        defaultsEditorScopeRef.current = null;
+      }
       setCustomPlaybooks(loadPlaybooks(nextUserId, nextWsKey));
       if (
         saveModalScopeRef.current &&
@@ -147,6 +153,11 @@ export function RequestMoment({
     const unsubscribeAuth = authStorage.subscribeAuthTokens((tokens) => {
       setCurrentUser(tokens.user);
       const nextUserId = tokens.user?.id ?? 'anonymous';
+      if (defaultsEditorScopeRef.current && defaultsEditorScopeRef.current.userId !== nextUserId) {
+        setDefaultsEditorOpen(false);
+        setDefaultRepoInput(''); setDefaultSlackInput('');
+        defaultsEditorScopeRef.current = null;
+      }
       if (
         saveModalScopeRef.current &&
         saveModalScopeRef.current.userId !== nextUserId
@@ -696,6 +707,7 @@ export function RequestMoment({
               type="button"
               data-testid="btn-open-workflow-defaults"
               onClick={() => {
+                defaultsEditorScopeRef.current = { userId, workspaceKey };
                 setDefaultRepoInput(activeDefaults?.github?.repo ?? '');
                 setDefaultSlackInput(activeDefaults?.slack?.channelId ?? '');
                 setDefaultsEditorOpen((prev) => !prev);
@@ -747,6 +759,12 @@ export function RequestMoment({
                 type="button"
                 data-testid="btn-save-workflow-defaults"
                 onClick={() => {
+                  const scope = defaultsEditorScopeRef.current;
+                  if (!scope || scope.userId !== authStorage.getStoredTokens().user?.id || scope.workspaceKey !== (getActiveWorkspaceSummary()?.id || 'personal')) {
+                    setDefaultsEditorOpen(false);
+                    defaultsEditorScopeRef.current = null;
+                    return;
+                  }
                   const nextDefaults: WorkflowResourceDefaults = {
                     ...(activeDefaults ?? {}),
                     ...(defaultRepoInput.trim() ? { github: { repo: defaultRepoInput.trim() } } : {}),
@@ -755,6 +773,7 @@ export function RequestMoment({
                   saveWorkflowDefaults(userId, workspaceKey, nextDefaults);
                   setActiveDefaults(loadWorkflowDefaults(userId, workspaceKey));
                   setDefaultsEditorOpen(false);
+                  defaultsEditorScopeRef.current = null;
                 }}
                 className="px-3 py-1 rounded-lg text-xs font-semibold bg-brand-primary text-white hover:bg-brand-primary-hover"
               >

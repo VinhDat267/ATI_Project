@@ -1,4 +1,4 @@
-import { SERVICE_REGISTRY, type ToolDefinition, type PlannerResponse, type ServiceDefinition, type GatherRule, type AnswerLookup, type ReportKind } from '@wap/tool-schemas';
+import { SERVICE_REGISTRY, requiresReportEvidence, reportLiteralBodies, reportOutputTargets, REPORT_SOURCE_TOOLS, type ToolDefinition, type PlannerResponse, type ServiceDefinition, type GatherRule, type AnswerLookup, type ReportKind } from '@wap/tool-schemas';
 import type { LLMProvider, ChatMessage, PlanningPhaseMetrics } from './types.js';
 import { WorkingMemory } from './working-memory.js';
 import { routeIntent, unavailableServiceReason, type RoutedIntent } from './router.js';
@@ -268,57 +268,33 @@ export class AIPlanner {
       return rawOutput;
     }
 
-    const reportTopicPattern =
-      /(?:báo cáo|tổng hợp)\s+[^\n]*?(?<![\p{L}\p{N}_])(?:prs?|pull requests?|issues?|tiến độ|jira|sprints?|sheets?|bảng tính|số liệu)(?![\p{L}\p{N}_])/iu;
-    const isReportIntent =
-      groundingUserTexts.some((t) => reportTopicPattern.test(t)) ||
-      reportTopicPattern.test(parsed.summary || '') ||
-      reportTopicPattern.test(parsed.thinking || '');
-
-    if (!isReportIntent) return rawOutput;
-
-    const REPORT_READ_TOOLS = new Set([
-      'github.list_pull_requests',
-      'github.list_issues',
-      'myjira.search_issues',
-      'jira.search_issues',
-      'mysheets.read_range',
-      'mysheets.aggregate_rows',
-      'sheets.read_range',
-    ]);
-
-    const writeStep = [...parsed.steps].reverse().find((s: any) => {
-      if (!s || typeof s.tool !== 'string' || REPORT_READ_TOOLS.has(s.tool)) return false;
-      return (
-        typeof s.args?.text === 'string' ||
-        typeof s.args?.body === 'string' ||
-        typeof s.args?.content === 'string'
-      );
-    });
-    if (!writeStep) return rawOutput;
-
-    const argument: 'text' | 'body' | 'content' =
-      typeof writeStep.args?.text === 'string'
-        ? 'text'
-        : typeof writeStep.args?.body === 'string'
-          ? 'body'
-          : 'content';
+    if (!requiresReportEvidence(groundingUserTexts.length ? groundingUserTexts : [parsed.summary || '', parsed.thinking || ''])) return rawOutput;
+    if (parsed.steps.some((s: any) => !s || typeof s.id !== 'string' || typeof s.tool !== 'string' || !s.args || typeof s.args !== 'object')) return rawOutput;
+    if (reportLiteralBodies(groundingUserTexts).length > 0) {
+      return JSON.stringify({ kind: 'clarification', question: 'Bạn muốn gửi báo cáo có nguồn và một tin nhắn nguyên văn riêng. Hãy tách hai yêu cầu để tôi giữ đúng nội dung và người nhận của từng phần.', context: 'Chưa gửi nội dung nào; tránh đưa báo cáo vào đích chỉ nhận tin nhắn nguyên văn.' });
+    }
+    const targets = reportOutputTargets(parsed.steps);
+    const primary = targets.at(-1);
+    if (!primary) return rawOutput;
+    if (targets.some(target => /^(?:github|myjira|jira|trello)\./.test(parsed.steps.find((s: any) => s.id === target.stepId).tool))) {
+      return JSON.stringify({ kind: 'clarification', question: 'Bạn muốn nội dung công việc mới là báo cáo dữ liệu hay một nội dung riêng? Hãy tách hoặc xác nhận nội dung để tôi giữ đúng từng phần.', context: 'Yêu cầu kết hợp báo cáo với nội dung tạo/cập nhật công việc; chưa gửi hoặc thay đổi dữ liệu.' });
+    }
 
     // Find observation from successfulReads or execute plan's read step via gatherSearch
     let readTool: string | undefined;
     let readArgs: Record<string, unknown> = {};
     let rawResult: unknown;
 
-    const priorRead = [...successfulReads].reverse().find((r) => REPORT_READ_TOOLS.has(r.tool) && r.result !== undefined && r.error === undefined);
+    const priorRead = [...successfulReads].reverse().find((r) => REPORT_SOURCE_TOOLS.has(r.tool) && r.result !== undefined && r.error === undefined);
     if (priorRead) {
       readTool = priorRead.tool;
       readArgs = priorRead.args ?? {};
       rawResult = priorRead.result;
     } else if (this.gatherSearch) {
-      const readStep = parsed.steps.find((s: any) => s && typeof s.tool === 'string' && REPORT_READ_TOOLS.has(s.tool));
+      const readStep = parsed.steps.find((s: any) => s && typeof s.tool === 'string' && REPORT_SOURCE_TOOLS.has(s.tool));
       if (readStep) {
         readTool = readStep.tool;
-        readArgs = (readStep.args as Record<string, unknown>) ?? {};
+        readArgs = readStep.args ?? {};
         rawResult = await this.gatherSearch({
           tool: readStep.tool,
           args: readArgs,
@@ -330,6 +306,12 @@ export class AIPlanner {
 
     if (!readTool || rawResult === undefined || rawResult === null) {
       return rawOutput;
+    }
+
+    if (readTool.endsWith('.read_range') && Array.isArray((rawResult as any)?.values) &&
+        (rawResult as any).values.length > 0 && !Array.isArray((rawResult as any).headers) &&
+        !Array.isArray((rawResult as any).records)) {
+      return JSON.stringify({ kind: 'clarification', question: 'Dòng đầu của vùng dữ liệu này có phải tiêu đề cột không? Hãy xác nhận hàng tiêu đề hoặc chọn vùng có tiêu đề để tôi tổng hợp chính xác.', context: 'Chưa xác định tiêu đề cột; dữ liệu đọc có dòng và chưa được gửi.' });
     }
 
     let kind: ReportKind;
@@ -414,15 +396,15 @@ export class AIPlanner {
       },
     });
 
-    writeStep.args = {
-      ...(writeStep.args ?? {}),
-      [argument]: artifact.renderedText,
-    };
+    for (const target of targets) {
+      const step = parsed.steps.find((s: any) => s.id === target.stepId);
+      step.args[target.argument] = artifact.renderedText;
+    }
     parsed.reportEvidence = {
       artifactId: artifact.id,
       kind,
-      stepId: writeStep.id,
-      argument,
+      stepId: primary.stepId,
+      argument: primary.argument,
       sourceTool: readTool,
       sourceLabel,
       readAt: artifact.createdAt,

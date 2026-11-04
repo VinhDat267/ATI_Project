@@ -10,7 +10,7 @@ import { readableRecoveryPlan, recoveryConflict, restoredProgress, validateRecov
 import type { AdapterContext } from './adapter-factory.js';
 import { validateJiraApprovalBinding } from './jira/jira-approval-guard.js';
 import { validateReportEvidenceBinding } from './report-evidence-guard.js';
-import type { ReportArtifactStore } from '@wap/planner';
+import { relevantGroundingUserTexts, type ReportArtifactStore, type ChatMessage } from '@wap/planner';
 import type { PlanJiraGuard } from '../db/repositories/plan-repo.js';
 import { JiraStreamBuffer, JiraStreamBufferRevokedError } from '../sse/jira-stream-guard.js';
 import type { JiraLeaseManager } from './jira/jira-lease-manager.js';
@@ -189,6 +189,29 @@ export class ExecutionService {
     // Everything that can fail is done before the approval CAS commits.
     const context = this.executionContext(userId, planJson?.connections, planRow.conversation);
     if (planJson?.reportEvidence || this.enforceReportGrounding) {
+      let requestTexts: string[] | undefined;
+      if (this.pool) {
+        // Bind the exact ingested turn, including overlapping requests during model latency.
+        const { rows: origins } = await this.pool.query<{ id: string }>(
+          `SELECT request.id FROM messages response JOIN messages request
+           ON request.conv_id=response.conv_id AND request.id::text=response.metadata->>'replyToMessageId'
+           WHERE response.conv_id=$1 AND response.role='assistant' AND response.metadata->>'planId'=$2
+           AND request.role='user' ORDER BY response.created_at DESC LIMIT 1`, [planRow.conv_id, planRow.id]);
+        const origin = origins[0]?.id;
+        const { rows } = await this.pool.query<ChatMessage & { id: string; metadata?: { type?: string } }>(
+          `SELECT id, role, content, metadata FROM messages WHERE conv_id=$1
+           AND created_at <= COALESCE((SELECT created_at FROM messages WHERE id=$3 AND conv_id=$1),
+                                     (SELECT created_at FROM plans WHERE id=$2 AND conv_id=$1))
+           AND role IN ('user','assistant') AND (metadata->>'type') IS DISTINCT FROM 'working_memory'
+           ORDER BY created_at DESC, id DESC LIMIT 100`, [planRow.conv_id, planRow.id, origin ?? null]);
+        const history = rows.reverse().map(message => ({ ...message,
+          content: message.role === 'assistant' && ['plan', 'answer', 'refusal', 'schedule_proposal'].includes(message.metadata?.type ?? '')
+            ? JSON.stringify({ kind: message.metadata!.type }) : message.content,
+        }));
+        let current = origin ? history.findIndex(message => message.id === origin) : history.length - 1;
+        while (current >= 0 && history[current]!.role !== 'user') current--;
+        if (current >= 0) requestTexts = relevantGroundingUserTexts(history.slice(0, current), history[current]!.content);
+      }
       const art = planJson?.reportEvidence && this.reportEvidenceStore
         ? this.reportEvidenceStore.getArtifact(planJson.reportEvidence.artifactId)
         : undefined;
@@ -198,6 +221,7 @@ export class ExecutionService {
         expectedPlanHash: planRow.plan_hash,
         planText: planRow.plan_text || undefined,
         enforceReportGrounding: this.enforceReportGrounding,
+        requestTexts,
         observedArtifact: art
           ? {
               id: art.id,
@@ -205,14 +229,7 @@ export class ExecutionService {
               workspaceId: art.workspaceId ?? 'default',
               contentHash: art.contentHash,
             }
-          : planJson?.reportEvidence && !this.reportEvidenceStore
-            ? {
-                id: planJson.reportEvidence.artifactId,
-                ownerUserId: userId,
-                workspaceId: context.workspaceId ?? 'default',
-                contentHash: planJson.reportEvidence.contentHash,
-              }
-            : undefined,
+          : undefined,
       });
       if (!evidenceCheck.valid) {
         return {

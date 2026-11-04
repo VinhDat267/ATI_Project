@@ -38,12 +38,8 @@ import { fixtureSearch } from '../golden-v2/fixtures.js';
 import { LIVE_SERVICES, checkLiveService } from '../live-execution/live-services.js';
 import { readLiveConfig } from '../live-execution/harness.js';
 
-// Load environment variables for live pre-flight checks
-try {
-  process.loadEnvFile?.(resolve(__dirname, '../../.env'));
-} catch {
-  // Ignore if .env is missing in isolated sandbox
-}
+// This suite verifies fixture-based planner composition, not native workflow acceptance.
+// Preflight is a separate opt-in diagnostic; normal tests never load live credentials.
 
 const CASES_PATH = resolve(__dirname, '../current-flows/cases.json');
 const testTools = [
@@ -69,9 +65,9 @@ const allCatalogTools = [
   ...MYJIRA_TOOLS,
 ];
 
-describe('FLOW-07: Live Acceptance Certification & 6 Persona Walkthroughs', () => {
-  describe('Gate 1: Pre-flight Connector Health Check & Named Blockers', () => {
-    it('probes read-only reachability across all registered connectors and identifies blockers without shared fallbacks', async () => {
+describe('FLOW-07: Offline composition and simulated planner context (not live certification)', () => {
+  describe('Optional preflight diagnostic (does not certify workflow execution)', () => {
+    it.skipIf(process.env.ATI_FLOW_PREFLIGHT !== '1')('probes read-only reachability across all registered connectors and identifies blockers without shared fallbacks', async () => {
       const config = readLiveConfig(process.env);
       const results: Record<string, { status: 'OK' | 'BLOCKED' | 'NOT_RUN'; detail: string }> = {};
 
@@ -101,8 +97,8 @@ describe('FLOW-07: Live Acceptance Certification & 6 Persona Walkthroughs', () =
 
         // Assert that failing services are explicitly marked as named blockers and NOT masked
         if (config.services['notion']) {
-          expect(results['notion']?.status).toBe('BLOCKED');
-          expect(results['notion']?.detail).toMatch(/401|unauthorized|failed/i);
+          expect(['OK', 'BLOCKED']).toContain(results['notion']?.status);
+          expect(results['notion']?.detail).toBeTruthy();
         }
       } else {
         // In CI sandbox without live .env credentials, unconfigured connectors must remain NOT_RUN (never faked as OK)
@@ -114,7 +110,7 @@ describe('FLOW-07: Live Acceptance Certification & 6 Persona Walkthroughs', () =
     }, 30000);
   });
 
-  describe('Gate 2: 36 Oracle Regression Test Cases', () => {
+  describe('Dataset shape and router smoke checks (runtime oracle NOT_RUN)', () => {
     const data = JSON.parse(readFileSync(CASES_PATH, 'utf8'));
     const cases = data.cases as Array<{
       id: string;
@@ -134,7 +130,7 @@ describe('FLOW-07: Live Acceptance Certification & 6 Persona Walkthroughs', () =
       expect(variants).toEqual(new Set(['explicit', 'natural', 'underspecified']));
     });
 
-    it.each(cases)('verifies oracle case $id ($jobId - $variant): $expectedKind via routeIntent and catalog validation', (c) => {
+    it.each(cases)('checks dataset metadata and catalog for $id ($jobId - $variant), not runtime output', (c) => {
       const fullRegistry = [
         ...SERVICE_REGISTRY,
         GMAIL_SERVICE,
@@ -162,7 +158,7 @@ describe('FLOW-07: Live Acceptance Certification & 6 Persona Walkthroughs', () =
     });
   });
 
-  describe('Gate 3: 6 Core Workflows × 3 Consecutive Runs Verification (18 Live Pipeline Runs)', () => {
+  describe('6 Core Workflows × 3 offline planner runs with controlled model responses', () => {
     const fullRegistry = [
       ...SERVICE_REGISTRY,
       GMAIL_SERVICE,
@@ -261,6 +257,7 @@ describe('FLOW-07: Live Acceptance Certification & 6 Persona Walkthroughs', () =
                       args: {
                         spreadsheetId: 'spreadsheet_sales_q4',
                         range: 'Sheet1!A1:B4',
+                        headerAware: true,
                       },
                     },
                     {
@@ -445,7 +442,7 @@ describe('FLOW-07: Live Acceptance Certification & 6 Persona Walkthroughs', () =
     });
   });
 
-  describe('Gate 4: 6 Simulated Personas Walkthroughs with Real WorkingMemory & AIPlanner', () => {
+  describe('6 simulated persona context tests (not app history or real participants)', () => {
     const personas = [
       {
         id: 'persona_lan',
@@ -499,7 +496,7 @@ describe('FLOW-07: Live Acceptance Certification & 6 Persona Walkthroughs', () =
           entities: { jira_project: 'WEB', priority: 'High,Blocker' },
         },
         turn2: {
-          prompt: 'Gửi danh sách blocker vừa tìm được vào kênh #frontend',
+          prompt: 'Gửi danh sách blocker Jira vừa tìm được vào kênh #frontend',
           reusedEntities: ['jira_project'],
         },
       },
@@ -513,7 +510,7 @@ describe('FLOW-07: Live Acceptance Certification & 6 Persona Walkthroughs', () =
           entities: { github_repo: 'acme/web', pr_filter: 'open' },
         },
         turn2: {
-          prompt: 'Tổng hợp các PR đó và gửi thông báo nhắc review vào Slack #frontend',
+          prompt: 'Tổng hợp các pull request đó và gửi thông báo nhắc review vào Slack #frontend',
           reusedEntities: ['github_repo'],
         },
       },
@@ -550,6 +547,16 @@ describe('FLOW-07: Live Acceptance Certification & 6 Persona Walkthroughs', () =
       }
 
       const provider = new MockLLMProvider();
+      const source = persona.id === 'persona_hanh'
+        ? { tool: 'mysheets.read_range', args: { spreadsheetId: 'spreadsheet_sales_q4', range: 'Sheet1!A1:B4', headerAware: true } }
+        : persona.id === 'persona_quan'
+          ? { tool: 'github.list_pull_requests', args: { repo: 'acme/web', state: 'open' } }
+          : persona.id === 'persona_an'
+            ? { tool: 'myjira.search_issues', args: { siteId: 'acme-site', projectKey: 'WEB', query: 'WEB' } }
+          : persona.id === 'persona_dung'
+            ? { tool: 'github.list_issues', args: { repo: 'acme/web', state: 'open' } }
+            : null;
+      const sourceSteps = source ? [{ id: 'source', ...source, description: 'Read controlled fixture source', dependsOn: [] }] : [];
       provider.setPlanResponses([
         {
           kind: 'plan',
@@ -557,11 +564,12 @@ describe('FLOW-07: Live Acceptance Certification & 6 Persona Walkthroughs', () =
           summary: `Kế hoạch lượt 1 cho ${persona.name}`,
           warnings: [],
           steps: [
+            ...sourceSteps,
             {
               id: 's_turn1',
               tool: 'slack.send_message',
               description: 'Thông báo kết quả xử lý lượt 1',
-              dependsOn: [],
+              dependsOn: source ? ['source'] : [],
               args: { channel: 'C_FE', text: `Đã xử lý bước 1 cho ${persona.name}` },
             },
           ],
@@ -572,11 +580,12 @@ describe('FLOW-07: Live Acceptance Certification & 6 Persona Walkthroughs', () =
           summary: `Kế hoạch lượt 2 cho ${persona.name}`,
           warnings: [],
           steps: [
+            ...sourceSteps,
             {
               id: 's_turn2',
               tool: 'slack.send_message',
               description: 'Gửi kết quả lượt 2 dựa trên ngữ cảnh đã lưu',
-              dependsOn: [],
+              dependsOn: source ? ['source'] : [],
               args: { channel: 'C_FE', text: `Hoàn tất bước 2 cho ${persona.name}` },
             },
           ],

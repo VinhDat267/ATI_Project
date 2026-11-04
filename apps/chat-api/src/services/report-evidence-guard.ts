@@ -6,6 +6,7 @@
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import type { PlanResponse, ReportEvidence } from '@wap/tool-schemas';
+import { requiresReportEvidence, reportOutputTargets } from '@wap/tool-schemas';
 
 export interface ReportEvidenceValidationOptions {
   userId: string;
@@ -19,6 +20,7 @@ export interface ReportEvidenceValidationOptions {
     contentHash: string;
   };
   enforceReportGrounding?: boolean;
+  requestTexts?: string[];
 }
 
 /**
@@ -26,18 +28,7 @@ export interface ReportEvidenceValidationOptions {
  */
 export function isReportPlan(plan: PlanResponse): boolean {
   if (plan.reportEvidence) return true;
-  const lowerSummary = (plan.summary || '').toLowerCase();
-  const lowerThinking = (plan.thinking || '').toLowerCase();
-  const stepTexts = plan.steps.map((s) => JSON.stringify(s.args || '')).join(' ').toLowerCase();
-
-  const isReportIntent =
-    /báo cáo|tổng hợp|digest|report|tình hình/i.test(lowerSummary) ||
-    /báo cáo|tổng hợp/i.test(lowerThinking);
-  const mentionsEntities = /pr|pull request|issue|tiến độ jira|bảng tính/i.test(
-    `${lowerSummary} ${lowerThinking} ${stepTexts}`
-  );
-
-  return isReportIntent && mentionsEntities;
+  return requiresReportEvidence([plan.summary || '', plan.thinking || '']);
 }
 
 export async function validateReportEvidenceBinding(
@@ -45,9 +36,11 @@ export async function validateReportEvidenceBinding(
   options: ReportEvidenceValidationOptions
 ): Promise<{ valid: boolean; error?: string }> {
   // 1. If plan claims to be or is detected as a report plan
-  const detectedAsReport = isReportPlan(plan);
+  const targets = reportOutputTargets(plan.steps);
+  const detectedAsReport = !!plan.reportEvidence || (options.requestTexts?.length
+    ? requiresReportEvidence(options.requestTexts) : isReportPlan(plan));
 
-  if (detectedAsReport && !plan.reportEvidence) {
+  if (detectedAsReport && targets.length > 0 && !plan.reportEvidence) {
     if (options.enforceReportGrounding) {
       return {
         valid: false,
@@ -105,6 +98,12 @@ export async function validateReportEvidenceBinding(
         valid: false,
         error: `Content altered or tampered: step argument '${evidence.argument}' hash does not match reportEvidence contentHash`,
       };
+    }
+    for (const target of targets) {
+      const value = plan.steps.find((step) => step.id === target.stepId)!.args[target.argument];
+      if (typeof value !== 'string' || createHash('sha256').update(value).digest('hex') !== evidence.contentHash) {
+        return { valid: false, error: `Unverified report content in step '${target.stepId}' argument '${target.argument}'` };
+      }
     }
 
     // Verify against server-side observation artifact if provided

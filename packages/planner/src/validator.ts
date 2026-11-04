@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { isSlackReadTool, type ToolDefinition, type PlannerResponse, type PlanStep, type ReportEvidence } from '@wap/tool-schemas';
+import { isSlackReadTool, requiresReportEvidence, reportOutputTargets, type ToolDefinition, type PlannerResponse, type PlanStep, type ReportEvidence } from '@wap/tool-schemas';
 import { normalizedRecipient, observedThreads, observedWorkspaceRecipients, userEmailAddresses } from './recipients.js';
 import type { ReportArtifactStore } from './reports/artifacts.js';
 
@@ -855,29 +855,11 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
   }
 
   // Layer 5b: Report Grounding (FLOW-01 & FLOW-05, F1) — factual reports must have verified reportEvidence
-  const reportTopicPattern =
-    /(?:báo cáo|tổng hợp)\s+[^\n]*?(?<![\p{L}\p{N}_])(?:prs?|pull requests?|issues?|tiến độ|jira|sprints?|sheets?|bảng tính|số liệu)(?![\p{L}\p{N}_])/iu;
-  const isReportIntent =
-    options.grounding?.userTexts?.some((t) => reportTopicPattern.test(t)) ||
-    reportTopicPattern.test(parsed.summary || '') ||
-    reportTopicPattern.test(parsed.thinking || '');
+  const userTexts = options.grounding?.userTexts;
+  const isReportIntent = requiresReportEvidence(userTexts?.length ? userTexts : [parsed.summary || '', parsed.thinking || '']);
+  const targets = reportOutputTargets(steps);
 
-  const hasFactualReportContent = steps.some((s) => {
-    const text =
-      typeof s.args?.text === 'string'
-        ? s.args.text
-        : typeof s.args?.body === 'string'
-          ? s.args.body
-          : '';
-    return (
-      reportTopicPattern.test(text) ||
-      /hiện có \d+ (?:pr|pull request|issue|ticket|dòng)/i.test(text) ||
-      /tổng số \d+ (?:ticket|dòng|issue)/i.test(text) ||
-      /#\d+/i.test(text)
-    );
-  });
-
-  if (isReportIntent && hasFactualReportContent) {
+  if (isReportIntent && targets.length > 0) {
     if (!parsed.reportEvidence) {
       return {
         valid: false,
@@ -913,6 +895,12 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
         layer: 'grounding',
         error: `Content hash mismatch: step '${evidence.stepId}' argument '${evidence.argument}' hash does not match reportEvidence contentHash`,
       };
+    }
+    for (const target of targets) {
+      const value = steps.find((s) => s.id === target.stepId)!.args[target.argument];
+      if (typeof value !== 'string' || createHash('sha256').update(value).digest('hex') !== evidence.contentHash) {
+        return { valid: false, layer: 'grounding', error: `Unverified report content in step '${target.stepId}' argument '${target.argument}'` };
+      }
     }
     if (options.reportEvidenceStore) {
       const art = options.reportEvidenceStore.getArtifact(evidence.artifactId);

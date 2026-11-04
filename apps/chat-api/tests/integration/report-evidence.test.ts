@@ -8,6 +8,7 @@ import type { PlanResponse, ReportEvidence } from '@wap/tool-schemas';
 import { ReportArtifactStore } from '@wap/planner';
 import { validateReportEvidenceBinding } from '../../src/services/report-evidence-guard.js';
 import { ExecutionService } from '../../src/services/execution-service.js';
+import { MessageRepo } from '../../src/db/repositories/message-repo.js';
 
 describe('Report Evidence Integration & Dispatch Guard (FLOW-01, F1)', () => {
   let ctx: IsolatedTestContext;
@@ -31,7 +32,8 @@ describe('Report Evidence Integration & Dispatch Guard (FLOW-01, F1)', () => {
   async function createTestPlan(
     userId: string,
     planJson: PlanResponse,
-    status: 'pending' | 'approved' = 'pending'
+    status: 'pending' | 'approved' = 'pending',
+    request?: string,
   ) {
     const convId = randomUUID();
     await pool.query(
@@ -39,6 +41,7 @@ describe('Report Evidence Integration & Dispatch Guard (FLOW-01, F1)', () => {
       [convId, userId]
     );
 
+    if (request) await new MessageRepo(pool).createMessage(convId, 'user', request);
     const planText = JSON.stringify(planJson);
     const planHash = createHash('sha256').update(planText).digest('hex');
     const plan = await planRepo.createPlan({
@@ -55,6 +58,87 @@ describe('Report Evidence Integration & Dispatch Guard (FLOW-01, F1)', () => {
 
     return { convId, planId: plan.id, planHash, planText };
   }
+
+  it.each([
+    'Cho tôi danh sách PR đang mở trên GitHub acme/web rồi nhắn kết quả vào Slack #dev',
+    'Summarize open pull requests on GitHub acme/web and send the report to Slack #dev',
+  ])('uses the persisted user request before approval, not model summary: %s', async (request) => {
+    const userId = await createSyntheticUser(pool, 'Natural report', 'natural');
+    const plan: PlanResponse = { kind: 'plan', summary: 'Gửi cập nhật PR', thinking: 'Notify dev', warnings: [], steps: [
+      { id: 'post', tool: 'slack.send_message', description: 'Notify', args: { channel: 'C_DEV', text: '999 open PRs: #999' }, dependsOn: [] },
+    ] };
+    const saved = await createTestPlan(userId, plan, 'pending', request);
+    // A later request cannot retroactively change the request bound to this preview.
+    await new MessageRepo(pool).createMessage(saved.convId, 'user', 'Gửi Slack nguyên văn "Chào team"');
+    const service = new ExecutionService({ planRepo, convRepo, pool, enforceReportGrounding: true,
+      adapterFactory: { getAdapterForService: () => ({ execute: async () => ({ ok: true }) }) } });
+    const result = await service.approveAndStart(saved.planId, userId);
+    expect(result).toMatchObject({ success: false, status: 409 });
+    expect((await pool.query('SELECT status FROM plans WHERE id=$1', [saved.planId])).rows[0].status).toBe('pending');
+  });
+
+  it('rejects an earlier unverified report even if the final destination has valid evidence', async () => {
+    const userId = await createSyntheticUser(pool, 'Multiple destinations', 'multi');
+    const store = new ReportArtifactStore();
+    const art = store.createArtifact({ kind: 'github_prs', sourceTool: 'github.list_pull_requests', sourceLabel: 'acme/web', items: [{ number: 41 }], renderedText: '1 PR: #41', actor: { userId } });
+    const plan: PlanResponse = { kind: 'plan', thinking: 'Báo cáo PR', summary: 'Báo cáo PR', warnings: [], steps: [
+      { id: 'first', tool: 'slack.send_message', description: 'First', args: { channel: 'C_DEV', text: '999 PRs: #999' }, dependsOn: [] },
+      { id: 'last', tool: 'slack.send_message', description: 'Last', args: { channel: 'C_OPS', text: art.renderedText }, dependsOn: [] },
+    ], reportEvidence: { artifactId: art.id, kind: art.kind, stepId: 'last', argument: 'text', sourceTool: art.sourceTool, sourceLabel: art.sourceLabel, readAt: art.createdAt, itemCount: 1, coverage: 'complete', contentHash: art.contentHash } };
+    const saved = await createTestPlan(userId, plan);
+    const service = new ExecutionService({ planRepo, convRepo, pool, enforceReportGrounding: true, reportEvidenceStore: store,
+      adapterFactory: { getAdapterForService: () => ({ execute: async () => ({ ok: true }) }) } });
+    expect(await service.approveAndStart(saved.planId, userId)).toMatchObject({ success: false, status: 409 });
+    expect((await pool.query('SELECT status FROM plans WHERE id=$1', [saved.planId])).rows[0].status).toBe('pending');
+  });
+
+  it('keeps request timestamps at PostgreSQL precision when binding approval', async () => {
+    const userId = await createSyntheticUser(pool, 'Precise report', 'precise');
+    const plan: PlanResponse = { kind: 'plan', summary: 'Notify dev', thinking: 'Send update', warnings: [], steps: [
+      { id: 'post', tool: 'slack.send_message', description: 'Notify', args: { channel: 'C_DEV', text: '999 PRs: #999' }, dependsOn: [] },
+    ] };
+    const saved = await createTestPlan(userId, plan, 'pending', 'Cho tôi danh sách PR đang mở rồi gửi Slack');
+    await pool.query("UPDATE messages SET created_at='2026-11-04 10:00:00.000200+00' WHERE conv_id=$1", [saved.convId]);
+    await pool.query("UPDATE plans SET created_at='2026-11-04 10:00:00.000800+00' WHERE id=$1", [saved.planId]);
+    const service = new ExecutionService({ planRepo, convRepo, pool, enforceReportGrounding: true,
+      adapterFactory: { getAdapterForService: () => ({ execute: async () => ({ ok: true }) }) } });
+    expect(await service.approveAndStart(saved.planId, userId)).toMatchObject({ success: false, status: 409 });
+  });
+
+  it('uses the exact correlated request when another turn arrives before preview persistence', async () => {
+    const userId = await createSyntheticUser(pool, 'Overlapping report', 'overlap');
+    const plan: PlanResponse = { kind: 'plan', summary: 'Notify dev', thinking: 'Send update', warnings: [], steps: [
+      { id: 'post', tool: 'slack.send_message', description: 'Notify', args: { channel: 'C_DEV', text: '999 PRs: #999' }, dependsOn: [] },
+    ] };
+    const saved = await createTestPlan(userId, plan, 'pending', 'Cho tôi danh sách PR đang mở rồi gửi Slack');
+    const original = (await pool.query("SELECT id FROM messages WHERE conv_id=$1 AND role='user'", [saved.convId])).rows[0].id;
+    const messages = new MessageRepo(pool);
+    const other = await messages.createMessage(saved.convId, 'user', 'Gửi Slack nguyên văn "Chào team"');
+    await pool.query("UPDATE messages SET created_at=(SELECT created_at FROM plans WHERE id=$1)-interval '1 microsecond' WHERE id=$2", [saved.planId, other.id]);
+    await messages.createMessage(saved.convId, 'assistant', 'Kế hoạch', { type: 'plan', planId: saved.planId, replyToMessageId: original });
+    const service = new ExecutionService({ planRepo, convRepo, pool, enforceReportGrounding: true,
+      adapterFactory: { getAdapterForService: () => ({ execute: async () => ({ ok: true }) }) } });
+    expect(await service.approveAndStart(saved.planId, userId)).toMatchObject({ success: false, status: 409 });
+  });
+
+  it('does not inherit an earlier completed report when approving a new ordinary notification', async () => {
+    const userId = await createSyntheticUser(pool, 'New notification', 'newnotice');
+    const convId = randomUUID();
+    await pool.query("INSERT INTO conversations(id,user_id,status) VALUES($1,$2,'chatting')", [convId,userId]);
+    const messages = new MessageRepo(pool);
+    await messages.createMessage(convId, 'user', 'Báo cáo PR đang mở trên GitHub vào Slack');
+    await messages.createMessage(convId, 'assistant', 'Đã gửi báo cáo PR', { type: 'answer' });
+    const original = await messages.createMessage(convId, 'user', 'Gửi tin nhắn chào team trên Slack');
+    const plan: PlanResponse = { kind: 'plan', summary: 'Chào team', thinking: 'Send notice', warnings: [], steps: [
+      { id: 'post', tool: 'slack.send_message', description: 'Notify', args: { channel: 'C_DEV', text: 'Chào team' }, dependsOn: [] },
+    ] };
+    const text = JSON.stringify(plan);
+    const saved = await planRepo.createPlan({ convId, planJson: plan, planText: text, planHash: createHash('sha256').update(text).digest('hex'), expiresAt: new Date(Date.now()+60000) });
+    await messages.createMessage(convId, 'assistant', 'Kế hoạch', { type: 'plan', planId: saved.id, replyToMessageId: original.id });
+    const service = new ExecutionService({ planRepo, convRepo, pool, enforceReportGrounding: true,
+      adapterFactory: { getAdapterForService: () => ({ execute: async () => ({ ok: true }) }) } });
+    expect(await service.approveAndStart(saved.id, userId)).toMatchObject({ success: true, status: 200 });
+  });
 
   it('rejects self-declared or fabricated client evidence without server observation', async () => {
     const userId = await createSyntheticUser(pool, 'User Evidence 1', 'ev1');

@@ -8,7 +8,9 @@ import type { ReportKind } from '@wap/tool-schemas';
 export interface GitHubPullRequestItem {
   number: number;
   title: string;
-  html_url: string;
+  url?: string;
+  /** Compatibility with older saved fixtures; native adapters return url. */
+  html_url?: string;
   state?: string;
 }
 
@@ -175,7 +177,8 @@ export function renderGithubPrsReport(
     ...itemsToRender.map((pr) => {
       const num = pr.number;
       const title = sanitizeReportString(pr.title);
-      const url = pr.html_url;
+      const url = pr.url ?? pr.html_url;
+      if (typeof url !== 'string' || !url) throw new Error('Missing verified PR URL');
       return `- #${num}: ${title} (${url})`;
     }),
   ];
@@ -388,6 +391,10 @@ export function renderSheetSummaryReport(
       });
       return obj;
     });
+  } else if (Array.isArray(data.values) && data.values.length > 0) {
+    throw new Error('Sheet headers required: read with headerAware=true before rendering a factual summary');
+  } else if (!Array.isArray(data.values)) {
+    throw new Error('Invalid Sheet summary outcome: missing records, values or groups');
   }
 
   const count = rows.length;

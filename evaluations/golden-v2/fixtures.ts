@@ -251,7 +251,13 @@ export async function fixtureSearch({ tool, args }: { tool: string; args: Record
       const first = Number(parts[4]) - 1, last = Number(parts[6] ?? parts[4]);
       const left = column(parts[3]!), right = column(parts[5] ?? parts[3]!) + 1;
       if (last <= first || right <= left) throw new Error('Fixture range is reversed');
-      return { range, values: bounded(grid.slice(first, last).map(row => row.slice(left, right)), 50) };
+      const values = bounded(grid.slice(first, last).map(row => row.slice(left, right)), 50);
+      if (args.headerAware === true) {
+        const headers = grid[0]!.slice(left, right).map(String);
+        const data = first === 0 ? values.slice(1) : values;
+        return { range, values: data, headers, records: data.map(row => Object.fromEntries(headers.map((header, i) => [header, row[i] ?? '']))) };
+      }
+      return { range, values };
     }
     case 'mysheets.list_drive_files':
       return { files: bounded([...DRIVE_FOLDERS, ...GOOGLE_DOCS].filter(item => matches(item.title, args.query)), 20) };

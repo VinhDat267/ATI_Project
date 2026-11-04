@@ -7,7 +7,7 @@ import type { ConversationRepo } from '../db/repositories/conversation-repo.js';
 import type { PlanRepo } from '../db/repositories/plan-repo.js';
 import type { ScheduleRepo } from '../db/repositories/schedule-repo.js';
 import type { WorkspaceRepo } from '../db/repositories/workspace-repo.js';
-import { WorkingMemory, unroutable, type ChatMessage, type ProcessMessageInput, type RoutedIntent, type ReportArtifactStore } from '@wap/planner';
+import { WorkingMemory, unroutable, relevantGroundingUserTexts, type ChatMessage, type ProcessMessageInput, type RoutedIntent, type ReportArtifactStore } from '@wap/planner';
 import type { CalendarDigestCandidate, PersonalSpreadsheetItem, PlanConnections, PlannerResponse, PlanResponse, PlanStep, ScheduleProposalMetadata, ScheduleResponse, ScheduleView, WorkflowContext } from '@wap/tool-schemas';
 import { filterPermittedWorkflowDefaults } from './workflow-context-guard.js';
 import { validateReportEvidenceBinding } from './report-evidence-guard.js';
@@ -1785,12 +1785,14 @@ export class ChatService {
         }
       }
     }
-    if (response.kind === 'plan' && response.reportEvidence) {
+    if (response.kind === 'plan') {
       const store = this.reportEvidenceStore ?? (this.planner as any)?.getReportEvidenceStore?.();
-      const art = store?.getArtifact?.(response.reportEvidence.artifactId);
+      const art = response.reportEvidence ? store?.getArtifact?.(response.reportEvidence.artifactId) : undefined;
       const evidenceCheck = await validateReportEvidenceBinding(response, {
         userId: target.userId,
         workspaceId: actor.workspaceId ?? 'default',
+        requestTexts: userTexts,
+        enforceReportGrounding: true,
         observedArtifact: art
           ? {
               id: art.id,
@@ -1798,14 +1800,7 @@ export class ChatService {
               workspaceId: art.workspaceId ?? 'default',
               contentHash: art.contentHash,
             }
-          : !store
-            ? {
-                id: response.reportEvidence.artifactId,
-                ownerUserId: target.userId,
-                workspaceId: actor.workspaceId ?? 'default',
-                contentHash: response.reportEvidence.contentHash,
-              }
-            : undefined,
+          : undefined,
       });
       if (!evidenceCheck.valid) {
         response = {
@@ -2068,7 +2063,7 @@ export class ChatService {
         messageFingerprint(messageSelectorValue({content:'',metadata:{type:'working_memory',state:previousState}}, 'working_memory_entity', selector),selector));
     }
     const prepared = await this.prepareResponse({ conversationId, userId, correlation, schedule, memoryState, slackContext, memorySelectors }, plannerResponse, memory,
-      [...history.filter(m => m.role === 'user').map(m => m.content), content]);
+      relevantGroundingUserTexts(history, content));
     await prepared.write();
     prepared.announce();
   }
