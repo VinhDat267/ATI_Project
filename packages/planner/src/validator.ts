@@ -1,5 +1,7 @@
-import { isSlackReadTool, type ToolDefinition, type PlannerResponse, type PlanStep } from '@wap/tool-schemas';
+import { createHash } from 'node:crypto';
+import { isSlackReadTool, type ToolDefinition, type PlannerResponse, type PlanStep, type ReportEvidence } from '@wap/tool-schemas';
 import { normalizedRecipient, observedThreads, observedWorkspaceRecipients, userEmailAddresses } from './recipients.js';
+import type { ReportArtifactStore } from './reports/artifacts.js';
 
 export interface ValidationSuccess {
   valid: true;
@@ -35,6 +37,7 @@ export interface ValidatePlanOptions {
   grounding?: GroundingContext;
   /** Only the dedicated personal Slack metadata proposal path may request approved read plans. */
   slackReadPlan?: boolean;
+  reportEvidenceStore?: ReportArtifactStore;
 }
 
 export const INJECTION_PATTERNS = [
@@ -848,6 +851,83 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
         error: `Member not on the card's board: ${listed}. Search members with that boardId, or ask the user which member to assign.`,
         ungrounded: offBoard,
       };
+    }
+  }
+
+  // Layer 5b: Report Grounding (FLOW-01, F1) — factual reports must have verified reportEvidence
+  const isReportIntent =
+    options.grounding?.userTexts?.some((t) =>
+      /báo cáo.*(?:pr|pull request|issue|tiến độ|sheet)|tổng hợp.*(?:pr|pull request|issue)/i.test(t)
+    ) ||
+    /báo cáo.*(?:pr|pull request|issue|tiến độ|sheet)/i.test(parsed.summary || '') ||
+    /báo cáo.*(?:pr|pull request|issue|tiến độ|sheet)/i.test(parsed.thinking || '');
+
+  const hasFactualReportContent = steps.some((s) => {
+    const text =
+      typeof s.args?.text === 'string'
+        ? s.args.text
+        : typeof s.args?.body === 'string'
+          ? s.args.body
+          : '';
+    return (
+      /báo cáo.*(?:pr|pull request|issue)/i.test(text) ||
+      /hiện có \d+ (?:pr|pull request|issue)/i.test(text) ||
+      /#\d+/i.test(text)
+    );
+  });
+
+  if (isReportIntent && hasFactualReportContent) {
+    if (!parsed.reportEvidence) {
+      const hasReadStep = steps.some((s) => {
+        const def = catalogMap.get(s.tool);
+        return def?.sideEffect === 'read' && (s.tool.includes('pull_request') || s.tool.includes('issue'));
+      });
+      if (!hasReadStep) {
+        return {
+          valid: false,
+          layer: 'grounding',
+          error:
+            'Report content must be grounded in verified read observations via reportEvidence: unverified report data in notification text without read observations',
+        };
+      }
+    }
+  }
+
+  if (parsed.reportEvidence) {
+    const evidence = parsed.reportEvidence as ReportEvidence;
+    const targetStep = steps.find((s) => s.id === evidence.stepId);
+    if (!targetStep) {
+      return {
+        valid: false,
+        layer: 'grounding',
+        error: `Report evidence references non-existent step '${evidence.stepId}'`,
+      };
+    }
+    const argVal = targetStep.args?.[evidence.argument];
+    if (typeof argVal !== 'string') {
+      return {
+        valid: false,
+        layer: 'grounding',
+        error: `Report evidence argument '${evidence.argument}' in step '${evidence.stepId}' is missing or not a string`,
+      };
+    }
+    const computedHash = createHash('sha256').update(argVal).digest('hex');
+    if (computedHash !== evidence.contentHash) {
+      return {
+        valid: false,
+        layer: 'grounding',
+        error: `Content hash mismatch: step '${evidence.stepId}' argument '${evidence.argument}' hash does not match reportEvidence contentHash`,
+      };
+    }
+    if (options.reportEvidenceStore) {
+      const art = options.reportEvidenceStore.getArtifact(evidence.artifactId);
+      if (!art) {
+        return {
+          valid: false,
+          layer: 'grounding',
+          error: `Observation artifact '${evidence.artifactId}' not found in reportEvidenceStore`,
+        };
+      }
     }
   }
 

@@ -1,4 +1,4 @@
-import type { AnswerLookup, CalendarDigestDelivery, JiraPlanConnection, ScheduleResponse, ScheduleView, ScheduleProposalMetadata, SlackPlanBindings } from '@wap/tool-schemas';
+import type { AnswerLookup, CalendarDigestDelivery, JiraPlanConnection, ReportEvidence, ScheduleResponse, ScheduleView, ScheduleProposalMetadata, SlackPlanBindings } from '@wap/tool-schemas';
 export type MessageRole = 'user' | 'assistant' | 'system';
 export interface AuthMessageResponse {
   message: string;
@@ -126,6 +126,7 @@ export interface ActivePlan {
   steps: PlanStep[];
   thinking?: string;
   warnings?: string[];
+  reportEvidence?: ReportEvidence;
 }
 
 export interface Conversation {

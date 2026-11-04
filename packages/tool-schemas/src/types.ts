@@ -1,4 +1,5 @@
 import type { JiraPlanConnection } from './myjira-context.js';
+import type { ReportEvidence } from './report-evidence.js';
 
 /**
  * Input properties naming an external resource carry `x-resource` (the working
@@ -130,6 +131,8 @@ export interface PlanResponse {
   warnings: string[];
   /** Written only by the server, after validation and before the plan hash is computed. */
   connections?: PlanConnections;
+  /** Server-verified report evidence binding (FLOW-01, F1) */
+  reportEvidence?: ReportEvidence;
 }
 
 export interface ClarificationResponse {
