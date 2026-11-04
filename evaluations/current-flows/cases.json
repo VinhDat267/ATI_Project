@@ -49,7 +49,7 @@
       "expectedTools": [
         "mycalendar.schedule_meet",
         "mysheets.create_doc",
-        "gmail.send_email"
+        "gmail.send_message"
       ],
       "evidenceRequirements": {
         "verifiedRecipient": "lan@example.com",
