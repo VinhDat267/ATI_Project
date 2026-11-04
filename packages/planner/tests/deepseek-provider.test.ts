@@ -109,6 +109,13 @@ describe('DeepSeekProvider', () => {
     });
   });
 
+  it('accepts the official deepseek-flash served alias when deepseek-chat is configured', async () => {
+    const { fetchFn } = scriptedFetch([completion('{"kind":"refusal","reason":"ok"}', 'deepseek-flash')]);
+    const provider = new DeepSeekProvider({ apiKey: 'ds-secret-key', fetch: fetchFn });
+    await expect(provider.generatePlan(input)).resolves.toBe('{"kind":"refusal","reason":"ok"}');
+    expect(provider.lastServedModel).toBe('deepseek-flash');
+  });
+
   it('redacts the API key on HTTP errors and rejects mismatched served models', async () => {
     const { fetchFn } = scriptedFetch([status(401, 'Invalid key ds-secret-key')]);
     const provider = new DeepSeekProvider({ apiKey: 'ds-secret-key', fetch: fetchFn });
