@@ -45,9 +45,9 @@ describe('1-Click Parameterized Playbooks & Extended Slack/GitHub Catalog', () =
 
   it('renders Quick Variable Fill Bar when a parameterized playbook is selected and saves Custom Playbook 1-Click', () => {
     const services: ServiceInfo[] = [
-      { id: 'mycalendar', name: 'Google Calendar', configured: true, connectionStatus: 'healthy' },
-      { id: 'mysheets', name: 'Google Sheets', configured: true, connectionStatus: 'healthy' },
-      { id: 'gmail', name: 'Gmail', configured: true, connectionStatus: 'healthy' },
+      { id: 'mycalendar', name: 'Google Calendar', configured: true, connected: true, connectionStatus: 'healthy' },
+      { id: 'mysheets', name: 'Google Sheets', configured: true, connected: true, connectionStatus: 'healthy' },
+      { id: 'gmail', name: 'Gmail', configured: true, connected: true, connectionStatus: 'healthy' },
     ];
     let currentDraft = '';
     const onDraft = vi.fn((val: string) => {
