@@ -104,7 +104,7 @@ describe('PlanoraShell & PlanoraSidebar (PL-02)', () => {
       expect(screen.getAllByLabelText(/Planora/i).length).toBeGreaterThanOrEqual(1);
 
       // New conversation button
-      const newChatBtn = screen.getByRole('button', { name: /Hội thoại mới/i });
+      const newChatBtn = screen.getByRole('button', { name: /Cuộc trò chuyện mới|Hội thoại mới/i });
       expect(newChatBtn).toBeInTheDocument();
       fireEvent.click(newChatBtn);
       expect(navigate).toHaveBeenCalledWith('/');
@@ -523,8 +523,8 @@ describe('PlanoraShell & PlanoraSidebar (PL-02)', () => {
       // Attempting to begin planning on c1 again is rejected
       expect(useChatStore.getState().beginPlanning('c1', 'req-duplicate')).toBe(false);
 
-      // Click actual sidebar "Hội thoại mới" button inside <App /> (calls App.tsx:handleNewConversation)
-      const newChatBtn = screen.getByRole('button', { name: /Hội thoại mới/i });
+      // Click actual sidebar "Cuộc trò chuyện mới" button inside <App /> (calls App.tsx:handleNewConversation)
+      const newChatBtn = screen.getByRole('button', { name: /Cuộc trò chuyện mới|Hội thoại mới/i });
       fireEvent.click(newChatBtn);
 
       // Verify route navigated to / and draft conversation is initialized
@@ -780,6 +780,276 @@ describe('PlanoraShell & PlanoraSidebar (PL-02)', () => {
         expect(toggleBtn).toHaveAttribute('aria-expanded', 'false');
       });
       expect(document.body.style.overflow).toBe('');
+    });
+  });
+
+  describe('8. Business-First UX & Design Brief v2.0 (PL-02)', () => {
+    it('renders /inbox navigation link with pending proposals badge count in forest green (#3c5741)', () => {
+      const navigate = vi.fn();
+      render(
+        <PlanoraShell
+          user={memberUser}
+          currentTab="workspace"
+          navigate={navigate}
+          onLogout={vi.fn()}
+          inboxBadgeCount={3}
+        >
+          <main>
+            <h1>Trang chính</h1>
+          </main>
+        </PlanoraShell>
+      );
+
+      const nav = screen.getByRole('navigation', { name: 'Điều hướng chính' });
+      const inboxLink = within(nav).getByRole('link', { name: /Hộp thư đề xuất.*3/i });
+      expect(inboxLink).toHaveAttribute('href', '/inbox');
+
+      const badge = inboxLink.querySelector('[data-inbox-badge-count]');
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent('3');
+      expect(badge).toHaveClass('planora-badge-count');
+
+      fireEvent.click(inboxLink);
+      expect(navigate).toHaveBeenCalledWith('/inbox');
+    });
+
+    it('switching workspace cleanly resets all store state, cancels pending operations, and leaks zero data to the new workspace', async () => {
+      setActiveWorkspaceId('ws-team-alpha');
+      useChatStore.getState().setConversationId('conv-alpha-sensitive');
+      useChatStore.getState().setConversations([
+        { id: 'conv-alpha-sensitive', title: 'Dữ liệu nội bộ Alpha', created_at: new Date().toISOString() },
+      ]);
+      useChatStore.getState().addMessage({
+        id: 'msg-alpha-secret',
+        role: 'assistant',
+        content: 'Thông tin bảo mật Alpha',
+      });
+      useChatStore.getState().setActivePlan({
+        id: 'plan-alpha',
+        status: 'preview',
+        steps: [{ id: 's1', title: 'Step Alpha', description: 'Alpha', service: 'jira' }],
+      } as any);
+
+      let resolveAlphaHistory!: (val: any) => void;
+      vi.spyOn(apiClient, 'getConversation').mockImplementation((id: string) => {
+        if (id === 'conv-alpha-sensitive') {
+          return new Promise((resolve) => {
+            resolveAlphaHistory = resolve;
+          });
+        }
+        return Promise.resolve({ conversation: { id }, messages: [] });
+      });
+
+      const navigate = vi.fn();
+      render(
+        <PlanoraShell
+          user={memberUser}
+          currentTab="workspace"
+          navigate={navigate}
+          onLogout={vi.fn()}
+        >
+          <main>
+            <h1>Trang chính</h1>
+          </main>
+        </PlanoraShell>
+      );
+
+      // In-flight call started on old workspace
+      const historyPromise = loadConversationHistory(
+        'conv-alpha-sensitive',
+        () => getActiveWorkspaceId() === 'ws-team-alpha' && useChatStore.getState().conversationId === 'conv-alpha-sensitive'
+      );
+
+      // User safely switches to Personal workspace
+      act(() => {
+        setActiveWorkspaceId('personal');
+      });
+
+      // Verify store is immediately cleaned up
+      expect(getActiveWorkspaceId()).toBe('personal');
+      expect(useChatStore.getState().conversationId).toBeNull();
+      expect(useChatStore.getState().messages).toHaveLength(0);
+      expect(useChatStore.getState().activePlan).toBeNull();
+
+      // Late SSE event from Alpha arrives
+      handleSSEEvent('clarification', JSON.stringify({ question: 'Alpha Question' }), undefined, 'conv-alpha-sensitive');
+      handleSSEEvent('message', JSON.stringify({ message: { id: 'm-late', role: 'assistant', content: 'Late Alpha Message' } }), undefined, 'conv-alpha-sensitive');
+
+      // Delayed HTTP response from Alpha arrives
+      resolveAlphaHistory({
+        conversation: { id: 'conv-alpha-sensitive', title: 'Stale Alpha' },
+        messages: [{ id: 'm-alpha-late', role: 'assistant', content: 'Secret Alpha Data' }],
+      });
+      await historyPromise;
+
+      // Invariant: zero leakage from old workspace
+      expect(useChatStore.getState().conversationId).toBeNull();
+      expect(useChatStore.getState().messages).toHaveLength(0);
+      expect(useChatStore.getState().activePlan).toBeNull();
+      expect(useChatStore.getState().activeClarification).toBeNull();
+    });
+
+    it('all navigation icons are vector SVGs with aria-hidden="true" and navigation contains no bare emojis', () => {
+      render(
+        <PlanoraShell
+          user={adminUser}
+          currentTab="workspace"
+          navigate={vi.fn()}
+          onLogout={vi.fn()}
+          inboxBadgeCount={2}
+        >
+          <main>
+            <h1>Trang</h1>
+          </main>
+        </PlanoraShell>
+      );
+
+      const nav = screen.getByRole('navigation', { name: 'Điều hướng chính' });
+      const links = within(nav).getAllByRole('link');
+      expect(links.length).toBeGreaterThanOrEqual(5);
+
+      // Every nav link has an SVG icon with aria-hidden="true"
+      links.forEach((link) => {
+        const svg = link.querySelector('svg');
+        expect(svg).toBeInTheDocument();
+        expect(svg).toHaveAttribute('aria-hidden', 'true');
+      });
+
+      // CTA Cuộc trò chuyện mới has SVG with aria-hidden="true"
+      const newChatBtn = screen.getByRole('button', { name: /Cuộc trò chuyện mới|Hội thoại mới/i });
+      const btnSvg = newChatBtn.querySelector('svg');
+      expect(btnSvg).toBeInTheDocument();
+      expect(btnSvg).toHaveAttribute('aria-hidden', 'true');
+
+      // Sidebar close button has SVG with aria-hidden="true"
+      const closeBtn = screen.getByRole('button', { name: /Đóng điều hướng/i });
+      const closeSvg = closeBtn.querySelector('svg');
+      expect(closeSvg).toBeInTheDocument();
+      expect(closeSvg).toHaveAttribute('aria-hidden', 'true');
+
+      // Mobile menu button has SVG with aria-hidden="true"
+      const mobileMenuBtn = screen.getByRole('button', { name: /Mở menu điều hướng/i });
+      const mobileSvg = mobileMenuBtn.querySelector('svg');
+      expect(mobileSvg).toBeInTheDocument();
+      expect(mobileSvg).toHaveAttribute('aria-hidden', 'true');
+
+      // Absolutely NO bare emoji characters in navigation markup
+      const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}]/u;
+      expect(nav.textContent).not.toMatch(emojiRegex);
+      expect(nav.textContent).not.toMatch(/[💬📋⚡📖👥✦📥👤🏢☰✕]/);
+    });
+
+    it('mobile drawer handles complete accessibility lifecycle: open, backdrop click close, Escape close, and Tab focus trap', async () => {
+      render(
+        <PlanoraShell
+          user={memberUser}
+          currentTab="workspace"
+          navigate={vi.fn()}
+          onLogout={vi.fn()}
+        >
+          <main>
+            <h1>Trang chính</h1>
+          </main>
+        </PlanoraShell>
+      );
+
+      const toggleBtn = screen.getByRole('button', { name: /Mở menu điều hướng/i });
+      const mainWork = document.querySelector('.planora-main-work');
+
+      // 1. Open drawer
+      fireEvent.click(toggleBtn);
+      expect(toggleBtn).toHaveAttribute('aria-expanded', 'true');
+      expect(mainWork).toHaveAttribute('inert');
+
+      // 2. Backdrop click closes drawer
+      const backdrop = document.querySelector('.planora-drawer-backdrop.open');
+      expect(backdrop).toBeInTheDocument();
+      fireEvent.click(backdrop!);
+      expect(toggleBtn).toHaveAttribute('aria-expanded', 'false');
+      expect(mainWork).not.toHaveAttribute('inert');
+      await waitFor(() => {
+        expect(document.activeElement).toBe(toggleBtn);
+      });
+
+      // 3. Open drawer again to test Tab focus trap and Escape
+      fireEvent.click(toggleBtn);
+      expect(toggleBtn).toHaveAttribute('aria-expanded', 'true');
+
+      const closeBtn = screen.getByRole('button', { name: /Đóng điều hướng/i });
+      await waitFor(() => {
+        expect(document.activeElement).toBe(closeBtn);
+      });
+
+      // Tab through focusable elements inside sidebar
+      const sidebar = document.querySelector('.planora-sidebar');
+      const focusables = Array.from(
+        sidebar!.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((el) => window.getComputedStyle(el).display !== 'none');
+
+      expect(focusables.length).toBeGreaterThan(1);
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+
+      // Tab from last element loops to first
+      last.focus();
+      expect(document.activeElement).toBe(last);
+      fireEvent.keyDown(window, { key: 'Tab' });
+      expect(document.activeElement).toBe(first);
+
+      // Shift+Tab from first element loops to last
+      first.focus();
+      expect(document.activeElement).toBe(first);
+      fireEvent.keyDown(window, { key: 'Tab', shiftKey: true });
+      expect(document.activeElement).toBe(last);
+
+      // 4. Escape closes drawer and restores focus to opener
+      fireEvent.keyDown(window, { key: 'Escape' });
+      expect(toggleBtn).toHaveAttribute('aria-expanded', 'false');
+      await waitFor(() => {
+        expect(document.activeElement).toBe(toggleBtn);
+      });
+    });
+
+    it('renders service connections strip in sidebar with self-hosted SVGs and real API statuses', async () => {
+      vi.spyOn(apiClient, 'getServices').mockResolvedValue({
+        services: [
+          { id: 'jira', name: 'Jira', connected: true, connectionStatus: 'healthy' },
+          { id: 'slack', name: 'Slack', connected: true, personalStatus: 'reconnect_required' },
+          { id: 'trello', name: 'Trello', connected: false },
+        ],
+        canConfigure: true,
+      });
+
+      render(
+        <PlanoraShell
+          user={memberUser}
+          currentTab="settings"
+          navigate={vi.fn()}
+          onLogout={vi.fn()}
+        >
+          <main>
+            <h1>Cài đặt</h1>
+          </main>
+        </PlanoraShell>
+      );
+
+      const servicesStrip = await screen.findByLabelText('Trạng thái kết nối dịch vụ');
+      expect(servicesStrip).toBeInTheDocument();
+
+      // Displays 8 integrated services
+      const jiraItem = within(servicesStrip).getByLabelText(/Jira: Đã kết nối/i);
+      expect(jiraItem).toBeInTheDocument();
+      expect(jiraItem).toHaveClass('planora-service-connected');
+
+      const slackItem = within(servicesStrip).getByLabelText(/Slack: Cần kết nối lại/i);
+      expect(slackItem).toBeInTheDocument();
+      expect(slackItem).toHaveClass('planora-service-warning');
+
+      const trelloItem = within(servicesStrip).getByLabelText(/Trello: Chưa kết nối/i);
+      expect(trelloItem).toBeInTheDocument();
+      expect(trelloItem).toHaveClass('planora-service-disconnected');
     });
   });
 });

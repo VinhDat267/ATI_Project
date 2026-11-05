@@ -30,6 +30,7 @@ export function App({ initialView }: AppProps) {
 
   const getTab = (kind: AppRoute['kind']): NavTab | undefined => {
     switch (kind) {
+      case 'inbox': return 'inbox';
       case 'settings': return 'settings';
       case 'history': return 'history';
       case 'admin-users': return 'users';
@@ -79,6 +80,11 @@ export function App({ initialView }: AppProps) {
                 <UsersPage user={session.user} onLogout={session.onLogout} navigate={navigate} />
               ) : route.kind === 'history' ? (
                 <HistoryPage user={session.user} onLogout={session.onLogout} navigate={navigate} />
+              ) : route.kind === 'inbox' ? (
+                <main className="planora-inbox-page p-6 max-w-4xl mx-auto w-full">
+                  <h1 className="font-serif text-2xl font-bold text-planora-text">Hộp thư đề xuất</h1>
+                  <p className="text-sm text-planora-muted mt-2">Các đề xuất và yêu cầu chờ bạn xử lý sẽ xuất hiện tại đây.</p>
+                </main>
               ) : route.kind === 'guide' ? (
                 <GuidePage navigate={navigate} user={session.user} onLogout={session.onLogout} />
               ) : route.kind === 'privacy' ? (
