@@ -1,14 +1,66 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import type { ChatMessage, ExecutionSnapshot, ServiceInfo } from '../src/types';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
+import type { ChatMessage, ExecutionSnapshot, ServiceInfo, User } from '../src/types';
 import { AnswerMoment, RefusalMoment, ExpandedClarificationMoment } from '../src/pages/Responses/ResponseMoment';
 import { ClarificationMoment } from '../src/pages/Cockpit/ClarificationMoment';
 import { SlowPlanningMoment, PlanningErrorMoment, OfflineBanner } from '../src/pages/Errors/PlanningErrors';
 import { RecoveryMoment, type RecoveryControls } from '../src/pages/Cockpit/RecoveryMoment';
 import { RecoveryEditor } from '../src/pages/Cockpit/RecoveryEditor';
+import { PlanoraChatWorkspace } from '../src/planora/workspace/PlanoraChatWorkspace';
+import { useChatStore } from '../src/store/chat-store';
+import { apiClient } from '../src/services/api-client';
+import { setActiveWorkspaceId } from '../src/services/workspace-storage';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const tokensCssPath = path.resolve(__dirname, '../src/planora/styles/tokens.css');
+const tokensCss = readFileSync(tokensCssPath, 'utf8');
+
+function parseTokens(css: string) {
+  const extract = (selector: string) => {
+    const idx = css.indexOf(selector);
+    if (idx === -1) return {} as Record<string, string>;
+    const block = css.slice(idx).split('}')[0];
+    return Object.fromEntries(
+      [...block.matchAll(/--(planora-[a-z0-9-]+):\s*(#[0-9A-Fa-f]{3,8})\s*;/g)].map(m => [m[1], m[2]])
+    );
+  };
+  return {
+    light: extract(':root {'),
+    dark: extract('html.dark,'),
+  };
+}
+
+const { light: lightTokens, dark: darkTokens } = parseTokens(tokensCss);
+
+function luminance(hex: string): number {
+  const rgb = hex
+    .replace('#', '')
+    .match(/.{2}/g)!
+    .map(x => parseInt(x, 16) / 255)
+    .map(c => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)));
+  return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+}
+
+function contrastRatio(hex1: string, hex2: string): number {
+  const l1 = luminance(hex1);
+  const l2 = luminance(hex2);
+  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+}
+
+const testUser: User = {
+  id: 'user-pl-07',
+  name: 'PL-07 Test User',
+  email: 'test@example.com',
+  role: 'member',
+};
 
 afterEach(() => {
   cleanup();
+  useChatStore.getState().reset();
   vi.restoreAllMocks();
 });
 
@@ -19,6 +71,31 @@ const sampleServices: ServiceInfo[] = [
   { id: 'gmail', name: 'Gmail', configured: true, connected: true, connectionStatus: 'healthy', personalStatus: 'connected' },
   { id: 'notion', name: 'Notion', configured: false, connected: false, connectionStatus: 'unconfigured' },
 ];
+
+const makeSnapshot = (
+  stepStatus: 'failed' | 'unknown' | 'succeeded',
+  recoveryActions: Array<'retry' | 'skip' | 'stop' | 'continue'>
+): ExecutionSnapshot => ({
+  plan: {
+    id: 'plan-rec-1',
+    convId: 'conv-rec-1',
+    status: 'partial',
+    summary: 'Kế hoạch phục hồi kiểm thử',
+    steps: [
+      { id: 's1', tool: 'trello.create_card', description: 'Tạo thẻ Trello', args: { listId: 'list1', name: 'Task 1' } },
+      { id: 's2', tool: 'slack.send_message', description: 'Gửi Slack', args: { channel: '#ati-test', text: 'Hello' } },
+    ],
+  },
+  execution: {
+    status: 'partial',
+    pausedStepId: 's2',
+  },
+  steps: [
+    { stepId: 's1', tool: 'trello.create_card', status: 'succeeded', output: { id: 'card-123', url: 'https://trello.com/c/123' } },
+    { stepId: 's2', tool: 'slack.send_message', status: stepStatus, error: 'Không thể kết nối máy chủ Slack' },
+  ],
+  recoveryActions,
+});
 
 describe('PL-07: Planora Responses & Recovery', () => {
   describe('AnswerMoment', () => {
@@ -209,10 +286,17 @@ describe('PL-07: Planora Responses & Recovery', () => {
       const submitBtn = screen.getByRole('button', { name: 'Xác nhận và tiếp tục' });
       expect(submitBtn).toBeDisabled();
 
-      // Clicking an option selects it without submitting
+      // Clicking an option selects it, pre-fills draft without auto-submitting
       const optionGeneral = screen.getByRole('radio', { name: '#general' });
       fireEvent.click(optionGeneral);
       expect(onSelect).toHaveBeenCalledWith('#general');
+      expect(onDraft).toHaveBeenCalledWith('#general');
+      expect(onSend).not.toHaveBeenCalled();
+
+      // Keyboard navigation updates selection and draft
+      fireEvent.keyDown(optionGeneral, { key: 'ArrowDown' });
+      expect(onSelect).toHaveBeenCalledWith('#ati-test');
+      expect(onDraft).toHaveBeenCalledWith('#ati-test');
       expect(onSend).not.toHaveBeenCalled();
 
       // Typing custom draft
@@ -222,8 +306,9 @@ describe('PL-07: Planora Responses & Recovery', () => {
       expect(onSend).not.toHaveBeenCalled();
     });
 
-    it('ExpandedClarificationMoment handles keyboard radio navigation', () => {
+    it('ExpandedClarificationMoment handles keyboard radio navigation and draft sync', () => {
       const onSelect = vi.fn();
+      const onDraft = vi.fn();
       const onSend = vi.fn();
       const onEdit = vi.fn();
 
@@ -241,6 +326,7 @@ describe('PL-07: Planora Responses & Recovery', () => {
           canConfigure={true}
           selected="Gửi Slack"
           onSelect={onSelect}
+          onDraft={onDraft}
           onSend={onSend}
           onEdit={onEdit}
           navigate={vi.fn()}
@@ -250,14 +336,66 @@ describe('PL-07: Planora Responses & Recovery', () => {
 
       const radioGhiSheets = screen.getByRole('radio', { name: 'Ghi Google Sheets' });
 
-      // ArrowDown on radio moves to next radio
+      // Click option calls onSelect and onDraft without sending
+      fireEvent.click(radioGhiSheets);
+      expect(onSelect).toHaveBeenCalledWith('Ghi Google Sheets');
+      expect(onDraft).toHaveBeenCalledWith('Ghi Google Sheets');
+      expect(onSend).not.toHaveBeenCalled();
+
+      // ArrowDown on radio moves to next radio and syncs draft
       fireEvent.keyDown(radioGhiSheets, { key: 'ArrowDown' });
       expect(onSelect).toHaveBeenCalledWith('Tạo Trello');
+      expect(onDraft).toHaveBeenCalledWith('Tạo Trello');
+      expect(onSend).not.toHaveBeenCalled();
 
       // Submit sends selected
       const submitBtn = screen.getByRole('button', { name: 'Xác nhận và tiếp tục' });
       fireEvent.click(submitBtn);
       expect(onSend).toHaveBeenCalledWith('Gửi Slack');
+    });
+
+    it('ExpandedClarificationMoment destination variant pre-fills draft and uses accessible colors', () => {
+      const onSelect = vi.fn();
+      const onDraft = vi.fn();
+      const onSend = vi.fn();
+
+      render(
+        <ExpandedClarificationMoment
+          clarification={{
+            question: 'Chọn nơi lưu dữ liệu',
+            options: ['Kho chính', 'Kho phụ'],
+            context: 'Chọn một nơi.',
+            reason: 'destination',
+          }}
+          variant="destination"
+          request="Lưu dữ liệu"
+          services={sampleServices}
+          canConfigure={true}
+          selected="Kho chính"
+          onSelect={onSelect}
+          onDraft={onDraft}
+          onSend={onSend}
+          onEdit={vi.fn()}
+          navigate={vi.fn()}
+          planning={false}
+        />
+      );
+
+      // Verify accessible colors: uses text-[var(--planora-on-primary)] instead of hardcoded text-white
+      const optionLabel = screen.getByText('Kho chính');
+      expect(optionLabel).toHaveClass('text-[var(--planora-on-primary)]');
+      expect(optionLabel).not.toHaveClass('text-white');
+
+      const selectedBadge = screen.getByText('Đã chọn');
+      expect(selectedBadge).toHaveClass('text-[var(--planora-on-primary)]');
+      expect(selectedBadge).not.toHaveClass('text-white');
+
+      // Click option updates both onSelect and onDraft
+      const radioKhoPhu = screen.getByRole('radio', { name: /Kho phụ/ });
+      fireEvent.click(radioKhoPhu);
+      expect(onSelect).toHaveBeenCalledWith('Kho phụ');
+      expect(onDraft).toHaveBeenCalledWith('Kho phụ');
+      expect(onSend).not.toHaveBeenCalled();
     });
   });
 
@@ -329,31 +467,6 @@ describe('PL-07: Planora Responses & Recovery', () => {
   });
 
   describe('RecoveryMoment & RecoveryEditor', () => {
-    const makeSnapshot = (
-      stepStatus: 'failed' | 'unknown' | 'succeeded',
-      recoveryActions: Array<'retry' | 'skip' | 'stop' | 'continue'>
-    ): ExecutionSnapshot => ({
-      plan: {
-        id: 'plan-rec-1',
-        convId: 'conv-rec-1',
-        status: 'partial',
-        summary: 'Kế hoạch phục hồi kiểm thử',
-        steps: [
-          { id: 's1', tool: 'trello.create_card', description: 'Tạo thẻ Trello', args: { listId: 'list1', name: 'Task 1' } },
-          { id: 's2', tool: 'slack.send_message', description: 'Gửi Slack', args: { channel: '#ati-test', text: 'Hello' } },
-        ],
-      },
-      execution: {
-        status: 'partial',
-        pausedStepId: 's2',
-      },
-      steps: [
-        { stepId: 's1', tool: 'trello.create_card', status: 'succeeded', output: { id: 'card-123', url: 'https://trello.com/c/123' } },
-        { stepId: 's2', tool: 'slack.send_message', status: stepStatus, error: 'Không thể kết nối máy chủ Slack' },
-      ],
-      recoveryActions,
-    });
-
     it('Moment 7 (known failure): renders error, impact, and triggers retry and skip', () => {
       const snapshot = makeSnapshot('failed', ['retry', 'skip', 'stop']);
       const controls: RecoveryControls = {
@@ -524,6 +637,236 @@ describe('PL-07: Planora Responses & Recovery', () => {
         expect.objectContaining({ title: 'Updated Title' }),
         'Ghi chú thêm'
       );
+    });
+  });
+
+  describe('F1: Workspace clarification prefill and safe send integration', () => {
+    beforeEach(() => {
+      localStorage.clear();
+      setActiveWorkspaceId('personal');
+      useChatStore.getState().reset();
+      vi.spyOn(apiClient, 'getRuntime').mockResolvedValue({ runtimeMode: 'sandbox', schedulesEnabled: true });
+      vi.spyOn(apiClient, 'getServices').mockResolvedValue({ services: sampleServices, canConfigure: true });
+      vi.spyOn(apiClient, 'getMe').mockResolvedValue({ user: testUser });
+      vi.spyOn(apiClient, 'getConversations').mockResolvedValue({ conversations: [] });
+    });
+
+    it('pre-fills composer draft when clicking read-only clarification option without sending, and posts once on confirm', () => {
+      const onSendMessage = vi.fn();
+      useChatStore.setState({
+        messages: [{ id: 'msg-u1', role: 'user', content: 'Liệt kê danh sách việc' }],
+        activeClarification: {
+          question: 'Bạn muốn làm gì với danh sách này?',
+          options: ['Gửi Slack', 'Ghi Google Sheets'],
+          reason: 'read_only',
+        },
+      });
+
+      render(
+        <PlanoraChatWorkspace
+          services={sampleServices}
+          servicesLoading={false}
+          servicesError={null}
+          onSendMessage={onSendMessage}
+          onNewConversation={vi.fn()}
+          onSelectConversation={vi.fn()}
+          onSettings={vi.fn()}
+          onApprove={vi.fn()}
+          onCancel={vi.fn()}
+          recovery={null}
+        />
+      );
+
+      const textarea = document.getElementById('chat-prompt-input') as HTMLTextAreaElement;
+      expect(textarea).toBeInTheDocument();
+      expect(textarea.value).toBe('');
+
+      // Click option "Ghi Google Sheets"
+      const optionSheets = screen.getByRole('radio', { name: 'Ghi Google Sheets' });
+      act(() => {
+        fireEvent.click(optionSheets);
+      });
+
+      // Draft textarea is prefilled
+      expect(textarea.value).toBe('Ghi Google Sheets');
+
+      // CRITICAL: Safe behavior - no message is posted yet
+      expect(onSendMessage).not.toHaveBeenCalled();
+
+      // User explicitly clicks "Xác nhận và tiếp tục"
+      const confirmBtn = screen.getByRole('button', { name: 'Xác nhận và tiếp tục' });
+      act(() => {
+        fireEvent.click(confirmBtn);
+      });
+
+      // Posts exactly once with the selected draft value
+      expect(onSendMessage).toHaveBeenCalledTimes(1);
+      expect(onSendMessage).toHaveBeenCalledWith('Ghi Google Sheets');
+    });
+
+    it('pre-fills composer draft when clicking destination clarification option without sending, and posts once on confirm', () => {
+      const onSendMessage = vi.fn();
+      useChatStore.setState({
+        messages: [{ id: 'msg-u2', role: 'user', content: 'Tạo thẻ việc mới' }],
+        activeClarification: {
+          question: 'Chọn bảng Trello',
+          options: ['Bảng Dự Án', 'Bảng Cá Nhân'],
+          reason: 'destination',
+        },
+      });
+
+      render(
+        <PlanoraChatWorkspace
+          services={sampleServices}
+          servicesLoading={false}
+          servicesError={null}
+          onSendMessage={onSendMessage}
+          onNewConversation={vi.fn()}
+          onSelectConversation={vi.fn()}
+          onSettings={vi.fn()}
+          onApprove={vi.fn()}
+          onCancel={vi.fn()}
+          recovery={null}
+        />
+      );
+
+      const textarea = document.getElementById('chat-prompt-input') as HTMLTextAreaElement;
+      expect(textarea).toBeInTheDocument();
+      expect(textarea.value).toBe('');
+
+      // Click option "Bảng Dự Án"
+      const optionProject = screen.getByRole('radio', { name: /Bảng Dự Án/ });
+      act(() => {
+        fireEvent.click(optionProject);
+      });
+
+      // Draft textarea is prefilled
+      expect(textarea.value).toBe('Bảng Dự Án');
+
+      // No message sent yet
+      expect(onSendMessage).not.toHaveBeenCalled();
+
+      // Click confirm
+      const confirmBtn = screen.getByRole('button', { name: 'Xác nhận và tiếp tục' });
+      act(() => {
+        fireEvent.click(confirmBtn);
+      });
+
+      expect(onSendMessage).toHaveBeenCalledTimes(1);
+      expect(onSendMessage).toHaveBeenCalledWith('Bảng Dự Án');
+    });
+
+    it('pre-fills draft in standard clarification (Moment 3) without sending, and posts once on confirm', () => {
+      const onSendMessage = vi.fn();
+      useChatStore.setState({
+        messages: [{ id: 'msg-u3', role: 'user', content: 'Thông báo nhóm' }],
+        activeClarification: {
+          question: 'Bạn muốn gửi vào kênh nào?',
+          options: ['#general', '#dev'],
+        },
+      });
+
+      render(
+        <PlanoraChatWorkspace
+          services={sampleServices}
+          servicesLoading={false}
+          servicesError={null}
+          onSendMessage={onSendMessage}
+          onNewConversation={vi.fn()}
+          onSelectConversation={vi.fn()}
+          onSettings={vi.fn()}
+          onApprove={vi.fn()}
+          onCancel={vi.fn()}
+          recovery={null}
+        />
+      );
+
+      const customInput = screen.getByLabelText('Nhập câu trả lời làm rõ yêu cầu') as HTMLTextAreaElement;
+      expect(customInput.value).toBe('');
+
+      // Click option "#dev"
+      const optionDev = screen.getByRole('radio', { name: '#dev' });
+      act(() => {
+        fireEvent.click(optionDev);
+      });
+
+      // Textarea draft is synchronized
+      expect(customInput.value).toBe('#dev');
+
+      // No message sent yet
+      expect(onSendMessage).not.toHaveBeenCalled();
+
+      // Click confirm
+      const confirmBtn = screen.getByRole('button', { name: 'Xác nhận và tiếp tục' });
+      act(() => {
+        fireEvent.click(confirmBtn);
+      });
+
+      expect(onSendMessage).toHaveBeenCalledTimes(1);
+      expect(onSendMessage).toHaveBeenCalledWith('#dev');
+    });
+  });
+
+  describe('F2: WCAG AA Contrast & Accessible Color Pairings', () => {
+    it('meets WCAG AA contrast (>= 4.5:1) for all critical PL-07 status pairs in both Light and Dark mode', () => {
+      // 1. RecoveryMoment destructive button: errorText on errorBg
+      const lightErrorContrast = contrastRatio(lightTokens['planora-error-text'], lightTokens['planora-error-bg']);
+      const darkErrorContrast = contrastRatio(darkTokens['planora-error-text'], darkTokens['planora-error-bg']);
+      expect(lightErrorContrast).toBeGreaterThanOrEqual(4.5);
+      expect(darkErrorContrast).toBeGreaterThanOrEqual(4.5);
+
+      // 2. ResponseMoment destination options: onPrimary on primary
+      const lightPrimaryContrast = contrastRatio(lightTokens['planora-on-primary'], lightTokens['planora-primary']);
+      const darkPrimaryContrast = contrastRatio(darkTokens['planora-on-primary'], darkTokens['planora-primary']);
+      expect(lightPrimaryContrast).toBeGreaterThanOrEqual(4.5);
+      expect(darkPrimaryContrast).toBeGreaterThanOrEqual(4.5);
+
+      // 3. OfflineBanner warning/offline: pendingText on pendingBg
+      const lightPendingContrast = contrastRatio(lightTokens['planora-pending-text'], lightTokens['planora-pending-bg']);
+      const darkPendingContrast = contrastRatio(darkTokens['planora-pending-text'], darkTokens['planora-pending-bg']);
+      expect(lightPendingContrast).toBeGreaterThanOrEqual(4.5);
+      expect(darkPendingContrast).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it('RecoveryMoment stop confirmation button uses accessible destructive styling without low-contrast hardcoded text-white', () => {
+      const snapshot = makeSnapshot('failed', ['stop']);
+      const controls: RecoveryControls = {
+        busy: false,
+        error: null,
+        onRetry: vi.fn(),
+        onSkip: vi.fn(),
+        onStop: vi.fn(),
+        onContinue: vi.fn(),
+        onEdit: vi.fn(),
+      };
+
+      render(
+        <RecoveryMoment
+          request="Gửi tin nhắn"
+          moment={7}
+          snapshot={snapshot}
+          steps={[{ id: 's2', tool: 'slack.send_message', description: 'Gửi Slack', status: 'failed' as const }]}
+          services={sampleServices}
+          controls={controls}
+        />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Dừng kế hoạch' }));
+      const confirmStopBtn = screen.getByRole('button', { name: 'Dừng hẳn quy trình' });
+      expect(confirmStopBtn).toHaveClass('text-[var(--planora-error-text)]');
+      expect(confirmStopBtn).toHaveClass('bg-[var(--planora-error-bg)]');
+      expect(confirmStopBtn).not.toHaveClass('text-white');
+    });
+
+    it('OfflineBanner uses accessible Planora pending warning tokens instead of low-contrast amber text-white', () => {
+      const onRetry = vi.fn();
+      render(<OfflineBanner busy={false} onRetry={onRetry} />);
+
+      const banner = screen.getByRole('status');
+      expect(banner).toHaveClass('bg-[var(--planora-pending-bg)]');
+      expect(banner).toHaveClass('text-[var(--planora-pending-text)]');
+      expect(banner).not.toHaveClass('bg-amber-600');
+      expect(banner).not.toHaveClass('text-white');
     });
   });
 });

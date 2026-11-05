@@ -73,32 +73,37 @@ Chuyển đổi các thẻ phản hồi của hệ thống sang chuẩn nhận d
 
 ## 5. Kết quả (Worker điền sau khi hoàn thành)
 
-- **Ngày hoàn thành:** 2026-11-04
+- **Ngày hoàn thành ban đầu:** 2026-11-04
+- **Ngày hoàn thành sửa review F1-F2:** 2026-11-05
 - **Người thực hiện:** Gemini (Orca worker)
 - **Base SHA:** `514d982fd9fc152290feb305b0d97f2c40dda21a`
 - **Các thay đổi chính:**
   1. **Answer & Sources (`ResponseMoment.tsx`, `page.css`):**
      - Chuyển đổi ResponseCard và AnswerMoment sang hệ thống CSS tokens Planora (`--planora-text`, `--planora-paper`, `--planora-primary`, `--planora-divider`, etc.).
      - Hiển thị citations và lookups an toàn qua giao thức HTTPS (`safeLink`), hỗ trợ mở rộng danh sách tra cứu (`#answer-lookups`) và bảo toàn `[data-answer-text]`.
-  2. **Clarification Moment (`ClarificationMoment.tsx`, `ResponseMoment.tsx`):**
+  2. **Clarification Moment (`ClarificationMoment.tsx`, `ResponseMoment.tsx`, `PlanoraChatWorkspace.tsx`, `PlanoraActiveTurn.tsx`):**
      - Nâng cấp radio cards và custom text input sang style Planora.
-     - Bảo toàn luồng pre-fill draft: khi chọn gợi ý hoặc gõ văn bản, hệ thống chỉ cập nhật draft/selection mà không tự ý gửi tin nhắn trước khi người dùng xác nhận.
+     - **Sửa finding F1 (P2):** Nối thao tác chọn gợi ý clarification vào cả selection và draft của composer dock / textarea (`handleSelectOption` trong workspace, `onDraft` trong `ClarificationMoment` và `ExpandedClarificationMoment`).
+     - Áp dụng cho cả clarification thông thường, read-only clarification và destination clarification.
+     - Bảo toàn an toàn: Tuyệt đối không tự động POST/submit message khi click radio option; chỉ prefill draft vào textarea, việc gửi tin nhắn chỉ kích hoạt khi người dùng trực tiếp bấm "Xác nhận và tiếp tục" hoặc nút gửi.
   3. **Refusal Moment (`ResponseMoment.tsx`):**
      - Style các thẻ dịch vụ thiếu kết nối/phạm vi sang nhận diện Planora với status badge rõ ràng.
      - Giữ nguyên các CTA kết nối cá nhân (`#trello-connect`, `#github-connect`, `#telegram-connect`, Gmail, Calendar, Sheets) và nút "Gửi lại yêu cầu" chỉ gửi khi người dùng bấm trực tiếp.
   4. **Planning Errors & Offline (`PlanningErrors.tsx`, `page.css`):**
      - Nâng cấp `SlowPlanningMoment` hiển thị tiến trình tra cứu (`gatherState`) và nút thôi chờ giữ lại câu yêu cầu.
      - Nâng cấp `PlanningErrorMoment` phân biệt sự cố máy chủ vs mất kết nối mạng.
-     - Cập nhật `OfflineBanner` sang màu sắc và tương phản chuẩn Planora WCAG AA.
+     - **Sửa finding F2 (P2):** Cập nhật `OfflineBanner` sang cặp màu warning/pending Planora (`--planora-pending-bg`, `--planora-pending-text`, `--planora-pending-border`) đạt chuẩn tương phản WCAG AA (≥ 4.5:1) ở cả Light và Dark mode (thay vì `bg-amber-600 text-white` chỉ đạt 3.186:1 ở Light mode).
   5. **Recovery Moments (`RecoveryMoment.tsx`, `RecoveryEditor.tsx`, `CockpitDialog.tsx`):**
      - Moment 7 (Lỗi đã biết): Giữ đầy đủ hành động Retry, Skip, Stop và Sửa rồi thử lại theo `recoveryActions`.
      - Moment 8 (Chưa chắc kết quả): TUYỆT ĐỐI KHÔNG mở Retry, Edit hay Continue ngay cả khi server trả về không nhất quán.
      - Moment 9 (Khôi phục phiên): Hiển thị danh sách việc đã làm và chỉ mở Continue khi an toàn.
      - Hộp thoại Dừng quy trình: Phím Escape chỉ đóng modal mà không dừng hay hủy execution. Thao tác dừng yêu cầu xác nhận rõ ràng.
+     - **Sửa finding F2 (P2):** Nút "Dừng hẳn quy trình" trong hộp thoại xác nhận chuyển sang cặp màu semantic error của Planora (`--planora-error-bg`, `--planora-error-text`, `--planora-error-border`), đạt tỷ lệ tương phản WCAG AA (≥ 4.5:1) ở cả Light và Dark mode (thay vì `text-white` trên nền `#fca5a5` chỉ đạt 1.898:1 ở Dark mode).
+     - **Sửa finding F2 (P2) trên ResponseMoment:** Nhãn option destination và badge "Đã chọn" kế thừa `--planora-on-primary` trên nền `--planora-primary`, đạt tương phản 7.07:1 ở Dark mode và 7.76:1 ở Light mode (thay vì hardcode `text-white` chỉ đạt 2.270:1 ở Dark mode).
      - Sửa kế hoạch (`RecoveryEditor`): Chỉ gửi yêu cầu mới sau khi người dùng xác nhận dừng kế hoạch cũ.
 - **Bằng chứng kiểm tra thực tế:**
   - `npm run typecheck:v3`: PASS (exit code 0).
-  - `npm test -w @wap/chat-web`: PASS (102 test files, 1141 tests, exit code 0).
+  - `npm test -w @wap/chat-web`: PASS (102 test files, 1148 tests, exit code 0).
   - `npm run build:v3`: PASS (exit code 0).
   - `node scripts/test-v3-web-build-security.mjs`: PASS (exit code 0).
 - **Trạng thái:** `STATUS: READY_FOR_CODEX_REVIEW`.

@@ -116,7 +116,11 @@ export function ClarificationMoment({
                         : -1) +
                       radios.length) %
                     radios.length;
-            onSelect(options[next] ?? null);
+            const nextOption = options[next] ?? null;
+            onSelect(nextOption);
+            if (nextOption !== null) {
+              onDraft(nextOption);
+            }
             radios[next]?.focus();
           }}
         >
@@ -130,7 +134,10 @@ export function ClarificationMoment({
               role="radio"
               aria-checked={selected === option}
               tabIndex={selected === option ? 0 : -1}
-              onClick={() => onSelect(option)}
+              onClick={() => {
+                onSelect(option);
+                onDraft(option);
+              }}
               className={
                 'w-full text-left p-4 bg-[var(--planora-paper)] hover:bg-[var(--planora-surface-hover)] rounded-2xl ' +
                 (selected === option

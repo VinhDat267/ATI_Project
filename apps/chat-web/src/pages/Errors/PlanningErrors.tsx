@@ -63,10 +63,10 @@ export function PlanningErrorMoment({ request, networkError = false, onRetry, on
   </section>;
 }
 export function OfflineBanner({ busy, onRetry }: { busy: boolean; onRetry: () => void }) {
-  return <aside id="network-offline-banner" role="status" className="w-full bg-amber-600 dark:bg-amber-800 text-white px-4 py-2 text-xs sm:text-sm font-medium transition-all z-50 shadow-xs">
+  return <aside id="network-offline-banner" role="status" className="w-full bg-[var(--planora-pending-bg)] text-[var(--planora-pending-text)] border-b border-[var(--planora-pending-border)] px-4 py-2 text-xs sm:text-sm font-medium transition-all z-50 shadow-xs">
     <div className="max-w-4xl mx-auto flex items-center justify-between gap-3"><div className="flex items-center gap-2 min-w-0">
-      <svg aria-hidden="true" className="w-4 h-4 animate-pulse flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 4.243a9 9 0 01-12.728 0m0 0l2.829-2.829m-2.829 2.829L3 21M8.464 15.536a5 5 0 010-7.072m0 0l2.829 2.829" /></svg>
-      <span>Mất kết nối. Hãy kiểm tra mạng và thử lại.</span></div><button type="button" disabled={busy} onClick={onRetry} className="underline hover:text-amber-100 flex-shrink-0 text-xs cursor-pointer">{busy ? 'Đang kiểm tra…' : 'Thử lại'}</button>
+      <svg aria-hidden="true" className="w-4 h-4 animate-pulse flex-shrink-0 text-[var(--planora-pending-text)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 4.243a9 9 0 01-12.728 0m0 0l2.829-2.829m-2.829 2.829L3 21M8.464 15.536a5 5 0 010-7.072m0 0l2.829 2.829" /></svg>
+      <span>Mất kết nối. Hãy kiểm tra mạng và thử lại.</span></div><button type="button" disabled={busy} onClick={onRetry} className="underline hover:opacity-80 flex-shrink-0 text-xs font-semibold cursor-pointer text-[var(--planora-pending-text)]">{busy ? 'Đang kiểm tra…' : 'Thử lại'}</button>
     </div>
   </aside>;
 }

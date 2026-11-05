@@ -186,6 +186,7 @@ export function PlanoraActiveTurn(props: PlanoraActiveTurnProps) {
           canConfigure={canConfigure}
           selected={selected}
           onSelect={onSelect}
+          onDraft={onDraft}
           onSend={onSend}
           onEdit={editRequest}
           navigate={navigate}

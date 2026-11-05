@@ -233,6 +233,13 @@ export function PlanoraChatWorkspace(props: PlanoraChatWorkspaceProps) {
     });
   };
 
+  const handleSelectOption = (option: string | null) => {
+    setSelected(option);
+    if (typeof option === 'string') {
+      setDraft(option);
+    }
+  };
+
   const activeMessageIds = new Set<string>();
   if (savedRequest) activeMessageIds.add(savedRequest.id);
   if (moment === 'answer' && latestMessage) activeMessageIds.add(latestMessage.id);
@@ -323,7 +330,7 @@ export function PlanoraChatWorkspace(props: PlanoraChatWorkspaceProps) {
                 onKeyDown={onKeyDown}
                 input={input}
                 selected={selected}
-                onSelect={setSelected}
+                onSelect={handleSelectOption}
                 onPreview={setPreview}
                 onApprove={props.onApprove}
                 onCancel={props.onCancel}

@@ -414,9 +414,9 @@ export function ResponseMoment(props: {
     />
   );
 }
-export function ExpandedClarificationMoment({ clarification, variant, request, services, canConfigure, selected, onSelect, onSend, onEdit, navigate, planning }: {
+export function ExpandedClarificationMoment({ clarification, variant, request, services, canConfigure, selected, onSelect, onDraft, onSend, onEdit, navigate, planning }: {
   clarification: ClarificationState; variant: 'read-only' | 'destination'; request: string; services: ServiceInfo[];
-  canConfigure: boolean; selected: string | null; onSelect: (value: string) => void; onSend: (value: string) => void;
+  canConfigure: boolean; selected: string | null; onSelect: (value: string) => void; onDraft?: (value: string) => void; onSend: (value: string) => void;
   onEdit: (value: string) => void; navigate: (path: string) => void; planning: boolean;
 }) {
   const mentioned = services.filter(service => `${request} ${clarification.context ?? ''} ${clarification.question}`.toLocaleLowerCase().includes(service.name.toLocaleLowerCase()));
@@ -430,11 +430,14 @@ export function ExpandedClarificationMoment({ clarification, variant, request, s
         if (!radios.length) return;
         event.preventDefault(); const index = radios.indexOf(event.target as HTMLButtonElement);
         const next = event.key === 'Home' ? 0 : event.key === 'End' ? radios.length - 1 : (index + (['ArrowDown', 'ArrowRight'].includes(event.key) ? 1 : -1) + radios.length) % radios.length;
-        onSelect(clarification.options[next]); radios[next].focus();
+        const nextOption = clarification.options[next];
+        onSelect(nextOption);
+        onDraft?.(nextOption);
+        radios[next].focus();
       }}>
-        {clarification.options.map((option, index) => <button key={`${index}:${option}`} type="button" role="radio" aria-checked={selected === option} tabIndex={selected === option || (!selected && index === 0) ? 0 : -1} onClick={() => onSelect(option)} className={variant === 'destination' ? 'inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-[var(--planora-primary)] hover:bg-[var(--planora-primary-hover)] text-[var(--planora-on-primary)] text-xs sm:text-sm font-semibold shadow-xs transition-all cursor-pointer' : `w-full text-left p-3.5 rounded-xl border ${selected === option ? 'border-[var(--planora-primary)] ring-1 ring-[var(--planora-primary)] bg-[var(--planora-primary-soft)]/20' : 'border-[var(--planora-divider)] bg-[var(--planora-paper)]'} hover:border-[var(--planora-primary)] hover:bg-[var(--planora-surface-hover)] transition-all flex items-center justify-between group shadow-xs gap-3 cursor-pointer`}>
-          <div className="flex items-center gap-3 min-w-0"><div aria-hidden="true" className={variant === 'destination' ? 'w-5 h-5 bg-white/20 rounded p-0.5 flex items-center justify-center flex-shrink-0' : 'w-8 h-8 rounded-lg bg-[var(--planora-surface-inset)] flex items-center justify-center flex-shrink-0'}><svg className="w-5 h-5 text-[var(--planora-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 10h8m-8 4h5M6 3h9l3 3v15H6z" /></svg></div><span className={variant === 'destination' ? 'break-words text-white' : 'text-xs sm:text-sm font-semibold text-[var(--planora-text)] group-hover:text-[var(--planora-primary)] transition-colors break-words'}>{option}</span></div>
-          {variant === 'destination' && selected === option && <span aria-hidden="true" className="text-[11px] font-semibold flex-shrink-0 text-white">Đã chọn</span>}
+        {clarification.options.map((option, index) => <button key={`${index}:${option}`} type="button" role="radio" aria-checked={selected === option} tabIndex={selected === option || (!selected && index === 0) ? 0 : -1} onClick={() => { onSelect(option); onDraft?.(option); }} className={variant === 'destination' ? 'inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-[var(--planora-primary)] hover:bg-[var(--planora-primary-hover)] text-[var(--planora-on-primary)] text-xs sm:text-sm font-semibold shadow-xs transition-all cursor-pointer' : `w-full text-left p-3.5 rounded-xl border ${selected === option ? 'border-[var(--planora-primary)] ring-1 ring-[var(--planora-primary)] bg-[var(--planora-primary-soft)]/20' : 'border-[var(--planora-divider)] bg-[var(--planora-paper)]'} hover:border-[var(--planora-primary)] hover:bg-[var(--planora-surface-hover)] transition-all flex items-center justify-between group shadow-xs gap-3 cursor-pointer`}>
+          <div className="flex items-center gap-3 min-w-0"><div aria-hidden="true" className={variant === 'destination' ? 'w-5 h-5 bg-current/15 rounded p-0.5 flex items-center justify-center flex-shrink-0' : 'w-8 h-8 rounded-lg bg-[var(--planora-surface-inset)] flex items-center justify-center flex-shrink-0'}><svg className={variant === 'destination' ? 'w-5 h-5 text-[var(--planora-on-primary)]' : 'w-5 h-5 text-[var(--planora-muted)]'} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 10h8m-8 4h5M6 3h9l3 3v15H6z" /></svg></div><span className={variant === 'destination' ? 'break-words text-[var(--planora-on-primary)]' : 'text-xs sm:text-sm font-semibold text-[var(--planora-text)] group-hover:text-[var(--planora-primary)] transition-colors break-words'}>{option}</span></div>
+          {variant === 'destination' && selected === option && <span aria-hidden="true" className="text-[11px] font-semibold flex-shrink-0 text-[var(--planora-on-primary)]">Đã chọn</span>}
           {variant !== 'destination' && <svg aria-hidden="true" className="w-4 h-4 text-[var(--planora-muted)] group-hover:text-[var(--planora-primary)] transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>}
         </button>)}
       </div>
