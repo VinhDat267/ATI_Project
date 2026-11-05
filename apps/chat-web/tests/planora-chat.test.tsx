@@ -6,6 +6,7 @@ import { apiClient } from '../src/services/api-client';
 import { setActiveWorkspaceId } from '../src/services/workspace-storage';
 import { PlanoraChatWorkspace } from '../src/planora/workspace/PlanoraChatWorkspace';
 import { PlanoraConversationFeed } from '../src/planora/workspace/PlanoraConversationFeed';
+import { PlanoraActiveTurn } from '../src/planora/workspace/PlanoraActiveTurn';
 import type { ChatMessage, ActivePlan, ServiceInfo, User } from '../src/types';
 
 const testUser: User = {
@@ -771,6 +772,162 @@ describe('PL-05: Planora Chat Workspace & One-Composer Policy', () => {
       const feed = document.querySelector('.planora-conversation-feed') as HTMLElement;
       expect(feed).toBeInTheDocument();
       expect(feed.style.scrollPaddingBottom).toContain('var(--composer-dock-height, 120px) + 24px');
+    });
+
+    it('P2-1 & P2-2: ExpandedClarificationMoment preserves request for "Sửa yêu cầu", hides duplicate bubble, and has no #FF5701', () => {
+      useChatStore.setState({
+        conversationId: 'c-expanded-clarify',
+        messages: [{ id: 'u1', role: 'user', content: 'Xem các bảng Trello' }],
+        activeClarification: {
+          question: 'Bạn muốn làm gì với danh sách này?',
+          options: ['Chỉ xem', 'Cập nhật'],
+          reason: 'read_only',
+        },
+      });
+
+      render(
+        <PlanoraChatWorkspace
+          services={sampleServices}
+          servicesLoading={false}
+          servicesError={null}
+          onSendMessage={vi.fn()}
+          onNewConversation={vi.fn()}
+          onSelectConversation={vi.fn()}
+          onSettings={vi.fn()}
+          onApprove={vi.fn()}
+          onCancel={vi.fn()}
+          recovery={null}
+        />
+      );
+
+      // Verify no duplicate bubble in ResponseCard
+      expect(document.getElementById('user-request-bubble-text')).toBeNull();
+
+      // Verify "Sửa yêu cầu" button fills original request into single composer textbox
+      const editButton = screen.getByRole('button', { name: 'Sửa yêu cầu' });
+      fireEvent.click(editButton);
+      const textbox = screen.getByRole('textbox');
+      expect(textbox).toHaveValue('Xem các bảng Trello');
+
+      // Verify no #FF5701 in the clarification card DOM
+      const card = document.getElementById('moment-3');
+      expect(card).not.toBeNull();
+      expect(card!.innerHTML).not.toContain('#FF5701');
+      expect(card!.innerHTML).not.toContain('#E04D00');
+    });
+
+    it('P2-1: AnswerMoment and RefusalMoment do not render duplicate request bubble in Planora mode', () => {
+      useChatStore.setState({
+        conversationId: 'c-answer-no-bubble',
+        messages: [
+          { id: 'u1', role: 'user', content: 'Kiểm tra PR mới nhất' },
+          { id: 'a1', role: 'assistant', content: 'PR #123 đang mở.', metadata: { lookups: [] } },
+        ],
+      });
+
+      render(
+        <PlanoraChatWorkspace
+          services={sampleServices}
+          servicesLoading={false}
+          servicesError={null}
+          onSendMessage={vi.fn()}
+          onNewConversation={vi.fn()}
+          onSelectConversation={vi.fn()}
+          onSettings={vi.fn()}
+          onApprove={vi.fn()}
+          onCancel={vi.fn()}
+          recovery={null}
+        />
+      );
+
+      // User request appears only once in the feed, not inside AnswerMoment's ResponseCard
+      expect(document.getElementById('user-request-bubble-text')).toBeNull();
+    });
+
+    it('P3-1: ClarificationMoment hides custom-sheet-form and label when inputHidden is true', () => {
+      useChatStore.setState({
+        conversationId: 'c-clarification-clean',
+        messages: [{ id: 'u1', role: 'user', content: 'Tạo công việc' }],
+        activeClarification: {
+          question: 'Chọn danh sách?',
+          options: ['Hộp thư đến', 'Đang làm'],
+        },
+      });
+
+      render(
+        <PlanoraChatWorkspace
+          services={sampleServices}
+          servicesLoading={false}
+          servicesError={null}
+          onSendMessage={vi.fn()}
+          onNewConversation={vi.fn()}
+          onSelectConversation={vi.fn()}
+          onSettings={vi.fn()}
+          onApprove={vi.fn()}
+          onCancel={vi.fn()}
+          recovery={null}
+        />
+      );
+
+      // In Planora mode, inputHidden is true, so #custom-sheet-form and label are NOT rendered
+      expect(document.getElementById('custom-sheet-form')).toBeNull();
+      expect(screen.queryByText('Nhập tên, link hoặc câu trả lời:')).toBeNull();
+    });
+
+    it('P2-2: PlanoraActiveTurn renders structured workflow step list instead of raw JSON.stringify', () => {
+      const state = {
+        ...useChatStore.getState(),
+        conversationId: 'c-plan-steps',
+        messages: [
+          { id: 'u1', role: 'user', content: 'Tạo thẻ Trello và issue GitHub' },
+          { id: 'a1', role: 'assistant', content: 'Đã hoàn thành' },
+        ],
+        activePlan: samplePlan,
+        planStatus: 'preview' as const,
+        executionSnapshot: null,
+      };
+
+      render(
+        <PlanoraActiveTurn
+          moment="fallback"
+          state={state as any}
+          runtimeMode="sandbox"
+          schedulesEnabled={true}
+          personalEnabled={true}
+          services={sampleServices}
+          servicesLoading={false}
+          servicesError={null}
+          canConfigure={true}
+          draft=""
+          onDraft={vi.fn()}
+          onSend={vi.fn()}
+          onKeyDown={vi.fn()}
+          input={{ current: null }}
+          selected={null}
+          onSelect={vi.fn()}
+          onPreview={vi.fn()}
+          onApprove={vi.fn()}
+          onCancel={vi.fn()}
+          onEditPlan={vi.fn()}
+          recovery={null}
+          onNewConversation={vi.fn()}
+          onSettings={vi.fn()}
+          navigate={vi.fn()}
+          servicePrompt={vi.fn()}
+          dismissedWait={null}
+          waitingKey={null}
+          editRequest={vi.fn()}
+          milliseconds={0}
+        />
+      );
+
+      // No raw JSON.stringify pre block
+      expect(document.querySelector('pre')).toBeNull();
+      // Rendered structured step list
+      expect(screen.getByText(/Bước 1:/)).toBeInTheDocument();
+      expect(screen.getByText('Tạo issue')).toBeInTheDocument();
+      expect(screen.getByText(/Bước 2:/)).toBeInTheDocument();
+      expect(screen.getByText('Tạo card')).toBeInTheDocument();
     });
   });
 });

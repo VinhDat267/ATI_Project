@@ -191,17 +191,17 @@ export function ClarificationMoment({
               </div>
               <span aria-hidden="true">⌄</span>
             </button>
-            <div
-              id="custom-sheet-form"
-              className="p-4 pt-1 bg-neutral-50 border-t border-dashed border-neutral-200 v3-space-y-2"
-            >
-              <label
-                htmlFor="custom-sheet-input"
-                className="text-xs font-medium text-brand-text"
+            {!inputHidden && (
+              <div
+                id="custom-sheet-form"
+                className="p-4 pt-1 bg-neutral-50 border-t border-dashed border-neutral-200 v3-space-y-2"
               >
-                Nhập tên, link hoặc câu trả lời:
-              </label>
-              {!inputHidden && (
+                <label
+                  htmlFor="custom-sheet-input"
+                  className="text-xs font-medium text-brand-text"
+                >
+                  Nhập tên, link hoặc câu trả lời:
+                </label>
                 <textarea
                   ref={input}
                   id="custom-sheet-input"
@@ -215,8 +215,8 @@ export function ClarificationMoment({
                   aria-label="Nhập câu trả lời làm rõ yêu cầu"
                   className="w-full px-3 py-2 bg-white rounded-xl border border-brand-border text-xs sm:text-sm text-brand-text focus:v3-outline-none focus:border-[var(--planora-primary)] resize-none"
                 />
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-3 pt-2">

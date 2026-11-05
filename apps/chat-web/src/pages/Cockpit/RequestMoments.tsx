@@ -89,7 +89,7 @@ export function RequestMoment({
           <div className="text-xs leading-relaxed min-w-0">
             <div className="font-semibold text-[#111827] flex items-center gap-1.5 flex-wrap">
               <span>Đang làm việc tại:</span>
-              <span className="text-[#FF5701]">{workspace.name}</span>
+              <span className="text-[var(--planora-primary)]">{workspace.name}</span>
             </div>
             <p className="text-[#6B7280] text-[11px] truncate">
               {workspace.id === 'personal'
@@ -138,7 +138,7 @@ export function RequestMoment({
           event.preventDefault();
           onSend(draft);
         }}
-        className="relative bg-white rounded-2xl border border-brand-border shadow-soft-card p-3 sm:p-4 focus-within:border-brand-primary focus-within:shadow-orange-glow transition-all"
+        className="relative bg-white rounded-2xl border border-brand-border shadow-soft-card p-3 sm:p-4 focus-within:border-[var(--planora-primary)] focus-within:ring-2 focus-within:ring-[var(--planora-primary)]/20 transition-all"
       >
         <label htmlFor="prompt-input" className="sr-only">
           Nội dung bạn muốn nhờ
@@ -167,7 +167,7 @@ export function RequestMoment({
             type="button"
             disabled={!draft.trim() || planning}
             onClick={() => onSend(draft)}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[var(--planora-primary)] hover:opacity-90 text-white text-sm font-semibold rounded-xl shadow-sm transition-all hover:scale-[1.01] active:scale-[0.99]"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[var(--planora-primary)] hover:bg-[var(--planora-primary-hover)] text-[var(--planora-on-primary)] text-sm font-semibold rounded-xl shadow-sm transition-all hover:scale-[1.01] active:scale-[0.99]"
           >
             <span>Gửi yêu cầu</span>
             <svg
@@ -221,7 +221,7 @@ export function RequestMoment({
                       </div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-brand-text group-hover:text-brand-primary transition-colors leading-snug">
+                      <div className="text-sm font-medium text-brand-text group-hover:text-[var(--planora-primary)] transition-colors leading-snug">
                         {servicePrompt(service)}
                       </div>
                       <div className="text-xs text-brand-muted mt-1 flex items-center gap-1.5 font-sans">
@@ -239,9 +239,6 @@ export function RequestMoment({
                 <div className="text-xs font-semibold uppercase tracking-wider text-brand-muted">
                   Kịch bản tự động hoá liên dịch vụ
                 </div>
-                <span className="text-[11px] font-medium text-brand-primary bg-[#FFF6EE] border border-[#FFDFC6] px-2 py-0.5 rounded-full">
-                  Make.com Orbital Flow
-                </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {multiServicePlaybooks.map((playbook) => (
@@ -254,7 +251,7 @@ export function RequestMoment({
                       onDraft(playbook.prompt);
                       input.current?.focus();
                     }}
-                    className="text-left p-3.5 bg-white hover:bg-neutral-50 rounded-2xl border border-brand-border hover:border-brand-primary/50 shadow-soft-card transition-all group flex flex-col justify-between gap-2.5"
+                    className="text-left p-3.5 bg-white hover:bg-neutral-50 rounded-2xl border border-brand-border hover:border-[var(--planora-primary)]/50 shadow-soft-card transition-all group flex flex-col justify-between gap-2.5"
                   >
                     <div className="flex items-center gap-1.5">
                       {playbook.services.map((svcId, idx) => (
@@ -269,7 +266,7 @@ export function RequestMoment({
                       ))}
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-brand-text group-hover:text-brand-primary transition-colors">
+                      <div className="text-xs font-bold text-brand-text group-hover:text-[var(--planora-primary)] transition-colors">
                         {playbook.title}
                       </div>
                       <p className="text-[11px] text-brand-muted line-clamp-2 mt-1 leading-relaxed">
@@ -289,7 +286,7 @@ export function RequestMoment({
           </p>
           <a
             href="/settings"
-            className="text-sm text-brand-primary hover:underline font-medium"
+            className="text-sm text-[var(--planora-primary)] hover:underline font-medium"
             onClick={(event) => {
               event.preventDefault();
               onSettings();
@@ -351,7 +348,7 @@ export function RequestMoment({
               event.preventDefault();
               onSettings();
             }}
-            className="text-brand-primary hover:underline font-medium"
+            className="text-[var(--planora-primary)] hover:underline font-medium"
           >
             Kết nối thêm
           </a>
@@ -362,7 +359,7 @@ export function RequestMoment({
               event.preventDefault();
               navigate('/guide');
             }}
-            className="text-brand-primary hover:underline font-medium"
+            className="text-[var(--planora-primary)] hover:underline font-medium"
           >
             Cẩm nang &amp; Mẫu câu lệnh
           </a>
@@ -391,7 +388,7 @@ export function DiscoveryMoment({
       aria-label="Cockpit"
     >
       <div className="p-6 bg-white rounded-2xl border border-brand-border shadow-soft-card v3-space-y-2">
-        <div className="text-xs font-semibold uppercase tracking-wider text-brand-primary">
+        <div className="text-xs font-semibold uppercase tracking-wider text-[var(--planora-primary)]">
           Đang phân tích yêu cầu
         </div>
         {origin && <RequestEcho request={request} />}

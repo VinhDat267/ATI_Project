@@ -188,4 +188,26 @@ Khôi phục bố cục không gian làm việc hội thoại Planora (Planora C
     - `npm test -w @wap/chat-web`: PASS 100/100 test files, 1119/1119 tests (exit code 0).
     - `npm run build:v3`: PASS (exit code 0).
     - `node scripts/test-v3-web-build-security.mjs`: PASS (exit code 0).
-- **Trạng thái:** `STATUS: READY_FOR_CODEX_REVIEW`.
+
+- **Kết quả xử lý Findings Round 6 (P2-1, P2-2, P3-1) (05/11/2026):**
+  1. **Xử lý [P2-1] - Khôi phục nút "Sửa yêu cầu" và triệt tiêu bong bóng lặp lại:**
+     - `apps/chat-web/src/planora/workspace/PlanoraActiveTurn.tsx`: Truyền nguyên vẹn `request={request ?? ''}` xuống `ExpandedClarificationMoment`, `AnswerMoment`, `RefusalMoment` bảo toàn hành vi nút "Sửa yêu cầu" (`onEdit(request)`) và logic phát hiện dịch vụ (`mentioned`).
+     - Bổ sung prop `hideRequestEcho?: boolean` (truyền `!props.legacyCockpit`) vào `ExpandedClarificationMoment`, `AnswerMoment`, `RefusalMoment`, `PlanningErrorMoment` và `ResponseCard`.
+     - `ResponseCard` (`ResponseMoment.tsx`): khi `hideRequestEcho === true`, triệt tiêu hoàn toàn khối bong bóng `#user-request-bubble-text` và `<RequestEcho>`.
+     - `SlowPlanningMoment`: truyền `request={props.legacyCockpit ? request : undefined}` để triệt tiêu `<RequestEcho>`.
+  2. **Xử lý [P2-2] - Xóa sạch #FF5701, Make.com Orbital Flow, ATI, Chưa lập kế hoạch, JSON.stringify và sửa tương phản Dark Mode:**
+     - `RequestMoments.tsx`: Nút "Gửi yêu cầu" dùng `text-[var(--planora-on-primary)]` trên nền `var(--planora-primary)` và `hover:bg-[var(--planora-primary-hover)]` đạt tương phản WCAG AA Dark Mode. Thay toàn bộ `#FF5701`, `brand-primary`, `shadow-orange-glow` bằng `var(--planora-primary)` và xóa bỏ hoàn toàn huy hiệu cấm `"Make.com Orbital Flow"`.
+     - `ResponseMoment.tsx`: Thay toàn bộ `#FF5701`, `#E04D00` bằng `var(--planora-primary)` / `var(--planora-primary-hover)` và `text-[var(--planora-on-primary)]`. Xóa bỏ fallback `"Chưa lập kế hoạch"`.
+     - `PlanningErrors.tsx`: Đổi "ATI đang suy nghĩ lâu hơn thường lệ", "ATI chưa lập xong kế hoạch" thành "Planora đang chuẩn bị kế hoạch...", đổi các màu cam còn sót sang `var(--planora-primary)`.
+     - `PlanoraActiveTurn.tsx`: Thay thế khối `<pre>{JSON.stringify(state.activePlan, null, 2)}</pre>` bằng danh sách các bước công việc thân thiện nghiệp vụ.
+  3. **Xử lý [P3-1] - Khung custom-sheet-form rỗng và đồng bộ browser tests:**
+     - `ClarificationMoment.tsx`: Chỉ render `#custom-sheet-form` và `<label>` khi `!inputHidden`.
+     - Cập nhật `fe-05-cockpit.spec.ts` và `fe-05b-parity-a.spec.ts` để tương thích cả Cockpit và Planora Feed.
+  4. **Kiểm tra kỹ thuật thực tế:**
+     - `npm run typecheck:v3`: PASS (exit code 0).
+     - `npm test -w @wap/chat-web -- planora-chat`: PASS 25/25 tests (exit code 0).
+     - `npm test -w @wap/chat-web`: PASS 100/100 test files, 1123/1123 tests (exit code 0).
+     - `npm run build:v3`: PASS (exit code 0, 196 modules transformed).
+     - `node scripts/test-v3-web-build-security.mjs`: PASS (exit code 0).
+
+- **Trạng thái:** `STATUS: READY_FOR_REVIEW`.

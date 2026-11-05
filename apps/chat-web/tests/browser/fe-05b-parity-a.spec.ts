@@ -121,10 +121,11 @@ test('FE-05b clarification before plan has one textarea and explicit radio confi
     .getByRole('radio', { name: 'Để tôi gõ tên hoặc link khác' })
     .click();
   await expect(page.locator('textarea:visible')).toHaveCount(1);
-  expect(await page.locator('#custom-sheet-input').evaluate(el => getComputedStyle(el).outlineColor)).toBe('rgba(0, 0, 0, 0)');
+  const activeInput = page.locator('#custom-sheet-input:visible, #prompt-input:visible').first();
+  expect(await activeInput.evaluate(el => getComputedStyle(el).outlineColor)).toBe('rgba(0, 0, 0, 0)');
   await page.getByRole('radio').first().click();
   await expect(page.locator('#moment-3')).toBeVisible();
-  await page.getByRole('button', { name: 'Xác nhận và tiếp tục' }).click();
+  await page.getByRole('button', { name: /Xác nhận và tiếp tục/ }).click();
   await expect(
     page.getByRole('button', { name: 'Duyệt kế hoạch', exact: true }),
   ).toBeVisible();

@@ -163,7 +163,7 @@ export function PlanoraActiveTurn(props: PlanoraActiveTurnProps) {
           }}
         />
       ) : moment === 'answer' && latestMessage ? (
-        <AnswerMoment key={latestMessage.id} message={latestMessage} request={request ?? ''} services={services} />
+        <AnswerMoment key={latestMessage.id} message={latestMessage} request={request ?? ''} services={services} hideRequestEcho={!props.legacyCockpit} />
       ) : moment === 'refusal' && latestMessage ? (
         <RefusalMoment
           message={latestMessage}
@@ -177,12 +177,13 @@ export function PlanoraActiveTurn(props: PlanoraActiveTurnProps) {
           onResend={onSend}
           servicesLoading={servicesLoading}
           onRefreshServices={onRefreshServices}
+          hideRequestEcho={!props.legacyCockpit}
         />
       ) : expanded && state.activeClarification && variant ? (
         <ExpandedClarificationMoment
           clarification={state.activeClarification}
           variant={variant}
-          request={props.legacyCockpit ? (request ?? '') : ''}
+          request={request ?? ''}
           services={services}
           canConfigure={canConfigure}
           selected={selected}
@@ -192,10 +193,11 @@ export function PlanoraActiveTurn(props: PlanoraActiveTurnProps) {
           navigate={navigate}
           planning={state.isPlanning}
           hideSubmit={!props.legacyCockpit}
+          hideRequestEcho={!props.legacyCockpit}
         />
       ) : slow ? (
         <SlowPlanningMoment
-          request={request}
+          request={props.legacyCockpit ? request : undefined}
           seconds={Math.floor(milliseconds / 1000)}
           gather={state.gatherState}
           services={services}
@@ -210,6 +212,7 @@ export function PlanoraActiveTurn(props: PlanoraActiveTurnProps) {
           networkError={networkError}
           onRetry={() => onSend(request ?? '')}
           onEdit={() => editRequest(request ?? '')}
+          hideRequestEcho={!props.legacyCockpit}
         />
       ) : moment === 1 ? (
         <RequestMoment
@@ -363,7 +366,26 @@ export function PlanoraActiveTurn(props: PlanoraActiveTurnProps) {
           )}
           {state.executionSnapshot?.execution.status === 'stopped' && <p role="status">Quy trình đã dừng.</p>}
           {moment !== 4 && state.activePlan && (
-            <details className="mt-5"><summary>Kế hoạch {state.planStatus === 'preview' ? 'đang chờ' : 'đã duyệt'}: <span>{state.activePlan.summary}</span></summary><pre className="whitespace-pre-wrap break-all">{JSON.stringify(state.activePlan, null, 2)}</pre></details>
+            <details className="mt-5 text-sm text-[var(--planora-text)]">
+              <summary className="cursor-pointer font-medium hover:text-[var(--planora-primary)]">
+                Kế hoạch {state.planStatus === 'preview' ? 'đang chờ' : 'đã duyệt'}: <span>{state.activePlan.summary}</span>
+              </summary>
+              <div className="mt-3 space-y-2">
+                <ol className="list-decimal list-inside space-y-1.5 text-xs text-[var(--planora-text)]">
+                  {state.activePlan.steps.map((step, idx) => (
+                    <li key={step.id ?? idx} className="p-2.5 rounded-xl bg-white border border-[var(--planora-divider)] shadow-2xs">
+                      <span className="font-semibold text-[var(--planora-text)]">Bước {idx + 1}: </span>
+                      <span>{step.description || step.tool}</span>
+                      {step.tool && (
+                        <span className="ml-2 font-mono text-[11px] text-[var(--planora-muted)]">
+                          ({step.tool})
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </details>
           )}
           {state.executionLoadError && <p role="alert">Không tải được trạng thái thực thi: {state.executionLoadError}. Hãy mở lại hội thoại.</p>}
         </section>

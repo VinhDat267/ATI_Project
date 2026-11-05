@@ -10,7 +10,7 @@ import type { ChatMessage, ClarificationState, ServiceInfo } from '../../types';
 import { RequestEcho, useScheduledOrigin } from '../Cockpit/RequestEcho';
 
 const secondary = 'px-4 py-2 bg-white hover:bg-neutral-50 text-[#111827] border border-[#E7E7E2] text-xs sm:text-sm font-medium rounded-xl transition-colors';
-const primary = 'px-4 py-2 bg-[#FF5701] hover:bg-[#E04D00] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition-colors';
+const primary = 'px-4 py-2 bg-[var(--planora-primary)] hover:bg-[var(--planora-primary-hover)] text-[var(--planora-on-primary)] text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition-colors';
 const labels = { healthy: 'Kết nối tốt', unhealthy: 'Không kết nối được', unchecked: 'Chưa kiểm tra', unconfigured: 'Chưa kết nối' };
 
 export function clarificationVariant(clarification: ClarificationState | null, request: string): 'read-only' | 'destination' | null {
@@ -30,7 +30,7 @@ export function NoWritesNotice() {
     <span>Chưa có gì được ghi lên công cụ nào.</span>
   </div>;
 }
-export function AnswerMoment({ message, request, services }: { message: ChatMessage; request: string; services: ServiceInfo[] }) {
+export function AnswerMoment({ message, request, services, hideRequestEcho }: { message: ChatMessage; request: string; services: ServiceInfo[]; hideRequestEcho?: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const lookups = message.metadata?.lookups ?? [];
   const directory = message.metadata?.usedDirectory ?? [];
@@ -38,7 +38,7 @@ export function AnswerMoment({ message, request, services }: { message: ChatMess
   const names = [...new Set([...lookups.map(lookup => lookup.tool.split('.')[0]), ...directory])].map(serviceName);
   const source = [lookups.length ? `${lookups.length} lần tra cứu` : '', directory.length ? `Danh mục ${directory.map(serviceName).join(', ')}` : ''].filter(Boolean).join(' · ');
   const safeLink = (link: string) => { try { return new URL(link).protocol === 'https:'; } catch { return false; } };
-  return <ResponseCard request={request} title="Câu trả lời" moment="answer">
+  return <ResponseCard request={request} title="Câu trả lời" moment="answer" hideRequestEcho={hideRequestEcho}>
     <p data-answer-text className="text-sm sm:text-base text-[#111827] leading-relaxed whitespace-pre-wrap break-words">{message.content}</p>
     <p className="text-xs sm:text-sm text-[#6B7280]">{source}{source ? ' · ' : ''}hãy kiểm lại ở {names.join(', ') || 'dịch vụ đã kết nối'}.</p>
     {lookups.length > 0 && <div>
@@ -47,16 +47,16 @@ export function AnswerMoment({ message, request, services }: { message: ChatMess
         {lookups.map((lookup, index) => <li key={index} className="border border-[#E7E7E2] rounded-xl p-3">
           <p className="font-mono">{lookup.tool}</p>{lookup.query !== undefined && <p>{lookup.query}</p>}
           <p>{lookup.resultCount} kết quả</p>
-          {lookup.links.filter(safeLink).map(link => <p key={link}><a className="text-[#FF5701] underline break-all" href={link} target="_blank" rel="noopener noreferrer">{link}</a></p>)}
+          {lookup.links.filter(safeLink).map(link => <p key={link}><a className="text-[var(--planora-primary)] underline break-all" href={link} target="_blank" rel="noopener noreferrer">{link}</a></p>)}
         </li>)}
       </ul>}
     </div>}
   </ResponseCard>;
 }
-function ResponseCard({ request, title, children, moment }: { request: string; title: string; children: ReactNode; moment: string }) {
+function ResponseCard({ request, title, children, moment, hideRequestEcho }: { request: string; title: string; children: ReactNode; moment: string; hideRequestEcho?: boolean }) {
   const origin = useScheduledOrigin();
   return <section id={`moment-${moment}`} data-moment={moment} aria-label="Cockpit" className="v3-space-y-6">
-    {origin ? <RequestEcho request={request} /> : <div className="flex items-start justify-end gap-3">
+    {hideRequestEcho ? null : origin ? <RequestEcho request={request} /> : <div className="flex items-start justify-end gap-3">
       <div className="max-w-xl bg-white border border-[#E7E7E2] rounded-2xl rounded-tr-sm p-4 sm:p-5 shadow-sm min-w-0">
         <div className="flex items-center justify-between gap-4 mb-1.5 text-xs text-[#6B7280]"><span className="font-semibold text-[#111827]">Bạn</span><span className="text-[11px] text-[#9CA3AF]">Yêu cầu đã gửi</span></div>
         <p id="user-request-bubble-text" className="text-sm sm:text-base font-medium text-[#111827] leading-relaxed break-words">{request}</p>
@@ -74,9 +74,7 @@ function ResponseCard({ request, title, children, moment }: { request: string; t
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[var(--planora-surface-inset)] text-[var(--planora-muted)] border border-[var(--planora-divider)]"><span className="w-1.5 h-1.5 rounded-full bg-[var(--planora-pending-text)]" />Cần kết nối thêm</span>
           ) : moment === '3' ? (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[var(--planora-surface-inset)] text-[var(--planora-muted)] border border-[var(--planora-divider)]"><span className="w-1.5 h-1.5 rounded-full bg-[var(--planora-primary)]" />Làm rõ yêu cầu</span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[var(--planora-surface-inset)] text-[var(--planora-muted)] border border-[var(--planora-divider)]"><span className="w-1.5 h-1.5 rounded-full bg-[var(--planora-muted)]" />Chưa lập kế hoạch</span>
-          )}
+          ) : null}
         </div>
         <h1 id="response-card-title" tabIndex={-1} className="font-display font-bold text-2xl sm:text-3xl text-[var(--planora-text)] tracking-tight focus:v3-outline-none focus:ring-2 focus:ring-[var(--planora-primary)]/20 rounded-lg break-words">{title}</h1>
         {children}<NoWritesNotice />
@@ -87,7 +85,7 @@ function ResponseCard({ request, title, children, moment }: { request: string; t
 /** "A", "A và B", "A, B và C". */
 const listOf = (names: string[]) => names.length > 1 ? `${names.slice(0, -1).join(', ')} và ${names[names.length - 1]}` : names[0] ?? '';
 
-export function RefusalMoment({ message, request, services, canConfigure, navigate, onEdit, connectFromChat = false, conversationId, onResend, servicesLoading, onRefreshServices }: {
+export function RefusalMoment({ message, request, services, canConfigure, navigate, onEdit, connectFromChat = false, conversationId, onResend, servicesLoading, onRefreshServices, hideRequestEcho }: {
   message: ChatMessage; request: string; services: ServiceInfo[]; canConfigure: boolean;
   navigate: (path: string) => void; onEdit: (text: string) => void;
   /** OAUTH-01, only while GMAIL_ENABLED is on. Off, the screen stays as before: no reading again, no "Gửi lại yêu cầu". */
@@ -99,6 +97,7 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
   servicesLoading?: boolean;
   /** Reads the services again: the list loaded with the page may be older than this refusal. */
   onRefreshServices?: () => void;
+  hideRequestEcho?: boolean;
 }) {
   const refresh = useRef(onRefreshServices);
   refresh.current = onRefreshServices;
@@ -200,10 +199,10 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
     } catch { if (mounted.current && owns()) setStartError('Không thể bắt đầu kết nối Telegram. Hãy kiểm tra mạng và thử lại.'); }
     finally { pending.current = false; if (mounted.current) setStarting(false); }
   };
-  return <ResponseCard request={request} title={unavailable.length ? 'Tôi chưa làm được yêu cầu này' : 'Việc này tôi chưa làm được'} moment="refusal">
+  return <ResponseCard request={request} title={unavailable.length ? 'Tôi chưa làm được yêu cầu này' : 'Việc này tôi chưa làm được'} moment="refusal" hideRequestEcho={hideRequestEcho}>
     <div id={`scenario-content-${unavailable.length ? 1 : 2}`} className="scenario-panel v3-space-y-5">
       <div className="p-3.5 sm:p-4 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] text-sm text-[#111827] font-medium flex items-start gap-3">
-        <svg aria-hidden="true" className="w-5 h-5 text-[#FF5701] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+        <svg aria-hidden="true" className="w-5 h-5 text-[var(--planora-primary)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
         <div className="v3-space-y-1 min-w-0"><p className="text-sm font-semibold text-[#111827] whitespace-pre-wrap break-words">{reason}</p>{suggestion && <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed whitespace-pre-wrap break-words">{suggestion}</p>}</div>
       </div>
       {unavailable.length > 0 && <div>
@@ -397,6 +396,7 @@ export function ResponseMoment(props: {
   canConfigure?: boolean;
   onEdit?: (text: string) => void;
   onResend?: (text: string) => void;
+  hideRequestEcho?: boolean;
 }) {
   const message: ChatMessage = {
     id: 'refusal',
@@ -419,17 +419,19 @@ export function ResponseMoment(props: {
       connectFromChat={props.connectFromChat ?? true}
       conversationId={props.conversationId}
       onResend={props.onResend}
+      hideRequestEcho={props.hideRequestEcho}
     />
   );
 }
-export function ExpandedClarificationMoment({ clarification, variant, request, services, canConfigure, selected, onSelect, onSend, onEdit, navigate, planning, hideSubmit }: {
+export function ExpandedClarificationMoment({ clarification, variant, request, services, canConfigure, selected, onSelect, onSend, onEdit, navigate, planning, hideSubmit, hideRequestEcho }: {
   clarification: ClarificationState; variant: 'read-only' | 'destination'; request: string; services: ServiceInfo[];
   canConfigure: boolean; selected: string | null; onSelect: (value: string) => void; onSend: (value: string) => void;
   onEdit: (value: string) => void; navigate: (path: string) => void; planning: boolean; hideSubmit?: boolean;
+  hideRequestEcho?: boolean;
 }) {
   const mentioned = services.filter(service => `${request} ${clarification.context ?? ''} ${clarification.question}`.toLocaleLowerCase().includes(service.name.toLocaleLowerCase()));
   const path = mentioned.length === 1 ? `/settings#${encodeURIComponent(mentioned[0].id)}` : '/settings';
-  return <ResponseCard request={request} title={clarification.question} moment="3">
+  return <ResponseCard request={request} title={clarification.question} moment="3" hideRequestEcho={hideRequestEcho}>
     <div id={`scenario-content-${variant === 'read-only' ? 3 : 4}`} className="scenario-panel v3-space-y-5">
       {clarification.context && <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed whitespace-pre-wrap break-words">{clarification.context}</p>}
       <div className="v3-space-y-2" role="radiogroup" aria-label={clarification.question} onKeyDown={event => {
@@ -440,14 +442,14 @@ export function ExpandedClarificationMoment({ clarification, variant, request, s
         const next = event.key === 'Home' ? 0 : event.key === 'End' ? radios.length - 1 : (index + (['ArrowDown', 'ArrowRight'].includes(event.key) ? 1 : -1) + radios.length) % radios.length;
         onSelect(clarification.options[next]); radios[next].focus();
       }}>
-        {clarification.options.map((option, index) => <button key={`${index}:${option}`} type="button" role="radio" aria-checked={selected === option} tabIndex={selected === option || (!selected && index === 0) ? 0 : -1} onClick={() => onSelect(option)} className={variant === 'destination' ? 'inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-[#FF5701] hover:bg-[#E04D00] text-white text-xs sm:text-sm font-semibold shadow-sm transition-all' : `w-full text-left p-3.5 rounded-xl border ${selected === option ? 'border-[#FF5701]' : 'border-[#E7E7E2]'} hover:border-[#FF5701] hover:bg-[#FF5701]/5 bg-white transition-all flex items-center justify-between group shadow-sm gap-3`}>
-          <div className="flex items-center gap-3 min-w-0"><div aria-hidden="true" className={variant === 'destination' ? 'w-5 h-5 bg-white rounded p-0.5 flex items-center justify-center flex-shrink-0' : 'w-8 h-8 rounded-lg bg-neutral-100 flex items-center justify-center flex-shrink-0'}><svg className="w-5 h-5 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 10h8m-8 4h5M6 3h9l3 3v15H6z" /></svg></div><span className={variant === 'destination' ? 'break-words' : 'text-xs sm:text-sm font-semibold text-[#111827] group-hover:text-[#FF5701] transition-colors break-words'}>{option}</span></div>
+        {clarification.options.map((option, index) => <button key={`${index}:${option}`} type="button" role="radio" aria-checked={selected === option} tabIndex={selected === option || (!selected && index === 0) ? 0 : -1} onClick={() => onSelect(option)} className={variant === 'destination' ? 'inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-[var(--planora-primary)] hover:bg-[var(--planora-primary-hover)] text-[var(--planora-on-primary)] text-xs sm:text-sm font-semibold shadow-sm transition-all' : `w-full text-left p-3.5 rounded-xl border ${selected === option ? 'border-[var(--planora-primary)] ring-1 ring-[var(--planora-primary)]' : 'border-[#E7E7E2]'} hover:border-[var(--planora-primary)] hover:bg-[var(--planora-primary)]/5 bg-white transition-all flex items-center justify-between group shadow-sm gap-3`}>
+          <div className="flex items-center gap-3 min-w-0"><div aria-hidden="true" className={variant === 'destination' ? 'w-5 h-5 bg-white rounded p-0.5 flex items-center justify-center flex-shrink-0' : 'w-8 h-8 rounded-lg bg-neutral-100 flex items-center justify-center flex-shrink-0'}><svg className="w-5 h-5 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 10h8m-8 4h5M6 3h9l3 3v15H6z" /></svg></div><span className={variant === 'destination' ? 'break-words' : 'text-xs sm:text-sm font-semibold text-[#111827] group-hover:text-[var(--planora-primary)] transition-colors break-words'}>{option}</span></div>
           {variant === 'destination' && selected === option && <span aria-hidden="true" className="text-[11px] font-semibold flex-shrink-0">Đã chọn</span>}
-          {variant !== 'destination' && <svg aria-hidden="true" className="w-4 h-4 text-[#9CA3AF] group-hover:text-[#FF5701] transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>}
+          {variant !== 'destination' && <svg aria-hidden="true" className="w-4 h-4 text-[#9CA3AF] group-hover:text-[var(--planora-primary)] transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>}
         </button>)}
       </div>
       {variant === 'destination' && <div className="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm text-[#4B5563]" id="s4-role-subline">
-        {canConfigure ? <p>Nơi bạn cần chưa có trong danh sách? <a href={path} onClick={event => { event.preventDefault(); navigate(path); }} className="font-medium text-[#FF5701] hover:underline underline-offset-2">Thêm ở Kết nối dịch vụ{mentioned.length === 1 ? ` → ${mentioned[0].name}` : ''} →</a></p> : <p>Nơi bạn cần chưa có trong danh sách? Hãy báo quản trị viên thêm vào.</p>}
+        {canConfigure ? <p>Nơi bạn cần chưa có trong danh sách? <a href={path} onClick={event => { event.preventDefault(); navigate(path); }} className="font-medium text-[var(--planora-primary)] hover:underline underline-offset-2">Thêm ở Kết nối dịch vụ{mentioned.length === 1 ? ` → ${mentioned[0].name}` : ''} →</a></p> : <p>Nơi bạn cần chưa có trong danh sách? Hãy báo quản trị viên thêm vào.</p>}
       </div>}
       <div className="pt-2 border-t border-[#F3F4F6] flex flex-wrap items-center gap-3">
         {clarification.options.length > 0 && !hideSubmit && <button type="button" disabled={!selected || planning} onClick={() => selected && onSend(selected)} className={primary}>Xác nhận và tiếp tục</button>}

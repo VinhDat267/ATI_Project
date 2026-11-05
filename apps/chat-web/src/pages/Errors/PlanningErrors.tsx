@@ -3,7 +3,7 @@ import { getServiceDefinition } from '@wap/tool-schemas';
 import { toolDefinition } from '../../services/tool-definitions';
 import type { GatherState, ServiceInfo } from '../../types';
 import { RequestEcho, useScheduledOrigin } from '../Cockpit/RequestEcho';
-const primary = 'w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#FF5701] hover:bg-[#e04d00] text-white text-xs font-semibold shadow-sm transition-colors flex items-center justify-center gap-1.5';
+const primary = 'w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[var(--planora-primary)] hover:bg-[var(--planora-primary-hover)] text-[var(--planora-on-primary)] text-xs font-semibold shadow-sm transition-colors flex items-center justify-center gap-1.5';
 const secondary = 'w-full sm:w-auto px-4 py-2.5 rounded-xl bg-white hover:bg-neutral-50 text-[#111827] text-xs font-medium border border-[#E7E7E2] transition-colors';
 export const latePlanNotice = 'Nếu kế hoạch đến sau, nó vẫn nằm trong hội thoại và chưa chạy cho tới khi bạn duyệt.';
 function ErrorIcon({ slow = false }: { slow?: boolean }) {
@@ -19,12 +19,12 @@ export function SlowPlanningMoment({ request, seconds, gather, services, onDismi
   return <section id="view-timeout" data-moment="2" aria-label="Cockpit" className="v3-space-y-6">
     <div className="bg-white rounded-2xl border border-[#E7E7E2] p-6 sm:p-8 shadow-soft max-w-2xl mx-auto v3-space-y-6">
       <div className="flex items-start gap-4">
-        <div className="w-12 h-12 rounded-xl bg-orange-50 text-[#FF5701] flex items-center justify-center flex-shrink-0 border border-orange-200"><ErrorIcon slow /></div>
+        <div className="w-12 h-12 rounded-xl bg-[var(--planora-primary)]/10 text-[var(--planora-primary)] flex items-center justify-center flex-shrink-0 border border-[var(--planora-primary)]/20"><ErrorIcon slow /></div>
         <div className="v3-space-y-1.5 flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap"><span className="px-2 py-0.5 rounded text-[11px] font-bold bg-orange-100 text-orange-800 uppercase tracking-wide">Đang lập kế hoạch</span><span className="text-xs font-mono text-[#FF5701] font-bold">Thời gian chờ: <span id="timer-seconds-display">{seconds}</span>s</span></div>
+          <div className="flex items-center gap-2 flex-wrap"><span className="px-2 py-0.5 rounded text-[11px] font-bold bg-[var(--planora-primary)]/15 text-[var(--planora-primary)] uppercase tracking-wide">Đang lập kế hoạch</span><span className="text-xs font-mono text-[var(--planora-primary)] font-bold">Thời gian chờ: <span id="timer-seconds-display">{seconds}</span>s</span></div>
           <RequestEcho request={request} />
-          <h1 tabIndex={-1} className="font-display font-bold text-xl sm:text-2xl text-[#111827]">ATI đang suy nghĩ lâu hơn thường lệ</h1>
-          <p className="text-sm text-[#4B5563] leading-relaxed">ATI chưa lập xong kế hoạch. Tiến trình bên dưới là thông tin máy chủ đã gửi.</p>
+          <h1 tabIndex={-1} className="font-display font-bold text-xl sm:text-2xl text-[#111827]">Planora đang chuẩn bị kế hoạch...</h1>
+          <p className="text-sm text-[#4B5563] leading-relaxed">Planora đang chuẩn bị kế hoạch lâu hơn thường lệ. Tiến trình bên dưới là thông tin máy chủ đã gửi.</p>
         </div>
       </div>
       <div className="p-4 bg-[#F8F8F6] rounded-xl border border-[#E7E7E2] v3-space-y-3">
@@ -33,9 +33,9 @@ export function SlowPlanningMoment({ request, seconds, gather, services, onDismi
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
           {gather?.steps.map((step, index) => {
             const id = toolDefinition(step.tool)?.service ?? step.tool.split('.')[0];
-            return <div key={`${step.tool}:${index}`} className={`p-2.5 rounded-lg ${step.status === 'running' ? 'bg-orange-50 border-orange-200' : 'bg-white border-[#E7E7E2]'} border flex items-center justify-between gap-2 flex-wrap`}>
+            return <div key={`${step.tool}:${index}`} className={`p-2.5 rounded-lg ${step.status === 'running' ? 'bg-[var(--planora-primary)]/10 border-[var(--planora-primary)]/30' : 'bg-white border-[#E7E7E2]'} border flex items-center justify-between gap-2 flex-wrap`}>
               <span className="break-words">{services.find(row => row.id === id)?.name ?? getServiceDefinition(id)?.name ?? id}{step.result && <span className="block mt-1">{step.result}</span>}</span>
-              <span className={`${step.status === 'completed' ? 'text-emerald-600' : 'text-orange-700'} font-medium`}>{step.status === 'completed' ? '✓ Đã tra cứu' : 'Đang chờ phản hồi…'}</span>
+              <span className={`${step.status === 'completed' ? 'text-emerald-600' : 'text-[var(--planora-primary)]'} font-medium`}>{step.status === 'completed' ? '✓ Đã tra cứu' : 'Đang chờ phản hồi…'}</span>
             </div>;
           })}
           {!gather?.steps.length && <p className="text-[#6B7280]">Chưa có tiến trình tra cứu được gửi từ máy chủ.</p>}
@@ -46,7 +46,7 @@ export function SlowPlanningMoment({ request, seconds, gather, services, onDismi
     </div>
   </section>;
 }
-export function PlanningErrorMoment({ request, networkError = false, onRetry, onEdit }: { request: string; networkError?: boolean; onRetry: () => void; onEdit: () => void }) {
+export function PlanningErrorMoment({ request, networkError = false, onRetry, onEdit, hideRequestEcho }: { request: string; networkError?: boolean; onRetry: () => void; onEdit: () => void; hideRequestEcho?: boolean }) {
   const origin = useScheduledOrigin();
   const label = networkError ? 'Mất kết nối' : 'Sự cố máy chủ';
   const title = networkError ? 'Mất kết nối máy chủ' : 'Sự cố máy chủ';
@@ -57,8 +57,8 @@ export function PlanningErrorMoment({ request, networkError = false, onRetry, on
         <div className="v3-space-y-1.5 flex-1 min-w-0"><div className="flex items-center gap-2 flex-wrap"><span className="px-2 py-0.5 rounded text-[11px] font-bold bg-red-100 text-red-800 uppercase tracking-wide">{label}</span></div><h1 tabIndex={-1} className="font-display font-bold text-xl sm:text-2xl text-[#111827]">{title}</h1><p role="alert" className="text-sm text-[#4B5563] leading-relaxed">{networkError ? 'Không thể kết nối máy chủ. Hãy kiểm tra mạng và thử lại.' : 'Không thể lập kế hoạch lúc này. Hãy thử lại.'}</p></div>
       </div>
       <PlanningSafetyNotice />
-      {origin ? <RequestEcho request={request} /> : request && <div className="v3-space-y-1.5"><div className="flex items-center justify-between text-xs text-[#6B7280]"><span>Câu yêu cầu của bạn:</span></div><div id="failed-prompt-text" className="p-3 bg-[#F8F8F6] rounded-xl border border-[#E7E7E2] text-xs font-mono text-[#111827] break-words whitespace-pre-wrap">{request}</div></div>}
-      {!origin && <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">{request && <button type="button" onClick={onRetry} className={primary}>Thử lại</button>}<button type="button" onClick={onEdit} className={secondary}>Sửa yêu cầu</button></div>}
+      {hideRequestEcho ? null : origin ? <RequestEcho request={request} /> : request && <div className="v3-space-y-1.5"><div className="flex items-center justify-between text-xs text-[#6B7280]"><span>Câu yêu cầu của bạn:</span></div><div id="failed-prompt-text" className="p-3 bg-[#F8F8F6] rounded-xl border border-[#E7E7E2] text-xs font-mono text-[#111827] break-words whitespace-pre-wrap">{request}</div></div>}
+      <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">{request && <button type="button" onClick={onRetry} className={primary}>Thử lại</button>}<button type="button" onClick={onEdit} className={secondary}>Sửa yêu cầu</button></div>
     </div>
   </section>;
 }
