@@ -1,0 +1,48 @@
+{
+  "sourceCommit": "6268e482891143b530b8e4d3500b53bd77a389ea",
+  "runtimeSourcesMatchCommit": true,
+  "recordedAt": "2026-11-05T08:51:53.522Z",
+  "runtimeMode": "live",
+  "database": "PostgreSQL test account; actual OAuth state and session repositories",
+  "scope": "Invalid-code native OAuth callback recovery only",
+  "realConsentAccepted": false,
+  "providerWorkflowWrites": 0,
+  "probeScriptSha256": "c8ddfcd95fa4ca130f0cb8d6bbb640e77212dedb6ea85d9699ea1a71b510fd21",
+  "runs": [
+    {
+      "service": "gmail",
+      "status": "PASS",
+      "originalSessionStatus": 200,
+      "originalStateConsumed": true,
+      "callbackRequests": [
+        {
+          "host": "localhost",
+          "status": 401
+        },
+        {
+          "host": "127.0.0.1",
+          "status": 400
+        }
+      ],
+      "providerExchange": "deliberately invalid code rejected; no real grant consumed"
+    },
+    {
+      "service": "myjira",
+      "status": "PASS",
+      "originalSessionStatus": 200,
+      "originalStateConsumed": true,
+      "callbackRequests": [
+        {
+          "host": "127.0.0.1",
+          "status": 400
+        }
+      ],
+      "providerExchange": "deliberately invalid code rejected; no real grant consumed"
+    }
+  ],
+  "boundaries": [
+    "HTTP 400 is expected for the deliberately invalid authorization code; it is not a successful provider connection.",
+    "Real consent and full workflow/provider readback acceptance remain OPEN.",
+    "No identity, token, cookie, state, code or account data is included in this export."
+  ]
+}
