@@ -36,7 +36,7 @@ export const routes = [
   { kind: 'trello-callback', pattern: /^\/connections\/trello\/callback\/?$/ },
   { kind: 'github-callback', pattern: /^\/connections\/github\/callback\/?$/ },
   { kind: 'notion-callback', pattern: /^\/connections\/(?:my)?notion\/callback\/?$/ },
-  { kind: 'jira-callback', pattern: /^\/connections\/myjira\/callback\/?$/ },
+  { kind: 'jira-callback', pattern: /^\/connections\/(?:my)?jira\/callback\/?$/ },
   { kind: 'telegram-callback', pattern: /^\/connections\/telegram\/callback\/?$/ },
   { kind: 'conversation', pattern: /^\/c\/([^/]+)\/?$/ },
   { kind: 'admin-users', pattern: /^\/admin\/users\/?$/ },

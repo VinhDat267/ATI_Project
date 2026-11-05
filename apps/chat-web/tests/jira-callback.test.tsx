@@ -99,6 +99,16 @@ const mount = () =>
     </StrictMode>
   );
 
+it('completes the configured /connections/jira/callback redirect without losing its OAuth input', async () => {
+  window.history.replaceState({}, '', '/connections/jira/callback?code=SENTINEL_CODE&state=SENTINEL_STATE#secret');
+  mount();
+  await waitFor(() => expect(navigate).toHaveBeenCalledWith('/settings#jira', true));
+  expect(callbacks).toHaveLength(1);
+  expect(callbacks[0]).toMatchObject({ body: { code: 'SENTINEL_CODE', state: 'SENTINEL_STATE' } });
+  expect(window.location.search).toBe('');
+  expect(window.location.hash).toBe('');
+});
+
 it('scrubs the full query before one authenticated callback, including StrictMode replay', async () => {
   mount();
   await waitFor(() => expect(navigate).toHaveBeenCalledWith('/settings#jira', true));

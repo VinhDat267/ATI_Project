@@ -25,6 +25,19 @@ Chứng minh sáu luồng × ba lần live, 36 câu hồi quy và góc nhìn sá
 
 ## Kết quả
 
+### 05/11/2026 — Gỡ lỗi callback Gmail/Jira trước nghiệm thu native
+
+- Source base `63f91f9e`; bản vá callback `6268e482` trên nhánh `test/flow07-app-acceptance`. Chủ dự án xác nhận cả hai kết nối gặp lỗi sau khi provider chuyển về ATI.
+- Jira: redirect đang cấu hình là `/connections/jira/callback`, trong khi router chỉ nhận `/connections/myjira/callback`. Bổ sung alias chính xác, giữ đường dẫn hiện có và cách đọc tham số một lần.
+- Gmail/Jira: khi return host `localhost` giữ session cũ hết hạn nhưng luồng bắt đầu ở `127.0.0.1`, AuthGate xóa session rồi về login sau khi URL đã được scrub. Bản vá dùng input còn trong route để chạy lại cơ chế hop loopback có giới hạn trước khi bỏ callback. Không chuyển token giữa host; không phục hồi khi người dùng hủy, logout chủ động hoặc logout từ tab khác; không hop sang domain ngoài loopback.
+- RED: test callback alias Jira fail trên router cũ; ba ca session hết hạn fail trước khi sửa AuthGate. GREEN: 50 test callback/session liên quan, typecheck v3 PASS. Review độc lập chạy lại 7 file/82 test PASS. Full `npm run check` cuối PASS, exit 0 (API 2.471, web 1.187, eval 500 PASS / 1 preflight SKIP; build/security/launcher/Node PASS).
+- Browser + API + PostgreSQL thật: hai ca Gmail/Jira trở lại host gốc đúng session/browser binding, state được consume, và chỉ có một callback đã xác thực. Bản xuất Gmail ghi nhận callback 401 trên host session cũ; Jira phục hồi qua AuthGate, bản xuất chỉ ghi phản hồi callback tại host gốc. **Dùng code cố ý không hợp lệ** để kiểm tra bước exchange; API callback trả HTTP 400 sau khi exchange bị từ chối là kết quả mong đợi của probe, không phải kết nối OAuth thành công. Các ca callback desktop/mobile hiển thị lỗi hợp lệ thay vì 404 và scrub query.
+- Kết nối Slack của workspace thử lưu token cũ bị `invalid_auth`; đã cập nhật qua API cấu hình bằng token thử hợp lệ sẵn có, thu hẹp đúng kênh `ati-test` đã khai báo. `auth.test`, thông tin kênh và history đều đọc được. Bản cấu hình cũ mã hóa giữ ở artifact cục bộ; không commit credential. Chưa gửi tin nhắn trong phiên này.
+- Artifact riêng tư: `.audit/flow07-app/` trong worktree thực thi, gồm RED/GREEN, ảnh browser, SQL/native callback probe và kết quả kiểm tra cuối. Không đưa dữ liệu tài khoản hoặc OAuth state/code thật vào PR.
+- **Còn mở:** chủ dự án cần kết nối lại Gmail/Jira trên app chạy bản vá để xác nhận consent/exchange thật. 18 lượt workflow có external writes/readback và sáu persona qua app/history chưa được chứng nhận bởi các probe callback này. FLOW-07 giữ OPEN.
+
+### Kết quả trước vòng sửa callback
+
 Đính chính sau review PR #277: các kết quả dưới đây là kết quả kỹ thuật offline hoặc ghi nhận của người vận hành; **không đóng bốn cổng nghiệm thu live**. Test đã đổi tên thành `evaluations/tests/current-flow-offline.test.ts`. Log lịch sử và output bên dưới được giữ để đối chiếu, không dùng làm bằng chứng 18 lượt thực thi provider.
 
 1. **Gate 1: Pre-flight Connector Health Check & Named Blockers (Read-only)**
