@@ -38,6 +38,32 @@ const sampleLinearSteps: PlanStep[] = [
   },
 ];
 
+function getLuminance(r: number, g: number, b: number): number {
+  const [rs, gs, bs] = [r, g, b].map((c) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+}
+
+function getContrastRatio(hex1: string, hex2: string): number {
+  const parseHex = (h: string) => {
+    const clean = h.replace('#', '');
+    return [
+      parseInt(clean.slice(0, 2), 16),
+      parseInt(clean.slice(2, 4), 16),
+      parseInt(clean.slice(4, 6), 16),
+    ] as const;
+  };
+  const [r1, g1, b1] = parseHex(hex1);
+  const [r2, g2, b2] = parseHex(hex2);
+  const l1 = getLuminance(r1, g1, b1);
+  const l2 = getLuminance(r2, g2, b2);
+  const lighter = Math.max(l1, l2);
+  const darker = Math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
 describe('PL-06: PlanoraWorkflowSteps Component', () => {
   it('renders Planora step cards sequence with index, action, read/write side-effects, and dependsOn', () => {
     const onPreview = vi.fn();
@@ -60,11 +86,15 @@ describe('PL-06: PlanoraWorkflowSteps Component', () => {
     expect(within(step1Card).getByText(/Bước 1/i)).toBeInTheDocument();
     expect(within(step1Card).getByText('Chỉ đọc')).toBeInTheDocument();
     expect(within(step1Card).getByText('Đọc từ bảng tính của bạn: Bảng KPI Q4')).toBeInTheDocument();
+    // Honest Read Disclosure (Chuẩn D1)
+    expect(within(step1Card).getByText('Sẽ đọc khi bạn duyệt kế hoạch')).toBeInTheDocument();
 
     const step2Card = screen.getByTestId('planora-step-card-step_2');
     expect(within(step2Card).getByText(/Bước 2/i)).toBeInTheDocument();
     expect(within(step2Card).getByText('Ghi')).toBeInTheDocument();
     expect(within(step2Card).getByText(/Phụ thuộc: Việc 1/i)).toBeInTheDocument();
+    // Dependent business parameter placeholder (Chuẩn D1)
+    expect(within(step2Card).getByText('‹danh sách công việc đọc ở bước 1›')).toBeInTheDocument();
 
     const step3Card = screen.getByTestId('planora-step-card-step_3');
     expect(within(step3Card).getByText(/Bước 3/i)).toBeInTheDocument();
@@ -166,7 +196,33 @@ describe('PL-06: PlanMoment Action Bar & Safety Controls', () => {
     steps: sampleLinearSteps,
   };
 
-  it('renders cryptographic plan_hash binding and preserves approval busy locking against double-clicks', () => {
+  it('verifies absence of raw JSON dumps and technical details accordion (UX-F1)', () => {
+    render(
+      <PlanMoment
+        request="Đọc KPI và gửi Slack"
+        runtimeMode="sandbox"
+        plan={plan}
+        services={[]}
+        destination={(step) => step.description}
+        onPreview={vi.fn()}
+        onApprove={vi.fn()}
+        onCancel={vi.fn()}
+        onEdit={vi.fn()}
+        inlineComposer={null}
+      />
+    );
+
+    // No <pre> blocks with JSON.stringify in DOM
+    expect(document.querySelector('pre')).toBeNull();
+    expect(document.querySelector('#tech-details-panel')).toBeNull();
+    expect(screen.queryByText(/Chi tiết kỹ thuật/i)).toBeNull();
+
+    // No raw plan_hash string exposed to the user
+    expect(screen.queryByText(/sha256_mock_hash/i)).toBeNull();
+    expect(document.body.textContent).not.toContain('plan_hash');
+  });
+
+  it('preserves approval busy locking against double-clicks and renders dynamic action verbs', () => {
     const onApprove = vi.fn();
     const onCancel = vi.fn();
     const onEdit = vi.fn();
@@ -186,31 +242,135 @@ describe('PL-06: PlanMoment Action Bar & Safety Controls', () => {
       />
     );
 
-    // Cryptographic hash binding
-    expect(screen.getByTestId('plan-hash-binding')).toHaveTextContent(/sha256_mock_hash_89abcdef0123456789abcdef/i);
+    // Action button shows dynamic text for multi-step plan
+    expect(screen.getByTestId('planora-approve-btn-text')).toHaveTextContent('Duyệt và thực hiện 3 việc');
 
-    // Action buttons
     const approveBtn = screen.getByRole('button', { name: /Duyệt kế hoạch/i });
     expect(approveBtn).toBeEnabled();
 
-    // First click triggers onApprove
-    fireEvent.click(approveBtn);
-    expect(onApprove).toHaveBeenCalledTimes(1);
-
-    // Immediate second click is locked (double approve guard)
+    // First click triggers onApprove and locks immediately
     fireEvent.click(approveBtn);
     expect(onApprove).toHaveBeenCalledTimes(1);
     expect(approveBtn).toBeDisabled();
+    expect(screen.getByText('Đang xử lý...')).toBeInTheDocument();
+
+    // Second click blocked
+    fireEvent.click(approveBtn);
+    expect(onApprove).toHaveBeenCalledTimes(1);
 
     // Cancel button
     const cancelBtn = screen.getByRole('button', { name: /Hủy/i });
     fireEvent.click(cancelBtn);
     expect(onCancel).toHaveBeenCalledTimes(1);
+  });
 
-    // Sửa qua Chat
+  it('renders specific business verb for single-step plan', () => {
+    const singleSlackPlan: ActivePlan = {
+      id: 'plan_slack_single',
+      summary: 'Gửi tin nhắn Slack',
+      steps: [
+        {
+          id: 'step_slack',
+          tool: 'slack.send_message',
+          description: 'Gửi tin Slack #thong-bao',
+          args: { channel: '#thong-bao', text: 'Chào buổi sáng' },
+        },
+      ],
+    };
+
+    const { unmount } = render(
+      <PlanMoment
+        request="Gửi tin nhắn Slack"
+        runtimeMode="sandbox"
+        plan={singleSlackPlan}
+        services={[]}
+        destination={(step) => step.description}
+        onPreview={vi.fn()}
+        onApprove={vi.fn()}
+        onCancel={vi.fn()}
+        onEdit={vi.fn()}
+        inlineComposer={null}
+      />
+    );
+
+    expect(screen.getByTestId('planora-approve-btn-text')).toHaveTextContent('Gửi tin nhắn Slack ngay');
+    unmount();
+
+    const singleSheetsPlan: ActivePlan = {
+      id: 'plan_sheets_single',
+      summary: 'Ghi thêm dòng KPI',
+      steps: [
+        {
+          id: 'step_sheets',
+          tool: 'mysheets.append_rows',
+          description: 'Ghi thêm dòng',
+          args: { spreadsheetId: 'sheet-1', range: 'A1:B1', rows: [['A', 'B']] },
+        },
+      ],
+    };
+
+    render(
+      <PlanMoment
+        request="Ghi thêm dòng"
+        runtimeMode="sandbox"
+        plan={singleSheetsPlan}
+        services={[]}
+        destination={(step) => step.description}
+        onPreview={vi.fn()}
+        onApprove={vi.fn()}
+        onCancel={vi.fn()}
+        onEdit={vi.fn()}
+        inlineComposer={null}
+      />
+    );
+
+    expect(screen.getByTestId('planora-approve-btn-text')).toHaveTextContent('Lưu vào bảng tính');
+  });
+
+  it('locks plan and shows replacement badge when user clicks "Sửa qua Chat" (Chuẩn D5)', () => {
+    const onEdit = vi.fn();
+
+    render(
+      <PlanMoment
+        request="Đọc KPI và gửi Slack"
+        runtimeMode="sandbox"
+        plan={plan}
+        services={[]}
+        destination={(step) => step.description}
+        onPreview={vi.fn()}
+        onApprove={vi.fn()}
+        onCancel={vi.fn()}
+        onEdit={onEdit}
+        inlineComposer={null}
+      />
+    );
+
     const editBtn = screen.getByRole('button', { name: /Sửa qua Chat/i });
+    const approveBtn = screen.getByRole('button', { name: /Duyệt kế hoạch/i });
+    expect(approveBtn).toBeEnabled();
+
+    // Click "Sửa qua Chat"
     fireEvent.click(editBtn);
     expect(onEdit).toHaveBeenCalledTimes(1);
+
+    // Displays clear replacement status badge
+    const badge = screen.getByTestId('plan-replaced-badge');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveTextContent('Đã thay thế bằng đề xuất mới trong cuộc trò chuyện');
+
+    // Disables approval button on replaced plan card
+    expect(approveBtn).toBeDisabled();
+  });
+
+  it('verifies Primary Dark contrast ratio meets WCAG AA standard (≥ 4.5:1)', () => {
+    const primaryDark = '#8fb68e';
+    const onPrimaryDark = '#171c18';
+    const contrast = getContrastRatio(primaryDark, onPrimaryDark);
+
+    // WCAG AA requirement for normal text is >= 4.5:1
+    expect(contrast).toBeGreaterThanOrEqual(4.5);
+    // Specifically reaches ~7.61:1 as specified in design brief v2.0
+    expect(contrast).toBeGreaterThan(7.0);
   });
 
   it('disables approve button when plan has no valid ID', () => {
@@ -443,59 +603,6 @@ describe('PL-06: Rich Previews & Overflow Safety', () => {
     expect(within(receiptCards[0]).getByText(/✓ Đã đọc/i)).toBeInTheDocument();
     expect(within(receiptCards[1]).getByText(/✓ Đã tạo/i)).toBeInTheDocument();
     expect(within(receiptCards[2]).getByText(/✓ Đã gửi/i)).toBeInTheDocument();
-  });
-
-  it('F2: renders cryptographic plan_hash when present, and displays plan.id as identifier when plan_hash is absent', () => {
-    const planWithHash: ActivePlan & { plan_hash?: string } = {
-      id: 'plan-uuid-9876-5432',
-      plan_hash: 'sha256_mock_hash_real_crypto_abc123',
-      summary: 'Kế hoạch có cryptographic plan_hash',
-      steps: sampleLinearSteps,
-    };
-
-    const { unmount } = render(
-      <PlanMoment
-        plan={planWithHash}
-        services={[]}
-        destination={(step) => step.description}
-        onPreview={vi.fn()}
-        onApprove={vi.fn()}
-        onCancel={vi.fn()}
-        onEdit={vi.fn()}
-        inlineComposer={null}
-        runtimeMode="sandbox"
-      />
-    );
-
-    const bindingWithHash = screen.getByTestId('plan-hash-binding');
-    expect(bindingWithHash).toHaveTextContent('Mã băm ràng buộc kế hoạch (plan_hash): sha256_mock_hash_real_crypto_abc123');
-    unmount();
-
-    // When plan_hash is undefined/missing: must display "Mã định danh kế hoạch: {plan.id}" and NEVER label UUID as plan_hash
-    const planWithoutHash: ActivePlan & { plan_hash?: string } = {
-      id: 'plan-uuid-9876-5432',
-      summary: 'Kế hoạch không có plan_hash',
-      steps: sampleLinearSteps,
-    };
-
-    render(
-      <PlanMoment
-        plan={planWithoutHash}
-        services={[]}
-        destination={(step) => step.description}
-        onPreview={vi.fn()}
-        onApprove={vi.fn()}
-        onCancel={vi.fn()}
-        onEdit={vi.fn()}
-        inlineComposer={null}
-        runtimeMode="sandbox"
-      />
-    );
-
-    const bindingWithoutHash = screen.getByTestId('plan-hash-binding');
-    expect(bindingWithoutHash).toHaveTextContent('Mã định danh kế hoạch: plan-uuid-9876-5432');
-    expect(bindingWithoutHash.textContent).not.toContain('plan_hash');
-    expect(bindingWithoutHash.textContent).not.toContain('Mã băm');
   });
 
   it('F3: shows schedule workflow button only when schedulesEnabled capability is true, and hides it when false or undefined', () => {

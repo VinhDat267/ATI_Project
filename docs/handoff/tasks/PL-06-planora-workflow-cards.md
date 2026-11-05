@@ -80,21 +80,40 @@ Chuyển đổi giao diện hiển thị kế hoạch (Plan), thực thi (Execut
 
 ## 5. Kết quả (Worker điền sau khi hoàn thành)
 
-- **Worker:** Antigravity (Gemini).
-- **Trạng thái:** Đã hoàn thành sửa 3 findings P2 (F1–F3) từ Codex Review Vòng 1 (`STATUS: READY_FOR_CODEX_RE_REVIEW`).
-- **Base SHA:** `e97d71862cee773be9e37f9ef9e456ea36975932`.
+- **Worker:** Antigravity (Gemini 3.8 Flash High).
+- **Trạng thái:** Hoàn tất Refactor Business-First UX theo Design Brief v2.0 & PLANORA-UX-01 (`STATUS: READY_FOR_REVIEW`).
+- **Base SHA:** `514d982fa181829cb93c4a20f92fefae3334657d`.
 - **Target branch:** `codex/planora-ui`.
 - **Các thay đổi chính:**
-  1. `apps/chat-web/src/planora/workspace/PlanoraWorkflowSteps.tsx`: Khởi tạo component hiển thị luồng quy trình Planora hỗ trợ đầy đủ 5 modes (`preview`, `executing`, `receipt`, `schedule`, `blueprint`), step cards hiển thị grid/cột responsive, nhãn Read/Write, phụ thuộc `dependsOn`, data-flow mappings và `showStepCards` toggle. Sửa F1: container `#plan-cards-container` bọc grid step cards `[data-testid="planora-step-cards-grid"]`, card là thẻ `<article>` bảo toàn `[data-od-id]`, preview button `#preview-${step.id}`, responsive 2 cột desktop (`md:grid-cols-2`), lọc `nonRedundantScopes`.
-  2. `apps/chat-web/src/components/WorkflowFlowCanvas.tsx`: Hỗ trợ `variant?: 'orbital' | 'planora'`, các props `serviceInfos`, `destination` và xuất khẩu `PlanoraWorkflowSteps`.
-  3. `apps/chat-web/src/pages/Cockpit/PlanMoment.tsx`: Tích hợp `PlanoraWorkflowSteps` làm renderer chính với `showStepCards={true}`, xóa danh sách thẻ cũ `v3-space-y-3` tránh render trùng lặp; sửa F2: hiển thị rõ `plan_hash` khi tồn tại hoặc `Mã định danh kế hoạch: {plan.id}` khi không có `plan_hash` (không gọi UUID là `plan_hash`).
-  4. `apps/chat-web/src/pages/Cockpit/ExecutionMoment.tsx`: Tích hợp `PlanoraWorkflowSteps` chế độ `executing` với `showStepCards={true}` và trạng thái thời gian thực.
-  5. `apps/chat-web/src/pages/Cockpit/ReceiptMoment.tsx`: Tích hợp `PlanoraWorkflowSteps` chế độ `receipt` với `showStepCards={true}` và tóm tắt kết quả từng bước; sửa F3: ẩn nút `[data-testid="receipt-schedule-workflow-btn"]` khi capability `schedulesEnabled` đang tắt/undefined.
-  6. `apps/chat-web/src/planora/workspace/PlanoraActiveTurn.tsx`: Truyền prop `schedulesEnabled={schedulesEnabled}` xuống `ReceiptMoment`.
-  7. `apps/chat-web/src/pages/Cockpit/{PreviewContents,GmailPreview,PreviewModal}.tsx`: Bảo vệ an toàn chống tràn ngang layout 320px (`overflow-x-auto min-w-0 break-words break-all`), chống giả mạo email Gmail, bảo toàn đầy đủ test selectors.
-  8. `apps/chat-web/tests/planora-workflow-steps.test.tsx`: 13 unit tests chuyên sâu kiểm tra chi tiết workflow steps, action bar busy locking, preview modals, anti-spoofing và kiểm tra cả 3 findings F1, F2, F3.
+  1. `apps/chat-web/src/pages/Cockpit/PlanMoment.tsx`:
+     - Xóa bỏ hoàn toàn accordion "Chi tiết kỹ thuật" và khối `<pre>{JSON.stringify(plan, null, 2)}</pre>` (đóng dứt điểm `UX-F1`).
+     - Xóa bỏ hiển thị raw hash code `plan_hash` trên UI (giữ biến `plan.plan_hash` và `plan.id` ngầm qua data attribute phục vụ approval binding).
+     - Busy locking (chống click đúp): Khi bấm duyệt, chuyển ngay sang trạng thái bận (`isApproving = true`, `disabled = true`, hiển thị spinner + "Đang xử lý..."), ngăn chặn 2 request đồng thời.
+     - Vòng đời Kế hoạch (Chuẩn D5): Khi bấm "Sửa qua Chat" (`onEdit`), khóa thẻ kế hoạch cũ với nền mờ nhẹ, gắn status badge: *"Đã thay thế bằng đề xuất mới trong cuộc trò chuyện"*, vô hiệu hóa nút duyệt.
+     - Action Bar: Với 1 bước dùng động từ hành động cụ thể (*"Gửi tin nhắn Slack ngay"*, *"Lưu vào bảng tính"*...); từ 2 bước trở lên dùng *"Duyệt và thực hiện X việc"*.
+     - Màu tương phản chuẩn D8: Nút Primary Dark `#8fb68e` sử dụng chữ Than tối `#171c18` đạt tỷ lệ tương phản 7.61:1 (chuẩn WCAG AA ≥ 4.5:1).
+  2. `apps/chat-web/src/planora/workspace/PlanoraWorkflowSteps.tsx`:
+     - Loại bỏ hoàn toàn đồ họa Orbital Flow cũ (loại bỏ dứt điểm `UX-F2`): xóa `OrbitalNodeButton`, `orbitalAssets`, `getOrbitalMeta`, `showStatusBubble`, Make.com Router và hoạt họa SVG chấm kết nối quỹ đạo.
+     - Thay thế bằng Chuỗi Thẻ Công việc Trực quan (Step Cards) tuần tự thanh lịch theo bản sắc Planora (nền kem/dark, viền mộc, Be Vietnam Pro).
+     - Phân định trung thực dữ liệu (Chuẩn D1): Bước đọc trong kế hoạch có nhãn *"Sẽ đọc khi bạn duyệt kế hoạch"*; bước tiếp theo có tham số phụ thuộc kết quả bước đọc hiển thị placeholder thanh lịch: `‹danh sách công việc đọc ở bước X›`.
+     - Thanh công cụ dịch vụ ở đầu hiển thị danh sách các dịch vụ tham gia dạng pill/badge tinh tế, bảo toàn các selector `workflow-node-${svc}` và highlight card khi chọn.
+  3. `apps/chat-web/src/pages/Cockpit/ReceiptMoment.tsx` & `ExecutionMoment.tsx`:
+     - Xóa bỏ hoàn toàn raw JSON dump trong `<pre>` của ReceiptMoment.
+     - Hiển thị biên nhận kết quả thanh lịch: permalink thực tế (*"Xem tin nhắn vừa gửi trên Slack"*, *"Mở bảng tính Google Sheets"*...).
+     - Tiến trình thực thi SSE hiển thị từng bước hoàn thành thực tế, không dùng thanh % giả.
+  4. `apps/chat-web/src/pages/Cockpit/PreviewContents.tsx`:
+     - Tích hợp `formatBusinessArgValue`: hiển thị placeholder thân thiện `‹danh sách công việc đọc ở bước 1›` khi tham chiếu output bước đọc, giữ định dạng an toàn cho url references.
+  5. `apps/chat-web/tests/planora-workflow-steps.test.tsx`:
+     - Bổ sung 16 unit tests chuyên sâu kiểm chứng:
+       - Không còn `<pre>{JSON.stringify}` hay accordion "Chi tiết kỹ thuật" trong DOM.
+       - Không hiển thị raw `plan_hash` trên UI.
+       - Bước đọc hiển thị nhãn *"Sẽ đọc khi bạn duyệt kế hoạch"*.
+       - Bước phụ thuộc hiển thị placeholder `‹danh sách công việc đọc ở bước 1›`.
+       - Busy locking nút duyệt khi approve.
+       - Bấm "Sửa qua Chat" hiển thị huy hiệu *"Đã thay thế bằng đề xuất mới trong cuộc trò chuyện"* và vô hiệu hóa nút duyệt.
+       - Tương phản nút Primary Dark đạt chuẩn WCAG AA (≥ 4.5:1, đạt 7.61:1).
 - **Bằng chứng kiểm chứng thực tế:**
   - `npm run typecheck:v3`: Exit code 0.
-  - `npm test -w @wap/chat-web`: 101/101 test files passed, 1128/1128 tests passed (exit code 0).
-  - `node scripts/test-v3-web-build-security.mjs`: PASS (exit code 0).
-  - `npm run build:v3`: Built successfully (exit code 0).
+  - `npm test -w @wap/chat-web`: 101/101 test files passed, 1131/1131 tests passed (exit code 0).
+  - `npm run build:v3`: Exit code 0.
+  - `node scripts/test-v3-web-build-security.mjs`: Exit code 0 (PASS: production build excludes credential sentinels and 7 forbidden UI claims).

@@ -1,12 +1,14 @@
-# Quy ước chung — Antigravity/Gemini thi công, Codex review
+# Quy ước chung — Antigravity/Gemini thi công, Gemini 4 Argon review
 
-Ngày 03/11/2026. File này là context bắt buộc cho mọi prompt PL-xx, không phải lệnh chạy tất cả task.
+Cập nhật 04/11/2026 theo main `cb069061e53776c967ef13e887d7c2adae578716`. File này là context bắt buộc cho mọi prompt PL-xx, không phải lệnh chạy tất cả task.
+
+**Reviewer hiện hành 05/11/2026:** đọc [REVIEWER-POLICY.md](REVIEWER-POLICY.md); model `gemini-4-argon-high` đã được xác minh qua CLI. Quyết định mới thay gate bắt buộc Codex; giữ nguyên review/findings lịch sử.
 
 ## Vai trò và quyền thực hiện
 
 - Điều phối: Antigravity với Gemini; khóa baseline, chuẩn bị đúng card hiện tại, phân file, theo dõi dependency và tập hợp bằng chứng.
 - Thi công: một subagent Antigravity/Gemini cho một PL-xx; không tự nhận task tiếp theo hoặc spawn thêm worker.
-- Review: **Codex độc lập**, không phải Gemini tự review hoặc một Gemini agent được đặt tên “Codex”. Có review từng task và review toàn nhánh cuối.
+- Review: **Gemini 4 Argon (High) độc lập trong Antigravity**, phiên/worktree riêng với worker viết code. Áp dụng [REVIEWER-POLICY.md](REVIEWER-POLICY.md) từ 05/11/2026; không tự review cùng phiên hoặc chỉ đổi tên agent.
 - Chỉ thi công khi task cụ thể đã được giao và các điều kiện duyệt/dependency đã đáp ứng. Bộ prompt được viết không có nghĩa các agent đã được khởi chạy.
 - Không tự merge main, deploy, bật flag runtime hoặc ghi provider thật. Việc merge task vào nhánh tích hợp cũng cần quyền đã được cấp; đủ CI/review là điều kiện kỹ thuật, không tự tạo quyền merge.
 
@@ -16,13 +18,14 @@ Ngày 03/11/2026. File này là context bắt buộc cho mọi prompt PL-xx, kh�
 - docs/handoff/PLANORA-MIGRATION-HANDOFF.md
 - docs/superpowers/specs/2026-11-02-planora-migration-design.md
 - docs/superpowers/plans/2026-11-02-planora-migration.md
-- Task card PL-xx mà điều phối đã giao.
+- docs/handoff/PLANORA-MAIN-SYNC-2026-11-04.md (scope mới và gate đồng bộ main bắt buộc).
+- Task card PL-xx mà điều phối đã giao; card phải phản ánh revision 04/11 trước dispatch.
 
-Quyết định đã chốt: **khôi phục cả bố cục Planora cũ**, gồm sidebar, hội thoại trung tâm, nền kem/xanh rừng. Các màn mới phải cùng phong cách và giữ đủ chức năng main.
+Quyết định mới 05/11/2026: **UI/UX mới từ góc nhìn người dùng, business-first, tự do sáng tạo theo Planora; không dựa cấu trúc UI hiện tại để refactor.** Đọc bắt buộc [spec UX mới](../../superpowers/specs/2026-11-05-planora-business-first-ux.md) và [PLANORA-UX-01](../tasks/PLANORA-UX-01-business-first-redesign.md). Giữ nhận diện Planora và đủ hành vi main; được thiết kế lại composition/props/markup frontend. Mọi phần đã làm phải audit, không đạt phải refactor dù từng PASS kỹ thuật.
 
 Nguồn thị giác đúng: ef13c56:apps/chat-web/DESIGN.md và source liên quan ở Frontend_UXUI. Root DESIGN.md trên nhánh cũ và System Design/ không phải mẫu Planora này. Không merge PR #262 hoặc khôi phục v1/v2 để lấy UI.
 
-Mốc khảo sát là main 1977ec7. Nền bộ prompt ngày 03/11 đã fast-forward tới main 6c235837efa6811064c652b570e8c91bf8f77ab6, gồm GitHub #260 và tài liệu #263; đây cũng không phải cam kết main sẽ đứng yên. Điều phối phải cập nhật inventory theo SHA mới nhất. 22 route/13 moment/8 callback là số liệu lịch sử, không được xóa chức năng mới để ép khớp số đó.
+Mốc khảo sát là main 1977ec7. Nền bộ prompt ngày 03/11 đã fast-forward tới main 6c235837efa6811064c652b570e8c91bf8f77ab6, gồm GitHub #260 và tài liệu #263; đây cũng không phải cam kết main sẽ đứng yên. Điều phối phải cập nhật inventory theo SHA mới nhất. 22 route/13 moment/8 callback là số liệu lịch sử; revision 04/11 đối chiếu 25 route + 404/13 moment/10 callback. Không được xóa chức năng mới để ép khớp số cũ. Giữ /inbox, Slack consent/automation/read/write, Notion scope, Jira v2 và Schedules default-on. Bộ prompt và metadata điều phối giữ local; không publish private commit ancestors trong PR sản phẩm.
 
 ## Git, ownership và dependency
 
@@ -41,7 +44,7 @@ Giữ route/deep link/Back-Forward, AuthGate, controller Workspace, store/hooks/
 - OAuth code/state một lần, returnTo an toàn; kết nối xong không tự gửi lại hoặc duyệt.
 - Manual/auto_digest theo eligibility/policy thật; unknown/reconciliation/needs_attention không tự retry/resend.
 - Một composer, IME, khả năng đọc lịch sử, focus, keyboard, dark mode và reduced motion.
-- Tên/ID/timestamp/trạng thái/kết quả thật; không tạo progress/success/connected giả.
+- Nội dung nghiệp vụ, tên tài nguyên/người nhận/thời gian và kết quả thật; ID/hash/enum/tool name giữ nội bộ, không raw data lên UI. Không tạo progress/success/connected giả.
 - Theme key ati-theme và identifiers kỹ thuật; đổi brand hiển thị không có nghĩa đổi URL/API/invite-code.
 
 ## Bằng chứng và kiểm thử
@@ -51,10 +54,10 @@ Giữ route/deep link/Back-Forward, AuthGate, controller Workspace, store/hooks/
 - Theo card chạy nhóm test liên quan, typecheck/build phù hợp; ghi command, SHA, exit code, pass/fail và NOT_RUN có lý do. Chỉ báo PASS từ output đã thực chạy.
 - Database/concurrency cần DB/pool/truy vấn thật; timeout cần AbortSignal thật. Test UI async có thể dùng deferred response để chứng minh stale-response guard.
 - Browser dùng sandbox và PostgreSQL16/port/container riêng theo harness; không copy .env live hoặc dùng DB/server của người khác. Không thêm bí mật vào log/PR.
-- Ảnh đối chiếu Planora core: 1440x900/375x812. Màn mới sáng/tối 1440/1024/768/375, overflow320. Chỉ claim viewport/state đã thực kiểm.
+- Nhận diện tham chiếu Planora và walkthrough công việc theo spec UX mới; không pixel parity/cấu trúc cũ. Ảnh core: 1440x900/375x812. Màn mới sáng/tối 1440/1024/768/375, overflow320. Chỉ claim viewport/state đã thực kiểm.
 - Không xóa assertion nghiệp vụ để đổi layout. Ghi rõ assertion hình thức prototype cũ được thay bằng reference mới đã duyệt.
 
-## Bàn giao cho Codex
+## Bàn giao cho Gemini 4 Argon
 
 Sau task, điền Kết quả card và thêm log mới; tạo/cập nhật task PR theo template nếu được giao. Trả packet sau trong chat, không tự nhận Đạt:
 
@@ -66,6 +69,9 @@ BASE_SHA (40 ký tự):
 HEAD_SHA (40 ký tự):
 PR_URL hoặc LOCAL_ONLY:
 FILES:
+USER JOB / INFORMATION HIERARCHY / PRIMARY ACTION:
+BUSINESS COPY + DATA MAPPING (không raw kỹ thuật trên UI):
+PRIOR UX AUDIT FINDINGS + KEEP/REDESIGN EVIDENCE nếu phần đã làm:
 BEHAVIOR / VISUAL CHANGES:
 TEST COMMANDS + EXIT CODE + PASS/FAIL:
 RED EVIDENCE nếu có thay đổi hành vi:
@@ -73,6 +79,6 @@ SCREENSHOTS / TRACE / LOG PATHS:
 ENVIRONMENT (sandbox/DB riêng, không secrets):
 NOT_RUN / LIMITATIONS:
 KNOWN RISKS / INTERFACE NOTES:
-STATUS: READY_FOR_CODEX_REVIEW
+STATUS: READY_FOR_REVIEW
 
-Nếu dependency thiếu, trả WAITING_DEPENDENCY và ID/SHA thiếu. Nếu cần contract ngoài scope, trả NEEDS_INTERFACE_DECISION và bằng chứng. Sau khi nhận finding từ Codex, dùng prompt sửa review; không tự miễn finding hoặc nhảy task.
+Nếu dependency thiếu, trả WAITING_DEPENDENCY và ID/SHA thiếu. Nếu cần contract ngoài scope, trả NEEDS_INTERFACE_DECISION và bằng chứng. Sau khi nhận finding từ Gemini 4 Argon, dùng prompt sửa review; không tự miễn finding hoặc nhảy task.

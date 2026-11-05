@@ -1,7 +1,6 @@
 // Source: AppStagePage.tsx PREVIEW.card/issue/rows/message content, with actual plan arguments.
 import { toolDefinition } from '../../services/tool-definitions';
 import type { PlanStep } from '../../types';
-import { formatArgValue } from '../../components/PlanStepItem';
 import { operation } from './presentation';
 import { GmailPreview } from './GmailPreview';
 
@@ -25,7 +24,41 @@ const names: Record<string, string> = {
   query: 'Từ khóa tìm kiếm',
 };
 
-const text = (value: unknown) => formatArgValue(value).text;
+export function formatBusinessArgValue(value: unknown): { text: string; isRef: boolean } {
+  if (typeof value === 'string' && value.startsWith('$step_')) {
+    const num = value.match(/\d+/)?.[0] ?? '1';
+    return { text: `‹danh sách công việc đọc ở bước ${num}›`, isRef: true };
+  }
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const { $ref, $template } = value as { $ref?: unknown; $template?: unknown };
+    if (typeof $ref === 'string') {
+      if ($ref.endsWith('.url') || $ref.endsWith('.html_url')) {
+        const [stepId, , ...field] = $ref.split('.');
+        return { text: `‹kết quả ${stepId}${field.length ? `: ${field.join('.')}` : ''}›`, isRef: true };
+      }
+      const num = $ref.match(/step_?(\d+)/i)?.[1] ?? '1';
+      return { text: `‹danh sách công việc đọc ở bước ${num}›`, isRef: true };
+    }
+    if (typeof $template === 'string') {
+      const replaced = $template.replace(/\$\{([^}]+)\}/g, (_, path: string) => {
+        if (path.endsWith('.url') || path.endsWith('.html_url')) {
+          const [stepId, , ...field] = path.split('.');
+          return `‹kết quả ${stepId}${field.length ? `: ${field.join('.')}` : ''}›`;
+        }
+        const num = path.match(/step_?(\d+)/i)?.[1] ?? '1';
+        return `‹danh sách công việc đọc ở bước ${num}›`;
+      });
+      return { text: replaced, isRef: false };
+    }
+    return { text: JSON.stringify(value), isRef: false };
+  }
+  if (Array.isArray(value)) {
+    return { text: value.map((item) => formatBusinessArgValue(item).text).join(', '), isRef: false };
+  }
+  return { text: String(value), isRef: false };
+}
+
+const text = (value: unknown) => formatBusinessArgValue(value).text;
 
 function OtherArguments({ step, except }: { step: PlanStep; except: string[] }) {
   return (

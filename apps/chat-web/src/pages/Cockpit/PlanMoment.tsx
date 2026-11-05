@@ -3,6 +3,22 @@ import { useState, type ReactNode } from 'react';
 import type { ActivePlan, PlanStep, ServiceInfo } from '../../types';
 import { PlanoraWorkflowSteps } from '../../planora/workspace/PlanoraWorkflowSteps';
 import { RequestEcho } from './RequestEcho';
+import { operation } from './presentation';
+
+function getSingleStepApproveVerb(step: PlanStep): string {
+  const tool = step.tool || '';
+  if (tool.startsWith('slack.')) return 'Gửi tin nhắn Slack ngay';
+  if (tool.startsWith('mysheets.') || tool.startsWith('sheets.')) return 'Lưu vào bảng tính';
+  if (tool.startsWith('mycalendar.') || tool.startsWith('calendar.')) return 'Lưu vào lịch';
+  if (tool.startsWith('gmail.')) return 'Gửi email ngay';
+  if (tool.startsWith('trello.')) return 'Tạo thẻ Trello';
+  if (tool.startsWith('github.')) return 'Tạo issue trên GitHub';
+  if (tool.startsWith('myjira.') || tool.startsWith('jira.')) return 'Tạo công việc Jira';
+  if (tool.startsWith('telegram.')) return 'Gửi tin Telegram ngay';
+  if (tool.startsWith('notion.')) return 'Lưu vào Notion';
+  const op = operation(tool);
+  return `${op.action} ngay`;
+}
 
 export function PlanMoment({
   request,
@@ -29,34 +45,60 @@ export function PlanMoment({
   inlineComposer: ReactNode;
   isApproving?: boolean;
 }) {
-  const [techOpen, setTechOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<string | null>(null);
   const [approvingLocal, setApprovingLocal] = useState(false);
+  const [isReplacedByChat, setIsReplacedByChat] = useState(false);
+
+  const isBusy = approvingLocal || isApproving;
+  const isApproveDisabled = !plan.id || isBusy || isReplacedByChat;
 
   const handleApprove = () => {
-    if (approvingLocal || isApproving || !plan.id) return;
+    if (isApproveDisabled) return;
     setApprovingLocal(true);
     onApprove();
   };
 
-  const isApproveDisabled = !plan.id || approvingLocal || isApproving;
+  const handleEdit = () => {
+    setIsReplacedByChat(true);
+    onEdit();
+  };
+
+  const stepCount = plan.steps?.length ?? 0;
+  const approveButtonText =
+    stepCount === 1
+      ? getSingleStepApproveVerb(plan.steps[0])
+      : `Duyệt và thực hiện ${stepCount} việc`;
 
   return (
     <section
       id="moment-4"
-      className="stage-section is-active v3-space-y-6 relative max-w-full"
+      className={`stage-section is-active v3-space-y-6 relative max-w-full transition-all ${
+        isReplacedByChat ? 'opacity-70 bg-[var(--planora-canvas)]/60 rounded-2xl p-3 sm:p-4' : ''
+      }`}
       aria-label="Cockpit"
       data-moment="4"
       aria-labelledby="heading-moment-4"
     >
       <div className="v3-space-y-2">
         <RequestEcho request={request} />
+        {isReplacedByChat && (
+          <div
+            data-testid="plan-replaced-badge"
+            role="status"
+            className="p-3.5 rounded-xl bg-[var(--planora-surface-inset)] border border-[var(--planora-divider)] text-xs sm:text-sm text-[var(--planora-muted)] font-medium flex items-center gap-2 shadow-2xs"
+          >
+            <svg className="w-4 h-4 flex-shrink-0 text-[var(--planora-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>Đã thay thế bằng đề xuất mới trong cuộc trò chuyện</span>
+          </div>
+        )}
         <h1
           id="heading-moment-4"
           className="font-display text-4xl sm:text-5xl text-[var(--planora-text)] font-normal tracking-tight leading-tight"
           tabIndex={-1}
         >
-          Tôi sẽ làm {plan.steps.length} việc, theo thứ tự
+          Tôi sẽ làm {stepCount} việc, theo thứ tự
         </h1>
         <p className="text-sm sm:text-base text-[var(--planora-muted)]">
           Xin hãy xem trước nội dung sẽ được ghi vào các công cụ dưới đây trước khi duyệt.
@@ -105,21 +147,14 @@ export function PlanMoment({
         showStepCards={true}
       />
 
-      {/* Cryptographic Plan Hash Binding / Plan Identifier */}
+      {/* Internal Plan Binding (no raw plan_hash/UUID exposed on UI) */}
       <div
         data-testid="plan-hash-binding"
-        className="text-[11px] font-mono text-[var(--planora-muted)] bg-[var(--planora-surface-inset)] border border-[var(--planora-divider)] p-2.5 sm:p-3 rounded-xl break-all"
-      >
-        {(plan as { plan_hash?: string }).plan_hash ? (
-          <>
-            Mã băm ràng buộc kế hoạch (plan_hash): <code>{(plan as { plan_hash?: string }).plan_hash}</code>
-          </>
-        ) : (
-          <>
-            Mã định danh kế hoạch: <code>{plan.id}</code>
-          </>
-        )}
-      </div>
+        data-plan-id={plan.id}
+        data-plan-hash={(plan as { plan_hash?: string }).plan_hash}
+        className="hidden"
+        aria-hidden="true"
+      />
 
       {/* Warning Banner */}
       <div className="p-4 rounded-xl bg-[var(--planora-pending-bg)] border border-[var(--planora-pending-border)] flex items-start gap-3">
@@ -162,15 +197,6 @@ export function PlanMoment({
         </p>
       )}
 
-      {techOpen && (
-        <div
-          id="tech-details-panel"
-          className="p-4 rounded-xl bg-neutral-900 text-neutral-200 font-mono text-xs v3-space-y-3 border border-neutral-800 overflow-x-auto"
-        >
-          <pre className="whitespace-pre-wrap break-all">{JSON.stringify(plan, null, 2)}</pre>
-        </div>
-      )}
-
       {/* Sticky Bottom Action Bar with Busy Locking */}
       <div
         id="moment-4-sticky-bar"
@@ -187,14 +213,27 @@ export function PlanMoment({
               onClick={handleApprove}
               className="w-full sm:w-auto px-5 sm:px-7 py-3 bg-[var(--planora-primary)] hover:bg-[var(--planora-primary-hover)] disabled:opacity-50 disabled:cursor-not-allowed text-[var(--planora-on-primary)] text-sm sm:text-base font-bold rounded-xl shadow-md transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 flex-shrink-0 cursor-pointer"
             >
-              <span>Duyệt kế hoạch</span>
-              <span className="text-base sm:text-lg">✓</span>
+              {isBusy ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <circle cx="12" cy="12" r="9" className="opacity-30" />
+                    <path d="M12 3a9 9 0 0 1 9 9" />
+                  </svg>
+                  <span>Đang xử lý...</span>
+                </>
+              ) : (
+                <>
+                  <span data-testid="planora-approve-btn-text">{approveButtonText}</span>
+                  <span className="text-base sm:text-lg">✓</span>
+                </>
+              )}
             </button>
             <button
               id="btn-edit-plan"
               type="button"
-              onClick={onEdit}
-              className="px-3.5 sm:px-4 py-2.5 sm:py-3 bg-[var(--planora-paper)] hover:bg-[var(--planora-surface-hover)] border border-[var(--planora-divider)] text-[var(--planora-text)] text-xs sm:text-sm font-medium rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5 flex-shrink-0 cursor-pointer"
+              disabled={isReplacedByChat}
+              onClick={handleEdit}
+              className="px-3.5 sm:px-4 py-2.5 sm:py-3 bg-[var(--planora-paper)] hover:bg-[var(--planora-surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed border border-[var(--planora-divider)] text-[var(--planora-text)] text-xs sm:text-sm font-medium rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5 flex-shrink-0 cursor-pointer"
             >
               <svg className="w-4 h-4 text-[var(--planora-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -214,25 +253,8 @@ export function PlanMoment({
               Hủy
             </button>
           </div>
-          <div>
-            <button
-              type="button"
-              onClick={() => setTechOpen(!techOpen)}
-              aria-controls="tech-details-panel"
-              className="text-xs text-[var(--planora-muted)] hover:text-[var(--planora-text)] font-mono inline-flex items-center gap-1.5 py-1 px-2 rounded hover:bg-[var(--planora-surface-hover)] transition-colors cursor-pointer"
-              aria-expanded={techOpen ? 'true' : 'false'}
-              id="btn-tech-toggle"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-              </svg>
-              <span>Chi tiết kỹ thuật</span>
-              <span id="tech-toggle-arrow">{techOpen ? '▲' : '▼'}</span>
-            </button>
-          </div>
         </div>
       </div>
     </section>
   );
 }
-

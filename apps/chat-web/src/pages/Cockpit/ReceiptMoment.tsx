@@ -121,9 +121,10 @@ function ReceiptCard({
             href={outcomeURL(step)}
             target="_blank"
             rel="noopener noreferrer"
-            className={`text-xs font-semibold ${palette.name} hover:underline inline-flex items-center gap-1`}
+            aria-label={operation(step.tool).link}
+            className={`text-xs font-semibold ${palette.name} hover:underline inline-flex items-center gap-1.5`}
           >
-            <span>{operation(step.tool).link}</span>
+            <span>{service === 'slack' ? 'Xem tin nhắn vừa gửi trên Slack' : service === 'mysheets' ? 'Mở bảng tính Google Sheets' : operation(step.tool).link}</span>
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -148,9 +149,6 @@ function ReceiptCard({
           <time className="block" dateTime={step.completedAt}>
             {new Date(step.completedAt).toLocaleString('vi-VN', { hour12: false })}
           </time>
-        )}
-        {step.status === 'succeeded' && step.output != null && (
-          <pre className="whitespace-pre-wrap break-all">{JSON.stringify(step.output, null, 2)}</pre>
         )}
       </details>
     </div>
