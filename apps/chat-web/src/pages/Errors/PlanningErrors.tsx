@@ -23,8 +23,8 @@ export function SlowPlanningMoment({ request, seconds, gather, services, onDismi
         <div className="v3-space-y-1.5 flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap"><span className="px-2 py-0.5 rounded text-[11px] font-bold bg-[var(--planora-pending-bg)] text-[var(--planora-pending-text)] uppercase tracking-wide">Đang lập kế hoạch</span><span className="text-xs font-mono text-[var(--planora-pending-text)] font-bold">Thời gian chờ: <span id="timer-seconds-display">{seconds}</span>s</span></div>
           <RequestEcho request={request} />
-          <h1 tabIndex={-1} className="font-display font-bold text-xl sm:text-2xl text-[var(--planora-text)]">ATI đang suy nghĩ lâu hơn thường lệ</h1>
-          <p className="text-sm text-[var(--planora-muted)] leading-relaxed">ATI chưa lập xong kế hoạch. Tiến trình bên dưới là thông tin máy chủ đã gửi.</p>
+          <h1 tabIndex={-1} className="font-display font-bold text-xl sm:text-2xl text-[var(--planora-text)]">Planora đang suy nghĩ lâu hơn thường lệ</h1>
+          <p className="text-sm text-[var(--planora-muted)] leading-relaxed">Planora chưa lập xong kế hoạch. Tiến trình bên dưới là thông tin máy chủ đã gửi.</p>
         </div>
       </div>
       <div className="p-4 bg-[var(--planora-surface-inset)] rounded-xl border border-[var(--planora-divider)] v3-space-y-3">
@@ -57,7 +57,7 @@ export function PlanningErrorMoment({ request, networkError = false, onRetry, on
         <div className="v3-space-y-1.5 flex-1 min-w-0"><div className="flex items-center gap-2 flex-wrap"><span className="px-2 py-0.5 rounded text-[11px] font-bold bg-[var(--planora-error-bg)] text-[var(--planora-error-text)] uppercase tracking-wide">{label}</span></div><h1 tabIndex={-1} className="font-display font-bold text-xl sm:text-2xl text-[var(--planora-text)]">{title}</h1><p role="alert" className="text-sm text-[var(--planora-muted)] leading-relaxed">{networkError ? 'Không thể kết nối máy chủ. Hãy kiểm tra mạng và thử lại.' : 'Không thể lập kế hoạch lúc này. Hãy thử lại.'}</p></div>
       </div>
       <PlanningSafetyNotice />
-      {origin ? <RequestEcho request={request} /> : request && <div className="v3-space-y-1.5"><div className="flex items-center justify-between text-xs text-[var(--planora-muted)]"><span>Câu yêu cầu của bạn:</span></div><div id="failed-prompt-text" className="p-3 bg-[var(--planora-surface-inset)] rounded-xl border border-[var(--planora-divider)] text-xs font-mono text-[var(--planora-text)] break-words whitespace-pre-wrap">{request}</div></div>}
+      {origin ? <RequestEcho request={request} /> : request && <div className="v3-space-y-1.5"><div className="flex items-center justify-between text-xs text-[var(--planora-muted)]"><span>Câu yêu cầu của bạn:</span></div><div id="failed-prompt-text" className="p-3 bg-[var(--planora-surface-inset)] rounded-xl border border-[var(--planora-divider)] text-xs sm:text-sm text-[var(--planora-text)] break-words whitespace-pre-wrap">{request}</div></div>}
       {!origin && <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">{request && <button type="button" onClick={onRetry} className={primary}>Thử lại</button>}<button type="button" onClick={onEdit} className={secondary}>Sửa yêu cầu</button></div>}
     </div>
   </section>;

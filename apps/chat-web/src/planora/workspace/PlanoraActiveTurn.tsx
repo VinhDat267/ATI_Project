@@ -362,7 +362,17 @@ export function PlanoraActiveTurn(props: PlanoraActiveTurnProps) {
           )}
           {state.executionSnapshot?.execution.status === 'stopped' && <p role="status">Quy trình đã dừng.</p>}
           {moment !== 4 && state.activePlan && (
-            <details className="mt-5"><summary>Kế hoạch {state.planStatus === 'preview' ? 'đang chờ' : 'đã duyệt'}: <span>{state.activePlan.summary}</span></summary><pre className="whitespace-pre-wrap break-all">{JSON.stringify(state.activePlan, null, 2)}</pre></details>
+            <details className="mt-5 text-xs text-[var(--planora-muted)]">
+              <summary className="cursor-pointer font-medium hover:text-[var(--planora-text)]">Kế hoạch {state.planStatus === 'preview' ? 'đang chờ' : 'đã duyệt'}: <span>{state.activePlan.summary}</span></summary>
+              <div className="mt-2 p-3 rounded-xl bg-[var(--planora-surface-inset)] border border-[var(--planora-divider)] v3-space-y-1.5 text-xs text-[var(--planora-text)]">
+                {state.activePlan.steps?.map((step, idx) => (
+                  <div key={step.id || idx} className="flex items-start gap-2">
+                    <span className="font-semibold text-[var(--planora-primary)]">{idx + 1}.</span>
+                    <span>{step.description}</span>
+                  </div>
+                ))}
+              </div>
+            </details>
           )}
           {state.executionLoadError && <p role="alert">Không tải được trạng thái thực thi: {state.executionLoadError}. Hãy mở lại hội thoại.</p>}
         </section>

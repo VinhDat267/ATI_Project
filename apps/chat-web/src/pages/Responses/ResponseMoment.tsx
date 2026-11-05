@@ -8,6 +8,7 @@ import { githubSessionOwner, redirectToGitHub } from '../../services/github-conn
 import { telegramSessionOwner, buildTelegramCallbackPath } from '../../services/telegram-connection';
 import type { ChatMessage, ClarificationState, ServiceInfo } from '../../types';
 import { RequestEcho, useScheduledOrigin } from '../Cockpit/RequestEcho';
+import { toolActionLabel } from '../Cockpit/presentation';
 
 const secondary = 'px-4 py-2 bg-[var(--planora-paper)] hover:bg-[var(--planora-surface-hover)] text-[var(--planora-text)] border border-[var(--planora-divider)] text-xs sm:text-sm font-medium rounded-xl shadow-xs transition-colors cursor-pointer';
 const primary = 'px-4 py-2 bg-[var(--planora-primary)] hover:bg-[var(--planora-primary-hover)] text-[var(--planora-on-primary)] text-xs sm:text-sm font-semibold rounded-xl shadow-xs transition-colors cursor-pointer';
@@ -45,7 +46,7 @@ export function AnswerMoment({ message, request, services }: { message: ChatMess
       <button type="button" className={secondary} aria-expanded={expanded} aria-controls="answer-lookups" onClick={() => setExpanded(value => !value)}>Đã tra cứu</button>
       {expanded && <ul id="answer-lookups" className="mt-3 v3-space-y-3 text-xs sm:text-sm break-words">
         {lookups.map((lookup, index) => <li key={index} className="border border-[var(--planora-divider)] bg-[var(--planora-surface-inset)] rounded-xl p-3">
-          <p className="font-mono text-[var(--planora-text)]">{lookup.tool}</p>{lookup.query !== undefined && <p className="text-[var(--planora-muted)]">{lookup.query}</p>}
+          <p className="font-semibold text-[var(--planora-text)]">{toolActionLabel(lookup.tool)}</p>{lookup.query !== undefined && <p className="text-[var(--planora-muted)]">{lookup.query}</p>}
           <p className="text-[var(--planora-muted)]">{lookup.resultCount} kết quả</p>
           {lookup.links.filter(safeLink).map(link => <p key={link}><a className="text-[var(--planora-primary)] underline break-all font-medium" href={link} target="_blank" rel="noopener noreferrer">{link}</a></p>)}
         </li>)}
@@ -64,11 +65,17 @@ function ResponseCard({ request, title, children, moment }: { request: string; t
       <div aria-hidden="true" className="w-9 h-9 rounded-full bg-[var(--planora-primary-soft)] text-[var(--planora-primary)] flex items-center justify-center text-xs font-bold flex-shrink-0 shadow-xs mt-0.5">B</div>
     </div>}
     <div className="flex items-start gap-3">
-      <div aria-hidden="true" className="w-9 h-9 rounded-xl bg-[var(--planora-primary)] text-[var(--planora-on-primary)] flex items-center justify-center font-display font-bold text-base shadow-xs flex-shrink-0 mt-0.5">A</div>
+      <div aria-hidden="true" className="w-9 h-9 rounded-xl bg-[var(--planora-primary)] text-[var(--planora-on-primary)] flex items-center justify-center font-display font-bold text-base shadow-xs flex-shrink-0 mt-0.5">P</div>
       <div className="flex-1 bg-[var(--planora-paper)] border border-[var(--planora-divider)] rounded-2xl rounded-tl-sm p-5 sm:p-7 shadow-xs v3-space-y-5 min-w-0">
         <div className="flex items-center justify-between text-xs text-[var(--planora-muted)] pb-2 border-b border-[var(--planora-divider)] gap-2 flex-wrap">
-          <div className="flex items-center gap-2"><span className="font-semibold text-[var(--planora-text)]">ATI</span><span className="text-[var(--planora-muted)]">·</span><span>Trợ lý điều phối</span></div>
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[var(--planora-surface-inset)] text-[var(--planora-muted)] border border-[var(--planora-divider)]"><span className="w-1.5 h-1.5 rounded-full bg-[var(--planora-muted)]" />Chưa lập kế hoạch</span>
+          <div className="flex items-center gap-2"><span className="font-semibold text-[var(--planora-text)]">Planora</span><span className="text-[var(--planora-muted)]">·</span><span>Trợ lý điều phối</span></div>
+          {moment === 'answer' ? (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[var(--planora-surface-inset)] text-[var(--planora-muted)] border border-[var(--planora-divider)]"><span className="w-1.5 h-1.5 rounded-full bg-[var(--planora-primary)]" />Thông tin tra cứu</span>
+          ) : moment === 'refusal' ? (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[var(--planora-surface-inset)] text-[var(--planora-muted)] border border-[var(--planora-divider)]"><span className="w-1.5 h-1.5 rounded-full bg-[var(--planora-pending-text)]" />Cần kết nối thêm</span>
+          ) : moment === '3' ? (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[var(--planora-surface-inset)] text-[var(--planora-muted)] border border-[var(--planora-divider)]"><span className="w-1.5 h-1.5 rounded-full bg-[var(--planora-primary)]" />Làm rõ yêu cầu</span>
+          ) : null}
         </div>
         <h1 id="response-card-title" tabIndex={-1} className="font-display font-bold text-2xl sm:text-3xl text-[var(--planora-text)] tracking-tight focus:v3-outline-none focus:ring-2 focus:ring-[var(--planora-primary)]/20 rounded-lg break-words">{title}</h1>
         {children}<NoWritesNotice />

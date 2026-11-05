@@ -461,7 +461,8 @@
 .planora-chat-feed {
   flex: 1;
   overflow-y: auto;
-  padding: 24px;
+  padding: 24px 24px calc(var(--cockpit-bottom-space, 120px) + 24px);
+  scroll-padding-bottom: calc(var(--cockpit-bottom-space, 120px) + 24px);
   max-width: var(--planora-chat-max-width);
   margin: 0 auto;
   width: 100%;
@@ -533,7 +534,8 @@
   }
 
   .planora-chat-feed {
-    padding: 16px 12px;
+    padding: 16px 12px calc(var(--cockpit-bottom-space, 120px) + 20px);
+    scroll-padding-bottom: calc(var(--cockpit-bottom-space, 120px) + 20px);
   }
 
   .planora-chat-composer-dock {

@@ -124,7 +124,8 @@ describe('PL-07: Planora Responses & Recovery', () => {
       expect(screen.queryByRole('list', { name: '' })).toBeNull();
 
       fireEvent.click(toggleBtn);
-      expect(screen.getByText('trello.list_cards')).toBeInTheDocument();
+      expect(screen.getByText('Đọc danh sách công việc Trello')).toBeInTheDocument();
+      expect(screen.queryByText('trello.list_cards')).toBeNull();
       expect(screen.getByText('Sprint 4')).toBeInTheDocument();
       expect(screen.getByText('3 kết quả')).toBeInTheDocument();
 
@@ -137,6 +138,44 @@ describe('PL-07: Planora Responses & Recovery', () => {
 
       // No writes notice
       expect(screen.getByText('Chưa có gì được ghi lên công cụ nào.')).toBeInTheDocument();
+    });
+
+    it('never renders raw technical tool identifiers on DOM', () => {
+      const message: ChatMessage = {
+        id: 'msg-ans-tools',
+        role: 'assistant',
+        content: 'Báo cáo đã gửi.',
+        metadata: {
+          type: 'answer',
+          lookups: [
+            { tool: 'trello.list_cards', query: 'Tasks', resultCount: 2, links: [] },
+            { tool: 'slack.post_message', query: 'Announcement', resultCount: 1, links: [] },
+            { tool: 'mysheets.read_range', query: 'Q4 Data', resultCount: 5, links: [] },
+            { tool: 'gmail.send_message', query: 'Client update', resultCount: 1, links: [] },
+          ],
+          usedDirectory: ['trello', 'slack', 'mysheets', 'gmail'],
+        },
+      };
+
+      const { container } = render(<AnswerMoment message={message} request="Tra cứu và báo cáo" services={sampleServices} />);
+      const toggleBtn = screen.getByRole('button', { name: 'Đã tra cứu' });
+      fireEvent.click(toggleBtn);
+
+      // Verify friendly labels exist
+      expect(screen.getByText('Đọc danh sách công việc Trello')).toBeInTheDocument();
+      expect(screen.getByText('Gửi thông báo Slack')).toBeInTheDocument();
+      expect(screen.getByText('Đọc dữ liệu bảng tính Google Sheets')).toBeInTheDocument();
+      expect(screen.getByText('Gửi email Gmail')).toBeInTheDocument();
+
+      // Verify NO raw tool names exist anywhere in DOM
+      expect(screen.queryByText('trello.list_cards')).toBeNull();
+      expect(screen.queryByText('slack.post_message')).toBeNull();
+      expect(screen.queryByText('mysheets.read_range')).toBeNull();
+      expect(screen.queryByText('gmail.send_message')).toBeNull();
+      expect(container.innerHTML).not.toContain('trello.list_cards');
+      expect(container.innerHTML).not.toContain('slack.post_message');
+      expect(container.innerHTML).not.toContain('mysheets.read_range');
+      expect(container.innerHTML).not.toContain('gmail.send_message');
     });
   });
 
@@ -410,7 +449,7 @@ describe('PL-07: Planora Responses & Recovery', () => {
             isGathering: true,
             summary: '1/2 công cụ đã khảo sát',
             steps: [
-              { tool: 'trello.list_boards', status: 'completed', result: 'Bảng ATI' },
+              { tool: 'trello.list_boards', status: 'completed', result: 'Bảng Kế Hoạch Planora' },
               { tool: 'slack.list_channels', status: 'running' },
             ],
           }}
@@ -421,7 +460,8 @@ describe('PL-07: Planora Responses & Recovery', () => {
 
       expect(screen.getByText('Đang lập kế hoạch')).toBeInTheDocument();
       expect(screen.getByText('18')).toBeInTheDocument();
-      expect(screen.getByText('ATI đang suy nghĩ lâu hơn thường lệ')).toBeInTheDocument();
+      expect(screen.getByText('Planora đang suy nghĩ lâu hơn thường lệ')).toBeInTheDocument();
+      expect(screen.queryByText(/ATI/)).toBeNull();
       expect(screen.getByText('1/2 công cụ đã khảo sát')).toBeInTheDocument();
       expect(screen.getByText('✓ Đã tra cứu')).toBeInTheDocument();
       expect(screen.getByText('Đang chờ phản hồi…')).toBeInTheDocument();
@@ -498,7 +538,7 @@ describe('PL-07: Planora Responses & Recovery', () => {
       expect(screen.getByText('Cần bạn xử lý · Lỗi đã biết')).toBeInTheDocument();
       expect(screen.getByText('Slack chưa hoàn thành việc này')).toBeInTheDocument();
       expect(screen.getByText('Chuyện gì đã xảy ra')).toBeInTheDocument();
-      expect(screen.getByText('Không thể kết nối máy chủ Slack')).toBeInTheDocument();
+      expect(screen.getAllByText('Không thể kết nối máy chủ Slack').length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText('Ảnh hưởng hiện tại')).toBeInTheDocument();
 
       // Retry button
@@ -628,7 +668,7 @@ describe('PL-07: Planora Responses & Recovery', () => {
       const reviewBtn = screen.getByRole('button', { name: 'Xem lại nội dung sửa' });
       fireEvent.click(reviewBtn);
       expect(onSubmit).not.toHaveBeenCalled();
-      expect(screen.getByText(/Gửi nội dung sửa để ATI lập kế hoạch mới\?/)).toBeInTheDocument();
+      expect(screen.getByText(/Gửi nội dung sửa để Planora lập kế hoạch mới\?/)).toBeInTheDocument();
 
       // Second click: submit confirmed
       const confirmSubmitBtn = screen.getByRole('button', { name: 'Dừng và gửi yêu cầu sửa' });
@@ -637,6 +677,143 @@ describe('PL-07: Planora Responses & Recovery', () => {
         expect.objectContaining({ title: 'Updated Title' }),
         'Ghi chú thêm'
       );
+    });
+
+    it('never renders raw JSON or raw tool identifiers inside details accordion', () => {
+      const snapshot = makeSnapshot('failed', ['retry', 'stop']);
+      const controls: RecoveryControls = {
+        busy: false,
+        error: null,
+        onRetry: vi.fn(),
+        onSkip: vi.fn(),
+        onStop: vi.fn(),
+        onContinue: vi.fn(),
+        onEdit: vi.fn(),
+      };
+
+      const steps = [
+        { id: 's2', tool: 'slack.send_message', description: 'Gửi Slack', status: 'failed' as const, error: 'Máy chủ Slack từ chối xác thực' },
+      ];
+
+      const { container } = render(
+        <RecoveryMoment
+          request="Gửi tin nhắn"
+          moment={7}
+          snapshot={snapshot}
+          steps={steps}
+          services={sampleServices}
+          controls={controls}
+        />
+      );
+
+      // Open accordion
+      const summary = screen.getByText('Thông tin đối chiếu');
+      fireEvent.click(summary);
+
+      // Friendly label should be present
+      expect(screen.getByText('Gửi thông báo Slack')).toBeInTheDocument();
+
+      // No code tag with tool identifier
+      expect(container.querySelector('code')).toBeNull();
+
+      // No <pre> tag with JSON dump
+      expect(container.querySelector('pre')).toBeNull();
+
+      // Raw tool name should not be present
+      expect(screen.queryByText('slack.send_message')).toBeNull();
+      expect(container.innerHTML).not.toContain('slack.send_message');
+    });
+
+    it('renders structured business inputs for channels and message text without raw JSON textarea', () => {
+      const onSubmit = vi.fn();
+      const onClose = vi.fn();
+
+      const { container } = render(
+        <RecoveryEditor
+          tool="slack.send_message"
+          stepArgs={{ channel: '#general', text: 'Thông báo hàng tuần' }}
+          prompt="Gửi lại kênh chung"
+          busy={false}
+          onClose={onClose}
+          onSubmit={onSubmit}
+        />
+      );
+
+      // Channel input with friendly label
+      expect(screen.getByLabelText('Tên kênh hoặc mã kênh')).toBeInTheDocument();
+      const channelInput = screen.getByDisplayValue('#general') as HTMLInputElement;
+      expect(channelInput.tagName.toLowerCase()).toBe('input');
+
+      // Message content with friendly label
+      expect(screen.getByLabelText('Nội dung tin nhắn')).toBeInTheDocument();
+      const contentTextarea = screen.getByDisplayValue('Thông báo hàng tuần') as HTMLTextAreaElement;
+      expect(contentTextarea.tagName.toLowerCase()).toBe('textarea');
+
+      // NO raw JSON textarea in DOM
+      expect(container.querySelector('textarea[name="json"]')).toBeNull();
+      expect(screen.queryByText(/\{ "channel"/)).toBeNull();
+      expect(channelInput.value).not.toContain('{');
+    });
+
+    it('Strict D2 safety: when paused.status is delivery_unknown, ONLY Stop button and external check link appear', () => {
+      const snapshot: ExecutionSnapshot = {
+        plan: {
+          id: 'plan-deliv-1',
+          convId: 'conv-deliv-1',
+          status: 'partial',
+          summary: 'Kế hoạch gửi thông báo',
+          steps: [
+            { id: 's1', tool: 'slack.send_message', description: 'Gửi Slack', args: { channel: '#announcements', text: 'Important update' } },
+          ],
+        },
+        execution: {
+          status: 'partial',
+          pausedStepId: 's1',
+        },
+        steps: [
+          { stepId: 's1', tool: 'slack.send_message', status: 'unknown' as const, error: 'Chưa rõ trạng thái gửi tin nhắn' },
+        ],
+        recoveryActions: ['retry', 'skip', 'stop', 'continue'], // Even if server sent all actions!
+      };
+
+      const controls: RecoveryControls = {
+        busy: false,
+        error: null,
+        onRetry: vi.fn(),
+        onSkip: vi.fn(),
+        onStop: vi.fn(),
+        onContinue: vi.fn(),
+        onEdit: vi.fn(),
+      };
+
+      const steps = [
+        { id: 's1', tool: 'slack.send_message', description: 'Gửi Slack', status: 'delivery_unknown' as any, error: 'Chưa rõ trạng thái gửi tin nhắn' },
+      ];
+
+      render(
+        <RecoveryMoment
+          request="Gửi tin nhắn Slack"
+          moment={8}
+          snapshot={snapshot}
+          steps={steps}
+          services={sampleServices}
+          controls={controls}
+        />
+      );
+
+      // NO Retry, Edit, Continue, or Skip
+      expect(screen.queryByRole('button', { name: /Thử lại/ })).toBeNull();
+      expect(screen.queryByRole('button', { name: /Sửa rồi thử lại/ })).toBeNull();
+      expect(screen.queryByRole('button', { name: /Làm tiếp/ })).toBeNull();
+      expect(screen.queryByRole('button', { name: /Bỏ qua/ })).toBeNull();
+
+      // Only Stop button and external check link are available
+      const stopBtn = screen.getByRole('button', { name: 'Dừng kế hoạch' });
+      expect(stopBtn).toBeInTheDocument();
+
+      const externalCheckLink = screen.getByRole('link', { name: /Kiểm tra trên Slack/ });
+      expect(externalCheckLink).toBeInTheDocument();
+      expect(externalCheckLink).toHaveAttribute('href', 'https://slack.com/app_redirect?channel=%23announcements');
     });
   });
 
@@ -856,6 +1033,25 @@ describe('PL-07: Planora Responses & Recovery', () => {
       expect(confirmStopBtn).toHaveClass('text-[var(--planora-error-text)]');
       expect(confirmStopBtn).toHaveClass('bg-[var(--planora-error-bg)]');
       expect(confirmStopBtn).not.toHaveClass('text-white');
+    });
+
+    it('meets WCAG AA contrast (>= 4.5:1) for Stop button in both default and hover states across Light and Dark mode', () => {
+      // Light mode default state
+      const lightDefaultContrast = contrastRatio(lightTokens['planora-error-text'], lightTokens['planora-error-bg']);
+      expect(lightDefaultContrast).toBeGreaterThanOrEqual(4.5);
+
+      // Light mode hover state: bg remains planora-error-bg, text remains planora-error-text
+      // (avoiding hover:bg-[var(--planora-error-border)] which yielded 4.46:1 in UX-P3-1)
+      const lightHoverContrast = contrastRatio(lightTokens['planora-error-text'], lightTokens['planora-error-bg']);
+      expect(lightHoverContrast).toBeGreaterThanOrEqual(4.5);
+
+      // Dark mode default state
+      const darkDefaultContrast = contrastRatio(darkTokens['planora-error-text'], darkTokens['planora-error-bg']);
+      expect(darkDefaultContrast).toBeGreaterThanOrEqual(4.5);
+
+      // Dark mode hover state
+      const darkHoverContrast = contrastRatio(darkTokens['planora-error-text'], darkTokens['planora-error-bg']);
+      expect(darkHoverContrast).toBeGreaterThanOrEqual(4.5);
     });
 
     it('OfflineBanner uses accessible Planora pending warning tokens instead of low-contrast amber text-white', () => {

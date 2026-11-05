@@ -4,7 +4,8 @@ import { createPortal } from 'react-dom';
 import type { ExecutionSnapshot, PlanStep, ServiceInfo } from '../../types';
 import type { ExecutionStepInfo } from '../../components/ExecutionProgress';
 import { CockpitDialog } from '../../components/CockpitDialog';
-import { OutcomeLink, serviceId, serviceName, serviceRecoveryLink, statusLabel } from './presentation';
+import { OutcomeLink, serviceId, serviceName, serviceRecoveryLink, statusLabel, toolActionLabel } from './presentation';
+import { recoveryFieldLabel } from './recovery-labels';
 import { RecoveryEditor } from './RecoveryEditor';
 import { RequestEcho } from './RequestEcho';
 
@@ -53,25 +54,26 @@ function SavedWork({steps}:{steps:ExecutionStepInfo[]}) { return <div className=
   </div>)}</div>; }
 export function RecoveryMoment({request,moment,snapshot,steps,services,controls}:{request?:string;moment:7|8|9;snapshot:ExecutionSnapshot|null;steps:ExecutionStepInfo[];services:ServiceInfo[];controls:RecoveryControls|null}) {
   const [dialog,setDialog]=useState<'stop'|'edit'|null>(null);
-  const unknown=steps.filter(step=>step.status==='unknown');
-  const paused=steps.find(step=>step.id===snapshot?.execution.pausedStepId && (step.status==='unknown'||step.status==='failed')) ?? unknown[0] ?? steps.find(step=>step.status==='failed');
+  const unknown=steps.filter(step=>step.status==='unknown' || (step.status as string)==='delivery_unknown');
+  const paused=steps.find(step=>step.id===snapshot?.execution.pausedStepId && (step.status==='unknown'||(step.status as string)==='delivery_unknown'||step.status==='failed')) ?? unknown[0] ?? steps.find(step=>step.status==='failed');
   const planStep=snapshot?.plan.steps?.find(step=>step.id===paused?.id);
   const actions=snapshot?.recoveryActions ?? [];
   const busy=controls?.busy ?? false;
   const service=serviceName(serviceId(paused?.tool ?? ''),services);
   const destination=recoveryDestination(planStep && snapshot ? {...planStep,args:savedArguments(planStep.args,snapshot) as Record<string,unknown>}:planStep);
-  const hasUnknown=unknown.length>0;
+  const isDeliveryUnknown = paused?.status === 'unknown' || (paused?.status as string) === 'delivery_unknown';
+  const hasUnknown=unknown.length>0 || isDeliveryUnknown;
   const gmailSender = snapshot?.plan.connections?.gmail?.email;
-  const sentFolder = paused?.status === 'unknown' && ['gmail.send_message', 'gmail.reply', 'gmail.forward'].includes(planStep?.tool ?? '') && gmailSender
+  const sentFolder = hasUnknown && ['gmail.send_message', 'gmail.reply', 'gmail.forward'].includes(planStep?.tool ?? '') && gmailSender
     ? `https://mail.google.com/mail/?authuser=${encodeURIComponent(gmailSender)}#sent` : undefined;
   const mycalendarEmail = snapshot?.plan.connections?.mycalendar?.email;
-  const calendarCheckUrl = paused?.status === 'unknown' && planStep?.tool === 'mycalendar.create_event' && mycalendarEmail
+  const calendarCheckUrl = hasUnknown && planStep?.tool === 'mycalendar.create_event' && mycalendarEmail
     ? `https://calendar.google.com/calendar/r?authuser=${encodeURIComponent(mycalendarEmail)}` : undefined;
   const mysheetsEmail = snapshot?.plan.connections?.mysheets?.email;
-  const spreadsheetCheckUrl = paused?.status === 'unknown' && planStep?.tool === 'mysheets.append_rows'
+  const spreadsheetCheckUrl = hasUnknown && planStep?.tool === 'mysheets.append_rows'
     ? (typeof planStep.args.spreadsheetId === 'string' && planStep.args.spreadsheetId ? `https://docs.google.com/spreadsheets/d/${encodeURIComponent(planStep.args.spreadsheetId)}/edit` : 'https://docs.google.com/spreadsheets') : undefined;
   const canRetry=moment===7 && !hasUnknown && paused?.status==='failed' && actions.includes('retry');
-  const canContinue=moment===9 && !hasUnknown && !steps.some(step=>['failed','running'].includes(step.status)) && actions.includes('continue');
+  const canContinue=moment===9 && !hasUnknown && !steps.some(step=>['failed','running','unknown','delivery_unknown'].includes(step.status as string)) && actions.includes('continue');
   const error=paused?.error ?? 'Dịch vụ không thể hoàn thành việc này.';
   const unknownInstructions=<>
     <p className="text-base text-[var(--planora-text)] leading-relaxed">Tôi không chắc lệnh đã tới {service || 'dịch vụ'} hay chưa. Hãy kiểm tra trên {service || 'dịch vụ'} trước khi quyết định.</p>
@@ -100,7 +102,32 @@ export function RecoveryMoment({request,moment,snapshot,steps,services,controls}
         <SavedWork steps={steps}/>
         {hasUnknown ? unknownInstructions : !canContinue && <p className="text-xs text-[var(--planora-muted)]">Chưa đủ dữ liệu để làm tiếp an toàn. Bạn chỉ có thể dừng kế hoạch này.</p>}
       </>}
-      {paused && <details className="text-xs text-[var(--planora-muted)]"><summary>Chi tiết để đối chiếu</summary><code>{paused.tool}</code><p>{paused.description}</p>{planStep && snapshot && <pre className="whitespace-pre-wrap break-all text-[var(--planora-text)]">{JSON.stringify(savedArguments(planStep.args,snapshot),null,2)}</pre>}{paused.duration && <p>{paused.duration}</p>}</details>}
+      {paused && <details className="text-xs text-[var(--planora-muted)] pt-2 border-t border-[var(--planora-divider)]">
+        <summary className="cursor-pointer font-medium hover:text-[var(--planora-text)]">Thông tin đối chiếu</summary>
+        <div className="mt-2.5 p-3 rounded-xl bg-[var(--planora-surface-inset)] border border-[var(--planora-divider)] v3-space-y-1.5 text-xs text-[var(--planora-text)]">
+          <p><span className="font-semibold text-[var(--planora-muted)]">Hành động:</span> {toolActionLabel(paused.tool)}</p>
+          <p><span className="font-semibold text-[var(--planora-muted)]">Nội dung công việc:</span> {paused.description}</p>
+          {moment !== 7 && paused.error && <p><span className="font-semibold text-[var(--planora-error-text)]">Lý do gián đoạn:</span> {paused.error}</p>}
+          {paused.duration && <p><span className="font-semibold text-[var(--planora-muted)]">Thời gian thực hiện:</span> {paused.duration}</p>}
+          {planStep && snapshot && (() => {
+            const resolved = savedArguments(planStep.args, snapshot) as Record<string, unknown> | undefined;
+            if (!resolved || typeof resolved !== 'object' || Array.isArray(resolved)) return null;
+            const entries = Object.entries(resolved);
+            if (!entries.length) return null;
+            return (
+              <div className="pt-2 border-t border-[var(--planora-divider)] v3-space-y-1">
+                <span className="font-semibold text-[var(--planora-muted)]">Dữ liệu liên quan:</span>
+                {entries.map(([k, v]) => (
+                  <p key={k} className="break-words">
+                    <span className="font-medium text-[var(--planora-text)]">{recoveryFieldLabel(paused.tool, k)}:</span>{' '}
+                    <span className="text-[var(--planora-muted)]">{typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v ?? '')}</span>
+                  </p>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+      </details>}
     </div>
     {sentFolder && <p className="text-sm text-[var(--planora-text)]">Hãy tự kiểm tra thư đã gửi rồi chọn Bỏ qua hoặc Dừng. <a href={sentFolder} target="_blank" rel="noopener noreferrer" className="text-[var(--planora-primary)] underline">Mở thư mục Đã gửi</a></p>}
     {calendarCheckUrl && <p className="text-sm text-[var(--planora-text)]">Hãy tự kiểm tra trên Google Calendar của {mycalendarEmail} rồi chọn Bỏ qua hoặc Dừng. <a href={calendarCheckUrl} target="_blank" rel="noopener noreferrer" className="text-[var(--planora-primary)] underline">Mở Google Calendar</a></p>}
@@ -109,12 +136,12 @@ export function RecoveryMoment({request,moment,snapshot,steps,services,controls}
     <div className="flex flex-wrap items-center gap-3">
       {canRetry && <><button type="button" disabled={busy} onClick={()=>paused && controls?.onRetry(paused.id)} className={primary}>Thử lại việc {steps.findIndex(step=>step.id===paused?.id)+1}</button><button id="btn-recovery-edit" type="button" disabled={busy || !actions.includes('stop')} onClick={()=>setDialog('edit')} className={secondary}>Sửa rồi thử lại</button></>}
       {canContinue && <button type="button" disabled={busy} onClick={()=>controls?.onContinue()} className={primary}>Làm tiếp các việc còn lại</button>}
-      {paused && actions.includes('skip') && <button type="button" disabled={busy} onClick={()=>controls?.onSkip(paused.id)} className={hasUnknown?primary:secondary}>{hasUnknown?'Đã thấy kết quả → Bỏ qua bước này và làm tiếp':'Bỏ qua việc này'}</button>}
+      {paused && actions.includes('skip') && (paused.status as string) !== 'delivery_unknown' && <button type="button" disabled={busy} onClick={()=>controls?.onSkip(paused.id)} className={hasUnknown?primary:secondary}>{hasUnknown?'Đã thấy kết quả → Bỏ qua bước này và làm tiếp':'Bỏ qua việc này'}</button>}
       {actions.includes('stop') && <button id="btn-recovery-stop" type="button" disabled={busy} onClick={()=>setDialog('stop')} className={moment===7?'px-4 py-3 text-sm font-medium text-[var(--planora-muted)] hover:text-[var(--planora-error-text)] transition-colors disabled:opacity-50 cursor-pointer':secondary}>Dừng kế hoạch</button>}
       {hasUnknown && destination && <a href={destination} target="_blank" rel="noopener noreferrer" className="px-4 py-3 text-sm font-medium text-[var(--planora-muted)] hover:text-[var(--planora-text)] inline-flex items-center gap-1.5 transition-colors">Kiểm tra trên {service}<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg></a>}
     </div>
     {busy && <p role="status" className="text-xs text-[var(--planora-muted)]">Đang gửi yêu cầu và tải lại trạng thái…</p>}
-    {dialog==='stop' && createPortal(<CockpitDialog title="Dừng kế hoạch?" returnFocusId="btn-recovery-stop" onClose={()=>{if(!busy)setDialog(null);}}><div className="p-5 v3-space-y-4 text-sm text-[var(--planora-text)]"><p>Không thể chạy tiếp sau khi dừng. Các kết quả đã có và bằng chứng chưa rõ kết quả được giữ nguyên.</p><div className="flex flex-wrap gap-3"><button type="button" disabled={busy} className={secondary} onClick={()=>setDialog(null)}>Tiếp tục xem</button><button type="button" disabled={busy} className="px-6 py-3 bg-[var(--planora-error-bg)] hover:bg-[var(--planora-error-border)] text-[var(--planora-error-text)] border border-[var(--planora-error-border)] text-sm font-semibold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50" onClick={()=>{setDialog(null);controls?.onStop();}}>Dừng hẳn quy trình</button></div></div></CockpitDialog>,document.body)}
+    {dialog==='stop' && createPortal(<CockpitDialog title="Dừng kế hoạch?" returnFocusId="btn-recovery-stop" onClose={()=>{if(!busy)setDialog(null);}}><div className="p-5 v3-space-y-4 text-sm text-[var(--planora-text)]"><p>Không thể tiếp tục sau khi dừng. Các kết quả đã hoàn thành trước đó được giữ nguyên.</p><div className="flex flex-wrap gap-3"><button type="button" disabled={busy} className={secondary} onClick={()=>setDialog(null)}>Tiếp tục xem</button><button type="button" disabled={busy} className="px-6 py-3 bg-[var(--planora-error-bg)] hover:bg-[var(--planora-error-bg)] text-[var(--planora-error-text)] border border-[var(--planora-error-border)] hover:border-[var(--planora-error-text)] hover:shadow-xs text-sm font-semibold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50" onClick={()=>{setDialog(null);controls?.onStop();}}>Dừng hẳn quy trình</button></div></div></CockpitDialog>,document.body)}
     {dialog==='edit' && paused && createPortal(<RecoveryEditor tool={paused.tool} stepArgs={snapshot && planStep ? savedArguments(planStep.args,snapshot) as Record<string,unknown> : planStep?.args} busy={busy} onClose={()=>setDialog(null)} onSubmit={(args,prompt)=>{setDialog(null);controls?.onEdit(paused.id,args,prompt);}}/>,document.body)}
   </section>;
 }

@@ -148,7 +148,7 @@ describe('saved execution recovery in the actual App/history flow', () => {
 
   it('loads UNKNOWN, saved output/args, no retry or approval, and preserves raw history time', async () => {
     const notice = await openHistory();
-    expect(within(notice).getByText('trello.add_member')).toBeInTheDocument();
+    expect(within(notice).getByText('Gán thành viên vào thẻ Trello')).toBeInTheDocument();
     expect(within(notice).getByText('Gán Minh vào thẻ')).toBeInTheDocument();
     expect(within(notice).getByText(/saved-card-123/)).toBeInTheDocument();
     expect(within(notice).getByText(/kiểm tra.*Trello/i)).toBeInTheDocument();
@@ -199,7 +199,7 @@ describe('saved execution recovery in the actual App/history flow', () => {
   it('obeys Stop-only even when saved step evidence contains UNKNOWN', async () => {
     snapshot.plan = { id: 'p1', convId: 'c1', status: 'reconciliation_required' }; snapshot.recoveryActions = ['stop'];
     const notice = await openHistory();
-    expect(within(notice).getByText('trello.add_member')).toBeInTheDocument();
+    expect(within(notice).getByText('Gán thành viên vào thẻ Trello')).toBeInTheDocument();
     expect(within(notice).queryByRole('button', { name: 'Đã thấy kết quả → Bỏ qua bước này và làm tiếp' })).toBeNull();
     expect(within(notice).getByRole('button', { name: 'Dừng kế hoạch' })).toBeEnabled();
   });
@@ -254,7 +254,8 @@ describe('saved execution recovery in the actual App/history flow', () => {
       nullable: { $ref: 'step_1.output.optional' }, text: { $template: 'Card ${ step_1.output.id }' },
     };
     const notice = await openHistory();
-    expect(JSON.parse(notice.querySelector('pre')!.textContent!)).toEqual({ wrapper: 'nested-card', whole: output, nullable: null, text: 'Card nested-card' });
+    expect(within(notice).getAllByText(/nested-card/).length).toBeGreaterThan(0);
+    expect(within(notice).getByText('Card nested-card')).toBeInTheDocument();
   });
 
   it('describes and retries the saved partial execution even with a newer preview sharing step IDs', async () => {
@@ -266,9 +267,9 @@ describe('saved execution recovery in the actual App/history flow', () => {
       : originalRequest(url, options));
     render(<App />); await openCockpitHistory(); fireEvent.click(await screen.findByText('Đối soát đã lưu'));
     const modal = await screen.findByRole('region', {name:/chưa hoàn thành việc này/});
-    expect(within(modal).getByText('trello.add_member')).toBeInTheDocument();
+    expect(within(modal).getByText('Gán thành viên vào thẻ Trello')).toBeInTheDocument();
     expect(within(modal).getAllByText('Gán Minh vào thẻ').length).toBeGreaterThan(0);
-    expect(modal.querySelector('pre')).toHaveTextContent('minh');
+    expect(modal).toHaveTextContent('minh');
     expect(within(modal).queryByText('NEW operation')).toBeNull();
     fireEvent.click(within(modal).getByRole('button', { name: /Thử lại việc 2/ }));
     await screen.findByText('Quy trình đã hoàn thành.');
@@ -279,7 +280,7 @@ describe('saved execution recovery in the actual App/history flow', () => {
   it('lets a fresh partial UNKNOWN use the same safe reconciliation actions', async () => {
     snapshot.execution.status = 'partial'; snapshot.plan.status = 'partial';
     const notice = await openHistory();
-    expect(within(notice).getByText('trello.add_member')).toBeInTheDocument();
+    expect(within(notice).getByText('Gán thành viên vào thẻ Trello')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Thử lại|retry/i })).toBeNull();
     fireEvent.click(within(notice).getByRole('button', { name: 'Đã thấy kết quả → Bỏ qua bước này và làm tiếp' }));
     await screen.findByText('Quy trình đã hoàn thành.');

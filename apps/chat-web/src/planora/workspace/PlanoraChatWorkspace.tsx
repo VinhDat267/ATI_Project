@@ -242,10 +242,11 @@ export function PlanoraChatWorkspace(props: PlanoraChatWorkspaceProps) {
 
   const activeMessageIds = new Set<string>();
   if (savedRequest) activeMessageIds.add(savedRequest.id);
-  if (moment === 'answer' && latestMessage) activeMessageIds.add(latestMessage.id);
-  if (moment === 'refusal' && latestMessage) activeMessageIds.add(latestMessage.id);
+  if ((moment === 'answer' || moment === 'refusal' || (moment as any) === 3) && latestMessage?.role === 'assistant') {
+    activeMessageIds.add(latestMessage.id);
+  }
   if (terminalError) activeMessageIds.add(terminalError.id);
-  if ([3, 4, 5, 6, 7, 8, 9, 'unsuccessful'].includes(moment as any)) {
+  if (moment !== null && moment !== undefined && [3, 4, 5, 6, 7, 8, 9, 'answer', 'refusal', 'unsuccessful'].includes(moment as any)) {
     const activeUser = [...state.messages].reverse().find((m) => m.role === 'user');
     if (activeUser) activeMessageIds.add(activeUser.id);
   }
