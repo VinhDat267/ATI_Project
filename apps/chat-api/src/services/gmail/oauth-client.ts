@@ -1,9 +1,10 @@
 import { CALENDAR_ID_PATTERN, type PersonalCalendarItem } from '@wap/tool-schemas';
 import type { GmailOAuthConfig } from '../../config/env.js';
 
-/** Failure kinds of a Google request. Messages never contain tokens, codes or verifiers. */
+/** Only allowlisted provider reasons survive; messages never contain provider bodies or credentials. */
 export class GmailOAuthError extends Error {
-  constructor(readonly kind: 'invalid_grant' | 'rejected' | 'network' | 'server', readonly status?: number) {
+  constructor(readonly kind: 'invalid_grant' | 'rejected' | 'network' | 'server', readonly status?: number,
+    readonly reason?: 'SERVICE_DISABLED') {
     super(`Gmail OAuth request failed: ${kind}${status ? ` (${status})` : ''}`);
     this.name = 'GmailOAuthError';
   }
@@ -114,7 +115,15 @@ export class GmailOAuthClient {
     try { body = text && text.length <= MAX_BODY_CHARS ? JSON.parse(text) : null; } catch { body = null; }
     if (response.ok) return body ?? {};
     if (response.status === 400 && body?.error === 'invalid_grant') throw new GmailOAuthError('invalid_grant', 400);
-    throw new GmailOAuthError(response.status >= 500 || response.status < 400 ? 'server' : 'rejected', response.status);
+    const error = body?.error;
+    const serviceDisabled = response.status === 403 && (
+      (Array.isArray(error?.details) && error.details.some((detail: any) =>
+        detail?.['@type'] === 'type.googleapis.com/google.rpc.ErrorInfo'
+        && detail?.domain === 'googleapis.com' && detail?.reason === 'SERVICE_DISABLED'))
+      || (Array.isArray(error?.errors) && error.errors.some((entry: any) => entry?.reason === 'accessNotConfigured'))
+    );
+    throw new GmailOAuthError(response.status >= 500 || response.status < 400 ? 'server' : 'rejected', response.status,
+      serviceDisabled ? 'SERVICE_DISABLED' : undefined);
   }
 
   private tokens(body: any): GmailTokens {

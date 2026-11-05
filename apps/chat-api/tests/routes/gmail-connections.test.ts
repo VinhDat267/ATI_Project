@@ -62,7 +62,7 @@ describe('Gmail connection routes over HTTP, PostgreSQL and the fake Google serv
   });
   beforeEach(async () => {
     Object.assign(google.settings, { email: 'Owner.Mailbox@Example.test', grantedScopes: ['https://www.googleapis.com/auth/gmail.modify'],
-      issueRefreshToken: true, accessTokenPrefix: SENTINEL, exchange: 'ok', exchangeDelayMs: 0, revoke: 'ok', profile: 'ok' });
+      issueRefreshToken: true, accessTokenPrefix: SENTINEL, exchange: 'ok', exchangeDelayMs: 0, revoke: 'ok', profile: 'ok', profileResponse: null });
     changed = []; now = Date.now(); seen = []; logs = [];
     for (const level of ['log', 'warn', 'error', 'info'] as const) {
       vi.spyOn(console, level).mockImplementation((...args: unknown[]) => { logs.push(args.map(String).join(' ')); });
@@ -173,6 +173,22 @@ describe('Gmail connection routes over HTTP, PostgreSQL and the fake Google serv
       google.settings.exchange = 'ok'; google.settings.profile = 'server_error';
       expect((await connect(build(), alice)).body.code).toBe('GMAIL_CONNECT_FAILED');
       expect(await stored(alice)).toBeNull();
+    });
+
+    it.each([
+      { details: [{ '@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason: 'SERVICE_DISABLED', domain: 'googleapis.com' }] },
+      { errors: [{ reason: 'accessNotConfigured' }] },
+    ])('identifies a disabled Gmail API without exposing provider data: %j', async providerError => {
+      google.settings.profileResponse = { status: 403, body: { error: {
+        code: 403, status: 'PERMISSION_DENIED', message: SENTINEL, ...providerError,
+      } } };
+      const response = await connect(build(), alice);
+      expect(response.status).toBe(400);
+      expect(response.body.code).toBe('GMAIL_API_DISABLED');
+      expect(response.body.error).toMatch(/quản trị viên.*Gmail API.*Google Cloud/i);
+      expect(await stored(alice)).toBeNull();
+      expect(changed).toEqual([]);
+      expect(google.stats.writes).toBe(0);
     });
 
     it('refuses expired, reused, foreign-user, foreign-session and foreign-browser states', async () => {

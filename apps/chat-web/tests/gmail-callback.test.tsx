@@ -2,7 +2,7 @@ import { StrictMode } from 'react';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { GmailCallbackView } from '../src/views/GmailCallbackView';
 import { useRoute } from '../src/hooks/use-route';
 import { authStorage } from '../src/services/auth-storage';
@@ -47,6 +47,16 @@ it.each(['GMAIL_STATE_INVALID', 'GMAIL_SCOPE_MISSING', 'GMAIL_REFRESH_TOKEN_MISS
   statuses = 400; errorCode = code; mount();
   const alert = await screen.findByRole('alert'); expect(alert.textContent).toMatch(/kết nối|đăng nhập/i);
   expect(navigate).not.toHaveBeenCalled(); expect(callbacks).toHaveLength(1);
+});
+it('directs a disabled Gmail API to the administrator without replaying consent', async () => {
+  statuses = 400; errorCode = 'GMAIL_API_DISABLED'; mount();
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toMatch(/quản trị viên.*Gmail API.*Google Cloud/i);
+  expect(navigate).not.toHaveBeenCalled(); expect(callbacks).toHaveLength(1);
+  expect(window.location.search).toBe('');
+  expect(document.body.textContent).not.toMatch(/SENTINEL_CODE|SENTINEL_STATE/);
+  fireEvent.click(screen.getByRole('link', { name: /Về Kết nối dịch vụ/i }));
+  expect(navigate).toHaveBeenCalledWith('/settings', true);
 });
 it.each(['logout', 'switch-user', 'new-session', 'unmount'])('does not navigate after %s while the callback is in flight', async change => {
   hold = true; const view = mount(); await waitFor(() => expect(callbacks).toHaveLength(1));

@@ -66,11 +66,12 @@ export function createGmailConnectionRoutes(options: GmailConnectionsOptions): R
     next();
   });
 
-  const fail = (res: Response, code: 'GMAIL_STATE_INVALID' | 'GMAIL_SCOPE_MISSING' | 'GMAIL_REFRESH_TOKEN_MISSING' | 'GMAIL_CONNECT_FAILED') => {
+  const fail = (res: Response, code: 'GMAIL_STATE_INVALID' | 'GMAIL_SCOPE_MISSING' | 'GMAIL_REFRESH_TOKEN_MISSING' | 'GMAIL_API_DISABLED' | 'GMAIL_CONNECT_FAILED') => {
     const messages = {
       GMAIL_STATE_INVALID: 'Yêu cầu kết nối Gmail đã hết hạn hoặc không còn hợp lệ. Hãy bấm "Kết nối Gmail" lại.',
       GMAIL_SCOPE_MISSING: 'Google chưa cấp quyền đọc và gửi thư cho Planora. Hãy kết nối lại và đồng ý quyền Gmail.',
       GMAIL_REFRESH_TOKEN_MISSING: 'Google không trả quyền truy cập lâu dài. Hãy kết nối lại.',
+      GMAIL_API_DISABLED: 'Gmail API chưa được bật cho ứng dụng. Hãy nhờ quản trị viên bật Gmail API trên Google Cloud, sau đó kết nối lại.',
       GMAIL_CONNECT_FAILED: 'Không kết nối được Gmail. Vui lòng thử lại.',
     };
     res.status(400).json({ error: messages[code], code });
@@ -142,9 +143,9 @@ export function createGmailConnectionRoutes(options: GmailConnectionsOptions): R
       let email: string;
       try {
         email = await client!.profileEmail(tokens.accessToken, AbortSignal.timeout(googleTimeoutMs));
-      } catch {
+      } catch (error) {
         revokeRefusedGrant(user.id, consumed.id, tokens.refreshToken);
-        fail(res, 'GMAIL_CONNECT_FAILED'); return;
+        fail(res, error instanceof GmailOAuthError && error.reason === 'SERVICE_DISABLED' ? 'GMAIL_API_DISABLED' : 'GMAIL_CONNECT_FAILED'); return;
       }
       const now = clock();
       const config = encryptCredentials({ refreshToken: tokens.refreshToken, email, scopes: tokens.scopes, connectedAt: new Date(now).toISOString() }, options.encryptionKey!);

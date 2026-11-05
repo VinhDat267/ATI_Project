@@ -89,8 +89,10 @@ Mọi route dưới `/api/connections/gmail` trả **404** khi cờ tắt, **503
 | Route | Thành công | Lỗi |
 |---|---|---|
 | `POST /api/connections/gmail/start` | `200 { url }` | `401 INVALID_SESSION` |
-| `POST /api/connections/gmail/callback`, body `{ code, state }` | `200 { email }` | `400` với `code` là `GMAIL_STATE_INVALID` (hết hạn, đã dùng, sai luồng, sai người/phiên/trình duyệt), `GMAIL_SCOPE_MISSING`, `GMAIL_REFRESH_TOKEN_MISSING` hoặc `GMAIL_CONNECT_FAILED`; `401 INVALID_SESSION` |
+| `POST /api/connections/gmail/callback`, body `{ code, state }` | `200 { email }` | `400` với `code` là `GMAIL_STATE_INVALID` (hết hạn, đã dùng, sai luồng, sai người/phiên/trình duyệt), `GMAIL_SCOPE_MISSING`, `GMAIL_REFRESH_TOKEN_MISSING`, `GMAIL_API_DISABLED` hoặc `GMAIL_CONNECT_FAILED`; `401 INVALID_SESSION` |
 | `DELETE /api/connections/gmail` | `200 { success: true }`, kể cả khi chưa kết nối | `401 INVALID_SESSION` |
+
+`GMAIL_API_DISABLED` phân biệt lỗi cấu hình khi Gmail profile trả HTTP 403 với Google ErrorInfo `SERVICE_DISABLED` hoặc reason cũ `accessNotConfigured`. UI hướng người dùng nhờ quản trị viên bật Gmail API trên Google Cloud rồi bắt đầu kết nối mới. Các lỗi khác vẫn dùng mã hiện có; không đưa raw provider body, token, code, verifier hay dữ liệu project vào thông báo.
 
 `GET /api/services`: mỗi dịch vụ thêm `connection`. Gmail chỉ có trong danh sách khi Gmail dùng được (cờ bật, đủ cấu hình OAuth và có PostgreSQL), và luôn là của chính người gọi:
 
