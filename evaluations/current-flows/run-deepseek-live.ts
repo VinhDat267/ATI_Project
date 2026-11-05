@@ -108,13 +108,23 @@ class RecordingDeepSeekProvider implements LLMProvider {
 }
 
 function resolveDirectDeepSeekEnv(): Record<string, string | undefined> {
+  const dsBase = process.env.DEEPSEEK_BASE_URL?.trim();
+  const llmBase = process.env.LLM_BASE_URL?.trim();
+  const dsIsDirect = Boolean(dsBase && !dsBase.includes('20128'));
+  const llmIsDirect = Boolean(llmBase && !llmBase.includes('20128'));
   const directBaseUrl =
     process.env.FLOW_07_USE_9ROUTER === '1'
-      ? process.env.DEEPSEEK_BASE_URL || 'http://localhost:20128/v1'
-      : process.env.LLM_BASE_URL && !process.env.LLM_BASE_URL.includes('20128')
-        ? process.env.LLM_BASE_URL
-        : 'https://api.deepseek.com';
-  const apiKey = process.env.LLM_API_KEY || process.env.DEEPSEEK_API_KEY;
+      ? dsBase || llmBase || 'http://localhost:20128/v1'
+      : dsIsDirect
+        ? dsBase!
+        : llmIsDirect
+          ? llmBase!
+          : 'https://api.deepseek.com';
+  const apiKey = dsIsDirect
+    ? process.env.DEEPSEEK_API_KEY || process.env.LLM_API_KEY
+    : llmIsDirect
+      ? process.env.LLM_API_KEY || process.env.DEEPSEEK_API_KEY
+      : process.env.DEEPSEEK_API_KEY || process.env.LLM_API_KEY;
   const model = process.env.DEEPSEEK_MODEL || process.env.LLM_MODEL || 'deepseek-chat';
   return {
     ...process.env,
