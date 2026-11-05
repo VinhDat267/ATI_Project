@@ -2,7 +2,6 @@ import React, { useLayoutEffect, useRef, type ReactNode } from 'react';
 import type { ChatMessage } from '../../types';
 import { runOrigin } from '../../services/schedule-text';
 import { useSchedulesEnabled } from '../../hooks/use-schedules';
-import { Brand } from '../components/Brand';
 
 export interface PlanoraConversationFeedProps {
   messages: ChatMessage[];
@@ -76,7 +75,10 @@ export function PlanoraConversationFeed({
       aria-live="polite"
       aria-label="Hội thoại"
       onScroll={handleScroll}
-      style={{ paddingBottom: 'calc(var(--cockpit-bottom-space, 112px) + 24px)' }}
+      style={{
+        paddingBottom: 'calc(var(--cockpit-bottom-space, 112px) + 24px)',
+        scrollPaddingBottom: 'calc(var(--composer-dock-height, 120px) + 24px)',
+      }}
       className="planora-conversation-feed planora-chat-feed flex-1 overflow-y-auto min-h-0 w-full max-w-[var(--planora-chat-max-width)] mx-auto px-4 sm:px-6 pt-6 pb-28 sm:pb-32 space-y-5"
     >
       {messages.map((message) => {
@@ -92,7 +94,7 @@ export function PlanoraConversationFeed({
           ? 'Bạn'
           : isScheduleRun
             ? runOrigin(message.metadata?.name ?? '', message.metadata?.dueAt ?? '')
-            : 'ATI';
+            : 'Planora';
 
         return (
           <div
@@ -102,10 +104,10 @@ export function PlanoraConversationFeed({
             <div className="flex items-center gap-2 text-[11px] text-[var(--planora-muted)] px-1">
               {!isUser && (
                 <div
-                  className="w-4 h-4 rounded-full bg-[var(--planora-primary)] text-[var(--planora-on-primary)] grid place-items-center"
+                  className="w-5 h-5 rounded-full bg-[var(--planora-primary)] text-[var(--planora-on-primary)] flex items-center justify-center font-bold text-[11px] flex-shrink-0 shadow-xs"
                   aria-hidden="true"
                 >
-                  <Brand size="sm" showWordmark={false} />
+                  P
                 </div>
               )}
               <span className="font-medium">{senderLabel}</span>
@@ -153,12 +155,12 @@ export function PlanoraConversationFeed({
         <div className="flex flex-col items-start space-y-1.5">
           <div className="flex items-center gap-2 text-[11px] text-[var(--planora-muted)] px-1">
             <div
-              className="w-4 h-4 rounded-full bg-[var(--planora-primary)] text-[var(--planora-on-primary)] grid place-items-center"
+              className="w-5 h-5 rounded-full bg-[var(--planora-primary)] text-[var(--planora-on-primary)] flex items-center justify-center font-bold text-[11px] flex-shrink-0 shadow-xs"
               aria-hidden="true"
             >
-              <Brand size="sm" showWordmark={false} />
+              P
             </div>
-            <span className="font-medium">ATI</span>
+            <span className="font-medium">Planora</span>
           </div>
           <div className="max-w-[88%] bg-[var(--planora-paper)] text-[var(--planora-text)] border border-[var(--planora-divider)] p-3.5 sm:p-4 rounded-2xl rounded-tl-none text-sm leading-relaxed shadow-sm whitespace-pre-wrap [overflow-wrap:anywhere]">
             {streamingText || 'Đang xử lý…'}

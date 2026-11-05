@@ -159,4 +159,33 @@ Khôi phục bố cục không gian làm việc hội thoại Planora (Planora C
     - `npm test -w @wap/chat-web`: PASS 100/100 test files, 1115/1115 tests (exit code 0).
     - `npm run build:v3`: PASS (exit code 0).
     - `node scripts/test-v3-web-build-security.mjs`: PASS (exit code 0).
+
+- **Kết quả đợt Refactor theo Design Brief v2.0 & Business-First UX (05/11/2026):**
+  1. `apps/chat-web/src/planora/workspace/PlanoraChatWorkspace.tsx` & `PlanoraActiveTurn.tsx`:
+     - **Chính sách Duy nhất Một Composer (One-Composer Policy — Chuẩn D3):** Thanh Composer ở chân trang (bottom dock) là nơi kích hoạt hành động duy nhất trong chế độ Planora.
+     - **Đổi nhãn nút gửi động:** Khi lựa chọn clarification được chọn, nút gửi của dock tự động đổi nhãn thành *"Xác nhận và tiếp tục →"* với màu xanh rừng Planora (`var(--planora-primary)` `#3c5741`).
+     - **Triệt tiêu nút gửi trùng lặp:** Triệt tiêu hoàn toàn nút gửi thứ hai trên thân thẻ `ClarificationMoment` và `ExpandedClarificationMoment` (`hideSubmit={!props.legacyCockpit}`).
+     - **Đồng bộ hai chiều (Two-Way Sync):** Khi người dùng gõ nội dung mới khác biệt hoặc xóa ô nhập, lựa chọn radio tự động bỏ chọn (`selected = null`) để chống gửi nhầm.
+     - **Khử trùng lặp nội dung feed tuyệt đối (Zero-Duplicate Rule):** Mỗi tin nhắn xuất hiện đúng 1 lần trong feed; không lặp lại câu yêu cầu của người dùng bên trong thân thẻ tương tác (`RequestEcho` được ẩn trong Planora mode).
+     - **Tương thích ngược Sprint 1:** Duy trì hành vi inline composer nguyên vẹn cho chế độ `legacyCockpit` (`Cockpit.tsx`).
+  2. `apps/chat-web/src/pages/Cockpit/ChatComposer.tsx` & `CockpitHeader.tsx`:
+     - **Loại bỏ triệt để màu cam cũ:** Chuyển đổi toàn bộ nút Gửi, focus ring, và shadow từ `#FF5701` / `bg-brand-primary` sang màu xanh rừng Planora (`var(--planora-primary)`, `--planora-on-primary`).
+     - **Thông điệp an toàn chuẩn Planora:** Thay câu cũ bằng *"Planora luôn yêu cầu bạn duyệt trước khi ghi hoặc gửi dữ liệu ra bên ngoài."*
+     - **Đổi thương hiệu:** Đổi toàn bộ nhãn nhận diện từ "ATI" sang "Planora".
+     - **Theo dõi chiều cao dock:** Tự động publish `--composer-dock-height` lên `:root` qua `useLayoutEffect`.
+  3. `apps/chat-web/src/planora/workspace/PlanoraConversationFeed.tsx`:
+     - Đổi nhãn người gửi trên tin nhắn trợ lý từ `"ATI"` sang `"Planora"`.
+     - Đổi avatar monogram trợ lý từ `"A"` sang `"P"`.
+     - Thiết lập `scrollPaddingBottom: 'calc(var(--composer-dock-height, 120px) + 24px)'` cùng dynamic padding đáy chống che khuất nút hành động.
+  4. `apps/chat-web/src/pages/Cockpit/RequestMoments.tsx` & `ResponseMoment.tsx`:
+     - Loại bỏ toàn bộ class `bg-brand-primary` và `#FF5701`, thay thế bằng token `var(--planora-primary)`.
+     - Cập nhật avatar ResponseCard sang "P" và nhãn sang "Planora".
+  5. `apps/chat-web/tests/planora-chat.test.tsx`:
+     - Bổ sung Mục 7 gồm 4 test cases toàn diện chứng minh One-Composer Policy, Zero-Duplicate Rule, Brand cleanup, và Layout Anti-Overlap. Nâng tổng số test lên 21/21 PASS.
+  - **Kiểm tra đã chạy và kết quả:**
+    - `npm run typecheck:v3`: PASS (exit code 0).
+    - `npm test -w @wap/chat-web -- tests/planora-chat.test.tsx`: PASS 21/21 tests (exit code 0).
+    - `npm test -w @wap/chat-web`: PASS 100/100 test files, 1119/1119 tests (exit code 0).
+    - `npm run build:v3`: PASS (exit code 0).
+    - `node scripts/test-v3-web-build-security.mjs`: PASS (exit code 0).
 - **Trạng thái:** `STATUS: READY_FOR_CODEX_REVIEW`.

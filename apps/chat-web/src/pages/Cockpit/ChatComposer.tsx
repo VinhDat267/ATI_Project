@@ -1,5 +1,6 @@
 // Source: AppStagePage.tsx global-bottom-bar, moment-4-inline-chat and chat-drawer input.
 import { useLayoutEffect, useRef, type FormEvent, type KeyboardEvent, type RefObject } from 'react';
+
 export interface ComposerProps {
   variant: 'bottom' | 'inline' | 'drawer' | 'response';
   draft: string;
@@ -10,6 +11,7 @@ export interface ComposerProps {
   onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
   onClose?: () => void;
   moment?: number | string;
+  submitLabel?: string;
 }
 
 export function ChatComposer({
@@ -22,20 +24,29 @@ export function ChatComposer({
   onKeyDown,
   onClose,
   moment,
+  submitLabel,
 }: ComposerProps) {
   const footer = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
     if (!['bottom', 'response'].includes(variant) || !footer.current) return;
-    const update = () =>
+    const update = () => {
+      if (!footer.current) return;
+      const height = footer.current.getBoundingClientRect().height;
+      document.documentElement.style.setProperty(
+        '--composer-dock-height',
+        `${height}px`
+      );
       document.documentElement.style.setProperty(
         '--cockpit-bottom-space',
-        `${Math.max(96, footer.current!.getBoundingClientRect().height + 16)}px`
+        `${Math.max(96, height + 16)}px`
       );
+    };
     update();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
     observer?.observe(footer.current);
     return () => {
       observer?.disconnect();
+      document.documentElement.style.removeProperty('--composer-dock-height');
       document.documentElement.style.removeProperty('--cockpit-bottom-space');
     };
   }, [variant, draft]);
@@ -58,7 +69,7 @@ export function ChatComposer({
   const placeholderText =
     moment === 3
       ? 'Nhập câu trả lời làm rõ yêu cầu...'
-      : 'Nhắn thêm với tôi để sửa kế hoạch hoặc thêm chi tiết...';
+      : 'Nhắn cho Planora để mô tả công việc, sửa kế hoạch hoặc thêm chi tiết...';
 
   // ResponsesPage footer, retaining the app's multiline textarea and shared draft.
   if (variant === 'response')
@@ -77,7 +88,7 @@ export function ChatComposer({
             className="relative flex items-center gap-2"
           >
             <label htmlFor="chat-prompt-input" className="sr-only">
-              Nhắn cho ATI
+              Nhắn cho Planora
             </label>
             <textarea
               ref={input}
@@ -87,26 +98,30 @@ export function ChatComposer({
               onChange={(event) => onDraft(event.target.value)}
               onKeyDown={onKeyDown}
               aria-label={textboxLabel}
-              placeholder="Nhắn cho ATI…"
+              placeholder="Nhắn cho Planora…"
               autoComplete="off"
-              className="w-full bg-white dark:bg-[#151b16] border border-[#E7E7E2] dark:border-[#394638] rounded-xl px-4 py-3 pr-24 text-xs sm:text-sm text-[#111827] dark:text-[#f5f1e7] placeholder-[#9CA3AF] shadow-sm focus:v3-outline-none focus:border-[#FF5701] focus:ring-2 focus:ring-[#FF5701]/20 transition-all resize-none"
+              className={`w-full bg-white dark:bg-[#151b16] border border-[#E7E7E2] dark:border-[#394638] rounded-xl px-4 py-3 ${
+                submitLabel ? 'pr-44 sm:pr-48' : 'pr-24'
+              } text-xs sm:text-sm text-[#111827] dark:text-[#f5f1e7] placeholder-[#9CA3AF] shadow-sm focus:v3-outline-none focus:border-[var(--planora-primary)] focus:ring-2 focus:ring-[var(--planora-primary)]/20 transition-all resize-none`}
             />
             <button
               type="submit"
               id="btn-submit-chat"
-              aria-label="Gửi tin nhắn"
+              aria-label={submitLabel ?? 'Gửi tin nhắn'}
               disabled={!draft.trim() || planning}
-              className="absolute right-2 px-3.5 py-1.5 bg-[#FF5701] hover:bg-[#E04D00] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
+              className="absolute right-2 px-3.5 py-1.5 bg-[var(--planora-primary)] hover:bg-[var(--planora-primary-hover)] text-[var(--planora-on-primary)] text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
             >
-              <span>Gửi</span>
-              <svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-              </svg>
+              <span>{submitLabel ?? 'Gửi'}</span>
+              {!submitLabel && (
+                <svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              )}
             </button>
           </form>
           <p className="text-[11px] text-[#6B7280] dark:text-[#b5bcae] text-center mt-1.5">
-            ATI chỉ đọc và ghi ở những nơi bạn cho phép. Chưa duyệt thì chưa làm. ·{' '}
-            <a href="/privacy" className="text-[#FF5701] hover:underline font-medium">
+            Planora luôn yêu cầu bạn duyệt trước khi ghi hoặc gửi dữ liệu ra bên ngoài. ·{' '}
+            <a href="/privacy" className="text-[var(--planora-primary)] hover:underline font-medium">
               Chính sách an toàn &amp; Dữ liệu
             </a>
           </p>
@@ -120,7 +135,7 @@ export function ChatComposer({
         aria-label="Nhập yêu cầu"
         onSubmit={submit}
         id="moment-4-inline-chat"
-        className={`mb-3 p-2 bg-white dark:bg-[#202820] rounded-xl border border-brand-border shadow-soft-card flex items-center gap-2 transition-all`}
+        className="mb-3 p-2 bg-white dark:bg-[#202820] rounded-xl border border-brand-border shadow-soft-card flex items-center gap-2 transition-all"
       >
         <textarea
           ref={input}
@@ -136,7 +151,7 @@ export function ChatComposer({
         <button
           type="submit"
           disabled={!draft.trim() || planning}
-          className="px-3.5 py-1.5 bg-brand-text hover:bg-black text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+          className="px-3.5 py-1.5 bg-[var(--planora-primary)] hover:bg-[var(--planora-primary-hover)] text-[var(--planora-on-primary)] text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
         >
           <span>Gửi</span>
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -149,10 +164,9 @@ export function ChatComposer({
           className="p-1.5 text-neutral-400 hover:text-neutral-700 rounded-lg hover:bg-neutral-100 transition-colors"
           aria-label="Đóng ô sửa"
         >
-          {' '}
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>{' '}
+          </svg>
         </button>
       </form>
     );
@@ -168,20 +182,19 @@ export function ChatComposer({
             onChange={(event) => onDraft(event.target.value)}
             aria-label={textboxLabel}
             id="drawer-chat-input"
-            className="flex-1 px-3 py-2 bg-white dark:bg-[#202820] rounded-xl border border-brand-border text-xs sm:text-sm focus:v3-outline-none focus:border-brand-primary"
+            className="flex-1 px-3 py-2 bg-white dark:bg-[#202820] rounded-xl border border-brand-border text-xs sm:text-sm focus:v3-outline-none focus:border-[var(--planora-primary)]"
             placeholder="Nhắn tiếp trong phiên này…"
             onKeyDown={onKeyDown}
           />
           <button
             type="submit"
             disabled={!draft.trim() || planning}
-            className="p-2 bg-brand-primary text-white rounded-xl hover:bg-brand-primary-hover transition-colors"
+            className="p-2 bg-[var(--planora-primary)] text-[var(--planora-on-primary)] rounded-xl hover:bg-[var(--planora-primary-hover)] transition-colors"
             aria-label="Gửi tin nhắn"
           >
-            {' '}
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-            </svg>{' '}
+            </svg>
           </button>
         </form>
       </div>
@@ -191,14 +204,14 @@ export function ChatComposer({
     <footer
       ref={footer}
       id="global-bottom-bar"
-      className={`fixed bottom-0 left-0 right-0 lg:left-[var(--planora-sidebar-width,248px)] z-20 bg-gradient-to-t from-[#F8F8F6] via-[#F8F8F6]/95 to-transparent dark:from-[#171c18] dark:via-[#171c18]/95 pt-6 pb-4 px-4 sm:px-6 pointer-events-none`}
+      className="fixed bottom-0 left-0 right-0 lg:left-[var(--planora-sidebar-width,248px)] z-20 bg-gradient-to-t from-[#F8F8F6] via-[#F8F8F6]/95 to-transparent dark:from-[#171c18] dark:via-[#171c18]/95 pt-6 pb-4 px-4 sm:px-6 pointer-events-none"
     >
       <div className="max-w-3xl mx-auto pointer-events-auto">
         <form
           aria-label="Nhập yêu cầu"
           aria-busy={planning}
           onSubmit={submit}
-          className="bg-white dark:bg-[#202820] rounded-2xl border border-brand-border shadow-elevated p-2 sm:p-2.5 flex items-center gap-2 focus-within:border-brand-primary focus-within:shadow-orange-glow transition-all"
+          className="bg-white dark:bg-[#202820] rounded-2xl border border-brand-border shadow-elevated p-2 sm:p-2.5 flex items-center gap-2 focus-within:border-[var(--planora-primary)] focus-within:ring-2 focus-within:ring-[var(--planora-primary)]/20 transition-all"
         >
           <div className="p-2 text-brand-muted hidden sm:block">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -211,7 +224,7 @@ export function ChatComposer({
             </svg>
           </div>
           <label htmlFor="bottom-chat-input" className="sr-only">
-            Nhắn thêm với tôi
+            Nhắn cho Planora
           </label>
           <textarea
             ref={input}
@@ -227,17 +240,26 @@ export function ChatComposer({
           <button
             type="submit"
             disabled={!draft.trim() || planning}
-            className="px-4 py-2 bg-neutral-900 hover:bg-black text-white text-xs sm:text-sm font-medium rounded-xl transition-colors flex-shrink-0 flex items-center gap-1.5"
-            aria-label="Gửi tin nhắn"
+            className="px-4 py-2 bg-[var(--planora-primary)] hover:bg-[var(--planora-primary-hover)] text-[var(--planora-on-primary)] text-xs sm:text-sm font-semibold rounded-xl transition-colors flex-shrink-0 flex items-center gap-1.5"
+            aria-label={submitLabel ?? 'Gửi tin nhắn'}
           >
-            <span>Gửi</span>
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-            </svg>
+            <span>{submitLabel ?? 'Gửi'}</span>
+            {!submitLabel && (
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
+            )}
           </button>
         </form>
+        <p className="text-[11px] text-[#6B7280] dark:text-[#b5bcae] text-center mt-2 pointer-events-auto">
+          Planora luôn yêu cầu bạn duyệt trước khi ghi hoặc gửi dữ liệu ra bên ngoài. ·{' '}
+          <a href="/privacy" className="text-[var(--planora-primary)] hover:underline font-medium">
+            Chính sách an toàn &amp; Dữ liệu
+          </a>
+        </p>
       </div>
     </footer>
   );
 }
+
 export default ChatComposer;

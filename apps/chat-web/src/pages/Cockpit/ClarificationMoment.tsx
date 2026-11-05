@@ -20,6 +20,7 @@ interface Props {
   onSend: (text: string) => void;
   onBack: () => void;
   onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
+  hideSubmit?: boolean;
 }
 export function ClarificationMoment({
   request,
@@ -36,6 +37,7 @@ export function ClarificationMoment({
   onSend,
   onBack,
   onKeyDown,
+  hideSubmit,
 }: Props) {
   return (
     <section
@@ -134,7 +136,7 @@ export function ClarificationMoment({
               className={
                 'w-full text-left p-4 bg-white hover:bg-neutral-50 rounded-2xl ' +
                 (selected === option
-                  ? 'border-2 border-brand-primary'
+                  ? 'border-2 border-[var(--planora-primary)]'
                   : 'border border-brand-border') +
                 ' shadow-sm transition-all flex items-center justify-between gap-3 group'
               }
@@ -143,7 +145,7 @@ export function ClarificationMoment({
                 <div title={service?.name ?? 'Lựa chọn'} className="w-10 h-10 rounded-xl bg-neutral-100 text-neutral-600 flex items-center justify-center font-bold text-sm shadow-sm flex-shrink-0">
                   {service ? <ServiceLogo service={service.id} className="w-5 h-5 shrink-0" /> : <svg aria-hidden="true" className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8 10h8m-8 4h5M6 3h9l3 3v15H6z" /></svg>}
                 </div>
-                <span className="text-base font-semibold text-brand-text group-hover:text-brand-primary transition-colors break-words">
+                <span className="text-base font-semibold text-brand-text group-hover:text-[var(--planora-primary)] transition-colors break-words">
                   {option}
                 </span>
               </div>
@@ -152,7 +154,7 @@ export function ClarificationMoment({
                 className={
                   'w-5 h-5 rounded-full border flex-shrink-0 ' +
                   (selected === option
-                    ? 'border-brand-primary text-brand-primary'
+                    ? 'border-[var(--planora-primary)] text-[var(--planora-primary)]'
                     : 'border-neutral-300')
                 }
               >
@@ -183,7 +185,7 @@ export function ClarificationMoment({
                 >
                   +
                 </div>
-                <span className="text-sm font-medium text-brand-text group-hover:text-brand-primary transition-colors">
+                <span className="text-sm font-medium text-brand-text group-hover:text-[var(--planora-primary)] transition-colors">
                   Để tôi gõ tên hoặc link khác
                 </span>
               </div>
@@ -211,21 +213,23 @@ export function ClarificationMoment({
                   }}
                   onKeyDown={onKeyDown}
                   aria-label="Nhập câu trả lời làm rõ yêu cầu"
-                  className="w-full px-3 py-2 bg-white rounded-xl border border-brand-border text-xs sm:text-sm text-brand-text focus:v3-outline-none focus:border-brand-primary resize-none"
+                  className="w-full px-3 py-2 bg-white rounded-xl border border-brand-border text-xs sm:text-sm text-brand-text focus:v3-outline-none focus:border-[var(--planora-primary)] resize-none"
                 />
               )}
             </div>
           </div>
         </div>
         <div className="flex items-center gap-3 pt-2">
-          <button
-            type="button"
-            disabled={planning || !(selected ?? draft).trim()}
-            onClick={() => onSend(selected ?? draft)}
-            className="px-6 py-2.5 bg-brand-primary hover:bg-brand-primary-hover text-white text-sm font-semibold rounded-xl shadow-sm transition-all"
-          >
-            Xác nhận và tiếp tục
-          </button>
+          {!hideSubmit && (
+            <button
+              type="button"
+              disabled={planning || !(selected ?? draft).trim()}
+              onClick={() => onSend(selected ?? draft)}
+              className="px-6 py-2.5 bg-[var(--planora-primary)] hover:bg-[var(--planora-primary-hover)] text-[var(--planora-on-primary)] text-sm font-semibold rounded-xl shadow-sm transition-all"
+            >
+              Xác nhận và tiếp tục
+            </button>
+          )}
           <button
             type="button"
             onClick={onBack}

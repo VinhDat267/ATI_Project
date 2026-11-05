@@ -167,7 +167,7 @@ export function RequestMoment({
             type="button"
             disabled={!draft.trim() || planning}
             onClick={() => onSend(draft)}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-primary hover:bg-brand-primary-hover text-white text-sm font-semibold rounded-xl shadow-sm transition-all hover:scale-[1.01] active:scale-[0.99]"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[var(--planora-primary)] hover:opacity-90 text-white text-sm font-semibold rounded-xl shadow-sm transition-all hover:scale-[1.01] active:scale-[0.99]"
           >
             <span>Gửi yêu cầu</span>
             <svg
@@ -400,7 +400,7 @@ export function DiscoveryMoment({
           className="font-display text-2xl sm:text-3xl text-brand-text font-normal leading-snug"
           tabIndex={-1}
         >
-          <span id="moment-2-query-display">{origin ? 'ATI đang lập kế hoạch cho lượt này' : `“${request}”`}</span>
+          <span id="moment-2-query-display">{origin ? 'Planora đang lập kế hoạch cho lượt này' : `“${request}”`}</span>
         </h1>
       </div>
       <div className="bg-white rounded-2xl border border-brand-border p-6 shadow-soft-card v3-space-y-4">
@@ -408,7 +408,7 @@ export function DiscoveryMoment({
           <div className="flex items-center gap-2">
             <div
               id="moment-2-pulse"
-              className="w-2.5 h-2.5 rounded-full bg-brand-primary animate-ping"
+              className="w-2.5 h-2.5 rounded-full bg-[var(--planora-primary)] animate-ping"
             />
             <span
               id="moment-2-status-text"
@@ -445,7 +445,7 @@ export function DiscoveryMoment({
                       {found ? (
                         '✓'
                       ) : (
-                        <span className="w-2 h-2 bg-brand-primary rounded-full animate-pulse" />
+                        <span className="w-2 h-2 bg-[var(--planora-primary)] rounded-full animate-pulse" />
                       )}
                     </span>
                     <span className="break-words">

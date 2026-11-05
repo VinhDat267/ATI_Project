@@ -614,4 +614,163 @@ describe('PL-05: Planora Chat Workspace & One-Composer Policy', () => {
       expect(bottomBar?.className).toContain('lg:left-');
     });
   });
+
+  describe('7. Business-First UX & One-Composer Refactor (Design Brief v2.0 Mẫu 3)', () => {
+    it('One-Composer Policy: exactly one submit button in workspace, changing label to "Xác nhận và tiếp tục →" upon clarification selection with two-way sync', () => {
+      useChatStore.setState({
+        conversationId: 'c-clarify',
+        messages: [{ id: 'u1', role: 'user', content: 'Gửi báo cáo' }],
+        activeClarification: {
+          question: 'Bạn muốn gửi báo cáo qua kênh nào?',
+          options: ['Kênh #marketing trên Slack', 'Email đến marketing@example.com'],
+        },
+      });
+
+      render(
+        <PlanoraChatWorkspace
+          services={sampleServices}
+          servicesLoading={false}
+          servicesError={null}
+          onSendMessage={vi.fn()}
+          onNewConversation={vi.fn()}
+          onSelectConversation={vi.fn()}
+          onSettings={vi.fn()}
+          onApprove={vi.fn()}
+          onCancel={vi.fn()}
+          recovery={null}
+        />
+      );
+
+      // Exactly ONE submit button in the entire workspace
+      const submitButtons = screen.getAllByRole('button', { name: /Gửi|Xác nhận và tiếp tục/ });
+      expect(submitButtons).toHaveLength(1);
+      const submitBtn = submitButtons[0];
+      expect(submitBtn).toHaveTextContent('Gửi');
+
+      // Click a radio option
+      const radio = screen.getByRole('radio', { name: /Kênh #marketing trên Slack/ });
+      fireEvent.click(radio);
+
+      // Submit button text changes to "Xác nhận và tiếp tục →"
+      expect(submitBtn).toHaveTextContent('Xác nhận và tiếp tục →');
+      // The single textarea is prefilled with the option text
+      const textbox = screen.getByRole('textbox');
+      expect(textbox).toHaveValue('Kênh #marketing trên Slack');
+
+      // Still exactly ONE submit button (no duplicate button on clarification card body)
+      expect(screen.getAllByRole('button', { name: /Gửi|Xác nhận và tiếp tục/ })).toHaveLength(1);
+
+      // Two-way sync: user clears textbox -> radio unselects, button reverts to "Gửi"
+      fireEvent.change(textbox, { target: { value: '' } });
+      expect(radio).toHaveAttribute('aria-checked', 'false');
+      expect(submitBtn).toHaveTextContent('Gửi');
+
+      // Re-select option
+      fireEvent.click(radio);
+      expect(submitBtn).toHaveTextContent('Xác nhận và tiếp tục →');
+      expect(radio).toHaveAttribute('aria-checked', 'true');
+
+      // User types a completely different message -> radio unselects, button reverts to "Gửi"
+      fireEvent.change(textbox, { target: { value: 'Một nội dung hoàn toàn khác' } });
+      expect(radio).toHaveAttribute('aria-checked', 'false');
+      expect(submitBtn).toHaveTextContent('Gửi');
+    });
+
+    it('Zero-Duplicate Rule: user request appears once in feed and is not duplicated inside interactive card', () => {
+      useChatStore.setState({
+        conversationId: 'c-zero-dup',
+        messages: [{ id: 'u-unique-123', role: 'user', content: 'Yêu cầu kiểm thử độc bản 123' }],
+        activeClarification: {
+          question: 'Bạn muốn chọn kho nào?',
+          options: ['Repo A', 'Repo B'],
+        },
+      });
+
+      render(
+        <PlanoraChatWorkspace
+          services={sampleServices}
+          servicesLoading={false}
+          servicesError={null}
+          onSendMessage={vi.fn()}
+          onNewConversation={vi.fn()}
+          onSelectConversation={vi.fn()}
+          onSettings={vi.fn()}
+          onApprove={vi.fn()}
+          onCancel={vi.fn()}
+          recovery={null}
+        />
+      );
+
+      // The user request string appears exactly once across the workspace
+      const requestMatches = screen.getAllByText('Yêu cầu kiểm thử độc bản 123');
+      expect(requestMatches).toHaveLength(1);
+      // It is rendered inside the feed log
+      const log = screen.getByRole('log', { name: 'Hội thoại' });
+      expect(within(log).getByText('Yêu cầu kiểm thử độc bản 123')).toBeInTheDocument();
+      // No request echo inside the interactive card
+      expect(document.querySelector('[data-request-echo]')).toBeNull();
+    });
+
+    it('Removes all orange #FF5701, old brand classes, and "ATI" strings, adopting Planora forest green and safety message', () => {
+      useChatStore.setState({
+        conversationId: 'c-clean-brand',
+        isPlanning: true,
+        messages: [
+          { id: 'u1', role: 'user', content: 'Xin chào' },
+          { id: 'a1', role: 'assistant', content: 'Tôi là trợ lý Planora' },
+        ],
+      });
+
+      render(
+        <PlanoraChatWorkspace
+          services={sampleServices}
+          servicesLoading={false}
+          servicesError={null}
+          onSendMessage={vi.fn()}
+          onNewConversation={vi.fn()}
+          onSelectConversation={vi.fn()}
+          onSettings={vi.fn()}
+          onApprove={vi.fn()}
+          onCancel={vi.fn()}
+          recovery={null}
+        />
+      );
+
+      // 1. Assistant message sender is "Planora" and avatar is "P"
+      const log = screen.getByRole('log', { name: 'Hội thoại' });
+      expect(within(log).getByText('Planora')).toBeInTheDocument();
+      expect(within(log).queryByText('ATI')).toBeNull();
+      expect(within(log).getByText('P')).toBeInTheDocument();
+
+      // 2. Safety message at composer footer
+      expect(
+        screen.getByText(/Planora luôn yêu cầu bạn duyệt trước khi ghi hoặc gửi dữ liệu ra bên ngoài/)
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/ATI chỉ đọc và ghi/)).toBeNull();
+
+      // 3. No orange #FF5701 on feed or composer
+      const feed = document.querySelector('.planora-conversation-feed')!;
+      const composer = document.getElementById('global-bottom-bar')!;
+      expect(feed.innerHTML).not.toContain('#FF5701');
+      expect(feed.innerHTML).not.toContain('bg-brand-primary');
+      expect(composer.innerHTML).not.toContain('#FF5701');
+      expect(composer.innerHTML).not.toContain('bg-brand-primary');
+
+      // 4. Submit button uses Planora primary green
+      const submitBtn = screen.getByRole('button', { name: /Gửi/ });
+      expect(submitBtn.className).toContain('var(--planora-primary)');
+    });
+
+    it('Layout Anti-Overlap: feed has scroll-padding-bottom and bottom padding to avoid dock overlap', () => {
+      render(
+        <PlanoraConversationFeed
+          messages={[{ id: 'm1', role: 'user', content: 'Tin test padding' }]}
+        />
+      );
+
+      const feed = document.querySelector('.planora-conversation-feed') as HTMLElement;
+      expect(feed).toBeInTheDocument();
+      expect(feed.style.scrollPaddingBottom).toContain('var(--composer-dock-height, 120px) + 24px');
+    });
+  });
 });

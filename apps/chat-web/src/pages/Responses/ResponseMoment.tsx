@@ -64,13 +64,21 @@ function ResponseCard({ request, title, children, moment }: { request: string; t
       <div aria-hidden="true" className="w-9 h-9 rounded-full bg-[#111827] text-white flex items-center justify-center text-xs font-bold flex-shrink-0 shadow-sm mt-0.5">B</div>
     </div>}
     <div className="flex items-start gap-3">
-      <div aria-hidden="true" className="w-9 h-9 rounded-xl bg-[#FF5701] text-white flex items-center justify-center font-display font-bold text-base shadow-sm flex-shrink-0 mt-0.5">A</div>
-      <div className="flex-1 bg-white border border-[#E7E7E2] rounded-2xl rounded-tl-sm p-5 sm:p-7 shadow-sm v3-space-y-5 min-w-0">
-        <div className="flex items-center justify-between text-xs text-[#6B7280] pb-2 border-b border-[#F3F4F6] gap-2 flex-wrap">
-          <div className="flex items-center gap-2"><span className="font-semibold text-[#111827]">ATI</span><span className="text-[#9CA3AF]">·</span><span>Trợ lý điều phối</span></div>
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[#F3F4F6] text-[#4B5563]"><span className="w-1.5 h-1.5 rounded-full bg-[#9CA3AF]" />Chưa lập kế hoạch</span>
+      <div aria-hidden="true" className="w-9 h-9 rounded-xl bg-[var(--planora-primary)] text-[var(--planora-on-primary)] flex items-center justify-center font-display font-bold text-base shadow-xs flex-shrink-0 mt-0.5">P</div>
+      <div className="flex-1 bg-[var(--planora-paper)] border border-[var(--planora-divider)] rounded-2xl rounded-tl-sm p-5 sm:p-7 shadow-xs v3-space-y-5 min-w-0">
+        <div className="flex items-center justify-between text-xs text-[var(--planora-muted)] pb-2 border-b border-[var(--planora-divider)] gap-2 flex-wrap">
+          <div className="flex items-center gap-2"><span className="font-semibold text-[var(--planora-text)]">Planora</span><span className="text-[var(--planora-muted)]">·</span><span>Trợ lý điều phối</span></div>
+          {moment === 'answer' ? (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[var(--planora-surface-inset)] text-[var(--planora-muted)] border border-[var(--planora-divider)]"><span className="w-1.5 h-1.5 rounded-full bg-[var(--planora-primary)]" />Thông tin tra cứu</span>
+          ) : moment === 'refusal' ? (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[var(--planora-surface-inset)] text-[var(--planora-muted)] border border-[var(--planora-divider)]"><span className="w-1.5 h-1.5 rounded-full bg-[var(--planora-pending-text)]" />Cần kết nối thêm</span>
+          ) : moment === '3' ? (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[var(--planora-surface-inset)] text-[var(--planora-muted)] border border-[var(--planora-divider)]"><span className="w-1.5 h-1.5 rounded-full bg-[var(--planora-primary)]" />Làm rõ yêu cầu</span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[var(--planora-surface-inset)] text-[var(--planora-muted)] border border-[var(--planora-divider)]"><span className="w-1.5 h-1.5 rounded-full bg-[var(--planora-muted)]" />Chưa lập kế hoạch</span>
+          )}
         </div>
-        <h1 id="response-card-title" tabIndex={-1} className="font-display font-bold text-2xl sm:text-3xl text-[#111827] tracking-tight focus:v3-outline-none focus:ring-2 focus:ring-[#FF5701]/20 rounded-lg break-words">{title}</h1>
+        <h1 id="response-card-title" tabIndex={-1} className="font-display font-bold text-2xl sm:text-3xl text-[var(--planora-text)] tracking-tight focus:v3-outline-none focus:ring-2 focus:ring-[var(--planora-primary)]/20 rounded-lg break-words">{title}</h1>
         {children}<NoWritesNotice />
       </div>
     </div>
@@ -414,10 +422,10 @@ export function ResponseMoment(props: {
     />
   );
 }
-export function ExpandedClarificationMoment({ clarification, variant, request, services, canConfigure, selected, onSelect, onSend, onEdit, navigate, planning }: {
+export function ExpandedClarificationMoment({ clarification, variant, request, services, canConfigure, selected, onSelect, onSend, onEdit, navigate, planning, hideSubmit }: {
   clarification: ClarificationState; variant: 'read-only' | 'destination'; request: string; services: ServiceInfo[];
   canConfigure: boolean; selected: string | null; onSelect: (value: string) => void; onSend: (value: string) => void;
-  onEdit: (value: string) => void; navigate: (path: string) => void; planning: boolean;
+  onEdit: (value: string) => void; navigate: (path: string) => void; planning: boolean; hideSubmit?: boolean;
 }) {
   const mentioned = services.filter(service => `${request} ${clarification.context ?? ''} ${clarification.question}`.toLocaleLowerCase().includes(service.name.toLocaleLowerCase()));
   const path = mentioned.length === 1 ? `/settings#${encodeURIComponent(mentioned[0].id)}` : '/settings';
@@ -442,7 +450,7 @@ export function ExpandedClarificationMoment({ clarification, variant, request, s
         {canConfigure ? <p>Nơi bạn cần chưa có trong danh sách? <a href={path} onClick={event => { event.preventDefault(); navigate(path); }} className="font-medium text-[#FF5701] hover:underline underline-offset-2">Thêm ở Kết nối dịch vụ{mentioned.length === 1 ? ` → ${mentioned[0].name}` : ''} →</a></p> : <p>Nơi bạn cần chưa có trong danh sách? Hãy báo quản trị viên thêm vào.</p>}
       </div>}
       <div className="pt-2 border-t border-[#F3F4F6] flex flex-wrap items-center gap-3">
-        {clarification.options.length > 0 && <button type="button" disabled={!selected || planning} onClick={() => selected && onSend(selected)} className={primary}>Xác nhận và tiếp tục</button>}
+        {clarification.options.length > 0 && !hideSubmit && <button type="button" disabled={!selected || planning} onClick={() => selected && onSend(selected)} className={primary}>Xác nhận và tiếp tục</button>}
         <button type="button" onClick={() => onEdit(request)} className={secondary}>Sửa yêu cầu</button>
       </div>
     </div>

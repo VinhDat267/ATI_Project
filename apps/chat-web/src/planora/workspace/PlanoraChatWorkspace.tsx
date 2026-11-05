@@ -233,14 +233,43 @@ export function PlanoraChatWorkspace(props: PlanoraChatWorkspaceProps) {
     });
   };
 
+  const handleSelect = (option: string | null) => {
+    setSelected(option);
+    if (option) {
+      setDraft(option);
+      input.current?.focus();
+    }
+  };
+
+  const handleDraft = (text: string) => {
+    setDraft(text);
+    if (selected) {
+      if (!text.trim() || !text.startsWith(selected)) {
+        setSelected(null);
+      }
+    }
+  };
+
+  const submitLabel =
+    (moment === 3 || expanded) && selected ? 'Xác nhận và tiếp tục →' : undefined;
+
   const activeMessageIds = new Set<string>();
   if (savedRequest) activeMessageIds.add(savedRequest.id);
   if (moment === 'answer' && latestMessage) activeMessageIds.add(latestMessage.id);
   if (moment === 'refusal' && latestMessage) activeMessageIds.add(latestMessage.id);
   if (terminalError) activeMessageIds.add(terminalError.id);
-  if ([3, 4, 5, 6, 7, 8, 9, 'unsuccessful'].includes(moment as any)) {
-    const activeUser = [...state.messages].reverse().find((m) => m.role === 'user');
-    if (activeUser) activeMessageIds.add(activeUser.id);
+  if (props.legacyCockpit) {
+    if ([3, 4, 5, 6, 7, 8, 9, 'unsuccessful'].includes(moment as any)) {
+      const activeUser = [...state.messages].reverse().find((m) => m.role === 'user');
+      if (activeUser) activeMessageIds.add(activeUser.id);
+    }
+  } else {
+    if (moment === 3 && latestMessage?.role === 'assistant') {
+      activeMessageIds.add(latestMessage.id);
+    }
+    if (moment === 4 && latestMessage?.role === 'assistant' && latestMessage?.metadata?.type === 'plan') {
+      activeMessageIds.add(latestMessage.id);
+    }
   }
 
   const feedMessages = state.messages.filter((m) => !activeMessageIds.has(m.id));
@@ -249,10 +278,11 @@ export function PlanoraChatWorkspace(props: PlanoraChatWorkspaceProps) {
     draft,
     planning: state.isPlanning,
     input,
-    onDraft: setDraft,
+    onDraft: handleDraft,
     onSend: send,
     onKeyDown,
     moment,
+    submitLabel,
   };
 
   return (
@@ -318,12 +348,12 @@ export function PlanoraChatWorkspace(props: PlanoraChatWorkspaceProps) {
                 onRefreshServices={props.onRefreshServices}
                 canConfigure={canConfigure}
                 draft={draft}
-                onDraft={setDraft}
+                onDraft={handleDraft}
                 onSend={send}
                 onKeyDown={onKeyDown}
                 input={input}
                 selected={selected}
-                onSelect={setSelected}
+                onSelect={handleSelect}
                 onPreview={setPreview}
                 onApprove={props.onApprove}
                 onCancel={props.onCancel}
@@ -351,19 +381,20 @@ export function PlanoraChatWorkspace(props: PlanoraChatWorkspaceProps) {
                 }}
                 drawer={drawer}
                 responseEditing={responseEditing}
+                legacyCockpit={props.legacyCockpit}
               />
             </PlanoraConversationFeed>
           )}
         </main>
 
         {!props.contentOverride &&
-          (![1, 3].includes(moment as number) || expanded || planningError) &&
-          !(props.legacyCockpit && moment === 4) &&
+          (![1].includes(moment as number) || planningError) &&
+          !(props.legacyCockpit && ((!expanded && moment === 3) || moment === 4)) &&
           !(moment === 4 && editOpen) &&
           drawer !== 'conversation' && (
             <div className="planora-chat-composer-dock">
               <ChatComposer
-                variant={moment === 'refusal' || moment === 'answer' || expanded ? 'response' : 'bottom'}
+                variant={moment === 'refusal' || moment === 'answer' || moment === 3 || expanded ? 'response' : 'bottom'}
                 {...composerProps}
               />
             </div>

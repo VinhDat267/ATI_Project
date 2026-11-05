@@ -549,7 +549,8 @@
   min-height: 0;
   overflow-y: auto;
   box-sizing: border-box;
-  padding-bottom: calc(var(--cockpit-bottom-space, 112px) + 24px) !important;
+  padding-bottom: calc(var(--composer-dock-height, var(--cockpit-bottom-space, 112px)) + 24px) !important;
+  scroll-padding-bottom: calc(var(--composer-dock-height, 120px) + 24px) !important;
 }
 
 @media (min-width: 1024px) {

@@ -57,6 +57,7 @@ export interface PlanoraActiveTurnProps {
   drawer?: 'history' | 'conversation' | null;
   onDismissWait?: () => void;
   responseEditing?: boolean;
+  legacyCockpit?: boolean;
 }
 
 export function PlanoraActiveTurn(props: PlanoraActiveTurnProps) {
@@ -181,7 +182,7 @@ export function PlanoraActiveTurn(props: PlanoraActiveTurnProps) {
         <ExpandedClarificationMoment
           clarification={state.activeClarification}
           variant={variant}
-          request={request ?? ''}
+          request={props.legacyCockpit ? (request ?? '') : ''}
           services={services}
           canConfigure={canConfigure}
           selected={selected}
@@ -190,6 +191,7 @@ export function PlanoraActiveTurn(props: PlanoraActiveTurnProps) {
           onEdit={editRequest}
           navigate={navigate}
           planning={state.isPlanning}
+          hideSubmit={!props.legacyCockpit}
         />
       ) : slow ? (
         <SlowPlanningMoment
@@ -253,7 +255,7 @@ export function PlanoraActiveTurn(props: PlanoraActiveTurnProps) {
         <DiscoveryMoment request={request ?? ''} gather={state.gatherState} services={services} />
       ) : moment === 3 && state.activeClarification ? (
         <ClarificationMoment
-          request={request}
+          request={props.legacyCockpit ? request : undefined}
           question={state.activeClarification.question}
           context={state.activeClarification.context}
           options={state.activeClarification.options}
@@ -263,17 +265,18 @@ export function PlanoraActiveTurn(props: PlanoraActiveTurnProps) {
           onDraft={onDraft}
           planning={state.isPlanning}
           input={input}
-          inputHidden={drawer === 'conversation'}
+          inputHidden={!props.legacyCockpit || drawer === 'conversation'}
           onSend={onSend}
           onKeyDown={event => onKeyDown(event, selected ?? draft)}
           onBack={() => {
             onDraft(request ?? '');
             state.setClarification(null);
           }}
+          hideSubmit={!props.legacyCockpit}
         />
       ) : moment === 4 && state.activePlan ? (
         <PlanMoment
-          request={request}
+          request={props.legacyCockpit ? request : undefined}
           runtimeMode={runtimeMode}
           key={state.activePlan.id}
           plan={state.activePlan}
@@ -301,7 +304,7 @@ export function PlanoraActiveTurn(props: PlanoraActiveTurnProps) {
         />
       ) : moment === 5 ? (
         <ExecutionMoment
-          request={request}
+          request={props.legacyCockpit ? request : undefined}
           steps={executionSteps}
           planSteps={plan?.steps ?? []}
           labels={plan?.resourceLabels}
@@ -309,7 +312,7 @@ export function PlanoraActiveTurn(props: PlanoraActiveTurnProps) {
         />
       ) : moment === 6 || moment === 'unsuccessful' ? (
         <ReceiptMoment
-          request={request}
+          request={props.legacyCockpit ? request : undefined}
           terminalStatus={moment === 'unsuccessful' ? state.planStatus : undefined}
           steps={executionSteps}
           planSteps={plan?.steps ?? []}
@@ -334,7 +337,7 @@ export function PlanoraActiveTurn(props: PlanoraActiveTurnProps) {
         />
       ) : [7, 8, 9].includes(moment as number) ? (
         <RecoveryMoment
-          request={request}
+          request={props.legacyCockpit ? request : undefined}
           key={`${state.conversationId}:${snapshot?.plan.id}:${moment}`}
           moment={moment as 7 | 8 | 9}
           snapshot={snapshot}
