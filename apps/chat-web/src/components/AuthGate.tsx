@@ -15,6 +15,7 @@ import { routes, type AppRoute } from '../routes';
 import type { User } from '../types';
 import { AuthActionPage, type AuthActionMode } from '../pages/AuthAction/AuthActionPage';
 import { clearAuthReturnTarget, consumeAuthReturnTarget, currentAuthReturnTarget, saveAuthReturnTarget } from '../services/auth-return-target';
+import { tryRecoverLoopbackConnectionCallback } from '../hooks/use-route';
 
 interface Session {
   authToken: string; user: User | null; authError: string | null;
@@ -55,6 +56,7 @@ export function AuthGate({ route, navigate, children }: AuthGateProps) {
       resetWorkspaceStorage();
       useChatStore.getState().reset(); useChatStore.getState().setConversations([]);
       if (!loggingOut.current && route.kind !== 'reset-password') {
+        if (source !== 'storage' && tryRecoverLoopbackConnectionCallback(route)) return;
         if (source !== 'storage') saveAuthReturnTarget(currentAuthReturnTarget(), lostUserId);
         setAuthError(source === 'storage' ? 'Phiên đăng nhập đã kết thúc ở một tab khác.' : 'Phiên đăng nhập đã hết hạn');
         navigate('/login', true);

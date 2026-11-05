@@ -34,6 +34,19 @@ export function tryLoopbackCallbackHop(pathname: string, search: string, hash = 
   }
 }
 
+/** The route retains one-use OAuth input after the address bar is scrubbed.
+ * A stale session on the return host must not discard that input before the
+ * existing bounded loopback recovery can reach the host that started OAuth.
+ */
+export function tryRecoverLoopbackConnectionCallback(route: AppRoute): boolean {
+  const input = route.kind === 'gmail-callback' ? route.googleCallback
+    : route.kind === 'jira-callback' ? route.jiraCallback : undefined;
+  if (!input?.code || !input.state || input.error) return false;
+  const pathname = route.kind === 'gmail-callback'
+    ? '/connections/gmail/callback' : '/connections/myjira/callback';
+  return tryLoopbackCallbackHop(pathname, `?${new URLSearchParams({ code: input.code, state: input.state })}`);
+}
+
 export function useRoute(initialView?: 'landing' | 'login') {
   const [route, setRoute] = useState<AppRoute>(() => initialView
     ? { kind: initialView === 'login' ? 'login' : 'home' } : readRoute());
