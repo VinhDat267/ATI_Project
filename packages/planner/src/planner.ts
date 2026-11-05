@@ -1,4 +1,4 @@
-import { SERVICE_REGISTRY, type ToolDefinition, type PlannerResponse, type ServiceDefinition, type GatherRule, type AnswerLookup } from '@wap/tool-schemas';
+import { SERVICE_REGISTRY, requiresReportEvidence, reportLiteralBodies, reportOutputTargets, REPORT_SOURCE_TOOLS, type ToolDefinition, type PlannerResponse, type ServiceDefinition, type GatherRule, type AnswerLookup, type ReportKind } from '@wap/tool-schemas';
 import type { LLMProvider, ChatMessage, PlanningPhaseMetrics } from './types.js';
 import { WorkingMemory } from './working-memory.js';
 import { routeIntent, unavailableServiceReason, type RoutedIntent } from './router.js';
@@ -10,12 +10,22 @@ import {
   type SearchOutcome,
 } from './search.js';
 import { extractWorkspaceRecipients } from './recipients.js';
+import { ReportArtifactStore } from './reports/artifacts.js';
+import {
+  renderGithubPrsReport,
+  renderGithubIssueAgingReport,
+  renderJiraProgressReport,
+  renderSheetSummaryReport,
+  type SheetSummaryData,
+  type RenderedReport,
+} from './reports/renderers.js';
 
 export interface AIPlannerOptions {
   provider: LLMProvider;
   toolCatalog: ToolDefinition[];
   gatherSearch?: (request: GatherSearchRequest) => Promise<unknown>;
   serviceRegistry?: ServiceDefinition[];
+  reportEvidenceStore?: ReportArtifactStore;
   /**
    * Reject plans whose resource IDs were not looked up, typed by the user or
    * produced by an earlier step. Only canned providers that never read
@@ -219,6 +229,7 @@ export class AIPlanner {
   private prefetchDirectory: boolean;
   private directoryBudgetMs: number;
   private schedules: boolean;
+  private reportEvidenceStore: ReportArtifactStore;
 
   constructor(options: AIPlannerOptions) {
     this.schedules = options.schedules ?? false;
@@ -234,6 +245,185 @@ export class AIPlanner {
     this.serviceRegistry = options.serviceRegistry ?? SERVICE_REGISTRY;
     this.requireGroundedResources = options.requireGroundedResources ?? true;
     this.readAnswers = options.readAnswers ?? false;
+    this.reportEvidenceStore = options.reportEvidenceStore ?? new ReportArtifactStore();
+  }
+
+  getReportEvidenceStore(): ReportArtifactStore {
+    return this.reportEvidenceStore;
+  }
+
+  private async bindReportEvidenceIfApplicable(
+    rawOutput: string,
+    input: ProcessMessageInput,
+    successfulReads: SearchOutcome[],
+    groundingUserTexts: string[],
+  ): Promise<string> {
+    let parsed: any;
+    try {
+      parsed = JSON.parse(rawOutput);
+    } catch {
+      return rawOutput;
+    }
+    if (!parsed || parsed.kind !== 'plan' || !Array.isArray(parsed.steps)) {
+      return rawOutput;
+    }
+    delete parsed.reportEvidence;
+
+    if (!requiresReportEvidence(groundingUserTexts.length ? groundingUserTexts : [parsed.summary || '', parsed.thinking || ''])) return rawOutput;
+    if (parsed.steps.some((s: any) => !s || typeof s.id !== 'string' || typeof s.tool !== 'string' || !s.args || typeof s.args !== 'object')) return rawOutput;
+    if (reportLiteralBodies(groundingUserTexts).length > 0) {
+      return JSON.stringify({ kind: 'clarification', question: 'Bạn muốn gửi báo cáo có nguồn và một tin nhắn nguyên văn riêng. Hãy tách hai yêu cầu để tôi giữ đúng nội dung và người nhận của từng phần.', context: 'Chưa gửi nội dung nào; tránh đưa báo cáo vào đích chỉ nhận tin nhắn nguyên văn.' });
+    }
+    const targets = reportOutputTargets(parsed.steps);
+    const primary = targets.at(-1);
+    if (!primary) return rawOutput;
+    if (targets.some(target => /^(?:github|myjira|jira|trello)\./.test(parsed.steps.find((s: any) => s.id === target.stepId).tool))) {
+      return JSON.stringify({ kind: 'clarification', question: 'Bạn muốn nội dung công việc mới là báo cáo dữ liệu hay một nội dung riêng? Hãy tách hoặc xác nhận nội dung để tôi giữ đúng từng phần.', context: 'Yêu cầu kết hợp báo cáo với nội dung tạo/cập nhật công việc; chưa gửi hoặc thay đổi dữ liệu.' });
+    }
+
+    // Find observation from successfulReads or execute plan's read step via gatherSearch
+    let readTool: string | undefined;
+    let readArgs: Record<string, unknown> = {};
+    let rawResult: unknown;
+
+    const priorRead = [...successfulReads].reverse().find((r) => REPORT_SOURCE_TOOLS.has(r.tool) && r.result !== undefined && r.error === undefined);
+    if (priorRead) {
+      readTool = priorRead.tool;
+      readArgs = priorRead.args ?? {};
+      rawResult = priorRead.result;
+    } else if (this.gatherSearch) {
+      const readStep = parsed.steps.find((s: any) => s && typeof s.tool === 'string' && REPORT_SOURCE_TOOLS.has(s.tool));
+      if (readStep) {
+        readTool = readStep.tool;
+        readArgs = readStep.args ?? {};
+        rawResult = await this.gatherSearch({
+          tool: readStep.tool,
+          args: readArgs,
+          signal: input.signal,
+          actor: input.actor,
+        });
+      }
+    }
+
+    if (!readTool || rawResult === undefined || rawResult === null) {
+      return rawOutput;
+    }
+    if (
+      Array.isArray(rawResult) &&
+      rawResult.length === 1 &&
+      rawResult[0] &&
+      typeof rawResult[0] === 'object' &&
+      !Array.isArray(rawResult[0]) &&
+      ('values' in rawResult[0] || 'records' in rawResult[0] || 'groups' in rawResult[0] || 'headers' in rawResult[0])
+    ) {
+      rawResult = rawResult[0];
+    }
+
+    if (readTool.endsWith('.read_range') && Array.isArray((rawResult as any)?.values) &&
+        (rawResult as any).values.length > 0 && !Array.isArray((rawResult as any).headers) &&
+        !Array.isArray((rawResult as any).records)) {
+      return JSON.stringify({ kind: 'clarification', question: 'Dòng đầu của vùng dữ liệu này có phải tiêu đề cột không? Hãy xác nhận hàng tiêu đề hoặc chọn vùng có tiêu đề để tôi tổng hợp chính xác.', context: 'Chưa xác định tiêu đề cột; dữ liệu đọc có dòng và chưa được gửi.' });
+    }
+
+    let kind: ReportKind;
+    let rendered: RenderedReport;
+    let sourceLabel: string;
+    let artifactItems: unknown[];
+
+    const combinedText = groundingUserTexts.join(' ');
+    if (readTool === 'github.list_pull_requests') {
+      const items = Array.isArray(rawResult)
+        ? rawResult
+        : Array.isArray((rawResult as any)?.pullRequests)
+          ? (rawResult as any).pullRequests
+          : Array.isArray((rawResult as any)?.items)
+            ? (rawResult as any).items
+            : null;
+      if (!Array.isArray(items)) return rawOutput;
+      kind = 'github_prs';
+      const repo = typeof readArgs.repo === 'string' ? readArgs.repo : undefined;
+      rendered = renderGithubPrsReport(items as any, { repo });
+      sourceLabel = repo || 'GitHub Pull Requests';
+      artifactItems = items;
+    } else if (readTool === 'github.list_issues') {
+      const items = Array.isArray(rawResult)
+        ? rawResult
+        : Array.isArray((rawResult as any)?.issues)
+          ? (rawResult as any).issues
+          : Array.isArray((rawResult as any)?.items)
+            ? (rawResult as any).items
+            : null;
+      if (!Array.isArray(items)) return rawOutput;
+      kind = 'github_issues';
+      const repo = typeof readArgs.repo === 'string' ? readArgs.repo : undefined;
+      const ageMatch = combinedText.match(/(?:quá|trên|hơn)\s*(\d+)\s*ngày/i);
+      const agingDays = ageMatch?.[1] ? Number.parseInt(ageMatch[1], 10) : 7;
+      rendered = renderGithubIssueAgingReport(items as any, { repo, agingDays, clock: this.now() });
+      sourceLabel = repo ? `${repo} (>${agingDays}d)` : 'GitHub Issues';
+      artifactItems = items;
+    } else if (readTool === 'myjira.search_issues' || readTool === 'jira.search_issues') {
+      const items = Array.isArray(rawResult)
+        ? rawResult
+        : Array.isArray((rawResult as any)?.issues)
+          ? (rawResult as any).issues
+          : Array.isArray((rawResult as any)?.items)
+            ? (rawResult as any).items
+            : null;
+      if (!Array.isArray(items)) return rawOutput;
+      kind = 'jira_progress';
+      const projectKey = typeof readArgs.projectKey === 'string' ? readArgs.projectKey : undefined;
+      rendered = renderJiraProgressReport(items as any, { projectKey });
+      sourceLabel = projectKey ? `Jira ${projectKey}` : 'Jira Sprint';
+      artifactItems = items;
+    } else {
+      let sheetData: SheetSummaryData | null = null;
+      if (Array.isArray(rawResult)) {
+        sheetData = { values: rawResult as any };
+      } else if (rawResult && typeof rawResult === 'object') {
+        sheetData = rawResult as SheetSummaryData;
+      }
+      if (!sheetData) return rawOutput;
+      kind = 'sheets_summary';
+      const sheetTitle =
+        typeof readArgs.range === 'string'
+          ? readArgs.range.split('!')[0]?.replace(/^'|'$/g, '') || 'Sheet1'
+          : typeof readArgs.sheet === 'string'
+            ? readArgs.sheet
+            : 'Sheet1';
+      rendered = renderSheetSummaryReport(sheetData, { sheetName: sheetTitle });
+      sourceLabel = `${typeof readArgs.spreadsheetId === 'string' ? readArgs.spreadsheetId : 'Spreadsheet'} (${sheetTitle})`;
+      artifactItems = Array.isArray(rawResult) ? rawResult : [rawResult];
+    }
+
+    const artifact = this.reportEvidenceStore.createArtifact({
+      kind,
+      sourceTool: readTool,
+      sourceLabel,
+      items: artifactItems,
+      renderedText: rendered.text,
+      actor: {
+        userId: input.actor?.userId ?? 'anonymous',
+        workspaceId: input.actor?.workspaceId ?? 'default',
+      },
+    });
+
+    for (const target of targets) {
+      const step = parsed.steps.find((s: any) => s.id === target.stepId);
+      step.args[target.argument] = artifact.renderedText;
+    }
+    parsed.reportEvidence = {
+      artifactId: artifact.id,
+      kind,
+      stepId: primary.stepId,
+      argument: primary.argument,
+      sourceTool: readTool,
+      sourceLabel,
+      readAt: artifact.createdAt,
+      itemCount: rendered.itemCount,
+      coverage: rendered.coverage,
+      contentHash: artifact.contentHash,
+    };
+    return JSON.stringify(parsed);
   }
 
   /** The services a schedule's request needs, by the same router as planning; the model never names them. */
@@ -546,9 +736,15 @@ export class AIPlanner {
 
       let answerOutput = false;
       try { answerOutput = this.readAnswers && JSON.parse(output)?.kind === 'answer'; } catch { /* Normal JSON validation reports this. */ }
+      const boundOutput = answerOutput
+        ? output
+        : await this.bindReportEvidenceIfApplicable(output, input, successfulReads, groundingUserTexts);
       const validation = answerOutput ? validateAnswer(output, { readAnswers: this.readAnswers,
-        hasReadData: successfulReads.length > 0 || usedDirectory.length > 0 }) : this.scheduleValidation(output, input) ?? validatePlan(output, activeTools,
-        this.requireGroundedResources ? { grounding: { memory: groundingMemory(memory.getAll(), memory.getEntity('__observed')), userTexts: groundingUserTexts } } : {});
+        hasReadData: successfulReads.length > 0 || usedDirectory.length > 0 }) : this.scheduleValidation(boundOutput, input) ?? validatePlan(boundOutput, activeTools,
+        {
+          ...(this.requireGroundedResources ? { grounding: { memory: groundingMemory(memory.getAll(), memory.getEntity('__observed')), userTexts: groundingUserTexts } } : {}),
+          reportEvidenceStore: this.reportEvidenceStore,
+        });
       if (validation.valid) {
         if (validation.parsed.kind === 'answer') return { ...validation.parsed,
           lookups: successfulReads.map(answerLookup), usedDirectory };
@@ -613,19 +809,24 @@ export class AIPlanner {
       { role: 'user', content: planningMessage },
     ];
 
-    const validationOptions = this.requireGroundedResources ? { grounding: {
-      memory: groundingMemory(memory.getAll(), memory.getEntity('__observed')),
-      userTexts: relevantGroundingUserTexts(history, planningMessage),
-    } } : {};
+    const groundingUserTexts = relevantGroundingUserTexts(history, planningMessage);
+    const validationOptions = {
+      ...(this.requireGroundedResources ? { grounding: {
+        memory: groundingMemory(memory.getAll(), memory.getEntity('__observed')),
+        userTexts: groundingUserTexts,
+      } } : {}),
+      reportEvidenceStore: this.reportEvidenceStore,
+    };
 
     // 3. Attempt 1: Call LLM provider
-    const firstOutput = await this.provider.generatePlan({
+    const firstRawOutput = await this.provider.generatePlan({
       systemPrompt,
       conversationHistory,
       toolCatalog: activeTools,
       workingMemory: providerMemory(memory.getAll()),
       signal,
     });
+    const firstOutput = await this.bindReportEvidenceIfApplicable(firstRawOutput, input, [], groundingUserTexts);
 
     const firstValidation = this.scheduleValidation(firstOutput, input) ?? validatePlan(firstOutput, activeTools, validationOptions);
     if (firstValidation.valid) {
@@ -636,20 +837,21 @@ export class AIPlanner {
     // 4. Attempt 2: Retry exactly 1x with feedback
     const feedbackTurn: ChatMessage[] = [
       ...conversationHistory,
-      { role: 'assistant', content: firstOutput },
+      { role: 'assistant', content: firstRawOutput },
       {
         role: 'user',
         content: `Your previous response failed validation (${firstValidation.layer} error):\n${firstValidation.error}\nPlease fix the plan and return only the corrected valid JSON response.`,
       },
     ];
 
-    const retryOutput = await this.provider.generatePlan({
+    const retryRawOutput = await this.provider.generatePlan({
       systemPrompt,
       conversationHistory: feedbackTurn,
       toolCatalog: activeTools,
       workingMemory: providerMemory(memory.getAll()),
       signal,
     });
+    const retryOutput = await this.bindReportEvidenceIfApplicable(retryRawOutput, input, [], groundingUserTexts);
 
     const retryValidation = this.scheduleValidation(retryOutput, input) ?? validatePlan(retryOutput, activeTools, validationOptions);
     if (retryValidation.valid) {

@@ -1,0 +1,2019 @@
+{
+  "headSha": "da3e5ec09abe99b4852c32445c5f5c34e92e51b8",
+  "executedAt": "2026-11-04T17:59:39.047Z",
+  "deepseek": {
+    "ok": true,
+    "requestedModel": "deepseek-chat",
+    "servedModel": "deepseek-flash",
+    "baseUrl": "https://api.deepseek.com"
+  },
+  "preflight": {
+    "jira": {
+      "status": "OK",
+      "detail": "1 allowlisted resources reachable"
+    },
+    "telegram": {
+      "status": "OK",
+      "detail": "1 allowlisted resources reachable"
+    },
+    "notion": {
+      "status": "BLOCKED",
+      "detail": "Notion request failed with HTTP 401"
+    },
+    "calendar": {
+      "status": "OK",
+      "detail": "1 allowlisted resources reachable"
+    },
+    "sheets": {
+      "status": "OK",
+      "detail": "1 allowlisted resources reachable"
+    },
+    "trello": {
+      "status": "NOT_RUN",
+      "detail": "TRELLO_ACCESS_TOKEN is required"
+    },
+    "slack": {
+      "status": "OK",
+      "detail": "1 allowlisted resources reachable"
+    },
+    "github": {
+      "status": "OK",
+      "detail": "1 allowlisted resources reachable"
+    }
+  },
+  "workflowRuns": [
+    {
+      "workflowId": "OFF-02",
+      "run": 1,
+      "requestedModel": "deepseek-chat",
+      "servedModel": "deepseek-flash",
+      "elapsedMs": 6752,
+      "llmCalls": [
+        {
+          "ms": 3370,
+          "servedModel": "deepseek-flash",
+          "metrics": {
+            "durationMs": 3370.7194,
+            "attempts": [
+              {
+                "startedAtMs": 0.0011000000004059984,
+                "durationMs": 3370.3633999999993,
+                "outcome": "success"
+              }
+            ],
+            "usage": {
+              "promptTokens": 15330,
+              "completionTokens": 660,
+              "reasoningTokens": null
+            },
+            "servedModel": "deepseek-flash"
+          },
+          "outputChars": 1706
+        },
+        {
+          "ms": 3107,
+          "servedModel": "deepseek-flash",
+          "metrics": {
+            "durationMs": 3106.165500000001,
+            "attempts": [
+              {
+                "startedAtMs": 0.0008999999990919605,
+                "durationMs": 3105.9125000000004,
+                "outcome": "success"
+              }
+            ],
+            "usage": {
+              "promptTokens": 16068,
+              "completionTokens": 668,
+              "reasoningTokens": null
+            },
+            "servedModel": "deepseek-flash"
+          },
+          "outputChars": 1734
+        }
+      ],
+      "kind": "plan",
+      "tools": [
+        "mycalendar.schedule_meet",
+        "mysheets.create_doc",
+        "gmail.send_message"
+      ],
+      "stepTools": [
+        "mycalendar.schedule_meet",
+        "mysheets.create_doc",
+        "gmail.send_message"
+      ],
+      "searches": [
+        "gmail.list_labels",
+        "mycalendar.list_calendars",
+        "mysheets.list_spreadsheets",
+        "mysheets.list_drive_files",
+        "mysheets.list_sheets",
+        "mysheets.list_sheets"
+      ],
+      "reportEvidence": null,
+      "guardValid": true,
+      "planHash": "a9d172251153f8d8888e63e12392330bf0c3b7bb9578cdebaef213c42232f9a8"
+    },
+    {
+      "workflowId": "OFF-02",
+      "run": 2,
+      "requestedModel": "deepseek-chat",
+      "servedModel": "deepseek-flash",
+      "elapsedMs": 6027,
+      "llmCalls": [
+        {
+          "ms": 2945,
+          "servedModel": "deepseek-flash",
+          "metrics": {
+            "durationMs": 2945.1757,
+            "attempts": [
+              {
+                "startedAtMs": 0.0014000000010128133,
+                "durationMs": 2944.3746999999985,
+                "outcome": "success"
+              }
+            ],
+            "usage": {
+              "promptTokens": 15330,
+              "completionTokens": 639,
+              "reasoningTokens": null
+            },
+            "servedModel": "deepseek-flash"
+          },
+          "outputChars": 1676
+        },
+        {
+          "ms": 3022,
+          "servedModel": "deepseek-flash",
+          "metrics": {
+            "durationMs": 3022.0362999999998,
+            "attempts": [
+              {
+                "startedAtMs": 0.0015000000021245796,
+                "durationMs": 3021.669099999999,
+                "outcome": "success"
+              }
+            ],
+            "usage": {
+              "promptTokens": 16044,
+              "completionTokens": 647,
+              "reasoningTokens": null
+            },
+            "servedModel": "deepseek-flash"
+          },
+          "outputChars": 1704
+        }
+      ],
+      "kind": "plan",
+      "tools": [
+        "mycalendar.schedule_meet",
+        "mysheets.create_doc",
+        "gmail.send_message"
+      ],
+      "stepTools": [
+        "mycalendar.schedule_meet",
+        "mysheets.create_doc",
+        "gmail.send_message"
+      ],
+      "searches": [
+        "gmail.list_labels",
+        "mycalendar.list_calendars",
+        "mysheets.list_spreadsheets",
+        "mysheets.list_drive_files",
+        "mysheets.list_sheets",
+        "mysheets.list_sheets"
+      ],
+      "reportEvidence": null,
+      "guardValid": true,
+      "planHash": "7499030c006f87932b3af2a2c174ceb6d612df70e1ab43eeda0a284772b9bf1d"
+    },
+    {
+      "workflowId": "OFF-02",
+      "run": 3,
+      "requestedModel": "deepseek-chat",
+      "servedModel": "deepseek-flash",
+      "elapsedMs": 5849,
+      "llmCalls": [
+        {
+          "ms": 3089,
+          "servedModel": "deepseek-flash",
+          "metrics": {
+            "durationMs": 3088.5445,
+            "attempts": [
+              {
+                "startedAtMs": 0.0011999999987892807,
+                "durationMs": 3088.2927999999993,
+                "outcome": "success"
+              }
+            ],
+            "usage": {
+              "promptTokens": 15330,
+              "completionTokens": 643,
+              "reasoningTokens": null
+            },
+            "servedModel": "deepseek-flash"
+          },
+          "outputChars": 1679
+        },
+        {
+          "ms": 2757,
+          "servedModel": "deepseek-flash",
+          "metrics": {
+            "durationMs": 2757.588200000002,
+            "attempts": [
+              {
+                "startedAtMs": 0.001299999999901047,
+                "durationMs": 2757.1708000000035,
+                "outcome": "success"
+              }
+            ],
+            "usage": {
+              "promptTokens": 16051,
+              "completionTokens": 651,
+              "reasoningTokens": null
+            },
+            "servedModel": "deepseek-flash"
+          },
+          "outputChars": 1707
+        }
+      ],
+      "kind": "plan",
+      "tools": [
+        "mycalendar.schedule_meet",
+        "mysheets.create_doc",
+        "gmail.send_message"
+      ],
+      "stepTools": [
+        "mycalendar.schedule_meet",
+        "mysheets.create_doc",
+        "gmail.send_message"
+      ],
+      "searches": [
+        "gmail.list_labels",
+        "mycalendar.list_calendars",
+        "mysheets.list_spreadsheets",
+        "mysheets.list_drive_files",
+        "mysheets.list_sheets",
+        "mysheets.list_sheets"
+      ],
+      "reportEvidence": null,
+      "guardValid": true,
+      "planHash": "39fe9a01bcd390583957d2a8ed3a9ca8c676208abbe514fa5436078cc0768742"
+    },
+    {
+      "workflowId": "OFF-03",
+      "run": 1,
+      "requestedModel": "deepseek-chat",
+      "servedModel": "deepseek-flash",
+      "elapsedMs": 1862,
+      "llmCalls": [
+        {
+          "ms": 1840,
+          "servedModel": "deepseek-flash",
+          "metrics": {
+            "durationMs": 1840.2905000000028,
+            "attempts": [
+              {
+                "startedAtMs": 0.0031000000017229468,
+                "durationMs": 1839.762999999999,
+                "outcome": "success"
+              }
+            ],
+            "usage": {
+              "promptTokens": 7871,
+              "completionTokens": 288,
+              "reasoningTokens": null
+            },
+            "servedModel": "deepseek-flash"
+          },
+          "outputChars": 808
+        }
+      ],
+      "kind": "plan",
+      "tools": [
+        "mysheets.read_range",
+        "slack.send_message"
+      ],
+      "stepTools": [
+        "mysheets.read_range",
+        "slack.send_message"
+      ],
+      "searches": [
+        "slack.search_channels",
+        "mysheets.list_spreadsheets",
+        "mysheets.list_drive_files",
+        "mysheets.list_sheets",
+        "mysheets.list_sheets",
+        "mysheets.read_range"
+      ],
+      "reportEvidence": {
+        "artifactId": "art_1793815067155_e12178da",
+        "kind": "sheets_summary",
+        "stepId": "send_slack",
+        "argument": "text",
+        "sourceTool": "mysheets.read_range",
+        "sourceLabel": "spreadsheet_sales_q4 (Sheet1)",
+        "readAt": "2026-11-04T17:57:47.158Z",
+        "itemCount": 3,
+        "coverage": "complete",
+        "contentHash": "16aabb2dc7c608514fbcbd520f6ea317d857e454960fb59953f38c79f165d42a"
+      },
+      "guardValid": true,
+      "planHash": "75ba3d11824ddca5e1ca6c99731b9e2d2f212fd6a016c7ef544ecc430ea11dda"
+    },
+    {
+      "workflowId": "OFF-03",
+      "run": 2,
+      "requestedModel": "deepseek-chat",
+      "servedModel": "deepseek-flash",
+      "elapsedMs": 2110,
+      "llmCalls": [
+        {
+          "ms": 2100,
+          "servedModel": "deepseek-flash",
+          "metrics": {
+            "durationMs": 2099.6983999999975,
+            "attempts": [
+              {
+                "startedAtMs": 0.0010000000002037268,
+                "durationMs": 2099.531899999998,
+                "outcome": "success"
+              }
+            ],
+            "usage": {
+              "promptTokens": 7871,
+              "completionTokens": 334,
+              "reasoningTokens": null
+            },
+            "servedModel": "deepseek-flash"
+          },
+          "outputChars": 914
+        }
+      ],
+      "kind": "plan",
+      "tools": [
+        "mysheets.read_range",
+        "slack.send_message"
+      ],
+      "stepTools": [
+        "mysheets.read_range",
+        "slack.send_message"
+      ],
+      "searches": [
+        "slack.search_channels",
+        "mysheets.list_spreadsheets",
+        "mysheets.list_drive_files",
+        "mysheets.list_sheets",
+        "mysheets.list_sheets",
+        "mysheets.read_range"
+      ],
+      "reportEvidence": {
+        "artifactId": "art_1793815069270_41d8ee23",
+        "kind": "sheets_summary",
+        "stepId": "send_slack",
+        "argument": "text",
+        "sourceTool": "mysheets.read_range",
+        "sourceLabel": "spreadsheet_sales_q4 (Sheet1)",
+        "readAt": "2026-11-04T17:57:49.270Z",
+        "itemCount": 3,
+        "coverage": "complete",
+        "contentHash": "16aabb2dc7c608514fbcbd520f6ea317d857e454960fb59953f38c79f165d42a"
+      },
+      "guardValid": true,
+      "planHash": "ff52a456e1fd045ccdd13f14521e423c8dc05b9818c3201768c29ffbd2365bc7"
+    },
+    {
+      "workflowId": "OFF-03",
+      "run": 3,
+      "requestedModel": "deepseek-chat",
+      "servedModel": "deepseek-flash",
+      "elapsedMs": 1792,
+      "llmCalls": [
+        {
+          "ms": 1789,
+          "servedModel": "deepseek-flash",
+          "metrics": {
+            "durationMs": 1789.3261999999995,
+            "attempts": [
+              {
+                "startedAtMs": 0.0017000000007101335,
+                "durationMs": 1789.124499999998,
+                "outcome": "success"
+              }
+            ],
+            "usage": {
+              "promptTokens": 7871,
+              "completionTokens": 273,
+              "reasoningTokens": null
+            },
+            "servedModel": "deepseek-flash"
+          },
+          "outputChars": 776
+        }
+      ],
+      "kind": "plan",
+      "tools": [
+        "mysheets.read_range",
+        "slack.send_message"
+      ],
+      "stepTools": [
+        "mysheets.read_range",
+        "slack.send_message"
+      ],
+      "searches": [
+        "slack.search_channels",
+        "mysheets.list_spreadsheets",
+        "mysheets.list_drive_files",
+        "mysheets.list_sheets",
+        "mysheets.list_sheets",
+        "mysheets.read_range"
+      ],
+      "reportEvidence": {
+        "artifactId": "art_1793815071063_45bd43d2",
+        "kind": "sheets_summary",
+        "stepId": "send_slack",
+        "argument": "text",
+        "sourceTool": "mysheets.read_range",
+        "sourceLabel": "spreadsheet_sales_q4 (Sheet1)",
+        "readAt": "2026-11-04T17:57:51.063Z",
+        "itemCount": 3,
+        "coverage": "complete",
+        "contentHash": "16aabb2dc7c608514fbcbd520f6ea317d857e454960fb59953f38c79f165d42a"
+      },
+      "guardValid": true,
+      "planHash": "51e2e790976239c19b146282b7791eba50618522ac21dd21264f4342d186ea51"
+    },
+    {
+      "workflowId": "PM-01",
+      "run": 1,
+      "requestedModel": "deepseek-chat",
+      "servedModel": "deepseek-flash",
+      "elapsedMs": 1892,
+      "llmCalls": [
+        {
+          "ms": 1879,
+          "servedModel": "deepseek-flash",
+          "metrics": {
+            "durationMs": 1878.9459000000024,
+            "attempts": [
+              {
+                "startedAtMs": 0.001299999999901047,
+                "durationMs": 1878.797499999997,
+                "outcome": "success"
+              }
+            ],
+            "usage": {
+              "promptTokens": 6572,
+              "completionTokens": 250,
+              "reasoningTokens": null
+            },
+            "servedModel": "deepseek-flash"
+          },
+          "outputChars": 694
+        }
+      ],
+      "kind": "plan",
+      "tools": [
+        "trello.create_card",
+        "slack.send_message"
+      ],
+      "stepTools": [
+        "trello.create_card",
+        "slack.send_message"
+      ],
+      "searches": [
+        "trello.search_boards",
+        "slack.search_channels",
+        "trello.search_lists",
+        "trello.search_lists",
+        "trello.search_lists",
+        "trello.search_members",
+        "trello.search_members",
+        "trello.search_members"
+      ],
+      "reportEvidence": null,
+      "guardValid": true,
+      "planHash": "a0f4f73791a63e587fab6fe4fde1609df51392ba4dca2a4efb8d9c9738d53e06"
+    },
+    {
+      "workflowId": "PM-01",
+      "run": 2,
+      "requestedModel": "deepseek-chat",
+      "servedModel": "deepseek-flash",
+      "elapsedMs": 2252,
+      "llmCalls": [
+        {
+          "ms": 2244,
+          "servedModel": "deepseek-flash",
+          "metrics": {
+            "durationMs": 2244.6454000000012,
+            "attempts": [
+              {
+                "startedAtMs": 0.0020000000004074536,
+                "durationMs": 2244.2776999999987,
+                "outcome": "success"
+              }
+            ],
+            "usage": {
+              "promptTokens": 6572,
+              "completionTokens": 247,
+              "reasoningTokens": null
+            },
+            "servedModel": "deepseek-flash"
+          },
+          "outputChars": 695
+        }
+      ],
+      "kind": "plan",
+      "tools": [
+        "trello.create_card",
+        "slack.send_message"
+      ],
+      "stepTools": [
+        "trello.create_card",
+        "slack.send_message"
+      ],
+      "searches": [
+        "trello.search_boards",
+        "slack.search_channels",
+        "trello.search_lists",
+        "trello.search_lists",
+        "trello.search_lists",
+        "trello.search_members",
+        "trello.search_members",
+        "trello.search_members"
+      ],
+      "reportEvidence": null,
+      "guardValid": true,
+      "planHash": "0dd415439f8e870c9158d9de704663c8201ad8c778b4599ef7827a1d7a59ce0e"
+    },
+    {
+      "workflowId": "PM-01",
+      "run": 3,
+      "requestedModel": "deepseek-chat",
+      "servedModel": "deepseek-flash",
+      "elapsedMs": 1846,
+      "llmCalls": [
+        {
+          "ms": 1844,
+          "servedModel": "deepseek-flash",
+          "metrics": {
+            "durationMs": 1844.4683000000005,
+            "attempts": [
+              {
+                "startedAtMs": 0.0014999999984866008,
+                "durationMs": 1844.3264000000054,
+                "outcome": "success"
+              }
+            ],
+            "usage": {
+              "promptTokens": 6572,
+              "completionTokens": 249,
+              "reasoningTokens": null
+            },
+            "servedModel": "deepseek-flash"
+          },
+          "outputChars": 695
+        }
+      ],
+      "kind": "plan",
+      "tools": [
+        "trello.create_card",
+        "slack.send_message"
+      ],
+      "stepTools": [
+        "trello.create_card",
+        "slack.send_message"
+      ],
+      "searches": [
+        "trello.search_boards",
+        "slack.search_channels",
+        "trello.search_lists",
+        "trello.search_lists",
+        "trello.search_lists",
+        "trello.search_members",
+        "trello.search_members",
+        "trello.search_members"
+      ],
+      "reportEvidence": null,
+      "guardValid": true,
+      "planHash": "0941ea55b08bae203cd93e6ca5d3ba0c4b2f48a01efad0d2013635ccfaccf0bb"
+    },
+    {
+      "workflowId": "PM-03",
+      "run": 1,
+      "requestedModel": "deepseek-chat",
+      "servedModel": "deepseek-flash",
+      "elapsedMs": 1519,
+      "llmCalls": [
+        {
+          "ms": 1499,
+          "servedModel": "deepseek-flash",
+          "metrics": {
+            "durationMs": 1498.8747000000003,
+            "attempts": [
+              {
+                "startedAtMs": 0.001799999998183921,
+                "durationMs": 1498.6098999999958,
+                "outcome": "success"
+              }
+            ],
+            "usage": {
+              "promptTokens": 8972,
+              "completionTokens": 272,
+              "reasoningTokens": null
+            },
+            "servedModel": "deepseek-flash"
+          },
+          "outputChars": 735
+        }
+      ],
+      "kind": "plan",
+      "tools": [
+        "myjira.search_issues",
+        "slack.send_message"
+      ],
+      "stepTools": [
+        "myjira.search_issues",
+        "slack.send_message"
+      ],
+      "searches": [
+        "slack.search_channels",
+        "github.search_repos",
+        "myjira.list_sites",
+        "myjira.search_projects",
+        "myjira.search_projects",
+        "myjira.search_issues"
+      ],
+      "reportEvidence": {
+        "artifactId": "art_1793815078559_a493e963",
+        "kind": "jira_progress",
+        "stepId": "s2",
+        "argument": "text",
+        "sourceTool": "myjira.search_issues",
+        "sourceLabel": "Jira WEB",
+        "readAt": "2026-11-04T17:57:58.559Z",
+        "itemCount": 1,
+        "coverage": "complete",
+        "contentHash": "74de1572a93ecc64a23e5ddf94d00036d31728456b259742e6170034f95cd8dc"
+      },
+      "guardValid": true,
+      "planHash": "4f733d7e2d80a982f7cfb976abe94e59a887f1c2813df090ec12a8b6c33eac27"
+    },
+    {
+      "workflowId": "PM-03",
+      "run": 2,
+      "requestedModel": "deepseek-chat",
+      "servedModel": "deepseek-flash",
+      "elapsedMs": 2163,
+      "llmCalls": [
+        {
+          "ms": 2151,
+          "servedModel": "deepseek-flash",
+          "metrics": {
+            "durationMs": 2150.8997999999992,
+            "attempts": [
+              {
+                "startedAtMs": 0.001799999998183921,
+                "durationMs": 2150.696600000003,
+                "outcome": "success"
+              }
+            ],
+            "usage": {
+              "promptTokens": 8972,
+              "completionTokens": 279,
+              "reasoningTokens": null
+            },
+            "servedModel": "deepseek-flash"
+          },
+          "outputChars": 765
+        }
+      ],
+      "kind": "plan",
+      "tools": [
+        "myjira.search_issues",
+        "slack.send_message"
+      ],
+      "stepTools": [
+        "myjira.search_issues",
+        "slack.send_message"
+      ],
+      "searches": [
+        "slack.search_channels",
+        "github.search_repos",
+        "myjira.list_sites",
+        "myjira.search_projects",
+        "myjira.search_projects",
+        "myjira.search_issues"
+      ],
+      "reportEvidence": {
+        "artifactId": "art_1793815080730_81b00512",
+        "kind": "jira_progress",
+        "stepId": "s2",
+        "argument": "text",
+        "sourceTool": "myjira.search_issues",
+        "sourceLabel": "Jira WEB",
+        "readAt": "2026-11-04T17:58:00.730Z",
+        "itemCount": 1,
+        "coverage": "complete",
+        "contentHash": "74de1572a93ecc64a23e5ddf94d00036d31728456b259742e6170034f95cd8dc"
+      },
+      "guardValid": true,
+      "planHash": "8a09219da0ad80cc42da51d22a9e862323b755c325b0fee58a7ff5ac2eae6c33"
+    },
+    {
+      "workflowId": "PM-03",
+      "run": 3,
+      "requestedModel": "deepseek-chat",
+      "servedModel": "deepseek-flash",
+      "elapsedMs": 2044,
+      "llmCalls": [
+        {
+          "ms": 2042,
+          "servedModel": "deepseek-flash",
+          "metrics": {
+            "durationMs": 2042.1052000000054,
+            "attempts": [
+              {
+                "startedAtMs": 0.0015000000057625584,
+                "durationMs": 2041.8952999999965,
+                "outcome": "success"
+              }
+            ],
+            "usage": {
+              "promptTokens": 8972,
+              "completionTokens": 294,
+              "reasoningTokens": null
+            },
+            "servedModel": "deepseek-flash"
+          },
+          "outputChars": 838
+        }
+      ],
+      "kind": "plan",
+      "tools": [
+        "myjira.search_issues",
+        "slack.send_message"
+      ],
+      "stepTools": [
+        "myjira.search_issues",
+        "slack.send_message"
+      ],
+      "searches": [
+        "slack.search_channels",
+        "github.search_repos",
+        "myjira.list_sites",
+        "myjira.search_projects",
+        "myjira.search_projects",
+        "myjira.search_issues"
+      ],
+      "reportEvidence": {
+        "artifactId": "art_1793815082785_dcd8ef85",
+        "kind": "jira_progress",
+        "stepId": "send_report",
+        "argument": "text",
+        "sourceTool": "myjira.search_issues",
+        "sourceLabel": "Jira WEB",
+        "readAt": "2026-11-04T17:58:02.785Z",
+        "itemCount": 1,
+        "coverage": "complete",
+        "contentHash": "74de1572a93ecc64a23e5ddf94d00036d31728456b259742e6170034f95cd8dc"
+      },
+      "guardValid": true,
+      "planHash": "81d893e7fce8a14febc2777e99de3e46d0daec61b9d58e41909bcd57e9f4586e"
+    },
+    {
+      "workflowId": "DEV-02",
+      "run": 1,
+      "requestedModel": "deepseek-chat",
+      "servedModel": "deepseek-flash",
+      "elapsedMs": 2012,
+      "llmCalls": [
+        {
+          "ms": 2009,
+          "servedModel": "deepseek-flash",
+          "metrics": {
+            "durationMs": 2009.6399999999994,
+            "attempts": [
+              {
+                "startedAtMs": 0.0017000000007101335,
+                "durationMs": 2009.490700000002,
+                "outcome": "success"
+              }
+            ],
+            "usage": {
+              "promptTokens": 4636,
+              "completionTokens": 266,
+              "reasoningTokens": null
+            },
+            "servedModel": "deepseek-flash"
+          },
+          "outputChars": 765
+        }
+      ],
+      "kind": "plan",
+      "tools": [
+        "github.list_pull_requests",
+        "slack.send_message"
+      ],
+      "stepTools": [
+        "github.list_pull_requests",
+        "slack.send_message"
+      ],
+      "searches": [
+        "slack.search_channels",
+        "github.search_repos",
+        "github.list_pull_requests"
+      ],
+      "reportEvidence": {
+        "artifactId": "art_1793815084798_cad6f32b",
+        "kind": "github_prs",
+        "stepId": "send_report",
+        "argument": "text",
+        "sourceTool": "github.list_pull_requests",
+        "sourceLabel": "acme/web",
+        "readAt": "2026-11-04T17:58:04.798Z",
+        "itemCount": 2,
+        "coverage": "complete",
+        "contentHash": "8438293f96fa305b4e1c260bc64fcad781ed7f6900200270fccc060fcaf1d05f"
+      },
+      "guardValid": true,
+      "planHash": "6ff8f0ceed84bf1202e629b0bbf570a4417859ca289bd5a2e880be1d98fcc23e"
+    },
+    {
+      "workflowId": "DEV-02",
+      "run": 2,
+      "requestedModel": "deepseek-chat",
+      "servedModel": "deepseek-flash",
+      "elapsedMs": 2087,
+      "llmCalls": [
+        {
+          "ms": 2085,
+          "servedModel": "deepseek-flash",
+          "metrics": {
+            "durationMs": 2085.1120999999985,
+            "attempts": [
+              {
+                "startedAtMs": 0.0011999999987892807,
+                "durationMs": 2085.013500000001,
+                "outcome": "success"
+              }
+            ],
+            "usage": {
+              "promptTokens": 4636,
+              "completionTokens": 264,
+              "reasoningTokens": null
+            },
+            "servedModel": "deepseek-flash"
+          },
+          "outputChars": 756
+        }
+      ],
+      "kind": "plan",
+      "tools": [
+        "github.list_pull_requests",
+        "slack.send_message"
+      ],
+      "stepTools": [
+        "github.list_pull_requests",
+        "slack.send_message"
+      ],
+      "searches": [
+        "slack.search_channels",
+        "github.search_repos",
+        "github.list_pull_requests"
+      ],
+      "reportEvidence": {
+        "artifactId": "art_1793815086886_be0f2569",
+        "kind": "github_prs",
+        "stepId": "send_report",
+        "argument": "text",
+        "sourceTool": "github.list_pull_requests",
+        "sourceLabel": "acme/web",
+        "readAt": "2026-11-04T17:58:06.886Z",
+        "itemCount": 2,
+        "coverage": "complete",
+        "contentHash": "8438293f96fa305b4e1c260bc64fcad781ed7f6900200270fccc060fcaf1d05f"
+      },
+      "guardValid": true,
+      "planHash": "384162786853b97709a39930ee9c5b8fb1e82f142c024d232abfcc1d68f01b64"
+    },
+    {
+      "workflowId": "DEV-02",
+      "run": 3,
+      "requestedModel": "deepseek-chat",
+      "servedModel": "deepseek-flash",
+      "elapsedMs": 3068,
+      "llmCalls": [
+        {
+          "ms": 958,
+          "servedModel": "deepseek-flash",
+          "metrics": {
+            "durationMs": 958.5279999999984,
+            "attempts": [
+              {
+                "startedAtMs": 0.0017000000007101335,
+                "durationMs": 958.3554000000004,
+                "outcome": "success"
+              }
+            ],
+            "usage": {
+              "promptTokens": 4636,
+              "completionTokens": 52,
+              "reasoningTokens": null
+            },
+            "servedModel": "deepseek-flash"
+          },
+          "outputChars": 187
+        },
+        {
+          "ms": 2106,
+          "servedModel": "deepseek-flash",
+          "metrics": {
+            "durationMs": 2105.5532999999996,
+            "attempts": [
+              {
+                "startedAtMs": 0.0011999999987892807,
+                "durationMs": 2105.4315999999963,
+                "outcome": "success"
+              }
+            ],
+            "usage": {
+              "promptTokens": 5163,
+              "completionTokens": 309,
+              "reasoningTokens": null
+            },
+            "servedModel": "deepseek-flash"
+          },
+          "outputChars": 839
+        }
+      ],
+      "kind": "plan",
+      "tools": [
+        "github.list_pull_requests",
+        "slack.send_message"
+      ],
+      "stepTools": [
+        "slack.send_message"
+      ],
+      "searches": [
+        "slack.search_channels",
+        "github.search_repos",
+        "github.list_pull_requests"
+      ],
+      "reportEvidence": {
+        "artifactId": "art_1793815089954_65ad1d04",
+        "kind": "github_prs",
+        "stepId": "send_report",
+        "argument": "text",
+        "sourceTool": "github.list_pull_requests",
+        "sourceLabel": "acme/web",
+        "readAt": "2026-11-04T17:58:09.954Z",
+        "itemCount": 2,
+        "coverage": "complete",
+        "contentHash": "8438293f96fa305b4e1c260bc64fcad781ed7f6900200270fccc060fcaf1d05f"
+      },
+      "guardValid": true,
+      "planHash": "23018f08b87e0fca802e0369bf59fdc67bdef3f119e863aa80ce565265e6eb5c"
+    },
+    {
+      "workflowId": "DEV-04",
+      "run": 1,
+      "requestedModel": "deepseek-chat",
+      "servedModel": "deepseek-flash",
+      "elapsedMs": 2040,
+      "llmCalls": [
+        {
+          "ms": 2038,
+          "servedModel": "deepseek-flash",
+          "metrics": {
+            "durationMs": 2037.7197000000015,
+            "attempts": [
+              {
+                "startedAtMs": 0.001799999998183921,
+                "durationMs": 2037.2108999999982,
+                "outcome": "success"
+              }
+            ],
+            "usage": {
+              "promptTokens": 4642,
+              "completionTokens": 319,
+              "reasoningTokens": null
+            },
+            "servedModel": "deepseek-flash"
+          },
+          "outputChars": 908
+        }
+      ],
+      "kind": "plan",
+      "tools": [
+        "github.list_issues",
+        "slack.send_message"
+      ],
+      "stepTools": [
+        "github.list_issues",
+        "slack.send_message"
+      ],
+      "searches": [
+        "slack.search_channels",
+        "github.search_repos",
+        "github.list_issues"
+      ],
+      "reportEvidence": {
+        "artifactId": "art_1793815091995_f45545f0",
+        "kind": "github_issues",
+        "stepId": "send_report",
+        "argument": "text",
+        "sourceTool": "github.list_issues",
+        "sourceLabel": "acme/web (>7d)",
+        "readAt": "2026-11-04T17:58:11.995Z",
+        "itemCount": 2,
+        "coverage": "complete",
+        "contentHash": "991f63ca12f4902a58681526c5c17e04a5d3773c375fab4d3e4d8bc693cc9d36"
+      },
+      "guardValid": true,
+      "planHash": "e4013184ea4fd93375f0dd9483404e88ad0597b16b84f480a0a1932fef75945b"
+    },
+    {
+      "workflowId": "DEV-04",
+      "run": 2,
+      "requestedModel": "deepseek-chat",
+      "servedModel": "deepseek-flash",
+      "elapsedMs": 3483,
+      "llmCalls": [
+        {
+          "ms": 815,
+          "servedModel": "deepseek-flash",
+          "metrics": {
+            "durationMs": 814.9760000000024,
+            "attempts": [
+              {
+                "startedAtMs": 0.0017000000007101335,
+                "durationMs": 814.8153999999995,
+                "outcome": "success"
+              }
+            ],
+            "usage": {
+              "promptTokens": 4642,
+              "completionTokens": 47,
+              "reasoningTokens": null
+            },
+            "servedModel": "deepseek-flash"
+          },
+          "outputChars": 172
+        },
+        {
+          "ms": 2666,
+          "servedModel": "deepseek-flash",
+          "metrics": {
+            "durationMs": 2666.002099999998,
+            "attempts": [
+              {
+                "startedAtMs": 0.0017000000007101335,
+                "durationMs": 2665.844799999999,
+                "outcome": "success"
+              }
+            ],
+            "usage": {
+              "promptTokens": 5164,
+              "completionTokens": 430,
+              "reasoningTokens": null
+            },
+            "servedModel": "deepseek-flash"
+          },
+          "outputChars": 1067
+        }
+      ],
+      "kind": "plan",
+      "tools": [
+        "github.list_issues",
+        "slack.send_message"
+      ],
+      "stepTools": [
+        "slack.send_message"
+      ],
+      "searches": [
+        "slack.search_channels",
+        "github.search_repos",
+        "github.list_issues"
+      ],
+      "reportEvidence": {
+        "artifactId": "art_1793815095480_29312de5",
+        "kind": "github_issues",
+        "stepId": "send_report",
+        "argument": "text",
+        "sourceTool": "github.list_issues",
+        "sourceLabel": "acme/web (>7d)",
+        "readAt": "2026-11-04T17:58:15.480Z",
+        "itemCount": 2,
+        "coverage": "complete",
+        "contentHash": "991f63ca12f4902a58681526c5c17e04a5d3773c375fab4d3e4d8bc693cc9d36"
+      },
+      "guardValid": true,
+      "planHash": "d855975c3b65e2e38db76f919163632b7cc23e729bebe645e68c8d963fd8428c"
+    },
+    {
+      "workflowId": "DEV-04",
+      "run": 3,
+      "requestedModel": "deepseek-chat",
+      "servedModel": "deepseek-flash",
+      "elapsedMs": 3350,
+      "llmCalls": [
+        {
+          "ms": 1030,
+          "servedModel": "deepseek-flash",
+          "metrics": {
+            "durationMs": 1029.7194999999992,
+            "attempts": [
+              {
+                "startedAtMs": 0.0005999999993946403,
+                "durationMs": 1029.6258000000016,
+                "outcome": "success"
+              }
+            ],
+            "usage": {
+              "promptTokens": 4642,
+              "completionTokens": 47,
+              "reasoningTokens": null
+            },
+            "servedModel": "deepseek-flash"
+          },
+          "outputChars": 172
+        },
+        {
+          "ms": 2319,
+          "servedModel": "deepseek-flash",
+          "metrics": {
+            "durationMs": 2318.2483999999968,
+            "attempts": [
+              {
+                "startedAtMs": 0.0008999999990919605,
+                "durationMs": 2318.1417999999976,
+                "outcome": "success"
+              }
+            ],
+            "usage": {
+              "promptTokens": 5164,
+              "completionTokens": 355,
+              "reasoningTokens": null
+            },
+            "servedModel": "deepseek-flash"
+          },
+          "outputChars": 914
+        }
+      ],
+      "kind": "plan",
+      "tools": [
+        "github.list_issues",
+        "slack.send_message"
+      ],
+      "stepTools": [
+        "slack.send_message"
+      ],
+      "searches": [
+        "slack.search_channels",
+        "github.search_repos",
+        "github.list_issues"
+      ],
+      "reportEvidence": {
+        "artifactId": "art_1793815098831_9b7b4c12",
+        "kind": "github_issues",
+        "stepId": "send_report",
+        "argument": "text",
+        "sourceTool": "github.list_issues",
+        "sourceLabel": "acme/web (>7d)",
+        "readAt": "2026-11-04T17:58:18.831Z",
+        "itemCount": 2,
+        "coverage": "complete",
+        "contentHash": "991f63ca12f4902a58681526c5c17e04a5d3773c375fab4d3e4d8bc693cc9d36"
+      },
+      "guardValid": true,
+      "planHash": "d9c18aa48cb044e3209d99c1addf02ae713878f099748dc046a5bcf329134561"
+    }
+  ],
+  "oracle": {
+    "datasetHash": "b954737bf468a084d58a02a1eaf1658fce28b4d9902e4dc52b9fa0c89c71abbe",
+    "results": [
+      {
+        "id": "OFF-01-explicit",
+        "jobId": "OFF-01",
+        "variant": "explicit",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "trello.search_boards",
+          "gmail.list_labels",
+          "mycalendar.list_calendars",
+          "trello.search_lists",
+          "trello.search_members",
+          "gmail.search_threads"
+        ],
+        "stepTools": [],
+        "elapsedMs": 3123,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 2,
+        "clarificationQuestion": "Có 5 email từ Lan cùng ngày 14/10/2026 (cùng giờ 09:00) nên không xác định được email nào là \"mới nhất\". Bạn muốn tạo thẻ Trello Frontend và nhắc hạn cho email nào?"
+      },
+      {
+        "id": "OFF-01-natural",
+        "jobId": "OFF-01",
+        "variant": "natural",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "trello.search_boards",
+          "trello.search_lists",
+          "trello.search_members"
+        ],
+        "stepTools": [],
+        "elapsedMs": 2121,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1,
+        "clarificationQuestion": "Bạn muốn mình tạo thẻ giao việc trên bảng/danh sách nào, và nội dung công việc + hạn chót cụ thể ra sao?"
+      },
+      {
+        "id": "OFF-01-underspecified",
+        "jobId": "OFF-01",
+        "variant": "underspecified",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "trello.search_boards",
+          "gmail.list_labels",
+          "trello.search_lists",
+          "trello.search_members"
+        ],
+        "stepTools": [],
+        "elapsedMs": 1640,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1,
+        "clarificationQuestion": "Bạn muốn tôi đọc email nào trong Gmail để tạo việc Trello? Vui lòng cho biết tiêu chí tìm email (ví dụ: người gửi, chủ đề, từ khóa, hoặc email mới nhất), và thẻ Trello nên được tạo ở bảng/danh sách nào."
+      },
+      {
+        "id": "OFF-02-explicit",
+        "jobId": "OFF-02",
+        "variant": "explicit",
+        "expectedKind": "plan",
+        "actualKind": "plan",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [
+          "mycalendar.schedule_meet",
+          "mysheets.create_doc",
+          "gmail.send_message"
+        ],
+        "actualTools": [
+          "gmail.list_labels",
+          "mycalendar.list_calendars",
+          "mysheets.list_spreadsheets",
+          "mysheets.list_drive_files",
+          "mysheets.list_sheets",
+          "mycalendar.schedule_meet",
+          "mysheets.create_doc",
+          "gmail.send_message"
+        ],
+        "stepTools": [
+          "mycalendar.schedule_meet",
+          "mysheets.create_doc",
+          "gmail.send_message"
+        ],
+        "elapsedMs": 6962,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 2
+      },
+      {
+        "id": "OFF-02-natural",
+        "jobId": "OFF-02",
+        "variant": "natural",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "notion.search_databases",
+          "mycalendar.list_calendars"
+        ],
+        "stepTools": [],
+        "elapsedMs": 2052,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1,
+        "clarificationQuestion": "Mình cần thêm vài thông tin để đặt lịch họp khởi động với Lan vào ngày mai (05/11/2026): giờ họp, email của Lan, và tài liệu nên tạo ở đâu?"
+      },
+      {
+        "id": "OFF-02-underspecified",
+        "jobId": "OFF-02",
+        "variant": "underspecified",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "mycalendar.list_calendars"
+        ],
+        "stepTools": [],
+        "elapsedMs": 2658,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1,
+        "clarificationQuestion": "Bạn muốn xếp cuộc họp vào lúc nào, kéo dài bao lâu, và dùng lịch nào (Personal hay Việc riêng)? Bạn cũng muốn tôi chuẩn bị biên bản dưới dạng nào?"
+      },
+      {
+        "id": "OFF-03-explicit",
+        "jobId": "OFF-03",
+        "variant": "explicit",
+        "expectedKind": "plan",
+        "actualKind": "plan",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [
+          "mysheets.read_range",
+          "slack.send_message"
+        ],
+        "actualTools": [
+          "mysheets.read_range",
+          "slack.search_channels",
+          "mysheets.list_spreadsheets",
+          "mysheets.list_drive_files",
+          "mysheets.list_sheets",
+          "mysheets.aggregate_rows",
+          "slack.send_message"
+        ],
+        "stepTools": [
+          "mysheets.read_range",
+          "mysheets.aggregate_rows",
+          "slack.send_message"
+        ],
+        "elapsedMs": 2454,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1
+      },
+      {
+        "id": "OFF-03-natural",
+        "jobId": "OFF-03",
+        "variant": "natural",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "slack.search_channels"
+        ],
+        "stepTools": [],
+        "elapsedMs": 1645,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1,
+        "clarificationQuestion": "Bạn muốn mình tổng hợp báo cáo tiến độ tuần và gửi vào kênh Slack nào?"
+      },
+      {
+        "id": "OFF-03-underspecified",
+        "jobId": "OFF-03",
+        "variant": "underspecified",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "mysheets.list_spreadsheets",
+          "mysheets.list_drive_files",
+          "mysheets.list_sheets"
+        ],
+        "stepTools": [],
+        "elapsedMs": 2035,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1,
+        "clarificationQuestion": "Bạn muốn tổng hợp bảng tính nào và gửi báo cáo dưới dạng nào?"
+      },
+      {
+        "id": "OFF-04-explicit",
+        "jobId": "OFF-04",
+        "variant": "explicit",
+        "expectedKind": "plan",
+        "actualKind": "plan",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [
+          "mysheets.create_doc",
+          "slack.send_message"
+        ],
+        "actualTools": [
+          "slack.search_channels",
+          "mysheets.list_spreadsheets",
+          "mysheets.list_drive_files",
+          "mysheets.list_sheets",
+          "mysheets.create_doc",
+          "slack.send_message"
+        ],
+        "stepTools": [
+          "mysheets.create_doc",
+          "slack.send_message"
+        ],
+        "elapsedMs": 2100,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1
+      },
+      {
+        "id": "OFF-04-natural",
+        "jobId": "OFF-04",
+        "variant": "natural",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "slack.search_channels",
+          "notion.search_databases"
+        ],
+        "stepTools": [],
+        "elapsedMs": 1591,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1,
+        "clarificationQuestion": "Bạn muốn lưu báo cáo tuần vào database Notion nào và báo cho kênh Slack nào? Nội dung báo cáo tuần cụ thể là gì?"
+      },
+      {
+        "id": "OFF-04-underspecified",
+        "jobId": "OFF-04",
+        "variant": "underspecified",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "slack.search_channels",
+          "mysheets.list_spreadsheets",
+          "mysheets.list_drive_files",
+          "mysheets.list_sheets"
+        ],
+        "stepTools": [],
+        "elapsedMs": 1835,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1,
+        "clarificationQuestion": "Bạn muốn lưu báo cáo nào vào Google Docs và gửi nội dung gì tới kênh Slack nào?"
+      },
+      {
+        "id": "PM-01-explicit",
+        "jobId": "PM-01",
+        "variant": "explicit",
+        "expectedKind": "plan",
+        "actualKind": "plan",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [
+          "trello.create_card",
+          "slack.send_message"
+        ],
+        "actualTools": [
+          "trello.search_boards",
+          "slack.search_channels",
+          "trello.search_lists",
+          "trello.search_members",
+          "trello.create_card",
+          "slack.send_message"
+        ],
+        "stepTools": [
+          "trello.create_card",
+          "slack.send_message"
+        ],
+        "elapsedMs": 1724,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1
+      },
+      {
+        "id": "PM-01-natural",
+        "jobId": "PM-01",
+        "variant": "natural",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "trello.search_boards",
+          "slack.search_channels",
+          "trello.search_lists",
+          "trello.search_members"
+        ],
+        "stepTools": [],
+        "elapsedMs": 1511,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1,
+        "clarificationQuestion": "Bạn muốn tạo thẻ việc tồn đọng mới trên bảng/danh sách nào, và báo nhóm trên kênh Slack nào?"
+      },
+      {
+        "id": "PM-01-underspecified",
+        "jobId": "PM-01",
+        "variant": "underspecified",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "trello.search_boards",
+          "slack.search_channels",
+          "trello.search_lists",
+          "trello.search_members"
+        ],
+        "stepTools": [],
+        "elapsedMs": 1726,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1,
+        "clarificationQuestion": "Bạn muốn tạo việc Trello cho Minh với nội dung gì, ở danh sách nào, và báo Slack vào kênh nào?"
+      },
+      {
+        "id": "PM-02-explicit",
+        "jobId": "PM-02",
+        "variant": "explicit",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "trello.search_boards",
+          "slack.search_channels",
+          "trello.search_lists",
+          "trello.search_members"
+        ],
+        "stepTools": [],
+        "elapsedMs": 1766,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1,
+        "clarificationQuestion": "Bạn muốn làm gì với danh sách thẻ quá hạn sau khi liệt kê? Hiện yêu cầu chỉ là đọc dữ liệu, chưa có hành động ghi nào."
+      },
+      {
+        "id": "PM-02-natural",
+        "jobId": "PM-02",
+        "variant": "natural",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "trello.search_boards",
+          "slack.search_channels",
+          "github.search_repos",
+          "notion.search_databases",
+          "telegram.list_chats",
+          "trello.search_lists",
+          "trello.search_members"
+        ],
+        "stepTools": [],
+        "elapsedMs": 1742,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1,
+        "clarificationQuestion": "Bạn muốn mình gom các việc trễ hẹn và nhắc mọi người ở đâu, theo cách nào?"
+      },
+      {
+        "id": "PM-02-underspecified",
+        "jobId": "PM-02",
+        "variant": "underspecified",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "trello.search_boards",
+          "trello.search_lists",
+          "trello.search_members"
+        ],
+        "stepTools": [],
+        "elapsedMs": 1664,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1,
+        "clarificationQuestion": "Bạn muốn làm gì với danh sách việc quá hạn trên Trello? (yêu cầu hiện tại chỉ là đọc/tổng hợp, chưa có hành động ghi nào)"
+      },
+      {
+        "id": "PM-03-explicit",
+        "jobId": "PM-03",
+        "variant": "explicit",
+        "expectedKind": "plan",
+        "actualKind": "plan",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [
+          "myjira.search_issues",
+          "slack.send_message"
+        ],
+        "actualTools": [
+          "myjira.search_issues",
+          "slack.search_channels",
+          "github.search_repos",
+          "myjira.list_sites",
+          "myjira.search_projects",
+          "slack.send_message"
+        ],
+        "stepTools": [
+          "myjira.search_issues",
+          "slack.send_message"
+        ],
+        "elapsedMs": 1703,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1
+      },
+      {
+        "id": "PM-03-natural",
+        "jobId": "PM-03",
+        "variant": "natural",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "slack.search_channels"
+        ],
+        "stepTools": [],
+        "elapsedMs": 1477,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1,
+        "clarificationQuestion": "Bạn muốn mình gửi báo cáo tiến độ và việc cần chú ý của nhóm vào kênh Slack nào, và nội dung báo cáo lấy từ đâu?"
+      },
+      {
+        "id": "PM-03-underspecified",
+        "jobId": "PM-03",
+        "variant": "underspecified",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "slack.search_channels",
+          "mycalendar.list_calendars",
+          "myjira.list_sites",
+          "myjira.search_projects"
+        ],
+        "stepTools": [],
+        "elapsedMs": 1955,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1,
+        "clarificationQuestion": "Bạn muốn đặt lịch báo cáo Jira qua Slack như thế nào? Vui lòng cho biết: (1) Jira site và project nào cần báo cáo, (2) kênh Slack nhận báo cáo, (3) thời gian bắt đầu và thời lượng, (4) lặp lại (hàng ngày / hàng tuần / một lần), và (5) lịch cá nhân nào (Personal hay Việc riêng) để tạo sự kiện nhắc?"
+      },
+      {
+        "id": "PM-04-explicit",
+        "jobId": "PM-04",
+        "variant": "explicit",
+        "expectedKind": "plan",
+        "actualKind": "plan",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [
+          "myjira.create_issue",
+          "notion.create_page",
+          "telegram.send_message",
+          "slack.send_message"
+        ],
+        "actualTools": [
+          "slack.search_channels",
+          "notion.search_databases",
+          "telegram.list_chats",
+          "myjira.list_sites",
+          "myjira.search_projects",
+          "myjira.create_issue",
+          "notion.create_page",
+          "telegram.send_message",
+          "slack.send_message"
+        ],
+        "stepTools": [
+          "myjira.create_issue",
+          "notion.create_page",
+          "telegram.send_message",
+          "slack.send_message"
+        ],
+        "elapsedMs": 5411,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 2
+      },
+      {
+        "id": "PM-04-natural",
+        "jobId": "PM-04",
+        "variant": "natural",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "slack.search_channels"
+        ],
+        "stepTools": [],
+        "elapsedMs": 1837,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1,
+        "clarificationQuestion": "Bạn muốn mình gửi thông báo sự cố thanh toán vào kênh Slack nào để báo trực ca?"
+      },
+      {
+        "id": "PM-04-underspecified",
+        "jobId": "PM-04",
+        "variant": "underspecified",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "notion.search_databases",
+          "telegram.list_chats",
+          "myjira.list_sites",
+          "myjira.search_projects"
+        ],
+        "stepTools": [],
+        "elapsedMs": 1854,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1,
+        "clarificationQuestion": "Bạn muốn tạo Jira issue cho sự cố nào, trên site nào, và ghi/báo ở đâu?"
+      },
+      {
+        "id": "DEV-01-explicit",
+        "jobId": "DEV-01",
+        "variant": "explicit",
+        "expectedKind": "plan",
+        "actualKind": "plan",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [
+          "github.get_issue",
+          "trello.create_card",
+          "slack.send_message"
+        ],
+        "actualTools": [
+          "trello.search_boards",
+          "slack.search_channels",
+          "github.search_repos",
+          "trello.search_lists",
+          "trello.search_members",
+          "github.get_issue",
+          "trello.create_card",
+          "slack.send_message"
+        ],
+        "stepTools": [
+          "trello.create_card",
+          "slack.send_message"
+        ],
+        "elapsedMs": 2287,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 2
+      },
+      {
+        "id": "DEV-01-natural",
+        "jobId": "DEV-01",
+        "variant": "natural",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "slack.search_channels"
+        ],
+        "stepTools": [],
+        "elapsedMs": 1798,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1,
+        "clarificationQuestion": "Bạn muốn tôi lấy lỗi webhook từ đâu và chuyển thành việc cho frontend ở đâu? Hiện chỉ có Slack được kết nối, chưa có công cụ quản lý công việc (task/board) hay hệ thống log/API để đọc lỗi webhook."
+      },
+      {
+        "id": "DEV-01-underspecified",
+        "jobId": "DEV-01",
+        "variant": "underspecified",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "trello.search_boards",
+          "github.search_repos",
+          "trello.search_lists",
+          "trello.search_members"
+        ],
+        "stepTools": [],
+        "elapsedMs": 1232,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1,
+        "clarificationQuestion": "Bạn muốn chuyển GitHub issue nào sang Trello, và đặt thẻ vào danh sách nào?"
+      },
+      {
+        "id": "DEV-02-explicit",
+        "jobId": "DEV-02",
+        "variant": "explicit",
+        "expectedKind": "plan",
+        "actualKind": "plan",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [
+          "github.list_pull_requests",
+          "slack.send_message"
+        ],
+        "actualTools": [
+          "github.list_pull_requests",
+          "slack.search_channels",
+          "github.search_repos",
+          "slack.send_message"
+        ],
+        "stepTools": [
+          "github.list_pull_requests",
+          "slack.send_message"
+        ],
+        "elapsedMs": 1837,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1
+      },
+      {
+        "id": "DEV-02-natural",
+        "jobId": "DEV-02",
+        "variant": "natural",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "trello.search_boards",
+          "slack.search_channels",
+          "github.search_repos",
+          "notion.search_databases",
+          "telegram.list_chats",
+          "trello.search_lists",
+          "trello.search_members",
+          "github.list_pull_requests"
+        ],
+        "stepTools": [],
+        "elapsedMs": 2530,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 2,
+        "clarificationQuestion": "Mình không tìm thấy PR nào đang mở (chờ review) trong các repo được kết nối (acme/web, acme/api). Bạn muốn mình nhắc nhóm ở đâu và với nội dung gì?"
+      },
+      {
+        "id": "DEV-02-underspecified",
+        "jobId": "DEV-02",
+        "variant": "underspecified",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "slack.search_channels",
+          "github.search_repos"
+        ],
+        "stepTools": [],
+        "elapsedMs": 1660,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1,
+        "clarificationQuestion": "Bạn muốn tổng hợp PR GitHub và báo Slack như thế nào — repo nào, trạng thái PR nào, và gửi vào kênh Slack nào?"
+      },
+      {
+        "id": "DEV-03-explicit",
+        "jobId": "DEV-03",
+        "variant": "explicit",
+        "expectedKind": "plan",
+        "actualKind": "plan",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [
+          "github.list_pull_requests",
+          "notion.create_page",
+          "slack.send_message"
+        ],
+        "actualTools": [
+          "github.list_pull_requests",
+          "slack.search_channels",
+          "github.search_repos",
+          "notion.search_databases",
+          "notion.create_page",
+          "slack.send_message"
+        ],
+        "stepTools": [
+          "notion.create_page",
+          "slack.send_message"
+        ],
+        "elapsedMs": 3420,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 2
+      },
+      {
+        "id": "DEV-03-natural",
+        "jobId": "DEV-03",
+        "variant": "natural",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "slack.search_channels"
+        ],
+        "stepTools": [],
+        "elapsedMs": 1812,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1,
+        "clarificationQuestion": "Bạn muốn mình đăng báo cáo bản phát hành dưới dạng tin nhắn Slack trong kênh #release, hay bạn muốn mình soạn nội dung trước để bạn xem lại? Và nội dung báo cáo gồm những mục nào?"
+      },
+      {
+        "id": "DEV-03-underspecified",
+        "jobId": "DEV-03",
+        "variant": "underspecified",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "github.search_repos"
+        ],
+        "stepTools": [],
+        "elapsedMs": 2049,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1,
+        "clarificationQuestion": "Bạn muốn tạo báo cáo release dưới dạng nào và ở đâu? Hiện chỉ có GitHub được kết nối, nên mình có thể tạo một issue làm báo cáo release. Bạn muốn dùng repo nào (acme/web hay acme/api) và báo cáo nên bao gồm những gì?"
+      },
+      {
+        "id": "DEV-04-explicit",
+        "jobId": "DEV-04",
+        "variant": "explicit",
+        "expectedKind": "plan",
+        "actualKind": "plan",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [
+          "github.list_issues",
+          "slack.send_message"
+        ],
+        "actualTools": [
+          "github.list_issues",
+          "slack.search_channels",
+          "github.search_repos",
+          "slack.send_message"
+        ],
+        "stepTools": [
+          "slack.send_message"
+        ],
+        "elapsedMs": 3065,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 2
+      },
+      {
+        "id": "DEV-04-natural",
+        "jobId": "DEV-04",
+        "variant": "natural",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "trello.search_boards",
+          "slack.search_channels",
+          "github.search_repos",
+          "notion.search_databases",
+          "telegram.list_chats",
+          "trello.search_lists",
+          "trello.search_members"
+        ],
+        "stepTools": [],
+        "elapsedMs": 1924,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1,
+        "clarificationQuestion": "Bạn muốn mình làm gì với danh sách lỗi tồn lâu chưa xử lý mỗi sáng? (hiện yêu cầu chỉ là đọc/tìm dữ liệu)"
+      },
+      {
+        "id": "DEV-04-underspecified",
+        "jobId": "DEV-04",
+        "variant": "underspecified",
+        "expectedKind": "clarification",
+        "actualKind": "clarification",
+        "kindMatched": true,
+        "toolsMatched": true,
+        "expectedTools": [],
+        "actualTools": [
+          "slack.search_channels",
+          "github.search_repos",
+          "mycalendar.list_calendars"
+        ],
+        "stepTools": [],
+        "elapsedMs": 1970,
+        "servedModel": "deepseek-flash",
+        "llmCallsCount": 1,
+        "clarificationQuestion": "Bạn muốn đặt lịch báo cáo GitHub qua Slack như thế nào? Vui lòng cho biết thời gian (ngày/giờ), tần suất (một lần hay lặp lại), kênh Slack nhận báo cáo, và repo GitHub nào cần theo dõi."
+      }
+    ]
+  }
+}

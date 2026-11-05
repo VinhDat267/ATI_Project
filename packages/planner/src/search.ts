@@ -227,6 +227,78 @@ export function sanitizeEntities(val: unknown): unknown {
   return val;
 }
 
+function applyWorkflowResourceDefaults(target: Record<string, any>, defaults: unknown): void {
+  if (!isObject(defaults)) return;
+  const addDefaultEntity = (resource: string, entity: Record<string, unknown>) => {
+    const existing = target[resource];
+    const list = Array.isArray(existing) ? existing : existing ? [existing] : [];
+    const observedList =
+      isObject(target.__observed) && Array.isArray(target.__observed[resource])
+        ? (target.__observed[resource] as unknown[])
+        : [];
+    const combined = [...list, ...observedList];
+    if (!combined.some((item: any) => item && String(item.id ?? item.key ?? item.siteId) === String(entity.id ?? entity.key ?? entity.siteId))) {
+      target[resource] = [...list, entity];
+    }
+  };
+  if (isObject(defaults.github) && typeof defaults.github.repo === 'string' && defaults.github.repo) {
+    const repo = defaults.github.repo;
+    addDefaultEntity('repository', { id: repo, fullName: repo, name: repo.split('/')[1] || repo });
+  }
+  if (isObject(defaults.trello) && typeof defaults.trello.boardId === 'string' && defaults.trello.boardId) {
+    addDefaultEntity('board', { id: defaults.trello.boardId, name: defaults.trello.boardId });
+    if (typeof defaults.trello.listId === 'string' && defaults.trello.listId) {
+      addDefaultEntity('list', { id: defaults.trello.listId, name: defaults.trello.listId, boardId: defaults.trello.boardId });
+    }
+  }
+  if (isObject(defaults.slack) && typeof defaults.slack.channelId === 'string' && defaults.slack.channelId) {
+    addDefaultEntity('channel', {
+      id: defaults.slack.channelId,
+      name: typeof defaults.slack.channelName === 'string' && defaults.slack.channelName ? defaults.slack.channelName : defaults.slack.channelId,
+    });
+  }
+  if (isObject(defaults.myjira) && typeof defaults.myjira.siteId === 'string' && defaults.myjira.siteId) {
+    const siteId = defaults.myjira.siteId;
+    const cloudId =
+      typeof defaults.myjira.cloudId === 'string' && defaults.myjira.cloudId
+        ? defaults.myjira.cloudId
+        : `cloud-${siteId}`;
+    const workspaceId =
+      typeof defaults.myjira.workspaceId === 'string' && defaults.myjira.workspaceId
+        ? defaults.myjira.workspaceId
+        : 'default';
+    addDefaultEntity('jira_site', { id: siteId, siteId, cloudId, workspaceId });
+    if (typeof defaults.myjira.projectKey === 'string' && defaults.myjira.projectKey) {
+      addDefaultEntity('jira_project', {
+        id: defaults.myjira.projectKey,
+        key: defaults.myjira.projectKey,
+        siteId,
+        cloudId,
+        workspaceId,
+      });
+    }
+  }
+  if (isObject(defaults.mycalendar) && typeof defaults.mycalendar.calendarId === 'string' && defaults.mycalendar.calendarId) {
+    addDefaultEntity('mycalendar', { id: defaults.mycalendar.calendarId, name: defaults.mycalendar.calendarId });
+  }
+  if (isObject(defaults.mysheets)) {
+    if (typeof defaults.mysheets.spreadsheetId === 'string' && defaults.mysheets.spreadsheetId) {
+      addDefaultEntity('myspreadsheet', {
+        id: defaults.mysheets.spreadsheetId,
+        title: typeof defaults.mysheets.sheetName === 'string' && defaults.mysheets.sheetName ? defaults.mysheets.sheetName : defaults.mysheets.spreadsheetId,
+      });
+    }
+    if (typeof defaults.mysheets.folderId === 'string' && defaults.mysheets.folderId) {
+      addDefaultEntity('drive_folder', { id: defaults.mysheets.folderId, title: defaults.mysheets.folderId });
+      addDefaultEntity('mydrive_file', {
+        id: defaults.mysheets.folderId,
+        title: defaults.mysheets.folderId,
+        mimeType: 'application/vnd.google-apps.folder',
+      });
+    }
+  }
+}
+
 export function providerMemory(memory: Record<string, any>): Record<string, any> {
   const { __labels: _displayOnly, ...safe } = memory;
   const result: Record<string, any> = {};
@@ -238,6 +310,7 @@ export function providerMemory(memory: Record<string, any>): Record<string, any>
       }
     }
   }
+  applyWorkflowResourceDefaults(result, memory?.workflow_resource_defaults);
   return result;
 }
 
@@ -257,6 +330,7 @@ export function groundingMemory(
     const activeObserved = entities.filter(item => !isEntityRevoked(item));
     merged[resource] = [...(Array.isArray(resolved) ? resolved : resolved ? [resolved] : []), ...activeObserved];
   }
+  applyWorkflowResourceDefaults(merged, memory?.workflow_resource_defaults);
   return merged;
 }
 

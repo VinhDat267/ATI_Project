@@ -36,6 +36,8 @@ export * from './myjira.js';
 export * from './myjira-context.js';
 export * from './myjira-policy.js';
 export * from './myjira-dto.js';
+export * from './report-evidence.js';
+export * from './workflow-context.js';
 export * from './registry/index.js';
 export * from './registry/gmail.js';
 export * from './registry/mycalendar.js';

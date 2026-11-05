@@ -40,6 +40,22 @@ export function PlanMoment({request,runtimeMode,plan,services,destination,onPrev
           {plan.connections?.notion?.workspaceName && <p className="text-sm text-brand-text break-words">Workspace Notion: {plan.connections.notion.workspaceName}</p>}
           {plan.connections?.telegram?.username && <p className="text-sm text-brand-text break-words">Tài khoản: @{plan.connections.telegram.username} (Telegram của bạn)</p>}
           {plan.connections?.myjira && <p className="text-sm text-brand-text break-words">Tài khoản Atlassian: {plan.connections.myjira.atlassianAccountId} · Workspace: {plan.connections.myjira.workspaceId}</p>}
+          {plan.reportEvidence && (
+            <div data-testid="verified-report-evidence-badge" className="flex items-center gap-2 p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-900 text-xs font-medium">
+              <span className="text-base">🛡️</span>
+              <span>
+                <strong>Báo cáo có nguồn dữ liệu xác minh:</strong> {plan.reportEvidence.sourceLabel} · {plan.reportEvidence.itemCount} mục ({plan.reportEvidence.coverage === 'complete' ? 'đầy đủ' : 'một phần'}) · Đọc lúc {plan.reportEvidence.readAt}
+              </span>
+            </div>
+          )}
+          {plan.steps.some(s => s.tool === 'mysheets.create_doc') && plan.steps.some(s => s.tool === 'gmail.send_message' || s.tool === 'mycalendar.schedule_meet' || s.tool === 'mycalendar.create_event') && (
+            <div data-testid="google-docs-sharing-notice" className="flex items-start gap-2.5 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs leading-relaxed">
+              <span className="text-base shrink-0">🔒</span>
+              <div>
+                <strong>Lưu ý quyền truy cập Google Docs (drive.file):</strong> Planora chỉ tạo tài liệu trong phạm vi tệp của bạn và không tự động mở quyền xem cho người nhận email. Trước hoặc sau khi gửi, hãy kiểm tra mục <em>Chia sẻ (Share)</em> trên Google Docs để cấp quyền đọc cho người nhận.
+              </div>
+            </div>
+          )}
           <WorkflowFlowCanvas steps={plan.steps} mode="preview" resourceLabels={plan.resourceLabels} selectedService={selectedService} onSelectService={setSelectedService} onStepPreview={onPreview} />
           {/* 4 Task Action Cards (NHÓM 2: Hiện so le dưới 300ms, NHÓM 8: Biểu tượng SVG) */}
           <div className="v3-space-y-3" id="plan-cards-container" role="list" aria-label="Các bước thực thi">

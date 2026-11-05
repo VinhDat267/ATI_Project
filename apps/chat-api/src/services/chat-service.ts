@@ -7,8 +7,10 @@ import type { ConversationRepo } from '../db/repositories/conversation-repo.js';
 import type { PlanRepo } from '../db/repositories/plan-repo.js';
 import type { ScheduleRepo } from '../db/repositories/schedule-repo.js';
 import type { WorkspaceRepo } from '../db/repositories/workspace-repo.js';
-import { WorkingMemory, unroutable, type ChatMessage, type ProcessMessageInput, type RoutedIntent } from '@wap/planner';
-import type { CalendarDigestCandidate, PersonalSpreadsheetItem, PlanConnections, PlannerResponse, PlanResponse, PlanStep, ScheduleProposalMetadata, ScheduleResponse, ScheduleView } from '@wap/tool-schemas';
+import { WorkingMemory, unroutable, relevantGroundingUserTexts, type ChatMessage, type ProcessMessageInput, type RoutedIntent, type ReportArtifactStore } from '@wap/planner';
+import type { CalendarDigestCandidate, PersonalSpreadsheetItem, PlanConnections, PlannerResponse, PlanResponse, PlanStep, ScheduleProposalMetadata, ScheduleResponse, ScheduleView, WorkflowContext } from '@wap/tool-schemas';
+import { filterPermittedWorkflowDefaults } from './workflow-context-guard.js';
+import { validateReportEvidenceBinding } from './report-evidence-guard.js';
 import { resourceLabels } from './resource-labels.js';
 import { nextRuns } from './schedules/next-occurrence.js';
 import { runMessage, type PreparedRun, type RunToPlan } from './schedules/schedule-runner.js';
@@ -120,6 +122,7 @@ export interface HandleUserMessageInput {
   userId: string;
   content: string;
   requestId?: string;
+  workflowContext?: WorkflowContext;
 }
 
 export interface IngestionResult {
@@ -186,6 +189,7 @@ export interface ChatServiceOptions {
   lookupTool?: (userId: string, tool: string, args: Record<string, unknown>, context?: { signal?: AbortSignal }) => Promise<unknown>;
   /** Bounds each MySheets discovery used to validate an append target, including ordinary chat. Default: 10 seconds. */
   mysheetsLookupTimeoutMs?: number;
+  reportEvidenceStore?: ReportArtifactStore;
 }
 
 type Correlation = { replyToMessageId?: string; requestId?: string };
@@ -220,6 +224,7 @@ export class ChatService {
   private getAdapter?: ChatServiceOptions['getAdapter'];
   private lookupTool?: ChatServiceOptions['lookupTool'];
   private mysheetsLookupTimeoutMs: number;
+  private reportEvidenceStore?: ReportArtifactStore;
   private slackReads?: SlackReadProposalService;
   private slackWrites?: SlackWriteRuntime;
 
@@ -239,6 +244,7 @@ export class ChatService {
     this.getAdapter = options.getAdapter;
     this.lookupTool = options.lookupTool;
     this.mysheetsLookupTimeoutMs = options.mysheetsLookupTimeoutMs ?? 10_000;
+    this.reportEvidenceStore = options.reportEvidenceStore;
     this.msgRepo = options.msgRepo;
     this.convRepo = options.convRepo;
     this.planRepo = options.planRepo;
@@ -268,7 +274,7 @@ export class ChatService {
 
     // 2. Schedule async planner pipeline execution
     setImmediate(() => {
-      this.executePlannerPipeline(conversationId, userId, content, message.id, requestId).catch(async () => {
+      this.executePlannerPipeline(conversationId, userId, content, message.id, requestId, input.workflowContext).catch(async () => {
         const text = 'Không thể lập kế hoạch lúc này. Hãy thử lại.';
         try {
           await this.msgRepo.createMessage(conversationId, 'system', `Lỗi: ${text}`, { type: 'planning_error', ...correlation });
@@ -1779,6 +1785,30 @@ export class ChatService {
         }
       }
     }
+    if (response.kind === 'plan') {
+      const store = this.reportEvidenceStore ?? (this.planner as any)?.getReportEvidenceStore?.();
+      const art = response.reportEvidence ? store?.getArtifact?.(response.reportEvidence.artifactId) : undefined;
+      const evidenceCheck = await validateReportEvidenceBinding(response, {
+        userId: target.userId,
+        workspaceId: actor.workspaceId ?? 'default',
+        requestTexts: userTexts,
+        enforceReportGrounding: true,
+        observedArtifact: art
+          ? {
+              id: art.id,
+              ownerUserId: art.actorUserId,
+              workspaceId: art.workspaceId ?? 'default',
+              contentHash: art.contentHash,
+            }
+          : undefined,
+      });
+      if (!evidenceCheck.valid) {
+        response = {
+          kind: 'refusal',
+          reason: `Báo cáo chưa được xác minh từ nguồn dữ liệu đọc thực tế: ${evidenceCheck.error}`,
+        };
+      }
+    }
     let proposal: ScheduleProposalMetadata | null = null;
     if (response.kind === 'schedule') {
       const prepared = await this.prepareProposal(response, actor, target.schedule ?? null);
@@ -1899,12 +1929,35 @@ export class ChatService {
     return { write, announce };
   }
 
+  private async loadActiveConnections(userId: string): Promise<PlanConnections> {
+    const [gmail, mycalendar, mysheets, trello, github, telegram, notion] = await Promise.all([
+      this.gmailConnection?.(userId).catch(() => null),
+      this.mycalendarConnection?.(userId).catch(() => null),
+      this.mysheetsConnection?.(userId).catch(() => null),
+      this.trelloConnection?.(userId).catch(() => null),
+      this.githubConnection?.(userId).catch(() => null),
+      this.telegramConnection?.(userId).catch(() => null),
+      this.notionConnection?.(userId).catch(() => null),
+    ]);
+    const connections: PlanConnections = {};
+    if (gmail) connections.gmail = gmail;
+    if (mycalendar) connections.mycalendar = mycalendar;
+    if (mysheets) connections.mysheets = mysheets;
+    if (trello) connections.trello = trello;
+    if (github) connections.github = github;
+    if (telegram) connections.telegram = telegram;
+    if (notion) connections.notion = notion;
+    if (this.slackWrites) connections.myslack = { credentialId: 'slack', scopes: [] } as any;
+    return connections;
+  }
+
   private async executePlannerPipeline(
     conversationId: string,
     userId: string,
     content: string,
     currentMessageId: string,
-    requestId?: string
+    requestId?: string,
+    workflowContext?: WorkflowContext
   ): Promise<void> {
     const correlation = { replyToMessageId: currentMessageId, ...(requestId ? { requestId } : {}) };
     // Emit agent_state: planning
@@ -1954,6 +2007,15 @@ export class ChatService {
     const previousState = structuredClone(memory.toJSON());
     if (slackContext) await this.msgRepo.inSlackTransaction(conversationId, slackContext, async () => undefined, undefined, 'planning');
     const actor = await this.actorForConversation(conversationId, userId);
+
+    // FLOW-04: Validate workflowContext defaults against user's actual connections and seed into memory
+    if (workflowContext) {
+      const activeConnections = await this.loadActiveConnections(userId);
+      const filtered = filterPermittedWorkflowDefaults(workflowContext, activeConnections);
+      if (filtered.resourceDefaults) {
+        memory.setEntity('workflow_resource_defaults', filtered.resourceDefaults);
+      }
+    }
     const gatheredJiraSourceRefs: any[] = [];
     const plannerResponse: PlannerResponse = await this.planner.processMessage({
       userMessage: content,
@@ -2001,7 +2063,7 @@ export class ChatService {
         messageFingerprint(messageSelectorValue({content:'',metadata:{type:'working_memory',state:previousState}}, 'working_memory_entity', selector),selector));
     }
     const prepared = await this.prepareResponse({ conversationId, userId, correlation, schedule, memoryState, slackContext, memorySelectors }, plannerResponse, memory,
-      [...history.filter(m => m.role === 'user').map(m => m.content), content]);
+      relevantGroundingUserTexts(history, content));
     await prepared.write();
     prepared.announce();
   }

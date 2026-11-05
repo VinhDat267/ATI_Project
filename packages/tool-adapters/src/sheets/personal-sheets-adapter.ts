@@ -77,8 +77,10 @@ export class PersonalSheetsAdapter extends BaseAdapter {
     this.apiBase = rawBase.includes('/v4/spreadsheets')
       ? rawBase.replace(/\/+$/, '') + '/'
       : `${rawBase.replace(/\/+$/, '')}/v4/spreadsheets/`;
-    if (config.apiBaseUrl) {
-      const host = config.apiBaseUrl.replace(/\/v4\/spreadsheets\/?$/, '').replace(/\/+$/, '');
+    const host = config.apiBaseUrl
+      ? config.apiBaseUrl.replace(/\/v4\/spreadsheets\/?$/, '').replace(/\/+$/, '')
+      : '';
+    if (host && host !== 'https://sheets.googleapis.com') {
       this.driveApiBase = `${host}/drive/v3/files`;
       this.driveUploadBase = `${host}/upload/drive/v3/files`;
     } else {

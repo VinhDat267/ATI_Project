@@ -1323,4 +1323,27 @@ describe('PersonalSheetsAdapter', () => {
       url: 'https://docs.google.com/document/d/doc_created_987654/edit',
     });
   });
+
+  it('routes Drive and Docs tools to www.googleapis.com even when apiBaseUrl is https://sheets.googleapis.com', async () => {
+    const { adapter, calls } = setup({
+      apiBaseUrl: 'https://sheets.googleapis.com',
+      handler: (url, init) => {
+        if (init?.method === 'POST' && url.pathname === '/upload/drive/v3/files') {
+          return json({
+            id: 'doc_prod_123456',
+            name: 'Biên bản họp Live',
+            mimeType: 'application/vnd.google-apps.document',
+            webViewLink: 'https://docs.google.com/document/d/doc_prod_123456/edit',
+          });
+        }
+        return json({ files: [] });
+      },
+    });
+
+    await adapter.execute('mysheets.list_drive_files', { query: 'Biên bản' });
+    await adapter.execute('mysheets.create_doc', { title: 'Biên bản họp Live', content: 'Nội dung họp' });
+
+    expect(calls[0]!.url.toString()).toMatch(/^https:\/\/www\.googleapis\.com\/drive\/v3\/files\?/);
+    expect(calls[1]!.url.toString()).toMatch(/^https:\/\/www\.googleapis\.com\/upload\/drive\/v3\/files\?/);
+  });
 });

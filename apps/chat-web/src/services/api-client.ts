@@ -870,11 +870,19 @@ export class ApiClient {
   async sendMessage(
     convId: string,
     content: string,
-    tempId: string
+    tempId: string,
+    workflowContext?: {
+      templateId?: string;
+      resourceDefaults?: Record<string, Record<string, string>>;
+    }
   ): Promise<any> {
     return this.request<any>(`/api/conversations/${encodeURIComponent(convId)}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ content, tempId }),
+      body: JSON.stringify({
+        content,
+        tempId,
+        ...(workflowContext ? { workflowContext } : {}),
+      }),
     });
   }
 

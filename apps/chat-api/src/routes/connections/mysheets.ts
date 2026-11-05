@@ -66,6 +66,7 @@ export function createMySheetsConnectionRoutes(options: MySheetsConnectionsOptio
   const auth = createAuthMiddleware(options.jwtSecret, { sessionRepo: options.sessionRepo, clock });
   const pickerLimiter = options.pickerLimiter ?? new GlobalRateLimiter({ maxRequests: 10, windowMs: 60_000 });
   const driveBase = (options.driveApiBaseUrl ?? 'https://www.googleapis.com').replace(/\/+$/, '');
+  const sheetsBase = (options.driveApiBaseUrl ?? options.oauth?.apiBaseUrl ?? 'https://sheets.googleapis.com').replace(/\/+$/, '');
 
   router.use((_req, res, next) => {
     const json = res.json.bind(res);
@@ -509,7 +510,7 @@ export function createMySheetsConnectionRoutes(options: MySheetsConnectionsOptio
         if (shouldIncludeSheets) {
           try {
             const sheetsRes = await fetchFn(
-              `${driveBase}/v4/spreadsheets/${encodeURIComponent(id)}?fields=sheets.properties(sheetId,title)`,
+              `${sheetsBase}/v4/spreadsheets/${encodeURIComponent(id)}?fields=sheets.properties(sheetId,title)`,
               {
                 headers: { Authorization: `Bearer ${accessToken}` },
                 signal: AbortSignal.timeout(googleTimeoutMs),

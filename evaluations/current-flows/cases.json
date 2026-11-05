@@ -1,0 +1,405 @@
+{
+  "version": 1,
+  "clock": "2026-11-04T13:00:00+07:00",
+  "totalCases": 36,
+  "supportedCoreJobs": [
+    "OFF-02",
+    "OFF-03",
+    "PM-01",
+    "PM-03",
+    "DEV-02",
+    "DEV-04"
+  ],
+  "cases": [
+    {
+      "id": "OFF-01-explicit",
+      "jobId": "OFF-01",
+      "variant": "explicit",
+      "prompt": "Đọc email mới nhất từ Lan trên Gmail, tạo thẻ Trello Frontend cho yêu cầu và đặt nhắc hạn trên Google Calendar.",
+      "services": ["gmail", "trello", "calendar"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["nội dung thẻ", "danh sách Trello", "thời gian hạn"],
+      "reasoning": "Tự động phân tích toàn bộ email thành thẻ Trello yêu cầu người dùng xác nhận thông tin chi tiết thẻ và danh sách đích"
+    },
+    {
+      "id": "OFF-01-natural",
+      "jobId": "OFF-01",
+      "variant": "natural",
+      "prompt": "Có thư khách vừa gửi, giúp mình giao việc cho nhóm rồi nhắc trước hạn nhé.",
+      "services": ["gmail", "trello", "calendar"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["email khách", "bảng Trello", "hạn chót"]
+    },
+    {
+      "id": "OFF-01-underspecified",
+      "jobId": "OFF-01",
+      "variant": "underspecified",
+      "prompt": "Đọc Gmail và tạo việc Trello cho email đó.",
+      "services": ["gmail", "trello"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["tiêu đề email", "bảng Trello", "danh sách việc"]
+    },
+    {
+      "id": "OFF-02-explicit",
+      "jobId": "OFF-02",
+      "variant": "explicit",
+      "prompt": "Tạo Google Meet từ 9h đến 10h ngày mai trên lịch Personal với lan@example.com, tạo Google Docs biên bản trong thư mục Biên bản họp Q4 trên Google Drive và gửi link qua Gmail.",
+      "services": ["mycalendar", "mysheets", "gmail"],
+      "expectedKind": "plan",
+      "expectedTools": [
+        "mycalendar.schedule_meet",
+        "mysheets.create_doc",
+        "gmail.send_message"
+      ],
+      "evidenceRequirements": {
+        "verifiedRecipient": "lan@example.com",
+        "documentDriveScope": "drive.file"
+      }
+    },
+    {
+      "id": "OFF-02-natural",
+      "jobId": "OFF-02",
+      "variant": "natural",
+      "prompt": "Mai họp khởi động với Lan, chuẩn bị chỗ họp và tài liệu rồi gửi cho bạn ấy giúp mình.",
+      "services": ["mycalendar", "mysheets", "gmail"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["email Lan", "giờ họp"]
+    },
+    {
+      "id": "OFF-02-underspecified",
+      "jobId": "OFF-02",
+      "variant": "underspecified",
+      "prompt": "Xếp một cuộc họp và chuẩn bị biên bản giúp tôi.",
+      "services": ["mycalendar", "mysheets"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["người tham dự", "thời gian", "tiêu đề cuộc họp"]
+    },
+    {
+      "id": "OFF-03-explicit",
+      "jobId": "OFF-03",
+      "variant": "explicit",
+      "prompt": "Đọc Google Sheets Frontend vùng Tasks!A1:B2 (có dòng tiêu đề đầu tiên), đếm việc theo trạng thái và gửi báo cáo vào Slack #general.",
+      "services": ["mysheets", "slack"],
+      "expectedKind": "plan",
+      "expectedTools": [
+        "mysheets.read_range",
+        "slack.send_message"
+      ],
+      "reportEvidenceKind": "sheet_summary",
+      "evidenceRequirements": {
+        "targetChannel": "general",
+        "groundedRead": true
+      }
+    },
+    {
+      "id": "OFF-03-natural",
+      "jobId": "OFF-03",
+      "variant": "natural",
+      "prompt": "Bảng tiến độ tuần có gì đang chậm? Tổng hợp rồi báo nhóm giúp mình.",
+      "services": ["mysheets", "slack"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["tên bảng tính", "kênh Slack"]
+    },
+    {
+      "id": "OFF-03-underspecified",
+      "jobId": "OFF-03",
+      "variant": "underspecified",
+      "prompt": "Tổng hợp bảng tính và gửi báo cáo.",
+      "services": ["mysheets", "slack"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["bảng tính", "kênh gửi"]
+    },
+    {
+      "id": "OFF-04-explicit",
+      "jobId": "OFF-04",
+      "variant": "explicit",
+      "prompt": "Tạo Google Docs báo cáo tuần trong thư mục Google Drive ATI và gửi liên kết vào Slack #general.",
+      "services": ["mysheets", "slack"],
+      "expectedKind": "plan",
+      "expectedTools": [
+        "mysheets.create_doc",
+        "slack.send_message"
+      ]
+    },
+    {
+      "id": "OFF-04-natural",
+      "jobId": "OFF-04",
+      "variant": "natural",
+      "prompt": "Lưu báo cáo tuần thành tài liệu trong kho chung rồi báo nhóm nhé.",
+      "services": ["mysheets", "slack"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["thư mục lưu", "kênh Slack"]
+    },
+    {
+      "id": "OFF-04-underspecified",
+      "jobId": "OFF-04",
+      "variant": "underspecified",
+      "prompt": "Lưu báo cáo vào Google Docs và gửi Slack.",
+      "services": ["mysheets", "slack"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["tiêu đề tài liệu", "thư mục Drive", "kênh Slack"]
+    },
+    {
+      "id": "PM-01-explicit",
+      "jobId": "PM-01",
+      "variant": "explicit",
+      "prompt": "Tạo thẻ Sửa lỗi đăng nhập trên Trello Frontend danh sách To Do, gán Minh và báo Slack #frontend.",
+      "services": ["trello", "slack"],
+      "expectedKind": "plan",
+      "expectedTools": [
+        "trello.create_card",
+        "slack.send_message"
+      ],
+      "evidenceRequirements": {
+        "memberAssignment": "Minh",
+        "board": "Frontend"
+      }
+    },
+    {
+      "id": "PM-01-natural",
+      "jobId": "PM-01",
+      "variant": "natural",
+      "prompt": "Nhờ Minh xử lý việc tồn đọng mới phát sinh trên thẻ việc rồi báo nhóm trên Slack giúp mình.",
+      "services": ["trello", "slack"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["bảng Trello", "danh sách To Do"]
+    },
+    {
+      "id": "PM-01-underspecified",
+      "jobId": "PM-01",
+      "variant": "underspecified",
+      "prompt": "Tạo việc Trello cho Minh và báo Slack.",
+      "services": ["trello", "slack"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["tiêu đề việc", "bảng Trello", "kênh Slack"]
+    },
+    {
+      "id": "PM-02-explicit",
+      "jobId": "PM-02",
+      "variant": "explicit",
+      "prompt": "Liệt kê các thẻ Trello Frontend quá hạn và gửi bản tóm tắt vào Slack #frontend.",
+      "services": ["trello", "slack"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["ngưỡng quá hạn", "bộ lọc thẻ"]
+    },
+    {
+      "id": "PM-02-natural",
+      "jobId": "PM-02",
+      "variant": "natural",
+      "prompt": "Nhóm đang có việc nào trễ hẹn? Gom lại rồi nhắc mọi người giúp mình.",
+      "services": ["trello", "slack"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["bảng Trello", "kênh nhắc nhở"]
+    },
+    {
+      "id": "PM-02-underspecified",
+      "jobId": "PM-02",
+      "variant": "underspecified",
+      "prompt": "Tổng hợp việc quá hạn trên Trello.",
+      "services": ["trello"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["bảng Trello", "nơi gửi"]
+    },
+    {
+      "id": "PM-03-explicit",
+      "jobId": "PM-03",
+      "variant": "explicit",
+      "prompt": "Tổng hợp tiến độ các issue của Jira project WEB trên site Acme Jira và gửi báo cáo vào Slack #general.",
+      "services": ["myjira", "slack"],
+      "expectedKind": "plan",
+      "expectedTools": [
+        "myjira.search_issues",
+        "slack.send_message"
+      ],
+      "reportEvidenceKind": "jira_progress",
+      "evidenceRequirements": {
+        "manualApprovalNote": true,
+        "singleTurnApproval": true
+      }
+    },
+    {
+      "id": "PM-03-natural",
+      "jobId": "PM-03",
+      "variant": "natural",
+      "prompt": "Sáng nào cũng báo giúp mình tiến độ và việc cần chú ý của nhóm nhé.",
+      "services": ["myjira", "slack"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["dự án Jira", "kênh Slack", "thời gian gửi"]
+    },
+    {
+      "id": "PM-03-underspecified",
+      "jobId": "PM-03",
+      "variant": "underspecified",
+      "prompt": "Đặt lịch báo cáo Jira qua Slack.",
+      "services": ["myjira", "slack"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["mã dự án Jira", "kênh Slack", "chu kỳ lặp"]
+    },
+    {
+      "id": "PM-04-explicit",
+      "jobId": "PM-04",
+      "variant": "explicit",
+      "prompt": "Tạo ticket sự cố thanh toán P1 trên Jira project WEB (site Acme Jira), tạo trang biên bản trong cơ sở dữ liệu Notion Frontend kèm link Jira, gửi cảnh báo vào nhóm Telegram frontend và kênh Slack #general.",
+      "services": ["myjira", "notion", "telegram", "slack"],
+      "expectedKind": "plan",
+      "expectedTools": [
+        "myjira.create_issue",
+        "notion.create_page",
+        "telegram.send_message",
+        "slack.send_message"
+      ]
+    },
+    {
+      "id": "PM-04-natural",
+      "jobId": "PM-04",
+      "variant": "natural",
+      "prompt": "Thanh toán đang lỗi nghiêm trọng, mở hồ sơ sự cố và báo trực ca với nhóm giúp mình.",
+      "services": ["myjira", "telegram", "slack"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["dự án Jira", "kênh trực ca Telegram", "kênh Slack"]
+    },
+    {
+      "id": "PM-04-underspecified",
+      "jobId": "PM-04",
+      "variant": "underspecified",
+      "prompt": "Tạo Jira, ghi Notion và báo Telegram về sự cố.",
+      "services": ["myjira", "notion", "telegram"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["tiêu đề sự cố", "mức độ ưu tiên", "project Jira"]
+    },
+    {
+      "id": "DEV-01-explicit",
+      "jobId": "DEV-01",
+      "variant": "explicit",
+      "prompt": "Đọc GitHub issue #42 trên acme/api, tạo Trello Frontend kèm link và báo Slack #frontend.",
+      "services": ["github", "trello", "slack"],
+      "expectedKind": "plan",
+      "expectedTools": [
+        "github.get_issue",
+        "trello.create_card",
+        "slack.send_message"
+      ]
+    },
+    {
+      "id": "DEV-01-natural",
+      "jobId": "DEV-01",
+      "variant": "natural",
+      "prompt": "Lấy lỗi webhook bên kho api chuyển thành việc cho frontend rồi báo nhóm nhé.",
+      "services": ["github", "trello", "slack"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["số issue GitHub", "bảng Trello"]
+    },
+    {
+      "id": "DEV-01-underspecified",
+      "jobId": "DEV-01",
+      "variant": "underspecified",
+      "prompt": "Chuyển GitHub issue sang Trello.",
+      "services": ["github", "trello"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["kho lưu trữ GitHub", "số issue", "bảng Trello"]
+    },
+    {
+      "id": "DEV-02-explicit",
+      "jobId": "DEV-02",
+      "variant": "explicit",
+      "prompt": "Liệt kê pull request đang mở của GitHub acme/web và gửi tổng hợp vào Slack #frontend.",
+      "services": ["github", "slack"],
+      "expectedKind": "plan",
+      "expectedTools": [
+        "github.list_pull_requests",
+        "slack.send_message"
+      ],
+      "reportEvidenceKind": "github_prs",
+      "evidenceRequirements": {
+        "repo": "acme/web",
+        "channel": "frontend",
+        "groundedRead": true
+      }
+    },
+    {
+      "id": "DEV-02-natural",
+      "jobId": "DEV-02",
+      "variant": "natural",
+      "prompt": "Có PR nào đang chờ review không? Nhắc nhóm giúp mình.",
+      "services": ["github", "slack"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["kho GitHub", "kênh Slack"]
+    },
+    {
+      "id": "DEV-02-underspecified",
+      "jobId": "DEV-02",
+      "variant": "underspecified",
+      "prompt": "Tổng hợp PR GitHub và báo Slack.",
+      "services": ["github", "slack"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["tên kho GitHub", "kênh Slack"]
+    },
+    {
+      "id": "DEV-03-explicit",
+      "jobId": "DEV-03",
+      "variant": "explicit",
+      "prompt": "Đọc pull request đang mở trên GitHub acme/web, tạo trang ghi chú phát hành trong cơ sở dữ liệu Notion Frontend và gửi thông báo vào Slack #release.",
+      "services": ["github", "notion", "slack"],
+      "expectedKind": "plan",
+      "expectedTools": [
+        "github.list_pull_requests",
+        "notion.create_page",
+        "slack.send_message"
+      ]
+    },
+    {
+      "id": "DEV-03-natural",
+      "jobId": "DEV-03",
+      "variant": "natural",
+      "prompt": "Chuẩn bị báo cáo bản phát hành tuần này từ các thay đổi rồi gửi nhóm release giúp mình.",
+      "services": ["github", "notion", "slack"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["kho GitHub", "phiên bản release", "kênh Slack"]
+    },
+    {
+      "id": "DEV-03-underspecified",
+      "jobId": "DEV-03",
+      "variant": "underspecified",
+      "prompt": "Tạo báo cáo release từ GitHub.",
+      "services": ["github", "slack"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["kho GitHub", "nơi lưu hoặc gửi"]
+    },
+    {
+      "id": "DEV-04-explicit",
+      "jobId": "DEV-04",
+      "variant": "explicit",
+      "prompt": "Tổng hợp các issue GitHub acme/api đang mở tồn đọng quá 7 ngày và gửi báo cáo vào Slack #general.",
+      "services": ["github", "slack"],
+      "expectedKind": "plan",
+      "expectedTools": [
+        "github.list_issues",
+        "slack.send_message"
+      ],
+      "reportEvidenceKind": "github_issue_aging",
+      "evidenceRequirements": {
+        "repo": "acme/api",
+        "agingDays": 7,
+        "channel": "general"
+      }
+    },
+    {
+      "id": "DEV-04-natural",
+      "jobId": "DEV-04",
+      "variant": "natural",
+      "prompt": "Mỗi sáng nhắc nhóm các lỗi tồn lâu chưa ai xử lý giúp mình.",
+      "services": ["github", "slack"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["kho GitHub", "ngưỡng ngày tồn đọng", "kênh Slack"]
+    },
+    {
+      "id": "DEV-04-underspecified",
+      "jobId": "DEV-04",
+      "variant": "underspecified",
+      "prompt": "Đặt lịch báo cáo GitHub qua Slack.",
+      "services": ["github", "slack"],
+      "expectedKind": "clarification",
+      "expectedClarificationTopics": ["kho GitHub", "giờ gửi", "kênh Slack"]
+    }
+  ]
+}

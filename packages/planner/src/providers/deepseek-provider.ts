@@ -9,6 +9,8 @@ export interface DeepSeekProviderConfig {
   model?: string;
   /** Optional API base URL (default: https://api.deepseek.com). */
   baseUrl?: string;
+  /** Sampling temperature for non-reasoner models (default: 0 for deterministic structured planning). */
+  temperature?: number;
   fetch?: typeof fetch;
   timeoutMs?: number;
   maxRetries?: number;
@@ -54,6 +56,7 @@ export class DeepSeekProvider implements LLMProvider {
   private readonly maxRetries: number;
   private readonly timeoutRetries: number;
   private readonly retryDelayMs: number;
+  private readonly temperature: number;
 
   constructor(config: DeepSeekProviderConfig = {}) {
     const rawBase = (config.baseUrl || 'https://api.deepseek.com').trim().replace(/\/+$/, '');
@@ -66,6 +69,7 @@ export class DeepSeekProvider implements LLMProvider {
     this.maxRetries = config.maxRetries ?? 2;
     this.timeoutRetries = config.timeoutRetries ?? 1;
     this.retryDelayMs = config.retryDelayMs ?? 1_000;
+    this.temperature = config.temperature ?? 0;
   }
 
   async generatePlan(input: LLMGeneratePlanInput): Promise<string> {
@@ -89,7 +93,7 @@ export class DeepSeekProvider implements LLMProvider {
       model: this.model,
       stream: false,
       ...(maxTokens !== undefined ? { max_tokens: maxTokens } : {}),
-      ...(isReasoner ? {} : { response_format: { type: 'json_object' } }),
+      ...(isReasoner ? {} : { temperature: this.temperature, response_format: { type: 'json_object' } }),
       messages: [
         { role: 'system', content: system },
         ...input.conversationHistory.map((m) => ({

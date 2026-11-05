@@ -179,15 +179,24 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
       {schedule ? <>
         <div className="flex flex-wrap items-center gap-2">
           <p role="status" className="text-sm font-semibold text-[#111827]">{scheduleLabel(schedule)}</p>
-          {(schedule.kind === 'calendar_digest' || schedule.kind === 'github_digest' || schedule.kind === 'trello_digest' || schedule.kind === 'notion_digest' || (schedule.kind as string) === 'myjira_digest' || schedule.kind === 'sheets_digest') && (
-            <span data-schedule-kind={schedule.kind} className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          {schedule.kind === 'plan' ? (
+            <span data-schedule-kind="plan" data-schedule-mode="manual" className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+              Mỗi lượt cần bạn duyệt
+            </span>
+          ) : schedule.kind !== 'telegram_digest' ? (
+            <span data-schedule-kind={schedule.kind} data-schedule-mode="auto_digest" className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
               Tự gửi
             </span>
-          )}
+          ) : null}
         </div>
         {schedule.kind === 'telegram_digest' && (
           <p data-schedule-kind={schedule.kind} className="text-xs font-semibold text-[#0369A1]">
             Tự gửi Telegram{schedule.digest && 'chatTitle' in schedule.digest && schedule.digest.chatTitle ? ` · ${schedule.digest.chatTitle}` : ''}
+          </p>
+        )}
+        {schedule.kind !== 'plan' && schedule.kind !== 'telegram_digest' && (
+          <p className="text-xs font-semibold text-emerald-700">
+            Gửi định kỳ theo phạm vi đã xác nhận
           </p>
         )}
         <p className="text-sm text-[#4B5563]">{describeRecurrence(schedule.recurrence)}</p>

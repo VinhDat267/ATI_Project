@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { createRef } from 'react';
 import {
   RequestMoment,
@@ -24,6 +24,15 @@ describe('1-Click Parameterized Playbooks & Extended Slack/GitHub Catalog', () =
     localStorage.clear();
     sessionStorage.clear();
     vi.restoreAllMocks();
+    authStorage.setStoredTokens({
+      accessToken: 'access-u1',
+      refreshToken: 'refresh-u1',
+      user: { id: 'u1', email: 'hanh@example.com', name: 'Hạnh', role: 'member' },
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   it('extracts and applies {{biến_số}} placeholders cleanly', () => {
@@ -380,5 +389,224 @@ describe('1-Click Parameterized Playbooks & Extended Slack/GitHub Catalog', () =
       />,
     );
     expect(screen.getByTestId('mycalendar-ecosystem-badges')).toBeDefined();
+  });
+
+  it('FLOW-03: preserves customized template edits and prevents sending when variables are unfilled', () => {
+    const services: ServiceInfo[] = [
+      { id: 'mycalendar', name: 'Google Calendar', configured: true, connected: true, connectionStatus: 'healthy' },
+      { id: 'mysheets', name: 'Google Sheets', configured: true, connected: true, connectionStatus: 'healthy' },
+      { id: 'gmail', name: 'Gmail', configured: true, connected: true, connectionStatus: 'healthy' },
+    ];
+    let currentDraft = '';
+    const onDraft = vi.fn((val: string) => {
+      currentDraft = val;
+    });
+    const onSend = vi.fn();
+    const inputRef = createRef<HTMLTextAreaElement>();
+
+    render(
+      <RequestMoment
+        services={services}
+        loading={false}
+        error={null}
+        draft={currentDraft}
+        planning={false}
+        input={inputRef}
+        onDraft={onDraft}
+        onSend={onSend}
+        onKeyDown={() => {}}
+        onSettings={() => {}}
+        navigate={() => {}}
+        servicePrompt={(s) => `Dùng ${s.name}`}
+      />,
+    );
+
+    // Select the parameterized Google Workspace playbook
+    const googlePlaybookBtn = screen.getByRole('button', {
+      name: /Hệ sinh thái Google Workspace/i,
+    });
+    fireEvent.click(googlePlaybookBtn);
+
+    // User switches to template mode or types into textarea to add customized instruction
+    const textarea = screen.getByLabelText('Mô tả công việc bạn muốn thực hiện');
+    fireEvent.change(textarea, {
+      target: {
+        value: `${textarea.textContent || currentDraft} CHỈ GỬI HẠNH, KHÔNG GỬI KHÁCH`,
+      },
+    });
+
+    // Save as a custom playbook
+    const saveBtn = screen.getByTestId('btn-save-playbook');
+    fireEvent.click(saveBtn);
+
+    const titleInput = screen.getByLabelText('Tên Playbook 1-Click');
+    fireEvent.change(titleInput, { target: { value: 'Mẫu riêng của Hạnh' } });
+    fireEvent.keyDown(titleInput, { key: 'Enter' });
+
+    // The saved playbook must contain the edited note AND the variable placeholders
+    expect(screen.getByText('Mẫu riêng của Hạnh')).toBeDefined();
+
+    // Now try to send while variables are unfilled -> must block onSend
+    const form = screen.getByRole('form', { name: 'Nhập yêu cầu' });
+    fireEvent.submit(form);
+    expect(onSend).not.toHaveBeenCalled();
+
+    // Fill the required variables
+    const projectInput = screen.getByLabelText('Biến số tên_dự_án');
+    fireEvent.change(projectInput, { target: { value: 'Dự án Hạnh Q4' } });
+
+    const guestInput = screen.getByLabelText('Biến số email_khách');
+    fireEvent.change(guestInput, { target: { value: 'hanh@example.com' } });
+
+    // Now submit form -> onSend is called with filled text containing the customized note
+    fireEvent.submit(form);
+    expect(onSend).toHaveBeenCalledWith(expect.stringContaining('Dự án Hạnh Q4'));
+    expect(onSend).toHaveBeenCalledWith(expect.stringContaining('CHỈ GỬI HẠNH, KHÔNG GỬI KHÁCH'));
+  });
+
+  it('FLOW-02/04: closes save playbook modal on account switch, forwards workflowContext with resourceDefaults, and renders OFF-02 sharing notice & reportEvidence readAt', async () => {
+    const services: ServiceInfo[] = [
+      { id: 'github', name: 'GitHub', configured: true, connected: true, connectionStatus: 'healthy' },
+      { id: 'myslack', name: 'Slack', configured: true, connected: true, connectionStatus: 'healthy' },
+      { id: 'mycalendar', name: 'Google Calendar', configured: true, connected: true, connectionStatus: 'healthy' },
+      { id: 'mysheets', name: 'Google Sheets', configured: true, connected: true, connectionStatus: 'healthy' },
+      { id: 'gmail', name: 'Gmail', configured: true, connected: true, connectionStatus: 'healthy' },
+    ];
+    let currentDraft = 'Tổng hợp PR repo acme/web gửi kênh #dev';
+    const onDraft = vi.fn((val: string) => {
+      currentDraft = val;
+    });
+    const onSend = vi.fn();
+    const inputRef = createRef<HTMLTextAreaElement>();
+
+    render(
+      <RequestMoment
+        services={services}
+        loading={false}
+        error={null}
+        draft={currentDraft}
+        planning={false}
+        input={inputRef}
+        onDraft={onDraft}
+        onSend={onSend}
+        onKeyDown={() => {}}
+        onSettings={() => {}}
+        navigate={() => {}}
+        servicePrompt={(s) => `Dùng ${s.name}`}
+      />,
+    );
+
+    // Open save modal as u1
+    fireEvent.click(screen.getByTestId('btn-save-playbook'));
+    expect(screen.getByTestId('save-playbook-modal')).toBeDefined();
+
+    // Switch account to u2 while modal is open -> modal must close immediately
+    authStorage.setStoredTokens({
+      accessToken: 'access-u2',
+      refreshToken: 'refresh-u2',
+      user: { id: 'u2', email: 'minh@example.com', name: 'Minh', role: 'member' },
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId('save-playbook-modal')).toBeNull();
+    });
+
+    // Configure default resources as u2 and select DEV-02 core job
+    fireEvent.click(screen.getByTestId('btn-open-workflow-defaults'));
+    fireEvent.change(screen.getByLabelText('GitHub Repository mặc định'), {
+      target: { value: 'acme/platform' },
+    });
+    fireEvent.change(screen.getByLabelText('Kênh Slack mặc định'), {
+      target: { value: 'C01DEV' },
+    });
+    fireEvent.click(screen.getByTestId('btn-save-workflow-defaults'));
+    expect(screen.getByTestId('workflow-active-defaults')).toBeDefined();
+
+    const dev02Btn = screen.getByRole('button', { name: /Quy trình DEV-02/i });
+    fireEvent.click(dev02Btn);
+    fireEvent.change(screen.getByLabelText('Biến số tên_repo'), {
+      target: { value: 'acme/platform' },
+    });
+    fireEvent.change(screen.getByLabelText('Biến số kênh_slack'), {
+      target: { value: 'C01DEV' },
+    });
+    fireEvent.submit(screen.getByRole('form', { name: 'Nhập yêu cầu' }));
+
+    expect(onSend).toHaveBeenCalledWith(
+      expect.stringContaining('acme/platform'),
+      expect.objectContaining({
+        templateId: 'DEV-02',
+        resourceDefaults: {
+          github: { repo: 'acme/platform' },
+          slack: { channelId: 'C01DEV' },
+        },
+      }),
+    );
+
+    cleanup();
+
+    // Verify PlanMoment renders reportEvidence readAt and OFF-02 Google Docs sharing notice
+    const off02Plan: ActivePlan = {
+      id: 'plan-off-02',
+      summary: 'Họp Kickoff + Docs + Gmail',
+      steps: [
+        { id: 's1', tool: 'mycalendar.schedule_meet', description: 'Tạo Meet', args: { calendarId: 'primary', title: 'Kickoff', start: '2026-11-05T09:00:00Z', end: '2026-11-05T10:00:00Z' } },
+        { id: 's2', tool: 'mysheets.create_doc', description: 'Tạo Docs', args: { title: 'Biên bản', content: 'Nội dung' } },
+        { id: 's3', tool: 'gmail.send_message', description: 'Gửi Gmail', args: { to: ['khach@example.com'], subject: 'Biên bản', body: 'Link' } },
+      ],
+      reportEvidence: {
+        artifactId: 'art_1',
+        kind: 'github_prs',
+        stepId: 's3',
+        argument: 'body',
+        sourceTool: 'github.list_pull_requests',
+        sourceLabel: 'acme/platform',
+        readAt: '2026-11-04T12:00:00.000Z',
+        itemCount: 2,
+        coverage: 'complete',
+        contentHash: 'hash123',
+      },
+    };
+
+    render(
+      <PlanMoment
+        runtimeMode="live"
+        plan={off02Plan}
+        services={services}
+        destination={(step) => resourceDestination(step)}
+        onPreview={() => {}}
+        onApprove={() => {}}
+        onCancel={() => {}}
+        onEdit={() => {}}
+        inlineComposer={null}
+      />,
+    );
+
+    expect(screen.getByTestId('verified-report-evidence-badge').textContent).toContain('2026-11-04T12:00:00.000Z');
+    expect(screen.getByTestId('google-docs-sharing-notice')).toBeDefined();
+  });
+
+  it('GMAIL-03 off compatibility: renders zero /Gmail/ matches in RequestMoment when gmail is disabled', () => {
+    const inputRef = createRef<HTMLTextAreaElement>();
+    render(
+      <RequestMoment
+        services={[
+          { id: 'trello', name: 'Trello', configured: false, connected: false, connectionStatus: 'unconfigured' },
+          { id: 'slack', name: 'Slack', configured: true, connected: true, connectionStatus: 'healthy' },
+        ]}
+        loading={false}
+        error={null}
+        draft=""
+        planning={false}
+        input={inputRef}
+        onDraft={() => {}}
+        onSend={() => {}}
+        onKeyDown={() => {}}
+        onSettings={() => {}}
+        navigate={() => {}}
+        servicePrompt={(s) => `Dùng ${s.name}`}
+      />,
+    );
+
+    expect(screen.queryAllByText(/Gmail/)).toHaveLength(0);
   });
 });

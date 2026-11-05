@@ -309,3 +309,16 @@ it('announces timeout when HTTP headers arrive but the response body hangs', asy
   holdTest = true; flushTestHeaders = true; mount(); await open('Notion'); fireEvent.click(screen.getByRole('button', { name: 'Kiểm tra kết nối' }));
   expect(await screen.findByText(/Không nhận được phản hồi sau 10 giây/, {}, { timeout: 12_000 })).toBeInTheDocument(); expect(requestSignal!.aborted).toBe(true);
 }, 15_000);
+it('hides duplicate shared calendar and sheets rows when personal mycalendar and mysheets are available', async () => {
+  services = [
+    service('telegram'),
+    service('calendar', false),
+    service('sheets', false),
+    { ...service('mycalendar', true), connection: 'personal', connected: true, personalStatus: 'connected' },
+    { ...service('mysheets', true), connection: 'personal', connected: true, personalStatus: 'connected' },
+  ];
+  mount();
+  await screen.findByRole('button', { name: /Telegram —/ });
+  expect(document.getElementById('service-row-calendar')).toBeNull();
+  expect(document.getElementById('service-row-sheets')).toBeNull();
+});

@@ -1,5 +1,5 @@
 // Source: AppStagePage.tsx moments 1–2. Content comes from the registered catalog and gatherState.
-import { useState, useEffect, type KeyboardEvent, type RefObject, type ReactNode } from 'react';
+import { useState, useEffect, useRef, type KeyboardEvent, type RefObject, type ReactNode } from 'react';
 import { getServiceDefinition } from '@wap/tool-schemas';
 import { toolDefinition } from '../../services/tool-definitions';
 import { ServiceLogo } from '../../components/ServiceLogo';
@@ -8,6 +8,24 @@ import type { ServiceInfo, GatherState } from '../../types';
 import { RequestEcho, useScheduledOrigin } from './RequestEcho';
 import { multiServicePlaybooks } from './presentation';
 import { getActiveWorkspaceSummary, setActiveWorkspaceId, subscribeWorkspace } from '../../services/workspace-storage';
+import { authStorage } from '../../services/auth-storage';
+import {
+  loadPlaybooks,
+  savePlaybook,
+  deletePlaybook,
+  type CustomPlaybook,
+} from '../../services/playbook-storage';
+import { CORE_JOBS, evaluateJobReadiness } from '../../services/job-readiness';
+import {
+  loadWorkflowDefaults,
+  saveWorkflowDefaults,
+  clearWorkflowDefaults,
+  type WorkflowResourceDefaults,
+} from '../../services/workflow-defaults-storage';
+export interface SendWorkflowContext {
+  templateId?: string;
+  resourceDefaults?: Record<string, Record<string, string>>;
+}
 interface Props {
   services: ServiceInfo[];
   loading: boolean;
@@ -20,7 +38,7 @@ interface Props {
   /** PBI-03: thẻ hội thoại đã lưu; khi có, tiêu đề mời tiếp tục thay vì bắt đầu mới. */
   resume?: ReactNode;
   onDraft: (value: string) => void;
-  onSend: (value: string) => void;
+  onSend: (value: string, workflowContext?: SendWorkflowContext) => void;
   onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
   onSettings: () => void;
   navigate: (path: string) => void;
@@ -43,16 +61,6 @@ const neutralCard: CardColors = {
   name: 'text-neutral-800',
   logo: 'text-neutral-900',
 };
-
-const CUSTOM_PLAYBOOKS_STORAGE_KEY = 'ati_custom_playbooks_v1';
-
-export interface CustomPlaybook {
-  id: string;
-  title: string;
-  prompt: string;
-  services: string[];
-  isCustom?: boolean;
-}
 
 export function extractPlaybookVariables(text: string): string[] {
   const vars: string[] = [];
@@ -78,34 +86,6 @@ export function applyPlaybookVariables(
   });
 }
 
-function loadCustomPlaybooks(): CustomPlaybook[] {
-  try {
-    const raw = localStorage.getItem(CUSTOM_PLAYBOOKS_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (item): item is CustomPlaybook =>
-        Boolean(
-          item &&
-            typeof item.id === 'string' &&
-            typeof item.title === 'string' &&
-            typeof item.prompt === 'string' &&
-            Array.isArray(item.services),
-        ),
-    );
-  } catch {
-    return [];
-  }
-}
-
-function saveCustomPlaybooks(list: CustomPlaybook[]): void {
-  try {
-    localStorage.setItem(CUSTOM_PLAYBOOKS_STORAGE_KEY, JSON.stringify(list));
-  } catch {
-    // ignore storage errors
-  }
-}
 export function RequestMoment({
   services,
   loading,
@@ -124,24 +104,96 @@ export function RequestMoment({
   servicePrompt,
 }: Props) {
   const [workspace, setWorkspace] = useState(getActiveWorkspaceSummary());
-  const [customPlaybooks, setCustomPlaybooks] = useState<CustomPlaybook[]>(() => loadCustomPlaybooks());
-  const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState(() => authStorage.getStoredTokens().user);
+  const userId = currentUser?.id ?? 'anonymous';
+  const workspaceKey = workspace?.id || 'personal';
+  const saveModalScopeRef = useRef<{ userId: string; workspaceKey: string } | null>(null);
+  const defaultsEditorScopeRef = useRef<{ userId: string; workspaceKey: string } | null>(null);
+
+  const [customPlaybooks, setCustomPlaybooks] = useState<CustomPlaybook[]>(() =>
+    loadPlaybooks(userId, workspaceKey)
+  );
+  const [activeDefaults, setActiveDefaults] = useState<WorkflowResourceDefaults | null>(() =>
+    loadWorkflowDefaults(userId, workspaceKey)
+  );
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [defaultsEditorOpen, setDefaultsEditorOpen] = useState(false);
+  const [defaultRepoInput, setDefaultRepoInput] = useState('');
+  const [defaultSlackInput, setDefaultSlackInput] = useState('');
+  const [templateText, setTemplateText] = useState<string>(() => draft);
+  const [composerTab, setComposerTab] = useState<'template' | 'preview'>('template');
   const [variableValues, setVariableValues] = useState<Record<string, string>>({});
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [savingPlaybookOpen, setSavingPlaybookOpen] = useState(false);
   const [newPlaybookTitle, setNewPlaybookTitle] = useState('');
   const [savedToast, setSavedToast] = useState<string | null>(null);
 
-  useEffect(() => subscribeWorkspace(() => setWorkspace(getActiveWorkspaceSummary())), []);
+  useEffect(() => {
+    const unsubscribeWs = subscribeWorkspace(() => {
+      const nextWs = getActiveWorkspaceSummary();
+      const nextWsKey = nextWs?.id || 'personal';
+      setWorkspace(nextWs);
+      const user = authStorage.getStoredTokens().user;
+      const nextUserId = user?.id ?? 'anonymous';
+      if (defaultsEditorScopeRef.current && (defaultsEditorScopeRef.current.userId !== nextUserId || defaultsEditorScopeRef.current.workspaceKey !== nextWsKey)) {
+        setDefaultsEditorOpen(false);
+        setDefaultRepoInput(''); setDefaultSlackInput('');
+        defaultsEditorScopeRef.current = null;
+      }
+      setCustomPlaybooks(loadPlaybooks(nextUserId, nextWsKey));
+      if (
+        saveModalScopeRef.current &&
+        (saveModalScopeRef.current.userId !== nextUserId ||
+          saveModalScopeRef.current.workspaceKey !== nextWsKey)
+      ) {
+        setSavingPlaybookOpen(false);
+        saveModalScopeRef.current = null;
+      }
+    });
+    const unsubscribeAuth = authStorage.subscribeAuthTokens((tokens) => {
+      setCurrentUser(tokens.user);
+      const nextUserId = tokens.user?.id ?? 'anonymous';
+      if (defaultsEditorScopeRef.current && defaultsEditorScopeRef.current.userId !== nextUserId) {
+        setDefaultsEditorOpen(false);
+        setDefaultRepoInput(''); setDefaultSlackInput('');
+        defaultsEditorScopeRef.current = null;
+      }
+      if (
+        saveModalScopeRef.current &&
+        saveModalScopeRef.current.userId !== nextUserId
+      ) {
+        setSavingPlaybookOpen(false);
+        saveModalScopeRef.current = null;
+      }
+    });
+    return () => {
+      unsubscribeWs();
+      unsubscribeAuth();
+    };
+  }, []);
+
+  useEffect(() => {
+    setCustomPlaybooks(loadPlaybooks(userId, workspaceKey));
+    setActiveDefaults(loadWorkflowDefaults(userId, workspaceKey));
+    if (
+      saveModalScopeRef.current &&
+      (saveModalScopeRef.current.userId !== userId ||
+        saveModalScopeRef.current.workspaceKey !== workspaceKey)
+    ) {
+      setSavingPlaybookOpen(false);
+      saveModalScopeRef.current = null;
+    }
+  }, [userId, workspaceKey]);
+
   useEffect(() => {
     try {
       const prefill = sessionStorage.getItem('ati_prefill_prompt');
       if (prefill) {
         sessionStorage.removeItem('ati_prefill_prompt');
+        setTemplateText(prefill);
+        setVariableValues({});
+        setValidationError(null);
         onDraft(prefill);
-        if (extractPlaybookVariables(prefill).length > 0) {
-          setActiveTemplate(prefill);
-          setVariableValues({});
-        }
         input.current?.focus();
       }
     } catch {
@@ -149,57 +201,90 @@ export function RequestMoment({
     }
   }, [onDraft, input]);
 
-  const templateSource =
-    activeTemplate && extractPlaybookVariables(activeTemplate).length > 0
-      ? activeTemplate
-      : extractPlaybookVariables(draft).length > 0
-        ? draft
-        : null;
-  const templateVariables = templateSource ? extractPlaybookVariables(templateSource) : [];
-
-  const handleSelectPlaybook = (promptText: string) => {
-    const vars = extractPlaybookVariables(promptText);
-    if (vars.length > 0) {
-      setActiveTemplate(promptText);
-      setVariableValues({});
-    } else {
-      setActiveTemplate(null);
-      setVariableValues({});
+  useEffect(() => {
+    if (draft && !templateText) {
+      setTemplateText(draft);
     }
+  }, [draft, templateText]);
+
+  const templateVariables = extractPlaybookVariables(templateText || draft);
+
+  const handleSelectPlaybook = (promptText: string, templateId?: string) => {
+    setTemplateText(promptText);
+    setSelectedTemplateId(templateId ?? null);
+    setVariableValues({});
+    setValidationError(null);
+    setComposerTab('template');
     onDraft(promptText);
     input.current?.focus();
   };
 
   const handleVariableChange = (varName: string, value: string) => {
-    const baseTemplate = activeTemplate ?? draft;
-    if (!activeTemplate) {
-      setActiveTemplate(baseTemplate);
-    }
+    const base = templateText || draft;
     const nextValues = { ...variableValues, [varName]: value };
     setVariableValues(nextValues);
-    onDraft(applyPlaybookVariables(baseTemplate, nextValues));
+    setValidationError(null);
+    onDraft(applyPlaybookVariables(base, nextValues));
   };
 
   const handleInsertVariableToken = () => {
-    const nextIdx = extractPlaybookVariables(activeTemplate ?? draft).length + 1;
-    const token = nextIdx === 1 ? '{{tên_dự_án}}' : nextIdx === 2 ? '{{email_nhận}}' : `{{biến_${nextIdx}}}`;
-    const updated = draft ? `${draft.trimEnd()} ${token}` : token;
-    setActiveTemplate(updated);
-    onDraft(updated);
+    const currentBase = templateText || draft;
+    const nextIdx = extractPlaybookVariables(currentBase).length + 1;
+    const token = nextIdx === 1 ? '{{tên_dự_án}}' : nextIdx === 2 ? '{{email_khách}}' : `{{biến_${nextIdx}}}`;
+    const updated = currentBase ? `${currentBase.trimEnd()} ${token}` : token;
+    setTemplateText(updated);
+    setComposerTab('template');
+    const rendered = applyPlaybookVariables(updated, variableValues);
+    onDraft(rendered);
     input.current?.focus();
   };
 
+  const handleSend = () => {
+    const currentTemplate = templateText || draft;
+    const vars = extractPlaybookVariables(currentTemplate);
+    const unfulfilled = vars.filter((v) => !variableValues[v]?.trim());
+    if (unfulfilled.length > 0) {
+      setValidationError(
+        `Vui lòng điền đủ các biến số còn thiếu: ${unfulfilled.map((v) => `{{${v}}}`).join(', ')}`
+      );
+      return;
+    }
+    setValidationError(null);
+    const rendered = applyPlaybookVariables(currentTemplate, variableValues);
+    const hasDefaults = Boolean(activeDefaults && Object.keys(activeDefaults).length > 0);
+    if (selectedTemplateId || hasDefaults) {
+      onSend(rendered, {
+        ...(selectedTemplateId ? { templateId: selectedTemplateId } : {}),
+        ...(hasDefaults ? { resourceDefaults: activeDefaults as Record<string, Record<string, string>> } : {}),
+      });
+    } else {
+      onSend(rendered);
+    }
+  };
+
   const handleOpenSavePlaybook = () => {
-    const sourceText = (activeTemplate ?? draft).trim();
+    const sourceText = (templateText || draft).trim();
     if (!sourceText) return;
     const defaultTitle =
       sourceText.length > 42 ? `${sourceText.slice(0, 42).trim()}…` : sourceText;
+    saveModalScopeRef.current = { userId, workspaceKey };
     setNewPlaybookTitle(defaultTitle);
     setSavingPlaybookOpen(true);
   };
 
   const handleConfirmSavePlaybook = () => {
-    const sourceText = (activeTemplate ?? draft).trim();
+    if (
+      saveModalScopeRef.current &&
+      (saveModalScopeRef.current.userId !== userId ||
+        saveModalScopeRef.current.workspaceKey !== workspaceKey)
+    ) {
+      setSavingPlaybookOpen(false);
+      saveModalScopeRef.current = null;
+      setSavedToast('Phiên làm việc hoặc tài khoản đã thay đổi. Vui lòng thử lưu lại.');
+      setTimeout(() => setSavedToast(null), 5000);
+      return;
+    }
+    const sourceText = (templateText || draft).trim();
     const title = newPlaybookTitle.trim();
     if (!sourceText || !title) return;
     const configuredIds = services.filter((s) => s.configured).map((s) => s.id);
@@ -219,9 +304,13 @@ export function RequestMoment({
       services: playbookServices.length > 0 ? playbookServices : ['calendar', 'sheets'],
       isCustom: true,
     };
-    const nextList = [created, ...customPlaybooks].slice(0, 12);
-    setCustomPlaybooks(nextList);
-    saveCustomPlaybooks(nextList);
+    const res = savePlaybook(userId, workspaceKey, created);
+    if (!res.success) {
+      setSavedToast(res.error || 'Không thể lưu mẫu');
+      setTimeout(() => setSavedToast(null), 5000);
+      return;
+    }
+    setCustomPlaybooks(loadPlaybooks(userId, workspaceKey));
     setSavingPlaybookOpen(false);
     setNewPlaybookTitle('');
     setSavedToast(`Đã lưu Playbook "${title}"`);
@@ -229,9 +318,8 @@ export function RequestMoment({
   };
 
   const handleDeleteCustomPlaybook = (id: string) => {
-    const nextList = customPlaybooks.filter((item) => item.id !== id);
-    setCustomPlaybooks(nextList);
-    saveCustomPlaybooks(nextList);
+    deletePlaybook(userId, workspaceKey, id);
+    setCustomPlaybooks(loadPlaybooks(userId, workspaceKey));
   };
 
   return (
@@ -305,35 +393,78 @@ export function RequestMoment({
         aria-busy={planning}
         onSubmit={(event) => {
           event.preventDefault();
-          onSend(draft);
+          handleSend();
         }}
         className="relative bg-white rounded-2xl border border-brand-border shadow-soft-card p-3 sm:p-4 focus-within:border-brand-primary focus-within:shadow-orange-glow transition-all"
       >
         <label htmlFor="prompt-input" className="sr-only">
           Nội dung bạn muốn nhờ
         </label>{' '}
+        {templateVariables.length > 0 && (
+          <div className="flex items-center gap-1.5 mb-2">
+            <button
+              type="button"
+              data-testid="tab-template-mode"
+              onClick={() => setComposerTab('template')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                composerTab === 'template'
+                  ? 'bg-[#FF5701] text-white shadow-xs'
+                  : 'bg-[#F4F4F0] text-[#4B5563] hover:bg-[#EAEAE5]'
+              }`}
+            >
+              Mẫu ({templateVariables.length} biến)
+            </button>
+            <button
+              type="button"
+              data-testid="tab-preview-mode"
+              onClick={() => setComposerTab('preview')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                composerTab === 'preview'
+                  ? 'bg-[#FF5701] text-white shadow-xs'
+                  : 'bg-[#F4F4F0] text-[#4B5563] hover:bg-[#EAEAE5]'
+              }`}
+            >
+              Nội dung sẽ gửi (Xem trước)
+            </button>
+          </div>
+        )}
         {!inputHidden && (
           <textarea
             ref={input}
             id="prompt-input"
             rows={3}
-            value={draft}
+            value={composerTab === 'preview' ? draft : (templateText || draft)}
+            readOnly={composerTab === 'preview'}
             onChange={(event) => {
               const nextVal = event.target.value;
-              onDraft(nextVal);
-              if (extractPlaybookVariables(nextVal).length > 0 && !activeTemplate) {
-                setActiveTemplate(nextVal);
-              } else if (!nextVal.trim()) {
-                setActiveTemplate(null);
-                setVariableValues({});
+              setTemplateText(nextVal);
+              setValidationError(null);
+              const rendered = applyPlaybookVariables(nextVal, variableValues);
+              onDraft(rendered);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                handleSend();
+              } else {
+                onKeyDown(event);
               }
             }}
-            onKeyDown={onKeyDown}
             aria-label="Mô tả công việc bạn muốn thực hiện"
             className="w-full text-base sm:text-lg text-brand-text placeholder-neutral-400 bg-transparent resize-none border-0 focus:ring-0 focus:v3-outline-none p-1"
             placeholder="Ví dụ: Tạo card Trello cho lỗi đăng nhập Google, tạo issue GitHub, ghi vào Google Sheets và báo kênh Slack..."
           />
         )}{' '}
+        {validationError && (
+          <div
+            role="alert"
+            data-testid="variable-validation-error"
+            className="mt-2 p-2.5 rounded-xl bg-red-50 border border-red-200 text-xs font-medium text-red-700 flex items-center gap-2"
+          >
+            <span className="text-sm">⚠️</span>
+            <span>{validationError}</span>
+          </div>
+        )}
         {templateVariables.length > 0 && (
           <div
             data-testid="playbook-variables-bar"
@@ -353,9 +484,9 @@ export function RequestMoment({
                   type="button"
                   data-testid="btn-reset-playbook-variables"
                   onClick={() => {
-                    const base = activeTemplate ?? draft;
                     setVariableValues({});
-                    onDraft(base);
+                    setValidationError(null);
+                    onDraft(templateText);
                   }}
                   className="text-[11px] font-medium text-[#C2410C] hover:underline"
                 >
@@ -364,8 +495,8 @@ export function RequestMoment({
                 <button
                   type="button"
                   onClick={() => {
-                    setActiveTemplate(null);
                     setVariableValues({});
+                    setValidationError(null);
                   }}
                   className="text-[11px] text-[#9A3412] hover:underline"
                 >
@@ -385,7 +516,11 @@ export function RequestMoment({
                     placeholder={`Nhập ${varName.replace(/_/g, ' ')}...`}
                     value={variableValues[varName] ?? ''}
                     onChange={(e) => handleVariableChange(varName, e.target.value)}
-                    className="px-2.5 py-1.5 rounded-lg text-xs bg-white border border-[#FED7AA] text-[#111827] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                    className={`px-2.5 py-1.5 rounded-lg text-xs bg-white text-[#111827] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-brand-primary ${
+                      validationError && !variableValues[varName]?.trim()
+                        ? 'border-2 border-red-400 bg-red-50/20'
+                        : 'border border-[#FED7AA]'
+                    }`}
                   />
                 </label>
               ))}
@@ -459,7 +594,7 @@ export function RequestMoment({
             <button
               type="button"
               data-testid="btn-save-playbook"
-              disabled={!draft.trim() || planning}
+              disabled={(!draft.trim() && !templateText.trim()) || planning}
               onClick={handleOpenSavePlaybook}
               className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-[#FFDFC6] bg-[#FFF6EE] text-brand-primary hover:bg-[#FFEDD5] disabled:opacity-40 transition-colors"
             >
@@ -468,8 +603,8 @@ export function RequestMoment({
           </div>
           <button
             type="button"
-            disabled={!draft.trim() || planning}
-            onClick={() => onSend(draft)}
+            disabled={(!draft.trim() && !templateText.trim()) || planning}
+            onClick={handleSend}
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-primary hover:bg-brand-primary-hover text-white text-sm font-semibold rounded-xl shadow-sm transition-all hover:scale-[1.01] active:scale-[0.99]"
           >
             <span>Gửi yêu cầu</span>
@@ -561,6 +696,219 @@ export function RequestMoment({
         </div>
       )}
 
+      {/* FLOW-04: 6 Core Jobs prioritized at the top of recommendations */}
+      <div className="v3-space-y-3" data-testid="core-jobs-section">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="text-xs font-semibold uppercase tracking-wider text-brand-muted">
+            6 Quy trình trọng tâm sẵn dùng (Chuẩn hoá theo đầu ra)
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              data-testid="btn-open-workflow-defaults"
+              onClick={() => {
+                defaultsEditorScopeRef.current = { userId, workspaceKey };
+                setDefaultRepoInput(activeDefaults?.github?.repo ?? '');
+                setDefaultSlackInput(activeDefaults?.slack?.channelId ?? '');
+                setDefaultsEditorOpen((prev) => !prev);
+              }}
+              className="text-[11px] font-medium text-neutral-700 hover:text-brand-primary bg-white border border-neutral-200 px-2.5 py-0.5 rounded-full transition-colors"
+            >
+              ⚙️ Đặt tài nguyên mặc định
+            </button>
+            <span className="text-[11px] font-medium text-brand-primary bg-[#FFF6EE] border border-[#FFDFC6] px-2 py-0.5 rounded-full">
+              Core Production Workflows
+            </span>
+          </div>
+        </div>
+
+        {defaultsEditorOpen && (
+          <div
+            data-testid="workflow-defaults-editor"
+            className="p-3 rounded-xl bg-white border border-brand-border shadow-xs v3-space-y-2.5"
+          >
+            <div className="text-xs font-semibold text-brand-text">
+              Cấu hình tài nguyên mặc định cho quy trình (lưu theo tài khoản &amp; workspace)
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <label className="flex flex-col gap-1 text-xs">
+                <span className="font-medium text-neutral-700">GitHub Repository mặc định</span>
+                <input
+                  type="text"
+                  aria-label="GitHub Repository mặc định"
+                  placeholder="vd: acme/web"
+                  value={defaultRepoInput}
+                  onChange={(e) => setDefaultRepoInput(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-lg text-xs border border-neutral-300"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs">
+                <span className="font-medium text-neutral-700">Kênh Slack mặc định (Channel ID)</span>
+                <input
+                  type="text"
+                  aria-label="Kênh Slack mặc định"
+                  placeholder="vd: C01GENERAL"
+                  value={defaultSlackInput}
+                  onChange={(e) => setDefaultSlackInput(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-lg text-xs border border-neutral-300"
+                />
+              </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                data-testid="btn-save-workflow-defaults"
+                onClick={() => {
+                  const scope = defaultsEditorScopeRef.current;
+                  if (!scope || scope.userId !== authStorage.getStoredTokens().user?.id || scope.workspaceKey !== (getActiveWorkspaceSummary()?.id || 'personal')) {
+                    setDefaultsEditorOpen(false);
+                    defaultsEditorScopeRef.current = null;
+                    return;
+                  }
+                  const nextDefaults: WorkflowResourceDefaults = {
+                    ...(activeDefaults ?? {}),
+                    ...(defaultRepoInput.trim() ? { github: { repo: defaultRepoInput.trim() } } : {}),
+                    ...(defaultSlackInput.trim() ? { slack: { channelId: defaultSlackInput.trim() } } : {}),
+                  };
+                  saveWorkflowDefaults(userId, workspaceKey, nextDefaults);
+                  setActiveDefaults(loadWorkflowDefaults(userId, workspaceKey));
+                  setDefaultsEditorOpen(false);
+                  defaultsEditorScopeRef.current = null;
+                }}
+                className="px-3 py-1 rounded-lg text-xs font-semibold bg-brand-primary text-white hover:bg-brand-primary-hover"
+              >
+                Lưu mặc định
+              </button>
+              <button
+                type="button"
+                onClick={() => setDefaultsEditorOpen(false)}
+                className="px-2.5 py-1 rounded-lg text-xs text-neutral-500 hover:text-neutral-800"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeDefaults && (
+          <div
+            data-testid="workflow-active-defaults"
+            className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs text-neutral-600"
+          >
+            <span className="font-semibold text-neutral-800">Tài nguyên mặc định:</span>
+            {activeDefaults.github?.repo && (
+              <span className="px-2 py-0.5 rounded bg-white border font-mono text-[11px]">
+                Repo: {activeDefaults.github.repo}
+              </span>
+            )}
+            {activeDefaults.slack?.channelId && (
+              <span className="px-2 py-0.5 rounded bg-white border font-mono text-[11px]">
+                Slack: #{activeDefaults.slack.channelId}
+              </span>
+            )}
+            {activeDefaults.trello?.boardId && (
+              <span className="px-2 py-0.5 rounded bg-white border font-mono text-[11px]">
+                Trello: {activeDefaults.trello.boardId}
+              </span>
+            )}
+            {activeDefaults.myjira?.projectKey && (
+              <span className="px-2 py-0.5 rounded bg-white border font-mono text-[11px]">
+                Jira: {activeDefaults.myjira.projectKey}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                clearWorkflowDefaults(userId, workspaceKey);
+                setActiveDefaults(null);
+              }}
+              className="text-[11px] text-neutral-500 hover:text-red-600 ml-auto underline"
+            >
+              Xoá mặc định
+            </button>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {CORE_JOBS.map((job) => {
+            const readiness = evaluateJobReadiness(job.requiredServices, services);
+            return (
+              <div
+                key={job.id}
+                className="relative p-3.5 bg-white hover:bg-neutral-50 rounded-2xl border border-brand-border hover:border-brand-primary/50 shadow-soft-card transition-all group flex flex-col justify-between gap-3"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-1.5 mb-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {job.requiredServices.map((svcId, idx) => (
+                        <span key={svcId} className="inline-flex items-center gap-1">
+                          <span className="w-6 h-6 rounded-full bg-white border border-brand-border shadow-2xs flex items-center justify-center">
+                            <ServiceLogo service={svcId} className="w-3.5 h-3.5" />
+                          </span>
+                          {idx < job.requiredServices.length - 1 && (
+                            <span className="text-[10px] font-mono text-neutral-400">+</span>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                    <span
+                      data-testid={`readiness-badge-${job.id}`}
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                        readiness.isReady
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : readiness.status === 'needs_reauth'
+                          ? 'bg-rose-50 text-rose-700 border-rose-200'
+                          : readiness.status === 'needs_resource'
+                          ? 'bg-amber-50 text-amber-800 border-amber-200'
+                          : 'bg-orange-50 text-orange-800 border-orange-200'
+                      }`}
+                    >
+                      {readiness.isReady
+                        ? '✓ Sẵn sàng'
+                        : readiness.status === 'needs_reauth'
+                        ? '⚠️ Cấp lại quyền'
+                        : readiness.status === 'needs_resource'
+                        ? '📁 Chọn tài nguyên'
+                        : `⚡ Thiếu ${readiness.missingServices.join(', ')}`}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    aria-label={`Quy trình ${job.id}: ${job.title}`}
+                    disabled={planning}
+                    onClick={() => handleSelectPlaybook(job.prompt, job.id)}
+                    className="text-left w-full"
+                  >
+                    <div className="text-xs font-bold text-brand-text group-hover:text-brand-primary transition-colors flex items-center gap-1.5">
+                      <span className="font-mono text-[10px] text-brand-primary font-semibold">[{job.id}]</span>
+                      <span>{job.title}</span>
+                    </div>
+                    <p className="text-[11px] text-brand-muted line-clamp-2 mt-1 leading-relaxed">
+                      {job.description}
+                    </p>
+                    <div className="mt-2 text-[10px] text-neutral-500 bg-neutral-50 p-1.5 rounded-lg border border-neutral-100 flex items-center gap-1">
+                      <span className="font-semibold text-neutral-700">Đầu ra:</span>
+                      <span className="truncate">{job.outputDescription}</span>
+                    </div>
+                  </button>
+                </div>
+
+                {!readiness.isReady && (
+                  <button
+                    type="button"
+                    onClick={() => navigate(readiness.ctaPath)}
+                    className="w-full py-1 text-center text-xs font-semibold text-brand-primary bg-[#FFF6EE] hover:bg-[#FFEDD5] border border-[#FFDFC6] rounded-lg transition-colors"
+                  >
+                    {readiness.ctaLabel} →
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {services.some((service) => service.configured) ? (
         <>
           <div className="v3-space-y-3">
@@ -607,63 +955,77 @@ export function RequestMoment({
             </div>
           </div>
 
-          {services.filter((service) => service.configured).length >= 2 && multiServicePlaybooks.filter((pb) => pb.services.filter((svcId) => services.some((s) => s.id === svcId || (svcId === 'calendar' && s.id === 'mycalendar') || (svcId === 'sheets' && s.id === 'mysheets') || (svcId === 'jira' && s.id === 'myjira') || (svcId === 'myjira' && s.id === 'jira'))).length >= 2).length > 0 && (
+          {multiServicePlaybooks.filter((pb) => services.some((s) => s.id === 'gmail') || !pb.services.includes('gmail')).length > 0 && (
             <div className="v3-space-y-3" data-testid="multi-service-playbooks">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-xs font-semibold uppercase tracking-wider text-brand-muted">
-                  Kịch bản tự động hoá liên dịch vụ
+                  Kịch bản tự động hoá nâng cao (Đa dịch vụ)
                 </div>
-                <span className="text-[11px] font-medium text-brand-primary bg-[#FFF6EE] border border-[#FFDFC6] px-2 py-0.5 rounded-full">
-                  Make.com Orbital Flow
+                <span className="text-[11px] font-medium text-neutral-600 bg-neutral-100 border border-neutral-200 px-2 py-0.5 rounded-full">
+                  Advanced Multi-Service Flow
                 </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {multiServicePlaybooks
-                  .filter((pb) => pb.services.filter((svcId) => services.some((s) => s.id === svcId || (svcId === 'calendar' && s.id === 'mycalendar') || (svcId === 'sheets' && s.id === 'mysheets') || (svcId === 'jira' && s.id === 'myjira') || (svcId === 'myjira' && s.id === 'jira'))).length >= 2)
-                  .map((playbook) => (
-                  <button
-                    key={playbook.id}
-                    type="button"
-                    aria-label={`Kịch bản liên dịch vụ: ${playbook.title}`}
-                    disabled={planning}
-                    onClick={() => handleSelectPlaybook(playbook.prompt)}
-                    className="text-left p-3.5 bg-white hover:bg-neutral-50 rounded-2xl border border-brand-border hover:border-brand-primary/50 shadow-soft-card transition-all group flex flex-col justify-between gap-2.5"
-                  >
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {playbook.services.map((svcId, idx) => (
-                        <span key={svcId} className="inline-flex items-center gap-1">
-                          <span className="w-7 h-7 rounded-full bg-white border border-brand-border shadow-2xs flex items-center justify-center">
-                            <ServiceLogo service={svcId} className="w-3.5 h-3.5" />
-                          </span>
-                          {idx < playbook.services.length - 1 && (
-                            <span className="text-[10px] font-mono text-neutral-400">→</span>
-                          )}
-                        </span>
-                      ))}
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-brand-text group-hover:text-brand-primary transition-colors">
-                        {playbook.title}
-                      </div>
-                      <p className="text-[11px] text-brand-muted line-clamp-2 mt-1 leading-relaxed">
-                        {playbook.prompt}
-                      </p>
-                      {extractPlaybookVariables(playbook.prompt).length > 0 && (
-                        <div className="flex flex-wrap items-center gap-1 mt-1.5">
-                          {extractPlaybookVariables(playbook.prompt).map((v) => (
-                            <span
-                              key={v}
-                              data-testid="playbook-var-chip"
-                              className="px-1.5 py-0.5 rounded bg-[#FFF6EE] text-[#C2410C] border border-[#FFDFC6] font-mono text-[10px]"
-                            >
-                              {`{{${v}}}`}
+                  .filter((pb) => services.some((s) => s.id === 'gmail') || !pb.services.includes('gmail'))
+                  .map((playbook) => {
+                  const pbReadiness = evaluateJobReadiness(playbook.services, services);
+                  return (
+                    <button
+                      key={playbook.id}
+                      type="button"
+                      aria-label={`Kịch bản liên dịch vụ: ${playbook.title}`}
+                      disabled={planning}
+                      onClick={() => handleSelectPlaybook(playbook.prompt)}
+                      className="text-left p-3.5 bg-white hover:bg-neutral-50 rounded-2xl border border-brand-border hover:border-brand-primary/50 shadow-soft-card transition-all group flex flex-col justify-between gap-2.5"
+                    >
+                      <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {playbook.services.map((svcId, idx) => (
+                            <span key={svcId} className="inline-flex items-center gap-1">
+                              <span className="w-6 h-6 rounded-full bg-white border border-brand-border shadow-2xs flex items-center justify-center">
+                                <ServiceLogo service={svcId} className="w-3 h-3" />
+                              </span>
+                              {idx < playbook.services.length - 1 && (
+                                <span className="text-[9px] font-mono text-neutral-400">→</span>
+                              )}
                             </span>
                           ))}
                         </div>
-                      )}
-                    </div>
-                  </button>
-                ))}
+                        <span
+                          className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border ${
+                            pbReadiness.isReady
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-neutral-100 text-neutral-600 border-neutral-200'
+                          }`}
+                        >
+                          {pbReadiness.isReady ? '✓ Sẵn sàng' : `Thiếu ${pbReadiness.missingServices.length} dịch vụ`}
+                        </span>
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-brand-text group-hover:text-brand-primary transition-colors">
+                          {playbook.title}
+                        </div>
+                        <p className="text-[11px] text-brand-muted line-clamp-2 mt-1 leading-relaxed">
+                          {playbook.prompt}
+                        </p>
+                        {extractPlaybookVariables(playbook.prompt).length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                            {extractPlaybookVariables(playbook.prompt).map((v) => (
+                              <span
+                                key={v}
+                                data-testid="playbook-var-chip"
+                                className="px-1.5 py-0.5 rounded bg-[#FFF6EE] text-[#C2410C] border border-[#FFDFC6] font-mono text-[10px]"
+                              >
+                                {`{{${v}}}`}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
