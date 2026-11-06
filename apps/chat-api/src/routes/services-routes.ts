@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
+import { hasGoogleCredentialOrigin } from '../services/gmail/credential-origin.js';
 import { encryptCredentials, decryptCredentials } from '@wap/tool-adapters';
 import {
   ALL_TOOLS,
@@ -37,6 +38,8 @@ export interface ServicesRoutesOptions {
   mycalendarAvailable?: boolean;
   /** MySheets is enabled and usable (flag on, OAuth and PostgreSQL configured). */
   mysheetsAvailable?: boolean;
+  /** Live clients only; legacy grants require consent before appearing usable. */
+  googleClientIds?: Partial<Record<'gmail' | 'mycalendar' | 'mysheets', string>>;
   /** MyJira OAuth is enabled and usable (flag on, OAuth and PostgreSQL configured). */
   myjiraAvailable?: boolean;
   jiraOAuthRepo?: {
@@ -123,10 +126,20 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
     return { mode, workspaceId, isAdminUser: canConfig };
   };
 
+  const googleConnection = async (service: 'gmail' | 'mycalendar' | 'mysheets', userId: string) => {
+    const record = await credentialRepo!.getPersonalConnectionStatus(service, userId);
+    const clientId = options.googleClientIds?.[service];
+    if (record?.status === 'active' && clientId && !hasGoogleCredentialOrigin(record.config, encryptionKey!, clientId)) {
+      if (await credentialRepo!.markReconnectRequired(service, userId, record.id)) options.onCredentialsChanged?.(service, null, userId);
+      return { ...record, status: 'reconnect_required' as const };
+    }
+    return record;
+  };
+
   /** The caller's own Gmail row; another person's connection is never read. */
   const personalGmail = async (userId: string) => {
     const { id, name, description, scopes, scopeKey, scopeLabel, credentialFields } = GMAIL_SERVICE;
-    const record = await credentialRepo!.getPersonalConnectionStatus('gmail', userId);
+    const record = await googleConnection('gmail', userId);
     let details: { email?: string; connectedAt?: string } = {};
     let personalStatus: 'connected' | 'reconnect_required' | 'not_connected' = record
       ? record.status === 'active'
@@ -165,7 +178,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
   /** The caller's own MyCalendar row; another person's connection is never read. */
   const personalMyCalendar = async (userId: string) => {
     const { id, name, description, scopes, scopeKey, scopeLabel, credentialFields } = MYCALENDAR_SERVICE;
-    const record = await credentialRepo!.getPersonalConnectionStatus('mycalendar', userId);
+    const record = await googleConnection('mycalendar', userId);
     let details: {
       email?: string;
       connectedAt?: string;
@@ -251,7 +264,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
   /** The caller's own MySheets row; another person's connection is never read. */
   const personalMySheets = async (userId: string) => {
     const { id, name, description, scopes, scopeKey, scopeLabel, credentialFields } = MYSHEETS_SERVICE;
-    const record = await credentialRepo!.getPersonalConnectionStatus('mysheets', userId);
+    const record = await googleConnection('mysheets', userId);
     let details: {
       email?: string;
       connectedAt?: string;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { validateEnv } from '../../src/config/env.js';
 
-const gmail = { GMAIL_ENABLED: 'on', GMAIL_OAUTH_CLIENT_ID: 'gmail-client', GMAIL_OAUTH_CLIENT_SECRET: 'gmail-secret', GMAIL_OAUTH_REDIRECT_URI: 'http://localhost:5174/connections/gmail/callback' };
+const gmail = { GMAIL_OAUTH_PROJECT_ID: 'ati-gmail', GMAIL_ENABLED: 'on', GMAIL_OAUTH_CLIENT_ID: '111111111111-mail.apps.googleusercontent.com', GMAIL_OAUTH_CLIENT_SECRET: 'gmail-secret', GMAIL_OAUTH_REDIRECT_URI: 'http://localhost:5174/connections/gmail/callback' };
 const fake = { GMAIL_OAUTH_AUTH_URL: 'http://127.0.0.1:4100/o/oauth2/v2/auth', GMAIL_OAUTH_TOKEN_URL: 'http://127.0.0.1:4100/token', GMAIL_OAUTH_REVOKE_URL: 'http://127.0.0.1:4100/revoke', GMAIL_API_BASE_URL: 'http://127.0.0.1:4100' };
 const live = { RUNTIME_MODE: 'live', DATABASE_URL: 'postgresql://local', JWT_SECRET: 'private-secret-at-least-32-characters', ENCRYPTION_KEY: 'a'.repeat(32), GEMINI_API_KEY: 'fake-for-validation' };
 
@@ -13,11 +13,11 @@ describe('GMAIL_ENABLED policy', () => {
 
     const sandboxAuto = validateEnv({ ...gmail, ...fake, GMAIL_ENABLED: undefined });
     expect(sandboxAuto.GMAIL_ENABLED).toBe(true);
-    expect(sandboxAuto.GMAIL_OAUTH).toMatchObject({ clientId: 'gmail-client' });
+    expect(sandboxAuto.GMAIL_OAUTH).toMatchObject({ clientId: '111111111111-mail.apps.googleusercontent.com' });
 
     const liveAuto = validateEnv({ ...live, ...gmail, GMAIL_ENABLED: undefined });
     expect(liveAuto.GMAIL_ENABLED).toBe(true);
-    expect(liveAuto.GMAIL_OAUTH).toMatchObject({ clientId: 'gmail-client' });
+    expect(liveAuto.GMAIL_OAUTH).toMatchObject({ clientId: '111111111111-mail.apps.googleusercontent.com' });
 
     const explicitOff = validateEnv({ ...live, ...gmail, GMAIL_ENABLED: 'off' });
     expect(explicitOff.GMAIL_ENABLED).toBe(false);
@@ -36,7 +36,7 @@ describe('GMAIL_ENABLED policy', () => {
     const config = validateEnv({ ...live, ...gmail, ...fake, GMAIL_OAUTH_REDIRECT_URI: 'https://ati.example/connections/gmail/callback' });
     expect(config.GMAIL_ENABLED).toBe(true);
     expect(config.GMAIL_OAUTH).toEqual({
-      clientId: 'gmail-client', clientSecret: 'gmail-secret', redirectUri: 'https://ati.example/connections/gmail/callback',
+      clientId: '111111111111-mail.apps.googleusercontent.com', clientSecret: 'gmail-secret', redirectUri: 'https://ati.example/connections/gmail/callback',
       authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth', tokenUrl: 'https://oauth2.googleapis.com/token',
       revokeUrl: 'https://oauth2.googleapis.com/revoke', apiBaseUrl: 'https://gmail.googleapis.com',
     });

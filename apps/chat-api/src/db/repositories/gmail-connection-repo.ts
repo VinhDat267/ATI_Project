@@ -2,6 +2,8 @@ import type pg from 'pg';
 import type { ServiceCredentialRow } from './credential-repo.js';
 
 const SERVICE = 'gmail';
+const GOOGLE_SERVICES = ['gmail', 'mycalendar', 'mysheets'];
+const GOOGLE_MODES = ['connect_gmail', 'connect_mycalendar', 'connect_mysheets'];
 
 /**
  * Saving and removing a member's own Gmail connection. Both take the same
@@ -74,7 +76,7 @@ export class GmailConnectionRepo {
 
   /** Keep a rejected grant's cleanup decision stable against save/disconnect. */
   async withLockedConnection(userId: string,
-    action: (current: ServiceCredentialRow | null, otherFlows: boolean) => Promise<void>, ignoredStateId?: string): Promise<void> {
+    action: (current: ServiceCredentialRow | null, otherFlows: boolean, peers: ServiceCredentialRow[]) => Promise<void>, ignoredStateId?: string): Promise<void> {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
@@ -82,11 +84,11 @@ export class GmailConnectionRepo {
       // The OAuth-state user FK takes a key-share lock on INSERT, so this also
       // prevents a new flow from beginning during the grant cleanup decision.
       await client.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [userId]);
-      const current = (await client.query<ServiceCredentialRow>(
-        'SELECT * FROM service_credentials WHERE service = $1 AND user_id = $2 FOR UPDATE', [this.service, userId])).rows[0] ?? null;
-      const otherFlows = (await client.query(`SELECT 1 FROM oauth_states WHERE user_id=$1 AND mode=$2
-        AND id IS DISTINCT FROM $3::uuid LIMIT 1`, [userId, this.mode, ignoredStateId ?? null])).rows.length > 0;
-      await action(current, otherFlows);
+      const rows = await this.lockedGoogleCredentials(client, userId);
+      const current = rows.find(row => row.service === this.service) ?? null;
+      const otherFlows = (await client.query(`SELECT 1 FROM oauth_states WHERE user_id=$1 AND mode=ANY($2::text[])
+        AND id IS DISTINCT FROM $3::uuid LIMIT 1`, [userId, GOOGLE_MODES, ignoredStateId ?? null])).rows.length > 0;
+      await action(current, otherFlows, rows.filter(row => row.service !== this.service));
       await client.query('COMMIT');
     } catch (error) {
       await client.query('ROLLBACK');
@@ -96,15 +98,25 @@ export class GmailConnectionRepo {
     }
   }
 
-  /** Deletes the connection and every state of the owner in this mode; returns the removed row for token revocation. */
-  async disconnect(userId: string): Promise<ServiceCredentialRow | null> {
+  private async lockedGoogleCredentials(client: pg.PoolClient, userId: string): Promise<ServiceCredentialRow[]> {
+    return (await client.query<ServiceCredentialRow>(`SELECT * FROM service_credentials
+      WHERE user_id=$1 AND workspace_id IS NULL AND service=ANY($2::text[]) ORDER BY service,id FOR UPDATE`, [userId, GOOGLE_SERVICES])).rows;
+  }
+
+  /** Cancel flows and remove the row, retaining the user lock through bounded grant cleanup. */
+  async disconnect(userId: string,
+    cleanup?: (removed: ServiceCredentialRow | null, peers: ServiceCredentialRow[], otherFlows: boolean) => Promise<void>): Promise<ServiceCredentialRow | null> {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [this.service, userId]);
+      await client.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [userId]);
+      const rows = await this.lockedGoogleCredentials(client, userId);
       await client.query('DELETE FROM oauth_states WHERE user_id = $1 AND mode = $2', [userId, this.mode]);
       const removed = (await client.query<ServiceCredentialRow>(
         'DELETE FROM service_credentials WHERE service = $1 AND user_id = $2 RETURNING *', [this.service, userId])).rows[0] ?? null;
+      const otherFlows = (await client.query('SELECT 1 FROM oauth_states WHERE user_id=$1 AND mode=ANY($2::text[]) LIMIT 1', [userId, GOOGLE_MODES])).rows.length > 0;
+      await cleanup?.(removed, rows.filter(row => row.service !== this.service), otherFlows);
       await client.query('COMMIT');
       return removed;
     } catch (error) {

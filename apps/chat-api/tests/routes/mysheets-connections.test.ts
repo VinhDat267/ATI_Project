@@ -394,6 +394,7 @@ describe('Routes: /api/connections/mysheets', () => {
 
       const storedRow = (await stored(alice))!;
       const decrypted = decryptCredentials(storedRow.config, key);
+      expect(decrypted.oauthClientId).toBe(oauth().clientId);
       expect(decrypted.allowedScope.spreadsheets).toEqual([validSpreadsheetId, readOnlySpreadsheetId]);
       expect(decrypted.selectedSpreadsheets).toHaveLength(2);
     });

@@ -4,10 +4,10 @@ import { validateEnv } from '../../src/config/env.js';
 const live = {
   RUNTIME_MODE: 'live', DATABASE_URL: 'postgresql://local',
   JWT_SECRET: 'project-isolation-test-secret-at-least-32', ENCRYPTION_KEY: 'a'.repeat(32), GEMINI_API_KEY: 'fixture',
-  MYCALENDAR_ENABLED: 'on', MYCALENDAR_OAUTH_CLIENT_ID: 'calendar-client', MYCALENDAR_OAUTH_CLIENT_SECRET: 'calendar-secret',
+  MYCALENDAR_ENABLED: 'on', MYCALENDAR_OAUTH_CLIENT_ID: '222222222222-calendar.apps.googleusercontent.com', MYCALENDAR_OAUTH_CLIENT_SECRET: 'calendar-secret',
   MYCALENDAR_OAUTH_REDIRECT_URI: 'https://ati.example/connections/mycalendar/callback',
 };
-const separate = { MYCALENDAR_OAUTH_PROJECT_ID: 'ati-calendar', GMAIL_OAUTH_PROJECT_ID: 'ati-gmail', GMAIL_OAUTH_CLIENT_ID: 'gmail-client' };
+const separate = { MYCALENDAR_OAUTH_PROJECT_ID: 'ati-calendar', GMAIL_OAUTH_PROJECT_ID: 'ati-gmail', GMAIL_OAUTH_CLIENT_ID: '111111111111-mail.apps.googleusercontent.com' };
 
 describe('live personal Google project isolation', () => {
   it('requires the Calendar project identity before enabling live Calendar', () => {
@@ -20,10 +20,10 @@ describe('live personal Google project isolation', () => {
     expect(() => validateEnv({ ...live, ...separate, GMAIL_OAUTH_PROJECT_ID: 'ati-calendar' })).toThrow('separate Google Cloud projects');
   });
   it('rejects the same client even if the declared project IDs differ', () => {
-    expect(() => validateEnv({ ...live, ...separate, GMAIL_OAUTH_CLIENT_ID: 'calendar-client' })).toThrow('different OAuth clients');
+    expect(() => validateEnv({ ...live, ...separate, GMAIL_OAUTH_CLIENT_ID: '222222222222-calendar.apps.googleusercontent.com' })).toThrow('different OAuth clients');
   });
   it('accepts separate projects and a standalone Calendar project', () => {
-    expect(validateEnv({ ...live, ...separate }).MYCALENDAR_OAUTH?.clientId).toBe('calendar-client');
+    expect(validateEnv({ ...live, ...separate }).MYCALENDAR_OAUTH?.clientId).toBe('222222222222-calendar.apps.googleusercontent.com');
     expect(validateEnv({ ...live, MYCALENDAR_OAUTH_PROJECT_ID: 'ati-calendar' }).MYCALENDAR_ENABLED).toBe(true);
   });
   it('ignores these new declarations when Calendar is off or uses fake sandbox endpoints', () => {

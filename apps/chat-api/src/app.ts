@@ -1,6 +1,7 @@
 import {createSlackAssistantRoutes,type SlackAssistantServices} from './routes/slack-assistant.js';
 import express, { type Express, type Request, type Response, type NextFunction } from 'express';
 import type pg from 'pg';
+import { assertGooglePickerProject, assertSeparateGoogleOAuthProjects } from './config/google-oauth-projects.js';
 import { createAuthRoutes } from './routes/auth/index.js';
 import { createSlackConnectionRoutes, type SlackConnectionsOptions } from './routes/connections/slack.js';
 import { createAccountRoutes } from './routes/auth/account.js';
@@ -212,6 +213,15 @@ export interface AppOptions extends AdminUsersOptions {
 }
 
 export function createApp(options: AppOptions): Express {
+  if (options.runtimeMode === 'live' && (options.gmail?.enabled || options.mycalendar?.enabled || options.mysheets?.enabled)) {
+    assertSeparateGoogleOAuthProjects([
+      { name: 'Gmail', clientId: options.gmail?.oauth?.clientId },
+      { name: 'MyCalendar', clientId: options.mycalendar?.oauth?.clientId },
+      { name: 'MySheets', clientId: options.mysheets?.oauth?.clientId },
+      { name: 'Google sign-in', clientId: options.googleOAuth?.clientId },
+    ].filter((entry): entry is { name: string; clientId: string } => Boolean(entry.clientId)));
+    if (options.mysheets?.oauth && options.mysheets.picker) assertGooglePickerProject(options.mysheets.oauth.clientId, options.mysheets.picker.appId);
+  }
   const app = express();
   const sessionRepo = options.sessionRepo ?? options.userRepo?.sessions;
   const states = options.states ?? options.userRepo?.googleAuth;
@@ -229,6 +239,7 @@ export function createApp(options: AppOptions): Express {
     onConnectionChanged: options.mycalendar.onConnectionChanged,
     conversationOwner: options.convRepo ? async (id: string) => (await options.convRepo!.getConversation(id))?.user_id ?? null : undefined,
     tokens: options.mycalendarTokens,
+    requireClientBinding: options.runtimeMode === 'live',
   } : undefined;
   const mysheetsRoutes = options.mysheets?.enabled ? {
     jwtSecret: options.jwtSecret, sessionRepo, states, credentialRepo: options.credentialRepo,
@@ -237,6 +248,7 @@ export function createApp(options: AppOptions): Express {
     onConnectionChanged: options.mysheets.onConnectionChanged,
     conversationOwner: options.convRepo ? async (id: string) => (await options.convRepo!.getConversation(id))?.user_id ?? null : undefined,
     tokens: options.mysheetsTokens,
+    requireClientBinding: options.runtimeMode === 'live',
     picker: options.mysheets.picker,
     fakePickerBaseUrl: options.mysheets.fakePickerBaseUrl,
     driveApiBaseUrl: options.mysheets.driveApiBaseUrl,
@@ -445,6 +457,9 @@ export function createApp(options: AppOptions): Express {
       gmailAvailable: Boolean(gmailRoutes && isGmailAvailable(gmailRoutes)),
       mycalendarAvailable: Boolean(mycalendarRoutes && isMyCalendarAvailable(mycalendarRoutes)),
       mysheetsAvailable: Boolean(mysheetsRoutes && isMySheetsAvailable(mysheetsRoutes)),
+      googleClientIds: options.runtimeMode === 'live' ? {
+        gmail: options.gmail?.oauth?.clientId, mycalendar: options.mycalendar?.oauth?.clientId, mysheets: options.mysheets?.oauth?.clientId,
+      } : undefined,
       myjiraAvailable: Boolean(jiraRoutes && isMyJiraAvailable(jiraRoutes)),
       jiraOAuthRepo: options.jira?.repo,
       jiraWorkspaceRepo: options.jiraWorkspaceRepo,

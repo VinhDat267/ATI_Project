@@ -14,7 +14,7 @@ const liveBase = {
 const liveSheets = {
   ...liveBase,
   MYSHEETS_ENABLED: 'on',
-  MYSHEETS_OAUTH_CLIENT_ID: 'sheets-client',
+  MYSHEETS_OAUTH_CLIENT_ID: '123456789012-sheets.apps.googleusercontent.com',
   MYSHEETS_OAUTH_CLIENT_SECRET: 'sheets-secret',
   MYSHEETS_OAUTH_REDIRECT_URI: 'https://ati.example/connections/mysheets/callback',
   MYSHEETS_OAUTH_PROJECT_ID: 'ati-sheets',
@@ -50,11 +50,15 @@ describe('MYSHEETS configuration and live project isolation', () => {
     expect(() => validateEnv({ ...liveSheets, MYSHEETS_OAUTH_PROJECT_ID: '' })).toThrow('MYSHEETS_OAUTH_PROJECT_ID');
   });
 
+  it('rejects a Picker app ID left on a different project after OAuth client migration', () => {
+    expect(() => validateEnv({ ...liveSheets, MYSHEETS_PICKER_APP_ID: '999999999999' })).toThrow('MYSHEETS_PICKER_APP_ID');
+  });
+
   it('rejects duplicate Google Cloud projects between MySheets and MyCalendar / Gmail', () => {
     const withCalendar = {
       ...liveSheets,
       MYCALENDAR_ENABLED: 'on',
-      MYCALENDAR_OAUTH_CLIENT_ID: 'calendar-client',
+      MYCALENDAR_OAUTH_CLIENT_ID: '222222222222-calendar.apps.googleusercontent.com',
       MYCALENDAR_OAUTH_CLIENT_SECRET: 'calendar-secret',
       MYCALENDAR_OAUTH_REDIRECT_URI: 'https://ati.example/connections/mycalendar/callback',
       MYCALENDAR_OAUTH_PROJECT_ID: 'ati-sheets', // duplicate with MYSHEETS
@@ -64,7 +68,7 @@ describe('MYSHEETS configuration and live project isolation', () => {
     const withGmail = {
       ...liveSheets,
       GMAIL_ENABLED: 'on',
-      GMAIL_OAUTH_CLIENT_ID: 'gmail-client',
+      GMAIL_OAUTH_CLIENT_ID: '111111111111-mail.apps.googleusercontent.com',
       GMAIL_OAUTH_CLIENT_SECRET: 'gmail-secret',
       GMAIL_OAUTH_REDIRECT_URI: 'https://ati.example/connections/gmail/callback',
       GMAIL_OAUTH_PROJECT_ID: 'ati-sheets', // duplicate with MYSHEETS
@@ -76,7 +80,7 @@ describe('MYSHEETS configuration and live project isolation', () => {
     const duplicateClient = {
       ...liveSheets,
       MYCALENDAR_ENABLED: 'on',
-      MYCALENDAR_OAUTH_CLIENT_ID: 'sheets-client', // duplicate client
+      MYCALENDAR_OAUTH_CLIENT_ID: '123456789012-sheets.apps.googleusercontent.com', // duplicate client
       MYCALENDAR_OAUTH_CLIENT_SECRET: 'calendar-secret',
       MYCALENDAR_OAUTH_REDIRECT_URI: 'https://ati.example/connections/mycalendar/callback',
       MYCALENDAR_OAUTH_PROJECT_ID: 'ati-calendar',
@@ -88,18 +92,18 @@ describe('MYSHEETS configuration and live project isolation', () => {
     const valid = validateEnv({
       ...liveSheets,
       MYCALENDAR_ENABLED: 'on',
-      MYCALENDAR_OAUTH_CLIENT_ID: 'calendar-client',
+      MYCALENDAR_OAUTH_CLIENT_ID: '222222222222-calendar.apps.googleusercontent.com',
       MYCALENDAR_OAUTH_CLIENT_SECRET: 'calendar-secret',
       MYCALENDAR_OAUTH_REDIRECT_URI: 'https://ati.example/connections/mycalendar/callback',
       MYCALENDAR_OAUTH_PROJECT_ID: 'ati-calendar',
       GMAIL_ENABLED: 'on',
-      GMAIL_OAUTH_CLIENT_ID: 'gmail-client',
+      GMAIL_OAUTH_CLIENT_ID: '111111111111-mail.apps.googleusercontent.com',
       GMAIL_OAUTH_CLIENT_SECRET: 'gmail-secret',
       GMAIL_OAUTH_REDIRECT_URI: 'https://ati.example/connections/gmail/callback',
       GMAIL_OAUTH_PROJECT_ID: 'ati-gmail',
     });
     expect(valid.MYSHEETS_ENABLED).toBe(true);
-    expect(valid.MYSHEETS_OAUTH?.clientId).toBe('sheets-client');
+    expect(valid.MYSHEETS_OAUTH?.clientId).toBe('123456789012-sheets.apps.googleusercontent.com');
     expect(valid.MYSHEETS_PICKER?.appId).toBe('123456789012');
   });
 
@@ -118,7 +122,7 @@ describe('MYSHEETS configuration and live project isolation', () => {
       GEMINI_API_KEY: 'fixture',
       RUNTIME_MODE: 'sandbox',
       MYSHEETS_ENABLED: 'on',
-      MYSHEETS_OAUTH_CLIENT_ID: 'sheets-client',
+      MYSHEETS_OAUTH_CLIENT_ID: '123456789012-sheets.apps.googleusercontent.com',
       MYSHEETS_OAUTH_CLIENT_SECRET: 'sheets-secret',
       MYSHEETS_OAUTH_REDIRECT_URI: 'http://127.0.0.1:3000/connections/mysheets/callback',
       MYSHEETS_OAUTH_AUTH_URL: 'http://127.0.0.1:55534/auth',

@@ -273,7 +273,7 @@ describe('Gmail connection routes over HTTP, PostgreSQL and the fake Google serv
       return { pending };
     };
 
-    it('keeps the connection saved first and refuses the other callback, revoking its separate grant', async () => {
+    it('keeps the first saved connection and retains the refused grant when only email differs', async () => {
       const app = build();
       google.settings.email = 'older-mailbox@example.test';
       const older = await start(app, alice);
@@ -290,7 +290,8 @@ describe('Gmail connection routes over HTTP, PostgreSQL and the fake Google serv
       expect(late.status).toBe(400); expect(late.body.code).toBe('GMAIL_STATE_INVALID');
       expect((await configOf(alice)).email).toBe('newer-mailbox@example.test');
       expect((await configOf(alice)).refreshToken).toBe(saved.refreshToken);
-      await vi.waitFor(() => expect(google.stats.revocations).toBe(before + 1));
+      await repo.withLockedConnection(alice.id, async () => {});
+      expect(google.stats.revocations).toBe(before);
       expect(google.isRevoked(saved.refreshToken as string)).toBe(false);
     });
 

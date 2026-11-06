@@ -166,6 +166,15 @@ export type PlannerResponse = PlanResponse | ClarificationResponse | RefusalResp
 
 ## 5. Các ca dễ bị bỏ sót (reviewer kiểm riêng)
 
+### Bổ sung FLOW-07 ngày 06/11/2026: origin và project Google
+
+- Fresh consent Gmail/Calendar/Sheets lưu `oauthClientId` trong config mã hóa; chỉ scope update được giữ origin hiện có, không backfill cho token cũ. Live bắt reconnect trước dùng token/selected resource khi thiếu hoặc khác client.
+- Live validation xét cả client còn cấu hình khi flag tắt, inferred-on Gmail và sign-in; từ chối namespace số trùng/không kiểm tra được và Picker app ID khác namespace Sheets. Ownership vẫn cần Cloud readback.
+- Disconnect giữ khóa DB qua revoke có deadline, xét peer Google credentials và OAuth flows của cùng ATI user. Remote revoke bỏ qua nếu origin thiếu/mismatch hoặc peer có thể dùng chung; khác email không chứng minh grant độc lập. Local delete/cache invalidation vẫn có hiệu lực.
+- Token provider bị ràng buộc generation và active DB row/origin; không trả cache/refresh muộn sau disconnect, không bỏ qua AbortSignal trong lúc chờ DB. Thay kết nối/phạm vi trả AUTH_ERROR với `details.code=GOOGLE_CONNECTION_CHANGED`, không đánh dấu grant mới bị mất. Chỉ CAS thành công mới phát thông báo reconnect/invalidate.
+- `clearPersonal(userId, serviceName?)` hỗ trợ invalidation theo dịch vụ; bỏ service vẫn giữ hành vi xóa toàn bộ. Runtime callbacks dùng service cụ thể để không làm gián đoạn peer.
+- [Runbook chuyển project và giới hạn nghiệm thu](../../runbooks/google-project-isolation.md). FLOW-07 vẫn OPEN tới đủ native acceptance.
+
 Mỗi ca có test ở task được ghi trong ngoặc.
 
 1. Địa chỉ viết hoa khác nhau, có khoảng trắng hai đầu, hoặc dạng `"Tên" <a@b.com>`. Kỳ vọng: chuẩn hoá chữ thường, bỏ khoảng trắng, từ chối tên hiển thị; grounding so sánh không phân biệt hoa thường (GMAIL-02).

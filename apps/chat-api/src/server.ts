@@ -370,7 +370,7 @@ async function bootstrap() {
   const trelloTokens = trelloAvailable ? new TrelloTokenManager({
     client: trelloOAuthClient!,
     credentials: credRepo,
-    onReconnectRequired: (userId) => realAdapterFactory.clearPersonal(userId),
+    onReconnectRequired: (userId) => realAdapterFactory.clearPersonal(userId, 'trello'),
   }) : undefined;
   const trelloLookup = trelloAvailable && trelloTeamRepo && trelloTokens && trelloOAuthClient
     ? createTrelloConnectionLookup({
@@ -413,7 +413,7 @@ async function bootstrap() {
   const githubTokens = githubAvailable ? new GitHubTokenManager({
     client: githubOAuthClient!,
     credentials: credRepo,
-    onReconnectRequired: (userId) => realAdapterFactory.clearPersonal(userId),
+    onReconnectRequired: (userId) => realAdapterFactory.clearPersonal(userId, 'github'),
   }) : undefined;
   const githubLookup = githubAvailable && githubTeamRepo && githubTokens && githubOAuthClient
     ? createGitHubConnectionLookup({
@@ -489,7 +489,7 @@ async function bootstrap() {
   const notionRepo = pool ? new NotionConnectionRepo(pool) : undefined;
   const notionOAuthClient = notionAvailable ? new NotionOAuthClient(env.NOTION_OAUTH!) : undefined;
   const notionTokens = notionAvailable && notionRepo && notionOAuthClient
-    ? new NotionTokenManager(notionRepo, notionOAuthClient, env.ENCRYPTION_KEY, (userId) => realAdapterFactory.clearPersonal(userId))
+    ? new NotionTokenManager(notionRepo, notionOAuthClient, env.ENCRYPTION_KEY, (userId) => realAdapterFactory.clearPersonal(userId, 'notion'))
     : undefined;
   const notionConnection = notionAvailable && notionRepo ? createNotionConnectionLookup({ repo: notionRepo }) : undefined;
 
@@ -716,19 +716,22 @@ async function bootstrap() {
     client: new GmailOAuthClient(env.GMAIL_OAUTH!),
     credentials: credRepo,
     service: 'gmail',
-    onReconnectRequired: (userId) => realAdapterFactory.clearPersonal(userId),
+    ...(env.RUNTIME_MODE === 'live' ? { clientId: env.GMAIL_OAUTH!.clientId, encryptionKey: env.ENCRYPTION_KEY } : {}),
+    onReconnectRequired: (userId) => realAdapterFactory.clearPersonal(userId, 'gmail'),
   }) : undefined;
   const mycalendarTokens = mycalendarAvailable ? new GmailTokenManager({
     client: new GmailOAuthClient(env.MYCALENDAR_OAUTH!),
     credentials: credRepo,
     service: 'mycalendar',
-    onReconnectRequired: (userId) => realAdapterFactory.clearPersonal(userId),
+    ...(env.RUNTIME_MODE === 'live' ? { clientId: env.MYCALENDAR_OAUTH!.clientId, encryptionKey: env.ENCRYPTION_KEY } : {}),
+    onReconnectRequired: (userId) => realAdapterFactory.clearPersonal(userId, 'mycalendar'),
   }) : undefined;
   const mysheetsTokens = mysheetsAvailable ? new GmailTokenManager({
     client: new GmailOAuthClient(env.MYSHEETS_OAUTH!),
     credentials: credRepo,
     service: 'mysheets',
-    onReconnectRequired: (userId) => realAdapterFactory.clearPersonal(userId),
+    ...(env.RUNTIME_MODE === 'live' ? { clientId: env.MYSHEETS_OAUTH!.clientId, encryptionKey: env.ENCRYPTION_KEY } : {}),
+    onReconnectRequired: (userId) => realAdapterFactory.clearPersonal(userId, 'mysheets'),
   }) : undefined;
 
   realAdapterFactory = new AdapterFactory({
@@ -982,13 +985,13 @@ async function bootstrap() {
       enabled: true,
       oauth: gmailAvailable ? env.GMAIL_OAUTH : undefined,
       repo: gmailAvailable && pool ? new GmailConnectionRepo(pool) : undefined,
-      onConnectionChanged: (userId: string) => realAdapterFactory.clearPersonal(userId),
+      onConnectionChanged: (userId: string) => realAdapterFactory.clearPersonal(userId, 'gmail'),
     } : undefined,
     mycalendar: env.MYCALENDAR_ENABLED ? {
       enabled: true,
       oauth: mycalendarAvailable ? env.MYCALENDAR_OAUTH : undefined,
       repo: mycalendarAvailable && pool ? new GmailConnectionRepo(pool, 'mycalendar', 'connect_mycalendar') : undefined,
-      onConnectionChanged: (userId: string) => realAdapterFactory.clearPersonal(userId),
+      onConnectionChanged: (userId: string) => realAdapterFactory.clearPersonal(userId, 'mycalendar'),
     } : undefined,
     mycalendarTokens,
     mysheets: env.MYSHEETS_ENABLED ? {
@@ -997,13 +1000,13 @@ async function bootstrap() {
       repo: mysheetsAvailable && pool ? new GmailConnectionRepo(pool, 'mysheets', 'connect_mysheets') : undefined,
       picker: env.MYSHEETS_PICKER,
       ...runtimeMySheetsEndpoints(env.RUNTIME_MODE, env.MYSHEETS_OAUTH?.apiBaseUrl),
-      onConnectionChanged: (userId: string) => realAdapterFactory.clearPersonal(userId),
+      onConnectionChanged: (userId: string) => realAdapterFactory.clearPersonal(userId, 'mysheets'),
     } : undefined,
     mysheetsTokens,
     trello: {
       oauth: trelloAvailable ? env.TRELLO_OAUTH : undefined,
       onConnectionChanged: (userId: string) => {
-        realAdapterFactory.clearPersonal(userId);
+        realAdapterFactory.clearPersonal(userId, 'trello');
         trelloTokens?.clear(userId);
       },
       tokens: trelloTokens,
@@ -1014,7 +1017,7 @@ async function bootstrap() {
     github: {
       oauth: githubAvailable ? env.GITHUB_OAUTH : undefined,
       onConnectionChanged: (userId: string) => {
-        realAdapterFactory.clearPersonal(userId);
+        realAdapterFactory.clearPersonal(userId, 'github');
         githubTokens?.clear(userId);
       },
       tokens: githubTokens,
@@ -1027,7 +1030,7 @@ async function bootstrap() {
       botClient: telegramBotClient,
       teamRepo: telegramTeamRepo,
       onConnectionChanged: (userId: string) => {
-        realAdapterFactory.clearPersonal(userId);
+        realAdapterFactory.clearPersonal(userId, 'telegram');
       },
     },
     telegramTeamRepo,
@@ -1037,7 +1040,7 @@ async function bootstrap() {
       repo: notionRepo,
       tokens: notionTokens,
       onConnectionChanged: (userId: string) => {
-        realAdapterFactory.clearPersonal(userId);
+        realAdapterFactory.clearPersonal(userId, 'notion');
       },
     },
     jira: env.MYJIRA_ENABLED ? {
@@ -1047,7 +1050,7 @@ async function bootstrap() {
       tokens: jiraTokens,
       client: jiraOAuthClient,
       onConnectionChanged: (userId: string) => {
-        realAdapterFactory.clearPersonal(userId);
+        realAdapterFactory.clearPersonal(userId, 'myjira');
         jiraTokens?.clear(userId);
         jiraNativeVerifier?.clearCache();
       },

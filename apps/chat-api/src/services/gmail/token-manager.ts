@@ -1,12 +1,19 @@
-import { StepError, type GmailAccessTokenProvider } from '@wap/tool-adapters';
+import { StepError, decryptCredentials, type GmailAccessTokenProvider } from '@wap/tool-adapters';
 import type { CredentialRepo } from '../../db/repositories/credential-repo.js';
 import { GmailOAuthError, type GmailOAuthClient } from './oauth-client.js';
 
 const REFRESH_SKEW_MS = 60_000;
 
+export function isGoogleConnectionChanged(error: unknown): boolean {
+  return error instanceof StepError && error.details?.code === 'GOOGLE_CONNECTION_CHANGED';
+}
+
 export interface GmailTokenManagerOptions {
   client: Pick<GmailOAuthClient, 'refresh'>;
-  credentials: Pick<CredentialRepo, 'markReconnectRequired'>;
+  credentials: Pick<CredentialRepo, 'markReconnectRequired'> & Partial<Pick<CredentialRepo, 'getPersonalConnectionStatus'>>;
+  /** Required together in live composition. Origin is read from the active encrypted DB row. */
+  clientId?: string;
+  encryptionKey?: string;
   service?: 'gmail' | 'mycalendar' | 'mysheets';
   serviceLabel?: string;
   clock?: () => number;
@@ -33,6 +40,9 @@ export class GmailTokenManager {
   private refreshTimeoutMs: number;
 
   constructor(private options: GmailTokenManagerOptions) {
+    if (options.clientId && (!options.encryptionKey || !options.credentials.getPersonalConnectionStatus)) {
+      throw new Error('Google token origin checks require an encryption key and credential repository');
+    }
     this.service = options.service ?? 'gmail';
     this.serviceLabel = options.serviceLabel ?? (
       this.service === 'mysheets'
@@ -53,7 +63,8 @@ export class GmailTokenManager {
   }
 
   forConnection(userId: string, credentialId: string, refreshToken: string): GmailAccessTokenProvider {
-    return { getAccessToken: (options) => this.getAccessToken(userId, credentialId, refreshToken, options) };
+    const generation = this.generation.get(userId) ?? 0;
+    return { getAccessToken: (options) => this.getAccessToken(userId, credentialId, refreshToken, generation, options) };
   }
 
   /** Forget every token of this person (reconnect, disconnect, reconnect_required). */
@@ -63,8 +74,40 @@ export class GmailTokenManager {
     for (const key of [...this.inflight.keys()]) if (key.startsWith(`${userId}:`)) this.inflight.delete(key);
   }
 
-  private async getAccessToken(userId: string, credentialId: string, refreshToken: string,
+  private async assertActive(userId: string, credentialId: string, refreshToken: string, generation: number): Promise<void> {
+    if ((this.generation.get(userId) ?? 0) !== generation) throw this.connectionChanged();
+    if (this.options.clientId) {
+      const row = await this.options.credentials.getPersonalConnectionStatus!(this.service, userId);
+      if (!row || row.id !== credentialId) throw this.connectionChanged();
+      if (row.status !== 'active') throw this.failure('AUTH_ERROR');
+      let valid = false;
+      try {
+        const config = decryptCredentials(row.config, this.options.encryptionKey!);
+        valid = config.oauthClientId === this.options.clientId && config.refreshToken === refreshToken;
+      } catch { /* An unreadable origin also requires fresh consent. */ }
+      if (!valid) {
+        await this.markReconnectRequired(userId, credentialId);
+        throw this.failure('AUTH_ERROR');
+      }
+    }
+    if ((this.generation.get(userId) ?? 0) !== generation) throw this.connectionChanged();
+  }
+
+  private connectionChanged(): StepError {
+    return new StepError({ category: 'AUTH_ERROR', retryable: false,
+      message: `Kết nối ${this.serviceLabel} đã thay đổi. Hãy thử lại với kết nối hiện tại.`, details: { code: 'GOOGLE_CONNECTION_CHANGED' } });
+  }
+
+  private async markReconnectRequired(userId: string, credentialId: string): Promise<void> {
+    try {
+      if (await this.options.credentials.markReconnectRequired(this.service, userId, credentialId)) this.options.onReconnectRequired?.(userId);
+    } catch { /* Still refuse this token; a failed status update cannot authorize use. */ }
+  }
+
+  private async getAccessToken(userId: string, credentialId: string, refreshToken: string, generation: number,
     options: { signal?: AbortSignal; forceRefresh?: boolean } = {}): Promise<string> {
+    if (options.signal?.aborted) throw this.failure('NETWORK');
+    await this.wait(this.assertActive(userId, credentialId, refreshToken, generation), options.signal);
     if (options.signal?.aborted) throw this.failure('NETWORK');
     const key = `${userId}:${credentialId}`;
     const cached = this.cache.get(key);
@@ -76,7 +119,10 @@ export class GmailTokenManager {
       const settle = () => { if (this.inflight.get(key) === shared) this.inflight.delete(key); };
       shared.then(settle, settle);
     }
-    return (await this.wait(shared, options.signal)).accessToken;
+    const entry = await this.wait(shared, options.signal);
+    await this.wait(this.assertActive(userId, credentialId, refreshToken, generation), options.signal);
+    if (options.signal?.aborted) throw this.failure('NETWORK');
+    return entry.accessToken;
   }
 
   private async refresh(userId: string, credentialId: string, refreshToken: string, key: string): Promise<Cached> {
@@ -85,13 +131,14 @@ export class GmailTokenManager {
       const tokens = await this.options.client.refresh(refreshToken, AbortSignal.timeout(this.refreshTimeoutMs));
       const entry = { accessToken: tokens.accessToken, expiresAt: this.clock() + tokens.expiresInSeconds * 1000 };
       // A clear() during the refresh (reconnect or disconnect) wins over this late result.
-      if ((this.generation.get(userId) ?? 0) === generation) this.cache.set(key, entry);
+      await this.assertActive(userId, credentialId, refreshToken, generation);
+      this.cache.set(key, entry);
       return entry;
     } catch (error) {
+      if (error instanceof StepError) throw error;
       if (error instanceof GmailOAuthError && error.kind === 'invalid_grant') {
         this.cache.delete(key);
-        try { await this.options.credentials.markReconnectRequired(this.service, userId, credentialId); } catch { /* still a lost grant */ }
-        this.options.onReconnectRequired?.(userId);
+        await this.markReconnectRequired(userId, credentialId);
         throw this.failure('AUTH_ERROR', 400);
       }
       if (error instanceof GmailOAuthError && error.kind !== 'network') throw this.failure('SERVER_ERROR', error.status);
@@ -103,7 +150,8 @@ export class GmailTokenManager {
     if (!signal) return shared;
     return new Promise<T>((resolve, reject) => {
       const abort = () => reject(this.failure('NETWORK'));
-      signal.addEventListener('abort', abort, { once: true });
+      if (signal.aborted) abort();
+      else signal.addEventListener('abort', abort, { once: true });
       shared.then(
         (value) => { signal.removeEventListener('abort', abort); resolve(value); },
         (error) => { signal.removeEventListener('abort', abort); reject(error); },
