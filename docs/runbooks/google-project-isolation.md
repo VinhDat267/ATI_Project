@@ -16,7 +16,7 @@ Ba project có thể thuộc ba tài khoản Google quản trị khác nhau. Ng�
 2. Tại Google Auth Platform, cấu hình Branding, Audience, Data Access; dùng tên riêng cho ba ứng dụng để phân biệt consent. Thêm test user khi ở Testing.
 3. Tạo OAuth client loại **Web application**, đăng ký redirect chính xác theo môi trường ATI. Đăng ký origin web đang dùng khi tạo browser client. Google sign-in tiếp tục client/project thứ tư hiện có.
 4. Download JSON khi tạo client, giữ tại nơi lưu secret riêng. Đọc lại `project_id`, `client_id`, redirect và project đang chọn trong Console; tên hiển thị khác nhau không chứng minh project khác nhau.
-5. Riêng Sheets, tạo Picker API key trong chính project đó; `MYSHEETS_PICKER_APP_ID` là **Project number**, không phải Project ID hay client ID. Hạn chế key cho Picker API và các HTTP referrer được Google Picker yêu cầu, gồm origin ATI và `https://docs.google.com/*`; xác minh lại bằng native Picker.
+5. Riêng Sheets, tạo Picker API key trong chính project đó; `MYSHEETS_PICKER_APP_ID` là **Project number**, không phải Project ID hay client ID. Hạn chế key cho Google Picker API và Google Drive API theo mẫu tích hợp chính thức, cùng các HTTP referrer được Google Picker yêu cầu gồm origin ATI và `https://docs.google.com/*`; xác minh lại bằng native Picker.
 
 Các biến cần thay trong cấu hình ngoài git:
 
