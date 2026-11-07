@@ -152,7 +152,7 @@ export const PlanoraAuthFrame = forwardRef<HTMLDivElement, PlanoraAuthFrameProps
           {showEditorial && <PlanoraEditorial badge={badge} />}
 
           <section className="planora-auth-card" aria-labelledby="planora-auth-title">
-            {tabs && <div className="planora-auth-tabs">{tabs}</div>}
+            {tabs}
 
             <div className="planora-auth-header">
               <div className="planora-auth-kicker">

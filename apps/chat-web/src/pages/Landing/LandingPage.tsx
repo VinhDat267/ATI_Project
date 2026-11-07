@@ -60,7 +60,7 @@ function restoreRequestedModalFocus() {
 
 const meta: PageMeta = {
   id: 'index',
-  title: 'Planora — Hệ thống điều phối quy trình làm việc tự động hóa bằng AI',
+  title: 'Planora — Nền tảng điều phối công việc liên dịch vụ',
   htmlClass: 'scroll-smooth',
   bodyClass: 'selection:bg-[#FF5701]/20 selection:text-[#111827]',
   css,
@@ -597,11 +597,14 @@ export function LandingPage({
                 </div>
 
                 <h1 className="planora-hero-heading" data-od-id="hero-title">
-                  Nói một câu. Việc trên nhiều công cụ được làm xong — sau khi bạn duyệt.
+                  Một lời nhắn.
+                  <br />
+                  Công việc{' '}
+                  <em>được kết nối.</em>
                 </h1>
 
                 <p className="planora-hero-copy">
-                  Planora đọc yêu cầu tiếng Việt, lên kế hoạch trên GitHub, Trello, Slack, Google Calendar, Sheets… và chỉ làm khi bạn đồng ý.
+                  Biến ý tưởng thành kế hoạch trên những công cụ bạn đã quen. Bạn kiểm tra, bạn quyết định — Planora phối hợp các bước còn lại trên GitHub, Trello, Slack, Google Calendar và Sheets.
                 </p>
 
                 <div className="planora-hero-cta-group">
@@ -1101,7 +1104,7 @@ export function LandingPage({
             <div className="planora-bottom-cta-box">
               <div className="planora-bottom-cta-text">
                 <h2>Dành chỗ cho điều bạn muốn làm.</h2>
-                <p>Bắt đầu trong workspace, duyệt trước khi tạo thay đổi.</p>
+                <p>Bắt đầu trong không gian làm việc của bạn, duyệt trước khi tạo thay đổi.</p>
               </div>
 
               <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
@@ -1180,7 +1183,7 @@ export function LandingPage({
                   ? 'Nhập email của bạn để nhận liên kết đặt lại mật khẩu.'
                   : isLoginView
                   ? 'Đăng nhập để tiếp tục không gian làm việc của bạn.'
-                  : 'Tạo tài khoản để bắt đầu cùng Planora.'
+                  : 'Tạo tài khoản để bắt đầu kết nối quy trình làm việc cùng Planora.'
               }
               onClose={closeAuthModal}
               tabs={
@@ -1283,16 +1286,22 @@ export function LandingPage({
                 <form onSubmit={actions.handleForgotSubmit} aria-label="Khôi phục mật khẩu">
                   <div className="planora-auth-field">
                     <label htmlFor="forgot-email">Email</label>
-                    <input
-                      ref={forgotEmailRef}
-                      id="forgot-email"
-                      type="email"
-                      autoComplete="email"
-                      required
-                      disabled={busy}
-                      placeholder="ban@congty.vn"
-                      className="planora-auth-input"
-                    />
+                    <div className="planora-auth-input-wrapper">
+                      <svg className="planora-auth-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <rect width="20" height="16" x="2" y="4" rx="2" />
+                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                      </svg>
+                      <input
+                        ref={forgotEmailRef}
+                        id="forgot-email"
+                        type="email"
+                        autoComplete="email"
+                        required
+                        disabled={busy}
+                        placeholder="ban@congty.vn"
+                        className="planora-auth-input has-icon-left"
+                      />
+                    </div>
                   </div>
 
                   <div
@@ -1348,18 +1357,24 @@ export function LandingPage({
                 >
                   <div className="planora-auth-field">
                     <label htmlFor="email">Email</label>
-                    <input
-                      ref={loginEmailRef}
-                      id="email"
-                      type="email"
-                      autoComplete="username"
-                      required
-                      disabled={isLoggingIn}
-                      value={email}
-                      onChange={e => setEmail(e.target.value)}
-                      placeholder="ban@congty.vn"
-                      className="planora-auth-input"
-                    />
+                    <div className="planora-auth-input-wrapper">
+                      <svg className="planora-auth-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <rect width="20" height="16" x="2" y="4" rx="2" />
+                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                      </svg>
+                      <input
+                        ref={loginEmailRef}
+                        id="email"
+                        type="email"
+                        autoComplete="username"
+                        required
+                        disabled={isLoggingIn}
+                        value={email}
+                        onChange={e => setEmail(e.target.value)}
+                        placeholder="ban@congty.vn"
+                        className="planora-auth-input has-icon-left"
+                      />
+                    </div>
                   </div>
 
                   <div className="planora-auth-field">
@@ -1375,6 +1390,10 @@ export function LandingPage({
                     </div>
 
                     <div className="planora-auth-input-wrapper">
+                      <svg className="planora-auth-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      </svg>
                       <input
                         id="password"
                         type={loginPwdShown ? 'text' : 'password'}
@@ -1387,7 +1406,7 @@ export function LandingPage({
                         onKeyDown={e => setCapsLock(e.getModifierState('CapsLock'))}
                         onKeyUp={e => setCapsLock(e.getModifierState('CapsLock'))}
                         onBlur={() => setCapsLock(false)}
-                        className="planora-auth-input"
+                        className="planora-auth-input has-icon-left"
                         style={{ paddingRight: 48 }}
                       />
                       <button
@@ -1466,6 +1485,13 @@ export function LandingPage({
                       Gửi lại email xác minh
                     </button>
                   </div>
+
+                  <div className="planora-auth-endnote">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z" />
+                    </svg>
+                    <span>Một lời nhắn. Một khởi đầu nhẹ nhàng.</span>
+                  </div>
                 </form>
               )}
 
@@ -1479,37 +1505,53 @@ export function LandingPage({
                   >
                     <div className="planora-auth-field">
                       <label htmlFor="signup-name">Họ tên</label>
-                      <input
-                        ref={signupNameRef}
-                        id="signup-name"
-                        type="text"
-                        autoComplete="name"
-                        maxLength={100}
-                        required
-                        disabled={busy}
-                        placeholder="Nguyễn Văn A"
-                        className="planora-auth-input"
-                      />
+                      <div className="planora-auth-input-wrapper">
+                        <svg className="planora-auth-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                          <circle cx="12" cy="7" r="4" />
+                        </svg>
+                        <input
+                          ref={signupNameRef}
+                          id="signup-name"
+                          type="text"
+                          autoComplete="name"
+                          maxLength={100}
+                          required
+                          disabled={busy}
+                          placeholder="Nguyễn Văn A"
+                          className="planora-auth-input has-icon-left"
+                        />
+                      </div>
                     </div>
 
                     <div className="planora-auth-field">
                       <label htmlFor="signup-email">Email</label>
-                      <input
-                        ref={signupEmailRef}
-                        id="signup-email"
-                        type="email"
-                        autoComplete="email"
-                        maxLength={254}
-                        required
-                        disabled={busy}
-                        placeholder="ban@congty.vn"
-                        className="planora-auth-input"
-                      />
+                      <div className="planora-auth-input-wrapper">
+                        <svg className="planora-auth-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <rect width="20" height="16" x="2" y="4" rx="2" />
+                          <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                        </svg>
+                        <input
+                          ref={signupEmailRef}
+                          id="signup-email"
+                          type="email"
+                          autoComplete="email"
+                          maxLength={254}
+                          required
+                          disabled={busy}
+                          placeholder="ban@congty.vn"
+                          className="planora-auth-input has-icon-left"
+                        />
+                      </div>
                     </div>
 
                     <div className="planora-auth-field">
                       <label htmlFor="signup-password">Mật khẩu</label>
                       <div className="planora-auth-input-wrapper">
+                        <svg className="planora-auth-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                        </svg>
                         <input
                           id="signup-password"
                           type={signupPwdShown ? 'text' : 'password'}
@@ -1520,7 +1562,7 @@ export function LandingPage({
                           required
                           disabled={busy}
                           aria-describedby="signup-password-hint"
-                          className="planora-auth-input"
+                          className="planora-auth-input has-icon-left"
                           style={{ paddingRight: 48 }}
                         />
                         <button
@@ -1589,6 +1631,13 @@ export function LandingPage({
                     <p style={{ fontSize: 'var(--planora-text-xs)', color: 'var(--planora-muted)', marginTop: 14, lineHeight: 1.5 }}>
                       Xác minh email và chờ quản trị viên phê duyệt trước khi sử dụng các dịch vụ của nhóm.
                     </p>
+
+                    <div className="planora-auth-endnote">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z" />
+                      </svg>
+                      <span>Một lời nhắn. Một khởi đầu nhẹ nhàng.</span>
+                    </div>
                   </form>
                 ) : (
                   <div style={{ padding: '24px 0', textAlign: 'center' }}>

@@ -150,3 +150,22 @@ Port giao diện Landing, Đăng nhập (Login), Đăng ký (Signup) và Auth Fr
     - `tests/planora-shell.test.tsx`: 12/12 tests PASS.
 
 - **Trạng thái:** `STATUS: READY_FOR_CODEX_REVIEW`.
+
+### Refactor Business-First UX v2.0 (07/11/2026)
+- **Mục tiêu:** Tinh chỉnh toàn diện Landing, Đăng nhập và Đăng ký đạt 100% chuẩn Business-First UX & Editorial Planora (theo audit `PLANORA-UX-01-business-first-redesign.md`).
+- **Nội dung đã hoàn thành:**
+  1. **Landing Hero & Copywriting nghiệp vụ:**
+     - Tái cấu trúc tiêu đề Hero theo phong cách editorial Planora: *"Một lời nhắn. Công việc được kết nối."* (sử dụng font serif chuẩn với nhấn mạnh nghệ thuật `<em>được kết nối.</em>`).
+     - Cập nhật thông điệp giá trị nghiệp vụ thay cho khẩu hiệu công nghệ: *"Biến ý tưởng thành kế hoạch trên những công cụ bạn đã quen. Bạn kiểm tra, bạn quyết định — Planora phối hợp các bước còn lại trên GitHub, Trello, Slack, Google Calendar và Sheets."*
+     - Đồng bộ tiêu đề trang (`meta.title`): *"Planora — Nền tảng điều phối công việc liên dịch vụ"*.
+     - Chuẩn hóa thông điệp CTA cuối trang: *"Dành chỗ cho điều bạn muốn làm. Bắt đầu trong không gian làm việc của bạn, duyệt trước khi tạo thay đổi."*
+  2. **Form Đăng nhập & Đăng ký (Editorial Auth):**
+     - Bổ sung icon vector SVG tự host (Mail, LockKeyhole, UserRound) với `aria-hidden="true"` vào bên trong các ô nhập Email, Mật khẩu và Họ tên (`has-icon-left`).
+     - Tích hợp ghi chú chân form đặc trưng của Planora (`.planora-auth-endnote`): *"Một lời nhắn. Một khởi đầu nhẹ nhàng."* trên cả màn hình Đăng nhập và Đăng ký.
+     - Cập nhật subtitle đăng ký: *"Tạo tài khoản để bắt đầu kết nối quy trình làm việc cùng Planora."*
+     - Loại bỏ thẻ bọc `.planora-auth-tabs` dư thừa trong `PlanoraAuthFrame.tsx`, loại bỏ viền/padding kép quanh tab xác thực.
+  3. **Bảo toàn 100% kiểm thử và an toàn:**
+     - `npm run typecheck:v3`: PASS (exit code 0).
+     - `npm run build:v3`: PASS (exit code 0).
+     - `node scripts/test-v3-web-build-security.mjs`: PASS (exit code 0).
+     - `npm test -w @wap/chat-web`: PASS 98/98 files, 1080/1080 tests (exit code 0).
