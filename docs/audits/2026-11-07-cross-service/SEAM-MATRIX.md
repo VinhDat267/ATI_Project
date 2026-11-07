@@ -17,4 +17,4 @@ Mỗi ô là một đường dữ liệu giữa hai bước. PASS là có lệnh
 | Calendar `timeMax` hết ngày | PASS | `personal-calendar-adapter.test.ts` 29/29. Live sau khi nạp lại: `mycalendar.list_events` cho "hôm nay", `resultCount` 0, 0 plan, 0 execution step |
 | Đọc provider thật rồi Hủy | PASS | Sau F8 và nạp lại server live. `github.list_pull_requests` chạy, `resultCount` 0. 0 plan, 0 execution step. Không có lệnh ghi |
 | Playwright `nine_service` đối chiếu `output_json` | PASS | Sau khi giữ `jira.create_issue` cho kịch bản mẫu. Sandbox API 3017, web 5184, PostgreSQL local 55533. 1 passed, 11.2s. Plan `completed`. Slack chứa các khóa bước trước. Biên nhận hiện mã Jira, mã thư, mã tin Telegram và phạm vi Sheets. Link lịch/Trello/Notion nằm trong khối chi tiết của output |
-| Notion, Trello credential thử | NOT_RUN | Preflight 05/11: Notion 401, Trello thiếu token |
+| Notion, Trello chỉ đọc | PASS | Server live. Trello `usedDirectory` gồm `trello`, 1 bảng. Notion `usedDirectory` gồm `notion`, 2 database. Mỗi lượt 0 plan, 0 execution step |

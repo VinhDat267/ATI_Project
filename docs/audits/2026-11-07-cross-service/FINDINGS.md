@@ -23,7 +23,7 @@ Mức là mức còn lại sau pha 1. F1–F3 và cổng duyệt đã có test �
 | F4 | đã đóng | Biên nhận chuyển trạng thái Jira đọc `status` của adapter. Fixture cũ `newStatus` vẫn hiện. | `jira-cockpit.test.tsx` 12/12. Ca output chỉ có `status` fail trước khi sửa vì pill là `🏷️`, rồi hiện `🔄 Trạng thái: Done` |
 | F5 | đã đóng | Cửa sổ lịch tự nhiên dùng `timeMax` là 00:00 ngày hôm sau, vì Calendar coi mốc đó là cận trên loại trừ. | `personal-calendar-adapter.test.ts` 29/29. Ca `hôm nay` fail trước khi sửa với `T23:59:59+07:00` |
 | F8 | đã đóng | Câu trả lời về Pull Request cần `github.list_pull_requests` thành công. Prefetch repository không đủ. | `read-answers.test.ts` 20/20. Live sau khi nạp lại server: tool `github.list_pull_requests`, `resultCount` 0, 0 plan, 0 execution step. Câu trả lời nói repository không có PR đang mở |
-| Notion, Trello token | — | Preflight 05/11: Notion 401, Trello thiếu token | Named blocker, không đóng bằng sandbox |
+| Notion, Trello | đã đọc | Preflight 05/11 hết hiệu lực sau khi cấu hình lại. Live chỉ đọc: Trello 1 bảng, Notion 2 database. 0 plan, 0 execution step. | Không tạo thẻ, không tạo trang |
 
 ## Giới hạn của bằng chứng
 
