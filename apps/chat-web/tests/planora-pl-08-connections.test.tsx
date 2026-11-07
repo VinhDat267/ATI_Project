@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { ConnectionCallbackFrame } from '../src/planora/layout/ConnectionCallbackFrame';
 import { SettingsPage } from '../src/pages/Settings/SettingsPage';
+import { PersonalMySheets } from '../src/pages/Settings/PersonalMySheets';
+import { GmailCallbackView } from '../src/views/GmailCallbackView';
+import { MyCalendarCallbackView } from '../src/views/MyCalendarCallbackView';
+import { MySheetsCallbackView } from '../src/views/MySheetsCallbackView';
 import { apiClient } from '../src/services/api-client';
 import type { User, ServiceInfo } from '../src/types';
 
@@ -251,9 +255,189 @@ describe('PL-08 Planora Settings & Google Connections (Business-First UX v2.0)',
       ).toBeInTheDocument();
       expect(
         screen.getByText(
-          /ATI chỉ thấy những bảng tính bạn chọn trong cửa sổ của Google/i
+          /Planora chỉ thấy những bảng tính bạn chọn trong cửa sổ của Google/i
         )
       ).toBeInTheDocument();
+    });
+  });
+
+  describe('4. Review Findings F1-F4 & P3-1 Verification', () => {
+    it('uses Planora primary tokens and on-primary color on action buttons without agentic orange #FF5701 (F1)', async () => {
+      vi.spyOn(apiClient, 'getServices').mockResolvedValue({
+        services: [
+          {
+            id: 'gmail',
+            name: 'Gmail',
+            connection: 'personal',
+            connected: false,
+            configured: false,
+            personalStatus: 'not_connected',
+            tools: ['gmail.send_message'],
+          },
+          {
+            id: 'notion',
+            name: 'Notion',
+            connection: 'shared',
+            connected: false,
+            configured: false,
+            credentialFields: [{ key: 'token', label: 'Token', type: 'password' }],
+            tools: ['notion.read_database'],
+          },
+        ],
+        canConfigure: true,
+      });
+
+      render(<SettingsPage user={testUser} navigate={vi.fn()} onLogout={vi.fn()} />);
+
+      const connectGmailBtn = await screen.findByRole('button', { name: 'Kết nối Gmail' });
+      expect(connectGmailBtn.className).toContain('bg-[var(--planora-primary)]');
+      expect(connectGmailBtn.className).toContain('text-[var(--planora-on-primary)]');
+      expect(connectGmailBtn.className).not.toContain('#FF5701');
+
+      // Open Notion drawer to check Save button
+      const notionCard = await screen.findByText('Notion');
+      fireEvent.click(notionCard);
+
+      const dialog = await screen.findByRole('dialog', { name: 'Notion' });
+      const saveBtn = within(dialog).getByRole('button', { name: 'Lưu thay đổi' });
+      expect(saveBtn.className).toContain('bg-[var(--planora-primary)]');
+      expect(saveBtn.className).toContain('text-[var(--planora-on-primary)]');
+      expect(saveBtn.className).not.toContain('#FF5701');
+    });
+
+    it('enforces vector SVGs with aria-hidden="true" on context pill without raw emoji (F3)', async () => {
+      vi.spyOn(apiClient, 'getServices').mockResolvedValue({
+        services: [],
+        canConfigure: true,
+      });
+
+      const { container } = render(<SettingsPage user={testUser} navigate={vi.fn()} onLogout={vi.fn()} />);
+      await screen.findByRole('heading', { level: 1, name: 'Kết nối dịch vụ' });
+
+      const pill = container.querySelector('div.mb-4.inline-flex.items-center');
+      expect(pill).toBeInTheDocument();
+      expect(pill?.textContent).not.toContain('👤');
+      expect(pill?.textContent).not.toContain('🏢');
+
+      const pillSvg = pill?.querySelector('svg');
+      expect(pillSvg).toHaveAttribute('aria-hidden', 'true');
+    });
+
+    it('does not leak legacy "ATI" branding in scope descriptions and metadata (F3)', async () => {
+      vi.spyOn(apiClient, 'getServices').mockResolvedValue({
+        services: [
+          {
+            id: 'notion',
+            name: 'Notion',
+            connection: 'shared',
+            connected: true,
+            configured: true,
+            credentialFields: [{ key: 'token', label: 'Token', type: 'password' }],
+            scopeLabel: 'Database ID',
+            allowedScope: ['db-1'],
+            tools: ['notion.read_database'],
+          },
+        ],
+        canConfigure: true,
+      });
+
+      render(<SettingsPage user={testUser} navigate={vi.fn()} onLogout={vi.fn()} />);
+      await screen.findByRole('heading', { level: 1, name: 'Kết nối dịch vụ' });
+
+      // Open drawer to inspect scope description
+      const notionCard = await screen.findByText('Notion');
+      fireEvent.click(notionCard);
+
+      const dialog = await screen.findByRole('dialog', { name: 'Notion' });
+      const scopeDesc = dialog.querySelector('#scope-description-text');
+      expect(scopeDesc?.textContent).toContain('Planora chỉ đọc và ghi');
+      expect(scopeDesc?.textContent).not.toContain('ATI');
+    });
+
+    it('guards disconnect dialog against premature close when disconnect request is busy (P3-1)', async () => {
+      let resolveDisconnect: () => void = () => {};
+      const disconnectPromise = new Promise<{ success: boolean }>((resolve) => {
+        resolveDisconnect = () => resolve({ success: true });
+      });
+      vi.spyOn(apiClient, 'disconnectMySheets').mockReturnValue(disconnectPromise as any);
+
+      render(
+        <PersonalMySheets
+          service={{
+            id: 'mysheets',
+            name: 'Google Sheets',
+            connection: 'personal',
+            connected: true,
+            configured: true,
+            personalStatus: 'connected',
+            email: 'user@sheets.test',
+            tools: ['mysheets.append_rows'],
+          }}
+          refresh={vi.fn()}
+          selected={null}
+        />
+      );
+
+      // Open disconnect modal
+      const disconnectBtn = screen.getByRole('button', { name: 'Ngắt kết nối' });
+      fireEvent.click(disconnectBtn);
+
+      const dialog = await screen.findByRole('dialog', { name: 'Ngắt kết nối Google Sheets?' });
+      expect(dialog).toBeInTheDocument();
+
+      // Click Confirm disconnect inside dialog to start busy request
+      const confirmBtn = within(dialog).getByRole('button', { name: 'Ngắt kết nối' });
+      act(() => {
+        fireEvent.click(confirmBtn);
+      });
+
+      // Dialog is now busy ('Đang ngắt…')
+      expect(screen.getByText('Đang ngắt…')).toBeInTheDocument();
+
+      // Trigger Escape key (CockpitDialog onClose) while busy
+      act(() => {
+        fireEvent.keyDown(window, { key: 'Escape' });
+      });
+
+      // Dialog MUST remain open because busy === true
+      expect(screen.getByRole('dialog', { name: 'Ngắt kết nối Google Sheets?' })).toBeInTheDocument();
+
+      // Once resolved, dialog closes
+      await act(async () => {
+        resolveDisconnect();
+      });
+      cleanup();
+    });
+
+    it('renders exactly one return action and no nested error boxes on callback views (F4)', () => {
+      // 1. GmailCallbackView with error
+      const { container: gmailContainer } = render(
+        <GmailCallbackView navigate={vi.fn()} input={{ error: 'access_denied' }} />
+      );
+      // Exactly 1 back to settings button
+      const gmailBackButtons = screen.getAllByRole('button', { name: 'Về Kết nối dịch vụ' });
+      expect(gmailBackButtons).toHaveLength(1);
+      expect(gmailContainer.querySelectorAll('a[href="/settings"]')).toHaveLength(0);
+      cleanup();
+
+      // 2. MyCalendarCallbackView with error
+      const { container: calContainer } = render(
+        <MyCalendarCallbackView navigate={vi.fn()} input={{ error: 'access_denied' }} />
+      );
+      // Clean single alert, no nested red-50 error box
+      expect(calContainer.querySelector('.bg-red-50')).toBeNull();
+      // Exactly 1 back to settings button in footer
+      expect(screen.getByRole('button', { name: 'Về trang Cài đặt' })).toBeInTheDocument();
+      cleanup();
+
+      // 3. MySheetsCallbackView with error
+      const { container: sheetsContainer } = render(
+        <MySheetsCallbackView navigate={vi.fn()} input={{ error: 'access_denied' }} />
+      );
+      // Clean single alert, no nested red-50 error box
+      expect(sheetsContainer.querySelector('.bg-red-50')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Về trang Cài đặt' })).toBeInTheDocument();
+      cleanup();
     });
   });
 });

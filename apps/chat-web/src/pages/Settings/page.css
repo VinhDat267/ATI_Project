@@ -1,11 +1,11 @@
 /* <style> của settings.html, giữ nguyên thứ tự (biến --font-* đổi thành --page-font-*). */
     :root {
-      --bg: #F8F8F6;
-      --surface: #FFFFFF;
-      --fg: #111827;
-      --muted: #6B7280;
-      --border: #E7E7E2;
-      --accent: #FF5701;
+      --bg: var(--planora-canvas, #F8F8F6);
+      --surface: var(--planora-paper, #FFFFFF);
+      --fg: var(--planora-text, #111827);
+      --muted: var(--planora-muted, #6B7280);
+      --border: var(--planora-divider, #E7E7E2);
+      --accent: var(--planora-primary, #3c5741);
       --success: #16A34A;
       --warn: #D97706;
       --danger: #DC2626;
@@ -15,15 +15,15 @@
     }
 
     body {
-      background-color: #F8F8F6;
-      color: #111827;
+      background-color: var(--planora-canvas, #F8F8F6);
+      color: var(--planora-text, #111827);
       font-family: 'Be Vietnam Pro', sans-serif;
       -webkit-font-smoothing: antialiased;
     }
 
     /* Focus Visible Ring */
     a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
-      outline: 2px solid #FF5701;
+      outline: 2px solid var(--planora-primary, #3c5741);
       outline-offset: 2px;
     }
 

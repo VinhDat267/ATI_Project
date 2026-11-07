@@ -267,30 +267,14 @@ export function MySheetsCallbackView({
         statusLabel={error ? 'Chưa kết nối' : loading ? 'Đang tải' : 'Đã xác thực'}
         loading={loading}
         loadingText="Đang tải thông tin kết nối từ Google…"
-        error={
-          error ? (
-            <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-sm text-[#DC2626] v3-space-y-3">
-              <p role="alert">{error}</p>
-              <a
-                href="/settings#mysheets"
-                onClick={(event) => {
-                  event.preventDefault();
-                  navigate('/settings#mysheets', true);
-                }}
-                className="inline-block text-[var(--planora-primary)] underline font-medium hover:opacity-80 transition-opacity"
-              >
-                Về trang Cài đặt
-              </a>
-            </div>
-          ) : undefined
-        }
-        onBackToSettings={handleLater}
+        error={error ? <p role="alert">{error}</p> : undefined}
+        onBackToSettings={error ? handleLater : undefined}
         backToSettingsLabel="Về trang Cài đặt"
       >
         {!loading && !error && (
           <div className="v3-space-y-5">
             <div className="p-3.5 sm:p-4 rounded-xl bg-[var(--planora-surface-inset)] border border-[var(--planora-divider)] text-xs sm:text-sm text-[var(--planora-text)] leading-relaxed">
-              ATI chỉ thấy những bảng tính bạn chọn trong cửa sổ của Google. Planora đọc các ô và thêm
+              Planora chỉ thấy những bảng tính bạn chọn trong cửa sổ của Google. Planora đọc các ô và thêm
               dòng mới, không sửa hay xoá ô có sẵn, không tạo bảng tính mới.
             </div>
 
@@ -299,7 +283,7 @@ export function MySheetsCallbackView({
                 type="button"
                 disabled={openingPicker || saving || spreadsheets.length >= 10}
                 onClick={handleOpenPicker}
-                className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-[var(--planora-paper)] text-[var(--planora-text)] border border-[var(--planora-border)] hover:bg-[var(--planora-surface-inset)] disabled:opacity-50 transition-colors shadow-xs inline-flex items-center gap-2"
+                className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-[var(--planora-paper)] text-[var(--planora-text)] border border-[var(--planora-border-strong)] hover:bg-[var(--planora-surface-inset)] disabled:opacity-50 transition-colors shadow-xs inline-flex items-center gap-2"
               >
                 <svg className="w-4 h-4 text-[#188038]" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z" />
@@ -325,13 +309,13 @@ export function MySheetsCallbackView({
                   value={urlInput}
                   disabled={saving || spreadsheets.length >= 10}
                   onChange={(e) => setUrlInput(e.target.value)}
-                  className="flex-1 px-3 py-2 rounded-xl text-xs sm:text-sm bg-[var(--planora-paper)] border border-[var(--planora-border)] text-[var(--planora-text)] placeholder:text-[var(--planora-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--planora-primary)]"
+                  className="flex-1 px-3 py-2 rounded-xl text-xs sm:text-sm bg-[var(--planora-paper)] border border-[var(--planora-border-strong)] text-[var(--planora-text)] placeholder:text-[var(--planora-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--planora-primary)]"
                 />
                 <button
                   type="button"
                   disabled={!urlInput.trim() || saving || spreadsheets.length >= 10}
                   onClick={() => void handleAddFromUrl()}
-                  className="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium bg-[var(--planora-paper)] text-[var(--planora-text)] border border-[var(--planora-border)] hover:bg-[var(--planora-surface-inset)] disabled:opacity-50 transition-colors"
+                  className="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium bg-[var(--planora-paper)] text-[var(--planora-text)] border border-[var(--planora-border-strong)] hover:bg-[var(--planora-surface-inset)] disabled:opacity-50 transition-colors"
                 >
                   Thêm từ liên kết
                 </button>
@@ -424,7 +408,7 @@ export function MySheetsCallbackView({
                 type="button"
                 disabled={spreadsheets.length === 0 || saving}
                 onClick={handleDone}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-[var(--planora-primary)] text-[var(--planora-on-primary,#FFFFFF)] hover:opacity-90 disabled:opacity-50 transition-all shadow-xs"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-[var(--planora-primary)] text-[var(--planora-on-primary)] hover:opacity-90 disabled:opacity-50 transition-all shadow-xs"
               >
                 {saving
                   ? 'Đang lưu…'
@@ -436,7 +420,7 @@ export function MySheetsCallbackView({
                 type="button"
                 disabled={saving}
                 onClick={handleLater}
-                className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium bg-[var(--planora-paper)] text-[var(--planora-muted)] border border-[var(--planora-border)] hover:bg-[var(--planora-surface-inset)] transition-colors"
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium bg-[var(--planora-paper)] text-[var(--planora-muted)] border border-[var(--planora-border-strong)] hover:bg-[var(--planora-surface-inset)] transition-colors"
               >
                 Để sau (về trang Cài đặt)
               </button>

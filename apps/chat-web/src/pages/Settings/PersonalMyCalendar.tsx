@@ -7,9 +7,9 @@ import { CockpitDialog } from '../../components/CockpitDialog';
 import { ServiceLogo } from '../../components/ServiceLogo';
 
 const button =
-  'px-4 py-2.5 rounded-xl text-xs font-semibold bg-[#FF5701] text-[var(--planora-on-primary,#FFFFFF)] hover:bg-[#E04C00] disabled:opacity-50 transition-all shadow-xs focus-visible:outline-2 focus-visible:outline-[var(--planora-primary)]';
+  'px-4 py-2.5 rounded-xl text-xs font-semibold bg-[var(--planora-primary)] text-[var(--planora-on-primary)] hover:bg-[var(--planora-primary-hover)] disabled:opacity-50 transition-all shadow-xs focus-visible:outline-2 focus-visible:outline-[var(--planora-primary)]';
 const secondary =
-  'px-4 py-2.5 rounded-xl text-xs font-medium bg-[var(--planora-paper)] text-[var(--planora-text)] border border-[var(--planora-border)] hover:bg-[var(--planora-surface-inset)] disabled:opacity-50 transition-colors';
+  'px-4 py-2.5 rounded-xl text-xs font-medium bg-[var(--planora-paper)] text-[var(--planora-text)] border border-[var(--planora-border-strong)] hover:bg-[var(--planora-surface-inset)] disabled:opacity-50 transition-colors';
 
 interface CalendarItem {
   id: string;
@@ -181,7 +181,7 @@ export function PersonalMyCalendar({
       ref={row}
       id="service-row-mycalendar"
       tabIndex={-1}
-      className="bg-[var(--planora-paper)] border border-[var(--planora-border)] rounded-xl p-4 sm:p-5 v3-space-y-3.5 shadow-xs focus-visible:ring-2 focus-visible:ring-[var(--planora-primary)] focus-visible:v3-outline-none"
+      className="bg-[var(--planora-paper)] border border-[var(--planora-divider)] rounded-xl p-4 sm:p-5 v3-space-y-3.5 shadow-xs focus-visible:ring-2 focus-visible:ring-[var(--planora-primary)] focus-visible:v3-outline-none"
     >
       <div id="mycalendar" />
       <div className="flex items-start sm:items-center justify-between gap-3 flex-wrap">
@@ -427,7 +427,7 @@ export function PersonalMyCalendar({
                     {calendars.map((cal) => (
                       <label
                         key={cal.id}
-                        className="flex items-start gap-3 p-3 rounded-lg border border-[var(--planora-border)] hover:bg-[var(--planora-surface-inset)] cursor-pointer"
+                        className="flex items-start gap-3 p-3 rounded-lg border border-[var(--planora-divider)] hover:bg-[var(--planora-surface-inset)] cursor-pointer"
                       >
                         <input
                           type="checkbox"
@@ -439,7 +439,7 @@ export function PersonalMyCalendar({
                                 : [...prev, cal.id]
                             )
                           }
-                          className="mt-0.5 text-[var(--planora-primary)] rounded border-[var(--planora-border)] focus:ring-[var(--planora-primary)]"
+                          className="mt-0.5 text-[var(--planora-primary)] rounded border-[var(--planora-border-strong)] focus:ring-[var(--planora-primary)]"
                         />
                         <div className="min-w-0 text-xs">
                           <span className="font-semibold text-[var(--planora-text)]">{cal.summary}</span>

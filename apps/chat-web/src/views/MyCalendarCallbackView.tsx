@@ -216,24 +216,8 @@ export function MyCalendarCallbackView({
         statusLabel={error ? 'Chưa kết nối' : loading ? 'Đang tải' : 'Đã xác thực'}
         loading={loading}
         loadingText="Đang tải danh sách lịch từ Google…"
-        error={
-          error ? (
-            <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-sm text-[#DC2626] v3-space-y-3">
-              <p role="alert">{error}</p>
-              <a
-                href="/settings#mycalendar"
-                onClick={(event) => {
-                  event.preventDefault();
-                  navigate('/settings#mycalendar', true);
-                }}
-                className="inline-block text-[var(--planora-primary)] underline font-medium hover:opacity-80 transition-opacity"
-              >
-                Về trang Cài đặt
-              </a>
-            </div>
-          ) : undefined
-        }
-        onBackToSettings={handleLater}
+        error={error ? <p role="alert">{error}</p> : undefined}
+        onBackToSettings={error ? handleLater : undefined}
         backToSettingsLabel="Về trang Cài đặt"
       >
         {!loading && !error && (
@@ -259,7 +243,7 @@ export function MyCalendarCallbackView({
                         type="checkbox"
                         checked={isChecked}
                         onChange={() => toggleCalendar(cal.id)}
-                        className="w-4 h-4 mt-0.5 text-[var(--planora-primary)] rounded border-[var(--planora-border)] focus:ring-[var(--planora-primary)]"
+                        className="w-4 h-4 mt-0.5 text-[var(--planora-primary)] rounded border-[var(--planora-border-strong)] focus:ring-[var(--planora-primary)]"
                         aria-label={cal.summary}
                       />
                       <div className="min-w-0">
@@ -307,7 +291,7 @@ export function MyCalendarCallbackView({
                   type="button"
                   disabled={saving}
                   onClick={() => void handleQuickSelectPrimary()}
-                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-[var(--planora-surface-inset)] text-[var(--planora-text)] border border-[var(--planora-border)] hover:bg-[var(--planora-divider)] disabled:opacity-50 transition-all shadow-xs"
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-[var(--planora-surface-inset)] text-[var(--planora-text)] border border-[var(--planora-border-strong)] hover:bg-[var(--planora-divider)] disabled:opacity-50 transition-all shadow-xs"
                 >
                   Dùng ngay Lịch chính (1 chạm)
                 </button>
@@ -316,7 +300,7 @@ export function MyCalendarCallbackView({
                 type="button"
                 disabled={selectedIds.length === 0 || saving}
                 onClick={handleSave}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-[var(--planora-primary)] text-[var(--planora-on-primary,#FFFFFF)] hover:opacity-90 disabled:opacity-50 transition-all shadow-xs"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-[var(--planora-primary)] text-[var(--planora-on-primary)] hover:opacity-90 disabled:opacity-50 transition-all shadow-xs"
               >
                 {saving
                   ? 'Đang lưu…'
@@ -328,7 +312,7 @@ export function MyCalendarCallbackView({
                 type="button"
                 disabled={saving}
                 onClick={handleLater}
-                className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium bg-[var(--planora-paper)] text-[var(--planora-muted)] border border-[var(--planora-border)] hover:bg-[var(--planora-surface-inset)] transition-colors"
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium bg-[var(--planora-paper)] text-[var(--planora-muted)] border border-[var(--planora-border-strong)] hover:bg-[var(--planora-surface-inset)] transition-colors"
               >
                 Để sau (về trang Cài đặt)
               </button>

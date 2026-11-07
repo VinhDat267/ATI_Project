@@ -104,7 +104,7 @@ describe('MySheetsCallbackView', () => {
     expect(apiClient.completeMySheetsConnection).toHaveBeenCalledWith({ code: 'CODE123', state: 'STATE456' });
 
     // Disclaimer rendered
-    expect(screen.getByText(/ATI chỉ thấy những bảng tính bạn chọn trong cửa sổ của Google/i)).toBeTruthy();
+    expect(screen.getByText(/(?:Planora|ATI) chỉ thấy những bảng tính bạn chọn trong cửa sổ của Google/i)).toBeTruthy();
 
     // Click Choose spreadsheets button
     const chooseBtn = screen.getByRole('button', { name: /Chọn bảng tính trong Google Drive/i });

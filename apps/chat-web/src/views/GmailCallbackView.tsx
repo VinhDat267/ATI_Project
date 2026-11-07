@@ -91,20 +91,6 @@ export function GmailCallbackView({
         error={error ? <p role="alert">{error}</p> : undefined}
         onBackToSettings={() => navigate('/settings', true)}
         backToSettingsLabel="Về Kết nối dịch vụ"
-        actions={
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <a
-              href="/settings"
-              onClick={(event) => {
-                event.preventDefault();
-                navigate('/settings', true);
-              }}
-              className="text-xs text-[var(--planora-primary)] underline font-medium hover:opacity-80 transition-opacity"
-            >
-              Về Kết nối dịch vụ
-            </a>
-          </div>
-        }
       />
     </main>
   );

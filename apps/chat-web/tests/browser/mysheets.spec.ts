@@ -59,7 +59,7 @@ test('MYSHEETS: Flow 1 - connect from settings, select scope with fake picker, r
   await row.getByRole('button', { name: 'Kết nối Google Sheets', exact: true }).click();
 
   // Redirected through fake Google to callback
-  await expect(page.getByRole('heading', { name: /Chọn bảng tính cho ATI/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Chọn bảng tính cho (?:Planora|ATI)/i })).toBeVisible();
   expect(new URL(page.url()).search).toBe('');
 
   // Click picker button to open FakeSheetsPicker modal
@@ -106,7 +106,7 @@ test('MYSHEETS: Flow 1 - connect from settings, select scope with fake picker, r
 
   // Re-select scope
   await row.getByRole('button', { name: 'Chọn lại bảng tính', exact: true }).click();
-  await expect(page.getByRole('heading', { name: /Chọn bảng tính cho ATI/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Chọn bảng tính cho (?:Planora|ATI)/i })).toBeVisible();
   await expect(page.getByText('Việc của tôi')).toBeVisible();
 
   // Add another sheet
@@ -155,7 +155,7 @@ test('MYSHEETS: Flow 2 - disconnect, connect from chat refusal, plan and receipt
   await connectBtn.click();
 
   // Redirected to callback
-  await expect(page.getByRole('heading', { name: /Chọn bảng tính cho ATI/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Chọn bảng tính cho (?:Planora|ATI)/i })).toBeVisible();
 
   // Open fake picker
   await page.getByRole('button', { name: 'Chọn bảng tính trong Google Drive', exact: true }).click();
@@ -219,7 +219,7 @@ test('MYSHEETS: Flow 3 - scope_required state recovery from refusal without re-r
   await page.getByRole('link', { name: /Kết nối Google Sheets/i }).click();
 
   // Once callback page opens, OAuth callback completed -> state is now scope_required
-  await expect(page.getByRole('heading', { name: /Chọn bảng tính cho ATI/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Chọn bảng tính cho (?:Planora|ATI)/i })).toBeVisible();
 
   // User navigates back to conversation without selecting spreadsheets
   await page.goto(conversationUrl);
@@ -231,7 +231,7 @@ test('MYSHEETS: Flow 3 - scope_required state recovery from refusal without re-r
 
   // Clicking "Chọn bảng tính" navigates directly to callback?mode=select without Google consent
   await selectScopeLink.click();
-  await expect(page.getByRole('heading', { name: /Chọn bảng tính cho ATI/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Chọn bảng tính cho (?:Planora|ATI)/i })).toBeVisible();
 
   // Select spreadsheet and save
   const openPickerBtn = page.getByRole('button', { name: /Chọn bảng tính trong Google Drive|Thêm bảng tính/i });
@@ -256,7 +256,7 @@ test('MYSHEETS: Flow 4 - cancel picker leaves list unchanged', async ({ page }) 
 
   await login(page);
   await page.goto('/connections/mysheets/callback?mode=select');
-  await expect(page.getByRole('heading', { name: /Chọn bảng tính cho ATI/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Chọn bảng tính cho (?:Planora|ATI)/i })).toBeVisible();
 
   // Wait for loading to finish and picker button to be visible
   const pickerBtn = page.getByRole('button', { name: /Chọn bảng tính trong Google Drive|Thêm bảng tính/i });
@@ -321,7 +321,7 @@ for (const width of [1440, 375]) {
 
       // Verify Callback page has zero overflow
       await page.goto('/connections/mysheets/callback?mode=select');
-      await expect(page.getByRole('heading', { name: /Chọn bảng tính cho ATI/i })).toBeVisible();
+      await expect(page.getByRole('heading', { name: /Chọn bảng tính cho (?:Planora|ATI)/i })).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
       expect(pageErrors).toEqual([]);

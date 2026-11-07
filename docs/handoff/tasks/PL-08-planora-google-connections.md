@@ -109,12 +109,39 @@ Thiết kế trang Cài đặt (Settings) và các kết nối dịch vụ Googl
      - Kiểm tra ngôn ngữ hướng nghiệp vụ, không dùng thuật ngữ OAuth trần.
    - Cập nhật assertions tương ứng trong `fe-07-settings.test.tsx` và `workflow-flow-canvas.test.tsx` để chấp nhận đếm dịch vụ động.
 
+### Giải quyết các phát hiện review (Review Findings F1-F4 & P3-1) - 07/11/2026:
+1. **[F1 — P2] Chuẩn tương phản WCAG AA & Token nút Primary CTA:**
+   - Đã chuyển toàn bộ các nút primary action trong `PersonalGmail.tsx:9-10`, `PersonalMyCalendar.tsx:9-10`, `PersonalMySheets.tsx:9-10`, nút lưu `#btn-save-service-changes` tại `SettingsPage.tsx:904`, và nút xác nhận ngắt kết nối tại `PersonalMySheets.tsx:311` sang CSS token chuẩn Planora `bg-[var(--planora-primary)] text-[var(--planora-on-primary)] hover:bg-[var(--planora-primary-hover)]`.
+   - Loại bỏ hoàn toàn nền cam `#FF5701`, đạt tỷ lệ tương phản >= 4.5:1 (7.80:1 Light / 7.91:1 Dark).
+   - Cập nhật test assertion màu cam cũ tại `apps/chat-web/tests/gmail-review-fixes.test.tsx:100` và `apps/chat-web/tests/browser/gmail-03.spec.ts:29`.
+
+2. **[F2 — P2] Khắc phục biến CSS không tồn tại `--planora-border`:**
+   - Thay thế toàn bộ 29 vị trí sử dụng `--planora-border`:
+     - Trên các phần tử tương tác (`input`, `textarea`, `checkbox`, `button` phụ): dùng `border-[var(--planora-border-strong)]` đạt WCAG 1.4.11 >= 3.0:1.
+     - Trên các thẻ card, context pill, khung phân cách, danh sách rỗng: dùng `border-[var(--planora-divider)]`.
+
+3. **[F3 — P2] Loại bỏ triệt để chuỗi "ATI" và emoji trần `👤`/`🏢`:**
+   - Thay đổi copy `"ATI chỉ đọc và ghi..."` / `"ATI chỉ thấy..."` thành `"Planora chỉ đọc và ghi..."` / `"Planora chỉ thấy..."` tại `SettingsPage.tsx:801`, `PersonalMySheets.tsx:125`, `MySheetsCallbackView.tsx:293`.
+   - Cập nhật `Settings/meta.ts:5` sang `"Kết nối dịch vụ — Planora"`.
+   - Cập nhật `apps/chat-web/src/pages/Settings/page.css` sang các CSS tokens `--planora-canvas`, `--planora-text`, `--planora-primary`.
+   - Thay emoji `👤` và `🏢` tại context pill bằng vector SVG icons chuẩn có thuộc tính `aria-hidden="true"`.
+   - Cập nhật matcher trong `tests/browser/mysheets.spec.ts`, `tests/components/service-naming.test.tsx`, `tests/mysheets-ui.test.tsx` và `tests/planora-pl-08-connections.test.tsx`.
+
+4. **[F4 — P2] Loại bỏ lồng trùng khung lỗi và nút quay về Cài đặt trùng lặp:**
+   - Trong `MyCalendarCallbackView.tsx` và `MySheetsCallbackView.tsx`: loại bỏ lớp bọc `<div className="p-4 rounded-xl bg-red-50 border border-red-200 ...">` dư thừa, sử dụng trực tiếp khung `--planora-error-*` của `ConnectionCallbackFrame`.
+   - Loại bỏ trùng lặp nút quay về:
+     - `GmailCallbackView`: bỏ prop `actions` dư thừa, chỉ dùng `onBackToSettings`.
+     - `MyCalendarCallbackView` & `MySheetsCallbackView`: chỉ truyền `onBackToSettings` khi `error` xuất hiện; ở trạng thái chọn tài nguyên (`!error`), chỉ dùng nút "Để sau (về trang Cài đặt)" trong form. Bảo đảm duy nhất 1 return action cho mỗi trạng thái.
+
+5. **[P3-1 — P3] Chặn đóng modal ngắt kết nối khi đang xử lý request:**
+   - Bổ sung guard `onClose={() => { if (!busy) setConfirm(false); }}` trong `PersonalMySheets.tsx:293`.
+
 ### Bằng chứng Kiểm thử Thực tế:
 
 | Lệnh kiểm thử | Kết quả | Ghi chú |
 |---|---|---|
 | `npm run typecheck:v3` | **PASS (exit code 0)** | Chat API & Chat Web 0 lỗi TypeScript |
-| `npm test -w @wap/chat-web -- fe-07-settings gmail mycalendar mysheets planora-pl-08-connections` | **PASS (exit code 0)** | 10 test files, 152/152 tests passed |
-| `npm test -w @wap/chat-web` | **PASS (exit code 0)** | Toàn bộ 103 test files, 1169/1169 tests passed |
+| `npm test -w @wap/chat-web -- fe-07-settings gmail mycalendar mysheets planora-pl-08-connections workflow-flow-canvas` | **PASS (exit code 0)** | 11 test files, 169/169 tests passed |
+| `npm test -w @wap/chat-web` | **PASS (exit code 0)** | Toàn bộ 103 test files, 1174/1174 tests passed |
 | `npm run build:v3` | **PASS (exit code 0)** | Vite production build thành công (HTML, CSS, JS bundle) |
 | `node scripts/test-v3-web-build-security.mjs` | **PASS (exit code 0)** | Loại trừ credential sentinels và 7 UI claims bị cấm |

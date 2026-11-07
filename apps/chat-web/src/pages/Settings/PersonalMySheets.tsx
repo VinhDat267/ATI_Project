@@ -7,9 +7,9 @@ import { CockpitDialog } from '../../components/CockpitDialog';
 import { ServiceLogo } from '../../components/ServiceLogo';
 
 const button =
-  'px-4 py-2.5 rounded-xl text-xs font-semibold bg-[#FF5701] text-[var(--planora-on-primary,#FFFFFF)] hover:bg-[#E04C00] disabled:opacity-50 transition-all shadow-xs focus-visible:outline-2 focus-visible:outline-[var(--planora-primary)]';
+  'px-4 py-2.5 rounded-xl text-xs font-semibold bg-[var(--planora-primary)] text-[var(--planora-on-primary)] hover:bg-[var(--planora-primary-hover)] disabled:opacity-50 transition-all shadow-xs focus-visible:outline-2 focus-visible:outline-[var(--planora-primary)]';
 const secondary =
-  'px-4 py-2.5 rounded-xl text-xs font-medium bg-[var(--planora-paper)] text-[var(--planora-text)] border border-[var(--planora-border)] hover:bg-[var(--planora-surface-inset)] disabled:opacity-50 transition-colors';
+  'px-4 py-2.5 rounded-xl text-xs font-medium bg-[var(--planora-paper)] text-[var(--planora-text)] border border-[var(--planora-border-strong)] hover:bg-[var(--planora-surface-inset)] disabled:opacity-50 transition-colors';
 
 export function PersonalMySheets({
   service,
@@ -109,7 +109,7 @@ export function PersonalMySheets({
       ref={row}
       id="service-row-mysheets"
       tabIndex={-1}
-      className="bg-[var(--planora-paper)] border border-[var(--planora-border)] rounded-xl p-4 sm:p-5 v3-space-y-3.5 shadow-xs focus-visible:ring-2 focus-visible:ring-[var(--planora-primary)] focus-visible:v3-outline-none"
+      className="bg-[var(--planora-paper)] border border-[var(--planora-divider)] rounded-xl p-4 sm:p-5 v3-space-y-3.5 shadow-xs focus-visible:ring-2 focus-visible:ring-[var(--planora-primary)] focus-visible:v3-outline-none"
     >
       <div id="mysheets" />
       <div className="flex items-start sm:items-center justify-between gap-3 flex-wrap">
@@ -122,7 +122,7 @@ export function PersonalMySheets({
       </div>
 
       <p className="text-xs text-[var(--planora-muted)] leading-relaxed">
-        ATI chỉ thấy những bảng tính bạn chọn trong cửa sổ của Google. ATI đọc các ô và thêm dòng
+        Planora chỉ thấy những bảng tính bạn chọn trong cửa sổ của Google. Planora đọc các ô và thêm dòng
         mới, không sửa hay xoá ô có sẵn, không tạo bảng tính mới.
       </p>
 
@@ -290,7 +290,9 @@ export function PersonalMySheets({
           <CockpitDialog
             title="Ngắt kết nối Google Sheets?"
             returnFocusId="mysheets-action"
-            onClose={() => setConfirm(false)}
+            onClose={() => {
+              if (!busy) setConfirm(false);
+            }}
           >
             <div className="p-4 sm:p-5 v3-space-y-4 text-xs sm:text-sm text-[var(--planora-text)]">
               <p>
@@ -308,7 +310,7 @@ export function PersonalMySheets({
                 </button>
                 <button
                   type="button"
-                  className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors shadow-xs"
+                  className={button}
                   disabled={busy}
                   onClick={() => void disconnect()}
                 >
