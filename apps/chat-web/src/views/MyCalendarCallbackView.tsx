@@ -9,12 +9,13 @@ import {
   conversationReturnPath,
 } from '../services/gmail-connection';
 import { usePrototypePage } from '../prototype/usePrototypePage';
+import { ConnectionCallbackFrame } from '../planora/layout/ConnectionCallbackFrame';
 
 const meta = {
   id: 'mycalendar-callback',
-  title: 'Chọn lịch Google Calendar — ATI',
+  title: 'Chọn lịch Google Calendar — Planora',
   htmlClass: '',
-  bodyClass: 'min-h-screen bg-[#F8F8F6] text-[#111827] antialiased',
+  bodyClass: 'min-h-screen bg-[var(--planora-canvas,#F8F8F6)] text-[var(--planora-text,#111827)] antialiased',
   css: '',
 };
 
@@ -198,136 +199,144 @@ export function MyCalendarCallbackView({
   const hasValidReturn = Boolean(returnToRef.current);
 
   return (
-    <main className="max-w-xl mx-auto px-4 py-16 text-[#111827] v3-space-y-6">
-      <div className="v3-space-y-2">
-        <h1 className="font-display text-2xl sm:text-3xl font-semibold">
-          Chọn lịch Google Calendar cho phép ATI sử dụng
-        </h1>
-        {email && (
-          <p className="text-sm text-[#4B5563]">
-            Đã xác thực tài khoản <strong>{email}</strong>
-          </p>
-        )}
-      </div>
+    <main>
+      <ConnectionCallbackFrame
+        serviceId="mycalendar"
+        serviceName="Google Calendar"
+        title="Chọn lịch Google Calendar cho phép Planora sử dụng"
+        subtitle={
+          email ? (
+            <p className="text-sm text-[var(--planora-muted)]">
+              Đã xác thực tài khoản <strong className="text-[var(--planora-text)]">{email}</strong>
+            </p>
+          ) : undefined
+        }
+        badge="KẾT NỐI LỊCH LÀM VIỆC DOANH NGHIỆP"
+        statusType={error ? 'error' : loading ? 'pending' : 'success'}
+        statusLabel={error ? 'Chưa kết nối' : loading ? 'Đang tải' : 'Đã xác thực'}
+        loading={loading}
+        loadingText="Đang tải danh sách lịch từ Google…"
+        error={
+          error ? (
+            <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-sm text-[#DC2626] v3-space-y-3">
+              <p role="alert">{error}</p>
+              <a
+                href="/settings#mycalendar"
+                onClick={(event) => {
+                  event.preventDefault();
+                  navigate('/settings#mycalendar', true);
+                }}
+                className="inline-block text-[var(--planora-primary)] underline font-medium hover:opacity-80 transition-opacity"
+              >
+                Về trang Cài đặt
+              </a>
+            </div>
+          ) : undefined
+        }
+        onBackToSettings={handleLater}
+        backToSettingsLabel="Về trang Cài đặt"
+      >
+        {!loading && !error && (
+          <div className="v3-space-y-5">
+            <div className="p-3.5 sm:p-4 rounded-xl bg-[var(--planora-surface-inset)] border border-[var(--planora-divider)] text-xs sm:text-sm text-[var(--planora-text)] leading-relaxed">
+              Planora chỉ có thể đọc sự kiện và tạo sự kiện mới trên những lịch bạn chọn dưới đây. Planora không thể sửa hay xoá sự kiện có sẵn và không gửi lời mời cho người khác.
+            </div>
 
-      {loading && <p role="status">Đang tải danh sách lịch từ Google…</p>}
-
-      {error && (
-        <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-sm text-[#DC2626] v3-space-y-3">
-          <p role="alert">{error}</p>
-          <a
-            href="/settings#mycalendar"
-            onClick={(event) => {
-              event.preventDefault();
-              navigate('/settings#mycalendar', true);
-            }}
-            className="inline-block text-[#FF5701] underline font-medium"
-          >
-            Về trang Cài đặt
-          </a>
-        </div>
-      )}
-
-      {!loading && !error && (
-        <>
-          <div className="p-3.5 sm:p-4 rounded-xl bg-blue-50 border border-blue-200 text-xs sm:text-sm text-blue-900 leading-relaxed">
-            ATI chỉ có thể đọc sự kiện và tạo sự kiện mới trên những lịch bạn chọn dưới đây. ATI
-            không thể sửa hay xoá sự kiện có sẵn và không gửi lời mời cho người khác.
-          </div>
-
-          <div className="v3-space-y-2.5" role="group" aria-label="Danh sách lịch ghi được">
-            {calendars.map((cal) => {
-              const isChecked = selectedIds.includes(cal.id);
-              return (
-                <label
-                  key={cal.id}
-                  className={`flex items-start justify-between p-3.5 sm:p-4 bg-white border rounded-xl transition-all cursor-pointer shadow-sm gap-3 ${
-                    isChecked
-                      ? 'border-[#FF5701] ring-1 ring-[#FF5701]'
-                      : 'border-[#E7E7E2] hover:border-neutral-300'
-                  }`}
-                >
-                  <div className="flex items-start gap-3 min-w-0">
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={() => toggleCalendar(cal.id)}
-                      className="w-4 h-4 mt-0.5 text-[#FF5701] rounded border-[#E7E7E2] focus:ring-[#FF5701]"
-                      aria-label={cal.summary}
-                    />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-sm text-[#111827] break-words">
-                          {cal.summary}
-                        </span>
-                        {cal.primary && (
-                          <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">
-                            Lịch chính
+            <div className="v3-space-y-2.5" role="group" aria-label="Danh sách lịch ghi được">
+              {calendars.map((cal) => {
+                const isChecked = selectedIds.includes(cal.id);
+                return (
+                  <label
+                    key={cal.id}
+                    className={`flex items-start justify-between p-3.5 sm:p-4 bg-[var(--planora-paper)] border rounded-xl transition-all cursor-pointer shadow-xs gap-3 ${
+                      isChecked
+                        ? 'border-[var(--planora-primary)] ring-1 ring-[var(--planora-primary)]'
+                        : 'border-[var(--planora-divider)] hover:border-[var(--planora-border-strong)]'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleCalendar(cal.id)}
+                        className="w-4 h-4 mt-0.5 text-[var(--planora-primary)] rounded border-[var(--planora-border)] focus:ring-[var(--planora-primary)]"
+                        aria-label={cal.summary}
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-sm text-[var(--planora-text)] break-words">
+                            {cal.summary}
                           </span>
+                          {cal.primary && (
+                            <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                              Lịch chính
+                            </span>
+                          )}
+                          <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-[var(--planora-surface-inset)] text-[var(--planora-muted)] border border-[var(--planora-divider)]">
+                            {cal.accessRole === 'owner' ? 'Chủ sở hữu' : 'Có quyền ghi'}
+                          </span>
+                        </div>
+                        {cal.id !== cal.summary && (
+                          <p className="text-xs text-[var(--planora-muted)] font-mono mt-0.5 break-all">
+                            {cal.id}
+                          </p>
                         )}
-                        <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-neutral-100 text-neutral-600">
-                          {cal.accessRole === 'owner' ? 'Chủ sở hữu' : 'Có quyền ghi'}
-                        </span>
                       </div>
-                      {cal.id !== cal.summary && (
-                        <p className="text-xs text-[#6B7280] font-mono mt-0.5 break-all">
-                          {cal.id}
-                        </p>
-                      )}
                     </div>
-                  </div>
-                </label>
-              );
-            })}
-          </div>
+                  </label>
+                );
+              })}
+            </div>
 
-          {selectedIds.length === 0 && (
-            <p role="alert" className="text-xs font-medium text-[#DC2626]">
-              Vui lòng chọn ít nhất 1 lịch để tiếp tục.
-            </p>
-          )}
+            {selectedIds.length === 0 && (
+              <p role="alert" className="text-xs font-medium text-[var(--planora-error-text,#DC2626)]">
+                Vui lòng chọn ít nhất 1 lịch để tiếp tục.
+              </p>
+            )}
 
-          {saveError && (
-            <p role="alert" className="text-xs font-medium text-[#DC2626]">
-              {saveError}
-            </p>
-          )}
+            {saveError && (
+              <p role="alert" className="text-xs font-medium text-[var(--planora-error-text,#DC2626)]">
+                {saveError}
+              </p>
+            )}
 
-          <div className="pt-2 flex flex-col sm:flex-row items-center gap-3 flex-wrap">
-            {calendars.length > 0 && (
+            <div className="pt-2 flex flex-col sm:flex-row items-center gap-3 flex-wrap">
+              {calendars.length > 0 && (
+                <button
+                  id="mycalendar-quick-primary"
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void handleQuickSelectPrimary()}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-[var(--planora-surface-inset)] text-[var(--planora-text)] border border-[var(--planora-border)] hover:bg-[var(--planora-divider)] disabled:opacity-50 transition-all shadow-xs"
+                >
+                  Dùng ngay Lịch chính (1 chạm)
+                </button>
+              )}
               <button
-                id="mycalendar-quick-primary"
+                type="button"
+                disabled={selectedIds.length === 0 || saving}
+                onClick={handleSave}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-[var(--planora-primary)] text-[var(--planora-on-primary,#FFFFFF)] hover:opacity-90 disabled:opacity-50 transition-all shadow-xs"
+              >
+                {saving
+                  ? 'Đang lưu…'
+                  : hasValidReturn
+                  ? 'Lưu lịch được dùng & quay lại hội thoại'
+                  : 'Lưu lịch được dùng'}
+              </button>
+              <button
                 type="button"
                 disabled={saving}
-                onClick={() => void handleQuickSelectPrimary()}
-                className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
+                onClick={handleLater}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium bg-[var(--planora-paper)] text-[var(--planora-muted)] border border-[var(--planora-border)] hover:bg-[var(--planora-surface-inset)] transition-colors"
               >
-                Dùng ngay Lịch chính (1 chạm)
+                Để sau (về trang Cài đặt)
               </button>
-            )}
-            <button
-              type="button"
-              disabled={selectedIds.length === 0 || saving}
-              onClick={handleSave}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-[#FF5701] text-white hover:bg-[#E04C00] disabled:opacity-50 transition-colors shadow-sm"
-            >
-              {saving
-                ? 'Đang lưu…'
-                : hasValidReturn
-                ? 'Lưu lịch được dùng & quay lại hội thoại'
-                : 'Lưu lịch được dùng'}
-            </button>
-            <button
-              type="button"
-              disabled={saving}
-              onClick={handleLater}
-              className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium bg-white text-[#4B5563] border border-[#E7E7E2] hover:bg-neutral-50 transition-colors"
-            >
-              Để sau (về trang Cài đặt)
-            </button>
+            </div>
           </div>
-        </>
-      )}
+        )}
+      </ConnectionCallbackFrame>
     </main>
   );
 }
+export default MyCalendarCallbackView;

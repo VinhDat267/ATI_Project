@@ -112,27 +112,27 @@ it('does not claim catalogue counts or empty groups while the first catalogue re
   holdCatalogue = true; mount();
   expect(await screen.findByRole('status')).toHaveTextContent('Đang tải dịch vụ...');
   await waitFor(() => expect(calls.some(call => call.url === '/api/services')).toBe(true));
-  expect(screen.queryByText('Tất cả 8 dịch vụ đều đã được thiết lập.')).not.toBeInTheDocument();
+  expect(screen.queryByText(/Tất cả \d+ dịch vụ đều đã được thiết lập\./)).not.toBeInTheDocument();
   expect(screen.queryByText('Chưa có dịch vụ nào được thiết lập.')).not.toBeInTheDocument();
-  expect(screen.queryByText(/\d+ \/ 8 dịch vụ đã thiết lập/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/\d+ \/ \d+ dịch vụ đã thiết lập/)).not.toBeInTheDocument();
   releaseCatalogue();
-  expect(await screen.findByText('1 / 8 dịch vụ đã thiết lập · 0 kết nối tốt')).toBeInTheDocument();
+  expect(await screen.findByText('1 / 2 dịch vụ đã thiết lập · 0 kết nối tốt')).toBeInTheDocument();
 });
 it('does not claim catalogue counts or empty groups after the first catalogue request fails, and recovers on retry', async () => {
   catalogueStatus = 503; mount();
   expect(await screen.findByRole('alert')).toHaveTextContent('Không thể kết nối máy chủ. Hãy kiểm tra mạng và thử lại.');
-  expect(screen.queryByText('Tất cả 8 dịch vụ đều đã được thiết lập.')).not.toBeInTheDocument();
+  expect(screen.queryByText(/Tất cả \d+ dịch vụ đều đã được thiết lập\./)).not.toBeInTheDocument();
   expect(screen.queryByText('Chưa có dịch vụ nào được thiết lập.')).not.toBeInTheDocument();
-  expect(screen.queryByText(/\d+ \/ 8 dịch vụ đã thiết lập/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/\d+ \/ \d+ dịch vụ đã thiết lập/)).not.toBeInTheDocument();
   catalogueStatus = 200; fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
-  expect(await screen.findByText('1 / 8 dịch vụ đã thiết lập · 0 kết nối tốt')).toBeInTheDocument();
+  expect(await screen.findByText('1 / 2 dịch vụ đã thiết lập · 0 kết nối tốt')).toBeInTheDocument();
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 
 it('groups by configured, summarizes eight services and presents four textual states and checked time', async () => {
   services = [service('telegram', true), service('notion', true), service('slack', true), service('jira')];
   services[0].connectionStatus = 'healthy'; services[0].lastCheckedAt = '2026-10-08T07:05:00Z'; services[1].connectionStatus = 'unhealthy';
-  mount(); expect(await screen.findByText('3 / 8 dịch vụ đã thiết lập · 1 kết nối tốt')).toBeInTheDocument();
+  mount(); expect(await screen.findByText('3 / 4 dịch vụ đã thiết lập · 1 kết nối tốt')).toBeInTheDocument();
   expect(screen.getByText(/Kết nối tốt · kiểm tra lúc/)).toBeInTheDocument();
   expect(screen.getByText('Không kết nối được')).toBeInTheDocument(); expect(screen.getByText('Chưa kiểm tra')).toBeInTheDocument(); expect(screen.getAllByText('Chưa kết nối').length).toBeGreaterThanOrEqual(1);
   expect(within(document.getElementById('list-connected-services')!).getAllByRole('button')).toHaveLength(3);

@@ -12,12 +12,13 @@ import {
 import { openGooglePicker } from '../services/google-picker';
 import { FakeSheetsPicker } from '../components/FakeSheetsPicker';
 import { usePrototypePage } from '../prototype/usePrototypePage';
+import { ConnectionCallbackFrame } from '../planora/layout/ConnectionCallbackFrame';
 
 const meta = {
   id: 'mysheets-callback',
-  title: 'Chọn bảng tính Google Sheets — ATI',
+  title: 'Chọn bảng tính Google Sheets — Planora',
   htmlClass: '',
-  bodyClass: 'min-h-screen bg-[#F8F8F6] text-[#111827] antialiased',
+  bodyClass: 'min-h-screen bg-[var(--planora-canvas,#F8F8F6)] text-[var(--planora-text,#111827)] antialiased',
   css: '',
 };
 
@@ -249,187 +250,200 @@ export function MySheetsCallbackView({
   const hasValidReturn = Boolean(returnToRef.current);
 
   return (
-    <main className="max-w-xl mx-auto px-4 py-16 text-[#111827] v3-space-y-6">
-      <div className="v3-space-y-2">
-        <h1 className="font-display text-2xl sm:text-3xl font-semibold">
-          Chọn bảng tính cho ATI
-        </h1>
-        {email && (
-          <p className="text-sm text-[#4B5563]">
-            Đã xác thực tài khoản <strong>{email}</strong>
-          </p>
-        )}
-      </div>
+    <main>
+      <ConnectionCallbackFrame
+        serviceId="mysheets"
+        serviceName="Google Sheets"
+        title="Chọn bảng tính cho Planora"
+        subtitle={
+          email ? (
+            <p className="text-sm text-[var(--planora-muted)]">
+              Đã xác thực tài khoản <strong className="text-[var(--planora-text)]">{email}</strong>
+            </p>
+          ) : undefined
+        }
+        badge="KẾT NỐI BẢNG TÍNH DOANH NGHIỆP"
+        statusType={error ? 'error' : loading ? 'pending' : 'success'}
+        statusLabel={error ? 'Chưa kết nối' : loading ? 'Đang tải' : 'Đã xác thực'}
+        loading={loading}
+        loadingText="Đang tải thông tin kết nối từ Google…"
+        error={
+          error ? (
+            <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-sm text-[#DC2626] v3-space-y-3">
+              <p role="alert">{error}</p>
+              <a
+                href="/settings#mysheets"
+                onClick={(event) => {
+                  event.preventDefault();
+                  navigate('/settings#mysheets', true);
+                }}
+                className="inline-block text-[var(--planora-primary)] underline font-medium hover:opacity-80 transition-opacity"
+              >
+                Về trang Cài đặt
+              </a>
+            </div>
+          ) : undefined
+        }
+        onBackToSettings={handleLater}
+        backToSettingsLabel="Về trang Cài đặt"
+      >
+        {!loading && !error && (
+          <div className="v3-space-y-5">
+            <div className="p-3.5 sm:p-4 rounded-xl bg-[var(--planora-surface-inset)] border border-[var(--planora-divider)] text-xs sm:text-sm text-[var(--planora-text)] leading-relaxed">
+              ATI chỉ thấy những bảng tính bạn chọn trong cửa sổ của Google. Planora đọc các ô và thêm
+              dòng mới, không sửa hay xoá ô có sẵn, không tạo bảng tính mới.
+            </div>
 
-      {loading && <p role="status">Đang tải thông tin kết nối từ Google…</p>}
+            <div className="v3-space-y-3">
+              <button
+                type="button"
+                disabled={openingPicker || saving || spreadsheets.length >= 10}
+                onClick={handleOpenPicker}
+                className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-[var(--planora-paper)] text-[var(--planora-text)] border border-[var(--planora-border)] hover:bg-[var(--planora-surface-inset)] disabled:opacity-50 transition-colors shadow-xs inline-flex items-center gap-2"
+              >
+                <svg className="w-4 h-4 text-[#188038]" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z" />
+                </svg>
+                <span>
+                  {spreadsheets.length === 0
+                    ? 'Chọn bảng tính trong Google Drive'
+                    : 'Thêm bảng tính'}
+                </span>
+              </button>
 
-      {error && (
-        <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-sm text-[#DC2626] v3-space-y-3">
-          <p role="alert">{error}</p>
-          <a
-            href="/settings#mysheets"
-            onClick={(event) => {
-              event.preventDefault();
-              navigate('/settings#mysheets', true);
-            }}
-            className="inline-block text-[#FF5701] underline font-medium"
-          >
-            Về trang Cài đặt
-          </a>
-        </div>
-      )}
+              {email && (
+                <p className="text-xs text-[var(--planora-muted)]">
+                  Trình duyệt cần đang đăng nhập đúng tài khoản <strong>{email}</strong>.
+                </p>
+              )}
 
-      {!loading && !error && (
-        <>
-          <div className="p-3.5 sm:p-4 rounded-xl bg-blue-50 border border-blue-200 text-xs sm:text-sm text-blue-900 leading-relaxed">
-            ATI chỉ thấy những bảng tính bạn chọn trong cửa sổ của Google. ATI đọc các ô và thêm
-            dòng mới, không sửa hay xoá ô có sẵn, không tạo bảng tính mới.
-          </div>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+                <input
+                  type="text"
+                  aria-label="Dán liên kết hoặc ID Google Sheets"
+                  placeholder="Dán liên kết hoặc ID Google Sheets..."
+                  value={urlInput}
+                  disabled={saving || spreadsheets.length >= 10}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  className="flex-1 px-3 py-2 rounded-xl text-xs sm:text-sm bg-[var(--planora-paper)] border border-[var(--planora-border)] text-[var(--planora-text)] placeholder:text-[var(--planora-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--planora-primary)]"
+                />
+                <button
+                  type="button"
+                  disabled={!urlInput.trim() || saving || spreadsheets.length >= 10}
+                  onClick={() => void handleAddFromUrl()}
+                  className="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium bg-[var(--planora-paper)] text-[var(--planora-text)] border border-[var(--planora-border)] hover:bg-[var(--planora-surface-inset)] disabled:opacity-50 transition-colors"
+                >
+                  Thêm từ liên kết
+                </button>
+              </div>
+            </div>
 
-          <div className="v3-space-y-3">
-            <button
-              type="button"
-              disabled={openingPicker || saving || spreadsheets.length >= 10}
-              onClick={handleOpenPicker}
-              className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-white text-[#111827] border border-[#E7E7E2] hover:bg-neutral-50 disabled:opacity-50 transition-colors shadow-sm inline-flex items-center gap-2"
-            >
-              <svg className="w-4 h-4 text-[#188038]" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z" />
-              </svg>
-              <span>
-                {spreadsheets.length === 0
-                  ? 'Chọn bảng tính trong Google Drive'
-                  : 'Thêm bảng tính'}
-              </span>
-            </button>
+            {spreadsheets.length > 0 && (
+              <div
+                className="v3-space-y-2.5 pt-2"
+                role="group"
+                aria-label="Danh sách bảng tính đã chọn"
+              >
+                <h2 className="text-xs font-semibold text-[var(--planora-muted)] uppercase tracking-wider">
+                  Bảng tính đã chọn ({spreadsheets.length}/10):
+                </h2>
+                {spreadsheets.map((sheet) => (
+                  <div
+                    key={sheet.id}
+                    className="flex items-center justify-between p-3.5 sm:p-4 bg-[var(--planora-paper)] border border-[var(--planora-divider)] rounded-xl shadow-xs gap-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-sm text-[var(--planora-text)] break-words">
+                          {sheet.title}
+                        </span>
+                        {!sheet.canEdit && (
+                          <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                            Chỉ xem
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-[var(--planora-muted)] font-mono mt-0.5 break-all">
+                        {sheet.id}
+                      </p>
+                      {sheet.sheets && sheet.sheets.length > 0 && (
+                        <p className="text-xs text-[var(--planora-muted)] mt-1">
+                          Tabs: {sheet.sheets.join(', ')}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={saving || spreadsheets.length <= 1}
+                      onClick={() => handleRemoveSpreadsheet(sheet.id)}
+                      aria-label={`Bỏ bảng tính ${sheet.title}`}
+                      title={
+                        spreadsheets.length <= 1
+                          ? 'Không thể bỏ bảng tính cuối cùng. Cần giữ lại ít nhất 1 bảng tính.'
+                          : `Bỏ ${sheet.title}`
+                      }
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors disabled:opacity-40 disabled:hover:bg-transparent"
+                    >
+                      Bỏ
+                    </button>
+                  </div>
+                ))}
+                {spreadsheets.length === 1 && (
+                  <p className="text-xs text-[var(--planora-muted)] pt-1">
+                    Cần giữ lại ít nhất 1 bảng tính. Để huỷ toàn bộ quyền truy cập, hãy{' '}
+                    <a
+                      href="/settings#mysheets"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        navigate('/settings#mysheets', true);
+                      }}
+                      className="text-[var(--planora-primary)] underline font-medium hover:opacity-80 transition-opacity"
+                    >
+                      ngắt kết nối tại Cài đặt
+                    </a>
+                    .
+                  </p>
+                )}
+              </div>
+            )}
 
-            {email && (
-              <p className="text-xs text-[#6B7280]">
-                Trình duyệt cần đang đăng nhập đúng tài khoản <strong>{email}</strong>.
+            {spreadsheets.length === 0 && (
+              <p role="alert" className="text-xs font-medium text-[var(--planora-error-text,#DC2626)]">
+                Hãy chọn ít nhất 1 bảng tính để tiếp tục.
               </p>
             )}
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
-              <input
-                type="text"
-                aria-label="Dán liên kết hoặc ID Google Sheets"
-                placeholder="Dán liên kết hoặc ID Google Sheets..."
-                value={urlInput}
-                disabled={saving || spreadsheets.length >= 10}
-                onChange={(e) => setUrlInput(e.target.value)}
-                className="flex-1 px-3 py-2 rounded-xl text-xs sm:text-sm bg-white border border-[#E7E7E2] text-[#111827] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#FF5701]"
-              />
+            {saveError && (
+              <p role="alert" className="text-xs font-medium text-[var(--planora-error-text,#DC2626)]">
+                {saveError}
+              </p>
+            )}
+
+            <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
               <button
                 type="button"
-                disabled={!urlInput.trim() || saving || spreadsheets.length >= 10}
-                onClick={() => void handleAddFromUrl()}
-                className="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium bg-white text-[#111827] border border-[#E7E7E2] hover:bg-neutral-50 disabled:opacity-50 transition-colors"
+                disabled={spreadsheets.length === 0 || saving}
+                onClick={handleDone}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-[var(--planora-primary)] text-[var(--planora-on-primary,#FFFFFF)] hover:opacity-90 disabled:opacity-50 transition-all shadow-xs"
               >
-                Thêm từ liên kết
+                {saving
+                  ? 'Đang lưu…'
+                  : hasValidReturn
+                  ? 'Xong, quay lại hội thoại'
+                  : 'Xong'}
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={handleLater}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium bg-[var(--planora-paper)] text-[var(--planora-muted)] border border-[var(--planora-border)] hover:bg-[var(--planora-surface-inset)] transition-colors"
+              >
+                Để sau (về trang Cài đặt)
               </button>
             </div>
           </div>
-
-          {spreadsheets.length > 0 && (
-            <div
-              className="v3-space-y-2.5 pt-2"
-              role="group"
-              aria-label="Danh sách bảng tính đã chọn"
-            >
-              <h2 className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider">
-                Bảng tính đã chọn ({spreadsheets.length}/10):
-              </h2>
-              {spreadsheets.map((sheet) => (
-                <div
-                  key={sheet.id}
-                  className="flex items-center justify-between p-3.5 sm:p-4 bg-white border border-[#E7E7E2] rounded-xl shadow-sm gap-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-sm text-[#111827] break-words">
-                        {sheet.title}
-                      </span>
-                      {!sheet.canEdit && (
-                        <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                          Chỉ xem
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-[#6B7280] font-mono mt-0.5 break-all">
-                      {sheet.id}
-                    </p>
-                    {sheet.sheets && sheet.sheets.length > 0 && (
-                      <p className="text-xs text-[#4B5563] mt-1">
-                        Tabs: {sheet.sheets.join(', ')}
-                      </p>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    disabled={saving || spreadsheets.length <= 1}
-                    onClick={() => handleRemoveSpreadsheet(sheet.id)}
-                    aria-label={`Bỏ bảng tính ${sheet.title}`}
-                    title={spreadsheets.length <= 1 ? 'Không thể bỏ bảng tính cuối cùng. Cần giữ lại ít nhất 1 bảng tính.' : `Bỏ ${sheet.title}`}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40 disabled:hover:bg-transparent"
-                  >
-                    Bỏ
-                  </button>
-                </div>
-              ))}
-              {spreadsheets.length === 1 && (
-                <p className="text-xs text-[#6B7280] pt-1">
-                  Cần giữ lại ít nhất 1 bảng tính. Để huỷ toàn bộ quyền truy cập, hãy{' '}
-                  <a
-                    href="/settings#mysheets"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      navigate('/settings#mysheets', true);
-                    }}
-                    className="text-[#FF5701] underline font-medium"
-                  >
-                    ngắt kết nối tại Cài đặt
-                  </a>.
-                </p>
-              )}
-            </div>
-          )}
-
-          {spreadsheets.length === 0 && (
-            <p role="alert" className="text-xs font-medium text-[#DC2626]">
-              Hãy chọn ít nhất 1 bảng tính để tiếp tục.
-            </p>
-          )}
-
-          {saveError && (
-            <p role="alert" className="text-xs font-medium text-[#DC2626]">
-              {saveError}
-            </p>
-          )}
-
-          <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
-            <button
-              type="button"
-              disabled={spreadsheets.length === 0 || saving}
-              onClick={handleDone}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-[#FF5701] text-white hover:bg-[#E04C00] disabled:opacity-50 transition-colors shadow-sm"
-            >
-              {saving
-                ? 'Đang lưu…'
-                : hasValidReturn
-                ? 'Xong, quay lại hội thoại'
-                : 'Xong'}
-            </button>
-            <button
-              type="button"
-              disabled={saving}
-              onClick={handleLater}
-              className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium bg-white text-[#4B5563] border border-[#E7E7E2] hover:bg-neutral-50 transition-colors"
-            >
-              Để sau (về trang Cài đặt)
-            </button>
-          </div>
-        </>
-      )}
+        )}
+      </ConnectionCallbackFrame>
 
       {fakePickerSession && (
         <FakeSheetsPicker
@@ -447,3 +461,4 @@ export function MySheetsCallbackView({
     </main>
   );
 }
+export default MySheetsCallbackView;
