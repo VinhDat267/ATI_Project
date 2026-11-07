@@ -1,5 +1,6 @@
 /** @vitest-environment jsdom */
 import '@testing-library/jest-dom/vitest';
+import { StrictMode } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { NotionConnection } from '../src/pages/Settings/NotionConnection';
@@ -246,6 +247,51 @@ describe('Task 5: Notion OAuth 1-Click UI, Callback View, and Chat Moments', () 
       await waitFor(() => {
         expect(navSpy).toHaveBeenCalledWith('/settings#notion', true);
       });
+    });
+
+    it('completes under React StrictMode and maps error code when err.data contains both error and code', async () => {
+      vi.spyOn(apiClient, 'completeNotionConnection').mockResolvedValueOnce({
+        available: true,
+        status: 'connected',
+        activeConnectionId: 'conn-1',
+        workspaceId: 'ws-1',
+        workspaceName: 'StrictMode Workspace',
+        connections: [],
+      });
+      const navSpy = vi.fn();
+
+      const { unmount } = render(
+        <StrictMode>
+          <NotionCallbackView
+            input={{ code: 'code-strict', state: 'state-strict' }}
+            navigate={navSpy}
+          />
+        </StrictMode>
+      );
+
+      await waitFor(() => {
+        expect(navSpy).toHaveBeenCalledWith('/settings#notion', true);
+      });
+      unmount();
+
+      vi.spyOn(apiClient, 'completeNotionConnection').mockRejectedValueOnce({
+        status: 400,
+        data: {
+          error: 'Phiên xác thực Notion không hợp lệ hoặc đã hết hạn.',
+          code: 'NOTION_STATE_INVALID',
+        },
+      });
+
+      render(
+        <NotionCallbackView
+          input={{ code: 'code-expired', state: 'state-expired' }}
+          navigate={vi.fn()}
+        />
+      );
+
+      expect(
+        await screen.findByText('Phiên kết nối Notion đã hết hạn hoặc không hợp lệ. Vui lòng thử lại.')
+      ).toBeInTheDocument();
     });
   });
 

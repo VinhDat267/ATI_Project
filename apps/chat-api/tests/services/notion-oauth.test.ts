@@ -132,4 +132,40 @@ describe('NotionOAuthClient & extractNotionDatabaseId', () => {
       client.validateDatabases('ntn_access_1', [db2], AbortSignal.timeout(5000)),
     ).rejects.toBeInstanceOf(NotionOAuthError);
   });
+
+  it('allows null/missing refresh_token on initial exchange() while requiring refresh_token on refresh()', async () => {
+    const wsId = '11111111-2222-3333-4444-555555555555';
+    const botId = '22222222-3333-4444-5555-666666666666';
+    const actorId = '33333333-4444-5555-6666-777777777777';
+
+    const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/oauth/token')) {
+        return new Response(
+          JSON.stringify({
+            access_token: 'ntn_access_no_refresh',
+            refresh_token: null,
+            token_type: 'bearer',
+            workspace_id: wsId,
+            workspace_name: 'ATI Product Team',
+            bot_id: botId,
+            owner: { type: 'user', user: { id: actorId } },
+          }),
+        );
+      }
+      if (url.endsWith('/users/me')) {
+        return new Response(JSON.stringify({ object: 'user', type: 'bot', id: botId }));
+      }
+      return new Response('{}', { status: 404 });
+    }) as unknown as typeof fetch;
+
+    const client = new NotionOAuthClient(cfg, fetchFn);
+    const grant = await client.exchange('code-initial', AbortSignal.timeout(5000));
+    expect(grant.accessToken).toBe('ntn_access_no_refresh');
+    expect(grant.refreshToken).toBe('');
+
+    await expect(
+      client.refresh('old-refresh-token', AbortSignal.timeout(5000)),
+    ).rejects.toBeInstanceOf(NotionOAuthError);
+  });
 });

@@ -255,4 +255,23 @@ describe('TrelloOAuthClient', () => {
 
     expect(mockFetch).not.toHaveBeenCalled();
   });
+
+  it('classifies Atlassian 403 unauthorized_client with invalid refresh_token as invalid_grant', async () => {
+    const mockFetch403 = vi.fn().mockImplementation(async () => {
+      return new Response(
+        JSON.stringify({
+          error: 'unauthorized_client',
+          error_description: 'refresh_token is invalid',
+        }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } },
+      );
+    });
+
+    const client = new TrelloOAuthClient(config, mockFetch403 as any);
+    await expect(client.refresh('expired-refresh-token', new AbortController().signal)).rejects.toMatchObject({
+      name: 'TrelloOAuthError',
+      kind: 'invalid_grant',
+      status: 403,
+    });
+  });
 });

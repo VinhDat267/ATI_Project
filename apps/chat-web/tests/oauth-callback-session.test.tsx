@@ -50,12 +50,13 @@ function Probe(){
  const {route,navigate}=useRoute();
  return <AuthGate route={route} navigate={navigate}>{()=>route.kind==='gmail-callback'?<GmailCallbackView input={route.googleCallback} navigate={navigate}/>:route.kind==='jira-callback'?<JiraCallbackView input={route.jiraCallback} navigate={navigate}/>:<p>Other page</p>}</AuthGate>;
 }
-it.each(['/connections/gmail/callback','/connections/myjira/callback','/connections/jira/callback'])('preserves %s callback for the alternate loopback host when stale hydration invalidates this host session',async path=>{
+it.each(['/connections/gmail/callback','/connections/myjira/callback','/connections/jira/callback','/connections/trello/callback','/connections/notion/callback'])('preserves %s callback for the alternate loopback host when stale hydration invalidates this host session',async path=>{
  land(path);render(<Probe/>);
  await waitFor(()=>expect(replace).toHaveBeenCalledTimes(1));
  const target=new URL(replace.mock.calls[0]![0]);
  expect(target.origin).toBe('http://127.0.0.1:5174');
- expect(path==='/connections/gmail/callback'?['/connections/gmail/callback']:['/connections/jira/callback','/connections/myjira/callback']).toContain(target.pathname);
+ const expectedPaths=path==='/connections/gmail/callback'?['/connections/gmail/callback']:path==='/connections/trello/callback'?['/connections/trello/callback']:path==='/connections/notion/callback'?['/connections/notion/callback']:['/connections/jira/callback','/connections/myjira/callback'];
+ expect(expectedPaths).toContain(target.pathname);
  expect(target.searchParams.get('code')).toBe('TEST_CALLBACK_CODE');
  expect(target.searchParams.get('state')).toBe('TEST_CALLBACK_STATE');
  expect(target.href).not.toContain('stale-access');expect(target.href).not.toContain('stale-refresh');
