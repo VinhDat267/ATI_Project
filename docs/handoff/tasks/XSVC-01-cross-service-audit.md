@@ -90,3 +90,7 @@ Plan bị hủy trước khi ghi. `trello.create_card` rồi `slack.send_message
 ### 07/11/2026 — Xem trước Notion rồi Slack
 
 Plan bị hủy trước khi ghi. `notion.create_page` trong Notes, rồi `slack.send_message` với `${create_page.output.url}`. Status `rejected`, 0 execution step.
+
+### 07/11/2026 — Xem trước Meet, Docs, Gmail
+
+Hai lượt đầu hỏi địa chỉ email. Sau khi tài khoản Gmail kết nối được tính là người nhận, plan bị hủy trước khi ghi. `schedule_meet`, `create_doc` với `meetLink`, `gmail.create_draft` với link Docs. 0 execution step. `gmail-grounding.test.ts` 22/22.
