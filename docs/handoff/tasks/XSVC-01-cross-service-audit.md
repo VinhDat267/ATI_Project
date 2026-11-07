@@ -103,6 +103,10 @@ Plan bị hủy trước khi gửi. `mysheets.aggregate_rows` rồi `slack.send_
 
 Yêu cầu tiến độ Jira rồi Slack bị từ chối trước plan. `myjira` không có credential. Cờ Jira vẫn bật. 0 plan.
 
+### 07/11/2026 — Kiểm tra lại Jira
+
+Grant OAuth `active`, site trên grant là `ati-workflow-test`. Workspace chưa có site được duyệt. Planner vẫn từ chối trước plan. 0 execution step.
+
 ### 07/11/2026 — Xem trước PR rồi Slack
 
 Plan bị hủy trước khi gửi. `github.list_pull_requests` rồi `slack.send_message`. Evidence `github_prs`, `itemCount` 0. 0 execution step.
