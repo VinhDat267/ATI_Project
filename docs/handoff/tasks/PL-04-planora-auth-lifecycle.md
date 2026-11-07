@@ -109,3 +109,28 @@ Di chuyển toàn bộ các màn hình xác thực nâng cao và vòng đời t�
   - `npm run build:v3`: PASS (exit code 0).
   - `node scripts/test-v3-web-build-security.mjs`: PASS (exit code 0).
   - `npm test -w @wap/chat-web`: PASS 99 files, 1098/1098 tests (exit code 0).
+
+---
+
+## 7. Refactor Business-First UX v2.0 (07/11/2026)
+
+- **Trạng thái:** `STATUS: READY_FOR_CODEX_REVIEW`
+- **Nhánh:** `longnguyen005/feat-planora-pl-04` (target `codex/planora-ui`)
+- **Tóm tắt cải tiến:**
+  1. **Vector Input Icons:**
+     - Tích hợp vector SVG Mail icon (`.planora-auth-input-icon`) và class `.has-icon-left` cho ô nhập email gửi lại xác minh trong `verify-expired` và `email-not-verified`.
+     - Tích hợp vector SVG Lock icon (`.planora-auth-input-icon`) và class `.has-icon-left` cho ô nhập mật khẩu mới và xác nhận mật khẩu trong `reset-password`.
+  2. **Planora Signature Endnote:**
+     - Bổ sung endnote chữ ký Planora (`.planora-auth-endnote`: *"Một lời nhắn. Một khởi đầu nhẹ nhàng."*) kèm vector icon lá/bút nghệ thuật trên các màn hình xác thực và form hành động.
+  3. **Zero Raw Emojis & Icon Accessibility:**
+     - Xóa bỏ ký tự emoji trần `⏳` trong `blocked-pending`, đồng bộ huy hiệu số 2 sạch sẽ theo chuỗi bước 1 - 2 - 3.
+     - 100% SVG icons có `aria-hidden="true"` rõ ràng, tuân thủ tiêu chuẩn trợ năng Planora.
+  4. **Copywriting Business-First:**
+     - Cập nhật thông điệp chân trang: *"Planora — Nền tảng điều phối công việc liên dịch vụ · 2026 · Xác thực tài khoản và phân quyền quản trị"*.
+  5. **Kiểm thử tự động:**
+     - Bổ sung 5 unit tests mới trong `tests/planora-auth-lifecycle.test.tsx` (tổng cộng 28 tests) bao phủ toàn diện: vector mail/lock icons, signature endnotes, zero emojis, và business-first footer copy.
+- **Bằng chứng kiểm tra thực tế:**
+  - `npm run typecheck:v3`: PASS (exit code 0).
+  - `npm run build:v3`: PASS (exit code 0).
+  - `node scripts/test-v3-web-build-security.mjs`: PASS (exit code 0).
+  - `npm test -w @wap/chat-web`: PASS 99 files, 1108/1108 tests (exit code 0).

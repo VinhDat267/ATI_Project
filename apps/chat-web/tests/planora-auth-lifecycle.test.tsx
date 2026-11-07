@@ -379,4 +379,110 @@ describe('PL-04 Planora AuthAction & Account Lifecycle', () => {
       expect(privacyLink.className).toContain('planora-auth-footer-link');
     });
   });
+
+  describe('Business-First UX v2.0: Input Vector Icons, Signature Endnote & Zero Raw Emojis', () => {
+    it('renders vector mail icon in input wrapper for verify-expired and email-not-verified modes', () => {
+      for (const m of ['verify-expired', 'email-not-verified'] as AuthActionMode[]) {
+        cleanup();
+        render(
+          <AuthActionPage
+            mode={m}
+            email="test@planora.vn"
+            navigate={vi.fn()}
+          />
+        );
+
+        const emailInput = screen.getByLabelText('Email');
+        expect(emailInput).toHaveClass('has-icon-left');
+
+        const wrapper = emailInput.closest('.planora-auth-input-wrapper');
+        expect(wrapper).toBeInTheDocument();
+
+        const icon = wrapper?.querySelector('.planora-auth-input-icon');
+        expect(icon).toBeInTheDocument();
+        expect(icon).toHaveAttribute('aria-hidden', 'true');
+      }
+    });
+
+    it('renders vector lock icons in input wrappers for reset-password mode', () => {
+      const { container } = render(
+        <AuthActionPage
+          mode="reset-password"
+          email="test@planora.vn"
+          navigate={vi.fn()}
+        />
+      );
+
+      const newPass = screen.getByLabelText('Mật khẩu mới');
+      const confirmPass = screen.getByLabelText('Nhập lại mật khẩu');
+
+      expect(newPass).toHaveClass('has-icon-left');
+      expect(confirmPass).toHaveClass('has-icon-left');
+
+      const newWrapper = newPass.closest('.planora-auth-input-wrapper');
+      const confirmWrapper = confirmPass.closest('.planora-auth-input-wrapper');
+
+      expect(newWrapper?.querySelector('.planora-auth-input-icon')).toBeInTheDocument();
+      expect(confirmWrapper?.querySelector('.planora-auth-input-icon')).toBeInTheDocument();
+
+      const eyeNew = container.querySelector('#icon-eye-new');
+      const eyeConfirm = container.querySelector('#icon-eye-confirm');
+      expect(eyeNew).toHaveAttribute('aria-hidden', 'true');
+      expect(eyeConfirm).toHaveAttribute('aria-hidden', 'true');
+    });
+
+    it('renders Planora signature endnote across views', () => {
+      const sampleModes: AuthActionMode[] = ['verify-success', 'verify-expired', 'reset-password', 'google-ready', 'blocked-locked'];
+      for (const m of sampleModes) {
+        cleanup();
+        const { container } = render(
+          <AuthActionPage
+            mode={m}
+            email="test@planora.vn"
+            navigate={vi.fn()}
+          />
+        );
+
+        const endnote = container.querySelector('.planora-auth-endnote');
+        expect(endnote).toBeInTheDocument();
+        expect(endnote).toHaveTextContent('Một lời nhắn. Một khởi đầu nhẹ nhàng.');
+        expect(endnote?.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+      }
+    });
+
+    it('ensures zero raw emojis and step badges are clean numbers in blocked-pending', () => {
+      const { container } = render(
+        <AuthActionPage
+          mode="blocked-pending"
+          email="test@planora.vn"
+          navigate={vi.fn()}
+        />
+      );
+
+      // Verify no raw hourglass emoji
+      expect(container.textContent).not.toContain('⏳');
+
+      // Verify step 1, 2, 3 sequence
+      const stepBadges = container.querySelectorAll('.w-5.h-5.rounded-full');
+      expect(stepBadges.length).toBeGreaterThanOrEqual(3);
+      expect(stepBadges[0]).toHaveTextContent('1');
+      expect(stepBadges[1]).toHaveTextContent('2');
+      expect(stepBadges[2]).toHaveTextContent('3');
+    });
+
+    it('renders business-first footer copy without technical AI jargon', () => {
+      render(
+        <AuthActionPage
+          mode="verify-success"
+          email="test@planora.vn"
+          navigate={vi.fn()}
+        />
+      );
+
+      const footer = document.querySelector('.planora-auth-footer');
+      expect(footer).toBeInTheDocument();
+      expect(footer).toHaveTextContent('Planora — Nền tảng điều phối công việc liên dịch vụ · 2026 · Xác thực tài khoản và phân quyền quản trị');
+      expect(footer?.textContent).not.toContain('luồng làm việc AI');
+    });
+  });
 });

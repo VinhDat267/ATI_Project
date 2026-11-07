@@ -26,7 +26,13 @@ export type AuthActionMode =
   | 'email-not-verified';
 
 const spinner = (
-  <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  <svg
+    className="w-4 h-4 animate-spin"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+    aria-hidden="true"
+  >
     <path
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -60,6 +66,61 @@ const eyeClosed = (
     strokeWidth="2"
     d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"
   />
+);
+
+const mailInputIcon = (
+  <svg
+    className="planora-auth-input-icon"
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <rect width="20" height="16" x="2" y="4" rx="2" />
+    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+  </svg>
+);
+
+const lockInputIcon = (
+  <svg
+    className="planora-auth-input-icon"
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+  </svg>
+);
+
+const signatureEndnote = (
+  <div className="planora-auth-endnote">
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z" />
+    </svg>
+    <span>Một lời nhắn. Một khởi đầu nhẹ nhàng.</span>
+  </div>
 );
 
 function strength(password: string): { bars: string[]; text: string; className: string } {
@@ -288,7 +349,7 @@ export function AuthActionPage({
             >
               <div className="flex items-center justify-center my-2">
                 <div className="w-14 h-14 rounded-2xl bg-[var(--planora-success-bg)] text-[var(--planora-success-text)] border border-[var(--planora-success-border)] flex items-center justify-center shadow-sm">
-                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -336,7 +397,7 @@ export function AuthActionPage({
               <div className="v3-space-y-2.5 pt-1">
                 <a onClick={followLink} href="/" className="planora-auth-submit">
                   <span>Về trang chủ Planora</span>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -354,6 +415,7 @@ export function AuthActionPage({
                   Thử đăng nhập lại
                 </a>
               </div>
+              {signatureEndnote}
             </section>
           ),
         };
@@ -379,7 +441,7 @@ export function AuthActionPage({
             >
               <div className="flex items-center justify-center my-2">
                 <div className="w-14 h-14 rounded-2xl bg-[var(--planora-pending-bg)] text-[var(--planora-pending-text)] border border-[var(--planora-pending-border)] flex items-center justify-center shadow-sm">
-                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -402,18 +464,21 @@ export function AuthActionPage({
                   >
                     Nhập email để nhận link xác minh mới
                   </label>
-                  <input
-                    ref={resendInputRef}
-                    type="email"
-                    id="resend-email-input"
-                    required
-                    defaultValue={email}
-                    aria-label="Email"
-                    autoComplete="email"
-                    maxLength={254}
-                    className="planora-auth-input"
-                    placeholder="name@example.com"
-                  />
+                  <div className="planora-auth-input-wrapper">
+                    {mailInputIcon}
+                    <input
+                      ref={resendInputRef}
+                      type="email"
+                      id="resend-email-input"
+                      required
+                      defaultValue={email}
+                      aria-label="Email"
+                      autoComplete="email"
+                      maxLength={254}
+                      className="planora-auth-input has-icon-left"
+                      placeholder="ban@congty.vn"
+                    />
+                  </div>
                 </div>
                 <button
                   type="submit"
@@ -433,6 +498,7 @@ export function AuthActionPage({
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
+                        aria-hidden="true"
                       >
                         <path
                           strokeLinecap="round"
@@ -463,6 +529,7 @@ export function AuthActionPage({
                   ← Quay lại trang chủ
                 </a>
               </div>
+              {signatureEndnote}
             </section>
           ),
         };
@@ -521,18 +588,21 @@ export function AuthActionPage({
                   >
                     Nhập email để nhận link xác minh mới
                   </label>
-                  <input
-                    ref={resendInputRef}
-                    type="email"
-                    id="resend-email-input"
-                    required
-                    defaultValue={email}
-                    aria-label="Email"
-                    autoComplete="email"
-                    maxLength={254}
-                    className="planora-auth-input"
-                    placeholder="name@example.com"
-                  />
+                  <div className="planora-auth-input-wrapper">
+                    {mailInputIcon}
+                    <input
+                      ref={resendInputRef}
+                      type="email"
+                      id="resend-email-input"
+                      required
+                      defaultValue={email}
+                      aria-label="Email"
+                      autoComplete="email"
+                      maxLength={254}
+                      className="planora-auth-input has-icon-left"
+                      placeholder="ban@congty.vn"
+                    />
+                  </div>
                 </div>
                 <button
                   type="submit"
@@ -552,6 +622,7 @@ export function AuthActionPage({
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
+                        aria-hidden="true"
                       >
                         <path
                           strokeLinecap="round"
@@ -582,6 +653,7 @@ export function AuthActionPage({
                   Thử đăng nhập lại
                 </a>
               </div>
+              {signatureEndnote}
             </section>
           ),
         };
@@ -607,7 +679,7 @@ export function AuthActionPage({
             >
               <div className="flex items-center justify-center my-2">
                 <div className="w-14 h-14 rounded-2xl bg-[var(--planora-surface-inset)] text-[var(--planora-primary)] border border-[var(--planora-divider)] flex items-center justify-center shadow-sm">
-                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -634,7 +706,7 @@ export function AuthActionPage({
               <div className="v3-space-y-2.5 pt-1">
                 <a onClick={followLink} href="/" className="planora-auth-submit">
                   <span>Đăng nhập hoặc về trang chủ</span>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -652,6 +724,7 @@ export function AuthActionPage({
                   Thử đăng nhập lại
                 </a>
               </div>
+              {signatureEndnote}
             </section>
           ),
         };
@@ -677,7 +750,7 @@ export function AuthActionPage({
             >
               <div className="flex items-center justify-center my-2">
                 <div className="w-14 h-14 rounded-2xl bg-[var(--planora-primary-soft)] text-[var(--planora-primary)] border border-[var(--planora-divider)] flex items-center justify-center shadow-sm">
-                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -701,6 +774,7 @@ export function AuthActionPage({
                     Mật khẩu mới
                   </label>
                   <div className="planora-auth-input-wrapper">
+                    {lockInputIcon}
                     <input
                       ref={newPasswordRef}
                       type={visible['new-password-input'] ? 'text' : 'password'}
@@ -712,7 +786,8 @@ export function AuthActionPage({
                       minLength={12}
                       placeholder="Ít nhất 12 ký tự"
                       onInput={event => actions.validatePasswordStrength(event.currentTarget.value)}
-                      className="planora-auth-input"
+                      className="planora-auth-input has-icon-left"
+                      style={{ paddingRight: 48 }}
                     />
                     <button
                       type="button"
@@ -726,6 +801,7 @@ export function AuthActionPage({
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
+                        aria-hidden="true"
                       >
                         {visible['new-password-input'] ? eyeClosed : eyeOpen}
                       </svg>
@@ -759,6 +835,7 @@ export function AuthActionPage({
                     Xác nhận mật khẩu mới
                   </label>
                   <div className="planora-auth-input-wrapper">
+                    {lockInputIcon}
                     <input
                       ref={confirmPasswordRef}
                       type={visible['confirm-password-input'] ? 'text' : 'password'}
@@ -770,7 +847,8 @@ export function AuthActionPage({
                       minLength={12}
                       placeholder="Nhập lại mật khẩu mới"
                       onInput={actions.checkPasswordMatch}
-                      className="planora-auth-input"
+                      className="planora-auth-input has-icon-left"
+                      style={{ paddingRight: 48 }}
                     />
                     <button
                       type="button"
@@ -784,6 +862,7 @@ export function AuthActionPage({
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
+                        aria-hidden="true"
                       >
                         {visible['confirm-password-input'] ? eyeClosed : eyeOpen}
                       </svg>
@@ -814,6 +893,7 @@ export function AuthActionPage({
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
+                        aria-hidden="true"
                       >
                         <path
                           strokeLinecap="round"
@@ -836,6 +916,7 @@ export function AuthActionPage({
                   mọi thiết bị.
                 </p>
               </div>
+              {signatureEndnote}
             </section>
           ),
         };
@@ -861,7 +942,7 @@ export function AuthActionPage({
             >
               <div className="flex items-center justify-center my-2">
                 <div className="w-14 h-14 rounded-2xl bg-[var(--planora-success-bg)] text-[var(--planora-success-text)] border border-[var(--planora-success-border)] flex items-center justify-center shadow-sm">
-                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -879,6 +960,7 @@ export function AuthActionPage({
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
+                    aria-hidden="true"
                   >
                     <path
                       strokeLinecap="round"
@@ -899,7 +981,7 @@ export function AuthActionPage({
               <div className="v3-space-y-2.5 pt-1">
                 <a onClick={followLink} href="/login" className="planora-auth-submit">
                   <span>Đăng nhập ngay</span>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -917,6 +999,7 @@ export function AuthActionPage({
                   Về trang chủ Planora
                 </a>
               </div>
+              {signatureEndnote}
             </section>
           ),
         };
@@ -942,7 +1025,7 @@ export function AuthActionPage({
             >
               <div className="flex items-center justify-center my-2">
                 <div className="w-14 h-14 rounded-2xl bg-[var(--planora-paper)] border border-[var(--planora-divider)] flex items-center justify-center shadow-sm">
-                  <svg className="w-7 h-7" viewBox="0 0 24 24">
+                  <svg className="w-7 h-7" viewBox="0 0 24 24" aria-hidden="true">
                     <path
                       fill="#4285F4"
                       d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
@@ -970,6 +1053,7 @@ export function AuthActionPage({
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
+                    aria-hidden="true"
                   >
                     <path
                       strokeLinecap="round"
@@ -1006,7 +1090,7 @@ export function AuthActionPage({
                       className="planora-auth-link-btn text-[11px]"
                     >
                       <span>Xem chính sách dữ liệu tài khoản Google</span>
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
                       </svg>
                     </a>
@@ -1017,7 +1101,7 @@ export function AuthActionPage({
               <div className="v3-space-y-2.5 pt-1">
                 <a onClick={followLink} href="/login" className="planora-auth-submit">
                   <span>Thử đăng nhập lại</span>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -1035,6 +1119,7 @@ export function AuthActionPage({
                   Về trang chủ Planora
                 </a>
               </div>
+              {signatureEndnote}
             </section>
           ),
         };
@@ -1060,7 +1145,7 @@ export function AuthActionPage({
             >
               <div className="flex items-center justify-center my-2">
                 <div className="w-14 h-14 rounded-2xl bg-[var(--planora-paper)] border border-[var(--planora-divider)] flex items-center justify-center shadow-sm relative">
-                  <svg className="w-7 h-7" viewBox="0 0 24 24">
+                  <svg className="w-7 h-7" viewBox="0 0 24 24" aria-hidden="true">
                     <path
                       fill="#4285F4"
                       d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
@@ -1095,7 +1180,7 @@ export function AuthActionPage({
               <div className="v3-space-y-2.5 pt-1">
                 <a onClick={followLink} href="/" className="planora-auth-submit">
                   <span>Vào ngay</span>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -1105,6 +1190,7 @@ export function AuthActionPage({
                   </svg>
                 </a>
               </div>
+              {signatureEndnote}
             </section>
           ),
         };
@@ -1123,7 +1209,7 @@ export function AuthActionPage({
             >
               <div className="flex items-center justify-center my-2">
                 <div className="w-14 h-14 rounded-2xl bg-[var(--planora-error-bg)] text-[var(--planora-error-text)] border border-[var(--planora-error-border)] flex items-center justify-center shadow-sm">
-                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -1152,7 +1238,7 @@ export function AuthActionPage({
                   className="planora-auth-submit"
                 >
                   <span>Thử lại với Google</span>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -1170,6 +1256,7 @@ export function AuthActionPage({
                   Đăng nhập bằng Email &amp; Mật khẩu
                 </a>
               </div>
+              {signatureEndnote}
             </section>
           ),
         };
@@ -1195,7 +1282,7 @@ export function AuthActionPage({
             >
               <div className="flex items-center justify-center my-2">
                 <div className="w-14 h-14 rounded-2xl bg-[var(--planora-pending-bg)] text-[var(--planora-pending-text)] border border-[var(--planora-pending-border)] flex items-center justify-center shadow-sm">
-                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -1213,6 +1300,7 @@ export function AuthActionPage({
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
+                    aria-hidden="true"
                   >
                     <path
                       strokeLinecap="round"
@@ -1246,7 +1334,7 @@ export function AuthActionPage({
                   <div className="flex items-center justify-between text-[var(--planora-pending-text)] bg-[var(--planora-pending-bg)] p-2.5 rounded-xl border border-[var(--planora-pending-border)]">
                     <div className="flex items-center gap-2">
                       <span className="w-5 h-5 rounded-full bg-[var(--planora-paper)] flex items-center justify-center font-bold text-[11px] text-[var(--planora-pending-text)]">
-                        ⏳
+                        2
                       </span>
                       <span className="font-medium text-[var(--planora-pending-text)]">
                         2. Quản trị viên duyệt tài khoản
@@ -1275,7 +1363,7 @@ export function AuthActionPage({
               <div className="v3-space-y-2.5 pt-1">
                 <a onClick={followLink} href="/login" className="planora-auth-submit">
                   <span>Thử đăng nhập lại</span>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -1293,6 +1381,7 @@ export function AuthActionPage({
                   ← Về trang chủ
                 </a>
               </div>
+              {signatureEndnote}
             </section>
           ),
         };
@@ -1318,7 +1407,7 @@ export function AuthActionPage({
             >
               <div className="flex items-center justify-center my-2">
                 <div className="w-14 h-14 rounded-2xl bg-[var(--planora-error-bg)] text-[var(--planora-error-text)] border border-[var(--planora-error-border)] flex items-center justify-center shadow-sm">
-                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -1331,7 +1420,7 @@ export function AuthActionPage({
 
               <div className="planora-auth-info-card">
                 <div className="flex items-center gap-2 text-xs font-semibold text-[var(--planora-error-text)]">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -1352,7 +1441,7 @@ export function AuthActionPage({
                   </div>
                 </div>
                 <div className="pt-3 border-t border-[var(--planora-divider)] text-xs text-[var(--planora-text)] flex items-center gap-2">
-                  <svg className="w-4 h-4 text-[var(--planora-primary)] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-[var(--planora-primary)] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -1377,6 +1466,7 @@ export function AuthActionPage({
                   Quay về trang chủ
                 </a>
               </div>
+              {signatureEndnote}
             </section>
           ),
         };
@@ -1406,7 +1496,7 @@ export function AuthActionPage({
             >
               <div className="flex items-center justify-center my-2">
                 <div className="w-14 h-14 rounded-2xl bg-[var(--planora-pending-bg)] text-[var(--planora-pending-text)] border border-[var(--planora-pending-border)] flex items-center justify-center shadow-sm">
-                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -1454,7 +1544,7 @@ export function AuthActionPage({
 
               <div className="planora-auth-info-card border-[var(--planora-pending-border)] bg-[var(--planora-pending-bg)] text-[var(--planora-pending-text)]">
                 <div className="flex items-center gap-2 text-xs font-semibold">
-                  <svg className="w-4 h-4 text-[var(--planora-pending-text)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-[var(--planora-pending-text)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -1473,7 +1563,7 @@ export function AuthActionPage({
                   className="planora-auth-submit"
                 >
                   <span>Đặt lại mật khẩu mới qua email</span>
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
                 </button>
@@ -1489,6 +1579,7 @@ export function AuthActionPage({
                   ← Quay lại trang đăng nhập (thử lại sau)
                 </a>
               </div>
+              {signatureEndnote}
             </section>
           ),
         };
@@ -1500,7 +1591,7 @@ export function AuthActionPage({
   const footer = (
     <footer className="planora-auth-footer mt-8 text-center text-xs text-[var(--planora-muted)] v3-space-y-2">
       <p className="m-0">
-        Planora — Nền tảng điều phối luồng làm việc AI · 2026 · Xác thực tài khoản và phân quyền quản trị
+        Planora — Nền tảng điều phối công việc liên dịch vụ · 2026 · Xác thực tài khoản và phân quyền quản trị
       </p>
       <div className="planora-auth-footer-links flex flex-wrap items-center justify-center gap-x-2 text-xs text-[var(--planora-muted)]">
         <a

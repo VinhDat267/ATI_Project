@@ -241,6 +241,40 @@ select:focus-visible {
   gap: 8px;
 }
 
+/* Vector Input Icons & Endnote (Business-First UX v2.0) */
+.planora-auth-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.planora-auth-input-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--planora-muted);
+  pointer-events: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.planora-auth-input.has-icon-left {
+  padding-left: 42px;
+}
+
+.planora-auth-endnote {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  font-size: var(--planora-text-xs);
+  color: var(--planora-muted);
+}
+
 /* Footer Links (F2: tap target min 44px) */
 .planora-auth-footer {
   margin-top: 24px;
