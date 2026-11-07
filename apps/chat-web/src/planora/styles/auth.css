@@ -370,6 +370,24 @@
   position: relative;
   display: flex;
   align-items: center;
+  width: 100%;
+}
+
+.planora-auth-input-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--planora-muted);
+  pointer-events: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.planora-auth-input.has-icon-left {
+  padding-left: 42px;
 }
 
 .planora-auth-input {

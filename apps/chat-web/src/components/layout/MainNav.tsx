@@ -12,7 +12,14 @@ import { useSchedulePendingCount } from '../../hooks/use-schedules';
 import { getActiveWorkspaceSummary, subscribeWorkspace } from '../../services/workspace-storage';
 import { PlanoraShellContext } from '../../planora/layout/PlanoraShell';
 
-export type NavTab = 'workspace' | 'history' | 'settings' | 'guide' | 'users';
+export type NavTab = 'workspace' | 'history' | 'settings' | 'guide' | 'users' | 'inbox';
+export const NAV_ITEMS = [
+  { to: '/', label: 'Không gian làm việc', end: true },
+  { to: '/inbox', label: 'Hộp thư đề xuất', end: false },
+  { to: '/history', label: 'Nhật ký', end: false },
+  { to: '/settings', label: 'Kết nối dịch vụ', end: false },
+  { to: '/guide', label: 'Cẩm nang', end: false },
+] as const;
 const TABS: { id: NavTab; path: string; name: string; short: string; adminOnly?: boolean }[] = [
   { id: 'workspace', path: '/', name: 'Không gian làm việc', short: 'Làm việc' },
   { id: 'history', path: '/history', name: 'Nhật ký', short: 'Nhật ký' },
@@ -36,11 +43,13 @@ export interface MainNavProps {
   pageName?: string;
   /** Nút riêng của trang, đặt trước nút sáng/tối (cockpit: Lịch sử, Xem hội thoại). */
   actions?: ReactNode;
+  /** Số đề xuất cần xử lý trong Hộp thư đề xuất (hiển thị badge nhanh trên thanh điều hướng). */
+  inboxBadgeCount?: number;
   /** Phần nằm ngay dưới thanh, trong cùng header dính (cockpit: dải Chế độ thử nghiệm). */
   children?: ReactNode;
 }
 
-export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pageName, actions, children }: MainNavProps) {
+export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pageName, actions, inboxBadgeCount, children }: MainNavProps) {
   const { inPlanoraShell } = useContext(PlanoraShellContext);
   const pendingCount = useSchedulePendingCount(user);
   const [activeWorkspace, setActiveWorkspace] = useState(getActiveWorkspaceSummary());
@@ -110,6 +119,19 @@ export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pag
           ))}
         </nav>
         <div className="col-start-3 flex items-center gap-2 flex-shrink-0 justify-self-end">
+          {typeof inboxBadgeCount === 'number' && inboxBadgeCount > 0 && (
+            <a
+              href="/inbox"
+              onClick={follow('/inbox')}
+              aria-label={`Hộp thư đề xuất, ${inboxBadgeCount} đề xuất cần xử lý`}
+              className="inline-flex items-center gap-1 rounded-full bg-[#FF5701]/10 px-2.5 py-1 text-xs font-semibold text-[#FF5701] hover:bg-[#FF5701]/20 transition-colors"
+            >
+              <span>Hộp thư đề xuất</span>
+              <span data-inbox-badge-count className="rounded-full bg-[#FF5701] px-1.5 py-0.5 text-[10px] font-bold text-white">
+                {inboxBadgeCount}
+              </span>
+            </a>
+          )}
           {actions}
           <ThemeToggle />
           <UserNavMenu user={user} pendingScheduleCount={pendingCount} variant="prototype" triggerClassName={AVATAR} menuItemClassName={MENU_ITEM} navigate={navigate} onOpenSettings={onOpenSettings ?? (() => navigate('/settings'))} onOpenAccount={() => navigate('/account')} onManageUsers={() => navigate('/admin/users')} onLogout={onLogout} />
