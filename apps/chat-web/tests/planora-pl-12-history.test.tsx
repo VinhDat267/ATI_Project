@@ -73,6 +73,9 @@ describe('PL-12: Planora History & Archives UI (GATE-03 & Business-First UX v2.0
       expect(heading.className).toContain('font-serif');
       expect(heading.className).toContain('text-[var(--planora-text)]');
 
+      // Await conversations list mount
+      await screen.findByRole('heading', { name: 'Đồng bộ lịch tuần sang Slack' });
+
       const main = document.querySelector('main')!;
       const footer = document.querySelector('footer')!;
       expect(main).toBeInTheDocument();
@@ -94,6 +97,7 @@ describe('PL-12: Planora History & Archives UI (GATE-03 & Business-First UX v2.0
     it('ensures 100% of SVG vector icons on HistoryPage main and footer have aria-hidden="true"', async () => {
       render(<HistoryPage user={mockUser} navigate={vi.fn()} onLogout={vi.fn()} />);
       await screen.findByRole('heading', { level: 1 });
+      await screen.findByRole('heading', { name: 'Đồng bộ lịch tuần sang Slack' });
 
       const main = document.querySelector('main')!;
       const footer = document.querySelector('footer')!;
@@ -226,6 +230,57 @@ describe('PL-12: Planora History & Archives UI (GATE-03 & Business-First UX v2.0
       });
       expect(await screen.findByText('Bản tin GitHub PR cần xử lý')).toBeInTheDocument();
     });
+
+    it('displays friendly empty state and reset button when statusFilter yields 0 results', async () => {
+      vi.spyOn(apiClient, 'getConversations').mockResolvedValueOnce({
+        conversations: [sampleConversations[0]], // only 'completed' status
+        nextCursor: null,
+      });
+
+      render(<HistoryPage user={mockUser} navigate={vi.fn()} onLogout={vi.fn()} />);
+      await screen.findByText('Đồng bộ lịch tuần sang Slack');
+
+      // Click 'Cần xử lý' filter -> 0 items match
+      const needsActionPill = screen.getByRole('button', { name: 'Cần xử lý' });
+      fireEvent.click(needsActionPill);
+
+      expect(screen.getByText('Không có hội thoại nào phù hợp bộ lọc')).toBeInTheDocument();
+      expect(screen.queryByText('Đồng bộ lịch tuần sang Slack')).toBeNull();
+
+      // Click 'Đặt lại bộ lọc' button
+      const resetBtn = screen.getByRole('button', { name: 'Đặt lại bộ lọc' });
+      fireEvent.click(resetBtn);
+
+      // Now filter is reset to 'all' and conversations reappear
+      expect(screen.getByText('Đồng bộ lịch tuần sang Slack')).toBeInTheDocument();
+      expect(screen.queryByText('Không có hội thoại nào phù hợp bộ lọc')).toBeNull();
+    });
+
+    it('clears stale notice when switching workspace in HistoryPage', async () => {
+      setActiveWorkspaceId('org-1');
+      render(<HistoryPage user={mockUser} navigate={vi.fn()} onLogout={vi.fn()} />);
+      await screen.findByText('Đồng bộ lịch tuần sang Slack');
+
+      // Rename to produce a notice
+      vi.spyOn(apiClient, 'renameConversation').mockResolvedValueOnce({
+        conversation: { id: 'conv-101', title: 'Tên đã cập nhật' },
+      });
+      const renameBtn = screen.getByRole('button', { name: 'Đổi tên Đồng bộ lịch tuần sang Slack' });
+      fireEvent.click(renameBtn);
+      const input = screen.getByRole('textbox', { name: 'Tiêu đề hội thoại' });
+      fireEvent.change(input, { target: { value: 'Tên đã cập nhật' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Lưu' }));
+
+      await screen.findByText('Đã đổi tên hội thoại.');
+
+      // Switch workspace
+      await act(async () => {
+        setActiveWorkspaceId('org-2');
+      });
+
+      // Notice must be cleared
+      expect(screen.queryByText('Đã đổi tên hội thoại.')).toBeNull();
+    });
   });
 
   describe('3. Workspace Data Isolation & Stale Response Guard', () => {
@@ -332,11 +387,59 @@ describe('PL-12: Planora History & Archives UI (GATE-03 & Business-First UX v2.0
 
       expect(screen.getByText(/Beta Fresh Conv/)).toBeInTheDocument();
     });
+
+    it('clears editing, saving, and error states when switching workspace during rename in SidebarHistory', async () => {
+      let rejectRename!: (err: any) => void;
+      vi.spyOn(apiClient, 'renameConversation').mockImplementation(
+        () => new Promise((_, reject) => {
+          rejectRename = reject;
+        })
+      );
+
+      setActiveWorkspaceId('org-alpha');
+      render(<SidebarHistory planora currentConversationId="conv-101" />);
+
+      // Wait for conversation item to appear
+      await screen.findByText(/Đồng bộ lịch tuần sang Slack/);
+
+      // Click rename button
+      const renameBtn = screen.getByRole('button', { name: 'Đổi tên hội thoại Đồng bộ lịch tuần sang Slack' });
+      fireEvent.click(renameBtn);
+
+      // Verify input is open
+      const input = screen.getByRole('textbox', { name: 'Tiêu đề hội thoại' });
+      expect(input).toBeInTheDocument();
+      fireEvent.change(input, { target: { value: 'Tên mới' } });
+
+      // Submit rename -> triggers saving
+      const form = input.closest('form')!;
+      fireEvent.submit(form);
+
+      // Switch workspace while rename request is in flight
+      await act(async () => {
+        setActiveWorkspaceId('org-beta');
+      });
+
+      // Form is unmounted / cleared
+      expect(screen.queryByRole('textbox', { name: 'Tiêu đề hội thoại' })).toBeNull();
+      expect(screen.queryByRole('alert')).toBeNull();
+
+      // The slow network request fails
+      await act(async () => {
+        rejectRename(new Error('Mạng bị gián đoạn'));
+      });
+
+      // Error must NOT leak into the new workspace and no form remains open
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(screen.queryByRole('textbox', { name: 'Tiêu đề hội thoại' })).toBeNull();
+    });
   });
 
   describe('4. Mutation Testing Verification (M1 - M3)', () => {
-    it('M1: fails if primary buttons or links revert to prototype orange #FF5701', () => {
+    it('M1: fails if primary buttons or links revert to prototype orange #FF5701', async () => {
       render(<HistoryPage user={mockUser} navigate={vi.fn()} onLogout={vi.fn()} />);
+      await screen.findByRole('heading', { name: 'Đồng bộ lịch tuần sang Slack' });
+
       const main = document.querySelector('main')!;
       const footer = document.querySelector('footer')!;
       const html = main.innerHTML + footer.innerHTML;
@@ -344,13 +447,16 @@ describe('PL-12: Planora History & Archives UI (GATE-03 & Business-First UX v2.0
       expect(html).not.toMatch(/#[Ee]04[CcDd]00/);
     });
 
-    it('M2: fails if any SVG icon in HistoryPage main, footer, or SidebarHistory lacks aria-hidden="true"', () => {
+    it('M2: fails if any SVG icon in HistoryPage main, footer, or SidebarHistory lacks aria-hidden="true"', async () => {
       const { container: pageContainer } = render(
         <HistoryPage user={mockUser} navigate={vi.fn()} onLogout={vi.fn()} />
       );
       const { container: sidebarContainer } = render(
         <SidebarHistory planora currentConversationId={null} />
       );
+
+      await screen.findByRole('heading', { name: 'Đồng bộ lịch tuần sang Slack' });
+      await screen.findAllByText(/Đồng bộ lịch tuần sang Slack/);
 
       const main = pageContainer.querySelector('main')!;
       const footer = pageContainer.querySelector('footer')!;
@@ -374,7 +480,7 @@ describe('PL-12: Planora History & Archives UI (GATE-03 & Business-First UX v2.0
       render(<SidebarHistory planora currentConversationId={null} />);
       expect(screen.getByText(/Hội thoại cũ từ Không gian trước/)).toBeInTheDocument();
 
-      act(() => {
+      await act(async () => {
         setActiveWorkspaceId('different-workspace');
       });
 

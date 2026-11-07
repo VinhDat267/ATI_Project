@@ -23,6 +23,7 @@ export function useHistory(user: User | null) {
   const draftRevision = useRef(0);
   const mounted = useRef(true);
   const returnFocus = useRef<string | null>(null);
+  const prevWorkspaceId = useRef(workspaceId);
 
   useLayoutEffect(() => {
     if (editing !== null || !returnFocus.current) return;
@@ -84,6 +85,10 @@ export function useHistory(user: User | null) {
   };
 
   useEffect(() => {
+    if (prevWorkspaceId.current !== workspaceId) {
+      prevWorkspaceId.current = workspaceId;
+      setNotice(null);
+    }
     const owner = ++generation.current;
     setRows([]);
     setCursor(null);

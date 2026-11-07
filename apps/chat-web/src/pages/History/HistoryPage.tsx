@@ -423,7 +423,7 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
         {/* NÚT TẢI THÊM CUỐI DANH SÁCH */}
         <div
           id="load-more-container"
-          className={`pt-2 flex flex-col items-center justify-center gap-2${cursor ? '' : ' hidden'}`}
+          className={`pt-2 flex flex-col items-center justify-center gap-2${cursor && displayed.length > 0 ? '' : ' hidden'}`}
         >
           <button
             type="button"
@@ -441,6 +441,38 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
             Đã hiển thị toàn bộ lịch sử hội thoại
           </div>
         </div>
+
+        {/* TRẠNG THÁI RỖNG DO BỘ LỌC */}
+        {!loading && rows.length > 0 && displayed.length === 0 && (
+          <div
+            id="filter-empty-state"
+            className="p-12 text-center bg-[var(--planora-paper)] rounded-2xl border border-[var(--planora-divider)] shadow-xs v3-space-y-3"
+          >
+            <div className="w-12 h-12 rounded-full bg-[var(--planora-surface-inset)] flex items-center justify-center mx-auto text-[var(--planora-muted)]">
+              <svg aria-hidden="true" className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                />
+              </svg>
+            </div>
+            <h3 className="font-serif text-lg font-bold text-[var(--planora-text)]">
+              Không có hội thoại nào phù hợp bộ lọc
+            </h3>
+            <p className="text-xs sm:text-sm text-[var(--planora-muted)] max-w-sm mx-auto">
+              Không tìm thấy hội thoại ở trạng thái đã chọn trong danh sách hiện tại.
+            </p>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('all')}
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-[var(--planora-surface-inset)] hover:bg-[var(--planora-divider)] text-[var(--planora-text)] transition-colors mt-2 cursor-pointer"
+            >
+              <span>Đặt lại bộ lọc</span>
+            </button>
+          </div>
+        )}
 
         {/* TRẠNG THÁI RỖNG (EMPTY STATE KHI TÌM KHÔNG THẤY) */}
         <div

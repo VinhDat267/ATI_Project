@@ -38,15 +38,30 @@ export function SidebarHistory({
   const busy = useRef(false);
   const selection = useRef(0);
   const prevWorkspaceId = useRef(workspaceId);
+  const renameGenRef = useRef(0);
 
   // Subscribe to workspace changes
   useEffect(() => subscribeWorkspace(() => setWorkspaceId(getActiveWorkspaceId())), []);
 
-  // Workspace change guard: clear stale conversations immediately
+  // Search change guard: reset rename state
+  useEffect(() => {
+    setEditing(null);
+    setTitle('');
+    setSaving(false);
+    setError(null);
+    renameGenRef.current++;
+  }, [search]);
+
+  // Workspace change guard: clear stale conversations immediately and reset rename state
   useEffect(() => {
     if (prevWorkspaceId.current !== workspaceId) {
       prevWorkspaceId.current = workspaceId;
       useChatStore.getState().setConversations([]);
+      setEditing(null);
+      setTitle('');
+      setSaving(false);
+      setError(null);
+      renameGenRef.current++;
     }
   }, [workspaceId]);
 
@@ -112,16 +127,20 @@ export function SidebarHistory({
       setError('Tiêu đề cần từ 1 đến 60 ký tự.');
       return;
     }
+    const generation = ++renameGenRef.current;
     setSaving(true);
     setError(null);
     try {
       const data = await apiClient.renameConversation(id, trimmed);
+      if (generation !== renameGenRef.current) return;
       const store = useChatStore.getState();
       store.setConversations(store.conversations.map(row => (row.id === id ? data.conversation : row)));
       setEditing(null);
+      setError(null);
+      setSaving(false);
     } catch (reason) {
+      if (generation !== renameGenRef.current) return;
       setError(userErrorMessage(reason));
-    } finally {
       setSaving(false);
     }
   };

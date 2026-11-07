@@ -18,9 +18,10 @@ Thiết kế trải nghiệm xem nhật ký, lịch sử và lưu trữ hội th
 2. **Kiến trúc Trang Nhật ký & Sidebar:**
    - **Trang Nhật ký đầy đủ (`HistoryPage.tsx`):** Danh sách hội thoại, phân vùng lịch chạy (`ScheduleSection` đã chuẩn hóa ở PL-11), bộ lọc/tìm kiếm và phân trang theo đúng API backend; xử lý đầy đủ các trạng thái rỗng (`empty`), đang tải (`loading`) và lỗi (`error`); điều hướng mở lại chính xác tại `/c/:id`.
    - **Thanh bên Lịch sử (`SidebarHistory.tsx`):** Đóng vai trò tóm tắt nhanh các hội thoại gần đây; không quảng cáo tìm kiếm vượt phạm vi dữ liệu thật đã tải (không giả vờ tìm toàn server trên danh sách giới hạn đã nạp).
-3. **Bảo toàn Quyền hạn & Thao tác Lưu trữ:**
-   - Hỗ trợ chính xác các thao tác đã có: Lưu trữ (`archive`), Xoá (`delete`), Khôi phục (`restore`); không tự bịa thêm các thao tác chưa có hợp đồng backend (như ghim `pin` hay đổi tên `rename`).
-   - Xử lý đồng bộ ngay lập tức giữa thanh bên (`SidebarHistory`) và trang chính (`HistoryPage`) sau mỗi thao tác.
+3. **Bảo toàn Quyền hạn & Thao tác Hội thoại:**
+   - Hỗ trợ chính xác các thao tác mà hợp đồng API backend hiện tại cung cấp: Đổi tên (`rename`), mở `/c/:id`, phân trang con trỏ (`cursor`), và lọc trạng thái công việc (`all`, `completed`, `needs_action`, `chatting`).
+   - Ghi chú rõ ràng: API backend hiện tại chưa cung cấp endpoint cho `archive`, `delete`, `restore`; frontend tuyệt đối tuân thủ nguyên tắc không tạo mock ảo giác để giả vờ hỗ trợ các thao tác chưa có hợp đồng backend.
+   - Xử lý đồng bộ ngay lập tức giữa thanh bên (`SidebarHistory`) và trang chính (`HistoryPage`) sau mỗi thao tác đổi tên qua `useChatStore`.
 4. **Bảo vệ chống Rò rỉ Dữ liệu & Race Conditions:**
    - Ngăn chặn triệt để tình trạng dữ liệu workspace cũ lọt sang workspace mới khi đổi workspace giữa chừng trong lúc request GET đang tải.
    - Giữ nguyên trạng thái bộ lọc và phân trang khi làm mới trang (refresh).
@@ -53,7 +54,7 @@ Thiết kế trải nghiệm xem nhật ký, lịch sử và lưu trữ hội th
 
 - [x] `HistoryPage.tsx`, `page.css`, `useHistory.ts` và `SidebarHistory.tsx` được chuyển đổi sang CSS tokens Planora và Business-First UX v2.0.
 - [x] Danh sách hội thoại hiển thị thông tin công việc rõ ràng (tiêu đề, nội dung tóm tắt, thời gian, kết quả), mở đúng `/c/:id`.
-- [x] Bảo toàn thao tác `archive`, `delete`, `restore`, đồng bộ tức thì với `SidebarHistory`.
+- [x] Bảo toàn thao tác `rename`, mở `/c/:id`, phân trang con trỏ, đồng bộ tức thì với `SidebarHistory` (ghi nhận API backend chưa cung cấp `archive`, `delete`, `restore`, frontend không tạo mock ảo giác).
 - [x] Chống rò rỉ dữ liệu giữa các workspace khi chuyển đổi trong lúc đang fetch.
 - [x] Đạt chuẩn tương phản WCAG AA $\ge 4.5:1$ cả Light/Dark mode; 100% SVG có `aria-hidden="true"`; 0% màu `#FF5701`, 0% "ATI".
 - [x] Toàn bộ test suite web PASS, `typecheck:v3` và `build:v3` exit code 0.
