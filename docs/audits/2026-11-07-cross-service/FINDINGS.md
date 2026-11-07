@@ -21,7 +21,7 @@ Mức là mức còn lại sau pha 1. F1–F3 và cổng duyệt đã có test �
 |---|---|---|---|
 | F4 | P2 | Biên nhận `myjira.transition_issue` tìm `newStatus`. Schema trả `status`. Nhánh sau vẫn hiện `status`. | Không chặn demo, không gửi sai đích |
 | F5 | P2 | `resolveNaturalWindowFromQuery` đặt `timeMax` `T23:59:59+07:00`. Sự kiện bắt đầu đúng giây cuối ngày bị bỏ. | Đã biết từ 18/10. Không nằm trên sáu việc demo |
-| F7 | P1 | Kịch bản sandbox 9 dịch vụ, không gian Cá nhân, MyJira bật theo môi trường máy: planner từ chối vì Jira không có trong catalog, trong khi màn từ chối nói Jira đã kết nối và mời gửi lại. Catalog sandbox bỏ `jira.*` khi `myjiraEnabled` (`gmail-tools-runtime.ts`). `MYJIRA_SERVICE.name` cũng là "Jira". Gửi lại không tạo được plan mẫu `jira.create_issue`. | Chưa sửa. Test browser dừng trước nút duyệt |
+| F7 | đã đóng | Kịch bản sandbox 4/5/9 dịch vụ giữ `jira.create_issue` và route `jira` khi MyJira đang bật. Ngoài ba kịch bản đó, MyJira vẫn thay Jira dùng chung. | `jira-runtime-catalog.test.ts` 9/9. Browser `nine_service` 1 passed (11.2s): plan `completed`, Slack chứa url/key/id của các bước trước, biên nhận hiện mã Jira, mã thư Gmail, mã tin Telegram và phạm vi Sheets |
 | Live | — | Đọc thật rồi Hủy, và sáu việc trên provider, chưa chạy trong đợt này | Không ghi dịch vụ thật khi chưa được duyệt từng lệnh |
 | Notion, Trello token | — | Preflight 05/11: Notion 401, Trello thiếu token | Named blocker, không đóng bằng sandbox |
 

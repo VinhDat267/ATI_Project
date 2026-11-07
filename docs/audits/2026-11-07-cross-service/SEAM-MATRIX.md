@@ -16,5 +16,5 @@ Mỗi ô là một đường dữ liệu giữa hai bước. PASS là có lệnh
 | Biên nhận transition Jira `newStatus` | FAIL | Schema có `status`. Chưa sửa. P2 |
 | Calendar `timeMax` 23:59:59 | FAIL | Mã `personal-calendar-adapter.ts` vẫn vậy. P2 |
 | Đọc provider thật rồi Hủy | NOT_RUN | Chưa mở app live |
-| Playwright `nine_service` đối chiếu `output_json` | FAIL | Chạy sandbox trên cổng API 3017, web 5184, PostgreSQL local 55533. Banner: kế hoạch mẫu, không gọi dịch vụ thật. Không có nút duyệt. Lý do: "Jira chưa được kết nối hoặc chưa có tài nguyên được phép." Cùng màn: "Jira Đã kết nối" và "Jira đã được kết nối. Bạn có thể gửi lại yêu cầu." Không gian Cá nhân. Calendar và Sheets trên màn đó: Chưa kết nối. Chưa tới `output_json` |
+| Playwright `nine_service` đối chiếu `output_json` | PASS | Sau khi giữ `jira.create_issue` cho kịch bản mẫu. Sandbox API 3017, web 5184, PostgreSQL local 55533. 1 passed, 11.2s. Plan `completed`. Slack chứa các khóa bước trước. Biên nhận hiện mã Jira, mã thư, mã tin Telegram và phạm vi Sheets. Link lịch/Trello/Notion nằm trong khối chi tiết của output |
 | Notion, Trello credential thử | NOT_RUN | Preflight 05/11: Notion 401, Trello thiếu token |

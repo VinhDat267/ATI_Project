@@ -1,6 +1,6 @@
 # XSVC-01 · Kiểm toán liên dịch vụ
 
-**Trạng thái:** pha 1 xong. Browser nine_service fail trước duyệt (F7). Đọc provider thật chưa chạy. · **Nhánh:** `docs/xsvc-01-cross-service-audit`
+**Trạng thái:** F7 đã sửa. Browser nine_service pass. Đọc provider thật chưa chạy. · **Nhánh:** `docs/xsvc-01-cross-service-audit`
 
 ## Mục tiêu
 
@@ -11,7 +11,7 @@
 - [x] **Pha 0.** Bản đồ 12 dịch vụ, 95 tool, placeholder của plan sandbox, và lệch với sáu việc demo. Xem [inventory](../../audits/2026-11-07-cross-service/INVENTORY.md).
 - [x] **Pha 1, F1–F3.** Test đỏ rồi sửa.
 - [x] **Pha 1, phần còn lại.** Cổng duyệt báo cáo mặc định bật. Resolver từ chối `htmlUrl` khi template hỏi `url`.
-- [ ] **Pha 2.** Browser `nine_service` đã chạy và fail trước duyệt (F7). Đọc provider thật rồi Hủy: chưa chạy. Không ghi dịch vụ thật.
+- [x] **Pha 2, browser.** `nine_service` pass sau khi sửa F7. Đọc provider thật rồi Hủy: chưa chạy. Không ghi dịch vụ thật.
 - [ ] **Pha 3.** `FINDINGS.md` và `SEAM-MATRIX.md`. Chỉ sửa P0, hoặc P1 chặn demo, trên nhánh riêng.
 
 ## Kết quả pha 0 (07/11/2026)
@@ -53,3 +53,7 @@ Chưa chạy `npm run check`, chưa chạy live, chưa làm F4/F5.
 ### 07/11/2026 — Pha 2, browser nine_service
 
 Sandbox, không gọi provider. Cổng API 3017 và web 5184 vì cổng 3000 đang có server. Test exit 1 trước nút duyệt. Lý do trên màn: Jira chưa có tài nguyên. Cùng màn nói Jira đã kết nối và mời gửi lại. Không gian Cá nhân. Chưa có bước thực thi nên chưa đối chiếu `output_json`. Đọc provider thật rồi Hủy chưa chạy.
+
+### 07/11/2026 — F7
+
+Ba kịch bản mẫu giữ `jira.create_issue` khi MyJira bật. Test catalog 9/9. Browser nine_service 1 passed, 11.2s, plan completed, biên nhận khớp output đã lưu.

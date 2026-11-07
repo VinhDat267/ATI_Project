@@ -7,18 +7,28 @@ import { getToolCatalogFor } from '../services/registered-services.js';
 import { createSandboxAdapter } from '../sandbox/index.js';
 import { createRuntimeAdapterFactory, type RuntimeMode } from './runtime-policy.js';
 
+const CANNED_SHARED_JIRA_SCENARIOS = new Set(['four_service', 'five_service', 'nine_service']);
+
+/** Canned sandbox plans call jira.create_issue. MyJira must not hide that tool or steal the route. */
+export function sandboxKeepsSharedJira(scenario = process.env.SANDBOX_SCENARIO): boolean {
+  return CANNED_SHARED_JIRA_SCENARIOS.has(scenario ?? '');
+}
+
 export const serviceRegistryForRuntime = (
   gmailEnabled: boolean,
   mycalendarEnabled: boolean = false,
   mysheetsEnabled: boolean = false,
   myjiraEnabled: boolean = false,
-) => [
-  ...SERVICE_REGISTRY.filter((s) => !myjiraEnabled || s.id !== 'jira'),
-  ...(gmailEnabled ? [GMAIL_SERVICE] : []),
-  ...(mycalendarEnabled ? [MYCALENDAR_SERVICE] : []),
-  ...(mysheetsEnabled ? [MYSHEETS_SERVICE] : []),
-  ...(myjiraEnabled ? [MYJIRA_SERVICE] : []),
-];
+) => {
+  const personalJira = myjiraEnabled && !sandboxKeepsSharedJira();
+  return [
+    ...SERVICE_REGISTRY.filter((s) => !personalJira || s.id !== 'jira'),
+    ...(gmailEnabled ? [GMAIL_SERVICE] : []),
+    ...(mycalendarEnabled ? [MYCALENDAR_SERVICE] : []),
+    ...(mysheetsEnabled ? [MYSHEETS_SERVICE] : []),
+    ...(personalJira ? [MYJIRA_SERVICE] : []),
+  ];
+};
 
 export const gmailServiceRegistry = (enabled: boolean) => serviceRegistryForRuntime(enabled, false, false, false);
 
@@ -86,7 +96,7 @@ export async function runtimeToolCatalog(
         t.service !== 'trello' &&
         t.service !== 'github' &&
         t.service !== 'telegram' &&
-        (!options.myjiraEnabled || t.service !== 'jira') &&
+        (!(options.myjiraEnabled && !sandboxKeepsSharedJira()) || t.service !== 'jira') &&
         (!hasMyCalendar || t.service !== 'calendar') &&
         (!hasMySheets || t.service !== 'sheets')
     ),
