@@ -157,6 +157,10 @@ function asksForPullRequests(texts: string[]): boolean {
   return /pull request|\bprs?\b/iu.test(texts.join('\n'));
 }
 
+function asksForCalendarEvents(texts: string[]): boolean {
+  return /sự kiện|su kien/iu.test(texts.join('\n'));
+}
+
 function readOnlyQuestion(): PlannerResponse {
   return { kind: 'clarification', question: 'Bạn muốn làm gì với dữ liệu này, chẳng hạn gửi thông báo, ghi vào bảng tính hoặc tạo công việc?',
     context: 'Kế hoạch cần ít nhất một hành động ghi. Hãy chọn hành động trên dịch vụ đã kết nối.', reason: 'read_only' };
@@ -746,7 +750,9 @@ export class AIPlanner {
       const validation = answerOutput ? validateAnswer(output, { readAnswers: this.readAnswers,
         hasReadData: asksForPullRequests(userTexts)
           ? successfulReads.some((read) => read.tool === 'github.list_pull_requests' && read.error === undefined && read.result !== undefined)
-          : successfulReads.length > 0 || usedDirectory.length > 0 }) : this.scheduleValidation(boundOutput, input) ?? validatePlan(boundOutput, activeTools,
+          : asksForCalendarEvents(userTexts)
+            ? successfulReads.some((read) => (read.tool === 'mycalendar.list_events' || read.tool === 'calendar.list_events') && read.error === undefined && read.result !== undefined)
+            : successfulReads.length > 0 || usedDirectory.length > 0 }) : this.scheduleValidation(boundOutput, input) ?? validatePlan(boundOutput, activeTools,
         {
           ...(this.requireGroundedResources ? { grounding: { memory: groundingMemory(memory.getAll(), memory.getEntity('__observed')), userTexts: groundingUserTexts } } : {}),
           reportEvidenceStore: this.reportEvidenceStore,

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, GITHUB_TOOLS, SLACK_TOOLS } from '@wap/tool-schemas';
+import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, GITHUB_TOOLS, MYCALENDAR_SERVICE, MYCALENDAR_TOOLS, SLACK_TOOLS } from '@wap/tool-schemas';
 import { AIPlanner, MockLLMProvider, WorkingMemory, buildSystemPrompt, formatSearchResults, validatePlan } from '../src/index.js';
 import * as validator from '../src/validator.js';
 
@@ -44,6 +44,12 @@ describe('ANS-01 read answers', () => {
   it('accepts 4000 characters, rejects missing data and ignores forged provenance', () => {
     expect(validate(JSON.stringify(answer('x'.repeat(4000))), { readAnswers: true, hasReadData: true }).valid).toBe(true);
     expect(validate(JSON.stringify(answer()), { readAnswers: true, hasReadData: false })).toMatchObject({ valid: false });
+    for (const text of [
+      'Mình chưa thể liệt kê PR vì cần tra cứu dữ liệu trước.',
+      'Tôi cần đọc dữ liệu lịch của bạn trước khi trả lời.',
+    ]) {
+      expect(validate(JSON.stringify(answer(text)), { readAnswers: true, hasReadData: true })).toMatchObject({ valid: false, layer: 'semantic' });
+    }
   });
   it('derives lookups from successful model calls, deduplicates/caps https links and drops forged sources', async () => {
     const rows = ['http://bad.example', 'javascript:alert(1)', ...Array.from({ length: 7 }, (_, i) => `https://a.example/${i}`), 'https://a.example/0'];
@@ -85,6 +91,34 @@ describe('ANS-01 read answers', () => {
     });
     expect(result).toMatchObject({ kind: 'clarification', reason: 'read_only' });
     expect(calls).not.toContain('github.list_pull_requests');
+  });
+
+  it('does not accept a today-events answer grounded only by the calendar directory', async () => {
+    const provider = new MockLLMProvider();
+    const unread = answer('Hôm nay không có sự kiện.');
+    provider.setPlanResponses([unread, unread]);
+    const calls: string[] = [];
+    const planner = new AIPlanner({
+      provider,
+      toolCatalog: MYCALENDAR_TOOLS,
+      serviceRegistry: [MYCALENDAR_SERVICE],
+      searchMode: 'llm',
+      readAnswers: true,
+      prefetchDirectory: true,
+      gatherSearch: async ({ tool }) => {
+        calls.push(tool);
+        if (tool === 'mycalendar.list_calendars') {
+          return [{ id: 'primary@example.com', title: 'Lịch của tôi', timeZone: 'Asia/Ho_Chi_Minh' }];
+        }
+        return [];
+      },
+    });
+    const result = await planner.processMessage({
+      userMessage: 'Liệt kê sự kiện hôm nay trên lịch Google của tôi. Chỉ đọc.',
+      memory: new WorkingMemory(),
+    });
+    expect(result).toMatchObject({ kind: 'clarification', reason: 'read_only' });
+    expect(calls).not.toContain('mycalendar.list_events');
   });
 
   it('records successful prefetch services separately, without inventing model lookups', async () => {

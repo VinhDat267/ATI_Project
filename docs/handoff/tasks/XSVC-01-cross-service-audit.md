@@ -1,6 +1,6 @@
 # XSVC-01 · Kiểm toán liên dịch vụ
 
-**Trạng thái:** Đọc live đã chạy, 0 plan và 0 execution step. F8 chưa sửa. · **Nhánh:** `docs/xsvc-01-cross-service-audit`
+**Trạng thái:** Kiểm toán liên dịch vụ đã ghi trên nhánh. Notion và Trello token vẫn là named blocker. · **Nhánh:** `docs/xsvc-01-cross-service-audit`
 
 ## Mục tiêu
 
@@ -13,7 +13,7 @@
 - [x] **Pha 1, phần còn lại.** Cổng duyệt báo cáo mặc định bật. Resolver từ chối `htmlUrl` khi template hỏi `url`.
 - [x] **Pha 2, browser.** `nine_service` pass sau khi sửa F7.
 - [x] **Pha 2, đọc live.** Sau F8, `github.list_pull_requests` chạy thật, `resultCount` 0, 0 plan, 0 execution step.
-- [ ] **Pha 3.** `FINDINGS.md` và `SEAM-MATRIX.md`. Chỉ sửa P0, hoặc P1 chặn demo, trên nhánh riêng.
+- [x] **Pha 3.** `FINDINGS.md` và `SEAM-MATRIX.md` đã ghi. Notion 401 và Trello thiếu token vẫn là named blocker.
 
 ## Kết quả pha 0 (07/11/2026)
 
@@ -74,3 +74,7 @@ Server được bật lại. Cùng prompt có tên repository. Tool `github.list
 ### 07/11/2026 — F4 và F5
 
 Biên nhận chuyển trạng thái đọc `status`. Cửa sổ lịch tự nhiên dùng `timeMax` 00:00 ngày hôm sau. Cockpit 12/12, calendar adapter 29/29.
+
+### 07/11/2026 — Đọc lịch hôm nay
+
+Lượt đầu trả lời chưa đọc lịch. Sau khi bắt buộc `list_events`, server nạp lại và gọi `mycalendar.list_events`, `resultCount` 0, 0 plan, 0 execution step. `read-answers.test.ts` 21/21.
