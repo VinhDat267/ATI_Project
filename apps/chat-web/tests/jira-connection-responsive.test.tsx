@@ -198,7 +198,8 @@ describe('Jira UI Responsive, Theme, Refresh, Delayed Callback & User Switch', (
     );
 
     // Shows in-flight status
-    expect(screen.getByRole('status')).toHaveTextContent(/đang hoàn tất kết nối jira/i);
+    const statusEls = screen.getAllByRole('status');
+    expect(statusEls.some((el) => /đang hoàn tất kết nối jira/i.test(el.textContent ?? ''))).toBe(true);
     expect(navigate).not.toHaveBeenCalled();
 
     // Resolve callback
@@ -234,7 +235,7 @@ describe('Jira UI Responsive, Theme, Refresh, Delayed Callback & User Switch', (
       />
     );
 
-    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getAllByRole('status').length).toBeGreaterThanOrEqual(1);
 
     // Switch user while callback is in flight!
     act(() => {

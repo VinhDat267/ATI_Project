@@ -8,6 +8,16 @@ import {
   conversationReturnPath,
 } from '../services/jira-connection';
 import { subscribeAuthTokens } from '../services/auth-storage';
+import { usePrototypePage } from '../prototype/usePrototypePage';
+import { ConnectionCallbackFrame } from '../planora/layout/ConnectionCallbackFrame';
+
+const meta = {
+  id: 'jira-callback',
+  title: 'Kết nối Jira — Planora',
+  htmlClass: '',
+  bodyClass: 'min-h-screen bg-[var(--planora-canvas,#F8F8F6)] text-[var(--planora-text,#111827)] antialiased',
+  css: '',
+};
 
 export function JiraCallbackView({
   input,
@@ -16,6 +26,8 @@ export function JiraCallbackView({
   input?: JiraCallbackInput;
   navigate: (path: string, replace?: boolean) => void;
 }) {
+  usePrototypePage(meta);
+
   useLayoutEffect(() => {
     // Strip sensitive OAuth query parameters from the URL before paint
     window.history.replaceState(window.history.state, '', '/connections/myjira/callback');
@@ -74,29 +86,22 @@ export function JiraCallbackView({
   }, [navigate]);
 
   return (
-    <main className="max-w-xl mx-auto px-4 py-16 text-[#111827] dark:text-white">
-      <h1 className="font-display text-3xl font-semibold mb-4">Kết nối Jira</h1>
-      {error ? (
-        <div role="alert" className="p-4 mb-4 rounded-xl bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300 border border-red-200 dark:border-red-900 text-sm">
-          {error}
-        </div>
-      ) : (
-        <p role="status" className="text-sm text-[#4B5563] dark:text-[#9CA3AF] mb-4">
-          Đang hoàn tất kết nối Jira…
-        </p>
-      )}
-      <div>
-        <a
-          href="/settings#jira"
-          onClick={(event) => {
-            event.preventDefault();
-            navigate('/settings#jira', true);
-          }}
-          className="text-xs font-semibold text-[#FF5701] hover:underline"
-        >
-          ← Về Kết nối dịch vụ
-        </a>
-      </div>
+    <main>
+      <ConnectionCallbackFrame
+        serviceId="jira"
+        serviceName="Atlassian Jira"
+        title="Kết nối Jira"
+        badge="KẾT NỐI QUẢN LÝ DỰ ÁN"
+        statusType={error ? 'error' : 'pending'}
+        statusLabel={error ? 'Chưa kết nối' : 'Đang xử lý'}
+        loading={!error}
+        loadingText="Đang hoàn tất kết nối Jira…"
+        error={error ? <p role="alert">{error}</p> : undefined}
+        onBackToSettings={() => navigate('/settings#jira', true)}
+        backToSettingsLabel="Về Kết nối dịch vụ"
+      />
     </main>
   );
 }
+
+export default JiraCallbackView;

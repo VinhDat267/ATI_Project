@@ -366,13 +366,13 @@ test.describe('JIRA-09A: Jira UI Foundation Browser Tests', () => {
     await expect(page.getByText('Yêu cầu kết nối Jira không hợp lệ. Hãy kết nối lại.')).toBeVisible();
     await page.reload();
     await expect(page.getByText('Yêu cầu kết nối Jira không hợp lệ. Hãy kết nối lại.')).toBeVisible();
-    await page.getByRole('link', { name: /Về Kết nối dịch vụ/i }).click();
+    await (page.getByRole('button', { name: /Về Kết nối dịch vụ/i }).or(page.getByRole('link', { name: /Về Kết nối dịch vụ/i }))).click();
     await page.waitForURL('**/settings#jira');
 
     // Callback with error parameter
     await page.goto('/connections/myjira/callback?error=access_denied');
     await expect(page.getByText('Bạn đã huỷ kết nối Jira.')).toBeVisible();
-    await page.getByRole('link', { name: /Về Kết nối dịch vụ/i }).click();
+    await (page.getByRole('button', { name: /Về Kết nối dịch vụ/i }).or(page.getByRole('link', { name: /Về Kết nối dịch vụ/i }))).click();
     await page.waitForURL('**/settings#jira');
 
     // --- STEP 4: Workspace switch & invite code persistence ---
@@ -443,7 +443,7 @@ test.describe('JIRA-09A: Jira UI Foundation Browser Tests', () => {
     await expect(page.getByText('Không thể đổi tài khoản Atlassian khi chưa ngắt kết nối tài khoản cũ.')).toBeVisible();
     await expect(page).toHaveURL(/\/connections\/myjira\/callback/);
 
-    await page.getByRole('link', { name: /Về Kết nối dịch vụ/i }).click();
+    await (page.getByRole('button', { name: /Về Kết nối dịch vụ/i }).or(page.getByRole('link', { name: /Về Kết nối dịch vụ/i }))).click();
     await page.waitForURL('**/settings#jira');
 
     // Stale session (401 INVALID_SESSION): clears stored session and displays session expired dialog
