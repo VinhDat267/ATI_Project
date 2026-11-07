@@ -12,6 +12,7 @@ export interface PlanoraShellProps {
   navigate: (to: string) => void;
   onLogout: () => void;
   onNewConversation?: () => void;
+  inboxBadgeCount?: number;
   children: React.ReactNode;
 }
 
@@ -25,6 +26,7 @@ export function PlanoraShell({
   navigate,
   onLogout,
   onNewConversation,
+  inboxBadgeCount,
   children,
 }: PlanoraShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -74,6 +76,8 @@ export function PlanoraShell({
         lastWorkspaceId.current = nextId;
         useChatStore.getState().reset();
         useChatStore.getState().setConversationId(null);
+        window.dispatchEvent(new Event('inbox:refresh'));
+        window.dispatchEvent(new Event('conversations:refresh'));
         if (/^\/c\//.test(window.location.pathname)) {
           navigate('/');
         }
@@ -141,7 +145,13 @@ export function PlanoraShell({
             'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
           )
         ).filter((el) => {
-          return el.offsetWidth > 0 || el.offsetHeight > 0 || el === closeBtnRef.current || el.getClientRects().length > 0;
+          return (
+            el.offsetWidth > 0 ||
+            el.offsetHeight > 0 ||
+            el === closeBtnRef.current ||
+            el.getClientRects().length > 0 ||
+            (typeof window !== 'undefined' && window.getComputedStyle(el).display !== 'none')
+          );
         });
 
         if (focusable.length > 0) {
@@ -207,6 +217,7 @@ export function PlanoraShell({
             navigate={navigate}
             onLogout={onLogout}
             onNewConversation={onNewConversation}
+            inboxBadgeCount={inboxBadgeCount}
             isOpen={drawerOpen}
             onClose={() => setDrawerOpen(false)}
           />
@@ -229,7 +240,17 @@ export function PlanoraShell({
                 aria-label="Mở menu điều hướng"
                 aria-expanded={drawerOpen}
               >
-                <span aria-hidden="true">☰</span>
+                <svg
+                  aria-hidden="true"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
               </button>
 
               <div className="planora-mobile-brand">
@@ -247,7 +268,15 @@ export function PlanoraShell({
                   }}
                   aria-label="Mở menu không gian làm việc"
                 >
-                  <span>{getActiveWorkspaceId() === 'personal' ? '👤' : '🏢'}</span>
+                  {getActiveWorkspaceId() === 'personal' ? (
+                    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  ) : (
+                    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                  )}
                 </button>
               </div>
             </div>

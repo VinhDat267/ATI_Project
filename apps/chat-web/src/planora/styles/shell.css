@@ -199,6 +199,71 @@
   flex-shrink: 0;
 }
 
+.planora-nav-item-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.planora-sidebar-services {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px 6px 28px;
+  flex-wrap: wrap;
+}
+
+.planora-service-item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--planora-radius-sm);
+  background-color: var(--planora-paper);
+  border: 1px solid var(--planora-divider);
+  box-sizing: border-box;
+  transition: border-color var(--planora-transition-fast), transform var(--planora-transition-fast);
+}
+
+.planora-service-item:hover {
+  border-color: var(--planora-primary);
+  transform: translateY(-1px);
+}
+
+.planora-service-logo {
+  width: 12px;
+  height: 12px;
+}
+
+.planora-service-item.planora-service-disconnected .planora-service-logo {
+  opacity: 0.38;
+  filter: grayscale(1);
+}
+
+.planora-service-indicator {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 5px;
+  height: 5px;
+  border-radius: var(--planora-radius-pill);
+  border: 1px solid var(--planora-sidebar);
+}
+
+.planora-service-indicator-connected {
+  background-color: #16a34a;
+}
+
+.planora-service-indicator-warning {
+  background-color: #d97706;
+}
+
+.planora-service-indicator-disconnected {
+  background-color: #9ca3af;
+}
+
 /* Sidebar History section */
 .planora-sidebar-history-wrap {
   flex: 1;
