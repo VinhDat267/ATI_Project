@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { apiClient } from '../../services/api-client';
 import {
   getActiveWorkspaceId,
@@ -168,7 +169,7 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
   const isPersonal = activeSummary.id === 'personal';
 
   return (
-    <div ref={menuRef} className="relative inline-block text-left">
+    <div ref={menuRef} className="relative inline-flex min-w-0 max-w-full text-left">
       <button
         ref={buttonRef}
         type="button"
@@ -177,25 +178,29 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border border-[#E7E7E2] bg-white hover:bg-[#F8F8F6] text-[#111827] shadow-sm transition-colors focus:outline-none focus:ring-1 focus:ring-[#FF5701]"
+        title={
+          !isPersonal
+            ? `${activeSummary.name} (${activeSummary.role === 'admin' ? 'Quản trị viên' : 'Thành viên'})`
+            : activeSummary.name
+        }
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border border-[#E7E7E2] bg-white hover:bg-[#F8F8F6] text-[#111827] shadow-sm transition-colors focus:outline-none focus:ring-1 focus:ring-[#FF5701] min-w-0 max-w-full"
       >
-        <span className="truncate max-w-[140px] sm:max-w-[180px] flex items-center gap-1">
-          <span>{isPersonal ? '👤' : '🏢'}</span>
-          <span className="font-semibold hidden xl:inline">{activeSummary.name}</span>
-        </span>
-        {!isPersonal && (
-          <span
-            className={`hidden xl:inline px-1.5 py-0.2 rounded text-[10px] font-medium ${
-              activeSummary.role === 'admin'
-                ? 'bg-amber-100 text-amber-800'
-                : 'bg-neutral-100 text-neutral-600'
-            }`}
-          >
-            {activeSummary.role === 'admin' ? 'Quản trị viên' : 'Thành viên'}
+        <span className="min-w-0 flex items-center gap-1.5">
+          {isPersonal ? (
+            <svg className="w-3.5 h-3.5 text-[#6B7280] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+          ) : (
+            <svg className="w-3.5 h-3.5 text-[#6B7280] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+          )}
+          <span className="font-semibold hidden xl:inline truncate max-w-[130px] 2xl:max-w-[180px]">
+            {activeSummary.name}
           </span>
-        )}
+        </span>
         <svg
-          className={`w-3.5 h-3.5 text-[#6B7280] transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`w-3.5 h-3.5 text-[#6B7280] flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -212,7 +217,7 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
           aria-label="Danh sách không gian làm việc"
           className="absolute left-0 top-full mt-1.5 w-72 sm:w-80 bg-white rounded-xl border border-[#E7E7E2] shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100"
         >
-          <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-[#6B7280]">
+          <div className="px-3 py-1.5 text-xs font-bold text-[#6B7280]">
             Không gian làm việc
           </div>
 
@@ -225,11 +230,15 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
               isPersonal ? 'bg-orange-50/80 font-semibold text-[#FF5701]' : 'hover:bg-neutral-50 text-[#111827]'
             }`}
           >
-            <div className="flex items-center gap-2">
-              <span className="text-base">👤</span>
+            <div className="flex items-center gap-2.5">
+              <span className="w-7 h-7 rounded-lg bg-[#F8F8F6] border border-[#E7E7E2] flex items-center justify-center text-[#4B5563] flex-shrink-0">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </span>
               <div>
                 <div>Không gian Cá nhân</div>
-                <div className="text-[10px] text-[#6B7280]">Lịch, Trang tính, Trello & công cụ riêng</div>
+                <div className="text-xs text-[#6B7280]">Lịch, Trang tính, Trello & công cụ riêng</div>
               </div>
             </div>
             {isPersonal && <span className="text-sm font-bold text-[#FF5701]">✓</span>}
@@ -237,9 +246,9 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
 
           {/* Organizations List */}
           <div className="mt-2 border-t border-[#E7E7E2] pt-1">
-            <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-[#6B7280] flex items-center justify-between">
+            <div className="px-3 py-1.5 text-xs font-bold text-[#6B7280] flex items-center justify-between">
               <span>Tổ chức của bạn</span>
-              <span className="text-[10px] font-normal text-neutral-400">{organizations.length}</span>
+              <span className="text-xs font-normal text-neutral-400">{organizations.length}</span>
             </div>
 
             {organizations.length === 0 ? (
@@ -265,11 +274,15 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
                         : 'hover:bg-neutral-50 text-[#111827]'
                     }`}
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-base flex-shrink-0">🏢</span>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="w-7 h-7 rounded-lg bg-[#F8F8F6] border border-[#E7E7E2] flex items-center justify-center text-[#4B5563] flex-shrink-0">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                      </span>
                       <div className="min-w-0">
                         <div className="truncate font-medium">{org.name}</div>
-                        <div className="text-[10px] text-[#6B7280] flex items-center gap-1.5">
+                        <div className="text-xs text-[#6B7280] flex items-center gap-1.5">
                           <span>{org.role === 'admin' ? 'Quản trị viên' : 'Thành viên'}</span>
                           {isPending && <span className="text-amber-600 font-medium">· Đang chờ duyệt</span>}
                           {isDisabled && <span className="text-red-600 font-medium">· Đã khóa</span>}
@@ -279,7 +292,7 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
 
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       {org.role === 'admin' && typeof org.pendingCount === 'number' && org.pendingCount > 0 && (
-                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-[#FF5701] text-white">
+                        <span className="px-1.5 py-0.5 rounded-full text-xs font-bold bg-[#FF5701] text-white">
                           {org.pendingCount}
                         </span>
                       )}
@@ -296,6 +309,7 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
             <button
               type="button"
               onClick={() => {
+                setOpen(false);
                 setShowCreateModal(true);
                 setCreateError(null);
               }}
@@ -308,163 +322,194 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
             <button
               type="button"
               onClick={() => {
+                setOpen(false);
                 setShowJoinModal(true);
                 setJoinError(null);
                 setJoinNotice(null);
               }}
               className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-[#111827] hover:bg-[#F8F8F6] hover:text-[#FF5701] transition-colors flex items-center gap-2"
             >
-              <span>🔑</span>
+              <svg className="w-3.5 h-3.5 text-[#6B7280] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              </svg>
               <span>Tham gia tổ chức bằng mã mời</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* Modal Tạo Không Gian Tổ Chức */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-white rounded-2xl border border-[#E7E7E2] shadow-2xl p-6 v3-space-y-4 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-[#111827] flex items-center gap-2">
-                <span>🏢</span>
-                <span>Tạo không gian tổ chức mới</span>
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowCreateModal(false)}
-                className="text-[#9CA3AF] hover:text-[#111827] text-sm font-semibold"
-              >
-                ✕
-              </button>
-            </div>
-
-            {createError && (
-              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-600">
-                {createError}
-              </div>
-            )}
-
-            <form onSubmit={handleCreateSubmit} className="v3-space-y-4">
-              <div>
-                <label htmlFor="create-org-name" className="block text-xs font-semibold text-[#111827] mb-1.5">
-                  Tên tổ chức
-                </label>
-                <input
-                  id="create-org-name"
-                  type="text"
-                  required
-                  placeholder="Nhập tên tổ chức (ví dụ: Công ty ABC, Đội Alpha)..."
-                  value={createName}
-                  onChange={(e) => setCreateName(e.target.value)}
-                  className="w-full px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-[#E7E7E2] focus:border-[#FF5701] focus:ring-1 focus:ring-[#FF5701] outline-none"
-                />
-              </div>
-
-              <div className="flex items-start gap-2.5 pt-1">
-                <input
-                  id="create-org-approval"
-                  type="checkbox"
-                  checked={requireApproval}
-                  onChange={(e) => setRequireApproval(e.target.checked)}
-                  className="mt-0.5 rounded border-[#E7E7E2] text-[#FF5701] focus:ring-[#FF5701]"
-                />
-                <label htmlFor="create-org-approval" className="text-xs text-[#4B5563] cursor-pointer">
-                  <span className="font-semibold text-[#111827] block">Cần Quản trị viên duyệt thành viên mới</span>
-                  <span>Khi tắt, bất kỳ ai có mã mời đều được vào làm việc ngay lập tức mà không cần phê duyệt.</span>
-                </label>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E7E7E2]">
+      {/* Modal Tạo Không Gian Tổ Chức (Portal ra document.body để không bị cắt bởi backdrop-blur trên header) */}
+      {showCreateModal &&
+        createPortal(
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-org-modal-title"
+            data-testid="create-org-modal-backdrop"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/45"
+          >
+            <div className="w-full max-w-md bg-white dark:bg-[#1E1E1E] rounded-2xl border border-[#E5E5E0] dark:border-[#333333] shadow-2xl p-6 v3-space-y-4 animate-in fade-in zoom-in-95">
+              <div className="flex items-center justify-between">
+                <h3 id="create-org-modal-title" className="font-sans text-base font-semibold text-[#111827] dark:text-white flex items-center gap-2 tracking-tight">
+                  <svg className="w-4 h-4 text-[#B43E00] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                  <span>Tạo không gian tổ chức mới</span>
+                </h3>
                 <button
                   type="button"
+                  aria-label="Đóng"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-medium text-[#4B5563] hover:bg-neutral-100"
+                  className="p-1 rounded-lg text-[#6B7280] hover:text-[#111827] hover:bg-[#F3F3EF] dark:hover:text-white transition-colors"
                 >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  disabled={createBusy}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#FF5701] text-white hover:bg-[#E04C00] shadow-sm disabled:opacity-50"
-                >
-                  {createBusy ? 'Đang tạo...' : 'Xác nhận tạo'}
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
 
-      {/* Modal Tham Gia Bằng Mã Mời */}
-      {showJoinModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-white rounded-2xl border border-[#E7E7E2] shadow-2xl p-6 v3-space-y-4 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-[#111827] flex items-center gap-2">
-                <span>🔑</span>
-                <span>Tham gia tổ chức bằng mã mời</span>
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowJoinModal(false)}
-                className="text-[#9CA3AF] hover:text-[#111827] text-sm font-semibold"
-              >
-                ✕
-              </button>
+              {createError && (
+                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
+                  {createError}
+                </div>
+              )}
+
+              <form onSubmit={handleCreateSubmit} className="v3-space-y-4">
+                <div>
+                  <label htmlFor="create-org-name" className="block text-xs font-semibold text-[#111827] dark:text-white mb-1.5">
+                    Tên tổ chức
+                  </label>
+                  <input
+                    id="create-org-name"
+                    type="text"
+                    required
+                    autoFocus
+                    placeholder="Nhập tên tổ chức (ví dụ: Công ty ABC, Đội Alpha)..."
+                    value={createName}
+                    onChange={(e) => setCreateName(e.target.value)}
+                    className="w-full px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-[#D4D4CE] dark:border-[#374151] bg-white dark:bg-[#121212] text-[#111827] dark:text-white focus:border-[#C84300] focus:ring-1 focus:ring-[#C84300] !outline-none focus-visible:!outline-none"
+                  />
+                </div>
+
+                <div className="flex items-start gap-2.5 pt-1">
+                  <input
+                    id="create-org-approval"
+                    type="checkbox"
+                    checked={requireApproval}
+                    onChange={(e) => setRequireApproval(e.target.checked)}
+                    className="mt-0.5 rounded border-[#D4D4CE] text-[#C84300] focus:ring-[#C84300]"
+                  />
+                  <label htmlFor="create-org-approval" className="text-xs text-[#4B5563] dark:text-[#9CA3AF] cursor-pointer">
+                    <span className="font-semibold text-[#111827] dark:text-white block">Cần Quản trị viên duyệt thành viên mới</span>
+                    <span>Khi tắt, bất kỳ ai có mã mời đều được vào làm việc ngay lập tức mà không cần phê duyệt.</span>
+                  </label>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E5E5E0] dark:border-[#333333]">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(false)}
+                    className="px-4 py-2 rounded-xl text-xs font-medium text-[#4B5563] dark:text-[#9CA3AF] hover:bg-[#F3F3EF] dark:hover:bg-[#2A2A2A]"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={createBusy}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#C84300] text-white hover:bg-[#A83800] shadow-xs disabled:opacity-50"
+                  >
+                    {createBusy ? 'Đang tạo...' : 'Xác nhận tạo'}
+                  </button>
+                </div>
+              </form>
             </div>
+          </div>,
+          document.body
+        )}
 
-            {joinError && (
-              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-600">
-                {joinError}
-              </div>
-            )}
-
-            {joinNotice && (
-              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 leading-relaxed">
-                {joinNotice}
-              </div>
-            )}
-
-            <form onSubmit={handleJoinSubmit} className="v3-space-y-4">
-              <div>
-                <label htmlFor="join-org-code" className="block text-xs font-semibold text-[#111827] mb-1.5">
-                  Mã mời tổ chức
-                </label>
-                <input
-                  id="join-org-code"
-                  type="text"
-                  required
-                  placeholder="ATI-XXXX-XXXX"
-                  value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value)}
-                  className="w-full px-3.5 py-2 text-xs sm:text-sm font-mono uppercase tracking-wider rounded-xl border border-[#E7E7E2] focus:border-[#FF5701] focus:ring-1 focus:ring-[#FF5701] outline-none"
-                />
-                <p className="text-[11px] text-[#6B7280] mt-1">
-                  Nhập mã mời được quản trị viên tổ chức cung cấp (định dạng ATI-XXXX-XXXX).
-                </p>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E7E7E2]">
+      {/* Modal Tham Gia Bằng Mã Mời (Portal ra document.body để không bị cắt bởi backdrop-blur trên header) */}
+      {showJoinModal &&
+        createPortal(
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="join-org-modal-title"
+            data-testid="join-org-modal-backdrop"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/45"
+          >
+            <div className="w-full max-w-md bg-white dark:bg-[#1E1E1E] rounded-2xl border border-[#E5E5E0] dark:border-[#333333] shadow-2xl p-6 v3-space-y-4 animate-in fade-in zoom-in-95">
+              <div className="flex items-center justify-between">
+                <h3 id="join-org-modal-title" className="font-sans text-base font-semibold text-[#111827] dark:text-white flex items-center gap-2 tracking-tight">
+                  <svg className="w-4 h-4 text-[#B43E00] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                  </svg>
+                  <span>Tham gia tổ chức bằng mã mời</span>
+                </h3>
                 <button
                   type="button"
+                  aria-label="Đóng"
                   onClick={() => setShowJoinModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-medium text-[#4B5563] hover:bg-neutral-100"
+                  className="p-1 rounded-lg text-[#6B7280] hover:text-[#111827] hover:bg-[#F3F3EF] dark:hover:text-white transition-colors"
                 >
-                  Đóng
-                </button>
-                <button
-                  type="submit"
-                  disabled={joinBusy}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#FF5701] text-white hover:bg-[#E04C00] shadow-sm disabled:opacity-50"
-                >
-                  {joinBusy ? 'Đang kiểm tra...' : 'Tham gia ngay'}
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
+
+              {joinError && (
+                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
+                  {joinError}
+                </div>
+              )}
+
+              {joinNotice && (
+                <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 leading-relaxed">
+                  {joinNotice}
+                </div>
+              )}
+
+              <form onSubmit={handleJoinSubmit} className="v3-space-y-4">
+                <div>
+                  <label htmlFor="join-org-code" className="block text-xs font-semibold text-[#111827] dark:text-white mb-1.5">
+                    Mã mời tổ chức
+                  </label>
+                  <input
+                    id="join-org-code"
+                    type="text"
+                    required
+                    autoFocus
+                    placeholder="ATI-XXXX-XXXX"
+                    value={joinCode}
+                    onChange={(e) => setJoinCode(e.target.value)}
+                    className="w-full px-3.5 py-2 text-xs sm:text-sm font-mono uppercase tracking-wider rounded-xl border border-[#D4D4CE] dark:border-[#374151] bg-white dark:bg-[#121212] text-[#111827] dark:text-white focus:border-[#C84300] focus:ring-1 focus:ring-[#C84300] !outline-none focus-visible:!outline-none"
+                  />
+                  <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF] mt-1">
+                    Nhập mã mời được quản trị viên tổ chức cung cấp (định dạng ATI-XXXX-XXXX).
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E5E5E0] dark:border-[#333333]">
+                  <button
+                    type="button"
+                    onClick={() => setShowJoinModal(false)}
+                    className="px-4 py-2 rounded-xl text-xs font-medium text-[#4B5563] dark:text-[#9CA3AF] hover:bg-[#F3F3EF] dark:hover:bg-[#2A2A2A]"
+                  >
+                    Đóng
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={joinBusy}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#C84300] text-white hover:bg-[#A83800] shadow-xs disabled:opacity-50"
+                  >
+                    {joinBusy ? 'Đang kiểm tra...' : 'Tham gia ngay'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

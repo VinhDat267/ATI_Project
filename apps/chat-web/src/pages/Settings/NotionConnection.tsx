@@ -6,6 +6,14 @@ import {
   extractNotionDatabaseIdClient,
 } from '../../services/notion-connection';
 import type { User } from '../../types';
+import { ServiceLogo } from '../../components/ServiceLogo';
+import {
+  CARD_CONTAINER_CLASS,
+  PRIMARY_CONNECT_BTN,
+  SECONDARY_ACTION_BTN,
+  DANGER_GHOST_BTN,
+  connectionBadgeClass,
+} from './ServiceConnectionCard';
 
 interface NotionDatabaseItem {
   id: string;
@@ -351,27 +359,27 @@ export function NotionConnection({
       case 'connected':
         return {
           text: `Đã kết nối${workspaceName ? ` · ${workspaceName}` : ''}`,
-          cls: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+          cls: connectionBadgeClass('connected'),
         };
       case 'needs_scope':
         return {
           text: `Cần chọn database${workspaceName ? ` · ${workspaceName}` : ''}`,
-          cls: 'border-amber-200 bg-amber-50 text-amber-800',
+          cls: connectionBadgeClass('warning'),
         };
       case 'reconnect_required':
         return {
           text: 'Cần kết nối lại',
-          cls: 'border-amber-200 bg-amber-50 text-amber-800',
+          cls: connectionBadgeClass('error'),
         };
       case 'unconfigured':
         return {
           text: 'Chưa bật trên máy chủ',
-          cls: 'border-neutral-200 bg-neutral-100 text-neutral-600',
+          cls: connectionBadgeClass('neutral'),
         };
       default:
         return {
           text: 'Chưa kết nối',
-          cls: 'border-neutral-200 bg-neutral-100 text-neutral-700',
+          cls: connectionBadgeClass('neutral'),
         };
     }
   };
@@ -389,27 +397,28 @@ export function NotionConnection({
   const content = (
     <div
       id="service-row-notion"
-      className={`px-4 py-4 transition-colors ${selected ? 'bg-amber-50/40' : ''}`}
+      className={`${CARD_CONTAINER_CLASS} ${selected ? 'border-[#FF5701] ring-2 ring-[#FF5701]/20' : ''}`}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-sm font-semibold text-neutral-900">Notion</h3>
-            <span
-              className={`inline-flex items-center rounded border px-2 py-0.5 text-xs font-medium ${badge.cls}`}
-            >
+          <div className="flex flex-wrap items-center gap-3">
+            <h3 className="font-sans font-semibold text-base text-[#111827] dark:text-white flex items-center gap-3">
+              <ServiceLogo service="notion" className="w-6 h-6" />
+              Notion
+            </h3>
+            <span className={badge.cls}>
               {badge.text}
             </span>
           </div>
-          <p className="mt-1 text-xs text-neutral-600">
-            Kết nối Notion cá nhân qua OAuth 1-Click để AI đọc, truy vấn database, tạo/cập nhật trang và lên lịch báo cáo tự động trong phạm vi database bạn cấp quyền.
+          <p className="mt-2 text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+            Liên kết tài khoản Notion để tra cứu dữ liệu, tạo hoặc cập nhật trang và tổng hợp báo cáo tự động trong đúng các bảng dữ liệu bạn cho phép.
           </p>
 
           {connections.length > 1 && (
             <div className="mt-2.5 flex items-center gap-2">
               <label
                 htmlFor="notion-workspace-select"
-                className="text-xs font-medium text-neutral-700"
+                className="text-xs font-medium text-[#374151] dark:text-[#D1D5DB]"
               >
                 Workspace đang dùng:
               </label>
@@ -419,7 +428,7 @@ export function NotionConnection({
                 value={activeConnectionId ?? ''}
                 disabled={busy}
                 onChange={(e) => void handleSwitchWorkspace(e.target.value)}
-                className="rounded border border-neutral-300 bg-white px-2 py-1 text-xs text-neutral-900 focus:border-neutral-900 focus:outline-none"
+                className="rounded-lg border border-[#E7E7E2] dark:border-[#374151] bg-white dark:bg-[#1F2937] px-2.5 py-1.5 text-xs text-[#111827] dark:text-white focus:border-[#FF5701] focus:outline-none"
               >
                 {connections.map((conn) => (
                   <option key={conn.id} value={conn.id}>
@@ -434,7 +443,7 @@ export function NotionConnection({
             <div className="mt-2 space-y-1.5">
               <div
                 data-testid="notion-connected-databases"
-                className="flex flex-wrap items-center gap-1.5 text-xs text-neutral-600"
+                className="flex flex-wrap items-center gap-1.5 text-xs text-[#6B7280] dark:text-[#9CA3AF]"
               >
                 <span>Database được phép:</span>
                 {databases.map((d) =>
@@ -444,17 +453,17 @@ export function NotionConnection({
                       href={d.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-0.5 text-xs font-medium text-neutral-900 hover:border-neutral-400 hover:bg-neutral-100"
+                      className="inline-flex items-center gap-1 rounded-full border border-[#E7E7E2] dark:border-[#374151] bg-[#F8F8F6] dark:bg-[#1F2937] px-2.5 py-0.5 text-xs font-medium text-[#111827] dark:text-white hover:border-[#FF5701]"
                     >
                       <span>{d.title}</span>
-                      <span aria-hidden="true" className="text-[10px] text-neutral-500">
+                      <span aria-hidden="true" className="text-xs text-neutral-500">
                         ↗
                       </span>
                     </a>
                   ) : (
                     <span
                       key={d.id}
-                      className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-0.5 text-xs font-medium text-neutral-900"
+                      className="inline-flex items-center gap-1 rounded-full border border-[#E7E7E2] dark:border-[#374151] bg-[#F8F8F6] dark:bg-[#1F2937] px-2.5 py-0.5 text-xs font-medium text-[#111827] dark:text-white"
                     >
                       {d.title}
                     </span>
@@ -472,7 +481,7 @@ export function NotionConnection({
               type="button"
               disabled={busy}
               onClick={startConnect}
-              className="rounded bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+              className={PRIMARY_CONNECT_BTN}
             >
               {busy
                 ? 'Đang mở Notion...'
@@ -493,7 +502,7 @@ export function NotionConnection({
                     setEditingScope(true);
                     void loadCandidates(activeConnectionId, databases);
                   }}
-                  className="rounded border border-neutral-300 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+                  className={SECONDARY_ACTION_BTN}
                 >
                   Đổi database
                 </button>
@@ -504,7 +513,7 @@ export function NotionConnection({
                   type="button"
                   disabled={busy}
                   onClick={handleCheckHealth}
-                  className="rounded border border-neutral-300 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+                  className={SECONDARY_ACTION_BTN}
                 >
                   Kiểm tra
                 </button>
@@ -515,7 +524,7 @@ export function NotionConnection({
                   type="button"
                   disabled={busy}
                   onClick={() => setConfirmDisconnect(true)}
-                  className="rounded border border-neutral-300 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+                  className={DANGER_GHOST_BTN}
                 >
                   Ngắt kết nối
                 </button>
@@ -525,7 +534,7 @@ export function NotionConnection({
                     type="button"
                     disabled={busy}
                     onClick={handleDisconnect}
-                    className="rounded bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                    className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
                   >
                     Xác nhận ngắt
                   </button>
@@ -533,7 +542,7 @@ export function NotionConnection({
                     type="button"
                     disabled={busy}
                     onClick={() => setConfirmDisconnect(false)}
-                    className="rounded border border-neutral-200 px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-100"
+                    className={SECONDARY_ACTION_BTN}
                   >
                     Huỷ
                   </button>
@@ -548,15 +557,15 @@ export function NotionConnection({
         <div
           id="notion-scope"
           data-testid="notion-scope"
-          className="mt-4 rounded border border-neutral-200 bg-neutral-50 p-3 space-y-3"
+          className="mt-4 rounded-xl border border-[#E7E7E2] dark:border-[#374151] bg-[#F8F8F6] dark:bg-[#1F2937]/50 p-4 space-y-3"
         >
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold text-neutral-800">
+            <p className="text-xs font-semibold text-[#111827] dark:text-white">
               Chọn phạm vi Database Notion (1–10 database)
             </p>
             <span
               data-testid="notion-scope-counter"
-              className="rounded border border-neutral-200 bg-white px-2 py-0.5 text-[11px] font-medium text-neutral-700"
+              className="rounded-md border border-[#E7E7E2] dark:border-[#374151] bg-white dark:bg-[#111827] px-2 py-0.5 text-xs font-medium text-[#374151] dark:text-[#D1D5DB]"
             >
               Đã chọn {selectedDatabases.size}/10
             </span>
@@ -570,13 +579,13 @@ export function NotionConnection({
               onChange={(e) => setPasteInput(e.target.value)}
               placeholder="Dán link hoặc ID Database Notion (VD: https://notion.so/...)"
               aria-label="Dán link hoặc ID Database Notion"
-              className="flex-1 rounded border border-neutral-300 bg-white px-2.5 py-1.5 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-none"
+              className="flex-1 rounded-lg border border-[#E7E7E2] dark:border-[#374151] bg-white dark:bg-[#111827] px-3 py-1.5 text-xs text-[#111827] dark:text-white placeholder:text-neutral-400 focus:border-[#FF5701] focus:outline-none"
             />
             <button
               id="notion-add-db-btn"
               type="button"
               onClick={handleAddPastedDatabase}
-              className="rounded border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-800 hover:bg-neutral-100"
+              className={SECONDARY_ACTION_BTN}
             >
               Thêm database
             </button>
@@ -594,16 +603,16 @@ export function NotionConnection({
                   onChange={(e) => setDbFilter(e.target.value)}
                   placeholder="Tìm nhanh database..."
                   aria-label="Tìm nhanh database"
-                  className="w-full rounded border border-neutral-300 bg-white px-2.5 py-1.5 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-none"
+                  className="w-full rounded-lg border border-[#E7E7E2] dark:border-[#374151] bg-white dark:bg-[#111827] px-3 py-1.5 text-xs text-[#111827] dark:text-white placeholder:text-neutral-400 focus:border-[#FF5701] focus:outline-none"
                 />
               )}
 
               {visibleCandidates.length === 0 ? (
                 <p className="text-xs text-neutral-500">
-                  Chưa tìm thấy database nào. Hãy chia sẻ database với integration trong Notion hoặc dán trực tiếp link/ID ở trên.
+                  Chưa tìm thấy database nào. Hãy chia sẻ database với kết nối trong Notion hoặc dán trực tiếp link/ID ở trên.
                 </p>
               ) : (
-                <div className="max-h-48 overflow-y-auto space-y-1.5 rounded border border-neutral-200 bg-white p-2">
+                <div className="max-h-48 overflow-y-auto space-y-1.5 rounded-lg border border-[#E7E7E2] dark:border-[#374151] bg-white dark:bg-[#111827] p-2">
                   {visibleCandidates.map((db) => {
                     const checked = selectedDatabases.has(db.id);
                     const disableNew = !checked && selectedDatabases.size >= 10;
@@ -613,7 +622,7 @@ export function NotionConnection({
                         className={`flex items-center justify-between gap-2 text-xs ${
                           disableNew
                             ? 'text-neutral-400 cursor-not-allowed'
-                            : 'text-neutral-800 cursor-pointer'
+                            : 'text-[#111827] dark:text-neutral-200 cursor-pointer'
                         }`}
                       >
                         <span className="flex items-center gap-2 min-w-0">
@@ -626,7 +635,7 @@ export function NotionConnection({
                           />
                           <span className="truncate font-medium">{db.title}</span>
                         </span>
-                        <span className="shrink-0 font-mono text-[10px] text-neutral-400">
+                        <span className="shrink-0 font-mono text-xs text-neutral-400">
                           {db.id.slice(0, 8)}
                         </span>
                       </label>
@@ -643,7 +652,7 @@ export function NotionConnection({
               type="button"
               disabled={savingScope || selectedDatabases.size < 1 || selectedDatabases.size > 10}
               onClick={handleSaveScope}
-              className="rounded bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+              className={PRIMARY_CONNECT_BTN}
             >
               {savingScope ? 'Đang lưu...' : 'Lưu phạm vi database'}
             </button>
@@ -652,7 +661,7 @@ export function NotionConnection({
                 type="button"
                 disabled={savingScope}
                 onClick={() => setEditingScope(false)}
-                className="rounded border border-neutral-200 bg-white px-2.5 py-1.5 text-xs text-neutral-600 hover:bg-neutral-100"
+                className={SECONDARY_ACTION_BTN}
               >
                 Đóng
               </button>
@@ -661,8 +670,8 @@ export function NotionConnection({
         </div>
       )}
 
-      {notice && <p className="mt-2 text-xs text-emerald-700">{notice}</p>}
-      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+      {notice && <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-400">{notice}</p>}
+      {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
     </div>
   );
 
@@ -670,9 +679,7 @@ export function NotionConnection({
 
   return (
     <section id="notion" aria-labelledby="heading-notion" className="space-y-3">
-      <div className="rounded border border-neutral-200 bg-white divide-y divide-neutral-200">
-        {content}
-      </div>
+      {content}
     </section>
   );
 }

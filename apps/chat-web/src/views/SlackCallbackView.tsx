@@ -109,7 +109,7 @@ export function SlackCallbackView({
 
   return (
     <main className="max-w-xl mx-auto px-4 py-16 text-[#111827] v3-space-y-5">
-      <h1 className="font-display text-3xl font-semibold">
+      <h1 className="font-sans text-2xl font-semibold tracking-tight">
         {result ? 'Đã kết nối Slack' : 'Kết nối Slack'}
       </h1>
       {error ? (

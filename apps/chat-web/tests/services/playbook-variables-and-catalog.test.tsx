@@ -130,7 +130,7 @@ describe('1-Click Parameterized Playbooks & Extended Slack/GitHub Catalog', () =
     const saveBtn = screen.getByTestId('btn-save-playbook');
     fireEvent.click(saveBtn);
 
-    const titleInput = screen.getByLabelText('Tên Playbook 1-Click');
+    const titleInput = screen.getByLabelText('Tên mẫu công việc');
     fireEvent.change(titleInput, { target: { value: 'Playbook Khởi động Dự án VIP' } });
     fireEvent.keyDown(titleInput, { key: 'Enter' });
 
@@ -321,12 +321,11 @@ describe('1-Click Parameterized Playbooks & Extended Slack/GitHub Catalog', () =
       />,
     );
 
-    expect(screen.getByText(/🎥 Đã tạo phòng họp Google Meet/i)).toBeDefined();
-    expect(screen.getByText(/👥 3 khách mời/i)).toBeDefined();
-    expect(screen.getByText(/📁 Thư mục Drive: Folder A/i)).toBeDefined();
-    expect(screen.getByText(/📝 Tài liệu Docs: Doc A/i)).toBeDefined();
-    expect(screen.getByTestId('slack-receipt-metrics')).toBeDefined();
-    expect(screen.getByText(/💬 Đã đọc 2 tin nhắn/i)).toBeDefined();
+    expect(screen.getByText(/Đã tạo phòng họp Google Meet/i)).toBeDefined();
+    expect(screen.getByText(/3 khách mời/i)).toBeDefined();
+    expect(screen.getByText(/Thư mục Drive: Folder A/i)).toBeDefined();
+    expect(screen.getByText(/Tài liệu Docs: Doc A/i)).toBeDefined();
+    expect(screen.getByTestId('slack-receipt-metrics')).toHaveTextContent(/💬 Đã đọc 2 tin nhắn/i);
   });
 
   it('allows 1-Click Quick Spreadsheet Creation directly inside PersonalMySheets settings and shows ecosystem capability pills', async () => {
@@ -439,7 +438,7 @@ describe('1-Click Parameterized Playbooks & Extended Slack/GitHub Catalog', () =
     const saveBtn = screen.getByTestId('btn-save-playbook');
     fireEvent.click(saveBtn);
 
-    const titleInput = screen.getByLabelText('Tên Playbook 1-Click');
+    const titleInput = screen.getByLabelText('Tên mẫu công việc');
     fireEvent.change(titleInput, { target: { value: 'Mẫu riêng của Hạnh' } });
     fireEvent.keyDown(titleInput, { key: 'Enter' });
 

@@ -78,17 +78,17 @@ export interface JobReadiness {
 }
 
 const SERVICE_DISPLAY_NAMES: Record<string, string> = {
-  calendar: 'Google Calendar',
   mycalendar: 'Google Calendar',
-  sheets: 'Google Sheets',
+  calendar: 'Google Calendar',
   mysheets: 'Google Sheets',
+  sheets: 'Google Sheets',
   gmail: 'Gmail',
-  jira: 'Jira',
-  myjira: 'Jira',
-  github: 'GitHub',
-  trello: 'Trello',
-  slack: 'Slack',
   myslack: 'Slack',
+  slack: 'Slack',
+  myjira: 'Jira',
+  jira: 'Jira',
+  trello: 'Trello',
+  github: 'GitHub',
   notion: 'Notion',
   telegram: 'Telegram',
 };
@@ -100,6 +100,9 @@ export function formatServiceDisplayName(serviceId: string): string {
 export function formatServiceDisplayList(serviceIds: string[]): string {
   return serviceIds.map(formatServiceDisplayName).join(', ');
 }
+
+export const formatServiceLabel = formatServiceDisplayName;
+export const formatServiceList = formatServiceDisplayList;
 
 export function matchService(requiredId: string, services: ServiceInfo[]): ServiceInfo | undefined {
   const norm = requiredId.toLowerCase();
@@ -147,7 +150,7 @@ export function evaluateJobReadiness(
     } else if (
       matched.personalStatus === 'needs_scope' ||
       matched.personalStatus === 'scope_required' ||
-      (Array.isArray(matched.allowedScope) && matched.allowedScope.length === 0)
+      (matched.id !== 'gmail' && Array.isArray(matched.allowedScope) && matched.allowedScope.length === 0)
     ) {
       missingResourceServices.push(matched.id);
     } else if (matched.personalStatus === 'needs_workspace' || matched.personalStatus === 'needs_membership') {
@@ -162,7 +165,7 @@ export function evaluateJobReadiness(
       missingServices,
       unhealthyServices,
       missingResourceServices,
-      ctaLabel: `Kết nối ${formatServiceDisplayList(missingServices)}`,
+      ctaLabel: `Kết nối ${formatServiceList(missingServices)}`,
       ctaPath: '/settings',
     };
   }
@@ -174,7 +177,7 @@ export function evaluateJobReadiness(
       missingServices,
       unhealthyServices,
       missingResourceServices,
-      ctaLabel: `Cấp lại quyền ${formatServiceDisplayList(unhealthyServices)}`,
+      ctaLabel: `Kết nối lại ${formatServiceList(unhealthyServices)}`,
       ctaPath: '/settings',
     };
   }
@@ -186,7 +189,7 @@ export function evaluateJobReadiness(
       missingServices,
       unhealthyServices,
       missingResourceServices,
-      ctaLabel: `Chọn tài nguyên cho ${formatServiceDisplayList(missingResourceServices)}`,
+      ctaLabel: `Chọn phạm vi dữ liệu cho ${formatServiceList(missingResourceServices)}`,
       ctaPath: '/settings',
     };
   }
@@ -198,7 +201,7 @@ export function evaluateJobReadiness(
       missingServices,
       unhealthyServices,
       missingResourceServices,
-      ctaLabel: `Cấu hình nhóm ${formatServiceDisplayList(adminServices)}`,
+      ctaLabel: `Thiết lập nhóm ${formatServiceList(adminServices)}`,
       ctaPath: '/settings',
     };
   }
@@ -213,3 +216,47 @@ export function evaluateJobReadiness(
     ctaPath: '#',
   };
 }
+
+export interface ScheduleEventTemplate {
+  id: string;
+  title: string;
+  cadenceLabel: string;
+  description: string;
+  services: string[];
+  prompt: string;
+}
+
+export const SCHEDULE_EVENT_TEMPLATES: ScheduleEventTemplate[] = [
+  {
+    id: 'morning-calendar-digest',
+    title: 'Bản tin Lịch họp & Công việc mỗi sáng',
+    cadenceLabel: 'Hàng ngày · 08:00',
+    description: 'Tổng hợp các cuộc họp trong ngày từ Google Calendar và gửi bản tin tóm tắt sang Slack hoặc Telegram.',
+    services: ['mycalendar', 'slack', 'telegram'],
+    prompt: 'Mỗi sáng lúc 08:00, đọc lịch họp hôm nay trên Google Calendar của tôi và gửi bản tin tóm tắt lên kênh Slack #general.',
+  },
+  {
+    id: 'sheets-overdue-tracker',
+    title: 'Theo dõi việc đến hạn trên Google Sheets',
+    cadenceLabel: 'Thứ Hai – Thứ Sáu · 08:30',
+    description: 'Kiểm tra các dòng công việc sắp tới hạn hoặc chờ duyệt trên bảng tính và nhắc nhóm.',
+    services: ['mysheets', 'telegram'],
+    prompt: 'Mỗi sáng lúc 08:30 từ thứ Hai đến thứ Sáu, đọc bảng Việc của tôi trên Google Sheets và nhắn Telegram những mục sắp tới hạn.',
+  },
+  {
+    id: 'sprint-standup-digest',
+    title: 'Báo cáo Tiến độ Sprint Jira & Trello',
+    cadenceLabel: 'Hàng ngày · 09:00',
+    description: 'Điểm danh các thẻ công việc đang làm, bị chặn hoặc ưu tiên cao để chuẩn bị họp Standup.',
+    services: ['myjira', 'trello', 'slack'],
+    prompt: 'Mỗi sáng lúc 09:00, tổng hợp các công việc ưu tiên cao và đang thực hiện trên Jira/Trello rồi gửi báo cáo Standup lên Slack.',
+  },
+  {
+    id: 'github-pr-aging-watch',
+    title: 'Cảnh báo Pull Request & Issue GitHub tồn đọng',
+    cadenceLabel: 'Thứ Hai – Thứ Sáu · 10:00',
+    description: 'Phát hiện sớm các Pull Request chờ review hoặc lỗi chưa xử lý để đội kỹ thuật phản hồi kịp thời.',
+    services: ['github', 'slack'],
+    prompt: 'Mỗi sáng lúc 10:00 các ngày trong tuần, kiểm tra các Pull Request và Issue đang mở trên GitHub rồi gửi bản tin tổng hợp vào Slack.',
+  },
+];

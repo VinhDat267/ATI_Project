@@ -5,9 +5,17 @@ import { apiClient } from '../../services/api-client';
 import { gmailSessionOwner, redirectToGmail } from '../../services/gmail-connection';
 import { CockpitDialog } from '../../components/CockpitDialog';
 import { ServiceLogo } from '../../components/ServiceLogo';
+import {
+  CAPABILITY_PILL_CLASS,
+  CARD_CONTAINER_CLASS,
+  DANGER_GHOST_BTN,
+  PRIMARY_CONNECT_BTN,
+  SECONDARY_ACTION_BTN,
+  connectionBadgeClass,
+} from './ServiceConnectionCard';
 
-const button = 'px-4 py-2 rounded-xl text-xs font-semibold bg-[#FF5701] text-white hover:bg-[#E04C00] disabled:opacity-50 transition-colors shadow-sm';
-const secondary = 'px-4 py-2 rounded-xl text-xs font-medium bg-white text-[#111827] border border-[#E7E7E2] hover:bg-neutral-50 disabled:opacity-50 transition-colors';
+const button = PRIMARY_CONNECT_BTN;
+const secondary = SECONDARY_ACTION_BTN;
 const GMAIL_CAPABILITIES = [
   'Đọc & tóm tắt thư',
   'Soạn nháp & gửi thư',
@@ -43,12 +51,8 @@ export function PersonalGmail({ service, refresh, selected, standalone = true }:
     finally { pending.current = false; if (mounted.current) setBusy(false); }
   };
   const status = service.personalStatus ?? 'not_connected';
-  const statusBadgeClass =
-    status === 'connected'
-      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-      : status === 'reconnect_required'
-        ? 'bg-amber-50 text-amber-700 border-amber-200'
-        : 'bg-neutral-100 text-[#6B7280] border-[#E7E7E2]';
+  const badgeTone =
+    status === 'connected' ? 'connected' : status === 'reconnect_required' ? 'warning' : 'neutral';
   const statusDotClass =
     status === 'connected'
       ? 'bg-[#16A34A]'
@@ -57,34 +61,47 @@ export function PersonalGmail({ service, refresh, selected, standalone = true }:
         : 'bg-[#9CA3AF]';
 
   const rowContent = (
-    <div ref={row} id="service-row-gmail" tabIndex={-1} className="bg-white border border-[#E7E7E2] rounded-xl p-4 sm:p-5 v3-space-y-3 focus-visible:ring-2 focus-visible:ring-[#FF5701] focus-visible:v3-outline-none">
-      <div id="gmail" />
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="font-display font-semibold text-base text-[#111827] flex items-center gap-3"><ServiceLogo service="gmail" className="w-6 h-6" />Gmail</h3>
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${statusBadgeClass}`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${statusDotClass}`} />
-          <span>{status === 'connected' ? 'Đã kết nối' : status === 'reconnect_required' ? 'Cần kết nối lại' : 'Chưa kết nối'}</span>
-        </span>
-      </div>
-      <p className="text-xs text-[#6B7280]">Chỉ bạn dùng được hộp thư này. Planora được đọc, soạn, gửi, gắn nhãn và chuyển thư vào thùng rác; không xoá vĩnh viễn.</p>
-      <p className="text-sm text-[#111827] break-words">{status === 'connected' ? 'Đã kết nối' : status === 'reconnect_required' ? 'Cần kết nối lại' : 'Chưa kết nối'}{service.email && <> · {service.email}</>}</p>
-      {status === 'connected' && (
-        <div data-testid="gmail-capabilities" className="flex flex-wrap gap-1.5 pt-0.5">
+    <div ref={row} id="service-row-gmail" tabIndex={-1} className={`${CARD_CONTAINER_CLASS} flex flex-col justify-between gap-3.5 focus-visible:ring-2 focus-visible:ring-[#FF5701] focus-visible:v3-outline-none`}>
+      <div id="gmail" className="hidden" />
+      <div className="v3-space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h3 className="font-sans font-semibold text-base text-[#111827] dark:text-white flex items-center gap-2.5">
+              <ServiceLogo service="gmail" className="w-5 h-5" />
+              <span>Gmail</span>
+            </h3>
+            {service.email && (
+              <p className="text-xs font-medium text-[#4B5563] dark:text-[#9CA3AF] break-words mt-0.5 pl-7">{service.email}</p>
+            )}
+          </div>
+          <span className={connectionBadgeClass(badgeTone)}>
+            <span className={`w-1.5 h-1.5 rounded-full ${statusDotClass}`} />
+            <span>{status === 'connected' ? 'Đã kết nối' : status === 'reconnect_required' ? 'Cần kết nối lại' : 'Chưa kết nối'}</span>
+          </span>
+        </div>
+        <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF] leading-relaxed">Chỉ bạn dùng được hộp thư này. Planora được đọc, soạn, gửi, gắn nhãn và chuyển thư vào thùng rác; không xoá vĩnh viễn.</p>
+        <div data-testid="gmail-capabilities" className="flex flex-wrap gap-1.5">
           {GMAIL_CAPABILITIES.map(cap => (
-            <span key={cap} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-[#F8F8F6] border border-[#E7E7E2] text-[#111827]">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A]" />
+            <span key={cap} className={CAPABILITY_PILL_CLASS}>
               <span>{cap}</span>
             </span>
           ))}
         </div>
-      )}
-      {service.connectedAt && <p className="text-xs text-[#6B7280]">Kết nối lúc {new Date(service.connectedAt).toLocaleString('vi-VN')}</p>}
-      {status === 'reconnect_required' && <p className="text-xs text-[#6B7280]">Quyền có thể đã bị thu hồi hoặc hết hạn sau 7 ngày ở chế độ thử nghiệm của Google. Hãy kết nối lại.</p>}
-      <div className="flex flex-wrap items-center gap-2 pt-1">
-        <button id="gmail-action" type="button" className={button} disabled={busy} onClick={() => status === 'connected' ? setConfirm(true) : void act(false)}>{status === 'connected' ? 'Ngắt kết nối' : status === 'reconnect_required' ? 'Kết nối lại' : 'Kết nối Gmail'}</button>
+        {status === 'connected' && service.email && (
+          <div className="flex flex-wrap items-center gap-1.5 p-2.5 rounded-xl bg-[#F8F8F6] dark:bg-[#161616] border border-[#E7E7E2] dark:border-[#2E2E2E]">
+            <span className="text-xs font-medium text-[#4B5563] dark:text-[#9CA3AF]">Hộp thư được dùng:</span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800/60">
+              <span>{service.email}</span>
+            </span>
+          </div>
+        )}
+        {status === 'reconnect_required' && <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">Quyền có thể đã bị thu hồi hoặc hết hạn sau 7 ngày ở chế độ thử nghiệm của Google. Hãy kết nối lại.</p>}
       </div>
-      {busy && <p role="status" className="text-xs text-[#6B7280]">{status === 'connected' ? 'Đang ngắt kết nối…' : 'Đang chuyển hướng tới Google…'}</p>}
-      {error && <p role="alert" className="text-xs text-[#DC2626]">{error}</p>}
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[#F3F4F6] dark:border-[#2E2E2E]">
+        <button id="gmail-action" type="button" className={status === 'connected' ? `${DANGER_GHOST_BTN} ml-auto` : button} disabled={busy} onClick={() => status === 'connected' ? setConfirm(true) : void act(false)}>{status === 'connected' ? 'Ngắt kết nối' : status === 'reconnect_required' ? 'Kết nối lại' : 'Kết nối Gmail'}</button>
+        {busy && <p role="status" className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">{status === 'connected' ? 'Đang ngắt kết nối…' : 'Đang chuyển hướng tới Google…'}</p>}
+        {error && <p role="alert" className="text-xs text-[#DC2626] w-full">{error}</p>}
+      </div>
     </div>
   );
   return <>

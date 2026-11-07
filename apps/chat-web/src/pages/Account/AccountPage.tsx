@@ -55,7 +55,7 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
   const initials = avatarInitials(account), isAdmin = view.role === 'admin', roleName = isAdmin ? 'Quản trị viên' : 'Thành viên';
   const googleOnly = !view.hasPassword, unlinkLocked = !view.hasPassword, linking = busy === 'link';
   const passType = (id: string) => shownPasswords.includes(id) ? 'text' : 'password';
-  const modalClass = (_id: string) => 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm';
+  const modalClass = (_id: string) => 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45';
   if (!account) return (
     <>
       <MainNav user={user} current={null} pageName="Tài khoản" navigate={navigate} onLogout={onLogout} />
@@ -67,12 +67,12 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
       {/* FE-12: thanh điều hướng chung thay thanh trên của bản mẫu. */}
       <MainNav user={user} current={null} pageName="Tài khoản" navigate={navigate} onLogout={onLogout} />
       {/* NỘI DUNG CHÍNH */}
-      <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-8 sm:py-10">
+      <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8">
         {!modal && error && <p role="alert" className="text-sm text-red-600 mb-4">{error}</p>}
         {notice && <p role="status" className="text-sm text-emerald-600 mb-4">{notice}</p>}
         {/* Tiêu đề trang */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 text-xs text-[#6B7280] mb-2 font-medium">
+        <div className="mb-6 border-b border-[#E5E5E0] pb-5">
+          <div className="flex items-center gap-2 text-xs text-[#6B7280] mb-1.5 font-medium">
             <a href="/" onClick={event => { event.preventDefault(); navigate("/"); }} className="hover:text-[#111827] transition-colors">
               Không gian làm việc
             </a>
@@ -83,26 +83,26 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
               Tài khoản của bạn
             </span>
           </div>
-          <h1 className="font-display text-3xl sm:text-4xl font-bold text-[#111827] tracking-tight">
+          <h1 className="font-sans text-2xl sm:text-[26px] font-semibold text-[#111827] tracking-tight">
             Cài đặt tài khoản
           </h1>
-          <p className="text-sm sm:text-base text-[#4B5563] mt-2">
+          <p className="text-sm text-[#4B5563] mt-1">
             Quản lý thông tin hồ sơ, bảo mật mật khẩu, các phiên thiết bị đang truy cập và liên kết tài khoản Google.
           </p>
         </div>
         {/* KHỐI TỔNG QUAN TÀI KHOẢN (PROFILE CARD) */}
-        <div className="bg-white rounded-2xl p-5 sm:p-6 border border-[#E7E7E2] shadow-sm mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
+        <div className="bg-white rounded-2xl p-5 sm:p-6 border border-[#E5E5E0] shadow-2xs mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
           <div className="flex items-center gap-4">
-            {/* Avatar tròn lớn */}
-            <div id="profile-card-avatar" className="w-16 h-16 rounded-2xl bg-[#FF5701] text-white flex items-center justify-center font-display font-bold text-2xl shadow-sm flex-shrink-0">
+            {/* Avatar lớn */}
+            <div id="profile-card-avatar" className="w-14 h-14 rounded-2xl bg-[#111827] text-white flex items-center justify-center font-sans font-semibold text-xl shadow-2xs flex-shrink-0">
               {initials}
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-2.5">
-                <h2 id="profile-card-name" className="font-display text-xl sm:text-2xl font-bold text-[#111827]">
+                <h2 id="profile-card-name" className="font-sans text-lg sm:text-xl font-semibold text-[#111827]">
                   {view.fullName}
                 </h2>
-                <span id="profile-card-role-badge" className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#FF5701]/10 text-[#FF5701] border border-[#FF5701]/20">
+                <span id="profile-card-role-badge" className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#FFF6EE] text-[#B43E00] border border-[#F7D7BE]">
                   {roleName}
                 </span>
               </div>
@@ -110,7 +110,7 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
                 <span className="font-mono text-[#111827]">
                   {view.email}
                 </span>
-                {user?.emailVerified !== undefined && <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#16A34A] bg-[#16A34A]/10 px-2 py-0.5 rounded-full">
+                {user?.emailVerified !== undefined && <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
                   <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
@@ -120,7 +120,7 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
             </div>
           </div>
           {/* Tóm tắt số thiết bị hoạt động */}
-          <div className="w-full sm:w-auto bg-[#F8F8F6] rounded-xl px-4 py-3 border border-[#E7E7E2] flex items-center gap-2 text-xs text-[#4B5563] self-start sm:self-center">
+          <div className="w-full sm:w-auto bg-[#F8F8F6] rounded-xl px-4 py-2.5 border border-[#E5E5E0] flex items-center gap-2 text-xs text-[#4B5563] self-start sm:self-center">
             <span className="w-2 h-2 rounded-full bg-[#16A34A]" />
             <span id="summary-sessions-text">
               {`${sessions.length} thiết bị đang hoạt động`}
@@ -128,11 +128,11 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
           </div>
         </div>
         {/* LƯỚI 4 PHẦN TÍNH NĂNG */}
-        <div className="v3-space-y-8">
+        <div className="v3-space-y-6">
           {/* PHẦN 1: THÔNG TIN CÁ NHÂN & ĐỔI TÊN */}
-          <section id="section-profile" className="bg-white rounded-2xl p-5 sm:p-7 border border-[#E7E7E2] shadow-sm" aria-labelledby="heading-profile">
-            <div className="border-b border-[#E7E7E2] pb-4 mb-6">
-              <h2 id="heading-profile" className="font-display text-xl sm:text-2xl font-bold text-[#111827]">
+          <section id="section-profile" className="bg-white rounded-2xl p-5 sm:p-6 border border-[#E5E5E0] shadow-2xs" aria-labelledby="heading-profile">
+            <div className="border-b border-[#E5E5E0] pb-4 mb-5">
+              <h2 id="heading-profile" className="font-sans text-lg sm:text-xl font-semibold text-[#111827]">
                 1. Thông tin cá nhân
               </h2>
               <p className="text-xs sm:text-sm text-[#6B7280] mt-1">
@@ -144,12 +144,12 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
               <div>
                 <label htmlFor="input-full-name" className="block text-xs sm:text-sm font-semibold text-[#111827] mb-1.5">
                   {"Họ và tên "}
-                  <span className="text-[#FF5701]">
+                  <span className="text-[#B43E00]">
                     *
                   </span>
                 </label>
                 {' '}
-                <input ref={fullNameRef} type="text" id="input-full-name" name="fullName" value={name} onChange={event => setName(event.target.value)} maxLength={100} autoComplete="name" required className="w-full text-sm sm:text-base px-3.5 py-2.5 bg-white border border-[#E7E7E2] rounded-xl text-[#111827] placeholder-[#9CA3AF] focus:border-[#FF5701] focus:ring-1 focus:ring-[#FF5701] transition-all" placeholder="Nhập họ và tên đầy đủ" />
+                <input ref={fullNameRef} type="text" id="input-full-name" name="fullName" value={name} onChange={event => setName(event.target.value)} maxLength={100} autoComplete="name" required className="w-full text-sm px-3.5 py-2.5 bg-white border border-[#E5E5E0] rounded-xl text-[#111827] placeholder-[#6B7280] !outline-none focus-visible:!outline-none focus:border-[#111827] transition-all" placeholder="Nhập họ và tên đầy đủ" />
                 {' '}
                 <p className="text-xs text-[#6B7280] mt-1.5">
                   Tên này sẽ hiển thị ở góc thanh điều khiển và đại diện cho bạn khi duyệt các kế hoạch của Planora.
@@ -161,9 +161,9 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
                   Địa chỉ email đăng nhập
                 </label>
                 <div className="relative">
-                  <input type="email" id="input-email-readonly" value={view.email} readOnly className="w-full text-sm sm:text-base px-3.5 py-2.5 bg-[#F8F8F6] border border-[#E7E7E2] rounded-xl text-[#6B7280] font-mono cursor-not-allowed pr-28" />
+                  <input type="email" id="input-email-readonly" value={view.email} readOnly className="w-full text-sm px-3.5 py-2.5 bg-[#F8F8F6] border border-[#E5E5E0] rounded-xl text-[#6B7280] font-mono cursor-not-allowed pr-28" />
                   {' '}
-                  {user?.emailVerified !== undefined && <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-xs font-medium text-[#16A34A] bg-[#16A34A]/10 px-2 py-0.5 rounded-md">
+                  {user?.emailVerified !== undefined && <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-xs font-medium text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
@@ -179,8 +179,8 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
                 <label className="block text-xs sm:text-sm font-semibold text-[#111827] mb-1.5">
                   Vai trò trong nhóm
                 </label>
-                <div className="p-3.5 bg-[#F8F8F6] border border-[#E7E7E2] rounded-xl flex items-start gap-3">
-                  <div className="w-7 h-7 rounded-lg bg-[#FF5701]/10 text-[#FF5701] flex items-center justify-center flex-shrink-0 mt-0.5">
+                <div className="p-3.5 bg-[#F8F8F6] border border-[#E5E5E0] rounded-xl flex items-start gap-3">
+                  <div className="w-7 h-7 rounded-lg bg-white border border-[#E5E5E0] text-[#4B5563] flex items-center justify-center flex-shrink-0 mt-0.5">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                     </svg>
@@ -198,8 +198,8 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
                 </div>
               </div>
               {/* Nút Lưu họ tên */}
-              <div className="pt-2">
-                <button type="submit" id="btn-save-profile" disabled={busy !== null} className="inline-flex items-center justify-center gap-2 px-5 py-2.5 min-h-[44px] bg-[#FF5701] hover:bg-[#e04d00] text-white text-sm font-semibold rounded-xl shadow-sm transition-all focus:v3-outline-none">
+              <div className="pt-1">
+                <button type="submit" id="btn-save-profile" disabled={busy !== null} className="inline-flex items-center justify-center gap-2 px-5 py-2.5 min-h-[42px] bg-[#C84300] hover:bg-[#A83800] text-white text-sm font-semibold rounded-xl shadow-2xs transition-all focus:v3-outline-none">
                   <span>
                     Lưu thay đổi họ tên
                   </span>
@@ -208,9 +208,9 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
             </form>
           </section>
           {/* PHẦN 2: ĐỔI MẬT KHẨU */}
-          <section id="section-password" className="bg-white rounded-2xl p-5 sm:p-7 border border-[#E7E7E2] shadow-sm" aria-labelledby="heading-password">
-            <div className="border-b border-[#E7E7E2] pb-4 mb-6">
-              <h2 id="heading-password" className="font-display text-xl sm:text-2xl font-bold text-[#111827]">
+          <section id="section-password" className="bg-white rounded-2xl p-5 sm:p-6 border border-[#E5E5E0] shadow-2xs" aria-labelledby="heading-password">
+            <div className="border-b border-[#E5E5E0] pb-4 mb-5">
+              <h2 id="heading-password" className="font-sans text-lg sm:text-xl font-semibold text-[#111827]">
                 2. Đổi mật khẩu
               </h2>
               <p className="text-xs sm:text-sm text-[#6B7280] mt-1">
@@ -222,12 +222,12 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
               <div>
                 <label htmlFor="input-current-pass" className="block text-xs sm:text-sm font-semibold text-[#111827] mb-1.5">
                   {"Mật khẩu hiện tại "}
-                  <span className="text-[#FF5701]">
+                  <span className="text-[#B43E00]">
                     *
                   </span>
                 </label>
                 <div className="relative">
-                  <input ref={currentPassRef} type={passType('input-current-pass')} id="input-current-pass" required maxLength={128} className="w-full text-sm sm:text-base px-3.5 py-2.5 bg-white border border-[#E7E7E2] rounded-xl text-[#111827] placeholder-[#9CA3AF] focus:border-[#FF5701] focus:ring-1 focus:ring-[#FF5701] transition-all pr-10" placeholder="Nhập mật khẩu đang dùng" />
+                  <input ref={currentPassRef} type={passType('input-current-pass')} id="input-current-pass" required maxLength={128} className="w-full text-sm px-3.5 py-2.5 bg-white border border-[#E5E5E0] rounded-xl text-[#111827] placeholder-[#6B7280] !outline-none focus-visible:!outline-none focus:border-[#111827] transition-all pr-10" placeholder="Nhập mật khẩu đang dùng" />
                   {' '}
                   <button type="button" onClick={() => actions.togglePasswordVisibility('input-current-pass')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[#111827] p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg" aria-label="Ẩn hoặc hiện mật khẩu hiện tại">
                     <EyeIcons visible={shownPasswords.includes('input-current-pass')} />
@@ -239,7 +239,7 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
                 <div className="flex items-center justify-between mb-1.5">
                   <label htmlFor="input-new-pass" className="block text-xs sm:text-sm font-semibold text-[#111827]">
                     {"Mật khẩu mới "}
-                    <span className="text-[#FF5701]">
+                    <span className="text-[#B43E00]">
                       *
                     </span>
                   </label>
@@ -248,14 +248,14 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
                   </span>
                 </div>
                 <div className="relative">
-                  <input ref={newPassRef} type={passType('input-new-pass')} id="input-new-pass" minLength={12} required onInput={(event) => setPasswordLength(event.currentTarget.value.length)} className="w-full text-sm sm:text-base px-3.5 py-2.5 bg-white border border-[#E7E7E2] rounded-xl text-[#111827] placeholder-[#9CA3AF] focus:border-[#FF5701] focus:ring-1 focus:ring-[#FF5701] transition-all pr-10" placeholder="Ít nhất 12 ký tự" />
+                  <input ref={newPassRef} type={passType('input-new-pass')} id="input-new-pass" minLength={12} required onInput={(event) => setPasswordLength(event.currentTarget.value.length)} className="w-full text-sm px-3.5 py-2.5 bg-white border border-[#E5E5E0] rounded-xl text-[#111827] placeholder-[#6B7280] !outline-none focus-visible:!outline-none focus:border-[#111827] transition-all pr-10" placeholder="Ít nhất 12 ký tự" />
                   {' '}
                   <button type="button" onClick={() => actions.togglePasswordVisibility('input-new-pass')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[#111827] p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg" aria-label="Ẩn hoặc hiện mật khẩu mới">
                     <EyeIcons visible={shownPasswords.includes('input-new-pass')} />
                   </button>
                 </div>
                 {/* Thanh độ mạnh mật khẩu */}
-                <div className="w-full bg-[#E7E7E2] h-1.5 rounded-full overflow-hidden mt-2">
+                <div className="w-full bg-[#E5E5E0] h-1.5 rounded-full overflow-hidden mt-2">
                   <div id="pass-strength-bar" className={strength.barClass} style={strength.width === undefined ? undefined : { width: strength.width }} />
                 </div>
               </div>
@@ -263,12 +263,12 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
               <div>
                 <label htmlFor="input-confirm-pass" className="block text-xs sm:text-sm font-semibold text-[#111827] mb-1.5">
                   {"Xác nhận mật khẩu mới "}
-                  <span className="text-[#FF5701]">
+                  <span className="text-[#B43E00]">
                     *
                   </span>
                 </label>
                 <div className="relative">
-                  <input ref={confirmPassRef} type={passType('input-confirm-pass')} id="input-confirm-pass" minLength={12} required maxLength={128} className="w-full text-sm sm:text-base px-3.5 py-2.5 bg-white border border-[#E7E7E2] rounded-xl text-[#111827] placeholder-[#9CA3AF] focus:border-[#FF5701] focus:ring-1 focus:ring-[#FF5701] transition-all pr-10" placeholder="Nhập lại đúng mật khẩu mới" />
+                  <input ref={confirmPassRef} type={passType('input-confirm-pass')} id="input-confirm-pass" minLength={12} required maxLength={128} className="w-full text-sm px-3.5 py-2.5 bg-white border border-[#E5E5E0] rounded-xl text-[#111827] placeholder-[#6B7280] !outline-none focus-visible:!outline-none focus:border-[#111827] transition-all pr-10" placeholder="Nhập lại đúng mật khẩu mới" />
                   {' '}
                   <button type="button" onClick={() => actions.togglePasswordVisibility('input-confirm-pass')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[#111827] p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg" aria-label="Ẩn hoặc hiện mật khẩu xác nhận">
                     <EyeIcons visible={shownPasswords.includes('input-confirm-pass')} />
@@ -276,15 +276,15 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
                 </div>
               </div>
               {/* Thông báo lưu ý khi đổi mật khẩu */}
-              <div className="p-3 bg-[#F8F8F6] border border-[#E7E7E2] rounded-xl text-xs text-[#4B5563] leading-relaxed">
+              <div className="p-3 bg-[#F8F8F6] border border-[#E5E5E0] rounded-xl text-xs text-[#4B5563] leading-relaxed">
                 <strong className="text-[#111827] font-semibold">
                   Lưu ý an toàn:
                 </strong>
                 {" Sau khi đổi mật khẩu, các thiết bị khác sẽ bị đăng xuất và các link đặt lại mật khẩu cũ hết hiệu lực. Thiết bị này vẫn giữ đăng nhập."}
               </div>
               {/* Nút Đổi mật khẩu */}
-              <div className="pt-2">
-                <button type="submit" id="btn-submit-change-pass" disabled={busy !== null} className="inline-flex items-center justify-center gap-2 px-5 py-2.5 min-h-[44px] bg-[#111827] hover:bg-black text-white text-sm font-semibold rounded-xl shadow-sm transition-all focus:v3-outline-none">
+              <div className="pt-1">
+                <button type="submit" id="btn-submit-change-pass" disabled={busy !== null} className="inline-flex items-center justify-center gap-2 px-5 py-2.5 min-h-[42px] bg-[#111827] hover:bg-black text-white text-sm font-semibold rounded-xl shadow-2xs transition-all focus:v3-outline-none">
                   <span>
                     Cập nhật mật khẩu mới
                   </span>
@@ -292,15 +292,15 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
               </div>
             </form>}
             {/* Hướng dẫn khi tài khoản chỉ đăng nhập bằng Google (chưa có mật khẩu) */}
-            <div id="password-google-only-guide" className={`${googleOnly ? '' : 'hidden '}max-w-xl p-5 bg-[#F8F8F6] border border-[#E7E7E2] rounded-2xl v3-space-y-4`}>
+            <div id="password-google-only-guide" className={`${googleOnly ? '' : 'hidden '}max-w-xl p-5 bg-[#F8F8F6] border border-[#E5E5E0] rounded-2xl v3-space-y-4`}>
               <div className="flex items-start gap-3.5">
-                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 border border-amber-200/70 flex items-center justify-center flex-shrink-0">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                   </svg>
                 </div>
                 <div className="v3-space-y-1">
-                  <h3 className="font-bold text-sm text-[#111827]">
+                  <h3 className="font-sans font-semibold text-sm text-[#111827]">
                     Tài khoản này chưa có mật khẩu
                   </h3>
                   <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
@@ -308,9 +308,9 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
                   </p>
                 </div>
               </div>
-              <div className="pt-2 border-t border-[#E7E7E2] flex flex-wrap items-center gap-3">
-                <a href="/forgot-password" onClick={event => { event.preventDefault(); navigate("/forgot-password"); }} className="inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-semibold text-[#111827] bg-white border border-[#E7E7E2] hover:bg-neutral-50 rounded-xl shadow-sm transition-colors">
-                  <svg className="w-4 h-4 text-[#FF5701]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="pt-2 border-t border-[#E5E5E0] flex flex-wrap items-center gap-3">
+                <a href="/forgot-password" onClick={event => { event.preventDefault(); navigate("/forgot-password"); }} className="inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-semibold text-[#111827] bg-white border border-[#E5E5E0] hover:bg-neutral-50 rounded-xl shadow-2xs transition-colors">
+                  <svg className="w-4 h-4 text-[#B43E00]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
                   </svg>
                   <span>
@@ -321,10 +321,10 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
             </div>
           </section>
           {/* PHẦN 3: DANH SÁCH PHIÊN & THU HỒI */}
-          <section id="section-sessions" className="bg-white rounded-2xl p-5 sm:p-7 border border-[#E7E7E2] shadow-sm" aria-labelledby="heading-sessions">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E7E7E2] pb-4 mb-6">
+          <section id="section-sessions" className="bg-white rounded-2xl p-5 sm:p-6 border border-[#E5E5E0] shadow-2xs" aria-labelledby="heading-sessions">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E5E5E0] pb-4 mb-5">
               <div>
-                <h2 id="heading-sessions" className="font-display text-xl sm:text-2xl font-bold text-[#111827]">
+                <h2 id="heading-sessions" className="font-sans text-lg sm:text-xl font-semibold text-[#111827]">
                   3. Các phiên đang đăng nhập
                 </h2>
                 <p className="text-xs sm:text-sm text-[#6B7280] mt-1">
@@ -393,9 +393,9 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
             </div>
           </section>
           {/* PHẦN 4: LIÊN KẾT / GỠ GOOGLE */}
-          {googleEnabled && <section id="section-google" className="bg-white rounded-2xl p-5 sm:p-7 border border-[#E7E7E2] shadow-sm" aria-labelledby="heading-google">
-            <div className="border-b border-[#E7E7E2] pb-4 mb-6">
-              <h2 id="heading-google" className="font-display text-xl sm:text-2xl font-bold text-[#111827]">
+          {googleEnabled && <section id="section-google" className="bg-white rounded-2xl p-5 sm:p-6 border border-[#E5E5E0] shadow-2xs" aria-labelledby="heading-google">
+            <div className="border-b border-[#E5E5E0] pb-4 mb-5">
+              <h2 id="heading-google" className="font-sans text-lg sm:text-xl font-semibold text-[#111827]">
                 4. Liên kết tài khoản Google
               </h2>
               <p className="text-xs sm:text-sm text-[#6B7280] mt-1">
@@ -506,10 +506,10 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
         <p className="text-xs text-[#6B7280] mt-8">Trang này không có chức năng xóa tài khoản hay đổi email. Nếu muốn ngừng sử dụng, hãy nhờ quản trị viên khóa tài khoản.</p>
       </main>
       {/* CHÂN TRANG NHẸ */}
-      <footer className="mt-auto border-t border-[#E7E7E2] bg-white py-6 px-4 sm:px-6">
+      <footer className="mt-auto border-t border-[#E5E5E0] bg-[#F8F8F6] py-6 px-4 sm:px-6">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#6B7280]">
           <div className="text-center sm:text-left">
-            <span className="font-display font-bold text-[#111827]">
+            <span className="font-sans font-semibold text-[#111827]">
               Planora
             </span>
             {" — AI Workflow Automation Platform · 2026"}
@@ -534,7 +534,7 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
               ·
             </span>
 
-            <a href="/privacy" onClick={event => { event.preventDefault(); navigate("/privacy"); }} className="text-[#FF5701] hover:underline font-medium transition-colors">
+            <a href="/privacy" onClick={event => { event.preventDefault(); navigate("/privacy"); }} className="text-[#B43E00] hover:underline font-medium transition-colors">
               Chính sách an toàn
             </a>
           </div>
@@ -542,13 +542,13 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
       </footer>
       {/* MODAL XÁC NHẬN THU HỒI TẤT CẢ PHIÊN KHÁC */}
       {modal === "modal-revoke-all" && <div id="modal-revoke-all" className={modalClass('modal-revoke-all')} role="dialog" aria-modal="true" aria-labelledby="modal-revoke-all-title">
-        <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-[#E7E7E2] animate-in fade-in zoom-in-95 duration-200">
-          <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center mb-4">
+        <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-[#E5E5E0] animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-10 h-10 rounded-xl bg-red-50 border border-red-200 text-red-600 flex items-center justify-center mb-4">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-          <h3 id="modal-revoke-all-title" className="font-display text-lg font-bold text-[#111827]">
+          <h3 id="modal-revoke-all-title" className="font-sans text-base sm:text-lg font-semibold text-[#111827]">
             Đăng xuất khỏi tất cả phiên khác?
           </h3>
           <p className="text-xs sm:text-sm text-[#4B5563] mt-2 leading-relaxed">
@@ -559,7 +559,7 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
             <button type="button" onClick={() => actions.closeModal('modal-revoke-all')} className="px-4 py-2 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] bg-[#F8F8F6] hover:bg-neutral-200 rounded-xl transition-colors">
               {" Hủy bỏ "}
             </button>
-            <button type="button" onClick={() => actions.confirmRevokeAllOtherSessions()} disabled={busy !== null} className="px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm transition-colors">
+            <button type="button" onClick={() => actions.confirmRevokeAllOtherSessions()} disabled={busy !== null} className="px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-2xs transition-colors">
               {" Xác nhận thu hồi "}
             </button>
           </div>
@@ -567,13 +567,13 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
       </div>}
       {/* MODAL XÁC NHẬN GỠ LIÊN KẾT GOOGLE */}
       {modal === "modal-unlink-google" && <div id="modal-unlink-google" className={modalClass('modal-unlink-google')} role="dialog" aria-modal="true" aria-labelledby="modal-unlink-google-title">
-        <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-[#E7E7E2] animate-in fade-in zoom-in-95 duration-200">
-          <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center mb-4">
+        <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-[#E5E5E0] animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-10 h-10 rounded-xl bg-red-50 border border-red-200 text-red-600 flex items-center justify-center mb-4">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
             </svg>
           </div>
-          <h3 id="modal-unlink-google-title" className="font-display text-lg font-bold text-[#111827]">
+          <h3 id="modal-unlink-google-title" className="font-sans text-base sm:text-lg font-semibold text-[#111827]">
             Gỡ liên kết tài khoản Google?
           </h3>
           <p className="text-xs sm:text-sm text-[#4B5563] mt-2 leading-relaxed">
@@ -583,12 +583,12 @@ export function AccountPage({ user, navigate, onLogout }: AccountPageProps) {
           <div className="mt-4 text-left">
             <label htmlFor="input-unlink-current-pass" className="block text-xs sm:text-sm font-semibold text-[#111827] mb-1.5">
               {"Mật khẩu hiện tại "}
-              <span className="text-[#FF5701]">
+              <span className="text-[#B43E00]">
                 *
               </span>
             </label>
             <div className="relative">
-              <input ref={unlinkPassRef} type={passType('input-unlink-current-pass')} id="input-unlink-current-pass" placeholder="Nhập mật khẩu hiện tại để xác nhận" onKeyDown={(event) => { if (event.key === 'Enter') actions.confirmUnlinkGoogle(); }} className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-white border border-[#E7E7E2] rounded-xl text-[#111827] placeholder-[#9CA3AF] focus:border-[#FF5701] focus:ring-1 focus:ring-[#FF5701] transition-all pr-10" required autoComplete="current-password" />
+              <input ref={unlinkPassRef} type={passType('input-unlink-current-pass')} id="input-unlink-current-pass" placeholder="Nhập mật khẩu hiện tại để xác nhận" onKeyDown={(event) => { if (event.key === 'Enter') actions.confirmUnlinkGoogle(); }} className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-white border border-[#E5E5E0] rounded-xl text-[#111827] placeholder-[#6B7280] !outline-none focus-visible:!outline-none focus:border-[#111827] transition-all pr-10" required autoComplete="current-password" />
               {' '}
               <button type="button" onClick={() => actions.togglePasswordVisibility('input-unlink-current-pass')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[#111827] p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg" aria-label="Ẩn hoặc hiện mật khẩu">
                 <EyeIcons visible={shownPasswords.includes('input-unlink-current-pass')} />

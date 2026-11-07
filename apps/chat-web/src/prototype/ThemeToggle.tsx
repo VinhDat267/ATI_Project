@@ -22,9 +22,9 @@ export function ThemeToggle({ style }: { style?: CSSProperties }) {
     timer.current = window.setTimeout(() => setAnnouncement(next === 'dark' ? 'Đã chuyển sang giao diện tối' : 'Đã chuyển sang giao diện sáng'), 30);
   };
   return <>
-    <button type="button" id="ati-theme-toggle" className="ati-theme-toggle" aria-label={label} title={label} aria-pressed={dark} onClick={onClick} style={style}>
-      <svg className="ati-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" /></svg>
-      <svg className="ati-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path strokeLinecap="round" d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41" /></svg>
+    <button type="button" id="ati-theme-toggle" className="ati-theme-toggle inline-flex items-center justify-center w-9 h-9 rounded-full" aria-label={label} title={label} aria-pressed={dark} onClick={onClick} style={style}>
+      <svg width={18} height={18} className="ati-moon w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" /></svg>
+      <svg width={18} height={18} className="ati-sun w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path strokeLinecap="round" d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41" /></svg>
     </button>
     {createPortal(<span id="ati-theme-live" aria-live="polite" style={visuallyHidden}>{announcement}</span>, document.body)}
   </>;

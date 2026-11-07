@@ -139,7 +139,7 @@ test('MYCALENDAR: Flow 2 - disconnect, connect from chat refusal, plan and recei
   await resendBtn.click();
 
   // PlanMoment displays plan with resolved calendar and connected account
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tôi sẽ làm 1 việc, theo thứ tự');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tôi sẽ làm 1 việc');
   await expect(page.getByText(/Google Calendar của bạn\)/i)).toBeVisible();
   const approvedAccount = await page.getByText(/^Tài khoản: .+ \(Google Calendar của bạn\)$/).innerText();
   await expect(page.locator('#plan-cards-container p').filter({ hasText: 'Đích đến:' })).toContainText('Lịch việc riêng');
@@ -258,7 +258,7 @@ test('MYCALENDAR: Flow 5 - 1-click primary calendar, rich PlanMoment pills, conf
   await page.waitForURL(/\/c\/[0-9a-f-]{36}/);
 
   // 3. PlanMoment renders quick feature pills & interactive conflict banner
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tôi sẽ làm 1 việc, theo thứ tự');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tôi sẽ làm 1 việc');
   const stepCard = page.locator('#plan-cards-container article').first();
   await expect(stepCard).toContainText('🎥 Google Meet');
   await expect(stepCard).toContainText('🔁 Thứ 2 – Thứ 6 hàng tuần');

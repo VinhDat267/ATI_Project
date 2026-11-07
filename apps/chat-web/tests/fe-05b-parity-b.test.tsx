@@ -16,7 +16,7 @@ const snapshot = (statuses: ExecutionSnapshot['steps'][number]['status'][]): Exe
 function view() { const onSendMessage=vi.fn(); render(<Cockpit services={[{id:'github',name:'GitHub',configured:true,connected:false,connectionStatus:'unchecked'},{id:'slack',name:'Slack',configured:true,connected:false,connectionStatus:'unchecked'}]} servicesLoading={false} servicesError={null} onSendMessage={onSendMessage} onNewConversation={vi.fn()} onSelectConversation={vi.fn()} onSettings={vi.fn()} onApprove={vi.fn()} onCancel={vi.fn()} recovery={null}/>); return onSendMessage; }
 it('moment 4 copies plan cards and sticky actions, with no bottom composer', async()=>{
   useChatStore.setState({activePlan:plan,planStatus:'preview'}); view();
-  expect(await screen.findByRole('heading',{level:1,name:'Tôi sẽ làm 2 việc, theo thứ tự'})).toHaveClass('font-display','text-4xl','sm:text-5xl');
+  expect(await screen.findByRole('heading',{level:1,name:'Tôi sẽ làm 2 việc, theo thứ tự'})).toHaveClass('text-xl','sm:text-2xl','font-semibold');
   expect(document.querySelectorAll('#plan-cards-container article')).toHaveLength(2);
   expect(document.getElementById('moment-4-sticky-bar')).toHaveClass('sticky','bottom-0');
   expect(screen.queryAllByRole('textbox')).toHaveLength(0);
@@ -144,4 +144,50 @@ it('history drawer preserves search and rename while using the source card hiera
   const row=await screen.findByRole('button',{name:/^Công việc hôm nay/});expect(row.querySelector('.font-medium')).not.toBeNull();
   expect(screen.getByRole('searchbox',{name:'Tìm hội thoại theo tiêu đề'})).toBeInTheDocument();expect(screen.getByRole('button',{name:'Đổi tên Công việc hôm nay'})).toBeInTheDocument();
   fireEvent.click(document.getElementById('drawer-backdrop')!);await waitFor(()=>expect(screen.queryByRole('dialog')).toBeNull());
+});
+it('single-step plan uses natural heading grammar, omits redundant flow diagram, and shows inline payload fields',async()=>{
+  const singleStepPlan: ActivePlan = {
+    id:'p-single',
+    summary:'Tạo issue fix lỗi frontend',
+    resourceLabels:{'VinhDat267/ati-test':'VinhDat267/ati-test'},
+    connections:{github:{credentialId:'gh-1',githubUserId:'101',login:'VinhDat267',repos:['VinhDat267/ati-test']}},
+    steps:[{id:'step_1',tool:'github.create_issue',description:'Tạo issue fix lỗi frontend',args:{repo:'VinhDat267/ati-test',title:'fix lỗi frontend',body:'sửa app.tsx'}}],
+  };
+  useChatStore.setState({activePlan:singleStepPlan,planStatus:'preview'});view();
+  expect(await screen.findByRole('heading',{level:1,name:'Tôi sẽ làm 1 việc'})).toBeInTheDocument();
+  expect(screen.queryByTestId('workflow-flow-canvas')).toBeNull();
+  const payload=screen.getByTestId('step-inline-payload');
+  expect(payload).toHaveTextContent('fix lỗi frontend');
+  expect(payload).toHaveTextContent('sửa app.tsx');
+});
+it('single-step execution and receipt omit redundant flow diagram and use full-width receipt row',async()=>{
+  const singleStepPlan: ActivePlan = {
+    id:'p-single-exec',
+    summary:'Tạo issue fix lỗi frontend',
+    resourceLabels:{'VinhDat267/ati-test':'VinhDat267/ati-test'},
+    steps:[{id:'step_1',tool:'github.create_issue',description:'Tạo issue fix lỗi frontend',args:{repo:'VinhDat267/ati-test',title:'fix lỗi frontend',body:'sửa app.tsx'}}],
+  };
+  const singleExecSnap: ExecutionSnapshot = {
+    plan:{...singleStepPlan,id:'p-single-exec',convId:'c-single',status:'approved'},
+    execution:{status:'executing'},
+    recoveryActions:[],
+    steps:[{stepId:'step_1',tool:'github.create_issue',status:'running',startedAt:'2026-10-07T00:00:00.000Z'}],
+  };
+  useChatStore.setState({activePlan:singleStepPlan,planStatus:'executing',executionSnapshot:singleExecSnap});
+  view();
+  expect(await screen.findByRole('heading',{level:1,name:'Đang thực hiện công việc'})).toBeInTheDocument();
+  expect(screen.queryByTestId('workflow-flow-canvas')).toBeNull();
+  cleanup();
+
+  const singleDoneSnap: ExecutionSnapshot = {
+    ...singleExecSnap,
+    execution:{status:'completed'},
+    steps:[{stepId:'step_1',tool:'github.create_issue',status:'succeeded',durationMs:850,startedAt:'2026-10-07T00:00:00.000Z',completedAt:'2026-10-07T00:00:00.850Z',output:{number:42,title:'fix lỗi frontend',html_url:'https://github.com/VinhDat267/ati-test/issues/42'}}],
+  };
+  useChatStore.setState({activePlan:singleStepPlan,planStatus:'completed',executionSnapshot:singleDoneSnap});
+  view();
+  expect(await screen.findByRole('heading',{level:1,name:'Đã xong 1 việc trên 1 công cụ'})).toBeInTheDocument();
+  expect(screen.queryByTestId('workflow-flow-canvas')).toBeNull();
+  const receiptRow=document.querySelector('#receipt-chain > div');
+  expect(receiptRow).not.toHaveClass('md:grid-cols-2');
 });

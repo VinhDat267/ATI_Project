@@ -5,11 +5,16 @@ import { apiClient } from '../../services/api-client';
 import { githubSessionOwner, redirectToGitHub } from '../../services/github-connection';
 import { CockpitDialog } from '../../components/CockpitDialog';
 import { ServiceLogo } from '../../components/ServiceLogo';
+import {
+  CARD_CONTAINER_CLASS,
+  PRIMARY_CONNECT_BTN,
+  SECONDARY_ACTION_BTN,
+  DANGER_GHOST_BTN,
+  connectionBadgeClass,
+} from './ServiceConnectionCard';
 
-const button =
-  'px-4 py-2 rounded-xl text-xs font-semibold bg-[#FF5701] text-white hover:bg-[#E04C00] disabled:opacity-50 transition-colors shadow-sm';
-const secondary =
-  'px-4 py-2 rounded-xl text-xs font-medium bg-white text-[#111827] border border-[#E7E7E2] hover:bg-neutral-50 disabled:opacity-50 transition-colors';
+const button = PRIMARY_CONNECT_BTN;
+const secondary = SECONDARY_ACTION_BTN;
 
 export interface GitHubConnectionProps {
   user: User | null;
@@ -186,25 +191,37 @@ export function GitHubConnection({
       ref={row}
       id="service-row-github"
       tabIndex={-1}
-      className="bg-white border border-[#E7E7E2] rounded-xl p-4 sm:p-5 v3-space-y-4 focus-visible:ring-2 focus-visible:ring-[#FF5701] focus-visible:v3-outline-none"
+      className={`${CARD_CONTAINER_CLASS} focus-visible:ring-2 focus-visible:ring-[#FF5701] focus-visible:v3-outline-none`}
     >
       <div className="flex items-center justify-between gap-3">
-        <h3 className="font-display font-semibold text-base text-[#111827] flex items-center gap-3">
+        <h3 className="font-sans font-semibold text-base text-[#111827] dark:text-white flex items-center gap-3">
           <ServiceLogo service="github" className="w-6 h-6" />
           GitHub
         </h3>
-        {status === 'connected' && (
-          <span className="text-xs font-semibold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md">
+        {status === 'connected' ? (
+          <span className={connectionBadgeClass('connected')}>
             Đã kết nối
+          </span>
+        ) : status === 'needs_scope' || status === 'needs_membership' ? (
+          <span className={connectionBadgeClass('warning')}>
+            Cần chọn repository
+          </span>
+        ) : status === 'reconnect_required' ? (
+          <span className={connectionBadgeClass('error')}>
+            Cần kết nối lại
+          </span>
+        ) : (
+          <span className={connectionBadgeClass('neutral')}>
+            Chưa kết nối
           </span>
         )}
       </div>
 
-      <p className="text-xs text-[#6B7280]">
+      <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
         Chỉ bạn dùng được tài khoản GitHub này để thao tác trên các repository đã được chọn.
       </p>
 
-      <div className="text-sm text-[#111827] break-words">
+      <div className="text-sm text-[#111827] dark:text-neutral-200 break-words">
         {status === 'connected' ? (
           <span>
             Đã kết nối {data?.login && <>· @{data.login}</>}
@@ -222,10 +239,8 @@ export function GitHubConnection({
             Cần kết nối lại {data?.login && <>· @{data.login}</>}
           </span>
         ) : status === 'unconfigured' ? (
-          <span className="text-[#6B7280]">GitHub chưa được cấu hình trên máy chủ.</span>
-        ) : (
-          <span className="text-[#6B7280]">Chưa kết nối</span>
-        )}
+          <span className="text-[#6B7280] dark:text-[#9CA3AF]">GitHub chưa được cấu hình trên máy chủ.</span>
+        ) : null}
       </div>
 
       {status === 'needs_membership' && data?.repos && data.repos.length > 0 && (
@@ -246,19 +261,6 @@ export function GitHubConnection({
               </div>
             ))}
           </div>
-          {isAdmin && !editingScope && (
-            <button
-              id="github-edit-scope"
-              type="button"
-              className={secondary}
-              onClick={() => {
-                setSelectedRepos((data.repos ?? []).filter((r) => r.accessible).map((r) => r.fullName));
-                setEditingScope(true);
-              }}
-            >
-              Đổi repository
-            </button>
-          )}
         </div>
       )}
 
@@ -283,23 +285,10 @@ export function GitHubConnection({
               </div>
             ))}
           </div>
-          {isAdmin && !editingScope && (
-            <button
-              id="github-edit-scope"
-              type="button"
-              className={secondary}
-              onClick={() => {
-                setSelectedRepos((data.repos ?? []).filter((r) => r.accessible).map((r) => r.fullName));
-                setEditingScope(true);
-              }}
-            >
-              Đổi repository
-            </button>
-          )}
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-3 pt-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[#F3F4F6] dark:border-[#2E2E2E]">
         {status === 'not_connected' || status === 'reconnect_required' || status === 'unconfigured' ? (
           <button
             id="github-connect"
@@ -311,15 +300,32 @@ export function GitHubConnection({
             Kết nối GitHub
           </button>
         ) : (
-          <button
-            id="github-disconnect"
-            type="button"
-            className={secondary}
-            disabled={busy}
-            onClick={() => setConfirm(true)}
-          >
-            Ngắt kết nối
-          </button>
+          <>
+            <div>
+              {isAdmin && !editingScope && (status === 'connected' || status === 'needs_membership') && (
+                <button
+                  id="github-edit-scope"
+                  type="button"
+                  className={secondary}
+                  onClick={() => {
+                    setSelectedRepos((data?.repos ?? []).filter((r) => r.accessible).map((r) => r.fullName));
+                    setEditingScope(true);
+                  }}
+                >
+                  Đổi repository
+                </button>
+              )}
+            </div>
+            <button
+              id="github-disconnect"
+              type="button"
+              className={DANGER_GHOST_BTN}
+              disabled={busy}
+              onClick={() => setConfirm(true)}
+            >
+              Ngắt kết nối
+            </button>
+          </>
         )}
       </div>
 
@@ -327,9 +333,9 @@ export function GitHubConnection({
         <div
           id="github-scope"
           data-testid="github-scope"
-          className="mt-4 p-4 border border-[#E7E7E2] rounded-xl bg-[#F8F8F6] v3-space-y-3"
+          className="mt-4 p-4 border border-[#E7E7E2] dark:border-[#374151] rounded-xl bg-[#F8F8F6] dark:bg-[#1F2937]/50 v3-space-y-3"
         >
-          <h4 className="text-xs font-bold uppercase tracking-wider text-[#6B7280]">
+          <h4 className="text-xs font-semibold text-[#374151] dark:text-[#D1D5DB]">
             Chọn repository GitHub cho nhóm
           </h4>
 
@@ -383,10 +389,10 @@ export function GitHubConnection({
                       </label>
                       {typeof r.private === 'boolean' && (
                         <span
-                          className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border shrink-0 ${
+                          className={`text-xs font-semibold px-1.5 py-0.5 rounded border shrink-0 ${
                             r.private
-                              ? 'bg-amber-50 text-amber-800 border-amber-200'
-                              : 'bg-neutral-100 text-neutral-600 border-neutral-200'
+                              ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
+                              : 'bg-neutral-100 text-neutral-600 border-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:border-neutral-700'
                           }`}
                         >
                           {r.private ? 'Private' : 'Public'}
