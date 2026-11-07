@@ -13,12 +13,24 @@ function mentionsKeyword(message: string, keyword: string): boolean {
  */
 function routingText(message: string, services: ServiceDefinition[]): string {
   return message.split('\n').map(line => {
-    const reported = /(?<![\p{L}\p{N}_])(?:là|rằng)\s+đã\s+tạo(?![\p{L}\p{N}_])/iu.exec(line);
-    if (!reported) return line;
-    const prefix = line.slice(0, reported.index);
+    let current = line;
+    const quotedContent = /(?<![\p{L}\p{N}_])(?:với\s+)?nội\s+dung(?:\s+là)?\s*:\s*(?:"[^"]+"|“[^”]+”)/iu.exec(current);
+    if (quotedContent) {
+      const prefix = current.slice(0, quotedContent.index);
+      const hasWriteVerb = /(?<![\p{L}\p{N}_])(?:tạo|viết|soạn|ghi|thêm|lưu|gửi)(?![\p{L}\p{N}_])/iu.test(prefix);
+      const hasTargetArtifact =
+        services.some(service => mentionsKeyword(prefix, service.id) || mentionsKeyword(prefix, service.name)) ||
+        /(?<![\p{L}\p{N}_])(?:tài liệu|biên bản|google docs|docs|trang|page|email|thư)(?![\p{L}\p{N}_])/iu.test(prefix);
+      if (hasWriteVerb && hasTargetArtifact) {
+        current = prefix + current.slice(quotedContent.index + quotedContent[0].length);
+      }
+    }
+    const reported = /(?<![\p{L}\p{N}_])(?:là|rằng)\s+đã\s+tạo(?![\p{L}\p{N}_])/iu.exec(current);
+    if (!reported) return current;
+    const prefix = current.slice(0, reported.index);
     if (!/(?<![\p{L}\p{N}_])(?:báo|thông báo|gửi|notify|send)(?![\p{L}\p{N}_])/iu.test(prefix) ||
-        !services.some(service => mentionsKeyword(prefix, service.id) || mentionsKeyword(prefix, service.name))) return line;
-    const content = line.slice(reported.index + reported[0].length);
+        !services.some(service => mentionsKeyword(prefix, service.id) || mentionsKeyword(prefix, service.name))) return current;
+    const content = current.slice(reported.index + reported[0].length);
     const nextAction = /(?:[.;!?]\s*|\s+(?:rồi|và|sau đó)\s+)(?:tạo|mở|tìm|đọc|lấy|gửi|báo|thông báo|đặt|thêm|gán|cập nhật)(?![\p{L}\p{N}_])/iu.exec(content);
     return prefix + (nextAction ? content.slice(nextAction.index) : '');
   }).join('\n');

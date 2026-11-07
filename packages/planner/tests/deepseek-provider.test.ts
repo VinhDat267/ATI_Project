@@ -81,6 +81,18 @@ describe('DeepSeekProvider', () => {
     expect(calls[0]!.body.max_tokens).toBe(8192);
   });
 
+  it.each([
+    ['official', undefined, 'https://api.deepseek.com/chat/completions'],
+    ['custom gateway', 'https://gateway.example/v1', 'https://gateway.example/v1/chat/completions'],
+  ])('preserves configured deepseek-flash on the %s endpoint', async (_label, baseUrl, endpoint) => {
+    const { fetchFn, calls } = scriptedFetch([completion('{"kind":"refusal","reason":"ok"}', 'deepseek-flash')]);
+    const provider = new DeepSeekProvider({ model: 'deepseek-flash', baseUrl, fetch: fetchFn });
+
+    await expect(provider.generatePlan(input)).resolves.toBe('{"kind":"refusal","reason":"ok"}');
+    expect(calls[0]!.url).toBe(endpoint);
+    expect(calls[0]!.body.model).toBe('deepseek-flash');
+  });
+
   it('supports deepseek-reasoner (Thinking Mode), records reasoning_tokens, and strips markdown JSON fences if present', async () => {
     const { fetchFn, calls } = scriptedFetch([
       completion(
