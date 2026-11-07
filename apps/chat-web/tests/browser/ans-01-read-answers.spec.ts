@@ -39,7 +39,7 @@ for (const width of [1440, 375]) for (const theme of ['light', 'dark']) {
       await expect(text).toContainText('<b>x</b>');
       await page.getByRole('textbox').fill('Gửi tóm tắt này vào Slack');
       await page.getByRole('button', { name: 'Gửi tin nhắn', exact: true }).click();
-      await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tôi sẽ làm 1 việc, theo thứ tự');
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tôi sẽ làm 1 việc');
       await expect(page.getByRole('button', { name: /Duyệt/ })).toBeVisible();
       const plans = (await db.query('SELECT id,status,plan_json FROM plans WHERE conv_id=$1', [conversationId])).rows;
       expect(plans).toHaveLength(1); expect(plans[0].status).toBe('pending');

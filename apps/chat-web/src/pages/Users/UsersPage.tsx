@@ -7,15 +7,16 @@ import css from './page.css?inline';
 import type { Member, PendingUser } from './data';
 import { useUsers } from './useUsers';
 type Role = 'admin' | 'member';
-const TABLE_WRAPPER = 'overflow-hidden rounded-2xl bg-white border border-[#E7E7E2] shadow-sm sm:block';
-const TAB_ON = 'flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-[#FF5701] text-white shadow-sm';
-const TAB_OFF = 'flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all text-[#6B7280] hover:text-[#111827]';
+const TABLE_WRAPPER = 'overflow-hidden rounded-2xl bg-white border border-[#E5E5E0] shadow-2xs sm:block';
+const TAB_ON = 'flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-[#111827] text-white shadow-2xs';
+const TAB_OFF = 'flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all text-[#4B5563] hover:text-[#111827]';
+const CHECK_SVG = <svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>;
 // Thẻ yêu cầu chờ duyệt (renderPendingList).
 function PendingCard({ u, isAdmin, onApprove, onReject }: { u: PendingUser; isAdmin: boolean; onApprove: (id: string) => void; onReject?: (id: string) => void }) {
   const isVerified = !!u.emailVerified;
-  return <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E7E7E2] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:border-neutral-300">
+  return <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E5E5E0] shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:border-[#B8B8B0]">
     <div className="flex items-start gap-3.5 min-w-0">
-      <div className={`w-10 h-10 rounded-full ${isVerified ? 'bg-amber-100 text-amber-900' : 'bg-neutral-100 text-neutral-600'} font-bold text-sm flex items-center justify-center flex-shrink-0`}>
+      <div className={`w-10 h-10 rounded-full ${isVerified ? 'bg-amber-100 text-amber-900' : 'bg-neutral-100 text-neutral-600'} font-semibold text-sm flex items-center justify-center flex-shrink-0`}>
         {u.avatarInitials}
       </div>
       <div className="min-w-0 v3-space-y-1">
@@ -41,21 +42,21 @@ function PendingCard({ u, isAdmin, onApprove, onReject }: { u: PendingUser; isAd
         </div>
       </div>
     </div>
-    <div className="flex flex-col sm:items-end gap-1.5 self-end sm:self-center flex-shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#E7E7E2] w-full sm:w-auto">
+    <div className="flex flex-col sm:items-end gap-1.5 self-end sm:self-center flex-shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#E5E5E0] w-full sm:w-auto">
       {isAdmin ? (isVerified ? <>
-        <button type="button" onClick={() => onApprove(u.id)} className="w-full sm:w-auto px-3.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-colors shadow-sm flex items-center justify-center gap-1.5">
+        <button type="button" onClick={() => onApprove(u.id)} className="w-full sm:w-auto px-3.5 py-1.5 rounded-lg bg-emerald-700 text-white text-xs font-semibold hover:bg-emerald-800 transition-colors shadow-2xs flex items-center justify-center gap-1.5">
           <span>Duyệt &amp; kích hoạt</span>
-          <span>✓</span>
+          {CHECK_SVG}
         </button>
-        {onReject && <button type="button" onClick={() => onReject(u.id)} className="w-full sm:w-auto px-3 py-1.5 rounded-lg text-xs font-semibold text-red-600 border border-red-200 hover:bg-red-50 transition-colors shadow-sm">Từ chối</button>}<span className="text-[11px] text-[#6B7280]">Chưa duyệt thì tài khoản không đăng nhập được.</span>
+        {onReject && <button type="button" onClick={() => onReject(u.id)} className="w-full sm:w-auto px-3 py-1.5 rounded-lg text-xs font-semibold text-red-600 border border-red-200 hover:bg-red-50 transition-colors">Từ chối</button>}<span className="text-[11px] text-[#6B7280]">Chưa duyệt thì tài khoản không đăng nhập được.</span>
       </> : <>
-        <button type="button" disabled className="w-full sm:w-auto px-3.5 py-1.5 rounded-lg bg-neutral-100 text-neutral-400 border border-neutral-200 text-xs font-semibold cursor-not-allowed flex items-center justify-center gap-1.5" title="Người này cần bấm link xác minh trong email trước.">
+        <button type="button" disabled className="w-full sm:w-auto px-3.5 py-1.5 rounded-lg bg-neutral-100 text-neutral-500 border border-neutral-200 text-xs font-semibold cursor-not-allowed flex items-center justify-center gap-1.5" title="Người này cần bấm link xác minh trong email trước.">
           <span>Duyệt &amp; kích hoạt</span>
-          <span>✓</span>
+          {CHECK_SVG}
         </button>
-        <span className="text-[11px] text-amber-700 font-medium">Người này cần bấm link xác minh trong email trước.</span>
+        <span className="text-[11px] text-amber-800 font-medium">Người này cần bấm link xác minh trong email trước.</span>
       </>) : (
-        <span className="text-xs text-[#9CA3AF] italic">Cần quyền Quản trị viên để duyệt</span>
+        <span className="text-xs text-[#6B7280] italic">Cần quyền Quản trị viên để duyệt</span>
       )}
     </div>
   </div>;
@@ -64,7 +65,7 @@ function PendingCard({ u, isAdmin, onApprove, onReject }: { u: PendingUser; isAd
 const roleText = (role: Role) => (role === 'admin' ? 'Quản trị viên' : 'Thành viên');
 const roleBadge = (role: Role) => (role === 'admin' ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-neutral-100 text-neutral-700 border-neutral-200');
 const statusBadge = (locked: boolean) => (locked ? 'bg-red-50 text-red-700 border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200');
-const SELF_BADGE = <span className="text-[10px] font-bold px-1.5 py-[2px] rounded bg-neutral-200 text-neutral-700">Bạn</span>;
+const SELF_BADGE = <span className="text-[11px] font-semibold px-1.5 py-[1px] rounded bg-neutral-200 text-neutral-700">Bạn</span>;
 
 // Dòng bảng thành viên trên desktop (renderMembersList).
 function MemberRow({ m, isAdmin, onRole, onLock }: { m: Member; isAdmin: boolean; onRole: (id: string) => void; onLock: (id: string) => void }) {
@@ -72,7 +73,7 @@ function MemberRow({ m, isAdmin, onRole, onLock }: { m: Member; isAdmin: boolean
   return <tr className="hover:bg-[#F8F8F6]/60 transition-colors">
     <td className="py-3 px-4">
       <div className="flex items-center gap-3">
-        <div className={`w-8 h-8 rounded-full ${m.role === 'admin' ? 'bg-[#FF5701] text-white' : 'bg-neutral-200 text-neutral-700'} font-semibold text-xs flex items-center justify-center flex-shrink-0`}>
+        <div className={`w-8 h-8 rounded-full ${m.role === 'admin' ? 'bg-[#111827] text-white' : 'bg-neutral-200 text-neutral-700'} font-semibold text-xs flex items-center justify-center flex-shrink-0`}>
           {m.avatarInitials}
         </div>
         <div className="min-w-0">
@@ -124,7 +125,7 @@ function MemberCard({ m, isAdmin, onRole, onLock }: { m: Member; isAdmin: boolea
   return <div className="p-3.5 rounded-xl bg-white border border-[#E7E7E2] shadow-sm v3-space-y-2.5">
     <div className="flex items-center justify-between gap-2">
       <div className="flex items-center gap-2.5">
-        <div className={`w-8 h-8 rounded-full ${m.role === 'admin' ? 'bg-[#FF5701] text-white' : 'bg-neutral-200 text-neutral-700'} font-semibold text-xs flex items-center justify-center`}>
+        <div className={`w-8 h-8 rounded-full ${m.role === 'admin' ? 'bg-[#111827] text-white' : 'bg-neutral-200 text-neutral-700'} font-semibold text-xs flex items-center justify-center`}>
           {m.avatarInitials}
         </div>
         <div>
@@ -175,7 +176,7 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
   const [copiedLink, setCopiedLink] = useState(false);
   const role = user?.role ?? 'member', membersEmpty = membersView.rows.length === 0;
   const approveUser = modal === 'modal-approve' ? selected : null, lockUser = selected ? { name: selected.name, locked: selected.status === 'disabled' } : null, roleUserName = selected?.name;
-  const modalClass = (_id: string) => 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm';
+  const modalClass = (_id: string) => 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45';
   const backdrop = (_id: string) => (event: ReactMouseEvent) => { if (event.target === event.currentTarget) closeModal(); };
   if (!canManage) return <main className="p-6"><p role="alert">Bạn không có quyền quản trị người dùng.</p><button onClick={() => navigate('/')}>Về trang chính</button></main>;
   return (
@@ -183,15 +184,15 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
       {/* FE-12: thanh điều hướng chung thay thanh trên của bản mẫu. */}
       <MainNav user={user} current="users" pageName="Người dùng" navigate={navigate} onLogout={onLogout} />
       {/* NỘI DUNG CHÍNH */}
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8 v3-space-y-8">
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 v3-space-y-6">
         {!modal && error && <p role="alert" className="text-sm text-red-600">{error}</p>}
         {notice && <p role="status" className="text-sm text-emerald-600">{notice}</p>}
         {loading && <p role="status" className="text-xs text-[#6B7280]">Đang tải người dùng...</p>}
         {/* PHẦN TIÊU ĐỀ & NGUYÊN TẮC AN TOÀN */}
         <section className="v3-space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[#E5E5E0] pb-5">
             <div>
-              <nav className="flex items-center gap-1.5 text-xs text-[#6B7280] mb-2" aria-label="Đường dẫn chuyển trang">
+              <nav className="flex items-center gap-1.5 text-xs text-[#6B7280] mb-1.5" aria-label="Đường dẫn chuyển trang">
                 <a href="/" onClick={event => { event.preventDefault(); navigate("/"); }} className="hover:text-[#111827] transition-colors">
                   Không gian làm việc
                 </a>
@@ -202,16 +203,16 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
                   Quản lý người dùng
                 </span>
               </nav>
-              <h1 className="text-2xl sm:text-3xl font-display font-bold text-[#111827]">
+              <h1 className="font-sans text-2xl sm:text-[26px] font-semibold tracking-tight text-[#111827]">
                 Quản lý người dùng &amp; Duyệt tài khoản
               </h1>
-              <p className="text-sm text-[#6B7280] mt-1">
+              <p className="text-sm text-[#4B5563] mt-1">
                 Kiểm soát ai được quyền sử dụng Planora trong nhóm và phê duyệt các đăng ký mới.
               </p>
             </div>
             {/* Hướng dẫn tự đăng ký cho thành viên mới */}
-            <div id="header-action-invite" className={`w-full sm:w-auto max-w-md p-3 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs text-[#4B5563] flex items-center gap-2.5${role === 'admin' ? '' : ' hidden'}`}>
-              <svg className="w-4 h-4 text-[#FF5701] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div id="header-action-invite" className={`w-full sm:w-auto max-w-sm p-3 rounded-xl bg-white border border-[#E5E5E0] text-xs text-[#4B5563] flex items-center gap-2.5${role === 'admin' ? '' : ' hidden'}`}>
+              <svg className="w-4 h-4 text-[#6B7280] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span className="leading-relaxed">
@@ -220,12 +221,10 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
             </div>
           </div>
           {/* Dòng nguyên tắc minh bạch */}
-          <div className="p-3.5 sm:p-4 rounded-xl bg-[#FFFFFF] border border-[#E7E7E2] shadow-sm flex items-start gap-3">
-            <div className="w-5 h-5 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0 mt-0.5">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
+          <div className="px-4 py-3 rounded-xl bg-white border border-[#E5E5E0] flex items-center gap-3">
+            <svg className="w-4 h-4 text-[#4B5563] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
             <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
               <strong className="text-[#111827] font-semibold">
                 Quy tắc nhóm:
@@ -235,14 +234,14 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
           </div>
         </section>
         {inviteCode && (
-          <section aria-label="Mã mời tổ chức" className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E7E7E2] shadow-sm v3-space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E7E7E2] pb-3.5">
+          <section aria-label="Mã mời tổ chức" className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E5E5E0] shadow-2xs v3-space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E5E5E0] pb-3.5">
               <div>
-                <div className="text-xs font-bold uppercase tracking-wider text-[#6B7280]">
+                <div className="text-xs font-semibold text-[#6B7280]">
                   Mã mời tham gia tổ chức
                 </div>
                 <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                  <span className="font-mono text-xl sm:text-2xl font-bold text-[#FF5701] tracking-wider bg-orange-50 px-3 py-1 rounded-xl border border-orange-200">
+                  <span className="font-mono text-lg sm:text-xl font-bold text-[#B43E00] tracking-wider bg-[#FFF6EE] px-3 py-1 rounded-xl border border-[#F7D7BE]">
                     {inviteCode}
                   </span>
                   <div className="flex items-center gap-2">
@@ -253,9 +252,9 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
                         setCopiedCode(true);
                         setTimeout(() => setCopiedCode(false), 2000);
                       }}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#E7E7E2] bg-white hover:bg-neutral-50 text-[#111827] transition-colors shadow-sm"
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#E5E5E0] bg-white hover:bg-neutral-50 text-[#111827] transition-colors shadow-2xs"
                     >
-                      {copiedCode ? '✓ Đã chép' : 'Sao chép mã'}
+                      {copiedCode ? 'Đã chép' : 'Sao chép mã'}
                     </button>
                     <button
                       type="button"
@@ -265,9 +264,9 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
                         setCopiedLink(true);
                         setTimeout(() => setCopiedLink(false), 2000);
                       }}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#FF5701] text-white hover:bg-[#E04C00] transition-colors shadow-sm"
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#C84300] text-white hover:bg-[#A83800] transition-colors shadow-2xs"
                     >
-                      {copiedLink ? '✓ Đã chép' : 'Sao chép Link mời'}
+                      {copiedLink ? 'Đã chép' : 'Sao chép Link mời'}
                     </button>
                     <button
                       type="button"
@@ -288,7 +287,7 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
                   aria-label="Cần Quản trị viên duyệt thành viên mới"
                   checked={requireApproval}
                   onChange={(e) => void actions.toggleRequireApproval(e.target.checked)}
-                  className="rounded border-[#E7E7E2] text-[#FF5701] focus:ring-[#FF5701]"
+                  className="rounded border-[#E5E5E0] text-[#C84300] focus:ring-[#C84300]"
                 />
                 <label htmlFor="toggle-require-approval" className="text-xs font-medium text-[#111827] cursor-pointer">
                   Cần Quản trị viên duyệt thành viên mới
@@ -303,60 +302,60 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
         {/* THẺ THỐNG KÊ TỔNG QUAN (4 METRIC CARDS) */}
         <section className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4" aria-label="Thống kê tổng quan thành viên">
           {/* Thẻ 1: Tổng thành viên */}
-          <div className="p-4 rounded-xl bg-white border border-[#E7E7E2] shadow-sm v3-space-y-1">
+          <div className="p-4 rounded-2xl bg-white border border-[#E5E5E0] shadow-2xs v3-space-y-1">
             <p className="text-xs font-medium text-[#6B7280]">
               Tổng thành viên
             </p>
             <div className="flex items-baseline gap-2">
-              <span id="stat-total-members" className="text-2xl font-bold font-display text-[#111827]">
+              <span id="stat-total-members" className="text-2xl font-semibold font-sans tabular-nums text-[#111827]">
                 {stats.total}
               </span>
-              <span className="text-xs text-neutral-400">
+              <span className="text-xs text-[#6B7280]">
                 người
               </span>
             </div>
           </div>
           {/* Thẻ 2: Chờ phê duyệt */}
-          <div className="p-4 rounded-xl bg-white border border-amber-200 shadow-sm v3-space-y-1 bg-gradient-to-br from-white to-amber-50/40">
-            <p className="text-xs font-medium text-amber-800 flex items-center justify-between">
+          <div className="p-4 rounded-2xl bg-white border border-[#E5E5E0] shadow-2xs v3-space-y-1">
+            <p className="text-xs font-medium text-[#6B7280] flex items-center justify-between">
               <span>
                 Chờ phê duyệt
               </span>
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              {stats.pending > 0 && <span className="w-2 h-2 rounded-full bg-amber-500" />}
             </p>
             <div className="flex items-baseline gap-2">
-              <span id="stat-pending-approvals" className="text-2xl font-bold font-display text-[#FF5701]">
+              <span id="stat-pending-approvals" className="text-2xl font-semibold font-sans tabular-nums text-[#B43E00]">
                 {stats.pending}
               </span>
-              <span className="text-xs text-amber-700 font-medium">
+              <span className="text-xs text-[#6B7280] font-medium">
                 yêu cầu mới
               </span>
             </div>
           </div>
           {/* Thẻ 3: Đang hoạt động */}
-          <div className="p-4 rounded-xl bg-white border border-[#E7E7E2] shadow-sm v3-space-y-1">
+          <div className="p-4 rounded-2xl bg-white border border-[#E5E5E0] shadow-2xs v3-space-y-1">
             <p className="text-xs font-medium text-[#6B7280]">
               Đang hoạt động
             </p>
             <div className="flex items-baseline gap-2">
-              <span id="stat-active-members" className="text-2xl font-bold font-display text-emerald-600">
+              <span id="stat-active-members" className="text-2xl font-semibold font-sans tabular-nums text-emerald-700">
                 {stats.active}
               </span>
-              <span className="text-xs text-neutral-400">
+              <span className="text-xs text-[#6B7280]">
                 tài khoản
               </span>
             </div>
           </div>
           {/* Thẻ 4: Đang bị khóa */}
-          <div className="p-4 rounded-xl bg-white border border-[#E7E7E2] shadow-sm v3-space-y-1">
+          <div className="p-4 rounded-2xl bg-white border border-[#E5E5E0] shadow-2xs v3-space-y-1">
             <p className="text-xs font-medium text-[#6B7280]">
               Đang bị khóa
             </p>
             <div className="flex items-baseline gap-2">
-              <span id="stat-locked-members" className="text-2xl font-bold font-display text-neutral-500">
+              <span id="stat-locked-members" className="text-2xl font-semibold font-sans tabular-nums text-[#4B5563]">
                 {stats.locked}
               </span>
-              <span className="text-xs text-neutral-400">
+              <span className="text-xs text-[#6B7280]">
                 tài khoản
               </span>
             </div>
@@ -364,14 +363,14 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
         </section>
         {/* THANH TABS CHUYỂN ĐỔI & BỘ LỌC TÌM KIẾM */}
         <section className="v3-space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E7E7E2] pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E5E5E0] pb-3">
             {/* Segmented Navigation Tabs */}
-            <div className="inline-flex p-1 bg-[#FFFFFF] border border-[#E7E7E2] rounded-xl shadow-sm self-start" role="tablist" aria-label="Phân nhóm quản lý người dùng">
+            <div className="inline-flex p-1 bg-white border border-[#E5E5E0] rounded-xl shadow-2xs self-start" role="tablist" aria-label="Phân nhóm quản lý người dùng">
               <button type="button" id="tab-btn-pending" role="tab" aria-selected={tab === 'pending' ? 'true' : 'false'} aria-controls="view-pending" onClick={() => actions.switchTab('pending')} className={tab === 'pending' ? TAB_ON : TAB_OFF}>
                 <span>
                   Chờ duyệt
                 </span>
-                <span id="tab-badge-pending-count" className={stats.pending === 0 ? 'px-1.5 py-[2px] rounded-full text-[11px] font-bold bg-neutral-100 text-neutral-500' : 'px-1.5 py-[2px] rounded-full text-[11px] font-bold bg-white text-[#FF5701]'}>
+                <span id="tab-badge-pending-count" className={stats.pending === 0 ? 'px-1.5 py-[2px] rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-600' : 'px-1.5 py-[2px] rounded-full text-[11px] font-semibold bg-white text-[#B43E00]'}>
                   {stats.pending}
                 </span>
               </button>
@@ -379,7 +378,7 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
                 <span>
                   Thành viên
                 </span>
-                <span id="tab-badge-members-count" className="px-1.5 py-[2px] rounded-full text-[11px] font-medium bg-neutral-100 text-neutral-600">
+                <span id="tab-badge-members-count" className="px-1.5 py-[2px] rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-600">
                   {stats.total}
                 </span>
               </button>
@@ -387,9 +386,9 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
             {/* Bộ lọc & Ô tìm kiếm thành viên */}
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <div className="relative flex-1 sm:w-64">
-                <input value={search} onChange={event => setSearch(event.target.value)} type="search" id="input-search-users" placeholder="Tìm theo tên hoặc email…" className="w-full text-xs sm:text-sm px-3 py-2 pl-8 rounded-lg border border-[#E7E7E2] bg-white text-[#111827] placeholder:text-[#9CA3AF] focus:border-[#FF5701] focus:ring-1 focus:ring-[#FF5701] transition-colors" aria-label="Tìm kiếm theo tên hoặc email" />
+                <input value={search} onChange={event => setSearch(event.target.value)} type="search" id="input-search-users" placeholder="Tìm theo tên hoặc email…" className="w-full text-xs sm:text-sm px-3 py-2 pl-8 rounded-xl border border-[#E5E5E0] bg-white text-[#111827] placeholder:text-[#6B7280] !outline-none focus-visible:!outline-none focus:border-[#111827] transition-colors" aria-label="Tìm kiếm theo tên hoặc email" />
                 {' '}
-                <svg className="w-4 h-4 text-[#9CA3AF] absolute left-2.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-[#6B7280] absolute left-2.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </div>
@@ -397,7 +396,7 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
             </div>
           </div>
           {/* CẢNH BÁO KHI XEM VỚI VAI TRÒ THÀNH VIÊN */}
-          <div id="banner-member-readonly" className={`${role === 'member' ? '' : 'hidden '}p-3 rounded-xl bg-neutral-100 border border-[#E7E7E2] text-xs text-[#4B5563] flex items-center gap-2`}>
+          <div id="banner-member-readonly" className={`${role === 'member' ? '' : 'hidden '}p-3 rounded-xl bg-neutral-100 border border-[#E5E5E0] text-xs text-[#4B5563] flex items-center gap-2`}>
             <svg className="w-4 h-4 text-[#6B7280] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -412,16 +411,16 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
           {/* VIEW 1: DANH SÁCH CHỜ DUYỆT (PENDING APPROVALS) */}
           <div id="view-pending" hidden={tab !== "pending"} role="tabpanel" aria-labelledby="tab-btn-pending" className={`${tab === 'pending' ? '' : 'hidden '}v3-space-y-3`}>
             <div id="pending-list-container" className={`v3-space-y-3${pendingView.users.length === 0 ? ' hidden' : ''}`}>
-              {pendingView.isAdmin && pendingView.users.length > 0 && (<div className="flex items-center justify-end pb-1"><button type="button" onClick={() => void actions.approveAllPending()} className="px-3.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-colors shadow-sm flex items-center gap-1.5"><span>Chấp thuận tất cả</span><span>✓</span></button></div>)}{pendingView.users.map(u => <PendingCard key={u.id} u={u} isAdmin={pendingView.isAdmin} onApprove={actions.openApproveModal} onReject={actions.rejectPendingUser} />)}
+              {pendingView.isAdmin && pendingView.users.length > 0 && (<div className="flex items-center justify-end pb-1"><button type="button" onClick={() => void actions.approveAllPending()} className="px-3.5 py-1.5 rounded-lg bg-emerald-700 text-white text-xs font-semibold hover:bg-emerald-800 transition-colors shadow-2xs flex items-center gap-1.5"><span>Chấp thuận tất cả</span>{CHECK_SVG}</button></div>)}{pendingView.users.map(u => <PendingCard key={u.id} u={u} isAdmin={pendingView.isAdmin} onApprove={actions.openApproveModal} onReject={actions.rejectPendingUser} />)}
             </div>
             {/* Trạng thái trống khi đã duyệt hết */}
-            <div id="pending-empty-state" hidden={loading || pendingView.users.length > 0} className={`${pendingView.users.length === 0 ? '' : 'hidden '}p-8 sm:p-12 text-center rounded-2xl bg-white border border-[#E7E7E2] shadow-sm v3-space-y-3`}>
-              <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div id="pending-empty-state" hidden={loading || pendingView.users.length > 0} className={`${pendingView.users.length === 0 ? '' : 'hidden '}p-8 sm:p-12 text-center rounded-2xl bg-white border border-[#E5E5E0] shadow-2xs v3-space-y-3`}>
+              <div className="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center mx-auto">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h3 className="text-base font-semibold text-[#111827]">
+              <h3 className="font-sans text-base font-semibold text-[#111827]">
                 Không có yêu cầu nào đang chờ duyệt
               </h3>
               <p className="text-xs sm:text-sm text-[#6B7280] max-w-sm mx-auto">
@@ -497,7 +496,7 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
             <a href="/account" onClick={event => { event.preventDefault(); navigate("/account"); }} className="hover:text-[#111827] transition-colors">
               Tài khoản
             </a>
-            <a href="/privacy" onClick={event => { event.preventDefault(); navigate("/privacy"); }} className="text-[#FF5701] hover:underline font-medium transition-colors">
+            <a href="/privacy" onClick={event => { event.preventDefault(); navigate("/privacy"); }} className="text-[#B43E00] hover:underline font-medium transition-colors">
               Chính sách an toàn
             </a>
           </div>
@@ -506,14 +505,14 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
       {/* ==================== CÁC MODAL HÀNH ĐỘNG ==================== */}
       {/* 1. MODAL XÁC NHẬN DUYỆT TÀI KHOẢN */}
       {modal === "modal-approve" && <div id="modal-approve" onClick={backdrop('modal-approve')} className={modalClass('modal-approve')} role="dialog" aria-modal="true" aria-labelledby="modal-approve-title">
-        <div className="w-full max-w-md bg-white rounded-2xl border border-[#E7E7E2] shadow-2xl p-6 v3-space-y-4">
-          <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+        <div className="w-full max-w-md bg-white rounded-2xl border border-[#E5E5E0] shadow-xl p-6 v3-space-y-4">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
             </svg>
           </div>
           <div className="v3-space-y-1">
-            <h3 id="modal-approve-title" className="text-base font-display font-bold text-[#111827]">
+            <h3 id="modal-approve-title" className="text-base font-sans font-semibold text-[#111827]">
               Duyệt kích hoạt tài khoản
             </h3>
             <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
@@ -529,12 +528,12 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
             </p>
           </div>
 
-          <div className="p-3 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs text-[#4B5563] v3-space-y-1">
+          <div className="p-3 rounded-xl bg-[#F8F8F6] border border-[#E5E5E0] text-xs text-[#4B5563] v3-space-y-1">
             <p>
-              ✓ Hệ thống sẽ gửi email báo duyệt kích hoạt ngay tới người dùng.
+              • Hệ thống sẽ gửi email báo duyệt kích hoạt ngay tới người dùng.
             </p>
             <p>
-              ✓ Người này sẽ dùng được các service đã kết nối của nhóm (Trello, Slack, GitHub…).
+              • Người này sẽ dùng được các service đã kết nối của nhóm (Trello, Slack, GitHub…).
             </p>
           </div>
           {error && <p role="alert" className="text-xs text-red-600">{error}</p>}
@@ -542,22 +541,23 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
             <button type="button" onClick={() => closeModal('modal-approve')} disabled={busy} className="btn-close-modal px-4 py-2 rounded-xl text-xs sm:text-sm font-medium text-[#4B5563] hover:bg-neutral-100 transition-colors">
               Hủy
             </button>
-            <button type="button" id="btn-confirm-approve" disabled={busy} onClick={() => actions.confirmApprove()} className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs sm:text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm">
-              Xác nhận duyệt ✓
+            <button type="button" id="btn-confirm-approve" disabled={busy} onClick={() => actions.confirmApprove()} className="px-4 py-2 rounded-xl bg-emerald-700 text-white text-xs sm:text-sm font-semibold hover:bg-emerald-800 transition-colors shadow-2xs inline-flex items-center gap-1.5">
+              <span>Xác nhận duyệt</span>
+              {CHECK_SVG}
             </button>
           </div>
         </div>
       </div>}
       {/* 2. MODAL KHÓA / MỞ KHÓA TÀI KHOẢN */}
       {modal === "modal-toggle-lock" && <div id="modal-toggle-lock" onClick={backdrop('modal-toggle-lock')} className={modalClass('modal-toggle-lock')} role="dialog" aria-modal="true" aria-labelledby="modal-lock-title">
-        <div className="w-full max-w-md bg-white rounded-2xl border border-[#E7E7E2] shadow-2xl p-6 v3-space-y-4">
-          <div id="lock-icon-box" className={lockUser?.locked ? 'w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center' : 'w-10 h-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center'}>
+        <div className="w-full max-w-md bg-white rounded-2xl border border-[#E5E5E0] shadow-xl p-6 v3-space-y-4">
+          <div id="lock-icon-box" className={lockUser?.locked ? 'w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center' : 'w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center'}>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
           </div>
           <div className="v3-space-y-1">
-            <h3 id="modal-lock-title" className="text-base font-display font-bold text-[#111827]">
+            <h3 id="modal-lock-title" className="text-base font-sans font-semibold text-[#111827]">
               {lockUser?.locked ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}
             </h3>
             <p id="modal-lock-desc" className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
@@ -573,7 +573,7 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
             <button type="button" onClick={() => closeModal('modal-toggle-lock')} disabled={busy} className="btn-close-modal px-4 py-2 rounded-xl text-xs sm:text-sm font-medium text-[#4B5563] hover:bg-neutral-100 transition-colors">
               Hủy
             </button>
-            <button type="button" id="btn-confirm-toggle-lock" disabled={busy} onClick={() => actions.confirmToggleLock()} className={lockUser?.locked ? 'px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs sm:text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm' : 'px-4 py-2 rounded-xl bg-amber-600 text-white text-xs sm:text-sm font-semibold hover:bg-amber-700 transition-colors shadow-sm'}>
+            <button type="button" id="btn-confirm-toggle-lock" disabled={busy} onClick={() => actions.confirmToggleLock()} className={lockUser?.locked ? 'px-4 py-2 rounded-xl bg-emerald-700 text-white text-xs sm:text-sm font-semibold hover:bg-emerald-800 transition-colors shadow-2xs' : 'px-4 py-2 rounded-xl bg-amber-700 text-white text-xs sm:text-sm font-semibold hover:bg-amber-800 transition-colors shadow-2xs'}>
               {lockUser?.locked ? 'Xác nhận mở khóa' : 'Xác nhận khóa'}
             </button>
           </div>
@@ -581,14 +581,14 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
       </div>}
       {/* 3. MODAL ĐỔI VAI TRÒ THÀNH VIÊN */}
       {modal === "modal-change-role" && <div id="modal-change-role" onClick={backdrop('modal-change-role')} className={modalClass('modal-change-role')} role="dialog" aria-modal="true" aria-labelledby="modal-role-title">
-        <div className="w-full max-w-md bg-white rounded-2xl border border-[#E7E7E2] shadow-2xl p-6 v3-space-y-4">
-          <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+        <div className="w-full max-w-md bg-white rounded-2xl border border-[#E5E5E0] shadow-xl p-6 v3-space-y-4">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 flex items-center justify-center">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
           </div>
           <div className="v3-space-y-1">
-            <h3 id="modal-role-title" className="text-base font-display font-bold text-[#111827]">
+            <h3 id="modal-role-title" className="text-base font-sans font-semibold text-[#111827]">
               Thay đổi vai trò thành viên
             </h3>
             <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
@@ -604,7 +604,7 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
             </label>
             {' '}
             <p className="text-xs text-[#4B5563]">Quản trị viên có thể duyệt tài khoản và quản lý cấu hình dịch vụ chung.</p>
-            <select ref={newRoleRef} value={newRole} onChange={event => setNewRole(event.target.value as Role)} id="select-new-role" className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-[#E7E7E2] bg-white focus:border-[#FF5701] transition-colors">
+            <select ref={newRoleRef} value={newRole} onChange={event => setNewRole(event.target.value as Role)} id="select-new-role" className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-[#E5E5E0] bg-white !outline-none focus-visible:!outline-none focus:border-[#111827] transition-colors">
               {' '}
               <option value="member">
                 Thành viên (chỉ gửi yêu cầu, không đổi kết nối chung)
@@ -621,7 +621,7 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
             <button type="button" onClick={() => closeModal('modal-change-role')} disabled={busy} className="btn-close-modal px-4 py-2 rounded-xl text-xs sm:text-sm font-medium text-[#4B5563] hover:bg-neutral-100 transition-colors">
               Hủy
             </button>
-            <button type="button" id="btn-confirm-change-role" disabled={busy} onClick={() => actions.confirmChangeRole()} className="px-4 py-2 rounded-xl bg-[#FF5701] text-white text-xs sm:text-sm font-semibold hover:bg-[#e04d01] transition-colors shadow-sm">
+            <button type="button" id="btn-confirm-change-role" disabled={busy} onClick={() => actions.confirmChangeRole()} className="px-4 py-2 rounded-xl bg-[#C84300] text-white text-xs sm:text-sm font-semibold hover:bg-[#A83800] transition-colors shadow-2xs">
               Xác nhận đổi vai trò
             </button>
           </div>

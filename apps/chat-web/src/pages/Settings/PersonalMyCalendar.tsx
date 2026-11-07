@@ -5,11 +5,17 @@ import { apiClient } from '../../services/api-client';
 import { mycalendarSessionOwner, redirectToMyCalendar } from '../../services/gmail-connection';
 import { CockpitDialog } from '../../components/CockpitDialog';
 import { ServiceLogo } from '../../components/ServiceLogo';
+import {
+  CAPABILITY_PILL_CLASS,
+  CARD_CONTAINER_CLASS,
+  DANGER_GHOST_BTN,
+  PRIMARY_CONNECT_BTN,
+  SECONDARY_ACTION_BTN,
+  connectionBadgeClass,
+} from './ServiceConnectionCard';
 
-const button =
-  'px-4 py-2 rounded-xl text-xs font-semibold bg-[#FF5701] text-white hover:bg-[#E04C00] disabled:opacity-50 transition-colors shadow-sm';
-const secondary =
-  'px-4 py-2 rounded-xl text-xs font-medium bg-white text-[#111827] border border-[#E7E7E2] hover:bg-neutral-50 disabled:opacity-50 transition-colors';
+const button = PRIMARY_CONNECT_BTN;
+const secondary = SECONDARY_ACTION_BTN;
 
 interface CalendarItem {
   id: string;
@@ -175,77 +181,97 @@ export function PersonalMyCalendar({
   };
 
   const status = service.personalStatus ?? 'not_connected';
+  const badgeTone =
+    status === 'connected'
+      ? 'connected'
+      : status === 'scope_required' || status === 'reconnect_required'
+        ? 'warning'
+        : 'neutral';
 
   const content = (
     <div
       ref={row}
       id="service-row-mycalendar"
       tabIndex={-1}
-      className="bg-white border border-[#E7E7E2] rounded-xl p-4 sm:p-5 v3-space-y-3 focus-visible:ring-2 focus-visible:ring-[#FF5701] focus-visible:v3-outline-none"
+      className={`${CARD_CONTAINER_CLASS} flex flex-col justify-between gap-3.5 focus-visible:ring-2 focus-visible:ring-[#FF5701] focus-visible:v3-outline-none`}
     >
-      <div id="mycalendar" />
-      <h3 className="font-display font-semibold text-base text-[#111827] flex items-center gap-3">
-        <ServiceLogo service="mycalendar" className="w-6 h-6" />
-        Google Calendar của bạn
-      </h3>
-      <p className="text-xs text-[#6B7280]">
-        Planora chỉ đọc sự kiện, tìm khung giờ trống và tạo, cập nhật hoặc huỷ sự kiện trên các lịch bạn
-        đã chọn sau khi bạn duyệt kế hoạch (không tự ý gửi lời mời cho người khác).
-      </p>
-      <div data-testid="mycalendar-ecosystem-badges" className="flex flex-wrap items-center gap-1.5 pt-0.5">
-        <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-800 border border-blue-200">
-          📅 Google Calendar
-        </span>
-        <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
-          🎥 Phòng họp Google Meet
-        </span>
-        <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-800 border border-indigo-200">
-          👥 Mời khách theo phê duyệt
-        </span>
+      <div id="mycalendar" className="hidden" />
+      <div className="v3-space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h3 className="font-sans font-semibold text-base text-[#111827] dark:text-white flex items-center gap-2.5">
+              <ServiceLogo service="mycalendar" className="w-5 h-5" />
+              <span>Google Calendar của bạn</span>
+            </h3>
+            {(status === 'scope_required' || service.email) && (
+              <p className="text-xs font-medium text-[#4B5563] dark:text-[#9CA3AF] break-words mt-0.5 pl-7">
+                {status === 'scope_required' && <span>Đã cấp quyền · Chưa chọn lịch</span>}
+                {status === 'scope_required' && service.email && ' · '}
+                {service.email}
+              </p>
+            )}
+          </div>
+          <span className={connectionBadgeClass(badgeTone)}>
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                badgeTone === 'connected'
+                  ? 'bg-[#16A34A]'
+                  : badgeTone === 'warning'
+                    ? 'bg-amber-500'
+                    : 'bg-[#9CA3AF]'
+              }`}
+            />
+            <span>
+              {status === 'connected'
+                ? 'Đã kết nối'
+                : status === 'scope_required'
+                  ? 'Chưa chọn lịch'
+                  : status === 'reconnect_required'
+                    ? 'Cần kết nối lại'
+                    : 'Chưa kết nối'}
+            </span>
+          </span>
+        </div>
+        <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF] leading-relaxed">
+          Planora chỉ đọc sự kiện, tìm khung giờ trống và tạo, cập nhật hoặc huỷ sự kiện trên các lịch bạn
+          đã chọn sau khi bạn duyệt kế hoạch (không tự ý gửi lời mời cho người khác).
+        </p>
+        <div data-testid="mycalendar-ecosystem-badges" className="flex flex-wrap items-center gap-1.5">
+          <span className={CAPABILITY_PILL_CLASS}>
+            Google Calendar
+          </span>
+          <span className={CAPABILITY_PILL_CLASS}>
+            Phòng họp Google Meet
+          </span>
+          <span className={CAPABILITY_PILL_CLASS}>
+            Mời khách theo phê duyệt
+          </span>
+        </div>
+
+        {status === 'connected' && service.selectedCalendars && service.selectedCalendars.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 p-2.5 rounded-xl bg-[#F8F8F6] dark:bg-[#161616] border border-[#E7E7E2] dark:border-[#2E2E2E]">
+            <span className="text-xs font-medium text-[#4B5563] dark:text-[#9CA3AF]">Lịch được dùng:</span>
+            {service.selectedCalendars.map((cal) => (
+              <span
+                key={cal.id}
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-200 border border-blue-200 dark:border-blue-800/60"
+              >
+                <span>{cal.summary}</span>
+                {cal.primary && <span className="text-xs text-blue-500 dark:text-blue-300 font-semibold">(chính)</span>}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {status === 'reconnect_required' && (
+          <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+            Quyền có thể đã bị thu hồi hoặc hết hạn sau 7 ngày ở chế độ thử nghiệm của Google. Hãy kết
+            nối lại.
+          </p>
+        )}
       </div>
 
-      <p className="text-sm text-[#111827] break-words">
-        <span>
-          {status === 'connected'
-            ? 'Đã kết nối'
-            : status === 'scope_required'
-            ? 'Đã cấp quyền · Chưa chọn lịch'
-            : status === 'reconnect_required'
-            ? 'Cần kết nối lại'
-            : 'Chưa kết nối'}
-        </span>
-        {service.email && <> · {service.email}</>}
-      </p>
-
-      {service.connectedAt && (
-        <p className="text-xs text-[#6B7280]">
-          Kết nối lúc {new Date(service.connectedAt).toLocaleString('vi-VN')}
-        </p>
-      )}
-
-      {status === 'connected' && service.selectedCalendars && service.selectedCalendars.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 pt-1">
-          <span className="text-xs text-[#6B7280]">Lịch được dùng:</span>
-          {service.selectedCalendars.map((cal) => (
-            <span
-              key={cal.id}
-              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200"
-            >
-              <span>{cal.summary}</span>
-              {cal.primary && <span className="text-[10px] text-blue-500 font-semibold">(chính)</span>}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {status === 'reconnect_required' && (
-        <p className="text-xs text-[#6B7280]">
-          Quyền có thể đã bị thu hồi hoặc hết hạn sau 7 ngày ở chế độ thử nghiệm của Google. Hãy kết
-          nối lại.
-        </p>
-      )}
-
-      <div className="flex flex-wrap items-center gap-3 pt-1">
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[#F3F4F6] dark:border-[#2E2E2E]">
         {status === 'not_connected' && (
           <button
             id="mycalendar-action"
@@ -260,27 +286,29 @@ export function PersonalMyCalendar({
 
         {status === 'scope_required' && (
           <>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                id="mycalendar-quick-primary"
+                type="button"
+                className={button}
+                disabled={busy}
+                onClick={() => void quickSelectPrimary()}
+              >
+                Dùng ngay Lịch chính
+              </button>
+              <button
+                id="mycalendar-action"
+                type="button"
+                className={secondary}
+                disabled={busy}
+                onClick={() => void openCalendarPicker()}
+              >
+                Chọn lịch được dùng
+              </button>
+            </div>
             <button
-              id="mycalendar-quick-primary"
               type="button"
-              className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
-              disabled={busy}
-              onClick={() => void quickSelectPrimary()}
-            >
-              Dùng ngay Lịch chính (1 chạm)
-            </button>
-            <button
-              id="mycalendar-action"
-              type="button"
-              className={button}
-              disabled={busy}
-              onClick={() => void openCalendarPicker()}
-            >
-              Chọn lịch được dùng
-            </button>
-            <button
-              type="button"
-              className={secondary}
+              className={DANGER_GHOST_BTN}
               disabled={busy}
               onClick={() => setConfirm(true)}
             >
@@ -302,7 +330,7 @@ export function PersonalMyCalendar({
             </button>
             <button
               type="button"
-              className={secondary}
+              className={DANGER_GHOST_BTN}
               disabled={busy}
               onClick={() => setConfirm(true)}
             >
@@ -324,7 +352,7 @@ export function PersonalMyCalendar({
             </button>
             <button
               type="button"
-              className={secondary}
+              className={DANGER_GHOST_BTN}
               disabled={busy}
               onClick={() => setConfirm(true)}
             >
@@ -446,7 +474,7 @@ export function PersonalMyCalendar({
                         <div className="min-w-0 text-xs">
                           <span className="font-semibold text-[#111827]">{cal.summary}</span>
                           {cal.primary && (
-                            <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700">
+                            <span className="ml-2 px-1.5 py-0.5 rounded text-xs bg-blue-50 text-blue-700">
                               Lịch chính
                             </span>
                           )}

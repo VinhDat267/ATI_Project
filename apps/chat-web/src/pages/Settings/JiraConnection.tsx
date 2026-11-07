@@ -21,15 +21,19 @@ import {
   setActiveWorkspaceId as setGlobalActiveWorkspaceId,
 } from '../../services/workspace-storage';
 import { ServiceLogo } from '../../components/ServiceLogo';
+import {
+  CARD_CONTAINER_CLASS,
+  PRIMARY_CONNECT_BTN,
+  SECONDARY_ACTION_BTN,
+  DANGER_GHOST_BTN,
+  connectionBadgeClass,
+} from './ServiceConnectionCard';
 
 const JIRA_KEY = 'ji' + 'ra';
 
-const buttonPrimary =
-  'px-4 py-2 rounded-xl text-xs font-semibold bg-[#FF5701] text-white hover:bg-[#E04C00] disabled:opacity-50 transition-colors shadow-sm cursor-pointer';
-const buttonSecondary =
-  'px-4 py-2 rounded-xl text-xs font-medium bg-white text-[#111827] dark:bg-[#1F2937] dark:text-white border border-[#E7E7E2] dark:border-[#374151] hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-50 transition-colors cursor-pointer';
-const buttonDanger =
-  'px-4 py-2 rounded-xl text-xs font-medium bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300 border border-red-200 dark:border-red-900 hover:bg-red-100 disabled:opacity-50 transition-colors cursor-pointer';
+const buttonPrimary = PRIMARY_CONNECT_BTN;
+const buttonSecondary = SECONDARY_ACTION_BTN;
+const buttonDanger = DANGER_GHOST_BTN;
 
 export interface JiraConnectionProps {
   user: User | null;
@@ -43,6 +47,7 @@ export function JiraConnection({
   user,
   refresh,
   selected,
+  standalone,
   navigate,
 }: JiraConnectionProps) {
   const [data, setData] = useState<JiraConnectionStatusResponse | null>(null);
@@ -645,49 +650,49 @@ export function JiraConnection({
       ref={row}
       id={JIRA_KEY}
       tabIndex={-1}
-      className={`rounded-2xl border bg-white dark:bg-[#111827] transition-all p-5 sm:p-6 ${
+      className={`${CARD_CONTAINER_CLASS} ${
         selected === JIRA_KEY
           ? 'border-[#FF5701] ring-2 ring-[#FF5701]/20 shadow-md'
-          : 'border-[#E7E7E2] dark:border-[#374151]'
+          : ''
       }`}
     >
       {/* HEADER SECTION */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-5 border-b border-[#E7E7E2] dark:border-[#374151]">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-[#E7E7E2] dark:border-[#374151]">
         <div className="flex items-center gap-3">
-          <ServiceLogo service={JIRA_KEY} className="w-8 h-8 rounded-lg" />
+          <ServiceLogo service={JIRA_KEY} className="w-6 h-6" />
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-sm sm:text-base text-[#111827] dark:text-white">
+              <h3 className="font-sans font-semibold text-base text-[#111827] dark:text-white">
                 Atlassian Jira Cloud
               </h3>
               {connectionError ? (
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900">
+                <span className={connectionBadgeClass('error')}>
                   Lỗi kết nối
                 </span>
               ) : isConnected ? (
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#16A34A]/10 text-[#16A34A] border border-[#16A34A]/20">
+                <span className={connectionBadgeClass('connected')}>
                   Đã kết nối
                 </span>
               ) : isIdentityConnected ? (
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                <span className={connectionBadgeClass('info')}>
                   Đã kết nối danh tính
                 </span>
               ) : isScopeRequired ? (
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                <span className={connectionBadgeClass('warning')}>
                   Cần cấp quyền site
                 </span>
               ) : isReconnectRequired ? (
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200">
+                <span className={connectionBadgeClass('error')}>
                   Cần kết nối lại
                 </span>
               ) : isDisconnected ? (
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
+                <span className={connectionBadgeClass('neutral')}>
                   Chưa kết nối
                 </span>
               ) : null}
             </div>
             <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF] mt-0.5">
-              Kết nối danh tính Atlassian, cấp quyền site Jira và quản lý quyền truy cập theo workspace.
+              Liên kết tài khoản Atlassian, chọn site Jira và quản lý dự án theo không gian làm việc của nhóm.
             </p>
           </div>
         </div>
@@ -773,6 +778,7 @@ export function JiraConnection({
       </div>
 
       {/* 3-STEP ONBOARDING PROGRESS BAR */}
+      {standalone !== false && (
       <div
         data-testid="jira-setup-steps"
         className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3 rounded-xl bg-[#F8F8F6] dark:bg-[#1F2937]/40 border border-[#E7E7E2] dark:border-[#374151] text-xs"
@@ -795,10 +801,10 @@ export function JiraConnection({
             </div>
             <div className="text-[11px] text-[#6B7280] dark:text-[#9CA3AF] truncate">
               {isConnected
-                ? 'Đã xác thực OAuth 3LO'
+                ? 'Đã liên kết tài khoản'
                 : isIdentityConnected
                 ? 'Cần cấp quyền site'
-                : 'Kết nối OAuth 3LO'}
+                : 'Đăng nhập tài khoản Atlassian'}
             </div>
           </div>
         </div>
@@ -845,6 +851,7 @@ export function JiraConnection({
           </div>
         </div>
       </div>
+      )}
 
       {/* CONNECTION ERROR ALERT */}
       {connectionError && (
@@ -915,55 +922,101 @@ export function JiraConnection({
 
       {/* DETAILS: ATLANSSIAN IDENTITY & SITES */}
       {(isConnected || isIdentityConnected || isScopeRequired) && (
-        <div className="py-4 border-b border-[#E7E7E2] dark:border-[#374151] text-xs">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-neutral-600 dark:text-neutral-400">
-            <div>
-              <span className="font-medium text-[#111827] dark:text-white">Tài khoản Atlassian: </span>
-              {data?.displayName ?? data?.atlassianAccountId ?? 'Đã xác thực'}
+        <div className="py-3.5 border-b border-[#E7E7E2] dark:border-[#374151] text-xs">
+          {standalone === false ? (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-neutral-600 dark:text-neutral-400">
+                <span className="font-medium text-[#111827] dark:text-white">Tài khoản Atlassian: </span>
+                <span>
+                  {data?.displayName && !/^712020:|^[0-9a-f-]{20,}$/i.test(data.displayName)
+                    ? data.displayName
+                    : 'Đã xác thực'}
+                </span>
+              </div>
+              {authorizedSites.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-neutral-500">Sites được cấp quyền:</span>
+                  {authorizedSites.map((s) => (
+                    <a
+                      key={s.cloudId}
+                      href={s.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-200 border border-blue-200 dark:border-blue-800/60 hover:underline"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                      <span>{s.name}</span>
+                      <span aria-hidden="true">↗</span>
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
-            {data?.atlassianAccountId && (
-              <div>
-                <span className="font-medium text-[#111827] dark:text-white">ID tài khoản Atlassian: </span>
-                <code className="text-[11px] bg-neutral-100 dark:bg-neutral-800 px-1 py-0.5 rounded">
-                  {data.atlassianAccountId}
-                </code>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-neutral-600 dark:text-neutral-400">
+                <div>
+                  <span className="font-medium text-[#111827] dark:text-white">Tài khoản Atlassian: </span>
+                  {data?.displayName ?? data?.atlassianAccountId ?? 'Đã xác thực'}
+                </div>
+                {data?.atlassianAccountId && (
+                  <div>
+                    <span className="font-medium text-[#111827] dark:text-white">ID tài khoản Atlassian: </span>
+                    <code className="text-[11px] bg-neutral-100 dark:bg-neutral-800 px-1 py-0.5 rounded">
+                      {data.atlassianAccountId}
+                    </code>
+                  </div>
+                )}
+                {data?.jiraAccountId && (
+                  <div>
+                    <span className="font-medium text-[#111827] dark:text-white">Jira Account ID: </span>
+                    <code className="text-[11px] bg-neutral-100 dark:bg-neutral-800 px-1 py-0.5 rounded">
+                      {data.jiraAccountId}
+                    </code>
+                  </div>
+                )}
               </div>
-            )}
-            {data?.jiraAccountId && (
-              <div>
-                <span className="font-medium text-[#111827] dark:text-white">Jira Account ID: </span>
-                <code className="text-[11px] bg-neutral-100 dark:bg-neutral-800 px-1 py-0.5 rounded">
-                  {data.jiraAccountId}
-                </code>
-              </div>
-            )}
-          </div>
 
-          {/* SITES LIST */}
-          {authorizedSites.length > 0 && (
-            <div className="mt-3">
-              <span className="font-medium text-[#111827] dark:text-white block mb-1">
-                Jira Cloud sites đã được cấp quyền ({authorizedSites.length}):
-              </span>
-              <ul className="space-y-1">
-                {authorizedSites.map((s) => (
-                  <li key={s.cloudId} className="flex items-center gap-2 text-neutral-600 dark:text-neutral-400">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                    <span className="font-medium text-[#111827] dark:text-white">{s.name}</span>
-                    <span className="text-[11px] text-neutral-400">({s.url})</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+              {/* SITES LIST */}
+              {authorizedSites.length > 0 && (
+                <div className="mt-3">
+                  <span className="font-medium text-[#111827] dark:text-white block mb-1">
+                    Jira Cloud sites đã được cấp quyền ({authorizedSites.length}):
+                  </span>
+                  <ul className="space-y-1">
+                    {authorizedSites.map((s) => (
+                      <li key={s.cloudId} className="flex items-center gap-2 text-neutral-600 dark:text-neutral-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                        <span className="font-medium text-[#111827] dark:text-white">{s.name}</span>
+                        <span className="text-[11px] text-neutral-400">({s.url})</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
 
       {/* JIRA WORKSPACE MANAGEMENT SECTION */}
-      <div className="pt-5">
+      <details
+        open={standalone === false ? false : (!isDisconnected || workspaces.length > 0)}
+        className="pt-3.5 mt-3.5 border-t border-[#E7E7E2] dark:border-[#374151] group"
+      >
+        <summary className="cursor-pointer list-none flex items-center justify-between gap-2 text-xs font-semibold text-[#374151] dark:text-[#D1D5DB] hover:text-[#111827] dark:hover:text-white select-none">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="transition-transform group-open:rotate-90 text-[10px]">▸</span>
+            <span>Quản lý Không gian làm việc Jira &amp; Dự án nhóm</span>
+          </span>
+          <span className="text-[#6B7280] dark:text-[#9CA3AF] font-normal px-2 py-0.5 rounded-md bg-[#F8F8F6] dark:bg-[#262626] border border-[#E7E7E2] dark:border-[#374151]">
+            {workspaces.length > 0 ? `${workspaces.length} không gian làm việc` : 'Mở cấu hình nâng cao'}
+          </span>
+        </summary>
+        <div className="pt-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
           <div>
-            <h4 className="font-semibold text-xs uppercase tracking-wider text-[#6B7280] dark:text-[#9CA3AF]">
+            <h4 className="font-semibold text-xs text-[#374151] dark:text-[#D1D5DB]">
               Không gian làm việc Jira (Jira Workspaces)
             </h4>
             <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
@@ -1111,7 +1164,7 @@ export function JiraConnection({
               <div className="mt-5 pt-4 border-t border-[#E7E7E2] dark:border-[#374151] space-y-5">
                 {/* 1. MEMBERS & DECISIONS */}
                 <div>
-                  <h5 className="font-semibold text-xs uppercase tracking-wider text-[#6B7280] dark:text-[#9CA3AF] mb-2">
+                  <h5 className="font-semibold text-xs text-[#374151] dark:text-[#D1D5DB] mb-2">
                     Quản lý thành viên ({members.length})
                   </h5>
                   <div className="space-y-2">
@@ -1180,7 +1233,7 @@ export function JiraConnection({
                 {/* 2. INVITES */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <h5 className="font-semibold text-xs uppercase tracking-wider text-[#6B7280] dark:text-[#9CA3AF]">
+                    <h5 className="font-semibold text-xs text-[#374151] dark:text-[#D1D5DB]">
                       Mã mời tham gia ({invites.length})
                     </h5>
                     <button
@@ -1252,8 +1305,8 @@ export function JiraConnection({
 
                 {/* 3. SITES & PROJECTS */}
                 <div>
-                  <h5 className="font-semibold text-xs uppercase tracking-wider text-[#6B7280] dark:text-[#9CA3AF] mb-2">
-                    Liên kết Jira Sites & Projects ({sites.length})
+                  <h5 className="font-semibold text-xs text-[#374151] dark:text-[#D1D5DB] mb-2">
+                    Liên kết Jira Sites &amp; Projects ({sites.length})
                   </h5>
 
                   {/* LINK NEW SITE DROPDOWN */}
@@ -1313,7 +1366,7 @@ export function JiraConnection({
                               [{site.active ? 'Đang hoạt động' : 'Tạm dừng'}]
                             </span>
                             {site.active && configuredProjectCount === 0 && (
-                              <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                              <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
                                 Cần chọn ít nhất 1 Project
                               </span>
                             )}
@@ -1416,16 +1469,16 @@ export function JiraConnection({
       </div>
 
       {/* COCKPIT JIRA CONVERSATION CTA */}
-      <div className="mt-6 pt-5 border-t border-[#E7E7E2] dark:border-[#374151]">
+      <div className="mt-5 pt-4 border-t border-[#E7E7E2] dark:border-[#374151]">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl bg-neutral-50 dark:bg-[#1F2937]/30 border border-[#E7E7E2] dark:border-[#374151]">
           <div>
             <h5 className="font-semibold text-xs text-[#111827] dark:text-white">
-              Hội thoại Atlassian Jira trong Cockpit
+              Làm việc với Jira trong Không gian làm việc
             </h5>
             <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF] mt-0.5">
               {data?.connectionState === 'connected' && isWorkspaceActive && (capabilities?.sites?.length ?? 0) > 0
-                ? 'Kết nối cá nhân, Jira workspace và danh mục site/project đã sẵn sàng để tạo kế hoạch trong Cockpit.'
-                : 'Hội thoại Jira trong Cockpit cần kết nối cá nhân, thành viên workspace hoạt động và ít nhất một site đã cấu hình (chờ hoàn tất JIRA-08).'}
+                ? 'Kết nối cá nhân, Jira workspace và danh mục site/project đã sẵn sàng để tạo kế hoạch công việc.'
+                : 'Cần hoàn tất kết nối cá nhân, tham gia Jira workspace hoạt động và kích hoạt ít nhất một site & project để bắt đầu làm việc.'}
             </p>
           </div>
           {data?.connectionState === 'connected' && isWorkspaceActive && (capabilities?.sites?.length ?? 0) > 0 ? (
@@ -1449,11 +1502,12 @@ export function JiraConnection({
               aria-disabled="true"
               className="px-4 py-2 rounded-xl text-xs font-semibold bg-neutral-200 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400 cursor-not-allowed whitespace-nowrap shadow-none"
             >
-              Bắt đầu hội thoại Jira (Chờ JIRA-08)
+              Bắt đầu hội thoại Jira
             </button>
           )}
         </div>
       </div>
+      </details>
     </div>
   );
 }

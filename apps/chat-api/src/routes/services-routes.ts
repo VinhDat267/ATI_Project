@@ -648,7 +648,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
           tools: MYJIRA_TOOLS.map((tool) => tool.name),
           configured: connected,
           connected,
-          connectionStatus: connected ? 'unchecked' : 'unconfigured',
+          connectionStatus: connected ? 'healthy' : 'unconfigured',
           lastCheckedAt: null,
           allowedScope,
           personalStatus,

@@ -65,7 +65,7 @@ export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pag
   return (
     <header className="sticky top-0 z-30 w-full bg-[#F8F8F6]/90 backdrop-blur-md border-b border-[#E7E7E2]">
       <div data-main-nav className="max-w-7xl mx-auto grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 sm:px-6 py-2">
-        <div className="col-start-1 flex items-center gap-2.5 min-w-0 justify-self-start">
+        <div className="col-start-1 flex items-center gap-2 min-w-0 max-w-full justify-self-start">
           <a href="/" onClick={follow('/')} aria-label="Planora · Về không gian làm việc" title="Về không gian làm việc" className="flex items-center gap-2 group flex-shrink-0">
             <div className="w-8 h-8 rounded-lg bg-[#FF5701] flex items-center justify-center text-white font-display font-bold text-lg shadow-sm group-hover:scale-105 transition-transform">
               P
@@ -74,7 +74,7 @@ export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pag
               Planora
             </span>
           </a>
-          <div className="hidden sm:inline-block flex-shrink-0">
+          <div className="hidden sm:flex min-w-0 shrink">
             <WorkspaceSwitcher navigate={navigate} />
           </div>
           {pageName && <span data-nav-page-name className="min-[900px]:hidden text-sm font-medium text-[#4B5563] truncate">{pageName}</span>}
@@ -84,25 +84,44 @@ export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pag
             <a key={tab.id} href={tab.path} onClick={follow(tab.path)} aria-label={tab.id === 'history' && pendingCount > 0 ? `Nhật ký, ${pendingCount} lượt chờ duyệt` : tab.name} aria-current={current === tab.id ? 'page' : undefined} className={current === tab.id ? TAB_ON : TAB_OFF}>
               <span className="xl:hidden">{tab.short}</span>
               <span className="hidden xl:inline">{tab.name}</span>
-              {tab.id === 'history' && pendingCount > 0 && <span aria-hidden="true" data-schedule-count className="ml-1 rounded-full px-1.5 py-0.5 bg-[#FF5701] text-white text-[10px] font-bold">{pendingCount}</span>}
-              {tab.id === 'users' && usersPendingCount > 0 && <span aria-hidden="true" data-users-pending-count className="ml-1 rounded-full px-1.5 py-0.5 bg-[#FF5701] text-white text-[10px] font-bold">{usersPendingCount}</span>}
+              {tab.id === 'history' && pendingCount > 0 && <span aria-hidden="true" data-schedule-count className="ml-1 rounded-full px-1.5 py-0.5 bg-[#FF5701] text-white text-xs font-bold">{pendingCount}</span>}
+              {tab.id === 'users' && usersPendingCount > 0 && <span aria-hidden="true" data-users-pending-count className="ml-1 rounded-full px-1.5 py-0.5 bg-[#FF5701] text-white text-xs font-bold">{usersPendingCount}</span>}
             </a>
           ))}
         </nav>
-        <div className="col-start-3 flex items-center gap-2 flex-shrink-0 justify-self-end">
-          {typeof inboxBadgeCount === 'number' && inboxBadgeCount > 0 && (
-            <a
-              href="/inbox"
-              onClick={follow('/inbox')}
-              aria-label={`Hộp thư đề xuất, ${inboxBadgeCount} đề xuất cần xử lý`}
-              className="inline-flex items-center gap-1 rounded-full bg-[#FF5701]/10 px-2.5 py-1 text-xs font-semibold text-[#FF5701] hover:bg-[#FF5701]/20 transition-colors"
-            >
-              <span>Hộp thư đề xuất</span>
-              <span data-inbox-badge-count className="rounded-full bg-[#FF5701] px-1.5 py-0.5 text-[10px] font-bold text-white">
+        <div className="col-start-3 flex items-center gap-1.5 sm:gap-2 flex-shrink-0 justify-self-end">
+          <a
+            href="/inbox"
+            onClick={follow('/inbox')}
+            data-testid="nav-events-inbox-link"
+            aria-current={current === 'inbox' ? 'page' : undefined}
+            aria-label={
+              typeof inboxBadgeCount === 'number' && inboxBadgeCount > 0
+                ? `Hộp thư đề xuất, ${inboxBadgeCount} đề xuất cần xử lý`
+                : 'Sự kiện & Đề xuất'
+            }
+            title="Mở Trung tâm Sự kiện & Đề xuất chờ duyệt"
+            className={
+              current === 'inbox' || (typeof inboxBadgeCount === 'number' && inboxBadgeCount > 0)
+                ? 'inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 rounded-xl bg-[#FF5701]/10 px-2.5 py-1.5 text-xs font-semibold text-[#FF5701] hover:bg-[#FF5701]/20 transition-colors border border-[#FF5701]/30'
+                : 'inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 rounded-xl bg-white dark:bg-[#1E1E1E] px-2.5 py-1.5 text-xs font-medium text-[#4B5563] dark:text-[#D1D5DB] hover:text-[#111827] dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-[#E7E7E2] dark:border-[#374151] shadow-sm transition-colors'
+            }
+          >
+            <svg className="w-3.5 h-3.5 text-[#FF5701] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <span className="hidden xl:inline 2xl:hidden">
+              {typeof inboxBadgeCount === 'number' && inboxBadgeCount > 0 ? 'Hộp thư' : 'Sự kiện'}
+            </span>
+            <span className="hidden 2xl:inline">
+              {typeof inboxBadgeCount === 'number' && inboxBadgeCount > 0 ? 'Hộp thư đề xuất' : 'Sự kiện & Đề xuất'}
+            </span>
+            {typeof inboxBadgeCount === 'number' && inboxBadgeCount > 0 && (
+              <span data-inbox-badge-count className="rounded-full bg-[#FF5701] px-1.5 py-0.5 text-xs font-bold text-white">
                 {inboxBadgeCount}
               </span>
-            </a>
-          )}
+            )}
+          </a>
           {actions}
           <ThemeToggle />
           <UserNavMenu user={user} pendingScheduleCount={pendingCount} variant="prototype" triggerClassName={AVATAR} menuItemClassName={MENU_ITEM} navigate={navigate} onOpenSettings={onOpenSettings ?? (() => navigate('/settings'))} onOpenAccount={() => navigate('/account')} onManageUsers={() => navigate('/admin/users')} onLogout={onLogout} />

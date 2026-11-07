@@ -7,6 +7,20 @@ import { describeRecurrence, formatRunTime, runLabel, scheduleLabel } from '../.
 import { getActiveWorkspaceId, subscribeWorkspace } from '../../services/workspace-storage';
 import { ScheduleActions } from '../Cockpit/ScheduleActions';
 import { WorkflowFlowCanvas } from '../../components/WorkflowFlowCanvas';
+import { ServiceLogo } from '../../components/ServiceLogo';
+
+import { SCHEDULE_EVENT_TEMPLATES, type ScheduleEventTemplate } from '../../services/job-readiness';
+
+export { SCHEDULE_EVENT_TEMPLATES, type ScheduleEventTemplate };
+
+function triggerScheduleTemplate(prompt: string, navigate: (path: string) => void) {
+  try {
+    sessionStorage.setItem('ati_prefill_prompt', prompt);
+  } catch {
+    // Ignore storage quota errors
+  }
+  navigate('/');
+}
 
 function RunLink({ run, navigate }: { run: ScheduleRunView; navigate: (path: string) => void }) {
   const sheetsDelivery = run.delivery && 'spreadsheetTitle' in run.delivery ? run.delivery : null;
@@ -28,7 +42,7 @@ function RunLink({ run, navigate }: { run: ScheduleRunView; navigate: (path: str
             : ''
         }`
       : null;
-  return <><span>{formatRunTime(run.dueAt)} · </span>{run.convId ? <a className="underline text-[#FF5701]" href={`/c/${run.convId}`} onClick={event => { if (event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); navigate(`/c/${run.convId}`); }}>{runLabel(run)}</a> : <span>{runLabel(run)}</span>}{sheetsDelivery && <span className="text-xs text-[#6B7280]"> ({sheetsDelivery.spreadsheetTitle} → {sheetsDelivery.targetLabel ?? sheetsDelivery.targetId})</span>}{githubDest && <span className="text-xs text-[#6B7280]"> ({githubDest})</span>}{telegramDest && <span className="text-xs text-[#6B7280]"> ({telegramDest})</span>}{run.error && <span className="block text-xs text-[#6B7280]">{run.error}</span>}</>;
+  return <><span>{formatRunTime(run.dueAt)} · </span>{run.convId ? <a className="underline text-[#B43E00]" href={`/c/${run.convId}`} onClick={event => { if (event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); navigate(`/c/${run.convId}`); }}>{runLabel(run)}</a> : <span>{runLabel(run)}</span>}{sheetsDelivery && <span className="text-xs text-[#6B7280]"> ({sheetsDelivery.spreadsheetTitle} → {sheetsDelivery.targetLabel ?? sheetsDelivery.targetId})</span>}{githubDest && <span className="text-xs text-[#6B7280]"> ({githubDest})</span>}{telegramDest && <span className="text-xs text-[#6B7280]"> ({telegramDest})</span>}{run.error && <span className="block text-xs text-[#6B7280]">{run.error}</span>}</>;
 }
 function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: ScheduleView; navigate: (path: string) => void; reload: () => Promise<void>; onChanged: (schedule: ScheduleView) => void }) {
   const [open, setOpen] = useState(false), [runs, setRuns] = useState<ScheduleRunView[]>([]), [error, setError] = useState('');
@@ -38,8 +52,8 @@ function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: Sche
     apiClient.getScheduleRuns(schedule.id, 10).then(data => { if (current) { setRuns(data.runs); setError(''); } }).catch(() => { if (current) setError('Không tải được các lượt chạy.'); });
     return () => { current = false; };
   }, [open, schedule]);
-  return <article className="bg-white rounded-2xl border border-[#E7E7E2] p-4 sm:p-5 v3-space-y-3 min-w-0">
-    <h3 className="text-base font-semibold text-[#111827] [overflow-wrap:anywhere] flex flex-wrap items-center gap-2">
+  return <article className="bg-white rounded-2xl border border-[#E5E5E0] p-4 sm:p-5 v3-space-y-3 min-w-0 shadow-2xs">
+    <h3 className="font-sans text-base font-semibold text-[#111827] [overflow-wrap:anywhere] flex flex-wrap items-center gap-2">
       <span>{schedule.name}</span>
       {schedule.kind === 'plan' ? (
         <span data-schedule-kind="plan" data-schedule-mode="manual" className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
@@ -74,7 +88,7 @@ function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: Sche
         <p>Kế hoạch đã sẵn sàng, cần bạn xem và xác nhận trước khi gửi.</p>
       </div>
     )}
-    {schedule.services && schedule.services.length > 0 && (
+    {schedule.services && schedule.services.length >= 2 && (
       <WorkflowFlowCanvas
         services={schedule.services}
         isAutoDigest={schedule.kind !== 'plan'}
@@ -91,20 +105,57 @@ function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: Sche
 // PBI-05: chỉ mô tả đúng luồng có thật — lịch được lưu khi người dùng bấm "Xác nhận" trên đề xuất
 // lịch chạy (ScheduleMoment → POST /conversations/:convId/schedule-proposals/:messageId/confirm).
 function ScheduleEmptyState({ navigate }: { navigate: (path: string) => void }) {
-  return <div data-schedule-empty className="p-5 sm:p-6 rounded-2xl bg-white border border-[#E7E7E2] shadow-soft flex flex-col sm:flex-row sm:items-start gap-4 min-w-0">
-    <div aria-hidden="true" className="w-10 h-10 rounded-xl bg-neutral-100 border border-[#E7E7E2] flex items-center justify-center flex-shrink-0 text-[#4B5563]">
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+  return <div data-schedule-empty className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E5E5E0] dark:border-[#374151] shadow-2xs v3-space-y-4 min-w-0">
+    <div className="flex flex-col sm:flex-row sm:items-start gap-4 min-w-0">
+      <div aria-hidden="true" className="w-10 h-10 rounded-xl bg-[#F8F8F6] dark:bg-neutral-800 border border-[#E5E5E0] dark:border-[#374151] flex items-center justify-center flex-shrink-0 text-[#4B5563] dark:text-[#D1D5DB]">
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+      </div>
+      <div className="v3-space-y-2 min-w-0 flex-1">
+        <h3 className="font-sans text-base font-semibold text-[#111827] dark:text-white">Chưa có lịch chạy nào</h3>
+        <p className="text-sm text-[#4B5563] dark:text-[#9CA3AF] leading-relaxed [overflow-wrap:anywhere]">
+          Lịch chạy được tạo trong Không gian làm việc: mô tả việc cần lặp lại kèm thời điểm, ví dụ “Mỗi sáng 08:00, gửi lịch họp hôm nay lên Slack”.
+          Khi Planora đưa ra đề xuất lịch chạy, lịch chỉ được lưu sau khi bạn bấm Xác nhận trên đề xuất đó.
+        </p>
+        <a href="/" onClick={event => { if (event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); navigate('/'); }}
+          className="inline-flex items-center gap-1.5 mt-1 px-4 py-2 rounded-xl text-sm font-semibold bg-[#111827] dark:bg-[#C84300] text-white hover:opacity-90 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C84300] focus-visible:ring-offset-2">
+          Mở Không gian làm việc
+        </a>
+      </div>
     </div>
-    <div className="v3-space-y-2 min-w-0 flex-1">
-      <h3 className="text-base font-semibold text-[#111827]">Chưa có lịch chạy nào</h3>
-      <p className="text-sm text-[#4B5563] leading-relaxed [overflow-wrap:anywhere]">
-        Lịch chạy được tạo trong Không gian làm việc: mô tả việc cần lặp lại kèm thời điểm, ví dụ “Mỗi sáng 08:00, gửi lịch họp hôm nay lên Slack”.
-        Khi Planora đưa ra đề xuất lịch chạy, lịch chỉ được lưu sau khi bạn bấm Xác nhận trên đề xuất đó.
+    <div className="pt-3 border-t border-[#E5E5E0] dark:border-[#374151] v3-space-y-2.5">
+      <p className="text-xs font-semibold text-[#6B7280] dark:text-[#9CA3AF]">
+        Kích hoạt nhanh mẫu sự kiện &amp; bản tin tự động phổ biến:
       </p>
-      <a href="/" onClick={event => { if (event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); navigate('/'); }}
-        className="inline-flex items-center gap-1.5 mt-1 px-4 py-2 rounded-xl text-sm font-semibold bg-[#111827] text-white hover:opacity-90 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5701] focus-visible:ring-offset-2">
-        Mở Không gian làm việc
-      </a>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5" data-testid="schedule-event-templates">
+        {SCHEDULE_EVENT_TEMPLATES.map(tpl => (
+          <div key={tpl.id} className="p-3.5 rounded-xl border border-[#E5E5E0] dark:border-[#374151] bg-[#F8F8F6] dark:bg-[#111827] flex flex-col justify-between gap-2.5">
+            <div className="v3-space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  {tpl.services.map(svc => (
+                    <ServiceLogo key={svc} service={svc} className="w-4 h-4" />
+                  ))}
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
+                  {tpl.cadenceLabel}
+                </span>
+              </div>
+              <p className="text-sm font-semibold text-[#111827] dark:text-white">{tpl.title}</p>
+              <p className="text-xs text-[#4B5563] dark:text-[#9CA3AF] leading-relaxed">{tpl.description}</p>
+            </div>
+            <div className="pt-1">
+              <button
+                type="button"
+                data-testid={`btn-schedule-template-${tpl.id}`}
+                onClick={() => triggerScheduleTemplate(tpl.prompt, navigate)}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-[#B43E00] hover:text-[#9A3400] transition-colors"
+              >
+                <span>Thiết lập lịch sự kiện này →</span>
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   </div>;
 }
@@ -125,5 +176,5 @@ export function ScheduleSection({ user, navigate }: { user: User | null; navigat
   }, [enabled, user?.id, workspaceId]);
   const reload = async () => { const data = await apiClient.getSchedules(); setSchedules(data.schedules); };
   if (!enabled || !user) return null;
-  return <section aria-labelledby="schedule-section-title" className="v3-space-y-4"><h2 id="schedule-section-title" className="font-display text-2xl font-bold text-[#111827]">Lịch chạy</h2>{!loaded && <p role="status" className="text-xs text-[#6B7280]">Đang tải lịch chạy…</p>}{error && <p role="alert" className="text-sm text-red-700">{error}</p>}{loaded && !error && !schedules.length && <ScheduleEmptyState navigate={navigate} />}{schedules.map(schedule => <ScheduleRow key={schedule.id} schedule={schedule} navigate={navigate} reload={reload} onChanged={changed => setSchedules(rows => rows.map(row => row.id === changed.id ? changed : row))} />)}</section>;
+  return <section aria-labelledby="schedule-section-title" className="v3-space-y-3"><h2 id="schedule-section-title" className="font-sans text-lg font-semibold tracking-tight text-[#111827]">Lịch chạy</h2>{!loaded && <p role="status" className="text-xs text-[#6B7280]">Đang tải lịch chạy…</p>}{error && <p role="alert" className="text-sm text-red-700">{error}</p>}{loaded && !error && !schedules.length && <ScheduleEmptyState navigate={navigate} />}{schedules.map(schedule => <ScheduleRow key={schedule.id} schedule={schedule} navigate={navigate} reload={reload} onChanged={changed => setSchedules(rows => rows.map(row => row.id === changed.id ? changed : row))} />)}</section>;
 }

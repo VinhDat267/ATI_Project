@@ -11,6 +11,7 @@ const PERSONAL_OAUTH_SERVICE_IDS = new Set(['gmail', 'mycalendar', 'mysheets', '
 export function useSettings(user: User | null) {
   const [services, setServices] = useState<ServiceInfo[]>([]);
   const [slackOAuthEnabled, setSlackOAuthEnabled] = useState(false);
+  const [hasPersonalOAuthCatalog, setHasPersonalOAuthCatalog] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -30,6 +31,8 @@ export function useSettings(user: User | null) {
     .filter(
       s =>
         !PERSONAL_OAUTH_SERVICE_IDS.has(s.id) &&
+        !(slackOAuthEnabled && `my${s.id}` === 'myslack') &&
+        !(hasPersonalOAuthCatalog && s.id === 'notion') &&
         !(s.id === 'calendar' && personalMyCalendar && (personalMyCalendar.connected || !s.configured)) &&
         !(s.id === 'sheets' && personalMySheets && (personalMySheets.connected || !s.configured)) &&
         !(s.id === 'telegram' && Array.isArray(s.credentialFields) && s.credentialFields.length === 0) &&
@@ -44,7 +47,16 @@ export function useSettings(user: User | null) {
     try {
       const data = await apiClient.getServices();
       if (!Array.isArray(data?.services)) throw new Error('Không tải được danh mục dịch vụ.');
-      if (owner === epoch.current && request === read.current) { setServices(data.services); setSlackOAuthEnabled(data.personalOAuth?.includes('myslack') === true); setCanEdit(data.canConfigure === true); setLoadError(null); }
+      if (owner === epoch.current && request === read.current) {
+        setServices(data.services);
+        setSlackOAuthEnabled(data.personalOAuth?.includes('myslack') === true);
+        setHasPersonalOAuthCatalog(
+          (Array.isArray(data.personalOAuth) && data.personalOAuth.length > 0) ||
+            data.services.some((s: any) => s.id === 'myjira')
+        );
+        setCanEdit(data.canConfigure === true);
+        setLoadError(null);
+      }
     } catch (error) {
       if (owner === epoch.current && request === read.current) setLoadError(userErrorMessage(error));
     } finally { if (owner === epoch.current && request === read.current) setLoading(false); }

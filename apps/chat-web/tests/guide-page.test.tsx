@@ -50,7 +50,7 @@ describe('GuidePage — OAuth-First AI Automation Playbook & Make.com Orbital Sh
     expect(canvases.length).toBeGreaterThanOrEqual(1);
     expect(canvases[0]).toHaveAttribute('data-router-node', 'true');
 
-    expect(screen.getAllByText(/OAuth 2\.0 · 1-Click/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Liên kết trực tiếp/i).length).toBeGreaterThanOrEqual(1);
   });
 
   it('provides clickable AI Prompt Templates with "Dùng thử mẫu lệnh này" that navigate to / and prefill RequestMoment prompt input', async () => {
@@ -109,14 +109,14 @@ describe('GuidePage — OAuth-First AI Automation Playbook & Make.com Orbital Sh
     render(<GuidePage navigate={navigate} />);
     await waitFor(() => expect(apiClient.getRuntime).toHaveBeenCalled());
 
-    // Trello is selected by default and guides user through 1-Click OAuth
-    expect(document.getElementById('service-guide-detail')).toHaveTextContent(/Kết nối OAuth 1-Click/i);
+    // Trello is selected by default and guides user through direct OAuth connection
+    expect(document.getElementById('service-guide-detail')).toHaveTextContent(/Liên kết tài khoản/i);
 
     fireEvent.click(document.getElementById('service-pill-sheets')!);
-    expect(document.getElementById('service-guide-detail')).toHaveTextContent(/Kết nối OAuth 1-Click/i);
+    expect(document.getElementById('service-guide-detail')).toHaveTextContent(/Liên kết tài khoản/i);
 
     fireEvent.click(document.getElementById('service-pill-calendar')!);
-    expect(document.getElementById('service-guide-detail')).toHaveTextContent(/Kết nối OAuth 1-Click/i);
+    expect(document.getElementById('service-guide-detail')).toHaveTextContent(/Liên kết tài khoản/i);
 
     // Clicking "Thử trên sân khấu →" on PromptCard also sets sessionStorage['ati_prefill_prompt']
     fireEvent.click(document.getElementById('tab-btn-prompts')!);

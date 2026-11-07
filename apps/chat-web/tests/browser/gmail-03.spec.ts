@@ -92,7 +92,7 @@ for (const width of [1440, 375]) for (const theme of ['light', 'dark']) {
     await page.goto('/');
     await page.getByRole('textbox').fill('Trả lời email mới nhất trong luồng Họp nhóm ATI');
     await page.getByRole('button', { name: 'Gửi yêu cầu', exact: true }).click();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tôi sẽ làm 1 việc, theo thứ tự');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tôi sẽ làm 1 việc');
     await expect(page.getByText('Gửi từ: gmail-owner@example.test', { exact: true })).toBeVisible();
     const destinationLine = page.locator('#plan-cards-container p').filter({ hasText: 'Đích đến:' });
     await expect(destinationLine).toHaveText('Đích đến: Họp nhóm ATI');

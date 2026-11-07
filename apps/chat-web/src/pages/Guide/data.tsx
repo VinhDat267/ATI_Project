@@ -71,24 +71,24 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
         id: 'trello',
         name: 'Trello',
         category: 'Quản lý công việc dạng bảng',
-        keys: ['API key', 'API token'],
-        scopeLabel: 'Board ID',
-        sampleScope: '5f1a2b3c4d5e6f7a8b9c0d1e',
-        timeEstimate: 'Khoảng 2 phút',
-        summary: 'Tạo và cập nhật card, gán thành viên, thêm checklist trên bảng công việc của nhóm.',
-        importantNotice: 'Planora chỉ đọc và ghi trên đúng Board ID bạn cấp. Card đã xong được lưu trữ chứ không bao giờ bị xoá mất.',
+        keys: ['Liên kết tài khoản Trello', 'Chọn bảng công việc'],
+        scopeLabel: 'Bảng Trello được chọn',
+        sampleScope: '1–10 bảng công việc của nhóm',
+        timeEstimate: 'Khoảng 30 giây',
+        summary: 'Tạo và cập nhật thẻ công việc, phân công thành viên, thêm danh sách kiểm tra trên bảng của nhóm.',
+        importantNotice: 'Planora chỉ đọc và ghi trên đúng các bảng Trello bạn đã tích chọn. Thẻ đã hoàn thành được lưu trữ an toàn chứ không bao giờ bị xoá vĩnh viễn.',
         steps: [
           {
             num: 1,
-            title: 'Khuyên dùng: Kết nối OAuth 1-Click & Chọn Bảng trực tiếp',
-            desc: 'Mở trang Cài đặt dịch vụ trên Planora, tại mục Trello cá nhân bấm nút <strong>Kết nối OAuth 1-Click</strong>, bấm "Allow" trên màn hình Trello và tích chọn các bảng (Board) bạn muốn cho phép ngay trên giao diện trực quan.',
-            callout: 'Không cần tự tạo Power-Up hay thêm đuôi .json để tìm Board ID thủ công.'
+            title: 'Liên kết tài khoản Trello trực tiếp',
+            desc: 'Mở trang Kết nối dịch vụ trên Planora, tại mục Trello bấm nút <strong>Kết nối Trello</strong> và xác nhận cho phép truy cập trên màn hình Trello.',
+            callout: 'Không cần tự tạo khoá kỹ thuật hay tìm mã bảng thủ công.'
           },
           {
             num: 2,
-            title: 'Dành cho Quản trị viên Workspace: Cổng Trello Power-Up',
-            desc: 'Nếu nhóm muốn dùng khoá chung toàn Workspace, đăng nhập vào Trello và mở trang quản lý tích hợp tại <a href="https://trello.com/power-ups/admin" target="_blank" rel="noopener noreferrer" class="text-[#0079BF] font-medium underline">trello.com/power-ups/admin</a> (hoặc trello.com/app-key).',
-            callout: 'Sao chép API Key, tạo API Token và chọn Board được phép dùng cho nhóm.'
+            title: 'Tích chọn các bảng công việc được phép dùng',
+            desc: 'Chọn Không gian làm việc Trello và tích chọn từ 1 đến 10 bảng (Board) bạn muốn sử dụng rồi bấm <strong>Lưu bảng được dùng</strong>. Bạn có thể bấm <strong>Đổi bảng</strong> bất cứ lúc nào để cập nhật phạm vi.',
+            callout: 'Mỗi bảng hiển thị rõ trạng thái thành viên và liên kết mở nhanh sang Trello.'
           }
         ]
       },
@@ -96,126 +96,100 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
         id: 'slack',
         name: 'Slack',
         category: 'Giao tiếp & Kênh thông báo nhóm',
-        keys: ['Bot token'],
-        scopeLabel: 'Channel ID',
-        sampleScope: 'C07DEMO9X1 (#ati-test)',
-        timeEstimate: 'Khoảng 3 phút',
-        summary: 'Gửi tin nhắn thông báo vào các kênh công khai hoặc riêng tư khi việc trên các công cụ khác hoàn thành.',
-        importantNotice: 'Bắt buộc mời bot vào kênh trước! Sau khi tạo, hãy gõ lệnh /invite @Planora trong kênh bạn muốn gửi tin.',
+        keys: ['Liên kết tài khoản Slack', 'Chọn kênh nhận thông báo'],
+        scopeLabel: 'Kênh Slack làm việc',
+        sampleScope: '#du-an-chung, #thong-bao-sprint',
+        timeEstimate: 'Khoảng 30 giây',
+        summary: 'Đọc tin nhắn tóm tắt thảo luận và gửi thông báo tiến độ vào các kênh làm việc khi công việc hoàn thành.',
+        importantNotice: 'Planora luôn hiển thị bản xem trước nội dung tin nhắn và kênh nhận để bạn kiểm tra trước khi gửi.',
         steps: [
           {
             num: 1,
-            title: 'Tạo ứng dụng Slack mới',
-            desc: 'Truy cập trang nhà phát triển Slack tại <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer" class="text-[#36C5F0] font-medium underline">api.slack.com/apps</a>. Bấm nút "Create New App" > chọn "From scratch". Đặt tên "Planora Bot" và chọn Workspace nhóm.',
-            callout: 'Chọn đúng không gian làm việc của công ty bạn.'
+            title: 'Liên kết tài khoản Slack của bạn',
+            desc: 'Trong trang Kết nối dịch vụ, tại mục Slack của bạn bấm nút <strong>Kết nối Slack</strong> và xác nhận đăng nhập vào không gian làm việc Slack của nhóm.',
+            callout: 'Liên kết trực tiếp với tài khoản của bạn mà không cần tạo ứng dụng hay sao chép mã token.'
           },
           {
             num: 2,
-            title: 'Cấp quyền hạn tối thiểu (Bot Scopes)',
-            desc: 'Ở menu bên trái, bấm vào "OAuth & Permissions". Cuộn xuống mục "Scopes" > "Bot Token Scopes" và bấm "Add an OAuth Scope". Thêm các quyền:',
-            tags: ['chat:write (gửi tin)', 'channels:read (xem kênh chung)', 'groups:read (xem kênh riêng)'],
-            callout: 'Chỉ cần quyền chat:write là đủ để bot gửi tin. Không cấp thêm quyền quản trị.'
-          },
-          {
-            num: 3,
-            title: 'Cài đặt vào Workspace & lấy Bot Token',
-            desc: 'Cuộn lên đầu trang "OAuth & Permissions", bấm nút "Install to Workspace" và bấm "Allow". Sau đó sao chép chuỗi "Bot User OAuth Token" bắt đầu bằng chữ "xoxb-".',
-            callout: 'Dán chuỗi bắt đầu bằng xoxb- vào ô "Bot token" trong Planora.'
-          },
-          {
-            num: 4,
-            title: 'Lấy Channel ID & Mời bot vào kênh',
-            desc: 'Mở ứng dụng Slack trên máy tính, chuột phải vào tên kênh (ví dụ #ati-test) > chọn "View channel details" (Xem chi tiết kênh). Cuộn xuống đáy cùng để thấy "Channel ID" (bắt đầu bằng chữ C, ví dụ C07DEMO9X1).',
-            callout: 'Đừng quên: Gõ lệnh /invite @Planora Bot trong kênh đó để bot có quyền gửi tin!'
+            title: 'Sử dụng kênh Slack trong câu lệnh hàng ngày',
+            desc: 'Khi giao việc hoặc lập báo cáo, chỉ cần nêu tên kênh (ví dụ <code>#general</code> hoặc <code>#ati-test</code>). Bạn cũng có thể đặt kênh Slack mặc định ngay trên màn hình Không gian làm việc.',
+            callout: 'Có thể kiểm tra hoặc ngắt kết nối bất cứ lúc nào trong trang Kết nối dịch vụ.'
           }
         ]
       },
       github: {
         id: 'github',
         name: 'GitHub',
-        category: 'Kho mã nguồn & Quản lý Issue lỗi',
-        keys: ['Personal access token'],
-        scopeLabel: 'Repository (chủ/tên-kho)',
-        sampleScope: 'VinhDat267/ati-test',
-        timeEstimate: 'Khoảng 2 phút',
-        summary: 'Tìm kho mã, đọc và tạo issue lỗi, gắn nhãn (bug, defect), liên kết chéo với card Trello.',
-        importantNotice: 'Planora không bao giờ xoá repository, không merge code, và chỉ thao tác trên issue thuộc kho bạn cho phép.',
+        category: 'Kho mã nguồn & Quản lý Issue / Pull Request',
+        keys: ['Liên kết tài khoản GitHub', 'Chọn kho mã (Repository)'],
+        scopeLabel: 'Repository được chọn',
+        sampleScope: 'VinhDat267/ati-test (1–10 kho)',
+        timeEstimate: 'Khoảng 30 giây',
+        summary: 'Đọc danh sách Pull Request đang mở, kiểm tra Issue tồn đọng, tạo Issue mới và gắn nhãn phân loại.',
+        importantNotice: 'Planora không bao giờ xoá kho mã, không tự động gộp nhánh (merge code), và chỉ thao tác trên các kho mã bạn đã tích chọn.',
         steps: [
           {
             num: 1,
-            title: 'Vào cài đặt mã truy cập cá nhân',
-            desc: 'Đăng nhập GitHub, bấm vào ảnh đại diện góc trên cùng bên phải > chọn "Settings". Ở menu bên trái, cuộn xuống dưới cùng chọn "Developer settings" > "Personal access tokens" > "Tokens (classic)".',
-            callout: 'Đường dẫn trực tiếp: github.com/settings/tokens'
+            title: 'Liên kết tài khoản GitHub trực tiếp',
+            desc: 'Mở trang Kết nối dịch vụ, tại thẻ GitHub bấm nút <strong>Kết nối GitHub</strong> và xác nhận cấp quyền trên trang đăng nhập GitHub.',
+            callout: 'Không cần vào Developer Settings hay tạo Personal Access Token thủ công.'
           },
           {
             num: 2,
-            title: 'Tạo mã truy cập mới (Token)',
-            desc: 'Bấm nút "Generate new token" (chọn Generate new token classic). Đặt tên ghi chú (Note) là "Planora Automation". Chọn thời hạn (Expiration) theo nhu cầu.',
-            callout: 'Tích chọn đúng phạm vi quyền duy nhất: "repo" (toàn quyền quản lý issue và đọc kho mã).'
-          },
-          {
-            num: 3,
-            title: 'Sao chép mã ghp_...',
-            desc: 'Cuộn xuống cuối trang bấm "Generate token". GitHub sẽ hiển thị chuỗi mã bắt đầu bằng "ghp_". Hãy sao chép ngay lập tức.',
-            callout: 'GitHub chỉ hiển thị mã này MỘT LẦN duy nhất. Dán ngay vào ô "Personal access token" trên Planora.'
-          },
-          {
-            num: 4,
-            title: 'Điền tên Repository được phép',
-            desc: 'Nhập tên kho mã dưới định dạng "tên_chủ_sở_hữu/tên_kho_mã". Ví dụ tài khoản là VinhDat267 và kho là ati-test thì điền:',
+            title: 'Chọn các kho mã (Repository) được phép sử dụng',
+            desc: 'Tích chọn từ 1 đến 10 kho mã trong danh sách tự động tải về rồi bấm <strong>Lưu repository được dùng</strong>. Bạn có thể bấm <strong>Đổi repository</strong> bất cứ lúc nào khi có dự án mới.',
             urlSample: 'VinhDat267/ati-test',
-            callout: 'Bạn có thể thêm nhiều kho mã bằng cách bấm "Thêm nơi được dùng".'
+            callout: 'Hệ thống hiển thị rõ nhãn Private / Public để bạn kiểm soát phạm vi an toàn.'
           }
         ]
       },
       sheets: {
         id: 'sheets',
         name: 'Google Sheets',
-        category: 'Bảng tính trực tuyến & Lưu trữ công việc',
-        keys: ['Email service account', 'Private key (PEM)'],
-        scopeLabel: 'Spreadsheet ID',
-        sampleScope: '1BxiMVs0XRA5nFMdKvBIIl_demo',
-        timeEstimate: 'Khoảng 4 phút',
-        summary: 'Xem danh sách tab, đọc dữ liệu các vùng ô và thêm dòng mới vào bảng tính nhiệm vụ.',
-        importantNotice: 'Bắt buộc chia sẻ bảng tính cho Email Service Account và cấp quyền "Người chỉnh sửa" (Editor)!',
+        category: 'Bảng tính trực tuyến & Tài liệu Google Drive',
+        keys: ['Liên kết tài khoản Google', 'Chọn tệp từ Google Drive'],
+        scopeLabel: 'Bảng tính & Thư mục Drive',
+        sampleScope: 'Bảng theo dõi công việc · Thư mục dự án',
+        timeEstimate: 'Khoảng 30 giây',
+        summary: 'Đọc số liệu đối chiếu, thêm dòng dữ liệu mới, tạo tài liệu Google Docs và thư mục Google Drive.',
+        importantNotice: 'Planora chỉ truy cập đúng các tệp bảng tính bạn đã chọn qua cửa sổ Google Drive hoặc bảng tính do chính bạn khởi tạo trên ứng dụng.',
         steps: [
           {
             num: 1,
-            title: 'Khuyên dùng: Kết nối OAuth 1-Click & Chọn Bảng tính trực tiếp',
-            desc: 'Trong trang Cài đặt dịch vụ, tại thẻ Google Sheets của bạn bấm nút <strong>Kết nối OAuth 1-Click</strong>, đăng nhập tài khoản Google và tích chọn các bảng tính được phép đọc/ghi ngay trên danh sách trực quan.',
-            callout: 'Hoàn tất trong 15 giây mà không cần tạo Service Account hay tải file JSON.'
+            title: 'Liên kết tài khoản Google & Chọn bảng tính trên Google Drive',
+            desc: 'Trong trang Kết nối dịch vụ, tại thẻ Google Sheets của bạn bấm <strong>Kết nối Google Sheets</strong>, sau đó bấm <strong>Chọn từ Google Drive</strong> để tích chọn các tệp bảng tính cần dùng.',
+            callout: 'Hoàn tất nhanh chóng mà không cần cấu hình tài khoản dịch vụ kỹ thuật hay tải tệp khoá JSON.'
           },
           {
             num: 2,
-            title: 'Dành cho Quản trị viên Workspace: Google Cloud Service Account',
-            desc: 'Nếu cần cấu hình tài khoản dịch vụ dùng chung cho nhóm tại <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" class="text-[#0F9D58] font-medium underline">console.cloud.google.com</a>, bật Google Sheets API, tạo Service Account và chia sẻ quyền Editor trên bảng tính.',
-            urlSample: 'https://docs.google.com/spreadsheets/d/[MÃ_SPREADSHEET_ID]/edit',
-            callout: 'Sao chép client_email, private_key (PEM) và Spreadsheet ID vào mục tích hợp Workspace.'
+            title: 'Tạo bảng tính mặc định mới chỉ với 1 bước',
+            desc: 'Nếu chưa có sẵn tệp, bạn có thể bấm nút <strong>Tạo bảng tính mặc định mới</strong> ngay trên thẻ Google Sheets để hệ thống khởi tạo sẵn bảng theo dõi công việc và gắn quyền tự động.',
+            callout: 'Hỗ trợ tạo tài liệu Google Docs và thư mục Google Drive đi kèm trong các quy trình họp nhóm.'
           }
         ]
       },
       calendar: {
         id: 'calendar',
         name: 'Google Calendar',
-        category: 'Lịch họp & Sự kiện nhóm',
-        keys: ['Email service account', 'Private key (PEM)'],
-        scopeLabel: 'Calendar ID',
-        sampleScope: 'team-calendar@group.calendar.google.com',
-        timeEstimate: 'Khoảng 2 phút (dùng chung khoá Sheets)',
-        summary: 'Xem lịch, kiểm tra thời gian trống và tạo sự kiện lịch họp cho các mốc sprint.',
-        importantNotice: 'Ưu tiên kết nối OAuth 1-Click cho lịch cá nhân hoặc dùng Service Account cho lịch phòng ban.',
+        category: 'Lịch họp & Phòng họp Google Meet',
+        keys: ['Liên kết tài khoản Google', 'Chọn lịch làm việc'],
+        scopeLabel: 'Lịch làm việc được chọn',
+        sampleScope: 'Lịch chính (Primary) hoặc lịch dự án',
+        timeEstimate: 'Khoảng 30 giây',
+        summary: 'Tra cứu lịch biểu, kiểm tra khung giờ trống, đặt lịch họp kèm liên kết Google Meet và gửi lời mời.',
+        importantNotice: 'Planora chỉ xem và đặt lịch trên đúng lịch làm việc bạn đã chọn, đồng thời luôn cho bạn duyệt trước thông tin cuộc họp.',
         steps: [
           {
             num: 1,
-            title: 'Khuyên dùng: Kết nối OAuth 1-Click & Chọn Lịch họp trực tiếp',
-            desc: 'Mở trang Cài đặt dịch vụ, tại thẻ Google Calendar của bạn bấm nút <strong>Kết nối OAuth 1-Click</strong>, uỷ quyền tài khoản Google và tích chọn các lịch (Calendar) cho phép Planora tra cứu hoặc đặt lịch họp.',
-            callout: 'Tự động liệt kê các lịch của bạn mà không cần tìm Calendar ID thủ công.'
+            title: 'Liên kết tài khoản Google & Chọn lịch họp trực tiếp',
+            desc: 'Mở trang Kết nối dịch vụ, tại thẻ Google Calendar của bạn bấm <strong>Kết nối Google Calendar</strong>, sau đó bấm <strong>Dùng ngay Lịch chính</strong> hoặc chọn các lịch làm việc cụ thể từ danh sách.',
+            callout: 'Tự động liệt kê các lịch của bạn mà không cần tra cứu mã Calendar ID thủ công.'
           },
           {
             num: 2,
-            title: 'Dành cho Quản trị viên Workspace: Lịch nhóm qua Service Account',
-            desc: 'Để dùng lịch phòng ban qua Service Account trên <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer" class="text-[#4285F4] font-medium underline">calendar.google.com</a>, bật Google Calendar API và chia sẻ lịch cho Email Service Account.',
-            callout: 'Sao chép Calendar ID trong phần Tích hợp lịch (Integrate calendar) vào cấu hình Workspace.'
+            title: 'Tạo lịch họp Google Meet & nhận Bản tin lịch sáng',
+            desc: 'Yêu cầu Planora tạo cuộc họp kèm phòng họp Google Meet tự động, mời thành viên qua email và bật lịch gửi bản tóm tắt lịch họp mỗi sáng sang Slack hoặc Telegram.',
+            callout: 'Bạn có thể bấm Chọn lại lịch được dùng bất cứ lúc nào để thêm hoặc bớt lịch.'
           }
         ]
       },
@@ -223,61 +197,61 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
         id: 'notion',
         name: 'Notion',
         category: 'Tài liệu, Wiki, CRM & Biên bản cuộc họp',
-        keys: ['Kết nối OAuth 1-Click (Không cần tạo Integration Secret)'],
+        keys: ['Liên kết tài khoản Notion', 'Chọn bảng dữ liệu (Database)'],
         scopeLabel: 'Database được chọn',
-        sampleScope: 'Roadmap 2026 · Biên bản họp (1–20 database)',
+        sampleScope: 'Roadmap 2026 · Biên bản họp (1–10 database)',
         timeEstimate: 'Khoảng 30 giây',
-        summary: 'Kết nối 1 chạm qua Notion OAuth 2.0, truy vấn database, đọc chi tiết trang, tạo/cập nhật trạng thái trang và tự gửi Bản tin mỗi sáng.',
-        importantNotice: 'Khi cấp quyền trên Notion OAuth, hãy tích chọn các trang/database bạn muốn Planora truy cập. Planora tự động khoá phạm vi an toàn vào đúng các database đó!',
+        summary: 'Liên kết tài khoản Notion, truy vấn bảng dữ liệu, đọc chi tiết trang, tạo hoặc cập nhật trạng thái trang và tự gửi Bản tin mỗi sáng.',
+        importantNotice: 'Khi cấp quyền trên Notion, hãy tích chọn các trang/database bạn muốn Planora truy cập. Planora tự động khoá phạm vi an toàn vào đúng các database đó!',
         steps: [
           {
             num: 1,
-            title: 'Khuyên dùng: Kết nối OAuth 1-Click trong 30 giây',
-            desc: 'Mở trang Cài đặt dịch vụ trên Planora, tại mục Notion bấm nút <strong>Kết nối Notion</strong>. Đăng nhập Notion, bấm <strong>Select pages</strong> để tích chọn các Database cần dùng rồi nhấn <strong>Allow access</strong>.',
-            callout: 'Nếu bạn chia sẻ từ 1 đến 20 database, Planora tự động kích hoạt ngay mà không cần thao tác thêm.'
+            title: 'Liên kết tài khoản Notion trong 30 giây',
+            desc: 'Mở trang Kết nối dịch vụ trên Planora, tại mục Notion bấm nút <strong>Kết nối Notion</strong>. Đăng nhập Notion, bấm <strong>Select pages</strong> để tích chọn các Database cần dùng rồi nhấn <strong>Allow access</strong>.',
+            callout: 'Không cần tạo mã Integration Secret thủ công.'
           },
           {
             num: 2,
-            title: 'Tích chọn hoặc Dán nhanh Link / ID Database Notion',
-            desc: 'Bạn có thể bấm nút <strong>Đổi database</strong> bất cứ lúc nào để tích chọn lại danh sách Database (tối đa 20 database) hoặc dán trực tiếp đường dẫn URL của Database Notion vào ô nhập nhanh:',
+            title: 'Tích chọn hoặc Dán nhanh đường dẫn Database Notion',
+            desc: 'Bạn có thể bấm nút <strong>Đổi database</strong> bất cứ lúc nào để tích chọn lại danh sách Database (tối đa 10 database) hoặc dán trực tiếp đường dẫn URL của Database Notion vào ô nhập nhanh:',
             urlSample: 'https://www.notion.so/workspace/Roadmap-11111111222233334444555555555555',
-            callout: 'Planora tự động bóc tách mã UUID 32 ký tự từ đường dẫn Notion bạn dán vào.'
+            callout: 'Planora tự động nhận diện mã định danh từ đường dẫn Notion bạn dán vào.'
           },
           {
             num: 3,
-            title: 'Đọc/Cập nhật thuộc tính & Lên lịch Bản tin Notion (Auto-Digest)',
-            desc: 'Yêu cầu Planora lọc các trang theo <code>Status</code>, đọc toàn văn nội dung trang (<code>notion.get_page</code>), cập nhật tiến độ/trạng thái trang (<code>notion.update_page</code>) hoặc bật <strong>Bản tin Notion tự động</strong> gửi sang Telegram/Slack mỗi sáng.',
-            callout: 'Bản tin tự động ưu tiên phân nhóm các mục Quá hạn/Bị chặn (Overdue/Blocked) lên đầu để bạn xử lý ngay.'
+            title: 'Đọc/Cập nhật thuộc tính & Lên lịch Bản tin Notion',
+            desc: 'Yêu cầu Planora lọc các trang theo trạng thái, đọc toàn văn nội dung trang, cập nhật tiến độ trang hoặc bật <strong>Bản tin Notion tự động</strong> gửi sang Telegram/Slack mỗi sáng.',
+            callout: 'Bản tin tự động ưu tiên phân nhóm các mục Quá hạn/Bị chặn lên đầu để bạn xử lý ngay.'
           }
         ]
       },
       telegram: {
         id: 'telegram',
         name: 'Telegram',
-        category: 'Ghép đôi 1-Click, Đọc tin nhóm & Bản tin tự động',
-        keys: ['Ghép đôi 1-Click (Không cần tạo Bot Token)'],
+        category: 'Nhắn tin nhanh, Đọc tin nhóm & Bản tin tự động',
+        keys: ['Ghép nối qua ứng dụng Telegram', 'Chọn nhóm làm việc'],
         scopeLabel: 'Chat / Nhóm được chọn',
-        sampleScope: 'Telegram của tôi · Đội Sản Phẩm (-1002489102931)',
+        sampleScope: 'Telegram của tôi · Đội Sản Phẩm',
         timeEstimate: 'Khoảng 30 giây',
-        summary: 'Kết nối 1 chạm với bot chính thức của Planora, đọc tin nhắn gần đây trong nhóm, gửi thông báo tiến độ và nhận bản tin tổng hợp tự động mỗi ngày.',
-        importantNotice: 'Không cần tự tạo bot với @BotFather hay tra cứu Chat ID thủ công. Planora chỉ truy cập đúng cuộc trò chuyện và nhóm bạn tích chọn.',
+        summary: 'Ghép nối nhanh với bot chính thức của Planora, đọc tin nhắn gần đây trong nhóm, gửi thông báo tiến độ và nhận bản tin tổng hợp tự động mỗi ngày.',
+        importantNotice: 'Không cần tự tạo bot với @BotFather hay tra cứu mã Chat ID thủ công. Planora chỉ truy cập đúng cuộc trò chuyện và nhóm bạn tích chọn.',
         steps: [
           {
             num: 1,
-            title: 'Khuyên dùng: Kết nối Telegram 1-Click trong 15 giây',
-            desc: 'Mở trang Cài đặt dịch vụ trên Planora, tại mục Telegram bấm nút <strong>Kết nối Telegram</strong>. Hệ thống sẽ mở ứng dụng Telegram tới bot chính thức của Planora — bạn chỉ cần nhấn nút <strong>Start</strong> rồi quay lại bấm xác nhận.',
-            callout: 'Tự động nhận diện tài khoản và kích hoạt ngay cuộc trò chuyện "Telegram của tôi" mà không cần nhập khoá API.'
+            title: 'Ghép nối tài khoản Telegram trong 15 giây',
+            desc: 'Mở trang Kết nối dịch vụ trên Planora, tại mục Telegram bấm nút <strong>Kết nối Telegram</strong>. Hệ thống sẽ mở ứng dụng Telegram tới bot chính thức của Planora — bạn chỉ cần nhấn nút <strong>Start</strong> rồi quay lại bấm xác nhận.',
+            callout: 'Tự động nhận diện tài khoản và kích hoạt ngay cuộc trò chuyện cá nhân mà không cần nhập khoá kỹ thuật.'
           },
           {
             num: 2,
-            title: 'Thêm Bot vào Nhóm công việc (Group / Supergroup)',
-            desc: 'Nếu muốn Planora gửi báo cáo hoặc đọc tin nhắn trong nhóm làm việc, bấm nút <strong>Thêm Bot vào Nhóm Telegram</strong> ngay trên trang Kết nối (hoặc mời bot của Planora vào nhóm).',
+            title: 'Thêm Bot vào Nhóm công việc',
+            desc: 'Nếu muốn Planora gửi báo cáo hoặc đọc tin nhắn trong nhóm làm việc, bấm liên kết <strong>+ Thêm bot vào nhóm mới</strong> ngay trên thẻ Telegram.',
             callout: 'Planora tự động phát hiện các nhóm mới mà bạn là thành viên và hiển thị ngay trong danh sách chọn phạm vi.'
           },
           {
             num: 3,
-            title: 'Tích chọn Phạm vi Chat & Bật Bản tin Tự động (Auto-Digest)',
-            desc: 'Tích chọn tối đa 10 cuộc trò chuyện/nhóm được phép sử dụng rồi bấm <strong>Lưu phạm vi</strong>. Khi lập lịch báo cáo hàng ngày từ Google Calendar, Sheets, Trello hoặc GitHub, bạn có thể bật chế độ <strong>Tự gửi (Auto-Digest)</strong> thẳng về Telegram.',
+            title: 'Tích chọn Phạm vi Chat & Bật Bản tin Tự động',
+            desc: 'Tích chọn tối đa 10 cuộc trò chuyện/nhóm được phép sử dụng rồi bấm <strong>Lưu danh sách chat</strong>. Khi lập lịch báo cáo hàng ngày từ Google Calendar, Sheets, Trello hoặc GitHub, bạn có thể bật chế độ gửi tự động thẳng về Telegram.',
             callout: 'Mọi bản tin tự động đều kiểm tra quyền thành viên nhóm theo thời gian thực trước khi gửi.'
           }
         ]
@@ -285,31 +259,31 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
       jira: {
         id: 'jira',
         name: 'Jira',
-        category: 'Quản lý dự án & Điều phối Sprint (OAuth 3LO 1-Click)',
-        keys: ['Kết nối OAuth 2.0 (3LO) 1-Click', 'Tự đồng bộ Site URL & Project'],
+        category: 'Quản lý dự án & Điều phối Sprint',
+        keys: ['Liên kết tài khoản Atlassian', 'Tự đồng bộ Site URL & Dự án'],
         scopeLabel: 'Project key',
         sampleScope: 'ATI',
-        timeEstimate: 'Khoảng 30 giây (OAuth 1-Click)',
-        summary: 'Kết nối Atlassian Jira 1 chạm, tạo/cập nhật issue, chuyển trạng thái workflow (In Progress/Done), gán thành viên, đặt ưu tiên và nhận Bản tin Standup mỗi sáng.',
-        importantNotice: 'Khuyên dùng Kết nối Jira OAuth 1-Click trong Workspace để tự động liệt kê Site URL & Dự án mà không cần tạo API Token thủ công.',
+        timeEstimate: 'Khoảng 30 giây',
+        summary: 'Liên kết tài khoản Atlassian Jira, tạo/cập nhật công việc, chuyển trạng thái tiến độ, phân công thành viên, đặt mức ưu tiên và nhận Bản tin Standup mỗi sáng.',
+        importantNotice: 'Liên kết trực tiếp tài khoản Atlassian trong Không gian làm việc để tự động đồng bộ Site URL & Dự án mà không cần tạo mã khoá thủ công.',
         steps: [
           {
             num: 1,
-            title: 'Khuyên dùng: Tạo Jira Workspace & Kết nối OAuth 2.0 (3LO) 1-Click',
-            desc: 'Trong trang Cài đặt dịch vụ, tại mục Atlassian Jira bấm <strong>Tạo Jira Workspace</strong> (nếu chưa có), sau đó bấm <strong>Kết nối Jira</strong> và nhấn <strong>Accept</strong> trên màn hình Atlassian để cấp quyền.',
+            title: 'Tạo Không gian làm việc Jira & Liên kết tài khoản Atlassian',
+            desc: 'Trong trang Kết nối dịch vụ, tại mục Atlassian Jira Cloud bấm <strong>Kết nối Jira</strong> và nhấn <strong>Accept</strong> trên màn hình Atlassian để cấp quyền truy cập.',
             callout: 'Planora tự động đồng bộ danh sách Site (.atlassian.net) và các Project bạn có quyền truy cập.'
           },
           {
             num: 2,
             title: 'Tích chọn Dự án (Project) & Cấp quyền thao tác',
-            desc: 'Chọn các dự án Jira cho phép sử dụng trong Workspace. Bạn có thể tạo issue kèm Priority/Assignee/Due Date, chuyển trạng thái (<code>myjira.transition_issue</code>), cập nhật issue (<code>myjira.update_issue</code>) hoặc đọc chi tiết issue (<code>myjira.get_issue</code>).',
-            callout: 'Mọi bước ghi đều hiển thị thẻ xem trước (Preview) rõ ràng trước khi bạn bấm Phê duyệt.'
+            desc: 'Chọn các dự án Jira cho phép sử dụng trong Không gian làm việc. Bạn có thể tạo công việc mới kèm mức độ ưu tiên, người phụ trách, hạn chót, hoặc chuyển trạng thái tiến độ trực tiếp.',
+            callout: 'Mọi bước ghi đều hiển thị thẻ xem trước rõ ràng trước khi bạn bấm Phê duyệt.'
           },
           {
             num: 3,
-            title: 'Lên lịch Bản tin Tiến độ & Blocker Jira (Read-Only Standup Digest)',
-            desc: 'Yêu cầu Planora tổng hợp các issue Blocker/High Priority và tiến độ Sprint định kỳ mỗi sáng để gửi thẳng vào kênh Slack hoặc nhóm Telegram của đội.',
-            callout: 'Bản tin tự động chỉ thực hiện truy vấn chỉ đọc (read-only) và kiểm tra quyền truy cập thực tế ở mỗi lượt chạy.'
+            title: 'Lên lịch Bản tin Tiến độ & Vướng mắc Jira mỗi sáng',
+            desc: 'Yêu cầu Planora tổng hợp các đầu việc ưu tiên cao và tiến độ Sprint định kỳ mỗi sáng để gửi thẳng vào kênh Slack hoặc nhóm Telegram của đội.',
+            callout: 'Bản tin tự động chỉ thực hiện truy vấn đọc an toàn và kiểm tra quyền truy cập thực tế ở mỗi lượt chạy.'
           }
         ]
       }
@@ -736,57 +710,57 @@ export const GUIDE_OAUTH_SHOWCASE_CARDS: GuideOAuthShowcaseCard[] = [
   {
     service: 'mycalendar',
     title: 'Google Calendar',
-    badge: 'OAuth 2.0 · 1-Click',
+    badge: 'Liên kết trực tiếp',
     badgeStyle: 'oauth',
     iconClassName: 'w-4 h-4',
-    description: 'Kết nối lịch cá nhân & tự gửi bản tin sáng không cần dán khoá.',
+    description: 'Liên kết lịch cá nhân, đặt cuộc họp Google Meet & nhận bản tin lịch sáng tự động.',
   },
   {
     service: 'trello',
     title: 'Trello cá nhân',
-    badge: 'OAuth 2.0 · 1-Click',
+    badge: 'Liên kết trực tiếp',
     badgeStyle: 'oauth',
     iconClassName: 'w-4 h-4 text-[#0079BF]',
-    description: 'Cấp quyền 1 chạm và khoá đúng bảng Trello được phép thao tác.',
+    description: 'Liên kết tài khoản và chọn đúng các bảng Trello được phép thao tác.',
   },
   {
     service: 'sheets',
     title: 'Google Sheets',
-    badge: 'OAuth 2.0 · 1-Click',
+    badge: 'Chọn tệp từ Drive',
     badgeStyle: 'oauth',
     iconClassName: 'w-4 h-4 text-[#16A34A]',
-    description: 'Chọn file bảng tính hoặc dán URL trực tiếp để đọc/ghi và lập báo cáo.',
+    description: 'Chọn bảng tính từ Google Drive hoặc tạo bảng mặc định mới để đọc/ghi và lập báo cáo.',
   },
   {
     service: 'telegram',
     title: 'Telegram cá nhân & Nhóm',
-    badge: '1-Click · Auto-Digest',
+    badge: 'Bản tin tự động',
     badgeStyle: 'oauth',
     iconClassName: 'w-4 h-4 text-[#229ED9]',
-    description: 'Ghép đôi 1 chạm với @ati_cnhn_bot, đọc tin nhắn nhóm và nhận Bản tin sáng.',
+    description: 'Ghép nối nhanh với bot chính thức, đọc tin nhắn nhóm và nhận Bản tin sáng.',
   },
   {
     service: 'notion',
     title: 'Notion cá nhân & Wiki',
-    badge: 'OAuth 2.0 · 1-Click',
+    badge: 'Chọn đúng phạm vi',
     badgeStyle: 'oauth',
     iconClassName: 'w-4 h-4 text-[#111827]',
-    description: 'Kết nối 1 chạm, đọc/cập nhật trang database và nhận Bản tin tiến độ mỗi sáng.',
+    description: 'Liên kết tài khoản, đọc/cập nhật trang database và nhận Bản tin tiến độ mỗi sáng.',
   },
   {
     service: 'jira',
     title: 'Atlassian Jira Cloud',
-    badge: 'OAuth 3LO · 1-Click',
+    badge: 'Theo dự án nhóm',
     badgeStyle: 'oauth',
     iconClassName: 'w-4 h-4 text-[#0052CC]',
-    description: 'Kết nối Atlassian 3LO, tạo/chuyển cột issue và nhận Bản tin Standup sáng.',
+    description: 'Liên kết tài khoản Atlassian, tạo/chuyển trạng thái công việc và nhận Bản tin Standup sáng.',
   },
   {
     service: 'slack',
     title: 'Slack & GitHub',
-    badge: 'Workspace',
+    badge: 'Liên kết trực tiếp',
     badgeStyle: 'workspace',
     iconClassName: 'w-4 h-4 text-[#E11D48]',
-    description: 'Tích hợp kênh nhóm, kho mã và trang tài liệu dùng chung của dự án.',
+    description: 'Liên kết kênh thảo luận nhóm và các kho mã dự án được phép sử dụng.',
   },
 ];

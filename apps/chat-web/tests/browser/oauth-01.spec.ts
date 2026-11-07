@@ -75,9 +75,9 @@ for (const width of [1440, 375]) for (const theme of ['light', 'dark']) {
     await page.screenshot({ path: info.outputPath(`oauth-01-connected-${width}-${theme}.png`), fullPage: true });
 
     // Nothing was sent again on its own: the plan comes only after the button, and still waits for approval.
-    await expect(page.getByRole('heading', { level: 1 })).not.toHaveText('Tôi sẽ làm 1 việc, theo thứ tự');
+    await expect(page.getByRole('heading', { level: 1 })).not.toHaveText('Tôi sẽ làm 1 việc');
     await page.getByRole('button', { name: 'Gửi lại yêu cầu' }).click();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tôi sẽ làm 1 việc, theo thứ tự');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tôi sẽ làm 1 việc');
     await expect(page.getByText('Gửi từ: gmail-owner@example.test', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Duyệt kế hoạch', exact: true })).toBeVisible();
     expect(new URL(page.url()).pathname).toBe(conversation);

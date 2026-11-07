@@ -112,7 +112,7 @@ async function createOrgViaMenu(name: string) {
 async function joinOrgViaMenu(code: string) {
   fireEvent.click(screen.getByRole('button', { name: /Không gian làm việc:/ }));
   const menu = await screen.findByRole('menu', { name: 'Danh sách không gian làm việc' });
-  fireEvent.click(within(menu).getByRole('button', { name: /🔑 Tham gia tổ chức bằng mã mời/i }));
+  fireEvent.click(within(menu).getByRole('button', { name: /Tham gia tổ chức bằng mã mời/i }));
   const input = await screen.findByPlaceholderText(/ATI-XXXX-XXXX/i);
   fireEvent.change(input, { target: { value: code } });
   fireEvent.click(screen.getByRole('button', { name: /Tham gia ngay/i }));
@@ -197,6 +197,23 @@ describe('PBI-06: tạo tổ chức mới & tham gia bằng mã mời giữ nguy
     await waitFor(() => expect(window.location.pathname).toBe('/'));
     expect(getActiveWorkspaceId()).toBe('ws-joined-2');
     expect(useChatStore.getState().conversationId).toBeNull();
+  });
+
+  it('portals create/join organization modals to document.body (outside sticky backdrop-blur header) and closes dropdown menu on open', async () => {
+    window.history.replaceState({}, '', '/');
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Không gian làm việc:/ }));
+    const menu = await screen.findByRole('menu', { name: 'Danh sách không gian làm việc' });
+    fireEvent.click(within(menu).getByRole('button', { name: /\+ Tạo không gian tổ chức mới/i }));
+
+    // Dropdown menu must close when modal opens
+    expect(screen.queryByRole('menu', { name: 'Danh sách không gian làm việc' })).toBeNull();
+
+    // Modal backdrop must be a direct child of document.body (not trapped inside <header>)
+    const backdrop = screen.getByTestId('create-org-modal-backdrop');
+    expect(backdrop.parentElement).toBe(document.body);
+    expect(backdrop.closest('header')).toBeNull();
   });
 });
 

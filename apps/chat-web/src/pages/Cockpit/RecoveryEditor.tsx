@@ -38,7 +38,7 @@ if(!result || typeof result!=='object' || Array.isArray(result))throw new Error(
       <label className="block v3-space-y-1"><span>Ghi chú thêm (không bắt buộc)</span><textarea value={promptText} disabled={busy || confirm} onChange={event=>setPrompt(event.target.value)} className="block w-full rounded-xl border border-brand-border p-3 bg-white text-brand-text"/></label>
       {error && <p role="alert" className="text-brand-danger">{error}</p>}
       {confirm && <p role="status">Không thể chạy tiếp kế hoạch cũ sau khi dừng. Gửi nội dung sửa để Planora lập kế hoạch mới?</p>}
-      <div className="flex flex-wrap gap-3"><button type="button" disabled={busy} onClick={()=>confirm?setConfirm(false):onClose()} className="px-5 py-3 bg-white border border-brand-border rounded-xl">{confirm?'Quay lại sửa':'Hủy sửa'}</button><button type="submit" disabled={busy} className="px-6 py-3 bg-brand-primary text-white font-semibold rounded-xl">{confirm?'Dừng và gửi yêu cầu sửa':'Xem lại nội dung sửa'}</button></div>
+      <div className="flex flex-wrap gap-2.5"><button type="button" disabled={busy} onClick={()=>confirm?setConfirm(false):onClose()} className="px-4 py-2.5 bg-white hover:bg-neutral-50 border border-[#E5E5E0] text-[#111827] font-medium rounded-xl transition-colors">{confirm?'Quay lại sửa':'Hủy sửa'}</button><button type="submit" disabled={busy} className="px-5 py-2.5 bg-[#C84300] hover:bg-[#A83800] text-white font-semibold rounded-xl shadow-sm transition-colors">{confirm?'Dừng và gửi yêu cầu sửa':'Xem lại nội dung sửa'}</button></div>
     </form>
   </CockpitDialog>;
 }
