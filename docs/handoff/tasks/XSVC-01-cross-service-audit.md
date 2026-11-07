@@ -98,3 +98,7 @@ Hai lượt đầu hỏi địa chỉ email. Sau khi tài khoản Gmail kết n�
 ### 07/11/2026 — Xem trước Sheets rồi Slack
 
 Plan bị hủy trước khi gửi. `mysheets.aggregate_rows` rồi `slack.send_message`. Evidence `sheets_summary`, `itemCount` 0. 0 execution step.
+
+### 07/11/2026 — Jira chưa nối
+
+Yêu cầu tiến độ Jira rồi Slack bị từ chối trước plan. `myjira` không có credential. Cờ Jira vẫn bật. 0 plan.
