@@ -94,3 +94,7 @@ Plan bị hủy trước khi ghi. `notion.create_page` trong Notes, rồi `slack
 ### 07/11/2026 — Xem trước Meet, Docs, Gmail
 
 Hai lượt đầu hỏi địa chỉ email. Sau khi tài khoản Gmail kết nối được tính là người nhận, plan bị hủy trước khi ghi. `schedule_meet`, `create_doc` với `meetLink`, `gmail.create_draft` với link Docs. 0 execution step. `gmail-grounding.test.ts` 22/22.
+
+### 07/11/2026 — Xem trước Sheets rồi Slack
+
+Plan bị hủy trước khi gửi. `mysheets.aggregate_rows` rồi `slack.send_message`. Evidence `sheets_summary`, `itemCount` 0. 0 execution step.
