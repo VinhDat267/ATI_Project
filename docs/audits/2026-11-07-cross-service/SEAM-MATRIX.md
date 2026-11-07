@@ -13,8 +13,8 @@ Mỗi ô là một đường dữ liệu giữa hai bước. PASS là có lệnh
 | GitHub trả `htmlUrl` thay vì `url` → template `${issue.output.url}` fail | PASS | `resolver.test.ts`. Xanh trên mã resolver trước pha 1 |
 | Báo cáo không có `reportEvidence` lúc duyệt | PASS | `report-evidence.test.ts` 12/12 trên PostgreSQL `127.0.0.1:56534`. Ca không truyền cờ: đỏ `success: true`, rồi xanh `409` và plan còn `pending` |
 | Lượt lịch lưu plan | PASS | `planScheduledRun` gọi `prepareResponse`. Đoạn đó đặt `enforceReportGrounding: true` trước khi ghi. Không có test lịch mới |
-| Biên nhận transition Jira `newStatus` | FAIL | Schema có `status`. Chưa sửa. P2 |
-| Calendar `timeMax` 23:59:59 | FAIL | Mã `personal-calendar-adapter.ts` vẫn vậy. P2 |
+| Biên nhận transition Jira `status` | PASS | `jira-cockpit.test.tsx` 12/12. Output adapter `{ status: 'Done' }` hiện `🔄 Trạng thái: Done` |
+| Calendar `timeMax` hết ngày | PASS | `personal-calendar-adapter.test.ts` 29/29. `hôm nay` gửi `timeMax` là 00:00 ngày hôm sau, cách `timeMin` đúng 24 giờ |
 | Đọc provider thật rồi Hủy | PASS | Sau F8 và nạp lại server live. `github.list_pull_requests` chạy, `resultCount` 0. 0 plan, 0 execution step. Không có lệnh ghi |
 | Playwright `nine_service` đối chiếu `output_json` | PASS | Sau khi giữ `jira.create_issue` cho kịch bản mẫu. Sandbox API 3017, web 5184, PostgreSQL local 55533. 1 passed, 11.2s. Plan `completed`. Slack chứa các khóa bước trước. Biên nhận hiện mã Jira, mã thư, mã tin Telegram và phạm vi Sheets. Link lịch/Trello/Notion nằm trong khối chi tiết của output |
 | Notion, Trello credential thử | NOT_RUN | Preflight 05/11: Notion 401, Trello thiếu token |

@@ -129,9 +129,12 @@ function MyJiraReceiptMetrics({step}:{step:ExecutionStepInfo}) {
   if(typeof out.key==='string' && out.key) {
     pills.push({text:`🎫 Mã: ${out.key}`});
   }
-  if(step.tool==='myjira.transition_issue' && typeof out.newStatus==='string' && out.newStatus) {
+  const transitionStatus = step.tool==='myjira.transition_issue'
+    ? (typeof out.status==='string' && out.status ? out.status : typeof out.newStatus==='string' ? out.newStatus : '')
+    : '';
+  if(transitionStatus) {
     const prev=typeof out.previousStatus==='string' && out.previousStatus ? `${out.previousStatus} → ` : '';
-    pills.push({text:`🔄 Trạng thái: ${prev}${out.newStatus}`});
+    pills.push({text:`🔄 Trạng thái: ${prev}${transitionStatus}`});
   } else if(typeof out.status==='string' && out.status) {
     pills.push({text:`🏷️ Trạng thái: ${out.status}`});
   }

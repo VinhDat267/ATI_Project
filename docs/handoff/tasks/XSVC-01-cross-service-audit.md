@@ -70,3 +70,7 @@ Câu trả lời về Pull Request cần `github.list_pull_requests` thành côn
 ### 07/11/2026 — Đọc lại live
 
 Server được bật lại. Cùng prompt có tên repository. Tool `github.list_pull_requests`, `resultCount` 0, 0 plan, 0 execution step.
+
+### 07/11/2026 — F4 và F5
+
+Biên nhận chuyển trạng thái đọc `status`. Cửa sổ lịch tự nhiên dùng `timeMax` 00:00 ngày hôm sau. Cockpit 12/12, calendar adapter 29/29.

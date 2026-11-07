@@ -534,8 +534,11 @@ describe('PersonalCalendarAdapter', () => {
 
     expect(listed.events).toHaveLength(1);
     expect(calls).toHaveLength(1);
-    expect(calls[0]!.url.searchParams.get('timeMin')).toMatch(/T00:00:00/);
-    expect(calls[0]!.url.searchParams.get('timeMax')).toMatch(/T23:59:59/);
+    const timeMin = calls[0]!.url.searchParams.get('timeMin')!;
+    const timeMax = calls[0]!.url.searchParams.get('timeMax')!;
+    expect(timeMin).toMatch(/T00:00:00\+07:00$/);
+    expect(timeMax).toMatch(/T00:00:00\+07:00$/);
+    expect(Date.parse(timeMax) - Date.parse(timeMin)).toBe(86_400_000);
   });
 
   it('supports createMeetLink: true in mycalendar.create_event (conferenceDataVersion=1) and returns meetLink', async () => {
