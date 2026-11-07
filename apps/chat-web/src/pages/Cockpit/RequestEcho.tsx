@@ -11,11 +11,11 @@ export function useScheduledOrigin() {
 }
 export function RequestEcho({ request }: { request?: string }) {
   const origin = useScheduledOrigin();
-  if (origin) return <p data-schedule-origin className="text-xs text-[#6B7280] leading-relaxed [overflow-wrap:anywhere]">{origin}</p>;
+  if (origin) return <p data-schedule-origin className="text-xs text-[var(--planora-muted)] leading-relaxed [overflow-wrap:anywhere]">{origin}</p>;
   if (!request?.trim()) return null;
   return (
-    <p data-request-echo title={request} className="text-xs text-[#6B7280] leading-relaxed line-clamp-2 break-words">
-      Bạn nhờ: “<span className="text-[#111827] font-medium">{request}</span>”
+    <p data-request-echo title={request} className="text-xs text-[var(--planora-muted)] leading-relaxed line-clamp-2 break-words">
+      Bạn nhờ: “<span className="text-[var(--planora-text)] font-medium">{request}</span>”
     </p>
   );
 }

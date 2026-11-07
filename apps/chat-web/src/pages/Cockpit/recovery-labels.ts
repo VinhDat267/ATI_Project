@@ -8,6 +8,23 @@ export function recoveryFieldLabel(tool: string, key: string, description?: stri
   return description || services[tool.split('.')[0]]?.[key] || common[key] || key;
 }
 
+export function friendlyFieldLabel(tool: string, key: string, description?: string): string {
+  const serviceKey = tool.split('.')[0];
+  const serviceOverride = services[serviceKey]?.[key];
+  if (serviceOverride) return serviceOverride;
+
+  if (key === 'channel') return 'Tên kênh hoặc mã kênh';
+  if (key === 'text' || key === 'body' || key === 'message' || key === 'content') return 'Nội dung tin nhắn';
+  if (key === 'title' || key === 'name' || key === 'summary') return 'Tiêu đề';
+  if (key === 'description') return 'Mô tả chi tiết';
+
+  if (description) {
+    return description.replace(/^ID\s+/i, 'Mã ').replace(/\bID\s+/gi, 'mã ').replace(/\bID\b/g, 'mã');
+  }
+
+  return common[key] || key;
+}
+
 const outputs: Record<string, string> = { ...common, ...labels.outputs };
 
 /** Keep every path segment: two fields of one output must remain distinguishable. */

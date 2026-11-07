@@ -412,6 +412,7 @@ describe('WorkflowFlowCanvas — Make.com Orbital Workflow Visualizer', () => {
         destination={(step) => step.description}
         onNewConversation={vi.fn()}
         onFollowup={onFollowup}
+        schedulesEnabled={true}
       />
     );
 

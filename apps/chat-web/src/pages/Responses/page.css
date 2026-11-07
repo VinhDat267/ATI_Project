@@ -1,33 +1,49 @@
-/* <style> của responses.html, giữ nguyên thứ tự. */
-    :root {
-      --bg: #F8F8F6;
-      --surface: #FFFFFF;
-      --fg: #111827;
-      --border: #E7E7E2;
-      --accent: #FF5701;
-      --muted: #6B7280;
-    }
-    body {
-      background-color: var(--bg);
-      color: var(--fg);
-      font-family: 'Be Vietnam Pro', system-ui, sans-serif;
-      -webkit-font-smoothing: antialiased;
-    }
-    .font-display {
-      font-family: 'Playfair Display', Georgia, serif;
-    }
-    .no-scrollbar::-webkit-scrollbar {
-      display: none;
-    }
-    .no-scrollbar {
-      -ms-overflow-style: none;
-      scrollbar-width: none;
-    }
-    @media (prefers-reduced-motion: reduce) {
-      *, ::before, ::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-        scroll-behavior: auto !important;
-      }
-    }
+/* Planora Responses & Refusal Page Styles */
+:root {
+  --bg: var(--planora-canvas, #f8f4eb);
+  --surface: var(--planora-paper, #fffdf7);
+  --fg: var(--planora-text, #2e382d);
+  --border: var(--planora-divider, #deded0);
+  --accent: var(--planora-primary, #3c5741);
+  --muted: var(--planora-muted, #656b5b);
+}
+
+html.dark,
+:root[data-theme="dark"] {
+  --bg: var(--planora-canvas, #171c18);
+  --surface: var(--planora-paper, #202820);
+  --fg: var(--planora-text, #f5f1e7);
+  --border: var(--planora-divider, #394638);
+  --accent: var(--planora-primary, #8fb68e);
+  --muted: var(--planora-muted, #b5bcae);
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--planora-font-sans, 'Be Vietnam Pro', system-ui, sans-serif);
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-family: var(--planora-font-serif, 'Playfair Display', Georgia, serif);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+

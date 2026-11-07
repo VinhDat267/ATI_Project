@@ -45,7 +45,7 @@ export function ClarificationMoment({
       aria-label="Cockpit"
     >
       <div className="v3-space-y-3">
-        <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-50 text-amber-800 rounded-lg text-xs font-medium border border-amber-200">
+        <div className="inline-flex items-center gap-2 px-3 py-1 bg-[var(--planora-pending-bg)] text-[var(--planora-pending-text)] rounded-lg text-xs font-medium border border-[var(--planora-pending-border)]">
           <svg
             className="w-3.5 h-3.5"
             fill="none"
@@ -64,12 +64,12 @@ export function ClarificationMoment({
         <RequestEcho request={request} />
         <h1
           id="heading-moment-3"
-          className="font-display text-3xl sm:text-4xl lg:text-[44px] text-brand-text font-normal leading-tight"
+          className="font-display text-3xl sm:text-4xl lg:text-[44px] text-[var(--planora-text)] font-normal leading-tight"
           tabIndex={-1}
         >
           {question}
         </h1>
-        {context && <p className="text-base text-brand-muted max-w-2xl leading-relaxed">{context}</p>}
+        {context && <p className="text-base text-[var(--planora-muted)] max-w-2xl leading-relaxed">{context}</p>}
       </div>
       <form
         aria-label="Nhập yêu cầu"
@@ -116,7 +116,11 @@ export function ClarificationMoment({
                         : -1) +
                       radios.length) %
                     radios.length;
-            onSelect(options[next] ?? null);
+            const nextOption = options[next] ?? null;
+            onSelect(nextOption);
+            if (nextOption !== null) {
+              onDraft(nextOption);
+            }
             radios[next]?.focus();
           }}
         >
@@ -130,30 +134,33 @@ export function ClarificationMoment({
               role="radio"
               aria-checked={selected === option}
               tabIndex={selected === option ? 0 : -1}
-              onClick={() => onSelect(option)}
+              onClick={() => {
+                onSelect(option);
+                onDraft(option);
+              }}
               className={
-                'w-full text-left p-4 bg-white hover:bg-neutral-50 rounded-2xl ' +
+                'w-full text-left p-4 bg-[var(--planora-paper)] hover:bg-[var(--planora-surface-hover)] rounded-2xl ' +
                 (selected === option
-                  ? 'border-2 border-brand-primary'
-                  : 'border border-brand-border') +
-                ' shadow-sm transition-all flex items-center justify-between gap-3 group'
+                  ? 'border-2 border-[var(--planora-primary)] ring-1 ring-[var(--planora-primary)]'
+                  : 'border border-[var(--planora-divider)]') +
+                ' shadow-xs transition-all flex items-center justify-between gap-3 group cursor-pointer'
               }
             >
               <div className="flex items-center gap-3.5 min-w-0">
-                <div title={service?.name ?? 'Lựa chọn'} className="w-10 h-10 rounded-xl bg-neutral-100 text-neutral-600 flex items-center justify-center font-bold text-sm shadow-sm flex-shrink-0">
+                <div title={service?.name ?? 'Lựa chọn'} className="w-10 h-10 rounded-xl bg-[var(--planora-surface-inset)] text-[var(--planora-text)] flex items-center justify-center font-bold text-sm shadow-xs flex-shrink-0">
                   {service ? <ServiceLogo service={service.id} className="w-5 h-5 shrink-0" /> : <svg aria-hidden="true" className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8 10h8m-8 4h5M6 3h9l3 3v15H6z" /></svg>}
                 </div>
-                <span className="text-base font-semibold text-brand-text group-hover:text-brand-primary transition-colors break-words">
+                <span className="text-base font-semibold text-[var(--planora-text)] group-hover:text-[var(--planora-primary)] transition-colors break-words">
                   {option}
                 </span>
               </div>
               <div
                 aria-hidden="true"
                 className={
-                  'w-5 h-5 rounded-full border flex-shrink-0 ' +
+                  'w-5 h-5 rounded-full border flex-shrink-0 flex items-center justify-center text-xs font-bold ' +
                   (selected === option
-                    ? 'border-brand-primary text-brand-primary'
-                    : 'border-neutral-300')
+                    ? 'border-[var(--planora-primary)] text-[var(--planora-primary)]'
+                    : 'border-[var(--planora-divider)]')
                 }
               >
                 {selected === option ? '✓' : ''}
@@ -162,7 +169,7 @@ export function ClarificationMoment({
           ); })}
           <div
             id="custom-sheet-container"
-            className="bg-white rounded-2xl border border-dashed border-neutral-300 shadow-sm transition-all overflow-hidden"
+            className="bg-[var(--planora-paper)] rounded-2xl border border-dashed border-[var(--planora-border-strong)] shadow-xs transition-all overflow-hidden"
           >
             <button
               id="btn-toggle-custom-sheet"
@@ -174,28 +181,28 @@ export function ClarificationMoment({
                 onSelect(null);
                 input.current?.focus();
               }}
-              className="w-full text-left p-4 hover:bg-neutral-50 flex items-center justify-between group"
+              className="w-full text-left p-4 hover:bg-[var(--planora-surface-hover)] flex items-center justify-between group cursor-pointer"
             >
               <div className="flex items-center gap-3.5">
                 <div
                   aria-hidden="true"
-                  className="w-10 h-10 rounded-xl bg-neutral-100 text-neutral-600 flex items-center justify-center text-lg font-medium"
+                  className="w-10 h-10 rounded-xl bg-[var(--planora-surface-inset)] text-[var(--planora-muted)] flex items-center justify-center text-lg font-medium"
                 >
                   +
                 </div>
-                <span className="text-sm font-medium text-brand-text group-hover:text-brand-primary transition-colors">
+                <span className="text-sm font-medium text-[var(--planora-text)] group-hover:text-[var(--planora-primary)] transition-colors">
                   Để tôi gõ tên hoặc link khác
                 </span>
               </div>
-              <span aria-hidden="true">⌄</span>
+              <span aria-hidden="true" className="text-[var(--planora-muted)]">⌄</span>
             </button>
             <div
               id="custom-sheet-form"
-              className="p-4 pt-1 bg-neutral-50 border-t border-dashed border-neutral-200 v3-space-y-2"
+              className="p-4 pt-1 bg-[var(--planora-surface-inset)] border-t border-dashed border-[var(--planora-divider)] v3-space-y-2"
             >
               <label
                 htmlFor="custom-sheet-input"
-                className="text-xs font-medium text-brand-text"
+                className="text-xs font-medium text-[var(--planora-text)]"
               >
                 Nhập tên, link hoặc câu trả lời:
               </label>
@@ -211,7 +218,7 @@ export function ClarificationMoment({
                   }}
                   onKeyDown={onKeyDown}
                   aria-label="Nhập câu trả lời làm rõ yêu cầu"
-                  className="w-full px-3 py-2 bg-white rounded-xl border border-brand-border text-xs sm:text-sm text-brand-text focus:v3-outline-none focus:border-brand-primary resize-none"
+                  className="w-full px-3 py-2 bg-[var(--planora-paper)] rounded-xl border border-[var(--planora-divider)] text-xs sm:text-sm text-[var(--planora-text)] focus:v3-outline-none focus:border-[var(--planora-primary)] resize-none"
                 />
               )}
             </div>
@@ -222,14 +229,14 @@ export function ClarificationMoment({
             type="button"
             disabled={planning || !(selected ?? draft).trim()}
             onClick={() => onSend(selected ?? draft)}
-            className="px-6 py-2.5 bg-brand-primary hover:bg-brand-primary-hover text-white text-sm font-semibold rounded-xl shadow-sm transition-all"
+            className="px-6 py-2.5 bg-[var(--planora-primary)] hover:bg-[var(--planora-primary-hover)] text-[var(--planora-on-primary)] text-sm font-semibold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50"
           >
             Xác nhận và tiếp tục
           </button>
           <button
             type="button"
             onClick={onBack}
-            className="px-4 py-2.5 text-sm font-medium text-brand-muted hover:text-brand-text transition-colors"
+            className="px-4 py-2.5 text-sm font-medium text-[var(--planora-muted)] hover:text-[var(--planora-text)] transition-colors cursor-pointer"
           >
             Quay lại
           </button>

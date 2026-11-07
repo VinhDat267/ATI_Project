@@ -12,6 +12,116 @@ export function serviceRecoveryLink(id:string):{url:string;argument:string;query
 export const serviceId=(tool:string)=>toolDefinition(tool)?.service ?? tool.split('.')[0];
 export const serviceName=(id:string,services:ServiceInfo[])=>services.find(service=>service.id===id)?.name ?? getServiceDefinition(id)?.name ?? id;
 export function servicePalette(id:string) { const palette=palettes[id] ?? {icon:'bg-neutral-100 border-neutral-200',name:'text-neutral-800'}; return {...palette,badge:palette.badge ?? `${palette.icon.split(' ').filter(cls=>cls.startsWith('bg-')).join(' ')} ${palette.name}`,receiptHover:palette.receiptHover ?? 'hover:border-neutral-300'}; }
+export const TOOL_ACTION_LABELS: Record<string, string> = {
+  // Trello
+  'trello.list_cards': 'Đọc danh sách công việc Trello',
+  'trello.search_cards': 'Tìm thẻ công việc Trello',
+  'trello.create_card': 'Tạo thẻ công việc Trello',
+  'trello.add_member': 'Gán thành viên vào thẻ Trello',
+  'trello.update_card': 'Cập nhật thẻ công việc Trello',
+  'trello.add_comment': 'Thêm bình luận Trello',
+  'trello.list_boards': 'Đọc danh sách bảng Trello',
+  'trello.list_lists': 'Đọc danh sách cột Trello',
+
+  // Slack
+  'slack.post_message': 'Gửi thông báo Slack',
+  'slack.send_message': 'Gửi thông báo Slack',
+  'slack.list_channels': 'Đọc danh sách kênh Slack',
+  'slack.search_channels': 'Tìm kênh Slack',
+  'slack.list_messages': 'Đọc tin nhắn Slack',
+  'slack.read_messages': 'Đọc tin nhắn Slack',
+
+  // Google Sheets
+  'mysheets.read_range': 'Đọc dữ liệu bảng tính Google Sheets',
+  'mysheets.append_rows': 'Thêm dòng vào bảng tính Google Sheets',
+  'mysheets.update_range': 'Cập nhật dữ liệu bảng tính Google Sheets',
+  'mysheets.list_sheets': 'Đọc danh sách trang tính Google Sheets',
+  'sheets.read_range': 'Đọc dữ liệu bảng tính Google Sheets',
+  'sheets.append_rows': 'Thêm dòng vào bảng tính Google Sheets',
+  'sheets.update_range': 'Cập nhật dữ liệu bảng tính Google Sheets',
+  'sheets.list_sheets': 'Đọc danh sách trang tính Google Sheets',
+
+  // Gmail
+  'gmail.send_message': 'Gửi email Gmail',
+  'gmail.reply': 'Trả lời email Gmail',
+  'gmail.forward': 'Chuyển tiếp email Gmail',
+  'gmail.search_threads': 'Tìm thư trong Gmail',
+  'gmail.get_thread': 'Đọc nội dung thư Gmail',
+  'gmail.list_labels': 'Đọc nhãn thư Gmail',
+  'gmail.create_draft': 'Tạo bản nháp Gmail',
+  'gmail.modify_thread_labels': 'Thay đổi nhãn thư Gmail',
+  'gmail.trash_thread': 'Chuyển thư vào thùng rác',
+  'gmail.create_label': 'Tạo nhãn thư mới trong Gmail',
+
+  // Google Calendar
+  'calendar.list_events': 'Đọc lịch hẹn Google Calendar',
+  'calendar.create_event': 'Tạo sự kiện Google Calendar',
+  'calendar.list_calendars': 'Đọc danh sách lịch Google Calendar',
+  'mycalendar.list_events': 'Đọc lịch hẹn Google Calendar',
+  'mycalendar.create_event': 'Tạo sự kiện Google Calendar',
+  'mycalendar.list_calendars': 'Đọc danh sách lịch Google Calendar',
+
+  // GitHub
+  'github.search_issues': 'Tìm công việc trên GitHub',
+  'github.list_issues': 'Đọc danh sách công việc GitHub',
+  'github.get_issue': 'Đọc chi tiết công việc GitHub',
+  'github.create_issue': 'Tạo công việc mới trên GitHub',
+  'github.update_issue': 'Cập nhật công việc GitHub',
+  'github.add_label': 'Gắn nhãn công việc GitHub',
+  'github.add_comment': 'Thêm bình luận trên GitHub',
+  'github.get_pull_request': 'Đọc pull request GitHub',
+  'github.search_repos': 'Tìm kho mã nguồn GitHub',
+
+  // Jira
+  'jira.search_issues': 'Tìm công việc trên Jira',
+  'myjira.search_issues': 'Tìm công việc trên Jira',
+  'jira.create_issue': 'Tạo công việc Jira',
+  'myjira.create_issue': 'Tạo công việc Jira',
+  'jira.add_comment': 'Thêm bình luận Jira',
+  'myjira.add_comment': 'Thêm bình luận Jira',
+  'jira.search_projects': 'Tìm dự án Jira',
+  'myjira.search_projects': 'Tìm dự án Jira',
+
+  // Notion
+  'notion.search': 'Tìm kiếm trong Notion',
+  'notion.create_page': 'Tạo trang Notion',
+  'notion.append_blocks': 'Thêm nội dung trang Notion',
+
+  // Telegram
+  'telegram.send_message': 'Gửi tin nhắn Telegram',
+  'telegram.search_chats': 'Tìm cuộc trò chuyện Telegram',
+};
+
+const SERVICE_DISPLAY_NAMES: Record<string, string> = {
+  trello: 'Trello',
+  slack: 'Slack',
+  sheets: 'Google Sheets',
+  mysheets: 'Google Sheets',
+  gmail: 'Gmail',
+  calendar: 'Google Calendar',
+  mycalendar: 'Google Calendar',
+  github: 'GitHub',
+  jira: 'Jira',
+  myjira: 'Jira',
+  notion: 'Notion',
+  telegram: 'Telegram',
+};
+
+export function toolActionLabel(tool: string): string {
+  if (TOOL_ACTION_LABELS[tool]) return TOOL_ACTION_LABELS[tool];
+  const [service, ...actionParts] = tool.split('.');
+  const serviceName = SERVICE_DISPLAY_NAMES[service] ?? service;
+  const action = actionParts.join(' ');
+  const actionVi = action.startsWith('list') ? 'Đọc danh sách'
+    : action.startsWith('search') ? 'Tìm kiếm'
+    : action.startsWith('get') ? 'Xem chi tiết'
+    : action.startsWith('create') ? 'Tạo mới'
+    : action.startsWith('update') ? 'Cập nhật'
+    : action.startsWith('send') ? 'Gửi'
+    : 'Thao tác';
+  return `${actionVi} trên ${serviceName}`;
+}
+
 export function operation(tool:string):Operation {
   if(operations[tool]) return operations[tool];
   const verb=tool.split('.')[1] ?? '';

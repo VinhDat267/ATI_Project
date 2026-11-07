@@ -83,15 +83,15 @@ export function RequestMoment({
       aria-label="Cockpit"
     >
       {/* Context Pill & Guidance Card */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-3.5 rounded-xl border border-[#E7E7E2] bg-white shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-3.5 rounded-xl border border-[var(--planora-divider)] bg-[var(--planora-paper)] shadow-xs">
         <div className="flex items-center gap-2.5 min-w-0">
           <span className="text-xl flex-shrink-0">{workspace.id === 'personal' ? '👤' : '🏢'}</span>
           <div className="text-xs leading-relaxed min-w-0">
-            <div className="font-semibold text-[#111827] flex items-center gap-1.5 flex-wrap">
+            <div className="font-semibold text-[var(--planora-text)] flex items-center gap-1.5 flex-wrap">
               <span>Đang làm việc tại:</span>
-              <span className="text-[#FF5701]">{workspace.name}</span>
+              <span className="text-[var(--planora-primary)]">{workspace.name}</span>
             </div>
-            <p className="text-[#6B7280] text-[11px] truncate">
+            <p className="text-[var(--planora-muted)] text-[11px] truncate">
               {workspace.id === 'personal'
                 ? '(Lịch, Trang tính, Trello & công cụ riêng của bạn)'
                 : '(Sử dụng kết nối chung của nhóm & dịch vụ đã cấp quyền)'}
@@ -106,7 +106,7 @@ export function RequestMoment({
                 setActiveWorkspaceId('personal');
                 navigate('/settings');
               }}
-              className="px-2.5 py-1 rounded-lg text-xs font-medium border border-[#E7E7E2] bg-[#F8F8F6] text-[#4B5563] hover:text-[#111827] hover:bg-neutral-100 transition-colors"
+              className="px-2.5 py-1 rounded-lg text-xs font-medium border border-[var(--planora-divider)] bg-[var(--planora-surface-inset)] text-[var(--planora-text)] hover:bg-[var(--planora-surface-hover)] transition-colors cursor-pointer"
             >
               Kết nối công cụ cá nhân
             </button>
@@ -117,12 +117,12 @@ export function RequestMoment({
       <div className="v3-space-y-3 text-center sm:text-left">
         <h1
           id="heading-moment-1"
-          className="font-display text-4xl sm:text-5xl lg:text-[52px] text-brand-text font-normal tracking-tight leading-[1.12]"
+          className="font-display text-4xl sm:text-5xl lg:text-[52px] text-[var(--planora-text)] font-normal tracking-tight leading-[1.12]"
           tabIndex={-1}
         >
           {resume ? 'Tiếp tục hội thoại này' : 'Hôm nay bạn muốn nhờ việc gì?'}
         </h1>
-        <p className="text-base sm:text-lg text-brand-muted max-w-2xl leading-relaxed">
+        <p className="text-base sm:text-lg text-[var(--planora-muted)] max-w-2xl leading-relaxed">
           {resume
             ? 'Xem lại yêu cầu trước bên dưới, rồi gửi tiếp hoặc mô tả việc mới.'
             : 'Mô tả bằng lời thường điều bạn cần. Tôi sẽ tự chia việc, lên kế hoạch và thao tác trên các công cụ của nhóm.'}
@@ -138,7 +138,7 @@ export function RequestMoment({
           event.preventDefault();
           onSend(draft);
         }}
-        className="relative bg-white rounded-2xl border border-brand-border shadow-soft-card p-3 sm:p-4 focus-within:border-brand-primary focus-within:shadow-orange-glow transition-all"
+        className="relative bg-[var(--planora-paper)] rounded-2xl border border-[var(--planora-divider)] shadow-xs p-3 sm:p-4 focus-within:border-[var(--planora-primary)] transition-all"
       >
         <label htmlFor="prompt-input" className="sr-only">
           Nội dung bạn muốn nhờ
@@ -152,13 +152,13 @@ export function RequestMoment({
             onChange={(event) => onDraft(event.target.value)}
             onKeyDown={onKeyDown}
             aria-label="Mô tả công việc bạn muốn thực hiện"
-            className="w-full text-base sm:text-lg text-brand-text placeholder-neutral-400 bg-transparent resize-none border-0 focus:ring-0 focus:v3-outline-none p-1"
+            className="w-full text-base sm:text-lg text-[var(--planora-text)] placeholder-[var(--planora-muted)] bg-transparent resize-none border-0 focus:ring-0 focus:v3-outline-none p-1"
             placeholder="Ví dụ: Tạo card Trello cho lỗi đăng nhập Google, tạo issue GitHub, ghi vào Google Sheets và báo kênh Slack..."
           />
         )}{' '}
-        <div className="flex items-center justify-between pt-2 border-t border-brand-border-subtle mt-1">
-          <span className="text-xs text-brand-muted inline-flex items-center gap-1">
-            <kbd className="px-1.5 py-0.5 bg-neutral-100 border border-neutral-300 rounded text-[10px] font-mono">
+        <div className="flex items-center justify-between pt-2 border-t border-[var(--planora-divider)] mt-1">
+          <span className="text-xs text-[var(--planora-muted)] inline-flex items-center gap-1">
+            <kbd className="px-1.5 py-0.5 bg-[var(--planora-surface-inset)] border border-[var(--planora-divider)] text-[var(--planora-text)] rounded text-[10px] font-mono">
               Enter
             </kbd>
             {' để gửi'}
@@ -167,7 +167,7 @@ export function RequestMoment({
             type="button"
             disabled={!draft.trim() || planning}
             onClick={() => onSend(draft)}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-primary hover:bg-brand-primary-hover text-white text-sm font-semibold rounded-xl shadow-sm transition-all hover:scale-[1.01] active:scale-[0.99]"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[var(--planora-primary)] hover:bg-[var(--planora-primary-hover)] text-[var(--planora-on-primary)] text-sm font-semibold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50"
           >
             <span>Gửi yêu cầu</span>
             <svg
@@ -190,7 +190,7 @@ export function RequestMoment({
       {services.some((service) => service.configured) ? (
         <>
           <div className="v3-space-y-3">
-            <div className="text-xs font-semibold uppercase tracking-wider text-brand-muted">
+            <div className="text-xs font-semibold uppercase tracking-wider text-[var(--planora-muted)]">
               Gợi ý việc phổ biến theo công cụ của bạn
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -209,11 +209,11 @@ export function RequestMoment({
                       onDraft(servicePrompt(service));
                       input.current?.focus();
                     }}
-                    className="relative overflow-hidden text-left p-4 bg-white hover:bg-neutral-50 rounded-2xl border border-brand-border shadow-soft-card transition-all duration-200 group hover:-translate-y-0.5 hover:shadow-md flex items-start gap-3.5"
+                    className="relative overflow-hidden text-left p-4 bg-[var(--planora-paper)] hover:bg-[var(--planora-surface-hover)] rounded-2xl border border-[var(--planora-divider)] shadow-xs transition-all duration-200 group hover:-translate-y-0.5 hover:shadow-sm flex items-start gap-3.5 cursor-pointer"
                   >
                     <div className={`absolute -right-6 -bottom-6 w-20 h-20 rounded-full ${colors.decoration} transition-colors pointer-events-none`} />
                     <div className="flex items-center -v3-space-x-1.5 flex-shrink-0 mt-0.5">
-                      <div title={service.name} className={`w-8 h-8 rounded-xl ${colors.icon} border flex items-center justify-center p-1.5 shadow-sm group-hover:scale-105 transition-transform`}>
+                      <div title={service.name} className={`w-8 h-8 rounded-xl ${colors.icon} border flex items-center justify-center p-1.5 shadow-xs group-hover:scale-105 transition-transform`}>
                         <ServiceLogo
                           service={service.id}
                           className={`w-4 h-4 ${colors.logo ?? ''}`}
@@ -221,10 +221,10 @@ export function RequestMoment({
                       </div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-brand-text group-hover:text-brand-primary transition-colors leading-snug">
+                      <div className="text-sm font-medium text-[var(--planora-text)] group-hover:text-[var(--planora-primary)] transition-colors leading-snug">
                         {servicePrompt(service)}
                       </div>
-                      <div className="text-xs text-brand-muted mt-1 flex items-center gap-1.5 font-sans">
+                      <div className="text-xs text-[var(--planora-muted)] mt-1 flex items-center gap-1.5 font-sans">
                         <span className={`${colors.name} font-medium`}>{service.name}</span>
                       </div>
                     </div>
@@ -236,13 +236,10 @@ export function RequestMoment({
           {services.filter((service) => service.configured).length >= 2 && multiServicePlaybooks.length > 0 && (
             <div className="v3-space-y-3" data-testid="multi-service-playbooks">
               <div className="flex items-center justify-between gap-2">
-                <div className="text-xs font-semibold uppercase tracking-wider text-brand-muted">
+                <div className="text-xs font-semibold uppercase tracking-wider text-[var(--planora-muted)]">
                   Kịch bản tự động hoá liên dịch vụ
                 </div>
-                <span className="text-[11px] font-medium text-brand-primary bg-[#FFF6EE] border border-[#FFDFC6] px-2 py-0.5 rounded-full">
-                  Make.com Orbital Flow
-                </span>
-              </div>
+                </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {multiServicePlaybooks.map((playbook) => (
                   <button
@@ -254,25 +251,25 @@ export function RequestMoment({
                       onDraft(playbook.prompt);
                       input.current?.focus();
                     }}
-                    className="text-left p-3.5 bg-white hover:bg-neutral-50 rounded-2xl border border-brand-border hover:border-brand-primary/50 shadow-soft-card transition-all group flex flex-col justify-between gap-2.5"
+                    className="text-left p-3.5 bg-[var(--planora-paper)] hover:bg-[var(--planora-surface-hover)] rounded-2xl border border-[var(--planora-divider)] hover:border-[var(--planora-primary)] shadow-xs transition-all group flex flex-col justify-between gap-2.5 cursor-pointer"
                   >
                     <div className="flex items-center gap-1.5">
                       {playbook.services.map((svcId, idx) => (
                         <span key={svcId} className="inline-flex items-center gap-1">
-                          <span className="w-7 h-7 rounded-full bg-white border border-brand-border shadow-2xs flex items-center justify-center">
+                          <span className="w-7 h-7 rounded-full bg-[var(--planora-surface-inset)] border border-[var(--planora-divider)] shadow-2xs flex items-center justify-center">
                             <ServiceLogo service={svcId} className="w-3.5 h-3.5" />
                           </span>
                           {idx < playbook.services.length - 1 && (
-                            <span className="text-[10px] font-mono text-neutral-400">→</span>
+                            <span className="text-[10px] font-mono text-[var(--planora-muted)]">→</span>
                           )}
                         </span>
                       ))}
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-brand-text group-hover:text-brand-primary transition-colors">
+                      <div className="text-xs font-bold text-[var(--planora-text)] group-hover:text-[var(--planora-primary)] transition-colors">
                         {playbook.title}
                       </div>
-                      <p className="text-[11px] text-brand-muted line-clamp-2 mt-1 leading-relaxed">
+                      <p className="text-[11px] text-[var(--planora-muted)] line-clamp-2 mt-1 leading-relaxed">
                         {playbook.prompt}
                       </p>
                     </div>
@@ -284,12 +281,12 @@ export function RequestMoment({
         </>
       ) : !loading && !error ? (
         <div className="v3-space-y-3">
-          <p className="text-sm text-brand-muted">
+          <p className="text-sm text-[var(--planora-muted)]">
             Chưa có dịch vụ nào được kết nối
           </p>
           <a
             href="/settings"
-            className="text-sm text-brand-primary hover:underline font-medium"
+            className="text-sm text-[var(--planora-primary)] hover:underline font-medium"
             onClick={(event) => {
               event.preventDefault();
               onSettings();
@@ -299,9 +296,9 @@ export function RequestMoment({
           </a>
         </div>
       ) : null}
-      <div className="pt-4 border-t border-brand-border flex flex-col gap-2.5 text-xs text-brand-muted">
+      <div className="pt-4 border-t border-[var(--planora-divider)] flex flex-col gap-2.5 text-xs text-[var(--planora-muted)]">
         <div
-          className="flex flex-wrap items-center gap-2 text-xs text-brand-muted"
+          className="flex flex-wrap items-center gap-2 text-xs text-[var(--planora-muted)]"
           aria-label="Dịch vụ đã thiết lập"
         >
           <span>Đã kết nối:</span>
@@ -310,7 +307,7 @@ export function RequestMoment({
             .map((service) => (
               <span
                 key={service.id}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-lg border border-brand-border text-neutral-800 font-medium shadow-sm"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[var(--planora-paper)] rounded-lg border border-[var(--planora-divider)] text-[var(--planora-text)] font-medium shadow-xs"
               >
                 <ServiceLogo
                   service={service.id}
@@ -328,14 +325,14 @@ export function RequestMoment({
               </span>
             ))}
         </div>
-        <div className="flex items-center gap-2 text-neutral-500 flex-wrap w-full">
+        <div className="flex items-center gap-2 text-[var(--planora-muted)] flex-wrap w-full">
           <span>Chưa kết nối:</span>
           {services
             .filter((service) => !service.configured)
             .map((service) => (
               <span
                 key={service.id}
-                className="inline-flex items-center gap-1 text-neutral-400"
+                className="inline-flex items-center gap-1 opacity-60"
               >
                 <ServiceLogo
                   service={service.id}
@@ -351,7 +348,7 @@ export function RequestMoment({
               event.preventDefault();
               onSettings();
             }}
-            className="text-brand-primary hover:underline font-medium"
+            className="text-[var(--planora-primary)] hover:underline font-medium"
           >
             Kết nối thêm
           </a>
@@ -362,7 +359,7 @@ export function RequestMoment({
               event.preventDefault();
               navigate('/guide');
             }}
-            className="text-brand-primary hover:underline font-medium"
+            className="text-[var(--planora-primary)] hover:underline font-medium"
           >
             Cẩm nang &amp; Mẫu câu lệnh
           </a>
@@ -390,29 +387,29 @@ export function DiscoveryMoment({
       data-moment="2"
       aria-label="Cockpit"
     >
-      <div className="p-6 bg-white rounded-2xl border border-brand-border shadow-soft-card v3-space-y-2">
-        <div className="text-xs font-semibold uppercase tracking-wider text-brand-primary">
+      <div className="p-6 bg-[var(--planora-paper)] rounded-2xl border border-[var(--planora-divider)] shadow-xs v3-space-y-2">
+        <div className="text-xs font-semibold uppercase tracking-wider text-[var(--planora-primary)]">
           Đang phân tích yêu cầu
         </div>
         {origin && <RequestEcho request={request} />}
         <h1
           id="heading-moment-2"
-          className="font-display text-2xl sm:text-3xl text-brand-text font-normal leading-snug"
+          className="font-display text-2xl sm:text-3xl text-[var(--planora-text)] font-normal leading-snug"
           tabIndex={-1}
         >
-          <span id="moment-2-query-display">{origin ? 'ATI đang lập kế hoạch cho lượt này' : `“${request}”`}</span>
+          <span id="moment-2-query-display">{origin ? 'Planora đang lập kế hoạch cho lượt này' : `“${request}”`}</span>
         </h1>
       </div>
-      <div className="bg-white rounded-2xl border border-brand-border p-6 shadow-soft-card v3-space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-brand-border-subtle">
+      <div className="bg-[var(--planora-paper)] rounded-2xl border border-[var(--planora-divider)] p-6 shadow-xs v3-space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-[var(--planora-divider)]">
           <div className="flex items-center gap-2">
             <div
               id="moment-2-pulse"
-              className="w-2.5 h-2.5 rounded-full bg-brand-primary animate-ping"
+              className="w-2.5 h-2.5 rounded-full bg-[var(--planora-primary)] animate-ping"
             />
             <span
               id="moment-2-status-text"
-              className="text-sm font-semibold text-brand-text"
+              className="text-sm font-semibold text-[var(--planora-text)]"
             >
               Tôi đang kiểm tra các tài nguyên liên quan
             </span>
@@ -424,7 +421,7 @@ export function DiscoveryMoment({
           aria-live="polite"
         >
           {!gather?.steps.length ? (
-            <li className="text-brand-muted">Đang đọc yêu cầu…</li>
+            <li className="text-[var(--planora-muted)]">Đang đọc yêu cầu…</li>
           ) : (
             gather.steps.map((step, index) => {
               const service =
@@ -439,13 +436,13 @@ export function DiscoveryMoment({
                 >
                   <span className="flex items-center gap-2.5 min-w-0">
                     <span
-                      className="disc-icon w-4 h-4 flex items-center justify-center flex-shrink-0"
+                      className="disc-icon w-4 h-4 flex items-center justify-center flex-shrink-0 text-[var(--planora-success-text)] font-bold"
                       aria-hidden="true"
                     >
                       {found ? (
                         '✓'
                       ) : (
-                        <span className="w-2 h-2 bg-brand-primary rounded-full animate-pulse" />
+                        <span className="w-2 h-2 bg-[var(--planora-primary)] rounded-full animate-pulse" />
                       )}
                     </span>
                     <span className="break-words">
