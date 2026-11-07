@@ -12,7 +12,7 @@
 - [x] **Pha 1, F1–F3.** Test đỏ rồi sửa.
 - [x] **Pha 1, phần còn lại.** Cổng duyệt báo cáo mặc định bật. Resolver từ chối `htmlUrl` khi template hỏi `url`.
 - [x] **Pha 2, browser.** `nine_service` pass sau khi sửa F7.
-- [x] **Pha 2, đọc live.** Hai lượt chỉ đọc, 0 plan, 0 execution step. F8 đã sửa ở planner; chưa chạy lại live.
+- [x] **Pha 2, đọc live.** Sau F8, `github.list_pull_requests` chạy thật, `resultCount` 0, 0 plan, 0 execution step.
 - [ ] **Pha 3.** `FINDINGS.md` và `SEAM-MATRIX.md`. Chỉ sửa P0, hoặc P1 chặn demo, trên nhánh riêng.
 
 ## Kết quả pha 0 (07/11/2026)
@@ -66,3 +66,7 @@ Server live sẵn. Hai prompt chỉ đọc PR GitHub, không duyệt. Kết qu�
 ### 07/11/2026 — F8
 
 Câu trả lời về Pull Request cần `github.list_pull_requests` thành công. Prefetch repository không đủ. `read-answers.test.ts` 20/20. Chưa chạy lại live.
+
+### 07/11/2026 — Đọc lại live
+
+Server được bật lại. Cùng prompt có tên repository. Tool `github.list_pull_requests`, `resultCount` 0, 0 plan, 0 execution step.
