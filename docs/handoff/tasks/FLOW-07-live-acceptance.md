@@ -25,6 +25,20 @@ Chứng minh sáu luồng × ba lần live, 36 câu hồi quy và góc nhìn sá
 
 ## Kết quả
 
+### 06/11/2026 — P1 chặn project Google dùng chung
+
+- Chủ dự án chọn tách project thực tế và chặn cấu hình sai; bản vá trong PR #280 bao gồm live env/direct composition guard, encrypted OAuth client origin, reconnect gate cho legacy token và disconnect/revoke dưới khóa DB.
+- Sửa race khi refresh trả muộn, cache/provider cũ sau local disconnect, invalidation chéo dịch vụ, stale-CAS làm hỏng kết nối mới và AbortSignal trong lúc chờ DB. Email khác nhau không còn được dùng để chứng minh grant độc lập.
+- PostgreSQL + fixture HTTP thật: bộ hồi quy liên quan 287 PASS; bổ sung Picker 23/23; bộ token/grant cuối 50/50. Chromium Gmail/Calendar/Sheets **30/30 PASS**. Review độc lập không còn P1/P2 cụ thể. `npm run check` PASS, exit 0 (API **2.535**, web **1.188**, eval **500 PASS / 1 preflight SKIP**; mọi package/typecheck/build/security/launcher/Node PASS). Delta hủy chờ DB cuối có kiểm tra lại và source hashes; CI final head theo PR #280.
+- Preflight cấu hình thật từ chối đúng client cùng project. Cloud hiện hết quota tạo project mới; chưa đổi `.env` hay revoke grant cũ. **Migration/consent/Picker/provider peer-readback native NOT_RUN**, FLOW-07 vẫn OPEN. Xem [log P1](../log/2026-11-06-FLOW-07-google-project-isolation.md) và [runbook](../../runbooks/google-project-isolation.md).
+
+### 06/11/2026 — P2 phân biệt Gmail API chưa bật
+
+- Tiếp tục gỡ blocker Gmail theo yêu cầu chủ dự án trên `fix/gmail-post-consent`, base `6e2d3bb9`. Google profile HTTP 403 với `SERVICE_DISABLED`/`accessNotConfigured` được chuẩn hóa an toàn thành `GMAIL_API_DISABLED`; UI hướng dẫn liên hệ quản trị viên bật Gmail API trên Google Cloud.
+- Không giữ raw provider body/metadata, không đổi state/session/PKCE, chính sách revoke hoặc tự replay callback. Cập nhật contract `GMAIL-common.md`.
+- RED API 4 ca, web 1 ca và browser desktop/mobile 2 ca; GREEN 89 test API, 51 test web, Chromium Gmail 12/12, review độc lập đạt. `npm run check` cuối PASS, exit 0: API 2.480, web 1.188, eval 500 PASS / 1 preflight SKIP; toàn bộ package/typecheck/build/security/launcher/Node PASS. Chi tiết tại [log P2](../log/2026-11-06-FLOW-07-gmail-api-error.md).
+- P1 project/grant dùng chung và nghiệm thu consent Google thật còn mở; bản vá P2 không đóng FLOW-07.
+
 ### 05/11/2026 — Gỡ lỗi callback Gmail/Jira trước nghiệm thu native
 
 - Source base `63f91f9e`; bản vá callback `6268e482` trên nhánh `test/flow07-app-acceptance`. Chủ dự án xác nhận cả hai kết nối gặp lỗi sau khi provider chuyển về ATI.

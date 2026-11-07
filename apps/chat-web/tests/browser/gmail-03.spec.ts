@@ -9,6 +9,28 @@ async function login(page: Page) {
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Hôm nay bạn muốn nhờ việc gì?');
 }
+
+for (const width of [1440, 375]) {
+  test(`GMAIL-03: disabled API explains administrator recovery ${width}`, async ({ page }, info) => {
+    await page.setViewportSize({ width, height: 900 });
+    await login(page);
+    let callbacks = 0;
+    // UI boundary fixture only; provider classification is covered over native HTTP + PostgreSQL in API tests.
+    await page.route('**/api/connections/gmail/callback', route => {
+      callbacks++;
+      return route.fulfill({ status: 400, json: { code: 'GMAIL_API_DISABLED' } });
+    });
+    await page.goto('/connections/gmail/callback?code=FIXTURE_CODE&state=FIXTURE_STATE');
+    await expect(page.getByRole('alert')).toContainText(/quản trị viên.*Gmail API.*Google Cloud/i);
+    expect(new URL(page.url()).search).toBe('');
+    expect(callbacks).toBe(1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: info.outputPath(`gmail-api-disabled-${width}.png`), fullPage: true });
+    await page.getByRole('link', { name: 'Về Kết nối dịch vụ' }).click();
+    await expect(page).toHaveURL(/\/settings$/);
+    expect(callbacks).toBe(1);
+  });
+}
 test('GMAIL-03 off: existing surfaces contain no Gmail when disabled', async ({ page }) => {
   await page.goto('/'); await expect(page.getByText(/Gmail/)).toHaveCount(0);
   await page.goto('/guide'); await expect(page.getByRole('heading', { level: 1 })).toBeVisible(); await expect(page.getByText(/Gmail/)).toHaveCount(0);

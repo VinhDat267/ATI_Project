@@ -120,7 +120,7 @@ export async function startFakeGoogleGmail(options = {}) {
   const { port = 0, now = Date.now, clientId, clientSecret, redirectUri, email } = { ...defaults, ...options };
   const settings = {
     email, grantedScopes: [GMAIL_MODIFY_SCOPE, CALENDAR_EVENTS_SCOPE, CALENDAR_READONLY_SCOPE, DRIVE_FILE_SCOPE], issueRefreshToken: true, accessTokenTtlSeconds: 3600,
-    accessTokenPrefix: 'ya29.fake', exchange: 'ok', exchangeDelayMs: 0, refresh: 'ok', refreshDelayMs: 0, revoke: 'ok', profile: 'ok',
+    accessTokenPrefix: 'ya29.fake', exchange: 'ok', exchangeDelayMs: 0, refresh: 'ok', refreshDelayMs: 0, revoke: 'ok', profile: 'ok', profileResponse: null,
     threads: defaultThreads(), calendars: defaultCalendars(email), calendarEvents: [], driveFiles: defaultDriveFiles(), grantedFiles: [], apiResponses: [], ...options.settings,
   };
   const stats = { authorizations: 0, exchanges: 0, refreshes: 0, revocations: 0, profiles: 0, apiRequests: [], writes: 0 };
@@ -250,6 +250,7 @@ export async function startFakeGoogleGmail(options = {}) {
       }
       if (request.method === 'GET' && url.pathname === '/gmail/v1/users/me/profile') {
         stats.profiles++;
+        if (settings.profileResponse) return json(response, settings.profileResponse.status, settings.profileResponse.body);
         if (settings.profile === 'server_error') return json(response, 500, { error: { code: 500 } });
         const token = /^Bearer (.+)$/.exec(request.headers.authorization ?? '')?.[1];
         const entry = token ? accessTokens.get(token) : undefined;

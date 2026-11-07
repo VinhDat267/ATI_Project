@@ -17,6 +17,7 @@ export interface FakeGoogleGmailSettings {
   refreshDelayMs: number;
   revoke: FakeOutcome;
   profile: 'ok' | 'server_error';
+  profileResponse: { status: number; body: unknown } | null;
   threads: { id: string; messages: any[] }[];
   apiResponses: { status?: number; reason?: string; retryAfter?: string; body?: unknown; mode?: 'hang' | 'disconnect' | 'invalid_json' | 'redirect' | 'server_error' }[];
 }

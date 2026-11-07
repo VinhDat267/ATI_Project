@@ -30,6 +30,7 @@ export const gmailCallbackError = (code?: string) => ({
   GMAIL_STATE_INVALID: 'Link kết nối đã hết hạn, đã dùng hoặc không thuộc phiên này. Hãy bắt đầu kết nối lại.',
   GMAIL_SCOPE_MISSING: 'Chưa cấp đủ quyền Gmail. Hãy kết nối lại và cấp quyền đọc, soạn, gửi và quản lý thư.',
   GMAIL_REFRESH_TOKEN_MISSING: 'Google chưa cấp quyền truy cập dài hạn. Hãy thu hồi quyền cũ rồi kết nối lại.',
+  GMAIL_API_DISABLED: 'Gmail API chưa được bật cho ứng dụng. Hãy nhờ quản trị viên bật Gmail API trên Google Cloud, sau đó kết nối lại.',
   GMAIL_CONNECT_FAILED: 'Không thể hoàn tất kết nối Gmail. Hãy thử kết nối lại từ trang dịch vụ.',
   INVALID_SESSION: 'Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại rồi kết nối Gmail.',
 }[code ?? ''] ?? 'Không thể hoàn tất kết nối Gmail. Hãy trở về trang dịch vụ để kết nối lại.');
