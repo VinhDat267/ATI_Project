@@ -447,7 +447,7 @@ export function RequestMoment({
           event.preventDefault();
           handleSend();
         }}
-        className="relative bg-white rounded-2xl border border-[#E5E5E0] shadow-2xs p-3.5 sm:p-4 focus-within:border-[#B8B8B0] transition-colors"
+        className="relative bg-white rounded-2xl border border-[#E5E5E0] shadow-2xs p-3.5 sm:p-4 focus-within:border-[#FF5701] transition-colors"
       >
         <label htmlFor="prompt-input" className="sr-only">
           Nội dung bạn muốn nhờ

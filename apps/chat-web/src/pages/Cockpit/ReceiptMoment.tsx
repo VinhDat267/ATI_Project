@@ -472,8 +472,13 @@ function ReceiptCard({
         {/* Outcome Identity & Metadata */}
         <div className="min-w-0">
           <h3 className="font-sans text-[15px] font-semibold text-[#111111] line-clamp-2 leading-snug break-words">
-            {secondaryTitle ?? primaryTitle}
+            {primaryTitle}
           </h3>
+          {secondaryTitle && (
+            <p className="text-xs font-medium text-[#111111] mt-0.5 break-words">
+              {secondaryTitle}
+            </p>
+          )}
           <p className="text-xs text-[#5F6368] mt-1 break-words">
             {destination(
               planSteps.find((row) => row.id === step.id) ?? {

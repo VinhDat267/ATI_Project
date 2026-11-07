@@ -268,7 +268,7 @@ export function PersonalMySheets({
 
         {(status === 'scope_required' || status === 'connected') && (
           <details
-            open={status === 'scope_required' || (service.selectedSpreadsheets?.length ?? 0) === 0}
+            open
             className="group"
           >
             <summary className="cursor-pointer list-none inline-flex items-center gap-1.5 text-xs font-medium text-[#6B7280] dark:text-[#9CA3AF] hover:text-[#111827] dark:hover:text-white select-none">

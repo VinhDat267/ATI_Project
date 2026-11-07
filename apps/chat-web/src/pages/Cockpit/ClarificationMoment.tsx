@@ -310,7 +310,7 @@ export function ClarificationMoment({
                     }}
                     onKeyDown={onKeyDown}
                     aria-label="Nhập câu trả lời làm rõ yêu cầu"
-                    className="w-full px-3 py-2.5 bg-white rounded-lg border border-[#DEDED8] text-sm text-[#111827] placeholder:text-[#9CA3AF] focus:v3-outline-none focus:border-[#111827] transition-colors resize-none"
+                    className="w-full px-3 py-2.5 bg-white rounded-lg border border-[#DEDED8] text-sm text-[#111827] placeholder:text-[#9CA3AF] v3-outline-none focus:v3-outline-none focus:border-[#111827] resize-none"
                   />
                 )}
               </div>

@@ -23,10 +23,11 @@
 ## 2. Bằng chứng kiểm thử thực tế
 
 - **Typecheck:** `npm run typecheck:v3` → **PASS (`exit code 0`)**.
-- **Unit & Integration Tests (`@wap/chat-web`):** `npm test -w @wap/chat-web` → **`114/114` test files PASS (`1.191/1.191` tests PASS, `exit code 0`)**.
+- **Unit & Integration Tests (`@wap/chat-web`):** `npm test -w @wap/chat-web` → **`114/114` test files PASS (`1.193/1.193` tests PASS, `exit code 0`)**.
 - **API Route Tests (`@wap/chat-api`):** `npm test -w @wap/chat-api -- tests/routes/myjira-app-wiring.test.ts` → **`17/17` tests PASS (`exit code 0`)**.
 - **Evaluation & Static Guard Suite:** `npm run test:eval:v3` → **`31/31` test files PASS (`500` passed, `1` skipped, `exit code 0`)**, trong đó `evaluations/generic-plumbing/static-guard.test.ts` đạt **`2/2` PASS (`0` vi phạm)**.
 - **Production Bundle & Security Sentinel Check:** `npm run build:v3 && node scripts/test-v3-web-build-security.mjs` → **PASS (`PASS: production build excludes credential sentinels and 8 forbidden UI claims`, `exit code 0`)**.
+- **Playwright Browser E2E (`scripts/test-v3-browser.mjs`):** **`23/23` kịch bản E2E PASS (`exit code 0`)**, bao gồm `slack_assistant`, `slack_write`, `slack_read`, `slack_oauth`, `default` (`FE-02` → `FE-12`), `auth02`, `auth04`, `clarification`, `partial_failure`, `three_service`, `four_service`, `nine_service`, `sheets_slack`, `calendar_slack`, `notion_slack`, `telegram_slack`, `jira_slack`, `answer`, `gmail`, `mycalendar`, `mysheets`, `schedule`.
 - **Kiểm định thị giác Chromium + `inspect.mjs --app` (`judgeApp`):** **`0 FAIL`** trên cả 5 kịch bản (Desktop `1366px` thu gọn, Desktop `1366px` bung `Chi tiết kỹ thuật`, Fan-out 3 dịch vụ, `Moment 5` đang thực thi, Mobile `390px` `no-horizontal-overflow: true`).
 
 ## 3. Ranh giới

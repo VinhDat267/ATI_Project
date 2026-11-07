@@ -230,7 +230,7 @@ export function PersonalSlack({ standalone = true }: { standalone?: boolean } = 
 
               {!row.processingReady && row.status === 'active' && (
                 <div className="mt-2 rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50/70 dark:bg-amber-950/30 p-2.5 text-xs text-amber-800 dark:text-amber-300">
-                  Không gian làm việc này đã liên kết nhưng đang chờ quản trị viên xác nhận quyền xử lý dữ liệu trước khi bật tự động hóa hoặc tra cứu tin nhắn Slack.
+                  Workspace này đã kết nối OAuth nhưng chưa có xác nhận cho phép xử lý dữ liệu (F1 Consent). Quản trị viên workspace cần cấp quyền xử lý cho nhà cung cấp mô hình AI trước khi bật tự động hóa hoặc tra cứu Slack.
                 </div>
               )}
 

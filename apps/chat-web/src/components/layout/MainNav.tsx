@@ -104,18 +104,20 @@ export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pag
             className={
               current === 'inbox' || (typeof inboxBadgeCount === 'number' && inboxBadgeCount > 0)
                 ? 'inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 rounded-xl bg-[#FF5701]/10 px-2.5 py-1.5 text-xs font-semibold text-[#FF5701] hover:bg-[#FF5701]/20 transition-colors border border-[#FF5701]/30'
-                : 'inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 rounded-xl bg-white dark:bg-[#1E1E1E] px-2.5 py-1.5 text-xs font-medium text-[#4B5563] dark:text-[#D1D5DB] hover:text-[#111827] dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-[#E7E7E2] dark:border-[#374151] shadow-sm transition-colors'
+                : `${actions ? 'hidden xl:inline-flex' : 'inline-flex'} items-center gap-1.5 whitespace-nowrap flex-shrink-0 rounded-xl bg-white dark:bg-[#1E1E1E] px-2.5 py-1.5 text-xs font-medium text-[#4B5563] dark:text-[#D1D5DB] hover:text-[#111827] dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-[#E7E7E2] dark:border-[#374151] shadow-sm transition-colors`
             }
           >
             <svg className="w-3.5 h-3.5 text-[#FF5701] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-            <span className="hidden xl:inline 2xl:hidden">
+            <span className={actions ? 'hidden 2xl:inline' : 'hidden xl:inline 2xl:hidden'}>
               {typeof inboxBadgeCount === 'number' && inboxBadgeCount > 0 ? 'Hộp thư' : 'Sự kiện'}
             </span>
-            <span className="hidden 2xl:inline">
-              {typeof inboxBadgeCount === 'number' && inboxBadgeCount > 0 ? 'Hộp thư đề xuất' : 'Sự kiện & Đề xuất'}
-            </span>
+            {!actions && (
+              <span className="hidden 2xl:inline">
+                {typeof inboxBadgeCount === 'number' && inboxBadgeCount > 0 ? 'Hộp thư đề xuất' : 'Sự kiện & Đề xuất'}
+              </span>
+            )}
             {typeof inboxBadgeCount === 'number' && inboxBadgeCount > 0 && (
               <span data-inbox-badge-count className="rounded-full bg-[#FF5701] px-1.5 py-0.5 text-xs font-bold text-white">
                 {inboxBadgeCount}

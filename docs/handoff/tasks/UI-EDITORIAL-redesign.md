@@ -24,4 +24,4 @@ Theo yêu cầu trực tiếp của chủ dự án trong phiên làm việc ngà
 
 ## Kết quả
 
-Hoàn tất triển khai, rebase trên `origin/main` (`2831d47d`) và vượt qua toàn bộ kiểm định cục bộ (`typecheck:v3`, `114/114` test files `@wap/chat-web` — `1.191/1.191` tests PASS, `31/31` eval files — `500/501` PASS / `1` skipped, `build:v3` + `test-v3-web-build-security` PASS). Chi tiết bằng chứng ghi tại [log bàn giao](../log/2026-11-08-UI-EDITORIAL-redesign.md).
+Hoàn tất triển khai, rebase trên `origin/main` (`2831d47d`) và vượt qua toàn bộ kiểm định cục bộ cũng như 23/23 kịch bản Playwright Browser E2E (`typecheck:v3`, `114/114` test files `@wap/chat-web` — `1.193/1.193` tests PASS, `31/31` eval files — `500/501` PASS / `1` skipped, `build:v3` + `test-v3-web-build-security` PASS, `test:browser:v3` 23/23 scenarios PASS). Chi tiết bằng chứng ghi tại [log bàn giao](../log/2026-11-08-UI-EDITORIAL-redesign.md).
