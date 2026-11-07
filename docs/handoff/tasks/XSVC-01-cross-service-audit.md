@@ -86,3 +86,7 @@ Hai lượt chỉ đọc trên server live. Trello trả 1 bảng. Notion trả 
 ### 07/11/2026 — Xem trước Trello rồi Slack
 
 Plan bị hủy trước khi ghi. `trello.create_card` rồi `slack.send_message` với `${step_1.output.url}`. Status `rejected`, 0 execution step.
+
+### 07/11/2026 — Xem trước Notion rồi Slack
+
+Plan bị hủy trước khi ghi. `notion.create_page` trong Notes, rồi `slack.send_message` với `${create_page.output.url}`. Status `rejected`, 0 execution step.
