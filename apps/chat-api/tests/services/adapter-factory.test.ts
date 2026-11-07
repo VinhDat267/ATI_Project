@@ -74,4 +74,34 @@ describe('registered adapter factory', () => {
       warnSpy.mockRestore();
     }
   });
+
+  it('builds a MySheets adapter for Docs when the account is connected and no spreadsheet is selected', async () => {
+    const config = encryptCredentials(
+      {
+        email: 'user@example.com',
+        refreshToken: 'refresh-token',
+        selectedSpreadsheets: [],
+        allowedScope: { spreadsheets: [] },
+      },
+      key,
+    );
+    const created = { service: 'mysheets', execute: async () => ({ id: 'doc' }) };
+    const createMySheetsAdapter = vi.fn().mockReturnValue(created);
+    const factory = new AdapterFactory({
+      credentialRepo: {
+        getPersonalCredentials: async () => ({ id: 'cred_1', status: 'active', config }),
+      } as any,
+      encryptionKey: key,
+      createMySheetsAdapter,
+      mysheetsTokens: { forConnection: () => ({ getAccessToken: async () => 'tok' }) } as any,
+    });
+
+    const adapter = await factory.getAdapterForService('mysheets', { userId: 'usr_1', phase: 'planning' });
+
+    expect(adapter).toBe(created);
+    expect(createMySheetsAdapter).toHaveBeenCalledWith(expect.objectContaining({
+      userId: 'usr_1',
+      allowedScope: { spreadsheets: [] },
+    }));
+  });
 });

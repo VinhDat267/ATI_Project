@@ -734,6 +734,18 @@ describe('PersonalCalendarAdapter', () => {
     expect(body.conferenceData?.createRequest?.conferenceSolutionKey?.type).toBe('hangoutsMeet');
   });
 
+  it('does not report success when schedule_meet creates an event without a Meet link', async () => {
+    const { adapter, calls } = setup();
+
+    await expect(adapter.execute('mycalendar.schedule_meet', {
+      calendarId,
+      summary: 'Họp không link',
+      start,
+      end,
+    })).rejects.toMatchObject({ category: 'UNKNOWN' });
+    expect(calls).toHaveLength(1);
+  });
+
   it('supports mycalendar.find_free_slots to proactively compute available slots within workday hours', async () => {
     const busy1 = {
       id: 'busy_1',

@@ -1,6 +1,6 @@
 # XSVC-01 · Kiểm toán liên dịch vụ
 
-**Trạng thái:** pha 0 xong (bản đồ tĩnh). Pha 1–3 chưa làm. · **Nhánh:** `docs/xsvc-01-cross-service-audit` · **Không sửa mã sản phẩm trong pha 0**
+**Trạng thái:** pha 0 và F1–F3 đã sửa trên nhánh. Pha 2–3 và phần còn lại của pha 1 chưa làm. · **Nhánh:** `docs/xsvc-01-cross-service-audit`
 
 ## Mục tiêu
 
@@ -9,7 +9,8 @@
 ## Pha
 
 - [x] **Pha 0.** Bản đồ 12 dịch vụ, 95 tool, placeholder của plan sandbox, và lệch với sáu việc demo. Xem [inventory](../../audits/2026-11-07-cross-service/INVENTORY.md).
-- [ ] **Pha 1.** Test tất định cho F1–F3 và cổng `enforceReportGrounding` lúc duyệt. Đột biến một khóa output.
+- [x] **Pha 1, F1–F3.** Test đỏ rồi sửa. Cổng `enforceReportGrounding` lúc duyệt và đột biến khóa output chưa làm.
+- [ ] **Pha 1, phần còn lại.** Cổng duyệt báo cáo khi `ExecutionService` không bật cờ, và đột biến một khóa output.
 - [ ] **Pha 2.** Một lượt đọc thật rồi Hủy. Browser sandbox `nine_service` đối chiếu `output_json`. Không ghi dịch vụ thật khi chưa được duyệt từng lệnh.
 - [ ] **Pha 3.** `FINDINGS.md` và `SEAM-MATRIX.md`. Chỉ sửa P0, hoặc P1 chặn demo, trên nhánh riêng.
 
@@ -22,4 +23,20 @@
 - F4: biên nhận transition tìm `newStatus`; schema có `status`.
 - F5: `timeMax` 23:59:59 còn trong `resolveNaturalWindowFromQuery`.
 - `ExecutionService` trong `server.ts` không bật `enforceReportGrounding`. `ChatService` bật lúc lưu plan. Pha 1 phải kiểm lượt lịch.
-- Chưa chạy test mới, chưa chạy live, chưa commit.
+- Pha 0 commit `fa24e150`.
+
+### 07/11/2026 — Pha 1, F1–F3
+
+Test mới fail trước khi sửa, rồi pass.
+
+- **F1.** OAuth MySheets còn active mà chưa chọn bảng tính: catalog có sáu tool Docs/Drive (`list_drive_files`, `create_drive_folder`, `create_doc`, `get_doc`, `append_doc_text`, `move_drive_file`) và không có `read_range`, `append_rows`, `create_sheet`. `bindConnections` nhận plan `create_doc`. `AdapterFactory` dựng adapter với `spreadsheets: []`. OFF-02 coi `scope_required` của mysheets là đủ; OFF-03 vẫn chưa sẵn sàng. Trạng thái API `scope_required` giữ nguyên.
+- **F2.** `trello.create_card` thiếu `url` ném `UNKNOWN` sau khi Trello đã tạo thẻ. Không trả `url: ''`.
+- **F3.** `mycalendar.schedule_meet` thiếu Meet link ném `UNKNOWN` sau khi sự kiện đã tạo.
+
+Lệnh, đều exit 0:
+
+- `npx vitest run tests/routes/mysheets-services.test.ts tests/services/adapter-factory.test.ts tests/services/mysheets-backend.test.ts --dir apps/chat-api` — 43 passed.
+- `npx vitest run tests/trello-write.test.ts tests/calendar/personal-calendar-adapter.test.ts --dir packages/tool-adapters` — 32 passed.
+- `npx vitest run tests/services/job-readiness.test.tsx --dir apps/chat-web` — 7 passed.
+
+Chưa chạy `npm run check`, chưa chạy live, chưa làm F4/F5.

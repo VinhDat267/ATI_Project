@@ -5,6 +5,8 @@ export interface CoreJob {
   title: string;
   description: string;
   requiredServices: string[];
+  /** Services that are usable after authentication even when a resource scope is still empty. */
+  scopeOptionalServices?: string[];
   prompt: string;
   outputDescription: string;
 }
@@ -16,6 +18,7 @@ export const CORE_JOBS: CoreJob[] = [
     description: 'Tạo phòng họp Google Meet, lưu tài liệu Docs vào thư mục đã chọn và gửi link qua email',
     outputDescription: 'Meet link + file Google Docs + email gửi người tham gia',
     requiredServices: ['mycalendar', 'mysheets', 'gmail'],
+    scopeOptionalServices: ['mysheets'],
     prompt: 'Tạo lịch họp Google Meet cho dự án {{tên_dự_án}}, lưu biên bản vào Google Docs trong thư mục dự án và gửi link cho {{email_nhận}}',
   },
   {
@@ -96,15 +99,18 @@ export function matchService(requiredId: string, services: ServiceInfo[]): Servi
 
 export function evaluateJobReadiness(
   requiredServices: string[],
-  services: ServiceInfo[]
+  services: ServiceInfo[],
+  scopeOptionalServices?: readonly string[],
 ): JobReadiness {
   const missingServices: string[] = [];
   const unhealthyServices: string[] = [];
   const missingResourceServices: string[] = [];
   const adminServices: string[] = [];
 
+  const scopeOptional = new Set(scopeOptionalServices ?? []);
   for (const reqId of requiredServices) {
     const matched = matchService(reqId, services);
+    if (matched && scopeOptional.has(reqId) && matched.personalStatus === 'scope_required') continue;
     if (!matched || !matched.configured || matched.personalStatus === 'not_connected' || matched.personalStatus === 'disconnected') {
       missingServices.push(reqId);
     } else if (matched.connectionStatus === 'unhealthy' || matched.connected === false || matched.personalStatus === 'reconnect_required') {

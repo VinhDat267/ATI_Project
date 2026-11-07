@@ -38,10 +38,16 @@ export class TrelloWriteTools extends TrelloReadTools {
       signal: options?.signal,
     });
 
+    if (typeof res.url !== 'string' || !res.url.trim()) {
+      throw new StepError({
+        message: 'Trello created the card without a url',
+        category: 'UNKNOWN',
+      });
+    }
     const out: { id: string; name: string; url: string; listId: string; dueComplete?: boolean } = {
       id: String(res.id),
       name: String(res.name),
-      url: String(res.url || ''),
+      url: res.url,
       listId: String(res.idList || args.listId),
     };
     if (typeof res.dueComplete === 'boolean') {

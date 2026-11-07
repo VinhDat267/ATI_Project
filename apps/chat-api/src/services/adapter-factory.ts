@@ -350,9 +350,6 @@ export class AdapterFactory {
       : Array.isArray(config.selectedSpreadsheets)
         ? config.selectedSpreadsheets.map((s: any) => s.id)
         : [];
-    if (!allowedSpreadsheets.length) {
-      throw mysheetsError('AUTH_ERROR', 'Bạn chưa chọn bảng tính Google Sheets cho Planora.');
-    }
 
     if (context?.phase === 'execution') {
       const previewed = context.connections?.mysheets;

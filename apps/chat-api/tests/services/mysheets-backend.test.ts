@@ -50,7 +50,7 @@ describe('Task 4 Backend & Fake Google Sheets/Drive', () => {
       expect(await lookup('usr_1')).toBeNull();
     });
 
-    it('returns null if empty spreadsheets', async () => {
+    it('returns the Docs connection when Google is active and no spreadsheet is selected', async () => {
       const encrypted = encryptCredentials(
         {
           email: 'user@example.com',
@@ -67,7 +67,12 @@ describe('Task 4 Backend & Fake Google Sheets/Drive', () => {
         }),
       };
       const lookup = createMySheetsConnectionLookup(credRepo, encryptionKey);
-      expect(await lookup('usr_1')).toBeNull();
+      expect(await lookup('usr_1')).toEqual({
+        credentialId: 'cred_1',
+        email: 'user@example.com',
+        allowedSpreadsheets: [],
+        selectedSpreadsheets: [],
+      });
     });
 
     it('returns credentialId, email, allowedSpreadsheets, and selectedSpreadsheets when active with sheets', async () => {

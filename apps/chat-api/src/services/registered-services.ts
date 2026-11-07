@@ -11,6 +11,15 @@ import { NOTION_TRANSPORT } from './transports/notion.js';
 import { TELEGRAM_TRANSPORT } from './transports/telegram.js';
 import { JIRA_TRANSPORT } from './transports/jira.js';
 
+const MYSHEETS_DRIVE_TOOLS = new Set([
+  'mysheets.list_drive_files',
+  'mysheets.create_drive_folder',
+  'mysheets.create_doc',
+  'mysheets.get_doc',
+  'mysheets.append_doc_text',
+  'mysheets.move_drive_file',
+]);
+
 export const SERVICE_TRANSPORTS: Record<string, ServiceTransport> = Object.fromEntries(
   [TRELLO_TRANSPORT, SLACK_TRANSPORT, GITHUB_TRANSPORT, SHEETS_TRANSPORT, CALENDAR_TRANSPORT, NOTION_TRANSPORT, TELEGRAM_TRANSPORT, JIRA_TRANSPORT].map(transport => [transport.id, transport]),
 );
@@ -197,9 +206,11 @@ export async function getToolCatalogFor(
           : Array.isArray(config.selectedSpreadsheets)
             ? config.selectedSpreadsheets.map((s: any) => s.id)
             : [];
-        if (spreadsheets.length > 0) {
-          catalog = [...catalog, ...MYSHEETS_TOOLS];
-        }
+        const driveTools = MYSHEETS_TOOLS.filter((tool) => MYSHEETS_DRIVE_TOOLS.has(tool.name));
+        catalog = [
+          ...catalog,
+          ...(spreadsheets.length > 0 ? MYSHEETS_TOOLS : driveTools),
+        ];
       } catch {
         // stale or unreadable connection does not add tools
         console.warn(

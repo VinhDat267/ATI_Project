@@ -64,7 +64,6 @@ export function createMySheetsConnectionLookup(
       const spreadsheets: string[] = Array.isArray(config.allowedScope?.spreadsheets)
         ? config.allowedScope.spreadsheets
         : selectedSpreadsheets.map((s: any) => s.id);
-      if (!spreadsheets.length) return null;
       return typeof email === 'string' && email
         ? {
             credentialId: record.id,

@@ -565,6 +565,12 @@ export class PersonalCalendarAdapter extends BaseAdapter {
           ),
           true
         );
+        if (isScheduleMeet && !created.meetLink) {
+          throw new StepError({
+            message: 'Calendar created the event without a Meet link',
+            category: 'UNKNOWN',
+          });
+        }
         return created;
       }
 
