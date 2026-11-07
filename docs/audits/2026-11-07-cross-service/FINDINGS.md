@@ -22,7 +22,7 @@ Mức là mức còn lại sau pha 1. F1–F3 và cổng duyệt đã có test �
 |---|---|---|---|
 | F4 | P2 | Biên nhận `myjira.transition_issue` tìm `newStatus`. Schema trả `status`. Nhánh sau vẫn hiện `status`. | Không chặn demo, không gửi sai đích |
 | F5 | P2 | `resolveNaturalWindowFromQuery` đặt `timeMax` `T23:59:59+07:00`. Sự kiện bắt đầu đúng giây cuối ngày bị bỏ. | Đã biết từ 18/10. Không nằm trên sáu việc demo |
-| F8 | P1 | Hai lượt live chỉ đọc, server `runtimeMode: live`, không bấm duyệt. Cả hai trả `answer`, 0 plan, 0 execution step. Lượt không nêu repo hỏi lại dù working memory đã có một repository. Lượt nêu đúng repository trả lời chưa có dữ liệu PR và không lập kế hoạch đọc. `validateAnswer` chấp nhận câu trả lời khi chỉ có prefetch thư mục, không cần `github.list_pull_requests`. | Chưa sửa. Không có preview để hủy |
+| F8 | đã đóng trên nhánh | Câu trả lời về Pull Request không còn được nhận khi chỉ có prefetch repository. Phải có `github.list_pull_requests` thành công. Câu trả lời khác vẫn dùng prefetch như trước. | `read-answers.test.ts` 20/20. Ca mới fail trước khi sửa (`kind: answer`) rồi thành `clarification` / `read_only`. Chưa chạy lại live |
 | Notion, Trello token | — | Preflight 05/11: Notion 401, Trello thiếu token | Named blocker, không đóng bằng sandbox |
 
 ## Giới hạn của bằng chứng

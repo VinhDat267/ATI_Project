@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { ALL_TOOLS, SLACK_TOOLS } from '@wap/tool-schemas';
+import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, GITHUB_TOOLS, SLACK_TOOLS } from '@wap/tool-schemas';
 import { AIPlanner, MockLLMProvider, WorkingMemory, buildSystemPrompt, formatSearchResults, validatePlan } from '../src/index.js';
 import * as validator from '../src/validator.js';
 
@@ -60,6 +60,33 @@ describe('ANS-01 read answers', () => {
     const s = setup([search, answer('Không có kết quả.')], { gatherSearch: async () => [] });
     expect(await s.run()).toMatchObject({ kind: 'answer', lookups: [{ resultCount: 0 }] });
   });
+  it('does not accept a pull request answer grounded only by the repository directory', async () => {
+    const provider = new MockLLMProvider();
+    const unread = answer('Mình chưa thể liệt kê PR vì cần tra cứu dữ liệu trước.');
+    provider.setPlanResponses([unread, unread]);
+    const calls: string[] = [];
+    const planner = new AIPlanner({
+      provider,
+      toolCatalog: [...GITHUB_TOOLS, ...GITHUB_OAUTH_TOOLS],
+      searchMode: 'llm',
+      readAnswers: true,
+      prefetchDirectory: true,
+      gatherSearch: async ({ tool }) => {
+        calls.push(tool);
+        if (tool === 'github.search_repos') {
+          return [{ id: '1', name: 'ati-test', fullName: 'VinhDat267/ati-test', url: 'https://github.com/VinhDat267/ati-test' }];
+        }
+        return [];
+      },
+    });
+    const result = await planner.processMessage({
+      userMessage: 'Đọc các Pull Request đang mở trên repository GitHub VinhDat267/ati-test. Chỉ liệt kê.',
+      memory: new WorkingMemory(),
+    });
+    expect(result).toMatchObject({ kind: 'clarification', reason: 'read_only' });
+    expect(calls).not.toContain('github.list_pull_requests');
+  });
+
   it('records successful prefetch services separately, without inventing model lookups', async () => {
     const s = setup([answer()], { prefetchDirectory: true });
     expect(await s.run()).toEqual({ ...answer(), lookups: [], usedDirectory: ['slack'] });

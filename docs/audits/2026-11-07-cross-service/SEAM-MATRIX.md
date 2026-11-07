@@ -15,6 +15,6 @@ Mỗi ô là một đường dữ liệu giữa hai bước. PASS là có lệnh
 | Lượt lịch lưu plan | PASS | `planScheduledRun` gọi `prepareResponse`. Đoạn đó đặt `enforceReportGrounding: true` trước khi ghi. Không có test lịch mới |
 | Biên nhận transition Jira `newStatus` | FAIL | Schema có `status`. Chưa sửa. P2 |
 | Calendar `timeMax` 23:59:59 | FAIL | Mã `personal-calendar-adapter.ts` vẫn vậy. P2 |
-| Đọc provider thật rồi Hủy | FAIL | Server live sẵn trên cổng 3000, web 5174. Hai prompt chỉ đọc GitHub PR, `LIVE_APP_CANCEL=1`. Không có nút duyệt. Hội thoại `27e7f464-4b0c-441d-88e6-0d06f2630925` và `19b79abd-86e7-4db6-87df-09e0184939a0`: 0 plan, 0 execution step. Lượt có tên repository trả lời chưa tra được PR |
+| Đọc provider thật rồi Hủy | FAIL trên live trước F8; sửa ở planner | Hai hội thoại live: 0 plan, 0 execution step. Sau đó planner từ chối câu trả lời PR nếu chưa gọi `github.list_pull_requests`. Test `read-answers.test.ts` 20/20. Chưa chạy lại live |
 | Playwright `nine_service` đối chiếu `output_json` | PASS | Sau khi giữ `jira.create_issue` cho kịch bản mẫu. Sandbox API 3017, web 5184, PostgreSQL local 55533. 1 passed, 11.2s. Plan `completed`. Slack chứa các khóa bước trước. Biên nhận hiện mã Jira, mã thư, mã tin Telegram và phạm vi Sheets. Link lịch/Trello/Notion nằm trong khối chi tiết của output |
 | Notion, Trello credential thử | NOT_RUN | Preflight 05/11: Notion 401, Trello thiếu token |
