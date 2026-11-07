@@ -9,19 +9,20 @@ import {
   conversationReturnPath,
 } from '../services/telegram-connection';
 import { usePrototypePage } from '../prototype/usePrototypePage';
+import { ConnectionCallbackFrame } from '../planora/layout/ConnectionCallbackFrame';
 
 const meta = {
   id: 'telegram-callback',
-  title: 'Kết nối Telegram — ATI',
+  title: 'Kết nối Telegram — Planora',
   htmlClass: '',
-  bodyClass: 'min-h-screen bg-[#F8F8F6] text-[#111827] antialiased',
+  bodyClass: 'min-h-screen bg-[var(--planora-canvas,#F8F8F6)] text-[var(--planora-text,#111827)] antialiased',
   css: '',
 };
 
 const primaryBtn =
-  'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-[#FF5701] text-white hover:bg-[#E04C00] disabled:opacity-50 transition-colors shadow-sm';
+  'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-[var(--planora-primary)] text-[var(--planora-on-primary)] hover:bg-[var(--planora-primary-hover)] disabled:opacity-50 transition-colors shadow-xs';
 const secondaryBtn =
-  'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium bg-white text-[#111827] border border-[#E7E7E2] hover:bg-neutral-50 disabled:opacity-50 transition-colors';
+  'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium bg-[var(--planora-paper)] text-[var(--planora-text)] border border-[var(--planora-border-strong)] hover:bg-[var(--planora-surface-inset)] disabled:opacity-50 transition-colors';
 
 export function TelegramCallbackView({
   navigate,
@@ -123,78 +124,70 @@ export function TelegramCallbackView({
       : undefined);
 
   return (
-    <main className="max-w-xl mx-auto px-4 py-16 text-[#111827] v3-space-y-5">
-      <h1 className="font-display text-3xl font-bold">Kết nối Telegram</h1>
-      <div className="bg-white border border-[#E7E7E2] rounded-2xl p-6 v3-space-y-4 shadow-sm">
-        <p className="text-sm text-[#4B5563] leading-relaxed">
-          Mở ứng dụng Telegram, bấm <strong>Start</strong> với bot của ATI để liên kết tài khoản cá nhân của bạn trong 1 chạm (không cần tạo BotFather token hay nhập mã số Chat ID).
-        </p>
+    <main>
+      <ConnectionCallbackFrame
+        serviceId="telegram"
+        serviceName="Telegram"
+        title="Kết nối Telegram"
+        badge="KẾT NỐI TIN NHẮN TỨC THỜI"
+        statusType={error ? 'error' : pendingPairing ? 'pending' : 'pending'}
+        statusLabel={error ? 'Chưa kết nối' : pendingPairing ? 'Chờ xác nhận' : 'Đang xử lý'}
+        loading={!error && !pendingPairing}
+        loadingText="Đang hoàn tất kết nối Telegram…"
+        error={error ? <p role="alert">{error}</p> : undefined}
+        onBackToSettings={() => navigate('/settings', true)}
+        backToSettingsLabel="Về Kết nối dịch vụ"
+      >
+        <div className="v3-space-y-4">
+          <p className="text-sm text-[var(--planora-muted)] leading-relaxed">
+            Mở ứng dụng Telegram, bấm <strong>Start</strong> với bot của Planora để liên kết tài khoản cá nhân của bạn trong 1 chạm (không cần tạo BotFather token hay nhập mã số Chat ID).
+          </p>
 
-        {deepLinkUrl && (
-          <div className="flex flex-wrap items-center gap-3">
-            <a
-              id="telegram-open-bot"
-              href={deepLinkUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={primaryBtn}
-            >
-              Mở Telegram và bấm Start
-            </a>
-            {groupDeepLinkUrl && (
+          {deepLinkUrl && (
+            <div className="flex flex-wrap items-center gap-3">
               <a
-                id="telegram-open-group"
-                href={groupDeepLinkUrl}
+                id="telegram-open-bot"
+                href={deepLinkUrl}
                 target="_blank"
                 rel="noopener noreferrer"
+                className={primaryBtn}
+              >
+                Mở Telegram và bấm Start
+              </a>
+              {groupDeepLinkUrl && (
+                <a
+                  id="telegram-open-group"
+                  href={groupDeepLinkUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={secondaryBtn}
+                >
+                  + Thêm bot vào nhóm Telegram
+                </a>
+              )}
+            </div>
+          )}
+
+          {pendingPairing && (
+            <div className="pt-3 border-t border-[var(--planora-divider)] v3-space-y-3">
+              <p role="status" className="text-xs sm:text-sm text-[var(--planora-muted)]">
+                Sau khi bạn đã nhấn <strong>Start</strong> trong Telegram, hãy bấm nút dưới đây để hoàn tất.
+              </p>
+              <button
+                id="telegram-verify-pairing"
+                type="button"
+                disabled={busy}
+                onClick={() => void verifyPairing()}
                 className={secondaryBtn}
               >
-                + Thêm bot vào nhóm Telegram
-              </a>
-            )}
-          </div>
-        )}
-
-        {pendingPairing && (
-          <div className="pt-3 border-t border-[#F3F4F6] v3-space-y-3">
-            <p role="status" className="text-xs sm:text-sm text-[#4B5563]">
-              Sau khi bạn đã nhấn <strong>Start</strong> trong Telegram, hãy bấm nút dưới đây để hoàn tất.
-            </p>
-            <button
-              id="telegram-verify-pairing"
-              type="button"
-              disabled={busy}
-              onClick={() => void verifyPairing()}
-              className={secondaryBtn}
-            >
-              {busy ? 'Đang kiểm tra…' : 'Tôi đã bấm Start trên Telegram'}
-            </button>
-          </div>
-        )}
-
-        {!pendingPairing && !error && (
-          <p role="status" className="text-sm text-[#6B7280]">
-            Đang hoàn tất kết nối Telegram…
-          </p>
-        )}
-
-        {error && (
-          <p role="alert" className="text-sm text-[#DC2626]">
-            {error}
-          </p>
-        )}
-      </div>
-
-      <a
-        href="/settings"
-        onClick={(event) => {
-          event.preventDefault();
-          navigate('/settings', true);
-        }}
-        className="text-[#FF5701] underline text-sm inline-block"
-      >
-        Về Kết nối dịch vụ
-      </a>
+                {busy ? 'Đang kiểm tra…' : 'Tôi đã bấm Start trên Telegram'}
+              </button>
+            </div>
+          )}
+        </div>
+      </ConnectionCallbackFrame>
     </main>
   );
 }
+
+export default TelegramCallbackView;
