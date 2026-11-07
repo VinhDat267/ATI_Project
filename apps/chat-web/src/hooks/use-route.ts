@@ -40,10 +40,17 @@ export function tryLoopbackCallbackHop(pathname: string, search: string, hash = 
  */
 export function tryRecoverLoopbackConnectionCallback(route: AppRoute): boolean {
   const input = route.kind === 'gmail-callback' ? route.googleCallback
-    : route.kind === 'jira-callback' ? route.jiraCallback : undefined;
+    : route.kind === 'jira-callback' ? route.jiraCallback
+    : route.kind === 'trello-callback' ? route.trelloCallback
+    : route.kind === 'notion-callback' ? route.notionCallback : undefined;
   if (!input?.code || !input.state || input.error) return false;
   const pathname = route.kind === 'gmail-callback'
-    ? '/connections/gmail/callback' : '/connections/myjira/callback';
+    ? '/connections/gmail/callback'
+    : route.kind === 'trello-callback'
+      ? '/connections/trello/callback'
+      : route.kind === 'notion-callback'
+        ? '/connections/notion/callback'
+        : '/connections/myjira/callback';
   return tryLoopbackCallbackHop(pathname, `?${new URLSearchParams({ code: input.code, state: input.state })}`);
 }
 
