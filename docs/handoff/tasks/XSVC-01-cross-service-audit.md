@@ -82,3 +82,7 @@ Lượt đầu trả lời chưa đọc lịch. Sau khi bắt buộc `list_event
 ### 07/11/2026 — Notion và Trello
 
 Hai lượt chỉ đọc trên server live. Trello trả 1 bảng. Notion trả 2 database. Mỗi lượt 0 plan, 0 execution step.
+
+### 07/11/2026 — Xem trước Trello rồi Slack
+
+Plan bị hủy trước khi ghi. `trello.create_card` rồi `slack.send_message` với `${step_1.output.url}`. Status `rejected`, 0 execution step.
