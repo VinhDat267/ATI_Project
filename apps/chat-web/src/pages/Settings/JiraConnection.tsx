@@ -22,7 +22,7 @@ const JIRA_KEY = 'ji' + 'ra';
 const buttonPrimary =
   'px-4 py-2 rounded-xl text-xs font-semibold bg-[var(--planora-primary)] text-[var(--planora-on-primary)] hover:bg-[var(--planora-primary-hover)] disabled:opacity-50 transition-all shadow-xs cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--planora-primary)]';
 const buttonSecondary =
-  'px-4 py-2 rounded-xl text-xs font-medium bg-white dark:bg-[#1F2937] bg-[var(--planora-paper)] text-[#111827] dark:text-white text-[var(--planora-text)] border border-[#E7E7E2] dark:border-[#374151] border-[var(--planora-border-strong)] hover:bg-neutral-50 dark:hover:bg-neutral-800 hover:bg-[var(--planora-surface-inset)] disabled:opacity-50 transition-colors cursor-pointer';
+  'px-4 py-2 rounded-lg text-sm font-medium bg-[var(--planora-paper)] text-[var(--planora-text)] border border-[var(--planora-divider)] hover:bg-[var(--planora-surface-inset)] disabled:opacity-50 transition-colors cursor-pointer';
 const buttonDanger =
   'px-4 py-2 rounded-xl text-xs font-medium bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300 border border-red-200 dark:border-red-900 hover:bg-red-100 dark:hover:bg-red-900/60 disabled:opacity-50 transition-colors cursor-pointer';
 
@@ -582,51 +582,51 @@ export function JiraConnection({
       ref={row}
       id={JIRA_KEY}
       tabIndex={-1}
-      className={`rounded-2xl border bg-white dark:bg-[#111827] bg-[var(--planora-paper)] text-[var(--planora-text)] transition-all p-5 sm:p-6 ${
+      className={`rounded-2xl border bg-[var(--planora-paper)] text-[var(--planora-text)] transition-all p-5 sm:p-6 ${
         selected === JIRA_KEY
           ? 'border-[var(--planora-primary)] ring-2 ring-[var(--planora-primary)]/20 shadow-md'
-          : 'border-[#E7E7E2] dark:border-[#374151] border-[var(--planora-divider)]'
+          : 'border-[var(--planora-divider)]'
       }`}
     >
       {/* HEADER SECTION */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-5 border-b border-[#E7E7E2] dark:border-[#374151] border-[var(--planora-divider)]">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-5 border-b border-[var(--planora-divider)]">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-[var(--planora-surface-inset)] border border-[var(--planora-divider)] flex items-center justify-center flex-shrink-0">
             <ServiceLogo service={JIRA_KEY} className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-sm sm:text-base text-[#111827] dark:text-white text-[var(--planora-text)]">
+              <h3 className="font-semibold text-sm sm:text-base text-[var(--planora-text)]">
                 Atlassian Jira Cloud
               </h3>
               {connectionError ? (
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900">
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--planora-error-bg)] text-[var(--planora-error-text)] border border-[var(--planora-error-border)]">
                   Lỗi kết nối
                 </span>
               ) : isConnected ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400" aria-hidden="true" />
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[var(--planora-success-bg)] text-[var(--planora-success-text)] border border-[var(--planora-success-border)]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--planora-success-text)]" aria-hidden="true" />
                   <span>Đã kết nối</span>
                 </span>
               ) : isIdentityConnected ? (
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900">
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--planora-unknown-bg)] text-[var(--planora-unknown-text)] border border-[var(--planora-unknown-border)]">
                   Đã kết nối danh tính
                 </span>
               ) : isScopeRequired ? (
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900">
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--planora-pending-bg)] text-[var(--planora-pending-text)] border border-[var(--planora-pending-border)]">
                   Cần cấp quyền site
                 </span>
               ) : isReconnectRequired ? (
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900">
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--planora-error-bg)] text-[var(--planora-error-text)] border border-[var(--planora-error-border)]">
                   Cần kết nối lại
                 </span>
               ) : isDisconnected ? (
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-[var(--planora-surface-inset)] text-[var(--planora-muted)] border border-[var(--planora-divider)]">
                   Chưa kết nối
                 </span>
               ) : null}
             </div>
-            <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF] text-[var(--planora-muted)] mt-0.5">
+            <p className="text-xs text-[var(--planora-muted)] mt-0.5">
               Kết nối danh tính Atlassian, cấp quyền site Jira và quản lý quyền truy cập theo workspace.
             </p>
           </div>
@@ -717,11 +717,11 @@ export function JiraConnection({
         <div
           id="jira-connection-error-alert"
           aria-live="polite"
-          className="mt-4 p-3.5 rounded-xl bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-900 text-xs flex items-center justify-between gap-3"
+          className="mt-4 p-3.5 rounded-xl bg-[var(--planora-error-bg)] text-[var(--planora-error-text)] border border-[var(--planora-error-border)] text-xs flex items-center justify-between gap-3"
         >
           <div className="flex items-center gap-2">
             <svg
-              className="w-4 h-4 flex-shrink-0 text-rose-600 dark:text-rose-400"
+              className="w-4 h-4 flex-shrink-0 text-[var(--planora-error-text)]"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -737,7 +737,7 @@ export function JiraConnection({
               void fetchConnection();
               void fetchWorkspaces();
             }}
-            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-100 hover:bg-rose-200 text-rose-800 dark:bg-rose-900 dark:hover:bg-rose-800 dark:text-rose-200 whitespace-nowrap cursor-pointer"
+            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-[var(--planora-paper)] hover:bg-[var(--planora-surface-inset)] text-[var(--planora-error-text)] border border-[var(--planora-error-border)] whitespace-nowrap cursor-pointer"
           >
             Thử lại
           </button>
@@ -746,11 +746,11 @@ export function JiraConnection({
 
       {/* DISCONNECT CONFIRMATION MODAL / PANEL */}
       {confirmDisconnect && (
-        <div className="my-4 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-xs">
-          <p className="font-semibold text-amber-900 dark:text-amber-200 mb-1">
+        <div className="my-4 p-4 rounded-xl bg-[var(--planora-pending-bg)] border border-[var(--planora-pending-border)] text-xs">
+          <p className="font-semibold text-[var(--planora-pending-text)] mb-1">
             Xác nhận ngắt kết nối Atlassian Jira?
           </p>
-          <p className="text-amber-800 dark:text-amber-300 mb-3">
+          <p className="text-[var(--planora-pending-text)] mb-3">
             Planora sẽ thu hồi quyền truy cập site và ngắt kết nối danh tính Atlassian của bạn. Các kế hoạch cũ sẽ không thể thực thi bằng kết nối đã ngắt.
           </p>
           <div className="flex items-center gap-2">
@@ -765,6 +765,7 @@ export function JiraConnection({
             <button
               type="button"
               onClick={() => setConfirmDisconnect(false)}
+              disabled={busy}
               className={buttonSecondary}
             >
               Huỷ
@@ -775,36 +776,36 @@ export function JiraConnection({
 
       {/* ERROR & INFO ALERTS */}
       {error && (
-        <div role="alert" className="my-4 p-3.5 rounded-xl bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300 border border-red-200 dark:border-red-900 text-xs">
+        <div role="alert" className="my-4 p-3.5 rounded-xl bg-[var(--planora-error-bg)] text-[var(--planora-error-text)] border border-[var(--planora-error-border)] text-xs">
           {error}
         </div>
       )}
       {infoNotice && (
-        <div role="status" className="my-4 p-3.5 rounded-xl bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-300 border border-green-200 dark:border-green-900 text-xs">
+        <div role="status" className="my-4 p-3.5 rounded-xl bg-[var(--planora-success-bg)] text-[var(--planora-success-text)] border border-[var(--planora-success-border)] text-xs">
           {infoNotice}
         </div>
       )}
 
       {/* DETAILS: ATLANSSIAN IDENTITY & SITES */}
       {(isConnected || isIdentityConnected || isScopeRequired) && (
-        <div className="py-4 border-b border-[#E7E7E2] dark:border-[#374151] text-xs">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-neutral-600 dark:text-neutral-400">
+        <div className="py-4 border-b border-[var(--planora-divider)] text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[var(--planora-muted)]">
             <div>
-              <span className="font-medium text-[#111827] dark:text-white">Tài khoản Atlassian: </span>
+              <span className="font-medium text-[var(--planora-text)]">Tài khoản Atlassian: </span>
               {data?.displayName ?? data?.atlassianAccountId ?? 'Đã xác thực'}
             </div>
             {data?.atlassianAccountId && (
               <div>
-                <span className="font-medium text-[#111827] dark:text-white">ID tài khoản Atlassian: </span>
-                <code className="text-[11px] bg-neutral-100 dark:bg-neutral-800 px-1 py-0.5 rounded">
+                <span className="font-medium text-[var(--planora-text)]">ID tài khoản Atlassian: </span>
+                <code className="text-[11px] bg-[var(--planora-surface-inset)] text-[var(--planora-text)] px-1 py-0.5 rounded">
                   {data.atlassianAccountId}
                 </code>
               </div>
             )}
             {data?.jiraAccountId && (
               <div>
-                <span className="font-medium text-[#111827] dark:text-white">Jira Account ID: </span>
-                <code className="text-[11px] bg-neutral-100 dark:bg-neutral-800 px-1 py-0.5 rounded">
+                <span className="font-medium text-[var(--planora-text)]">Jira Account ID: </span>
+                <code className="text-[11px] bg-[var(--planora-surface-inset)] text-[var(--planora-text)] px-1 py-0.5 rounded">
                   {data.jiraAccountId}
                 </code>
               </div>
@@ -814,15 +815,15 @@ export function JiraConnection({
           {/* SITES LIST */}
           {authorizedSites.length > 0 && (
             <div className="mt-3">
-              <span className="font-medium text-[#111827] dark:text-white block mb-1">
+              <span className="font-medium text-[var(--planora-text)] block mb-1">
                 Jira Cloud sites đã được cấp quyền ({authorizedSites.length}):
               </span>
               <ul className="space-y-1">
                 {authorizedSites.map((s) => (
-                  <li key={s.cloudId} className="flex items-center gap-2 text-neutral-600 dark:text-neutral-400">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                    <span className="font-medium text-[#111827] dark:text-white">{s.name}</span>
-                    <span className="text-[11px] text-neutral-400">({s.url})</span>
+                  <li key={s.cloudId} className="flex items-center gap-2 text-[var(--planora-muted)]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--planora-success-text)]" aria-hidden="true" />
+                    <span className="font-medium text-[var(--planora-text)]">{s.name}</span>
+                    <span className="text-[11px] text-[var(--planora-muted)]">({s.url})</span>
                   </li>
                 ))}
               </ul>
@@ -835,10 +836,10 @@ export function JiraConnection({
       <div className="pt-5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
           <div>
-            <h4 className="font-semibold text-xs uppercase tracking-wider text-[#6B7280] dark:text-[#9CA3AF] text-[var(--planora-muted)]">
+            <h4 className="font-semibold text-xs uppercase tracking-wider text-[var(--planora-muted)]">
               Không gian làm việc Jira (Jira Workspaces)
             </h4>
-            <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF] text-[var(--planora-muted)]">
+            <p className="text-xs text-[var(--planora-muted)]">
               Quyền Jira được kiểm soát theo từng workspace độc lập với quyền tổ chức Planora.
             </p>
           </div>
@@ -846,7 +847,7 @@ export function JiraConnection({
           {/* WORKSPACE SELECTOR */}
           {workspaces.length > 0 && (
             <div className="flex items-center gap-2">
-              <label htmlFor="jira-workspace-select" className="text-xs text-[#6B7280] dark:text-[#9CA3AF] text-[var(--planora-muted)] whitespace-nowrap">
+              <label htmlFor="jira-workspace-select" className="text-xs text-[var(--planora-muted)] whitespace-nowrap">
                 Chọn workspace:
               </label>
               <select
@@ -854,7 +855,7 @@ export function JiraConnection({
                 aria-label="Chọn Jira Workspace"
                 value={activeWorkspaceId}
                 onChange={(e) => handleSelectWorkspace(e.target.value)}
-                className="px-2.5 py-1.5 text-xs rounded-lg border border-[#E7E7E2] dark:border-[#374151] border-[var(--planora-border-strong)] bg-white dark:bg-[#1F2937] bg-[var(--planora-paper)] text-[#111827] dark:text-white text-[var(--planora-text)] focus:outline-none focus:ring-1 focus:ring-[var(--planora-primary)]"
+                className="px-2.5 py-1.5 text-xs rounded-lg border border-[var(--planora-border-strong)] bg-[var(--planora-paper)] text-[var(--planora-text)] focus:outline-none focus:ring-1 focus:ring-[var(--planora-primary)]"
               >
                 {workspaces.map((w) => (
                   <option key={w.id} value={w.id}>
@@ -874,7 +875,7 @@ export function JiraConnection({
             value={inviteTokenInput}
             onChange={(e) => setInviteTokenInput(e.target.value)}
             disabled={busy}
-            className="flex-1 px-3 py-2 text-xs rounded-xl border border-[#E7E7E2] dark:border-[#374151] border-[var(--planora-border-strong)] bg-white dark:bg-[#1F2937] bg-[var(--planora-paper)] text-[#111827] dark:text-white text-[var(--planora-text)] placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-[var(--planora-primary)]"
+            className="flex-1 px-3 py-2 text-xs rounded-xl border border-[var(--planora-border-strong)] bg-[var(--planora-paper)] text-[var(--planora-text)] placeholder:text-[var(--planora-placeholder)] focus:outline-none focus:ring-1 focus:ring-[var(--planora-primary)]"
           />
           <button
             type="submit"
@@ -887,32 +888,32 @@ export function JiraConnection({
 
         {/* CURRENT WORKSPACE DETAILS */}
         {selectedWorkspace ? (
-          <div className="p-4 rounded-xl border border-[#E7E7E2] dark:border-[#374151] bg-[#F8F8F6] dark:bg-[#1F2937]/50 text-xs">
+          <div className="p-4 rounded-xl border border-[var(--planora-divider)] bg-[var(--planora-surface-inset)] text-xs">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-sm text-[#111827] dark:text-white">
+                <span className="font-semibold text-sm text-[var(--planora-text)]">
                   {selectedWorkspace.name}
                 </span>
-                <span className="text-[11px] text-neutral-500">({selectedWorkspace.slug})</span>
+                <span className="text-[11px] text-[var(--planora-muted)]">({selectedWorkspace.slug})</span>
               </div>
               <div>
                 {selectedWorkspace.membershipStatus === 'active' && (
-                  <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-green-50 text-green-700 border border-green-200">
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--planora-success-bg)] text-[var(--planora-success-text)] border border-[var(--planora-success-border)]">
                     Thành viên hoạt động
                   </span>
                 )}
                 {selectedWorkspace.membershipStatus === 'pending' && (
-                  <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--planora-pending-bg)] text-[var(--planora-pending-text)] border border-[var(--planora-pending-border)]">
                     Đang chờ duyệt
                   </span>
                 )}
                 {selectedWorkspace.membershipStatus === 'rejected' && (
-                  <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200">
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--planora-error-bg)] text-[var(--planora-error-text)] border border-[var(--planora-error-border)]">
                     Bị từ chối
                   </span>
                 )}
                 {selectedWorkspace.membershipStatus === 'removed' && (
-                  <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-200 text-neutral-700">
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--planora-surface-inset)] text-[var(--planora-muted)] border border-[var(--planora-divider)]">
                     Đã bị gỡ khỏi workspace
                   </span>
                 )}
@@ -921,37 +922,37 @@ export function JiraConnection({
 
             {/* CAPABILITIES DIRECTORY */}
             {isWorkspaceActive && (
-              <div className="mt-4 pt-4 border-t border-[#E7E7E2] dark:border-[#374151]">
-                <h5 className="font-semibold text-xs text-[#111827] dark:text-white mb-2">
+              <div className="mt-4 pt-4 border-t border-[var(--planora-divider)]">
+                <h5 className="font-semibold text-xs text-[var(--planora-text)] mb-2">
                   Danh mục khả dụng Jira (Capabilities Directory)
                 </h5>
                 {capabilities?.sites && capabilities.sites.length > 0 ? (
                   <div className="space-y-3">
                     {capabilities.sites.map((site) => (
-                      <div key={site.siteId} className="p-3 rounded-lg bg-white dark:bg-[#111827] border border-[#E7E7E2] dark:border-[#374151]">
-                        <div className="font-medium text-[#111827] dark:text-white flex items-center justify-between">
+                      <div key={site.siteId} className="p-3 rounded-lg bg-[var(--planora-paper)] border border-[var(--planora-divider)]">
+                        <div className="font-medium text-[var(--planora-text)] flex items-center justify-between">
                           <span>{site.name}</span>
-                          <span className="text-[11px] text-neutral-400">{site.url}</span>
+                          <span className="text-[11px] text-[var(--planora-muted)]">{site.url}</span>
                         </div>
-                        <div className="mt-2 text-neutral-600 dark:text-neutral-400">
-                          <span className="text-[11px] font-medium text-[#111827] dark:text-white">Projects được phép: </span>
+                        <div className="mt-2 text-[var(--planora-muted)]">
+                          <span className="text-[11px] font-medium text-[var(--planora-text)]">Projects được phép: </span>
                           {site.projects.length > 0 ? (
                             <ul className="mt-1 list-disc list-inside space-y-0.5 pl-1">
                               {site.projects.map((proj) => (
-                                <li key={proj.id} className="text-[11px]">
+                                <li key={proj.id} className="text-[11px] text-[var(--planora-text)]">
                                   {proj.key} — {proj.name}
                                 </li>
                               ))}
                             </ul>
                           ) : (
-                            <span className="text-[11px] text-neutral-400">Chưa có project nào được chọn.</span>
+                            <span className="text-[11px] text-[var(--planora-muted)]">Chưa có project nào được chọn.</span>
                           )}
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-neutral-500 italic text-xs">
+                  <p className="text-[var(--planora-muted)] italic text-xs">
                     Chưa có site hoặc project Jira nào được kích hoạt trong workspace này.
                   </p>
                 )}
@@ -960,31 +961,31 @@ export function JiraConnection({
 
             {/* ADMIN SECTION: MEMBERS, INVITES, SITES */}
             {isWorkspaceAdmin && (
-              <div className="mt-5 pt-4 border-t border-[#E7E7E2] dark:border-[#374151] space-y-5">
+              <div className="mt-5 pt-4 border-t border-[var(--planora-divider)] space-y-5">
                 {/* 1. MEMBERS & DECISIONS */}
                 <div>
-                  <h5 className="font-semibold text-xs uppercase tracking-wider text-[#6B7280] dark:text-[#9CA3AF] mb-2">
+                  <h5 className="font-semibold text-xs uppercase tracking-wider text-[var(--planora-muted)] mb-2">
                     Quản lý thành viên ({members.length})
                   </h5>
                   <div className="space-y-2">
                     {members.map((mem) => (
                       <div
                         key={mem.userId}
-                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-2.5 rounded-lg bg-white dark:bg-[#111827] border border-[#E7E7E2] dark:border-[#374151] gap-2"
+                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-2.5 rounded-lg bg-[var(--planora-paper)] border border-[var(--planora-divider)] gap-2"
                       >
                         <div>
-                          <span className="font-medium text-[#111827] dark:text-white">
+                          <span className="font-medium text-[var(--planora-text)]">
                             {mem.userId}
                           </span>
-                          <span className="ml-2 text-[11px] px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
+                          <span className="ml-2 text-[11px] px-1.5 py-0.5 rounded bg-[var(--planora-surface-inset)] text-[var(--planora-muted)]">
                             {mem.role}
                           </span>
                           <span className={`ml-2 text-[11px] font-medium ${
                             mem.status === 'active'
-                              ? 'text-green-600'
+                              ? 'text-[var(--planora-success-text)]'
                               : mem.status === 'pending'
-                              ? 'text-amber-600'
-                              : 'text-neutral-500'
+                              ? 'text-[var(--planora-pending-text)]'
+                              : 'text-[var(--planora-muted)]'
                           }`}>
                             [{mem.status}]
                           </span>
@@ -1032,7 +1033,7 @@ export function JiraConnection({
                 {/* 2. INVITES */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <h5 className="font-semibold text-xs uppercase tracking-wider text-[#6B7280] dark:text-[#9CA3AF]">
+                    <h5 className="font-semibold text-xs uppercase tracking-wider text-[var(--planora-muted)]">
                       Mã mời tham gia ({invites.length})
                     </h5>
                     <button
@@ -1046,9 +1047,9 @@ export function JiraConnection({
                   </div>
 
                   {createdInviteToken && (
-                    <div className="mb-3 p-3 rounded-lg bg-green-50 text-green-800 dark:bg-green-950/40 dark:text-green-300 border border-green-200 dark:border-green-800 text-xs">
+                    <div className="mb-3 p-3 rounded-lg bg-[var(--planora-success-bg)] text-[var(--planora-success-text)] border border-[var(--planora-success-border)] text-xs">
                       <span className="font-semibold">Mã mời mới tạo (hết hạn trong 7 ngày):</span>
-                      <code className="block mt-1 p-1 bg-white dark:bg-black/30 rounded border border-green-300 font-mono text-[11px]">
+                      <code className="block mt-1 p-1 bg-[var(--planora-paper)] rounded border border-[var(--planora-success-border)] font-mono text-[11px] text-[var(--planora-text)]">
                         {createdInviteToken}
                       </code>
                     </div>
@@ -1058,13 +1059,13 @@ export function JiraConnection({
                     {invites.map((inv) => (
                       <div
                         key={inv.id}
-                        className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-[#111827] border border-[#E7E7E2] dark:border-[#374151]"
+                        className="flex items-center justify-between p-2 rounded-lg bg-[var(--planora-paper)] border border-[var(--planora-divider)]"
                       >
                         <div>
-                          <span className="font-mono text-[11px] text-neutral-600 dark:text-neutral-300">
+                          <span className="font-mono text-[11px] text-[var(--planora-text)]">
                             {inv.id}
                           </span>
-                          <span className="ml-2 text-[11px] text-neutral-400">
+                          <span className="ml-2 text-[11px] text-[var(--planora-muted)]">
                             {inv.revokedAt ? '(Đã thu hồi)' : `(Hạn: ${new Date(inv.expiresAt).toLocaleDateString('vi-VN')})`}
                           </span>
                         </div>
@@ -1086,7 +1087,7 @@ export function JiraConnection({
 
                 {/* 3. SITES & PROJECTS */}
                 <div>
-                  <h5 className="font-semibold text-xs uppercase tracking-wider text-[#6B7280] dark:text-[#9CA3AF] mb-2">
+                  <h5 className="font-semibold text-xs uppercase tracking-wider text-[var(--planora-muted)] mb-2">
                     Liên kết Jira Sites & Projects ({sites.length})
                   </h5>
 
@@ -1095,13 +1096,14 @@ export function JiraConnection({
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-3">
                       <select
                         id="link-site-select"
+                        aria-label="Chọn site Atlassian để liên kết"
                         defaultValue=""
                         onChange={(e) => {
                           const val = e.target.value;
                           if (val) handleLinkSite(val);
                         }}
                         disabled={busy}
-                        className="px-2.5 py-1.5 text-xs rounded-lg border border-[#E7E7E2] dark:border-[#374151] bg-white dark:bg-[#1F2937] text-[#111827] dark:text-white"
+                        className="px-2.5 py-1.5 text-xs rounded-lg border border-[var(--planora-border-strong)] bg-[var(--planora-paper)] text-[var(--planora-text)] focus:outline-none focus:ring-1 focus:ring-[var(--planora-primary)]"
                       >
                         <option value="" disabled>
                           -- Chọn site Atlassian để liên kết --
@@ -1132,15 +1134,15 @@ export function JiraConnection({
                     {sites.map((site) => (
                       <div
                         key={site.siteId}
-                        className="p-3 rounded-lg bg-white dark:bg-[#111827] border border-[#E7E7E2] dark:border-[#374151]"
+                        className="p-3 rounded-lg bg-[var(--planora-paper)] border border-[var(--planora-divider)]"
                       >
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                           <div>
-                            <span className="font-semibold text-[#111827] dark:text-white">
+                            <span className="font-semibold text-[var(--planora-text)]">
                               {site.name}
                             </span>
-                            <span className="ml-2 text-[11px] text-neutral-400">({site.url})</span>
-                            <span className={`ml-2 text-[11px] font-medium ${site.active ? 'text-green-600' : 'text-neutral-400'}`}>
+                            <span className="ml-2 text-[11px] text-[var(--planora-muted)]">({site.url})</span>
+                            <span className={`ml-2 text-[11px] font-medium ${site.active ? 'text-[var(--planora-success-text)]' : 'text-[var(--planora-muted)]'}`}>
                               [{site.active ? 'Đang hoạt động' : 'Tạm dừng'}]
                             </span>
                           </div>
@@ -1168,8 +1170,8 @@ export function JiraConnection({
 
                         {/* PROJECT CONFIGURATION MODAL / PANEL */}
                         {configuringSite?.siteId === site.siteId && (
-                          <div className="mt-3 pt-3 border-t border-[#E7E7E2] dark:border-[#374151]">
-                            <h6 className="font-semibold text-xs text-[#111827] dark:text-white mb-2">
+                          <div className="mt-3 pt-3 border-t border-[var(--planora-divider)]">
+                            <h6 className="font-semibold text-xs text-[var(--planora-text)] mb-2">
                               Chọn Projects cho {site.name}:
                             </h6>
                             {candidateProjects.length > 0 ? (
@@ -1179,7 +1181,7 @@ export function JiraConnection({
                                   return (
                                     <label
                                       key={p.projectId}
-                                      className="flex items-center gap-2 text-xs text-neutral-700 dark:text-neutral-300 cursor-pointer"
+                                      className="flex items-center gap-2 text-xs text-[var(--planora-text)] cursor-pointer"
                                     >
                                       <input
                                         type="checkbox"
@@ -1194,7 +1196,7 @@ export function JiraConnection({
                                             setSelectedProjectIds([...selectedProjectIds, p.projectId]);
                                           }
                                         }}
-                                        className="rounded border-gray-300 text-[var(--planora-primary)] focus:ring-[var(--planora-primary)] cursor-pointer"
+                                        className="rounded border border-[var(--planora-border-strong)] text-[var(--planora-primary)] focus:ring-[var(--planora-primary)] cursor-pointer"
                                       />
                                       <span className="font-medium">{p.key}</span>
                                       <span>— {p.name}</span>
@@ -1203,7 +1205,7 @@ export function JiraConnection({
                                 })}
                               </div>
                             ) : (
-                              <p className="text-neutral-400 text-[11px] mb-2">
+                              <p className="text-[var(--planora-muted)] text-[11px] mb-2">
                                 Không tìm thấy project nào hoặc đang tải...
                               </p>
                             )}
@@ -1219,6 +1221,7 @@ export function JiraConnection({
                               <button
                                 type="button"
                                 onClick={() => setConfiguringSite(null)}
+                                disabled={busy}
                                 className={buttonSecondary}
                               >
                                 Đóng
@@ -1234,20 +1237,20 @@ export function JiraConnection({
             )}
           </div>
         ) : (
-          <p className="text-neutral-500 italic text-xs">
+          <p className="text-[var(--planora-muted)] italic text-xs">
             Bạn chưa thuộc Jira workspace nào. Hãy nhập mã mời để tham gia.
           </p>
         )}
       </div>
 
       {/* COCKPIT JIRA CONVERSATION CTA (DISABLED PENDING JIRA-08) */}
-      <div className="mt-6 pt-5 border-t border-[#E7E7E2] dark:border-[#374151]">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl bg-neutral-50 dark:bg-[#1F2937]/30 border border-[#E7E7E2] dark:border-[#374151]">
+      <div className="mt-6 pt-5 border-t border-[var(--planora-divider)]">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl bg-[var(--planora-surface-inset)] border border-[var(--planora-divider)]">
           <div>
-            <h5 className="font-semibold text-xs text-[#111827] dark:text-white">
+            <h5 className="font-semibold text-xs text-[var(--planora-text)]">
               Hội thoại Atlassian Jira trong Cockpit
             </h5>
-            <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF] mt-0.5">
+            <p className="text-xs text-[var(--planora-muted)] mt-0.5">
               Hội thoại Jira trong Cockpit đang được phát triển và chưa mở trong phiên bản hiện tại (chờ hoàn tất JIRA-08).
             </p>
           </div>
@@ -1255,7 +1258,7 @@ export function JiraConnection({
             type="button"
             disabled
             aria-disabled="true"
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-neutral-200 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400 cursor-not-allowed whitespace-nowrap shadow-none"
+            className="px-4 py-2 rounded-xl text-xs font-semibold bg-[var(--planora-paper)] text-[var(--planora-muted)] border border-[var(--planora-divider)] cursor-not-allowed whitespace-nowrap shadow-none"
           >
             Bắt đầu hội thoại Jira (Chờ JIRA-08)
           </button>

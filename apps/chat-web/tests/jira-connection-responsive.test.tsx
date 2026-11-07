@@ -140,14 +140,14 @@ describe('Jira UI Responsive, Theme, Refresh, Delayed Callback & User Switch', (
       expect(screen.getByText(/Atlassian Jira Cloud/i)).toBeInTheDocument();
     });
     const card = container.querySelector('#jira');
-    expect(card?.className).toContain('bg-white');
-    expect(card?.className).toContain('dark:bg-[#111827]');
+    expect(card?.className).toContain('bg-[var(--planora-paper)]');
+    expect(card?.className).toContain('border-[var(--planora-divider)]');
 
     // 2. Dark theme
     document.documentElement.classList.add('dark');
     rerender(<JiraConnection user={userA} />);
     expect(document.documentElement.classList.contains('dark')).toBe(true);
-    expect(card?.className).toContain('dark:border-[#374151]');
+    expect(card?.className).toContain('border-[var(--planora-divider)]');
   });
 
   it('handles refresh by reloading connection status and capabilities', async () => {
