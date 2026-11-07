@@ -16,7 +16,7 @@ export function NotionCallbackView({
   input?: NotionCallbackInput;
   navigate: (path: string, replace?: boolean) => void;
 }) {
-  const started = useRef(false);
+  const completion = useRef<ReturnType<typeof apiClient.completeNotionConnection> | null>(null);
   const [error, setError] = useState(() =>
     input?.error
       ? 'Bạn đã hủy kết nối Notion.'
@@ -31,13 +31,12 @@ export function NotionCallbackView({
   };
 
   useEffect(() => {
-    if (started.current || error || !input?.code || !input?.state) return;
-    started.current = true;
+    if (error || !input?.code || !input?.state) return;
     let active = true;
     const owner = notionSessionOwner();
 
-    void apiClient
-      .completeNotionConnection(input.code, input.state)
+    completion.current ??= apiClient.completeNotionConnection(input.code, input.state);
+    void completion.current
       .then((result) => {
         if (!active || notionSessionOwner() !== owner) return;
         const back = conversationReturnPath(result.returnTo);
@@ -52,7 +51,7 @@ export function NotionCallbackView({
       })
       .catch((err) => {
         if (!active || notionSessionOwner() !== owner) return;
-        const code = err?.data?.error || err?.data?.code || err?.code;
+        const code = err?.data?.code || err?.code || err?.data?.error;
         setError(notionCallbackError(typeof code === 'string' ? code : undefined));
       });
 
