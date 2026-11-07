@@ -1,6 +1,6 @@
 # XSVC-01 · Kiểm toán liên dịch vụ
 
-**Trạng thái:** pha 0 và F1–F3 đã sửa trên nhánh. Pha 2–3 và phần còn lại của pha 1 chưa làm. · **Nhánh:** `docs/xsvc-01-cross-service-audit`
+**Trạng thái:** pha 1 xong trên nhánh. Pha 2 live/browser chưa chạy. Ma trận và phát hiện đã ghi. · **Nhánh:** `docs/xsvc-01-cross-service-audit`
 
 ## Mục tiêu
 
@@ -9,8 +9,8 @@
 ## Pha
 
 - [x] **Pha 0.** Bản đồ 12 dịch vụ, 95 tool, placeholder của plan sandbox, và lệch với sáu việc demo. Xem [inventory](../../audits/2026-11-07-cross-service/INVENTORY.md).
-- [x] **Pha 1, F1–F3.** Test đỏ rồi sửa. Cổng `enforceReportGrounding` lúc duyệt và đột biến khóa output chưa làm.
-- [ ] **Pha 1, phần còn lại.** Cổng duyệt báo cáo khi `ExecutionService` không bật cờ, và đột biến một khóa output.
+- [x] **Pha 1, F1–F3.** Test đỏ rồi sửa.
+- [x] **Pha 1, phần còn lại.** Cổng duyệt báo cáo mặc định bật. Resolver từ chối `htmlUrl` khi template hỏi `url`.
 - [ ] **Pha 2.** Một lượt đọc thật rồi Hủy. Browser sandbox `nine_service` đối chiếu `output_json`. Không ghi dịch vụ thật khi chưa được duyệt từng lệnh.
 - [ ] **Pha 3.** `FINDINGS.md` và `SEAM-MATRIX.md`. Chỉ sửa P0, hoặc P1 chặn demo, trên nhánh riêng.
 
@@ -40,3 +40,12 @@ Lệnh, đều exit 0:
 - `npx vitest run tests/services/job-readiness.test.tsx --dir apps/chat-web` — 7 passed.
 
 Chưa chạy `npm run check`, chưa chạy live, chưa làm F4/F5.
+
+### 07/11/2026 — Pha 1, cổng duyệt và khóa `url`
+
+- Test mới `constructed without the grounding flag` fail trước khi sửa: `approveAndStart` trả `success: true`, status 200. Sau khi mặc định `enforceReportGrounding` là bật và `server.ts` truyền `true`: trả 409, plan còn `pending`, adapter không được gọi.
+- `report-evidence.test.ts`: 12/12 pass trên PostgreSQL loopback cổng 56534.
+- Resolver: output chỉ có `htmlUrl` làm `${issue.output.url}` ném `property 'output.url' not found`. Test này xanh trước khi sửa resolver.
+- `npm test -w @wap/chat-api` với `DATABASE_URL` cổng 56534: 2474 pass, 1 fail. Fail là timeout 5s của `conversation-history.integration.test.ts` ca phân trang 57 dòng. Chạy lại riêng file đó: 8/8 pass, ca đó 1397ms. Không phải hồi quy cổng báo cáo.
+- `npx vitest run --dir packages/executor`: 56/56 pass.
+- Ma trận và phát hiện: `docs/audits/2026-11-07-cross-service/SEAM-MATRIX.md`, `FINDINGS.md`.

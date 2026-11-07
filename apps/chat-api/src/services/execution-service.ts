@@ -85,7 +85,7 @@ export class ExecutionService {
     this.jiraLeaseManager = options.jiraLeaseManager;
     this.jiraNativeVerifier = options.jiraNativeVerifier;
     this.reportEvidenceStore = options.reportEvidenceStore;
-    this.enforceReportGrounding = options.enforceReportGrounding;
+    this.enforceReportGrounding = options.enforceReportGrounding ?? true;
   }
 
   private emitExecution(convId:string,event:string,payload:any):void{

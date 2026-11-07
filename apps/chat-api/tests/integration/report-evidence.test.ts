@@ -59,6 +59,21 @@ describe('Report Evidence Integration & Dispatch Guard (FLOW-01, F1)', () => {
     return { convId, planId: plan.id, planHash, planText };
   }
 
+  it('rejects an unverified report at approval when constructed without the grounding flag', async () => {
+    const userId = await createSyntheticUser(pool, 'Default gate', 'default-gate');
+    const plan: PlanResponse = { kind: 'plan', summary: 'Gửi cập nhật PR', thinking: 'Notify dev', warnings: [], steps: [
+      { id: 'post', tool: 'slack.send_message', description: 'Notify', args: { channel: 'C_DEV', text: '999 open PRs: #999' }, dependsOn: [] },
+    ] };
+    const saved = await createTestPlan(userId, plan, 'pending', 'Cho tôi danh sách PR đang mở trên GitHub acme/web rồi nhắn kết quả vào Slack #dev');
+    const calls: string[] = [];
+    const service = new ExecutionService({ planRepo, convRepo, pool,
+      adapterFactory: { getAdapterForService: () => ({ execute: async (tool: string) => { calls.push(tool); return { ok: true }; } }) } });
+    const result = await service.approveAndStart(saved.planId, userId);
+    expect(result).toMatchObject({ success: false, status: 409 });
+    expect(calls).toEqual([]);
+    expect((await pool.query('SELECT status FROM plans WHERE id=$1', [saved.planId])).rows[0].status).toBe('pending');
+  });
+
   it.each([
     'Cho tôi danh sách PR đang mở trên GitHub acme/web rồi nhắn kết quả vào Slack #dev',
     'Summarize open pull requests on GitHub acme/web and send the report to Slack #dev',
