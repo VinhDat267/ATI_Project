@@ -521,6 +521,13 @@ test('real browser and PostgreSQL: approved nine-service workflow resolves prior
     expect(slackText).toContain(gmailId);
     expect(slackText).toContain(telegramMsgId);
     await expect(page.getByRole('heading', { level: 1, name: /^Đã xong 9 việc trên 9 công cụ/ })).toBeVisible();
+    await expect(page.getByText(`🎫 Mã: ${jiraKey}`)).toBeVisible();
+    await expect(page.getByText(`✉️ Mã thư: ${gmailId}`)).toBeVisible();
+    await expect(page.getByText(`📨 Tin nhắn #${telegramMsgId}`)).toBeVisible();
+    await expect(page.getByText(`Phạm vi ${sheetsRange}`)).toBeVisible();
+    await expect(page.getByText(calendarUrl).first()).toBeVisible();
+    await expect(page.getByText(trelloUrl).first()).toBeVisible();
+    await expect(page.getByText(notionUrl).first()).toBeVisible();
     await expect(page.getByTestId('calendar-receipt-metrics')).toBeVisible();
     await expect(page.getByTestId('myjira-receipt-metrics')).toBeVisible();
     await expect(page.getByTestId('github-receipt-metrics')).toBeVisible();
