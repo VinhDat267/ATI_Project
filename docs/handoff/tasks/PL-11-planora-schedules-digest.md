@@ -66,7 +66,7 @@ Thiết kế trải nghiệm tạo, quản lý và theo dõi lịch chạy và b
 - **Worktree / Nhánh:** `longnguyen005/feat-planora-pl-11`
 - **Target branch:** `codex/planora-ui`
 - **Base SHA:** `89deb95ce3de0f3708c3d07d7184c335b65f61b5` (HEAD accepted của PL-10)
-- **Commit SHA:** `ee7b98ceb82ac0452eb4fd2f902f6e22e49d5b91`
+- **Commit SHA:** `f643a297a9dc809465f58656c40e364e0870eb18`
 - **Orca Task ID:** `task_4f6e0fd7a5bd` (Dispatch `ctx_b2cdaa24a823`)
 
 ### Tóm tắt công việc đã thực hiện:

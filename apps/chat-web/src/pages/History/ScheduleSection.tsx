@@ -111,10 +111,12 @@ function ScheduleRow({
       <p className="text-xs text-[var(--planora-muted)]">{scheduleLabel(schedule)}</p>
       {schedule.services && schedule.services.length > 0 && (
         <WorkflowFlowCanvas
+          variant="planora"
+          mode="schedule"
           services={schedule.services}
           isAutoDigest={schedule.kind !== 'plan'}
-          mode="schedule"
           compact
+          className="mt-3"
         />
       )}
       {schedule.lastRun && (

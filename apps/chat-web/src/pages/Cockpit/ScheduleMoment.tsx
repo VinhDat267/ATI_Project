@@ -162,7 +162,13 @@ export function ScheduleMoment({
       </h1>
       <div className="bg-[var(--planora-paper)] border border-[var(--planora-divider)] rounded-2xl shadow-sm p-5 sm:p-6 v3-space-y-5 min-w-0">
         {!manage && scheduleServices.length > 0 && (
-          <WorkflowFlowCanvas services={scheduleServices} isAutoDigest={isAutoDigestActive} mode="schedule" />
+          <WorkflowFlowCanvas
+            variant="planora"
+            mode="schedule"
+            services={scheduleServices}
+            isAutoDigest={isAutoDigestActive}
+            className="mt-3"
+          />
         )}
         {schedule ? (
           <>
@@ -389,8 +395,10 @@ export function ScheduleMoment({
                       ) : ineligibleReason ? (
                         <p className="text-xs text-[var(--planora-muted)]">{ineligibleReason}</p>
                       ) : null}
-                      <p className="text-sm text-[var(--planora-muted)] leading-relaxed">
-                        Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.
+                      <p className="mt-1 text-xs text-[var(--planora-muted)]">
+                        {approvalMode === 'auto_digest'
+                          ? 'Tới giờ, Planora tự động gửi bản tin theo kế hoạch đã duyệt.'
+                          : 'Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.'}
                       </p>
                     </>
                   ) : (
@@ -400,6 +408,7 @@ export function ScheduleMoment({
                           <legend className="text-xs font-semibold text-[var(--planora-text)] px-1">Chế độ khi tới giờ</legend>
                           <label className="flex items-start gap-2.5 text-xs sm:text-sm text-[var(--planora-text)] cursor-pointer">
                             <input
+                              id="schedule-mode-manual"
                               type="radio"
                               name={`schedule-mode-${message.id}`}
                               checked={approvalMode === 'manual'}
@@ -416,6 +425,7 @@ export function ScheduleMoment({
                             }`}
                           >
                             <input
+                              id="schedule-mode-auto-digest"
                               type="radio"
                               name={`schedule-mode-${message.id}`}
                               disabled={!digestCandidate.canAutoDigest}

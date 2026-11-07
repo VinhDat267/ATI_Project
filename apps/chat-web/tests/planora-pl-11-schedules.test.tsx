@@ -12,9 +12,6 @@ import { useChatStore } from '../src/store/chat-store';
 import { SchedulesCapabilityContext } from '../src/hooks/use-schedules';
 import type { ChatMessage, User } from '../src/types';
 
-vi.mock('../src/components/WorkflowFlowCanvas', () => ({
-  WorkflowFlowCanvas: () => <div data-testid="workflow-flow-canvas-mock" />,
-}));
 
 describe('PL-11 Planora Schedules & Auto-Digest UI - Business-First UX v2.0', () => {
   const user: User = {
@@ -81,7 +78,7 @@ describe('PL-11 Planora Schedules & Auto-Digest UI - Business-First UX v2.0', ()
             recurrence: sampleSchedule.recurrence,
             summary: 'Tạo lịch bản tin sáng',
           },
-          services: [],
+          services: ['mycalendar', 'slack'],
           nextRuns: sampleSchedule.nextRuns,
           digestCandidate: {
             eligible: true,
@@ -105,6 +102,19 @@ describe('PL-11 Planora Schedules & Auto-Digest UI - Business-First UX v2.0', ()
       expect(container.innerHTML).toContain('var(--planora-divider)');
       expect(container.innerHTML).toContain('var(--planora-primary)');
       expect(container.innerHTML).toContain('var(--planora-text)');
+
+      // Verify WorkflowFlowCanvas renders PlanoraWorkflowSteps with no prototype colors
+      expect(screen.getByTestId('workflow-flow-canvas')).toBeInTheDocument();
+      expect(screen.getByTestId('workflow-node-mycalendar')).toBeInTheDocument();
+      expect(screen.getByTestId('workflow-node-slack')).toBeInTheDocument();
+      expect(container.innerHTML).not.toContain('#F8F8F6');
+
+      // Verify all SVGs have aria-hidden="true"
+      const svgs = container.querySelectorAll('svg');
+      expect(svgs.length).toBeGreaterThan(0);
+      svgs.forEach((svg) => {
+        expect(svg).toHaveAttribute('aria-hidden', 'true');
+      });
 
       // Verify heading has font-serif
       const heading = screen.getByRole('heading', { level: 1 });
@@ -271,6 +281,38 @@ describe('PL-11 Planora Schedules & Auto-Digest UI - Business-First UX v2.0', ()
       expect(cta.className).not.toContain('#111827');
       expect(cta.className).not.toContain('#FF5701');
     });
+
+    it('ScheduleSection with active schedule renders real PlanoraWorkflowSteps with zero prototype colors and 100% aria-hidden SVGs', async () => {
+      vi.spyOn(apiClient, 'getSchedules').mockResolvedValue({ schedules: [sampleSchedule] });
+
+      const { container } = render(
+        <SchedulesCapabilityContext.Provider value={true}>
+          <ScheduleSection user={user} navigate={vi.fn()} />
+        </SchedulesCapabilityContext.Provider>
+      );
+
+      await screen.findByRole('heading', { level: 2, name: 'Lịch chạy' });
+      expect(screen.getByText('Bản tin sáng')).toBeInTheDocument();
+
+      // Verify PlanoraWorkflowSteps rendered for sampleSchedule (services: ['mycalendar', 'slack'])
+      expect(screen.getByTestId('workflow-flow-canvas')).toBeInTheDocument();
+      expect(screen.getByTestId('workflow-node-mycalendar')).toBeInTheDocument();
+      expect(screen.getByTestId('workflow-node-slack')).toBeInTheDocument();
+
+      // Zero legacy prototype colors
+      expect(container.innerHTML).not.toContain('#FF5701');
+      expect(container.innerHTML).not.toContain('#E04C00');
+      expect(container.innerHTML).not.toContain('#111827');
+      expect(container.innerHTML).not.toContain('#E7E7E2');
+      expect(container.innerHTML).not.toContain('#F8F8F6');
+
+      // 100% of SVGs have aria-hidden="true"
+      const svgs = container.querySelectorAll('svg');
+      expect(svgs.length).toBeGreaterThan(0);
+      svgs.forEach((svg) => {
+        expect(svg).toHaveAttribute('aria-hidden', 'true');
+      });
+    });
   });
 
   describe('2. A11y & 100% SVG aria-hidden="true" Audit', () => {
@@ -399,6 +441,116 @@ describe('PL-11 Planora Schedules & Auto-Digest UI - Business-First UX v2.0', ()
       expect(document.querySelector('#schedule-mode-auto-digest')).toBeNull();
       // Clear explanation is displayed
       expect(screen.getByText('Yêu cầu có thao tác ghi dữ liệu nên cần duyệt từng lượt chạy.')).toBeInTheDocument();
+    });
+
+    it('F2: Calendar candidate toggles dynamic description according to approvalMode', () => {
+      const message: ChatMessage = {
+        id: 'msg-cal-mode',
+        role: 'assistant',
+        content: '',
+        metadata: {
+          type: 'schedule_proposal',
+          proposal: {
+            kind: 'schedule',
+            action: 'create',
+            name: sampleSchedule.name,
+            request: sampleSchedule.request,
+            recurrence: sampleSchedule.recurrence,
+            summary: 'Tạo lịch bản tin sáng',
+          },
+          services: ['mycalendar', 'slack'],
+          nextRuns: sampleSchedule.nextRuns,
+          digestCandidate: {
+            eligible: true,
+            config: sampleDigestConfig,
+          },
+        },
+      };
+
+      render(<ScheduleMoment message={message} convId={CONV_ID} navigate={vi.fn()} onEdit={vi.fn()} />);
+
+      // Initially manual mode
+      expect(
+        screen.getByText('Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.')
+      ).toBeInTheDocument();
+
+      // Switch to auto_digest
+      const autoRadio = screen.getByLabelText(/Tự gửi bản tin Lịch theo phạm vi đã khóa/i);
+      fireEvent.click(autoRadio);
+      expect(
+        screen.getByText('Tới giờ, Planora tự động gửi bản tin theo kế hoạch đã duyệt.')
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText('Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.')
+      ).toBeNull();
+
+      // Switch back to manual
+      const manualRadio = screen.getByLabelText(/Lập kế hoạch & chờ duyệt từng lượt/i);
+      fireEvent.click(manualRadio);
+      expect(
+        screen.getByText('Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.')
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText('Tới giờ, Planora tự động gửi bản tin theo kế hoạch đã duyệt.')
+      ).toBeNull();
+    });
+
+    it('F2: Sheets/Generic candidate provides ids schedule-mode-manual and schedule-mode-auto-digest', () => {
+      const message: ChatMessage = {
+        id: 'msg-sheets-candidate',
+        role: 'assistant',
+        content: '',
+        metadata: {
+          type: 'schedule_proposal',
+          proposal: {
+            kind: 'schedule',
+            action: 'create',
+            name: 'Báo cáo doanh thu',
+            request: 'Mỗi tuần đọc Google Sheets gửi Slack',
+            recurrence: { type: 'weekly', days: [1], time: '09:00' },
+            summary: 'Lịch Sheets',
+          },
+          services: ['sheets', 'slack'],
+          nextRuns: ['2026-11-09T02:00:00Z'],
+          digestCandidate: {
+            canAutoDigest: true,
+            config: {
+              version: 1,
+              source: {
+                service: 'mysheets',
+                spreadsheetId: 'sheet-123',
+                spreadsheetTitle: 'Doanh thu Q4',
+                sheetName: 'TongHop',
+                tailRows: 10,
+              },
+              destination: {
+                service: 'slack',
+                channelId: 'C_SALES',
+                channelLabel: '#sales-report',
+              },
+              includeAiSummary: true,
+            },
+          },
+        },
+      };
+
+      render(<ScheduleMoment message={message} convId={CONV_ID} navigate={vi.fn()} onEdit={vi.fn()} />);
+
+      const manualRadio = document.getElementById('schedule-mode-manual') as HTMLInputElement;
+      const autoRadio = document.getElementById('schedule-mode-auto-digest') as HTMLInputElement;
+
+      expect(manualRadio).toBeInTheDocument();
+      expect(autoRadio).toBeInTheDocument();
+      expect(manualRadio.checked).toBe(true);
+      expect(autoRadio.checked).toBe(false);
+
+      fireEvent.click(autoRadio);
+      expect(autoRadio.checked).toBe(true);
+      expect(manualRadio.checked).toBe(false);
+
+      fireEvent.click(manualRadio);
+      expect(manualRadio.checked).toBe(true);
+      expect(autoRadio.checked).toBe(false);
     });
   });
 

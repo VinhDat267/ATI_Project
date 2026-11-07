@@ -123,6 +123,7 @@ function DottedConnector({
       )}
       <div className="relative flex items-center justify-center">
         <svg
+          aria-hidden="true"
           width="48"
           height="18"
           viewBox="0 0 48 18"
@@ -147,7 +148,7 @@ function DottedConnector({
           className="absolute w-4 h-4 rounded-full bg-[var(--planora-paper)] border border-[var(--planora-divider)] shadow-2xs flex items-center justify-center text-[var(--planora-muted)]"
           title="Bộ lọc & ánh xạ dữ liệu giữa các bước"
         >
-          <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+          <svg aria-hidden="true" className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
             <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
           </svg>
         </span>
@@ -214,7 +215,7 @@ function OrbitalNodeButton({
             title="Kích hoạt tự động theo lịch định kỳ"
             className="absolute -bottom-1 -left-1 z-20 w-6 h-6 rounded-full bg-[var(--planora-text)] text-[var(--planora-paper)] border-2 border-[var(--planora-paper)] shadow-xs flex items-center justify-center pointer-events-none"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.3">
+            <svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.3">
               <circle cx="12" cy="12" r="9" />
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 2" />
             </svg>
@@ -238,7 +239,7 @@ function OrbitalNodeButton({
           {showStatusBubble && node.status === 'succeeded' ? (
             '✓'
           ) : showStatusBubble && node.status === 'running' ? (
-            <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+            <svg aria-hidden="true" className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
               <circle cx="12" cy="12" r="9" className="opacity-30" />
               <path d="M12 3a9 9 0 0 1 9 9" />
             </svg>
@@ -492,7 +493,7 @@ export function PlanoraWorkflowSteps({
                     className="flex flex-col items-center text-center px-1"
                   >
                     <div className="w-12 h-12 rounded-full bg-emerald-600 text-white ring-4 ring-emerald-500/25 flex items-center justify-center shadow-sm">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg aria-hidden="true" className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
@@ -605,6 +606,7 @@ export function PlanoraWorkflowSteps({
                   </span>
                   <div className="relative flex items-center justify-center">
                     <svg
+                      aria-hidden="true"
                       width="52"
                       height="24"
                       viewBox="0 0 52 24"
@@ -629,7 +631,7 @@ export function PlanoraWorkflowSteps({
                       data-flow-filter-badge="true"
                       className="absolute w-3.5 h-3.5 rounded-full bg-[var(--planora-paper)] border border-[var(--planora-divider)] shadow-2xs flex items-center justify-center text-[var(--planora-muted)]"
                     >
-                      <svg className="w-2 h-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                      <svg aria-hidden="true" className="w-2 h-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m6-6H6" />
                       </svg>
                     </span>
@@ -809,7 +811,7 @@ export function PlanoraWorkflowSteps({
                         }
                         className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-[var(--planora-surface-inset)] hover:bg-[var(--planora-surface-hover)] text-[var(--planora-text)] border border-[var(--planora-divider)] transition-colors inline-flex items-center gap-1 cursor-pointer"
                       >
-                        <svg className="w-3.5 h-3.5 text-[var(--planora-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg aria-hidden="true" className="w-3.5 h-3.5 text-[var(--planora-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
