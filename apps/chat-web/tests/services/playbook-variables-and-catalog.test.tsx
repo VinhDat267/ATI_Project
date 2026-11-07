@@ -608,5 +608,33 @@ describe('1-Click Parameterized Playbooks & Extended Slack/GitHub Catalog', () =
     );
 
     expect(screen.queryAllByText(/Gmail/)).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: /^Quy trình OFF-02:/ })).toBeNull();
+  });
+
+  it('keeps the Gmail workflow discoverable when Gmail is enabled but disconnected', () => {
+    render(
+      <RequestMoment
+        services={[
+          { id: 'mycalendar', name: 'Google Calendar', configured: true, connected: true, connectionStatus: 'healthy' },
+          { id: 'mysheets', name: 'Google Sheets', configured: true, connected: true, connectionStatus: 'healthy' },
+          { id: 'gmail', name: 'Gmail', configured: false, connected: false, connectionStatus: 'unconfigured' },
+        ]}
+        loading={false}
+        error={null}
+        draft=""
+        planning={false}
+        input={createRef<HTMLTextAreaElement>()}
+        onDraft={() => {}}
+        onSend={() => {}}
+        onKeyDown={() => {}}
+        onSettings={() => {}}
+        navigate={() => {}}
+        servicePrompt={(s) => `Dùng ${s.name}`}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /^Quy trình OFF-02:/ })).toBeDefined();
+    expect(screen.getByTestId('readiness-badge-OFF-02').textContent).toContain('Gmail');
+    expect(screen.getByRole('button', { name: /^Kết nối Gmail/ })).toBeDefined();
   });
 });

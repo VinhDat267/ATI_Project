@@ -15,7 +15,7 @@ import {
   deletePlaybook,
   type CustomPlaybook,
 } from '../../services/playbook-storage';
-import { CORE_JOBS, evaluateJobReadiness } from '../../services/job-readiness';
+import { CORE_JOBS, evaluateJobReadiness, formatServiceDisplayList } from '../../services/job-readiness';
 import {
   loadWorkflowDefaults,
   saveWorkflowDefaults,
@@ -830,7 +830,7 @@ export function RequestMoment({
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {CORE_JOBS.map((job) => {
+          {CORE_JOBS.filter((job) => services.some((service) => service.id === 'gmail') || !job.requiredServices.includes('gmail')).map((job) => {
             const readiness = evaluateJobReadiness(job.requiredServices, services);
             return (
               <div
@@ -869,7 +869,7 @@ export function RequestMoment({
                         ? '⚠️ Cấp lại quyền'
                         : readiness.status === 'needs_resource'
                         ? '📁 Chọn tài nguyên'
-                        : `⚡ Thiếu ${readiness.missingServices.join(', ')}`}
+                        : `⚡ Thiếu ${formatServiceDisplayList(readiness.missingServices)}`}
                     </span>
                   </div>
 
@@ -996,10 +996,20 @@ export function RequestMoment({
                           className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border ${
                             pbReadiness.isReady
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : pbReadiness.status === 'needs_reauth'
+                              ? 'bg-rose-50 text-rose-700 border-rose-200'
+                              : pbReadiness.status === 'needs_resource'
+                              ? 'bg-amber-50 text-amber-800 border-amber-200'
                               : 'bg-neutral-100 text-neutral-600 border-neutral-200'
                           }`}
                         >
-                          {pbReadiness.isReady ? '✓ Sẵn sàng' : `Thiếu ${pbReadiness.missingServices.length} dịch vụ`}
+                          {pbReadiness.isReady
+                            ? '✓ Sẵn sàng'
+                            : pbReadiness.status === 'needs_reauth'
+                            ? '⚠️ Cấp lại quyền'
+                            : pbReadiness.status === 'needs_resource'
+                            ? '📁 Chọn tài nguyên'
+                            : `Thiếu ${pbReadiness.missingServices.length} dịch vụ`}
                         </span>
                       </div>
                       <div>
@@ -1079,7 +1089,12 @@ export function RequestMoment({
         <div className="flex items-center gap-2 text-neutral-500 flex-wrap w-full">
           <span>Chưa kết nối:</span>
           {services
-            .filter((service) => !service.configured)
+            .filter(
+              (service) =>
+                !service.configured &&
+                !(service.id === 'calendar' && services.some((s) => s.id === 'mycalendar')) &&
+                !(service.id === 'sheets' && services.some((s) => s.id === 'mysheets'))
+            )
             .map((service) => (
               <span
                 key={service.id}

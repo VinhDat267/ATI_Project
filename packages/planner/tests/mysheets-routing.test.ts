@@ -76,4 +76,14 @@ describe('mysheets router rules', () => {
       unavailable: [],
     });
   });
+
+  it('does not falsely require Slack or GitHub when mentioned inside quoted Google Docs content', () => {
+    const mysheetsOnlyTools = [...MYSHEETS_TOOLS];
+    const prompt =
+      'Tạo một tài liệu Google Docs mới tên là "Biên bản Họp Sprint Planora" với nội dung: "1. Đã hoàn thành tích hợp Google Docs, Drive, Meet. 2. Đã nâng cấp đọc tin nhắn Slack và danh sách PR GitHub."';
+    expect(routeIntent(prompt, mysheetsOnlyTools, combinedServices)).toEqual({
+      services: ['mysheets'],
+      unavailable: [],
+    });
+  });
 });

@@ -77,9 +77,33 @@ export interface JobReadiness {
   ctaPath: string;
 }
 
+const SERVICE_DISPLAY_NAMES: Record<string, string> = {
+  calendar: 'Google Calendar',
+  mycalendar: 'Google Calendar',
+  sheets: 'Google Sheets',
+  mysheets: 'Google Sheets',
+  gmail: 'Gmail',
+  jira: 'Jira',
+  myjira: 'Jira',
+  github: 'GitHub',
+  trello: 'Trello',
+  slack: 'Slack',
+  myslack: 'Slack',
+  notion: 'Notion',
+  telegram: 'Telegram',
+};
+
+export function formatServiceDisplayName(serviceId: string): string {
+  return SERVICE_DISPLAY_NAMES[serviceId.toLowerCase()] ?? serviceId;
+}
+
+export function formatServiceDisplayList(serviceIds: string[]): string {
+  return serviceIds.map(formatServiceDisplayName).join(', ');
+}
+
 export function matchService(requiredId: string, services: ServiceInfo[]): ServiceInfo | undefined {
   const norm = requiredId.toLowerCase();
-  return services.find((s) => {
+  const candidates = services.filter((s) => {
     const sId = s.id.toLowerCase();
     if (sId === norm) return true;
     if (norm === 'calendar' && (sId === 'mycalendar' || sId === 'calendar')) return true;
@@ -92,6 +116,13 @@ export function matchService(requiredId: string, services: ServiceInfo[]): Servi
     if (norm === 'myslack' && (sId === 'slack' || sId === 'myslack')) return true;
     return false;
   });
+  if (candidates.length === 0) return undefined;
+  return (
+    candidates.find((s) => s.configured && s.id.toLowerCase() === norm) ??
+    candidates.find((s) => s.configured) ??
+    candidates.find((s) => s.id.toLowerCase() === norm) ??
+    candidates[0]
+  );
 }
 
 export function evaluateJobReadiness(
@@ -107,7 +138,11 @@ export function evaluateJobReadiness(
     const matched = matchService(reqId, services);
     if (!matched || !matched.configured || matched.personalStatus === 'not_connected' || matched.personalStatus === 'disconnected') {
       missingServices.push(reqId);
-    } else if (matched.connectionStatus === 'unhealthy' || matched.connected === false || matched.personalStatus === 'reconnect_required') {
+    } else if (
+      matched.connectionStatus === 'unhealthy' ||
+      matched.personalStatus === 'reconnect_required' ||
+      (matched.connected === false && matched.connectionStatus !== 'unchecked' && matched.connectionStatus !== undefined)
+    ) {
       unhealthyServices.push(matched.id);
     } else if (
       matched.personalStatus === 'needs_scope' ||
@@ -127,7 +162,7 @@ export function evaluateJobReadiness(
       missingServices,
       unhealthyServices,
       missingResourceServices,
-      ctaLabel: `Kết nối ${missingServices.join(', ')}`,
+      ctaLabel: `Kết nối ${formatServiceDisplayList(missingServices)}`,
       ctaPath: '/settings',
     };
   }
@@ -139,7 +174,7 @@ export function evaluateJobReadiness(
       missingServices,
       unhealthyServices,
       missingResourceServices,
-      ctaLabel: `Cấp lại quyền ${unhealthyServices.join(', ')}`,
+      ctaLabel: `Cấp lại quyền ${formatServiceDisplayList(unhealthyServices)}`,
       ctaPath: '/settings',
     };
   }
@@ -151,7 +186,7 @@ export function evaluateJobReadiness(
       missingServices,
       unhealthyServices,
       missingResourceServices,
-      ctaLabel: `Chọn tài nguyên cho ${missingResourceServices.join(', ')}`,
+      ctaLabel: `Chọn tài nguyên cho ${formatServiceDisplayList(missingResourceServices)}`,
       ctaPath: '/settings',
     };
   }
@@ -163,7 +198,7 @@ export function evaluateJobReadiness(
       missingServices,
       unhealthyServices,
       missingResourceServices,
-      ctaLabel: `Cấu hình nhóm ${adminServices.join(', ')}`,
+      ctaLabel: `Cấu hình nhóm ${formatServiceDisplayList(adminServices)}`,
       ctaPath: '/settings',
     };
   }

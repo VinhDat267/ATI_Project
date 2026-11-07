@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { createServer } from 'node:http';
 import {
   TrelloOAuthClient,
   TrelloOAuthError,
@@ -15,6 +16,33 @@ const config = {
 };
 
 describe('TrelloOAuthClient', () => {
+  it.each([
+    [400, 'invalid_grant', 'Unknown or invalid refresh token.', 'invalid_grant'],
+    [401, 'invalid_grant', 'Unknown or invalid refresh token.', 'invalid_grant'],
+    [403, 'invalid_grant', 'Unknown or invalid refresh token.', 'invalid_grant'],
+    [403, 'unauthorized_client', 'refresh_token is invalid', 'invalid_grant'],
+    [403, 'unauthorized_client', 'Grant type refresh_token is not allowed for this client.', 'rejected'],
+    [400, 'invalid_request', 'Missing required parameter refresh_token.', 'rejected'],
+    [503, 'invalid_grant', 'Unknown or invalid refresh token.', 'server'],
+  ])('classifies real HTTP %i %s (%s) as %s', async (status, error, description, expectedKind) => {
+    const server = createServer((_req, response) => {
+      response.writeHead(Number(status), { 'Content-Type': 'application/json' });
+      response.end(JSON.stringify({ error, error_description: description }));
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    try {
+      const port = (server.address() as { port: number }).port;
+      const client = new TrelloOAuthClient({ ...config, tokenUrl: `http://127.0.0.1:${port}/token` });
+      await expect(client.refresh('fixture-refresh-token', new AbortController().signal)).rejects.toMatchObject({
+        kind: expectedKind,
+        status,
+      });
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    }
+  });
+
   it('builds authorizationUrl with PKCE S256, required params, exact scope, and no audience', () => {
     const client = new TrelloOAuthClient(config);
     const urlString = client.authorizationUrl({ state: 'state-123', codeChallenge: 'challenge-xyz' });
