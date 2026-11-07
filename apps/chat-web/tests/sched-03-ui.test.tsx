@@ -29,7 +29,7 @@ it('shows only changed fields as old and new and always explains approval', () =
   expect(document.querySelectorAll('del')).toHaveLength(1);
   expect(document.querySelector('del')).toHaveTextContent('Hằng ngày, 08:00');
   expect(screen.getByText('Thứ Hai đến thứ Sáu, 08:30, giờ Việt Nam')).toBeInTheDocument();
-  expect(screen.getByText('Tới giờ, ATI lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.')).toBeInTheDocument();
+  expect(screen.getByText('Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.')).toBeInTheDocument();
 });
 it('ignores a proposal locally without any mutation and editing focuses the composer', () => {
   const edit = vi.fn(); show(proposal, edit);
