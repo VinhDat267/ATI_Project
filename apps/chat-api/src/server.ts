@@ -285,12 +285,21 @@ async function bootstrap() {
     credentialRepo: credRepo,
     mysheetsEnabled: mysheetsAvailable,
     createSheetsDigestAdapter: (serviceId, userId, config, scheduleContext) => {
-      const workspaceMode =
-        scheduleContext?.workspaceMode ??
-        ('workspaceMode' in config ? config.workspaceMode : 'legacy');
-      const workspaceId =
-        scheduleContext?.workspaceId ??
-        ('workspaceId' in config ? config.workspaceId : null);
+      const workspaceMode = scheduleContext
+        ? scheduleContext.workspaceMode
+        : 'workspaceMode' in config
+          ? config.workspaceMode
+          : 'legacy';
+      const workspaceId = scheduleContext
+        ? scheduleContext.workspaceId
+        : 'workspaceId' in config
+          ? config.workspaceId
+          : null;
+      if ('workspaceMode' in config) {
+        if (config.workspaceMode !== workspaceMode || (config.workspaceId ?? null) !== (workspaceId ?? null)) {
+          throw new Error('Schedule workspace context mismatch in createSheetsDigestAdapter');
+        }
+      }
       return (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(serviceId, {
         userId,
         phase: 'execution',

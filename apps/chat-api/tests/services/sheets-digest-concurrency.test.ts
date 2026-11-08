@@ -2,7 +2,7 @@ import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { encryptCredentials, SlackAdapter, type ReadDigestWindowResult } from '@wap/tool-adapters';
+import { encryptCredentials, SlackAdapter, StepError, type ReadDigestWindowResult } from '@wap/tool-adapters';
 import type { SheetsDigestConfigV1, SheetsDigestConfigV2 } from '@wap/tool-schemas';
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
 import {
@@ -494,6 +494,28 @@ describe('Task 3 (PR-3): 0033 DDL, Controlled V1/V2 Runner, Mandatory Pre-Send A
       if (enforceOutcome.status === 'blocked') {
         expect(enforceOutcome.pauseReason).toMatch(/phiên bản cũ \(v1\)/i);
       }
+
+      // Malformed scope guard: workspace_mode = 'organization' with workspace_id = null must fail closed (never downgrade to 'legacy')
+      const compatAllowRunner = new SheetsDigestRunner({
+        pool: db.pool,
+        repo: scheduleRepo,
+        credentialRepo,
+        messageRepo,
+        encryptionKey: DIGEST_TEST_ENC_KEY,
+        mysheetsEnabled: true,
+        v2Mode: 'compat',
+        v1CompatPolicy: 'allow_consistency_candidate',
+        createAdapter: spy.createAdapter,
+      });
+      const malformedOrgRow = { ...row, workspace_mode: 'organization' as const, workspace_id: null };
+      const malformedScopeCheck = await compatAllowRunner.verifyConfigAndScope(malformedOrgRow);
+      expect(malformedScopeCheck.ok).toBe(false);
+      if (!malformedScopeCheck.ok) {
+        expect(malformedScopeCheck.reason).toMatch(/thiếu định danh không gian làm việc hợp lệ/i);
+      }
+      const runId3 = await insertPlanningRun(row.id, row.version, '2026-11-03T03:00:00.000Z');
+      const malformedOutcome = await compatAllowRunner.executeDigest(malformedOrgRow, row.version, runId3);
+      expect(malformedOutcome.status).toBe('blocked');
       expect(spy.getCallCount()).toBe(0);
     });
   });
@@ -1315,6 +1337,59 @@ describe('Task 3 (PR-3): 0033 DDL, Controlled V1/V2 Runner, Mandatory Pre-Send A
         expect(reconciledRun.status).toBe('needs_attention');
         expect(reconciledRun.error).toBe(SHEETS_DELIVERY_UNKNOWN);
         expect(reconciledRun.delivery_started_at).toBeInstanceOf(Date);
+
+        // Scenario D: Post-claim StepError(category=UNKNOWN, statusCode=400) and StepError(category=RATE_LIMIT, statusCode=403, retryable=true) classify as delivery_unknown
+        const rowForStepErrors = (await scheduleRepo.ownedSchedule(sched.id, orgA.member.id))!;
+        let nextPostClaimErr: Error = new StepError({
+          message: 'Contradictory envelope',
+          category: 'UNKNOWN',
+          statusCode: 400,
+          retryable: false,
+        });
+        const stepErrRunner = new SheetsDigestRunner({
+          pool: db.pool,
+          repo: scheduleRepo,
+          credentialRepo,
+          messageRepo,
+          encryptionKey: DIGEST_TEST_ENC_KEY,
+          mysheetsEnabled: true,
+          createAdapter: async (serviceId) => {
+            if (serviceId === 'sheets') {
+              return {
+                execute: async () => ({
+                  headers: ['Hạng mục', 'Trạng thái'],
+                  records: [{ 'Hạng mục': 'KPI A', 'Trạng thái': 'Hoàn thành' }],
+                  values: [['Hạng mục', 'Trạng thái'], ['KPI A', 'Hoàn thành']],
+                }),
+              };
+            }
+            return {
+              execute: async () => {
+                throw nextPostClaimErr;
+              },
+            };
+          },
+        });
+
+        const runD1 = await insertPlanningRun(sched.id, rowForStepErrors.version, '2026-11-03T05:00:00.000Z');
+        const outD1 = await stepErrRunner.executeDigest(rowForStepErrors, rowForStepErrors.version, runD1);
+        expect(outD1).toEqual({
+          status: 'delivery_unknown',
+          error: SHEETS_DELIVERY_UNKNOWN,
+        });
+
+        nextPostClaimErr = new StepError({
+          message: 'Quota exceeded',
+          category: 'RATE_LIMIT',
+          statusCode: 403,
+          retryable: true,
+        });
+        const runD2 = await insertPlanningRun(sched.id, rowForStepErrors.version, '2026-11-03T06:00:00.000Z');
+        const outD2 = await stepErrRunner.executeDigest(rowForStepErrors, rowForStepErrors.version, runD2);
+        expect(outD2).toEqual({
+          status: 'delivery_unknown',
+          error: SHEETS_DELIVERY_UNKNOWN,
+        });
       } finally {
         await new Promise<void>((resolve) => server.close(() => resolve()));
       }

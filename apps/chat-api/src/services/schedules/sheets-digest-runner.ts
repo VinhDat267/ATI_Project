@@ -66,13 +66,13 @@ export type SheetsDigestOutcome =
 export function resolveTrustedScheduleScope(
   schedule: Pick<ScheduleRow, 'workspace_mode' | 'workspace_id'>
 ): SheetsDigestScheduleContext {
-  if (schedule.workspace_mode === 'organization' && schedule.workspace_id) {
-    return { workspaceMode: 'organization', workspaceId: schedule.workspace_id };
+  if (schedule.workspace_mode === 'organization') {
+    return { workspaceMode: 'organization', workspaceId: schedule.workspace_id ?? null };
   }
   if (schedule.workspace_mode === 'personal') {
-    return { workspaceMode: 'personal', workspaceId: null };
+    return { workspaceMode: 'personal', workspaceId: schedule.workspace_id ?? null };
   }
-  return { workspaceMode: 'legacy', workspaceId: null };
+  return { workspaceMode: 'legacy', workspaceId: schedule.workspace_id ?? null };
 }
 
 export function sanitizeSlackDigestText(text: string): string {
@@ -248,7 +248,27 @@ function isDefinitePreAcceptanceRejection(err: unknown): boolean {
     retryable?: boolean;
     category?: string;
     message?: string;
+    details?: Record<string, unknown> | null;
   };
+  if (anyErr.details && typeof anyErr.details === 'object' && anyErr.details.requestSent === false) {
+    return true;
+  }
+  if (anyErr.retryable === true) {
+    return false;
+  }
+  if (
+    typeof anyErr.category === 'string' &&
+    ['NETWORK', 'SERVER_ERROR', 'RATE_LIMIT', 'UNKNOWN', 'TIMEOUT'].includes(anyErr.category)
+  ) {
+    return false;
+  }
+  if (
+    anyErr.retryable === false &&
+    typeof anyErr.category === 'string' &&
+    ['VALIDATION', 'AUTH_ERROR', 'PERMISSION_DENIED', 'NOT_FOUND'].includes(anyErr.category)
+  ) {
+    return true;
+  }
   if (
     typeof anyErr.statusCode === 'number' &&
     [400, 401, 403, 404, 422].includes(anyErr.statusCode)
@@ -256,9 +276,10 @@ function isDefinitePreAcceptanceRejection(err: unknown): boolean {
     return true;
   }
   if (
-    anyErr.retryable === false &&
-    typeof anyErr.category === 'string' &&
-    ['VALIDATION', 'AUTH_ERROR', 'PERMISSION_DENIED', 'NOT_FOUND'].includes(anyErr.category)
+    anyErr.details &&
+    typeof anyErr.details === 'object' &&
+    anyErr.details.ok === false &&
+    typeof anyErr.details.error === 'string'
   ) {
     return true;
   }
@@ -350,6 +371,15 @@ export class SheetsDigestRunner {
     }
 
     const trustedScope = resolveTrustedScheduleScope(schedule);
+    if (
+      trustedScope.workspaceMode === 'organization' &&
+      (!trustedScope.workspaceId || !UUID_RE.test(trustedScope.workspaceId))
+    ) {
+      return { ok: false, reason: 'Lịch Tổ chức thiếu định danh không gian làm việc hợp lệ.' };
+    }
+    if (trustedScope.workspaceMode !== 'organization' && trustedScope.workspaceId !== null) {
+      return { ok: false, reason: 'Phạm vi không gian làm việc của lịch không hợp lệ.' };
+    }
 
     // Branch A: Pinned v2 schedule
     if (isSheetsDigestConfigV2(config)) {
@@ -748,6 +778,7 @@ export class SheetsDigestRunner {
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
+        await client.query("SET LOCAL lock_timeout = '5s'");
 
         // 1. Lock conversation
         await client.query('SELECT id FROM conversations WHERE id = $1 FOR UPDATE', [schedule.conv_id]);
