@@ -134,3 +134,19 @@ Sau khi chuẩn hóa `.endsWith('.list_events')` trong `planner.ts` (giữ nguy�
 ### 07/11/2026 — Xem trước PR rồi Slack
 
 Plan bị hủy trước khi gửi. `github.list_pull_requests` rồi `slack.send_message`. Evidence `github_prs`, `itemCount` 0. 0 execution step.
+
+### 08/11/2026 — Chạy lại một mạch `npm run check` (SHA `b05d49a2`)
+
+Chạy một lần `npm run check` từ đầu đến cuối với `DATABASE_URL=postgres://ati_v3:ati_v3_local_only@127.0.0.1:56534/ati_v3` trên container `ati-pr277-fix-db` tại SHA `b05d49a20b68361f3f63b222f9332d744de5b7c6` (`b05d49a2`): **exit code `0`**.
+- `typecheck:v3`: PASS
+- `@wap/tool-schemas`: 25 files, 579 passed
+- `@wap/tool-adapters`: 22 files, 638 passed + `test:probe` 32 pass
+- `@wap/planner`: 39 files, 555 passed
+- `@wap/executor`: 7 files, 56 passed
+- `@wap/chat-api`: 258 files, 2554 passed
+- `@wap/chat-web`: 114 files, 1198 passed
+- `evaluations` (`test:eval:v3`): 31 files, 500 passed, 1 skipped (501)
+- `build:v3`, `test-v3-web-build-security.mjs`: PASS
+- `test:launcher:v3`: 1 pass, 0 fail
+- `node --test` (6 files): 66 pass, 0 fail
+- Xem log: [`docs/handoff/log/2026-11-08-xsvc-01-full-check.md`](../log/2026-11-08-xsvc-01-full-check.md).
