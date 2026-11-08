@@ -1,4 +1,14 @@
-import type { CalendarDigestDelivery, GithubDigestDelivery, ScheduleRunState, ScheduleRunView, SheetsDigestDelivery, TelegramDigestDelivery } from '@wap/tool-schemas';
+import type {
+  CalendarDigestDelivery,
+  GithubDigestDelivery,
+  NotionDigestDelivery,
+  ScheduleRunDeliveryResolution,
+  ScheduleRunState,
+  ScheduleRunView,
+  SheetsDigestDelivery,
+  TelegramDigestDelivery,
+  TrelloDigestDelivery,
+} from '@wap/tool-schemas';
 
 /** A schedule_runs row joined with the latest plan of its conversation (see RUN_SELECT). */
 export interface RunRow {
@@ -12,7 +22,19 @@ export interface RunRow {
   conv_id: string | null;
   plan_id: string | null;
   error: string | null;
-  delivery?: SheetsDigestDelivery | CalendarDigestDelivery | GithubDigestDelivery | TelegramDigestDelivery | null;
+  delivery?:
+    | SheetsDigestDelivery
+    | CalendarDigestDelivery
+    | GithubDigestDelivery
+    | TelegramDigestDelivery
+    | TrelloDigestDelivery
+    | NotionDigestDelivery
+    | null;
+  delivery_started_at?: Date | string | null;
+  delivery_resolution?: ScheduleRunDeliveryResolution | null;
+  delivery_resolved_at?: Date | string | null;
+  delivery_resolved_by?: string | null;
+  delivery_followup_run_id?: string | null;
   created_at: Date | string;
   latest_plan_id?: string | null;
   plan_status?: string | null;
@@ -23,7 +45,13 @@ export interface RunRow {
  * A run's columns plus the latest plan of its conversation. The member may have
  * changed the first plan in that conversation, so plan_id alone is not the answer.
  */
-export const RUN_SELECT = `SELECT r.*, p.id AS latest_plan_id, p.status AS plan_status, p.expires_at AS plan_expires_at
+export const RUN_SELECT = `SELECT r.*,
+    r.delivery_started_at,
+    r.delivery_resolution,
+    r.delivery_resolved_at,
+    r.delivery_resolved_by,
+    r.delivery_followup_run_id,
+    p.id AS latest_plan_id, p.status AS plan_status, p.expires_at AS plan_expires_at
   FROM schedule_runs r
   LEFT JOIN LATERAL (
     SELECT id, status, expires_at FROM plans
@@ -48,6 +76,13 @@ export function runView(row: RunRow, now: Date): ScheduleRunView {
     convId: row.conv_id, planId: row.latest_plan_id ?? row.plan_id ?? null,
     planStatus: row.plan_status ?? null, error: row.error,
     delivery: row.delivery ?? null,
+    deliveryStartedAt: row.delivery_started_at ? iso(row.delivery_started_at) : null,
+    deliveryResolution: row.delivery_resolution ?? null,
+    deliveryResolvedAt: row.delivery_resolved_at ? iso(row.delivery_resolved_at) : null,
+    deliveryFollowupRunId: row.delivery_followup_run_id ?? null,
   };
   return view;
 }
+
+export const toRunView = runView;
+export const runViewFromRow = runView;

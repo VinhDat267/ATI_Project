@@ -249,6 +249,23 @@ export class ScheduleRepo {
     return res.rows[0] ? (db===this.pool?this.safeRun(res.rows[0]):res.rows[0]) : null;
   }
 
+  async runForUpdate(runId: string, client: pg.PoolClient): Promise<RunRow | null> {
+    if (!isUuid(runId)) return null;
+    const res = await client.query<RunRow>(
+      `SELECT r.*,
+              r.delivery_started_at,
+              r.delivery_resolution,
+              r.delivery_resolved_at,
+              r.delivery_resolved_by,
+              r.delivery_followup_run_id
+       FROM schedule_runs r
+       WHERE r.id = $1
+       FOR UPDATE`,
+      [runId]
+    );
+    return res.rows[0] ?? null;
+  }
+
   private async safeRun(row:any):Promise<any>{
     const schedule=await readScheduleArtifact(this.pool,'schedules',row.schedule_id);
     const safe=await readScheduleArtifact(this.pool,'schedule_runs',row.id);
