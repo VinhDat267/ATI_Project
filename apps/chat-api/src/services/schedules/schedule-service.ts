@@ -1569,7 +1569,7 @@ export class ScheduleService {
         const src = cfg?.source;
         const dest = cfg?.destination;
         const targetId =
-          dest?.service === 'slack'
+          dest && 'channelId' in dest
             ? dest.channelId
             : dest?.service === 'gmail'
               ? dest.recipientEmail
@@ -1577,7 +1577,7 @@ export class ScheduleService {
                 ? dest.chatId
                 : 'unknown';
         const targetLabel =
-          dest?.service === 'slack'
+          dest && 'channelId' in dest
             ? (dest as any).channelLabel ?? dest.channelId
             : dest?.service === 'telegram'
               ? (dest as any).chatLabel ?? dest.chatId
@@ -1586,7 +1586,7 @@ export class ScheduleService {
                 : undefined;
 
         const delivery: SheetsDigestDelivery = {
-          destination: dest?.service ?? 'slack',
+          destination: dest?.service ?? 'telegram',
           targetId,
           ...(targetLabel ? { targetLabel } : {}),
           spreadsheetId: src?.spreadsheetId ?? '',
