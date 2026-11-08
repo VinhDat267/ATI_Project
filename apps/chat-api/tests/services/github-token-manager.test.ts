@@ -29,7 +29,7 @@ describe('GitHubTokenManager', () => {
     expect(markReconnectRequired).toHaveBeenCalledWith('github', 'user-1', 'cred-1');
   });
 
-  it('ignores stale refreshToken when accessToken is a non-expiring gho_ or ghp_ token', async () => {
+  it('ignores stale refreshToken when accessToken is a non-expiring gho_, ghp_, or github_pat_ token', async () => {
     const refresh = vi.fn();
     const rotatePersonalSecret = vi.fn();
     const markReconnectRequired = vi.fn();
@@ -48,6 +48,13 @@ describe('GitHubTokenManager', () => {
     expect(token).toBe('gho_valid_oauth_token');
     expect(refresh).not.toHaveBeenCalled();
     expect(markReconnectRequired).not.toHaveBeenCalled();
+
+    const patProvider = manager.forConnection('user-2', 'cred-2', {
+      accessToken: 'github_pat_valid_fine_grained_token',
+      refreshToken: 'ghr_stale_refresh',
+    });
+    expect(await patProvider.getAccessToken()).toBe('github_pat_valid_fine_grained_token');
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it('refreshes and rotates expiring tokens once under concurrent getAccessToken calls', async () => {

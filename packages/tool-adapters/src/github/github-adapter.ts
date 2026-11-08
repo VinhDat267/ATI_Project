@@ -102,7 +102,27 @@ function githubIssue(value: any, repo: string, writing: boolean, allowPullReques
     });
   }
   if (value.pull_request && !allowPullRequests) validation('GitHub returned a pull request where an issue was required');
-  return { id: String(value.id), number: value.number as number, title: value.title as string, url: value.html_url as string, repo };
+  const createdAt =
+    typeof value.created_at === 'string' && value.created_at.trim()
+      ? value.created_at.trim()
+      : typeof value.createdAt === 'string' && value.createdAt.trim()
+        ? value.createdAt.trim()
+        : undefined;
+  const updatedAt =
+    typeof value.updated_at === 'string' && value.updated_at.trim()
+      ? value.updated_at.trim()
+      : typeof value.updatedAt === 'string' && value.updatedAt.trim()
+        ? value.updatedAt.trim()
+        : undefined;
+  return {
+    id: String(value.id),
+    number: value.number as number,
+    title: value.title as string,
+    url: value.html_url as string,
+    repo,
+    ...(createdAt ? { createdAt } : {}),
+    ...(updatedAt ? { updatedAt } : {}),
+  };
 }
 
 /** GitHub REST adapter. All endpoints are fixed and each target must be on the exact allowlist. */

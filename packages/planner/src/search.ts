@@ -63,6 +63,7 @@ const KEPT_FIELDS = [
   'priority',
   'assignee',
   'issueType',
+  'createdAt',
   'updatedAt',
   'dueDate',
   'listId',
