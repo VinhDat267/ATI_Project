@@ -324,9 +324,9 @@ export class SheetsDigestRunner {
 
   private resolveV1CompatPolicy(): SheetsDigestV1CompatPolicy {
     if (this.options.v1CompatPolicy) return this.options.v1CompatPolicy;
-    return process.env.SHEETS_DIGEST_V1_COMPAT_POLICY === 'strict_pause_all'
-      ? 'strict_pause_all'
-      : 'allow_consistency_candidate';
+    return process.env.SHEETS_DIGEST_V1_COMPAT_POLICY === 'allow_consistency_candidate'
+      ? 'allow_consistency_candidate'
+      : 'strict_pause_all';
   }
 
   private async findCredentialById(

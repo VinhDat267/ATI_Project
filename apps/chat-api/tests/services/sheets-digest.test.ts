@@ -830,6 +830,7 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
       messageRepo,
       encryptionKey: ENC_KEY,
       mysheetsEnabled: true,
+      v1CompatPolicy: 'allow_consistency_candidate',
       createAdapter: async (serviceId) => ({
         execute: async (tool, args) => {
           if (serviceId === 'mysheets') {

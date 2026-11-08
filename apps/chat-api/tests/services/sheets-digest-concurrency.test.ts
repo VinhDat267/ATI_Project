@@ -1,6 +1,8 @@
 import http from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { encryptCredentials, SlackAdapter, StepError, type ReadDigestWindowResult } from '@wap/tool-adapters';
 import type { SheetsDigestConfigV1, SheetsDigestConfigV2 } from '@wap/tool-schemas';
@@ -30,6 +32,7 @@ import {
 } from '../../src/services/schedules/sheets-digest-runner.js';
 
 const TZ = 'Asia/Ho_Chi_Minh';
+const MIGRATIONS_DIR = fileURLToPath(new URL('../../../../db/v3/', import.meta.url));
 const MIGRATION_0033_PATH = fileURLToPath(
   new URL('../../../../db/v3/0033_sheets_digest_v2_remediation.sql', import.meta.url)
 );
@@ -178,6 +181,88 @@ describe('Task 3 (PR-3): 0033 DDL, Controlled V1/V2 Runner, Mandatory Pre-Send A
       await expect(
         db.pool.query("UPDATE schedule_runs SET delivery_resolution = 'bogus' WHERE id = $1", [runId])
       ).rejects.toThrow();
+
+      // Verify upgrading a prior-schema (0001..0032 only) database with pre-existing schedules & schedule_runs rows
+      // and re-applying 0033 idempotently (2nd and 3rd times) with zero data mutation
+      const dbConnStr = process.env.DATABASE_URL || 'postgresql://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3';
+      const priorSchema = `sheets_digest_prior_0032_${randomUUID().replaceAll('-', '')}`;
+      const adminPool = new pg.Pool({ connectionString: dbConnStr });
+      await adminPool.query(`CREATE SCHEMA "${priorSchema}"`);
+      const priorUrl = new URL(dbConnStr);
+      priorUrl.searchParams.set('options', `-c search_path=${priorSchema}`);
+      const priorPool = new pg.Pool({ connectionString: priorUrl.href, max: 4 });
+      try {
+        const files0001To0032 = (await readdir(MIGRATIONS_DIR))
+          .filter((f) => /^\d{4}_.*\.sql$/.test(f) && !f.startsWith('0033_'))
+          .sort();
+        for (const f of files0001To0032) {
+          await priorPool.query(await readFile(`${MIGRATIONS_DIR}/${f}`, 'utf8'));
+        }
+
+        // Seed user, conversation, schedule, and schedule_run on 0001..0032 schema BEFORE 0033
+        const uRes = await priorPool.query<{ id: string }>(
+          `INSERT INTO users (email, name, password, status, email_verified)
+           VALUES ('prior@example.test', 'Prior User', 'hash', 'active', true)
+           RETURNING id`
+        );
+        const uid = uRes.rows[0]!.id;
+        const cRes = await priorPool.query<{ id: string }>(
+          `INSERT INTO conversations (user_id, status, title, workspace_mode)
+           VALUES ($1, 'chatting', 'Prior Conv', 'personal')
+           RETURNING id`,
+          [uid]
+        );
+        const cid = cRes.rows[0]!.id;
+        const sInserted = await insertTestSheetsDigestSchedule(priorPool, {
+          userId: uid,
+          convId: cid,
+          workspaceMode: 'personal',
+          workspaceId: null,
+          digestConfig: v1Config as unknown as Record<string, unknown>,
+        });
+        const sid = sInserted.id;
+        const rRes = await priorPool.query<{ id: string }>(
+          `INSERT INTO schedule_runs (schedule_id, schedule_version, trigger, due_at, status)
+           VALUES ($1, 1, 'scheduled', '2026-11-03T01:00:00Z', 'planning')
+           RETURNING id`,
+          [sid]
+        );
+        const rid = rRes.rows[0]!.id;
+
+        const priorSchedBefore = (await priorPool.query('SELECT * FROM schedules WHERE id = $1', [sid])).rows;
+        const priorRunBefore = (
+          await priorPool.query(
+            'SELECT id, schedule_id, schedule_version, status FROM schedule_runs WHERE id = $1',
+            [rid]
+          )
+        ).rows;
+
+        // Apply 0033 1st, 2nd, and 3rd times on prior-schema DB
+        await priorPool.query(ddlSql);
+        await priorPool.query(ddlSql);
+        await priorPool.query(ddlSql);
+
+        const priorSchedAfter = (await priorPool.query('SELECT * FROM schedules WHERE id = $1', [sid])).rows;
+        const priorRunAfter = (
+          await priorPool.query(
+            'SELECT id, schedule_id, schedule_version, status, delivery_started_at, delivery_resolution, delivery_resolved_at, delivery_resolved_by, delivery_followup_run_id FROM schedule_runs WHERE id = $1',
+            [rid]
+          )
+        ).rows;
+        expect(priorSchedAfter).toEqual(priorSchedBefore);
+        expect(priorRunAfter[0]).toMatchObject({
+          ...priorRunBefore[0],
+          delivery_started_at: null,
+          delivery_resolution: null,
+          delivery_resolved_at: null,
+          delivery_resolved_by: null,
+          delivery_followup_run_id: null,
+        });
+      } finally {
+        await priorPool.end();
+        await adminPool.query(`DROP SCHEMA IF EXISTS "${priorSchema}" CASCADE`);
+        await adminPool.end();
+      }
     });
   });
 
@@ -263,7 +348,104 @@ describe('Task 3 (PR-3): 0033 DDL, Controlled V1/V2 Runner, Mandatory Pre-Send A
   });
 
   describe('3. TC-13a & TC-23: Controlled V1 Compatibility Mode vs Strict Pause & Enforce Mode', () => {
-    it('allows Class A (v1_pinned_consistency_candidate) on default PR-3 deploy while failing closed on all Class B v1 schedules with 0 sends', async () => {
+    it('fails closed on BOTH Class A and Class B v1 schedules by default (v1CompatPolicy=strict_pause_all) with 0 sends', async () => {
+      const { personalA, orgA, credentialRepo } = fixtures;
+      const spy = createDigestProviderSpy();
+
+      // 1. Class A (v1_pinned_consistency_candidate, evidenceBoundary: consistency_only_not_config_immutability_proof)
+      const classASched = await insertTestSheetsDigestSchedule(db.pool, {
+        userId: personalA.user.id,
+        convId: personalA.conversation.id,
+        workspaceMode: 'personal',
+        workspaceId: null,
+        digestApprovedAt: new Date('2026-11-02T00:00:00.000Z'),
+        nextRunAt: new Date('2026-11-03T01:00:00.000Z'),
+        digestConfig: {
+          version: 1,
+          source: {
+            service: 'mysheets',
+            credentialId: personalA.mysheetsCred.id,
+            email: personalA.email,
+            spreadsheetId: personalA.spreadsheetId,
+            spreadsheetTitle: personalA.spreadsheetTitle,
+            tailRows: 20,
+          },
+          destination: {
+            service: 'gmail',
+            credentialId: personalA.gmailCred.id,
+            recipientEmail: 'ceo@company.test',
+          },
+          includeAiSummary: false,
+        },
+      });
+
+      // 2. Class B (v1_unpinned_fail_closed): Organization v1 schedule (sheets -> slack)
+      const classBOrgSched = await insertTestSheetsDigestSchedule(db.pool, {
+        userId: orgA.member.id,
+        convId: orgA.conversation.id,
+        workspaceMode: 'organization',
+        workspaceId: orgA.workspaceId,
+        digestApprovedAt: new Date('2026-11-02T00:00:00.000Z'),
+        nextRunAt: new Date('2026-11-03T01:00:00.000Z'),
+        digestConfig: {
+          version: 1,
+          source: {
+            service: 'sheets',
+            spreadsheetId: orgA.spreadsheetId,
+            spreadsheetTitle: orgA.spreadsheetTitle,
+            tailRows: 20,
+          },
+          destination: {
+            service: 'slack',
+            channelId: orgA.slackChannelId,
+          },
+          includeAiSummary: false,
+        },
+      });
+
+      let runner!: ScheduleRunner;
+      const service = new ScheduleService({
+        pool: db.pool,
+        timeZone: TZ,
+        runner: { planNow: (runId) => runner.planNow(runId) },
+        credentialRepo,
+        encryptionKey: DIGEST_TEST_ENC_KEY,
+        mysheetsEnabled: true,
+      });
+      // Default SheetsDigestRunner (no v1CompatPolicy passed, SHEETS_DIGEST_V1_COMPAT_POLICY unset -> 'strict_pause_all')
+      const defaultDigestRunner = new SheetsDigestRunner({
+        pool: db.pool,
+        repo: scheduleRepo,
+        credentialRepo,
+        messageRepo,
+        encryptionKey: DIGEST_TEST_ENC_KEY,
+        mysheetsEnabled: true,
+        createAdapter: spy.createAdapter,
+      });
+      runner = new ScheduleRunner({
+        pool: db.pool,
+        timeZone: TZ,
+        planRun: vi.fn() as any,
+        recordState: (client, row, now) => service.recordState(client, row, now),
+        sheetsDigestRunner: defaultDigestRunner,
+        now: () => new Date('2026-11-03T01:00:05.000Z'),
+      });
+
+      await runner.tick();
+
+      // Both Class A and Class B must be paused under default strict_pause_all with 0 sends
+      const classAAfter = await scheduleRepo.ownedSchedule(classASched.id, personalA.user.id);
+      expect(classAAfter?.status).toBe('paused');
+      expect(classAAfter?.pause_reason).toMatch(/cấp quyền lại \(v2\)/i);
+
+      const classBOrgAfter = await scheduleRepo.ownedSchedule(classBOrgSched.id, orgA.member.id);
+      expect(classBOrgAfter?.status).toBe('paused');
+      expect(classBOrgAfter?.pause_reason).toMatch(/cấp quyền lại \(v2\)/i);
+
+      expect(spy.getCallCount()).toBe(0);
+    });
+
+    it('allows Class A (v1_pinned_consistency_candidate) only under explicit v1CompatPolicy=allow_consistency_candidate while failing closed on all Class B v1 schedules with 0 sends', async () => {
       const { personalA, personalB, orgA, credentialRepo } = fixtures;
       const spy = createDigestProviderSpy();
 
@@ -392,6 +574,7 @@ describe('Task 3 (PR-3): 0033 DDL, Controlled V1/V2 Runner, Mandatory Pre-Send A
         messageRepo,
         encryptionKey: DIGEST_TEST_ENC_KEY,
         mysheetsEnabled: true,
+        v1CompatPolicy: 'allow_consistency_candidate',
         createAdapter: spy.createAdapter,
       });
       runner = new ScheduleRunner({
@@ -428,9 +611,27 @@ describe('Task 3 (PR-3): 0033 DDL, Controlled V1/V2 Runner, Mandatory Pre-Send A
       expect(spy.getCallCount({ service: 'gmail', credentialId: personalB.gmailCred.id })).toBe(0);
     });
 
-    it('blocks and pauses even Class A v1 schedules when v1CompatPolicy=strict_pause_all or v2Mode=enforce is active', async () => {
-      const { personalA, credentialRepo } = fixtures;
+    it('proves policy switch (strict_pause_all <-> allow_consistency_candidate) never upgrades digest_config to v2, never unpauses paused schedules, and never revives revoked/rotated credentials, and blocks enforce mode or malformed scope', async () => {
+      const { personalA, personalB, credentialRepo } = fixtures;
       const spy = createDigestProviderSpy();
+
+      const classAConfig: SheetsDigestConfigV1 = {
+        version: 1,
+        source: {
+          service: 'mysheets',
+          credentialId: personalA.mysheetsCred.id,
+          email: personalA.email,
+          spreadsheetId: personalA.spreadsheetId,
+          spreadsheetTitle: personalA.spreadsheetTitle,
+          tailRows: 20,
+        },
+        destination: {
+          service: 'gmail',
+          credentialId: personalA.gmailCred.id,
+          recipientEmail: 'ceo@company.test',
+        },
+        includeAiSummary: false,
+      };
 
       const classASched = await insertTestSheetsDigestSchedule(db.pool, {
         userId: personalA.user.id,
@@ -439,44 +640,108 @@ describe('Task 3 (PR-3): 0033 DDL, Controlled V1/V2 Runner, Mandatory Pre-Send A
         workspaceId: null,
         digestApprovedAt: new Date('2026-11-02T00:00:00.000Z'),
         nextRunAt: new Date('2026-11-03T01:00:00.000Z'),
+        digestConfig: classAConfig as unknown as Record<string, unknown>,
+      });
+
+      // Step 1: Under default strict_pause_all, ScheduleRunner.tick() pauses Class A and never mutates digest_config
+      let activePolicy: 'strict_pause_all' | 'allow_consistency_candidate' = 'strict_pause_all';
+      let runner!: ScheduleRunner;
+      const service = new ScheduleService({
+        pool: db.pool,
+        timeZone: TZ,
+        runner: { planNow: (runId) => runner.planNow(runId) },
+        credentialRepo,
+        encryptionKey: DIGEST_TEST_ENC_KEY,
+        mysheetsEnabled: true,
+      });
+      const makeRunnerForPolicy = (policy: 'strict_pause_all' | 'allow_consistency_candidate') =>
+        new SheetsDigestRunner({
+          pool: db.pool,
+          repo: scheduleRepo,
+          credentialRepo,
+          messageRepo,
+          encryptionKey: DIGEST_TEST_ENC_KEY,
+          mysheetsEnabled: true,
+          v2Mode: 'compat',
+          v1CompatPolicy: policy,
+          createAdapter: spy.createAdapter,
+        });
+
+      runner = new ScheduleRunner({
+        pool: db.pool,
+        timeZone: TZ,
+        planRun: vi.fn() as any,
+        recordState: (client, row, now) => service.recordState(client, row, now),
+        sheetsDigestRunner: makeRunnerForPolicy(activePolicy),
+        now: () => new Date('2026-11-03T01:00:05.000Z'),
+      });
+
+      await runner.tick();
+
+      const afterStrictPause = (await scheduleRepo.ownedSchedule(classASched.id, personalA.user.id))!;
+      expect(afterStrictPause.status).toBe('paused');
+      expect((afterStrictPause.digest_config as any)?.version).toBe(1);
+      expect(afterStrictPause.digest_config_hash).toBe(classASched.digest_config_hash);
+      expect(spy.getCallCount()).toBe(0);
+
+      // Step 2: Switching policy to 'allow_consistency_candidate' NEVER unpauses an already-paused schedule or upgrades digest_config to v2
+      activePolicy = 'allow_consistency_candidate';
+      const allowDigestRunner = makeRunnerForPolicy(activePolicy);
+      const runnerWithAllow = new ScheduleRunner({
+        pool: db.pool,
+        timeZone: TZ,
+        planRun: vi.fn() as any,
+        recordState: (client, row, now) => service.recordState(client, row, now),
+        sheetsDigestRunner: allowDigestRunner,
+        now: () => new Date('2026-11-03T02:00:05.000Z'),
+      });
+      await runnerWithAllow.tick();
+
+      const stillPaused = (await scheduleRepo.ownedSchedule(classASched.id, personalA.user.id))!;
+      expect(stillPaused.status).toBe('paused');
+      expect((stillPaused.digest_config as any)?.version).toBe(1);
+      expect(spy.getCallCount()).toBe(0);
+
+      // Step 3: Even on an active schedule, allow_consistency_candidate executes without upgrading digest_config to v2,
+      // and NEVER revives a schedule whose credential was revoked (reconnect_required) or rotated
+      const activeClassBRevoked = await insertTestSheetsDigestSchedule(db.pool, {
+        userId: personalB.user.id,
+        convId: personalB.conversation.id,
+        workspaceMode: 'personal',
+        workspaceId: null,
+        digestApprovedAt: new Date('2026-11-02T00:00:00.000Z'),
+        nextRunAt: new Date('2026-11-03T02:00:00.000Z'),
         digestConfig: {
           version: 1,
           source: {
             service: 'mysheets',
-            credentialId: personalA.mysheetsCred.id,
-            email: personalA.email,
-            spreadsheetId: personalA.spreadsheetId,
-            spreadsheetTitle: personalA.spreadsheetTitle,
+            credentialId: personalB.mysheetsCred.id,
+            email: personalB.email,
+            spreadsheetId: personalB.spreadsheetId,
+            spreadsheetTitle: personalB.spreadsheetTitle,
             tailRows: 20,
           },
           destination: {
             service: 'gmail',
-            credentialId: personalA.gmailCred.id,
-            recipientEmail: 'ceo@company.test',
+            credentialId: personalB.gmailCred.id,
+            recipientEmail: 'cfo@company.test',
           },
           includeAiSummary: false,
         },
       });
+      await credentialRepo.markReconnectRequired('gmail', personalB.user.id, personalB.gmailCred.id);
+      const revokedRow = (await scheduleRepo.ownedSchedule(activeClassBRevoked.id, personalB.user.id))!;
+      const runRevoked = await insertPlanningRun(revokedRow.id, revokedRow.version, '2026-11-03T02:00:00.000Z');
+      const revokedOutcome = await allowDigestRunner.executeDigest(revokedRow, revokedRow.version, runRevoked);
+      expect(revokedOutcome.status).toBe('blocked');
+      expect(spy.getCallCount()).toBe(0);
 
-      const strictRunner = new SheetsDigestRunner({
-        pool: db.pool,
-        repo: scheduleRepo,
-        credentialRepo,
-        messageRepo,
-        encryptionKey: DIGEST_TEST_ENC_KEY,
-        mysheetsEnabled: true,
-        v2Mode: 'compat',
-        v1CompatPolicy: 'strict_pause_all',
-        createAdapter: spy.createAdapter,
-      });
+      // Step 4: v2Mode=enforce blocks Class A even when v1CompatPolicy=allow_consistency_candidate
+      await db.pool.query(
+        "UPDATE schedules SET status = 'active', pause_reason = NULL, next_run_at = '2026-11-03T02:30:00.000Z' WHERE id = $1",
+        [classASched.id]
+      );
       const row = (await scheduleRepo.ownedSchedule(classASched.id, personalA.user.id))!;
-      const runId1 = await insertPlanningRun(row.id, row.version, '2026-11-03T01:00:00.000Z');
-      const strictOutcome = await strictRunner.executeDigest(row, row.version, runId1);
-      expect(strictOutcome.status).toBe('blocked');
-      if (strictOutcome.status === 'blocked') {
-        expect(strictOutcome.pauseReason).toMatch(/cấp quyền lại \(v2\)/i);
-      }
-
       const enforceRunner = new SheetsDigestRunner({
         pool: db.pool,
         repo: scheduleRepo,
@@ -488,33 +753,22 @@ describe('Task 3 (PR-3): 0033 DDL, Controlled V1/V2 Runner, Mandatory Pre-Send A
         v1CompatPolicy: 'allow_consistency_candidate',
         createAdapter: spy.createAdapter,
       });
-      const runId2 = await insertPlanningRun(row.id, row.version, '2026-11-03T02:00:00.000Z');
+      const runId2 = await insertPlanningRun(row.id, row.version, '2026-11-03T02:30:00.000Z');
       const enforceOutcome = await enforceRunner.executeDigest(row, row.version, runId2);
       expect(enforceOutcome.status).toBe('blocked');
       if (enforceOutcome.status === 'blocked') {
         expect(enforceOutcome.pauseReason).toMatch(/phiên bản cũ \(v1\)/i);
       }
 
-      // Malformed scope guard: workspace_mode = 'organization' with workspace_id = null must fail closed (never downgrade to 'legacy')
-      const compatAllowRunner = new SheetsDigestRunner({
-        pool: db.pool,
-        repo: scheduleRepo,
-        credentialRepo,
-        messageRepo,
-        encryptionKey: DIGEST_TEST_ENC_KEY,
-        mysheetsEnabled: true,
-        v2Mode: 'compat',
-        v1CompatPolicy: 'allow_consistency_candidate',
-        createAdapter: spy.createAdapter,
-      });
+      // Step 5: Malformed scope guard: workspace_mode = 'organization' with workspace_id = null must fail closed (never downgrade to 'legacy')
       const malformedOrgRow = { ...row, workspace_mode: 'organization' as const, workspace_id: null };
-      const malformedScopeCheck = await compatAllowRunner.verifyConfigAndScope(malformedOrgRow);
+      const malformedScopeCheck = await allowDigestRunner.verifyConfigAndScope(malformedOrgRow);
       expect(malformedScopeCheck.ok).toBe(false);
       if (!malformedScopeCheck.ok) {
         expect(malformedScopeCheck.reason).toMatch(/thiếu định danh không gian làm việc hợp lệ/i);
       }
       const runId3 = await insertPlanningRun(row.id, row.version, '2026-11-03T03:00:00.000Z');
-      const malformedOutcome = await compatAllowRunner.executeDigest(malformedOrgRow, row.version, runId3);
+      const malformedOutcome = await allowDigestRunner.executeDigest(malformedOrgRow, row.version, runId3);
       expect(malformedOutcome.status).toBe('blocked');
       expect(spy.getCallCount()).toBe(0);
     });
@@ -1143,6 +1397,105 @@ describe('Task 3 (PR-3): 0033 DDL, Controlled V1/V2 Runner, Mandatory Pre-Send A
         await lockClient.query('ROLLBACK').catch(() => undefined);
         lockClient.release();
       }
+    });
+
+    it('Linearization boundary (T_claim < T_revoke vs T_revoke < T_claim): revocation during in-flight post-claim HTTP send commits immediately without DB lock contention, allows the 1 already-claimed send to complete, and blocks any subsequent run with 0 sends', async () => {
+      const { personalA, credentialRepo } = fixtures;
+      const sendBarrier = createBarrier();
+      let gmailSendCalls = 0;
+
+      const v2Config: SheetsDigestConfigV2 = {
+        version: 2,
+        workspaceMode: 'personal',
+        workspaceId: null,
+        source: {
+          service: 'mysheets',
+          credentialId: personalA.mysheetsCred.id,
+          email: personalA.email,
+          spreadsheetId: personalA.spreadsheetId,
+          spreadsheetTitle: personalA.spreadsheetTitle,
+          tailRows: 20,
+        },
+        destination: {
+          service: 'gmail',
+          credentialId: personalA.gmailCred.id,
+          senderEmail: personalA.email,
+          recipientEmail: 'ceo@company.test',
+        },
+        includeAiSummary: false,
+      };
+
+      const sched = await insertTestSheetsDigestSchedule(db.pool, {
+        userId: personalA.user.id,
+        convId: personalA.conversation.id,
+        workspaceMode: 'personal',
+        workspaceId: null,
+        digestConfig: v2Config as unknown as Record<string, unknown>,
+      });
+
+      const digestRunner = new SheetsDigestRunner({
+        pool: db.pool,
+        repo: scheduleRepo,
+        credentialRepo,
+        messageRepo,
+        encryptionKey: DIGEST_TEST_ENC_KEY,
+        mysheetsEnabled: true,
+        createAdapter: async (serviceId) => {
+          if (serviceId === 'mysheets') {
+            return {
+              execute: async () => ({
+                headers: ['Task', 'Status'],
+                records: [{ Task: 'Item 1', Status: 'Done' }],
+                values: [['Task', 'Status'], ['Item 1', 'Done']],
+              }),
+            };
+          }
+          return {
+            execute: async () => {
+              await sendBarrier.wait();
+              gmailSendCalls++;
+              return { id: 'gmail-msg-linear-1', threadId: 'th-linear-1' };
+            },
+          };
+        },
+      });
+
+      const row = (await scheduleRepo.ownedSchedule(sched.id, personalA.user.id))!;
+      const run1Id = await insertPlanningRun(row.id, row.version, '2026-11-03T01:00:00.000Z');
+
+      // Start Run 1; wait until claimSheetsDigestDelivery has committed delivery_started_at and destAdapter.execute is in flight
+      const run1Promise = digestRunner.executeDigest(row, row.version, run1Id);
+      await sendBarrier.reached;
+
+      // Verify delivery_started_at is already committed in PostgreSQL (T_claim)
+      const claimedRunRow = (
+        await db.pool.query('SELECT delivery_started_at FROM schedule_runs WHERE id = $1', [run1Id])
+      ).rows[0];
+      expect(claimedRunRow.delivery_started_at).toBeInstanceOf(Date);
+
+      // Now execute credential revocation at T_revoke > T_claim while outbound HTTP call is still paused on sendBarrier
+      const revokeStartMs = Date.now();
+      const revoked = await credentialRepo.markReconnectRequired(
+        'gmail',
+        personalA.user.id,
+        personalA.gmailCred.id
+      );
+      const revokeElapsedMs = Date.now() - revokeStartMs;
+      expect(revoked).toBe(true);
+      // Zero DB locks are held during outbound HTTP send, so revocation commits immediately without blocking
+      expect(revokeElapsedMs).toBeLessThan(1000);
+
+      // Release in-flight HTTP send: Run 1 (admitted at T_claim < T_revoke) completes its single send
+      sendBarrier.release();
+      const run1Outcome = await run1Promise;
+      expect(run1Outcome.status).toBe('digest_sent');
+      expect(gmailSendCalls).toBe(1);
+
+      // Subsequent Run 2 (T_revoke < T_claim_2) fails closed ('blocked') with 0 additional sends
+      const run2Id = await insertPlanningRun(row.id, row.version, '2026-11-03T02:00:00.000Z');
+      const run2Outcome = await digestRunner.executeDigest(row, row.version, run2Id);
+      expect(run2Outcome.status).toBe('blocked');
+      expect(gmailSendCalls).toBe(1);
     });
   });
 
