@@ -2004,6 +2004,10 @@ export class ChatService {
     if (lastMemory?.metadata?.state && typeof lastMemory.metadata.state === 'object') {
       memory.fromJSON(lastMemory.metadata.state);
     }
+    const connectedGmail = await this.gmailConnection?.(userId).catch(() => null);
+    if (typeof connectedGmail?.email === 'string' && connectedGmail.email.trim()) {
+      memory.setEntity('gmail_account', { email: connectedGmail.email.trim() });
+    }
     const previousState = structuredClone(memory.toJSON());
     if (slackContext) await this.msgRepo.inSlackTransaction(conversationId, slackContext, async () => undefined, undefined, 'planning');
     const actor = await this.actorForConversation(conversationId, userId);

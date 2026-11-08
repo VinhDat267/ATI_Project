@@ -42,9 +42,13 @@ function resolveNaturalWindowFromQuery(rawQuery: unknown, now = new Date()): { t
   const endDate = isWeek ? new Date(baseDate.getTime() + 6 * 86_400_000) : baseDate;
   const s = vnParts(baseDate);
   const e = vnParts(endDate);
+  const end = new Date(Date.UTC(Number(e.year), Number(e.month) - 1, Number(e.day)));
+  end.setUTCDate(end.getUTCDate() + 1);
+  const endMonth = String(end.getUTCMonth() + 1).padStart(2, '0');
+  const endDay = String(end.getUTCDate()).padStart(2, '0');
   return {
     timeMin: `${s.year}-${s.month}-${s.day}T00:00:00+07:00`,
-    timeMax: `${e.year}-${e.month}-${e.day}T23:59:59+07:00`,
+    timeMax: `${end.getUTCFullYear()}-${endMonth}-${endDay}T00:00:00+07:00`,
   };
 }
 
@@ -565,6 +569,12 @@ export class PersonalCalendarAdapter extends BaseAdapter {
           ),
           true
         );
+        if (isScheduleMeet && !created.meetLink) {
+          throw new StepError({
+            message: 'Calendar created the event without a Meet link',
+            category: 'UNKNOWN',
+          });
+        }
         return created;
       }
 

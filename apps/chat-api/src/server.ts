@@ -908,6 +908,7 @@ async function bootstrap() {
     jiraLeaseManager: jiraLeaseManager ?? undefined,
     jiraNativeVerifier: jiraNativeVerifier ?? undefined,
     reportEvidenceStore,
+    enforceReportGrounding: true,
   });
 
   if (!env.EMAIL_ENABLED) console.warn('\x1b[33m[chat-api] Chưa cấu hình SMTP: đăng ký, xác minh email và quên mật khẩu tạm tắt (503).\x1b[0m');

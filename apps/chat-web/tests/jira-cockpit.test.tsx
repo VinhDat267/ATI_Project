@@ -525,7 +525,7 @@ describe('JIRA-09B: Jira Cockpit UI integration', () => {
     expect(screen.getByText('1 bình luận')).toBeInTheDocument();
     unmount();
 
-    render(
+    const transition = render(
       <ReceiptMoment
         request="Chuyển trạng thái ENG-42"
         steps={[
@@ -558,6 +558,35 @@ describe('JIRA-09B: Jira Cockpit UI integration', () => {
     );
 
     expect(screen.getByTestId('myjira-receipt-metrics')).toHaveTextContent('🔄 Trạng thái: In Progress → Done');
+    transition.unmount();
+
+    render(
+      <ReceiptMoment
+        request="Chuyển trạng thái ENG-42"
+        steps={[
+          {
+            id: 's1',
+            tool: 'myjira.transition_issue',
+            description: 'Chuyển ENG-42 sang Done',
+            status: 'succeeded',
+            output: { siteId: 'site-1', id: '10042', key: 'ENG-42', status: 'Done', url: 'https://acme.atlassian.net/browse/ENG-42' },
+          },
+        ]}
+        planSteps={[
+          {
+            id: 's1',
+            tool: 'myjira.transition_issue',
+            description: 'Chuyển ENG-42 sang Done',
+            args: { siteId: 'site-1', issueKey: 'ENG-42', status: 'Done' },
+          },
+        ]}
+        services={[{ id: 'myjira', name: 'Atlassian Jira', connected: true, configured: true }]}
+        destination={resourceDestination}
+        onNewConversation={() => {}}
+        onFollowup={() => {}}
+      />
+    );
+    expect(screen.getByTestId('myjira-receipt-metrics')).toHaveTextContent('🔄 Trạng thái: Done');
   });
 
   it('supports Vietnamese recovery labels, Moment 8 check link, ScheduleMoment myjira_digest, and Guide OAuth card', () => {

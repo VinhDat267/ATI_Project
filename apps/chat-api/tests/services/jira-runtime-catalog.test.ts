@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import { WorkingMemory } from '@wap/planner';
+import { routeIntent, WorkingMemory } from '@wap/planner';
 import { MYJIRA_SERVICE, MYJIRA_TOOLS, type PlanResponse } from '@wap/tool-schemas';
 import {
   serviceRegistryForRuntime,
@@ -75,6 +75,34 @@ describe('JIRA-08 Runtime Catalog, Factory, Legacy Route Lock & Resource Labels'
       MYJIRA_TOOLS.map((t) => t.name)
     );
   });
+
+  it.each(['four_service', 'five_service', 'nine_service'])(
+    'sandbox scenario %s still routes Jira to jira.create_issue when MyJira is enabled',
+    async (scenario) => {
+      const previous = process.env.SANDBOX_SCENARIO;
+      process.env.SANDBOX_SCENARIO = scenario;
+      try {
+        const catalog = await runtimeToolCatalog('sandbox', fakeCredRepo, '0'.repeat(64), {
+          userId: 'user-1',
+          workspaceMode: 'personal',
+          workspaceId: 'personal-1',
+          gmailEnabled: true,
+          myjiraEnabled: true,
+          jiraWorkspaceRepo: {
+            getCapabilities: async () => ({ sites: [{ siteId: 'site-1' }] }),
+          },
+        });
+        const registry = serviceRegistryForRuntime(true, false, false, true);
+        const route = routeIntent('Tạo ticket sự cố trên Jira và báo Slack', catalog, registry);
+        expect(catalog.some((tool) => tool.name === 'jira.create_issue')).toBe(true);
+        expect(route.unavailable).toEqual([]);
+        expect(route.services).toContain('jira');
+      } finally {
+        if (previous === undefined) delete process.env.SANDBOX_SCENARIO;
+        else process.env.SANDBOX_SCENARIO = previous;
+      }
+    },
+  );
 
   it('routes myjira to personal adapter factory even in sandbox mode', async () => {
     const personal = vi.fn().mockResolvedValue({ execute: vi.fn() });

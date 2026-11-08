@@ -1,0 +1,136 @@
+# XSVC-01 · Kiểm toán liên dịch vụ
+
+**Trạng thái:** Kiểm toán liên dịch vụ đã ghi trên nhánh. Notion và Trello đã đọc live, 0 plan. · **Nhánh:** `docs/xsvc-01-cross-service-audit`
+
+## Mục tiêu
+
+Đối chiếu cách các dịch vụ truyền dữ liệu cho nhau và ghi bug có tái hiện. Không kiểm lại từng adapter. Không coi Playwright `nine_service` là đã đóng kiểm toán.
+
+## Pha
+
+- [x] **Pha 0.** Bản đồ 12 dịch vụ, 95 tool, placeholder của plan sandbox, và lệch với sáu việc demo. Xem [inventory](../../audits/2026-11-07-cross-service/INVENTORY.md).
+- [x] **Pha 1, F1–F3.** Test đỏ rồi sửa.
+- [x] **Pha 1, phần còn lại.** Cổng duyệt báo cáo mặc định bật. Resolver từ chối `htmlUrl` khi template hỏi `url`.
+- [x] **Pha 2, browser.** `nine_service` pass sau khi sửa F7.
+- [x] **Pha 2, đọc live.** Sau F8, `github.list_pull_requests` chạy thật, `resultCount` 0, 0 plan, 0 execution step.
+- [x] **Pha 3.** `FINDINGS.md` và `SEAM-MATRIX.md` đã ghi. Notion và Trello đã đọc live sau khi cấu hình lại.
+
+## Kết quả pha 0 (07/11/2026)
+
+- Ba plan sandbox không có placeholder nào thiếu khóa schema. `trello.create_card.url` là optional.
+- F1: `mysheets.create_doc` chỉ vào catalog khi đã chọn ít nhất một bảng tính. UI `scope_required` cũng đòi bảng tính. Default `folderId` không đủ cho OFF-02.
+- F2: adapter Trello đổi `url` thiếu thành `''`. Bước sau vẫn gửi được chuỗi rỗng.
+- F3: `schedule_meet` có thể trả output không có `meetLink`. Template bước sau sẽ lỗi sau khi sự kiện đã tạo.
+- F4: biên nhận transition tìm `newStatus`; schema có `status`.
+- F5: `timeMax` 23:59:59 còn trong `resolveNaturalWindowFromQuery`.
+- `ExecutionService` trong `server.ts` không bật `enforceReportGrounding`. `ChatService` bật lúc lưu plan. Pha 1 phải kiểm lượt lịch.
+- Pha 0 commit `fa24e150`.
+
+### 07/11/2026 — Pha 1, F1–F3
+
+Test mới fail trước khi sửa, rồi pass.
+
+- **F1.** OAuth MySheets còn active mà chưa chọn bảng tính: catalog có sáu tool Docs/Drive (`list_drive_files`, `create_drive_folder`, `create_doc`, `get_doc`, `append_doc_text`, `move_drive_file`) và không có `read_range`, `append_rows`, `create_sheet`. `bindConnections` nhận plan `create_doc`. `AdapterFactory` dựng adapter với `spreadsheets: []`. OFF-02 coi `scope_required` của mysheets là đủ; OFF-03 vẫn chưa sẵn sàng. Trạng thái API `scope_required` giữ nguyên.
+- **F2.** `trello.create_card` thiếu `url` ném `UNKNOWN` sau khi Trello đã tạo thẻ. Không trả `url: ''`.
+- **F3.** `mycalendar.schedule_meet` thiếu Meet link ném `UNKNOWN` sau khi sự kiện đã tạo.
+
+Lệnh, đều exit 0:
+
+- `npx vitest run tests/routes/mysheets-services.test.ts tests/services/adapter-factory.test.ts tests/services/mysheets-backend.test.ts --dir apps/chat-api` — 43 passed.
+- `npx vitest run tests/trello-write.test.ts tests/calendar/personal-calendar-adapter.test.ts --dir packages/tool-adapters` — 32 passed.
+- `npx vitest run tests/services/job-readiness.test.tsx --dir apps/chat-web` — 7 passed.
+
+Chưa chạy `npm run check`, chưa chạy live, chưa làm F4/F5.
+
+### 07/11/2026 — Pha 1, cổng duyệt và khóa `url`
+
+- Test mới `constructed without the grounding flag` fail trước khi sửa: `approveAndStart` trả `success: true`, status 200. Sau khi mặc định `enforceReportGrounding` là bật và `server.ts` truyền `true`: trả 409, plan còn `pending`, adapter không được gọi.
+- `report-evidence.test.ts`: 12/12 pass trên PostgreSQL loopback cổng 56534.
+- Resolver: output chỉ có `htmlUrl` làm `${issue.output.url}` ném `property 'output.url' not found`. Test này xanh trước khi sửa resolver.
+- `npm test -w @wap/chat-api` với `DATABASE_URL` cổng 56534: 2474 pass, 1 fail. Fail là timeout 5s của `conversation-history.integration.test.ts` ca phân trang 57 dòng. Chạy lại riêng file đó: 8/8 pass, ca đó 1397ms. Không phải hồi quy cổng báo cáo.
+- `npx vitest run --dir packages/executor`: 56/56 pass.
+- Ma trận và phát hiện: `docs/audits/2026-11-07-cross-service/SEAM-MATRIX.md`, `FINDINGS.md`.
+
+### 07/11/2026 — Pha 2, browser nine_service
+
+Sandbox, không gọi provider. Cổng API 3017 và web 5184 vì cổng 3000 đang có server. Test exit 1 trước nút duyệt. Lý do trên màn: Jira chưa có tài nguyên. Cùng màn nói Jira đã kết nối và mời gửi lại. Không gian Cá nhân. Chưa có bước thực thi nên chưa đối chiếu `output_json`. Đọc provider thật rồi Hủy chưa chạy.
+
+### 07/11/2026 — F7
+
+Ba kịch bản mẫu giữ `jira.create_issue` khi MyJira bật. Test catalog 9/9. Browser nine_service 1 passed, 11.2s, plan completed, biên nhận khớp output đã lưu.
+
+### 07/11/2026 — Đọc live
+
+Server live sẵn. Hai prompt chỉ đọc PR GitHub, không duyệt. Kết quả là `answer`, không phải plan. 0 execution step. Lượt có tên repository nói chưa tra được dữ liệu PR.
+
+### 07/11/2026 — F8
+
+Câu trả lời về Pull Request cần `github.list_pull_requests` thành công. Prefetch repository không đủ. `read-answers.test.ts` 20/20. Chưa chạy lại live.
+
+### 07/11/2026 — Đọc lại live
+
+Server được bật lại. Cùng prompt có tên repository. Tool `github.list_pull_requests`, `resultCount` 0, 0 plan, 0 execution step.
+
+### 07/11/2026 — F4 và F5
+
+Biên nhận chuyển trạng thái đọc `status`. Cửa sổ lịch tự nhiên dùng `timeMax` 00:00 ngày hôm sau. Cockpit 12/12, calendar adapter 29/29.
+
+### 07/11/2026 — Đọc lịch hôm nay
+
+Lượt đầu trả lời chưa đọc lịch. Sau khi bắt buộc `list_events`, server nạp lại và gọi `mycalendar.list_events`, `resultCount` 0, 0 plan, 0 execution step. `read-answers.test.ts` 21/21.
+
+### 07/11/2026 — Notion và Trello
+
+Hai lượt chỉ đọc trên server live. Trello trả 1 bảng. Notion trả 2 database. Mỗi lượt 0 plan, 0 execution step.
+
+### 07/11/2026 — Xem trước Trello rồi Slack
+
+Plan bị hủy trước khi ghi. `trello.create_card` rồi `slack.send_message` với `${step_1.output.url}`. Status `rejected`, 0 execution step.
+
+### 07/11/2026 — Xem trước Notion rồi Slack
+
+Plan bị hủy trước khi ghi. `notion.create_page` trong Notes, rồi `slack.send_message` với `${create_page.output.url}`. Status `rejected`, 0 execution step.
+
+### 07/11/2026 — Xem trước Meet, Docs, Gmail
+
+Hai lượt đầu hỏi địa chỉ email. Sau khi tài khoản Gmail kết nối được tính là người nhận, plan bị hủy trước khi ghi. `schedule_meet`, `create_doc` với `meetLink`, `gmail.create_draft` với link Docs. 0 execution step. `gmail-grounding.test.ts` 22/22.
+
+### 07/11/2026 — Xem trước Sheets rồi Slack
+
+Plan bị hủy trước khi gửi. `mysheets.aggregate_rows` rồi `slack.send_message`. Evidence `sheets_summary`, `itemCount` 0. 0 execution step.
+
+### 07/11/2026 — Jira chưa nối
+
+Yêu cầu tiến độ Jira rồi Slack bị từ chối trước plan. `myjira` không có credential. Cờ Jira vẫn bật. 0 plan.
+
+### 07/11/2026 — Kiểm tra lại Jira
+
+Grant OAuth `active`, site trên grant là `ati-workflow-test`. Workspace chưa có site được duyệt. Planner vẫn từ chối trước plan. 0 execution step.
+
+### 07/11/2026 — Thử lại trong Không gian Chung
+
+Site đã có trên workspace. Hội thoại legacy không thấy site. Trong Không gian Chung, planner từ chối vì `invalid_evidence` ở project ATIT và Slack `invalid_auth` với kênh ati-test. 0 plan.
+
+### 07/11/2026 — Jira sau PR #284
+
+Không gian Chung lập được plan: `myjira.search_issues` rồi `slack.send_message`. Evidence `jira_progress`, `itemCount` 6. Plan bị hủy, 0 execution step.
+
+### 07/11/2026 — Issue GitHub tồn đọng
+
+DEV-04 bị từ chối trước plan. Credential GitHub là `reconnect_required`. 0 plan, 0 execution step.
+
+### 07/11/2026 — Issue GitHub sau khi nối lại
+
+Credential `active`. Plan bị hủy trước khi gửi. `github.list_issues` rồi `slack.send_message`. Evidence `github_issues`, `itemCount` 4, nhãn `>7d`. 0 execution step.
+
+### 07/11/2026 — Xem trước Telegram
+
+Plan bị hủy trước khi gửi. `telegram.send_message` tới chat cá nhân đang kết nối. 0 execution step.
+
+### 07/11/2026 — npm run check
+
+Sau khi chuẩn hóa `.endsWith('.list_events')` trong `planner.ts` (giữ nguyên danh sách ngoại lệ `static-guard.test.ts`) và cô lập biến môi trường trong `live-without-smtp.test.ts`, toàn bộ `npm run check` đã chạy lại thành một lệnh duy nhất trên PostgreSQL 16 kiểm thử sạch cổng 56534: PASS, exit 0 (schemas 579, adapters 638 + probe 32, planner 555, executor 56, API 2554, web 1198; evaluations 500 pass / 1 skip; build web, kiểm tra build, launcher 1, node test 66 đều pass).
+
+### 07/11/2026 — Xem trước PR rồi Slack
+
+Plan bị hủy trước khi gửi. `github.list_pull_requests` rồi `slack.send_message`. Evidence `github_prs`, `itemCount` 0. 0 execution step.

@@ -38,6 +38,14 @@ it('rejects body-only addresses even when present in several memory projections'
 it.each([['Lan <lan@example.com>'], ['lan@example.com\r\nBcc: evil@example.com'], Array.from({ length: 21 }, (_, i) => `a${i}@example.com`)])('rejects malformed recipient literals at preview: %j', to => {
   expect(validatePlan(plan(to), GMAIL_TOOLS).valid).toBe(false);
 });
+it('accepts the connected Gmail account when the user did not type that address', () => {
+  expect(validate(['owner@example.com'], { gmail_account: { email: 'Owner@example.com' } }, ['Gửi cho chính tài khoản Gmail đang kết nối']).valid).toBe(true);
+  expect(validate(['other@example.com'], { gmail_account: { email: 'owner@example.com' } }, ['Gửi cho chính tài khoản Gmail đang kết nối'])).toMatchObject({
+    valid: false,
+    layer: 'grounding',
+    ungrounded: [{ resource: 'recipient', value: 'other@example.com' }],
+  });
+});
 it('accepts recipients observed from trusted workspace services (sheets, mysheets, notion, trello, jira) while still rejecting untrusted services (gmail body, mycalendar)', () => {
   expect(validate(['khachhang@agency.vn'], { __observed: { recipient: [{ id: 'khachhang@agency.vn', service: 'sheets' }] } }).valid).toBe(true);
   expect(validate(['lead@company.vn'], { __observed: { recipient: [{ id: 'Lead@Company.vn', service: 'notion' }] } }).valid).toBe(true);

@@ -153,14 +153,40 @@ describe('GET /api/services, AdapterFactory, ChatService, and health check for M
       });
     });
 
-    it('excludes MYSHEETS_TOOLS in getToolCatalogFor when in scope_required state', async () => {
+    it('excludes spreadsheet tools from getToolCatalogFor when no spreadsheet is selected', async () => {
       await connectMySheets(alice, 'alice@example.com', []);
       const catalog = await getToolCatalogFor(credentials, key, {
         userId: alice.id,
         gmailEnabled: false,
         mysheetsEnabled: true,
       });
-      expect(catalog.some((t) => t.name.startsWith('mysheets.'))).toBe(false);
+      const names = catalog.map((tool) => tool.name);
+      expect(names).not.toContain('mysheets.read_range');
+      expect(names).not.toContain('mysheets.append_rows');
+      expect(names).not.toContain('mysheets.create_sheet');
+    });
+
+    it('offers Docs and Drive tools when Google is connected and no spreadsheet is selected', async () => {
+      await connectMySheets(alice, 'alice@example.com', []);
+      const catalog = await getToolCatalogFor(credentials, key, {
+        userId: alice.id,
+        gmailEnabled: false,
+        mysheetsEnabled: true,
+      });
+      const names = catalog.map((tool) => tool.name);
+      for (const name of [
+        'mysheets.list_drive_files',
+        'mysheets.create_drive_folder',
+        'mysheets.create_doc',
+        'mysheets.get_doc',
+        'mysheets.append_doc_text',
+        'mysheets.move_drive_file',
+      ]) {
+        expect(names).toContain(name);
+      }
+      for (const name of ['mysheets.read_range', 'mysheets.append_rows', 'mysheets.create_sheet']) {
+        expect(names).not.toContain(name);
+      }
     });
 
     it('ChatService.bindConnections refuses a mysheets.* plan with unavailableServices', async () => {
@@ -191,6 +217,39 @@ describe('GET /api/services, AdapterFactory, ChatService, and health check for M
       const result = await (chatService as any).bindConnections(plan, alice.id);
       expect(result.kind).toBe('refusal');
       expect(result.unavailableServices).toEqual([{ id: 'mysheets', name: 'Google Sheets của bạn' }]);
+    });
+
+    it('binds a Docs plan when Google is connected and no spreadsheet is selected', async () => {
+      const saved = await connectMySheets(alice, 'alice@example.com', []);
+      const chatService = new ChatService({
+        msgRepo: {} as any,
+        planner: {} as any,
+        eventEmitter: { emit: () => {} },
+        mysheetsConnection: createMySheetsConnectionLookup(credentials, key),
+      });
+      const plan: PlanResponse = {
+        kind: 'plan',
+        thinking: 'Tạo biên bản',
+        summary: 'Tạo Google Docs trong thư mục dự án',
+        steps: [
+          {
+            id: 's1',
+            tool: 'mysheets.create_doc',
+            description: 'Tạo biên bản',
+            args: { title: 'Biên bản họp', folderId: 'folder1234567890' },
+            dependsOn: [],
+          },
+        ],
+        warnings: [],
+      };
+
+      const result = await (chatService as any).bindConnections(plan, alice.id);
+      expect(result.kind).toBe('plan');
+      expect(result.connections?.mysheets).toEqual({
+        credentialId: saved.id,
+        email: 'alice@example.com',
+        allowedSpreadsheets: [],
+      });
     });
   });
 

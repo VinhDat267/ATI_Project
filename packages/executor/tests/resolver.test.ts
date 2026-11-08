@@ -90,6 +90,16 @@ describe('packages/executor (Task 12: Reference Resolver)', () => {
     );
   });
 
+  it('interpolates a GitHub issue url and rejects a payload that only has htmlUrl', () => {
+    const linked = new Map<string, any>([['issue', { url: 'https://github.com/acme/web/issues/7', number: 7 }]]);
+    expect(resolveArgs({ body: { $template: 'Issue ${issue.output.url}' } }, linked).body).toBe('Issue https://github.com/acme/web/issues/7');
+
+    const renamed = new Map<string, any>([['issue', { htmlUrl: 'https://github.com/acme/web/issues/7', number: 7 }]]);
+    expect(() => resolveArgs({ body: { $template: 'Issue ${issue.output.url}' } }, renamed)).toThrow(
+      /property 'output.url' not found on step 'issue'/i
+    );
+  });
+
   it('throws an error if referenced property path does not exist on step output', () => {
     const args = {
       badPath: { $ref: 'step_1.output.nonexistent.field' },

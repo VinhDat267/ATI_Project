@@ -1055,7 +1055,7 @@ export function RequestMoment({
           <div className="sr-only">{visibleCoreJobs.length} Quy trình trọng tâm sẵn dùng</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 items-stretch">
             {visibleCoreJobs.map((job) => {
-              const readiness = evaluateJobReadiness(job.requiredServices, services);
+              const readiness = evaluateJobReadiness(job.requiredServices, services, job.scopeOptionalServices);
               return (
                 <div
                   key={job.id}

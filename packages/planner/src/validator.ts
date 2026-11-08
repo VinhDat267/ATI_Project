@@ -329,6 +329,7 @@ function findAmbiguousSites(steps: PlanStep[], grounding: GroundingContext): Ung
 function findUngrounded(steps: PlanStep[], catalog: Map<string, ToolDefinition>, grounding: GroundingContext): UngroundedArgument[] {
   const typed = userTokens(grounding.userTexts);
   const typedEmails = userEmailAddresses(grounding.userTexts);
+  const accountEmail = normalizedRecipient(grounding.memory.gmail_account?.email);
   const seenEmails = new Set(observedThreads(grounding.memory).flatMap(t => t.participants.map(normalizedRecipient).filter((a): a is string => Boolean(a))));
   const workspaceEmails = new Set(observedWorkspaceRecipients(grounding.memory).keys());
   const createdSheetsByResource = new Map<string, Set<string>>([
@@ -348,7 +349,7 @@ function findUngrounded(steps: PlanStep[], catalog: Map<string, ToolDefinition>,
       if (schema['x-recipient'] && Array.isArray(step.args[argument])) {
         for (const value of step.args[argument]) {
           const address = normalizedRecipient(value);
-          if (address && !typedEmails.has(address) && !seenEmails.has(address) && !workspaceEmails.has(address)) ungrounded.push({ stepId: step.id, argument, resource: 'recipient', value: address });
+          if (address && address !== accountEmail && !typedEmails.has(address) && !seenEmails.has(address) && !workspaceEmails.has(address)) ungrounded.push({ stepId: step.id, argument, resource: 'recipient', value: address });
         }
         continue;
       }
@@ -511,6 +512,9 @@ export function validateAnswer(raw: string, options: { readAnswers: boolean; has
     return { valid: false, layer: 'schema', error: 'Answer requires non-empty text of at most 4000 characters.' };
   }
   if (!options.hasReadData) return { valid: false, layer: 'semantic', error: 'Search with a read tool first, or ask for clarification. No successful read data exists in this turn.' };
+  if (/cần (?:đọc|tra cứu)|chưa thể liệt kê|trước khi trả lời/iu.test(parsed.text)) {
+    return { valid: false, layer: 'semantic', error: 'Search with a read tool first. The answer says the data has not been read.' };
+  }
   // Provenance is supplied by the planner from executed reads, never by the model.
   return { valid: true, parsed: { kind: 'answer', text: parsed.text, lookups: [], usedDirectory: [] } };
 }

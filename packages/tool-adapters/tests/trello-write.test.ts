@@ -327,4 +327,32 @@ describe('packages/tool-adapters (Task 4c: Trello Write Tools & Unified Adapter)
       })
     ).rejects.toMatchObject({ category: 'VALIDATION', statusCode: 400 });
   });
+
+  it('rejects a created card that has no url instead of handing an empty link downstream', async () => {
+    const fetchFn = vi.fn(async (url: string | URL, options?: RequestInit) => {
+      const urlStr = url.toString();
+      const method = options?.method || 'GET';
+      if (method === 'GET' && urlStr.includes('/lists/l1')) {
+        return { ok: true, status: 200, json: async () => ({ id: 'l1', idBoard: 'b1' }) };
+      }
+      if (method === 'POST' && urlStr.includes('/cards')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ id: 'card_created_1', name: 'Thẻ thiếu link', idList: 'l1' }),
+        };
+      }
+      return { ok: false, status: 404, text: async () => 'Not found' };
+    });
+    const adapter = new TrelloAdapter({
+      credentials: { accessToken: 't' },
+      allowedBoardIds: ['b1'],
+      allowedScope: { boards: ['b1'] },
+      fetchFn: fetchFn as any,
+    });
+
+    await expect(adapter.createCard({ listId: 'l1', title: 'Thẻ thiếu link' })).rejects.toMatchObject({
+      category: 'UNKNOWN',
+    });
+  });
 });

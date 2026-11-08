@@ -114,6 +114,46 @@ describe('Job Readiness Evaluation (FLOW-04)', () => {
     expect(readiness.missingResourceServices).toContain('trello');
   });
 
+  it('marks OFF-02 ready when Calendar and Gmail are connected and Sheets is authenticated without a spreadsheet', () => {
+    const services: ServiceInfo[] = [
+      { id: 'mycalendar', name: 'Calendar', configured: true, connected: true, connectionStatus: 'healthy', personalStatus: 'connected' },
+      { id: 'gmail', name: 'Gmail', configured: true, connected: true, connectionStatus: 'healthy', personalStatus: 'connected' },
+      {
+        id: 'mysheets',
+        name: 'Google Sheets',
+        configured: false,
+        connected: false,
+        connectionStatus: 'unconfigured',
+        personalStatus: 'scope_required',
+        statusReason: 'Đã xác thực Google nhưng chưa chọn bảng tính được phép dùng.',
+      },
+    ];
+    const job = CORE_JOBS.find((item) => item.id === 'OFF-02')!;
+    const readiness = evaluateJobReadiness(job.requiredServices, services, job.scopeOptionalServices);
+
+    expect(job.scopeOptionalServices).toEqual(['mysheets']);
+    expect(readiness.status).toBe('ready');
+    expect(readiness.isReady).toBe(true);
+  });
+
+  it('keeps OFF-03 blocked when Sheets is authenticated but no spreadsheet is selected', () => {
+    const services: ServiceInfo[] = [
+      {
+        id: 'mysheets',
+        name: 'Google Sheets',
+        configured: false,
+        connected: false,
+        connectionStatus: 'unconfigured',
+        personalStatus: 'scope_required',
+      },
+      { id: 'slack', name: 'Slack', configured: true, connected: true, connectionStatus: 'healthy' },
+    ];
+    const job = CORE_JOBS.find((item) => item.id === 'OFF-03')!;
+    const readiness = evaluateJobReadiness(job.requiredServices, services, job.scopeOptionalServices);
+
+    expect(readiness.isReady).toBe(false);
+  });
+
   it('prefers configured personal mycalendar/mysheets over earlier unconfigured legacy calendar/sheets entries and treats unchecked shared slack as ready', () => {
     const services: ServiceInfo[] = [
       { id: 'calendar', name: 'Google Calendar', configured: false, connected: false, connectionStatus: 'unconfigured' },

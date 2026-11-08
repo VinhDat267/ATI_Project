@@ -534,8 +534,11 @@ describe('PersonalCalendarAdapter', () => {
 
     expect(listed.events).toHaveLength(1);
     expect(calls).toHaveLength(1);
-    expect(calls[0]!.url.searchParams.get('timeMin')).toMatch(/T00:00:00/);
-    expect(calls[0]!.url.searchParams.get('timeMax')).toMatch(/T23:59:59/);
+    const timeMin = calls[0]!.url.searchParams.get('timeMin')!;
+    const timeMax = calls[0]!.url.searchParams.get('timeMax')!;
+    expect(timeMin).toMatch(/T00:00:00\+07:00$/);
+    expect(timeMax).toMatch(/T00:00:00\+07:00$/);
+    expect(Date.parse(timeMax) - Date.parse(timeMin)).toBe(86_400_000);
   });
 
   it('supports createMeetLink: true in mycalendar.create_event (conferenceDataVersion=1) and returns meetLink', async () => {
@@ -732,6 +735,18 @@ describe('PersonalCalendarAdapter', () => {
     const body = JSON.parse(String(calls[0]!.init.body));
     expect(body.attendees).toEqual([{ email: 'alice@example.com' }, { email: 'bob@example.com' }]);
     expect(body.conferenceData?.createRequest?.conferenceSolutionKey?.type).toBe('hangoutsMeet');
+  });
+
+  it('does not report success when schedule_meet creates an event without a Meet link', async () => {
+    const { adapter, calls } = setup();
+
+    await expect(adapter.execute('mycalendar.schedule_meet', {
+      calendarId,
+      summary: 'Họp không link',
+      start,
+      end,
+    })).rejects.toMatchObject({ category: 'UNKNOWN' });
+    expect(calls).toHaveLength(1);
   });
 
   it('supports mycalendar.find_free_slots to proactively compute available slots within workday hours', async () => {
