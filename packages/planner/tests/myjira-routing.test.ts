@@ -46,4 +46,17 @@ describe('personal Jira routing', () => {
     expect(routeIntent('Tạo ticket Jira', ALL_TOOLS, SERVICE_REGISTRY).services).toEqual(['jira']);
     expect(routeIntent('Thêm comment vào ticket ATI-12', ALL_TOOLS, SERVICE_REGISTRY).services).toEqual(['jira']);
   });
+
+  it('does not falsely require GitHub when a Jira issue workflow does not mention GitHub/repo/PR', () => {
+    const toolsWithoutGithub = enabled.filter(t => t.service !== 'github');
+    const result = routeIntent(
+      'Lập kế hoạch tra cứu tiến độ các issue Jira đang kết nối, tóm tắt, rồi soạn tin Slack vào kênh ati-test chứa bản tóm tắt.',
+      toolsWithoutGithub,
+      services,
+    );
+    expect(result).toEqual({
+      services: ['slack', 'myjira'],
+      unavailable: [],
+    });
+  });
 });
