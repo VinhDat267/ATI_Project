@@ -75,6 +75,14 @@ export function routeIntent(
       matched.push(personalJira);
     }
   }
+  const hasJiraRoute = matched.some((service) => service.id === 'jira' || service.id === 'myjira');
+  if (hasJiraRoute && matched.some((service) => service.id === 'github') && !available.has('github')) {
+    const githubSpecificKeywords = ['github', 'pull request', 'pull requests', 'repository', 'repositories', 'repo', 'mã nguồn', 'pr'];
+    const mentionsGitHubSpecifically = githubSpecificKeywords.some((keyword) => mentionsKeyword(intent, keyword));
+    if (!mentionsGitHubSpecifically) {
+      matched = matched.filter((service) => service.id !== 'github');
+    }
+  }
   const mentionsExplicitChannelService =
     explicitlyNamed.some((s) => s.scopeKey === 'channels') ||
     ['channel', 'channels', 'kênh'].some((keyword) => mentionsKeyword(intent, keyword)) ||
