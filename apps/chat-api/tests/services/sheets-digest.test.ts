@@ -144,15 +144,19 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
     const okCandidate = await analyzeSheetsDigestCandidate({
       userId: alice.id,
       request: 'Đọc tab KPI Tháng 11 từ bảng Báo cáo KPI Q4 và gửi báo cáo tiến độ vào Slack #bao-cao',
+      recurrence: { type: 'daily', time: '08:00' },
       services: ['mysheets', 'slack'],
       credentialRepo,
       encryptionKey: ENC_KEY,
       mysheetsEnabled: true,
+      emitV2: true,
     });
 
     expect(okCandidate.canAutoDigest).toBe(true);
     expect(okCandidate.config).toMatchObject({
-      version: 1,
+      version: 2,
+      workspaceMode: 'legacy',
+      workspaceId: null,
       source: {
         service: 'mysheets',
         credentialId: mysheetsCredId,
@@ -164,6 +168,7 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
       },
       destination: {
         service: 'slack',
+        credentialId: slackCredId,
         channelId: 'C12345678',
       },
       includeAiSummary: true,
@@ -177,6 +182,7 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
       credentialRepo,
       encryptionKey: ENC_KEY,
       mysheetsEnabled: true,
+      emitV2: true,
     });
     expect(writeCandidate.canAutoDigest).toBe(false);
     expect(writeCandidate.reason).toMatch(/ghi hoặc cập nhật/i);
@@ -189,6 +195,7 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
       credentialRepo,
       encryptionKey: ENC_KEY,
       mysheetsEnabled: true,
+      emitV2: true,
     });
     expect(multiServiceCandidate.canAutoDigest).toBe(false);
   });
@@ -197,10 +204,12 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
     const candidate = await analyzeSheetsDigestCandidate({
       userId: alice.id,
       request: 'Đọc bảng Báo cáo KPI Q4 và gửi tóm tắt KPI sáng vào Slack',
+      recurrence: { type: 'daily', time: '08:00' },
       services: ['mysheets', 'slack'],
       credentialRepo,
       encryptionKey: ENC_KEY,
       mysheetsEnabled: true,
+      emitV2: true,
     });
     expect(candidate.canAutoDigest).toBe(true);
 
@@ -235,6 +244,7 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
       credentialRepo,
       encryptionKey: ENC_KEY,
       mysheetsEnabled: true,
+      emitV2: true,
     });
 
     const change = await service.confirmProposal({
@@ -264,10 +274,12 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
     const candidate = await analyzeSheetsDigestCandidate({
       userId: alice.id,
       request: 'Đọc tab KPI Tháng 11 từ bảng Báo cáo KPI Q4 và gửi báo cáo vào Slack',
+      recurrence: { type: 'daily', time: '08:00' },
       services: ['mysheets', 'slack'],
       credentialRepo,
       encryptionKey: ENC_KEY,
       mysheetsEnabled: true,
+      emitV2: true,
     });
 
     const conv = await convRepo.createConversation(alice.id);
@@ -344,6 +356,7 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
       credentialRepo,
       encryptionKey: ENC_KEY,
       mysheetsEnabled: true,
+      emitV2: true,
     });
     runner = new ScheduleRunner({
       pool: db.pool,
@@ -361,7 +374,6 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
       now: new Date('2026-11-02T00:00:00Z'),
       approvalMode: 'auto_digest',
     });
-    await upgradeScheduleToPinnedV2(change.schedule.id);
 
     await runner.tick();
 
@@ -388,10 +400,12 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
     const candidate = await analyzeSheetsDigestCandidate({
       userId: alice.id,
       request: 'Đọc bảng Báo cáo KPI Q4 và gửi báo cáo vào Slack',
+      recurrence: { type: 'daily', time: '08:00' },
       services: ['mysheets', 'slack'],
       credentialRepo,
       encryptionKey: ENC_KEY,
       mysheetsEnabled: true,
+      emitV2: true,
     });
 
     const conv = await convRepo.createConversation(alice.id);
@@ -458,6 +472,7 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
       credentialRepo,
       encryptionKey: ENC_KEY,
       mysheetsEnabled: true,
+      emitV2: true,
     });
     runner = new ScheduleRunner({
       pool: db.pool,
@@ -475,7 +490,6 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
       now: new Date('2026-11-02T00:00:00Z'),
       approvalMode: 'auto_digest',
     });
-    await upgradeScheduleToPinnedV2(change.schedule.id);
 
     const runOnce = async (iso: string) => {
       const r = await service.startRun({
@@ -528,6 +542,7 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
       credentialRepo,
       encryptionKey: ENC_KEY,
       mysheetsEnabled: true,
+      emitV2: true,
     });
 
     const chatService = new ChatService({
@@ -567,6 +582,7 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
         credentialRepo,
         encryptionKey: ENC_KEY,
         mysheetsEnabled: true,
+        emitV2: true,
         now: () => new Date('2026-11-02T00:00:00Z'),
       },
     });
@@ -609,7 +625,6 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
     });
     expect(change.schedule.kind).toBe('sheets_digest');
     expect(change.schedule.approvalMode).toBe('auto_digest');
-    await upgradeScheduleToPinnedV2(change.schedule.id);
 
     const sentTelegram: Array<{ chatId: string; text: string }> = [];
     const digestRunner = new SheetsDigestRunner({
@@ -654,10 +669,12 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
     const candidate = await analyzeSheetsDigestCandidate({
       userId: alice.id,
       request: 'Đọc bảng Báo cáo KPI Q4 và gửi báo cáo vào Slack',
+      recurrence: { type: 'daily', time: '08:00' },
       services: ['mysheets', 'slack'],
       credentialRepo,
       encryptionKey: ENC_KEY,
       mysheetsEnabled: true,
+      emitV2: true,
     });
 
     const conv = await convRepo.createConversation(alice.id);
@@ -721,6 +738,7 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
       credentialRepo,
       encryptionKey: ENC_KEY,
       mysheetsEnabled: true,
+      emitV2: true,
     });
     runner = new ScheduleRunner({
       pool: db.pool,
@@ -739,7 +757,6 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
       now: new Date('2026-11-02T00:00:00Z'),
       approvalMode: 'auto_digest',
     });
-    await upgradeScheduleToPinnedV2(change.schedule.id);
 
     // 1. Normal run emits message_complete SSE
     await runner.tick();
@@ -762,7 +779,7 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
     expect(dbRun.status).toBe('interrupted');
   });
 
-  it('supports sheets_digest delivery via Gmail and smart fallback from shared sheets to personal mysheets', async () => {
+  it('supports sheets_digest delivery via Gmail with explicit mysheets source and refuses silent fallback from unconfigured shared sheets (F-09)', async () => {
     // Save personal Gmail credential for Alice
     const gmailConfig = encryptCredentials(
       {
@@ -778,21 +795,38 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
       [savedGmail.id]
     );
 
-    // 1. Smart fallback: services=['sheets', 'gmail'] when shared 'sheets' is not configured falls back to Alice's 'mysheets'
-    const candidate = await analyzeSheetsDigestCandidate({
+    // 1a. F-09: services=['sheets', 'gmail'] when shared 'sheets' is not configured refuses silent fallback to 'mysheets'
+    const fallbackRefused = await analyzeSheetsDigestCandidate({
       userId: alice.id,
       request: 'Mỗi sáng thứ Hai 8:00 đọc Google Sheets Báo cáo KPI Q4 và gửi email tổng hợp qua Gmail tới ceo@example.com',
+      recurrence: { type: 'daily', time: '08:00' },
       services: ['sheets', 'gmail'],
       credentialRepo,
       encryptionKey: ENC_KEY,
       mysheetsEnabled: true,
+      emitV2: true,
+    });
+    expect(fallbackRefused.canAutoDigest).toBe(false);
+
+    // 1b. Explicit mysheets + gmail produces pinned v2 config with senderEmail and recipientEmail
+    const candidate = await analyzeSheetsDigestCandidate({
+      userId: alice.id,
+      request: 'Mỗi sáng thứ Hai 8:00 đọc Google Sheets Báo cáo KPI Q4 và gửi email tổng hợp qua Gmail tới ceo@example.com',
+      recurrence: { type: 'daily', time: '08:00' },
+      services: ['mysheets', 'gmail'],
+      credentialRepo,
+      encryptionKey: ENC_KEY,
+      mysheetsEnabled: true,
+      emitV2: true,
     });
 
     expect(candidate.canAutoDigest).toBe(true);
+    expect(candidate.config?.version).toBe(2);
     expect(candidate.config?.source.service).toBe('mysheets');
     expect(candidate.config?.source.spreadsheetId).toBe(SPREADSHEET_ID);
     expect(candidate.config?.destination).toEqual({
       service: 'gmail',
+      senderEmail: 'alice@example.com',
       recipientEmail: 'ceo@example.com',
       credentialId: savedGmail.id,
     });
@@ -830,7 +864,6 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
       messageRepo,
       encryptionKey: ENC_KEY,
       mysheetsEnabled: true,
-      v1CompatPolicy: 'allow_consistency_candidate',
       createAdapter: async (serviceId) => ({
         execute: async (tool, args) => {
           if (serviceId === 'mysheets') {
@@ -864,6 +897,7 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
       credentialRepo,
       encryptionKey: ENC_KEY,
       mysheetsEnabled: true,
+      emitV2: true,
     });
     runner = new ScheduleRunner({
       pool: db.pool,

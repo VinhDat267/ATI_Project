@@ -277,6 +277,40 @@ async function bootstrap() {
   let digestRunnerImpl: RunGithubDigest | undefined;
   let trelloDigestRunnerImpl: RunTrelloDigest | undefined;
   let notionDigestRunnerImpl: RunNotionDigest | undefined;
+  const fetchOrgSheetsMetadata = async (input: {
+    credentialId: string;
+    allowedSpreadsheetIds: string[];
+    workspaceId: string | null;
+    signal?: AbortSignal;
+  }) => {
+    const signal = input.signal
+      ? AbortSignal.any([input.signal, AbortSignal.timeout(5_000)])
+      : AbortSignal.timeout(5_000);
+    const adapter = await (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(
+      'sheets',
+      {
+        phase: 'planning',
+        workspaceMode: 'organization',
+        ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
+      }
+    );
+    const listed = await adapter.execute(
+      'sheets.list_spreadsheets',
+      { query: '', limit: 10 },
+      { signal }
+    );
+    const listArr = Array.isArray(listed) ? listed : [];
+    const titleById = new Map<string, string>();
+    for (const item of listArr) {
+      if (item && typeof item.id === 'string' && typeof item.title === 'string') {
+        titleById.set(item.id, item.title);
+      }
+    }
+    return input.allowedSpreadsheetIds.map((id) => ({
+      id,
+      title: titleById.get(id) ?? id,
+    }));
+  };
   const schedules = createScheduleRuntime({
     enabled: env.SCHEDULES_ENABLED,
     pool: pool && userRepo ? pool : null,
@@ -284,6 +318,7 @@ async function bootstrap() {
     encryptionKey: env.ENCRYPTION_KEY,
     credentialRepo: credRepo,
     mysheetsEnabled: mysheetsAvailable,
+    fetchOrgSheetsMetadata,
     createSheetsDigestAdapter: (serviceId, userId, config, scheduleContext) => {
       const workspaceMode = scheduleContext
         ? scheduleContext.workspaceMode
@@ -722,6 +757,7 @@ async function bootstrap() {
           credentialRepo: credRepo,
           encryptionKey: env.ENCRYPTION_KEY,
           mysheetsEnabled: mysheetsAvailable,
+          fetchOrgSheetsMetadata,
           evaluateDigestCandidate: pool
             ? async (input) =>
                 (

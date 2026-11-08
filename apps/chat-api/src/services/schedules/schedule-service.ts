@@ -1,23 +1,25 @@
 import type pg from 'pg';
-import type {
-  CalendarDigestCandidate,
-  GithubDigestConfig,
-  ScheduleApprovalMode,
-  ScheduleDigestCandidate,
-  ScheduleKind,
-  ScheduleProposalMetadata,
-  ScheduleResponse,
-  ScheduleRunView,
-  ScheduleStateMetadata,
-  ScheduleView,
-  SheetsDigestCandidate,
-  TelegramDigestConfig,
-  TelegramDigestCandidate,
-  TrelloDigestConfig,
-  TrelloDigestCandidate,
-  NotionDigestConfig,
-  NotionDigestCandidate,
+import {
+  isSheetsDigestConfigV2,
+  type CalendarDigestCandidate,
+  type GithubDigestConfig,
+  type ScheduleApprovalMode,
+  type ScheduleDigestCandidate,
+  type ScheduleKind,
+  type ScheduleProposalMetadata,
+  type ScheduleResponse,
+  type ScheduleRunView,
+  type ScheduleStateMetadata,
+  type ScheduleView,
+  type SheetsDigestCandidate,
+  type TelegramDigestConfig,
+  type TelegramDigestCandidate,
+  type TrelloDigestConfig,
+  type TrelloDigestCandidate,
+  type NotionDigestConfig,
+  type NotionDigestCandidate,
 } from '@wap/tool-schemas';
+import { isSheetsDigestEmitV2Enabled } from '../../config/schedules-runtime.js';
 import type { CredentialRepo } from '../../db/repositories/credential-repo.js';
 import { MessageRepo } from '../../db/repositories/message-repo.js';
 import { ScheduleRepo, type Queryable, type ScheduleRow, type ScheduleScope } from '../../db/repositories/schedule-repo.js';
@@ -28,7 +30,11 @@ import { nextOccurrence } from './next-occurrence.js';
 import { captureScheduleArtifact, guardScheduleArtifact, prelockScheduleArtifacts, registerScheduleFields, scheduleRegistry, scheduleSourceContext, tagScheduleContext } from '../slack/slack-schedule-lineage.js';
 import { messageOutputSelectors } from '../slack/slack-message-selectors.js';
 import type { DerivedSegmentInput } from '../../db/repositories/slack-derived-lineage-repo.js';
-import { analyzeSheetsDigestCandidate, computeSheetsDigestHash } from './sheets-digest-candidate.js';
+import {
+  resolveTrustedScheduleScope,
+  verifySheetsDigestCandidateInTx,
+  type FetchOrgSheetsMetadataFn,
+} from './sheets-digest-candidate.js';
 import { canonicalizeDigestConfig, computeDigestConfigHash } from './github-digest-candidate.js';
 import { computeTelegramDigestConfigHash } from './telegram-digest-candidate.js';
 import { canonicalizeTrelloDigestConfig, computeTrelloDigestConfigHash } from './trello-digest-candidate.js';
@@ -49,6 +55,10 @@ export const SCHEDULE_CONFLICTS = {
   AUTO_DIGEST_NOT_ELIGIBLE: 'Lịch này không đủ điều kiện gửi tự động hoặc kết nối Google Calendar/kênh nhận đã thay đổi. Hãy chọn chế độ duyệt thủ công hoặc kiểm tra lại kết nối.',
   AUTO_DIGEST_NOT_ALLOWED: 'Lịch này cần duyệt từng lượt.',
   DIGEST_PREVIEW_CHANGED: 'Kết nối, phạm vi lịch hoặc kênh nhận khác bản xem trước. Hãy yêu cầu đề xuất mới và xác nhận lại.',
+  DIGEST_V2_DISABLED_SINCE_PREVIEW:
+    'Chế độ tự động tổng hợp Google Sheets v2 đã tạm tắt sau khi tạo bản xem trước. Vui lòng tạo lại đề xuất lịch.',
+  LEGACY_V1_PROPOSAL_STALE:
+    'Đề xuất lịch phiên bản cũ (v1) không đủ thông tin ràng buộc bảo mật. Vui lòng tạo đề xuất mới để xác nhận.',
 } as const;
 export type ScheduleConflictCode = keyof typeof SCHEDULE_CONFLICTS;
 
@@ -87,6 +97,8 @@ export interface ScheduleServiceOptions {
   credentialRepo?: CredentialRepo;
   encryptionKey?: string;
   mysheetsEnabled?: boolean;
+  emitV2?: boolean;
+  fetchOrgSheetsMetadata?: FetchOrgSheetsMetadataFn;
 }
 
 const REPLANNABLE = new Set(['expired', 'planning_failed', 'interrupted', 'missed', 'digest_failed']);
@@ -336,9 +348,17 @@ export class ScheduleService {
       if (latest.rows[0].id !== messageId) throw new ScheduleConflict('STALE_PROPOSAL');
 
       const proposal = metadata.proposal;
-      const wsId = owner.rows[0].workspace_id ?? null;
-      const wsMode = owner.rows[0].workspace_mode ?? 'legacy';
+      const trustedScope = resolveTrustedScheduleScope(owner.rows[0]);
+      const wsId = trustedScope.workspaceId;
+      const wsMode = trustedScope.workspaceMode;
+      if (wsMode === 'organization' && (!wsId || !isUuid(wsId))) {
+        throw new ScheduleConflict('DIGEST_NOT_ELIGIBLE');
+      }
+      if (wsMode !== 'organization' && wsId !== null) {
+        throw new ScheduleConflict('DIGEST_NOT_ELIGIBLE');
+      }
       const wantAutoDigest = approvalMode === 'auto_digest';
+      let persistedServices = metadata.services;
       const candidateConfig = (metadata.digestCandidate as any)?.config;
       const hasGithubDigestCandidate =
         Boolean(candidateConfig) &&
@@ -471,29 +491,32 @@ export class ScheduleService {
           if (!sheetsCandidate?.canAutoDigest || !sheetsCandidate.config) {
             throw new ScheduleConflict('DIGEST_NOT_ELIGIBLE');
           }
-          if (this.options.credentialRepo && this.options.encryptionKey) {
-            const recheck = await analyzeSheetsDigestCandidate({
-              userId,
-              request: proposal.request!,
-              services: metadata.services,
-              credentialRepo: this.options.credentialRepo,
-              encryptionKey: this.options.encryptionKey,
-              mysheetsEnabled: this.options.mysheetsEnabled,
-            });
-            if (!recheck.canAutoDigest || !recheck.config) {
-              throw new ScheduleConflict('DIGEST_NOT_ELIGIBLE');
-            }
+          if (!metadata.reauthorize && !isSheetsDigestEmitV2Enabled(this.options)) {
+            throw new ScheduleConflict('DIGEST_V2_DISABLED_SINCE_PREVIEW');
           }
-          const config = sheetsCandidate.config;
-          const hash = computeSheetsDigestHash({
+          if (!isSheetsDigestConfigV2(sheetsCandidate.config)) {
+            throw new ScheduleConflict('LEGACY_V1_PROPOSAL_STALE');
+          }
+          const verified = await verifySheetsDigestCandidateInTx(client, {
             userId,
             recurrence: proposal.recurrence!,
-            config,
+            config: sheetsCandidate.config,
+            expectedHash: sheetsCandidate.configHash,
+            trustedScope,
+            encryptionKey: this.options.encryptionKey,
+            mysheetsEnabled: this.options.mysheetsEnabled,
           });
+          if (!verified.ok) {
+            throw new ScheduleConflict('DIGEST_PREVIEW_CHANGED', verified.reason);
+          }
+          persistedServices = [
+            verified.config.source.service,
+            verified.config.destination.service,
+          ];
           digestFields = {
             kind: 'sheets_digest',
-            digestConfig: JSON.stringify(config),
-            digestConfigHash: hash,
+            digestConfig: JSON.stringify(verified.config),
+            digestConfigHash: verified.configHash,
             digestApprovedAt: now,
           };
         }
@@ -664,7 +687,7 @@ export class ScheduleService {
             proposal.name,
             proposal.request,
             JSON.stringify(proposal.recurrence),
-            metadata.services,
+            persistedServices,
             next,
             messageId,
             wsId,
@@ -679,7 +702,7 @@ export class ScheduleService {
         return this.recordState(client, tagScheduleContext(created.rows[0],segments), now);
       }
       if (!existing || metadata.baseVersion !== existing.version) throw new ScheduleConflict('STALE_PROPOSAL');
-      const fields = this.transition(existing, proposal.action, proposal, metadata.services, now);
+      const fields = this.transition(existing, proposal.action, proposal, persistedServices, now);
       if (!fields) {
         await client.query('UPDATE schedules SET last_proposal_id=$2 WHERE id=$1', [existing.id, messageId]);
         return this.unchanged(client, existing, now);

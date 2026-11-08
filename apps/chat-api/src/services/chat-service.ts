@@ -19,6 +19,12 @@ import { evaluateTelegramDigestCandidate } from './schedules/telegram-digest-can
 import { evaluateTrelloDigestCandidate } from './schedules/trello-digest-candidate.js';
 import { evaluateNotionDigestCandidate } from './schedules/notion-digest-candidate.js';
 import { evaluateJiraDigestCandidate, type EvaluateJiraDigestInput } from './schedules/jira-digest-candidate.js';
+import {
+  analyzeSheetsDigestCandidate,
+  resolveTrustedScheduleScope,
+  type FetchOrgSheetsMetadataFn,
+} from './schedules/sheets-digest-candidate.js';
+import { isSheetsDigestEmitV2Enabled } from '../config/schedules-runtime.js';
 import { resolveRef } from '@wap/executor';
 import type { SlackWriteRuntime } from './slack/slack-write-runtime.js';
 import type { SlackReadProposalService } from './slack/slack-read-proposals.js';
@@ -182,6 +188,8 @@ export interface ChatServiceOptions {
     credentialRepo?: any;
     encryptionKey?: string;
     mysheetsEnabled?: boolean;
+    emitV2?: boolean;
+    fetchOrgSheetsMetadata?: FetchOrgSheetsMetadataFn;
     evaluateDigestCandidate?: (input: { userId: string; services: string[]; request: string }) => Promise<CalendarDigestCandidate | undefined>;
   };
   /** Optional adapter retriever or tool executor for live resource validation in planning. */
@@ -1373,12 +1381,24 @@ export class ChatService {
   private async prepareProposal(
     proposal: ScheduleResponse,
     actor: { userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization' },
-    schedule: ScheduleView | null
+    schedule: ScheduleView | null,
+    conv?: { workspace_mode?: string | null; workspace_id?: string | null } | null
   ): Promise<PlannerResponse | ScheduleProposalMetadata> {
     if (!this.schedules) throw new Error('Schedules are off');
+    const trustedScope = conv
+      ? resolveTrustedScheduleScope(conv)
+      : resolveTrustedScheduleScope({
+          workspace_mode: actor.workspaceMode ?? 'legacy',
+          workspace_id: actor.workspaceId ?? null,
+        });
+    const scheduleActor = {
+      userId: actor.userId,
+      workspaceId: trustedScope.workspaceId,
+      workspaceMode: trustedScope.workspaceMode,
+    };
     let services: string[];
     if (proposal.action === 'create' || proposal.action === 'update') {
-      const route = await this.planner.routeSchedule(proposal.request!, actor);
+      const route = await this.planner.routeSchedule(proposal.request!, scheduleActor);
       if (route.unavailable.length > 0 || route.services.length === 0) return unroutable(route.unavailable);
       services = route.services;
     } else {
@@ -1490,21 +1510,24 @@ export class ChatService {
       this.schedules.credentialRepo &&
       this.schedules.encryptionKey
     ) {
-      const { analyzeSheetsDigestCandidate } = await import('./schedules/sheets-digest-candidate.js');
       digestCandidate = await analyzeSheetsDigestCandidate({
         userId: actor.userId,
+        workspaceMode: trustedScope.workspaceMode,
+        workspaceId: trustedScope.workspaceId,
         request: proposal.request,
+        recurrence,
         services,
         credentialRepo: this.schedules.credentialRepo,
         encryptionKey: this.schedules.encryptionKey,
         mysheetsEnabled: this.schedules.mysheetsEnabled,
+        fetchOrgSheetsMetadata: this.schedules.fetchOrgSheetsMetadata,
+        emitV2: isSheetsDigestEmitV2Enabled(this.schedules),
       });
-      if (
-        digestCandidate.canAutoDigest &&
-        digestCandidate.config?.source.service === 'mysheets' &&
-        services.includes('sheets')
-      ) {
-        services = services.map((s) => (s === 'sheets' ? 'mysheets' : s));
+      if (digestCandidate.canAutoDigest && digestCandidate.config) {
+        services = [
+          digestCandidate.config.source.service,
+          digestCandidate.config.destination.service,
+        ];
       }
     } else if ((proposal.action === 'create' || proposal.action === 'update') && services.includes('telegram') && this.telegramConnection) {
       const tgLookup = await this.telegramConnection(actor.userId).catch(() => null);
@@ -1811,7 +1834,7 @@ export class ChatService {
     }
     let proposal: ScheduleProposalMetadata | null = null;
     if (response.kind === 'schedule') {
-      const prepared = await this.prepareProposal(response, actor, target.schedule ?? null);
+      const prepared = await this.prepareProposal(response, actor, target.schedule ?? null, conv);
       if ('type' in prepared) proposal = prepared; else response = prepared;
     }
     const emit = (event: string, payload: Record<string, unknown>) => this.eventEmitter.emit(event, { conversationId, ...payload, ...correlation });
