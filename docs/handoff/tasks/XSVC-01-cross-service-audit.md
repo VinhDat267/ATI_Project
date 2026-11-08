@@ -127,6 +127,10 @@ Credential `active`. Plan bị hủy trước khi gửi. `github.list_issues` r�
 
 Plan bị hủy trước khi gửi. `telegram.send_message` tới chat cá nhân đang kết nối. 0 execution step.
 
+### 07/11/2026 — npm run check
+
+Lượt đầy đủ dừng ở test live không SMTP và static guard. Cả hai đã sửa và chạy lại pass. Phần eval, build web, kiểm tra build, launcher và node test exit 0.
+
 ### 07/11/2026 — Xem trước PR rồi Slack
 
 Plan bị hủy trước khi gửi. `github.list_pull_requests` rồi `slack.send_message`. Evidence `github_prs`, `itemCount` 0. 0 execution step.
