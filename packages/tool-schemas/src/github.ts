@@ -15,6 +15,8 @@ const issueProperties = {
   title: { type: 'string' },
   url: { type: 'string' },
   repo: { type: 'string' },
+  createdAt: { type: 'string' },
+  updatedAt: { type: 'string' },
 };
 
 export const GITHUB_TOOLS: ToolDefinition[] = [
@@ -126,7 +128,7 @@ export const GITHUB_OAUTH_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'github.list_issues', service: 'github', discovers: 'issue', sideEffect: 'read', riskLevel: 'low',
-    description: 'List issues across allowed GitHub repositories or within one allowed repository.',
+    description: 'List open or closed issues (including aging or long-open issues for summaries and reports) across allowed GitHub repositories or within one allowed repository.',
     inputSchema: {
       type: 'object',
       properties: {

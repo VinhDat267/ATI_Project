@@ -345,7 +345,21 @@ export class AIPlanner {
       rendered = renderGithubPrsReport(items as any, { repo });
       sourceLabel = repo || 'GitHub Pull Requests';
       artifactItems = items;
-    } else if (readTool === 'github.list_issues') {
+    } else if (readTool === 'myjira.search_issues' || readTool === 'jira.search_issues') {
+      const items = Array.isArray(rawResult)
+        ? rawResult
+        : Array.isArray((rawResult as any)?.issues)
+          ? (rawResult as any).issues
+          : Array.isArray((rawResult as any)?.items)
+            ? (rawResult as any).items
+            : null;
+      if (!Array.isArray(items)) return rawOutput;
+      kind = 'jira_progress';
+      const projectKey = typeof readArgs.projectKey === 'string' ? readArgs.projectKey : undefined;
+      rendered = renderJiraProgressReport(items as any, { projectKey });
+      sourceLabel = projectKey ? `Jira ${projectKey}` : 'Jira Sprint';
+      artifactItems = items;
+    } else if (readTool === 'github.list_issues' || readTool.endsWith('.search_issues')) {
       const items = Array.isArray(rawResult)
         ? rawResult
         : Array.isArray((rawResult as any)?.issues)
@@ -360,20 +374,6 @@ export class AIPlanner {
       const agingDays = ageMatch?.[1] ? Number.parseInt(ageMatch[1], 10) : 7;
       rendered = renderGithubIssueAgingReport(items as any, { repo, agingDays, clock: this.now() });
       sourceLabel = repo ? `${repo} (>${agingDays}d)` : 'GitHub Issues';
-      artifactItems = items;
-    } else if (readTool === 'myjira.search_issues' || readTool === 'jira.search_issues') {
-      const items = Array.isArray(rawResult)
-        ? rawResult
-        : Array.isArray((rawResult as any)?.issues)
-          ? (rawResult as any).issues
-          : Array.isArray((rawResult as any)?.items)
-            ? (rawResult as any).items
-            : null;
-      if (!Array.isArray(items)) return rawOutput;
-      kind = 'jira_progress';
-      const projectKey = typeof readArgs.projectKey === 'string' ? readArgs.projectKey : undefined;
-      rendered = renderJiraProgressReport(items as any, { projectKey });
-      sourceLabel = projectKey ? `Jira ${projectKey}` : 'Jira Sprint';
       artifactItems = items;
     } else {
       let sheetData: SheetSummaryData | null = null;

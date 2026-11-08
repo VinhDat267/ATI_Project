@@ -82,7 +82,7 @@ export function reportLiteralBodies(userTexts: readonly string[]): string[] {
 }
 
 export const REPORT_SOURCE_TOOLS: ReadonlySet<string> = new Set([
-  'github.list_pull_requests', 'github.list_issues', 'myjira.search_issues', 'jira.search_issues',
+  'github.list_pull_requests', 'github.list_issues', 'github.search_issues', 'myjira.search_issues', 'jira.search_issues',
   'mysheets.read_range', 'mysheets.aggregate_rows', 'sheets.read_range',
 ]);
 

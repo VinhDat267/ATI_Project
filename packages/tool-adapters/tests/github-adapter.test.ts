@@ -388,6 +388,37 @@ describe('GitHub adapter', () => {
     expect(listed).toEqual([
       { id: '12', number: 7, title: 'Fix login', url: issue.html_url, repo },
     ]);
+
+    // 6. list_issues preserves created_at and updated_at as createdAt and updatedAt for aging reports
+    const timestampedFetch = vi.fn(async () =>
+      json({
+        items: [
+          {
+            ...issue,
+            repository_url: 'https://api.github.com/repos/team/project',
+            created_at: '2026-10-01T00:00:00Z',
+            updated_at: '2026-10-05T12:00:00Z',
+          },
+        ],
+      }),
+    );
+    const timestampedAdapter = new GitHubAdapter({
+      credentials: { token: 'test' },
+      allowedScope,
+      fetchFn: timestampedFetch as typeof fetch,
+    });
+    const timestampedListed = await timestampedAdapter.execute('github.list_issues', { repo, state: 'open' });
+    expect(timestampedListed).toEqual([
+      {
+        id: '12',
+        number: 7,
+        title: 'Fix login',
+        url: issue.html_url,
+        repo,
+        createdAt: '2026-10-01T00:00:00Z',
+        updatedAt: '2026-10-05T12:00:00Z',
+      },
+    ]);
   });
 
   it('lists pull requests from allowed repository with state and keyword filtering', async () => {
