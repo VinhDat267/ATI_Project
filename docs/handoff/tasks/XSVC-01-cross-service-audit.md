@@ -123,6 +123,10 @@ DEV-04 bị từ chối trước plan. Credential GitHub là `reconnect_required
 
 Credential `active`. Plan bị hủy trước khi gửi. `github.list_issues` rồi `slack.send_message`. Evidence `github_issues`, `itemCount` 4, nhãn `>7d`. 0 execution step.
 
+### 07/11/2026 — Xem trước Telegram
+
+Plan bị hủy trước khi gửi. `telegram.send_message` tới chat cá nhân đang kết nối. 0 execution step.
+
 ### 07/11/2026 — Xem trước PR rồi Slack
 
 Plan bị hủy trước khi gửi. `github.list_pull_requests` rồi `slack.send_message`. Evidence `github_prs`, `itemCount` 0. 0 execution step.
