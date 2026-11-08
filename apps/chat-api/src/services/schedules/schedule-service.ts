@@ -1555,6 +1555,15 @@ export class ScheduleService {
       // Canonical lock order: c -> s -> u/wm -> r -> r.conv_id
       const schedule = await this.lockSchedule(client, meta.schedule_id, userId, scope);
       if (!schedule) throw new ScheduleNotFound();
+      if (schedule.kind !== 'sheets_digest') {
+        throw new ScheduleConflict(
+          'RUN_NOT_AWAITING_DELIVERY_RESOLUTION',
+          'Chỉ lượt chạy Google Sheets Digest mới hỗ trợ xử lý trạng thái gửi không xác định.',
+        );
+      }
+      if (schedule.status === 'cancelled') {
+        throw new ScheduleConflict('SCHEDULE_CLOSED');
+      }
 
       const trustedScope = resolveTrustedScheduleScope(schedule);
       const userRes = await client.query<{ status: string }>(
@@ -1586,10 +1595,15 @@ export class ScheduleService {
           'Lượt chạy này đã được xử lý trạng thái gửi trước đó.',
         );
       }
-      if (run.status !== 'needs_attention' || run.delivery_started_at == null) {
+      if (
+        run.status !== 'needs_attention' ||
+        run.delivery_started_at == null ||
+        typeof run.error !== 'string' ||
+        !run.error.includes('SHEETS_DELIVERY_UNKNOWN')
+      ) {
         throw new ScheduleConflict(
           'RUN_NOT_AWAITING_DELIVERY_RESOLUTION',
-          'Lượt chạy này không ở trạng thái chờ xác nhận kết quả gửi.',
+          'Lượt chạy này không ở trạng thái chờ xác nhận kết quả gửi (SHEETS_DELIVERY_UNKNOWN).',
         );
       }
 
@@ -1598,12 +1612,16 @@ export class ScheduleService {
 
       if (resolution === 'mark_sent') {
         const cfg =
-          schedule.kind === 'sheets_digest' && schedule.digest_config && typeof schedule.digest_config === 'object'
+          schedule.digest_config && typeof schedule.digest_config === 'object'
             ? (schedule.digest_config as SheetsDigestConfig)
             : null;
         const src = cfg?.source;
         const dest = cfg?.destination;
-        const targetId =
+        const prevDelivery =
+          run.delivery && typeof run.delivery === 'object'
+            ? (run.delivery as Partial<SheetsDigestDelivery>)
+            : null;
+        const fallbackTargetId =
           dest && 'channelId' in dest
             ? dest.channelId
             : dest?.service === 'gmail'
@@ -1611,7 +1629,7 @@ export class ScheduleService {
               : dest?.service === 'telegram'
                 ? dest.chatId
                 : 'unknown';
-        const targetLabel =
+        const fallbackTargetLabel =
           dest && 'channelId' in dest
             ? (dest as any).channelLabel ?? dest.channelId
             : dest?.service === 'telegram'
@@ -1619,20 +1637,52 @@ export class ScheduleService {
               : dest?.service === 'gmail'
                 ? dest.recipientEmail
                 : undefined;
+        const effectiveTargetLabel = prevDelivery?.targetLabel ?? fallbackTargetLabel;
+        const effectiveSheetName = prevDelivery?.sheetName ?? src?.sheetName;
 
         const delivery: SheetsDigestDelivery = {
-          destination: dest?.service ?? 'telegram',
-          targetId,
-          ...(targetLabel ? { targetLabel } : {}),
-          spreadsheetId: src?.spreadsheetId ?? '',
-          spreadsheetTitle: src?.spreadsheetTitle ?? '',
-          ...(src?.sheetName ? { sheetName: src.sheetName } : {}),
-          rowCount: 0,
-          summaryMode: cfg?.includeAiSummary ? 'ai' : 'deterministic',
-          sentAt: resolvedAtIso,
+          destination: prevDelivery?.destination ?? dest?.service ?? 'telegram',
+          targetId: prevDelivery?.targetId ?? fallbackTargetId,
+          ...(effectiveTargetLabel ? { targetLabel: effectiveTargetLabel } : {}),
+          spreadsheetId: prevDelivery?.spreadsheetId ?? src?.spreadsheetId ?? '',
+          spreadsheetTitle: prevDelivery?.spreadsheetTitle ?? src?.spreadsheetTitle ?? '',
+          ...(effectiveSheetName ? { sheetName: effectiveSheetName } : {}),
+          rowCount: typeof prevDelivery?.rowCount === 'number' ? prevDelivery.rowCount : null,
+          ...(prevDelivery?.dataScope ? { dataScope: prevDelivery.dataScope } : {}),
+          ...(prevDelivery?.scannedRange ? { scannedRange: prevDelivery.scannedRange } : {}),
+          ...(typeof prevDelivery?.windowClipped === 'boolean'
+            ? { windowClipped: prevDelivery.windowClipped }
+            : {}),
+          summaryMode:
+            prevDelivery?.summaryMode === 'ai' || prevDelivery?.summaryMode === 'deterministic'
+              ? prevDelivery.summaryMode
+              : cfg?.includeAiSummary
+                ? 'ai'
+                : 'deterministic',
+          sentAt: typeof prevDelivery?.sentAt === 'string' ? prevDelivery.sentAt : null,
+          providerSentAt:
+            typeof prevDelivery?.providerSentAt === 'string'
+              ? prevDelivery.providerSentAt
+              : typeof prevDelivery?.sentAt === 'string'
+                ? prevDelivery.sentAt
+                : null,
+          manualConfirmedAt: resolvedAtIso,
+          ...(typeof prevDelivery?.slackMessageTs === 'string'
+            ? { slackMessageTs: prevDelivery.slackMessageTs }
+            : {}),
+          ...(prevDelivery?.telegramMessageId !== undefined
+            ? { telegramMessageId: prevDelivery.telegramMessageId }
+            : {}),
+          ...(typeof prevDelivery?.gmailMessageId === 'string'
+            ? { gmailMessageId: prevDelivery.gmailMessageId }
+            : {}),
+          ...(typeof prevDelivery?.skippedEmpty === 'boolean'
+            ? { skippedEmpty: prevDelivery.skippedEmpty }
+            : {}),
           manualResolution: {
             status: 'confirmed_sent',
             resolvedAt: resolvedAtIso,
+            manualConfirmedAt: resolvedAtIso,
             resolvedBy: userId,
           },
         };
@@ -1685,12 +1735,7 @@ export class ScheduleService {
       }
 
       // Branch B: resolution === 'retry_new_run' with confirmDuplicateRisk === true
-      if (schedule.status === 'cancelled') {
-        throw new ScheduleConflict('SCHEDULE_CLOSED');
-      }
-      if (schedule.kind === 'sheets_digest') {
-        await this.assertSheetsDigestCanResumeInTx(client, schedule);
-      }
+      await this.assertSheetsDigestCanResumeInTx(client, schedule);
       const busy = await client.query(
         "SELECT 1 FROM schedule_runs WHERE schedule_id = $1 AND status = 'planning'",
         [schedule.id],

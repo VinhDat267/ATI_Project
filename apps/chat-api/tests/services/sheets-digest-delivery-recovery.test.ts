@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import type { SheetsDigestConfigV2 } from '@wap/tool-schemas';
 import { createApp } from '../../src/app.js';
@@ -6,6 +6,7 @@ import { generateAccessToken } from '../../src/auth/jwt.js';
 import { computeSheetsDigestHash } from '../../src/services/schedules/sheets-digest-candidate.js';
 import { SHEETS_DELIVERY_UNKNOWN } from '../../src/services/schedules/sheets-digest-runner.js';
 import { ScheduleService } from '../../src/services/schedules/schedule-service.js';
+import { certifyScheduleFixture } from '../../src/services/slack/slack-schedule-origin.js';
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
 import {
   DIGEST_TEST_ENC_KEY,
@@ -395,7 +396,7 @@ describe('Task 5B (PR-5B): Manual Delivery Recovery API & Audit Preservation (TC
     });
   });
 
-  it('4. resolves with mark_sent by transitioning run to digest_sent, clearing error, preserving write-once delivery_started_at, and populating delivery.manualResolution satisfying schedule_runs_delivery_check', async () => {
+  it('4. resolves with mark_sent by transitioning run to digest_sent, clearing error, preserving write-once delivery_started_at, and recording honest manual-confirmation metadata without fabricating rowCount, sentAt, or provider receipts', async () => {
     const service = buildService();
     const app = buildApp(service);
     const { schedule, run, runConv, owner, workspaceId } = await seedOrgDigestScheduleWithUnknownRun();
@@ -422,16 +423,25 @@ describe('Task 5B (PR-5B): Manual Delivery Recovery API & Audit Preservation (TC
         targetLabel: '#general',
         spreadsheetId: ORG_A_SPREADSHEET_ID,
         spreadsheetTitle: fixtures.orgA.spreadsheetTitle,
-        rowCount: 0,
+        rowCount: null,
         summaryMode: 'deterministic',
-        sentAt: NOW.toISOString(),
+        sentAt: null,
+        providerSentAt: null,
+        manualConfirmedAt: NOW.toISOString(),
         manualResolution: {
           status: 'confirmed_sent',
           resolvedAt: NOW.toISOString(),
+          manualConfirmedAt: NOW.toISOString(),
           resolvedBy: owner.id,
         },
       },
     });
+    expect(res.body.run.delivery.slackMessageTs).toBeUndefined();
+    expect(res.body.run.delivery.telegramMessageId).toBeUndefined();
+    expect(res.body.run.delivery.gmailMessageId).toBeUndefined();
+    expect(res.body.run.delivery.ts).toBeUndefined();
+    expect(res.body.run.delivery.id).toBeUndefined();
+    expect(res.body.run.delivery.messageId).toBeUndefined();
     expect(plannedRuns).toEqual([]);
 
     const dbRun = (await db.pool.query('SELECT * FROM schedule_runs WHERE id = $1', [run.id])).rows[0];
@@ -441,9 +451,17 @@ describe('Task 5B (PR-5B): Manual Delivery Recovery API & Audit Preservation (TC
     expect(dbRun.delivery_resolution).toBe('confirmed_sent');
     expect(new Date(dbRun.delivery_resolved_at).toISOString()).toBe(NOW.toISOString());
     expect(dbRun.delivery_resolved_by).toBe(owner.id);
+    expect(dbRun.delivery.rowCount).toBeNull();
+    expect(dbRun.delivery.sentAt).toBeNull();
+    expect(dbRun.delivery.providerSentAt).toBeNull();
+    expect(dbRun.delivery.manualConfirmedAt).toBe(NOW.toISOString());
+    expect(dbRun.delivery.slackMessageTs).toBeUndefined();
+    expect(dbRun.delivery.telegramMessageId).toBeUndefined();
+    expect(dbRun.delivery.gmailMessageId).toBeUndefined();
     expect(dbRun.delivery.manualResolution).toEqual({
       status: 'confirmed_sent',
       resolvedAt: NOW.toISOString(),
+      manualConfirmedAt: NOW.toISOString(),
       resolvedBy: owner.id,
     });
 
@@ -464,6 +482,72 @@ describe('Task 5B (PR-5B): Manual Delivery Recovery API & Audit Preservation (TC
       runId: run.id,
       resolution: 'mark_sent',
       deliveryResolution: 'confirmed_sent',
+    });
+  });
+
+  it('4b. preserves pre-existing genuine delivery metadata when already present on run.delivery during mark_sent', async () => {
+    const service = buildService();
+    const app = buildApp(service);
+    const { run, owner, workspaceId } = await seedOrgDigestScheduleWithUnknownRun();
+
+    const preExistingSentAt = '2026-11-02T01:55:04.000Z';
+    const origRunForUpdate = (service as any).repo.runForUpdate.bind((service as any).repo);
+    const spy = vi.spyOn((service as any).repo, 'runForUpdate').mockImplementationOnce(async (...args: unknown[]) => {
+      const row = await origRunForUpdate(args[0] as string, args[1]);
+      if (row) {
+        row.delivery = {
+          destination: 'slack',
+          targetId: fixtures.orgA.slackChannelId,
+          targetLabel: '#general-custom',
+          spreadsheetId: ORG_A_SPREADSHEET_ID,
+          spreadsheetTitle: fixtures.orgA.spreadsheetTitle,
+          sheetName: 'Tab Doanh Thu',
+          rowCount: 42,
+          dataScope: 'full_tab_verified',
+          scannedRange: 'Tab Doanh Thu!A1:F43',
+          windowClipped: false,
+          summaryMode: 'ai',
+          sentAt: preExistingSentAt,
+          providerSentAt: preExistingSentAt,
+          slackMessageTs: '1730512504.000200',
+          skippedEmpty: false,
+        };
+      }
+      return row;
+    });
+
+    const res = await request(app)
+      .post(`/api/schedule-runs/${run.id}/resolve-delivery`)
+      .set('Authorization', bearer(owner))
+      .set('X-Workspace-Id', workspaceId)
+      .send({ resolution: 'mark_sent' });
+
+    spy.mockRestore();
+
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.run.delivery).toEqual({
+      destination: 'slack',
+      targetId: fixtures.orgA.slackChannelId,
+      targetLabel: '#general-custom',
+      spreadsheetId: ORG_A_SPREADSHEET_ID,
+      spreadsheetTitle: fixtures.orgA.spreadsheetTitle,
+      sheetName: 'Tab Doanh Thu',
+      rowCount: 42,
+      dataScope: 'full_tab_verified',
+      scannedRange: 'Tab Doanh Thu!A1:F43',
+      windowClipped: false,
+      summaryMode: 'ai',
+      sentAt: preExistingSentAt,
+      providerSentAt: preExistingSentAt,
+      manualConfirmedAt: NOW.toISOString(),
+      slackMessageTs: '1730512504.000200',
+      skippedEmpty: false,
+      manualResolution: {
+        status: 'confirmed_sent',
+        resolvedAt: NOW.toISOString(),
+        manualConfirmedAt: NOW.toISOString(),
+        resolvedBy: owner.id,
+      },
     });
   });
 
@@ -551,5 +635,167 @@ describe('Task 5B (PR-5B): Manual Delivery Recovery API & Audit Preservation (TC
       .send({ resolution: 'mark_sent' });
     expect(unclaimedResolve.status).toBe(409);
     expect(unclaimedResolve.body.error.code).toBe('RUN_NOT_AWAITING_DELIVERY_RESOLUTION');
+  });
+
+  it('7. rejects wrong-kind schedules (calendar_digest, notion_digest, plan, github_digest) with 409 RUN_NOT_AWAITING_DELIVERY_RESOLUTION and zero DB mutations', async () => {
+    const service = buildService();
+    const app = buildApp(service);
+    const { personalA } = fixtures;
+    const recurrence = { type: 'daily' as const, time: '08:00' };
+    const dummyHash = 'a'.repeat(64);
+
+    const wrongKinds = ['calendar_digest', 'notion_digest', 'plan', 'github_digest'] as const;
+
+    for (const kind of wrongKinds) {
+      const isPlan = kind === 'plan';
+      const kindConv = await fixtures.convRepo.createConversation(
+        personalA.user.id,
+        `Hội thoại ${kind}`,
+        { workspaceMode: 'personal', workspaceId: null }
+      );
+      const schedRes = await db.pool.query(
+        `INSERT INTO schedules (
+           user_id, conv_id, name, request, recurrence, services, status, pause_reason,
+           version, next_run_at, workspace_id, workspace_mode, kind, digest_config, digest_config_hash, digest_approved_at
+         )
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6, 'active', NULL, 1, $7, NULL, 'personal', $8, $9::jsonb, $10, $11)
+         RETURNING *`,
+        [
+          personalA.user.id,
+          kindConv.id,
+          `Lịch ${kind}`,
+          `Yêu cầu ${kind}`,
+          JSON.stringify(recurrence),
+          ['slack'],
+          new Date('2026-11-03T01:00:00.000Z'),
+          kind,
+          isPlan ? null : JSON.stringify({ version: 1, dummy: kind }),
+          isPlan ? null : dummyHash,
+          isPlan ? null : new Date('2026-11-01T12:00:00.000Z'),
+        ]
+      );
+      const sched = schedRes.rows[0];
+      await certifyScheduleFixture(db.pool, sched.id);
+
+      const runRes = await db.pool.query(
+        `INSERT INTO schedule_runs (
+           schedule_id, schedule_version, trigger, due_at, status, conv_id, error, delivery_started_at
+         )
+         VALUES ($1, 1, 'scheduled', $2, 'needs_attention', $3, $4, $5)
+         RETURNING *`,
+        [
+          sched.id,
+          new Date('2026-11-02T01:00:00.000Z'),
+          kindConv.id,
+          SHEETS_DELIVERY_UNKNOWN,
+          CLAIMED_AT,
+        ]
+      );
+      const wrongKindRun = runRes.rows[0];
+
+      const markSentRes = await request(app)
+        .post(`/api/schedule-runs/${wrongKindRun.id}/resolve-delivery`)
+        .set('Authorization', bearer(personalA.user))
+        .send({ resolution: 'mark_sent' });
+      expect(markSentRes.status, `mark_sent for kind=${kind}`).toBe(409);
+      expect(markSentRes.body.error.code).toBe('RUN_NOT_AWAITING_DELIVERY_RESOLUTION');
+
+      const retryRes = await request(app)
+        .post(`/api/schedule-runs/${wrongKindRun.id}/resolve-delivery`)
+        .set('Authorization', bearer(personalA.user))
+        .send({ resolution: 'retry_new_run', confirmDuplicateRisk: true });
+      expect(retryRes.status, `retry_new_run for kind=${kind}`).toBe(409);
+      expect(retryRes.body.error.code).toBe('RUN_NOT_AWAITING_DELIVERY_RESOLUTION');
+
+      // Verify zero DB mutations on schedule_runs for this schedule
+      const runsInDb = (
+        await db.pool.query('SELECT * FROM schedule_runs WHERE schedule_id = $1', [sched.id])
+      ).rows;
+      expect(runsInDb).toHaveLength(1);
+      expect(runsInDb[0].status).toBe('needs_attention');
+      expect(runsInDb[0].delivery).toBeNull();
+      expect(runsInDb[0].delivery_resolution).toBeNull();
+      expect(runsInDb[0].delivery_resolved_at).toBeNull();
+      expect(runsInDb[0].delivery_followup_run_id).toBeNull();
+      expect(runsInDb[0].error).toBe(SHEETS_DELIVERY_UNKNOWN);
+    }
+    expect(plannedRuns).toEqual([]);
+  });
+
+  it('8. rejects needs_attention runs whose error does not include SHEETS_DELIVERY_UNKNOWN with 409 RUN_NOT_AWAITING_DELIVERY_RESOLUTION and zero DB mutations', async () => {
+    const service = buildService();
+    const app = buildApp(service);
+    const { schedule, owner } = await seedPersonalDigestScheduleWithUnknownRun();
+
+    const wrongErrorRunRes = await db.pool.query(
+      `INSERT INTO schedule_runs (
+         schedule_id, schedule_version, trigger, due_at, status, error, delivery_started_at
+       )
+       VALUES ($1, 1, 'scheduled', $2, 'needs_attention', $3, $4)
+       RETURNING *`,
+      [
+        schedule.id,
+        new Date('2026-11-02T04:00:00.000Z'),
+        'NETWORK_TIMEOUT_NON_SHEETS: Không thể kết nối dịch vụ.',
+        CLAIMED_AT,
+      ]
+    );
+    const wrongErrorRun = wrongErrorRunRes.rows[0];
+
+    const markSentRes = await request(app)
+      .post(`/api/schedule-runs/${wrongErrorRun.id}/resolve-delivery`)
+      .set('Authorization', bearer(owner))
+      .send({ resolution: 'mark_sent' });
+    expect(markSentRes.status).toBe(409);
+    expect(markSentRes.body.error.code).toBe('RUN_NOT_AWAITING_DELIVERY_RESOLUTION');
+
+    const retryRes = await request(app)
+      .post(`/api/schedule-runs/${wrongErrorRun.id}/resolve-delivery`)
+      .set('Authorization', bearer(owner))
+      .send({ resolution: 'retry_new_run', confirmDuplicateRisk: true });
+    expect(retryRes.status).toBe(409);
+    expect(retryRes.body.error.code).toBe('RUN_NOT_AWAITING_DELIVERY_RESOLUTION');
+
+    const dbRun = (await db.pool.query('SELECT * FROM schedule_runs WHERE id = $1', [wrongErrorRun.id])).rows[0];
+    expect(dbRun.status).toBe('needs_attention');
+    expect(dbRun.delivery).toBeNull();
+    expect(dbRun.delivery_resolution).toBeNull();
+    expect(dbRun.delivery_resolved_at).toBeNull();
+    expect(dbRun.delivery_followup_run_id).toBeNull();
+    expect(dbRun.error).toBe('NETWORK_TIMEOUT_NON_SHEETS: Không thể kết nối dịch vụ.');
+    expect(plannedRuns).toEqual([]);
+  });
+
+  it('9. rejects both mark_sent and retry_new_run on a cancelled schedule with 409 SCHEDULE_CLOSED and zero DB mutations', async () => {
+    const service = buildService();
+    const app = buildApp(service);
+    const { schedule, run, owner } = await seedPersonalDigestScheduleWithUnknownRun();
+
+    await db.pool.query("UPDATE schedules SET status = 'cancelled', next_run_at = NULL WHERE id = $1", [schedule.id]);
+
+    const markSentRes = await request(app)
+      .post(`/api/schedule-runs/${run.id}/resolve-delivery`)
+      .set('Authorization', bearer(owner))
+      .send({ resolution: 'mark_sent' });
+    expect(markSentRes.status).toBe(409);
+    expect(markSentRes.body.error.code).toBe('SCHEDULE_CLOSED');
+
+    const retryRes = await request(app)
+      .post(`/api/schedule-runs/${run.id}/resolve-delivery`)
+      .set('Authorization', bearer(owner))
+      .send({ resolution: 'retry_new_run', confirmDuplicateRisk: true });
+    expect(retryRes.status).toBe(409);
+    expect(retryRes.body.error.code).toBe('SCHEDULE_CLOSED');
+
+    const runsInDb = (
+      await db.pool.query('SELECT * FROM schedule_runs WHERE schedule_id = $1', [schedule.id])
+    ).rows;
+    expect(runsInDb).toHaveLength(1);
+    expect(runsInDb[0].status).toBe('needs_attention');
+    expect(runsInDb[0].delivery).toBeNull();
+    expect(runsInDb[0].delivery_resolution).toBeNull();
+    expect(runsInDb[0].delivery_resolved_at).toBeNull();
+    expect(runsInDb[0].delivery_followup_run_id).toBeNull();
+    expect(plannedRuns).toEqual([]);
   });
 });
