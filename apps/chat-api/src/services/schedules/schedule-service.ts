@@ -326,6 +326,7 @@ export class ScheduleService {
       if (metadata?.type !== 'schedule_proposal') throw new ScheduleNotFound();
       const rawJiraCandidateConfig = (metadata.digestCandidate as any)?.config;
       const isReadOnlyJiraDigestConfirm =
+        !metadata.reauthorize &&
         approvalMode === 'auto_digest' &&
         (metadata.digestCandidate as any)?.canAutoDigest === true &&
         Boolean(rawJiraCandidateConfig) &&
@@ -356,6 +357,15 @@ export class ScheduleService {
       if (metadata.reauthorize) {
         if (!existing || metadata.scheduleId !== existing.id) {
           throw new ScheduleConflict('STALE_PROPOSAL');
+        }
+        if (existing.kind !== 'sheets_digest') {
+          throw new ScheduleConflict(
+            'REAUTHORIZATION_NOT_READY',
+            'Chỉ lịch tổng hợp Google Sheets (sheets_digest) mới hỗ trợ cấp quyền lại v2.',
+          );
+        }
+        if (metadata.proposal?.action !== 'update') {
+          throw new ScheduleConflict('DIGEST_NOT_ELIGIBLE');
         }
         if (existing.last_proposal_id === messageId) {
           throw new ScheduleConflict('STALE_PROPOSAL', 'Đề xuất cấp quyền lại này đã được sử dụng.');
@@ -419,18 +429,21 @@ export class ScheduleService {
         candidateConfig && typeof candidateConfig === 'object' && 'databases' in candidateConfig,
       );
       const isCalendarSchedule =
-        existing?.kind === 'calendar_digest' ||
-        (!candidateHasTelegramSources &&
-          !hasGithubDigestCandidate &&
-          !hasTrelloDigestCandidate &&
-          !hasNotionDigestCandidate &&
-          existing?.kind !== 'telegram_digest' &&
-          existing?.kind !== 'github_digest' &&
-          existing?.kind !== 'trello_digest' &&
-          existing?.kind !== 'notion_digest' &&
-          (metadata.services.includes('mycalendar') ||
-            (metadata.services.includes('calendar') && !metadata.services.includes('github'))));
+        !metadata.reauthorize &&
+        (existing?.kind === 'calendar_digest' ||
+          (!candidateHasTelegramSources &&
+            !hasGithubDigestCandidate &&
+            !hasTrelloDigestCandidate &&
+            !hasNotionDigestCandidate &&
+            existing?.kind !== 'telegram_digest' &&
+            existing?.kind !== 'github_digest' &&
+            existing?.kind !== 'trello_digest' &&
+            existing?.kind !== 'notion_digest' &&
+            existing?.kind !== 'sheets_digest' &&
+            (metadata.services.includes('mycalendar') ||
+              (metadata.services.includes('calendar') && !metadata.services.includes('github')))));
       const isSheetsSchedule =
+        Boolean(metadata.reauthorize) ||
         existing?.kind === 'sheets_digest' ||
         (!candidateHasTelegramSources &&
           !hasGithubDigestCandidate &&
@@ -443,6 +456,7 @@ export class ScheduleService {
           existing?.kind !== 'calendar_digest' &&
           (metadata.services.includes('mysheets') || metadata.services.includes('sheets')));
       const isGithubSchedule =
+        !metadata.reauthorize &&
         !isCalendarSchedule &&
         !isSheetsSchedule &&
         (hasGithubDigestCandidate ||
@@ -451,6 +465,7 @@ export class ScheduleService {
             !metadata.services.includes('telegram') &&
             (metadata.services.includes('github') || existing?.kind === 'github_digest')));
       const isTrelloSchedule =
+        !metadata.reauthorize &&
         !isCalendarSchedule &&
         !isSheetsSchedule &&
         !isGithubSchedule &&
@@ -460,6 +475,7 @@ export class ScheduleService {
             !metadata.services.includes('telegram') &&
             (metadata.services.includes('trello') || existing?.kind === 'trello_digest')));
       const isNotionSchedule =
+        !metadata.reauthorize &&
         !isCalendarSchedule &&
         !isSheetsSchedule &&
         !isGithubSchedule &&
@@ -471,6 +487,7 @@ export class ScheduleService {
             !metadata.services.includes('telegram') &&
             (metadata.services.includes('notion') || existing?.kind === 'notion_digest')));
       const isTelegramSchedule =
+        !metadata.reauthorize &&
         !isCalendarSchedule &&
         !isSheetsSchedule &&
         !isGithubSchedule &&
@@ -947,6 +964,12 @@ export class ScheduleService {
       }
       let savedRow = await this.saveFields(client, existing.id, fields, messageId, segments);
       if (proposal.action === 'update') {
+        if (metadata.reauthorize && digestFields.kind !== 'sheets_digest') {
+          throw new ScheduleConflict(
+            'REAUTHORIZATION_NOT_READY',
+            'Chỉ lịch tổng hợp Google Sheets (sheets_digest) mới hỗ trợ cấp quyền lại v2.',
+          );
+        }
         const updatedDigest = await client.query(
           `UPDATE schedules SET kind=$2, digest_config=$3::jsonb, digest_config_hash=$4, digest_approved_at=$5, workspace_id=$6, workspace_mode=$7 WHERE id=$1 RETURNING *`,
           [
@@ -1020,6 +1043,12 @@ export class ScheduleService {
     // Phase A (Outside DB Transaction): Snapshot read & Candidate/Metadata resolution
     const snap = await this.repo.ownedSchedule(scheduleId, userId, this.options.pool, false, scope);
     if (!snap) throw new ScheduleNotFound();
+    if (snap.kind !== 'sheets_digest') {
+      throw new ScheduleConflict(
+        'REAUTHORIZATION_NOT_READY',
+        'Chỉ lịch tổng hợp Google Sheets (sheets_digest) mới hỗ trợ cấp quyền lại v2.',
+      );
+    }
     if (snap.status === 'cancelled' || snap.status === 'completed') {
       throw new ScheduleConflict('SCHEDULE_CLOSED');
     }
@@ -1249,6 +1278,12 @@ export class ScheduleService {
       );
       const current = schedRes.rows[0];
       if (!current) throw new ScheduleNotFound();
+      if (current.kind !== 'sheets_digest') {
+        throw new ScheduleConflict(
+          'REAUTHORIZATION_NOT_READY',
+          'Chỉ lịch tổng hợp Google Sheets (sheets_digest) mới hỗ trợ cấp quyền lại v2.',
+        );
+      }
 
       const guarded = await guardScheduleArtifact(client, this.registry, saved, 'planning', 'UPDATE');
       if (!guarded.allowed) throw new ScheduleConflict('SCHEDULE_SOURCE_PURGED');
