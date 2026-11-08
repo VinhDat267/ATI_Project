@@ -27,4 +27,4 @@ Mức là mức còn lại sau pha 1. F1–F3 và cổng duyệt đã có test �
 
 ## Giới hạn của bằng chứng
 
-`npm test -w @wap/chat-api` trên PostgreSQL loopback cổng 56534: 2474 pass, 1 timeout 5s ở phân trang hội thoại. Chạy lại file đó 8/8 pass. Chưa chạy `npm run check`. Browser `nine_service` đã pass sau F7. Hai lượt đọc live không tạo plan.
+`npm run check` một lệnh duy nhất trên PostgreSQL kiểm thử sạch cổng 56534: PASS, exit 0 (`typecheck:v3` pass; schemas 579, adapters 638 + probe 32, planner 555, executor 56, API 2554, web 1198; evaluations 500 pass / 1 preflight skip; build/security/launcher 1/Node 66 pass). Browser `nine_service` đã pass sau F7. Các lượt xem trước live trên ma trận đều bấm Hủy trước khi ghi (`0 execution step`).

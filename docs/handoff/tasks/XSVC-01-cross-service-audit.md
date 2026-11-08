@@ -129,7 +129,7 @@ Plan bị hủy trước khi gửi. `telegram.send_message` tới chat cá nhân
 
 ### 07/11/2026 — npm run check
 
-Lượt đầy đủ dừng ở test live không SMTP và static guard. Cả hai đã sửa và chạy lại pass. Phần eval, build web, kiểm tra build, launcher và node test exit 0.
+Sau khi chuẩn hóa `.endsWith('.list_events')` trong `planner.ts` (giữ nguyên danh sách ngoại lệ `static-guard.test.ts`) và cô lập biến môi trường trong `live-without-smtp.test.ts`, toàn bộ `npm run check` đã chạy lại thành một lệnh duy nhất trên PostgreSQL 16 kiểm thử sạch cổng 56534: PASS, exit 0 (schemas 579, adapters 638 + probe 32, planner 555, executor 56, API 2554, web 1198; evaluations 500 pass / 1 skip; build web, kiểm tra build, launcher 1, node test 66 đều pass).
 
 ### 07/11/2026 — Xem trước PR rồi Slack
 

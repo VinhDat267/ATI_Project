@@ -751,7 +751,7 @@ export class AIPlanner {
         hasReadData: asksForPullRequests(userTexts)
           ? successfulReads.some((read) => read.tool === 'github.list_pull_requests' && read.error === undefined && read.result !== undefined)
           : asksForCalendarEvents(userTexts)
-            ? successfulReads.some((read) => (read.tool === 'mycalendar.list_events' || read.tool === 'calendar.list_events') && read.error === undefined && read.result !== undefined)
+            ? successfulReads.some((read) => read.tool.endsWith('.list_events') && read.error === undefined && read.result !== undefined)
             : successfulReads.length > 0 || usedDirectory.length > 0 }) : this.scheduleValidation(boundOutput, input) ?? validatePlan(boundOutput, activeTools,
         {
           ...(this.requireGroundedResources ? { grounding: { memory: groundingMemory(memory.getAll(), memory.getEntity('__observed')), userTexts: groundingUserTexts } } : {}),

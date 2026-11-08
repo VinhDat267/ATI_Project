@@ -14,7 +14,7 @@ const scopedUrl = new URL(databaseUrl);
 scopedUrl.searchParams.set('options', `-c search_path=${schema}`);
 // Never hand real provider or mail credentials from a developer .env to this live process.
 const inherited = Object.fromEntries(Object.entries(process.env).filter(([key]) =>
-  !/^(SMTP_|MAIL_FROM|APP_BASE_URL|AUTH_SIGNUP_ENABLED|TRELLO_|MYTRELLO_|SLACK_|MYSLACK_|GITHUB_|GOOGLE_|NOTION_|MYNOTION_|TELEGRAM_|JIRA_|MYJIRA_|GMAIL_|MYCALENDAR_|MYSHEETS_|LIVE_|LLM_|GEMINI_|SANDBOX_|CHAT_ADMIN_|SERVICE_ADMIN)/.test(key)));
+  !/^(SMTP_|MAIL_FROM|APP_BASE_URL|AUTH_SIGNUP_ENABLED|TRELLO_|MYTRELLO_|SLACK_|MYSLACK_|GITHUB_|GOOGLE_|NOTION_|MYNOTION_|TELEGRAM_|JIRA_|MYJIRA_|GMAIL_|MYCALENDAR_|MYSHEETS_|LIVE_|LLM_|GEMINI_|DEEPSEEK_|SANDBOX_|CHAT_ADMIN_|SERVICE_ADMIN)/.test(key)));
 
 async function unusedPort() {
   const socket = createServer(); socket.listen(0, '127.0.0.1'); await once(socket, 'listening');
