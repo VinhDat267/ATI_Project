@@ -36,19 +36,21 @@ export function CockpitHeader({
   onConversation,
 }: Props) {
   const [testExplainOpen, setTestExplainOpen] = useState(false);
+  const hasActiveChat = !(moment === 1 && chatCount === 0);
   const actions = (
     <>
       <button
         id="btn-open-history"
         type="button"
         aria-label="Mở danh sách hội thoại"
+        title="Hội thoại gần đây"
         onClick={() => onHistory()}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 whitespace-nowrap text-xs font-medium text-brand-text bg-white hover:bg-neutral-100 rounded-lg border border-brand-border shadow-sm transition-colors"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 whitespace-nowrap text-xs font-medium text-brand-text bg-white hover:bg-neutral-100 rounded-xl border border-brand-border shadow-2xs transition-colors cursor-pointer"
         aria-expanded={historyOpen ? 'true' : 'false'}
         aria-controls={historyOpen ? historyDialogId : undefined}
       >
         <svg
-          className="w-3.5 h-3.5 text-brand-muted"
+          className="w-3.5 h-3.5 text-brand-muted flex-shrink-0"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -57,23 +59,26 @@ export function CockpitHeader({
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeWidth="2"
-            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+            d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
           />
         </svg>
-        <span className="hidden xl:inline">Lịch sử</span>
+        <span className={hasActiveChat ? 'hidden 2xl:inline' : 'hidden xl:inline'}>
+          Hội thoại gần đây
+        </span>
       </button>
       {/* Nút Xem hội thoại (Ẩn ở khoảnh khắc 1 khi chưa có tin nhắn; PBI-03: hội thoại đã lưu vẫn mở được) */}
       <button
         id="btn-open-chat"
         type="button"
         aria-label="Xem hội thoại"
+        title="Xem nhật ký hội thoại hiện tại"
         onClick={() => onConversation()}
-        className={`${moment === 1 && chatCount === 0 ? 'hidden! ' : ''}inline-flex items-center gap-1.5 px-3 py-1.5 whitespace-nowrap text-xs font-medium text-white bg-brand-text hover:bg-black rounded-lg shadow-sm transition-all`}
+        className={`${!hasActiveChat ? 'hidden! ' : ''}inline-flex items-center gap-1.5 px-2.5 py-1.5 whitespace-nowrap text-xs font-medium text-white bg-brand-text hover:bg-black rounded-xl shadow-2xs transition-all cursor-pointer`}
         aria-expanded={chatOpen ? 'true' : 'false'}
         aria-controls={chatOpen ? chatDialogId : undefined}
       >
         <svg
-          className="w-3.5 h-3.5"
+          className="w-3.5 h-3.5 flex-shrink-0"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -85,7 +90,8 @@ export function CockpitHeader({
             d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
           />
         </svg>
-        <span className="hidden xl:inline">Xem hội thoại</span>
+        <span className="hidden xl:inline 2xl:hidden">Hội thoại</span>
+        <span className="hidden 2xl:inline">Xem hội thoại</span>
         <span
           id="chat-count-badge"
           className="px-1.5 py-[2px] bg-white/20 rounded-full text-[10px] font-bold"

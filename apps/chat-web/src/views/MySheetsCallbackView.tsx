@@ -283,7 +283,7 @@ export function MySheetsCallbackView({
   return (
     <main className="max-w-xl mx-auto px-4 py-16 text-[#111827] v3-space-y-6">
       <div className="v3-space-y-2">
-        <h1 className="font-display text-2xl sm:text-3xl font-semibold">
+        <h1 className="font-sans text-2xl font-semibold tracking-tight">
           Chọn bảng tính cho Planora
         </h1>
         {email && (

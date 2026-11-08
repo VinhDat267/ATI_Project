@@ -5,7 +5,7 @@ import { apiClient } from '../../services/api-client';
 import { describeRecurrence, formatRunTime, scheduleLabel } from '../../services/schedule-text';
 import { schedulesChanged } from '../../hooks/use-schedules';
 import { useChatStore } from '../../store/chat-store';
-import { serviceName, servicePalette } from './presentation';
+import { serviceName } from './presentation';
 import { ScheduleActions, scheduleButton, primaryScheduleButton } from './ScheduleActions';
 import { ServiceLogo } from '../../components/ServiceLogo';
 import { WorkflowFlowCanvas } from '../../components/WorkflowFlowCanvas';
@@ -169,11 +169,18 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
   const title = schedule?.name ?? (manage ? `${proposal.action === 'pause' ? 'Tạm dừng' : proposal.action === 'resume' ? 'Chạy tiếp' : 'Hủy'} lịch "${previous?.name ?? ''}"?` : proposal?.name);
   const scheduleServices = schedule?.services ?? metadata.services ?? [];
   const isAutoDigestActive = approvalMode === 'auto_digest' || schedule?.kind === 'calendar_digest' || schedule?.kind === 'sheets_digest' || schedule?.kind === 'github_digest' || schedule?.kind === 'trello_digest' || schedule?.kind === 'notion_digest' || (schedule?.kind as string) === 'myjira_digest' || schedule?.kind === 'telegram_digest';
-  return <section data-moment="schedule" className="w-full min-w-0 max-w-3xl mx-auto v3-space-y-5">
-    <p className="text-xs uppercase tracking-wider text-[#6B7280]">Planora · Lịch chạy workflow</p>
-    <h1 tabIndex={-1} className="font-display text-3xl sm:text-4xl font-bold text-[#111827] [overflow-wrap:anywhere]">{title}</h1>
-    <div className="bg-white border border-[#E7E7E2] rounded-2xl shadow-soft-card p-5 sm:p-6 v3-space-y-5 min-w-0">
-      {!manage && scheduleServices.length > 0 && (
+  return <section data-moment="schedule" className="w-full min-w-0 max-w-3xl mx-auto">
+    <div className="bg-white border border-[#E5E5E0] rounded-2xl shadow-sm overflow-hidden min-w-0">
+      <div className="px-5 sm:px-6 py-3 bg-[#F8F8F6] border-b border-[#EAEAE4] flex items-center justify-between gap-2 text-xs">
+        <span className="inline-flex items-center gap-1.5 font-semibold text-[#111827]">
+          <svg aria-hidden="true" className="w-3.5 h-3.5 text-[#B43E00]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          <span>Lịch chạy tự động</span>
+        </span>
+        <span className="text-[#6B7280] font-medium">{schedule ? 'Đã xác nhận' : 'Đang xem trước đề xuất'}</span>
+      </div>
+      <div className="p-5 sm:p-6 v3-space-y-5 min-w-0">
+        <h1 tabIndex={-1} className="font-sans text-xl sm:text-2xl font-semibold tracking-tight text-[#111827] [overflow-wrap:anywhere]">{title}</h1>
+      {!manage && scheduleServices.length >= 2 && (
         <WorkflowFlowCanvas services={scheduleServices} isAutoDigest={isAutoDigestActive} mode="schedule" />
       )}
       {schedule ? <>
@@ -206,7 +213,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
           {proposal.action === 'update' && previous?.name !== proposal.name && change('Tên lịch', previous?.name, proposal.name)}
           {change('Thời gian', previous ? describeRecurrence(previous.recurrence) : undefined, proposal.recurrence ? describeRecurrence(proposal.recurrence) : undefined)}
           {change('Việc sẽ làm', previous?.request, proposal.request)}
-          <div className="flex flex-wrap gap-2">{metadata.services?.map(id => <span key={id} className="inline-flex items-center gap-2 text-xs text-[#4B5563]"><span aria-hidden="true" className={`w-6 h-6 rounded-lg border flex items-center justify-center ${servicePalette(id).icon}`}><ServiceLogo service={id} className="w-3.5 h-3.5" /></span>{serviceName(id, [])}</span>)}</div>
+          <div className="flex flex-wrap gap-2">{metadata.services?.map(id => <span key={id} className="inline-flex items-center gap-2 text-xs text-[#4B5563]"><span aria-hidden="true" className="w-6 h-6 rounded-lg border border-[#E5E5E0] bg-[#F8F8F6] flex items-center justify-center"><ServiceLogo service={id} className="w-3.5 h-3.5" /></span>{serviceName(id, [])}</span>)}</div>
           {!!metadata.nextRuns?.length && <div className="text-xs text-[#4B5563] v3-space-y-1"><p className="font-semibold">Lần chạy tới:</p>{metadata.nextRuns.map(time => <p key={time}>{formatRunTime(time)}</p>)}</div>}
           {isTelegramCandidate ? (
             <>
@@ -555,6 +562,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
         <div className="flex flex-wrap gap-2"><button type="button" disabled={busy} className={primaryScheduleButton} onClick={() => void confirm()}>{(isGithubCandidate || isTrelloCandidate || isJiraCandidate) && !manage && approvalMode === 'auto_digest' ? 'Xác nhận và bật tự gửi' : 'Xác nhận'}</button><button type="button" disabled={busy} className={scheduleButton} onClick={() => { try { if (proposal?.request) sessionStorage.setItem('ati_prefill_prompt', proposal.request); } catch { /* ignore */ } onEdit(); }}>Sửa</button><button type="button" disabled={busy} className={scheduleButton} onClick={() => setIgnored(true)}>Bỏ qua</button></div>
       </>}
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+      </div>
     </div>
   </section>;
 }

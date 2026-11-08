@@ -75,7 +75,7 @@ export function JiraCallbackView({
 
   return (
     <main className="max-w-xl mx-auto px-4 py-16 text-[#111827] dark:text-white">
-      <h1 className="font-display text-3xl font-semibold mb-4">Kết nối Jira</h1>
+      <h1 className="font-sans text-2xl font-semibold tracking-tight text-[#111827] dark:text-white mb-4">Kết nối Jira</h1>
       {error ? (
         <div role="alert" className="p-4 mb-4 rounded-xl bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300 border border-red-200 dark:border-red-900 text-sm">
           {error}

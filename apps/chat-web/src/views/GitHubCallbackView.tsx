@@ -48,7 +48,7 @@ export function GitHubCallbackView({ navigate, input }: { navigate: (path: strin
 
   return (
     <main className="max-w-xl mx-auto px-4 py-16 text-[#111827] v3-space-y-5">
-      <h1 className="font-display text-3xl">Kết nối GitHub</h1>
+      <h1 className="font-sans text-2xl font-semibold tracking-tight text-[#111827] dark:text-white">Kết nối GitHub</h1>
       {error ? <p role="alert">{error}</p> : <p role="status">Đang hoàn tất kết nối GitHub…</p>}
       <a href="/settings" onClick={event => { event.preventDefault(); navigate('/settings', true); }} className="text-[#FF5701] underline">Về Kết nối dịch vụ</a>
     </main>

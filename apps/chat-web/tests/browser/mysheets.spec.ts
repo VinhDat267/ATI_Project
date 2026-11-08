@@ -184,7 +184,7 @@ test('MYSHEETS: Flow 2 - disconnect, connect from chat refusal, plan and receipt
   await resendBtn.click();
 
   // PlanMoment displays plan with resolved spreadsheet and connected account
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tôi sẽ làm 1 việc, theo thứ tự');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tôi sẽ làm 1 việc');
   await expect(page.getByText(/Google Sheets của bạn\)/i)).toBeVisible();
   const approvedAccount = await page.getByText(/^Tài khoản: .+ \(Google Sheets của bạn\)$/).innerText();
   await expect(page.locator('#plan-cards-container p').filter({ hasText: 'Đích đến:' })).toContainText('Việc của tôi');

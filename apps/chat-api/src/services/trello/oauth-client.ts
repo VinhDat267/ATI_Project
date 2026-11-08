@@ -179,8 +179,13 @@ export class TrelloOAuthClient {
     }
 
     if (response.ok) return body ?? {};
-    if (response.status === 400 && body?.error === 'invalid_grant') {
-      throw new TrelloOAuthError('invalid_grant', 400);
+    if (
+      (response.status === 400 || response.status === 401 || response.status === 403) &&
+      (body?.error === 'invalid_grant' ||
+        (typeof body?.error_description === 'string' &&
+          /^refresh_token is invalid\.?$/i.test(body.error_description.trim())))
+    ) {
+      throw new TrelloOAuthError('invalid_grant', response.status);
     }
     throw new TrelloOAuthError(
       response.status >= 500 || response.status < 400 ? 'server' : 'rejected',

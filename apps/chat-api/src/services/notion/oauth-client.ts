@@ -56,14 +56,14 @@ function actorIdFromOwner(owner: any): string {
   return normalizeNotionId(userId);
 }
 
-function parseTokenGrant(data: any, appId: string): NotionTokenGrant {
+function parseTokenGrant(data: any, appId: string, requireRefreshToken = false): NotionTokenGrant {
   const accessToken = typeof data?.access_token === 'string' ? data.access_token.trim() : '';
   const refreshToken = typeof data?.refresh_token === 'string' ? data.refresh_token.trim() : '';
   const rawWorkspace = typeof data?.workspace_id === 'string' ? data.workspace_id.trim() : '';
   const rawBot = typeof data?.bot_id === 'string' ? data.bot_id.trim() : '';
   if (
     !accessToken ||
-    !refreshToken ||
+    (requireRefreshToken && !refreshToken) ||
     !NOTION_ID_PATTERN.test(rawWorkspace) ||
     !NOTION_ID_PATTERN.test(rawBot)
   ) {
@@ -186,6 +186,7 @@ export class NotionOAuthClient {
         }),
       }),
       this.config.clientId,
+      true,
     );
     await this.verify(grant.accessToken, grant.botId, signal);
     return grant;

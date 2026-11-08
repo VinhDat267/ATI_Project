@@ -85,7 +85,7 @@ function ServiceRow({ service, onOpen }: { service: Service; onOpen: (id: string
       </div>
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <h3 className="font-display font-semibold text-base text-[#111827] group-hover:text-[#FF5701] transition-colors">
+          <h3 className="font-sans font-semibold text-base text-[#111827] group-hover:text-[#B43E00] transition-colors">
             {service.name}
           </h3>
         </div>
@@ -109,6 +109,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
   const [workspace, setWorkspace] = useState(getActiveWorkspaceSummary());
   useEffect(() => subscribeWorkspace(() => setWorkspace(getActiveWorkspaceSummary())), []);
   const { slackOAuthEnabled, list, personal, personalMyCalendar, personalMySheets, active, draft, selected, loading, loadError, refresh, canEdit, errors, results, busy, keyHelpOpen, actions } = useSettings(user);
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'google' | 'work' | 'messaging'>('all');
   const [connectedEmail, setConnectedEmail] = useState<string>();
   useEffect(() => {
     const email =
@@ -175,63 +176,148 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
         {/* Tiêu đề trang & Nguyên tắc */}
         <div className="mb-8 sm:mb-10">
           {/* Context Pill */}
-          <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#E7E7E2] bg-white text-xs text-[#111827] shadow-sm">
-            <span>{workspace.id === 'personal' ? '👤' : '🏢'}</span>
-            <span className="font-semibold text-[#4B5563]">
+          <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#E7E7E2] dark:border-[#333333] bg-white dark:bg-[#1E1E1E] text-xs text-[#111827] dark:text-white shadow-sm">
+            {workspace.id === 'personal' ? (
+              <svg className="w-3.5 h-3.5 text-[#6B7280] dark:text-[#9CA3AF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            ) : (
+              <svg className="w-3.5 h-3.5 text-[#6B7280] dark:text-[#9CA3AF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+            )}
+            <span className="font-semibold text-[#4B5563] dark:text-[#D1D5DB]">
               {workspace.id === 'personal'
                 ? 'Đang cấu hình kết nối cho: Không gian Cá nhân'
                 : `Đang cấu hình kết nối cho: ${workspace.name}`}
             </span>
           </div>
           <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 mb-3">
-            <h1 className="font-display text-3xl sm:text-4xl font-bold text-[#111827] tracking-tight">
+            <h1 className="font-sans text-2xl sm:text-[26px] leading-tight font-semibold text-[#111827] dark:text-white tracking-tight">
               Kết nối dịch vụ
             </h1>
-            {hasCatalogue && <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#16A34A]" />
-                <span id="summary-connected-count" className="text-sm sm:text-base font-semibold text-[#111827]">
-                  {`${configured.length} / ${list.length} dịch vụ đã thiết lập · ${okCount} kết nối tốt`}
+            {hasCatalogue ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[#16A34A]" />
+                  <span id="summary-connected-count" className="text-sm sm:text-base font-semibold text-[#111827] dark:text-white">
+                    {`${configured.length} / ${list.length} dịch vụ đã thiết lập · ${okCount} kết nối tốt`}
+                  </span>
+                </div>
+                <span data-testid="settings-oauth-summary" className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800/60">
+                  Liên kết tài khoản cá nhân &amp; Không gian làm việc
                 </span>
               </div>
-              <span data-testid="settings-oauth-summary" className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                OAuth 1-Click cá nhân &amp; Tích hợp Workspace
+            ) : (
+              <span data-testid="settings-oauth-summary" className="px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800/60">
+                Liên kết trực tiếp · Tự chọn phạm vi dữ liệu
               </span>
-            </div>}
+            )}
           </div>
           {/* Khung nguyên tắc an toàn dữ liệu */}
-          <div className="bg-white rounded-xl p-4 sm:p-5 border border-[#E7E7E2] shadow-sm flex items-start gap-3">
+          <div className="bg-white dark:bg-[#1E1E1E] rounded-xl p-4 sm:p-5 border border-[#E7E7E2] dark:border-[#333333] shadow-sm flex items-start gap-3">
             <div className="w-6 h-6 rounded-full bg-[#FF5701]/10 text-[#FF5701] flex items-center justify-center flex-shrink-0 mt-0.5">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
             </div>
-            <div className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
-              <strong className="text-[#111827] font-semibold">
+            <div className="text-xs sm:text-sm text-[#4B5563] dark:text-[#9CA3AF] leading-relaxed">
+              <strong className="text-[#111827] dark:text-white font-semibold">
                 Nguyên tắc an toàn của nhóm:
               </strong>
-              {" Planora chỉ đọc và ghi ở những nơi bạn chọn bên dưới. Khoá được mã hoá khi lưu và không hiển thị lại."}
+              {" Planora chỉ đọc và ghi ở những bảng, lịch, tệp hoặc kênh bạn đã chọn bên dưới. Thông tin xác thực được mã hoá an toàn và bạn có thể ngắt kết nối bất cứ lúc nào."}
             </div>
           </div>
         </div>
-        {slackOAuthEnabled && <PersonalSlack key={`slack-${user?.id}`} />}
-        {loading && <p role="status" className="text-xs text-[#6B7280]">Đang tải dịch vụ...</p>}
+        {loading && <p role="status" className="text-xs text-[#6B7280] mb-4">Đang tải dịch vụ...</p>}
         {loadError && <div role="alert" className="text-xs text-[#DC2626] mb-4">{loadError} <button type="button" onClick={() => void refresh()} className="underline">Thử lại</button></div>}
-        {connectedEmail && <p role="status" className="text-sm text-[#111827] mb-4">Đã kết nối {connectedEmail}</p>}
-        <section aria-labelledby="heading-personal-services" className="mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-3.5">
-            <h2 id="heading-personal-services" className="text-xs font-bold uppercase tracking-wider text-[#6B7280]">Của riêng bạn</h2>
-            <span className="text-xs text-[#6B7280]">Tài khoản Cá nhân (OAuth 1-Click) · Chọn tài nguyên trực quan</span>
+        {connectedEmail && <p role="status" className="text-sm text-[#111827] dark:text-white mb-4">Đã kết nối {connectedEmail}</p>}
+        <section aria-labelledby="heading-personal-services" className="mb-8 v3-space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-[#E7E7E2] dark:border-[#2E2E2E]">
+            <div>
+              <h2 id="heading-personal-services" className="text-sm font-semibold text-[#111827] dark:text-white">Của riêng bạn</h2>
+              <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF] mt-0.5">Liên kết tài khoản trực tiếp · Chỉ truy cập đúng dữ liệu bạn cho phép</p>
+            </div>
+            <div role="tablist" aria-label="Phân nhóm dịch vụ" className="inline-flex flex-wrap items-center gap-1 p-1 rounded-xl bg-[#F3F2EE] dark:bg-[#161616] border border-[#E7E7E2] dark:border-[#2E2E2E]">
+              {([
+                { id: 'all', label: 'Tất cả' },
+                { id: 'google', label: 'Google Workspace' },
+                { id: 'work', label: 'Dự án & Mã nguồn' },
+                { id: 'messaging', label: 'Tin nhắn & Thông báo' },
+              ] as const).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={categoryFilter === tab.id}
+                  onClick={() => setCategoryFilter(tab.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    categoryFilter === tab.id
+                      ? 'bg-white dark:bg-[#262626] text-[#111827] dark:text-white shadow-sm'
+                      : 'text-[#6B7280] dark:text-[#9CA3AF] hover:text-[#111827] dark:hover:text-white'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="v3-space-y-4">
-            {personal && <PersonalGmail key={`gmail-${user?.id}`} selected={selected} service={personal} refresh={refresh} standalone={false} />}
-            {personalMyCalendar && <PersonalMyCalendar key={`mycalendar-${user?.id}`} selected={selected} service={personalMyCalendar} refresh={refresh} navigate={navigate} standalone={false} />}
-            {personalMySheets && <PersonalMySheets key={`mysheets-${user?.id}`} selected={selected} service={personalMySheets} refresh={refresh} navigate={navigate} standalone={false} />}
-            <TrelloConnection key={`trello-${user?.id}`} user={user} selected={selected} refresh={refresh} standalone={false} />
-            <GitHubConnection key={`github-${user?.id}`} user={user} selected={selected} refresh={refresh} standalone={false} />
-            <NotionConnection key={`notion-${user?.id}`} user={user} selected={selected === 'notion'} refresh={refresh} standalone={false} />
-            <TelegramConnection key={`telegram-${user?.id}`} user={user} selected={selected} refresh={refresh} navigate={navigate} standalone={false} />
-            <JiraConnection key={`jira-${user?.id}`} user={user} selected={selected} refresh={refresh} navigate={navigate} standalone={false} />
+
+          {/* Nhóm 1: Hệ sinh thái Google Workspace */}
+          {(personal || personalMyCalendar || personalMySheets) && (
+            <div className={categoryFilter !== 'all' && categoryFilter !== 'google' ? 'hidden' : 'v3-space-y-3'}>
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-[#111827] dark:text-white">
+                  Google Workspace · Thư, Lịch họp &amp; Bảng tính
+                </h3>
+                <span className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">Cấp quyền riêng từng tệp &amp; lịch</span>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+                {personal && <PersonalGmail key={`gmail-${user?.id}`} selected={selected} service={personal} refresh={refresh} standalone={false} />}
+                {personalMyCalendar && <PersonalMyCalendar key={`mycalendar-${user?.id}`} selected={selected} service={personalMyCalendar} refresh={refresh} navigate={navigate} standalone={false} />}
+                {personalMySheets && (
+                  <div className="lg:col-span-2">
+                    <PersonalMySheets key={`mysheets-${user?.id}`} selected={selected} service={personalMySheets} refresh={refresh} navigate={navigate} standalone={false} />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Nhóm 2: Quản lý dự án, Tài liệu & Mã nguồn */}
+          <div className={categoryFilter !== 'all' && categoryFilter !== 'work' ? 'hidden' : 'v3-space-y-3'}>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-[#111827] dark:text-white">
+                Quản lý dự án, Tài liệu &amp; Mã nguồn
+              </h3>
+              <span className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">Bảng công việc, kho mã &amp; tài liệu nhóm</span>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+              <TrelloConnection key={`trello-${user?.id}`} user={user} selected={selected} refresh={refresh} standalone={false} />
+              <GitHubConnection key={`github-${user?.id}`} user={user} selected={selected} refresh={refresh} standalone={false} />
+              <div className="lg:col-span-2">
+                <JiraConnection key={`jira-${user?.id}`} user={user} selected={selected} refresh={refresh} navigate={navigate} standalone={false} />
+              </div>
+              <div className="lg:col-span-2">
+                <NotionConnection key={`notion-${user?.id}`} user={user} selected={selected === 'notion'} refresh={refresh} standalone={false} />
+              </div>
+            </div>
+          </div>
+
+          {/* Nhóm 3: Tin nhắn & Kênh thông báo */}
+          <div className={categoryFilter !== 'all' && categoryFilter !== 'messaging' ? 'hidden' : 'v3-space-y-3'}>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-[#111827] dark:text-white">
+                Tin nhắn &amp; Kênh thông báo tự động
+              </h3>
+              <span className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">Nhận báo cáo &amp; nhắc việc tức thì</span>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+              <div className={slackOAuthEnabled ? '' : 'lg:col-span-2'}>
+                <TelegramConnection key={`telegram-${user?.id}`} user={user} selected={selected} refresh={refresh} navigate={navigate} standalone={false} />
+              </div>
+              {slackOAuthEnabled && <PersonalSlack key={`slack-${user?.id}`} standalone={false} />}
+            </div>
           </div>
         </section>
         {/* DANH SÁCH 2 NHÓM DỊCH VỤ */}
@@ -285,8 +371,8 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
             <p>
               Planora — Nền tảng điều phối công việc liên dịch vụ · 2026
             </p>
-            <p className="text-[11px] text-[#9CA3AF] mt-0.5">
-              {personal ? 'Dịch vụ dùng chung: chỉ quản trị viên cập nhật khoá. OAuth 1-Click cá nhân (Gmail, Calendar, Sheets, Trello, GitHub, Notion, Jira Cloud, Telegram) do mỗi người tự kết nối.' : 'Khoá dịch vụ là tài nguyên dùng chung của cả nhóm · Chỉ quản trị viên có quyền cập nhật'}
+            <p className="text-xs text-[#6B7280] mt-0.5">
+              {personal ? 'Các tích hợp cá nhân (Gmail, Google Calendar, Google Sheets, Slack, Trello, GitHub, Notion, Jira Cloud, Telegram) do mỗi thành viên tự liên kết và chọn phạm vi dữ liệu.' : 'Khoá dịch vụ là tài nguyên dùng chung của cả nhóm · Chỉ quản trị viên có quyền cập nhật'}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-4 text-xs">
@@ -320,7 +406,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
                   <ServiceLogo service={drawer.service.id} className="w-6 h-6" />
                 </div>
                 <div className="min-w-0">
-                  <h2 id="drawer-service-title" className="font-display text-xl font-bold text-[#111827] truncate">
+                  <h2 id="drawer-service-title" className="font-sans text-lg font-semibold text-[#111827] truncate">
                     {drawer.service.name}
                   </h2>
                   <div id="drawer-header-status-badge" className="mt-0.5">

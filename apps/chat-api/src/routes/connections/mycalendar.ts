@@ -1,3 +1,5 @@
+import { hasGoogleCredentialOrigin } from '../../services/gmail/credential-origin.js';
+import { canRevokeGoogleGrant } from '../../services/gmail/revocation.js';
 import { Router, type Request, type Response } from 'express';
 import { createHash, randomBytes } from 'node:crypto';
 import { decryptCredentials, encryptCredentials } from '@wap/tool-adapters';
@@ -9,7 +11,7 @@ import type { GmailConnectionRepo } from '../../db/repositories/gmail-connection
 import type { GoogleAuthRepo } from '../../db/repositories/google-auth-repo.js';
 import type { SessionRepo } from '../../db/repositories/session-repo.js';
 import { GmailOAuthClient, GmailOAuthError } from '../../services/gmail/oauth-client.js';
-import type { GmailTokenManager } from '../../services/gmail/token-manager.js';
+import { isGoogleConnectionChanged, type GmailTokenManager } from '../../services/gmail/token-manager.js';
 
 const COOKIE = 'ati_mycalendar_browser';
 const COOKIE_PATH = '/api/connections/mycalendar';
@@ -25,6 +27,7 @@ const CONVERSATION_PATH = /^\/c\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4
 
 export interface MyCalendarConnectionsOptions {
   jwtSecret: string;
+  requireClientBinding?: boolean;
   sessionRepo?: SessionRepo;
   states?: GoogleAuthRepo;
   credentialRepo?: CredentialRepo;
@@ -97,24 +100,10 @@ export function createMyCalendarConnectionRoutes(options: MyCalendarConnectionsO
     res.status(400).json({ error: messages[code], code });
   };
 
-  const revokeRefusedGrant = (userId: string, stateId: string, token: string, email?: string) => {
-    options.repo!.withLockedConnection(userId, async (current, otherFlows) => {
+  const revokeRefusedGrant = (userId: string, stateId: string, token: string) => {
+    options.repo!.withLockedConnection(userId, async (current, otherFlows, peers) => {
       if (otherFlows) return;
-      if (current) {
-        let connectedEmail: unknown;
-        try {
-          connectedEmail = decryptCredentials(current.config, options.encryptionKey!).email;
-        } catch {
-          return;
-        }
-        if (
-          !email ||
-          typeof connectedEmail !== 'string' ||
-          !connectedEmail.trim() ||
-          connectedEmail.trim().toLowerCase() === email.trim().toLowerCase()
-        )
-          return;
-      }
+      if (!canRevokeGoogleGrant(options.oauth!.clientId, [...peers, ...(current ? [current] : [])], options.encryptionKey!)) return;
       await client!.revoke(token, AbortSignal.timeout(revokeTimeoutMs));
     }, stateId).catch((error) => {
       console.warn(`[chat-api] MyCalendar revoke failed: ${error instanceof GmailOAuthError ? error.kind : 'error'}`);
@@ -125,6 +114,13 @@ export function createMyCalendarConnectionRoutes(options: MyCalendarConnectionsO
     const id = typeof value === 'string' ? CONVERSATION_PATH.exec(value)?.[1]?.toLowerCase() : undefined;
     if (!id || !options.conversationOwner) return null;
     return (await options.conversationOwner(id)) === userId ? `/c/${id}` : null;
+  };
+
+  const markReconnectRequired = async (userId: string, credentialId: string, error?: unknown): Promise<void> => {
+    if (isGoogleConnectionChanged(error)) return;
+    try {
+      if (await options.credentialRepo!.markReconnectRequired('mycalendar', userId, credentialId)) options.onConnectionChanged?.(userId);
+    } catch { /* Refuse the request even if the status update fails. */ }
   };
 
   const getAccessToken = async (userId: string, credentialId: string, refreshToken: string): Promise<string> => {
@@ -247,6 +243,7 @@ export function createMyCalendarConnectionRoutes(options: MyCalendarConnectionsO
         : [];
       const config = encryptCredentials(
         {
+          oauthClientId: options.oauth!.clientId,
           refreshToken: tokens.refreshToken,
           email: live.email,
           scopes: tokens.scopes,
@@ -258,7 +255,7 @@ export function createMyCalendarConnectionRoutes(options: MyCalendarConnectionsO
       );
       const saved = await options.repo!.saveConnection(user.id, consumed.id, config, clock);
       if (!saved) {
-        revokeRefusedGrant(user.id, consumed.id, tokens.refreshToken, live.email);
+        revokeRefusedGrant(user.id, consumed.id, tokens.refreshToken);
         fail(res, 'MYCALENDAR_STATE_INVALID');
         return;
       }
@@ -277,6 +274,20 @@ export function createMyCalendarConnectionRoutes(options: MyCalendarConnectionsO
     } catch {
       fail(res, 'MYCALENDAR_CONNECT_FAILED');
     }
+  });
+
+  // Start/callback establish the origin; every resource endpoint requires it in live.
+  router.use(async (req, res, next) => {
+    if (!options.requireClientBinding || req.method === 'DELETE') { next(); return; }
+    const user = (req as any).user as AuthUser;
+    try {
+      const record = await options.credentialRepo!.getPersonalConnectionStatus('mycalendar', user.id);
+      if (record?.status === 'active' && hasGoogleCredentialOrigin(record.config, options.encryptionKey!, options.oauth!.clientId)) { next(); return; }
+      if (record?.status === 'active') {
+        await markReconnectRequired(user.id, record.id);
+      }
+      res.status(409).json({ error: 'Google Calendar của bạn cần kết nối lại.', code: 'MYCALENDAR_NOT_CONNECTED' });
+    } catch { next(new Error('Google credential origin check failed')); }
   });
 
   router.get('/calendars', async (req, res) => {
@@ -305,10 +316,7 @@ export function createMyCalendarConnectionRoutes(options: MyCalendarConnectionsO
         accessToken = await getAccessToken(user.id, record.id, decrypted.refreshToken);
       } catch (error: any) {
         if ((error instanceof GmailOAuthError && error.kind === 'invalid_grant') || error?.category === 'AUTH_ERROR') {
-          try {
-            await options.credentialRepo!.markReconnectRequired('mycalendar', user.id, record.id);
-          } catch {}
-          options.onConnectionChanged?.(user.id);
+          await markReconnectRequired(user.id, record.id, error);
           res.status(409).json({
             error: 'Google Calendar của bạn chưa được kết nối hoặc cần kết nối lại.',
             code: 'MYCALENDAR_NOT_CONNECTED',
@@ -326,10 +334,7 @@ export function createMyCalendarConnectionRoutes(options: MyCalendarConnectionsO
         live = await client!.writableCalendars(accessToken, AbortSignal.timeout(googleTimeoutMs));
       } catch (error: any) {
         if (error instanceof GmailOAuthError && error.kind === 'invalid_grant') {
-          try {
-            await options.credentialRepo!.markReconnectRequired('mycalendar', user.id, record.id);
-          } catch {}
-          options.onConnectionChanged?.(user.id);
+          await markReconnectRequired(user.id, record.id, error);
           res.status(409).json({
             error: 'Google Calendar của bạn chưa được kết nối hoặc cần kết nối lại.',
             code: 'MYCALENDAR_NOT_CONNECTED',
@@ -390,10 +395,7 @@ export function createMyCalendarConnectionRoutes(options: MyCalendarConnectionsO
         accessToken = await getAccessToken(user.id, record.id, decrypted.refreshToken);
       } catch (error: any) {
         if ((error instanceof GmailOAuthError && error.kind === 'invalid_grant') || error?.category === 'AUTH_ERROR') {
-          try {
-            await options.credentialRepo!.markReconnectRequired('mycalendar', user.id, record.id);
-          } catch {}
-          options.onConnectionChanged?.(user.id);
+          await markReconnectRequired(user.id, record.id, error);
           res.status(409).json({
             error: 'Google Calendar của bạn chưa được kết nối hoặc cần kết nối lại.',
             code: 'MYCALENDAR_NOT_CONNECTED',
@@ -411,10 +413,7 @@ export function createMyCalendarConnectionRoutes(options: MyCalendarConnectionsO
         live = await client!.writableCalendars(accessToken, AbortSignal.timeout(googleTimeoutMs));
       } catch (error: any) {
         if (error instanceof GmailOAuthError && error.kind === 'invalid_grant') {
-          try {
-            await options.credentialRepo!.markReconnectRequired('mycalendar', user.id, record.id);
-          } catch {}
-          options.onConnectionChanged?.(user.id);
+          await markReconnectRequired(user.id, record.id, error);
           res.status(409).json({
             error: 'Google Calendar của bạn chưa được kết nối hoặc cần kết nối lại.',
             code: 'MYCALENDAR_NOT_CONNECTED',
@@ -506,10 +505,7 @@ export function createMyCalendarConnectionRoutes(options: MyCalendarConnectionsO
         accessToken = await getAccessToken(user.id, record.id, decrypted.refreshToken);
       } catch (error: any) {
         if ((error instanceof GmailOAuthError && error.kind === 'invalid_grant') || error?.category === 'AUTH_ERROR') {
-          try {
-            await options.credentialRepo!.markReconnectRequired('mycalendar', user.id, record.id);
-          } catch {}
-          options.onConnectionChanged?.(user.id);
+          await markReconnectRequired(user.id, record.id, error);
           res.status(409).json({
             error: 'Google Calendar của bạn chưa được kết nối hoặc cần kết nối lại.',
             code: 'MYCALENDAR_NOT_CONNECTED',
@@ -527,10 +523,7 @@ export function createMyCalendarConnectionRoutes(options: MyCalendarConnectionsO
         live = await client!.writableCalendars(accessToken, AbortSignal.timeout(googleTimeoutMs));
       } catch (error: any) {
         if (error instanceof GmailOAuthError && error.kind === 'invalid_grant') {
-          try {
-            await options.credentialRepo!.markReconnectRequired('mycalendar', user.id, record.id);
-          } catch {}
-          options.onConnectionChanged?.(user.id);
+          await markReconnectRequired(user.id, record.id, error);
           res.status(409).json({
             error: 'Google Calendar của bạn chưa được kết nối hoặc cần kết nối lại.',
             code: 'MYCALENDAR_NOT_CONNECTED',
@@ -596,19 +589,18 @@ export function createMyCalendarConnectionRoutes(options: MyCalendarConnectionsO
   router.delete('/', async (req, res) => {
     const user = (req as any).user as AuthUser;
     try {
-      const revokeRow = async (config: string | undefined) => {
-        if (!config) return;
+      await options.repo!.disconnect(user.id, async (removed, peers, otherFlows) => {
+        if (!removed || otherFlows) return;
         try {
-          const token = decryptCredentials(config, options.encryptionKey!).refreshToken;
+          const config = decryptCredentials(removed.config, options.encryptionKey!);
+          if (config.oauthClientId !== options.oauth!.clientId) return;
+          if (!canRevokeGoogleGrant(options.oauth!.clientId, peers, options.encryptionKey!)) return;
+          const token = config.refreshToken;
           if (typeof token === 'string' && token) await client!.revoke(token, AbortSignal.timeout(revokeTimeoutMs));
         } catch (error) {
           console.warn(`[chat-api] MyCalendar revoke failed: ${error instanceof GmailOAuthError ? error.kind : 'error'}`);
         }
-      };
-      const current = await options.credentialRepo!.getPersonalConnectionStatus('mycalendar', user.id);
-      await revokeRow(current?.config);
-      const removed = await options.repo!.disconnect(user.id);
-      if (removed && removed.id !== current?.id) await revokeRow(removed.config);
+      });
       options.onConnectionChanged?.(user.id);
       res.json({ success: true });
     } catch {

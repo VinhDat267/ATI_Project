@@ -22,6 +22,11 @@ interface Cached {
   expiresAt?: number;
 }
 
+function isNonExpiringGitHubToken(token?: string): boolean {
+  const trimmed = token?.trim();
+  return Boolean(trimmed && (trimmed.startsWith('gho_') || trimmed.startsWith('ghp_')));
+}
+
 export class GitHubTokenManager {
   private cache = new Map<string, Cached>();
   private inflight = new Map<string, Promise<Cached>>();
@@ -53,8 +58,11 @@ export class GitHubTokenManager {
     credentialId: string,
     secrets: GitHubConnectionSecrets | string
   ): { getAccessToken(options?: { signal?: AbortSignal; forceRefresh?: boolean }): Promise<string> } {
-    const normalized: GitHubConnectionSecrets =
+    const raw: GitHubConnectionSecrets =
       typeof secrets === 'string' ? { accessToken: secrets } : secrets;
+    const normalized: GitHubConnectionSecrets = isNonExpiringGitHubToken(raw.accessToken)
+      ? { accessToken: raw.accessToken }
+      : raw;
     const key = `${userId}:${credentialId}`;
     if (normalized.refreshToken?.trim() && !this.refreshTokens.has(key)) {
       this.refreshTokens.set(key, normalized.refreshToken.trim());

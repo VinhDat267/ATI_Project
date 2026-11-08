@@ -148,7 +148,7 @@ export function TelegramCallbackView({
             <ServiceLogo service="telegram" className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="font-display text-2xl sm:text-3xl font-bold">Kết nối Telegram</h1>
+            <h1 className="font-sans text-2xl font-semibold tracking-tight">Kết nối Telegram</h1>
             <p className="text-xs text-[#6B7280]">Ghép đôi 1 chạm an toàn · Không cần nhập Bot Token hay Chat ID</p>
           </div>
         </div>

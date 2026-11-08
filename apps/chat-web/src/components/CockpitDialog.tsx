@@ -29,7 +29,7 @@ export function CockpitDialog({ id, title, onClose, returnFocusId, side, childre
   }, [returnFocusId]);
   return <div className="fixed inset-0 z-50 flex bg-black/40" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
     <div id={id} ref={ref} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} className={`bg-surface text-text border border-border flex flex-col min-w-0 w-full ${side ? `max-w-md h-full ${side === 'right' ? 'ml-auto' : ''}` : 'max-w-2xl max-h-[85dvh] m-auto rounded-2xl'} shadow-xl`}>
-      <div className="flex items-center justify-between gap-3 border-b border-border p-4"><h2 className="font-semibold">{title}</h2><button type="button" aria-label={`Đóng ${title}`} className="h-10 w-10 shrink-0" onClick={onClose}>✕</button></div>
+      <div className="flex items-center justify-between gap-3 border-b border-[#EAEAE4] bg-[#F8F8F6] px-5 py-3.5 rounded-t-2xl"><h2 className="font-sans font-semibold text-base text-[#111827]">{title}</h2><button type="button" aria-label={`Đóng ${title}`} className="h-9 w-9 shrink-0 rounded-lg text-[#6B7280] hover:text-[#111827] hover:bg-neutral-200/70 inline-flex items-center justify-center transition-colors" onClick={onClose}><svg aria-hidden="true" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></button></div>
       <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
     </div>
   </div>;

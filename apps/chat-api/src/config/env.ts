@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { assertGooglePickerProject, assertSeparateGoogleOAuthProjects } from './google-oauth-projects.js';
 import { slackOAuthEnv } from './slack-env.js';
 import type { SlackOAuthConfig } from '../services/slack/oauth-client.js';
 import { GOOGLE_ENDPOINTS, type GoogleOAuthConfig } from '../auth/google-oidc.js';
@@ -274,7 +275,8 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
   const MYSHEETS_ENABLED = env.MYSHEETS_ENABLED === 'on';
   const MYSHEETS_OAUTH = MYSHEETS_ENABLED ? mysheetsOAuth(env, isLive) : undefined;
   const MYSHEETS_PICKER = MYSHEETS_ENABLED ? mysheetsPicker(env, isLive) : undefined;
-  if (isLive && (MYCALENDAR_ENABLED || MYSHEETS_ENABLED)) validatePersonalGoogleProjects(env);
+  if (isLive && (GMAIL_ENABLED || MYCALENDAR_ENABLED || MYSHEETS_ENABLED)) validatePersonalGoogleProjects(env);
+  if (isLive && MYSHEETS_OAUTH && MYSHEETS_PICKER) assertGooglePickerProject(MYSHEETS_OAUTH.clientId, MYSHEETS_PICKER.appId);
   if (env.SCHEDULES_ENABLED && !['on', 'off'].includes(env.SCHEDULES_ENABLED)) throw new Error('SCHEDULES_ENABLED must be on or off');
   const SCHEDULES_ENABLED = env.SCHEDULES_ENABLED !== 'off';
   const TRELLO_OAUTH = trelloOAuth(env, isLive);
@@ -412,6 +414,10 @@ function validatePersonalGoogleProjects(env: Record<string, string | undefined>)
       }
     }
   }
+  assertSeparateGoogleOAuthProjects([
+    ...Array.from(clientMap, ([name, clientId]) => ({ name, clientId })),
+    ...(env.GOOGLE_OAUTH_CLIENT_ID?.trim() ? [{ name: 'Google sign-in', clientId: env.GOOGLE_OAUTH_CLIENT_ID.trim() }] : []),
+  ]);
 }
 
 /** Live with the flag on refuses to start on a missing variable; sandbox disables Gmail instead. */

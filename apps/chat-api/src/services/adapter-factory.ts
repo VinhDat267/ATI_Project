@@ -128,7 +128,7 @@ export class AdapterFactory {
 
   clearCache(serviceName: string, workspaceId?: string | null, userId?: string): void {
     if (userId) {
-      this.adapterCache.delete(`personal-shared:${userId}:${serviceName}`);
+      this.clearPersonal(userId, serviceName);
       return;
     }
     if (workspaceId) {
@@ -143,8 +143,18 @@ export class AdapterFactory {
     }
   }
 
-  /** Forget the Gmail, MyCalendar, MySheets, Trello, GitHub & Telegram adapters and access tokens of one member (connect, disconnect, reconnect_required). */
-  clearPersonal(userId: string): void {
+  /** Invalidate one service on connection changes; omit the service for owner-wide invalidation. */
+  clearPersonal(userId: string, serviceName?: string): void {
+    if (serviceName) {
+      this.personalCache.delete(`${serviceName}:${userId}`);
+      this.adapterCache.delete(`personal-shared:${userId}:${serviceName}`);
+      if (serviceName === 'gmail') this.options.gmailTokens?.clear(userId);
+      if (serviceName === 'mycalendar') this.options.mycalendarTokens?.clear(userId);
+      if (serviceName === 'mysheets') this.options.mysheetsTokens?.clear(userId);
+      if (serviceName === 'trello') this.options.trelloTokens?.clear?.(userId);
+      if (serviceName === 'github') this.options.githubTokens?.clear?.(userId);
+      return;
+    }
     this.personalCache.delete(`gmail:${userId}`);
     this.personalCache.delete(`mycalendar:${userId}`);
     this.personalCache.delete(`mysheets:${userId}`);

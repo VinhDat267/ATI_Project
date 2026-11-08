@@ -537,7 +537,7 @@ describe('JiraConnection component', () => {
     await waitFor(() => {
       const cta = screen.getByRole('button', { name: /bắt đầu hội thoại jira/i });
       expect(cta).toBeDisabled();
-      expect(screen.getByText(/chờ JIRA-08/i)).toBeInTheDocument();
+      expect(screen.getByText(/kích hoạt ít nhất một site & project/i)).toBeInTheDocument();
     });
   });
 

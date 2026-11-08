@@ -499,11 +499,11 @@ describe('Task 9: Telegram 1-Click Pairing UI, Settings & Cockpit Moments', () =
       expect(screen.getByText('Đã chốt lịch deploy bản v3.2')).toBeInTheDocument();
       unmountReceipt();
 
-      // 4. FE-5: GuidePage & GUIDE_OAUTH_SHOWCASE_CARDS include Telegram 1-Click
+      // 4. FE-5: GuidePage & GUIDE_OAUTH_SHOWCASE_CARDS include Telegram
       expect(GUIDE_OAUTH_SHOWCASE_CARDS.some((c) => c.service === 'telegram')).toBe(true);
       window.history.replaceState({}, '', '/guide?service=telegram');
       const { unmount: unmountGuide } = render(<GuidePage navigate={vi.fn()} user={memberUser} />);
-      expect(screen.getByRole('link', { name: /Kết nối Telegram 1-Click →/i })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /Kết nối Telegram →/i })).toBeInTheDocument();
       unmountGuide();
     });
   });

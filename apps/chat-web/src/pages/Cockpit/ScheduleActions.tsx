@@ -6,14 +6,14 @@ import { schedulesChanged } from '../../hooks/use-schedules';
 import { useDialogFocus } from './useDialogFocus';
 import { runConversation } from '../../services/schedule-run';
 
-export const scheduleButton = 'inline-flex items-center justify-center px-4 py-2 rounded-xl border border-[#E7E7E2] bg-white text-sm font-semibold text-[#111827] hover:bg-neutral-100 disabled:opacity-50 disabled:cursor-wait';
-export const primaryScheduleButton = 'inline-flex items-center justify-center px-4 py-2 rounded-xl bg-[#FF5701] text-white text-sm font-semibold hover:bg-[#E04C00] disabled:opacity-50 disabled:cursor-wait';
+export const scheduleButton = 'inline-flex items-center justify-center px-4 py-2 rounded-xl border border-[#E5E5E0] bg-white text-xs sm:text-sm font-semibold text-[#111827] hover:bg-neutral-50 transition-colors disabled:opacity-50 disabled:cursor-wait';
+export const primaryScheduleButton = 'inline-flex items-center justify-center px-4 py-2 rounded-xl bg-[#C84300] text-white text-xs sm:text-sm font-semibold hover:bg-[#A83800] shadow-sm transition-colors disabled:opacity-50 disabled:cursor-wait';
 function CancelDialog({ name, busy, onClose, onConfirm }: { name: string; busy: boolean; onClose: () => void; onConfirm: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   useDialogFocus(ref, onClose, '');
-  return createPortal(<div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"><div ref={ref} role="alertdialog" aria-modal="true" aria-labelledby="cancel-schedule-title" tabIndex={-1} className="w-full max-w-md min-w-0 rounded-3xl bg-white border border-[#E7E7E2] p-6 text-[#111827] shadow-2xl">
-    <h2 id="cancel-schedule-title" className="font-display text-xl font-bold [overflow-wrap:anywhere]">Hủy lịch "{name}"?</h2><p className="text-sm text-[#4B5563] mt-3">Lịch đã hủy không bật lại được.</p>
-    <div className="flex flex-wrap gap-2 mt-5"><button type="button" className={scheduleButton} onClick={onClose}>Giữ lịch</button><button type="button" disabled={busy} className={primaryScheduleButton} onClick={onConfirm}>Xác nhận hủy lịch</button></div>
+  return createPortal(<div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"><div ref={ref} role="alertdialog" aria-modal="true" aria-labelledby="cancel-schedule-title" tabIndex={-1} className="w-full max-w-md min-w-0 rounded-2xl bg-white border border-[#E5E5E0] p-6 text-[#111827] shadow-xl">
+    <h2 id="cancel-schedule-title" className="font-sans text-lg font-semibold text-[#111827] [overflow-wrap:anywhere]">Hủy lịch "{name}"?</h2><p className="text-sm text-[#4B5563] mt-2">Lịch đã hủy không bật lại được.</p>
+    <div className="flex flex-wrap justify-end gap-2 mt-5"><button type="button" className={scheduleButton} onClick={onClose}>Giữ lịch</button><button type="button" disabled={busy} className={primaryScheduleButton} onClick={onConfirm}>Xác nhận hủy lịch</button></div>
   </div></div>, document.body);
 }
 export function ScheduleActions({ schedule, navigate, onChanged, onConflict }: { schedule: ScheduleView; navigate: (path: string) => void; onChanged: (schedule: ScheduleView) => void; onConflict: () => Promise<void> }) {

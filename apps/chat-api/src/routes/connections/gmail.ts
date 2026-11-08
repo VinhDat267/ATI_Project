@@ -1,3 +1,4 @@
+import { canRevokeGoogleGrant } from '../../services/gmail/revocation.js';
 import { Router, type Request, type Response } from 'express';
 import { createHash, randomBytes } from 'node:crypto';
 import { decryptCredentials, encryptCredentials } from '@wap/tool-adapters';
@@ -66,28 +67,23 @@ export function createGmailConnectionRoutes(options: GmailConnectionsOptions): R
     next();
   });
 
-  const fail = (res: Response, code: 'GMAIL_STATE_INVALID' | 'GMAIL_SCOPE_MISSING' | 'GMAIL_REFRESH_TOKEN_MISSING' | 'GMAIL_CONNECT_FAILED') => {
+  const fail = (res: Response, code: 'GMAIL_STATE_INVALID' | 'GMAIL_SCOPE_MISSING' | 'GMAIL_REFRESH_TOKEN_MISSING' | 'GMAIL_API_DISABLED' | 'GMAIL_CONNECT_FAILED') => {
     const messages = {
       GMAIL_STATE_INVALID: 'Yêu cầu kết nối Gmail đã hết hạn hoặc không còn hợp lệ. Hãy bấm "Kết nối Gmail" lại.',
       GMAIL_SCOPE_MISSING: 'Google chưa cấp quyền đọc và gửi thư cho Planora. Hãy kết nối lại và đồng ý quyền Gmail.',
       GMAIL_REFRESH_TOKEN_MISSING: 'Google không trả quyền truy cập lâu dài. Hãy kết nối lại.',
+      GMAIL_API_DISABLED: 'Gmail API chưa được bật cho ứng dụng. Hãy nhờ quản trị viên bật Gmail API trên Google Cloud, sau đó kết nối lại.',
       GMAIL_CONNECT_FAILED: 'Không kết nối được Gmail. Vui lòng thử lại.',
     };
     res.status(400).json({ error: messages[code], code });
   };
-  // Google revokes the account's grant, not just this refresh token. Keep a
-  // possibly shared grant when the connected mailbox matches or is unknown.
+  // Google revokes the account's grant, not just this token. Email snapshots
+  // cannot prove separate accounts; retain grants unless peer origins differ.
   // The same lock as save/disconnect protects this decision through revocation.
-  const revokeRefusedGrant = (userId: string, stateId: string, token: string, email?: string) => {
-    options.repo!.withLockedConnection(userId, async (current, otherFlows) => {
+  const revokeRefusedGrant = (userId: string, stateId: string, token: string) => {
+    options.repo!.withLockedConnection(userId, async (current, otherFlows, peers) => {
       if (otherFlows) return; // Another callback may already hold the same grant.
-      if (current) {
-        let connectedEmail: unknown;
-        try { connectedEmail = decryptCredentials(current.config, options.encryptionKey!).email; }
-        catch { return; } // An unreadable connection cannot prove separate grants.
-        if (!email || typeof connectedEmail !== 'string' || !connectedEmail.trim()
-          || connectedEmail.trim().toLowerCase() === email.trim().toLowerCase()) return;
-      }
+      if (!canRevokeGoogleGrant(options.oauth!.clientId, [...peers, ...(current ? [current] : [])], options.encryptionKey!)) return;
       await client!.revoke(token, AbortSignal.timeout(revokeTimeoutMs));
     }, stateId).catch((error) => {
       console.warn(`[chat-api] Gmail revoke failed: ${error instanceof GmailOAuthError ? error.kind : 'error'}`);
@@ -142,17 +138,17 @@ export function createGmailConnectionRoutes(options: GmailConnectionsOptions): R
       let email: string;
       try {
         email = await client!.profileEmail(tokens.accessToken, AbortSignal.timeout(googleTimeoutMs));
-      } catch {
+      } catch (error) {
         revokeRefusedGrant(user.id, consumed.id, tokens.refreshToken);
-        fail(res, 'GMAIL_CONNECT_FAILED'); return;
+        fail(res, error instanceof GmailOAuthError && error.reason === 'SERVICE_DISABLED' ? 'GMAIL_API_DISABLED' : 'GMAIL_CONNECT_FAILED'); return;
       }
       const now = clock();
-      const config = encryptCredentials({ refreshToken: tokens.refreshToken, email, scopes: tokens.scopes, connectedAt: new Date(now).toISOString() }, options.encryptionKey!);
+      const config = encryptCredentials({ oauthClientId: options.oauth!.clientId, refreshToken: tokens.refreshToken, email, scopes: tokens.scopes, connectedAt: new Date(now).toISOString() }, options.encryptionKey!);
       const saved = await options.repo!.saveConnection(user.id, consumed.id, config, clock);
       if (!saved) {
         // Another callback, disconnect or logout won: never overwrite it. Only
         // revoke when this is provably not the grant of the current connection.
-        revokeRefusedGrant(user.id, consumed.id, tokens.refreshToken, email);
+        revokeRefusedGrant(user.id, consumed.id, tokens.refreshToken);
         fail(res, 'GMAIL_STATE_INVALID'); return;
       }
       options.onConnectionChanged?.(user.id);
@@ -166,20 +162,18 @@ export function createGmailConnectionRoutes(options: GmailConnectionsOptions): R
   router.delete('/', async (req, res) => {
     const user = (req as any).user as AuthUser;
     try {
-      const revokeRow = async (config: string | undefined) => {
-        if (!config) return;
+      await options.repo!.disconnect(user.id, async (removed, peers, otherFlows) => {
+        if (!removed || otherFlows) return;
         try {
-          const token = decryptCredentials(config, options.encryptionKey!).refreshToken;
+          const config = decryptCredentials(removed.config, options.encryptionKey!);
+          if (config.oauthClientId !== options.oauth!.clientId) return;
+          if (!canRevokeGoogleGrant(options.oauth!.clientId, peers, options.encryptionKey!)) return;
+          const token = config.refreshToken;
           if (typeof token === 'string' && token) await client!.revoke(token, AbortSignal.timeout(revokeTimeoutMs));
         } catch (error) {
           console.warn(`[chat-api] Gmail revoke failed: ${error instanceof GmailOAuthError ? error.kind : 'error'}`);
         }
-      };
-      const current = await options.credentialRepo!.getPersonalConnectionStatus('gmail', user.id);
-      await revokeRow(current?.config);
-      const removed = await options.repo!.disconnect(user.id);
-      // A connection saved by another tab between the two reads is revoked too.
-      if (removed && removed.id !== current?.id) await revokeRow(removed.config);
+      });
       options.onConnectionChanged?.(user.id);
       res.json({ success: true });
     } catch {

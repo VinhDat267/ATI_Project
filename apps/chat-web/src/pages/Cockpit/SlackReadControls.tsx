@@ -8,6 +8,8 @@ import {
 
 export interface SlackReadControlsProps {
   purpose?: 'read' | 'write';
+  compact?: boolean;
+  hideInboxLink?: boolean;
   userId?: string;
   busy: boolean;
   value: string | null;
@@ -22,6 +24,8 @@ export function SlackReadControls({
   value,
   onChange,
   purpose = 'read',
+  compact = false,
+  hideInboxLink = false,
   onSelectChannel,
   onSelectUser,
 }: SlackReadControlsProps) {
@@ -97,7 +101,11 @@ export function SlackReadControls({
   return (
     <section
       aria-label={purpose === 'write' ? 'Gửi tin Slack' : 'Chế độ tra cứu'}
-      className="mb-6 rounded-2xl border border-brand-border bg-white p-4 text-sm"
+      className={
+        compact && !active
+          ? 'inline-flex items-center'
+          : 'mb-4 rounded-2xl border border-[#E5E5E0] bg-white p-4 text-sm shadow-2xs'
+      }
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <button
@@ -105,13 +113,21 @@ export function SlackReadControls({
           aria-pressed={active}
           disabled={busy}
           onClick={() => onChange(active ? null : '')}
-          className="rounded-lg border border-brand-border px-3 py-2 font-medium text-brand-text"
+          className={
+            compact && !active
+              ? 'rounded-lg border border-[#E5E5E0] bg-[#F8F8F6] hover:bg-[#EFEFE9] px-2.5 py-1 text-xs font-semibold text-[#111827] transition-colors'
+              : active
+                ? 'rounded-xl border border-[#111827] bg-[#111827] px-3 py-1.5 text-xs font-semibold text-white transition-colors'
+                : 'rounded-xl border border-[#E5E5E0] bg-white hover:bg-[#F8F8F6] px-3 py-1.5 text-xs font-semibold text-[#111827] transition-colors'
+          }
         >
           {purpose === 'write' ? 'Gửi tin Slack' : 'Tra cứu Slack của bạn'}
         </button>
-        <a href="/inbox" className="text-xs underline text-brand-muted">
-          Mở hộp thư đề xuất Slack
-        </a>
+        {!hideInboxLink && (
+          <a href="/inbox" className="text-xs font-medium underline underline-offset-2 text-[#4B5563] hover:text-[#111827]">
+            Mở hộp thư đề xuất Slack
+          </a>
+        )}
       </div>
       {active && (
         <div className="mt-3 space-y-2">

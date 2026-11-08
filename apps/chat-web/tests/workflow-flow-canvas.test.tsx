@@ -510,7 +510,7 @@ describe('WorkflowFlowCanvas — Make.com Orbital Workflow Visualizer', () => {
     expect(screen.getByText('Tất cả 2 dịch vụ đều đã được thiết lập.')).toBeInTheDocument();
     expect(screen.getByTestId('settings-oauth-summary')).toBeInTheDocument();
     expect(document.body).toHaveTextContent(
-      /OAuth 1-Click cá nhân \(Gmail, Calendar, Sheets, Trello, GitHub(?:, Notion, Jira Cloud)?, Telegram\)/i,
+      /Các tích hợp cá nhân \(Gmail, Google Calendar, Google Sheets, Slack, Trello, GitHub, Notion, Jira Cloud, Telegram\)/i,
     );
   });
 

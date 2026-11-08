@@ -227,6 +227,34 @@ describe('TrelloTokenManager', () => {
     expect(reconnectCalls).toEqual([{ service: 'trello', userId, credentialId }]);
   });
 
+  it('TrelloOAuthClient classifies Atlassian 403 refresh_token is invalid as invalid_grant', async () => {
+    const client = new TrelloOAuthClient(
+      {
+        clientId: 'cid',
+        clientSecret: 'csec',
+        redirectUri: 'http://127.0.0.1/callback',
+        authorizationUrl: 'http://127.0.0.1/auth',
+        tokenUrl: 'http://127.0.0.1/oauth/token',
+        apiBaseUrl: 'http://127.0.0.1/api',
+      },
+      (async () =>
+        new Response(
+          JSON.stringify({
+            error: 'unauthorized_client',
+            error_description: 'refresh_token is invalid',
+          }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        )) as typeof fetch
+    );
+
+    await expect(client.refresh('expired-refresh-token', new AbortController().signal)).rejects.toSatisfy((err: unknown) => {
+      expect(err).toBeInstanceOf(TrelloOAuthError);
+      expect((err as TrelloOAuthError).kind).toBe('invalid_grant');
+      expect((err as TrelloOAuthError).status).toBe(403);
+      return true;
+    });
+  });
+
   it('rejects when refresh succeeds without returning a new refreshToken, marks reconnect required, and prevents subsequent calls from refreshing', async () => {
     mockClient.refresh.mockResolvedValueOnce({
       accessToken: 'access-token-without-refresh',

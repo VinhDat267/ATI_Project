@@ -125,34 +125,36 @@ function DottedConnector({
   fromColor,
   toColor,
   label,
+  compact = false,
 }: {
   mode: WorkflowFlowMode;
   fromColor: string;
   toColor: string;
   label?: string;
+  compact?: boolean;
 }) {
   const isReceipt = mode === 'receipt';
   const isExecuting = mode === 'executing';
-  const strokeColor = isReceipt ? '#10B981' : fromColor || toColor || '#9CA3AF';
+  const strokeColor = isReceipt ? '#9CA3AF' : isExecuting ? '#6B7280' : fromColor || toColor || '#9CA3AF';
 
   return (
     <div
       data-flow-connector="true"
-      className="flex flex-col items-center justify-center px-1 sm:px-2 flex-shrink-0 select-none relative"
+      className={`flex flex-col items-center justify-center ${compact ? 'px-1.5 sm:px-2.5' : 'px-1 sm:px-2'} flex-shrink-0 select-none relative`}
       aria-hidden="true"
     >
       {label && (
-        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#F8F8F6] text-[#4B5563] border border-[#E7E7E2] mb-1 whitespace-nowrap">
+        <span className="text-[11px] font-medium px-1.5 py-0.5 rounded bg-[#F4F4F3] text-[#4B5563] border border-[#E5E5E3] mb-1 whitespace-nowrap">
           {label}
         </span>
       )}
       <div className="relative flex items-center justify-center">
         <svg
-          width="48"
-          height="18"
+          width={compact ? '36' : '48'}
+          height={compact ? '14' : '18'}
           viewBox="0 0 48 18"
           fill="none"
-          className={`w-9 sm:w-12 h-4 ${isExecuting ? 'animate-pulse' : ''}`}
+          className={`${compact ? 'w-8 sm:w-9 h-3.5' : 'w-9 sm:w-12 h-4'} ${isExecuting ? 'animate-pulse' : ''}`}
         >
           <line
             x1="2"
@@ -160,23 +162,29 @@ function DottedConnector({
             x2="46"
             y2="9"
             stroke={strokeColor}
-            strokeWidth="3"
+            strokeWidth={compact ? '2' : '2.2'}
             strokeLinecap="round"
             strokeDasharray="4 4"
           />
-          <circle cx="8" cy="9" r="2.5" fill={isReceipt ? '#10B981' : fromColor} />
-          <circle cx="40" cy="9" r="2.5" fill={isReceipt ? '#10B981' : toColor} />
+          <circle cx="6" cy="9" r="2" fill={strokeColor} />
+          <circle cx="42" cy="9" r="2" fill={strokeColor} />
         </svg>
-        {/* Make.com Signature Wrench / Filter Data-Flow Badge on Connector */}
-        <span
-          data-flow-filter-badge="true"
-          className="absolute w-4 h-4 rounded-full bg-white border border-[#E7E7E2] shadow-2xs flex items-center justify-center text-[#6B7280]"
-          title="Bộ lọc & ánh xạ dữ liệu giữa các bước"
-        >
-          <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          </svg>
-        </span>
+        {!compact && (
+          <span
+            data-flow-filter-badge="true"
+            className="absolute w-4 h-4 rounded-full bg-white border border-[#E5E5E3] flex items-center justify-center text-[#6B7280]"
+            title="Bộ lọc & ánh xạ dữ liệu giữa các bước"
+          >
+            <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </span>
+        )}
+        {compact && (
+          <span data-flow-filter-badge="true" className="sr-only">
+            Ánh xạ dữ liệu
+          </span>
+        )}
       </div>
     </div>
   );
@@ -187,6 +195,7 @@ function OrbitalNodeButton({
   index,
   isLast,
   mode,
+  compact = false,
   isSelected,
   onSelect,
 }: {
@@ -194,6 +203,7 @@ function OrbitalNodeButton({
   index: number;
   isLast?: boolean;
   mode: WorkflowFlowMode;
+  compact?: boolean;
   isSelected: boolean;
   onSelect: () => void;
 }) {
@@ -201,23 +211,99 @@ function OrbitalNodeButton({
     (mode === 'executing' || mode === 'receipt') &&
     (node.status === 'succeeded' || node.status === 'running' || node.status === 'failed');
 
+  if (compact) {
+    return (
+      <div className="inline-flex items-center">
+        <div className="relative inline-flex items-center">
+          {index > 0 && <span data-connector-ear="true" aria-hidden="true" className="sr-only" />}
+          {!isLast && <span data-connector-ear="true" aria-hidden="true" className="sr-only" />}
+          <button
+            type="button"
+            data-testid={`workflow-node-${node.service}`}
+            data-service={node.service}
+            data-step-count={node.stepCount}
+            aria-label={`Nút dịch vụ ${node.label} (${node.stepCount} bước)`}
+            aria-expanded={isSelected ? 'true' : 'false'}
+            onClick={onSelect}
+            className={`inline-flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-lg bg-white border transition-colors cursor-pointer focus:v3-outline-none ${
+              isSelected
+                ? 'border-[#111827] bg-[#F5F5F4]'
+                : 'border-[#E5E5E3] hover:border-[#CFCFC9]'
+            } ${mode === 'executing' && node.status === 'running' ? 'animate-pulse' : ''}`}
+          >
+            <span className="relative w-7 h-7 rounded-md bg-[#F8F8F7] border border-[#ECECE9] flex items-center justify-center flex-shrink-0">
+              <ServiceLogo service={node.service} className="w-4 h-4 text-[#111827]" />
+              <span
+                data-testid={`node-bubble-${node.service}`}
+                data-step-count={node.stepCount}
+                data-status-icon={showStatusBubble ? node.status : 'count'}
+                className={`absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 rounded-full text-[11px] font-semibold flex items-center justify-center border pointer-events-none tabular-nums ${
+                  showStatusBubble && node.status === 'succeeded'
+                    ? 'bg-[#DCFAE5] text-[#04250E] border-[#B7EBCA]'
+                    : showStatusBubble && node.status === 'running'
+                      ? 'bg-[#1D1F20] text-white border-[#1D1F20]'
+                      : showStatusBubble && node.status === 'failed'
+                        ? 'bg-[#FEE2E2] text-[#7F1D1D] border-[#FECACA]'
+                        : 'bg-white text-[#111827] border-[#DFDFDC]'
+                }`}
+              >
+                {showStatusBubble && node.status === 'succeeded' ? (
+                  '✓'
+                ) : showStatusBubble && node.status === 'running' ? (
+                  <svg className="w-2.5 h-2.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                    <circle cx="12" cy="12" r="9" className="opacity-30" />
+                    <path d="M12 3a9 9 0 0 1 9 9" />
+                  </svg>
+                ) : showStatusBubble && node.status === 'failed' ? (
+                  '!'
+                ) : (
+                  node.stepCount
+                )}
+              </span>
+            </span>
+            <span className="text-left min-w-0">
+              <span className="block text-xs font-semibold text-[#111827] leading-tight truncate">
+                {node.label}
+              </span>
+              <span className="block text-[11px] text-[#5F6368] leading-tight truncate mt-0.5">
+                {node.actionSummary}
+              </span>
+            </span>
+          </button>
+          {mode === 'schedule' && index === 0 && (
+            <span
+              data-trigger-badge="schedule"
+              title="Kích hoạt tự động theo lịch định kỳ"
+              className="ml-1 w-5 h-5 rounded-full bg-[#1D1F20] text-white flex items-center justify-center pointer-events-none"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.2">
+                <circle cx="12" cy="12" r="9" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 2" />
+              </svg>
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col items-center text-center min-w-[76px] max-w-[116px]">
       <div className="relative flex items-center justify-center">
-        {/* Left Make.com Connector Ear */}
+        {/* Left Connector Ear */}
         {index > 0 && (
           <span
             data-connector-ear="true"
             aria-hidden="true"
-            className="absolute -left-1.5 w-2.5 h-3.5 rounded-l-full bg-white border border-[#D1D5DB] shadow-2xs pointer-events-none z-0"
+            className="absolute -left-1.5 w-2 h-3 rounded-l-full bg-white border border-[#DFDFDC] pointer-events-none z-0"
           />
         )}
-        {/* Right Make.com Connector Ear */}
+        {/* Right Connector Ear */}
         {!isLast && (
           <span
             data-connector-ear="true"
             aria-hidden="true"
-            className="absolute -right-1.5 w-2.5 h-3.5 rounded-r-full bg-white border border-[#D1D5DB] shadow-2xs pointer-events-none z-0"
+            className="absolute -right-1.5 w-2 h-3 rounded-r-full bg-white border border-[#DFDFDC] pointer-events-none z-0"
           />
         )}
 
@@ -229,40 +315,40 @@ function OrbitalNodeButton({
           aria-label={`Nút dịch vụ ${node.label} (${node.stepCount} bước)`}
           aria-expanded={isSelected ? 'true' : 'false'}
           onClick={onSelect}
-          className={`w-16 h-16 rounded-full bg-white ring-4 ${node.meta.ringClass} border-2 shadow-sm hover:shadow-md transition-all flex items-center justify-center relative z-10 group cursor-pointer focus:v3-outline-none ${
-            isSelected ? 'scale-105 ring-[#FF5701]/40 border-[#FF5701]' : 'hover:scale-105'
+          className={`w-16 h-16 rounded-full bg-white ring-4 ring-[#111827]/[0.03] border transition-colors flex items-center justify-center relative z-10 group cursor-pointer focus:v3-outline-none ${
+            isSelected ? 'border-[#111827] bg-[#F8F8F7]' : 'border-[#DFDFDC] hover:border-[#BDBDB7]'
           } ${mode === 'executing' && node.status === 'running' ? 'animate-pulse' : ''}`}
         >
-          <ServiceLogo service={node.service} className="w-7 h-7 transition-transform group-hover:scale-110" />
+          <ServiceLogo service={node.service} className="w-6 h-6 text-[#111827]" />
         </button>
 
-        {/* Make.com Schedule Clock Trigger Badge on First Node */}
+        {/* Schedule Clock Trigger Badge on First Node */}
         {mode === 'schedule' && index === 0 && (
           <span
             data-trigger-badge="schedule"
             title="Kích hoạt tự động theo lịch định kỳ"
-            className="absolute -bottom-1 -left-1 z-20 w-6 h-6 rounded-full bg-[#111827] text-white border-2 border-white shadow-xs flex items-center justify-center pointer-events-none"
+            className="absolute -bottom-1 -left-1 z-20 w-5 h-5 rounded-full bg-[#1D1F20] text-white border-2 border-white flex items-center justify-center pointer-events-none"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.3">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.2">
               <circle cx="12" cy="12" r="9" />
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 2" />
             </svg>
           </span>
         )}
 
-        {/* Top-Right Step Count or Status Bubble (Make.com style) */}
+        {/* Top-Right Step Count or Status Bubble */}
         <span
           data-testid={`node-bubble-${node.service}`}
           data-step-count={node.stepCount}
           data-status-icon={showStatusBubble ? node.status : 'count'}
-          className={`absolute -top-1.5 -right-1.5 z-20 min-w-[22px] h-[22px] px-1 rounded-full text-[11px] font-bold flex items-center justify-center border shadow-xs pointer-events-none ${
+          className={`absolute -top-1 -right-1 z-20 min-w-[20px] h-[20px] px-1 rounded-full text-[11px] font-semibold flex items-center justify-center border pointer-events-none tabular-nums ${
             showStatusBubble && node.status === 'succeeded'
-              ? 'bg-emerald-600 text-white border-emerald-700'
+              ? 'bg-[#DCFAE5] text-[#04250E] border-[#B7EBCA]'
               : showStatusBubble && node.status === 'running'
-                ? 'bg-[#FF5701] text-white border-[#E04D00]'
+                ? 'bg-[#1D1F20] text-white border-[#1D1F20]'
                 : showStatusBubble && node.status === 'failed'
-                  ? 'bg-red-600 text-white border-red-700'
-                  : 'bg-white text-[#111827] border-[#E7E7E2]'
+                  ? 'bg-[#FEE2E2] text-[#7F1D1D] border-[#FECACA]'
+                  : 'bg-white text-[#111827] border-[#DFDFDC]'
           }`}
         >
           {showStatusBubble && node.status === 'succeeded' ? (
@@ -281,21 +367,10 @@ function OrbitalNodeButton({
       </div>
 
       {/* Node Footer Label */}
-      <div className="mt-2 flex items-center justify-center gap-1 max-w-full">
-        {node.status === 'succeeded' && (mode === 'executing' || mode === 'receipt') && (
-          <span
-            aria-hidden="true"
-            className="w-3.5 h-3.5 rounded-full bg-emerald-600 text-white text-[9px] font-bold inline-flex items-center justify-center flex-shrink-0"
-          >
-            ✓
-          </span>
-        )}
-        <span className="text-xs font-bold text-[#111827] truncate">{node.label}</span>
-        <span className="text-[10px] font-mono px-1 py-0.2 rounded border border-[#E7E7E2] bg-[#F8F8F6] text-[#4B5563] flex-shrink-0">
-          {index + 1}
-        </span>
+      <div className="mt-1.5 flex items-center justify-center max-w-full">
+        <span className="text-xs font-semibold text-[#111827] truncate">{node.label}</span>
       </div>
-      <span className="text-[11px] text-[#4B5563] line-clamp-1 mt-0.5">{node.actionSummary}</span>
+      <span className="text-[11px] text-[#5F6368] line-clamp-1 mt-0.5">{node.actionSummary}</span>
     </div>
   );
 }
@@ -454,22 +529,22 @@ export function WorkflowFlowCanvas({
       data-flow-mode={mode}
       data-router-node={hasRouterNode ? 'true' : undefined}
       data-auto-digest={mode === 'schedule' ? (isAutoDigest ? 'true' : 'false') : undefined}
-      className={`w-full rounded-2xl border border-[#E7E7E2] bg-[#F8F8F6] ${
-        compact ? 'p-3 sm:p-4' : 'p-4 sm:p-5'
-      } shadow-xs min-w-0 overflow-hidden ${className}`}
+      className={`w-full rounded-lg border border-[#E6E6E3] bg-[#F9F9F8] ${
+        compact ? 'px-3.5 py-2.5' : 'p-3.5 sm:p-4'
+      } min-w-0 overflow-hidden ${className}`}
     >
       {/* Top Stage Header Pill */}
       {!compact && (
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-          <div className="inline-flex items-center gap-2 text-xs font-semibold text-[#4B5563]">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+          <div className="inline-flex items-center gap-2 text-xs font-medium text-[#4B5563]">
             <span
               aria-hidden="true"
-              className={`w-2 h-2 rounded-full ${
+              className={`w-1.5 h-1.5 rounded-full ${
                 mode === 'receipt'
-                  ? 'bg-emerald-600'
+                  ? 'bg-[#047857]'
                   : mode === 'executing'
-                    ? 'bg-[#FF5701] animate-ping'
-                    : 'bg-[#FF5701]'
+                    ? 'bg-[#1D1F20] animate-ping'
+                    : 'bg-[#5F6368]'
               }`}
             />
             <span>
@@ -484,80 +559,129 @@ export function WorkflowFlowCanvas({
                       : 'Mô hình luồng mẫu'}
             </span>
           </div>
-          <span className="text-[11px] text-[#6B7280]">
-            Bấm vào biểu tượng dịch vụ để xem chi tiết
-          </span>
+          {inspectedNode && (
+            <button
+              type="button"
+              onClick={() => handleToggleService(null)}
+              className="text-xs font-medium text-[#5F6368] hover:text-[#111827] cursor-pointer"
+            >
+              Bỏ lọc ({inspectedNode.label})
+            </button>
+          )}
         </div>
       )}
 
-      {/* Make.com Orbital Canvas Area */}
+      {/* Pipeline Canvas Area */}
       {!hasRouterNode ? (
         <div
-          data-testid="workflow-upstream-chain"
-          className="flex flex-wrap items-center justify-center gap-y-4 py-2"
+          className={
+            compact && dataFlowBadges.length > 0
+              ? 'flex flex-wrap items-center justify-between gap-x-4 gap-y-2'
+              : ''
+          }
         >
-          {serviceNodes.map((node, index) => (
-            <div key={node.service} className="flex items-center">
-              <OrbitalNodeButton
-                node={node}
-                index={index}
-                isLast={index === serviceNodes.length - 1}
-                mode={mode}
-                isSelected={selectedService === node.service}
-                onSelect={() => handleToggleService(node.service)}
-              />
+          <div
+            data-testid="workflow-upstream-chain"
+            className={`flex flex-wrap items-center ${
+              compact ? 'justify-start gap-y-2' : 'justify-center gap-y-4 py-1.5'
+            }`}
+          >
+            {serviceNodes.map((node, index) => (
+              <div key={node.service} className="flex items-center">
+                <OrbitalNodeButton
+                  node={node}
+                  index={index}
+                  isLast={index === serviceNodes.length - 1}
+                  mode={mode}
+                  compact={compact}
+                  isSelected={selectedService === node.service}
+                  onSelect={() => handleToggleService(node.service)}
+                />
 
-              {/* Schedule Auto-Digest Central Pill */}
-              {mode === 'schedule' && isAutoDigest && index === 0 && serviceNodes.length >= 2 && (
-                <>
+                {/* Schedule Auto-Digest Central Pill */}
+                {mode === 'schedule' && isAutoDigest && index === 0 && serviceNodes.length >= 2 && (
+                  <>
+                    <DottedConnector
+                      mode={mode}
+                      compact={compact}
+                      fromColor={node.meta.strokeHex}
+                      toColor="#6B7280"
+                    />
+                    <div
+                      data-testid="workflow-auto-digest-node"
+                      className={
+                        compact
+                          ? 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white border border-[#DFDFDC]'
+                          : 'flex flex-col items-center text-center px-1'
+                      }
+                    >
+                      <div
+                        className={
+                          compact
+                            ? 'w-5 h-5 rounded bg-[#1D1F20] text-white flex items-center justify-center flex-shrink-0'
+                            : 'w-11 h-11 rounded-full bg-[#1D1F20] text-white border border-[#1D1F20] flex items-center justify-center'
+                        }
+                      >
+                        <svg className={compact ? 'w-3 h-3' : 'w-4 h-4'} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M13 10V3L4 14h7v7l9-11h-7z"
+                          />
+                        </svg>
+                      </div>
+                      <span className={`${compact ? 'text-xs font-medium text-[#111827]' : 'mt-1.5 text-[11px] font-semibold text-[#111827]'} whitespace-nowrap`}>
+                        Auto-Digest
+                      </span>
+                      {!compact && <span className="text-[11px] text-[#5F6368]">Gửi tự động</span>}
+                    </div>
+                  </>
+                )}
+
+                {index < serviceNodes.length - 1 && (
                   <DottedConnector
                     mode={mode}
-                    fromColor={node.meta.strokeHex}
-                    toColor="#10B981"
+                    compact={compact}
+                    fromColor={
+                      mode === 'schedule' && isAutoDigest && index === 0
+                        ? '#6B7280'
+                        : node.meta.strokeHex
+                    }
+                    toColor={serviceNodes[index + 1].meta.strokeHex}
                   />
-                  <div
-                    data-testid="workflow-auto-digest-node"
-                    className="flex flex-col items-center text-center px-1"
-                  >
-                    <div className="w-12 h-12 rounded-full bg-emerald-600 text-white ring-4 ring-emerald-500/25 flex items-center justify-center shadow-sm">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M13 10V3L4 14h7v7l9-11h-7z"
-                        />
-                      </svg>
-                    </div>
-                    <span className="mt-1.5 text-[11px] font-bold text-emerald-800 whitespace-nowrap">
-                      Auto-Digest
-                    </span>
-                    <span className="text-[10px] text-[#4B5563]">Gửi tự động</span>
-                  </div>
-                </>
-              )}
+                )}
+              </div>
+            ))}
+          </div>
 
-              {index < serviceNodes.length - 1 && (
-                <DottedConnector
-                  mode={mode}
-                  fromColor={
-                    mode === 'schedule' && isAutoDigest && index === 0
-                      ? '#10B981'
-                      : node.meta.strokeHex
-                  }
-                  toColor={serviceNodes[index + 1].meta.strokeHex}
-                />
-              )}
+          {compact && dataFlowBadges.length > 0 && (
+            <div
+              data-testid="workflow-data-flow-strip"
+              className="flex flex-wrap items-center gap-1.5"
+            >
+              {dataFlowBadges.map((edge) => (
+                <span
+                  key={`${edge.fromStepId}-${edge.toStepId}-${edge.field}`}
+                  data-testid="workflow-data-flow-pill"
+                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-white border border-[#E5E5E3] text-[11px] font-medium text-[#4B5563]"
+                >
+                  <span className="text-[#111827] font-medium">
+                    Dữ liệu từ Việc {edge.fromIndex} → Việc {edge.toIndex}
+                  </span>
+                  <span className="text-[#5F6368] font-mono text-[11px]">({edge.field})</span>
+                </span>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       ) : (
-        /* Make.com Router Fan-Out Layout: Sequential Upstream Chain -> Green Router -> Curved Dotted Branches -> Destinations */
-        <div className="flex flex-col md:flex-row items-center justify-center gap-3 md:gap-2 py-2">
+        /* Router Fan-Out Layout: Sequential Upstream Chain -> Router -> Curved Dotted Branches -> Destinations */
+        <div className={`flex flex-col md:flex-row items-center ${compact ? 'justify-start gap-2.5 py-0.5' : 'justify-center gap-3 md:gap-2 py-1.5'}`}>
           {/* Upstream Linear Service Chain BEFORE Router */}
           <div
             data-testid="workflow-upstream-chain"
-            className="flex flex-wrap items-center justify-center gap-y-3"
+            className="flex flex-wrap items-center justify-center gap-y-2.5"
           >
             {upstreamNodes.map((uNode, uIdx) => (
               <div key={uNode.service} className="flex items-center">
@@ -566,42 +690,48 @@ export function WorkflowFlowCanvas({
                   index={uIdx}
                   isLast={false}
                   mode={mode}
+                  compact={compact}
                   isSelected={selectedService === uNode.service}
                   onSelect={() => handleToggleService(uNode.service)}
                 />
                 <DottedConnector
                   mode={mode}
+                  compact={compact}
                   fromColor={uNode.meta.strokeHex}
                   toColor={
                     uIdx < upstreamNodes.length - 1
                       ? upstreamNodes[uIdx + 1].meta.strokeHex
-                      : '#10B981'
+                      : '#6B7280'
                   }
                 />
               </div>
             ))}
           </div>
 
-          {/* Central Make.com Emerald Router Node */}
-          <div className="flex flex-col items-center text-center min-w-[72px]">
+          {/* Central Router Node */}
+          <div className={compact ? 'inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white border border-[#DFDFDC]' : 'flex flex-col items-center text-center min-w-[72px]'}>
             <div className="relative flex items-center justify-center">
               <span
                 data-connector-ear="true"
                 aria-hidden="true"
-                className="absolute -left-1.5 w-2.5 h-3.5 rounded-l-full bg-white border border-emerald-300 shadow-2xs pointer-events-none z-0"
+                className={compact ? 'sr-only' : 'absolute -left-1.5 w-2 h-3 rounded-l-full bg-white border border-[#DFDFDC] pointer-events-none z-0'}
               />
               <span
                 data-connector-ear="true"
                 aria-hidden="true"
-                className="absolute -right-1.5 w-2.5 h-3.5 rounded-r-full bg-white border border-emerald-300 shadow-2xs pointer-events-none z-0"
+                className={compact ? 'sr-only' : 'absolute -right-1.5 w-2 h-3 rounded-r-full bg-white border border-[#DFDFDC] pointer-events-none z-0'}
               />
               <div
                 data-testid="workflow-router-node"
                 data-router-node="true"
-                className="w-16 h-16 rounded-full bg-emerald-600 text-white ring-4 ring-emerald-500/30 border-2 border-emerald-700 shadow-sm flex items-center justify-center relative z-10"
+                className={
+                  compact
+                    ? 'w-7 h-7 rounded-md bg-[#1D1F20] text-white flex items-center justify-center relative z-10'
+                    : 'w-14 h-14 rounded-full bg-[#1D1F20] text-white border border-[#1D1F20] flex items-center justify-center relative z-10'
+                }
               >
                 <svg
-                  className="w-7 h-7"
+                  className={compact ? 'w-4 h-4' : 'w-6 h-6'}
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -613,34 +743,34 @@ export function WorkflowFlowCanvas({
                 </svg>
               </div>
             </div>
-            <div className="mt-2 flex items-center gap-1">
-              <span className="text-xs font-bold text-[#111827]">Router</span>
-              <span className="text-[10px] font-mono px-1 rounded border border-emerald-200 bg-emerald-50 text-emerald-800">
+            <div className={compact ? 'text-left' : 'mt-1.5 flex items-center gap-1'}>
+              <span className="text-xs font-semibold text-[#111827] block">Router</span>
+              <span className="text-[11px] font-mono px-1.5 rounded border border-[#E5E5E3] bg-[#F4F4F3] text-[#4B5563] tabular-nums">
                 {destinationNodes.length} nhánh
               </span>
             </div>
-            <span className="text-[11px] text-[#4B5563]">Phân luồng dữ liệu</span>
+            {!compact && <span className="text-[11px] text-[#5F6368]">Phân luồng dữ liệu</span>}
           </div>
 
           {/* Fan-Out Branches to Destination Nodes */}
           <div
             data-testid="workflow-branch-chain"
-            className="flex flex-col gap-3 w-full md:w-auto items-center md:items-start"
+            className={`flex flex-col ${compact ? 'gap-2' : 'gap-2.5'} w-full md:w-auto items-center md:items-start`}
           >
             {destinationNodes.map((destNode, branchIdx) => (
               <div key={destNode.service} className="flex items-center justify-center">
                 {/* Curved Dotted Branch SVG */}
                 <div className="flex flex-col items-center px-1 sm:px-2 flex-shrink-0 relative" aria-hidden="true">
-                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded-full mb-0.5">
+                  <span className="text-[11px] font-medium text-[#4B5563] bg-white border border-[#E5E5E3] px-1.5 py-0.2 rounded mb-0.5 tabular-nums">
                     {ordinalLabel(branchIdx)}
                   </span>
                   <div className="relative flex items-center justify-center">
                     <svg
-                      width="52"
-                      height="24"
+                      width={compact ? '40' : '52'}
+                      height={compact ? '18' : '24'}
                       viewBox="0 0 52 24"
                       fill="none"
-                      className={`w-10 sm:w-13 h-6 ${mode === 'executing' ? 'animate-pulse' : ''}`}
+                      className={`${compact ? 'w-8 sm:w-10 h-4' : 'w-10 sm:w-13 h-6'} ${mode === 'executing' ? 'animate-pulse' : ''}`}
                     >
                       <path
                         d={
@@ -650,15 +780,15 @@ export function WorkflowFlowCanvas({
                               ? 'M 2 6 C 20 6, 28 18, 50 18'
                               : 'M 2 12 L 50 12'
                         }
-                        stroke={mode === 'receipt' ? '#10B981' : destNode.meta.strokeHex}
-                        strokeWidth="3"
+                        stroke="#9CA3AF"
+                        strokeWidth="2"
                         strokeLinecap="round"
                         strokeDasharray="4 4"
                       />
                     </svg>
                     <span
                       data-flow-filter-badge="true"
-                      className="absolute w-3.5 h-3.5 rounded-full bg-white border border-[#E7E7E2] shadow-2xs flex items-center justify-center text-[#6B7280]"
+                      className={compact ? 'sr-only' : 'absolute w-3.5 h-3.5 rounded-full bg-white border border-[#E5E5E3] flex items-center justify-center text-[#6B7280]'}
                     >
                       <svg className="w-2 h-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m6-6H6" />
@@ -672,6 +802,7 @@ export function WorkflowFlowCanvas({
                   index={upstreamNodes.length + branchIdx}
                   isLast={true}
                   mode={mode}
+                  compact={compact}
                   isSelected={selectedService === destNode.service}
                   onSelect={() => handleToggleService(destNode.service)}
                 />
@@ -681,23 +812,23 @@ export function WorkflowFlowCanvas({
         </div>
       )}
 
-      {/* Data-Flow Mapping Strip ($ref / $template between steps) */}
-      {dataFlowBadges.length > 0 && (
+      {/* Data-Flow Mapping Strip ($ref / $template between steps) for non-compact or router views */}
+      {dataFlowBadges.length > 0 && (!compact || hasRouterNode) && (
         <div
           data-testid="workflow-data-flow-strip"
-          className="mt-2 pt-2 border-t border-[#E7E7E2] flex flex-wrap items-center gap-1.5"
+          className="mt-2.5 pt-2 border-t border-[#E6E6E3] flex flex-wrap items-center gap-1.5"
         >
-          <span className="text-[11px] font-semibold text-[#4B5563]">Luồng truyền dữ liệu:</span>
+          <span className="text-[11px] font-medium text-[#5F6368]">Luồng truyền dữ liệu:</span>
           {dataFlowBadges.map((edge) => (
             <span
               key={`${edge.fromStepId}-${edge.toStepId}-${edge.field}`}
               data-testid="workflow-data-flow-pill"
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-[#E7E7E2] text-[11px] font-medium text-[#111827] shadow-2xs"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-[#E5E5E3] text-[11px] font-medium text-[#111827]"
             >
-              <span className="font-semibold text-[#FF5701]">
+              <span className="font-medium text-[#111827]">
                 Dữ liệu từ Việc {edge.fromIndex} → Việc {edge.toIndex}
               </span>
-              <span className="text-[#6B7280] font-mono text-[10px]">({edge.field})</span>
+              <span className="text-[#5F6368] font-mono text-[11px]">({edge.field})</span>
             </span>
           ))}
         </div>
@@ -709,17 +840,17 @@ export function WorkflowFlowCanvas({
           data-testid="workflow-node-inspector"
           role="region"
           aria-label={`Chi tiết nút ${inspectedNode.label}`}
-          className="mt-3 p-3.5 sm:p-4 rounded-xl bg-white border border-[#E7E7E2] shadow-sm v3-space-y-2.5"
+          className="mt-2.5 p-3 rounded-lg bg-white border border-[#E5E5E3] v3-space-y-2"
         >
-          <div className="flex items-center justify-between gap-2 pb-2 border-b border-[#E7E7E2]">
+          <div className="flex items-center justify-between gap-2 pb-2 border-b border-[#ECECE9]">
             <div className="flex items-center gap-2 min-w-0">
-              <div className="w-7 h-7 rounded-lg bg-[#F8F8F6] border border-[#E7E7E2] flex items-center justify-center flex-shrink-0">
-                <ServiceLogo service={inspectedNode.service} className="w-4 h-4" />
+              <div className="w-6 h-6 rounded-md bg-[#F8F8F7] border border-[#E6E6E3] flex items-center justify-center flex-shrink-0">
+                <ServiceLogo service={inspectedNode.service} className="w-3.5 h-3.5 text-[#111827]" />
               </div>
-              <span className="text-xs sm:text-sm font-bold text-[#111827] truncate">
+              <span className="text-xs font-semibold text-[#111827] truncate">
                 {inspectedNode.label}
               </span>
-              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${inspectedNode.meta.badgeClass}`}>
+              <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-[#F4F4F3] text-[#4B5563] border border-[#E5E5E3] tabular-nums">
                 {inspectedNode.stepCount} bước
               </span>
             </div>
@@ -727,33 +858,36 @@ export function WorkflowFlowCanvas({
               type="button"
               aria-label="Đóng chi tiết nút"
               onClick={() => handleToggleService(null)}
-              className="text-xs font-medium text-[#6B7280] hover:text-[#111827] px-2 py-1 rounded-lg hover:bg-[#F8F8F6] transition-colors"
+              className="text-xs font-medium text-[#5F6368] hover:text-[#111827] px-2 py-1 rounded-md hover:bg-[#F5F5F4] transition-colors inline-flex items-center gap-1 cursor-pointer"
             >
-              Đóng ✕
+              <span>Đóng</span>
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           </div>
 
-          <ul className="v3-space-y-2">
+          <ul className="v3-space-y-1.5">
             {inspectedNode.steps.map((step, sIdx) => {
               const op = operation(step.tool);
               const scopes = extractScopeBadges(step, resourceLabels);
               return (
                 <li
                   key={step.id}
-                  className="p-2.5 rounded-lg bg-[#F8F8F6] border border-[#E7E7E2] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                  className="p-2.5 rounded-md bg-[#F9F9F8] border border-[#ECECE9] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
                 >
                   <div className="v3-space-y-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-mono text-[10px] font-semibold px-1.5 py-0.5 rounded bg-white border border-[#E7E7E2] text-[#4B5563]">
+                      <span className="font-mono text-[11px] font-medium px-1.5 py-0.5 rounded bg-white border border-[#E5E5E3] text-[#5F6368] tabular-nums">
                         #{sIdx + 1}
                       </span>
-                      <span className="font-semibold text-[#111827] px-2 py-0.5 rounded bg-white border border-[#E7E7E2]">
+                      <span className="font-medium text-[#111827] px-2 py-0.5 rounded bg-white border border-[#E5E5E3]">
                         {op.action}
                       </span>
                       {scopes.map((scope) => (
                         <span
                           key={scope}
-                          className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200"
+                          className="text-[11px] font-medium px-2 py-0.5 rounded bg-white text-[#4B5563] border border-[#E5E5E3]"
                         >
                           Phạm vi: {scope}
                         </span>
@@ -773,7 +907,7 @@ export function WorkflowFlowCanvas({
                           dependsOn: step.dependsOn,
                         })
                       }
-                      className="flex-shrink-0 px-2.5 py-1 rounded-lg bg-white hover:bg-neutral-100 border border-[#E7E7E2] text-[#111827] text-[11px] font-semibold transition-colors"
+                      className="flex-shrink-0 h-7 px-2.5 rounded-md bg-white hover:bg-[#F3F3F1] border border-[#DFDFDC] text-[#111827] text-[11px] font-medium transition-colors cursor-pointer"
                     >
                       Mở bản xem trước
                     </button>

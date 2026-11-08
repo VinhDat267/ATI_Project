@@ -153,4 +153,24 @@ describe('Job Readiness Evaluation (FLOW-04)', () => {
 
     expect(readiness.isReady).toBe(false);
   });
+
+  it('prefers configured personal mycalendar/mysheets over earlier unconfigured legacy calendar/sheets entries and treats unchecked shared slack as ready', () => {
+    const services: ServiceInfo[] = [
+      { id: 'calendar', name: 'Google Calendar', configured: false, connected: false, connectionStatus: 'unconfigured' },
+      { id: 'sheets', name: 'Google Sheets', configured: false, connected: false, connectionStatus: 'unconfigured' },
+      { id: 'slack', name: 'Slack', configured: true, connected: false, connectionStatus: 'unchecked', allowedScope: ['C123'] },
+      { id: 'trello', name: 'Trello', configured: true, connected: true, connectionStatus: 'healthy', personalStatus: 'connected', allowedScope: ['B123'] },
+      { id: 'mycalendar', name: 'Google Calendar của bạn', configured: true, connected: true, connectionStatus: 'healthy', personalStatus: 'connected', allowedScope: ['primary'] },
+    ];
+
+    const pm01Job = CORE_JOBS.find((j) => j.id === 'PM-01')!;
+    const pm01Readiness = evaluateJobReadiness(pm01Job.requiredServices, services);
+    expect(pm01Readiness.status).toBe('ready');
+    expect(pm01Readiness.isReady).toBe(true);
+
+    const off02Job = CORE_JOBS.find((j) => j.id === 'OFF-02')!;
+    const off02Readiness = evaluateJobReadiness(off02Job.requiredServices, services);
+    expect(off02Readiness.missingServices).toEqual(['mysheets', 'gmail']);
+    expect(off02Readiness.ctaLabel).toBe('Kết nối Google Sheets, Gmail');
+  });
 });

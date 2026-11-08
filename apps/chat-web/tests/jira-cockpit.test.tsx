@@ -424,7 +424,7 @@ describe('JIRA-09B: Jira Cockpit UI integration', () => {
       />
     );
 
-    expect(screen.getByTestId('jira-context-ready-pill')).toHaveTextContent('Jira OAuth 3LO: Sẵn sàng');
+    expect(screen.getByTestId('jira-context-ready-pill')).toHaveTextContent('Jira: Sẵn sàng làm việc');
     expect(screen.getByTestId('multi-service-playbooks')).toBeInTheDocument();
     expect(screen.getByText(/Xử lý lỗi khách hàng & điều phối Jira Sprint/i)).toBeInTheDocument();
   });

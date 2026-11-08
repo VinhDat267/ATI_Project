@@ -130,7 +130,7 @@ describe('1-Click Parameterized Playbooks & Extended Slack/GitHub Catalog', () =
     const saveBtn = screen.getByTestId('btn-save-playbook');
     fireEvent.click(saveBtn);
 
-    const titleInput = screen.getByLabelText('Tên Playbook 1-Click');
+    const titleInput = screen.getByLabelText('Tên mẫu công việc');
     fireEvent.change(titleInput, { target: { value: 'Playbook Khởi động Dự án VIP' } });
     fireEvent.keyDown(titleInput, { key: 'Enter' });
 
@@ -321,12 +321,11 @@ describe('1-Click Parameterized Playbooks & Extended Slack/GitHub Catalog', () =
       />,
     );
 
-    expect(screen.getByText(/🎥 Đã tạo phòng họp Google Meet/i)).toBeDefined();
-    expect(screen.getByText(/👥 3 khách mời/i)).toBeDefined();
-    expect(screen.getByText(/📁 Thư mục Drive: Folder A/i)).toBeDefined();
-    expect(screen.getByText(/📝 Tài liệu Docs: Doc A/i)).toBeDefined();
-    expect(screen.getByTestId('slack-receipt-metrics')).toBeDefined();
-    expect(screen.getByText(/💬 Đã đọc 2 tin nhắn/i)).toBeDefined();
+    expect(screen.getByText(/Đã tạo phòng họp Google Meet/i)).toBeDefined();
+    expect(screen.getByText(/3 khách mời/i)).toBeDefined();
+    expect(screen.getByText(/Thư mục Drive: Folder A/i)).toBeDefined();
+    expect(screen.getByText(/Tài liệu Docs: Doc A/i)).toBeDefined();
+    expect(screen.getByTestId('slack-receipt-metrics')).toHaveTextContent(/💬 Đã đọc 2 tin nhắn/i);
   });
 
   it('allows 1-Click Quick Spreadsheet Creation directly inside PersonalMySheets settings and shows ecosystem capability pills', async () => {
@@ -439,7 +438,7 @@ describe('1-Click Parameterized Playbooks & Extended Slack/GitHub Catalog', () =
     const saveBtn = screen.getByTestId('btn-save-playbook');
     fireEvent.click(saveBtn);
 
-    const titleInput = screen.getByLabelText('Tên Playbook 1-Click');
+    const titleInput = screen.getByLabelText('Tên mẫu công việc');
     fireEvent.change(titleInput, { target: { value: 'Mẫu riêng của Hạnh' } });
     fireEvent.keyDown(titleInput, { key: 'Enter' });
 
@@ -608,5 +607,33 @@ describe('1-Click Parameterized Playbooks & Extended Slack/GitHub Catalog', () =
     );
 
     expect(screen.queryAllByText(/Gmail/)).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: /^Quy trình OFF-02:/ })).toBeNull();
+  });
+
+  it('keeps the Gmail workflow discoverable when Gmail is enabled but disconnected', () => {
+    render(
+      <RequestMoment
+        services={[
+          { id: 'mycalendar', name: 'Google Calendar', configured: true, connected: true, connectionStatus: 'healthy' },
+          { id: 'mysheets', name: 'Google Sheets', configured: true, connected: true, connectionStatus: 'healthy' },
+          { id: 'gmail', name: 'Gmail', configured: false, connected: false, connectionStatus: 'unconfigured' },
+        ]}
+        loading={false}
+        error={null}
+        draft=""
+        planning={false}
+        input={createRef<HTMLTextAreaElement>()}
+        onDraft={() => {}}
+        onSend={() => {}}
+        onKeyDown={() => {}}
+        onSettings={() => {}}
+        navigate={() => {}}
+        servicePrompt={(s) => `Dùng ${s.name}`}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /^Quy trình OFF-02:/ })).toBeDefined();
+    expect(screen.getByTestId('readiness-badge-OFF-02').textContent).toContain('Gmail');
+    expect(screen.getByRole('button', { name: /^Kết nối Gmail/ })).toBeDefined();
   });
 });

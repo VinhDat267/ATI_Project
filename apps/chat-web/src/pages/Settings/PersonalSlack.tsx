@@ -8,8 +8,14 @@ import {
   type SlackConnectionPublicInfo,
 } from '../../services/slack-connection';
 import { CockpitDialog } from '../../components/CockpitDialog';
+import { ServiceLogo } from '../../components/ServiceLogo';
+import {
+  CARD_CONTAINER_CLASS,
+  PRIMARY_CONNECT_BTN,
+  connectionBadgeClass,
+} from './ServiceConnectionCard';
 
-export function PersonalSlack() {
+export function PersonalSlack({ standalone = true }: { standalone?: boolean } = {}) {
   const [rows, setRows] = useState<SlackConnectionPublicInfo[]>([]);
   const [loadError, setLoadError] = useState('');
   const [error, setError] = useState('');
@@ -117,20 +123,49 @@ export function PersonalSlack() {
     return 'Các workspace đang chờ cấp quyền xử lý dữ liệu.';
   };
 
+  const readyCount = rows.filter((r) => r.processingReady).length;
+  const badgeTone =
+    rows.length === 0
+      ? 'neutral'
+      : readyCount === rows.length
+        ? 'connected'
+        : 'warning';
+  const badgeLabel =
+    rows.length === 0
+      ? 'Chưa kết nối'
+      : readyCount === rows.length
+        ? 'Đã kết nối'
+        : 'Chờ cấp quyền xử lý';
+
   return (
     <section
       id="myslack"
       aria-labelledby="myslack-title"
-      className="my-6 p-5 bg-white dark:bg-[#1E1E1E] border border-[#E7E7E2] dark:border-[#333333] rounded-xl v3-space-y-4"
+      className={`${standalone ? 'my-6 ' : ''}${CARD_CONTAINER_CLASS} v3-space-y-4`}
     >
-      <div className="flex flex-col gap-1">
-        <h2 id="myslack-title" className="font-display text-xl font-semibold text-[#111827] dark:text-white">
-          Slack của bạn
-        </h2>
-        <p className="text-sm text-[#4B5563] dark:text-[#9CA3AF]">
+      <div className="flex flex-col gap-1.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="myslack-title" className="font-sans text-base font-semibold text-[#111827] dark:text-white flex items-center gap-3">
+            <ServiceLogo service="myslack" className="w-6 h-6" />
+            Slack của bạn
+          </h2>
+          <span className={connectionBadgeClass(badgeTone)}>
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                badgeTone === 'connected'
+                  ? 'bg-[#16A34A]'
+                  : badgeTone === 'warning'
+                    ? 'bg-amber-500'
+                    : 'bg-[#9CA3AF]'
+              }`}
+            />
+            <span>{badgeLabel}</span>
+          </span>
+        </div>
+        <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
           Kết nối từng workspace bằng tài khoản Slack của bạn. Mỗi workspace được quản lý riêng.
         </p>
-        <p className="text-sm text-[#6B7280] dark:text-[#9CA3AF]">
+        <p className="text-xs text-[#4B5563] dark:text-[#D1D5DB]">
           {getHeaderDescription()}
         </p>
       </div>
@@ -254,12 +289,12 @@ export function PersonalSlack() {
         </p>
       )}
 
-      <div className="pt-2">
+      <div className="pt-1">
         <button
           type="button"
           disabled={!!busy}
           onClick={() => void start()}
-          className="bg-[#FF5701] text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-sm hover:bg-[#E04C00] transition-colors disabled:opacity-50"
+          className={PRIMARY_CONNECT_BTN}
         >
           {busy === 'connect' ? 'Đang mở Slack…' : 'Kết nối workspace Slack'}
         </button>

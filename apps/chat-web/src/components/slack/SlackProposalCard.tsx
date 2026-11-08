@@ -6,11 +6,11 @@ import { conversationPath } from '../../routes';
 import { slackSessionOwner } from '../../services/slack-connection';
 
 const buttonClass =
-  'rounded-lg border border-[#D1D5DB] dark:border-[#4B5563] px-3 py-1.5 text-xs font-medium text-[#111827] dark:text-white disabled:opacity-50';
+  'rounded-lg border border-[#D1D5DB] dark:border-[#4B5563] px-3 py-1.5 text-xs font-medium text-[#111827] dark:text-white hover:bg-neutral-50 dark:hover:bg-[#262626] transition-colors disabled:opacity-50';
 const primaryClass =
-  'rounded-lg bg-[#FF5701] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50';
+  'rounded-lg bg-[#C84300] hover:bg-[#A83800] px-3 py-1.5 text-xs font-semibold text-white transition-colors disabled:opacity-50';
 const inputClass =
-  'w-full rounded-lg border border-[#D1D5DB] dark:border-[#4B5563] bg-white dark:bg-[#1E1E1E] px-2.5 py-1.5 text-xs text-[#111827] dark:text-white';
+  'w-full rounded-lg border border-[#D1D5DB] dark:border-[#4B5563] bg-white dark:bg-[#1E1E1E] px-2.5 py-1.5 text-xs text-[#111827] dark:text-white !outline-none focus-visible:!outline-none focus:border-[#111827]';
 
 const statusLabels: Record<string, string> = {
   pending: 'Đang chờ xem xét',
@@ -310,9 +310,9 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
   };
 
   return (
-    <article className="rounded-xl border border-[#E7E7E2] dark:border-[#333333] bg-white dark:bg-[#1E1E1E] p-4 space-y-3 text-[#111827] dark:text-white">
+    <article className="rounded-2xl border border-[#E5E5E0] dark:border-[#333333] bg-white dark:bg-[#1E1E1E] p-4 sm:p-5 space-y-3 text-[#111827] dark:text-white shadow-2xs">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="inline-flex items-center rounded-full bg-[#F8F8F6] dark:bg-[#2A2A2A] px-2.5 py-0.5 text-xs font-medium">
+        <span className="inline-flex items-center rounded-full bg-[#F8F8F6] dark:bg-[#2A2A2A] border border-[#E5E5E0] dark:border-[#333333] px-2.5 py-0.5 text-xs font-semibold">
           {statusLabels[proposal.status] ?? proposal.status}
         </span>
         <span className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
@@ -329,8 +329,8 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
         proposal.body && (
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="font-display text-base font-semibold">{proposal.body.decision.title}</h3>
-              <span className="rounded-md bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 text-xs text-amber-800 dark:text-amber-200">
+              <h3 className="font-sans text-base font-semibold">{proposal.body.decision.title}</h3>
+              <span className="rounded-md bg-amber-50 dark:bg-amber-950/50 border border-amber-200/70 px-2 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-200">
                 {relevanceLabels[proposal.body.decision.relevance.kind] ?? proposal.body.decision.relevance.kind}
               </span>
             </div>
@@ -341,7 +341,7 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
               </p>
             )}
             {proposal.body.context.length > 0 && (
-              <blockquote className="rounded-lg border-l-2 border-[#FF5701] bg-[#F8F8F6] dark:bg-[#262626] p-2.5 text-xs text-[#374151] dark:text-[#D1D5DB] space-y-1">
+              <blockquote className="rounded-xl border-l-2 border-[#C84300] bg-[#F8F8F6] dark:bg-[#262626] p-3 text-xs text-[#374151] dark:text-[#D1D5DB] space-y-1">
                 {proposal.body.context.map((msg) => {
                   const msgTime = formatSlackTs(msg.ts);
                   return (
@@ -450,7 +450,7 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
       {actionable && (
         <div className="space-y-2 pt-2 border-t border-[#E7E7E2] dark:border-[#333333]">
           {isQuestionProposal && (
-            <p className="text-xs text-[#FF5701] font-medium">
+            <p className="text-xs text-[#B43E00] font-medium">
               Đề xuất phản hồi câu hỏi Slack: nhập câu trả lời vào ô bên dưới để lên kế hoạch gửi trực tiếp vào thread nguồn.
             </p>
           )}
@@ -575,7 +575,7 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
                     />
                   </label>
                   <label className="block space-y-1">
-                    <span>Thời gian bắt đầu (ISO 8601)</span>
+                    <span>Thời gian bắt đầu</span>
                     <input
                       className={inputClass}
                       placeholder="2026-11-12T09:00:00+07:00"
@@ -588,7 +588,7 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
                     />
                   </label>
                   <label className="block space-y-1">
-                    <span>Thời gian kết thúc (ISO 8601)</span>
+                    <span>Thời gian kết thúc</span>
                     <input
                       className={inputClass}
                       placeholder="2026-11-12T09:30:00+07:00"

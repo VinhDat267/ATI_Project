@@ -152,7 +152,7 @@ describe('MyCalendar connection routes over HTTP, PostgreSQL and the fake Google
     const base = {
       MYCALENDAR_ENABLED: 'on',
       MYCALENDAR_OAUTH_PROJECT_ID: 'ati-calendar-test',
-      MYCALENDAR_OAUTH_CLIENT_ID: 'cal-client',
+      MYCALENDAR_OAUTH_CLIENT_ID: '222222222222-calendar.apps.googleusercontent.com',
       MYCALENDAR_OAUTH_CLIENT_SECRET: 'cal-secret',
       MYCALENDAR_OAUTH_REDIRECT_URI: 'http://localhost:5174/connections/mycalendar/callback',
     };
@@ -194,7 +194,7 @@ describe('MyCalendar connection routes over HTTP, PostgreSQL and the fake Google
       });
       expect(config.MYCALENDAR_ENABLED).toBe(true);
       expect(config.MYCALENDAR_OAUTH).toEqual({
-        clientId: 'cal-client',
+        clientId: '222222222222-calendar.apps.googleusercontent.com',
         clientSecret: 'cal-secret',
         redirectUri: 'https://ati.example/connections/mycalendar/callback',
         authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
@@ -520,6 +520,7 @@ describe('MyCalendar connection routes over HTTP, PostgreSQL and the fake Google
 
       const row = (await stored(alice))!;
       const config = decryptCredentials(row.config, key);
+      expect(config.oauthClientId).toBe(oauth().clientId);
       expect(config.selectedCalendars).toEqual(r.body.selectedCalendars);
       expect(config.allowedScope).toEqual({ calendars: r.body.allowedScope });
       expect(changed).toEqual([alice.id]);
@@ -625,7 +626,7 @@ describe('MyCalendar connection routes over HTTP, PostgreSQL and the fake Google
       await expect(survivingClient.refresh(String(beforeConfig.refreshToken), AbortSignal.timeout(2000))).resolves.toHaveProperty('accessToken');
     });
 
-    it('revokes the mycalendar token, deletes the mycalendar row, leaving gmail row active and untouched', async () => {
+    it('deletes MyCalendar locally and retains the provider grant when a legacy Gmail peer has unknown origin', async () => {
       const app = build();
       await connect(app, alice);
 
@@ -643,7 +644,7 @@ describe('MyCalendar connection routes over HTTP, PostgreSQL and the fake Google
       const r = await request(app).delete('/api/connections/mycalendar').set('Authorization', bearer(alice));
       expect(r.status).toBe(200);
       expect(r.body).toEqual({ success: true });
-      expect(google.isRevoked(mycalToken)).toBe(true);
+      expect(google.isRevoked(mycalToken)).toBe(false);
       expect(await stored(alice)).toBeNull();
       expect(changed).toEqual([alice.id]);
 

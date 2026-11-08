@@ -210,7 +210,7 @@ describe('Personal and Workspace Auth (Task 5)', () => {
       render(<WorkspaceSwitcher navigate={navigate} />);
       fireEvent.click(screen.getByRole('button', { name: /Không gian làm việc:/i }));
 
-      const openJoinBtn = screen.getByRole('button', { name: /🔑 Tham gia tổ chức bằng mã mời/i });
+      const openJoinBtn = screen.getByRole('button', { name: /Tham gia tổ chức bằng mã mời/i });
       fireEvent.click(openJoinBtn);
 
       const codeInput = screen.getByPlaceholderText(/ATI-XXXX-XXXX/i);

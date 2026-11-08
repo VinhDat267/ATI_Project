@@ -89,8 +89,10 @@ Mọi route dưới `/api/connections/gmail` trả **404** khi cờ tắt, **503
 | Route | Thành công | Lỗi |
 |---|---|---|
 | `POST /api/connections/gmail/start` | `200 { url }` | `401 INVALID_SESSION` |
-| `POST /api/connections/gmail/callback`, body `{ code, state }` | `200 { email }` | `400` với `code` là `GMAIL_STATE_INVALID` (hết hạn, đã dùng, sai luồng, sai người/phiên/trình duyệt), `GMAIL_SCOPE_MISSING`, `GMAIL_REFRESH_TOKEN_MISSING` hoặc `GMAIL_CONNECT_FAILED`; `401 INVALID_SESSION` |
+| `POST /api/connections/gmail/callback`, body `{ code, state }` | `200 { email }` | `400` với `code` là `GMAIL_STATE_INVALID` (hết hạn, đã dùng, sai luồng, sai người/phiên/trình duyệt), `GMAIL_SCOPE_MISSING`, `GMAIL_REFRESH_TOKEN_MISSING`, `GMAIL_API_DISABLED` hoặc `GMAIL_CONNECT_FAILED`; `401 INVALID_SESSION` |
 | `DELETE /api/connections/gmail` | `200 { success: true }`, kể cả khi chưa kết nối | `401 INVALID_SESSION` |
+
+`GMAIL_API_DISABLED` phân biệt lỗi cấu hình khi Gmail profile trả HTTP 403 với Google ErrorInfo `SERVICE_DISABLED` hoặc reason cũ `accessNotConfigured`. UI hướng người dùng nhờ quản trị viên bật Gmail API trên Google Cloud rồi bắt đầu kết nối mới. Các lỗi khác vẫn dùng mã hiện có; không đưa raw provider body, token, code, verifier hay dữ liệu project vào thông báo.
 
 `GET /api/services`: mỗi dịch vụ thêm `connection`. Gmail chỉ có trong danh sách khi Gmail dùng được (cờ bật, đủ cấu hình OAuth và có PostgreSQL), và luôn là của chính người gọi:
 
@@ -163,6 +165,15 @@ export type PlannerResponse = PlanResponse | ClarificationResponse | RefusalResp
 - `AIPlanner` thêm tuỳ chọn `readAnswers?: boolean` (mặc định `false`). GMAIL-04 dùng tuỳ chọn này cho `EVAL_SET=answers`.
 
 ## 5. Các ca dễ bị bỏ sót (reviewer kiểm riêng)
+
+### Bổ sung FLOW-07 ngày 06/11/2026: origin và project Google
+
+- Fresh consent Gmail/Calendar/Sheets lưu `oauthClientId` trong config mã hóa; chỉ scope update được giữ origin hiện có, không backfill cho token cũ. Live bắt reconnect trước dùng token/selected resource khi thiếu hoặc khác client.
+- Live validation xét cả client còn cấu hình khi flag tắt, inferred-on Gmail và sign-in; từ chối namespace số trùng/không kiểm tra được và Picker app ID khác namespace Sheets. Ownership vẫn cần Cloud readback.
+- Disconnect giữ khóa DB qua revoke có deadline, xét peer Google credentials và OAuth flows của cùng ATI user. Remote revoke bỏ qua nếu origin thiếu/mismatch hoặc peer có thể dùng chung; khác email không chứng minh grant độc lập. Local delete/cache invalidation vẫn có hiệu lực.
+- Token provider bị ràng buộc generation và active DB row/origin; không trả cache/refresh muộn sau disconnect, không bỏ qua AbortSignal trong lúc chờ DB. Thay kết nối/phạm vi trả AUTH_ERROR với `details.code=GOOGLE_CONNECTION_CHANGED`, không đánh dấu grant mới bị mất. Chỉ CAS thành công mới phát thông báo reconnect/invalidate.
+- `clearPersonal(userId, serviceName?)` hỗ trợ invalidation theo dịch vụ; bỏ service vẫn giữ hành vi xóa toàn bộ. Runtime callbacks dùng service cụ thể để không làm gián đoạn peer.
+- [Runbook chuyển project và giới hạn nghiệm thu](../../runbooks/google-project-isolation.md). FLOW-07 vẫn OPEN tới đủ native acceptance.
 
 Mỗi ca có test ở task được ghi trong ngoặc.
 

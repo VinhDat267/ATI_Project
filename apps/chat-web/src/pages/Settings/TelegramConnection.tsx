@@ -5,11 +5,16 @@ import { apiClient } from '../../services/api-client';
 import { telegramSessionOwner, buildTelegramCallbackPath } from '../../services/telegram-connection';
 import { CockpitDialog } from '../../components/CockpitDialog';
 import { ServiceLogo } from '../../components/ServiceLogo';
+import {
+  CARD_CONTAINER_CLASS,
+  PRIMARY_CONNECT_BTN,
+  SECONDARY_ACTION_BTN,
+  DANGER_GHOST_BTN,
+  connectionBadgeClass,
+} from './ServiceConnectionCard';
 
-const button =
-  'px-4 py-2 rounded-xl text-xs font-semibold bg-[#FF5701] text-white hover:bg-[#E04C00] disabled:opacity-50 transition-colors shadow-sm';
-const secondary =
-  'px-4 py-2 rounded-xl text-xs font-medium bg-white text-[#111827] border border-[#E7E7E2] hover:bg-neutral-50 disabled:opacity-50 transition-colors';
+const button = PRIMARY_CONNECT_BTN;
+const secondary = SECONDARY_ACTION_BTN;
 
 export interface TelegramChatItem {
   chatId: string;
@@ -214,35 +219,37 @@ export function TelegramConnection({
       ref={row}
       id="service-row-telegram"
       tabIndex={-1}
-      className="bg-white border border-[#E7E7E2] rounded-xl p-4 sm:p-5 v3-space-y-4 focus-visible:ring-2 focus-visible:ring-[#FF5701] focus-visible:v3-outline-none"
+      className={`${CARD_CONTAINER_CLASS} focus-visible:ring-2 focus-visible:ring-[#FF5701] focus-visible:v3-outline-none`}
     >
       <div className="flex items-center justify-between gap-3">
-        <h3 className="font-display font-semibold text-base text-[#111827] flex items-center gap-3">
+        <h3 className="font-sans font-semibold text-base text-[#111827] dark:text-white flex items-center gap-3">
           <ServiceLogo service="telegram" className="w-6 h-6" />
           Telegram
         </h3>
-        {status === 'connected' && (
-          <span className="text-xs font-semibold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md">
+        {status === 'connected' ? (
+          <span className={connectionBadgeClass('connected')}>
             Đã kết nối
           </span>
-        )}
-        {status === 'needs_scope' && (
-          <span className="text-xs font-semibold px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-md">
+        ) : status === 'needs_scope' ? (
+          <span className={connectionBadgeClass('warning')}>
             Chưa chọn chat
           </span>
-        )}
-        {status === 'reconnect_required' && (
-          <span className="text-xs font-semibold px-2 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-md">
+        ) : status === 'reconnect_required' ? (
+          <span className={connectionBadgeClass('error')}>
             Cần kết nối lại
+          </span>
+        ) : (
+          <span className={connectionBadgeClass('neutral')}>
+            Chưa kết nối
           </span>
         )}
       </div>
 
-      <p className="text-xs text-[#6B7280]">
-        Kết nối 1 chạm với Telegram cá nhân hoặc nhóm làm việc của bạn. Chọn từ 1 đến 10 cuộc trò chuyện bằng tên hiển thị rõ ràng để gửi thông báo, đọc tin nhắn nhóm và nhận Bản tin sáng tự động.
+      <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+        Liên kết tài khoản Telegram cá nhân hoặc nhóm làm việc của bạn. Chọn từ 1 đến 10 cuộc trò chuyện bằng tên hiển thị rõ ràng để gửi thông báo, đọc tin nhắn nhóm và nhận Bản tin sáng tự động.
       </p>
 
-      <div className="text-sm text-[#111827] break-words">
+      <div className="text-sm text-[#111827] dark:text-neutral-200 break-words">
         {status === 'connected' ? (
           <span>
             Đã kết nối {data?.username && <>· @{data.username}</>}
@@ -256,10 +263,8 @@ export function TelegramConnection({
             Cần kết nối lại {data?.username && <>· @{data.username}</>}
           </span>
         ) : status === 'unconfigured' ? (
-          <span className="text-[#6B7280]">Telegram Bot chưa được cấu hình trên máy chủ.</span>
-        ) : (
-          <span className="text-[#6B7280]">Chưa kết nối</span>
-        )}
+          <span className="text-[#6B7280] dark:text-[#9CA3AF]">Telegram Bot chưa được cấu hình trên máy chủ.</span>
+        ) : null}
       </div>
 
       {status === 'connected' && data?.selectedChats && data.selectedChats.length > 0 && (
@@ -317,11 +322,11 @@ export function TelegramConnection({
         <div
           id="telegram-scope"
           data-testid="telegram-scope"
-          className="mt-4 p-4 border border-[#E7E7E2] rounded-xl bg-[#F8F8F6] v3-space-y-3"
+          className="mt-4 p-4 border border-[#E7E7E2] dark:border-[#374151] rounded-xl bg-[#F8F8F6] dark:bg-[#1F2937]/50 v3-space-y-3"
         >
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2 flex-wrap">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-[#6B7280]">
+              <h4 className="text-xs font-semibold text-[#374151] dark:text-[#D1D5DB]">
                 Chọn cuộc trò chuyện Telegram (1–10 chat)
               </h4>
               <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-white border border-[#E7E7E2] text-[#111827]">
@@ -434,7 +439,7 @@ export function TelegramConnection({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-3 pt-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-[#F3F4F6] dark:border-[#2E2E2E]">
         {status === 'not_connected' || status === 'reconnect_required' || status === 'unconfigured' ? (
           <button
             id="telegram-connect"
@@ -449,7 +454,7 @@ export function TelegramConnection({
           <button
             id="telegram-disconnect"
             type="button"
-            className={secondary}
+            className={`${DANGER_GHOST_BTN} ml-auto`}
             disabled={busy}
             onClick={() => setConfirm(true)}
           >
