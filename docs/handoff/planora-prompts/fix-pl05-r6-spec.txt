@@ -1,0 +1,47 @@
+Bạn là implementer trong Antigravity, dùng Gemini 3.8 Flash (High), model ID gemini-3.8-flash-high; phụ trách thi công và sửa findings của task PL-05 theo chuẩn Business-First UX v2.0.
+
+TASK: Fix Findings PL-05 Round 6 (P2-1, P2-2, P3-1)
+CARD: docs/handoff/tasks/PL-05-planora-chat-feed.md
+UX TASK: docs/handoff/tasks/PLANORA-UX-01-business-first-redesign.md
+REPORT: docs/handoff/log/2026-11-05-argon-review-pl-05-r6.md
+BRANCH: longnguyen005/feat-planora-pl-05
+BASE_SHA: e97d71862cee773be9e37f9ef9e456ea36975932
+CURRENT_HEAD: a27d2dfcf7157d837d6b9fec4bb1f17c1799871c
+WORKTREE: C:/Users/Admin/orca/workspaces/ATI_Project/feat-planora-pl-05
+
+Đọc kỹ báo cáo review docs/handoff/log/2026-11-05-argon-review-pl-05-r6.md và xử lý triệt để 3 findings:
+
+1. Xử lý [P2-1] - Khôi phục nút "Sửa yêu cầu" và triệt tiêu bong bóng lặp lại:
+   - Trong apps/chat-web/src/planora/workspace/PlanoraActiveTurn.tsx:
+     - Giữ nguyên `request={request ?? ''}` truyền xuống ExpandedClarificationMoment, AnswerMoment, RefusalMoment (không truyền request='').
+     - Thêm prop `hideRequestEcho?: boolean` (truyền `!props.legacyCockpit`) vào ExpandedClarificationMoment, AnswerMoment, RefusalMoment và ResponseCard.
+     - Khi `hideRequestEcho === true`, ResponseCard KHÔNG render khối bong bóng `#user-request-bubble-text` / `<RequestEcho>`.
+     - Ở SlowPlanningMoment (dòng 198), truyền `request={props.legacyCockpit ? request : undefined}` để không render RequestEcho.
+   - Đảm bảo nút "Sửa yêu cầu" trong ExpandedClarificationMoment gọi onEdit(request) với đầy đủ nội dung câu yêu cầu gốc.
+
+2. Xử lý [P2-2] - Xóa sạch #FF5701, Make.com Orbital Flow, ATI, Chưa lập kế hoạch, JSON.stringify và sửa tương phản Dark Mode:
+   - Trong apps/chat-web/src/pages/Cockpit/RequestMoments.tsx:
+     - Dòng 170: Nút "Gửi yêu cầu" dùng text-[var(--planora-on-primary)] (thay cho text-white) để đạt WCAG AA trên nền xanh mạ ở Dark Mode.
+     - Dòng 92, 141, 224, 257, 272, 292, 354, 365, 394: Thay toàn bộ #FF5701, brand-primary, shadow-orange-glow bằng CSS variables Planora (var(--planora-primary), var(--planora-primary-hover), ring-[var(--planora-primary)]).
+     - Dòng 242-244: Xóa bỏ hoàn toàn huy hiệu "Make.com Orbital Flow".
+   - Trong apps/chat-web/src/pages/Responses/ResponseMoment.tsx:
+     - Dòng 13, 50, 206, 443-450: Thay toàn bộ #FF5701, #E04D00 bằng var(--planora-primary) / var(--planora-primary-hover) và text-[var(--planora-on-primary)].
+     - Dòng 78: Bỏ fallback "Chưa lập kế hoạch".
+   - Trong apps/chat-web/src/pages/Errors/PlanningErrors.tsx:
+     - Đổi "ATI đang suy nghĩ lâu hơn thường lệ", "ATI chưa lập xong kế hoạch" thành "Planora đang chuẩn bị kế hoạch...", đổi các màu cam còn sót sang var(--planora-primary).
+   - Trong apps/chat-web/src/planora/workspace/PlanoraActiveTurn.tsx:
+     - Dòng 366: Thay thế khối JSON.stringify(state.activePlan, null, 2) bằng giao diện danh sách các bước công việc hoặc PlanoraWorkflowSteps thân thiện nghiệp vụ.
+
+3. Xử lý [P3-1] - Khung custom-sheet-form rỗng và đồng bộ browser tests:
+   - Trong apps/chat-web/src/pages/Cockpit/ClarificationMoment.tsx:
+     - Dòng 194: Chỉ render #custom-sheet-form và label khi `!inputHidden`.
+   - Cập nhật các bài test nếu cần: apps/chat-web/tests/browser/fe-05-cockpit.spec.ts và fe-05b-parity-a.spec.ts.
+
+4. Kiểm tra kỹ thuật bắt buộc:
+   - npm run typecheck:v3
+   - npm test -w @wap/chat-web
+   - npm run build:v3
+   - node scripts/test-v3-web-build-security.mjs
+   - npm test -w @wap/chat-web -- planora-chat
+
+5. Ghi log hoàn thành vào docs/handoff/log/2026-11-05-gemini-pl-05-r6-fixes.md, commit và gửi worker_done.

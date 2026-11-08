@@ -1,0 +1,32 @@
+Bạn là Codex, reviewer độc lập cho migration Planora. Reviewer không phải tác giả task và không sửa code của worker.
+
+TASK: PL-05 · Feed hội thoại và một composer (Re-review vòng 2 sau khi sửa F1-F5)
+CARD: docs/handoff/tasks/PL-05-planora-chat-feed.md
+PR_URL hoặc LOCAL_ONLY: LOCAL_ONLY
+TARGET_BRANCH: codex/planora-ui
+BASE_SHA: b9230b8b592237275866e027c1744362ef4c6eda
+PREVIOUS_HEAD: 88da9c06365468cecdfe9ff6a84c467ec3f480de
+HEAD_SHA: 52865cd651d4e728c7622ff5d8f943367f67e250
+EVIDENCE:
+- docs/handoff/log/2026-11-04-gemini-pl-05-review-fixes.md (Log sửa F1-F5 của worker Gemini)
+- docs/handoff/log/2026-11-04-codex-review-pl-05.md (Báo cáo review vòng 1)
+- docs/handoff/tasks/PL-05-planora-chat-feed.md
+- Commit: 52865cd651d4e728c7622ff5d8f943367f67e250 trên nhánh longnguyen005/feat-planora-pl-05
+- Fix chi tiết findings F1-F5:
+  + F1 (P2): Sửa lỗi mất composer sau Edit planning error: PlanoraActiveTurn tính planningError = ... && !props.responseEditing, PlanoraChatWorkspace đồng bộ responseEditing. Bấm Edit render RequestMoment với prefilled draft và textarea để sửa/gửi, không tự gửi.
+  + F2 (P2): Bọc layout & stage với min-h-0 overflow-hidden, PlanoraConversationFeed có overflow-y-auto và scrollHeight > clientHeight độc lập. Loại bỏ scroller.scrollTop = 0 cưỡng bức khi đổi moment ở Planora mode.
+  + F3 (P2): Moment 4 preview giữ dock composer ở đáy màn hình; khi bấm "Sửa qua Chat" thì dock ẩn và inline composer hiện; đóng sửa thì dock hiện lại; mở Drawer thì chỉ có 1 composer trong drawer. Đảm bảo đúng 1 composer ở mọi moment. Sửa test assert toHaveLength(1).
+  + F4 (P2): Bổ sung class .planora-chat-workspace và .planora-conversation-feed vào JSX; thêm |PL-05: vào scenarios runner scripts/test-v3-browser.mjs.
+  + F5 (P2): Thiết lập lg:left-[var(--planora-sidebar-width,248px)] cho #global-bottom-bar và #response-bottom-bar tại viewport >= 1024px để không bị sidebar che ô nhập.
+- Unit tests: 100 files (1114 tests) PASS, typecheck:v3 exit 0, build:v3 exit 0, build-security exit 0.
+
+Đọc AGENTS.md, REVIEW-CHECKLIST.md, COMMON.md, card, log sửa lỗi và báo cáo review vòng 1.
+Xem actual diff base/head (b9230b8b -> 52865cd6) và previous/head (88da9c06 -> 52865cd6) trong apps/chat-web.
+
+Làm trong worktree review riêng: C:/Users/Admin/orca/workspaces/ATI_Project/review-planora-pl-05-r2 (nhánh longnguyen005/review-planora-pl-05-r2 tại HEAD 52865cd6).
+Chạy lại kiểm chứng độc lập (typecheck, build, web tests, browser tests với Playwright, geometry/responsive probes 5 viewports 2 theme).
+
+Output:
+- Ghi báo cáo review vào: docs/handoff/log/2026-11-04-codex-review-pl-05-r2.md
+- Gửi worker_done qua Orca orchestration.
+- Kết luận rõ ràng: Verdict Đạt / Chưa đạt.

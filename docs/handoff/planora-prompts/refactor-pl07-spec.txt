@@ -1,0 +1,80 @@
+NHIỆM VỤ: REFACTOR PL-07 THEO DESIGN BRIEF V2.0 & BUSINESS-FIRST UX (05/11/2026)
+
+Bạn là worker Antigravity / Gemini 3.8 Flash High thi công PL-07 trên worktree:
+C:/Users/Admin/orca/workspaces/ATI_Project/feat-planora-pl-07
+Branch: longnguyen005/feat-planora-pl-07
+Current HEAD: f4cd6f44
+Card: docs/handoff/tasks/PL-07-planora-responses-recovery.md
+UX Task: docs/handoff/tasks/PLANORA-UX-01-business-first-redesign.md
+
+Đọc các tài liệu chuẩn tắc trước khi làm:
+- docs/superpowers/specs/2026-11-05-planora-design-brief.md (v2.0, MẪU 3 & MẪU 4)
+- docs/superpowers/specs/2026-11-05-planora-business-first-ux.md
+- docs/handoff/log/2026-11-05-argon-review-pl-07-r2.md (các findings UX-F1, UX-F2, UX-F3, UX-P3-1)
+- docs/handoff/planora-prompts/COMMON.md
+
+---
+
+### MỤC TIÊU & CÁC FINDINGS CẦN GIẢI QUYẾT TRIỆT ĐỂ
+
+Dù PL-07 đã đạt PASS về mặt kỹ thuật/hành vi trong lượt re-review của Argon, nhưng vẫn CHƯA ĐẠT gate UX 05/11 do còn tồn tại rác kỹ thuật và cấu trúc Cockpit cũ. Bạn có nhiệm vụ refactor PL-07 để đạt 100% chuẩn Business-First UX:
+
+#### 1. Sửa `apps/chat-web/src/pages/Responses/ResponseMoment.tsx` (Giải quyết `UX-F1`, `UX-F2`):
+- **Thay tên tool kỹ thuật bằng tên hành động tiếng Việt thân thiện:**
+  - `trello.list_cards` ➔ *"Đọc danh sách công việc Trello"*
+  - `slack.post_message` ➔ *"Gửi thông báo Slack"*
+  - `mysheets.read_range` ➔ *"Đọc dữ liệu bảng tính Google Sheets"*
+  - `gmail.send_message` ➔ *"Gửi email Gmail"*
+  - Áp dụng hàm mapping thân thiện cho mọi tool/service, tuyệt đối KHÔNG hiển thị raw identifier dạng `service.action` cho người dùng.
+- **Xóa bỏ huy hiệu "Chưa lập kế hoạch"** (unplanned badge): Diễn đạt tự nhiên theo ngữ cảnh nghiệp vụ.
+- **Xóa bỏ nhãn "ATI"** trên toàn bộ các component: Đổi thành "Planora" hoặc danh tính kết nối thực tế.
+- **Clarification:** Giữ nguyên tính an toàn F1 đã sửa (chọn gợi ý radio thì prefill draft vào composer dock, không tự POST submit). Không đặt thêm nút gửi thứ hai trên thân thẻ card.
+
+#### 2. Sửa `apps/chat-web/src/pages/Cockpit/RecoveryMoment.tsx` (Giải quyết `UX-F1`, `UX-P3-1`, chuẩn `D2`):
+- **Bỏ `<code>{paused.tool}</code>` và raw JSON dump** trong accordion "Chi tiết để đối chiếu". Thay bằng tóm tắt lỗi nghiệp vụ thân thiện (VD: *"Không thể kết nối đến máy chủ Slack để gửi tin nhắn"*, *"Tài khoản Google cần xác thực lại quyền truy cập"*).
+- **Chuẩn D2 — Xử lý an toàn tuyệt đối khi `delivery_unknown`:**
+  - Khi trạng thái lỗi là `delivery_unknown` (chưa xác nhận được kết quả gửi):
+    - TUYỆT ĐỐI KHÔNG hiển thị các nút "Thử lại", "Sửa" hay "Tiếp tục" (tránh gửi lặp tin nhắn).
+    - CHỈ hiển thị 2 hành động an toàn:
+      1. *"Kiểm tra trên Slack"* (liên kết ngoài an toàn mở kênh đích).
+      2. *"Dừng hẳn quy trình"* (để kết thúc phiên an toàn).
+- **Sửa tương phản nút Dừng ở Light mode (`UX-P3-1`):**
+  - Tinh chỉnh màu hover của nút Dừng ("Dừng hẳn quy trình"): Nền hover kết hợp màu chữ phải đạt tỷ lệ tương phản WCAG AA ≥ 4.5:1 (hiện tại đo được 4.46:1, cần nâng lên ≥ 4.5:1).
+- **Hộp thoại xác nhận Dừng quy trình:**
+  - Khi bấm "Dừng hẳn quy trình", mở modal xác nhận: *"Không thể tiếp tục sau khi dừng. Các kết quả đã hoàn thành trước đó được giữ nguyên."*
+
+#### 3. Sửa `apps/chat-web/src/pages/Cockpit/RecoveryEditor.tsx` (Giải quyết `UX-F1`):
+- **Thay thế hoàn toàn form textarea JSON thô `{ "channel": ... }`:**
+  - Chuyển sang form chỉnh sửa nghiệp vụ thân thiện:
+    - Dropdown/Select chọn kênh Slack theo tên thân thiện (hoặc input text rõ ràng có label *"Tên kênh hoặc mã kênh"*).
+    - Ô nhập lại nội dung văn bản (textarea văn bản thuần có label *"Nội dung tin nhắn"*).
+    - CÁC tham số mảng chuyển thành chip/danh sách.
+  - CẤM hiển thị và bắt người dùng gõ JSON thô trong RecoveryEditor.
+
+#### 4. Sửa `apps/chat-web/src/pages/Cockpit/RequestMoments.tsx` & `PlanningErrors.tsx` (Giải quyết `UX-F2`):
+- Loại bỏ hoàn toàn huy hiệu "Make.com Orbital Flow" và các class màu cam cũ.
+- Thiết kế lại các thông báo lỗi và yêu cầu theo bảng màu Planora (giấy kem, xanh rừng, đỏ đất nhạt cho lỗi).
+
+#### 5. Cập nhật và bổ sung Tests trong `apps/chat-web/tests/planora-responses-recovery.test.tsx`:
+- Viết test khẳng định KHÔNG CÒN tên tool raw kỹ thuật (ví dụ `trello.list_cards`) trên DOM của ResponseMoment.
+- Viết test khẳng định KHÔNG CÒN khối JSON thô trong RecoveryMoment.
+- Viết test khẳng định RecoveryEditor hiển thị form nhập liệu nghiệp vụ (channel selector/text inputs), không dùng JSON textarea.
+- Viết test khẳng định khi `paused.status === 'delivery_unknown'`, chỉ có nút Dừng và liên kết kiểm tra ngoài, các nút Retry/Edit/Continue hoàn toàn không xuất hiện.
+- Viết test kiểm tra tương phản nút Dừng ở cả trạng thái default và hover đạt WCAG AA ≥ 4.5:1.
+
+---
+
+### TIÊU CHUẨN KIỂM TRA BẮT BUỘC
+Chạy và kiểm tra exit code 0 của toàn bộ các lệnh sau:
+1. `npm run typecheck:v3`
+2. `npm test -w @wap/chat-web`
+3. `npm run build:v3`
+4. `npm run security`
+
+### BÀN GIAO VÀ COMMIT
+1. Commit với Conventional Commits:
+   `git add apps/chat-web/ docs/handoff/`
+   `git commit -m "refactor(planora): redesign PL-07 responses and recovery moments for business-first UX"`
+2. Cập nhật phần Kết quả trong `docs/handoff/tasks/PL-07-planora-responses-recovery.md`.
+3. Tạo log mới: `docs/handoff/log/2026-11-05-gemini-pl-07-business-first-refactor.md`.
+4. Trả packet bàn giao đầy đủ theo mẫu quy định tại `docs/handoff/planora-prompts/COMMON.md`.

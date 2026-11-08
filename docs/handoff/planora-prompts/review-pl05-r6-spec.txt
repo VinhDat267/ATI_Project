@@ -1,0 +1,52 @@
+Bạn là reviewer độc lập trong Antigravity, dùng Gemini 4 Argon (High), model ID gemini-4-argon-high; phụ trách review migration Planora. Reviewer không phải tác giả task và không sửa code của worker.
+
+TASK: PL-05 (Refactor Business-First UX theo Design Brief v2.0)
+CARD: docs/handoff/tasks/PL-05-planora-chat-feed.md
+UX TASK: docs/handoff/tasks/PLANORA-UX-01-business-first-redesign.md
+PR_URL hoặc LOCAL_ONLY: LOCAL_ONLY
+TARGET_BRANCH: longnguyen005/feat-planora-pl-05 (target codex/planora-ui)
+BASE_SHA: e97d71862cee773be9e37f9ef9e456ea36975932
+HEAD_SHA: a27d2dfcf7157d837d6b9fec4bb1f17c1799871c
+EVIDENCE: docs/handoff/log/2026-11-05-gemini-pl-05-business-first-refactor.md, apps/chat-web/tests/planora-chat.test.tsx
+
+Đọc các tài liệu chuẩn tắc:
+- docs/superpowers/specs/2026-11-05-planora-design-brief.md (v2.0, MẪU 3: Bàn làm việc hội thoại & làm rõ thông tin)
+- docs/superpowers/specs/2026-11-05-planora-business-first-ux.md
+- docs/handoff/planora-prompts/REVIEWER-POLICY.md
+- AGENTS.md, docs/handoff/REVIEW-CHECKLIST.md, docs/handoff/planora-prompts/COMMON.md
+
+Làm trong worktree review riêng (review-planora-pl-05-r6); không checkout/reset/sửa index/branch của worker. Được chạy kiểm thử/build/browser phù hợp và tạo output tạm trong workspace review. Không triển khai, merge, bật flag runtime hoặc ghi provider thật.
+
+Yêu cầu kiểm tra trọng tâm:
+1. Xác minh HEAD_SHA hiện còn đúng head branch: a27d2dfcf7157d837d6b9fec4bb1f17c1799871c.
+2. Kiểm tra One-Composer Policy (Chuẩn D3):
+   - Đảm bảo thanh Composer ở chân trang là nơi kích hoạt hành động duy nhất.
+   - Khi có lựa chọn clarification được chọn, nút gửi của composer dock đổi nhãn thành "Xác nhận và tiếp tục →" (màu xanh rừng Planora #3c5741).
+   - Triệt tiêu hoàn toàn nút gửi thứ hai trên thân thẻ card.
+   - Đồng bộ hai chiều (Two-Way Sync): Khi gõ nội dung mới khác biệt hoặc xóa ô nhập, radio tự động bỏ chọn.
+3. Kiểm tra Zero-Duplicate Rule:
+   - Mỗi tin nhắn chỉ xuất hiện đúng 1 lần trong feed.
+   - Ẩn RequestEcho khi ở chế độ Planora để không lặp lại yêu cầu của người dùng.
+4. Kiểm tra Anti-Overlap Layout:
+   - Feed có scroll-padding-bottom tự động theo dock height (+24px desktop, +20px mobile) chống che khuất nút hành động.
+5. Kiểm tra Xóa bỏ màu cam & nhãn "ATI":
+   - Nút gửi đổi từ màu cam sang xanh rừng Planora #3c5741.
+   - Footer đổi sang: "Planora luôn yêu cầu bạn duyệt trước khi ghi hoặc gửi dữ liệu ra bên ngoài."
+   - Avatar đổi thành "P", thương hiệu đổi thành "Planora".
+6. Chạy lại checks kỹ thuật bắt buộc:
+   - npm run typecheck:v3
+   - npm test -w @wap/chat-web
+   - npm run build:v3
+   - node scripts/test-v3-web-build-security.mjs
+   - npm test -w @wap/chat-web -- planora-chat
+7. Thực hiện kiểm chứng mutation / regression test thực tế trong workspace review để đảm bảo test không phải mock ảo giác.
+8. Lưu báo cáo review chi tiết tại docs/handoff/log/2026-11-05-argon-review-pl-05-r6.md trong worktree review.
+
+Output báo cáo:
+- Reviewer: Antigravity / Gemini 4 Argon (High); model ID gemini-4-argon-high.
+- Task, Target Branch, Base/Head SHA đã kiểm.
+- Lệnh đã chạy, exit codes, kết quả tests.
+- Đánh giá Behavior & Technical: PASS / FAIL.
+- Đánh giá UX Gate 05/11 (Business-First): ĐẠT / CHƯA ĐẠT.
+- Findings P1/P2/P3 nếu có (file, dòng, mô tả, cách sửa).
+- Overall Verdict: Đạt / Đạt sau khi sửa nhỏ / Chưa đạt.

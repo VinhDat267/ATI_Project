@@ -1,0 +1,30 @@
+Bạn là worker Antigravity/Gemini đã thi công PL-03. Chỉ sửa findings R1-R3 từ Codex re-review vòng 2 trong phạm vi task này, không tự nhận task mới.
+
+PR: LOCAL_ONLY
+REVIEWED_HEAD_SHA: 1b41b14c4ba50e71acd21b808bd792f2b3742540
+CURRENT_HEAD_SHA: 1b41b14c4ba50e71acd21b808bd792f2b3742540
+CARD: docs/handoff/tasks/PL-03-planora-public-auth.md
+CODEX REVIEW REPORT: docs/handoff/log/2026-11-03-codex-review-pl-03-r2.md
+
+Codex ghi nhận: 6 findings vòng 1 (F2, F3, F4, F5, F7, F8) đã ĐÓNG hoàn toàn. Chỉ còn 2 P2 và 1 P3:
+
+### R1 · P2 · F1 chưa đóng: navbar vẫn cắt Đăng ký ở 375/320px
+- File:dòng: apps/chat-web/src/pages/Landing/page.css:832, :894; consumer LandingPage.tsx:558.
+- Tái hiện: mở / ở 375px (scrollWidth=383px) hoặc 320px (scrollWidth=354px), CTA kết thúc tại 383px và 354px, bị cắt ở mép phải.
+- Nguyên nhân: Brand thực còn rộng 147.7px do wordmark computed 32px ở cả 2 viewport. Rule compact `.planora-brand .planora-brand-word` trong page.css bị rule cùng specificity `.planora-brand-md .planora-brand-word` của global components.css thắng do thứ tự stylesheet load.
+- Cách sửa: tăng specificity cho rule compact trong page.css (ví dụ: `.planora-landing-nav-inner .planora-brand-md .planora-brand-word { font-size: 18px !important; }` hoặc `.planora-landing-nav-inner .planora-brand .planora-brand-word { font-size: 18px !important; }`), đảm bảo Brand co lại ~80px và navbar không tràn: scrollWidth <= window.innerWidth trên cả 320px và 375px.
+
+### R2 · P2 · F6 chưa đóng: locator mới làm cả 10 ca landing PL-03 đỏ
+- File:dòng: apps/chat-web/tests/browser/planora-public.spec.ts:43.
+- Tái hiện: locator `.planora-landing-nav-actions button` lọc text "Đăng ký", nhưng phần tử thật tại LandingPage.tsx:578 là thẻ <a>!
+- Tác động: Cả 10 ca responsive timeout ở toBeVisible button, làm test gate đỏ.
+- Cách sửa: đổi locator trong planora-public.spec.ts thành `.planora-landing-nav-actions a` hoặc `[data-od-id="btn-header-signup"]` để khớp thẻ <a> thật.
+
+### R3 · P3 · CTA landing trên mobile vẫn chỉ cao 36px
+- File:dòng: apps/chat-web/src/pages/Landing/LandingPage.tsx:648, :1069.
+- Tái hiện: ở 375px hoặc 320px, nút `landing-try-playbook-btn` và `landing-try-digest-btn` cùng các link action header có chiều cao 36px (.planora-btn-sm).
+- Tác động: chưa đạt yêu cầu vùng chạm tối thiểu 44px trên mobile.
+- Cách sửa: tăng min-height đạt 44px cho các CTA landing trên mobile (ví dụ trong media query: `.planora-landing-page .planora-btn-sm, .planora-landing-nav-actions a { min-height: 44px; display: inline-flex; align-items: center; }`).
+
+Đọc AGENTS.md, COMMON.md, card, log sửa lỗi và báo cáo review vòng 2.
+Sửa đúng 3 điểm trên, chạy typecheck:v3, build:v3, tests web, cập nhật card và log mới docs/handoff/log/2026-11-03-gemini-pl-03-review-r2-fixes.md, commit lên longnguyen005/feat-planora-pl-03 và gửi worker_done qua Orca.

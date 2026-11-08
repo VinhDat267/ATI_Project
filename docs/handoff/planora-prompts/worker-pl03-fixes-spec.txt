@@ -1,0 +1,64 @@
+Bạn là worker Antigravity/Gemini đã thi công PL-03. Chỉ sửa findings từ Codex trong phạm vi task này, không tự nhận task mới.
+
+PR: LOCAL_ONLY
+REVIEWED_HEAD_SHA: 9cce7c25072f97400262aa860fde1fe395671cd8
+CURRENT_HEAD_SHA: 9cce7c25072f97400262aa860fde1fe395671cd8
+CARD: docs/handoff/tasks/PL-03-planora-public-auth.md
+CODEX REVIEW REPORT: docs/handoff/log/2026-11-03-codex-review-pl-03.md
+
+CODEX_FINDINGS:
+### F1 · P2 · Header landing tràn và cắt mất Đăng ký trên mobile
+- File:dòng: apps/chat-web/src/pages/Landing/page.css:40, :69, responsive :636; consumer LandingPage.tsx:554.
+- Trigger: mở / ở 375×812 hoặc 320×568, cả hai theme.
+- Tác động: navbar không wrap/thu gọn đủ; nhóm action kết thúc ở x≈399.64px. Tại 375 nút Đăng ký bị cắt, tại 320 nó nằm ngoài viewport. scrollWidth=400.
+- Cách sửa: bố trí lại header mobile bằng wrap/grid/nhóm action thích hợp, giữ các CTA truy cập được; đảm bảo scrollWidth <= window.innerWidth trên 320 và 375px.
+
+### F2 · P2 · CTA Auto-Digest điền yêu cầu tạo issue thay vì lịch đã chọn
+- File:dòng: apps/chat-web/src/pages/Landing/LandingPage.tsx:1064, helper :509.
+- Trigger: click “Dùng thử lịch Auto-Digest 8:00 sáng”.
+- Tác động: sessionStorage nhận “Tạo issue đăng nhập trên GitHub, thêm thẻ vào Trello rồi thông báo trên Slack.” thay vì kịch bản lịch 08:00 Thứ 2-6 (lấy từ src/assets/landing-playbooks.json:316 digestPrompt).
+- Cách sửa: truyền đúng prompt tương ứng từng CTA; thêm assertion nội dung draft sau click digest và xác nhận không auto-submit.
+
+### F3 · P2 · Mất live status của signup/forgot thành công và signup bị đóng
+- File:dòng: apps/chat-web/src/planora/layout/PlanoraAuthFrame.tsx:167; nơi truyền success LandingPage.tsx:1148; nhánh signup-disabled :1547.
+- Trigger: signup thành công, gửi forgot-password thành công, hoặc vào /signup với signupEnabled=false.
+- Tác động: nội dung chuyển thành div/p thường, mất vùng role="status", làm auth-02-signup-reset.spec.ts:32, :99 FAIL.
+- Cách sửa: giữ role="status" cho thông báo thành công và thông báo đóng đăng ký (signup-disabled).
+
+### F4 · P2 · Ba nhóm nội dung landing được gắn class nhưng thiếu toàn bộ CSS
+- File:dòng: apps/chat-web/src/pages/Landing/LandingPage.tsx:950, :963, :983, :1037; thiếu rules tương ứng trong pages/Landing/page.css.
+- Trigger: cuộn qua integrations tới an toàn, bắt đầu và Auto-Digest.
+- Tác động: .planora-principles-section, .planora-proof-grid/card, .planora-onboarding-section/grid/card không có declaration CSS.
+- Cách sửa: bổ sung CSS hoàn thiện cho các section, grid, card này theo chuẩn Planora (spacing, card nền, border, responsive).
+
+### F5 · P2 · Nền landing tối vẫn bị prototype ghi đè, không lấy token Planora
+- File:dòng: apps/chat-web/src/pages/Landing/page.css:18; LandingPage.tsx:314 gọi usePrototypePage; nguồn override src/prototype/theme.css:5.
+- Trigger: đặt ati-theme=dark, mở /.
+- Tác động: html.dark body{background-color:#0B1020!important} thắng token --planora-canvas (#171c18).
+- Cách sửa: scope/override CSS trên container .planora-landing-page (ví dụ background: var(--planora-canvas, #171c18) !important) để nền tối của Landing hiển thị đúng token xanh rừng rêu của Planora.
+
+### F6 · P2 · Browser regression và gate chưa được chuyển sang reference Planora thật
+- File:dòng: apps/chat-web/tests/browser/planora-public.spec.ts:14; tests/browser/fe-08-landing-auth.spec.ts:12, :34, :143; marker giả tại LandingPage.tsx:1070.
+- Trigger: chạy npm run test:browser:v3 hoặc fe-08-landing-auth.
+- Tác động: five-moment/fallback cũ FAIL; marker ẩn display:none rỗng data-flow-mode=schedule.
+- Cách sửa: cập nhật có chủ đích assertions five-moment/copy sang Planora; xóa marker ẩn và thay bằng assertion vào minh họa/summary thật; cập nhật grep trong scripts/test-v3-browser.mjs để bao gồm PL-03.
+
+### F7 · P3 · Breakpoint auth 1024 mâu thuẫn spec bàn giao
+- File:dòng: apps/chat-web/src/planora/styles/auth.css:594; tests/browser/planora-public.spec.ts:60.
+- Trigger: /login tại 1024×768 sáng/tối.
+- Tác động: auth.css dùng max-width: 1024px ẩn editorial trong khi spec yêu cầu desktop >= 1024px phải có split panel.
+- Cách sửa: đổi media query thành max-width: 1023px (hoặc min-width: 1024px cho split panel) để tại 1024px editorial panel hiển thị đúng.
+
+### F8 · P3 · Các control trong auth frame chưa đạt tap target 44px
+- File:dòng: apps/chat-web/src/pages/Landing/LandingPage.tsx:1325; src/planora/layout/PlanoraAuthFrame.tsx:123.
+- Trigger: mobile login/signup.
+- Tác động: "Quên mật khẩu?" bị minHeight:0; padding:0 (chỉ 16.5px); ThemeToggle 32×32px; Brand close ≈42.3px.
+- Cách sửa: nâng min-height / tap target padding cho "Quên mật khẩu?", ThemeToggle và nút đóng Brand trong AuthFrame tối thiểu 44px.
+
+Đọc AGENTS.md, COMMON.md, card, actual code/diff và findings.
+Với từng finding:
+- Tái hiện và sửa tối thiểu đúng nguyên nhân, giữ domain/API/ownership và tính năng main.
+- Chạy npm run typecheck:v3, npm run build:v3, npm test -w @wap/chat-web.
+- Cập nhật Kết quả card docs/handoff/tasks/PL-03-planora-public-auth.md và tạo log mới docs/handoff/log/2026-11-03-gemini-pl-03-review-fixes.md.
+- Commit đúng file lên branch longnguyen005/feat-planora-pl-03.
+- Trả packet với bảng finding -> sửa gì -> command/exit code, base/head SHA và gửi worker_done qua Orca orchestration.

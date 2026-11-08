@@ -1,0 +1,72 @@
+NHIỆM VỤ: REFACTOR PL-06 THEO DESIGN BRIEF V2.0 & BUSINESS-FIRST UX (05/11/2026)
+
+Bạn là worker Antigravity / Gemini 3.8 Flash High thi công PL-06 trên worktree:
+C:/Users/Admin/orca/workspaces/ATI_Project/feat-planora-pl-06
+Branch: longnguyen005/feat-planora-pl-06
+Current HEAD: 514d982f
+Card: docs/handoff/tasks/PL-06-planora-workflow-cards.md
+UX Task: docs/handoff/tasks/PLANORA-UX-01-business-first-redesign.md
+
+Đọc các tài liệu chuẩn tắc trước khi làm:
+- docs/superpowers/specs/2026-11-05-planora-design-brief.md (v2.0, MẪU 4: Duyệt tác động, theo dõi tiến trình & phục hồi an toàn)
+- docs/superpowers/specs/2026-11-05-planora-business-first-ux.md
+- docs/handoff/planora-prompts/COMMON.md
+
+---
+
+### MỤC TIÊU & CÁC CÔNG VIỆC CẦN THỰC HIỆN
+
+Toàn bộ các module PL-01 đến PL-07 vừa được audit theo PLANORA-UX-01 và kết luận: Dù đã PASS kỹ thuật nhưng vẫn mang nặng rác kỹ thuật và đồ họa của Cockpit/Make.com cũ. Bạn có nhiệm vụ refactor PL-06 để đạt 100% chuẩn Business-First UX theo Design Brief v2.0.
+
+#### 1. Sửa `apps/chat-web/src/pages/Cockpit/PlanMoment.tsx`:
+- **Xóa bỏ hoàn toàn accordion "Chi tiết kỹ thuật"** và khối `<pre>{JSON.stringify(plan, null, 2)}</pre>` (loại bỏ dứt điểm `UX-F1`).
+- **Xóa bỏ hiển thị raw hash code `plan_hash`** trên UI (giữ biến `plan.plan_hash` ngầm bên trong để truyền vào `onApprove`).
+- **Busy locking (Chống bấm đúp):** Khi người dùng bấm nút duyệt, nút phải ngay lập tức chuyển sang trạng thái bận (`isApproving = true`, `disabled = true`, hiển thị chỉ báo "Đang xử lý..."), ngăn chặn tuyệt đối phát sinh 2 request duyệt đồng thời.
+- **Vòng đời Kế hoạch (Chuẩn D5):** Khi người dùng bấm "Sửa lại bằng chat" (`onEdit` / "Sửa qua Chat"):
+  - Khóa thẻ kế hoạch cũ, đổi nền sang màu mờ nhẹ, gắn huy hiệu rõ ràng: *"Đã thay thế bằng đề xuất mới trong cuộc trò chuyện"*.
+  - Vô hiệu hóa nút duyệt trên thẻ cũ để ngăn việc bấm duyệt nhầm trên bản đề xuất đã bị thay thế.
+- **Thanh hành động duyệt (Action Bar):**
+  - Nếu kế hoạch có 1 bước: Dùng động từ cụ thể (VD: *"Gửi tin nhắn Slack ngay"*, *"Lưu vào bảng tính"*).
+  - Nếu kế hoạch có từ 2 bước trở lên: *"Duyệt và thực hiện X việc"* (Màu xanh rừng Planora `#3c5741`).
+  - Màu tương phản chuẩn D8: Nút Primary Dark `#8fb68e` bắt buộc dùng chữ Than tối `#171c18` (tỷ lệ 7.61:1), tuyệt đối không dùng chữ trắng (2.27:1).
+
+#### 2. Sửa `apps/chat-web/src/planora/workspace/PlanoraWorkflowSteps.tsx`:
+- **Loại bỏ hoàn toàn đồ họa Orbital Flow cũ** (loại bỏ dứt điểm `UX-F2`):
+  - Xóa bỏ `OrbitalNodeButton`, `orbitalAssets`, `getOrbitalMeta`, `showStatusBubble`, Make.com Router, các bong bóng node quỹ đạo và hoạt họa SVG chấm kết nối quỹ đạo.
+- **Thay thế bằng Chuỗi Thẻ Công việc Trực quan (Step Cards) tuần tự thanh lịch:**
+  - Thiết kế theo bản sắc Planora: Nền giấy kem `#f8f4eb` (hoặc Dark tương ứng), viền mảnh `#e3ded1`, typography thanh lịch (serif editorial + Be Vietnam Pro).
+  - Header thẻ: Số thứ tự bước (1, 2, 3...), Icon dịch vụ vector SVG tự host (Sheets, Slack, Trello, Jira, Gmail), Tiêu đề hành động rõ ràng (VD: *"Đọc dữ liệu công việc · Google Sheets"*, *"Gửi thông báo tổng kết · Slack"*).
+  - **Phân định trung thực dữ liệu (Chuẩn D1):**
+    - Bước đọc (VD: `mysheets.read_range`, `trello.list_cards`) nằm trong kế hoạch sẽ thực thi: Hiển thị nhãn *"Sẽ đọc khi bạn duyệt kế hoạch"*. Tuyệt đối không bịa ra số lượng nhiệm vụ giả hay hiển thị rỗng `{}`.
+    - Bước thực thi tiếp theo có tham số phụ thuộc kết quả bước đọc (VD: `$ref`, `$template`): Bản xem trước (Preview) phải dùng placeholder thanh lịch: `‹danh sách công việc đọc ở bước 1›` (hoặc `‹danh sách công việc đọc ở bước X›`).
+    - Hiển thị đầy đủ các tham số nghiệp vụ thực tế: người gửi, kênh đích, tiêu đề, tệp đính kèm. Tuyệt đối không ẩn giấu tham số hay dump raw JSON args.
+
+#### 3. Sửa `apps/chat-web/src/pages/Cockpit/ReceiptMoment.tsx` & `ExecutionMoment.tsx`:
+- Xóa bỏ raw JSON dump.
+- Hiển thị biên nhận kết quả thanh lịch: permalink thực tế ("Xem tin nhắn vừa gửi trên Slack"), liên kết bảng tính Google Sheets, mã thẻ Trello/Jira thực tế.
+- Tiến trình thực thi SSE hiển thị từng bước hoàn thành thực tế, không dùng thanh % giả.
+
+#### 4. Cập nhật và bổ sung Tests trong `apps/chat-web/tests/planora-workflow-steps.test.tsx`:
+- Viết test khẳng định KHÔNG CÒN khối `<pre>{JSON.stringify...}` hay accordion "Chi tiết kỹ thuật" trong DOM.
+- Viết test khẳng định bước đọc trong kế hoạch có nhãn *"Sẽ đọc khi bạn duyệt kế hoạch"*.
+- Viết test khẳng định bước tiếp theo phụ thuộc hiển thị placeholder `‹danh sách công việc đọc ở bước 1›`.
+- Viết test khẳng định nút duyệt có busy locking (`disabled`) khi đang approve.
+- Viết test khẳng định bấm "Sửa qua Chat" hiển thị huy hiệu *"Đã thay thế bằng đề xuất mới trong cuộc trò chuyện"* và disable nút duyệt.
+- Viết test kiểm tra tương phản nút Primary Dark đạt chuẩn WCAG AA ≥ 4.5:1.
+
+---
+
+### TIÊU CHUẨN KIỂM TRA BẮT BUỘC
+Chạy và kiểm tra exit code 0 của toàn bộ các lệnh sau:
+1. `npm run typecheck:v3`
+2. `npm test -w @wap/chat-web`
+3. `npm run build:v3`
+4. `npm run security`
+
+### BÀN GIAO VÀ COMMIT
+1. Commit với Conventional Commits:
+   `git add apps/chat-web/ docs/handoff/`
+   `git commit -m "refactor(planora): redesign PL-06 plan and preview moments for business-first UX"`
+2. Cập nhật phần Kết quả trong `docs/handoff/tasks/PL-06-planora-workflow-cards.md`.
+3. Tạo log mới: `docs/handoff/log/2026-11-05-gemini-pl-06-business-first-refactor.md`.
+4. Trả packet bàn giao đầy đủ theo mẫu quy định tại `docs/handoff/planora-prompts/COMMON.md`.

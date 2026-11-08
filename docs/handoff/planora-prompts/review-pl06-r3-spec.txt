@@ -1,0 +1,46 @@
+Bạn là reviewer độc lập trong Antigravity, dùng Gemini 4 Argon (High), model ID gemini-4-argon-high; phụ trách review migration Planora. Reviewer không phải tác giả task và không sửa code của worker.
+
+TASK: PL-06 (Refactor Business-First UX theo Design Brief v2.0)
+CARD: docs/handoff/tasks/PL-06-planora-workflow-cards.md
+UX TASK: docs/handoff/tasks/PLANORA-UX-01-business-first-redesign.md
+PR_URL hoặc LOCAL_ONLY: LOCAL_ONLY
+TARGET_BRANCH: longnguyen005/feat-planora-pl-06 (target codex/planora-ui)
+BASE_SHA: 514d982fd9fc152290feb305b0d97f2c40dda21a
+HEAD_SHA: 5fdcb366fd49e456bd81842ee0b6d9577a2fe6a7
+EVIDENCE: docs/handoff/log/2026-11-05-gemini-pl-06-business-first-refactor.md, apps/chat-web/tests/planora-workflow-steps.test.tsx
+
+Đọc các tài liệu chuẩn tắc:
+- docs/superpowers/specs/2026-11-05-planora-design-brief.md (v2.0, MẪU 4: Duyệt tác động, theo dõi tiến trình & phục hồi an toàn)
+- docs/superpowers/specs/2026-11-05-planora-business-first-ux.md
+- docs/handoff/planora-prompts/REVIEWER-POLICY.md
+- AGENTS.md, docs/handoff/REVIEW-CHECKLIST.md, docs/handoff/planora-prompts/COMMON.md
+
+Làm trong worktree review riêng (review-planora-pl-06-r3); không checkout/reset/sửa index/branch của worker. Được chạy kiểm thử/build/browser phù hợp và tạo output tạm trong workspace review. Không triển khai, merge, bật flag runtime hoặc ghi provider thật.
+
+Yêu cầu kiểm tra trọng tâm:
+1. Xác minh HEAD_SHA hiện còn đúng head branch: 5fdcb366fd49e456bd81842ee0b6d9577a2fe6a7.
+2. Kiểm tra việc xóa bỏ triệt để rác kỹ thuật & đồ họa cũ:
+   - PlanMoment: Đã xóa hoàn toàn accordion "Chi tiết kỹ thuật", không còn khối <pre>{JSON.stringify(plan, ...)}</pre>, không còn hiển thị raw hash `plan_hash` trên UI?
+   - PlanoraWorkflowSteps: Đã loại bỏ hoàn toàn Make.com Router, OrbitalNodeButton, bong bóng node và hoạt họa SVG chấm quỹ đạo chưa? Đã thay bằng Step Cards tuần tự thanh lịch chưa?
+3. Kiểm tra các chuẩn nghiệp vụ từ Design Brief v2.0 & Claude Opus review:
+   - Chuẩn D1 (Trung thực dữ liệu): Bước đọc chưa chạy có hiển thị nhãn "Sẽ đọc khi bạn duyệt kế hoạch" không? Bước phụ thuộc tiếp theo có hiển thị placeholder "‹danh sách công việc đọc ở bước X›" không?
+   - Chuẩn D5 (Vòng đời kế hoạch & Busy locking): Nút duyệt có bị disable (busy locking) chống double-click không? Bấm "Sửa qua Chat" có hiển thị huy hiệu "Đã thay thế bằng đề xuất mới trong cuộc trò chuyện" và disable nút duyệt cũ không?
+   - Chuẩn D8 (Tương phản): Nút Primary Dark `#8fb68e` kết hợp chữ Than tối `#171c18` có đạt WCAG AA ≥ 4.5:1 (thực tế 7.61:1) không?
+   - ReceiptMoment & ExecutionMoment: Đã bỏ raw JSON dump, hiển thị biên nhận trang nhã với permalink và issue key thật chưa?
+4. Chạy lại checks kỹ thuật bắt buộc:
+   - npm run typecheck:v3
+   - npm test -w @wap/chat-web
+   - npm run build:v3
+   - node scripts/test-v3-web-build-security.mjs
+   - npm test -w @wap/chat-web -- planora-workflow-steps
+5. Thực hiện kiểm chứng mutation / regression test thực tế trong workspace review để đảm bảo test không phải mock ảo giác.
+6. Lưu báo cáo review chi tiết tại docs/handoff/log/2026-11-05-argon-review-pl-06-r3.md trong worktree review.
+
+Output báo cáo:
+- Reviewer: Antigravity / Gemini 4 Argon (High); model ID gemini-4-argon-high.
+- Task, Target Branch, Base/Head SHA đã kiểm.
+- Lệnh đã chạy, exit codes, kết quả tests.
+- Đánh giá Behavior & Technical: PASS / FAIL.
+- Đánh giá UX Gate 05/11 (Business-First): ĐẠT / CHƯA ĐẠT.
+- Findings P1/P2/P3 nếu có (file, dòng, mô tả, cách sửa).
+- Overall Verdict: Đạt / Đạt sau khi sửa nhỏ / Chưa đạt.

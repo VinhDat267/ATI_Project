@@ -1,0 +1,45 @@
+Bạn là subagent Antigravity sử dụng Gemini 3.8 Flash High, phụ trách triển khai PL-10: Jira workspace, site/project và yêu cầu quyền.
+
+Đọc trước: AGENTS.md; docs/handoff/planora-prompts/COMMON.md; docs/handoff/PLANORA-MIGRATION-HANDOFF.md; spec và plan Planora ngày 02/11/2026; CURRENT-STATE/README và ba log mới nhất.
+Đặc biệt tuân thủ đặc tả Business-First UX:
+- docs/superpowers/specs/2026-11-05-planora-design-brief.md
+- docs/superpowers/specs/2026-11-05-planora-business-first-ux.md
+
+TASK CARD: docs/handoff/tasks/PL-10-planora-jira-ui.md
+WORKTREE: C:/Users/Admin/orca/workspaces/ATI_Project/feat-planora-pl-10
+NHÁNH: longnguyen005/feat-planora-pl-10
+BASE_SHA: 5b5df90e3413384ec71fb2afbf4bd0c6964c458c
+TARGET_BRANCH: codex/planora-ui
+
+PHẠM VI FILE CHO PHÉP:
+- apps/chat-web/src/pages/Settings/JiraConnection.tsx
+- có thể tách panels UI trong apps/chat-web/src/pages/Settings/jira/ nếu cần cấu trúc rõ ràng
+- apps/chat-web/src/views/JiraCallbackView.tsx
+- Tests jira liên quan trong apps/chat-web/tests/
+
+THỰC HIỆN:
+1. Port các panels Jira sang chuẩn CSS tokens Planora và Business-First UX:
+   - Account identity, workspace list/create/join, site/project selector, pending request/admin approval, capability notice.
+   - Loại bỏ các thuật ngữ kỹ thuật như "9 tools/3LO/siteId"; tập trung vào tên nhóm làm việc, dự án và quyền hạn.
+2. Bảo toàn phân quyền & hợp đồng kỹ thuật:
+   - Giữ nguyên JiraConnectionProps, selectedWorkspace, API response/error và membership.
+   - Role trong Jira workspace (admin vs member) độc lập, tuyệt đối không tự suy ra từ global role.
+   - Giữ race guards khi đổi workspace/site/user giữa chừng, thông báo rõ ràng khi bị từ chối, cần kết nối lại, hết hạn, hoặc mất mạng.
+3. Tái sử dụng ConnectionCallbackFrame từ PL-08 cho JiraCallbackView:
+   - Presentation-only: không mutate OAuth state.
+   - Không lồng 2 khung lỗi, không duplicate nút quay về Cài đặt.
+   - 100% SVG vector icons có aria-hidden="true".
+4. Tương phản WCAG AA >= 4.5:1 (nút primary dùng bg-[var(--planora-primary)] text-[var(--planora-on-primary)] hover:bg-[var(--planora-primary-hover)]), không dùng text-white ở dark mode; viền dùng --planora-border-strong và --planora-divider (tuyệt đối không dùng --planora-border không tồn tại).
+
+KIỂM CHỨNG BẮT BUỘC TRƯỚC KHI BÀN GIAO:
+- npm run typecheck:v3
+- npm test -w @wap/chat-web -- jira
+- npm test -w @wap/chat-web
+- npm run build:v3
+- node scripts/test-v3-web-build-security.mjs
+
+KẾT THÚC:
+- Điền phần Kết quả của task card docs/handoff/tasks/PL-10-planora-jira-ui.md.
+- Tạo file log mới docs/handoff/log/2026-11-07-gemini-pl-10.md.
+- Commit toàn bộ thay đổi với conventional commit: `feat(planora): implement PL-10 Jira workspace, site/project and permissions`.
+- Gửi worker_done qua Orca orchestration.

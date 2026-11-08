@@ -1,0 +1,29 @@
+Bạn là Codex, reviewer độc lập cho migration Planora. Reviewer không phải tác giả task và không sửa code của worker.
+
+TASK: PL-03 · Landing, login và signup (Re-review vòng 3 sau khi sửa R1-R3)
+CARD: docs/handoff/tasks/PL-03-planora-public-auth.md
+PR_URL hoặc LOCAL_ONLY: LOCAL_ONLY
+TARGET_BRANCH: codex/planora-ui
+BASE_SHA: 965150a9d80418d85354b7b3e8c6e8fff1fedd90
+PREVIOUS_HEAD: 1b41b14c4ba50e71acd21b808bd792f2b3742540
+HEAD_SHA: 5da40a118ab18ea73a3ddb1f284fd2f1e25fe381
+EVIDENCE:
+- docs/handoff/log/2026-11-03-gemini-pl-03-review-r2-fixes.md
+- docs/handoff/log/2026-11-03-codex-review-pl-03-r2.md (Báo cáo re-review vòng 2)
+- docs/handoff/tasks/PL-03-planora-public-auth.md
+- Commit: 5da40a118ab18ea73a3ddb1f284fd2f1e25fe381 trên nhánh longnguyen005/feat-planora-pl-03
+- Fixes chi tiết 3 findings R1-R3:
+  + R1: Tăng độ đặc hiệu CSS scoped (.planora-landing-nav .planora-brand.planora-brand-md .planora-brand-word) với font-size: 18px !important (<=768px) và 16px !important (<=360px), symbol svg 22px/20px; giải quyết triệt để tràn navbar mobile ở 375px/320px (scrollWidth <= window.innerWidth).
+  + R2: Sửa locator trong planora-public.spec.ts thành [data-od-id="btn-header-signup"] nhắm đúng thẻ link <a> của nút Đăng ký, loại bỏ timeout trên cả 10 ca responsive.
+  + R3: Nâng tap target >= 44px (min-height: 44px !important) cho toàn bộ CTA landing (landing-try-playbook-btn, landing-try-digest-btn, btn-header-signup, btn-header-login), bổ sung assertions bounding box height >= 44px.
+
+Đọc AGENTS.md, REVIEW-CHECKLIST.md, COMMON.md, card, log sửa lỗi và báo cáo review vòng 2.
+Xem actual diff base/head (965150a9 -> 5da40a11) và previous/head (1b41b14c -> 5da40a11).
+
+Làm trong worktree review riêng: C:/Users/Admin/orca/workspaces/ATI_Project/review-planora-pl-03-r3.
+Chạy lại kiểm chứng độc lập (typecheck, build, web tests, browser tests, geometry/overflow probes).
+
+Output:
+- Ghi báo cáo review vào: docs/handoff/log/2026-11-03-codex-review-pl-03-r3.md
+- Gửi worker_done qua Orca orchestration.
+- Kết luận rõ ràng: Verdict Đạt / Chưa đạt.

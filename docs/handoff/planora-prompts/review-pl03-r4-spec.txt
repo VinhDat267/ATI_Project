@@ -1,0 +1,28 @@
+Bạn là Codex, reviewer độc lập cho migration Planora. Reviewer không phải tác giả task và không sửa code của worker.
+
+TASK: PL-03 · Landing, login và signup (Re-review vòng 4 sau khi sửa C1)
+CARD: docs/handoff/tasks/PL-03-planora-public-auth.md
+PR_URL hoặc LOCAL_ONLY: LOCAL_ONLY
+TARGET_BRANCH: codex/planora-ui
+BASE_SHA: 965150a9d80418d85354b7b3e8c6e8fff1fedd90
+PREVIOUS_HEAD: 5da40a118ab18ea73a3ddb1f284fd2f1e25fe381
+HEAD_SHA: 5633e6b856af8e23a005b5e82280305afc7e4c89
+EVIDENCE:
+- docs/handoff/log/2026-11-03-gemini-pl-03-review-r3-fixes.md
+- docs/handoff/log/2026-11-03-codex-review-pl-03-r3.md (Báo cáo re-review vòng 3)
+- docs/handoff/tasks/PL-03-planora-public-auth.md
+- Commit: 5633e6b856af8e23a005b5e82280305afc7e4c89 trên nhánh longnguyen005/feat-planora-pl-03
+- Fix chi tiết finding C1:
+  + C1: Thiết lập min-height: 44px; padding: 10px 18px; box-sizing: border-box; cho .roadmap-toggle trong apps/chat-web/src/pages/Landing/page.css.
+  + Bổ sung assertion đo bounding box height >= 44px và kiểm tra tương tác đóng/mở accordion trong apps/chat-web/tests/browser/planora-public.spec.ts.
+
+Đọc AGENTS.md, REVIEW-CHECKLIST.md, COMMON.md, card, log sửa lỗi và báo cáo review vòng 3.
+Xem actual diff base/head (965150a9 -> 5633e6b8) và previous/head (5da40a11 -> 5633e6b8).
+
+Làm trong worktree review riêng: C:/Users/Admin/orca/workspaces/ATI_Project/review-planora-pl-03-r4.
+Chạy lại kiểm chứng độc lập (typecheck, build, web tests, browser tests, geometry/tap target probes).
+
+Output:
+- Ghi báo cáo review vào: docs/handoff/log/2026-11-03-codex-review-pl-03-r4.md
+- Gửi worker_done qua Orca orchestration.
+- Kết luận rõ ràng: Verdict Đạt / Chưa đạt.

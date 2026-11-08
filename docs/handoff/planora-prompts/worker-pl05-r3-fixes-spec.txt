@@ -1,0 +1,35 @@
+Bạn là worker Antigravity/Gemini đã thi công PL-05. Chỉ sửa findings R3–R4 từ Codex re-review vòng 3 trong phạm vi task này, không tự nhận task mới.
+
+TASK: PL-05 · Feed hội thoại và một composer (Sửa findings R3–R4 vòng 3)
+PR hoặc LOCAL_ONLY: LOCAL_ONLY
+REVIEWED_HEAD_SHA: 128fab1da4178ce28cebdbcc1d974f5dc39d4ab6
+CURRENT_HEAD_SHA: 128fab1da4178ce28cebdbcc1d974f5dc39d4ab6
+CARD: docs/handoff/tasks/PL-05-planora-chat-feed.md
+WORKTREE: C:/Users/Admin/orca/workspaces/ATI_Project/feat-planora-pl-05
+LOG_REVIEW: docs/handoff/log/2026-11-04-codex-review-pl-05-r3.md
+
+CODEX_FINDINGS:
+### R3 · P2 · Giới hạn chiều cao/overflow của chat đang áp dụng cho mọi trang, làm mất cuộn bằng chuột
+Vị trí: apps/chat-web/src/planora/styles/shell.css:15, :25, :53, :315, :374–:377.
+Nguyên nhân: Khai báo mới khóa toàn bộ .planora-shell → .planora-screen-layout → .planora-main-work → .planora-content-body trong một viewport với `overflow: hidden` và `height: 100%`. Những trang như Settings (/settings), History (/history), Account (/account) và Guide (/guide) vẫn dựa vào document/page scrolling; nội dung dài của chúng bị cắt trong .planora-content-body, wheel chuột không cuộn được (24/24 ca test thất bại khi dùng mouse wheel).
+Yêu cầu sửa:
+- Giữ giới hạn chiều cao và overflow hidden cho layout chat, nhưng KHÔNG khóa overflow của toàn bộ các trang khác.
+- Ví dụ: Chỉ áp dụng `height: 100%; overflow: hidden;` khi ở trong màn chat (dùng class scoped, hoặc `.planora-shell:has(.planora-chat-workspace)`, hoặc để `.planora-content-body` có `overflow-y: auto` cho các trang thông thường, hoặc chỉ khóa khi render `PlanoraChatWorkspace`).
+- Bổ sung test/browser probe kiểm tra cuộn bằng wheel/scroll container thực tế trên một trang dài ngoài chat (ví dụ /settings hoặc /history) ở cả desktop và mobile (1440, 375, 320) trên light/dark theme.
+
+### R4 · P2 · Padding cố định của feed vẫn để composer nhiều dòng che thao tác cuối
+Vị trí: apps/chat-web/src/planora/workspace/PlanoraConversationFeed.tsx:66; apps/chat-web/src/pages/Cockpit/ChatComposer.tsx:29; apps/chat-web/src/index.css:153.
+Nguyên nhân: `pb-28 sm:pb-32` chỉ dành 112/128px trong feed, trong khi khi người dùng nhập draft dài nhiều dòng thì composer tự động giãn chiều cao textarea tới 144px và toàn bộ footer cao tới 202-206px. Biến `--cockpit-bottom-space` tăng padding của body chứ không tăng padding của feed scroll container. Khi feed cuộn hết xuống đáy, active card cuối cùng (ví dụ nút Chi tiết kỹ thuật `#btn-tech-toggle` trên mobile) bị composer đè lên và che mất.
+Yêu cầu sửa:
+- Dự trữ khoảng trống trong chính vùng cuộn feed theo chiều cao footer thực tế (ví dụ: dùng biến CSS dynamic `--cockpit-bottom-space` hoặc inline style `paddingBottom: 'calc(var(--cockpit-bottom-space, 128px) + 16px)'` trên container feed).
+- Kiểm tra bằng browser/unit test với draft nhiều dòng, đảm bảo khi feed cuộn hết xuống đáy thì thao tác cuối cùng của active card không bị che bởi composer và nhận click/hit-test bình thường.
+
+Đọc AGENTS.md, COMMON.md, card, actual code/diff và log review vòng 3.
+Với từng finding:
+- Tái hiện và sửa triệt để đúng nguyên nhân.
+- Chạy unit tests và browser tests thực tế.
+- Cập nhật docs/handoff/tasks/PL-05-planora-chat-feed.md và tạo log mới docs/handoff/log/2026-11-04-gemini-pl-05-review-r3-fixes.md.
+- Commit đúng file. Không force-push hay tự merge.
+- Gửi worker_done qua Orca orchestration cho task task_e73dd8f6b0d9:
+  orca orchestration send --from term_244187ba-fdfe-4fdd-85d8-558213e43ae9 --type worker_done --subject "<short status>" --body "<3-sentence summary: what you did, what you found, what's left>" --task-id task_e73dd8f6b0d9 --outcome <succeeded|failed>
+- Trả packet kết quả chi tiết với STATUS: READY_FOR_CODEX_REVIEW.

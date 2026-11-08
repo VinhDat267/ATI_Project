@@ -1,0 +1,52 @@
+Bạn là subagent Antigravity sử dụng Gemini 3.8 Flash High, phụ trách xử lý findings F1-F4 và P3-1 cho PL-08: Settings, Gmail, Calendar và Sheets.
+
+Đọc trước:
+- Báo cáo review chi tiết của Argon High: docs/handoff/log/2026-11-05-argon-review-pl-08.md
+- TASK CARD: docs/handoff/tasks/PL-08-planora-google-connections.md
+- docs/superpowers/specs/2026-11-05-planora-design-brief.md
+- docs/superpowers/specs/2026-11-05-planora-business-first-ux.md
+- AGENTS.md, docs/handoff/planora-prompts/COMMON.md
+
+WORKTREE: C:/Users/Admin/orca/workspaces/ATI_Project/feat-planora-pl-08
+NHÁNH: longnguyen005/feat-planora-pl-08
+BASE_SHA: 81d139580d19641bfdf7b3eebe8b11c97a8ec9ec
+PREVIOUS_HEAD: 76ebeedba79970834fe9d3b2dd69f0276612e740
+
+YÊU CẦU SỬA CHỮA CHI TIẾT:
+
+1. [F1 — P2] Tương phản WCAG AA & Xóa sạch màu cam cũ (#FF5701) trên các nút Primary CTA:
+   - Tại PersonalGmail.tsx, PersonalMyCalendar.tsx, PersonalMySheets.tsx và SettingsPage.tsx (nút #btn-save-service-changes): chuyển các nút primary sang token chuẩn Planora:
+     `bg-[var(--planora-primary)] text-[var(--planora-on-primary)] hover:bg-[var(--planora-primary-hover)]`
+   - Nút "Xác nhận ngắt kết nối" tại PersonalMySheets.tsx:311: đổi sang token semantic error của Planora:
+     `bg-[var(--planora-error-bg)] text-[var(--planora-error-text)] border border-[var(--planora-error-border)] hover:opacity-90`
+   - Cập nhật assertion màu cam cũ tại apps/chat-web/tests/gmail-review-fixes.test.tsx:100 và tests/browser/gmail-03.spec.ts:29 sang token `--planora-primary`.
+
+2. [F2 — P2] Thay thế triệt để 29 vị trí dùng biến CSS không tồn tại `--planora-border`:
+   - Trên input, textarea, checkbox, nút bấm phụ (secondaryButton): thay bằng `border-[var(--planora-border-strong)]`.
+   - Trên khung/thẻ phân cách và đường viền card: thay bằng `border-[var(--planora-divider)]` hoặc `border-[var(--planora-border-strong)]`.
+   - Dùng `git grep "planora-border"` kiểm tra sạch 100%, không còn biến `--planora-border` không tồn tại.
+
+3. [F3 — P2] Xóa sạch thương hiệu cũ "ATI", thay emoji trần bằng vector SVG:
+   - Thay "ATI" thành "Planora" tại SettingsPage.tsx:801, PersonalMySheets.tsx:125, MySheetsCallbackView.tsx:293, và Settings/meta.ts:5.
+   - SettingsPage.tsx:300: thay emoji trần `👤` / `🏢` bằng vector SVG icons (User / Building2) có `aria-hidden="true"`.
+   - Cập nhật page.css của Settings dùng `--planora-canvas`, `--planora-text` và focus outline `--planora-primary`.
+   - Cập nhật regex trong tests/browser/mysheets.spec.ts sang `/Chọn bảng tính cho Planora/i` và `/Planora chỉ thấy những bảng tính bạn chọn/i`.
+
+4. [F4 — P2] Khử lồng trùng 2 khung lỗi và xóa duplicate nút quay về Cài đặt trong các màn Callback:
+   - Trong MyCalendarCallbackView.tsx và MySheetsCallbackView.tsx: bỏ thẻ bọc dư thừa `<div className="p-4 rounded-xl bg-red-50 border border-red-200 ...">` khi truyền prop `error` cho ConnectionCallbackFrame, để ConnectionCallbackFrame tự render khung lỗi chuẩn Planora (--planora-error-*).
+   - Khử lặp nút "Về Kết nối dịch vụ" / "Về trang Cài đặt": chỉ render đúng 1 nút/link điều hướng cho mỗi trạng thái, không để người dùng thấy 2 nút quay về Cài đặt đứng sát nhau trong cùng một card. Bảo toàn đúng thẻ/link mà các bài test hiện hữu kiểm tra.
+
+5. [P3-1 — P3] Guard onClose khi busy trong PersonalMySheets.tsx:
+   - Dòng 293: sửa thành `onClose={() => { if (!busy) setConfirm(false); }}`.
+
+KIỂM TRA BẮT BUỘC:
+- npm run typecheck:v3
+- npm test -w @wap/chat-web -- fe-07-settings gmail mycalendar mysheets planora-pl-08-connections
+- npm test -w @wap/chat-web
+- npm run build:v3
+- node scripts/test-v3-web-build-security.mjs
+
+KẾT THÚC:
+- Ghi nhật ký sửa lỗi vào docs/handoff/log/2026-11-07-gemini-pl-08-fixes.md.
+- Commit toàn bộ thay đổi với conventional commit: `fix(planora): resolve review findings F1-F4 and P3-1 for PL-08`.
+- Gửi worker_done qua Orca orchestration.

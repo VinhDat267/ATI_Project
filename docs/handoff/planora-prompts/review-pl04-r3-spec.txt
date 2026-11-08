@@ -1,0 +1,30 @@
+Bạn là Codex, reviewer độc lập cho migration Planora. Reviewer không phải tác giả task và không sửa code của worker.
+
+TASK: PL-04 · Xác thực nâng cao và Google login callback (Re-review vòng 3 sau khi sửa R1)
+CARD: docs/handoff/tasks/PL-04-planora-auth-lifecycle.md
+PR_URL hoặc LOCAL_ONLY: LOCAL_ONLY
+TARGET_BRANCH: codex/planora-ui
+BASE_SHA: 5633e6b856af8e23a005b5e82280305afc7e4c89
+PREVIOUS_HEAD: a024801f772b682c2ac5fcf41118afda3c8feed1
+HEAD_SHA: b9230b8b592237275866e027c1744362ef4c6eda
+EVIDENCE:
+- docs/handoff/log/2026-11-03-gemini-pl-04-review-r2-fixes.md
+- docs/handoff/log/2026-11-03-codex-review-pl-04-r2.md (Báo cáo re-review vòng 2)
+- docs/handoff/tasks/PL-04-planora-auth-lifecycle.md
+- Commit: b9230b8b592237275866e027c1744362ef4c6eda trên nhánh longnguyen005/feat-planora-pl-04
+- Fix chi tiết finding R1:
+  + R1 (P2): Scoped chính xác footer locator: `const footer = page.locator('.planora-auth-footer'); const homeLink = footer.getByRole('link', { name: 'Trang chủ', exact: true }); const privacyLink = footer.getByRole('link', { name: 'Chính sách an toàn & Dữ liệu', exact: true });` ở cả 2 test case `verify-expired` và `reset-password` trong apps/chat-web/tests/browser/planora-auth-lifecycle.spec.ts. Khắc phục triệt để lỗi Playwright strict mode violation (trùng `← Quay lại trang chủ` và footer `Trang chủ`).
+- Unit tests: 99 files (1098 tests) PASS, typecheck:v3 exit 0, build:v3 exit 0.
+
+Đọc AGENTS.md, REVIEW-CHECKLIST.md, COMMON.md, card, log sửa lỗi và báo cáo review vòng 2.
+Xem actual diff base/head (5633e6b8 -> b9230b8b) và previous/head (a024801f -> b9230b8b).
+
+Làm trong worktree review: C:/Users/Admin/orca/workspaces/ATI_Project/review-planora-pl-04-r2.
+Kéo commit b9230b8b hoặc fetch từ nhánh longnguyen005/feat-planora-pl-04 vào worktree review.
+Chạy lại kiểm chứng độc lập (typecheck, build, web tests, browser tests runner auth02 không override GREP, geometry/responsive probes).
+
+Output:
+- Ghi báo cáo review vào: docs/handoff/log/2026-11-03-codex-review-pl-04-r3.md
+- Gửi worker_done qua Orca orchestration cho task task_e274f436f1ae:
+  orca orchestration send --from term_f6bcdc72-adce-42b6-96e3-ba779019e0b4 --type worker_done --subject "<short status>" --body "<3-sentence summary: what you did, what you found, what's left>" --task-id task_e274f436f1ae --outcome <succeeded|failed>
+- Kết luận rõ ràng: Verdict Đạt / Chưa đạt.

@@ -1,0 +1,50 @@
+Bạn là reviewer độc lập trong Antigravity, dùng Gemini 4 Argon (High), model ID gemini-4-argon-high; phụ trách review migration Planora. Reviewer không phải tác giả task và không sửa code của worker.
+
+TASK: PL-04 (Round 4: Review Refactor Business-First Advanced Auth Lifecycle & Callbacks theo Design Brief v2.0)
+CARD: docs/handoff/tasks/PL-04-planora-auth-lifecycle.md
+UX TASK: docs/handoff/tasks/PLANORA-UX-01-business-first-redesign.md
+PR_URL hoặc LOCAL_ONLY: LOCAL_ONLY
+TARGET_BRANCH: longnguyen005/feat-planora-pl-04 (target codex/planora-ui)
+BASE_SHA: 1023889bfae5a223c653e040506b8ad1d79a4ae4
+HEAD_SHA: 8520e0a9b0cb1e16f4e9c27209443edbdcadc187
+EVIDENCE: docs/handoff/log/2026-11-07-gemini-pl-04-business-first-refactor.md
+
+Đọc các tài liệu chuẩn tắc:
+- docs/superpowers/specs/2026-11-05-planora-design-brief.md (v2.0, MẪU 1: Hành trình khám phá, đăng nhập & bắt đầu)
+- docs/superpowers/specs/2026-11-05-planora-business-first-ux.md
+- docs/handoff/planora-prompts/REVIEWER-POLICY.md
+- AGENTS.md, docs/handoff/REVIEW-CHECKLIST.md, docs/handoff/planora-prompts/COMMON.md
+
+Làm trong worktree review riêng (review-planora-pl-04-r4); không checkout/reset/sửa index/branch của worker. Được chạy kiểm thử/build/browser phù hợp và tạo output tạm trong workspace review. Không triển khai, merge, bật flag runtime hoặc ghi provider thật.
+
+Yêu cầu kiểm tra trọng tâm:
+1. Xác minh HEAD_SHA trên nhánh feat-planora-pl-04.
+2. Kiểm tra chuẩn MẪU 1 Design Brief v2.0 & Business-First UX:
+   - Toàn bộ 13 trạng thái của `AuthAction` được chuyển ngữ tự nhiên sang tiếng Việt hướng công việc, xóa sạch mã enum nội bộ, tên tham số URL kỹ thuật và thuật ngữ máy tính khô khan.
+   - Mỗi trạng thái có hướng dẫn hành động tiếp theo rõ ràng (nút CTA quay lại làm việc, thử lại, gửi lại mã, đăng nhập bằng tài khoản khác).
+   - Icons vector SVG (Mail, LockKeyhole, AlertCircle, CheckCircle2) tự host, có aria-hidden="true".
+   - Chữ ký Planora endnote ("Một lời nhắn. Một khởi đầu nhẹ nhàng.") được hiển thị nhất quán.
+   - Tương phản WCAG AA >= 4.5:1 (nút primary dùng var(--planora-on-primary), không dùng text-white ở dark mode).
+3. Bảo toàn 100% nghiệp vụ và kỹ thuật:
+   - Các tham số URL: mode, oobCode, apiKey, state, code, error.
+   - Các luồng xử lý: verifyEmail, resetPassword, recoverEmail, callback Google, timeout, header Retry-After, xử lý lỗi mạng, deep-link returnTo.
+4. Chạy lại checks kỹ thuật bắt buộc:
+   - npm run typecheck:v3
+   - npm test -w @wap/chat-web -- planora-auth-lifecycle
+   - npm test -w @wap/chat-web -- auth-google
+   - npm test -w @wap/chat-web -- auth-signup-reset
+   - npm test -w @wap/chat-web -- fe-08-landing-auth
+   - npm test -w @wap/chat-web
+   - npm run build:v3
+   - node scripts/test-v3-web-build-security.mjs
+5. Thực hiện kiểm chứng mutation / regression test thực tế trong workspace review để đảm bảo test không phải mock ảo giác.
+6. Lưu báo cáo review chi tiết tại docs/handoff/log/2026-11-05-argon-review-pl-04-r4.md trong worktree review.
+
+Output báo cáo:
+- Reviewer: Antigravity / Gemini 4 Argon (High); model ID gemini-4-argon-high.
+- Task, Target Branch, Base/Head SHA đã kiểm.
+- Lệnh đã chạy, exit codes, kết quả tests.
+- Đánh giá Behavior & Technical: PASS / FAIL.
+- Đánh giá UX Gate 05/11 (Business-First): ĐẠT / CHƯA ĐẠT.
+- Findings P1/P2/P3 nếu có (file, dòng, mô tả, cách sửa).
+- Overall Verdict: Đạt / Đạt sau khi sửa nhỏ / Chưa đạt.

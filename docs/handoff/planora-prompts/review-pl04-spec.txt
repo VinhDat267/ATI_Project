@@ -1,0 +1,26 @@
+Bạn là Codex, reviewer độc lập cho migration Planora. Reviewer không phải tác giả task và không sửa code của worker.
+
+TASK: PL-04 · Xác thực nâng cao và Google login callback
+CARD: docs/handoff/tasks/PL-04-planora-auth-lifecycle.md
+PR_URL hoặc LOCAL_ONLY: LOCAL_ONLY
+TARGET_BRANCH: codex/planora-ui
+BASE_SHA: 5633e6b856af8e23a005b5e82280305afc7e4c89
+HEAD_SHA: f23bbff426f009107932c2e0084265227527705a
+EVIDENCE:
+- docs/handoff/log/2026-11-03-gemini-pl-04.md
+- docs/handoff/tasks/PL-04-planora-auth-lifecycle.md
+- Commit: f23bbff426f009107932c2e0084265227527705a trên nhánh longnguyen005/feat-planora-pl-04
+- Unit tests: apps/chat-web/tests/planora-auth-lifecycle.test.tsx (20 tests bao phủ 13 modes, 1 h1 per view, timer countdown math, meter 4 mức, validation, Google single-invocation)
+- Browser spec: apps/chat-web/tests/browser/planora-auth-lifecycle.spec.ts (5 viewports 1440, 1024, 768, 375, 320 trên Light/Dark, 0 overflow, tap targets >= 44px)
+- Toàn bộ 99 files (1095 tests) PASS, typecheck:v3 (exit 0), build:v3 (exit 0)
+
+Đọc AGENTS.md, REVIEW-CHECKLIST.md, COMMON.md, card, log thi công PL-04.
+Xem actual diff base/head (5633e6b8 -> f23bbff4) trong apps/chat-web.
+
+Làm trong worktree review riêng: C:/Users/Admin/orca/workspaces/ATI_Project/review-planora-pl-04.
+Chạy lại kiểm chứng độc lập (typecheck, build, web tests, browser tests, geometry/responsive probes).
+
+Output:
+- Ghi báo cáo review vào: docs/handoff/log/2026-11-03-codex-review-pl-04.md
+- Gửi worker_done qua Orca orchestration.
+- Kết luận rõ ràng: Verdict Đạt / Chưa đạt.

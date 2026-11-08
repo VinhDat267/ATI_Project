@@ -1,0 +1,34 @@
+Bạn là Codex, reviewer độc lập cho migration Planora. Reviewer không phải tác giả task và không sửa code của worker.
+
+TASK: PL-03 · Landing, login và signup (Re-review vòng 2 sau khi sửa F1-F8)
+CARD: docs/handoff/tasks/PL-03-planora-public-auth.md
+PR_URL hoặc LOCAL_ONLY: LOCAL_ONLY
+TARGET_BRANCH: codex/planora-ui
+BASE_SHA: 965150a9d80418d85354b7b3e8c6e8fff1fedd90
+PREVIOUS_HEAD: 9cce7c25072f97400262aa860fde1fe395671cd8
+HEAD_SHA: 1b41b14c4ba50e71acd21b808bd792f2b3742540
+EVIDENCE:
+- docs/handoff/log/2026-11-03-gemini-pl-03-review-fixes.md
+- docs/handoff/log/2026-11-03-codex-review-pl-03.md (Báo cáo review vòng 1)
+- docs/handoff/tasks/PL-03-planora-public-auth.md
+- Commit: 1b41b14c4ba50e71acd21b808bd792f2b3742540 trên nhánh longnguyen005/feat-planora-pl-03
+- Fixes chi tiết 8 findings F1-F8:
+  + F1: Navbar mobile không tràn trên 375/320px (thu gọn brand wordmark, font/padding compact, scrollWidth <= window.innerWidth).
+  + F2: Nút Auto-Digest nạp đúng landingPlaybooks.digestPrompt vào sessionStorage.
+  + F3: Khôi phục role="status" cho thông báo signup success, forgot password sent feedback box, và signup disabled notice.
+  + F4: Bổ sung CSS đầy đủ cho .planora-principles-section, .planora-proof-grid/card, .planora-onboarding-section/grid/card.
+  + F5: Nền dark canvas được scope theo data-proto-page="index" với background-color: var(--planora-canvas) !important (#171c18).
+  + F6: Thay thế marker ẩn bằng preview trực quan .planora-digest-flow-preview mang data-testid="workflow-flow-canvas" và data-flow-mode="schedule"; cập nhật tiêu đề Google auth; cập nhật fe-08-landing-auth.spec.ts và default grep trong test-v3-browser.mjs.
+  + F7: Đổi breakpoint @media (max-width: 1024px) thành (max-width: 1023.98px) để 1024px hiển thị split panel chuẩn desktop.
+  + F8: Nâng min-height và tap target cho link Quên mật khẩu, ThemeToggle và nút đóng AuthFrame đạt >= 44px.
+
+Đọc AGENTS.md, REVIEW-CHECKLIST.md, COMMON.md, card, log sửa lỗi và báo cáo review vòng 1.
+Xem actual diff base/head (965150a9 -> 1b41b14c) và previous/head (9cce7c25 -> 1b41b14c).
+
+Làm trong worktree review riêng: C:/Users/Admin/orca/workspaces/ATI_Project/review-planora-pl-03-r2.
+Chạy lại kiểm chứng độc lập (typecheck, build, web tests, browser tests, geometry/overflow probes, mutation tests nếu cần).
+
+Output:
+- Ghi báo cáo review vào: docs/handoff/log/2026-11-03-codex-review-pl-03-r2.md
+- Gửi worker_done qua Orca orchestration.
+- Kết luận rõ ràng: Verdict Đạt / Chưa đạt.

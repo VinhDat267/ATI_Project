@@ -1,0 +1,56 @@
+Bạn là subagent Antigravity sử dụng Gemini 3.8 Flash High, phụ trách refactor PL-04: Xác thực nâng cao và vòng đời tài khoản (Advanced Auth Lifecycle & Callbacks) theo chuẩn Business-First UX (Design Brief v2.0, MẪU 1). Gemini 4 Argon (High) sẽ review độc lập kết quả; bạn không tự nghiệm thu.
+
+TASK: PL-04 (Refactor Business-First Auth Lifecycle theo Design Brief v2.0)
+CARD: docs/handoff/tasks/PL-04-planora-auth-lifecycle.md
+UX TASK: docs/handoff/tasks/PLANORA-UX-01-business-first-redesign.md
+BRANCH: longnguyen005/feat-planora-pl-04
+WORKTREE: C:/Users/Admin/orca/workspaces/ATI_Project/feat-planora-pl-04
+BASE_SHA: 1023889b0ea8623ad0594dbf06886eecfc6f6998 (đã merge PL-03 base 6143de9a và PL-02 accepted f19ceed3)
+TARGET_BRANCH: longnguyen005/feat-planora-pl-04 (target codex/planora-ui)
+
+Đọc các tài liệu chuẩn tắc:
+- docs/superpowers/specs/2026-11-05-planora-design-brief.md (v2.0, MẪU 1: Xác thực & Vòng đời tài khoản)
+- docs/superpowers/specs/2026-11-05-planora-business-first-ux.md
+- docs/handoff/tasks/PLANORA-UX-01-business-first-redesign.md
+- docs/handoff/planora-prompts/REVIEWER-POLICY.md
+- AGENTS.md, docs/handoff/planora-prompts/COMMON.md
+
+Phạm vi file cho phép:
+- apps/chat-web/src/views/{VerifyEmailView,ForgotPasswordView,ResetPasswordView,GoogleCallbackView}.tsx
+- apps/chat-web/src/pages/AuthAction/{AuthActionPage.tsx,page.css}
+- apps/chat-web/src/components/AuthGate.tsx (chỉ phần presentation nếu cần)
+- tests liên quan: tests/auth-02-signup-reset.test.tsx, tests/auth-04-google.test.tsx, tests/auth-return-target.test.tsx
+
+Nhiệm vụ cụ thể:
+1. Ánh xạ toàn bộ 13 chế độ AuthAction sang ngôn ngữ công việc theo bảng MẪU 1 Design Brief v2.0:
+   - verify-email: Tiêu đề "Xác thực tài khoản", thông điệp "Tài khoản của bạn đã được xác thực thành công. Bạn có thể bắt đầu làm việc ngay.", nút [Vào không gian làm việc →].
+   - verify-expired: Tiêu đề "Mã xác thực đã hết hạn", thông điệp "Mã xác thực này đã hết thời gian hiệu lực để bảo vệ an toàn cho bạn. Vui lòng yêu cầu mã mới.", nút [Gửi lại mã xác thực mới].
+   - verify-used: Tiêu đề "Mã đã được sử dụng", thông điệp "Liên kết xác thực này đã được sử dụng trước đó. Vui lòng đăng nhập vào tài khoản của bạn.", nút [Đăng nhập ngay].
+   - reset-password: Tiêu đề "Đặt lại mật khẩu", thông điệp "Nhập mật khẩu mới cho tài khoản {email} để tiếp tục.", nút [Cập nhật mật khẩu].
+   - blocked-pending: Tiêu đề "Chờ quản trị viên duyệt", thông điệp "Yêu cầu tham gia tổ chức của bạn đang chờ quản trị viên phê duyệt. Chúng tôi sẽ thông báo qua email khi hoàn tất.", nút [Kiểm tra lại trạng thái].
+   - blocked-locked: Tiêu đề "Tài khoản tạm khóa", thông điệp "Tài khoản tạm thời bị khóa vì lý do an toàn. Vui lòng liên hệ quản trị viên nhóm của bạn.", nút [Gửi hỗ trợ].
+   - google-*: Tiêu đề "Lỗi kết nối Google", thông điệp "Chưa thể hoàn tất đăng nhập bằng Google. Vui lòng thử lại hoặc dùng email.", nút [Thử lại với Google].
+   - Tuyệt đối không phơi enum AuthActionMode, UUID, token, hay lỗi kỹ thuật nội bộ trên UI.
+2. Xác thực Email & Quên mật khẩu:
+   - Tuyệt đối không dùng copy "liên kết đăng nhập / magic link" (backend không hỗ trợ).
+   - Form gửi email xác thực: nói rõ gửi tới email nào, nút "Gửi lại mã" có đếm ngược cooldown timer lấy deadline từ server.
+   - Form đặt lại mật khẩu: thanh đánh giá độ mạnh trực quan, bảo toàn password validation rules.
+3. Google OAuth Callback:
+   - Khung Planora thanh lịch, hiển thị rõ pending/ready/error.
+   - Bảo đảm xử lý 1 lần duy nhất (chống double-trigger do StrictMode/reload), gỡ token khỏi URL sau xử lý, bảo toàn return target.
+4. Trợ năng & Tương phản WCAG AA:
+   - Nút Primary dùng text-[var(--planora-on-primary)] trên nền var(--planora-primary) (không dùng text-white ở dark mode).
+   - Tap target tối thiểu 44px trên mobile, co giãn mượt từ 320px đến 1440px (0px tràn ngang).
+5. Kiểm tra bắt buộc:
+   - npm run typecheck:v3
+   - npm test -w @wap/chat-web -- auth-02-signup-reset
+   - npm test -w @wap/chat-web -- auth-04-google
+   - npm test -w @wap/chat-web -- auth-return-target
+   - npm test -w @wap/chat-web
+   - npm run build:v3
+   - node scripts/test-v3-web-build-security.mjs
+6. Bàn giao:
+   - Cập nhật mục Kết quả trong docs/handoff/tasks/PL-04-planora-auth-lifecycle.md.
+   - Viết nhật ký docs/handoff/log/2026-11-07-gemini-pl-04-business-first-refactor.md.
+   - Commit đúng files: `refactor(planora): redesign PL-04 auth lifecycle and callbacks for business-first UX`.
+   - Trả packet READY_FOR_REVIEW theo mẫu trong COMMON.md.

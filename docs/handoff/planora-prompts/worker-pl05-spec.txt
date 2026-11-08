@@ -1,0 +1,45 @@
+Bạn là subagent Antigravity sử dụng Gemini, chỉ phụ trách PL-05: Feed hội thoại và một composer. Codex review độc lập kết quả; bạn không tự cấp nghiệm thu thay Codex.
+
+Đọc trước: AGENTS.md; docs/handoff/planora-prompts/COMMON.md; docs/handoff/PLANORA-MIGRATION-HANDOFF.md; spec và plan Planora ngày 02/11/2026; CURRENT-STATE/README và ba log mới nhất.
+
+TASK CARD: docs/handoff/tasks/PL-05-planora-chat-feed.md
+BRANCH GỢI Ý: longnguyen005/feat-planora-pl-05
+DEPENDENCIES: PL-02 và PL-04 đã tích hợp vào codex/planora-ui và Codex review Đạt tại b9230b8b592237275866e027c1744362ef4c6eda.
+BASE_SHA: b9230b8b592237275866e027c1744362ef4c6eda
+TARGET_BRANCH: codex/planora-ui
+
+PHẠM VI FILE:
+Tạo mới:
+- apps/chat-web/src/planora/workspace/PlanoraChatWorkspace.tsx
+- apps/chat-web/src/planora/workspace/PlanoraActiveTurn.tsx
+- apps/chat-web/src/planora/workspace/PlanoraConversationFeed.tsx
+- apps/chat-web/tests/planora-chat.test.tsx
+- apps/chat-web/tests/browser/planora-chat.spec.ts
+Sửa đổi cho phép:
+- apps/chat-web/src/components/Workspace.tsx
+- apps/chat-web/src/components/Cockpit.tsx
+- apps/chat-web/src/pages/Cockpit/ChatComposer.tsx
+- apps/chat-web/src/pages/Cockpit/ConversationDrawer.tsx
+- apps/chat-web/src/pages/Cockpit/SavedConversation.tsx
+- Tests chat/history/SSE integration riêng.
+
+THỰC HIỆN:
+1. Giữ Workspace làm controller, handlers/hooks/store/API; nối renderer Planora bằng props hiện tại, không chép App/store/API cũ.
+2. Làm feed đọc được hội thoại, active card gắn đúng plan/run/proposal; chỉ một bản tương tác và một composer (One-Composer Policy).
+3. Giữ selectMoment priority, saved history, nguồn scheduled run, timestamp và prefill chỉ điền draft.
+4. Giữ IME, Enter/Shift+Enter, auto-scroll gần cuối và vị trí người đang đọc lịch sử.
+
+KIỂM CHỨNG:
+Viết ca fail trước cho one-composer/one-send và race integration; chạy FE-02/03b/05, saved conversation và SCHED history/state; browser đổi hội thoại/workspace, reload và SSE trùng/muộn.
+Bắt buộc đọc/chạy command thật và ghi exit code; tên nhóm test là gợi ý tìm các file hiện có, không được bịa output hoặc giả định runner đã bao phủ.
+
+TẬP TRUNG BẮT REGRESSION:
+GET cũ ghi đè SSE mới; kế hoạch settled sống lại; execution snapshot thuộc plan khác; draft/composer xuất hiện hai nơi; dữ liệu A lọt sang B.
+
+RANH GIỚI RIÊNG:
+Không tự đổi business-state priority hoặc schema messages; card hình thức tiếp tục được hoàn thiện ở PL-06/07.
+
+Áp dụng COMMON.md về ownership, kiểm thử, Git và bằng chứng. Không spawn agent con; không nhận PL khác, sửa backend hoặc tự merge/deploy.
+
+KẾT THÚC:
+Điền Kết quả của card, thêm log mới YYYY-MM-DD-<agent>-pl-05.md, commit đúng file; tạo/cập nhật task PR khi được giao. Trả packet đầy đủ theo COMMON.md với BASE_SHA/HEAD_SHA, output/exit code, ảnh và NOT_RUN. STATUS: READY_FOR_CODEX_REVIEW. Chờ Codex review SHA này và xử lý finding trước bước tiếp theo.

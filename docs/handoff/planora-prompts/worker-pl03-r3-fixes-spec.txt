@@ -1,0 +1,20 @@
+Bạn là worker Antigravity/Gemini đã thi công PL-03. Chỉ sửa finding C1 từ Codex re-review vòng 3 trong phạm vi task này, không tự nhận task mới.
+
+PR: LOCAL_ONLY
+REVIEWED_HEAD_SHA: 5da40a118ab18ea73a3ddb1f284fd2f1e25fe381
+CURRENT_HEAD_SHA: 5da40a118ab18ea73a3ddb1f284fd2f1e25fe381
+CARD: docs/handoff/tasks/PL-03-planora-public-auth.md
+CODEX REVIEW REPORT: docs/handoff/log/2026-11-03-codex-review-pl-03-r3.md
+
+Codex ghi nhận: Toàn bộ findings P1 & P2 đã ĐÓNG hoàn toàn. Toàn bộ 98 files (1075 tests) PASS, browser 33 PASS/0 FAIL/1 SKIP. Chỉ còn duy nhất 1 finding P3 (C1):
+
+### C1 · P3 · Nút mở roadmap trên landing còn thiếu vùng chạm 44px
+- File:dòng: apps/chat-web/src/pages/Landing/page.css:542; consumer apps/chat-web/src/pages/Landing/LandingPage.tsx:933.
+- Tái hiện: mở /, viewport 375×812 hoặc 320×812, light hoặc dark; cuộn tới nút “Những kết nối tiếp theo” (.roadmap-toggle), đo height = 34.5px, computed min-height: 0px, padding 8px 16px. Thiếu 9.5px so với tiêu chuẩn tối thiểu 44px của card:63 trên mobile.
+- Cách sửa:
+  1. Trong apps/chat-web/src/pages/Landing/page.css (tại quy tắc `.roadmap-toggle` hoặc trong `@media (max-width: 768px)`):
+     Thêm `min-height: 44px !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; box-sizing: border-box !important;` để chiều cao thực tế của nút .roadmap-toggle đạt >= 44px trên mobile.
+  2. Trong apps/chat-web/tests/browser/planora-public.spec.ts: Bổ sung assertion đo bounding box height >= 44px cho `.roadmap-toggle`.
+
+Đọc AGENTS.md, COMMON.md, card, log sửa lỗi và báo cáo review vòng 3.
+Sửa đúng điểm C1 trên, chạy typecheck:v3, build:v3, tests web, cập nhật card và log mới docs/handoff/log/2026-11-03-gemini-pl-03-review-r3-fixes.md, commit lên longnguyen005/feat-planora-pl-03 và gửi worker_done qua Orca.

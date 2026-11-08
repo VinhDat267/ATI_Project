@@ -1,0 +1,48 @@
+Bạn là reviewer độc lập trong Antigravity, dùng Gemini 4 Argon (High), model ID gemini-4-argon-high; phụ trách review migration Planora. Reviewer không phải tác giả task và không sửa code của worker.
+
+TASK: PL-08 (Round 2: Re-review Kiểm chứng khắc phục findings F1-F4 và P3-1 cho Cài đặt kết nối, Gmail, Calendar, Sheets)
+CARD: docs/handoff/tasks/PL-08-planora-google-connections.md
+PR_URL hoặc LOCAL_ONLY: LOCAL_ONLY
+TARGET_BRANCH: longnguyen005/feat-planora-pl-08 (target codex/planora-ui)
+BASE_SHA: 81d139580d19641bfdf7b3eebe8b11c97a8ec9ec
+PREVIOUS_HEAD: 76ebeedba79970834fe9d3b2dd69f0276612e740
+HEAD_SHA: 13d18efb565ccf8d121f1914a919856aac974590
+EVIDENCE:
+- docs/handoff/log/2026-11-07-gemini-pl-08-review-fixes.md
+- docs/handoff/log/2026-11-05-argon-review-pl-08.md
+- apps/chat-web/tests/planora-pl-08-connections.test.tsx
+
+Đọc các tài liệu chuẩn tắc:
+- docs/superpowers/specs/2026-11-05-planora-design-brief.md
+- docs/superpowers/specs/2026-11-05-planora-business-first-ux.md
+- docs/handoff/planora-prompts/REVIEWER-POLICY.md
+- AGENTS.md, docs/handoff/REVIEW-CHECKLIST.md, docs/handoff/planora-prompts/COMMON.md
+
+Làm trong worktree review riêng (review-planora-pl-08); không checkout/reset/sửa index/branch của worker. Được chạy kiểm thử/build/browser phù hợp và tạo output tạm trong workspace review. Không triển khai, merge, bật flag runtime hoặc ghi provider thật.
+
+Yêu cầu kiểm tra trọng tâm:
+1. Xác minh HEAD_SHA hiện còn đúng head branch: 13d18efb565ccf8d121f1914a919856aac974590.
+2. Kiểm tra việc khắc phục triệt để toàn bộ 4 findings P2 và 1 finding P3 từ Round 1:
+   - F1 (P2): Các nút Primary CTA (PersonalGmail, PersonalMyCalendar, PersonalMySheets, #btn-save-service-changes) đã chuyển sang `bg-[var(--planora-primary)] text-[var(--planora-on-primary)] hover:bg-[var(--planora-primary-hover)]`. Nút ngắt kết nối tại PersonalMySheets.tsx:311 đã dùng token chuẩn Planora. Tương phản WCAG AA đạt >= 4.5:1 ở cả Light và Dark mode.
+   - F2 (P2): Đã thay thế toàn bộ 29 vị trí dùng biến CSS không tồn tại `--planora-border` bằng `--planora-border-strong` (thành phần tương tác) và `--planora-divider` (thành phần cấu trúc). Chạy `git grep "planora-border"` xác nhận 0 kết quả tồn đọng.
+   - F3 (P2): Đã xóa sạch thương hiệu cũ "ATI" tại SettingsPage.tsx:801, PersonalMySheets.tsx:125, MySheetsCallbackView.tsx:293, Settings/meta.ts:5; thay emoji trần `👤`/`🏢` bằng SVG vector có `aria-hidden="true"`; cập nhật locator trong tests/browser/mysheets.spec.ts.
+   - F4 (P2): Đã loại bỏ khung lỗi đỏ cứng lồng nhau trong MyCalendarCallbackView và MySheetsCallbackView (dùng trực tiếp khung chuẩn của ConnectionCallbackFrame); đã khử trùng lặp nút quay về Cài đặt trong cùng một view callback.
+   - P3-1 (P3): Đã bổ sung guard `if (!busy) setConfirm(false)` trong PersonalMySheets.tsx:293.
+3. Chạy lại checks kỹ thuật bắt buộc:
+   - npm run typecheck:v3
+   - npm test -w @wap/chat-web -- planora-pl-08-connections
+   - npm test -w @wap/chat-web -- fe-07-settings gmail mycalendar mysheets planora-pl-08-connections workflow-flow-canvas
+   - npm test -w @wap/chat-web
+   - npm run build:v3
+   - node scripts/test-v3-web-build-security.mjs
+4. Thực hiện kiểm chứng mutation / regression test thực tế trong workspace review để đảm bảo test không phải mock ảo giác.
+5. Lưu báo cáo review chi tiết tại docs/handoff/log/2026-11-05-argon-review-pl-08-r2.md trong worktree review.
+
+Output báo cáo:
+- Reviewer: Antigravity / Gemini 4 Argon (High); model ID gemini-4-argon-high.
+- Task, Target Branch, Base/Head SHA đã kiểm.
+- Lệnh đã chạy, exit codes, kết quả tests.
+- Đánh giá Behavior & Technical: PASS / FAIL.
+- Đánh giá UX Gate 05/11 (Business-First): ĐẠT / CHƯA ĐẠT.
+- Trạng thái các findings R1: F1, F2, F3, F4, P3-1 đã đóng hay chưa.
+- Overall Verdict: Đạt / Đạt sau khi sửa nhỏ / Chưa đạt.

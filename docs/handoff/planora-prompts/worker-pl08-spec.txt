@@ -1,0 +1,45 @@
+Bạn là subagent Antigravity sử dụng Gemini 3.8 Flash High, phụ trách triển khai PL-08: Settings, Gmail, Calendar và Sheets.
+
+Đọc trước: AGENTS.md; docs/handoff/planora-prompts/COMMON.md; docs/handoff/PLANORA-MIGRATION-HANDOFF.md; spec và plan Planora ngày 02/11/2026; CURRENT-STATE/README và ba log mới nhất.
+Đặc biệt tuân thủ đặc tả Business-First UX:
+- docs/superpowers/specs/2026-11-05-planora-design-brief.md
+- docs/superpowers/specs/2026-11-05-planora-business-first-ux.md
+
+TASK CARD: docs/handoff/tasks/PL-08-planora-google-connections.md
+WORKTREE: C:/Users/Admin/orca/workspaces/ATI_Project/feat-planora-pl-08
+NHÁNH: longnguyen005/feat-planora-pl-08
+BASE_SHA: 81d139580d19641bfdf7b3eebe8b11c97a8ec9ec
+TARGET_BRANCH: codex/planora-ui
+
+PHẠM VI FILE CHO PHÉP:
+- apps/chat-web/src/pages/Settings/SettingsPage.tsx
+- apps/chat-web/src/pages/Settings/PersonalGmail.tsx
+- apps/chat-web/src/pages/Settings/PersonalMyCalendar.tsx
+- apps/chat-web/src/pages/Settings/PersonalMySheets.tsx
+- apps/chat-web/src/pages/Settings/page.css
+- apps/chat-web/src/pages/Settings/useSettings.ts (chỉ phần nối UI nếu cần)
+- apps/chat-web/src/views/GmailCallbackView.tsx
+- apps/chat-web/src/views/MyCalendarCallbackView.tsx
+- apps/chat-web/src/views/MySheetsCallbackView.tsx
+- Tạo mới: apps/chat-web/src/planora/layout/ConnectionCallbackFrame.tsx
+- Tests Settings và Google connection trong apps/chat-web/tests/
+
+THỰC HIỆN:
+1. Dựng Settings Planora: phân nhóm rõ ràng cá nhân/tổ chức, connection/identity/scope/quyền thật; đếm dịch vụ từ dữ liệu thực tế (không hardcode "8 dịch vụ").
+2. Thiết kế kết nối theo lợi ích công việc và mức sẵn sàng: chọn tài khoản/lịch/bảng dễ hiểu, giải thích quyền cần thiết, xác nhận đã sẵn sàng. Không dựng form theo schema/API hoặc đưa OAuth/scope/callback vào copy.
+3. Tạo ConnectionCallbackFrame chuẩn editorial Planora: chỉ trình bày, không tiêu thụ OAuth state; từng view (Gmail, MyCalendar, MySheets) giữ state machine/handler/returnTo riêng.
+4. Giữ nguyên anchors hiện hành (#gmail, #mycalendar, #mysheets) và Google Picker do Google sở hữu; không cố skin UI của Google.
+5. Bảo toàn tương phản WCAG AA >= 4.5:1 (nút primary dùng var(--planora-on-primary), không dùng text-white ở dark mode), 100% SVG icons có aria-hidden="true".
+
+KIỂM CHỨNG BẮT BUỘC TRƯỚC KHI BÀN GIAO:
+- npm run typecheck:v3
+- npm test -w @wap/chat-web -- tests/fe-07-service-connections.test.tsx (hoặc các test settings/google tương ứng)
+- npm test -w @wap/chat-web
+- npm run build:v3
+- node scripts/test-v3-web-build-security.mjs
+
+KẾT THÚC:
+- Điền phần Kết quả của task card docs/handoff/tasks/PL-08-planora-google-connections.md.
+- Tạo file log mới docs/handoff/log/2026-11-07-gemini-pl-08.md.
+- Commit toàn bộ thay đổi với conventional commit: feat(planora): implement PL-08 settings and Google service connections.
+- Gửi worker_done qua Orca orchestration.

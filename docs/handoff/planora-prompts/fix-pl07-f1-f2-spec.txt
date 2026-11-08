@@ -1,0 +1,65 @@
+NHIỆM VỤ: SỬA 2 FINDINGS P2 (F1 VÀ F2) TỪ INDEPENDENT REVIEW TRÊN PL-07 (HEAD 4405fd36)
+
+Bạn là worker Antigravity / Gemini 3.8 Flash High thi công PL-07 trên worktree:
+C:/Users/Admin/orca/workspaces/ATI_Project/feat-planora-pl-07
+Branch: longnguyen005/feat-planora-pl-07
+Current HEAD: 4405fd36bfda8e46623261c81aaa971301ec834c
+Card: docs/handoff/tasks/PL-07-planora-responses-recovery.md
+
+Chỉ sửa đúng 2 findings P2 dưới đây trong phạm vi PL-07, không tự nhận task mới.
+
+---
+
+### F1 — P2: Chọn gợi ý clarification không prefill draft của composer
+
+1. **Vị trí:**
+   - apps/chat-web/src/pages/Responses/ResponseMoment.tsx:435
+   - apps/chat-web/src/pages/Cockpit/ClarificationMoment.tsx:133
+   - apps/chat-web/src/planora/workspace/PlanoraChatWorkspace.tsx:326 và :249
+
+2. **Vấn đề đã tái hiện:**
+   - Khi người dùng bấm chọn radio option trong clarification (ví dụ reason: 'read_only' với options "Gửi Slack", "Ghi Google Sheets", hoặc destination clarification), textarea composer vẫn rỗng (`""`), không được prefill draft.
+   - Nguyên nhân: Các renderer chỉ gọi `onSelect(option)`. Workspace truyền `setSelected`, trong khi composer đọc state `draft` riêng; không có bước đồng bộ lựa chọn vào composer draft.
+
+3. **Yêu cầu sửa:**
+   - Nối thao tác chọn gợi ý clarification vào cả selection và draft của composer dock (đồng bộ vào draft/textarea của composer).
+   - Áp dụng cho cả clarification thông thường, read-only clarification và destination clarification.
+   - **Bảo toàn tính an toàn:** Tuyệt đối KHÔNG tự động POST/submit message khi chọn radio option; chỉ prefill draft vào textarea, việc gửi vẫn phải chờ người dùng bấm xác nhận trực tiếp ("Xác nhận và tiếp tục").
+   - Thêm unit/integration test trong `apps/chat-web/tests/planora-responses-recovery.test.tsx` (hoặc test tương ứng) khẳng định: khi click option -> textarea hiển thị đúng giá trị draft option -> chưa có message POST nào -> bấm xác nhận mới POST đúng 1 lần.
+
+---
+
+### F2 — P2: Ghép sai màu chữ/nền làm mất tương phản ở các trạng thái PL-07
+
+1. **Vị trí và tỷ lệ đo được từ DOM thực:**
+   - `apps/chat-web/src/pages/Cockpit/RecoveryMoment.tsx:117`:
+     Nút "Dừng hẳn quy trình" ở dark mode: chữ `#ffffff` trên nền `#fca5a5` (tương phản chỉ 1.898:1 < 4.5:1).
+   - `apps/chat-web/src/pages/Responses/ResponseMoment.tsx:436–437`:
+     Nhãn option destination và nhãn "Đã chọn" ở dark mode: `#ffffff` trên nền `#8fb68e` (tương phản chỉ 2.270:1 < 4.5:1) do thẻ con hardcode `text-white`.
+   - `apps/chat-web/src/pages/Errors/PlanningErrors.tsx:66`:
+     Banner offline ở light mode: `#ffffff` trên nền `#d97706` (tương phản chỉ 3.186:1 < 4.5:1).
+
+2. **Yêu cầu sửa:**
+   - Với nút dừng quy trình (RecoveryMoment): dùng cặp màu destructive (background và text) đạt tỷ lệ tương phản WCAG AA (≥ 4.5:1) ở cả light và dark mode.
+   - Với destination options (ResponseMoment): để nhãn và nhãn "Đã chọn" kế thừa `--planora-on-primary` hoặc class tương thích thay vì hardcode `text-white` trên nền xanh nhạt ở dark mode. Đảm bảo tỷ lệ tương phản ≥ 4.5:1 ở cả light và dark mode.
+   - Với OfflineBanner (PlanningErrors): dùng cặp màu cảnh báo / offline (background, text, border) Planora đạt chuẩn tương phản WCAG AA (≥ 4.5:1) ở light mode (ví dụ dùng text màu tối trên nền amber nhạt, hoặc nền tối với chữ trắng).
+   - Cập nhật test đo màu/tương phản hoặc xác nhận computed colors trong test suite.
+
+---
+
+### TIÊU CHUẨN KIỂM CHỨNG BẮT BUỘC:
+
+1. `npm run typecheck:v3` (exit 0)
+2. `npm test -w @wap/chat-web` (toàn bộ unit tests đạt, bao gồm các test mới cho prefill và contrast)
+3. `npm run build:v3` (exit 0)
+4. `node scripts/test-v3-web-build-security.mjs` (exit 0)
+
+---
+
+### BÀN GIAO:
+
+1. Cập nhật phần Kết quả trong `docs/handoff/tasks/PL-07-planora-responses-recovery.md`.
+2. Tạo file log mới: `docs/handoff/log/2026-11-05-gemini-pl-07-fixes.md`.
+3. Chỉ `git add` đúng các file liên quan đến PL-07, không add file ngoài phạm vi.
+4. Commit Conventional Commits: `fix(planora): resolve review findings F1-F2 for PL-07 responses and recovery`.
+5. Báo cáo hoàn thành với HEAD SHA mới.

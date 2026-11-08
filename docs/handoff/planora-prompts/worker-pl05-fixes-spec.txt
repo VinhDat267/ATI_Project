@@ -1,0 +1,46 @@
+Bạn là worker Antigravity/Gemini đã thi công PL-05. Chỉ sửa findings từ Codex trong phạm vi task này, không tự nhận task mới.
+
+TASK: PL-05 · Feed hội thoại và một composer (Chat Feed & One-Composer)
+PR hoặc LOCAL_ONLY: LOCAL_ONLY
+REVIEWED_HEAD_SHA: 88da9c06365468cecdfe9ff6a84c467ec3f480de
+CURRENT_HEAD_SHA: 88da9c06365468cecdfe9ff6a84c467ec3f480de
+CARD: docs/handoff/tasks/PL-05-planora-chat-feed.md
+WORKTREE: C:/Users/Admin/orca/workspaces/ATI_Project/feat-planora-pl-05
+LOG_REVIEW: docs/handoff/log/2026-11-04-codex-review-pl-05.md
+
+CODEX_FINDINGS:
+### F1 · P2 · Bấm “Sửa yêu cầu” sau planning error làm mất composer
+Vị trí: apps/chat-web/src/planora/workspace/PlanoraActiveTurn.tsx:137, :204; PlanoraChatWorkspace.tsx:200, :355.
+Workspace tính planningError với !responseEditing, nhưng ActiveTurn tự tính lại mà không có điều kiện này. Sau editRequest, parent bỏ dock composer, trong khi child tiếp tục render PlanningErrorMoment thay vì vùng nhập yêu cầu. Draft được điền nhưng không còn textarea để sửa hoặc gửi.
+Tái hiện: đưa store về moment 1, messages gồm một yêu cầu user và system message có metadata.type = 'planning_error'; bấm “Sửa yêu cầu”. Chromium thực đo textarea:visible từ 1 → 0, #view-server vẫn tồn tại.
+Yêu cầu sửa: dùng chung quyết định error/edit giữa parent và renderer; thêm regression cho hành trình error → edit → sửa nội dung → gửi. Không tự gửi khi bấm Edit.
+
+### F2 · P2 · Feed dài không cuộn riêng; chuyển moment kéo người đọc về đầu
+Vị trí: apps/chat-web/src/planora/workspace/PlanoraChatWorkspace.tsx:107, :290; PlanoraConversationFeed.tsx:43, :65.
+Feed được đặt trong các wrapper không giới hạn chiều cao đầy đủ. Với nội dung dài, feed nở theo nội dung, nên scrollTop mà auto-scroll theo dõi không phải vùng người dùng đang cuộn. Đồng thời effect đổi moment vẫn đặt document.scrollingElement.scrollTop = 0 vô điều kiện.
+Bằng chứng: 80 messages tạo feed cao 10177px và document cao 10370px. Gán scroll xuống đáy feed rồi append message vẫn có feed.scrollTop = 0; tin mới không được đưa vào viewport. Khi cuộn document đến 500px, chuyển planning → preview đưa vị trí về 0px.
+Yêu cầu sửa: xác lập một vùng cuộn thực cho feed (overflow-y: auto / max-height / flex containment phù hợp), theo dõi đúng vùng đó, giữ vị trí người đang đọc lịch sử khi đổi active card; kiểm cả near-bottom, streaming, thay đổi chiều cao card và thông báo nội dung mới. Bổ sung browser assertions dựa trên geometry thật.
+
+### F3 · P2 · Moment 4 có 0 composer; unit test hợp thức hóa sai tiêu chí
+Vị trí: apps/chat-web/src/planora/workspace/PlanoraChatWorkspace.tsx:355; PlanoraActiveTurn.tsx:285; apps/chat-web/tests/planora-chat.test.tsx:95.
+Dock loại trừ moment 4 và inline composer chỉ mount sau “Sửa qua Chat”. Vì vậy màn chờ duyệt (Plan preview) có 0 textarea, dù card yêu cầu đúng một composer ở tất cả active state và thiết kế đặt composer ở đáy vùng làm việc. Test mới mang tên “renders exactly one textbox during plan preview” nhưng assert toHaveLength(0).
+Yêu cầu sửa: giữ đúng một composer theo đúng One-Composer policy; thay assertion 0 bằng kiểm chứng tiêu chí thật (1 composer), kiểm cả chuyển drawer/edit để tránh nhân đôi ô nhập/nút gửi.
+
+### F4 · P2 · Browser spec PL-05 không chạy qua được selector workspace
+Vị trí: apps/chat-web/tests/browser/planora-chat.spec.ts:37, :56.
+Spec tìm .planora-chat-workspace và .planora-conversation-feed, trong khi component render .planora-chat-main và .planora-chat-feed. Chạy nguyên spec tại đúng head cho kết quả 10/10 FAIL, tất cả timeout 10000ms tại dòng 38 vì workspace không tồn tại.
+Yêu cầu sửa: dùng selector/accessible contract tồn tại trong DOM (.planora-chat-main, .planora-chat-feed hoặc testids/aria phù hợp), chạy lại trực tiếp node scripts/test-v3-browser.mjs planora-chat.spec.ts và bảo đảm PASS 10/10 ca.
+
+### F5 · P2 · Composer bị sidebar che ở breakpoint desktop 1024px
+Vị trí: apps/chat-web/src/pages/Cockpit/ChatComposer.tsx:194, tương tự response variant ở :69; PlanoraChatWorkspace.tsx:356.
+Composer vẫn dùng footer position: fixed; left: 0; right: 0, nên căn theo toàn viewport thay vì vùng chat bên phải sidebar. Ở desktop 1024px, textarea bắt đầu khoảng x=178–183px, sidebar chiếm x=0–248px và có z-index cao hơn. Khoảng 65–70px đầu textarea bị che; người dùng không đọc/click được phần đầu văn bản.
+Yêu cầu sửa: đặt composer trong vùng chat với kích thước/vị trí phù hợp shell (hoặc scoped footer với left margin / position thích hợp theo sidebar); kiểm giao nhau và hit testing với sidebar tại 1024/1440, cả bottom/response variant, ngoài kiểm horizontal overflow.
+
+Đọc AGENTS.md, COMMON.md, card, actual code/diff và findings.
+Với từng finding:
+- Tái hiện và sửa triệt để đúng nguyên nhân.
+- Chạy unit tests và browser tests thực tế.
+- Cập nhật docs/handoff/tasks/PL-05-planora-chat-feed.md và tạo log mới docs/handoff/log/2026-11-04-gemini-pl-05-review-fixes.md.
+- Commit đúng file. Không force-push hay tự merge.
+- Gửi worker_done qua Orca orchestration.
+- Trả packet kết quả chi tiết với STATUS: READY_FOR_CODEX_REVIEW.

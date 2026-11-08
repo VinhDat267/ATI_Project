@@ -1,0 +1,26 @@
+Bạn là chuyên gia thẩm định thiết kế UI/UX cao cấp, sử dụng mô hình Claude Opus (High).
+Nhiệm vụ của bạn là thực hiện độc lập một đợt đánh giá chuyên sâu (Design Review) cho bản thiết kế giao diện mới của hệ thống Planora.
+
+Tài liệu cần đọc và thẩm định:
+1. docs/superpowers/specs/2026-11-05-planora-design-brief.md (Bản Design Brief & Đặc tả 4 Mẫu trải nghiệm vừa lập).
+2. docs/superpowers/specs/2026-11-05-planora-business-first-ux.md (Quyết định chuẩn tắc UX Business-First 05/11).
+3. docs/handoff/tasks/PLANORA-UX-01-business-first-redesign.md (Bảng audit hiện trạng các module PL-01 đến PL-07).
+4. docs/handoff/log/2026-11-05-argon-review-pl-07-r2.md (Báo cáo review của Gemini 4 Argon High chỉ ra các điểm yếu UX-F1, UX-F2, UX-F3).
+
+Các góc độ thẩm định bắt buộc:
+1. Tính Thực chất Business-First (User Job & Value):
+   - Bản thiết kế đã thực sự giải quyết công việc của người dùng hay chỉ là lớp vỏ trang trí?
+   - Ngôn ngữ, thuật ngữ đã loại bỏ sạch rác kỹ thuật (raw JSON, tool names, plan_hash, UUID, enum trạng thái máy) chưa?
+2. Tính Khả thi & Bảo toàn Nghiệp vụ (Feasibility & Architecture Alignment):
+   - Bản thiết kế có bảo toàn được các ràng buộc kỹ thuật cốt lõi: auth, workspace isolation, cryptographic plan binding, SSE streaming, và an toàn khi phục hồi sự cố (unknown / recovery) không?
+   - Việc loại bỏ JSON dump và engine graph có ảnh hưởng đến khả năng kiểm soát của người dùng trước khi duyệt tác động không?
+3. Bố cục, Tương tác & Trải nghiệm Người dùng (Layout, Hierarchy, Interaction):
+   - Đánh giá tính mạch lạc của 4 mẫu đại diện: Landing/Auth (Mẫu 1), Điều hướng & Inbox đề xuất (Mẫu 2), Hội thoại 1 composer (Mẫu 3), Duyệt tác động & Phục hồi (Mẫu 4).
+   - Cơ chế giải quyết các vấn đề đã biết (thanh dock composer đè lên nút hành động, lặp bong bóng tin nhắn, thiếu route /inbox).
+4. Đóng góp & Khuyến nghị Cải tiến (Specific Recommendations):
+   - Những điểm xuất sắc cần phát huy.
+   - Những rủi ro tiềm ẩn hoặc điểm cần tinh chỉnh thêm trước khi cho worker triển khai mã nguồn.
+   - Kết luận tổng thể: Phê duyệt (Approved) / Phê duyệt kèm điều chỉnh nhỏ (Approved with Minor Revisions) / Cần sửa đổi lớn (Needs Major Changes).
+
+Lưu báo cáo thẩm định chi tiết tại: docs/handoff/log/2026-11-05-claude-opus-design-review.md
+Gửi kết quả hoàn thành qua tín hiệu worker_done.

@@ -1,0 +1,38 @@
+Bạn là worker Antigravity/Gemini đã thi công PL-05. Chỉ sửa findings R1–R2 từ Codex re-review vòng 2 trong phạm vi task này, không tự nhận task mới.
+
+TASK: PL-05 · Feed hội thoại và một composer (Sửa findings R1–R2 vòng 2)
+PR hoặc LOCAL_ONLY: LOCAL_ONLY
+REVIEWED_HEAD_SHA: 52865cd651d4e728c7622ff5d8f943367f67e250
+CURRENT_HEAD_SHA: 52865cd651d4e728c7622ff5d8f943367f67e250
+CARD: docs/handoff/tasks/PL-05-planora-chat-feed.md
+WORKTREE: C:/Users/Admin/orca/workspaces/ATI_Project/feat-planora-pl-05
+LOG_REVIEW: docs/handoff/log/2026-11-04-codex-review-pl-05-r2.md
+
+CODEX_FINDINGS:
+### R1 · P2 · F2 chưa đóng: feed vẫn nở theo lịch sử, auto-scroll theo dõi sai vùng
+Vị trí: apps/chat-web/src/planora/workspace/PlanoraChatWorkspace.tsx:262, :297; apps/chat-web/src/planora/workspace/PlanoraConversationFeed.tsx:43, :55, :66.
+Nguyên nhân: h-full/max-h-full trên workspace cùng min-h-0/overflow-hidden ở stage chưa tạo được giới hạn chiều cao thực. Trong app thật, chuỗi cha .planora-screen-layout → .planora-main-work → .planora-content-body tiếp tục nở theo nội dung. Feed có overflow-y:auto nhưng scrollHeight === clientHeight (ví dụ 80 messages: clientHeight = scrollHeight = 10177px), nên feed.scrollTop luôn bằng 0. Khi có tin nhắn mới append, feed không tự cuộn xuống đáy được (gap = 190–437px).
+Yêu cầu sửa:
+- Thiết lập chiều cao hữu hạn (bounded height) xuyên suốt chuỗi cha trong layout/shell: bảo đảm .planora-screen-layout, .planora-main-work, .planora-content-body và .planora-chat-workspace có h-full/min-h-0/overflow-hidden phù hợp để PlanoraConversationFeed có scrollHeight > clientHeight thực tế.
+- Xử lý khoảng trống footer trong vùng đó.
+- Cập nhật test planora-chat.test.tsx hoặc browser spec để kiểm chứng scrollHeight > clientHeight thực, scroll tới đáy, follow bottom khi có tin mới; không bọc trong điều kiện lỏng lẻo làm test giả pass.
+
+### R2 · P2 · Browser regression còn dùng contract cũ, chặn gate của task
+Vị trí: apps/chat-web/tests/browser/fe-05-cockpit.spec.ts:14; apps/chat-web/tests/browser/fe-02-routing-history.spec.ts:106.
+Nguyên nhân:
+- 4 ca FE-05 ở 1440/375, light/dark vẫn assert preview có textarea:visible bằng 0, trong khi F3 đã sửa đúng theo One-Composer policy thành 1 composer. Test cũ dừng ở đây nên các bước sau không chạy.
+- 1 ca FE-02 scroll dùng page.getByText(/Saved message 24:/) sau khi mở drawer. Cả feed mới và drawer đều render tin này, khiến strict-mode locator nhận 2 phần tử và fail.
+(Lưu ý: Lỗi thứ sáu tại fe-02-routing-history.spec.ts:60 là lỗi baseline có sẵn trên base b9230b8b, coordinator sẽ giao xử lý ở task shell/history riêng).
+Yêu cầu sửa:
+- Cập nhật assertion bố cục có chủ đích của fe-05-cockpit.spec.ts từ 0 sang đúng policy 1 (như đã làm ở unit test), giữ nguyên các assertions nghiệp vụ/focus/approval.
+- Scope locator trong fe-02-routing-history.spec.ts:106 vào drawer/dialog đích: ví dụ page.locator('.planora-conversation-drawer').getByText(/Saved message 24:/) thay vì query toàn trang.
+- Chạy lại các browser specs này và bảo đảm PASS.
+
+Đọc AGENTS.md, COMMON.md, card, actual code/diff và log review vòng 2.
+Với từng finding:
+- Tái hiện và sửa triệt để đúng nguyên nhân.
+- Chạy unit tests và browser tests thực tế.
+- Cập nhật docs/handoff/tasks/PL-05-planora-chat-feed.md và tạo log mới docs/handoff/log/2026-11-04-gemini-pl-05-review-r2-fixes.md.
+- Commit đúng file. Không force-push hay tự merge.
+- Gửi worker_done qua Orca orchestration cho task task_252608d5ea69.
+- Trả packet kết quả chi tiết với STATUS: READY_FOR_CODEX_REVIEW.

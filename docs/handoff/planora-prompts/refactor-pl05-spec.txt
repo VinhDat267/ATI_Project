@@ -1,0 +1,69 @@
+NHIỆM VỤ: REFACTOR PL-05 THEO DESIGN BRIEF V2.0 & BUSINESS-FIRST UX (05/11/2026)
+
+Bạn là worker Antigravity / Gemini 3.8 Flash High thi công PL-05 trên worktree:
+C:/Users/Admin/orca/workspaces/ATI_Project/feat-planora-pl-05
+Branch: longnguyen005/feat-planora-pl-05
+Current HEAD: e97d71862cee773be9e37f9ef9e456ea36975932
+Card: docs/handoff/tasks/PL-05-planora-chat-feed.md
+UX Task: docs/handoff/tasks/PLANORA-UX-01-business-first-redesign.md
+
+Đọc các tài liệu chuẩn tắc trước khi làm:
+- docs/superpowers/specs/2026-11-05-planora-design-brief.md (v2.0, MẪU 3: Bàn làm việc hội thoại & làm rõ thông tin)
+- docs/superpowers/specs/2026-11-05-planora-business-first-ux.md
+- docs/handoff/log/2026-11-05-argon-review-pl-07-r3.md (Mục 4.2: Ghi chú các phần thuộc PL-05)
+- docs/handoff/planora-prompts/COMMON.md
+
+---
+
+### MỤC TIÊU & CÁC CÔNG VIỆC CẦN THỰC HIỆN
+
+Toàn bộ các module PL-01 đến PL-07 vừa được audit theo PLANORA-UX-01: PL-05 dù từng PASS kỹ thuật nhưng vẫn bọc các component Cockpit cũ (ChatComposer nút cam, nhãn "ATI", footer cũ), có nguy cơ đè nút và trùng lặp bong bóng tin nhắn. Bạn có nhiệm vụ refactor PL-05 để đạt 100% chuẩn Business-First UX theo Design Brief v2.0:
+
+#### 1. Sửa `apps/chat-web/src/planora/workspace/PlanoraChatWorkspace.tsx` & `PlanoraActiveTurn.tsx`:
+- **Chính sách Duy nhất Một Composer (One-Composer Policy — Chuẩn D3):**
+  - Đảm bảo thanh Composer ở chân trang là **nơi kích hoạt hành động duy nhất**.
+  - Khi có lựa chọn làm rõ thông tin (Clarification option) được chọn, nút gửi của Composer dock tự động đổi nhãn thành *"Xác nhận và tiếp tục →"* với màu xanh rừng Planora (`#3c5741`).
+  - Triệt tiêu hoàn toàn nút gửi thứ hai trên thân thẻ Clarification / Thẻ lựa chọn.
+  - Đồng bộ hai chiều: Khi người dùng gõ nội dung mới hoàn toàn khác hoặc xóa ô nhập, lựa chọn radio tự động bỏ chọn (`selected = null`) để tránh gửi nhầm.
+- **Khử trùng lặp nội dung feed tuyệt đối (Zero-Duplicate Rule):**
+  - Mỗi tin nhắn chỉ xuất hiện đúng 1 lần trong feed.
+  - Khi có thẻ tương tác ở cuối feed (như Clarification hay Plan), không lặp lại câu hỏi hay câu yêu cầu của người dùng bên trong thân thẻ.
+- **Layout chống đè nút tương tác (Anti-Overlap Layout — Chuẩn D3):**
+  - Thiết lập vùng feed cuộn có `scroll-padding-bottom: calc(var(--composer-dock-height, 120px) + 24px)`.
+  - Tự động theo dõi chiều cao Composer dock bằng `ResizeObserver`, đảm bảo khi ô nhập mở rộng hoặc có thông báo offline, khoảng đệm tăng tương ứng. Nút hành động cách thanh Composer dock tối thiểu 24px (desktop) và 20px (mobile).
+
+#### 2. Sửa `apps/chat-web/src/pages/Cockpit/ChatComposer.tsx` & `CockpitHeader.tsx`:
+- **Loại bỏ hoàn toàn màu cam cũ (`#FF5701`, `bg-brand-primary`):**
+  - Chuyển nút Gửi sang màu xanh rừng Planora (`--planora-primary: #3c5741`, chữ `--planora-on-primary: #ffffff` ở light mode / than tối `#171c18` ở dark mode).
+- **Loại bỏ chữ "ATI" và cập nhật thông điệp an toàn ở chân trang:**
+  - Thay câu *"ATI chỉ đọc và ghi..."* bằng thông điệp nghiệp vụ Planora:
+    *"Planora luôn yêu cầu bạn duyệt trước khi ghi hoặc gửi dữ liệu ra bên ngoài."*
+  - Đổi thương hiệu từ "ATI" sang "Planora" trên toàn bộ giao diện composer và header.
+
+#### 3. Sửa `apps/chat-web/src/planora/workspace/PlanoraConversationFeed.tsx`:
+- Đổi nhãn người gửi trên tin nhắn của trợ lý từ `"ATI"` sang `"Planora"`.
+- Đổi avatar từ `"A"` sang `"P"` (Planora Monogram).
+- Đảm bảo typography và màu sắc tuân thủ bảng màu Planora (giấy kem `#f8f4eb`, text Than `#171c18`, viền `#e3ded1`).
+
+#### 4. Cập nhật và bổ sung Tests trong `apps/chat-web/tests/planora-chat.test.tsx`:
+- Viết test khẳng định chỉ có duy nhất 1 nút submit/send trong toàn bộ workspace.
+- Viết test khẳng định nút gửi đổi nhãn thành *"Xác nhận và tiếp tục →"* khi có lựa chọn clarification.
+- Viết test khẳng định không còn bất kỳ nút màu cam `#FF5701` hay chuỗi `"ATI"` nào trên feed/composer.
+- Viết test khẳng định feed có `scroll-padding-bottom` tự động chống che khuất nút hành động.
+
+---
+
+### TIÊU CHUẨN KIỂM TRA BẮT BUỘC
+Chạy và kiểm tra exit code 0 của toàn bộ các lệnh sau:
+1. `npm run typecheck:v3`
+2. `npm test -w @wap/chat-web`
+3. `npm run build:v3`
+4. `npm run security`
+
+### BÀN GIAO VÀ COMMIT
+1. Commit với Conventional Commits:
+   `git add apps/chat-web/ docs/handoff/`
+   `git commit -m "refactor(planora): redesign PL-05 chat workspace and one-composer for business-first UX"`
+2. Cập nhật phần Kết quả trong `docs/handoff/tasks/PL-05-planora-chat-feed.md`.
+3. Tạo log mới: `docs/handoff/log/2026-11-05-gemini-pl-05-business-first-refactor.md`.
+4. Trả packet bàn giao đầy đủ theo mẫu quy định tại `docs/handoff/planora-prompts/COMMON.md`.

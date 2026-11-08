@@ -1,0 +1,63 @@
+NHIỆM VỤ: REFACTOR PL-02 THEO DESIGN BRIEF V2.0 & BUSINESS-FIRST UX (05/11/2026)
+
+Bạn là worker Antigravity / Gemini 3.8 Flash High thi công PL-02 trên worktree:
+C:/Users/Admin/orca/workspaces/ATI_Project/feat-planora-pl-02
+Branch: longnguyen005/feat-planora-pl-02
+Current HEAD: 965150a9
+Card: docs/handoff/tasks/PL-02-planora-shell-workspaces.md
+UX Task: docs/handoff/tasks/PLANORA-UX-01-business-first-redesign.md
+
+Đọc các tài liệu chuẩn tắc trước khi làm:
+- docs/superpowers/specs/2026-11-05-planora-design-brief.md (v2.0, MẪU 2: Điều hướng không gian & Hộp thư đề xuất chờ xử lý)
+- docs/superpowers/specs/2026-11-05-planora-business-first-ux.md
+- docs/handoff/planora-prompts/COMMON.md
+
+---
+
+### MỤC TIÊU & CÁC CÔNG VIỆC CẦN THỰC HIỆN
+
+Toàn bộ các module PL-01 đến PL-07 vừa được audit theo PLANORA-UX-01: PL-02 thiếu entry `/inbox` và badge số lượng đề xuất chờ duyệt (theo baseline main sync 04/11), cấu trúc sidebar còn chia theo tabs cockpit cũ và chưa đạt chuẩn editorial Planora. Bạn có nhiệm vụ refactor PL-02 để đạt 100% chuẩn Business-First UX theo Design Brief v2.0:
+
+#### 1. Sửa `apps/chat-web/src/planora/layout/PlanoraSidebar.tsx`:
+- **Thiết kế lại Sidebar Planora (248px desktop / Drawer mobile):**
+  - **Phần 1: Nhận diện & Bộ chọn không gian (Workspace Switcher):**
+    - Logo Monogram Planora (chữ "P" thanh lịch) + dropdown chọn không gian: Cá nhân / Tổ chức / Tạo hoặc tham gia nhóm mới.
+    - Cơ chế chuyển đổi an toàn: Khi đổi không gian, hủy an toàn các request đang chờ, tải mới danh sách hội thoại và inbox, tuyệt đối không để lộ dữ liệu nhóm cũ sang nhóm mới.
+  - **Phần 2: Điều hướng công việc (Work Navigation):**
+    - ✦ *"Cuộc trò chuyện mới"* (nút nổi bật trên nền giấy kem).
+    - 📥 **Hộp thư đề xuất (`/inbox`) kèm badge số lượng thực tế: `[3]`** (Màu xanh rừng Planora `#3c5741`, chỉ đếm các đề xuất thực sự cần người dùng duyệt hoặc trả lời: `action_needed` hoặc `awaiting_approval`).
+    - 💬 *"Hội thoại gần đây"* (danh sách cuộn, gom nhóm "Hôm nay", "Tuần này", tìm kiếm theo tiêu đề).
+    - 📋 *"Nhật ký & Lịch chạy"* (`/history`).
+  - **Phần 3: Dịch vụ & Tài khoản (Chân sidebar):**
+    - ⚡ *"Kết nối dịch vụ"* (`/settings`): Hiển thị icon vector SVG tự host (Jira, Slack, Google Sheets, Calendar, Trello, GitHub, Notion, Telegram) kèm chỉ báo trạng thái thực tế từ API.
+    - 👤 *"Hồ sơ & Đăng xuất"*: Tên người dùng + Avatar ký tự tắt + chuyển đổi giao diện Sáng/Tối (`ati-theme`).
+  - **Biểu tượng (Iconography):**
+    - Tuyệt đối sử dụng icon SVG vector chính thức có `aria-hidden="true"`, CẤM dùng emoji trực tiếp trong markup navigation.
+
+#### 2. Sửa `apps/chat-web/src/planora/layout/PlanoraShell.tsx` & `shell.css`:
+- Bố cục responsive 1440/1024/768/375, overflow 320 an toàn.
+- Drawer mobile (< 1024px) mở bằng nút hamburger, hỗ trợ phím Escape để đóng, backdrop mờ nhẹ và focus trap an toàn.
+- Bảng màu Planora chuẩn: giấy kem `#f8f4eb`, viền `#e3ded1`, text than `#171c18`, xanh rừng `#3c5741`.
+
+#### 3. Cập nhật và bổ sung Tests trong `apps/chat-web/tests/planora-shell.test.tsx`:
+- Viết test khẳng định có menu item `/inbox` với badge số lượng đề xuất chờ xử lý.
+- Viết test khẳng định chuyển đổi workspace dọn dẹp sạch sẽ state và không rò rỉ dữ liệu.
+- Viết test khẳng định toàn bộ icons điều hướng là SVG với `aria-hidden="true"`, không có emoji trần.
+- Viết test kiểm tra drawer mobile (phím Escape, backdrop click, focus trap).
+
+---
+
+### TIÊU CHUẨN KIỂM TRA BẮT BUỘC
+Chạy và kiểm tra exit code 0 của toàn bộ các lệnh sau:
+1. `npm run typecheck:v3`
+2. `npm test -w @wap/chat-web`
+3. `npm run build:v3`
+4. `npm run security`
+
+### BÀN GIAO VÀ COMMIT
+1. Commit với Conventional Commits:
+   `git add apps/chat-web/ docs/handoff/`
+   `git commit -m "refactor(planora): redesign PL-02 sidebar navigation and inbox entry for business-first UX"`
+2. Cập nhật phần Kết quả trong `docs/handoff/tasks/PL-02-planora-shell-workspaces.md`.
+3. Tạo log mới: `docs/handoff/log/2026-11-05-gemini-pl-02-business-first-refactor.md`.
+4. Trả packet bàn giao đầy đủ theo mẫu quy định tại `docs/handoff/planora-prompts/COMMON.md`.

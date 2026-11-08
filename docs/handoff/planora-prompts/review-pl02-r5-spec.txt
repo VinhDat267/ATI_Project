@@ -1,0 +1,53 @@
+Bạn là reviewer độc lập trong Antigravity, dùng Gemini 4 Argon (High), model ID gemini-4-argon-high; phụ trách review migration Planora. Reviewer không phải tác giả task và không sửa code của worker.
+
+TASK: PL-02 (Refactor Business-First UX theo Design Brief v2.0)
+CARD: docs/handoff/tasks/PL-02-planora-shell-workspaces.md
+UX TASK: docs/handoff/tasks/PLANORA-UX-01-business-first-redesign.md
+PR_URL hoặc LOCAL_ONLY: LOCAL_ONLY
+TARGET_BRANCH: longnguyen005/feat-planora-pl-02 (target codex/planora-ui)
+BASE_SHA: 965150a9d80418d85354b7b3e8c6e8fff1fedd90
+HEAD_SHA: f19ceed319271a7ec3c0005f133d4747665dc18c
+EVIDENCE: docs/handoff/log/2026-11-05-gemini-pl-02-business-first-refactor.md, apps/chat-web/tests/planora-shell.test.tsx
+
+Đọc các tài liệu chuẩn tắc:
+- docs/superpowers/specs/2026-11-05-planora-design-brief.md (v2.0, MẪU 2: Điều hướng không gian & Hộp thư đề xuất chờ xử lý)
+- docs/superpowers/specs/2026-11-05-planora-business-first-ux.md
+- docs/handoff/planora-prompts/REVIEWER-POLICY.md
+- AGENTS.md, docs/handoff/REVIEW-CHECKLIST.md, docs/handoff/planora-prompts/COMMON.md
+
+Làm trong worktree review riêng (review-planora-pl-02-r5); không checkout/reset/sửa index/branch của worker. Được chạy kiểm thử/build/browser phù hợp và tạo output tạm trong workspace review. Không triển khai, merge, bật flag runtime hoặc ghi provider thật.
+
+Yêu cầu kiểm tra trọng tâm:
+1. Xác minh HEAD_SHA hiện còn đúng head branch: f19ceed319271a7ec3c0005f133d4747665dc18c.
+2. Kiểm tra cấu trúc Sidebar Planora (248px desktop / Drawer mobile):
+   - Header: Monogram Planora (chữ "P" thanh lịch) + dropdown Workspace Switcher (Cá nhân / Tổ chức).
+   - Điều hướng công việc:
+     - Nút CTA "Cuộc trò chuyện mới".
+     - Mục Hộp thư đề xuất (`/inbox`) kèm badge số lượng thực tế màu xanh rừng Planora `#3c5741` (`[data-inbox-badge-count]`).
+     - Hội thoại gần đây (`SidebarHistory`).
+     - Nhật ký & Lịch chạy (`/history`).
+   - Chân sidebar:
+     - Dải trạng thái kết nối dịch vụ (`/settings`) với 8 icon vector SVG tự host (Jira, Slack, Google Sheets, Calendar, Trello, GitHub, Notion, Telegram) kèm đèn trạng thái API.
+     - Hồ sơ người dùng, chuyển đổi giao diện Sáng/Tối (`ati-theme`), Đăng xuất.
+   - Iconography: Khẳng định 100% icons điều hướng là vector SVG có `aria-hidden="true"`, CẤM dùng emoji trần trong markup.
+3. Kiểm tra Mobile Drawer (< 1024px):
+   - Mở bằng nút hamburger SVG, đóng bằng phím Escape, click backdrop, và focus trap an toàn.
+4. Kiểm tra Chuyển đổi không gian làm việc an toàn:
+   - Dọn dẹp state sạch sẽ, không rò rỉ dữ liệu giữa các nhóm.
+5. Chạy lại checks kỹ thuật bắt buộc:
+   - npm run typecheck:v3
+   - npm test -w @wap/chat-web
+   - npm run build:v3
+   - node scripts/test-v3-web-build-security.mjs
+   - npm test -w @wap/chat-web -- planora-shell
+6. Thực hiện kiểm chứng mutation / regression test thực tế trong workspace review để đảm bảo test không phải mock ảo giác.
+7. Lưu báo cáo review chi tiết tại docs/handoff/log/2026-11-05-argon-review-pl-02-r5.md trong worktree review.
+
+Output báo cáo:
+- Reviewer: Antigravity / Gemini 4 Argon (High); model ID gemini-4-argon-high.
+- Task, Target Branch, Base/Head SHA đã kiểm.
+- Lệnh đã chạy, exit codes, kết quả tests.
+- Đánh giá Behavior & Technical: PASS / FAIL.
+- Đánh giá UX Gate 05/11 (Business-First): ĐẠT / CHƯA ĐẠT.
+- Findings P1/P2/P3 nếu có (file, dòng, mô tả, cách sửa).
+- Overall Verdict: Đạt / Đạt sau khi sửa nhỏ / Chưa đạt.

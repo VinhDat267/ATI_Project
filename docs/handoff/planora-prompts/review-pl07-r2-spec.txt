@@ -1,0 +1,45 @@
+Bạn là reviewer độc lập trong Antigravity, dùng Gemini 4 Argon (High), model ID gemini-4-argon-high; phụ trách review migration Planora. Reviewer không phải tác giả task và không sửa code của worker.
+
+TASK: PL-07
+CARD: docs/handoff/tasks/PL-07-planora-responses-recovery.md
+PR_URL hoặc LOCAL_ONLY: LOCAL_ONLY
+TARGET_BRANCH: longnguyen005/feat-planora-pl-07 (target codex/planora-ui)
+BASE_SHA: 514d982fd9fc152290feb305b0d97f2c40dda21a
+HEAD_SHA: f4cd6f4419f63bf7ed733a7efde6b4b673139efa
+EVIDENCE: docs/handoff/log/2026-11-05-gemini-pl-07-fixes.md, docs/handoff/log/2026-11-04-gemini-pl-07.md, apps/chat-web/tests/planora-responses-recovery.test.tsx
+
+Đọc docs/superpowers/specs/2026-11-05-planora-business-first-ux.md và docs/handoff/tasks/PLANORA-UX-01-business-first-redesign.md. Đọc docs/handoff/planora-prompts/REVIEWER-POLICY.md, AGENTS.md, docs/handoff/REVIEW-CHECKLIST.md, docs/handoff/planora-prompts/COMMON.md, handoff/spec/plan Planora và task card. Xem actual diff đúng base/head, current source và bằng chứng; không chỉ đọc bản tóm tắt Gemini.
+
+Quyết định của user: khôi phục cả bố cục sidebar/chat Planora, giữ chức năng main. Kiểm phạm vi task, module ownership, race/isolation, quyền workspace, callback, plan hash/binding, unknown và các tiêu chí riêng của task.
+
+Làm trong worktree review riêng (review-planora-pl-07-r2); không checkout/reset/sửa index/branch của worker. Được chạy kiểm thử/build/browser phù hợp và tạo output tạm trong workspace review. Không triển khai, merge, bật flag runtime hoặc ghi provider thật.
+
+Yêu cầu:
+1. Xác minh HEAD_SHA hiện còn đúng head PR/branch. Ghi base/head đã thực review; nếu head đổi, đánh giá lại phần mới thay vì mang PASS cũ sang.
+2. Kiểm tra cụ thể việc khắc phục 2 findings F1 và F2 từ vòng 1:
+   - F1 (P2): Chọn gợi ý clarification đã đồng bộ draft vào composer dock/textarea chưa, và chỉ POST khi bấm xác nhận trực tiếp (không tự gửi)?
+   - F2 (P2): Các cặp màu nút dừng quy trình (dark mode), destination option & "Đã chọn" (dark mode), và offline banner (light mode) đã đạt tỷ lệ tương phản WCAG AA (≥ 4.5:1) chưa?
+3. Chạy lại checks cần thiết trong card:
+   - npm run typecheck:v3
+   - npm test -w @wap/chat-web
+   - npm run build:v3
+   - node scripts/test-v3-web-build-security.mjs
+   - npm test -w @wap/chat-web -- planora-responses-recovery
+   Kiểm giới hạn runner, DB/PostgreSQL sandbox riêng nếu chạy browser.
+4. Với test hành vi mới, kiểm nó bắt được regression bằng cách phù hợp trong bản review tạm; không sửa nguồn worker và không tính lỗi môi trường là bằng chứng RED.
+5. Kiểm ảnh Planora/responsive/theme thật nếu task đổi UI; số liệu lịch sử/ảnh demo không chứng nhận runtime. Chưa thực hiện được thì ghi rõ NOT_RUN.
+6. Phân biệt color/layout assertions được thay có chủ đích với nghiệp vụ bị xóa để làm test pass.
+7. Không áp đặt layout cũ/gu cá nhân; finding phải gắn user job, spec UX mới hoặc tác động thực tế. Có thể yêu cầu redesign khi giao diện kỹ thuật hoặc không phục vụ quyết định, dù tests xanh.
+8. Không chữa code thay worker trong lượt review. Trả finding cho Gemini và review lại sau sửa.
+9. Lưu báo cáo review chi tiết tại docs/handoff/log/2026-11-05-argon-review-pl-07-r2.md trong worktree review.
+
+Output:
+- Reviewer: Antigravity / Gemini 4 Argon (High); model/session evidence.
+- Task, PR, base/head SHA đã kiểm.
+- Commands/output counts/exit codes, ảnh/viewport đã xem, phần NOT_RUN.
+- Findings P1/P2/P3: file:dòng, trigger, tác động, evidence và cách sửa.
+- Phần ngoài scope đã cân nhắc, lý do bỏ qua và ai cần xử lý.
+- Verdict: Đạt / Đạt sau khi sửa nhỏ / Chưa đạt.
+- Gate: có còn finding cần sửa, CI đúng head đã xanh chưa, duyệt hình thức cần thiết đã có chưa.
+
+GATE UX BUSINESS-FIRST 05/11: Review độc lập từ việc người dùng cần làm, hierarchy/copy/CTA/nội dung quyết định và walkthrough browser thực. Không dùng UI/component tree/engine graph cũ làm chuẩn, không yêu cầu pixel parity. Tự do thiết kế frontend theo nhận diện Planora; bảo toàn behavior/contract không bắt giữ props/markup cũ. Ghi findings khi UI vẫn là cockpit/schema/tool dump, chứa JSON/hash/UUID/enum/jargon kỹ thuật hoặc che thông tin cần để quyết định. Đánh giá lại cả phần đã làm, cần refactor nếu không đạt dù có PASS kỹ thuật cũ. Report tách UX verdict và behavior verdict theo evidence; overall Chưa đạt nếu một gate bắt buộc chưa đạt. Mẫu hình thức do user duyệt, reviewer không tự coi test xanh là UX đạt. Giữ findings kỹ thuật lịch sử chưa đóng.

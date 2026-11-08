@@ -1,0 +1,49 @@
+Bạn là reviewer độc lập trong Antigravity, dùng Gemini 4 Argon (High), model ID gemini-4-argon-high; phụ trách review migration Planora. Reviewer không phải tác giả task và không sửa code của worker.
+
+TASK: PL-10 (Review Jira Workspace, Site/Project và Permissions theo Design Brief v2.0 & Business-First UX)
+CARD: docs/handoff/tasks/PL-10-planora-jira-ui.md
+PR_URL hoặc LOCAL_ONLY: LOCAL_ONLY
+TARGET_BRANCH: longnguyen005/feat-planora-pl-10 (target codex/planora-ui)
+BASE_SHA: 5b5df90e3413384ec71fb2afbf4bd0c6964c458c
+HEAD_SHA: b58c9eb2b7ef344a010d2704d2164001d74ef6e5
+EVIDENCE: docs/handoff/log/2026-11-07-gemini-pl-10.md, apps/chat-web/tests/planora-pl-10-jira.test.tsx
+
+Đọc các tài liệu chuẩn tắc:
+- docs/superpowers/specs/2026-11-05-planora-design-brief.md
+- docs/superpowers/specs/2026-11-05-planora-business-first-ux.md
+- docs/handoff/planora-prompts/REVIEWER-POLICY.md
+- AGENTS.md, docs/handoff/REVIEW-CHECKLIST.md, docs/handoff/planora-prompts/COMMON.md
+
+Làm trong worktree review riêng (review-planora-pl-10); không checkout/reset/sửa index/branch của worker. Được chạy kiểm thử/build/browser phù hợp và tạo output tạm trong workspace review. Không triển khai, merge, bật flag runtime hoặc ghi provider thật.
+
+Yêu cầu kiểm tra trọng tâm:
+1. Xác minh HEAD_SHA hiện còn đúng head branch: b58c9eb2b7ef344a010d2704d2164001d74ef6e5.
+2. Kiểm tra chuẩn Design Brief v2.0 & Business-First UX cho Jira:
+   - Thẻ kết nối JiraConnection và các panels (account identity, workspace list/create/join, site/project, pending/admin approval) dùng chuẩn CSS tokens Planora:
+     - Nút Primary dùng `bg-[var(--planora-primary)] text-[var(--planora-on-primary)] hover:bg-[var(--planora-primary-hover)]`, đạt tương phản WCAG AA >= 4.5:1 (7.80:1 Light / 7.91:1 Dark).
+     - Viền dùng `--planora-border-strong` và `--planora-divider`, tuyệt đối không dùng `--planora-border`.
+     - 100% SVG vector icons có `aria-hidden="true"`.
+     - Xóa sạch thương hiệu cũ "ATI" trong copy hiển thị và modal ngắt kết nối.
+   - Bảo toàn phân quyền & nghiệp vụ:
+     - Jira workspace role độc lập: quyền admin trong Jira workspace không suy từ global user role, và global admin không tự động có quyền admin Jira workspace.
+     - Race guards khi đổi workspace/site/user.
+   - Tái sử dụng ConnectionCallbackFrame:
+     - Tích hợp cho JiraCallbackView.
+     - Presentation-only, không mutate state, không lồng 2 khung lỗi, không duplicate nút quay về Cài đặt.
+3. Chạy lại checks kỹ thuật bắt buộc:
+   - npm run typecheck:v3
+   - npm test -w @wap/chat-web -- jira planora-pl-10-jira
+   - npm test -w @wap/chat-web
+   - npm run build:v3
+   - node scripts/test-v3-web-build-security.mjs
+4. Thực hiện kiểm chứng mutation / regression test thực tế trong workspace review để đảm bảo test không phải mock ảo giác.
+5. Lưu báo cáo review chi tiết tại docs/handoff/log/2026-11-05-argon-review-pl-10.md trong worktree review.
+
+Output báo cáo:
+- Reviewer: Antigravity / Gemini 4 Argon (High); model ID gemini-4-argon-high.
+- Task, Target Branch, Base/Head SHA đã kiểm.
+- Lệnh đã chạy, exit codes, kết quả tests.
+- Đánh giá Behavior & Technical: PASS / FAIL.
+- Đánh giá UX Gate 05/11 (Business-First): ĐẠT / CHƯA ĐẠT.
+- Findings P1/P2/P3 nếu có (file, dòng, mô tả, cách sửa).
+- Overall Verdict: Đạt / Đạt sau khi sửa nhỏ / Chưa đạt.
