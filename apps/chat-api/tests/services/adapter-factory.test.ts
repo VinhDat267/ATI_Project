@@ -104,4 +104,82 @@ describe('registered adapter factory', () => {
       allowedScope: { spreadsheets: [] },
     }));
   });
+
+  it('attaches enumerable _sourceRef and _sourceRefs to each issue in myjira.search_issues output and forwards policyVersion from capabilities', async () => {
+    const project = { id: '10001', key: 'ATIT', name: 'ATI Test' };
+    Object.defineProperty(project, 'policyVersion', { value: 4, enumerable: false, configurable: true });
+    const site = {
+      siteId: 'site-1',
+      cloudId: 'cloud-1',
+      name: 'ati-workflow-test',
+      url: 'https://ati-workflow-test.atlassian.net',
+      projects: [project],
+    };
+    Object.defineProperty(site, 'policyVersion', { value: 3, enumerable: false, configurable: true });
+
+    const executeGuardedDispatch = vi.fn().mockImplementation(async (_scope, _opts, fn) => {
+      const out = await fn('tok-1', new AbortController().signal);
+      Object.defineProperty(out, '_leaseBinding', {
+        value: {
+          jiraAccountId: 'acc-1',
+          atlassianAccountId: 'atl-1',
+          membershipVersion: 1,
+          grantId: 'grant-1',
+          identityVersion: 1,
+          workspaceVersion: 1,
+        },
+        enumerable: false,
+      });
+      return out;
+    });
+
+    const factory = new AdapterFactory({
+      credentialRepo: { getCredentials: vi.fn() } as any,
+      encryptionKey: key,
+      jiraWorkspaceRepo: {
+        getCapabilities: vi.fn().mockResolvedValue({
+          workspaceId: 'ws-1',
+          sites: [site],
+        }),
+      },
+      jiraDispatchGuard: { executeGuardedDispatch } as any,
+      jiraTokens: {
+        forSite: vi.fn().mockReturnValue({ getAccessToken: vi.fn().mockResolvedValue('tok-1') }),
+      } as any,
+      createPersonalJiraAdapter: () => ({
+        service: 'myjira',
+        execute: vi.fn().mockResolvedValue({
+          issues: [{ id: '10015', key: 'ATIT-6', title: 'Kiểm tra W3-11 workflow' }],
+        }),
+      }),
+    });
+
+    const adapter = await factory.getAdapterForService('myjira', {
+      phase: 'planning',
+      userId: 'user-1',
+      workspaceId: 'ws-1',
+      workspaceMode: 'organization',
+    });
+
+    const result = await adapter.execute('myjira.search_issues', {
+      siteId: 'site-1',
+      projectKey: 'ATIT',
+    });
+
+    expect(executeGuardedDispatch).toHaveBeenCalledTimes(1);
+    expect(executeGuardedDispatch.mock.calls[0]?.[0]).toMatchObject({
+      siteId: 'site-1',
+      cloudId: 'cloud-1',
+      sitePolicyVersion: 3,
+      projectId: '10001',
+      projectPolicyVersion: 4,
+    });
+    expect(result.issues).toHaveLength(1);
+    expect(result.issues[0]._sourceRef).toBeDefined();
+    expect(result.issues[0]._sourceRef.siteId).toBe('site-1');
+    expect(result.issues[0]._sourceRef.sitePolicyVersion).toBe(3);
+    expect(result.issues[0]._sourceRef.projectId).toBe('10001');
+    expect(result.issues[0]._sourceRef.projectPolicyVersion).toBe(4);
+    expect(result.issues[0]._sourceRefs).toHaveLength(1);
+  });
 });

@@ -1114,8 +1114,8 @@ export class WorkspaceSiteProjectRepo {
     );
     if (!account.rows[0]) return directory;
     const directorySql =
-      `SELECT s.id AS site_id, s.cloud_id, s.site_name, s.site_url,
-              p.numeric_project_id AS project_id, p.project_key, p.project_name
+      `SELECT s.id AS site_id, s.cloud_id, s.site_name, s.site_url, s.policy_version AS site_policy_version,
+              p.numeric_project_id AS project_id, p.project_key, p.project_name, p.policy_version AS project_policy_version
        FROM ati_workspace_jira_sites s
        LEFT JOIN ati_workspace_jira_projects p ON p.workspace_id = s.workspace_id
          AND p.site_id = s.id AND p.selected = true
@@ -1128,8 +1128,8 @@ export class WorkspaceSiteProjectRepo {
          )
        ORDER BY s.cloud_id, p.numeric_project_id`;
     type DirectoryRow = {
-      site_id: string; cloud_id: string; site_name: string; site_url: string;
-      project_id: string | null; project_key: string | null; project_name: string | null;
+      site_id: string; cloud_id: string; site_name: string; site_url: string; site_policy_version?: number;
+      project_id: string | null; project_key: string | null; project_name: string | null; project_policy_version?: number | null;
     };
     const rows = await this.pool.query<DirectoryRow>(directorySql, [workspaceId, account.rows[0].id]);
     if (rows.rowCount === 0) return directory;
@@ -1148,6 +1148,7 @@ export class WorkspaceSiteProjectRepo {
           if (nativeSite.status !== 'granted') throw new Error('Unknown native site permission status');
           if (!nativeSite.canBrowse) continue;
           site = { siteId: row.site_id, cloudId: row.cloud_id, name: row.site_name, url: row.site_url, projects: [] };
+          Object.defineProperty(site, 'policyVersion', { value: Number(row.site_policy_version ?? 1), enumerable: false, configurable: true });
           sites.set(row.site_id, site);
         }
         if (!row.project_id) continue;
@@ -1155,7 +1156,11 @@ export class WorkspaceSiteProjectRepo {
         if (nativeProject.status === 'unavailable') throw new Error('Native project permission unavailable');
         if (nativeProject.status === 'denied') continue;
         if (nativeProject.status !== 'granted') throw new Error('Unknown native project permission status');
-        if (nativeProject.canBrowse) site.projects.push({ id: row.project_id, key: row.project_key ?? '', name: row.project_name ?? '' });
+        if (nativeProject.canBrowse) {
+          const proj = { id: row.project_id, key: row.project_key ?? '', name: row.project_name ?? '' };
+          Object.defineProperty(proj, 'policyVersion', { value: Number(row.project_policy_version ?? 1), enumerable: false, configurable: true });
+          site.projects.push(proj);
+        }
       }
     } catch {
       throw new WorkspaceRepoError(503, 'NATIVE_VERIFIER_UNAVAILABLE', 'Jira native permission verifier unavailable');
@@ -1170,10 +1175,14 @@ export class WorkspaceSiteProjectRepo {
     const currentRows = await this.pool.query<DirectoryRow>(directorySql, [workspaceId, account.rows[0].id]);
     const currentSites = new Set(currentRows.rows.map((row) => row.site_id));
     const currentProjects = new Set(currentRows.rows.filter((row) => row.project_id).map((row) => `${row.site_id}:${row.project_id}`));
-    directory.sites = [...sites.values()].filter((site) => currentSites.has(site.siteId)).map((site) => ({
-      ...site,
-      projects: site.projects.filter((project) => currentProjects.has(`${site.siteId}:${project.id}`)),
-    }));
+    directory.sites = [...sites.values()].filter((site) => currentSites.has(site.siteId)).map((site) => {
+      const nextSite = {
+        ...site,
+        projects: site.projects.filter((project) => currentProjects.has(`${site.siteId}:${project.id}`)),
+      };
+      Object.defineProperty(nextSite, 'policyVersion', { value: (site as any).policyVersion ?? 1, enumerable: false, configurable: true });
+      return nextSite;
+    });
     return directory;
   }
 }

@@ -75,6 +75,17 @@ export function routeIntent(
       matched.push(personalJira);
     }
   }
+  const hasProjectIssueRoute = matched.some((service) => service.scopeKey === 'projects' || service.id === 'myjira');
+  if (hasProjectIssueRoute) {
+    matched = matched.filter((service) => {
+      if (service.scopeKey !== 'repos' || available.has(service.id) || explicitlyNamed.includes(service)) {
+        return true;
+      }
+      return service.intentKeywords.some(
+        (keyword) => keyword !== 'issue' && keyword !== 'issues' && mentionsKeyword(intent, keyword),
+      );
+    });
+  }
   const mentionsExplicitChannelService =
     explicitlyNamed.some((s) => s.scopeKey === 'channels') ||
     ['channel', 'channels', 'kênh'].some((keyword) => mentionsKeyword(intent, keyword)) ||

@@ -947,7 +947,12 @@ export class AdapterFactory {
           (typeof args?.issueKey === 'string' && args.issueKey.trim() ? args.issueKey.trim().split('-')[0] : undefined);
         if (!projectId && resolvedProjectKey && targetSite) {
           const proj = targetSite.projects?.find((p: any) => p.key === resolvedProjectKey);
-          if (proj) projectId = proj.id;
+          if (proj) {
+            projectId = proj.id;
+            if (!projectPolicyVersion && (proj as any).policyVersion) {
+              projectPolicyVersion = (proj as any).policyVersion;
+            }
+          }
         }
 
         const scope: DispatchScope = {
@@ -1074,7 +1079,14 @@ export class AdapterFactory {
         }
 
         if (rawOutput && typeof rawOutput === 'object') {
-          const resultObj = { ...rawOutput, _receipt: receipt, _sourceRef: sourceRef, _sourceRefs: [sourceRef] };
+          const resultObj: Record<string, any> = { ...rawOutput, _receipt: receipt, _sourceRef: sourceRef, _sourceRefs: [sourceRef] };
+          if (Array.isArray(resultObj.issues)) {
+            resultObj.issues = resultObj.issues.map((item: unknown) =>
+              item && typeof item === 'object'
+                ? { ...(item as Record<string, unknown>), _sourceRef: sourceRef, _sourceRefs: [sourceRef] }
+                : item,
+            );
+          }
           if (leaseId) {
             Object.defineProperty(resultObj, '_leaseId', {
               value: leaseId,
