@@ -179,7 +179,14 @@ export type ScheduleStatus = 'active' | 'paused' | 'cancelled' | 'completed';
 export type ScheduleKind = 'plan' | 'plan_approval' | 'sheets_digest' | 'calendar_digest' | 'github_digest' | 'telegram_digest' | 'trello_digest' | 'notion_digest' | 'myjira_digest';
 export type ScheduleApprovalMode = 'manual' | 'auto_digest';
 
-export interface SheetsDigestConfig {
+export type SheetsDigestWorkspaceMode = 'personal' | 'organization' | 'legacy';
+
+export type SheetsDigestDataScope =
+  | 'full_tab_verified'
+  | 'full_requested_range'
+  | 'partial';
+
+export interface SheetsDigestConfigV1 {
   version: 1;
   source: {
     service: 'mysheets' | 'sheets';
@@ -199,10 +206,180 @@ export interface SheetsDigestConfig {
   includeAiSummary: boolean;
 }
 
+export interface SheetsDigestSourceConfigV2 {
+  service: 'mysheets' | 'sheets';
+  credentialId: string;
+  email?: string;
+  spreadsheetId: string;
+  spreadsheetTitle: string;
+  sheetName?: string;
+  range?: string;
+  tailRows: number;
+}
+
+export type SheetsDigestDestinationConfigV2 =
+  | {
+      service: 'slack';
+      credentialId: string;
+      channelId: string;
+      channelLabel?: string;
+    }
+  | {
+      service: 'telegram';
+      credentialId: string;
+      chatId: string;
+      chatLabel?: string;
+    }
+  | {
+      service: 'gmail';
+      credentialId: string;
+      senderEmail?: string;
+      recipientEmail: string;
+    };
+
+export interface SheetsDigestConfigV2 {
+  version: 2;
+  workspaceMode: SheetsDigestWorkspaceMode;
+  workspaceId: string | null;
+  source: SheetsDigestSourceConfigV2;
+  destination: SheetsDigestDestinationConfigV2;
+  focus?: string;
+  includeAiSummary: boolean;
+}
+
+export type SheetsDigestConfig = SheetsDigestConfigV1 | SheetsDigestConfigV2;
+
+export function isSheetsDigestConfigV2(config: unknown): config is SheetsDigestConfigV2 {
+  if (typeof config !== 'object' || config === null) {
+    return false;
+  }
+  const rec = config as Record<string, unknown>;
+  if (rec.version !== 2) {
+    return false;
+  }
+  if (
+    rec.workspaceMode !== 'personal' &&
+    rec.workspaceMode !== 'organization' &&
+    rec.workspaceMode !== 'legacy'
+  ) {
+    return false;
+  }
+  if (rec.workspaceMode === 'organization') {
+    if (typeof rec.workspaceId !== 'string' || rec.workspaceId.trim().length === 0) {
+      return false;
+    }
+  } else if (rec.workspaceId !== null) {
+    return false;
+  }
+
+  if (typeof rec.source !== 'object' || rec.source === null) {
+    return false;
+  }
+  const source = rec.source as Record<string, unknown>;
+  if (source.service !== 'mysheets' && source.service !== 'sheets') {
+    return false;
+  }
+  if (typeof source.credentialId !== 'string' || source.credentialId.trim().length === 0) {
+    return false;
+  }
+  if (typeof source.spreadsheetId !== 'string' || source.spreadsheetId.trim().length === 0) {
+    return false;
+  }
+  if (typeof source.spreadsheetTitle !== 'string') {
+    return false;
+  }
+  if (
+    typeof source.tailRows !== 'number' ||
+    !Number.isFinite(source.tailRows) ||
+    source.tailRows <= 0
+  ) {
+    return false;
+  }
+  if (source.email !== undefined && typeof source.email !== 'string') {
+    return false;
+  }
+  if (source.sheetName !== undefined && typeof source.sheetName !== 'string') {
+    return false;
+  }
+  if (source.range !== undefined && typeof source.range !== 'string') {
+    return false;
+  }
+
+  if (typeof rec.destination !== 'object' || rec.destination === null) {
+    return false;
+  }
+  const destination = rec.destination as Record<string, unknown>;
+  if (typeof destination.credentialId !== 'string' || destination.credentialId.trim().length === 0) {
+    return false;
+  }
+  if (destination.service === 'slack') {
+    if (typeof destination.channelId !== 'string' || destination.channelId.trim().length === 0) {
+      return false;
+    }
+    if (destination.channelLabel !== undefined && typeof destination.channelLabel !== 'string') {
+      return false;
+    }
+  } else if (destination.service === 'telegram') {
+    if (typeof destination.chatId !== 'string' || destination.chatId.trim().length === 0) {
+      return false;
+    }
+    if (destination.chatLabel !== undefined && typeof destination.chatLabel !== 'string') {
+      return false;
+    }
+  } else if (destination.service === 'gmail') {
+    if (
+      typeof destination.recipientEmail !== 'string' ||
+      !destination.recipientEmail.trim().includes('@')
+    ) {
+      return false;
+    }
+    if (
+      destination.senderEmail !== undefined &&
+      (typeof destination.senderEmail !== 'string' || !destination.senderEmail.trim().includes('@'))
+    ) {
+      return false;
+    }
+  } else {
+    return false;
+  }
+
+  if (rec.focus !== undefined && typeof rec.focus !== 'string') {
+    return false;
+  }
+  if (typeof rec.includeAiSummary !== 'boolean') {
+    return false;
+  }
+
+  return true;
+}
+
+export interface SheetsDigestPreviewInfo {
+  workspaceMode: SheetsDigestWorkspaceMode;
+  workspaceName?: string;
+  sourceConnectionLabel: string;
+  sourceOwnerLabel: string;
+  spreadsheetTitle: string;
+  spreadsheetId: string;
+  sheetName?: string;
+  requestedRangeLabel: string;
+  destinationConnectionLabel: string;
+  destinationTargetLabel: string;
+  crossBoundaryWarning?: string;
+}
+
 export interface SheetsDigestCandidate {
   canAutoDigest: boolean;
   config?: SheetsDigestConfig;
+  configHash?: string;
+  preview?: SheetsDigestPreviewInfo;
+  requiresClarification?: boolean;
   reason?: string;
+}
+
+export interface SheetsDigestManualResolution {
+  status: 'confirmed_sent';
+  resolvedAt: string;
+  resolvedBy: string;
 }
 
 export interface SheetsDigestDelivery {
@@ -213,8 +390,12 @@ export interface SheetsDigestDelivery {
   spreadsheetTitle: string;
   sheetName?: string;
   rowCount: number;
+  dataScope?: SheetsDigestDataScope;
+  scannedRange?: string;
+  windowClipped?: boolean;
   summaryMode: 'ai' | 'deterministic';
   sentAt: string;
+  manualResolution?: SheetsDigestManualResolution;
 }
 
 export interface CalendarDigestConfig {
@@ -422,6 +603,8 @@ export type ScheduleRunState =
   | 'needs_attention' | 'planning_failed' | 'interrupted' | 'discarded' | 'missed' | 'blocked'
   | 'digest_sent' | 'digest_failed';
 
+export type ScheduleRunDeliveryResolution = 'confirmed_sent' | 'retried_new_run';
+
 export interface ScheduleRunView {
   id: string; scheduleId: string;
   trigger: 'scheduled' | 'manual' | 'replan';
@@ -435,6 +618,10 @@ export interface ScheduleRunView {
   /** A Vietnamese sentence for the user. */
   error: string | null;
   delivery?: SheetsDigestDelivery | CalendarDigestDelivery | GithubDigestDelivery | TelegramDigestDelivery | TrelloDigestDelivery | NotionDigestDelivery | null;
+  deliveryStartedAt?: string | null;
+  deliveryResolution?: ScheduleRunDeliveryResolution | null;
+  deliveryResolvedAt?: string | null;
+  deliveryFollowupRunId?: string | null;
 }
 
 /** Metadata of the assistant message that carries a schedule proposal. */
@@ -454,6 +641,8 @@ export interface ScheduleProposalMetadata {
     | TrelloDigestCandidate
     | NotionDigestCandidate
     | { canAutoDigest: boolean; disabledReason?: string; config?: Record<string, unknown>; configHash?: string };
+  reauthorize?: boolean;
+  expiresAt?: string;
 }
 
 /** Metadata of the assistant message recording the schedule after each change. */
