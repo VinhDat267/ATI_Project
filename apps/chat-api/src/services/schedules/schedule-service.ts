@@ -1131,7 +1131,8 @@ export class ScheduleService {
       requestHints.push(`tab "${prevSource.sheetName}"`);
     }
     if (
-      prevDest?.service === 'slack' &&
+      prevDest &&
+      'channelId' in prevDest &&
       prevDest.channelId &&
       !reqLower.includes(prevDest.channelId.toLowerCase())
     ) {
@@ -1186,9 +1187,10 @@ export class ScheduleService {
         `Bảng tính "${prevSource.spreadsheetTitle || prevSource.spreadsheetId}" không còn trong phạm vi cấp quyền hiện tại.`,
       );
     }
-    if (prevDest?.service === 'slack') {
+    if (prevDest && 'channelId' in prevDest) {
       if (
-        candidate.config.destination.service !== 'slack' ||
+        candidate.config.destination.service !== prevDest.service ||
+        !('channelId' in candidate.config.destination) ||
         candidate.config.destination.channelId !== prevDest.channelId
       ) {
         throw new ScheduleConflict(
