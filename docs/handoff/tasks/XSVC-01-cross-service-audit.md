@@ -115,6 +115,10 @@ Site đã có trên workspace. Hội thoại legacy không thấy site. Trong Kh
 
 Không gian Chung lập được plan: `myjira.search_issues` rồi `slack.send_message`. Evidence `jira_progress`, `itemCount` 6. Plan bị hủy, 0 execution step.
 
+### 07/11/2026 — Issue GitHub tồn đọng
+
+DEV-04 bị từ chối trước plan. Credential GitHub là `reconnect_required`. 0 plan, 0 execution step.
+
 ### 07/11/2026 — Xem trước PR rồi Slack
 
 Plan bị hủy trước khi gửi. `github.list_pull_requests` rồi `slack.send_message`. Evidence `github_prs`, `itemCount` 0. 0 execution step.
