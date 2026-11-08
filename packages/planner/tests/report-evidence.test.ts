@@ -270,6 +270,8 @@ describe('Report Evidence & Grounding (FLOW-01, F1)', () => {
     const store = new ReportArtifactStore();
     const planner = new AIPlanner({
       toolCatalog: GITHUB_PR_TOOLS,
+      searchMode: 'llm',
+      prefetchDirectory: false,
       reportEvidenceStore: store,
       gatherSearch: async ({ tool }) => {
         if (tool === 'github.list_pull_requests') {
@@ -337,6 +339,95 @@ describe('Report Evidence & Grounding (FLOW-01, F1)', () => {
       expect(postStep?.args.text).toContain('#42: Fix auth session expiry');
       expect(postStep?.args.text).not.toContain('#128');
       expect(store.getArtifact(response.reportEvidence!.artifactId)).toBeDefined();
+    }
+  });
+
+  it('AIPlanner.processMessage binds github_issues reportEvidence from github.search_issues or github.list_issues with aging calculation', async () => {
+    const store = new ReportArtifactStore();
+    const planner = new AIPlanner({
+      toolCatalog: GITHUB_PR_TOOLS,
+      searchMode: 'llm',
+      prefetchDirectory: false,
+      reportEvidenceStore: store,
+      now: () => new Date('2026-11-08T00:00:00Z'),
+      gatherSearch: async ({ tool }) => {
+        if (tool === 'github.search_issues') {
+          return [
+            {
+              id: '5981686058',
+              number: 4,
+              title: 'Lỗi nút đăng nhập trên Safari',
+              url: 'https://github.com/VinhDat267/ati-test/issues/4',
+              repo: 'VinhDat267/ati-test',
+              createdAt: '2026-10-22T14:50:56Z',
+              updatedAt: '2026-10-22T14:50:56Z',
+            },
+            {
+              id: '6261381475',
+              number: 6,
+              title: 'lỗi đăng nhập google - fis',
+              url: 'https://github.com/VinhDat267/ati-test/issues/6',
+              repo: 'VinhDat267/ati-test',
+              createdAt: '2026-11-07T16:18:36Z',
+              updatedAt: '2026-11-07T16:18:36Z',
+            },
+          ];
+        }
+        return [];
+      },
+      provider: {
+        name: 'mock',
+        model: 'mock',
+        generatePlan: async () =>
+          JSON.stringify({
+            kind: 'plan',
+            thinking: 'Tìm issue mở quá lâu và gửi Slack',
+            summary: 'Báo cáo issue tồn đọng sang kênh ati-test',
+            warnings: [],
+            steps: [
+              {
+                id: 's_read',
+                tool: 'github.search_issues',
+                description: 'Tìm các issue đang mở',
+                args: { repo: 'VinhDat267/ati-test', query: 'is:open' },
+                dependsOn: [],
+              },
+              {
+                id: 's_post',
+                tool: 'slack.send_message',
+                description: 'Gửi báo cáo Slack',
+                args: {
+                  channel: 'C_ATI',
+                  text: 'Placeholder',
+                },
+                dependsOn: ['s_read'],
+              },
+            ],
+          }),
+      },
+    });
+
+    const memory = new WorkingMemory();
+    memory.setEntity('workflow_resource_defaults', {
+      github: { repo: 'VinhDat267/ati-test' },
+      slack: { channelId: 'C_ATI', channelName: 'ati-test' },
+    });
+
+    const response = await planner.processMessage({
+      userMessage:
+        'Lập kế hoạch tìm các issue GitHub đang mở quá lâu trên repository VinhDat267/ati-test, tóm tắt, rồi soạn tin Slack vào kênh ati-test chứa bản tóm tắt.',
+      memory,
+      actor: { userId: 'user_live', workspaceId: 'ws_live' },
+    });
+
+    expect(response.kind).toBe('plan');
+    if (response.kind === 'plan') {
+      expect(response.reportEvidence).toBeDefined();
+      expect(response.reportEvidence?.kind).toBe('github_issues');
+      expect(response.reportEvidence?.itemCount).toBe(1);
+      const postStep = response.steps.find((s) => s.id === 's_post');
+      expect(postStep?.args.text).toContain('#4: Lỗi nút đăng nhập trên Safari');
+      expect(postStep?.args.text).not.toContain('#6:');
     }
   });
 });

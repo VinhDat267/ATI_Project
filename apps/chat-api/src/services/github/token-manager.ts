@@ -24,7 +24,12 @@ interface Cached {
 
 function isNonExpiringGitHubToken(token?: string): boolean {
   const trimmed = token?.trim();
-  return Boolean(trimmed && (trimmed.startsWith('gho_') || trimmed.startsWith('ghp_')));
+  return Boolean(
+    trimmed &&
+      (trimmed.startsWith('gho_') ||
+        trimmed.startsWith('ghp_') ||
+        trimmed.startsWith('github_pat_'))
+  );
 }
 
 export class GitHubTokenManager {
