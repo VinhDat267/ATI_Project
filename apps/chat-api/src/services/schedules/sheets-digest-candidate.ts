@@ -1,20 +1,22 @@
 import { createHash } from 'node:crypto';
 import { decryptCredentials } from '@wap/tool-adapters';
-import type {
-  PersonalSpreadsheetItem,
-  ScheduleRecurrence,
-  SheetsDigestCandidate,
-  SheetsDigestConfig,
+import {
+  isSheetsDigestConfigV2,
+  type PersonalSpreadsheetItem,
+  type ScheduleRecurrence,
+  type SheetsDigestCandidate,
+  type SheetsDigestConfig,
+  type SheetsDigestConfigV1,
 } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../../db/repositories/credential-repo.js';
 
 const WRITE_INTENT_RE =
   /\b(?:thêm\s+dòng|ghi\s+vào|append|chèn\s+dòng|cập\s+nhật\s+bảng|sửa\s+ô|xóa\s+dòng|xoá\s+dòng|đồng\s+bộ\s+vào\s+sheets|ghi\s+thêm)\b/iu;
 
-export function computeSheetsDigestHash(input: {
+export function computeSheetsDigestV1Hash(input: {
   userId: string;
   recurrence: ScheduleRecurrence;
-  config: SheetsDigestConfig;
+  config: SheetsDigestConfigV1 | SheetsDigestConfig;
 }): string {
   const rec = input.recurrence;
   const canonicalRecurrence =
@@ -45,6 +47,63 @@ export function computeSheetsDigestHash(input: {
               service: 'gmail',
               recipientEmail: input.config.destination.recipientEmail,
               credentialId: input.config.destination.credentialId ?? null,
+            },
+    includeAiSummary: input.config.includeAiSummary,
+  });
+  return createHash('sha256').update(canonical).digest('hex');
+}
+
+export function computeSheetsDigestHash(input: {
+  userId: string;
+  recurrence: ScheduleRecurrence;
+  config: SheetsDigestConfig;
+}): string {
+  if (!isSheetsDigestConfigV2(input.config)) {
+    return computeSheetsDigestV1Hash(input);
+  }
+
+  const rec = input.recurrence;
+  const canonicalRecurrence =
+    rec.type === 'once'
+      ? { type: 'once', date: rec.date, time: rec.time }
+      : rec.type === 'daily'
+        ? { type: 'daily', time: rec.time }
+        : { type: 'weekly', time: rec.time, days: [...rec.days] };
+
+  const canonical = JSON.stringify({
+    kind: 'sheets_digest',
+    version: 2,
+    userId: input.userId,
+    workspaceMode: input.config.workspaceMode,
+    workspaceId: input.config.workspaceId,
+    recurrence: canonicalRecurrence,
+    source: {
+      service: input.config.source.service,
+      credentialId: input.config.source.credentialId,
+      email: input.config.source.email ?? null,
+      spreadsheetId: input.config.source.spreadsheetId,
+      sheetName: input.config.source.sheetName ?? null,
+      range: input.config.source.range ?? null,
+      tailRows: input.config.source.tailRows,
+    },
+    destination:
+      input.config.destination.service === 'slack'
+        ? {
+            service: 'slack',
+            credentialId: input.config.destination.credentialId,
+            channelId: input.config.destination.channelId,
+          }
+        : input.config.destination.service === 'telegram'
+          ? {
+              service: 'telegram',
+              credentialId: input.config.destination.credentialId,
+              chatId: input.config.destination.chatId,
+            }
+          : {
+              service: 'gmail',
+              credentialId: input.config.destination.credentialId,
+              senderEmail: input.config.destination.senderEmail,
+              recipientEmail: input.config.destination.recipientEmail,
             },
     includeAiSummary: input.config.includeAiSummary,
   });
