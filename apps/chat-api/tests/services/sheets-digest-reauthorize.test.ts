@@ -17,6 +17,7 @@ import {
   ScheduleConflict,
   ScheduleService,
 } from '../../src/services/schedules/schedule-service.js';
+import { certifyScheduleFixture } from '../../src/services/slack/slack-schedule-origin.js';
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
 import {
   DIGEST_TEST_ENC_KEY,
@@ -972,6 +973,327 @@ describe('Task 5A (PR-5A): Strict Resume Separation & Two-Phase Server-Side Reau
           approvalMode: 'auto_digest',
         })
       ).rejects.toMatchObject({ code: 'DIGEST_PREVIEW_CHANGED' });
+    });
+  });
+
+  describe('4. Strict sheets_digest Kind Guard on Reauthorize Preview & Confirm', () => {
+    const nonSheetsKinds = [
+      'plan',
+      'calendar_digest',
+      'notion_digest',
+      'github_digest',
+    ] as const;
+
+    it('rejects POST /api/schedules/:id/reauthorize-preview on schedules of kind plan, calendar_digest, notion_digest, and github_digest with 409 REAUTHORIZATION_NOT_READY and creates 0 proposal messages', async () => {
+      const { personalA, convRepo } = fixtures;
+      const service = buildService();
+      const app = buildApp(service);
+
+      for (const kind of nonSheetsKinds) {
+        const conv = await convRepo.createConversation(
+          personalA.user.id,
+          `Conv Non-Sheets Preview (${kind})`,
+          { workspaceMode: 'personal', workspaceId: null }
+        );
+        const recurrence = { type: 'daily' as const, time: '08:00' };
+        const initialConfig =
+          kind === 'plan' ? null : { stubKind: kind, preserveMe: true };
+        const initialHash = kind === 'plan' ? null : 'a'.repeat(64);
+        const initialApprovedAt =
+          kind === 'plan' ? null : new Date('2026-11-01T12:00:00.000Z');
+
+        const ins = await db.pool.query(
+          `INSERT INTO schedules (
+             user_id, conv_id, name, request, recurrence, services, status, pause_reason,
+             version, next_run_at, workspace_id, workspace_mode, kind, digest_config, digest_config_hash, digest_approved_at
+           )
+           VALUES ($1, $2, $3, $4, $5::jsonb, $6, 'paused', 'REAUTH_REQUIRED', 2, NULL, NULL, 'personal', $7, $8::jsonb, $9, $10)
+           RETURNING *`,
+          [
+            personalA.user.id,
+            conv.id,
+            `Lịch ${kind}`,
+            'Đọc bảng Báo cáo KPI Cá nhân A và gửi qua Gmail cho tôi',
+            JSON.stringify(recurrence),
+            ['mysheets', 'gmail'],
+            kind,
+            initialConfig ? JSON.stringify(initialConfig) : null,
+            initialHash,
+            initialApprovedAt,
+          ]
+        );
+        const sched = ins.rows[0];
+        await certifyScheduleFixture(db.pool, sched.id);
+
+        const res = await request(app)
+          .post(`/api/schedules/${sched.id}/reauthorize-preview`)
+          .set('Authorization', bearer(personalA.user))
+          .send({});
+
+        expect(res.status).toBe(409);
+        expect(res.body.error.code).toBe('REAUTHORIZATION_NOT_READY');
+
+        const msgCount = await db.pool.query<{ n: number }>(
+          'SELECT count(*)::int AS n FROM messages WHERE conv_id = $1',
+          [conv.id]
+        );
+        expect(msgCount.rows[0]!.n).toBe(0);
+      }
+    });
+
+    it('rejects confirmProposal on a crafted reauthorize: true proposal message targeting an existing schedule of kind plan, calendar_digest, notion_digest, or github_digest with 409 REAUTHORIZATION_NOT_READY without mutating PostgreSQL', async () => {
+      const { personalA, convRepo } = fixtures;
+      const service = buildService();
+      const app = buildApp(service);
+      const recurrence = { type: 'daily' as const, time: '08:00' };
+
+      const validV2Config: SheetsDigestConfigV2 = {
+        version: 2,
+        workspaceMode: 'personal',
+        workspaceId: null,
+        source: {
+          service: 'mysheets',
+          credentialId: personalA.mysheetsCred.id,
+          email: personalA.email,
+          spreadsheetId: PERSONAL_A_SPREADSHEET_ID,
+          spreadsheetTitle: personalA.spreadsheetTitle,
+          tailRows: 20,
+        },
+        destination: {
+          service: 'gmail',
+          credentialId: personalA.gmailCred.id,
+          senderEmail: personalA.email,
+          recipientEmail: personalA.email,
+        },
+        includeAiSummary: true,
+      };
+      const validV2Hash = computeSheetsDigestHash({
+        userId: personalA.user.id,
+        recurrence,
+        config: validV2Config,
+      });
+
+      for (const kind of nonSheetsKinds) {
+        const conv = await convRepo.createConversation(
+          personalA.user.id,
+          `Conv Non-Sheets Confirm (${kind})`,
+          { workspaceMode: 'personal', workspaceId: null }
+        );
+        const initialConfig =
+          kind === 'plan' ? null : { stubKind: kind, preserveMe: true };
+        const initialHash = kind === 'plan' ? null : 'b'.repeat(64);
+        const initialApprovedAt =
+          kind === 'plan' ? null : new Date('2026-11-01T12:00:00.000Z');
+
+        const ins = await db.pool.query(
+          `INSERT INTO schedules (
+             user_id, conv_id, name, request, recurrence, services, status, pause_reason,
+             version, next_run_at, workspace_id, workspace_mode, kind, digest_config, digest_config_hash, digest_approved_at
+           )
+           VALUES ($1, $2, $3, $4, $5::jsonb, $6, 'paused', 'REAUTH_REQUIRED', 4, NULL, NULL, 'personal', $7, $8::jsonb, $9, $10)
+           RETURNING *`,
+          [
+            personalA.user.id,
+            conv.id,
+            `Lịch ${kind}`,
+            'Đọc bảng Báo cáo KPI Cá nhân A và gửi qua Gmail cho tôi',
+            JSON.stringify(recurrence),
+            ['mysheets', 'gmail'],
+            kind,
+            initialConfig ? JSON.stringify(initialConfig) : null,
+            initialHash,
+            initialApprovedAt,
+          ]
+        );
+        const sched = ins.rows[0];
+        await certifyScheduleFixture(db.pool, sched.id);
+
+        const craftedMsg = await messageRepo.createMessage(
+          conv.id,
+          'assistant',
+          'Đề xuất cấp quyền lại giả mạo',
+          {
+            type: 'schedule_proposal',
+            scheduleId: sched.id,
+            baseVersion: 4,
+            reauthorize: true,
+            expiresAt: new Date(NOW.getTime() + 15 * 60_000).toISOString(),
+            services: ['mysheets', 'gmail'],
+            nextRuns: [new Date('2026-11-03T01:00:00.000Z').toISOString()],
+            digestCandidate: {
+              canAutoDigest: true,
+              config: validV2Config,
+              configHash: validV2Hash,
+            },
+            proposal: {
+              kind: 'schedule',
+              action: 'update',
+              name: sched.name,
+              request: sched.request,
+              recurrence,
+              summary: 'Cấp quyền lại lịch',
+            },
+          }
+        );
+
+        const confirmRes = await request(app)
+          .post(`/api/conversations/${conv.id}/schedule-proposals/${craftedMsg.id}/confirm`)
+          .set('Authorization', bearer(personalA.user))
+          .send({ approvalMode: 'auto_digest' });
+
+        expect(confirmRes.status).toBe(409);
+        expect(confirmRes.body.error.code).toBe('REAUTHORIZATION_NOT_READY');
+
+        const afterRow = (
+          await db.pool.query('SELECT * FROM schedules WHERE id = $1', [sched.id])
+        ).rows[0];
+        expect(afterRow.kind).toBe(kind);
+        expect(afterRow.digest_config).toEqual(initialConfig);
+        expect(afterRow.digest_config_hash).toBe(initialHash);
+        expect(afterRow.status).toBe('paused');
+        expect(afterRow.pause_reason).toBe('REAUTH_REQUIRED');
+        expect(afterRow.version).toBe(4);
+      }
+    });
+
+    it('rejects Phase B of createReauthorizePreview if schedule kind drifts from sheets_digest during Phase A, and rejects confirmProposal when reauthorize: true has action !== update', async () => {
+      const { personalA, orgA, convRepo } = fixtures;
+      const recurrence = { type: 'daily' as const, time: '08:00' };
+
+      // 1. Phase B in-tx kind guard when kind drifts during Phase A network fetch
+      const orgConv = await convRepo.createConversation(
+        orgA.member.id,
+        'Conv Phase B Kind Drift',
+        { workspaceMode: 'organization', workspaceId: orgA.workspaceId }
+      );
+      const orgSched = await insertScheduleRow({
+        userId: orgA.member.id,
+        convId: orgConv.id,
+        workspaceMode: 'organization',
+        workspaceId: orgA.workspaceId,
+        request: 'Đọc bảng Bảng KPI Tổ chức A và gửi vào Slack #general',
+        services: ['sheets', 'slack'],
+        status: 'paused',
+        pauseReason: 'REAUTH_REQUIRED',
+        version: 1,
+        config: {
+          version: 1,
+          source: {
+            service: 'sheets',
+            spreadsheetId: ORG_A_SPREADSHEET_ID,
+            spreadsheetTitle: orgA.spreadsheetTitle,
+            tailRows: 20,
+          },
+          destination: {
+            service: 'slack',
+            channelId: orgA.slackChannelId,
+          },
+          includeAiSummary: true,
+        },
+      });
+
+      const fetchOrgSheetsMetadata = vi.fn(async () => {
+        await db.pool.query(
+          "UPDATE schedules SET kind = 'plan', digest_config = NULL, digest_config_hash = NULL, digest_approved_at = NULL WHERE id = $1",
+          [orgSched.id]
+        );
+        return [
+          {
+            id: ORG_A_SPREADSHEET_ID,
+            title: orgA.spreadsheetTitle,
+            sheets: ['Sheet1'],
+          },
+        ];
+      });
+      const orgService = buildService({ fetchOrgSheetsMetadata });
+      await expect(
+        orgService.createReauthorizePreview({
+          userId: orgA.member.id,
+          scheduleId: orgSched.id,
+          now: NOW,
+          scope: { workspaceMode: 'organization', workspaceId: orgA.workspaceId },
+        })
+      ).rejects.toMatchObject({
+        code: 'REAUTHORIZATION_NOT_READY',
+      });
+
+      const orgMsgCount = await db.pool.query<{ n: number }>(
+        'SELECT count(*)::int AS n FROM messages WHERE conv_id = $1',
+        [orgConv.id]
+      );
+      expect(orgMsgCount.rows[0]!.n).toBe(0);
+
+      // 2. confirmProposal with reauthorize: true and proposal.action !== 'update' on sheets_digest schedule -> 409 DIGEST_NOT_ELIGIBLE
+      const v1Config: SheetsDigestConfigV1 = {
+        version: 1,
+        source: {
+          service: 'mysheets',
+          credentialId: personalA.mysheetsCred.id,
+          email: personalA.email,
+          spreadsheetId: PERSONAL_A_SPREADSHEET_ID,
+          spreadsheetTitle: personalA.spreadsheetTitle,
+          tailRows: 20,
+        },
+        destination: {
+          service: 'gmail',
+          credentialId: personalA.gmailCred.id,
+          recipientEmail: personalA.email,
+        },
+        includeAiSummary: true,
+      };
+      const sheetsSched = await insertScheduleRow({
+        userId: personalA.user.id,
+        convId: personalA.conversation.id,
+        workspaceMode: 'personal',
+        workspaceId: null,
+        request: 'Đọc bảng Báo cáo KPI Cá nhân A và gửi qua Gmail cho tôi',
+        services: ['mysheets', 'gmail'],
+        status: 'paused',
+        pauseReason: 'REAUTH_REQUIRED',
+        version: 3,
+        config: v1Config,
+      });
+
+      const nonUpdateMsg = await messageRepo.createMessage(
+        personalA.conversation.id,
+        'assistant',
+        'Đề xuất cấp quyền lại sai action',
+        {
+          type: 'schedule_proposal',
+          scheduleId: sheetsSched.id,
+          baseVersion: 3,
+          reauthorize: true,
+          expiresAt: new Date(NOW.getTime() + 15 * 60_000).toISOString(),
+          services: ['mysheets', 'gmail'],
+          nextRuns: [new Date('2026-11-03T01:00:00.000Z').toISOString()],
+          proposal: {
+            kind: 'schedule',
+            action: 'resume',
+            name: sheetsSched.name,
+            request: sheetsSched.request,
+            recurrence,
+            summary: 'Bật lại lịch',
+          },
+        }
+      );
+
+      const service = buildService();
+      const app = buildApp(service);
+      const nonUpdateRes = await request(app)
+        .post(
+          `/api/conversations/${personalA.conversation.id}/schedule-proposals/${nonUpdateMsg.id}/confirm`
+        )
+        .set('Authorization', bearer(personalA.user))
+        .send({ approvalMode: 'auto_digest' });
+      expect(nonUpdateRes.status).toBe(409);
+      expect(nonUpdateRes.body.error.code).toBe('DIGEST_NOT_ELIGIBLE');
+
+      const afterSheetsRow = (
+        await db.pool.query('SELECT * FROM schedules WHERE id = $1', [sheetsSched.id])
+      ).rows[0];
+      expect(afterSheetsRow.status).toBe('paused');
+      expect(afterSheetsRow.version).toBe(3);
+      expect(afterSheetsRow.digest_config).toEqual(v1Config);
     });
   });
 });
