@@ -387,12 +387,16 @@ export class ApiClient {
       status: 'unconfigured' | 'not_connected' | 'reconnect_required' | 'needs_scope' | 'needs_membership' | 'connected';
       login?: string;
       repos: Array<{ repoId: string; fullName: string; name: string; accessible: boolean }>;
-    }>('/api/connections/github', { credentials: 'include' });
+    }>('/api/connections/github', {
+      credentials: 'include',
+      headers: { 'X-Workspace-Id': getActiveWorkspaceId() },
+    });
   }
   startGitHubConnection(options: { returnTo?: string } = {}) {
     return this.request<{ url: string }>('/api/connections/github/start', {
       method: 'POST',
       credentials: 'include',
+      headers: { 'X-Workspace-Id': getActiveWorkspaceId() },
       ...(options.returnTo ? { body: JSON.stringify({ returnTo: options.returnTo }) } : {}),
     });
   }
@@ -400,6 +404,7 @@ export class ApiClient {
     return this.request<{ login: string; returnTo?: string }>('/api/connections/github/callback', {
       method: 'POST',
       credentials: 'include',
+      headers: { 'X-Workspace-Id': getActiveWorkspaceId() },
       body: JSON.stringify({ code, state }),
     }, true);
   }
@@ -407,12 +412,16 @@ export class ApiClient {
     return this.request<{ success: true }>('/api/connections/github', {
       method: 'DELETE',
       credentials: 'include',
+      headers: { 'X-Workspace-Id': getActiveWorkspaceId() },
     });
   }
   getGitHubCandidateRepos() {
     return this.request<{
       repos: Array<{ repoId: string; fullName: string; name: string; private?: boolean }>;
-    }>('/api/connections/github/candidate-repos', { credentials: 'include' });
+    }>('/api/connections/github/candidate-repos', {
+      credentials: 'include',
+      headers: { 'X-Workspace-Id': getActiveWorkspaceId() },
+    });
   }
   saveGitHubScope(repos: string[]) {
     return this.request<{
@@ -422,6 +431,7 @@ export class ApiClient {
     }>('/api/connections/github/scope', {
       method: 'PUT',
       credentials: 'include',
+      headers: { 'X-Workspace-Id': getActiveWorkspaceId() },
       body: JSON.stringify({ repos }),
     });
   }

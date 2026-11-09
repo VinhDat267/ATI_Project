@@ -1496,8 +1496,8 @@ export class ChatService {
       });
     } else if ((proposal.action === 'create' || proposal.action === 'update') && isGithubThreeSectionOverTelegram) {
       const githubScopeId =
-        actor.workspaceMode === 'organization' && actor.workspaceId
-          ? actor.workspaceId
+        trustedScope.workspaceMode === 'organization' && trustedScope.workspaceId
+          ? trustedScope.workspaceId
           : `personal:${actor.userId}`;
       digestCandidate = await evaluateGithubDigestCandidate({
         userId: actor.userId,
@@ -1537,8 +1537,8 @@ export class ChatService {
       }
     } else if ((proposal.action === 'create' || proposal.action === 'update') && services.includes('telegram') && this.telegramConnection) {
       const githubScopeId =
-        actor.workspaceMode === 'organization' && actor.workspaceId
-          ? actor.workspaceId
+        trustedScope.workspaceMode === 'organization' && trustedScope.workspaceId
+          ? trustedScope.workspaceId
           : `personal:${actor.userId}`;
       const tgLookup = await this.telegramConnection(actor.userId).catch(() => null);
       const ghLookup = services.includes('github') && this.githubConnection
@@ -1558,8 +1558,8 @@ export class ChatService {
       (services.includes('github') || (!this.schedules.evaluateDigestCandidate && Boolean(this.githubConnection)))
     ) {
       const githubScopeId =
-        actor.workspaceMode === 'organization' && actor.workspaceId
-          ? actor.workspaceId
+        trustedScope.workspaceMode === 'organization' && trustedScope.workspaceId
+          ? trustedScope.workspaceId
           : `personal:${actor.userId}`;
       digestCandidate = await evaluateGithubDigestCandidate({
         userId: actor.userId,
