@@ -302,7 +302,13 @@ describe('PR-R1-A1: GitHub Workspace-Scoped Team Scope Migration (0034) & Route/
         }),
       );
 
-      // Organization workspace admin (even with global user.role === 'member') must be allowed (200) on PUT /scope
+      // Organization workspace admin (even with global user.role === 'member') must be allowed (200) on GET /candidate-repos and PUT /scope
+      const orgAdminCandidates = await request(app)
+        .get('/api/connections/github/candidate-repos')
+        .set('Authorization', `Bearer ${orgAdminToken}`)
+        .set('x-workspace-id', ws.id);
+      expect(orgAdminCandidates.status).toBe(200);
+
       const orgAdminPut = await request(app)
         .put('/api/connections/github/scope')
         .set('Authorization', `Bearer ${orgAdminToken}`)
@@ -310,7 +316,13 @@ describe('PR-R1-A1: GitHub Workspace-Scoped Team Scope Migration (0034) & Route/
         .send({ repos: ['alpha-org/alpha-repo'] });
       expect(orgAdminPut.status).toBe(200);
 
-      // Non-admin member of organization workspace gets 403 on PUT /scope
+      // Non-admin member of organization workspace gets 403 on GET /candidate-repos and PUT /scope, but 200 on GET /
+      const memberCandidates = await request(app)
+        .get('/api/connections/github/candidate-repos')
+        .set('Authorization', `Bearer ${orgMemberToken}`)
+        .set('x-workspace-id', ws.id);
+      expect(memberCandidates.status).toBe(403);
+
       const memberPut = await request(app)
         .put('/api/connections/github/scope')
         .set('Authorization', `Bearer ${orgMemberToken}`)
@@ -318,7 +330,26 @@ describe('PR-R1-A1: GitHub Workspace-Scoped Team Scope Migration (0034) & Route/
         .send({ repos: ['alpha-org/alpha-repo'] });
       expect(memberPut.status).toBe(403);
 
-      // Outsider (even with global admin role) who is NOT a member of ws.id gets 403 on PUT /scope
+      const memberGet = await request(app)
+        .get('/api/connections/github')
+        .set('Authorization', `Bearer ${orgMemberToken}`)
+        .set('x-workspace-id', ws.id);
+      expect(memberGet.status).toBe(200);
+      expect(memberGet.body.status).toBe('connected');
+
+      // Outsider (even with global admin role) who is NOT a member of ws.id gets 403 on GET /, GET /candidate-repos, and PUT /scope
+      const outsiderGet = await request(app)
+        .get('/api/connections/github')
+        .set('Authorization', `Bearer ${outsiderToken}`)
+        .set('x-workspace-id', ws.id);
+      expect(outsiderGet.status).toBe(403);
+
+      const outsiderCandidates = await request(app)
+        .get('/api/connections/github/candidate-repos')
+        .set('Authorization', `Bearer ${outsiderToken}`)
+        .set('x-workspace-id', ws.id);
+      expect(outsiderCandidates.status).toBe(403);
+
       const outsiderPut = await request(app)
         .put('/api/connections/github/scope')
         .set('Authorization', `Bearer ${outsiderToken}`)

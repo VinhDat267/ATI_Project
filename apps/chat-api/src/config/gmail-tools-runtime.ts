@@ -61,7 +61,7 @@ export async function runtimeToolCatalog(
     githubTeamRepo?: any;
     githubOAuthClient?: any;
     githubTokens?: any;
-    githubConnection?: (userId: string) => Promise<any>;
+    githubConnection?: (userId: string, scopeId?: string) => Promise<any>;
     telegramEnabled?: boolean;
     telegramConnection?: (userId: string) => Promise<any>;
     notionEnabled?: boolean;

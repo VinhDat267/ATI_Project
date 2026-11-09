@@ -132,7 +132,7 @@ export async function getToolCatalogFor(
     githubTeamRepo?: any;
     githubOAuthClient?: any;
     githubTokens?: any;
-    githubConnection?: (userId: string) => Promise<any>;
+    githubConnection?: (userId: string, scopeId?: string) => Promise<any>;
     telegramEnabled?: boolean;
     telegramConnection?: (userId: string) => Promise<any>;
     notionEnabled?: boolean;
@@ -263,9 +263,19 @@ export async function getToolCatalogFor(
       }
     }
   }
+  const githubScopeId =
+    options.workspaceMode === 'organization'
+      ? options.workspaceId ?? undefined
+      : options.userId
+        ? `personal:${options.userId}`
+        : undefined;
   if (options.githubConnection) {
     try {
-      const github = await options.githubConnection(options.userId);
+      const github = githubScopeId
+        ? await options.githubConnection(options.userId, githubScopeId)
+        : options.workspaceMode === 'organization'
+          ? null
+          : await options.githubConnection(options.userId);
       if (github?.status === 'connected' && github.connection?.repos?.length > 0) {
         catalog = [...catalog, ...GITHUB_TOOLS, ...GITHUB_OAUTH_TOOLS];
       }
@@ -278,7 +288,9 @@ export async function getToolCatalogFor(
       try {
         const teamRepos = typeof options.githubTeamRepo.repos === 'function'
           ? await options.githubTeamRepo.repos()
-          : (await options.githubTeamRepo.get?.())?.repos ?? [];
+          : githubScopeId
+            ? (await options.githubTeamRepo.get?.(githubScopeId))?.repos ?? []
+            : [];
         if (Array.isArray(teamRepos) && teamRepos.length > 0) {
           const dec = decryptCredentials(cred.config, encryptionKey);
           if (dec.accessToken) {

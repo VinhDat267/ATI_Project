@@ -161,7 +161,7 @@ export interface ChatServiceOptions {
   /** The caller's active Trello connection lookup; absent when Trello is off or not connected. */
   trelloConnection?: (userId: string, scopeId?: string) => Promise<any>;
   /** The caller's active GitHub connection lookup; absent when GitHub is off or not connected. */
-  githubConnection?: (userId: string) => Promise<any>;
+  githubConnection?: (userId: string, scopeId?: string) => Promise<any>;
   /** The caller's active Telegram connection lookup; absent when Telegram is off or not connected. */
   telegramConnection?: (userId: string) => Promise<any>;
   /** The caller's active Notion connection lookup; absent when Notion OAuth is off or not connected. */
@@ -877,7 +877,8 @@ export class ChatService {
     }
 
     if (usesGitHub) {
-      const github = await this.githubConnection?.(userId);
+      const githubScopeId = scopeId && scopeId !== 'default' ? scopeId : `personal:${userId}`;
+      const github = await this.githubConnection?.(userId, githubScopeId);
       if (!github || github.status === 'not_connected' || github.status === 'reconnect_required') {
         unavailableServices.push({ id: 'github', name: 'GitHub' });
         reasons.push('Tài khoản của bạn chưa Kết nối GitHub hoặc cần kết nối lại.');
@@ -1474,8 +1475,13 @@ export class ChatService {
         request: proposal.request,
       });
     } else if ((proposal.action === 'create' || proposal.action === 'update') && isGithubThreeSectionOverTelegram) {
+      const githubScopeId =
+        actor.workspaceMode === 'organization' && actor.workspaceId
+          ? actor.workspaceId
+          : `personal:${actor.userId}`;
       digestCandidate = await evaluateGithubDigestCandidate({
         userId: actor.userId,
+        scopeId: githubScopeId,
         request: proposal.request,
         services,
         recurrence,
@@ -1507,9 +1513,13 @@ export class ChatService {
         services = services.map((s) => (s === 'sheets' ? 'mysheets' : s));
       }
     } else if ((proposal.action === 'create' || proposal.action === 'update') && services.includes('telegram') && this.telegramConnection) {
+      const githubScopeId =
+        actor.workspaceMode === 'organization' && actor.workspaceId
+          ? actor.workspaceId
+          : `personal:${actor.userId}`;
       const tgLookup = await this.telegramConnection(actor.userId).catch(() => null);
       const ghLookup = services.includes('github') && this.githubConnection
-        ? await this.githubConnection(actor.userId).catch(() => null)
+        ? await this.githubConnection(actor.userId, githubScopeId).catch(() => null)
         : null;
       digestCandidate = evaluateTelegramDigestCandidate({
         proposal,
@@ -1524,8 +1534,13 @@ export class ChatService {
       recurrence &&
       (services.includes('github') || (!this.schedules.evaluateDigestCandidate && Boolean(this.githubConnection)))
     ) {
+      const githubScopeId =
+        actor.workspaceMode === 'organization' && actor.workspaceId
+          ? actor.workspaceId
+          : `personal:${actor.userId}`;
       digestCandidate = await evaluateGithubDigestCandidate({
         userId: actor.userId,
+        scopeId: githubScopeId,
         request: proposal.request,
         services,
         recurrence,

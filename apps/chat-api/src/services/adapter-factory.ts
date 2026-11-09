@@ -497,7 +497,13 @@ export class AdapterFactory {
       }
     }
 
-    const scope = this.options.githubTeamRepo ? await this.options.githubTeamRepo.get() : null;
+    const scopeId =
+      context?.workspaceMode === 'organization'
+        ? context.workspaceId ?? undefined
+        : context?.userId
+          ? `personal:${context.userId}`
+          : undefined;
+    const scope = this.options.githubTeamRepo && scopeId ? await this.options.githubTeamRepo.get(scopeId) : null;
     if (!scope || !scope.repos || scope.repos.length === 0) {
       throw githubError('AUTH_ERROR', 'Quản trị chưa chọn repository GitHub.');
     }

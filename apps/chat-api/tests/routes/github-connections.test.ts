@@ -7,6 +7,7 @@ import { generateAccessToken } from '../../src/auth/jwt.js';
 import { ConversationRepo } from '../../src/db/repositories/conversation-repo.js';
 import { CredentialRepo } from '../../src/db/repositories/credential-repo.js';
 import { GitHubTeamRepo } from '../../src/db/repositories/github-team-repo.js';
+import { WorkspaceRepo } from '../../src/db/repositories/workspace-repo.js';
 import { GitHubOAuthClient } from '../../src/services/github/oauth-client.js';
 import { GitHubTokenManager } from '../../src/services/github/token-manager.js';
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
@@ -21,6 +22,8 @@ describe('GitHub connection routes', () => {
   let credentials: CredentialRepo;
   let convRepo: ConversationRepo;
   let teamRepo: GitHubTeamRepo;
+  let workspaceRepo: WorkspaceRepo;
+  let workspaceId: string;
   let changed: string[];
   let now: number;
   let alice: Person;
@@ -87,6 +90,7 @@ describe('GitHub connection routes', () => {
       userRepo: db.users,
       credentialRepo: credentials,
       convRepo,
+      workspaceRepo,
       encryptionKey: key,
       authClock: () => now,
       appBaseUrl: 'http://127.0.0.1:5174',
@@ -109,6 +113,7 @@ describe('GitHub connection routes', () => {
     credentials = new CredentialRepo(db.pool, key);
     convRepo = new ConversationRepo(db.pool);
     teamRepo = new GitHubTeamRepo(db.pool);
+    workspaceRepo = new WorkspaceRepo(db.pool);
   });
 
   beforeEach(async () => {
@@ -118,10 +123,12 @@ describe('GitHub connection routes', () => {
       status: 200,
       body: [{ id: 101, name: 'ati', full_name: 'nhom/ati', private: true }],
     };
-    await db.pool.query("DELETE FROM github_team_repos WHERE scope_id = 'default'");
-    await db.pool.query("DELETE FROM github_team_scope WHERE id = 'default'");
+    await db.pool.query('DELETE FROM github_team_repos');
+    await db.pool.query('DELETE FROM github_team_scope');
     alice = await db.person('Alice');
     bob = await db.person('Bob');
+    const ws = await workspaceRepo.create(alice.id, 'Alice Org');
+    workspaceId = ws.id;
   });
 
   afterAll(async () => {
@@ -210,6 +217,7 @@ describe('GitHub connection routes', () => {
       bob.id
     );
     await teamRepo.replace({
+      scopeId: workspaceId,
       chosenBy: alice.id,
       repos: [{ repoId: '101', fullName: 'nhom/ati', name: 'ati' }],
     });
@@ -218,7 +226,8 @@ describe('GitHub connection routes', () => {
     fakeReposResponse = { status: 401, body: { message: 'Bad credentials' } };
     const statusRes = await request(app)
       .get('/api/connections/github')
-      .set('Authorization', bearer(alice));
+      .set('Authorization', bearer(alice))
+      .set('x-workspace-id', workspaceId);
     expect(statusRes.status).toBe(200);
     expect(statusRes.body).toEqual({
       status: 'reconnect_required',
