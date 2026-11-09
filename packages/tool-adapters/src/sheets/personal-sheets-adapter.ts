@@ -31,7 +31,29 @@ export interface PersonalSheetsAdapterConfig extends BaseAdapterConfig {
   tokens: GmailAccessTokenProvider;
   apiBaseUrl?: string;
   fetchFn?: typeof fetch;
+  /**
+   * Server-owned Dual Kill-Switch flag for the 4 Drive/Docs write tools:
+   * - mysheets.create_drive_folder
+   * - mysheets.create_doc
+   * - mysheets.append_doc_text
+   * - mysheets.move_drive_file
+   * Populated ONLY from server env/config, NEVER from HTTP request body, AdapterContext, persisted planJson, or step.args.
+   * Defaults to false (Default OFF).
+   */
+  enableDriveWriteTools?: boolean;
 }
+
+export const MYSHEETS_DRIVE_READ_TOOLS: ReadonlySet<string> = new Set([
+  'mysheets.list_drive_files',
+  'mysheets.get_doc',
+]);
+
+export const MYSHEETS_DRIVE_WRITE_TOOLS: ReadonlySet<string> = new Set([
+  'mysheets.create_drive_folder',
+  'mysheets.create_doc',
+  'mysheets.append_doc_text',
+  'mysheets.move_drive_file',
+]);
 
 const DRIVE_API_DEFAULT_BASE = 'https://www.googleapis.com/drive/v3/files';
 const DRIVE_UPLOAD_DEFAULT_BASE = 'https://www.googleapis.com/upload/drive/v3/files';
@@ -62,6 +84,7 @@ export class PersonalSheetsAdapter extends BaseAdapter {
   private readonly driveApiBase: string;
   private readonly driveUploadBase: string;
   private readonly fetchFn: typeof fetch;
+  private readonly enableDriveWriteTools: boolean;
 
   constructor(config: PersonalSheetsAdapterConfig) {
     super(config);
@@ -73,6 +96,11 @@ export class PersonalSheetsAdapter extends BaseAdapter {
     }
     this.userId = config.userId;
     this.tokens = config.tokens;
+    this.enableDriveWriteTools =
+      typeof config.enableDriveWriteTools === 'boolean'
+        ? config.enableDriveWriteTools
+        : process.env.ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS === 'true' ||
+          process.env.ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS === 'on';
     const rawBase = config.apiBaseUrl ?? SHEETS_API_BASE;
     this.apiBase = rawBase.includes('/v4/spreadsheets')
       ? rawBase.replace(/\/+$/, '') + '/'
@@ -348,6 +376,20 @@ export class PersonalSheetsAdapter extends BaseAdapter {
   }
 
   async execute(toolName: string, args: Record<string, any>, context?: { signal?: AbortSignal }): Promise<any> {
+    if (MYSHEETS_DRIVE_WRITE_TOOLS.has(toolName) && !this.enableDriveWriteTools) {
+      throw new StepError({
+        category: 'AUTH_ERROR',
+        statusCode: 403,
+        message: `Google Drive/Docs write tool '${toolName}' is disabled by server policy.`,
+        retryable: false,
+        details: {
+          code: 'MYSHEETS_DRIVE_WRITE_DISABLED',
+          tool: toolName,
+          requestSent: false,
+        },
+      });
+    }
+
     const signal = context?.signal;
     const isWrite =
       toolName === 'mysheets.append_rows' ||
@@ -992,7 +1034,7 @@ export class PersonalSheetsAdapter extends BaseAdapter {
         statusCode: e.statusCode,
         retryable: e.retryable,
         message: e.message,
-        details: { requestSent: false },
+        details: { ...(e.details ?? {}), requestSent: false },
       });
     }
   }

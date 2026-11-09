@@ -11,13 +11,31 @@ import { NOTION_TRANSPORT } from './transports/notion.js';
 import { TELEGRAM_TRANSPORT } from './transports/telegram.js';
 import { JIRA_TRANSPORT } from './transports/jira.js';
 
-const MYSHEETS_DRIVE_TOOLS = new Set([
+/**
+ * Read-only Google Drive / Docs tools exposed via mysheets OAuth (drive.file scope).
+ * Always remained enabled when mysheets connection is active.
+ */
+export const MYSHEETS_DRIVE_READ_TOOLS = new Set([
   'mysheets.list_drive_files',
+  'mysheets.get_doc',
+]);
+
+/**
+ * High-risk Google Drive / Docs write tools exposed via mysheets OAuth.
+ * All 4 tools (create_drive_folder, create_doc, append_doc_text, move_drive_file)
+ * are temporarily blocked by default (Dual Kill-Switch OFF) until target allowlist
+ * and Docs API atomic append are enabled.
+ */
+export const MYSHEETS_DRIVE_WRITE_TOOLS = new Set([
   'mysheets.create_drive_folder',
   'mysheets.create_doc',
-  'mysheets.get_doc',
   'mysheets.append_doc_text',
   'mysheets.move_drive_file',
+]);
+
+const MYSHEETS_DRIVE_TOOLS = new Set([
+  ...MYSHEETS_DRIVE_READ_TOOLS,
+  ...MYSHEETS_DRIVE_WRITE_TOOLS,
 ]);
 
 export const SERVICE_TRANSPORTS: Record<string, ServiceTransport> = Object.fromEntries(
@@ -123,6 +141,8 @@ export async function getToolCatalogFor(
     gmailEnabled: boolean;
     mycalendarEnabled?: boolean;
     mysheetsEnabled?: boolean;
+    /** Server-owned kill-switch for the 4 MySheets Drive/Docs write tools (defaults to false). */
+    enableMySheetsDriveWriteTools?: boolean;
     trelloEnabled?: boolean;
     trelloTeamRepo?: any;
     trelloOAuthClient?: any;
@@ -206,10 +226,18 @@ export async function getToolCatalogFor(
           : Array.isArray(config.selectedSpreadsheets)
             ? config.selectedSpreadsheets.map((s: any) => s.id)
             : [];
-        const driveTools = MYSHEETS_TOOLS.filter((tool) => MYSHEETS_DRIVE_TOOLS.has(tool.name));
+        const driveWriteEnabled =
+          typeof options.enableMySheetsDriveWriteTools === 'boolean'
+            ? options.enableMySheetsDriveWriteTools
+            : process.env.ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS === 'true' ||
+              process.env.ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS === 'on';
+        const allowedMySheetsTools = MYSHEETS_TOOLS.filter(
+          (tool) => driveWriteEnabled || !MYSHEETS_DRIVE_WRITE_TOOLS.has(tool.name),
+        );
+        const driveTools = allowedMySheetsTools.filter((tool) => MYSHEETS_DRIVE_TOOLS.has(tool.name));
         catalog = [
           ...catalog,
-          ...(spreadsheets.length > 0 ? MYSHEETS_TOOLS : driveTools),
+          ...(spreadsheets.length > 0 ? allowedMySheetsTools : driveTools),
         ];
       } catch {
         // stale or unreadable connection does not add tools

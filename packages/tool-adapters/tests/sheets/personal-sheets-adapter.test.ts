@@ -31,6 +31,7 @@ function setup(options?: {
   tokenError?: Error;
   onTokenCall?: (opts?: { signal?: AbortSignal; forceRefresh?: boolean }) => void;
   apiBaseUrl?: string;
+  enableDriveWriteTools?: boolean;
 }) {
   const calls: Array<{ url: URL; init: RequestInit }> = [];
   const tokenCalls: Array<{ signal?: AbortSignal; forceRefresh?: boolean }> = [];
@@ -74,6 +75,7 @@ function setup(options?: {
     allowedScope: options?.allowedScope ?? { spreadsheets: [spreadsheetId] },
     fetchFn,
     apiBaseUrl: options?.apiBaseUrl,
+    enableDriveWriteTools: options?.enableDriveWriteTools,
     rateLimiter: new GlobalRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
   });
 
@@ -1186,8 +1188,9 @@ describe('PersonalSheetsAdapter', () => {
     expect(searched.matches[0]?.record.Notes).toHaveLength(500);
   });
 
-  it('supports Google Drive & Google Docs tools: list_drive_files, create_drive_folder, create_doc, get_doc, append_doc_text, and move_drive_file', async () => {
+  it('supports Google Drive & Google Docs tools: list_drive_files, create_drive_folder, create_doc, get_doc, append_doc_text, and move_drive_file when enableDriveWriteTools is enabled', async () => {
     const { adapter, calls } = setup({
+      enableDriveWriteTools: true,
       handler: (url, init) => {
         if (init.method === 'GET' && url.pathname === '/drive/v3/files') {
           return json({
@@ -1327,6 +1330,7 @@ describe('PersonalSheetsAdapter', () => {
   it('routes Drive and Docs tools to www.googleapis.com even when apiBaseUrl is https://sheets.googleapis.com', async () => {
     const { adapter, calls } = setup({
       apiBaseUrl: 'https://sheets.googleapis.com',
+      enableDriveWriteTools: true,
       handler: (url, init) => {
         if (init?.method === 'POST' && url.pathname === '/upload/drive/v3/files') {
           return json({
