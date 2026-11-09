@@ -1241,7 +1241,9 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
     expect(savedCred).not.toBeNull();
     expect(savedCred!.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
 
+    const personalScopeId = `personal:${owner.id}`;
     await teamRepo.replace({
+      scopeId: personalScopeId,
       chosenBy: owner.id,
       repos: [{ repoId: '101', fullName: 'nhom/ati', name: 'ati' }],
     });
@@ -1303,6 +1305,7 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
     const requestText = 'Mỗi sáng 8 giờ, gửi bản tin GitHub repo nhom/ati lên Slack #general';
     const digestCandidate = await evaluateGithubDigestCandidate({
       userId: owner.id,
+      scopeId: personalScopeId,
       request: requestText,
       services: ['github', 'slack'],
       recurrence: dailyRecurrence,
@@ -1393,5 +1396,183 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
     expect(slackMessages).toHaveLength(1);
     expect(slackMessages[0]!.channel).toBe('C0123456789');
     expect(slackMessages[0]!.text).toContain('Verify C1-03 pinned credential flow');
+  });
+
+  it('14. (R1-A1 + R1-C1) organization workspace digest runner uses workspaceId scopeId and fails closed if repo only exists in personal scope', async () => {
+    const encryptionKey = '01234567890123456789012345678901';
+    const credRepo = new CredentialRepo(db.pool);
+    const teamRepo = new GitHubTeamRepo(db.pool);
+
+    const orgWorkspaceId = (
+      await db.pool.query(
+        "INSERT INTO workspaces(name, invite_code, created_by) VALUES('Org R1-A1-C1', 'INV-R1A1C1', $1) RETURNING id",
+        [owner.id],
+      )
+    ).rows[0].id as string;
+    await db.pool.query(
+      "INSERT INTO workspace_members(workspace_id, user_id, role, status) VALUES($1, $2, 'admin', 'active')",
+      [orgWorkspaceId, owner.id],
+    );
+
+    await db.pool.query("DELETE FROM service_credentials WHERE service = 'github' AND user_id = $1", [owner.id]);
+    const encryptedGithub = encryptCredentials(
+      {
+        accessToken: 'gho_org_flow_token',
+        login: 'octocat',
+        githubUserId: '1001',
+        connectedAt: now.toISOString(),
+      },
+      encryptionKey,
+    );
+    await credRepo.saveCredentials('github', encryptedGithub, owner.id);
+    const savedCred = await credRepo.getPersonalConnectionStatus('github', owner.id);
+
+    // Select nhom/ati in orgWorkspaceId, NOT in personal scope
+    await db.pool.query('DELETE FROM github_team_scope WHERE id = $1', [`personal:${owner.id}`]);
+    await teamRepo.replace({
+      scopeId: orgWorkspaceId,
+      chosenBy: owner.id,
+      repos: [{ repoId: '101', fullName: 'nhom/ati', name: 'ati' }],
+    });
+
+    const fakeOAuthClient = {
+      repos: async () => [{ id: '101', name: 'ati', fullName: 'nhom/ati', private: false }],
+    } as any;
+    const tokens = new GitHubTokenManager({
+      client: fakeOAuthClient,
+      credentials: credRepo,
+    });
+    const githubLookup = createGitHubConnectionLookup({
+      credentialRepo: credRepo,
+      teamRepo,
+      encryptionKey,
+      tokens,
+      client: fakeOAuthClient,
+    });
+
+    const adapterContexts: Array<{ serviceName: string; workspaceId?: string | null; workspaceMode?: string }> = [];
+    const getAdapter = async (serviceName: string, ctx?: any) => {
+      adapterContexts.push({
+        serviceName,
+        workspaceId: ctx?.workspaceId,
+        workspaceMode: ctx?.workspaceMode,
+      });
+      if (serviceName === 'github') {
+        return {
+          execute: async (tool: string) => {
+            if (tool === 'github.search_issues') {
+              return [
+                {
+                  number: 99,
+                  title: 'Org workspace scoped digest issue',
+                  state: 'open',
+                  createdAt: new Date(now.getTime() - 3600_000).toISOString(),
+                  updatedAt: new Date(now.getTime() - 1800_000).toISOString(),
+                  assignees: ['octocat'],
+                  url: 'https://github.com/nhom/ati/issues/99',
+                },
+              ];
+            }
+            return [];
+          },
+        };
+      }
+      if (serviceName === 'slack') {
+        return {
+          execute: async (tool: string) => {
+            if (tool === 'slack.search_channels') {
+              return [{ id: 'C0123456789', name: 'general' }];
+            }
+            if (tool === 'slack.send_message') {
+              return { ok: true, ts: '1700000000.000200' };
+            }
+            return {};
+          },
+        };
+      }
+      throw new Error(`Unexpected service ${serviceName}`);
+    };
+
+    const requestText = 'Mỗi sáng 8 giờ, gửi bản tin GitHub repo nhom/ati lên Slack #general';
+    const digestCandidate = await evaluateGithubDigestCandidate({
+      userId: owner.id,
+      scopeId: orgWorkspaceId,
+      request: requestText,
+      services: ['github', 'slack'],
+      recurrence: dailyRecurrence,
+      githubConnection: githubLookup,
+      getAdapter,
+    });
+    expect(digestCandidate.canAutoDigest).toBe(true);
+    expect(digestCandidate.config?.credentialId).toBe(savedCred!.id);
+
+    const convId = (
+      await db.pool.query(
+        "INSERT INTO conversations(user_id, workspace_id, workspace_mode) VALUES($1, $2, 'organization') RETURNING id",
+        [owner.id, orgWorkspaceId],
+      )
+    ).rows[0].id as string;
+    const proposalMetadata = {
+      type: 'schedule_proposal',
+      proposal: {
+        kind: 'schedule',
+        action: 'create',
+        name: 'Bản tin GitHub Tổ chức',
+        request: requestText,
+        recurrence: dailyRecurrence,
+        summary: 'Mỗi sáng 8 giờ, gửi bản tin GitHub repo nhom/ati lên Slack #general.',
+      },
+      services: ['github', 'slack'],
+      nextRuns: ['2026-10-26T01:00:00.000Z'],
+      scheduleId: null,
+      baseVersion: null,
+      previous: null,
+      digestCandidate,
+    };
+    const msgId = (
+      await db.pool.query(
+        `INSERT INTO messages(conv_id, role, content, metadata)
+         VALUES($1, 'assistant', $2, $3::jsonb) RETURNING id`,
+        [convId, proposalMetadata.proposal.summary, JSON.stringify(proposalMetadata)],
+      )
+    ).rows[0].id as string;
+
+    const confirmed = await service.confirmProposal({
+      userId: owner.id,
+      convId,
+      messageId: msgId,
+      approvalMode: 'auto_digest',
+      now: new Date('2026-10-25T10:00:00.000Z'),
+    });
+
+    adapterContexts.length = 0;
+    const runner = createGithubDigestRunner({
+      pool: db.pool,
+      githubConnection: githubLookup,
+      getAdapter,
+    });
+    const scheduler = new ScheduleRunner({
+      pool: db.pool,
+      timeZone: VN,
+      now: () => now,
+      planRun: async () => ({ persist: async () => ({ state: 'needs_attention' }), afterCommit() {} }),
+      runGithubDigest: runner,
+      recordState: (client, row, at) => service.recordState(client, row, at),
+    });
+
+    await scheduler.tick();
+    await scheduler.stop();
+
+    const runRow = (
+      await db.pool.query(
+        'SELECT status, error FROM schedule_runs WHERE schedule_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [confirmed.schedule.id],
+      )
+    ).rows[0];
+    expect(runRow.status).toBe('digest_sent');
+    expect(adapterContexts).toEqual([
+      { serviceName: 'github', workspaceId: orgWorkspaceId, workspaceMode: 'organization' },
+      { serviceName: 'slack', workspaceId: orgWorkspaceId, workspaceMode: 'organization' },
+    ]);
   });
 });

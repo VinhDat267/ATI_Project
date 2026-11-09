@@ -9,12 +9,22 @@ import { certifyFixturePlan, fixtureConversation, fixtureMessage } from './persi
 const enabled = process.env.SANDBOX_SCENARIO === 'schedule';
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || '01234567890123456789012345678901';
 
-async function loginUser(page: Page, email: string, password: string) {
+async function loginUser(page: Page, email: string, password: string, workspaceId?: string) {
   await page.goto('/login');
   await page.getByLabel('Email', { exact: true }).fill(email);
   await page.getByLabel('Mật khẩu', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Hôm nay bạn muốn nhờ việc gì?');
+  if (workspaceId) {
+    await page.evaluate((wsId) => {
+      const rawUser = localStorage.getItem('wap_user');
+      const userId = rawUser ? JSON.parse(rawUser)?.id : null;
+      if (userId) {
+        localStorage.setItem(`wap_active_workspace_id:${userId}`, wsId);
+      }
+      localStorage.setItem('wap_active_workspace_id', wsId);
+    }, workspaceId);
+  }
 }
 
 test('GITHUB-DIGEST: [USER_FLOW_E2E] admin selects team repos, member connects from refusal card, and schedules an auto-digest run end-to-end', async ({ page }, testInfo) => {
@@ -30,6 +40,7 @@ test('GITHUB-DIGEST: [USER_FLOW_E2E] admin selects team repos, member connects f
   const memberId = randomUUID();
   const memberEmail = `github-member-${memberId}@example.test`;
   const memberPassword = 'Member@12345678';
+  const workspaceId = randomUUID();
   let refusalConvId = '';
 
   try {
@@ -57,7 +68,30 @@ test('GITHUB-DIGEST: [USER_FLOW_E2E] admin selects team repos, member connects f
       "INSERT INTO users(id, email, password, name, status, role, email_verified) VALUES($1, $2, $3, 'GitHub Member', 'active', 'member', true)",
       [memberId, memberEmail, hashPassword(memberPassword)]
     );
-    refusalConvId = await fixtureConversation(db, memberId);
+
+    // Seed an organization workspace where admin is 'admin' and member is 'member' (migration 0034 workspace-scoped team scope)
+    await db.query(
+      "INSERT INTO workspaces(id, name, invite_code, created_by) VALUES($1, 'ATI GitHub Workspace', $2, $3)",
+      [workspaceId, `GH-${workspaceId.slice(0, 8).toUpperCase()}`, adminId]
+    );
+    await db.query(
+      "INSERT INTO workspace_members(workspace_id, user_id, role, status) VALUES($1, $2, 'admin', 'active'), ($1, $3, 'member', 'active')",
+      [workspaceId, adminId, memberId]
+    );
+    await db.query(
+      `INSERT INTO service_credentials(id, service, user_id, workspace_id, config, status)
+       SELECT gen_random_uuid(), service, NULL, $1, config, status
+       FROM service_credentials
+       WHERE service = 'slack' AND user_id IS NULL AND workspace_id IS NULL`,
+      [workspaceId]
+    );
+
+    refusalConvId = (
+      await db.query(
+        "INSERT INTO conversations(user_id, workspace_id, workspace_mode) VALUES($1, $2, 'organization') RETURNING id",
+        [memberId, workspaceId]
+      )
+    ).rows[0].id as string;
     await fixtureMessage(db, refusalConvId, 'user', 'Tạo issue trên repo acme/ati');
     await fixtureMessage(
       db,
@@ -72,7 +106,7 @@ test('GITHUB-DIGEST: [USER_FLOW_E2E] admin selects team repos, member connects f
     );
 
     // 1. Admin logs in and selects two repositories (acme/ati and owner/repo) for the team via the real backend /api/connections/github/scope
-    await loginUser(page, process.env.CHAT_ADMIN_EMAIL!, process.env.CHAT_ADMIN_PASSWORD!);
+    await loginUser(page, process.env.CHAT_ADMIN_EMAIL!, process.env.CHAT_ADMIN_PASSWORD!, workspaceId);
 
     await page.goto('/settings#github');
     const adminGithubRow = page.locator('#service-row-github');
@@ -105,7 +139,7 @@ test('GITHUB-DIGEST: [USER_FLOW_E2E] admin selects team repos, member connects f
 
     // 2. Member logs in, opens the refusal conversation, connects GitHub via the real OAuth PKCE callback route, and returns to the same conversation
     await page.evaluate(() => localStorage.clear());
-    await loginUser(page, memberEmail, memberPassword);
+    await loginUser(page, memberEmail, memberPassword, workspaceId);
 
     await page.goto(`/c/${refusalConvId}`);
     const connectFromChatBtn = page.locator('#github-connect');
@@ -220,10 +254,12 @@ test('GITHUB-DIGEST: [SEEDED_INTEGRATION] extended GitHub tools plan destination
         ),
       ],
     );
+    const adminScopeId = `personal:${adminId}`;
     await db.query('DELETE FROM github_team_scope');
-    await db.query("INSERT INTO github_team_scope(id, chosen_by) VALUES('default', $1)", [adminId]);
+    await db.query('INSERT INTO github_team_scope(id, chosen_by) VALUES($1, $2)', [adminScopeId, adminId]);
     await db.query(
-      "INSERT INTO github_team_repos(scope_id, repo_id, full_name, name, position) VALUES('default', '100', 'owner/repo', 'repo', 1)",
+      "INSERT INTO github_team_repos(scope_id, repo_id, full_name, name, position) VALUES($1, '100', 'owner/repo', 'repo', 1)",
+      [adminScopeId],
     );
 
     // 1. Seed a conversation with a 4-step GitHub plan exercising create_issue (with assignees), update_issue, get_pull_request, and add_comment

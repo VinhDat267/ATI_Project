@@ -36,7 +36,7 @@ export type RunGithubDigest = (
 
 export interface GithubDigestRunnerOptions {
   pool: pg.Pool;
-  githubConnection?: (userId: string) => Promise<any>;
+  githubConnection?: (userId: string, scopeId?: string) => Promise<any>;
   telegramConnection?: (userId: string) => Promise<any>;
   getAdapter?: (serviceName: string, context?: any) => Promise<any> | any;
   summarizeDigest?: (
@@ -222,9 +222,14 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
       };
     }
 
+    const githubScopeId =
+      run.workspaceMode === 'organization' && run.workspaceId
+        ? run.workspaceId
+        : `personal:${run.userId}`;
+
     let gh: any;
     try {
-      gh = await options.githubConnection?.(run.userId);
+      gh = await options.githubConnection?.(run.userId, githubScopeId);
     } catch {
       gh = null;
     }
@@ -260,6 +265,8 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
     try {
       githubAdapter = await options.getAdapter?.('github', {
         userId: run.userId,
+        ...(run.workspaceId !== undefined ? { workspaceId: run.workspaceId } : {}),
+        ...(run.workspaceMode !== undefined ? { workspaceMode: run.workspaceMode } : {}),
         phase: 'execution',
         connections: {
           github: {
@@ -296,6 +303,8 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
         const telegramUsername = config.telegramUsername ?? tg?.connection?.username ?? '';
         telegramAdapter = await options.getAdapter?.('telegram', {
           userId: run.userId,
+          ...(run.workspaceId !== undefined ? { workspaceId: run.workspaceId } : {}),
+          ...(run.workspaceMode !== undefined ? { workspaceMode: run.workspaceMode } : {}),
           phase: 'execution',
           connections: {
             telegram: {
@@ -309,6 +318,8 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
       } else {
         slackAdapter = await options.getAdapter?.('slack', {
           userId: run.userId,
+          ...(run.workspaceId !== undefined ? { workspaceId: run.workspaceId } : {}),
+          ...(run.workspaceMode !== undefined ? { workspaceMode: run.workspaceMode } : {}),
           phase: 'execution',
         });
       }
