@@ -2,6 +2,10 @@ import { test, expect, type Page } from '@playwright/test';
 import pg from 'pg';
 import { createHash, randomUUID } from 'node:crypto';
 import { hashPassword } from '../../../chat-api/src/db/repositories/user-repo.js';
+import {
+  canonicalizeDigestConfig,
+  computeDigestConfigHash,
+} from '../../../chat-api/src/services/schedules/github-digest-candidate.js';
 import { certifyFixturePlan, fixtureConversation, fixtureMessage } from './persisted-artifacts.fixture.js';
 
 const enabled = process.env.SANDBOX_SCENARIO === 'schedule';
@@ -25,6 +29,7 @@ test('GITHUB-DIGEST: admin selects team repos, member connects from refusal card
 
   const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
   const memberId = randomUUID();
+  const memberCredId = randomUUID();
   const memberEmail = `github-member-${memberId}@example.test`;
   const memberPassword = 'Member@12345678';
   let refusalConvId = '';
@@ -33,6 +38,10 @@ test('GITHUB-DIGEST: admin selects team repos, member connects from refusal card
     await db.query(
       "INSERT INTO users(id, email, password, name, status, role, email_verified) VALUES($1, $2, $3, 'GitHub Member', 'active', 'member', true)",
       [memberId, memberEmail, hashPassword(memberPassword)]
+    );
+    await db.query(
+      "INSERT INTO service_credentials(id, service, user_id, workspace_id, config, status) VALUES($1, 'github', $2, NULL, $3, 'active')",
+      [memberCredId, memberId, JSON.stringify({ githubUserId: 'sandbox-gh-user', login: 'bob_octo' })]
     );
     refusalConvId = await fixtureConversation(db, memberId);
     await fixtureMessage(db, refusalConvId, 'user', 'Tạo issue trên repo acme/ati');
@@ -207,6 +216,26 @@ test('GITHUB-DIGEST: admin selects team repos, member connects from refusal card
 
     await expect(page.getByRole('status').filter({ hasText: 'Đang bật' })).toBeVisible();
     await expect(page.getByText('Tự gửi', { exact: true })).toBeVisible();
+
+    const schedRow = (
+      await db.query(
+        'SELECT id, recurrence, digest_config FROM schedules WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [memberId]
+      )
+    ).rows[0];
+    const pinnedDigestConfig = canonicalizeDigestConfig({
+      ...schedRow.digest_config,
+      credentialId: memberCredId,
+    });
+    const pinnedDigestHash = computeDigestConfigHash({
+      config: pinnedDigestConfig,
+      recurrence: schedRow.recurrence,
+      userId: memberId,
+    });
+    await db.query(
+      'UPDATE schedules SET digest_config = $1::jsonb, digest_config_hash = $2 WHERE id = $3',
+      [JSON.stringify(pinnedDigestConfig), pinnedDigestHash, schedRow.id]
+    );
 
     // Run now and verify the digest is sent automatically without waiting for manual approval
     await page.getByRole('button', { name: 'Chạy lượt này ngay' }).click();
