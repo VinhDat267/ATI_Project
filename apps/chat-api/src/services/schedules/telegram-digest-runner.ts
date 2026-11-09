@@ -642,8 +642,9 @@ export class TelegramDigestRunner {
         const pinnedCtx = await buildPinnedTelegramAdapterContext({
           pool: this.options.pool,
           scheduleId: run.scheduleId,
+          encryptionKey: this.options.encryptionKey,
         });
-        if (!pinnedCtx.allowed) {
+        if (!pinnedCtx.allowed || pinnedCtx.chatId !== targetChatId) {
           return {
             status: 'blocked',
             error: 'Kết nối hoặc phạm vi Telegram của lịch chạy không còn hợp lệ.',

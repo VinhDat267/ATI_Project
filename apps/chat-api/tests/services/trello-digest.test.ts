@@ -9,6 +9,9 @@ import { ScheduleService } from '../../src/services/schedules/schedule-service.j
 import { ScheduleRunner } from '../../src/services/schedules/schedule-runner.js';
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
 
+// Real personal Trello credential row pinned by the digest config (see PR-R1-C1 digest scope guard).
+const TRELLO_CRED_ID = '0b5c1f0e-7a6d-4c1e-9d2a-1a2b3c4d5e03';
+
 describe('Trello Automated Digest (Task 3: trello_digest & Telegram Trello enrichment)', () => {
   const userId = 'user-trello-1';
   const recurrence = { type: 'daily' as const, time: '08:30' };
@@ -23,7 +26,7 @@ describe('Trello Automated Digest (Task 3: trello_digest & Telegram Trello enric
         trelloConnection: async () => ({
           status: 'connected',
           connection: {
-            credentialId: 'cred-trello-1',
+            credentialId: TRELLO_CRED_ID,
             memberId: 'mem-1',
             username: 'alice_trello',
             boardIds: ['b1'],
@@ -42,7 +45,7 @@ describe('Trello Automated Digest (Task 3: trello_digest & Telegram Trello enric
 
       expect(candidate.canAutoDigest).toBe(true);
       expect(candidate.config).toEqual({
-        credentialId: 'cred-trello-1',
+        credentialId: TRELLO_CRED_ID,
         trelloMemberId: 'mem-1',
         username: 'alice_trello',
         boards: [{ id: 'b1', name: 'Frontend' }],
@@ -62,7 +65,7 @@ describe('Trello Automated Digest (Task 3: trello_digest & Telegram Trello enric
         trelloConnection: async () => ({
           status: 'connected',
           connection: {
-            credentialId: 'cred-trello-1',
+            credentialId: TRELLO_CRED_ID,
             memberId: 'mem-1',
             username: 'alice_trello',
             boardIds: ['b1'],
@@ -79,7 +82,7 @@ describe('Trello Automated Digest (Task 3: trello_digest & Telegram Trello enric
   describe('2. createTrelloDigestRunner', () => {
     it('scans overdue, due-soon, and unassigned Trello cards, includes AI summary, and sends Slack digest', async () => {
       const config = {
-        credentialId: 'cred-trello-1',
+        credentialId: TRELLO_CRED_ID,
         trelloMemberId: 'mem-1',
         username: 'alice_trello',
         boards: [{ id: 'b1', name: 'Frontend' }],
@@ -100,7 +103,7 @@ describe('Trello Automated Digest (Task 3: trello_digest & Telegram Trello enric
         trelloConnection: async () => ({
           status: 'connected',
           connection: {
-            credentialId: 'cred-trello-1',
+            credentialId: TRELLO_CRED_ID,
             memberId: 'mem-1',
             username: 'alice_trello',
             boardIds: ['b1'],
@@ -248,6 +251,11 @@ describe('Trello Automated Digest (Task 3: trello_digest & Telegram Trello enric
 
     it('confirms a trello_digest proposal in PostgreSQL and executes it on ScheduleRunner.tick()', async () => {
       const user = await db.person('TrelloDigestOwner');
+      await db.pool.query(
+        `INSERT INTO service_credentials (id, service, user_id, config, status) VALUES ($1, 'trello', $2, 'fixture', 'active')
+         ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, workspace_id = NULL, status = 'active'`,
+        [TRELLO_CRED_ID, user.id],
+      );
       const convRes = await db.pool.query(
         "INSERT INTO conversations(user_id, status, title) VALUES($1, 'chatting', 'Lịch Trello') RETURNING id",
         [user.id]
@@ -255,7 +263,7 @@ describe('Trello Automated Digest (Task 3: trello_digest & Telegram Trello enric
       const convId = convRes.rows[0].id as string;
 
       const config = {
-        credentialId: 'cred-trello-1',
+        credentialId: TRELLO_CRED_ID,
         trelloMemberId: 'mem-1',
         username: 'alice_trello',
         boards: [{ id: 'b1', name: 'Frontend' }],
@@ -329,7 +337,7 @@ describe('Trello Automated Digest (Task 3: trello_digest & Telegram Trello enric
           trelloConnection: async () => ({
             status: 'connected',
             connection: {
-              credentialId: 'cred-trello-1',
+              credentialId: TRELLO_CRED_ID,
               memberId: 'mem-1',
               username: 'alice_trello',
               boardIds: ['b1'],
@@ -390,6 +398,11 @@ describe('Trello Automated Digest (Task 3: trello_digest & Telegram Trello enric
 
     it('marks run as needs_attention on ambiguous delivery failure (blocking duplicate replan) and discards when schedule is cancelled before delivery', async () => {
       const user = await db.person('TrelloDigestSafetyOwner');
+      await db.pool.query(
+        `INSERT INTO service_credentials (id, service, user_id, config, status) VALUES ($1, 'trello', $2, 'fixture', 'active')
+         ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, workspace_id = NULL, status = 'active'`,
+        [TRELLO_CRED_ID, user.id],
+      );
       const convRes = await db.pool.query(
         "INSERT INTO conversations(user_id, status, title) VALUES($1, 'chatting', 'Lịch Trello Safety') RETURNING id",
         [user.id]
@@ -397,7 +410,7 @@ describe('Trello Automated Digest (Task 3: trello_digest & Telegram Trello enric
       const convId = convRes.rows[0].id as string;
 
       const config = {
-        credentialId: 'cred-trello-1',
+        credentialId: TRELLO_CRED_ID,
         trelloMemberId: 'mem-1',
         username: 'alice_trello',
         boards: [{ id: 'b1', name: 'Frontend' }],
@@ -451,7 +464,7 @@ describe('Trello Automated Digest (Task 3: trello_digest & Telegram Trello enric
           trelloConnection: async () => ({
             status: 'connected',
             connection: {
-              credentialId: 'cred-trello-1',
+              credentialId: TRELLO_CRED_ID,
               memberId: 'mem-1',
               username: 'alice_trello',
               boardIds: ['b1'],
@@ -529,7 +542,7 @@ describe('Trello Automated Digest (Task 3: trello_digest & Telegram Trello enric
           trelloConnection: async () => ({
             status: 'connected',
             connection: {
-              credentialId: 'cred-trello-1',
+              credentialId: TRELLO_CRED_ID,
               memberId: 'mem-1',
               username: 'alice_trello',
               boardIds: ['b1'],

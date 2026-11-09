@@ -11,6 +11,10 @@ import { createGithubDigestRunner, escapeSlackMrkdwn } from '../../../src/servic
 import { createMigratedSchema } from '../../helpers/gmail-test-db.js';
 
 const VN = 'Asia/Ho_Chi_Minh';
+// Real personal credential rows (service_credentials) pinned by the digest config; the live digest
+// scope guard (PR-R1-C1) rejects missing, malformed, stale or foreign credential pins.
+const GH_CRED_ID = '0b5c1f0e-7a6d-4c1e-9d2a-1a2b3c4d5e01';
+const TG_CRED_ID = '0b5c1f0e-7a6d-4c1e-9d2a-1a2b3c4d5e02';
 type Db = Awaited<ReturnType<typeof createMigratedSchema>>;
 type Person = Awaited<ReturnType<Db['person']>>;
 
@@ -21,7 +25,7 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
   let service: ScheduleService;
 
   const baseConfig: GithubDigestConfig = {
-    credentialId: 'cred-gh-1',
+    credentialId: GH_CRED_ID,
     githubUserId: '1001',
     login: 'octocat',
     repos: ['nhom/ati'],
@@ -71,6 +75,12 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
   beforeEach(async () => {
     await db.pool.query('DELETE FROM schedule_runs; DELETE FROM schedules;');
     owner = await db.person('Chủ lịch');
+    await db.pool.query(
+      `INSERT INTO service_credentials (id, service, user_id, config, status)
+       VALUES ($1, 'github', $3, 'fixture', 'active'), ($2, 'telegram', $3, 'fixture', 'active')
+       ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, workspace_id = NULL, status = 'active'`,
+      [GH_CRED_ID, TG_CRED_ID, owner.id],
+    );
     now = new Date('2026-10-26T01:00:10.000Z'); // 08:00:10 VN
     service = new ScheduleService({ pool: db.pool, timeZone: VN });
   });
@@ -98,7 +108,7 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
       githubConnection: async () => ({
         status: 'connected',
         connection: {
-          credentialId: 'cred-gh-1',
+          credentialId: GH_CRED_ID,
           githubUserId: '1001',
           login: 'octocat',
           repos: ['nhom/ati'],
@@ -189,7 +199,7 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
       githubConnection: async () => ({
         status: 'connected',
         connection: {
-          credentialId: 'cred-gh-1',
+          credentialId: GH_CRED_ID,
           githubUserId: '1001',
           login: 'octocat',
           repos: ['nhom/ati'],
@@ -261,7 +271,7 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
       githubConnection: async () => ({
         status: 'connected',
         connection: {
-          credentialId: 'cred-gh-1',
+          credentialId: GH_CRED_ID,
           githubUserId: '1001',
           login: 'octocat',
           repos: ['nhom/ati'],
@@ -301,7 +311,7 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
       githubConnection: async () => ({
         status: 'connected',
         connection: {
-          credentialId: 'cred-gh-1',
+          credentialId: GH_CRED_ID,
           githubUserId: '1001',
           login: 'octocat',
           repos: ['nhom/ati'],
@@ -367,7 +377,7 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
       githubConnection: async () => ({
         status: 'connected',
         connection: {
-          credentialId: 'cred-gh-1',
+          credentialId: GH_CRED_ID,
           githubUserId: '1001',
           login: 'octocat',
           repos: ['nhom/ati'],
@@ -415,7 +425,7 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
       githubConnection: async () => ({
         status: 'connected',
         connection: {
-          credentialId: 'cred-gh-1',
+          credentialId: GH_CRED_ID,
           githubUserId: '1001',
           login: 'octocat',
           repos: ['nhom/ati'],
@@ -482,7 +492,7 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
       githubConnection: async () => ({
         status: 'connected',
         connection: {
-          credentialId: 'cred-gh-1',
+          credentialId: GH_CRED_ID,
           githubUserId: '1001',
           login: 'octocat',
           repos: ['nhom/ati'],
@@ -492,7 +502,7 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
       telegramConnection: async () => ({
         status: 'connected',
         connection: {
-          credentialId: 'cred-tg-1',
+          credentialId: TG_CRED_ID,
           telegramUserId: '777',
           username: 'octo_tg',
           chatIds: ['-100999888'],
@@ -516,7 +526,7 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
       githubConnection: async () => ({
         status: 'connected',
         connection: {
-          credentialId: 'cred-gh-1',
+          credentialId: GH_CRED_ID,
           githubUserId: '1001',
           login: 'octocat',
           repos: ['nhom/ati'],
@@ -525,7 +535,7 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
       telegramConnection: async () => ({
         status: 'connected',
         connection: {
-          credentialId: 'cred-tg-1',
+          credentialId: TG_CRED_ID,
           telegramUserId: '777',
           username: 'octo_tg',
           chatIds: ['-100999888'],
@@ -574,7 +584,7 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
     const tg = {
       status: 'connected',
       connection: {
-        credentialId: 'cred-tg-1',
+        credentialId: TG_CRED_ID,
         telegramUserId: '777',
         username: 'octo_tg',
         chatIds: ['-100999888'],
@@ -584,7 +594,7 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
     const gh = {
       status: 'connected',
       connection: {
-        credentialId: 'cred-gh-1',
+        credentialId: GH_CRED_ID,
         githubUserId: '1001',
         login: 'octocat',
         repos: ['nhom/ati'],
@@ -608,10 +618,10 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
     });
 
     expect(candidate.canAutoDigest).toBe(true);
-    expect(candidate.config?.telegramCredentialId).toBe('cred-tg-1');
+    expect(candidate.config?.telegramCredentialId).toBe(TG_CRED_ID);
 
     const tgRecord = {
-      id: 'cred-tg-1',
+      id: TG_CRED_ID,
       status: 'active',
       config: encryptCredentials(
         { telegramUserId: '777', selectedChats: tg.selectedChats },
@@ -672,7 +682,7 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
     const tg = {
       status: 'connected',
       connection: {
-        credentialId: 'cred-tg-1',
+        credentialId: TG_CRED_ID,
         telegramUserId: '777',
         username: 'octo_tg',
         chatIds: ['-100999888'],
@@ -682,7 +692,7 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
     const gh = {
       status: 'connected',
       connection: {
-        credentialId: 'cred-gh-1',
+        credentialId: GH_CRED_ID,
         githubUserId: '1001',
         login: 'octocat',
         repos: ['nhom/ati'],
@@ -783,7 +793,7 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
     const gh = {
       status: 'connected',
       connection: {
-        credentialId: 'cred-gh-1',
+        credentialId: GH_CRED_ID,
         githubUserId: '1001',
         login: 'octocat',
         repos: ['nhom/ati'],
@@ -895,7 +905,7 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
     const gh = {
       status: 'connected',
       connection: {
-        credentialId: 'cred-gh-1',
+        credentialId: GH_CRED_ID,
         githubUserId: '1001',
         login: 'octocat',
         repos: ['nhom/ati'],
@@ -904,7 +914,7 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
     const tg = {
       status: 'connected',
       connection: {
-        credentialId: 'cred-tg-1',
+        credentialId: TG_CRED_ID,
         telegramUserId: '777',
         username: 'octo_tg',
         chatIds: ['-100999888'],
@@ -953,7 +963,7 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
           channelName: '',
           telegramChatId: '-100999888',
           telegramChatTitle: 'Dev Alerts',
-          telegramCredentialId: 'cred-tg-1',
+          telegramCredentialId: TG_CRED_ID,
           telegramUserId: '777',
           telegramUsername: 'octo_tg',
         };
