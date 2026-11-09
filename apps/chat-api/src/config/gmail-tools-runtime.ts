@@ -75,7 +75,9 @@ export async function runtimeToolCatalog(
 ) {
   const personal = await getToolCatalogFor(repo, key, options);
   const hasMyCalendar = personal.some((t) => t.service === 'mycalendar');
-  const hasMySheets = personal.some((t) => t.service === 'mysheets');
+  const hasMySheetsSpreadsheets = personal.some((t) => t.name === 'mysheets.read_range');
+  const isOrgMode = options.workspaceMode === 'organization' && Boolean(options.workspaceId);
+  const stripSharedSheets = hasMySheetsSpreadsheets && !isOrgMode;
   if (mode === 'live') {
     const hasSlack = personal.some((t) => t.service === 'slack');
     const hasSheets = personal.some((t) => t.service === 'sheets');
@@ -83,10 +85,10 @@ export async function runtimeToolCatalog(
       ...personal.filter(
         (t) =>
           (!hasMyCalendar || t.service !== 'calendar') &&
-          (!hasMySheets || t.service !== 'sheets')
+          (!stripSharedSheets || t.service !== 'sheets')
       ),
       ...(hasSlack ? SLACK_EXTENDED_TOOLS : []),
-      ...(hasSheets && !hasMySheets ? SHEETS_EXTENDED_TOOLS : []),
+      ...(hasSheets && !stripSharedSheets ? SHEETS_EXTENDED_TOOLS : []),
     ];
     return Array.from(new Map(unified.map((t) => [t.name, t])).values());
   }
@@ -98,10 +100,10 @@ export async function runtimeToolCatalog(
         t.service !== 'telegram' &&
         (!(options.myjiraEnabled && !sandboxKeepsSharedJira()) || t.service !== 'jira') &&
         (!hasMyCalendar || t.service !== 'calendar') &&
-        (!hasMySheets || t.service !== 'sheets')
+        (!stripSharedSheets || t.service !== 'sheets')
     ),
     ...SLACK_EXTENDED_TOOLS,
-    ...(!hasMySheets ? SHEETS_EXTENDED_TOOLS : []),
+    ...(!stripSharedSheets ? SHEETS_EXTENDED_TOOLS : []),
     ...NOTION_OAUTH_TOOLS,
     ...(process.env.SANDBOX_SCENARIO === 'nine_service' ? GMAIL_TOOLS : []),
   ];

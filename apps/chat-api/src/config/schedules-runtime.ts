@@ -2,6 +2,7 @@ import type pg from 'pg';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import type { RunCalendarDigest } from '../services/schedules/calendar-digest-runner.js';
 import { ScheduleService } from '../services/schedules/schedule-service.js';
+import type { FetchOrgSheetsMetadataFn } from '../services/schedules/sheets-digest-candidate.js';
 import { ScheduleRunner, reconcileScheduleRuns, type ExecuteDigestRun, type PlanRun } from '../services/schedules/schedule-runner.js';
 import {
   SheetsDigestRunner,
@@ -12,6 +13,14 @@ import {
 import type { RunGithubDigest } from '../services/schedules/github-digest-runner.js';
 import type { RunTrelloDigest } from '../services/schedules/trello-digest-runner.js';
 import type { RunNotionDigest } from '../services/schedules/notion-digest-runner.js';
+
+export function isSheetsDigestEmitV2Enabled(options?: { emitV2?: boolean }): boolean {
+  if (typeof options?.emitV2 === 'boolean') return options.emitV2;
+  const raw = process.env.SHEETS_DIGEST_EMIT_V2?.trim().toLowerCase();
+  if (raw === 'true' || raw === '1' || raw === 'on') return true;
+  if (raw === 'false' || raw === '0' || raw === 'off') return false;
+  return false;
+}
 
 export interface ScheduleRuntimeOptions {
   enabled: boolean;
@@ -30,6 +39,8 @@ export interface ScheduleRuntimeOptions {
   now?: () => Date;
   credentialRepo?: CredentialRepo;
   mysheetsEnabled?: boolean;
+  emitV2?: boolean;
+  fetchOrgSheetsMetadata?: FetchOrgSheetsMetadataFn;
   sheetsDigestV2Mode?: SheetsDigestV2Mode;
   sheetsDigestV1CompatPolicy?: SheetsDigestV1CompatPolicy;
   sheetsDigestRunner?: SheetsDigestRunner;
@@ -51,6 +62,8 @@ export function createScheduleRuntime(options: ScheduleRuntimeOptions) {
     credentialRepo: options.credentialRepo,
     encryptionKey: options.encryptionKey,
     mysheetsEnabled: options.mysheetsEnabled,
+    emitV2: options.emitV2,
+    fetchOrgSheetsMetadata: options.fetchOrgSheetsMetadata,
   });
   const sheetsDigestRunner =
     options.sheetsDigestRunner ??
