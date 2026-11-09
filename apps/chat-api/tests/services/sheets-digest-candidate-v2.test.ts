@@ -36,6 +36,7 @@ describe('Task 4 (PR-4): Two-Phase Candidate & Confirmation, Zero-V1-Downgrade F
   let fixtures: SheetsDigestTenantFixtures;
   let messageRepo: MessageRepo;
   const originalEmitV2Env = process.env.SHEETS_DIGEST_EMIT_V2;
+  const originalDriveDocsWritesEnv = process.env.MYSHEETS_DRIVE_DOCS_WRITES_ENABLED;
 
   beforeAll(async () => {
     db = await createMigratedSchema('sheets_digest_pr4_unit');
@@ -48,6 +49,7 @@ describe('Task 4 (PR-4): Two-Phase Candidate & Confirmation, Zero-V1-Downgrade F
 
   beforeEach(async () => {
     delete process.env.SHEETS_DIGEST_EMIT_V2;
+    delete process.env.MYSHEETS_DRIVE_DOCS_WRITES_ENABLED;
     await db.pool.query(
       'TRUNCATE sheets_digest_v2_migration_audit, schedule_runs, schedules, messages, conversations, workspace_members, workspaces, service_credentials CASCADE'
     );
@@ -62,6 +64,11 @@ describe('Task 4 (PR-4): Two-Phase Candidate & Confirmation, Zero-V1-Downgrade F
       delete process.env.SHEETS_DIGEST_EMIT_V2;
     } else {
       process.env.SHEETS_DIGEST_EMIT_V2 = originalEmitV2Env;
+    }
+    if (originalDriveDocsWritesEnv === undefined) {
+      delete process.env.MYSHEETS_DRIVE_DOCS_WRITES_ENABLED;
+    } else {
+      process.env.MYSHEETS_DRIVE_DOCS_WRITES_ENABLED = originalDriveDocsWritesEnv;
     }
     vi.restoreAllMocks();
   });
@@ -81,7 +88,18 @@ describe('Task 4 (PR-4): Two-Phase Candidate & Confirmation, Zero-V1-Downgrade F
       expect(liveNames.has('sheets.read_range')).toBe(true);
       expect(liveNames.has('sheets.search_rows')).toBe(true);
       expect(liveNames.has('mysheets.read_range')).toBe(true);
-      expect(liveNames.has('mysheets.create_doc')).toBe(true);
+      expect(liveNames.has('mysheets.create_doc')).toBe(false);
+
+      process.env.MYSHEETS_DRIVE_DOCS_WRITES_ENABLED = 'on';
+      const liveWithDriveDocs = await runtimeToolCatalog('live', credentialRepo, encryptionKey, {
+        userId: personalA.user.id,
+        workspaceMode: 'organization',
+        workspaceId: orgA.workspaceId,
+        gmailEnabled: true,
+        mysheetsEnabled: true,
+      });
+      expect(new Set(liveWithDriveDocs.map((t) => t.name)).has('mysheets.create_doc')).toBe(true);
+      delete process.env.MYSHEETS_DRIVE_DOCS_WRITES_ENABLED;
 
       const sandboxCatalog = await runtimeToolCatalog('sandbox', credentialRepo, encryptionKey, {
         userId: personalA.user.id,
@@ -98,6 +116,7 @@ describe('Task 4 (PR-4): Two-Phase Candidate & Confirmation, Zero-V1-Downgrade F
 
     it('never strips shared sheets.* when mysheets is Drive-only (0 selected spreadsheets) in legacy/personal mode, and strips sheets.* when mysheets has spreadsheets in legacy mode', async () => {
       const { legacy, personalA, credentialRepo, encryptionKey } = fixtures;
+      process.env.MYSHEETS_DRIVE_DOCS_WRITES_ENABLED = 'on';
 
       // Connect Drive-only mysheets (0 spreadsheets) for legacy.user
       const driveOnlyConfig = encryptCredentials(
