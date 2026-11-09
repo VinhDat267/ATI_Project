@@ -1,6 +1,38 @@
+import type { SheetsDigestDataScope } from '@wap/tool-schemas';
 import { StepError } from '../base-adapter.js';
 import { SHEETS_MAX_CELL_CHARS, clipText } from '../bounds.js';
 import { GlobalRateLimiter } from '../rate-limiter.js';
+
+export const SHEETS_DIGEST_MAX_DATA_ROWS = 500;
+export const SHEETS_DIGEST_SCAN_ROW_LIMIT = 502; // 1 header row + 500 data rows + 1 overflow probe row
+export const SHEETS_DIGEST_MAX_COLUMNS = 26;     // A..Z
+
+export interface ReadDigestWindowInput {
+  spreadsheetId: string;
+  sheetName?: string;
+  range?: string;
+  tailRows?: number;
+}
+
+export interface ReadDigestWindowResult {
+  spreadsheetId: string;
+  sheetTitle: string;
+  scannedRange: string;
+  explicitRangeRequested: boolean;
+  dataScope: SheetsDigestDataScope;
+  windowClipped: boolean;
+  rowLimitExceeded: boolean;
+  columnLimitExceeded: boolean;
+  gridRowCapacity: number | null;
+  gridColumnCapacity: number | null;
+  populatedRowCountInWindow: number;
+  totalDataRows: number;
+  headers: string[];
+  records: Array<Record<string, string>>;
+  values: string[][];
+  tailRecords: Array<Record<string, string>>;
+  tailValues: string[][];
+}
 
 export const spreadsheetPattern = /^[A-Za-z0-9_-]{20,}$/;
 export const SHEETS_API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets/';
@@ -1133,4 +1165,427 @@ export function buildPartialCellUpdates(
     updatedRowsCount: updatedRowSet.size,
     unmatchedKeys,
   };
+}
+
+const CELL_COORD_PARSE_RE = /^([A-Za-z]{1,3})([1-9]\d*)(?::([A-Za-z]{1,3})([1-9]\d*))?$/;
+
+function columnLettersToOneBased(letters: string): number {
+  let col = 0;
+  const upper = letters.toUpperCase();
+  for (let i = 0; i < upper.length; i++) {
+    col = col * 26 + (upper.charCodeAt(i) - 64);
+  }
+  return col;
+}
+
+function unquoteSheetToken(token: string): string {
+  const trimmed = token.trim();
+  if (trimmed.startsWith("'") && trimmed.endsWith("'") && trimmed.length >= 2) {
+    return trimmed.slice(1, -1).replaceAll("''", "'");
+  }
+  return trimmed;
+}
+
+export function quoteSheetTitle(title: string): string {
+  return /^[\p{L}\p{N}_-]+$/u.test(title) ? title : `'${title.replaceAll("'", "''")}'`;
+}
+
+export interface ResolvedDigestScanWindow {
+  requestedSheetTitle?: string;
+  a1Spec: string;
+  explicitRangeRequested: boolean;
+  requestedRowOverflow: boolean;
+  requestedColOverflow: boolean;
+  tailCount: number;
+}
+
+export function resolveDigestScanWindow(input: ReadDigestWindowInput): ResolvedDigestScanWindow {
+  let explicitSheetName: string | undefined;
+  if (input.sheetName !== undefined) {
+    if (typeof input.sheetName !== 'string') {
+      invalid('tab title is invalid');
+    }
+    const trimmedSheet = input.sheetName.trim();
+    if (trimmedSheet !== '') {
+      explicitSheetName = titleText(unquoteSheetToken(trimmedSheet));
+    }
+  }
+
+  let tailCount = 20;
+  if (input.tailRows !== undefined) {
+    if (typeof input.tailRows !== 'number' || !Number.isFinite(input.tailRows) || input.tailRows < 1) {
+      invalid('tail is outside its allowed range');
+    }
+    tailCount = Math.min(Math.max(1, Math.trunc(input.tailRows)), 50);
+  }
+
+  if (input.range === undefined || (typeof input.range === 'string' && input.range.trim() === '')) {
+    return {
+      requestedSheetTitle: explicitSheetName,
+      a1Spec: `A1:Z${SHEETS_DIGEST_SCAN_ROW_LIMIT}`,
+      explicitRangeRequested: false,
+      requestedRowOverflow: false,
+      requestedColOverflow: false,
+      tailCount,
+    };
+  }
+
+  if (
+    typeof input.range !== 'string' ||
+    input.range.length > 200 ||
+    /[\[\]\/\\?#\u0000-\u001f]/.test(input.range)
+  ) {
+    invalid('range must be a local A1 cell range');
+  }
+
+  const trimmedRange = input.range.trim();
+  const bangIdx = trimmedRange.indexOf('!');
+  let rangeSheetTitle: string | undefined;
+  let spec = '';
+
+  if (bangIdx !== -1) {
+    const rawSheet = trimmedRange.slice(0, bangIdx);
+    spec = trimmedRange.slice(bangIdx + 1);
+    if (!rawSheet || !SHEET_TITLE_TOKEN_RE.test(rawSheet) || spec.includes('!')) {
+      invalid('range must be a local A1 cell range');
+    }
+    rangeSheetTitle = titleText(unquoteSheetToken(rawSheet));
+  } else if (
+    TAIL_SPEC_RE.test(trimmedRange) ||
+    COL_RANGE_RE.test(trimmedRange) ||
+    CELL_COORD_PARSE_RE.test(trimmedRange)
+  ) {
+    rangeSheetTitle = undefined;
+    spec = trimmedRange;
+  } else if (SHEET_TITLE_TOKEN_RE.test(trimmedRange)) {
+    rangeSheetTitle = titleText(unquoteSheetToken(trimmedRange));
+    spec = '';
+  } else {
+    invalid('range must be a local A1 cell range');
+  }
+
+  const requestedSheetTitle = rangeSheetTitle ?? explicitSheetName;
+
+  if (spec === '') {
+    return {
+      requestedSheetTitle,
+      a1Spec: `A1:Z${SHEETS_DIGEST_SCAN_ROW_LIMIT}`,
+      explicitRangeRequested: false,
+      requestedRowOverflow: false,
+      requestedColOverflow: false,
+      tailCount,
+    };
+  }
+
+  const tailMatch = TAIL_SPEC_RE.exec(spec);
+  if (tailMatch) {
+    const parsedTail = Number(tailMatch[1]);
+    if (!Number.isInteger(parsedTail) || parsedTail < 1) {
+      invalid('range must be a local A1 cell range');
+    }
+    const effectiveTail =
+      input.tailRows !== undefined ? tailCount : Math.min(Math.max(1, parsedTail), 50);
+    return {
+      requestedSheetTitle,
+      a1Spec: `A1:Z${SHEETS_DIGEST_SCAN_ROW_LIMIT}`,
+      explicitRangeRequested: false,
+      requestedRowOverflow: false,
+      requestedColOverflow: false,
+      tailCount: effectiveTail,
+    };
+  }
+
+  const colMatch = COL_RANGE_RE.exec(spec);
+  if (colMatch) {
+    const colStartLetters = colMatch[1]!.toUpperCase();
+    const colEndLetters = colMatch[2]!.toUpperCase();
+    const colStart = columnLettersToOneBased(colStartLetters);
+    const colEnd = columnLettersToOneBased(colEndLetters);
+    if (colEnd < colStart) {
+      invalid('range must be a local A1 cell range');
+    }
+    const requestedColOverflow = colEnd > SHEETS_DIGEST_MAX_COLUMNS;
+    const clampedStart = colStart > SHEETS_DIGEST_MAX_COLUMNS ? 'Z' : colStartLetters;
+    const clampedEnd = colEnd > SHEETS_DIGEST_MAX_COLUMNS ? 'Z' : colEndLetters;
+    return {
+      requestedSheetTitle,
+      a1Spec: `${clampedStart}1:${clampedEnd}${SHEETS_DIGEST_SCAN_ROW_LIMIT}`,
+      explicitRangeRequested: false,
+      requestedRowOverflow: false,
+      requestedColOverflow,
+      tailCount,
+    };
+  }
+
+  const cellMatch = CELL_COORD_PARSE_RE.exec(spec);
+  if (cellMatch) {
+    const colStartLetters = cellMatch[1]!.toUpperCase();
+    const rowStart = Number(cellMatch[2]);
+    const colEndLetters = (cellMatch[3] ?? cellMatch[1])!.toUpperCase();
+    const rowEnd = cellMatch[4] ? Number(cellMatch[4]) : rowStart;
+    const colStart = columnLettersToOneBased(colStartLetters);
+    const colEnd = columnLettersToOneBased(colEndLetters);
+    if (colEnd < colStart || rowEnd < rowStart) {
+      invalid('range must be a local A1 cell range');
+    }
+    const maxAllowedRowSpan = SHEETS_DIGEST_MAX_DATA_ROWS + 1; // 1 header + 500 data rows = 501
+    const requestedRowSpan = rowEnd - rowStart + 1;
+    const requestedRowOverflow = requestedRowSpan > maxAllowedRowSpan;
+    const clampedRowEnd = requestedRowOverflow ? rowStart + maxAllowedRowSpan : rowEnd;
+    const requestedColOverflow = colEnd > SHEETS_DIGEST_MAX_COLUMNS;
+    const clampedStart = colStart > SHEETS_DIGEST_MAX_COLUMNS ? 'Z' : colStartLetters;
+    const clampedEnd = colEnd > SHEETS_DIGEST_MAX_COLUMNS ? 'Z' : colEndLetters;
+    const a1Spec = cellMatch[3]
+      ? `${clampedStart}${rowStart}:${clampedEnd}${clampedRowEnd}`
+      : `${clampedStart}${rowStart}`;
+    return {
+      requestedSheetTitle,
+      a1Spec,
+      explicitRangeRequested: true,
+      requestedRowOverflow,
+      requestedColOverflow,
+      tailCount,
+    };
+  }
+
+  invalid('range must be a local A1 cell range');
+}
+
+export function classifyDigestDataScope(params: {
+  explicitRangeRequested: boolean;
+  windowClipped: boolean;
+  gridRowCapacity: number | null;
+  gridColumnCapacity: number | null;
+}): SheetsDigestDataScope {
+  const { explicitRangeRequested, windowClipped, gridRowCapacity, gridColumnCapacity } = params;
+  if (
+    !explicitRangeRequested &&
+    !windowClipped &&
+    gridRowCapacity !== null &&
+    gridRowCapacity <= SHEETS_DIGEST_MAX_DATA_ROWS + 1 &&
+    gridColumnCapacity !== null &&
+    gridColumnCapacity <= SHEETS_DIGEST_MAX_COLUMNS
+  ) {
+    return 'full_tab_verified';
+  }
+  if (explicitRangeRequested && !windowClipped) {
+    return 'full_requested_range';
+  }
+  return 'partial';
+}
+
+export function transformDigestWindowValues(params: {
+  spreadsheetId: string;
+  sheetTitle: string;
+  scannedRange: string;
+  explicitRangeRequested: boolean;
+  requestedRowOverflow: boolean;
+  requestedColOverflow: boolean;
+  gridRowCapacity: number | null;
+  gridColumnCapacity: number | null;
+  tailCount: number;
+  rawValues: unknown[][];
+}): ReadDigestWindowResult {
+  const {
+    spreadsheetId,
+    sheetTitle,
+    scannedRange,
+    explicitRangeRequested,
+    requestedRowOverflow,
+    requestedColOverflow,
+    gridRowCapacity,
+    gridColumnCapacity,
+    tailCount,
+    rawValues,
+  } = params;
+
+  const nonEmptyRawRows = [...rawValues];
+  while (
+    nonEmptyRawRows.length > 0 &&
+    nonEmptyRawRows[nonEmptyRawRows.length - 1]!.every(
+      (cell) => String(cell ?? '').trim() === ''
+    )
+  ) {
+    nonEmptyRawRows.pop();
+  }
+
+  if (nonEmptyRawRows.length === 0) {
+    const rowLimitExceeded = requestedRowOverflow;
+    const columnLimitExceeded = requestedColOverflow;
+    const windowClipped = rowLimitExceeded || columnLimitExceeded;
+    const dataScope = classifyDigestDataScope({
+      explicitRangeRequested,
+      windowClipped,
+      gridRowCapacity,
+      gridColumnCapacity,
+    });
+    return {
+      spreadsheetId,
+      sheetTitle,
+      scannedRange,
+      explicitRangeRequested,
+      dataScope,
+      windowClipped,
+      rowLimitExceeded,
+      columnLimitExceeded,
+      gridRowCapacity,
+      gridColumnCapacity,
+      populatedRowCountInWindow: 0,
+      totalDataRows: 0,
+      headers: [],
+      records: [],
+      values: [],
+      tailRecords: [],
+      tailValues: [],
+    };
+  }
+
+  const columnLimitExceeded =
+    requestedColOverflow ||
+    nonEmptyRawRows.some((row) => Array.isArray(row) && row.length > SHEETS_DIGEST_MAX_COLUMNS);
+
+  const normalizedRows: string[][] = nonEmptyRawRows.map((row) =>
+    (Array.isArray(row) ? row : [])
+      .slice(0, SHEETS_DIGEST_MAX_COLUMNS)
+      .map((cell) => clipText(cell == null ? '' : String(cell), SHEETS_MAX_CELL_CHARS).text)
+  );
+
+  const headerRow = normalizedRows[0]!;
+  const headers = headerRow.map((h, idx) => h.trim() || `col_${idx + 1}`);
+  const allDataRows = normalizedRows.slice(1);
+  const populatedDataRows = allDataRows.filter((row) => row.some((cell) => cell.trim() !== ''));
+
+  const maxTotalRowsWithoutOverflow = SHEETS_DIGEST_MAX_DATA_ROWS + 1; // 501
+  const rowLimitExceeded =
+    requestedRowOverflow ||
+    populatedDataRows.length > SHEETS_DIGEST_MAX_DATA_ROWS ||
+    normalizedRows.length > maxTotalRowsWithoutOverflow;
+
+  const cappedDataRows = populatedDataRows.slice(0, SHEETS_DIGEST_MAX_DATA_ROWS);
+  const populatedRowCountInWindow = cappedDataRows.length;
+  const totalDataRows = populatedRowCountInWindow;
+
+  const records = cappedDataRows.map((row) => {
+    const record: Record<string, string> = {};
+    for (let i = 0; i < headers.length; i++) {
+      record[headers[i]!] = row[i] ?? '';
+    }
+    return record;
+  });
+
+  const values = [headerRow, ...cappedDataRows];
+  const boundedTail = Math.min(Math.max(1, tailCount), 50);
+  const tailDataRows = cappedDataRows.slice(-boundedTail);
+  const tailRecords = records.slice(-boundedTail);
+  const tailValues = [headerRow, ...tailDataRows];
+
+  const windowClipped = rowLimitExceeded || columnLimitExceeded;
+  const dataScope = classifyDigestDataScope({
+    explicitRangeRequested,
+    windowClipped,
+    gridRowCapacity,
+    gridColumnCapacity,
+  });
+
+  return {
+    spreadsheetId,
+    sheetTitle,
+    scannedRange,
+    explicitRangeRequested,
+    dataScope,
+    windowClipped,
+    rowLimitExceeded,
+    columnLimitExceeded,
+    gridRowCapacity,
+    gridColumnCapacity,
+    populatedRowCountInWindow,
+    totalDataRows,
+    headers,
+    records,
+    values,
+    tailRecords,
+    tailValues,
+  };
+}
+
+export async function executeReadDigestWindow(
+  spreadsheetId: string,
+  input: ReadDigestWindowInput,
+  requestFn: (path: string, signal?: AbortSignal) => Promise<any>,
+  signal?: AbortSignal
+): Promise<ReadDigestWindowResult> {
+  const resolvedScan = resolveDigestScanWindow(input);
+  const metaFields = 'sheets.properties(sheetId,title,gridProperties(rowCount,columnCount))';
+  const meta = await requestFn(
+    `${spreadsheetId}?fields=${encodeURIComponent(metaFields)}`,
+    signal
+  );
+
+  if (
+    !Array.isArray(meta?.sheets) ||
+    meta.sheets.length === 0 ||
+    meta.sheets.some((tab: any) => typeof tab?.properties?.title !== 'string')
+  ) {
+    badResponse();
+  }
+
+  let matchedTab: any;
+  if (resolvedScan.requestedSheetTitle !== undefined) {
+    const target = resolvedScan.requestedSheetTitle;
+    matchedTab =
+      meta.sheets.find((t: any) => t.properties.title === target) ??
+      meta.sheets.find((t: any) => t.properties.title.toLowerCase() === target.toLowerCase());
+    if (!matchedTab) {
+      throw new StepError({
+        message: 'Sheets tab not found in the allowed spreadsheet',
+        category: 'NOT_FOUND',
+        statusCode: 404,
+      });
+    }
+  } else {
+    matchedTab = meta.sheets[0];
+  }
+
+  const sheetTitle: string = matchedTab.properties.title;
+  const rawGridRows = matchedTab.properties?.gridProperties?.rowCount;
+  const rawGridCols = matchedTab.properties?.gridProperties?.columnCount;
+  const gridRowCapacity =
+    typeof rawGridRows === 'number' && Number.isInteger(rawGridRows) && rawGridRows >= 0
+      ? rawGridRows
+      : null;
+  const gridColumnCapacity =
+    typeof rawGridCols === 'number' && Number.isInteger(rawGridCols) && rawGridCols >= 0
+      ? rawGridCols
+      : null;
+
+  const quotedSheet = quoteSheetTitle(sheetTitle);
+  const scannedRange = `${quotedSheet}!${resolvedScan.a1Spec}`;
+
+  const value = await requestFn(
+    `${spreadsheetId}/values/${encodeURIComponent(scannedRange)}`,
+    signal
+  );
+
+  if (
+    typeof value?.range !== 'string' ||
+    (value.values !== undefined &&
+      (!Array.isArray(value.values) || value.values.some((row: unknown) => !Array.isArray(row))))
+  ) {
+    badResponse();
+  }
+
+  const rawValues: unknown[][] = Array.isArray(value.values) ? value.values : [];
+
+  return transformDigestWindowValues({
+    spreadsheetId,
+    sheetTitle,
+    scannedRange,
+    explicitRangeRequested: resolvedScan.explicitRangeRequested,
+    requestedRowOverflow: resolvedScan.requestedRowOverflow,
+    requestedColOverflow: resolvedScan.requestedColOverflow,
+    gridRowCapacity,
+    gridColumnCapacity,
+    tailCount: resolvedScan.tailCount,
+    rawValues,
+  });
 }

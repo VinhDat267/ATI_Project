@@ -277,6 +277,40 @@ async function bootstrap() {
   let digestRunnerImpl: RunGithubDigest | undefined;
   let trelloDigestRunnerImpl: RunTrelloDigest | undefined;
   let notionDigestRunnerImpl: RunNotionDigest | undefined;
+  const fetchOrgSheetsMetadata = async (input: {
+    credentialId: string;
+    allowedSpreadsheetIds: string[];
+    workspaceId: string | null;
+    signal?: AbortSignal;
+  }) => {
+    const signal = input.signal
+      ? AbortSignal.any([input.signal, AbortSignal.timeout(5_000)])
+      : AbortSignal.timeout(5_000);
+    const adapter = await (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(
+      'sheets',
+      {
+        phase: 'planning',
+        workspaceMode: 'organization',
+        ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
+      }
+    );
+    const listed = await adapter.execute(
+      'sheets.list_spreadsheets',
+      { query: '', limit: 10 },
+      { signal }
+    );
+    const listArr = Array.isArray(listed) ? listed : [];
+    const titleById = new Map<string, string>();
+    for (const item of listArr) {
+      if (item && typeof item.id === 'string' && typeof item.title === 'string') {
+        titleById.set(item.id, item.title);
+      }
+    }
+    return input.allowedSpreadsheetIds.map((id) => ({
+      id,
+      title: titleById.get(id) ?? id,
+    }));
+  };
   const schedules = createScheduleRuntime({
     enabled: env.SCHEDULES_ENABLED,
     pool: pool && userRepo ? pool : null,
@@ -284,16 +318,34 @@ async function bootstrap() {
     encryptionKey: env.ENCRYPTION_KEY,
     credentialRepo: credRepo,
     mysheetsEnabled: mysheetsAvailable,
-    createSheetsDigestAdapter: (serviceId, userId, config) =>
-      (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(serviceId, {
+    fetchOrgSheetsMetadata,
+    createSheetsDigestAdapter: (serviceId, userId, config, scheduleContext) => {
+      const workspaceMode = scheduleContext
+        ? scheduleContext.workspaceMode
+        : 'workspaceMode' in config
+          ? config.workspaceMode
+          : 'legacy';
+      const workspaceId = scheduleContext
+        ? scheduleContext.workspaceId
+        : 'workspaceId' in config
+          ? config.workspaceId
+          : null;
+      if ('workspaceMode' in config) {
+        if (config.workspaceMode !== workspaceMode || (config.workspaceId ?? null) !== (workspaceId ?? null)) {
+          throw new Error('Schedule workspace context mismatch in createSheetsDigestAdapter');
+        }
+      }
+      return (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(serviceId, {
         userId,
         phase: 'execution',
+        workspaceMode,
+        ...(workspaceId ? { workspaceId } : {}),
         connections: {
           ...(config.source.service === 'mysheets' && config.source.credentialId
             ? {
                 mysheets: {
                   credentialId: config.source.credentialId,
-                  email: '',
+                  email: config.source.email ?? '',
                   allowedSpreadsheets: [config.source.spreadsheetId],
                 },
               }
@@ -302,12 +354,28 @@ async function bootstrap() {
             ? {
                 gmail: {
                   credentialId: config.destination.credentialId,
-                  email: '',
+                  email:
+                    'senderEmail' in config.destination && config.destination.senderEmail
+                      ? config.destination.senderEmail
+                      : '',
+                },
+              }
+            : {}),
+          ...(config.destination.service === 'telegram' &&
+          'credentialId' in config.destination &&
+          config.destination.credentialId
+            ? {
+                telegram: {
+                  credentialId: config.destination.credentialId,
+                  telegramUserId: '',
+                  username: '',
+                  chatIds: [config.destination.chatId],
                 },
               }
             : {}),
         },
-      }),
+      });
+    },
     summarizeSheetsDigestWithAi: async (prompt, signal) => {
       if (typeof provider?.generateText !== 'function') return '';
       return provider.generateText(
@@ -689,6 +757,7 @@ async function bootstrap() {
           credentialRepo: credRepo,
           encryptionKey: env.ENCRYPTION_KEY,
           mysheetsEnabled: mysheetsAvailable,
+          fetchOrgSheetsMetadata,
           evaluateDigestCandidate: pool
             ? async (input) =>
                 (

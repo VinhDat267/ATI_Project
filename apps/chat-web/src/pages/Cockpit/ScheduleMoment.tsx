@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ScheduleApprovalMode, ScheduleView } from '@wap/tool-schemas';
+import type { ScheduleApprovalMode, ScheduleView, SheetsDigestPreviewInfo } from '@wap/tool-schemas';
 import type { ChatMessage } from '../../types';
 import { apiClient } from '../../services/api-client';
 import { describeRecurrence, formatRunTime, scheduleLabel } from '../../services/schedule-text';
@@ -41,17 +41,19 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
   const convId = props.convId ?? 'conv-default';
   const navigate = props.navigate ?? (() => {});
   const onEdit = props.onEdit ?? (() => {});
+  const isReauthorize = Boolean((message.metadata as any)?.reauthorize);
   const [ignored, setIgnored] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [confirmed, setConfirmed] = useState<ScheduleView | null>(null);
-  const [approvalMode, setApprovalMode] = useState<ScheduleApprovalMode>('manual');
+  const [approvalMode, setApprovalMode] = useState<ScheduleApprovalMode>(() => (isReauthorize ? 'auto_digest' : 'manual'));
   const locked = useRef(false);
   const currentMessage = useRef(message.id); currentMessage.current = message.id;
-  useEffect(() => { setIgnored(false); setConfirmed(null); setApprovalMode('manual'); }, [message.id]);
+  useEffect(() => { setIgnored(false); setConfirmed(null); setApprovalMode((message.metadata as any)?.reauthorize ? 'auto_digest' : 'manual'); }, [message.id, (message.metadata as any)?.reauthorize]);
   const metadata = message.metadata!;
   const schedule = confirmed ?? metadata.schedule;
   const proposal = metadata.proposal;
   const previous = metadata.previous;
   const digestCandidate = (props.digestCandidate ?? metadata.digestCandidate) as any;
+  const sheetsPreview = digestCandidate?.preview as SheetsDigestPreviewInfo | undefined;
   const isTelegramCandidate = Boolean(
     digestCandidate &&
       !Array.isArray(digestCandidate?.config?.repos) &&
@@ -154,7 +156,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
           ? isEligible
             ? await apiClient.confirmSchedule(convId, message.id, approvalMode)
             : await apiClient.confirmSchedule(convId, message.id)
-          : approvalMode === 'auto_digest'
+          : approvalMode === 'auto_digest' || isReauthorize
             ? await apiClient.confirmSchedule(convId, message.id, 'auto_digest')
             : await apiClient.confirmSchedule(convId, message.id);
       if (currentMessage.current === message.id) setConfirmed(result.schedule); schedulesChanged();
@@ -210,6 +212,15 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
         <p className="text-sm text-[#4B5563] [overflow-wrap:anywhere]">{schedule.request}</p>
         <ScheduleActions schedule={schedule} navigate={navigate} onChanged={setConfirmed} onConflict={() => reloadScheduleConversation(convId)} /></>
         : proposal && <>{manage ? <p className="text-sm text-[#4B5563]">{proposal.action === 'cancel' ? 'Lịch đã hủy không bật lại được.' : proposal.summary}</p> : <>
+          {isReauthorize && (
+            <div
+              data-testid="reauthorize-proposal-banner"
+              className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 v3-space-y-1"
+            >
+              <p className="font-semibold">Đề xuất cấp quyền lại lịch Google Sheets (v2)</p>
+              <p>Xác nhận lại nguồn bảng tính, kênh nhận và phạm vi tài khoản gửi tự động trước khi bật lại lịch.</p>
+            </div>
+          )}
           {proposal.action === 'update' && previous?.name !== proposal.name && change('Tên lịch', previous?.name, proposal.name)}
           {change('Thời gian', previous ? describeRecurrence(previous.recurrence) : undefined, proposal.recurrence ? describeRecurrence(proposal.recurrence) : undefined)}
           {change('Việc sẽ làm', previous?.request, proposal.request)}
@@ -512,12 +523,13 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
               {digestCandidate && (
                 <fieldset className="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] v3-space-y-2.5">
                   <legend className="text-xs font-semibold text-[#111827] px-1">Chế độ khi tới giờ</legend>
-                  <label className="flex items-start gap-2.5 text-xs sm:text-sm text-[#111827] cursor-pointer">
+                  <label className={`flex items-start gap-2.5 text-xs sm:text-sm ${isReauthorize ? 'text-[#9CA3AF] cursor-not-allowed' : 'text-[#111827] cursor-pointer'}`}>
                     <input
                       type="radio"
                       name={`schedule-mode-${message.id}`}
+                      disabled={isReauthorize}
                       checked={approvalMode === 'manual'}
-                      onChange={() => setApprovalMode('manual')}
+                      onChange={() => { if (!isReauthorize) setApprovalMode('manual'); }}
                       className="mt-0.5"
                     />
                     <span>Chờ tôi duyệt mỗi lượt (mặc định)</span>
@@ -550,6 +562,32 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                     </span>
                   </label>
                 </fieldset>
+              )}
+              {sheetsPreview && (
+                <div
+                  data-testid="sheets-digest-v2-preview"
+                  className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 text-xs text-[#111827] v3-space-y-1.5"
+                >
+                  <p className="font-semibold text-emerald-950">Chi tiết phạm vi tự gửi Google Sheets (v2):</p>
+                  <p>
+                    <span className="font-semibold">Nguồn dữ liệu:</span> {sheetsPreview.sourceConnectionLabel} · Chủ sở hữu/Tài khoản: {sheetsPreview.sourceOwnerLabel}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Bảng tính &amp; vùng đọc:</span> {sheetsPreview.spreadsheetTitle} ({sheetsPreview.sheetName ? `${sheetsPreview.sheetName} · ` : ''}{sheetsPreview.requestedRangeLabel})
+                  </p>
+                  <p>
+                    <span className="font-semibold">Kênh nhận &amp; tài khoản gửi:</span> {sheetsPreview.destinationConnectionLabel} → {sheetsPreview.destinationTargetLabel}
+                  </p>
+                  {sheetsPreview.crossBoundaryWarning && (
+                    <div
+                      data-testid="sheets-digest-cross-boundary-warning"
+                      role="note"
+                      className="mt-2 p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 font-medium"
+                    >
+                      {sheetsPreview.crossBoundaryWarning}
+                    </div>
+                  )}
+                </div>
               )}
               <p className="text-sm text-[#4B5563] leading-relaxed">
                 {approvalMode === 'auto_digest'
