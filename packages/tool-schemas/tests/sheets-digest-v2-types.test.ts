@@ -368,4 +368,34 @@ describe('SheetsDigestConfigV2 & Gate A recovery schema contracts', () => {
     expect(sourceV2.credentialId).toBe('cred-1');
     expect(destV2.credentialId).toBe('cred-2');
   });
+
+  it('supports honest manual-resolution SheetsDigestDelivery shape with null rowCount/sentAt/providerSentAt and manualConfirmedAt', () => {
+    const manualResolution: SheetsDigestManualResolution = {
+      status: 'confirmed_sent',
+      resolvedAt: '2026-11-08T08:05:00.000Z',
+      manualConfirmedAt: '2026-11-08T08:05:00.000Z',
+      resolvedBy: 'user-1',
+    };
+
+    const manualDelivery: SheetsDigestDelivery = {
+      destination: 'slack',
+      targetId: 'C123',
+      targetLabel: '#finance-alerts',
+      spreadsheetId: 'sheet-123',
+      spreadsheetTitle: 'Q4 Revenue',
+      sheetName: 'Transactions',
+      rowCount: null,
+      summaryMode: 'deterministic',
+      sentAt: null,
+      providerSentAt: null,
+      manualConfirmedAt: '2026-11-08T08:05:00.000Z',
+      manualResolution,
+    };
+
+    expect(manualDelivery.rowCount).toBeNull();
+    expect(manualDelivery.sentAt).toBeNull();
+    expect(manualDelivery.providerSentAt).toBeNull();
+    expect(manualDelivery.manualConfirmedAt).toBe('2026-11-08T08:05:00.000Z');
+    expect(manualDelivery.manualResolution?.manualConfirmedAt).toBe('2026-11-08T08:05:00.000Z');
+  });
 });

@@ -379,6 +379,7 @@ export interface SheetsDigestCandidate {
 export interface SheetsDigestManualResolution {
   status: 'confirmed_sent';
   resolvedAt: string;
+  manualConfirmedAt?: string;
   resolvedBy: string;
 }
 
@@ -389,12 +390,18 @@ export interface SheetsDigestDelivery {
   spreadsheetId: string;
   spreadsheetTitle: string;
   sheetName?: string;
-  rowCount: number;
+  rowCount: number | null;
   dataScope?: SheetsDigestDataScope;
   scannedRange?: string;
   windowClipped?: boolean;
   summaryMode: 'ai' | 'deterministic';
-  sentAt: string;
+  sentAt: string | null;
+  providerSentAt?: string | null;
+  manualConfirmedAt?: string;
+  slackMessageTs?: string;
+  telegramMessageId?: string | number;
+  gmailMessageId?: string;
+  skippedEmpty?: boolean;
   manualResolution?: SheetsDigestManualResolution;
 }
 

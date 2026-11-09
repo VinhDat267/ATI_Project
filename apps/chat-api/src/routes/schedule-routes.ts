@@ -157,5 +157,18 @@ export function createScheduleRoutes(options: ScheduleRoutesOptions): Router {
     res.status(201).json({ run: await service.startRun({ userId, runId: String(req.params.id), trigger: 'replan', now: now(), scope }) });
   }));
 
+  router.post('/schedule-runs/:id/resolve-delivery', handle(async (req, res, userId) => {
+    const scope = req.workspace ? { workspaceMode: req.workspace.mode, workspaceId: req.workspace.workspaceId } : undefined;
+    const result = await service.resolveRunDelivery({
+      userId,
+      runId: String(req.params.id),
+      resolution: req.body?.resolution,
+      confirmDuplicateRisk: req.body?.confirmDuplicateRisk,
+      now: now(),
+      scope,
+    });
+    res.json(result);
+  }));
+
   return router;
 }

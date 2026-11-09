@@ -13,6 +13,7 @@ import {
   type ScheduleView,
   type SheetsDigestCandidate,
   type SheetsDigestConfig,
+  type SheetsDigestDelivery,
   type TelegramDigestConfig,
   type TelegramDigestCandidate,
   type TrelloDigestConfig,
@@ -66,8 +67,19 @@ export const SCHEDULE_CONFLICTS = {
     'Kết nối hoặc phạm vi quyền của lịch đã thay đổi. Vui lòng xem lại bản xem trước và xác nhận cấp quyền lại trước khi bật lịch.',
   REAUTHORIZATION_NOT_READY:
     'Chưa đủ kết nối hoặc quyền truy cập hợp lệ để cấp quyền lại cho lịch này.',
+  DELIVERY_ALREADY_RESOLVED:
+    'Lượt chạy này đã được xử lý trạng thái gửi trước đó.',
+  RUN_NOT_AWAITING_DELIVERY_RESOLUTION:
+    'Lượt chạy này không ở trạng thái chờ xác nhận kết quả gửi.',
 } as const;
 export type ScheduleConflictCode = keyof typeof SCHEDULE_CONFLICTS;
+
+const SCHEDULE_BAD_REQUESTS: Record<string, string> = {
+  BAD_REQUEST: 'Yêu cầu xử lý lịch không hợp lệ.',
+  INVALID_DELIVERY_RESOLUTION: 'Lựa chọn xử lý trạng thái gửi không hợp lệ.',
+  DUPLICATE_RISK_CONFIRMATION_REQUIRED:
+    'Vui lòng xác nhận rủi ro gửi trùng trước khi tạo lượt gửi bù.',
+};
 
 export class ScheduleConflict extends Error {
   constructor(readonly code: ScheduleConflictCode, customMessage?: string) {
@@ -78,8 +90,17 @@ export class ScheduleNotFound extends Error {
   constructor() { super('Không tìm thấy lịch.'); }
 }
 export class ScheduleBadRequest extends Error {
-  constructor(message: string, readonly code = 'BAD_REQUEST') {
-    super(message);
+  readonly code: string;
+  constructor(codeOrMessage: string, messageOrCode?: string) {
+    if (/^[A-Z][A-Z0-9_]*$/.test(codeOrMessage)) {
+      const code = codeOrMessage;
+      const message = messageOrCode ?? SCHEDULE_BAD_REQUESTS[code] ?? code;
+      super(message);
+      this.code = code;
+    } else {
+      super(codeOrMessage);
+      this.code = messageOrCode ?? 'BAD_REQUEST';
+    }
   }
 }
 
@@ -1440,7 +1461,17 @@ export class ScheduleService {
       if (input.trigger === 'replan') {
         const previous = await this.repo.run(input.runId, client);
         if (!previous || !await this.repo.ownedSchedule(previous.schedule_id, userId, client, false, scope)) throw new ScheduleNotFound();
-        if (!REPLANNABLE.has(runState(previous, now))) throw new ScheduleConflict('RUN_NOT_REPLANNABLE');
+        const prevState = runState(previous, now);
+        if (
+          prevState === 'needs_attention' ||
+          previous.status === 'needs_attention' ||
+          previous.delivery_resolution != null ||
+          (previous.delivery_started_at != null && previous.status !== 'digest_failed') ||
+          (typeof previous.error === 'string' && previous.error.includes('SHEETS_DELIVERY_UNKNOWN')) ||
+          !REPLANNABLE.has(prevState)
+        ) {
+          throw new ScheduleConflict('RUN_NOT_REPLANNABLE');
+        }
         scheduleId = previous.schedule_id;
       } else {
         scheduleId = input.scheduleId;
@@ -1459,5 +1490,322 @@ export class ScheduleService {
     });
     this.options.runner?.planNow(row.id).catch((error) => console.error('[schedules] planning a run failed:', error instanceof Error ? error.message : error));
     return runView(row, now);
+  }
+
+  async resolveRunDelivery(input: {
+    userId: string;
+    runId: string;
+    resolution: 'mark_sent' | 'retry_new_run' | string;
+    confirmDuplicateRisk?: boolean;
+    now?: Date;
+    scope?: ScheduleScope;
+  }): Promise<{
+    run: ScheduleRunView;
+    followUpRun: ScheduleRunView | null;
+    schedule: ScheduleView;
+  }> {
+    const { userId, runId, resolution, confirmDuplicateRisk, scope } = input;
+    const now = input.now ?? new Date();
+    if (!isUuid(userId) || !isUuid(runId)) throw new ScheduleNotFound();
+
+    const committed = await this.transaction(async (client) => {
+      const lookup = await client.query<{
+        run_id: string;
+        schedule_id: string;
+        user_id: string;
+        workspace_id: string | null;
+        workspace_mode: string | null;
+      }>(
+        `SELECT r.id AS run_id, s.id AS schedule_id, s.user_id, s.workspace_id, s.workspace_mode
+         FROM schedule_runs r
+         JOIN schedules s ON s.id = r.schedule_id
+         WHERE r.id = $1`,
+        [runId],
+      );
+      const meta = lookup.rows[0];
+      if (!meta || meta.user_id !== userId) throw new ScheduleNotFound();
+      if (scope) {
+        if (
+          scope.workspaceMode === 'personal' &&
+          (meta.workspace_id != null || !['personal', 'legacy', undefined, null].includes(meta.workspace_mode))
+        ) {
+          throw new ScheduleNotFound();
+        }
+        if (
+          scope.workspaceMode === 'organization' &&
+          (!scope.workspaceId || meta.workspace_mode !== 'organization' || meta.workspace_id !== scope.workspaceId)
+        ) {
+          throw new ScheduleNotFound();
+        }
+        if (scope.workspaceMode === 'legacy' && meta.workspace_id != null) {
+          throw new ScheduleNotFound();
+        }
+      }
+
+      if (resolution !== 'mark_sent' && resolution !== 'retry_new_run') {
+        throw new ScheduleBadRequest('INVALID_DELIVERY_RESOLUTION');
+      }
+      if (resolution === 'retry_new_run' && confirmDuplicateRisk !== true) {
+        throw new ScheduleBadRequest(
+          'DUPLICATE_RISK_CONFIRMATION_REQUIRED',
+          'Vui lòng xác nhận rủi ro gửi trùng trước khi tạo lượt gửi bù.',
+        );
+      }
+
+      // Canonical lock order: c -> s -> u/wm -> r -> r.conv_id
+      const schedule = await this.lockSchedule(client, meta.schedule_id, userId, scope);
+      if (!schedule) throw new ScheduleNotFound();
+      if (schedule.kind !== 'sheets_digest') {
+        throw new ScheduleConflict(
+          'RUN_NOT_AWAITING_DELIVERY_RESOLUTION',
+          'Chỉ lượt chạy Google Sheets Digest mới hỗ trợ xử lý trạng thái gửi không xác định.',
+        );
+      }
+      if (schedule.status === 'cancelled') {
+        throw new ScheduleConflict('SCHEDULE_CLOSED');
+      }
+
+      const trustedScope = resolveTrustedScheduleScope(schedule);
+      const userRes = await client.query<{ status: string }>(
+        'SELECT status FROM users WHERE id = $1 FOR SHARE',
+        [userId],
+      );
+      if (userRes.rows[0]?.status !== 'active') {
+        throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', 'Tài khoản người dùng không còn hoạt động.');
+      }
+      if (trustedScope.workspaceMode === 'organization') {
+        if (!trustedScope.workspaceId || !isUuid(trustedScope.workspaceId)) {
+          throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+        }
+        const memberRes = await client.query<{ status: string }>(
+          'SELECT status FROM workspace_members WHERE workspace_id = $1 AND user_id = $2 FOR SHARE',
+          [trustedScope.workspaceId, userId],
+        );
+        if (memberRes.rows[0]?.status !== 'active') {
+          throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', 'Quyền thành viên trong Tổ chức không còn hiệu lực.');
+        }
+      }
+
+      const run = await this.repo.runForUpdate(runId, client);
+      if (!run || run.schedule_id !== schedule.id) throw new ScheduleNotFound();
+
+      if (run.delivery_resolution != null) {
+        throw new ScheduleConflict(
+          'DELIVERY_ALREADY_RESOLVED',
+          'Lượt chạy này đã được xử lý trạng thái gửi trước đó.',
+        );
+      }
+      if (
+        run.status !== 'needs_attention' ||
+        run.delivery_started_at == null ||
+        typeof run.error !== 'string' ||
+        !run.error.includes('SHEETS_DELIVERY_UNKNOWN')
+      ) {
+        throw new ScheduleConflict(
+          'RUN_NOT_AWAITING_DELIVERY_RESOLUTION',
+          'Lượt chạy này không ở trạng thái chờ xác nhận kết quả gửi (SHEETS_DELIVERY_UNKNOWN).',
+        );
+      }
+
+      const resolvedAtIso = now.toISOString();
+      const targetConvId = run.conv_id ?? schedule.conv_id;
+
+      if (resolution === 'mark_sent') {
+        const cfg =
+          schedule.digest_config && typeof schedule.digest_config === 'object'
+            ? (schedule.digest_config as SheetsDigestConfig)
+            : null;
+        const src = cfg?.source;
+        const dest = cfg?.destination;
+        const prevDelivery =
+          run.delivery && typeof run.delivery === 'object'
+            ? (run.delivery as Partial<SheetsDigestDelivery>)
+            : null;
+        const fallbackTargetId =
+          dest && 'channelId' in dest
+            ? dest.channelId
+            : dest?.service === 'gmail'
+              ? dest.recipientEmail
+              : dest?.service === 'telegram'
+                ? dest.chatId
+                : 'unknown';
+        const fallbackTargetLabel =
+          dest && 'channelId' in dest
+            ? (dest as any).channelLabel ?? dest.channelId
+            : dest?.service === 'telegram'
+              ? (dest as any).chatLabel ?? dest.chatId
+              : dest?.service === 'gmail'
+                ? dest.recipientEmail
+                : undefined;
+        const effectiveTargetLabel = prevDelivery?.targetLabel ?? fallbackTargetLabel;
+        const effectiveSheetName = prevDelivery?.sheetName ?? src?.sheetName;
+
+        const delivery: SheetsDigestDelivery = {
+          destination: prevDelivery?.destination ?? dest?.service ?? 'telegram',
+          targetId: prevDelivery?.targetId ?? fallbackTargetId,
+          ...(effectiveTargetLabel ? { targetLabel: effectiveTargetLabel } : {}),
+          spreadsheetId: prevDelivery?.spreadsheetId ?? src?.spreadsheetId ?? '',
+          spreadsheetTitle: prevDelivery?.spreadsheetTitle ?? src?.spreadsheetTitle ?? '',
+          ...(effectiveSheetName ? { sheetName: effectiveSheetName } : {}),
+          rowCount: typeof prevDelivery?.rowCount === 'number' ? prevDelivery.rowCount : null,
+          ...(prevDelivery?.dataScope ? { dataScope: prevDelivery.dataScope } : {}),
+          ...(prevDelivery?.scannedRange ? { scannedRange: prevDelivery.scannedRange } : {}),
+          ...(typeof prevDelivery?.windowClipped === 'boolean'
+            ? { windowClipped: prevDelivery.windowClipped }
+            : {}),
+          summaryMode:
+            prevDelivery?.summaryMode === 'ai' || prevDelivery?.summaryMode === 'deterministic'
+              ? prevDelivery.summaryMode
+              : cfg?.includeAiSummary
+                ? 'ai'
+                : 'deterministic',
+          sentAt: typeof prevDelivery?.sentAt === 'string' ? prevDelivery.sentAt : null,
+          providerSentAt:
+            typeof prevDelivery?.providerSentAt === 'string'
+              ? prevDelivery.providerSentAt
+              : typeof prevDelivery?.sentAt === 'string'
+                ? prevDelivery.sentAt
+                : null,
+          manualConfirmedAt: resolvedAtIso,
+          ...(typeof prevDelivery?.slackMessageTs === 'string'
+            ? { slackMessageTs: prevDelivery.slackMessageTs }
+            : {}),
+          ...(prevDelivery?.telegramMessageId !== undefined
+            ? { telegramMessageId: prevDelivery.telegramMessageId }
+            : {}),
+          ...(typeof prevDelivery?.gmailMessageId === 'string'
+            ? { gmailMessageId: prevDelivery.gmailMessageId }
+            : {}),
+          ...(typeof prevDelivery?.skippedEmpty === 'boolean'
+            ? { skippedEmpty: prevDelivery.skippedEmpty }
+            : {}),
+          manualResolution: {
+            status: 'confirmed_sent',
+            resolvedAt: resolvedAtIso,
+            manualConfirmedAt: resolvedAtIso,
+            resolvedBy: userId,
+          },
+        };
+
+        const updatedRes = await client.query(
+          `UPDATE schedule_runs
+           SET status = 'digest_sent',
+               error = NULL,
+               delivery = $2::jsonb,
+               delivery_resolution = 'confirmed_sent',
+               delivery_resolved_at = $3,
+               delivery_resolved_by = $4,
+               updated_at = now()
+           WHERE id = $1 AND delivery_resolution IS NULL
+           RETURNING *`,
+          [run.id, JSON.stringify(delivery), now, userId],
+        );
+        if (!updatedRes.rowCount) {
+          throw new ScheduleConflict(
+            'DELIVERY_ALREADY_RESOLVED',
+            'Lượt chạy này đã được xử lý trạng thái gửi trước đó.',
+          );
+        }
+        const updatedRunRow = updatedRes.rows[0]!;
+
+        const auditText =
+          'Người dùng đã xác nhận thủ công rằng báo cáo của lượt chạy này đã được gửi tới đích.';
+        await this.messages.createMessage(
+          targetConvId,
+          'system',
+          auditText,
+          {
+            type: 'schedule_delivery_resolved',
+            scheduleId: schedule.id,
+            runId: run.id,
+            resolution: 'mark_sent',
+            deliveryResolution: 'confirmed_sent',
+            resolvedAt: resolvedAtIso,
+            resolvedBy: userId,
+          },
+          client,
+        );
+
+        const scheduleView = this.repo.view(schedule, await this.repo.lastRun(schedule.id, client), now);
+        return {
+          run: runView(updatedRunRow, now),
+          followUpRun: null as ScheduleRunView | null,
+          schedule: scheduleView,
+        };
+      }
+
+      // Branch B: resolution === 'retry_new_run' with confirmDuplicateRisk === true
+      await this.assertSheetsDigestCanResumeInTx(client, schedule);
+      const busy = await client.query(
+        "SELECT 1 FROM schedule_runs WHERE schedule_id = $1 AND status = 'planning'",
+        [schedule.id],
+      );
+      if (busy.rowCount) {
+        throw new ScheduleConflict('RUN_IN_PROGRESS');
+      }
+
+      const newRunRes = await client.query(
+        `INSERT INTO schedule_runs (schedule_id, schedule_version, trigger, due_at, status)
+         VALUES ($1, $2, 'manual', $3, 'planning')
+         RETURNING *`,
+        [schedule.id, schedule.version, now],
+      );
+      const newRunRow = newRunRes.rows[0]!;
+
+      const updatedOldRes = await client.query(
+        `UPDATE schedule_runs
+         SET delivery_resolution = 'retried_new_run',
+             delivery_resolved_at = $2,
+             delivery_resolved_by = $3,
+             delivery_followup_run_id = $4,
+             updated_at = now()
+         WHERE id = $1 AND delivery_resolution IS NULL
+         RETURNING *`,
+        [run.id, now, userId, newRunRow.id],
+      );
+      if (!updatedOldRes.rowCount) {
+        throw new ScheduleConflict(
+          'DELIVERY_ALREADY_RESOLVED',
+          'Lượt chạy này đã được xử lý trạng thái gửi trước đó.',
+        );
+      }
+      const updatedOldRow = updatedOldRes.rows[0]!;
+
+      const auditText = `Người dùng đã xác nhận rủi ro gửi trùng và yêu cầu tạo lượt chạy bù mới (${newRunRow.id}).`;
+      await this.messages.createMessage(
+        targetConvId,
+        'system',
+        auditText,
+        {
+          type: 'schedule_delivery_resolved',
+          scheduleId: schedule.id,
+          runId: run.id,
+          resolution: 'retry_new_run',
+          deliveryResolution: 'retried_new_run',
+          followUpRunId: newRunRow.id,
+          confirmDuplicateRisk: true,
+          resolvedAt: resolvedAtIso,
+          resolvedBy: userId,
+        },
+        client,
+      );
+
+      const scheduleView = this.repo.view(schedule, await this.repo.lastRun(schedule.id, client), now);
+      return {
+        run: runView(updatedOldRow, now),
+        followUpRun: runView(newRunRow, now),
+        schedule: scheduleView,
+      };
+    });
+
+    if (committed.followUpRun) {
+      this.options.runner
+        ?.planNow(committed.followUpRun.id)
+        .catch((error) =>
+          console.error('[schedules] planning a follow-up run failed:', error instanceof Error ? error.message : error),
+        );
+    }
+
+    return committed;
   }
 }
