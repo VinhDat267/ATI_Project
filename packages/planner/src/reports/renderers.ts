@@ -43,9 +43,16 @@ export interface SheetSummaryData {
   records?: SheetSummaryRow[];
   headers?: string[];
   values?: (string | number | null | undefined)[][];
-  groups?: Array<{ key: string; count: number; metrics?: Record<string, number> }>;
+  groups?: Array<{ key: string | Record<string, unknown>; count: number; metrics?: Record<string, number> }>;
   totalRowsScanned?: number;
   matchedRows?: number;
+  totalMatched?: number;
+  matches?: Array<{
+    rowNumber?: number;
+    values?: (string | number | null | undefined)[];
+    record?: SheetSummaryRow;
+  }>;
+  totals?: Record<string, number>;
 }
 
 export interface RenderedReport {
@@ -365,7 +372,16 @@ export function renderSheetSummaryReport(
       `Báo cáo tổng hợp số liệu Google Sheets${spreadsheetLabel}:`,
       `Tổng số dòng đã đối chiếu: ${total}`,
       ...data.groups.map((g) => {
-        const key = sanitizeReportString(g.key) || 'Khác';
+        const rawKey =
+          typeof g.key === 'string'
+            ? g.key
+            : g.key && typeof g.key === 'object'
+              ? Object.values(g.key)
+                  .map((v) => sanitizeReportString(String(v ?? '')))
+                  .filter(Boolean)
+                  .join(' / ')
+              : String(g.key ?? '');
+        const key = sanitizeReportString(rawKey) || 'Khác';
         const pct = total > 0 ? Math.round((g.count / total) * 100) : 0;
         return `- ${key}: ${g.count} (${pct}%)`;
       }),
@@ -378,10 +394,24 @@ export function renderSheetSummaryReport(
     };
   }
 
-  // Case 2: Array of records or values
+  // Case 2: Array of records, matches (from search_rows), or values
   let rows: SheetSummaryRow[] = [];
   if (Array.isArray(data.records)) {
     rows = data.records;
+  } else if (Array.isArray(data.matches)) {
+    rows = data.matches.map((m) => {
+      if (m && typeof m === 'object' && m.record && typeof m.record === 'object' && !Array.isArray(m.record)) {
+        return m.record;
+      }
+      if (m && typeof m === 'object' && Array.isArray(m.values) && Array.isArray(data.headers)) {
+        const obj: SheetSummaryRow = {};
+        data.headers.forEach((h, idx) => {
+          obj[h] = m.values?.[idx];
+        });
+        return obj;
+      }
+      return m && typeof m === 'object' ? (m as SheetSummaryRow) : {};
+    });
   } else if (Array.isArray(data.values) && Array.isArray(data.headers)) {
     const headers = data.headers;
     rows = data.values.map((row) => {
@@ -441,6 +471,24 @@ export function renderSheetSummaryReport(
     }
     if (validCount > 0) {
       lines.push(`- Tổng ${sanitizeReportString(metricKey)}: ${formatFactualNumber(sum, locale)}`);
+    }
+  }
+
+  // When no grouping or metric column is requested (e.g. search_rows or plain read_range summary), render verified row summaries
+  if (!options?.groupBy && !options?.metricColumn) {
+    const limit = options?.limit ?? 10;
+    const itemsToRender = rows.slice(0, limit);
+    for (const r of itemsToRender) {
+      const parts = Object.entries(r)
+        .map(([k, v]) => {
+          const sk = sanitizeReportString(k);
+          const sv = sanitizeReportString(v === null || v === undefined ? '' : String(v));
+          return sk && sv ? `${sk}: ${sv}` : '';
+        })
+        .filter(Boolean);
+      if (parts.length > 0) {
+        lines.push(`- ${parts.join(' | ')}`);
+      }
     }
   }
 

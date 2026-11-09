@@ -1,4 +1,4 @@
-import { SERVICE_REGISTRY, requiresReportEvidence, reportLiteralBodies, reportOutputTargets, REPORT_SOURCE_TOOLS, type ToolDefinition, type PlannerResponse, type ServiceDefinition, type GatherRule, type AnswerLookup, type ReportKind } from '@wap/tool-schemas';
+import { SERVICE_REGISTRY, requiresReportEvidence, reportLiteralBodies, reportOutputTargets, isWorkItemWriteStep, REPORT_SOURCE_TOOLS, type ToolDefinition, type PlannerResponse, type ServiceDefinition, type GatherRule, type AnswerLookup, type ReportKind } from '@wap/tool-schemas';
 import type { LLMProvider, ChatMessage, PlanningPhaseMetrics } from './types.js';
 import { WorkingMemory } from './working-memory.js';
 import { routeIntent, unavailableServiceReason, type RoutedIntent } from './router.js';
@@ -285,8 +285,32 @@ export class AIPlanner {
     const targets = reportOutputTargets(parsed.steps);
     const primary = targets.at(-1);
     if (!primary) return rawOutput;
-    if (targets.some(target => /^(?:github|myjira|jira|trello)\./.test(parsed.steps.find((s: any) => s.id === target.stepId).tool))) {
-      return JSON.stringify({ kind: 'clarification', question: 'Bạn muốn nội dung công việc mới là báo cáo dữ liệu hay một nội dung riêng? Hãy tách hoặc xác nhận nội dung để tôi giữ đúng từng phần.', context: 'Yêu cầu kết hợp báo cáo với nội dung tạo/cập nhật công việc; chưa gửi hoặc thay đổi dữ liệu.' });
+
+    const hasWorkItemStep = parsed.steps.some((s: any) => isWorkItemWriteStep(s));
+    if (hasWorkItemStep) {
+      const alreadyClarifiedWorkItem = (input.history ?? []).some(
+        (msg) =>
+          msg.role === 'assistant' &&
+          typeof msg.content === 'string' &&
+          msg.content.includes('Bạn muốn nội dung công việc mới là báo cáo dữ liệu hay một nội dung riêng?'),
+      );
+      const hasDedicatedNotificationTarget = targets.some((target) => {
+        const step = parsed.steps.find((s: any) => s.id === target.stepId);
+        return step && !isWorkItemWriteStep(step);
+      });
+      const hasExplicitWorkItemPayload = groundingUserTexts.some((text) =>
+        /(?:với\s+|with\s+)?(?:tiêu\s+đề|tieu\s+de|title)\s*[:=]?\s*(?:"[^"\n]+"|“[^”\n]+”|'[^'\n]+').*(?:nội\s+dung|noi\s+dung|mô\s+tả|mo\s+ta|body|description)\s*[:=]?\s*(?:"[^"\n]+"|“[^”\n]+”|'[^'\n]+')/iu.test(
+          text,
+        ),
+      );
+      if (!alreadyClarifiedWorkItem && !(hasDedicatedNotificationTarget && hasExplicitWorkItemPayload)) {
+        return JSON.stringify({
+          kind: 'clarification',
+          question:
+            'Bạn muốn nội dung công việc mới là báo cáo dữ liệu hay một nội dung riêng? Hãy tách hoặc xác nhận nội dung để tôi giữ đúng từng phần.',
+          context: 'Yêu cầu kết hợp báo cáo với nội dung tạo/cập nhật công việc; chưa gửi hoặc thay đổi dữ liệu.',
+        });
+      }
     }
 
     // Find observation from successfulReads or execute plan's read step via gatherSearch
@@ -322,7 +346,7 @@ export class AIPlanner {
       rawResult[0] &&
       typeof rawResult[0] === 'object' &&
       !Array.isArray(rawResult[0]) &&
-      ('values' in rawResult[0] || 'records' in rawResult[0] || 'groups' in rawResult[0] || 'headers' in rawResult[0])
+      ('values' in rawResult[0] || 'records' in rawResult[0] || 'groups' in rawResult[0] || 'headers' in rawResult[0] || 'matches' in rawResult[0])
     ) {
       rawResult = rawResult[0];
     }

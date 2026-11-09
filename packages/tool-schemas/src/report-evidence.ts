@@ -81,14 +81,41 @@ export function reportLiteralBodies(userTexts: readonly string[]): string[] {
     .map(match => match[1] ?? match[2] ?? match[3] ?? ''));
 }
 
-export const REPORT_SOURCE_TOOLS: ReadonlySet<string> = new Set([
-  'github.list_pull_requests', 'github.list_issues', 'github.search_issues', 'myjira.search_issues', 'jira.search_issues',
-  'mysheets.read_range', 'mysheets.aggregate_rows', 'sheets.read_range',
-]);
+export const REPORT_SOURCE_TOOL_KINDS: Readonly<Record<string, ReportKind>> = {
+  'github.list_pull_requests': 'github_prs',
+  'github.list_issues': 'github_issues',
+  'github.search_issues': 'github_issues',
+  'myjira.search_issues': 'jira_progress',
+  'jira.search_issues': 'jira_progress',
+  'mysheets.read_range': 'sheets_summary',
+  'mysheets.search_rows': 'sheets_summary',
+  'mysheets.aggregate_rows': 'sheets_summary',
+  'sheets.read_range': 'sheets_summary',
+  'sheets.search_rows': 'sheets_summary',
+  'sheets.aggregate_rows': 'sheets_summary',
+};
+
+export const REPORT_SOURCE_TOOLS: ReadonlySet<string> = new Set(
+  Object.keys(REPORT_SOURCE_TOOL_KINDS),
+);
+
+const WORK_ITEM_TOOL_PATTERN = /^(?:github|myjira|jira|trello)\./;
+
+export function isWorkItemWriteStep(step: { tool?: unknown } | null | undefined): boolean {
+  return Boolean(
+    step &&
+      typeof step.tool === 'string' &&
+      !REPORT_SOURCE_TOOLS.has(step.tool) &&
+      WORK_ITEM_TOOL_PATTERN.test(step.tool),
+  );
+}
 
 /** Every content field in a report must be bound, including references and earlier writes. */
 export function reportOutputTargets(steps: readonly { id: string; tool: string; args: Record<string, unknown> }[]) {
-  return steps.flatMap((step) => !step || typeof step.tool !== 'string' || REPORT_SOURCE_TOOLS.has(step.tool) ? [] :
+  const allTargets = steps.flatMap((step) => !step || typeof step.tool !== 'string' || REPORT_SOURCE_TOOLS.has(step.tool) ? [] :
     (['text', 'body', 'content'] as const).filter((argument) => Object.hasOwn(step.args ?? {}, argument))
-      .map((argument) => ({ stepId: step.id, argument })));
+      .map((argument) => ({ stepId: step.id, argument, tool: step.tool })));
+  const nonWorkItemTargets = allTargets.filter((target) => !WORK_ITEM_TOOL_PATTERN.test(target.tool));
+  const selected = nonWorkItemTargets.length > 0 ? nonWorkItemTargets : allTargets;
+  return selected.map(({ stepId, argument }) => ({ stepId, argument }));
 }
