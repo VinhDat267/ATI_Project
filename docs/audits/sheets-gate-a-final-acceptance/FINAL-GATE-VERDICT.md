@@ -3,7 +3,7 @@
 - **Phiên bản:** `FEAC v1.1 (Final Evidence Closure & Merge Approval Package)`
 - **Ngày công bố:** `2026-11-09`
 - **Repository:** [`VinhDat267/ATI_Project`](https://github.com/VinhDat267/ATI_Project)
-- **Nhánh xuất bản bằng chứng kiểm toán độc lập (Audit-Only Branch, base `main`):** `docs/sheets-gate-a-feac-audit`
+- **Nhánh & PR xuất bản bằng chứng kiểm toán độc lập (Audit-Only Branch, base `main`):** [`PR #302`](https://github.com/VinhDat267/ATI_Project/pull/302) (`docs/sheets-gate-a-feac-audit`, initial commit `4bba88e146f4b088b16b06cf7ef6f2d8e7ae664e` trên nền `origin/main` `08c8d8c5e7bf12625857ac3496fb96ec3914e34f`)
 - **Phạm vi kiểm định:** 9 Stacked Draft PRs (`#289` → `#299`, HEAD `b80c238941c4927cbd6c9b435816a4fdc6522f4e` trên nền `origin/main` `08c8d8c5e7bf12625857ac3496fb96ec3914e34f`)
 - **Hội đồng Kiểm định Độc lập:**
   - **Independent Axis A Auditor (`64957501-7d8b-4d0c-9294-6fa8e12efd86`):** Spec, Product & UX Compliance (`G0`, `G1`, `G3`, `G6`, `G8B`)
