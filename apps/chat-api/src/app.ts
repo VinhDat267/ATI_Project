@@ -274,6 +274,7 @@ export function createApp(options: AppOptions): Express {
     onConnectionChanged: options.github?.onConnectionChanged,
     conversationOwner: options.convRepo ? async (id: string) => (await options.convRepo!.getConversation(id))?.user_id ?? null : undefined,
     tokens: githubTokens, adminUserIds: options.serviceAdminUserIds,
+    workspaceRepo: options.workspaceRepo,
   };
   const telegramTeamRepo = options.telegramTeamRepo ?? options.telegram?.teamRepo ?? (options.credentialRepo ? new TelegramTeamRepo((options.credentialRepo as any).pool) : undefined);
   const telegramRoutes: TelegramConnectionsOptions = {

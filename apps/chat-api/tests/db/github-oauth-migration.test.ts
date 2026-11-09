@@ -96,27 +96,37 @@ describe('migration 0018 (github oauth, team repo scope, and digest schedules) o
     await pool.query('DELETE FROM service_credentials WHERE id=$1', [own.id]);
   });
 
-  it('enforces team repo scope limit of 10 repos and validates full_name pattern', async () => {
+  it('enforces team repo scope limit of 10 repos and validates full_name pattern while rejecting legacy default scope', async () => {
+    await expect(
+      pool.query(
+        `INSERT INTO github_team_scope(id, chosen_by)
+         VALUES('default', $1)`,
+        [userId]
+      )
+    ).rejects.toMatchObject({ code: '23514' });
+
+    const scopeId = randomUUID();
     await pool.query(
       `INSERT INTO github_team_scope(id, chosen_by)
-       VALUES('default', $1)
+       VALUES($1, $2)
        ON CONFLICT (id) DO UPDATE SET chosen_by = EXCLUDED.chosen_by`,
-      [userId]
+      [scopeId, userId]
     );
-    await pool.query("DELETE FROM github_team_repos WHERE scope_id = 'default'");
+    await pool.query('DELETE FROM github_team_repos WHERE scope_id = $1', [scopeId]);
 
     for (let i = 1; i <= 10; i++) {
       await pool.query(
         `INSERT INTO github_team_repos(scope_id, repo_id, full_name, name, position)
-         VALUES('default', $1, $2, $3, $4)`,
-        [`repo_${i}`, `octo/repo_${i}`, `repo_${i}`, i]
+         VALUES($1, $2, $3, $4, $5)`,
+        [scopeId, `repo_${i}`, `octo/repo_${i}`, `repo_${i}`, i]
       );
     }
 
     await expect(
       pool.query(
         `INSERT INTO github_team_repos(scope_id, repo_id, full_name, name, position)
-         VALUES('default', 'repo_11', 'octo/repo_11', 'repo_11', 11)`
+         VALUES($1, 'repo_11', 'octo/repo_11', 'repo_11', 11)`,
+        [scopeId]
       )
     ).rejects.toMatchObject({ code: '23514' });
   });

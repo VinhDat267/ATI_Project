@@ -51,11 +51,12 @@ const WRITE_INTENT_REGEX =
 
 export interface EvaluateGithubDigestInput {
   userId: string;
+  scopeId?: string;
   request?: string;
   proposal?: { request: string; recurrence: ScheduleRecurrence; [key: string]: any };
   services: string[];
   recurrence?: ScheduleRecurrence;
-  githubConnection?: (userId: string) => Promise<any>;
+  githubConnection?: (userId: string, scopeId?: string) => Promise<any>;
   telegramConnection?: (userId: string) => Promise<any>;
   getAdapter?: (serviceName: string, context?: any) => Promise<any> | any;
 }
@@ -92,7 +93,9 @@ export async function evaluateGithubDigestCandidate(
 
   let gh: any;
   try {
-    gh = await input.githubConnection?.(userId);
+    gh = input.scopeId
+      ? await input.githubConnection?.(userId, input.scopeId)
+      : await input.githubConnection?.(userId);
   } catch {
     gh = null;
   }

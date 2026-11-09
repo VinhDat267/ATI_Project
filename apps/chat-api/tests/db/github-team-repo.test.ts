@@ -61,33 +61,46 @@ describe('GitHubTeamRepo and CredentialRepo.rotatePersonalSecret for github', ()
   });
 
   describe('GitHubTeamRepo', () => {
-    it('returns null when no team scope is configured', async () => {
-      const scope = await teamRepo.get();
-      expect(scope).toBeNull();
+    const scopeId = randomUUID();
+
+    it('returns null when no team scope is configured or when scopeId is omitted/default', async () => {
+      expect(await teamRepo.get()).toBeNull();
+      expect(await teamRepo.get('default')).toBeNull();
+      expect(await teamRepo.get(scopeId)).toBeNull();
     });
 
-    it('rejects replace with 0 repos, 11 repos, or invalid fullName and does not write', async () => {
-      await expect(teamRepo.replace({ chosenBy: userId, repos: [] })).rejects.toThrow();
+    it('rejects replace with missing/default scopeId, 0 repos, 11 repos, or invalid fullName and does not write', async () => {
+      await expect(
+        teamRepo.replace({
+          scopeId: 'default',
+          chosenBy: userId,
+          repos: [{ repoId: '101', fullName: 'nhom/ati', name: 'ati' }],
+        })
+      ).rejects.toThrow(/scopeId/i);
+
+      await expect(teamRepo.replace({ scopeId, chosenBy: userId, repos: [] })).rejects.toThrow();
 
       const elevenRepos = Array.from({ length: 11 }, (_, i) => ({
         repoId: `r_${i + 1}`,
         fullName: `octo/repo_${i + 1}`,
         name: `repo_${i + 1}`,
       }));
-      await expect(teamRepo.replace({ chosenBy: userId, repos: elevenRepos })).rejects.toThrow();
+      await expect(teamRepo.replace({ scopeId, chosenBy: userId, repos: elevenRepos })).rejects.toThrow();
 
       await expect(
         teamRepo.replace({
+          scopeId,
           chosenBy: userId,
           repos: [{ repoId: 'r_bad', fullName: 'invalid-repo-name', name: 'invalid' }],
         })
       ).rejects.toThrow();
 
-      expect(await teamRepo.get()).toBeNull();
+      expect(await teamRepo.get(scopeId)).toBeNull();
     });
 
     it('replaces team scope with valid repos in order, deduplicates fullName, and preserves old data on failure', async () => {
       const saved = await teamRepo.replace({
+        scopeId,
         chosenBy: userId,
         repos: [
           { repoId: '101', fullName: 'nhom/ati', name: 'ati' },
@@ -103,12 +116,12 @@ describe('GitHubTeamRepo and CredentialRepo.rotatePersonalSecret for github', ()
         { repoId: '102', fullName: 'nhom/web', name: 'web' },
       ]);
 
-      const fetched = await teamRepo.get();
+      const fetched = await teamRepo.get(scopeId);
       expect(fetched).toEqual(saved);
 
       // Invalid update keeps previous scope intact
-      await expect(teamRepo.replace({ chosenBy: userId, repos: [] })).rejects.toThrow();
-      expect(await teamRepo.get()).toEqual(saved);
+      await expect(teamRepo.replace({ scopeId, chosenBy: userId, repos: [] })).rejects.toThrow();
+      expect(await teamRepo.get(scopeId)).toEqual(saved);
     });
   });
 

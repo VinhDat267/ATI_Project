@@ -5,6 +5,7 @@ import { createApp } from '../../src/app.js';
 import { generateAccessToken } from '../../src/auth/jwt.js';
 import { CredentialRepo } from '../../src/db/repositories/credential-repo.js';
 import { GitHubTeamRepo } from '../../src/db/repositories/github-team-repo.js';
+import { WorkspaceRepo } from '../../src/db/repositories/workspace-repo.js';
 import { GitHubOAuthClient } from '../../src/services/github/oauth-client.js';
 import { GitHubTokenManager } from '../../src/services/github/token-manager.js';
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
@@ -17,6 +18,8 @@ describe('GitHub team repository scope routes', () => {
   let db: Awaited<ReturnType<typeof createMigratedSchema>>;
   let credentials: CredentialRepo;
   let teamRepo: GitHubTeamRepo;
+  let workspaceRepo: WorkspaceRepo;
+  let workspaceId: string;
   let admin: Person;
   let member: Person;
 
@@ -55,6 +58,7 @@ describe('GitHub team repository scope routes', () => {
       jwtSecret: secret,
       userRepo: db.users,
       credentialRepo: credentials,
+      workspaceRepo,
       encryptionKey: key,
       serviceAdminUserIds: [admin.id],
       github: {
@@ -72,14 +76,21 @@ describe('GitHub team repository scope routes', () => {
     db = await createMigratedSchema('github_scope_routes');
     credentials = new CredentialRepo(db.pool, key);
     teamRepo = new GitHubTeamRepo(db.pool);
+    workspaceRepo = new WorkspaceRepo(db.pool);
   });
 
   beforeEach(async () => {
-    await db.pool.query("DELETE FROM github_team_repos WHERE scope_id = 'default'");
-    await db.pool.query("DELETE FROM github_team_scope WHERE id = 'default'");
+    await db.pool.query('DELETE FROM github_team_repos');
+    await db.pool.query('DELETE FROM github_team_scope');
     await db.pool.query("DELETE FROM service_credentials WHERE service = 'github'");
     admin = await db.person('Admin');
     member = await db.person('Member');
+    const ws = await workspaceRepo.create(admin.id, 'Team Org');
+    workspaceId = ws.id;
+    await db.pool.query(
+      "INSERT INTO workspace_members (workspace_id, user_id, role, status) VALUES ($1, $2, 'member', 'active')",
+      [workspaceId, member.id]
+    );
 
     reposByToken = {
       gho_admin: [
@@ -115,12 +126,14 @@ describe('GitHub team repository scope routes', () => {
 
     const candRes = await request(app)
       .get('/api/connections/github/candidate-repos')
-      .set('Authorization', bearer(member));
+      .set('Authorization', bearer(member))
+      .set('x-workspace-id', workspaceId);
     expect(candRes.status).toBe(403);
 
     const scopeRes = await request(app)
       .put('/api/connections/github/scope')
       .set('Authorization', bearer(member))
+      .set('x-workspace-id', workspaceId)
       .send({ repos: ['nhom/ati'] });
     expect(scopeRes.status).toBe(403);
   });
@@ -130,7 +143,8 @@ describe('GitHub team repository scope routes', () => {
 
     const candRes = await request(app)
       .get('/api/connections/github/candidate-repos')
-      .set('Authorization', bearer(admin));
+      .set('Authorization', bearer(admin))
+      .set('x-workspace-id', workspaceId);
     expect(candRes.status).toBe(200);
     expect(candRes.body).toEqual({
       repos: [
@@ -142,6 +156,7 @@ describe('GitHub team repository scope routes', () => {
     const saveRes = await request(app)
       .put('/api/connections/github/scope')
       .set('Authorization', bearer(admin))
+      .set('x-workspace-id', workspaceId)
       .send({ repos: ['nhom/ati', 'nhom/web', 'nhom/ati'] });
     expect(saveRes.status).toBe(200);
     expect(saveRes.body.repos).toEqual([
@@ -154,12 +169,13 @@ describe('GitHub team repository scope routes', () => {
       const badRes = await request(app)
         .put('/api/connections/github/scope')
         .set('Authorization', bearer(admin))
+        .set('x-workspace-id', workspaceId)
         .send({ repos: bad });
       expect(badRes.status).toBe(400);
     }
 
     // Existing scope remains intact
-    const current = await teamRepo.get();
+    const current = await teamRepo.get(workspaceId);
     expect(current?.repos.map((r) => r.fullName)).toEqual(['nhom/ati', 'nhom/web']);
   });
 
@@ -168,6 +184,7 @@ describe('GitHub team repository scope routes', () => {
     await request(app)
       .put('/api/connections/github/scope')
       .set('Authorization', bearer(admin))
+      .set('x-workspace-id', workspaceId)
       .send({ repos: ['nhom/ati', 'nhom/web'] });
 
     // Member with access to nhom/ati only -> connected, 1 accessible, 1 not accessible
@@ -178,7 +195,8 @@ describe('GitHub team repository scope routes', () => {
     );
     const partialRes = await request(app)
       .get('/api/connections/github')
-      .set('Authorization', bearer(member));
+      .set('Authorization', bearer(member))
+      .set('x-workspace-id', workspaceId);
     expect(partialRes.status).toBe(200);
     expect(partialRes.body).toEqual({
       status: 'connected',
@@ -197,7 +215,8 @@ describe('GitHub team repository scope routes', () => {
     );
     const noneRes = await request(app)
       .get('/api/connections/github')
-      .set('Authorization', bearer(member));
+      .set('Authorization', bearer(member))
+      .set('x-workspace-id', workspaceId);
     expect(noneRes.status).toBe(200);
     expect(noneRes.body).toEqual({
       status: 'needs_membership',

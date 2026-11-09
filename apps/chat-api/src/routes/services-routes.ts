@@ -66,7 +66,7 @@ export interface ServicesRoutesOptions {
     get: (scopeId?: string) => Promise<{ boards?: Array<{ boardId: string; boardName?: string }> } | null>;
   };
   githubTeamRepo?: {
-    get: () => Promise<{ repos?: Array<{ repoId: string; fullName: string }> } | null>;
+    get: (scopeId?: string) => Promise<{ repos?: Array<{ repoId: string; fullName: string }> } | null>;
   };
 }
 
@@ -520,9 +520,15 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
                     personalAllowedScope = teamScope.boards.map((b) => b.boardId);
                   }
                 } else if (id === 'github' && options.githubTeamRepo) {
+                  const githubScopeId =
+                    mode === 'organization'
+                      ? workspaceId ?? undefined
+                      : userId
+                        ? 'personal:' + userId
+                        : undefined;
                   let teamScope: { repos?: Array<{ repoId: string; fullName: string }> } | null = null;
                   try {
-                    teamScope = await options.githubTeamRepo.get();
+                    teamScope = githubScopeId ? await options.githubTeamRepo.get(githubScopeId) : null;
                   } catch {
                     teamScope = null;
                   }
