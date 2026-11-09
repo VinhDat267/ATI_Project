@@ -138,6 +138,35 @@ describe('PR-R1-A3c: Atomic Approval & Recovery Re-Validation SQL CAS + continue
     expect(claimedStop).toBe(true);
   });
 
+  it('A3c-6: approvePlan rejects a pending (not yet approved) account created with the schema default status', async () => {
+    const userId = await createSyntheticUser(pool, 'Pending User', 'a3c-pending', { status: 'pending' });
+    const { plan, planHash } = await seedPendingPlanForUser(userId);
+    expect(await planRepo.approvePlan(plan.id, planHash, userId)).toBe(false);
+    expect((await planRepo.getPlan(plan.id))?.status).toBe('pending');
+  });
+
+  it('A3c-7: active user with active organization membership is approved exactly once and can claim recovery', async () => {
+    const ownerId = await createSyntheticUser(pool, 'Org Owner 7', 'a3c-owner7');
+    const memberId = await createSyntheticUser(pool, 'Active Member 7', 'a3c-member7', { status: 'active' });
+    const ws = await workspaceRepo.create(ownerId, 'Org A3c Active');
+    await pool.query(
+      `INSERT INTO workspace_members (workspace_id, user_id, role, status) VALUES ($1, $2, 'member', 'active')`,
+      [ws.id, memberId],
+    );
+    const { plan, planHash } = await seedPendingPlanForUser(memberId, ws.id);
+    const approvals = await Promise.all([
+      planRepo.approvePlan(plan.id, planHash, memberId),
+      planRepo.approvePlan(plan.id, planHash, memberId),
+      planRepo.approvePlan(plan.id, planHash, memberId),
+    ]);
+    expect(approvals.filter(Boolean)).toHaveLength(1);
+
+    await pool.query(`UPDATE plans SET status = 'partial' WHERE id = $1`, [plan.id]);
+    const partialRow = (await planRepo.getPlan(plan.id))!;
+    expect(await planRepo.claimRecovery(partialRow, memberId, 'executing')).toBe(true);
+    expect((await planRepo.getPlan(plan.id))?.status).toBe('executing');
+  });
+
   it('A3c-5: ExecutionService.continueStep when reuseController=true on a non-myslack plan calls planRepo.claimRecovery and transitions DB status to "executing"', async () => {
     const userId = await createSyntheticUser(pool, 'ContinueStep User', 'a3c-cont');
     const { plan } = await seedPendingPlanForUser(userId);
