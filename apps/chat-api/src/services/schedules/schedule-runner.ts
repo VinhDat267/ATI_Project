@@ -14,6 +14,7 @@ import { GITHUB_DELIVERY_UNKNOWN } from './github-digest-runner.js';
 import type { TrelloDigestRunOutcome, RunTrelloDigest } from './trello-digest-runner.js';
 import type { NotionDigestRunOutcome, RunNotionDigest } from './notion-digest-runner.js';
 import type { DigestRunInput, DigestRunOutcome } from './telegram-digest-runner.js';
+import { assertDigestScheduleLiveScopeAndAuth } from './digest-scope-guard.js';
 
 export interface RunToPlan {
   runId: string; scheduleId: string; scheduleVersion: number; userId: string;
@@ -388,6 +389,61 @@ export class ScheduleRunner {
       };
     });
     if (!started) return;
+
+    const isDigestSchedule =
+      started.scheduleRow.kind === 'sheets_digest' ||
+      started.kind === 'calendar_digest' ||
+      started.kind === 'github_digest' ||
+      started.kind === 'trello_digest' ||
+      started.kind === 'notion_digest' ||
+      started.kind === 'myjira_digest' ||
+      started.kind === 'telegram_digest';
+
+    if (isDigestSchedule) {
+      const liveGuard = await assertDigestScheduleLiveScopeAndAuth({
+        pool,
+        scheduleId: started.toPlan.scheduleId,
+        claimedWorkspaceId: started.toPlan.workspaceId,
+      });
+      started.toPlan.workspaceId = liveGuard.trustedWorkspaceId;
+      started.toPlan.workspaceMode = liveGuard.trustedWorkspaceMode as RunToPlan['workspaceMode'];
+      if (!liveGuard.allowed) {
+        const blockReason = liveGuard.pauseReason ?? BLOCKED;
+        const now = this.now();
+        const blockedChanges = await inTransaction(pool, async (client) => {
+          const changes: ScheduleChange[] = [];
+          await client.query('SELECT id FROM conversations WHERE id=$1 FOR UPDATE', [started.scheduleRow.conv_id]);
+          const schedule = (
+            await client.query('SELECT * FROM schedules WHERE id=$1 FOR UPDATE', [started.toPlan.scheduleId])
+          ).rows[0] as ScheduleRow | undefined;
+          const run = (await client.query('SELECT status FROM schedule_runs WHERE id=$1 FOR UPDATE', [runId])).rows[0];
+          if (!schedule || run?.status !== 'planning') return changes;
+          await this.messages.createMessage(
+            started.convId,
+            'system',
+            `Lỗi: ${blockReason}`,
+            { type: 'planning_error', replyToMessageId: started.messageId },
+            client,
+          );
+          await client.query(
+            "UPDATE schedule_runs SET status='blocked', error=$2, updated_at=now() WHERE id=$1",
+            [runId, blockReason],
+          );
+          if (schedule.status === 'active') {
+            const paused = await this.pause(client, schedule.id, blockReason);
+            changes.push(await this.options.recordState(client, paused, now));
+          }
+          return changes;
+        });
+        this.announce(blockedChanges);
+        this.send(started.convId, 'error', {
+          conversationId: started.convId,
+          message: blockReason,
+          replyToMessageId: started.messageId,
+        });
+        return;
+      }
+    }
 
     if (started.scheduleRow.kind === 'sheets_digest' && this.options.sheetsDigestRunner) {
       await this.executeDigestRun(runId, started);
