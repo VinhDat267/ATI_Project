@@ -1,7 +1,7 @@
-# Security, Tenant Isolation & Credential Scope Findings (Waves 1, 2 & 3)
+# Security, Tenant Isolation & Credential Scope Findings (Waves 1, 2, 3 & 4 — Complete)
 
-- **Baseline Commit SHA (`HEAD`):** `08c8d8c5e7bf12625857ac3496fb96ec3914e34f`
-- **Scope:** Personal vs Organization Workspace Isolation, Hybrid Opt-In Policy, Credential Encryption & Decryption, Pinned Connection Revalidation, Allowlist Enforcement, and Cross-Tenant Data Boundaries across Waves 1–3.
+- **Baseline Commit SHA (`origin/main`):** `08c8d8c5e7bf12625857ac3496fb96ec3914e34f`
+- **Scope:** Personal vs Organization Workspace Isolation, Hybrid Opt-In Policy, Credential Encryption & Decryption, Pinned Connection Revalidation, Allowlist Enforcement, Report Evidence Verification, and Cross-Tenant Data Boundaries across Waves 1–4.
 
 ---
 
@@ -97,6 +97,30 @@ Planora v3 implements a **Hybrid Opt-In Workspace Model** ([`workspace-context.t
 - **Root Cause & Nuanced Impact:**
   1. **Hardcoded Fallback Keys (`AUD-W1-07`):** [`tryDecryptCredentialConfig`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/services/slack/slack-proposal-service.ts#L31-L53) in `SlackProposalService` tries `this.encryptionKey` and `process.env.ENCRYPTION_KEY` first, so production decryption succeeds whenever `ENCRYPTION_KEY` is configured. However, it appends hardcoded development keys (`'01234567890123456789012345678901'` and `'0123456789abcdef0123456789abcdef'`) as fallback candidates, violating secret-hygiene rules.
   2. **Unverified Proposal Scope vs Enforced Execution Scope (`AUD-W1-08`):** [`SlackProposalService.prepare`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/services/slack/slack-proposal-service.ts#L182-L232) attaches raw `allowedScope` from `service_credentials` into `PlanProposal.connections` without live provider membership verification at proposal creation time. Runtime execution (`phase: 'execution'`) still re-validates credentials and scope through `AdapterFactory`.
+
+---
+
+### 2.6. `AUD-W4-01` (P1) — `PersonalSheetsAdapter` Drive/Docs Tools Bypass `allowedScope.spreadsheets` and Unpicked `mysheets` Blacks Out Organization Shared `sheets`
+- **Verification Status:** `CONFIRMED (INTEGRATION_REPRODUCED & CODE_TRACE_CONFIRMED)` (Wave 4 reproduction harness Case 1)
+- **Root Cause & Security Impact:**
+  1. **Unconstrained `checkedDriveId` on Drive/Docs Tools (`INTEGRATION_REPRODUCED`):** In [`PersonalSheetsAdapter`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/tool-adapters/src/sheets/personal-sheets-adapter.ts#L101-L113), `checkedId(value)` (`lines 101-106`) calls `this.assertAllowedScope('spreadsheets', value)` for all 9 spreadsheet tools. In contrast, all 6 Google Drive/Docs tools (`mysheets.list_drive_files`, `create_drive_folder`, `create_doc`, `get_doc`, `append_doc_text`, `move_drive_file` at `lines 733-965`) call `this.checkedDriveId(value, fieldName)` (`lines 108-113`), which validates only regex `/^[A-Za-z0-9_-]{10,128}$/` and never consults `this.allowedScope`. Consequently, `mysheets.move_drive_file` (`lines 940-964`) can move an unapproved spreadsheet (`unapproved_sheet_999999`) that `mysheets.read_range` rejects, and [`ChatService.bindConnections`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/services/chat-service.ts#L515-L545) checks only `step.args?.spreadsheetId`, ignoring `documentId`, `fileId`, and `folderId`.
+  2. **Organization Shared `sheets` Catalog Blackout on Empty Personal `mysheets` Picker (`INTEGRATION_REPRODUCED`):** When an Organization member connects personal `mysheets` OAuth with `selectedSpreadsheets: []` (`0` spreadsheets picked), [`getToolCatalogFor`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/services/registered-services.ts#L199-L221) (`lines 209-213`) still injects the 6 `MYSHEETS_DRIVE_TOOLS` (`service: 'mysheets'`). Then [`runtimeToolCatalog`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/config/gmail-tools-runtime.ts#L76-L91) sees `hasMySheets === true` and strips all Organization shared `sheets.*` tools (`line 86`), leaving the user with zero spreadsheet tools.
+
+---
+
+### 2.7. `AUD-W4-05` (P2) — Process-Local `ReportArtifactStore` Lacks Persistence and TTL Eviction
+- **Verification Status:** `CONFIRMED (CODE_TRACE_CONFIRMED)`
+- **Root Cause & Impact:**
+  [`ReportArtifactStore`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/planner/src/reports/artifacts.ts#L21-L82) keeps `ReportArtifact` records (`actor.userId`, `actor.workspaceId`, `items`, `renderedText`, `contentHash`) in a process-local `Map<string, ReportArtifact>()` (`line 22`). While [`verifyPlanReportEvidence`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/services/report-evidence-guard.ts#L97-L145) properly checks actor ownership (`artifact.actor.userId !== context.userId` and `artifact.actor.workspaceId !== context.workspaceId` at `lines 116-130`), any server restart or multi-instance hop causes `store.getArtifact(ev.artifactId)` to return `undefined` (`409 Conflict` at [`execution-service.ts:215-240`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/services/execution-service.ts#L215-L240)), while long-running single instances retain all un-evicted observation payloads in heap memory indefinitely.
+
+---
+
+### 2.8. `AUD-W4-07` (P2) — Non-`myjira` Plan Approval / Recovery SQL CAS Omits Active Membership Verification & Shared Service Pinning
+- **Verification Status:** `CONFIRMED (CODE_TRACE_CONFIRMED)`
+- **Root Cause & Impact:**
+  1. In [`PlanRepo.approvePlan`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/db/repositories/plan-repo.ts#L161-L183) (`lines 170-174`) and [`PlanRepo.claimRecovery`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/db/repositories/plan-repo.ts#L274-L289) (`lines 280-286`), only plans with `jiraGuard` check `users.status = 'active'` and `workspace_members.status = 'active'` inside the SQL CAS transaction; non-`myjira` plans check only `conversations.user_id = $3`.
+  2. In [`ExecutionService.continueStep`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/services/execution-service.ts#L578-L646) (`lines 594-610`), when `reuseController === true` (controller cached in `this.activeControllers`), `planRepo.claimRecovery` is only called for `myslack` plans (`line 605`).
+  3. [`PlanConnections`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/services/chat-service.ts#L353-L362) pins personal/team OAuth services (`gmail`, `mycalendar`, `mysheets`, `trello`, `github`, `telegram`, `notion`, `myslack`, `myjira`), but does not pin `credentialId` or `updatedAt` for shared Organization services (`slack`, `sheets`, `calendar`, `jira`).
 
 ---
 

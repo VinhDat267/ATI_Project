@@ -1,15 +1,24 @@
-# Consolidated Audit Findings Register (Waves 1, 2 & 3)
+# Consolidated Audit Findings Register (Waves 1, 2, 3 & 4 — Complete)
 
 - **Repository:** `VinhDat267/ATI_Project`
-- **Baseline Commit SHA (`HEAD`):** `08c8d8c5e7bf12625857ac3496fb96ec3914e34f`
-- **Remote Baseline (`origin/main`):** `08c8d8c5e7bf12625857ac3496fb96ec3914e34f` (`0` diff)
-- **Total Active Findings:** `23` (`7` P1, `15` P2, `1` P3)
+- **Baseline Commit SHA (`origin/main`):** `08c8d8c5e7bf12625857ac3496fb96ec3914e34f`
+- **Audit Branch:** `independent_service_audit` (`0` product code changes; documentation-only Draft PR `#298`)
+- **Total Active Findings:** `30` (`0` P0, `9` P1, `20` P2, `1` P3)
 
 ## Evidence Classification Taxonomy
 - **`CODE_TRACE_CONFIRMED`:** Proven directly by static source code, SQL migration schema, and TypeScript contract trace at baseline SHA `08c8d8c5e7bf12625857ac3496fb96ec3914e34f`.
 - **`INTEGRATION_REPRODUCED`:** Proven by both static code trace and deterministic runtime execution in an isolated PostgreSQL (`localhost:56534/ati_v3`) + mock-provider test harness (`0` production side effects).
 - **`NOT_TESTED`:** Requires live external third-party provider infrastructure (e.g., live Google/Atlassian/Notion/Slack production OAuth servers or inbound webhook delivery) that cannot be exercised under the audit-only no-live-write constraint.
 - **`PRODUCT_GAP`:** Feature, cross-service handoff, or UX capability is not implemented or only partially wired by current architecture/roadmap state (distinguished from regressions in implemented code).
+
+## Parallel Execution Guard: Baseline `main` vs. Unmerged Gate A Draft PRs
+To prevent cross-stream confusion with the parallel agent executing Google Sheets Scheduled Digest Gate A (`RMD-00 → RMD-04`), this audit strictly distinguishes code on `origin/main` (`08c8d8c5e7bf12625857ac3496fb96ec3914e34f`) from open unmerged Gate A Draft PRs:
+
+| Scope / PR Stream | Git Reference / PRs | Status on `origin/main` (`08c8d8c5...`) | Audit Boundary Rule |
+|---|---|---|---|
+| **Baseline Production Tree** | `origin/main` (`08c8d8c5e7bf12625857ac3496fb96ec3914e34f`) | **Active Baseline** | All findings (`AUD-W1-01` .. `AUD-W4-07`), line numbers, and reproduction tests are verified against this exact commit. |
+| **Gate A: Google Sheets Scheduled Digest (`RMD-00 → RMD-04`)** | Open Draft PRs `#289`, `#290`, `#291`, `#292`, `#293`, `#294`, `#295`, `#297` | **UNMERGED (Out of Scope)** | Excluded from Wave 4 (`W4-A` audits interactive `sheets`/`mysheets` only). Unmerged Gate A changes are **not** counted as present on `main`. |
+| **Independent Deep Service Audit (Waves 1–4)** | Branch `independent_service_audit` / Draft PR `#298` | **Audit-Only Docs PR** | Modifies only `docs/audits/service-deep-review/*.md`; zero overlap with Gate A files. |
 
 ---
 
@@ -40,6 +49,13 @@
 | `AUD-W3-03` | W3 | `github_digest`, `notion_digest`, `trello_digest`, `slack` | **P2** | `CONFIRMED (INTEGRATION_REPRODUCED & CODE_TRACE_CONFIRMED)` | Digest candidates and runners call `getAdapter('slack', ...)` without `workspaceMode`/`workspaceId`, breaking Organization Slack digest delivery | `RMD-W1-03` |
 | `AUD-W3-04` | W3 | `github`, `notion` | **P2** | `CONFIRMED (INTEGRATION_REPRODUCED)` | `GitHubAdapter.request` and `NotionAdapter.request` omit `details: { requestSent: false }` on pre-dispatch abort, causing `StepRunner` to mark un-sent write steps `unknown` | `RMD-W3-03` |
 | `AUD-W3-05` | W3 | `notion` | **P2** | `CONFIRMED (INTEGRATION_REPRODUCED & CODE_TRACE_CONFIRMED)` | Notion OAuth (`notion_connections` & `NOTION_OAUTH_TOOLS`) is omitted from `GET /api/services`, `ALL_TOOLS`, `getConfiguredToolCatalog`, `runner.ts` static `catalog` Map, and sandbox personal-OAuth policy | `RMD-W3-02` |
+| `AUD-W4-01` | W4-A | `mysheets`, `sheets` | **P1** | `CONFIRMED (INTEGRATION_REPRODUCED)` | `mysheets` with `0` selected spreadsheets (`scope_required`) blacks out Organization shared `sheets` catalog, and `PersonalSheetsAdapter` Drive/Docs tools (`move_drive_file`, `append_doc_text`, `get_doc`) bypass `allowedScope` + overwrite Google Docs as `text/plain` | `RMD-W4-01` |
+| `AUD-W4-02` | W4-A | `sheets`, `mysheets` | **P2** | `CONFIRMED (INTEGRATION_REPRODUCED & CODE_TRACE_CONFIRMED)` | Shared `SheetsAdapter` omits `details: { requestSent: false }` on pre-write `GET` failure (yielding false `unknown` state), `append_rows` (`onDuplicate: 'update'`) / `create_sheet` execute non-atomic two-POST mutations that reset `writeDispatched`, and `A1:Z500` caps scans at 500 rows | `RMD-W4-02` |
+| `AUD-W4-03` | W4-A | `sheets` | **P2** | `CONFIRMED (CODE_TRACE_CONFIRMED)` | `SHEETS_EXTENDED_TOOLS` (`search_rows`, `aggregate_rows`, `update_rows`, `delete_rows`, `create_sheet`) omitted from `ALL_TOOLS` / `GET /api/services` and missing `buildSystemPrompt` rules when `sheets` (not `mysheets`) is active | `RMD-W4-03` |
+| `AUD-W4-04` | W4-B/C | `mysheets`, `sheets`, `planner` | **P1** | `CONFIRMED (INTEGRATION_REPRODUCED)` | `REPORT_SOURCE_TOOLS` omits `mysheets.search_rows`, `sheets.search_rows`, and `sheets.aggregate_rows` (causing `validatePlan` to reject search-based spreadsheet reports), and mixed report + work-item plans (`github`/`jira`/`myjira`/`trello`) trap users in an unresolvable clarification loop | `RMD-W4-04` |
+| `AUD-W4-05` | W4-B/C | `planner`, `chat-api` | **P2** | `CONFIRMED (CODE_TRACE_CONFIRMED)` | `ReportArtifactStore` stores `ReportArtifact` entries solely in an unbounded in-memory `Map` with no database persistence or TTL eviction, breaking plan approval (`409 Conflict`) across server restarts or multi-replica routing | `RMD-W4-05` |
+| `AUD-W4-06` | W4-B/C | `executor`, `planner` | **P2** | `CONFIRMED (INTEGRATION_REPRODUCED)` | `validatePlan` accepts bracket array indexing (`{ "$ref": "step_1.output[0].id" }`) on array-output tools, but Executor `resolveRef` (`resolver.ts:6-42`) splits strictly on `.` and throws `Property 'output[0].id' not found` at runtime | `RMD-W4-06` |
+| `AUD-W4-07` | W4-C | `chat-api` | **P2** | `CONFIRMED (CODE_TRACE_CONFIRMED)` | Non-`myjira` `PlanRepo.approvePlan` / `claimRecovery` SQL CAS omits `users.status = 'active'` and `workspace_members.status = 'active'` verification, and in-memory `ExecutionService.continueStep` (`reuseController === true`) skips `claimRecovery` for non-`myslack` plans | `RMD-W4-07` |
 
 ---
 
@@ -336,7 +352,97 @@
 
 ---
 
-## 5. Findings Change Log (Historical Traceability & ID Stabilization)
+## 5. Wave 4 Detailed Findings (`AUD-W4-01` → `AUD-W4-07`)
+
+### `AUD-W4-01` (P1) — `mysheets` with `0` Selected Spreadsheets (`scope_required`) Blacks Out Organization Shared `sheets` Catalog, and `PersonalSheetsAdapter` Drive/Docs Tools Bypass `allowedScope` + Overwrite Google Docs as `text/plain`
+- **Status:** `CONFIRMED (INTEGRATION_REPRODUCED & CODE_TRACE_CONFIRMED)` (Wave 4 reproduction harness Case 1)
+- **Source References:**
+  - [`apps/chat-api/src/services/registered-services.ts:14-21, 199-221`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/services/registered-services.ts#L199-L221) (`MYSHEETS_DRIVE_TOOLS` & `getToolCatalogFor`)
+  - [`apps/chat-api/src/config/gmail-tools-runtime.ts:76-91`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/config/gmail-tools-runtime.ts#L76-L91) (`runtimeToolCatalog`)
+  - [`packages/tool-adapters/src/sheets/personal-sheets-adapter.ts:101-113, 733-965`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/tool-adapters/src/sheets/personal-sheets-adapter.ts#L101-L113) (`checkedId`, `checkedDriveId`, and Drive/Docs tools)
+  - [`apps/chat-api/src/services/chat-service.ts:515-545`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/services/chat-service.ts#L515-L545) (`bindConnections`)
+- **Technical Root Cause:**
+  1. **Organization Shared `sheets` Blackout on Empty Picker Scope (`INTEGRATION_REPRODUCED`):** In `getToolCatalogFor` (`registered-services.ts:209-213`), when a user has an active `mysheets` credential with `spreadsheets.length === 0` (`personalStatus: 'scope_required'`, e.g., immediately after OAuth callback before picking any spreadsheet via Google Picker), `getToolCatalogFor` still appends the 6 `MYSHEETS_DRIVE_TOOLS` (`service: 'mysheets'`). Then `runtimeToolCatalog` (`gmail-tools-runtime.ts:78, 86, 89`) computes `hasMySheets = personal.some((t) => t.service === 'mysheets')` (`true`) and strips all Organization shared `sheets.*` tools (`!hasMySheets || t.service !== 'sheets'`). Consequently, the Organization user is left with **zero** spreadsheet tools (`mysheets` spreadsheet tools are excluded because `spreadsheets.length === 0`, and Organization `sheets` tools are stripped because `hasMySheets === true`). Even when `spreadsheets.length > 0`, connecting personal `mysheets` completely hides the Organization's shared `sheets.*` service-account spreadsheets.
+  2. **Unconstrained Drive/Docs Tools Bypass `allowedScope.spreadsheets` (`INTEGRATION_REPRODUCED`):** While all 9 spreadsheet tools in `PersonalSheetsAdapter` call `this.checkedId(args.spreadsheetId)` (`personal-sheets-adapter.ts:101-106`, enforcing `this.assertAllowedScope('spreadsheets', value)`), all 6 Drive/Docs tools (`mysheets.list_drive_files`, `create_drive_folder`, `create_doc`, `get_doc`, `append_doc_text`, `move_drive_file` at `lines 733-965`) call `this.checkedDriveId(value, fieldName)` (`lines 108-113`), which only checks regex `/^[A-Za-z0-9_-]{10,128}$/` and never consults `this.allowedScope`. `mysheets.move_drive_file` (`lines 940-964`) can relocate any Drive file accessible to the token (including unapproved spreadsheets rejected by `mysheets.read_range`), and `ChatService.bindConnections` (`chat-service.ts:522-535`) only inspects `step.args?.spreadsheetId`, ignoring `documentId`, `fileId`, and `folderId`.
+  3. **Destructive Plain-Text Overwrite in `mysheets.append_doc_text` (`INTEGRATION_REPRODUCED`):** `mysheets.append_doc_text` (`personal-sheets-adapter.ts:900-938`) exports a Google Doc as `text/plain` (`GET /drive/v3/files/{documentId}/export?mimeType=text%2Fplain`) and overwrites the entire file via `PATCH /upload/drive/v3/files/{documentId}?uploadType=media` with `Content-Type: text/plain; charset=UTF-8`, permanently destroying all headings, tables, links, inline images, and comments in the document.
+
+---
+
+### `AUD-W4-02` (P2) — Shared `SheetsAdapter` Omits `details: { requestSent: false }` on Pre-Write `GET` Failures, `append_rows` / `create_sheet` Execute Non-Atomic Two-POST Mutations That Reset `writeDispatched`, and `A1:Z500` Caps Interactive Scans at 500 Rows
+- **Status:** `CONFIRMED (INTEGRATION_REPRODUCED & CODE_TRACE_CONFIRMED)` (Wave 4 reproduction harness Case 2)
+- **Source References:**
+  - [`packages/tool-adapters/src/sheets/sheets-adapter.ts:62-102, 166, 184, 201-258, 271-285, 316-333, 363-405`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/tool-adapters/src/sheets/sheets-adapter.ts#L62-L102)
+  - [`packages/tool-adapters/src/sheets/personal-sheets-adapter.ts:285-363, 390, 417, 460-535, 555-580, 610-635, 665-721, 985-995`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/tool-adapters/src/sheets/personal-sheets-adapter.ts#L460-L535)
+  - [`packages/executor/src/runner.ts:157-160`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/executor/src/runner.ts#L157-L160)
+- **Technical Root Cause:**
+  1. **False `unknown` Write State in Shared `SheetsAdapter` (`INTEGRATION_REPRODUCED`):** Unlike `PersonalSheetsAdapter` (which tracks `writeDispatched` and attaches `details: { requestSent: false }` when `!writeDispatched`), shared `SheetsAdapter.request` (`sheets-adapter.ts:62-102`) never sets `details: { requestSent: false }` on pre-dispatch aborts, token exchange failures, or pre-write `GET` calls (`this.tabs(id)` and `GET .../values/...!A1:Z500` in `append_rows`, `update_rows`, `delete_rows`, `create_sheet`). A 5xx/network error during pre-write tab/header discovery causes `StepRunner.executeStep` (`runner.ts:157-160`) to mark the un-sent write step as `status: 'unknown'` (`reconciliation_required`).
+  2. **Non-Atomic Multi-POST Mutations Reset `writeDispatched` (`INTEGRATION_REPRODUCED`):** In both `PersonalSheetsAdapter` (`personal-sheets-adapter.ts:500-534, 672-721`) and `SheetsAdapter` (`sheets-adapter.ts:231-258, 371-405`), `append_rows` (with `onDuplicate: 'update'` when a batch contains both duplicate updates and new rows) and `create_sheet` (with `headers`) execute two separate mutating `POST` requests. In `PersonalSheetsAdapter.request` (`lines 290, 305`), if the second `POST` (`:append` or header write) encounters HTTP 401 or 429, `onDispatch?.(false)` resets `writeDispatched = false` even though the first `POST` (`:batchUpdate` or `addSheet`) already mutated the spreadsheet. If the subsequent token refresh or retry aborts, `catch (e)` (`line 986`) attaches `details: { requestSent: false }`, allowing unsafe replay of an already partially applied write.
+  3. **Hard `A1:Z500` Ceiling & Full-Row Formula Overwrite on `onDuplicate: 'update'` (`CODE_TRACE_CONFIRMED`):** All interactive table tools (`search_rows`, `aggregate_rows`, `update_rows`, `delete_rows`, and `append_rows` dedup scan) hardcode `A1:Z500`. Spreadsheets with $>500$ rows silently miss duplicates at rows `501+`, return truncated `aggregate_rows` metrics, and reject `rowNumber > 500`. Furthermore, while `update_rows` updates individual cells (preserving formulas in other columns), `append_rows` with `onDuplicate: 'update'` overwrites full row slices `A${rowNumber}` with formatted string values read from `A1:Z500`, overwriting any formula columns within that row.
+
+---
+
+### `AUD-W4-03` (P2) — Shared `sheets` Extended Tools (`SHEETS_EXTENDED_TOOLS`) Omitted from `ALL_TOOLS` / `GET /api/services` and Missing Planner System Prompt Rules
+- **Status:** `CONFIRMED (CODE_TRACE_CONFIRMED)`
+- **Source References:**
+  - [`packages/tool-schemas/src/index.ts:47, 73-91`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/tool-schemas/src/index.ts#L47-L91)
+  - [`apps/chat-api/src/services/registered-services.ts:107`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/services/registered-services.ts#L107)
+  - [`apps/chat-api/src/routes/services-routes.ts:576`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/routes/services-routes.ts#L576)
+  - [`packages/planner/src/prompts/system-prompt.ts:57-59`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/planner/src/prompts/system-prompt.ts#L57-L59)
+- **Technical Root Cause:**
+  `ALL_TOOLS` (`packages/tool-schemas/src/index.ts:47`) includes only `SHEETS_TOOLS` (4 tools), omitting `SHEETS_EXTENDED_TOOLS` (`sheets.search_rows`, `sheets.aggregate_rows`, `sheets.update_rows`, `sheets.delete_rows`, `sheets.create_sheet`). Consequently, `getConfiguredToolCatalog()` (`registered-services.ts:107`) and `GET /api/services` (`services-routes.ts:576`) report only 4 tools for `sheets`. Although `runtimeToolCatalog()` (`gmail-tools-runtime.ts:89`) injects `SHEETS_EXTENDED_TOOLS` in live mode when `!hasMySheets`, `buildSystemPrompt()` (`system-prompt.ts:57-59`) only injects spreadsheet extended-tool usage rules (`search_rows` before `update_rows`/`delete_rows`, `create_sheet` before `append_rows`, `deduplicate: true`) when `tools.some(t => t.service === 'mysheets')`, leaving shared `sheets` without planner prompt rules.
+
+---
+
+### `AUD-W4-04` (P1) — `REPORT_SOURCE_TOOLS` Omits `mysheets.search_rows`, `sheets.search_rows`, and `sheets.aggregate_rows`, and Mixed Report + Work-Item Plans Trap Users in a Clarification Loop
+- **Status:** `CONFIRMED (INTEGRATION_REPRODUCED & CODE_TRACE_CONFIRMED)` (Wave 4 reproduction harness Case 3)
+- **Source References:**
+  - [`packages/tool-schemas/src/report-evidence.ts:41-94`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/tool-schemas/src/report-evidence.ts#L41-L94)
+  - [`packages/planner/src/planner.ts:200-216, 263-435, 747-759`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/planner/src/planner.ts#L263-L435)
+  - [`packages/planner/src/validator.ts:861-920`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/planner/src/validator.ts#L861-L920)
+  - [`packages/planner/src/prompts/system-prompt.ts:58`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/planner/src/prompts/system-prompt.ts#L58)
+- **Technical Root Cause:**
+  1. **`REPORT_SOURCE_TOOLS` Omission vs. System Prompt (`INTEGRATION_REPRODUCED`):** `REPORT_SOURCE_TOOLS` (`report-evidence.ts:84-87`) lists `mysheets.read_range`, `mysheets.aggregate_rows`, and `sheets.read_range`, but **omits** `mysheets.search_rows`, `sheets.search_rows`, and `sheets.aggregate_rows`. Meanwhile, `buildSystemPrompt` (`system-prompt.ts:58`) explicitly instructs the LLM: *"prefer `mysheets.search_rows` over `mysheets.read_range`"*. When a user asks to find/filter rows in a spreadsheet and send a summary/notification (`requiresReportEvidence(userTexts) === true`), `bindReportEvidenceIfApplicable` (`planner.ts:297`) ignores `mysheets.search_rows` because it is not in `REPORT_SOURCE_TOOLS`, attaches no `reportEvidence`, and `validatePlan` (`validator.ts:866-875`) rejects the plan with `Report content must be grounded in verified read observations via reportEvidence`.
+  2. **Unresolvable Clarification Loop on Mixed Report + Work-Item Creation (`INTEGRATION_REPRODUCED`):** In `bindReportEvidenceIfApplicable` (`planner.ts:288-290`), if `requiresReportEvidence(groundingUserTexts)` is `true` and any step in `parsed.steps` targets `github`, `myjira`, `jira`, or `trello` with a `text`, `body`, or `content` argument (e.g., `github.create_issue`, `trello.add_comment`), `bindReportEvidenceIfApplicable` replaces the plan with a hardcoded clarification (`"Bạn muốn nội dung công việc mới là báo cáo dữ liệu hay một nội dung riêng?"`). When the user replies to that clarification, `relevantGroundingUserTexts` (`planner.ts:200-216`) retains the original user turn in `groundingUserTexts` because the assistant turn was a `clarification`, re-triggering line `288` on every subsequent turn.
+
+---
+
+### `AUD-W4-05` (P2) — In-Memory `ReportArtifactStore` Loses Observation Artifacts Across Restarts/Replicas and Has No TTL Eviction
+- **Status:** `CONFIRMED (CODE_TRACE_CONFIRMED)`
+- **Source References:**
+  - [`packages/planner/src/reports/artifacts.ts:21-82`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/planner/src/reports/artifacts.ts#L21-L82)
+  - [`apps/chat-api/src/server.ts:573, 631, 683, 910`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/server.ts#L573-L683)
+  - [`apps/chat-api/src/services/execution-service.ts:215-240`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/services/execution-service.ts#L215-L240)
+  - [`apps/chat-api/src/services/report-evidence-guard.ts:109-115`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/services/report-evidence-guard.ts#L109-L115)
+- **Technical Root Cause:**
+  `ReportArtifactStore` (`artifacts.ts:21-22`) stores `ReportArtifact` objects solely in a process-local `new Map<string, ReportArtifact>()` with no PostgreSQL persistence and no TTL or size eviction. While `plans` rows persist in PostgreSQL with a 30-minute `expires_at` window (`chat-service.ts:1853`), any process restart or multi-instance load-balancer hop between plan creation and `POST /api/plans/:id/approve` causes `ExecutionService.approveAndStart` (`execution-service.ts:215-240`) to fail with HTTP `409 Conflict` (`Unverified observation artifact: observation not found on server for artifactId '...'`). Conversely, in long-running processes, `this.artifacts` never evicts expired artifacts.
+
+---
+
+### `AUD-W4-06` (P2) — Cross-Step `$ref` / `$template` Resolution Fails on Bracket Array Indexing (`step_1.output[0].id`) and Non-String Schema Targets
+- **Status:** `CONFIRMED (INTEGRATION_REPRODUCED)` (Wave 4 reproduction harness Case 4)
+- **Source References:**
+  - [`packages/executor/src/resolver.ts:6-42`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/executor/src/resolver.ts#L6-L42) (`resolveRef`)
+  - [`packages/planner/src/validator.ts:62-69, 722-778`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/planner/src/validator.ts#L62-L69) (`validateSchemaValue` & `$ref` semantic validation)
+  - [`apps/chat-api/src/services/chat-service.ts:49`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/services/chat-service.ts#L49) (`normalizeStepRefPath`)
+- **Technical Root Cause:**
+  While `chat-service.ts:49` normalizes bracket array paths via `rawRef.replace(/\[(\d+)\]/g, '.$1')`, `resolveRef` in `packages/executor/src/resolver.ts:6-42` splits strictly on `.` (`path.split('.')`) without normalizing `[0]`. Any step referencing `{ "$ref": "step_1.output[0].id" }` or `{ "$template": "${step_1.output[0].name}" }` on an array-output tool passes `validatePlan` (`validator.ts:62-69, 761-777`) and then fails at execution time in `StepRunner` with `Error: Property 'output[0].id' not found on step 'step_1'`. Additionally, `validateSchemaValue` (`validator.ts:64`) restricts `$ref` and `$template` exclusively to `schema.type === 'string'`, prohibiting array/object handoffs such as passing a step output array directly to `append_rows.args.rows` or `records`.
+
+---
+
+### `AUD-W4-07` (P2) — Non-`myjira` Plan Approval / Recovery SQL CAS Omits Active Membership Verification, and In-Memory `continueStep` Skips `claimRecovery`
+- **Status:** `CONFIRMED (CODE_TRACE_CONFIRMED)`
+- **Source References:**
+  - [`apps/chat-api/src/db/repositories/plan-repo.ts:161-183, 274-289`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/db/repositories/plan-repo.ts#L161-L183) (`approvePlan` & `claimRecovery`)
+  - [`apps/chat-api/src/services/execution-service.ts:160-341, 578-646`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/services/execution-service.ts#L578-L646) (`approveAndStart` & `continueStep`)
+  - [`apps/chat-api/src/services/chat-service.ts:353-362`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/services/chat-service.ts#L353-L362) (`PlanConnections`)
+- **Technical Root Cause:**
+  1. In `PlanRepo.approvePlan` (`plan-repo.ts:170-174`) and `PlanRepo.claimRecovery` (`lines 280-286`), when `jiraGuard` is absent (all non-`myjira` plans), the SQL CAS checks only `conversations.user_id = $3` and does not verify `users.status = 'active'` or `workspace_members.status = 'active'` inside the transaction.
+  2. In `ExecutionService.continueStep` (`execution-service.ts:594-610`), when `controller` is still cached in `this.activeControllers` (`reuseController === true`), `claimRecovery` is only called for `myslack` plans (`line 605`). For all other services, retrying or skipping a failed step in memory does not transition `plans.status` from `'partial'` to `'executing'` in PostgreSQL before dispatching the step.
+  3. Shared Organization services (`slack`, `sheets`, `calendar`, `jira`) are not pinned in `PlanConnections` (`chat-service.ts:353-362`), so credential rotation on a shared service between preview and approval is not detected at approval time.
+
+---
+
+## 6. Findings Change Log (Historical Traceability & ID Stabilization)
 
 | Date / Revision | Finding ID(s) | Change Description | Reason for Change |
 |---|---|---|---|
@@ -346,3 +452,4 @@
 | `2026-11-08` (Wave 3 Evidence Integrity Gate) | `AUD-W2-01`..`AUD-W2-07` | Restored canonical Wave 2 IDs (`AUD-W2-01`: `myjira_digest` 3-layer failure; `AUD-W2-02`: `trello_digest` `scope_id='default'` & missing `connections.telegram`; `AUD-W2-03`: `trello.add_checklist` non-idempotent retry; `AUD-W2-04`: `myjira` Personal Mode status mismatch; `AUD-W2-05`: `PersonalJiraHttpTransport.request` missing `requestSent: false` on pre-dispatch/pre-write GET failures) and assigned non-colliding IDs `AUD-W2-06` (`JiraOAuthRepo.saveSitesGrant`/`syncSites` lease revocation on site deselection) and `AUD-W2-07` (`JiraAdapter.request` pre-dispatch abort) | Prevented `AUD-*` ID collisions across Wave 2 and Wave 3 revisions. |
 | `2026-11-08` (Wave 3 Evidence Integrity Gate) | `AUD-W3-03` | Separated per-call-site evidence labels into `INTEGRATION_REPRODUCED` (`evaluateGithubDigestCandidate`, `createGithubDigestRunner`, `evaluateNotionDigestCandidate`) vs `CODE_TRACE_CONFIRMED` (`createNotionDigestRunner`, `evaluateTrelloDigestCandidate`, `createTrelloDigestRunner`) | Enforced strict per-call-site evidence accuracy. |
 | `2026-11-08` (Wave 3 Evidence Integrity Gate) | `AUD-W3-05` | Corrected `NOTION_OAUTH_TOOLS` tool names to `notion.get_page` and `notion.update_page` (`packages/tool-schemas/src/notion.ts:38-49`), documented `NOTION_OAUTH_TOOL_MAP` in `getToolDefinition` (`packages/tool-schemas/src/index.ts:69-71, 81-92`) vs omission from `ALL_TOOLS` (`index.ts:47`) and `runner.ts:16-18` `catalog` Map, and documented all 6 Notion OAuth layers `(a)`–`(f)` | Replaced inaccurate tool names and inaccurate `StepRunner` claim with verified baseline contracts at `08c8d8c5e7bf12625857ac3496fb96ec3914e34f`. |
+| `2026-11-09` (Wave 4 Targeted Evidence Correction & Completion) | `AUD-W3-01`, `AUD-W1-02`, `AUD-W4-01`..`AUD-W4-07` | Clarified global `isAdmin()` guard on `PUT /api/connections/github/scope` (`AUD-W3-01`); documented `projectTelegramUpdate()` text stripping (`AUD-W1-02`); added Wave 4 findings `AUD-W4-01` through `AUD-W4-07` (`2` P1, `5` P2) with deterministic reproduction evidence | Completed Wave 4 (`W4-A`, `W4-B`, `W4-C`, `W4-D`) and targeted Wave 3 corrections. |

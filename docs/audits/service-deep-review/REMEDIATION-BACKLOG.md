@@ -1,8 +1,8 @@
-# Prioritized Remediation Backlog (Waves 1, 2 & 3)
+# Prioritized Remediation Backlog (Waves 1, 2, 3 & 4 — Complete)
 
 - **Repository:** `VinhDat267/ATI_Project`
-- **Baseline Commit SHA (`HEAD`):** `08c8d8c5e7bf12625857ac3496fb96ec3914e34f`
-- **Scope:** Actionable engineering specifications for remediating all confirmed Wave 1 (`AUD-W1-01`..`11`), Wave 2 (`AUD-W2-01`..`07`), and Wave 3 (`AUD-W3-01`..`05`) findings outside Google Sheets Digest Gate A.
+- **Baseline Commit SHA (`origin/main`):** `08c8d8c5e7bf12625857ac3496fb96ec3914e34f`
+- **Scope:** Actionable engineering specifications for remediating all confirmed Wave 1 (`AUD-W1-01`..`11`), Wave 2 (`AUD-W2-01`..`07`), Wave 3 (`AUD-W3-01`..`05`), and Wave 4 (`AUD-W4-01`..`07`) findings outside Google Sheets Digest Gate A (`RMD-00 → RMD-04`).
 - **Audit Constraint:** This document is a specification only; zero product code has been modified in the audit worktree.
 
 ---
@@ -25,6 +25,13 @@
 | `RMD-W2-05` | **P2** | `AUD-W2-05`, `AUD-W2-07` | `packages/tool-adapters/src/jira/personal-jira-http.ts`, `packages/tool-adapters/src/jira/personal-jira-adapter.ts`, `packages/tool-adapters/src/jira/jira-adapter.ts` | Attach `details: { requestSent: false }` on pre-dispatch aborts and pre-write `GET` verification failures (`writing = false`) in `PersonalJiraHttpTransport.request` and shared `JiraAdapter.request`. |
 | `RMD-W3-02` | **P2** | `AUD-W3-05` | `apps/chat-api/src/routes/services-routes.ts`, `apps/chat-api/src/config/gmail-tools-runtime.ts`, `packages/tool-schemas/src/index.ts`, `apps/chat-api/src/services/registered-services.ts`, `packages/executor/src/runner.ts` | Add `'notion'` to `isPersonalOAuth` and query `NotionConnectionRepo` in `GET /api/services`; exclude `'notion'` from `mayFallbackToShared` when personal OAuth is active; spread `...NOTION_OAUTH_TOOLS` (`notion.get_page`, `notion.update_page`) in `ALL_TOOLS` and `StepRunner` `catalog` Map. |
 | `RMD-W3-03` | **P2** | `AUD-W3-04` | `packages/tool-adapters/src/github/github-adapter.ts`, `packages/tool-adapters/src/notion/notion-adapter.ts` | Track `writeDispatched` in `GitHubAdapter.request` and `NotionAdapter.request`: set `details: { requestSent: false }` on pre-dispatch aborts (`waitForSlot` / pre-fetch) so `StepRunner` does not mark un-sent write steps `unknown`. |
+| `RMD-W4-01` | **P1** | `AUD-W4-01` | `apps/chat-api/src/services/registered-services.ts`, `apps/chat-api/src/config/gmail-tools-runtime.ts`, `packages/tool-adapters/src/sheets/personal-sheets-adapter.ts`, `apps/chat-api/src/services/chat-service.ts` | 1. Only set `hasMySheets = true` to suppress shared `sheets` when `personal` contains spreadsheet tools (`mysheets.read_range` / `spreadsheets.length > 0`).<br>2. Enforce an explicit Drive/Docs allowlist (`allowedScope.driveFiles` / session-created IDs) in `checkedDriveId` and `ChatService.bindConnections`, and block `move_drive_file` on unapproved spreadsheets.<br>3. Replace destructive `text/plain` media upload in `mysheets.append_doc_text` with Google Docs API `documents.batchUpdate` (`insertText` at `endOfSegmentLocation`) or disable `append_doc_text` on pre-existing formatted Docs until `documents` scope is enabled. |
+| `RMD-W4-02` | **P2** | `AUD-W4-02` | `packages/tool-adapters/src/sheets/sheets-adapter.ts`, `packages/tool-adapters/src/sheets/personal-sheets-adapter.ts`, `packages/tool-adapters/src/sheets/sheets-shared.ts` | 1. Track `writeDispatched` in shared `SheetsAdapter` and attach `details: { requestSent: false }` on pre-write `GET` failures.<br>2. Never reset `writeDispatched = false` on a second `POST` after the first `POST` (`:batchUpdate` or `addSheet`) has already mutated the spreadsheet.<br>3. Surface explicit `truncated: true, scannedRange: 'A1:Z500'` metadata (or paginate ranges) and update only changed columns on `onDuplicate: 'update'` so formulas in other columns are preserved. |
+| `RMD-W4-03` | **P2** | `AUD-W4-03` | `packages/tool-schemas/src/index.ts`, `packages/planner/src/prompts/system-prompt.ts` | Spread `...SHEETS_EXTENDED_TOOLS` in `ALL_TOOLS` and trigger spreadsheet extended-tool prompt rules in `buildSystemPrompt` when either `mysheets` or `sheets` extended tools are present. |
+| `RMD-W4-04` | **P1** | `AUD-W4-04` | `packages/tool-schemas/src/report-evidence.ts`, `packages/planner/src/planner.ts`, `packages/planner/src/reports/renderers.ts` | 1. Add `mysheets.search_rows: 'sheets_rows'`, `sheets.search_rows: 'sheets_rows'`, and `sheets.aggregate_rows: 'sheets_metrics'` to `REPORT_SOURCE_TOOLS` and support `{ matches, headers }` in `renderSheetsRowsReport`.<br>2. In `bindReportEvidenceIfApplicable`, allow mixed report + work-item plans when the user reply resolves the clarification or bind report evidence only to notification steps (`slack`, `gmail`, `telegram`) without looping on work-item steps. |
+| `RMD-W4-05` | **P2** | `AUD-W4-05` | `packages/planner/src/reports/artifacts.ts`, `apps/chat-api/src/db/repositories/plan-repo.ts` | Persist `ReportArtifact` payload/hash alongside `plans.report_evidence` in PostgreSQL (aligned with `plans.expires_at` 30m TTL) and add bounded TTL eviction (`maxAgeMs = 30 * 60_000`) to `ReportArtifactStore`. |
+| `RMD-W4-06` | **P2** | `AUD-W4-06` | `packages/executor/src/resolver.ts`, `packages/planner/src/validator.ts` | Normalize bracket array indexing `path.replace(/\[(\d+)\]/g, '.$1')` inside `resolveRef` (`packages/executor/src/resolver.ts:6-42`) and `validator.ts:723` so `step_1.output[0].id` and `step_1.output.matches[0].rowNumber` resolve consistently across validation, preview, and execution. |
+| `RMD-W4-07` | **P2** | `AUD-W4-07` | `apps/chat-api/src/db/repositories/plan-repo.ts`, `apps/chat-api/src/services/execution-service.ts`, `apps/chat-api/src/services/chat-service.ts` | Enforce `users.status = 'active'` and (when `workspace_id IS NOT NULL`) `workspace_members.status = 'active'` inside `PlanRepo.approvePlan` and `PlanRepo.claimRecovery` for all plans; always call `planRepo.claimRecovery` in `ExecutionService.continueStep`; and pin shared service `credentialId` in `PlanConnections`. |
 
 ---
 
@@ -135,3 +142,66 @@
    - In [`gmail-tools-runtime.ts:179-202`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/config/gmail-tools-runtime.ts#L179-L202), add `'notion'` to the personal-OAuth exclusion list when `notionOAuthEnabled` is active.
 3. **Register `NOTION_OAUTH_TOOLS` (`notion.get_page`, `notion.update_page`) in `ALL_TOOLS` & Static Catalogs:**
    - In [`packages/tool-schemas/src/index.ts:47`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/tool-schemas/src/index.ts#L47), spread `...NOTION_OAUTH_TOOLS` into `ALL_TOOLS` so `getConfiguredToolCatalog` ([`registered-services.ts:71-108`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/services/registered-services.ts#L71-L108)), `GET /api/services` (`services-routes.ts:576`), `backupPlanner` (`server.ts:576` via `prepareSearchCall` at [`packages/planner/src/search.ts:154-167`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/planner/src/search.ts#L154-L167)), and [`packages/executor/src/runner.ts:16-18`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/executor/src/runner.ts#L16-L18) (`catalog` Map) all include `notion.get_page` and `notion.update_page`.
+
+---
+
+### `RMD-W4-01` — `mysheets` Empty-Picker Shared `sheets` Preservation, Drive/Docs Scope Enforcement & Non-Destructive `append_doc_text` (`AUD-W4-01`)
+1. **Prevent Empty `mysheets` Picker (`spreadsheets.length === 0`) from Blacking Out Organization Shared `sheets`:**
+   - In [`apps/chat-api/src/config/gmail-tools-runtime.ts:78-91`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/config/gmail-tools-runtime.ts#L78-L91), compute `const hasMySheets = personal.some((t) => t.name === 'mysheets.read_range');` (rather than `t.service === 'mysheets'`) so that when `spreadsheets.length === 0` (`scope_required`), Organization shared `sheets.*` tools remain available.
+2. **Enforce Allowed Scope on `PersonalSheetsAdapter` Drive/Docs Tools:**
+   - In [`packages/tool-adapters/src/sheets/personal-sheets-adapter.ts:108-113, 733-965`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/tool-adapters/src/sheets/personal-sheets-adapter.ts#L108-L113) and [`apps/chat-api/src/services/chat-service.ts:515-545`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/services/chat-service.ts#L515-L545), check `fileId` / `documentId` / `folderId` against an explicit Drive/Docs allowlist (or files created via `drive.file` by the app and pinned in `connections.mysheets`), and reject `mysheets.move_drive_file` on any spreadsheet ID not present in `allowedScope.spreadsheets`.
+3. **Eliminate Destructive `text/plain` Media Overwrite in `mysheets.append_doc_text`:**
+   - In [`personal-sheets-adapter.ts:900-938`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/tool-adapters/src/sheets/personal-sheets-adapter.ts#L900-L938), replace `GET .../export?mimeType=text/plain` + `PATCH /upload/drive/v3/files/{documentId}?uploadType=media` (`Content-Type: text/plain`) with Google Docs REST API `POST https://docs.googleapis.com/v1/documents/{documentId}:batchUpdate` (`insertText` at `endOfSegmentLocation: {}`), which appends text non-destructively while preserving all headings, tables, links, and inline images.
+
+---
+
+### `RMD-W4-02` — Shared `SheetsAdapter` Pre-Write `requestSent: false` Tracking, Atomic Multi-POST `writeDispatched` Guard & `A1:Z500` Truncation Safety (`AUD-W4-02`)
+1. **Track `writeDispatched` in Shared `SheetsAdapter` ([`sheets-adapter.ts:62-102, 201-405`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/tool-adapters/src/sheets/sheets-adapter.ts#L62-L102)):**
+   - Mirror `PersonalSheetsAdapter`'s `writeDispatched` flag in `SheetsAdapter.execute` so any failure during token exchange or pre-write `GET` (`tabs` or `A1:Z500` dedup read) attaches `details: { requestSent: false }`.
+2. **Preserve `writeDispatched = true` Across Multi-POST Mutations ([`personal-sheets-adapter.ts:290, 305, 500-534, 672-721`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/tool-adapters/src/sheets/personal-sheets-adapter.ts#L500-L534)):**
+   - Once the first mutating `POST` (`:batchUpdate` in `append_rows` or `addSheet` in `create_sheet`) has been dispatched (`writeDispatched = true`), pass a sticky dispatcher callback `(dispatched) => { if (dispatched) writeDispatched = true; }` to the second `POST` so a 401/429 on the second `POST` never resets `writeDispatched` back to `false`.
+3. **Preserve Formula Cells on `onDuplicate: 'update'` & Surface `A1:Z500` Truncation Metadata:**
+   - When `append_rows` updates duplicate rows from `records`, generate per-column cell ranges (`${quotedSheet}!${colLetter}${rowNumber}`) for only the keys provided in `record` (matching `update_rows` behavior) instead of overwriting the entire row `A${rowNumber}`.
+   - Return `scannedRange: 'A1:Z500'` and `truncated: fetchedRows.length >= 500` on `search_rows` and `aggregate_rows`.
+
+---
+
+### `RMD-W4-03` — Register `SHEETS_EXTENDED_TOOLS` in `ALL_TOOLS` and Align Planner System Prompt (`AUD-W4-03`)
+- In [`packages/tool-schemas/src/index.ts:47`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/tool-schemas/src/index.ts#L47), spread `...SHEETS_EXTENDED_TOOLS` into `ALL_TOOLS`.
+- In [`packages/planner/src/prompts/system-prompt.ts:57-59`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/planner/src/prompts/system-prompt.ts#L57-L59), check `tools.some(t => t.service === 'mysheets' || t.name === 'sheets.search_rows')` and emit service-appropriate tool names (`mysheets.*` vs `sheets.*`).
+
+---
+
+### `RMD-W4-04` — Ground `mysheets.search_rows` / `sheets.search_rows` / `sheets.aggregate_rows` in `REPORT_SOURCE_TOOLS` and Resolve Mixed Report + Work-Item Clarification Loop (`AUD-W4-04`)
+1. **Add Missing Spreadsheet Tools to `REPORT_SOURCE_TOOLS` ([`packages/tool-schemas/src/report-evidence.ts:84-87`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/tool-schemas/src/report-evidence.ts#L84-L87)):**
+   - Register `'mysheets.search_rows': 'sheets_rows'`, `'sheets.search_rows': 'sheets_rows'`, and `'sheets.aggregate_rows': 'sheets_metrics'` in `REPORT_SOURCE_TOOLS`.
+   - Update `renderSheetsRowsReport` ([`packages/planner/src/reports/renderers.ts`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/planner/src/reports/renderers.ts#L1-L120)) to accept `{ headers, matches }` output from `search_rows` in addition to `{ values }` from `read_range`.
+2. **Unblock Mixed Report + Work-Item Plans ([`packages/planner/src/planner.ts:288-290`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/planner/src/planner.ts#L288-L290)):**
+   - When `parsed.steps` contains both a report notification step (`slack.send_message`, `gmail.send_message`, `telegram.send_message`) and a work-item creation step (`github.create_issue`, `trello.create_card`, `jira.create_issue`, `myjira.create_issue`), bind `reportEvidence` to the notification step(s) without forcing a clarification loop on the work-item step, or honor the user's clarification reply on the next turn.
+
+---
+
+### `RMD-W4-05`, `RMD-W4-06` & `RMD-W4-07` — Durable `ReportArtifactStore`, Bracket Array `$ref` Normalization & Approval/Recovery SQL CAS Hardening (`AUD-W4-05`, `AUD-W4-06`, `AUD-W4-07`)
+1. **`RMD-W4-05` (`AUD-W4-05`):** Persist `ReportArtifact` records in PostgreSQL (or serialize the verified artifact snapshot inside `plans.report_evidence`) with a 30-minute TTL matching `plans.expires_at`, and evict expired entries from the in-memory `ReportArtifactStore` cache.
+2. **`RMD-W4-06` (`AUD-W4-06`):** In [`packages/executor/src/resolver.ts:6-42`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/executor/src/resolver.ts#L6-L42) (`resolveRef`) and [`packages/planner/src/validator.ts:723`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/packages/planner/src/validator.ts#L723), normalize bracket array indices via `const normalizedPath = path.replace(/\[(\d+)\]/g, '.$1');` before `.split('.')` (matching [`chat-service.ts:49`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/services/chat-service.ts#L49)).
+3. **`RMD-W4-07` (`AUD-W4-07`):** In [`PlanRepo.approvePlan`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/db/repositories/plan-repo.ts#L161-L183) and [`PlanRepo.claimRecovery`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/db/repositories/plan-repo.ts#L274-L289), enforce `EXISTS (SELECT 1 FROM users u WHERE u.id = $3 AND u.status = 'active')` and (when `conversations.workspace_id IS NOT NULL`) `EXISTS (SELECT 1 FROM workspace_members wm WHERE wm.workspace_id = c.workspace_id AND wm.user_id = $3 AND wm.status = 'active')` for all plans; and always invoke `planRepo.claimRecovery` in [`ExecutionService.continueStep`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/src/services/execution-service.ts#L594-L610).
+
+---
+
+## 3. Master Remediation Sequencing Roadmap (Post-Audit Execution Order)
+
+To minimize merge conflicts with Google Sheets Digest Gate A (`RMD-00 → RMD-04`) and respect package ownership boundaries in `docs/team-workflow.md`:
+
+1. **Phase R1 — P1 Tenant Isolation, Scope Enforcement & Data Safety (`RMD-W4-01`, `RMD-W3-01`, `RMD-W1-03`):**
+   - Fix `PersonalSheetsAdapter` `append_doc_text` plain-text overwrite, Drive/Docs allowlist, and empty-picker `sheets` blackout (`RMD-W4-01`).
+   - Partition `GitHubTeamRepo` by mandatory `scopeId` and quarantine legacy `'default'` rows (`RMD-W3-01`).
+   - Close `calendar_digest` unscoped Slack query and enforce authoritative DB workspace + pinned Telegram revalidation across digest runners (`RMD-W1-03`).
+2. **Phase R2 — P1 Planner Grounding & Scheduled Digest Wiring (`RMD-W4-04`, `RMD-W2-01`, `RMD-W2-02`, `RMD-W1-01`):**
+   - Add `mysheets.search_rows`, `sheets.search_rows`, and `sheets.aggregate_rows` to `REPORT_SOURCE_TOOLS` and fix the mixed report + work-item clarification loop (`RMD-W4-04`).
+   - Wire `myjira_digest` end-to-end (`RMD-W2-01`) and fix `trello_digest` `scopeId` + `connections.telegram` (`RMD-W2-02`).
+   - Implement consent-gated, encrypted Telegram inbox message retention and route `telegram.read_messages` through `TelegramUpdateStore` (`RMD-W1-01`).
+3. **Phase R3 — P2 Adapter Idempotency, Executor `$ref` Resolution & Approval Hardening (`RMD-W1-02`, `RMD-W1-04`, `RMD-W2-03`, `RMD-W2-05`, `RMD-W3-03`, `RMD-W4-02`, `RMD-W4-05`, `RMD-W4-06`, `RMD-W4-07`):**
+   - Standardize pre-dispatch `details: { requestSent: false }` across all adapters and prevent two-POST `writeDispatched` resets (`RMD-W1-02`, `RMD-W2-03`, `RMD-W2-05`, `RMD-W3-03`, `RMD-W4-02`).
+   - Normalize bracket array `$ref` paths in `resolveRef` (`RMD-W4-06`), persist `ReportArtifactStore` (`RMD-W4-05`), and harden `PlanRepo.approvePlan` / `claimRecovery` (`RMD-W4-07`).
+4. **Phase R4 — P2/P3 Catalog Registration, Service Status Badges & Recovery UX (`RMD-W1-05`, `RMD-W1-06`, `RMD-W2-04`, `RMD-W3-02`, `RMD-W4-03`):**
+   - Register `SLACK_EXTENDED_TOOLS`, `NOTION_OAUTH_TOOLS`, and `SHEETS_EXTENDED_TOOLS` in `ALL_TOOLS` and align `GET /api/services` for `notion` and `myjira`.

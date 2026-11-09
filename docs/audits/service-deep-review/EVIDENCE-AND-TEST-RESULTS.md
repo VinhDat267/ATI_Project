@@ -1,10 +1,10 @@
-# Evidence & Test Verification Log — Independent Deep Service Audit (Waves 1, 2 & 3)
+# Evidence & Test Verification Log — Independent Deep Service Audit (Waves 1, 2, 3 & 4 — Complete)
 
 - **Repository:** `VinhDat267/ATI_Project`
 - **Audit Worktree:** `C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit`
 - **Audit Branch:** `independent_service_audit`
-- **Baseline Commit SHA (`HEAD`):** `08c8d8c5e7bf12625857ac3496fb96ec3914e34f`
-- **Remote Baseline (`origin/main`):** `08c8d8c5e7bf12625857ac3496fb96ec3914e34f` (`0` commits ahead/behind, `0` tracked modifications)
+- **Baseline Commit SHA (`origin/main`):** `08c8d8c5e7bf12625857ac3496fb96ec3914e34f`
+- **Tracked Product Code Diff (`git diff origin/main -- packages apps db prompts evaluations`):** `0` changes
 - **Isolated Test Database:** PostgreSQL 16 container `ati-pr277-fix-db` on `localhost:56534/ati_v3`
 
 ---
@@ -24,10 +24,10 @@ All test files listed in this report were enumerated directly from `git ls-files
 
 ---
 
-## 2. True Set-Union Reconciliation & Full-Relative-Path Manifest (Waves 1, 2 & 3)
+## 2. True Set-Union Reconciliation & Full-Relative-Path Manifest (Waves 1, 2, 3 & 4)
 
 ### 2.1. Reconciliation of Set Union vs Checkpoint Re-Run Counts
-1. **Why Wave 1 + Wave 2 + Wave 3 Raw Checkpoint Sums Must Not Be Added:**
+1. **Why Raw Checkpoint Sums Must Not Be Added:**
    - In **Wave 1**, `npm test -w` executed **100% of test files** across 5 workspaces:
      - `packages/tool-schemas`: **`25` Vitest files (`579` tests)**
      - `packages/tool-adapters`: **`22` Vitest files (`638` tests)** + **`1` Node `--test` probe file (`packages/tool-adapters/tests/jira-oauth-probe.check.mjs`, `32` tests)** (`23` files / `670` tests)
@@ -38,6 +38,7 @@ All test files listed in this report were enumerated directly from `git ls-files
      - **Wave 1 True Unique Set (`|W1|`):** **`307` Vitest files (`4,052` tests) + `1` Node `--test` probe file (`32` tests) = `308` unique repository test files / `4,084` unique repository test cases**. *(The earlier summary row stating `275` files / `3,897` tests was an estimated service slice and is replaced below by the exact full-path manifest.)*
    - In **Wave 2**, `83` files (`1,107` tests) were executed. Because `packages/tool-schemas`, `packages/tool-adapters`, and `apps/chat-web` were already executed in full during Wave 1, the **`26` files (`269` tests)** run in those 3 workspaces during Wave 2 (`4` `tool-schemas` [`66` tests] + `7` `tool-adapters` [`88` tests] + `15` `chat-web` [`115` tests]) are **checkpoint re-runs (subsets of Wave 1)**, whereas the **`57` `apps/chat-api` files (`838` tests)** (`11` `W2-A` Trello [`106` tests] + `46` `W2-B` Jira/Workspace [`732` tests]) have `0` overlap with Wave 1 (`|W2 \ W1| = 57` unique files / `838` unique tests).
    - In **Wave 3**, `31` files (`229` tests) were executed. Of these, **`7` files (`118` tests)** in `packages/tool-schemas` (`1`), `packages/planner` (`1`), `packages/tool-adapters` (`2`), and `apps/chat-web` (`3`) were already executed in Wave 1's full-workspace runs, and **`1` `apps/chat-api` file (`4` tests)** (`apps/chat-api/tests/services/schedules/telegram-digest-github.test.ts`) was already executed in Wave 1 `W1-A`. Thus **`8` files (`122` tests)** in Wave 3 are **checkpoint re-runs (subsets of Wave 1)**, and **`23` `apps/chat-api` files (`107` tests)** (`12` GitHub [`77` tests] + `11` Notion [`30` tests]) are net-new unique repository test files (`|W3 \ (W1 ∪ W2)| = 23` unique files / `107` unique tests).
+   - In **Wave 4**, **`11` net-new `apps/chat-api` files (`110` tests)** covering interactive `mysheets`/`sheets`, `report-evidence`, and `execution` recovery/security were executed with `0` overlap against `W1 ∪ W2 ∪ W3` (`|W4 \ (W1 ∪ W2 ∪ W3)| = 11` unique files / `110` unique tests).
 
 ### 2.2. Master Set-Union Summary Table (Strictly Separating Unique Union, Re-Runs & Reproduction Harness)
 
@@ -46,11 +47,12 @@ All test files listed in this report were enumerated directly from `git ls-files
 | **Wave 1 Unique Set (`W1`)** | `packages/tool-schemas` (`25` files: `579` tests), `packages/tool-adapters` (`22` Vitest files: `638` tests + `1` Node `--test` probe file: `32` tests), `packages/planner` (`39` files: `555` tests), `packages/executor` (`7` files: `56` tests), `apps/chat-web` (`114` files: `1,198` tests), `apps/chat-api` (`100` files: `32` `W1-A` [`237` tests] + `56` `W1-B` [`680` tests] + `12` `W1-C` [`109` tests] = `1,026` tests) | `308` | `0` | **`308`** (`307` Vitest + `1` Node probe) | **`4,084`** (`4,052` Vitest + `32` Node probe) | `npm test -w` (`5` workspaces) + `npx vitest run` (`100` `chat-api` files) (`EXIT=0`) |
 | **Wave 2 Net-New Addition (`W2 \ W1`)** | `apps/chat-api` (`57` net-new files: `11` `W2-A` Trello [`106` tests] + `46` `W2-B` Jira/Workspace [`732` tests]); deducts `26` subset re-runs (`269` tests) in `tool-schemas` (`4`), `tool-adapters` (`7`), and `chat-web` (`15`) already in `W1` | `83` (`1,107` raw tests) | `-26` files (`-269` tests in `W1`) | **`57`** | **`838`** | `npx --prefix apps/chat-api vitest run` (`EXIT=0`) |
 | **Wave 3 Net-New Addition (`W3 \ (W1 ∪ W2)`)** | `apps/chat-api` (`23` net-new files: `12` GitHub [`77` tests] + `11` Notion [`30` tests]); deducts `8` subset re-runs (`122` tests) already in `W1` (`4` `packages/*` [`90` tests], `3` `chat-web` [`28` tests], and `1` `chat-api` file `tests/services/schedules/telegram-digest-github.test.ts` [`4` tests]) | `31` (`229` raw tests) | `-8` files (`-122` tests in `W1`) | **`23`** | **`107`** | `npx --prefix apps/chat-api vitest run` (`EXIT=0`) |
-| **True Set Union (`W1 ∪ W2 ∪ W3`) — Unique Repository Test Suites** | **`25` `tool-schemas` + `23` `tool-adapters` (`22` Vitest + `1` Node probe) + `39` `planner` + `7` `executor` + `114` `chat-web` + `180` `chat-api` (`100 + 57 + 23`)** | `422` *(total file runs)* | `-34` *(re-run file executions)* | **`388`** (`387` Vitest + `1` Node probe) | **`5,029`** (`4,997` Vitest + `32` Node probe) | **All `388` unique repo files (`5,029` unique tests) `EXIT=0`** |
+| **Wave 4 Net-New Addition (`W4 \ (W1 ∪ W2 ∪ W3)`)** | `apps/chat-api` (`11` net-new files: interactive `mysheets`/`sheets`, `report-evidence`, `execution-routes`, `execution-security`, `memory-execution-snapshot`) | `11` (`110` raw tests) | `0` | **`11`** | **`110`** | `npx vitest run` (`EXIT=0`) |
+| **True Set Union (`W1 ∪ W2 ∪ W3 ∪ W4`) — Unique Repository Test Suites** | **`25` `tool-schemas` + `23` `tool-adapters` (`22` Vitest + `1` Node probe) + `39` `planner` + `7` `executor` + `114` `chat-web` + `191` `chat-api` (`100 + 57 + 23 + 11`)** | `433` *(total file runs)* | `-34` *(re-run file executions)* | **`399`** (`398` Vitest + `1` Node probe) | **`5,139`** (`5,107` Vitest + `32` Node probe) | **All `399` unique repo files (`5,139` unique tests) `EXIT=0`** |
 | **Separate Checkpoint Re-Run Count (Not in Unique Total)** | `26` Wave 2 re-runs (`269` tests) + `8` Wave 3 re-runs (`122` tests) | `34` *(re-runs)* | N/A | *(`0` net-new)* | *(`391` re-run test executions)* | `EXIT=0` |
-| **Separate Ephemeral Audit Reproduction Harness (Not in Repo Total)** | `apps/chat-api/tests/integration/__audit_repro_temp.test.ts` (ephemeral, deleted in `finally`) | `1` *(temp)* | N/A | **`1` *(ephemeral)*** | **`10` *(reproduction tests)*** | `npx --prefix apps/chat-api vitest run tests/integration/__audit_repro_temp.test.ts` (`EXIT=0`) |
+| **Separate Ephemeral Audit Reproduction Harnesses (Not in Repo Total)** | `apps/chat-api/tests/integration/__audit_repro_temp.test.ts` (`10` tests, W1–W3) + `apps/chat-api/tests/integration/__audit_repro_w4_temp.test.ts` (`4` tests, W4) — ephemeral, deleted in `finally` | `2` *(temp)* | N/A | **`2` *(ephemeral)*** | **`14` *(reproduction tests)*** | `npx vitest run` (`EXIT=0`) |
 
-### 2.3. Complete Manifest by Full Relative Path (`388` Unique Repository Test Files in `W1 ∪ W2 ∪ W3`)
+### 2.3. Complete Manifest by Full Relative Path (`399` Unique Repository Test Files in `W1 ∪ W2 ∪ W3 ∪ W4`)
 
 Every path below is verified in `git ls-files` at `08c8d8c5e7bf12625857ac3496fb96ec3914e34f`:
 
@@ -272,7 +274,7 @@ Every path below is verified in `git ls-files` at `08c8d8c5e7bf12625857ac3496fb9
 - `apps/chat-web/tests/use-sse-hidden.test.tsx`
 - `apps/chat-web/tests/workflow-flow-canvas.test.tsx`
 
-#### F. `apps/chat-api` (`180` Unique Files / `1,971` Unique Tests Across `W1 ∪ W2 ∪ W3`)
+#### F. `apps/chat-api` (`191` Unique Files / `2,081` Unique Tests Across `W1 ∪ W2 ∪ W3 ∪ W4`)
 - **Wave 1 `W1-A` (`32` Unique Files / `237` Unique Tests):**
   - `apps/chat-api/tests/config/gmail-env.test.ts`
   - `apps/chat-api/tests/config/gmail-sandbox.test.ts`
@@ -378,6 +380,7 @@ Every path below is verified in `git ls-files` at `08c8d8c5e7bf12625857ac3496fb9
   - `apps/chat-api/tests/services/schedule-calendar-digest.test.ts`
 - **Wave 2 Net-New `W2-A` & `W2-B` (`57` Unique Files / `838` Unique Tests):** Listed in full in Section 3.1 (`11` files) and Section 3.2 (`46` files) below.
 - **Wave 3 Net-New (`23` Unique Files / `107` Unique Tests):** Listed in full in Section 4.2 (`12` net-new GitHub files + `1` re-run `telegram-digest-github.test.ts`) and Section 4.3 (`11` net-new Notion files) below.
+- **Wave 4 Net-New (`11` Unique Files / `110` Unique Tests):** Listed in full in Section 5.1 below (`apps/chat-api/tests/config/mysheets-config.test.ts`, `apps/chat-api/tests/config/sheets-sandbox.test.ts`, `apps/chat-api/tests/db/mysheets-migration.test.ts`, `apps/chat-api/tests/integration/memory-execution-snapshot.test.ts`, `apps/chat-api/tests/integration/report-evidence.test.ts`, `apps/chat-api/tests/routes/execution-routes.test.ts`, `apps/chat-api/tests/routes/execution-security.test.ts`, `apps/chat-api/tests/routes/mysheets-connections.test.ts`, `apps/chat-api/tests/routes/mysheets-services.test.ts`, `apps/chat-api/tests/services/mysheets-backend.test.ts`, `apps/chat-api/tests/services/mysheets-planning-lookup.test.ts`).
 
 ---
 
@@ -572,18 +575,51 @@ Every single file below was verified against `git ls-files` at `08c8d8c5e7bf1262
 
 ---
 
-## 5. Deterministic Integration Reproduction Harness (Waves 1, 2 & 3 — `10` Test Blocks)
+## 5. Wave 4 Repository Test Suite Execution (`11` Net-New `apps/chat-api` Files / `110` Tests)
 
-### 5.1. Database Safety Guard & State Preservation Design
-To guarantee the temporary reproduction harness (`apps/chat-api/tests/integration/__audit_repro_temp.test.ts`) can never run destructive `DELETE` statements against a shared or non-isolated database:
+### 5.1. Interactive `mysheets` / `sheets`, Report Evidence & Execution Recovery Suite (`11` Files / `110` Tests)
+- **Command:**
+  ```powershell
+  $env:DATABASE_URL="postgresql://ati_v3:ati_v3_local_only@localhost:56534/ati_v3"
+  $env:TEST_DATABASE_URL="postgresql://ati_v3:ati_v3_local_only@localhost:56534/ati_v3"
+  npx vitest run apps/chat-api/tests/routes/mysheets-connections.test.ts apps/chat-api/tests/routes/mysheets-services.test.ts apps/chat-api/tests/integration/report-evidence.test.ts apps/chat-api/tests/routes/execution-routes.test.ts apps/chat-api/tests/config/mysheets-config.test.ts apps/chat-api/tests/config/sheets-sandbox.test.ts apps/chat-api/tests/db/mysheets-migration.test.ts apps/chat-api/tests/routes/execution-security.test.ts apps/chat-api/tests/services/mysheets-backend.test.ts apps/chat-api/tests/services/mysheets-planning-lookup.test.ts apps/chat-api/tests/integration/memory-execution-snapshot.test.ts
+  ```
+- **Raw Vitest Output:**
+  ```text
+  RUN  v4.1.11 C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit
+
+   ✓ apps/chat-api/tests/db/mysheets-migration.test.ts (4 tests) 1468ms
+   ✓ apps/chat-api/tests/services/mysheets-backend.test.ts (9 tests) 159ms
+   ✓ apps/chat-api/tests/config/sheets-sandbox.test.ts (1 test) 9ms
+   ✓ apps/chat-api/tests/routes/execution-routes.test.ts (3 tests) 106ms
+   ✓ apps/chat-api/tests/config/mysheets-config.test.ts (11 tests) 50ms
+   ✓ apps/chat-api/tests/routes/execution-security.test.ts (11 tests) 310ms
+   ✓ apps/chat-api/tests/integration/report-evidence.test.ts (12 tests) 1315ms
+   ✓ apps/chat-api/tests/services/mysheets-planning-lookup.test.ts (9 tests) 2355ms
+   ✓ apps/chat-api/tests/integration/memory-execution-snapshot.test.ts (2 tests) 4592ms
+   ✓ apps/chat-api/tests/routes/mysheets-connections.test.ts (18 tests) 3500ms
+   ✓ apps/chat-api/tests/routes/mysheets-services.test.ts (30 tests) 5060ms
+
+   Test Files  11 passed (11)
+        Tests  110 passed (110)
+     Duration  8.28s
+  W4_CHAT_API_EXIT=0
+  ```
+
+---
+
+## 6. Deterministic Integration Reproduction Harnesses (Waves 1–3: `10` Tests + Wave 4: `4` Tests = `14` Total Reproduction Tests)
+
+### 6.1. Database Safety Guard & State Preservation Design
+To guarantee the temporary reproduction harnesses (`apps/chat-api/tests/integration/__audit_repro_temp.test.ts` and `apps/chat-api/tests/integration/__audit_repro_w4_temp.test.ts`) can never run destructive `DELETE` statements against a shared or non-isolated database:
 1. **Fail-Closed Connection Guard (`assertIsolatedTestDatabase`):**
    Before opening a `pg.Pool`, `beforeAll` parses `DB_URL` and asserts `hostname` is `localhost` or `127.0.0.1`, `port === '56534'`, and `pathname === '/ati_v3'`. Any other host, port, or database name immediately throws `[AUDIT-HARNESS-GUARD] Refusing to execute destructive SQL against non-isolated database URL`.
 2. **Pre-Test Snapshot & `afterAll` Restoration:**
    `beforeAll` snapshots existing rows in `service_credentials WHERE service = 'slack' AND user_id IS NULL`, `github_team_scope WHERE id = 'default'`, and `github_team_repos WHERE scope_id = 'default'`. `afterAll` deletes only the synthetic test UUIDs (`00000000-0000-4000-8000-000000000901`, `...0902`, `...0911`) and restores the pre-existing snapshot rows.
 3. **Ephemeral File Cleanup:**
-   The PowerShell wrapper runs inside `try { ... } finally { Remove-Item -Force apps/chat-api/tests/integration/__audit_repro_temp.test.ts }`, leaving `git status --short` completely clean (`0` untracked or modified code files).
+   The PowerShell wrapper runs inside `try { ... } finally { Remove-Item -Force ... }`, leaving `git status --short` completely clean (`0` untracked or modified code files).
 
-### 5.2. Cases Reproduced in the 10-Test Harness
+### 6.2. Cases Reproduced in the Waves 1–3 10-Test Harness (`__audit_repro_temp.test.ts`)
 | Test Block | Finding ID(s) | Reproduced Runtime Behavior | Result |
 |---|---|---|---|
 | **Test 1 (`Case 1`)** | `AUD-W1-02` | `TelegramBotClient.getUpdates` advances `offset = 7002` and purges message `7001` from the Bot API queue before `TelegramAdapter.execute('telegram.read_messages')` runs, returning `{ messages: [] }`. | **PASS** (`21ms`) |
@@ -597,7 +633,7 @@ To guarantee the temporary reproduction harness (`apps/chat-api/tests/integratio
 | **Test 9 (`Case 10`)** | `AUD-W3-02` | `createNotionDigestRunner` omits `connections.telegram` when calling `getAdapter('telegram', { phase: 'execution' })`, failing with `state: 'blocked'` and `error: 'Kết nối Telegram đã thay đổi, hãy lập lại kế hoạch.'`. | **PASS** (`15ms`) |
 | **Test 10 (`Case 11`)** | `AUD-W3-03`, `AUD-W3-04`, `AUD-W3-05` | `evaluateGithubDigestCandidate`, `createGithubDigestRunner`, and `evaluateNotionDigestCandidate` fail to resolve Org Slack (`"No credentials configured for service 'slack'"`); pre-dispatch abort on `github.create_issue` and `notion.create_page` returns `status: 'unknown'` with `fetchCalled === false`; `GET /api/services` reports connected Notion OAuth user as `configured: false, connected: false, connectionStatus: 'unconfigured'`. | **PASS** (`24ms`) |
 
-### 5.3. Raw Execution Log of 10-Test Reproduction Harness
+### 6.3. Raw Execution Log of Waves 1–3 10-Test Reproduction Harness
 ```text
 RUN  v4.1.11 C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit
 
@@ -609,4 +645,26 @@ RUN  v4.1.11 C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independ
    Duration  2.44s (transform 1.25s, setup 0ms, import 1.96s, tests 283ms, environment 0ms)
 
 REPRO_EXIT=0
+```
+
+### 6.4. Cases Reproduced in the Wave 4 4-Test Harness (`__audit_repro_w4_temp.test.ts`)
+| Test Block | Finding ID(s) | Reproduced Runtime Behavior | Result |
+|---|---|---|---|
+| **W4 Test 1 (`AUD-W4-01`)** | `AUD-W4-01` | 1. `getToolCatalogFor` with `selectedSpreadsheets: []` returns 6 `MYSHEETS_DRIVE_TOOLS` (`service: 'mysheets'`), causing `runtimeToolCatalog` to strip all Organization shared `sheets` tools (`0` spreadsheet tools remain).<br>2. `PersonalSheetsAdapter.execute('mysheets.move_drive_file', { fileId: 'unapproved_sheet_999999', folderId: 'folder_target_123456' })` succeeds on an unapproved spreadsheet rejected by `mysheets.read_range`.<br>3. `PersonalSheetsAdapter.execute('mysheets.append_doc_text', ...)` exports as `text/plain` and issues `PATCH /upload/drive/v3/files/{id}?uploadType=media` with `Content-Type: text/plain`, overwriting the entire Google Doc as plain text. | **PASS** (`55ms`) |
+| **W4 Test 2 (`AUD-W4-02`)** | `AUD-W4-02` | 1. Shared `SheetsAdapter.execute('sheets.append_rows', ...)` failing with `503` on pre-write `GET` (`tabs`) omits `details: { requestSent: false }`, causing `StepRunner.executeStep` to return `status: 'unknown'` with `postSent === false`.<br>2. `PersonalSheetsAdapter.execute('mysheets.append_rows', { deduplicate: true, keyColumn: 'ID', onDuplicate: 'update', records: [...] })` mutates row 1 via `POST :batchUpdate`, then hits `401` on the second `POST :append`, resetting `writeDispatched = false` and throwing `details: { requestSent: false }` despite the first `POST` having already mutated the spreadsheet. | **PASS** (`41ms`) |
+| **W4 Test 3 (`AUD-W4-04`)** | `AUD-W4-04` | 1. `validatePlan` rejects a report plan grounded via `mysheets.search_rows` (`Report content must be grounded in verified read observations via reportEvidence`) because `mysheets.search_rows` is omitted from `REPORT_SOURCE_TOOLS`.<br>2. `AIPlanner.processMessage` on a mixed report + `github.create_issue` prompt forces a hardcoded clarification (`"Bạn muốn nội dung công việc mới là báo cáo dữ liệu hay một nội dung riêng?"`). | **PASS** (`7ms`) |
+| **W4 Test 4 (`AUD-W4-06`)** | `AUD-W4-06` | `validatePlan` accepts `{ "$ref": "step_1.output[0].id" }` when `step_1` (`trello.search_lists`) has `outputSchema.type === 'array'`, and Executor `resolveArgs` then throws `Error: Property 'output[0].id' not found on step 'step_1'` at runtime. | **PASS** (`3ms`) |
+
+### 6.5. Raw Execution Log of Wave 4 4-Test Reproduction Harness
+```text
+RUN  v4.1.11 C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit
+
+ ✓ apps/chat-api/tests/integration/__audit_repro_w4_temp.test.ts (4 tests) 218ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  07:44:22
+   Duration  1.66s (transform 878ms, setup 0ms, import 1.24s, tests 218ms, environment 0ms)
+
+W4_REPRO_EXIT=0
 ```
