@@ -618,8 +618,8 @@ To make all `14` reproduction tests (`10` in Waves 1–3 + `4` in Wave 4) **100%
    Using [`createIsolatedTestSchema`](file:///C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit/apps/chat-api/tests/helpers/jira-test-db.ts#L88-L255), `beforeAll` creates a dedicated ephemeral PostgreSQL schema (`test_...`), runs all `db/v3` migrations inside that isolated schema, executes all `14` tests against `isoCtx.pool`, and drops the schema cleanly in `afterAll` (`await isoCtx.cleanup()`). This guarantees deterministic execution even if the container's `public` schema is empty.
 3. **Strict Sanitization (Zero Secrets, Zero Real Tokens, Zero User PII):**
    All credentials in the package use synthetic test placeholders (`TEST_KEY = 'a'.repeat(64)`, `000000:TEST_BOT_PLACEHOLDER`, `xoxb-test`, `ya29.test`, synthetic RSA keypair generated in-memory via `generateKeyPairSync('rsa', { modulusLength: 2048 })`, and synthetic UUIDs `00000000-0000-4000-8000-000000000901`..`0931`).
-4. **Ephemeral Self-Extracting Execution (`try / finally`):**
-   Section 6.6 below embeds the complete runnable TypeScript file between `<!-- BEGIN_SANITIZED_14_TEST_REPRO_PACKAGE -->` and `<!-- END_SANITIZED_14_TEST_REPRO_PACKAGE -->`. Running the one-line PowerShell command extracts the block to `apps/chat-api/tests/integration/__audit_repro_all_14_temp.test.ts`, runs `npx vitest run`, and removes the temporary file in `finally`, leaving `git status --short` completely clean.
+4. **Ephemeral Self-Extracting Execution (`try / finally` + No-Overwrite Guard + Non-Zero Exit Propagation):**
+   Section 6.6 below embeds the complete runnable TypeScript file between `<!-- BEGIN_SANITIZED_14_TEST_REPRO_PACKAGE -->` and `<!-- END_SANITIZED_14_TEST_REPRO_PACKAGE -->`. Running the PowerShell runner in Section 6.5 refuses to overwrite `apps/chat-api/tests/integration/__audit_repro_all_14_temp.test.ts` if it already exists, extracts the block, runs `npx vitest run`, propagates a non-zero exit status by throwing if `$LASTEXITCODE -ne 0`, and removes the temporary file in `finally` (only when created by that run), leaving `git status --short` completely clean.
 
 ### 6.2. Cases Reproduced in the Waves 1–3 10-Test Harness (`Case 1`–`Case 11`)
 | Test Block | Finding ID(s) | Reproduced Runtime Behavior | Result |
@@ -647,12 +647,12 @@ To make all `14` reproduction tests (`10` in Waves 1–3 + `4` in Wave 4) **100%
 ```text
 RUN  v4.1.11 C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit
 
- ✓ apps/chat-api/tests/integration/__audit_repro_all_14_temp.test.ts (14 tests) 908ms
+ ✓ apps/chat-api/tests/integration/__audit_repro_all_14_temp.test.ts (14 tests) 1461ms
 
  Test Files  1 passed (1)
       Tests  14 passed (14)
-   Start at  09:07:35
-   Duration  3.44s (transform 1.15s, setup 0ms, import 1.98s, tests 908ms, environment 0ms)
+   Start at  09:59:42
+   Duration  4.73s (transform 1.81s, setup 0ms, import 3.00s, tests 1.46s, environment 0ms)
 
 ALL_14_REPRO_EXIT=0
 ```
@@ -664,16 +664,27 @@ Any reviewer on a machine with the local test PostgreSQL container running on `l
 $env:DATABASE_URL = "postgresql://ati_v3:ati_v3_local_only@localhost:56534/ati_v3"
 $docPath = "docs/audits/service-deep-review/EVIDENCE-AND-TEST-RESULTS.md"
 $tempTestPath = "apps/chat-api/tests/integration/__audit_repro_all_14_temp.test.ts"
+$createdTempFile = $false
 try {
+  if (Test-Path $tempTestPath) {
+    throw "Refusing to overwrite existing file: $tempTestPath"
+  }
   $raw = [System.IO.File]::ReadAllText((Resolve-Path $docPath), [System.Text.Encoding]::UTF8)
   $pattern = '(?s)<!-- BEGIN_SANITIZED_14_TEST_REPRO_PACKAGE -->\s*```ts\r?\n(.*?)\r?\n```\s*<!-- END_SANITIZED_14_TEST_REPRO_PACKAGE -->'
   $match = [regex]::Match($raw, $pattern)
   if (-not $match.Success) { throw "Could not locate sanitized 14-test reproduction block in $docPath" }
   [System.IO.File]::WriteAllText((Join-Path (Get-Location) $tempTestPath), $match.Groups[1].Value, (New-Object System.Text.UTF8Encoding($false)))
+  $createdTempFile = $true
   npx vitest run $tempTestPath
-  Write-Output "ALL_14_REPRO_EXIT=$LASTEXITCODE"
+  $vitestExit = $LASTEXITCODE
+  Write-Output "ALL_14_REPRO_EXIT=$vitestExit"
+  if ($vitestExit -ne 0) {
+    throw "Vitest reproduction suite failed with exit code $vitestExit"
+  }
 } finally {
-  if (Test-Path $tempTestPath) { Remove-Item -Force $tempTestPath }
+  if ($createdTempFile -and (Test-Path $tempTestPath)) {
+    Remove-Item -Force $tempTestPath
+  }
 }
 ```
 

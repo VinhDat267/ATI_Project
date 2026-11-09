@@ -2,11 +2,10 @@
 
 - **Repository:** `VinhDat267/ATI_Project`
 - **Audit Worktree:** `C:/Users/VinhDat/.gemini/antigravity/worktrees/ATI_Project/independent_service_audit`
-- **Audit Branch:** `independent_service_audit`
-- **Baseline Commit SHA (`origin/main`):** `08c8d8c5e7bf12625857ac3496fb96ec3914e34f`
 - **Audit Branch:** `independent_service_audit` (`0` product code changes; documentation-only Draft PR `#298`)
+- **Baseline Commit SHA (`origin/main`):** `08c8d8c5e7bf12625857ac3496fb96ec3914e34f`
 - **Audit Date:** `2026-11-09` (Phase 0 + Wave 1 + Wave 2 + Wave 3 + Wave 4 Complete & Evidence Integrity Verified)
-- **Scope Rule:** Strictly excludes Google Sheets Digest Gate A (`RMD-00 → RMD-04`, open Draft PRs `#289–#295` and `#297`) currently being implemented by a parallel agent. Zero product code modifications.
+- **Scope Rule:** Strictly excludes Google Sheets Digest Gate A (`RMD-00 → RMD-04`, open Draft PRs `#289–#295`, `#297` [Migration Tool], and `#299` [Frontend Recovery UI]) currently being implemented by a parallel agent. Zero product code modifications.
 
 ---
 
