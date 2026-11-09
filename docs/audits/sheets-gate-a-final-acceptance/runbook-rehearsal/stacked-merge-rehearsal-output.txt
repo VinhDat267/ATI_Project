@@ -1,0 +1,106 @@
+== Part 1: synthetic main -> PR A -> PR B ==
+-- pre-merge checks for PR A
+  [PASS] PR A head SHA matches locked SHA
+  [PASS] main is ancestor of PR A (PR A is based on current main) (exit 0, expected 0)
+  [PASS] PR A expected delta = a.txt
+-- merge PR A with a merge commit (equivalent of: gh pr merge A --merge --match-head-commit A_SHA)
+  [PASS] merge commit parent 1 = previous main
+  [PASS] merge commit parent 2 = PR A SHA
+-- OLD (defective) check
+  [PASS] OLD: git merge-base --is-ancestor main <PR_B_SHA> fails after a merge commit (exit 1, expected 1)
+-- CORRECTED checks
+  [PASS] NEW: git merge-base --is-ancestor <PR_A_SHA> main (exit 0, expected 0)
+  [PASS] NEW: git merge-base --is-ancestor <PR_A_SHA> <PR_B_SHA> (exit 0, expected 0)
+  [PASS] no integration drift: tree(main) == tree(PR A)
+-- retarget PR B to main and verify expected delta
+  [PASS] PR B delta vs main (three-dot) = b.txt only
+  [PASS] after merging PR B: tree(main) == tree(PR B)
+-- drift scenario: unrelated commit lands on main between merges
+  [PASS] PR A still ancestor of drifted main (exit 0, expected 0)
+  [PASS] drift DETECTED: tree(main) != tree(PR A) -> PR B CI must be re-run on new integration state
+-- head mutation scenario: PR B head changed after review
+  [PASS] SHA mismatch DETECTED -> --match-head-commit would refuse the merge
+
+== Part 2: replay 9 locked Gate A SHAs as merge commits ==
+-- Step 1/9: PR #289 @ dd7fd0b7b73a5e3f7d1ce26a4965694ca512780f
+  [PASS] locked SHA present
+  [PASS] previous PR/base 08c8d8c5e7bf12625857ac3496fb96ec3914e34f is ancestor of PR #289 (exit 0, expected 0)
+  [PASS] expected delta vs main = 6 files (three-dot == parent..child)
+  [PASS] merge commit parents = (previous main, PR #289)
+  [PASS] NEW: is-ancestor PR #289 -> main (exit 0, expected 0)
+  [PASS] tree(main) == tree(PR #289) (no integration drift)
+  [PASS] NEW: is-ancestor PR #289 -> next PR #290 (exit 0, expected 0)
+  [PASS] OLD (defective): is-ancestor main -> next PR #290 fails (exit 1, expected 1)
+-- Step 2/9: PR #290 @ 365b674bfa52f6d15b4c7b4034f9f63ef01c9ce7
+  [PASS] locked SHA present
+  [PASS] previous PR/base dd7fd0b7b73a5e3f7d1ce26a4965694ca512780f is ancestor of PR #290 (exit 0, expected 0)
+  [PASS] expected delta vs main = 2 files (three-dot == parent..child)
+  [PASS] merge commit parents = (previous main, PR #290)
+  [PASS] NEW: is-ancestor PR #290 -> main (exit 0, expected 0)
+  [PASS] tree(main) == tree(PR #290) (no integration drift)
+  [PASS] NEW: is-ancestor PR #290 -> next PR #291 (exit 0, expected 0)
+  [PASS] OLD (defective): is-ancestor main -> next PR #291 fails (exit 1, expected 1)
+-- Step 3/9: PR #291 @ 6b307bdc81a22fa3ae95df5a1b39a1a3ee103b52
+  [PASS] locked SHA present
+  [PASS] previous PR/base 365b674bfa52f6d15b4c7b4034f9f63ef01c9ce7 is ancestor of PR #291 (exit 0, expected 0)
+  [PASS] expected delta vs main = 5 files (three-dot == parent..child)
+  [PASS] merge commit parents = (previous main, PR #291)
+  [PASS] NEW: is-ancestor PR #291 -> main (exit 0, expected 0)
+  [PASS] tree(main) == tree(PR #291) (no integration drift)
+  [PASS] NEW: is-ancestor PR #291 -> next PR #292 (exit 0, expected 0)
+  [PASS] OLD (defective): is-ancestor main -> next PR #292 fails (exit 1, expected 1)
+-- Step 4/9: PR #292 @ e3e1e2b86e7f2619844d9030f07c96f978051214
+  [PASS] locked SHA present
+  [PASS] previous PR/base 6b307bdc81a22fa3ae95df5a1b39a1a3ee103b52 is ancestor of PR #292 (exit 0, expected 0)
+  [PASS] expected delta vs main = 9 files (three-dot == parent..child)
+  [PASS] merge commit parents = (previous main, PR #292)
+  [PASS] NEW: is-ancestor PR #292 -> main (exit 0, expected 0)
+  [PASS] tree(main) == tree(PR #292) (no integration drift)
+  [PASS] NEW: is-ancestor PR #292 -> next PR #293 (exit 0, expected 0)
+  [PASS] OLD (defective): is-ancestor main -> next PR #293 fails (exit 1, expected 1)
+-- Step 5/9: PR #293 @ e8e7ce31d950acd7dcdc915c65f175893d2770cf
+  [PASS] locked SHA present
+  [PASS] previous PR/base e3e1e2b86e7f2619844d9030f07c96f978051214 is ancestor of PR #293 (exit 0, expected 0)
+  [PASS] expected delta vs main = 9 files (three-dot == parent..child)
+  [PASS] merge commit parents = (previous main, PR #293)
+  [PASS] NEW: is-ancestor PR #293 -> main (exit 0, expected 0)
+  [PASS] tree(main) == tree(PR #293) (no integration drift)
+  [PASS] NEW: is-ancestor PR #293 -> next PR #294 (exit 0, expected 0)
+  [PASS] OLD (defective): is-ancestor main -> next PR #294 fails (exit 1, expected 1)
+-- Step 6/9: PR #294 @ d97574f81a509c471ca81d21631e2ca757adfe60
+  [PASS] locked SHA present
+  [PASS] previous PR/base e8e7ce31d950acd7dcdc915c65f175893d2770cf is ancestor of PR #294 (exit 0, expected 0)
+  [PASS] expected delta vs main = 3 files (three-dot == parent..child)
+  [PASS] merge commit parents = (previous main, PR #294)
+  [PASS] NEW: is-ancestor PR #294 -> main (exit 0, expected 0)
+  [PASS] tree(main) == tree(PR #294) (no integration drift)
+  [PASS] NEW: is-ancestor PR #294 -> next PR #295 (exit 0, expected 0)
+  [PASS] OLD (defective): is-ancestor main -> next PR #295 fails (exit 1, expected 1)
+-- Step 7/9: PR #295 @ 84057251564b9d88cc0da642ba4cf171c9701074
+  [PASS] locked SHA present
+  [PASS] previous PR/base d97574f81a509c471ca81d21631e2ca757adfe60 is ancestor of PR #295 (exit 0, expected 0)
+  [PASS] expected delta vs main = 7 files (three-dot == parent..child)
+  [PASS] merge commit parents = (previous main, PR #295)
+  [PASS] NEW: is-ancestor PR #295 -> main (exit 0, expected 0)
+  [PASS] tree(main) == tree(PR #295) (no integration drift)
+  [PASS] NEW: is-ancestor PR #295 -> next PR #297 (exit 0, expected 0)
+  [PASS] OLD (defective): is-ancestor main -> next PR #297 fails (exit 1, expected 1)
+-- Step 8/9: PR #297 @ c7ef31cb761f74a5ce3a1afef525f30d60b742c1
+  [PASS] locked SHA present
+  [PASS] previous PR/base 84057251564b9d88cc0da642ba4cf171c9701074 is ancestor of PR #297 (exit 0, expected 0)
+  [PASS] expected delta vs main = 3 files (three-dot == parent..child)
+  [PASS] merge commit parents = (previous main, PR #297)
+  [PASS] NEW: is-ancestor PR #297 -> main (exit 0, expected 0)
+  [PASS] tree(main) == tree(PR #297) (no integration drift)
+  [PASS] NEW: is-ancestor PR #297 -> next PR #299 (exit 0, expected 0)
+  [PASS] OLD (defective): is-ancestor main -> next PR #299 fails (exit 1, expected 1)
+-- Step 9/9: PR #299 @ b80c238941c4927cbd6c9b435816a4fdc6522f4e
+  [PASS] locked SHA present
+  [PASS] previous PR/base c7ef31cb761f74a5ce3a1afef525f30d60b742c1 is ancestor of PR #299 (exit 0, expected 0)
+  [PASS] expected delta vs main = 11 files (three-dot == parent..child)
+  [PASS] merge commit parents = (previous main, PR #299)
+  [PASS] NEW: is-ancestor PR #299 -> main (exit 0, expected 0)
+  [PASS] tree(main) == tree(PR #299) (no integration drift)
+  [PASS] final integrated main tree == Gate A stack tip #299 tree
+
+RESULT: PASS=85 FAIL=0

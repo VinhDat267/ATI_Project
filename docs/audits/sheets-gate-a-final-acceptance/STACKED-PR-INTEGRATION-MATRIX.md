@@ -1,6 +1,6 @@
 # Google Sheets Digest Gate A — Stacked PR Integration Matrix & Merge Readiness (`STACKED-PR-INTEGRATION-MATRIX.md`)
 
-- **Phiên bản báo cáo:** `FEAC v1.2 (Cross-Track Hunk Analysis including PR #300/#301 & Step-by-Step Merge Runbook)`
+- **Phiên bản báo cáo:** `FEAC v1.2 (Cross-Track Hunk Analysis including PR #300/#301, Corrected Merge-Commit Ancestry Runbook & Release Safety)`
 - **Ngày kiểm toán:** `2026-11-09`
 - **Repository:** [`VinhDat267/ATI_Project`](https://github.com/VinhDat267/ATI_Project)
 - **Baseline `origin/main`:** `08c8d8c5e7bf12625857ac3496fb96ec3914e34f`
@@ -54,7 +54,7 @@ flowchart LR
 | **[PR #296](https://github.com/VinhDat267/ATI_Project/pull/296)** (Trello Gate 0 Evidence) | `test/trello-gate0-evidence` (`c1212b34196b6e31db042af44c60e03e02dd1717`) | `Draft / OPEN` (`MERGEABLE`, CI `FAILURE` do RED tests) | **`0` files** (`A trello-gate0-digest.red.test.ts`, `A trello-gate0-scope.red.test.ts`, `A docs/...`) | **Hoàn toàn độc lập:** Không chạm bất kỳ file nào của Gate A. Vì `#296` chứa RED tests cố ý fail CI, không merge `#296` vào `main` cho tới khi Trello Gate A xanh. |
 | **[PR #298](https://github.com/VinhDat267/ATI_Project/pull/298)** (Independent Deep Service Audit) | `independent_service_audit` (`a1c01e1a01d3142e9251c1b12c7df938159727cf`) | `Draft / OPEN` (`MERGEABLE`, CI `SUCCESS`) | **`0` files** (7 file tài liệu trong `docs/audits/service-deep-review/*.md`) | **Hoàn toàn độc lập ở mức Git diff (`G9-07`):** `#298` chỉ chứa tài liệu kiểm toán. Tuy nhiên, backlog Wave R1/R2 trong `#298` có kế hoạch sửa các file dùng chung (`gmail-tools-runtime.ts`, `personal-sheets-adapter.ts`, `chat-service.ts`, `schedule-runner.ts`, `server.ts`) — các file này đã được **KHÓA (`LOCKED`) cho Gate A** cho tới khi `#289..#299` hoàn tất merge. |
 | **[PR #300](https://github.com/VinhDat267/ATI_Project/pull/300)** (`PR-R1-A2a` MySheets Drive Write Kill-Switch) | `fix/r1-a2a-mysheets-drive-killswitch` (`982539ecf69c63a3794b85078bd8a259542ec3ee`) | `Draft / OPEN` (`MERGEABLE`, CI `SUCCESS` — [Run 42589873061](https://github.com/VinhDat267/ATI_Project/actions/runs/42589873061/job/129068623590)) | **1 file:** [`packages/tool-adapters/src/sheets/personal-sheets-adapter.ts`](https://github.com/VinhDat267/ATI_Project/blob/6b307bdc81a22fa3ae95df5a1b39a1a3ee103b52/packages/tool-adapters/src/sheets/personal-sheets-adapter.ts) (trùng với Gate A **[PR #291](https://github.com/VinhDat267/ATI_Project/pull/291)**) | **Khóa tích hợp nghiêm ngặt (`LOCKED BEHIND GATE A`):** `PR #300` sửa `personal-sheets-adapter.ts` tại dòng `34-57, 87-103, 379-392, 1037` (ngay vị trí kết thúc class nơi `PR #291` thêm `readDigestWindow` tại dòng `1003-1015`). **Tuyệt đối không thêm `#300` vào chuỗi merge 9 PR Gate A và không merge `#300` trước khi Gate A (`#289..#299`) đã vào `main`.** Sau khi Gate A merge xong, `#300` phải rebase lên `main` đã tích hợp Gate A, bảo toàn cả `readDigestWindow` lẫn dual-layer catalog + adapter Drive write kill-switch, và chạy lại toàn bộ kiểm thử trước khi xét duyệt merge. |
-| **[PR #301](https://github.com/VinhDat267/ATI_Project/pull/301)** (`PR-R1-B1` Planner & Report Evidence Grounding) | `fix/r1-b1-report-evidence-grounding` (`81fa178aab73adfb6b8edbf5b5eb7b0bd573f82f`) | `Draft / OPEN` — **Đang ở `CHANGES REQUESTED GATE` (Chưa nghiệm thu merge)** | **`0` direct files** (`packages/planner/src/planner.ts`, `packages/planner/src/reports/renderers.ts`, `packages/tool-schemas/src/report-evidence.ts`), nhưng chạm **Planner / Report Evidence** dùng chung cho workflow Sheets | **Không được coi là đã nghiệm thu merge (`HOLD AT CHANGES REQUESTED GATE`):** **Tuyệt đối không tự thêm `#301` vào chuỗi merge 9 PR Gate A.** Trước khi `#301` có thể được xét merge (sau Gate A), bắt buộc phải: (1) xử lý xong toàn bộ yêu cầu sửa đổi của cổng `Changes Requested`, (2) rebase lên `main` sau khi chuỗi `#289..#299` đã tích hợp, và (3) kiểm chứng không gây suy giảm hành vi (behavioral regression) đối với luồng tạo đề xuất, xem trước và thực thi định kỳ Google Sheets Digest. |
+| **[PR #301](https://github.com/VinhDat267/ATI_Project/pull/301)** (`PR-R1-B1` Planner & Report Evidence Grounding) | `fix/r1-b1-report-evidence-grounding` (HEAD mới `dc8f8f3d5f8fd86915f5f49ac14f0f3cd0e668fe`, trước đó `81fa178aab73adfb6b8edbf5b5eb7b0bd573f82f`) | `Draft / OPEN` (`MERGEABLE`, CI `SUCCESS` — [Run 42596963808](https://github.com/VinhDat267/ATI_Project/actions/runs/42596963808/job/129091859267)) — **Trạng thái nghiệm thu phải được review riêng; CI xanh không đồng nghĩa đã nghiệm thu merge** | **`0` direct files** (HEAD `dc8f8f3d` chạm 6 files: `apps/chat-api/src/services/report-evidence-guard.ts`, `packages/planner/src/planner.ts`, `packages/planner/src/reports/renderers.ts`, `packages/planner/src/validator.ts`, `packages/planner/tests/report-evidence-sheets-mixed.test.ts`, `packages/tool-schemas/src/report-evidence.ts`; giao với 46 files của chuỗi Gate A = `0`), nhưng chạm **Planner / Report Evidence** dùng chung cho workflow Sheets | **Không được coi là đã nghiệm thu merge (`SEPARATE ACCEPTANCE REVIEW REQUIRED`):** **Tuyệt đối không tự thêm `#301` vào chuỗi merge 9 PR Gate A.** Trước khi `#301` có thể được xét merge (sau Gate A), bắt buộc phải: (1) có kết luận review độc lập riêng cho HEAD `dc8f8f3d5f8fd86915f5f49ac14f0f3cd0e668fe` (đóng hay chưa đóng các yêu cầu `Changes Requested` trước đó), (2) rebase lên `main` sau khi chuỗi `#289..#299` đã tích hợp, và (3) kiểm chứng không gây suy giảm hành vi (behavioral regression) đối với luồng tạo đề xuất, xem trước và thực thi định kỳ Google Sheets Digest. |
 
 ### 3.2. Bảng Phân tích Tác động Chi Tiết ở Mức Hunk / Dòng Code trên 5 Module Dùng Chung Trọng Yếu (`Task D`)
 
@@ -88,115 +88,123 @@ flowchart LR
 ## 5. Runbook Merge Tuần Tự 9 Bước Có Kiểm Chứng Sau Mỗi PR (`G9-06` — Chỉ Thực Hiện Sau Khi Chủ Dự Án Cấp `MERGE GO`)
 
 > [!CAUTION]
-> **Tuyệt đối KHÔNG thực hiện bất kỳ bước nào dưới đây khi chưa có lệnh `MERGE GO` tường minh từ Chủ dự án (`GATEA-EXT-A01`).**
-> Khi được cấp phép:
-> 1. Phải merge bằng **Merge Commit thông thường (`gh pr merge <PR> --merge`, TUYỆT ĐỐI KHÔNG dùng `--squash` hay `--rebase`)** để bảo toàn 40-char commit SHA trong chuỗi ancestry của các nhánh con phía trên.
-> 2. Sau **mỗi một PR** được merge vào `main`, bắt buộc phải: (a) đổi `base` của PR kế tiếp sang `main`, (b) kiểm tra lại `git merge-base --is-ancestor`, (c) kiểm tra `gh pr diff <next_PR> --name-only` khớp đúng danh sách file tại Mục 2, và (d) đợi GitHub Actions `v3 check` trên PR kế tiếp (hoặc `main`) xanh hoàn toàn trước khi chuyển sang bước tiếp theo.
+> **Tuyệt đối KHÔNG thực hiện bất kỳ bước nào dưới đây khi chưa có lệnh `MERGE GO` tường minh từ Chủ dự án (`GATEA-EXT-A01`) và chưa đóng toàn bộ điều kiện Release Safety tại Mục 6 (Release Safety).**
 
-### Bước 1 / 9 — Merge `PR #289` (`test/tenant-digest-baseline`, SHA `dd7fd0b7b73a5e3f7d1ce26a4965694ca512780f`) → `main`
-```powershell
-git fetch origin
-# 1. Xác nhận base branch, HEAD SHA và diff của PR #289 (6 files)
-gh pr view 289 --json baseRefName,headRefName,headRefOid,mergeable,statusCheckRollup
-gh pr diff 289 --name-only
-# 2. Chuyển Draft -> Ready và Merge bằng Merge Commit
-gh pr ready 289
-gh pr merge 289 --merge
-# 3. Retarget PR #290 về main và kiểm chứng hậu merge
-git fetch origin
-git merge-base --is-ancestor origin/main 365b674bfa52f6d15b4c7b4034f9f63ef01c9ce7
-gh pr edit 290 --base main
-gh pr view 290 --json baseRefName,headRefOid,mergeable,statusCheckRollup
-gh pr diff 290 --name-only # Phải chỉ có đúng 2 files của Task 1
+### 5.1. Sửa lỗi kiểm tra ancestry (`FEAC v1.2 Runbook Correction`)
+
+> [!WARNING]
+> **Lỗi đã được sửa:** Bản runbook trước dùng `git merge-base --is-ancestor origin/main <next_SHA>` sau `gh pr merge --merge`. Phép kiểm tra này **luôn thất bại (exit 1)** vì merge commit mới trên `main` không phải tổ tiên của nhánh PR kế tiếp. Rehearsal cô lập ở Mục 5.4 đã chứng minh lệnh cũ trả về `exit 1` ở cả `8/8` bước có PR kế tiếp.
+
+Sau mỗi lần merge `PR <prev>` (SHA `PREV`) và trước khi xét `PR <next>` (SHA `NEXT`), dùng hai phép kiểm tra đúng:
+
+```bash
+git merge-base --is-ancestor "$PREV" origin/main   # PR vừa merge đã nằm trong main
+git merge-base --is-ancestor "$PREV" "$NEXT"       # PR kế tiếp được xây trên đúng PR vừa merge
 ```
 
-### Bước 2 / 9 — Merge `PR #290` (`feat/sheets-digest-v2-schemas`, SHA `365b674bfa52f6d15b4c7b4034f9f63ef01c9ce7`) → `main`
-```powershell
-# Đợi CI của PR #290 (base main) COMPLETED / SUCCESS rồi thực thi:
-gh pr ready 290
-gh pr merge 290 --merge
-git fetch origin
-git merge-base --is-ancestor origin/main 6b307bdc81a22fa3ae95df5a1b39a1a3ee103b52
-gh pr edit 291 --base main
-gh pr view 291 --json baseRefName,headRefOid,mergeable,statusCheckRollup
-gh pr diff 291 --name-only # Phải chỉ có đúng 5 files của Task 2
+Kèm ba phép kiểm tra cấu trúc merge commit và trạng thái tích hợp:
+
+```bash
+MERGE=$(gh pr view <prev> --json mergeCommit --jq .mergeCommit.oid)
+test "$(git rev-parse "$MERGE^1")" = "$MAIN_BEFORE"                       # parent 1 = main trước khi merge
+test "$(git rev-parse "$MERGE^2")" = "$PREV"                              # parent 2 = đúng SHA đã khóa
+test "$(git rev-parse "$MERGE^{tree}")" = "$(git rev-parse "$PREV^{tree}")" # không có drift tích hợp
 ```
 
-### Bước 3 / 9 — Merge `PR #291` (`feat/sheets-digest-bounded-reader`, SHA `6b307bdc81a22fa3ae95df5a1b39a1a3ee103b52`) → `main`
-```powershell
-gh pr ready 291
-gh pr merge 291 --merge
+Nếu phép so sánh tree cuối cùng **khác nhau**, nghĩa là `main` đã nhận commit khác ngoài chuỗi Gate A. Khi đó **DỪNG**: CI cũ của PR kế tiếp không còn hợp lệ; phải chạy CI mới trên trạng thái tích hợp mới (Mục 5.2, cổng G5) trước khi tiếp tục.
+
+### 5.2. Cổng kiểm soát bắt buộc ở MỖI bước (`G1`–`G7`)
+
+| Cổng | Kiểm tra | Lệnh / Bằng chứng | Điều kiện đạt |
+|---|---|---|---|
+| **G1 — SHA** | HEAD của PR đúng SHA đã khóa | `gh pr view <pr> --json headRefOid`; merge bằng `gh pr merge <pr> --merge --match-head-commit <SHA>` | `headRefOid` = SHA khóa; `--match-head-commit` từ chối merge nếu HEAD đã đổi |
+| **G2 — Base** | Base của PR là `main` | `gh pr view <pr> --json baseRefName` | `baseRefName == main` (repo đang bật `delete_branch_on_merge: true`, GitHub tự retarget PR con về `main` khi nhánh base bị xoá sau merge; nếu chưa retarget thì chạy `gh pr edit <pr> --base main`) |
+| **G3 — Expected delta** | Diff chỉ chứa file của Task tương ứng | `git diff --name-only origin/main...<SHA>` và `gh pr diff <pr> --name-only` | Đúng số file và danh sách ở Mục 2: `#289`=6, `#290`=2, `#291`=5, `#292`=9, `#293`=9, `#294`=3, `#295`=7, `#297`=3, `#299`=11 |
+| **G4 — Ancestry** | Hai phép kiểm tra đúng ở Mục 5.1 + parent/tree của merge commit | Như Mục 5.1 | Cả hai `is-ancestor` exit `0`; parent 1/2 và tree khớp |
+| **G5 — CI của trạng thái tích hợp mới** | Không dùng lại CI cũ khi base hoặc trạng thái tích hợp đã đổi | (a) Run `push` của `v3 check` trên merge commit mới của `main`: `gh run list --branch main --event push --commit "$MERGE"`. (b) Run `pull_request` mới của PR kế tiếp được tạo **sau** khi retarget. | Cả (a) và (b) `COMPLETED / SUCCESS` trên đúng SHA. **Lưu ý:** workflow `v3-check.yml` dùng `pull_request:` với activity type mặc định (`opened`, `synchronize`, `reopened`), nên việc đổi base (`edited`) **không tự chạy CI mới**. Để có run mới trên merge ref mới mà không sửa nhánh Gate A, dùng `gh pr close <next>` rồi `gh pr reopen <next>` (sinh sự kiện `reopened`), sau đó chờ run mới xanh. |
+| **G6 — Review requirements** | Quyết định review của Chủ dự án | `gh pr view <pr> --json reviewDecision,reviews` | Có quyết định A1 đã ghi nhận. **Lưu ý:** cả 9 PR do chính tài khoản `VinhDat267` (chủ repo) mở, GitHub không cho tác giả tự *approve* PR của mình; Chủ dự án phải chọn cách ghi nhận: một reviewer độc lập có quyền approve, hoặc review dạng *comment* ghi rõ `MERGE GO` (A1). |
+| **G7 — Branch protection** | Kiểm tra lại quy tắc bảo vệ trước mỗi lần merge | `gh api repos/VinhDat267/ATI_Project/branches/main --jq .protected`; `gh api repos/VinhDat267/ATI_Project/rulesets` | Snapshot ngày `2026-11-09`: `main` **không được bảo vệ** (`protected: false`, `0` rulesets, `0` required checks, `0` required reviews). GitHub sẽ **không chặn** merge khi CI đỏ hay thiếu review; các cổng G1–G6 phải được người thực hiện kiểm thủ công. Nếu Chủ dự án bật branch protection trước khi merge, ghi lại cấu hình mới và tuân thủ. |
+
+### 5.3. Lệnh mẫu cho một bước (lặp lại cho cả 9 PR theo bảng 5.5)
+
+```bash
+# Biến của bước: PR=<số PR>, SHA=<SHA khóa>, PREV=<SHA PR trước hoặc baseline main 08c8d8c5...>, NEXT_PR / NEXT=<PR và SHA kế tiếp>
 git fetch origin
-git merge-base --is-ancestor origin/main e3e1e2b86e7f2619844d9030f07c96f978051214
-gh pr edit 292 --base main
-gh pr view 292 --json baseRefName,headRefOid,mergeable,statusCheckRollup
-gh pr diff 292 --name-only # Phải chỉ có đúng 9 files của Task 3
+MAIN_BEFORE=$(git rev-parse origin/main)
+
+# G7: branch protection
+gh api repos/VinhDat267/ATI_Project/branches/main --jq .protected
+# G1, G2: SHA và base
+gh pr view "$PR" --json headRefOid,baseRefName,isDraft,mergeable,reviewDecision,statusCheckRollup
+# G3: expected delta (phải khớp số file ở bảng 5.5)
+git diff --name-only origin/main..."$SHA"
+gh pr diff "$PR" --name-only
+# G4 (trước merge): PR được xây trên main hiện tại
+git merge-base --is-ancestor "$MAIN_BEFORE" "$SHA"
+# G5 (trước merge): run pull_request mới nhất của PR phải xanh trên đúng SHA và được tạo sau lần đổi main gần nhất
+gh run list --workflow "v3 check" --event pull_request --commit "$SHA" --limit 5
+# G6: đã có quyết định A1 của Chủ dự án
+
+gh pr ready "$PR"
+gh pr merge "$PR" --merge --match-head-commit "$SHA"     # KHÔNG dùng --squash / --rebase / --admin
+
+# G4 (sau merge): kiểm tra ancestry đúng
+git fetch origin
+MERGE=$(gh pr view "$PR" --json mergeCommit --jq .mergeCommit.oid)
+git merge-base --is-ancestor "$SHA" origin/main
+test "$(git rev-parse "$MERGE^1")" = "$MAIN_BEFORE"
+test "$(git rev-parse "$MERGE^2")" = "$SHA"
+test "$(git rev-parse "$MERGE^{tree}")" = "$(git rev-parse "$SHA^{tree}")"
+# G5 (sau merge): run push trên main phải xanh
+gh run list --workflow "v3 check" --branch main --event push --commit "$MERGE"
+
+# Chuẩn bị PR kế tiếp (bỏ qua ở bước 9)
+git merge-base --is-ancestor "$SHA" "$NEXT"
+gh pr view "$NEXT_PR" --json baseRefName,headRefOid   # baseRefName phải là main (GitHub auto-retarget), nếu không:
+# gh pr edit "$NEXT_PR" --base main
+git diff --name-only origin/main..."$NEXT"            # phải đúng expected delta của PR kế tiếp
+gh pr close "$NEXT_PR" && gh pr reopen "$NEXT_PR"     # kích hoạt CI mới trên trạng thái tích hợp mới
+# Chờ run pull_request mới của NEXT_PR COMPLETED / SUCCESS rồi mới sang bước tiếp theo
 ```
 
-### Bước 4 / 9 — Merge `PR #292` (`feat/sheets-digest-atomic-runner`, SHA `e3e1e2b86e7f2619844d9030f07c96f978051214`) → `main`
-```powershell
-gh pr ready 292
-gh pr merge 292 --merge
-git fetch origin
-git merge-base --is-ancestor origin/main e8e7ce31d950acd7dcdc915c65f175893d2770cf
-gh pr edit 293 --base main
-gh pr view 293 --json baseRefName,headRefOid,mergeable,statusCheckRollup
-gh pr diff 293 --name-only # Phải chỉ có đúng 9 files của Task 4
-```
+### 5.4. Bằng chứng rehearsal git DAG cô lập
 
-### Bước 5 / 9 — Merge `PR #293` (`feat/sheets-digest-v2-candidate`, SHA `e8e7ce31d950acd7dcdc915c65f175893d2770cf`) → `main`
-```powershell
-gh pr ready 293
-gh pr merge 293 --merge
-git fetch origin
-git merge-base --is-ancestor origin/main d97574f81a509c471ca81d21631e2ca757adfe60
-gh pr edit 294 --base main
-gh pr view 294 --json baseRefName,headRefOid,mergeable,statusCheckRollup
-gh pr diff 294 --name-only # Phải chỉ có đúng 3 files của Task 5A
-```
+- **Script:** [`runbook-rehearsal/stacked-merge-rehearsal.sh`](./runbook-rehearsal/stacked-merge-rehearsal.sh) — chạy hoàn toàn trong repository tạm, không push, không gọi GitHub.
+- **Output thô:** [`runbook-rehearsal/stacked-merge-rehearsal-output.txt`](./runbook-rehearsal/stacked-merge-rehearsal-output.txt) — `RESULT: PASS=85 FAIL=0`, exit code `0`.
+- **Phần 1 (tổng hợp):** `main → PR A → PR B`; merge PR A bằng merge commit (`--no-ff`); lệnh cũ `is-ancestor main <PR_B>` trả `exit 1` (xác nhận lỗi); hai lệnh mới trả `exit 0`; parent và tree của merge commit đúng; retarget PR B và diff ba chấm chỉ còn `b.txt`; kịch bản *drift* (commit lạ trên `main`) bị phát hiện qua tree khác nhau; kịch bản HEAD bị đổi sau review bị phát hiện qua SHA khác nhau.
+- **Phần 2 (SHA thật):** phát lại 9 SHA khóa `#289 → #299` thành merge commit trên bản sao cục bộ của `origin/main` `08c8d8c5e7bf12625857ac3496fb96ec3914e34f`. Ở cả 9 bước: SHA có mặt, PR trước là tổ tiên, expected delta đúng (`6/2/5/9/9/3/7/3/11`), merge không xung đột, parent đúng, `is-ancestor <PR> main` exit `0`, tree(main) = tree(PR). Ở 8 bước có PR kế tiếp: `is-ancestor <PR> <next>` exit `0` và lệnh cũ exit `1`. Tree cuối của `main` tích hợp bằng tree của `#299` (`b80c238941c4927cbd6c9b435816a4fdc6522f4e`).
+- **Giới hạn:** rehearsal chứng minh DAG và delta, không thay thế CI GitHub của trạng thái tích hợp thật (cổng G5) và không thao tác trên GitHub.
 
-### Bước 6 / 9 — Merge `PR #294` (`feat/sheets-digest-reauthorize-api`, SHA `d97574f81a509c471ca81d21631e2ca757adfe60`) → `main`
-```powershell
-gh pr ready 294
-gh pr merge 294 --merge
-git fetch origin
-git merge-base --is-ancestor origin/main 84057251564b9d88cc0da642ba4cf171c9701074
-gh pr edit 295 --base main
-gh pr view 295 --json baseRefName,headRefOid,mergeable,statusCheckRollup
-gh pr diff 295 --name-only # Phải chỉ có đúng 7 files của Task 5B
-```
+### 5.5. Bảng tham số 9 bước
 
-### Bước 7 / 9 — Merge `PR #295` (`feat/sheets-digest-delivery-recovery-api`, SHA `84057251564b9d88cc0da642ba4cf171c9701074`) → `main`
-```powershell
-gh pr ready 295
-gh pr merge 295 --merge
-git fetch origin
-git merge-base --is-ancestor origin/main c7ef31cb761f74a5ce3a1afef525f30d60b742c1
-gh pr edit 297 --base main
-gh pr view 297 --json baseRefName,headRefOid,mergeable,statusCheckRollup
-gh pr diff 297 --name-only # Phải chỉ có đúng 3 files của Task 6
-```
+| Bước | PR | SHA khóa (`SHA`) | `PREV` | Expected delta | PR kế tiếp (`NEXT_PR` @ `NEXT`) |
+|---|---|---|---|---|---|
+| 1/9 | `#289` | `dd7fd0b7b73a5e3f7d1ce26a4965694ca512780f` | `08c8d8c5e7bf12625857ac3496fb96ec3914e34f` (main) | 6 files | `#290` @ `365b674bfa52f6d15b4c7b4034f9f63ef01c9ce7` |
+| 2/9 | `#290` | `365b674bfa52f6d15b4c7b4034f9f63ef01c9ce7` | `dd7fd0b7b73a5e3f7d1ce26a4965694ca512780f` | 2 files | `#291` @ `6b307bdc81a22fa3ae95df5a1b39a1a3ee103b52` |
+| 3/9 | `#291` | `6b307bdc81a22fa3ae95df5a1b39a1a3ee103b52` | `365b674bfa52f6d15b4c7b4034f9f63ef01c9ce7` | 5 files | `#292` @ `e3e1e2b86e7f2619844d9030f07c96f978051214` |
+| 4/9 | `#292` | `e3e1e2b86e7f2619844d9030f07c96f978051214` | `6b307bdc81a22fa3ae95df5a1b39a1a3ee103b52` | 9 files | `#293` @ `e8e7ce31d950acd7dcdc915c65f175893d2770cf` |
+| 5/9 | `#293` | `e8e7ce31d950acd7dcdc915c65f175893d2770cf` | `e3e1e2b86e7f2619844d9030f07c96f978051214` | 9 files | `#294` @ `d97574f81a509c471ca81d21631e2ca757adfe60` |
+| 6/9 | `#294` | `d97574f81a509c471ca81d21631e2ca757adfe60` | `e8e7ce31d950acd7dcdc915c65f175893d2770cf` | 3 files | `#295` @ `84057251564b9d88cc0da642ba4cf171c9701074` |
+| 7/9 | `#295` | `84057251564b9d88cc0da642ba4cf171c9701074` | `d97574f81a509c471ca81d21631e2ca757adfe60` | 7 files | `#297` @ `c7ef31cb761f74a5ce3a1afef525f30d60b742c1` |
+| 8/9 | `#297` | `c7ef31cb761f74a5ce3a1afef525f30d60b742c1` | `84057251564b9d88cc0da642ba4cf171c9701074` | 3 files | `#299` @ `b80c238941c4927cbd6c9b435816a4fdc6522f4e` |
+| 9/9 | `#299` | `b80c238941c4927cbd6c9b435816a4fdc6522f4e` | `c7ef31cb761f74a5ce3a1afef525f30d60b742c1` | 11 files | — (hậu kiểm `main`) |
 
-### Bước 8 / 9 — Merge `PR #297` (`feat/sheets-digest-v2-migration-tool`, SHA `c7ef31cb761f74a5ce3a1afef525f30d60b742c1`) → `main`
-```powershell
-gh pr ready 297
-gh pr merge 297 --merge
-git fetch origin
-git merge-base --is-ancestor origin/main b80c238941c4927cbd6c9b435816a4fdc6522f4e
-gh pr edit 299 --base main
-gh pr view 299 --json baseRefName,headRefOid,mergeable,statusCheckRollup
-gh pr diff 299 --name-only # Phải chỉ có đúng 11 files của Task 7
-```
+**Hậu kiểm sau bước 9:** `test "$(git rev-parse origin/main^{tree})" = "$(git rev-parse b80c238941c4927cbd6c9b435816a4fdc6522f4e^{tree})"`; run `push` của `v3 check` trên merge commit cuối `COMPLETED / SUCCESS`; merge PR kiểm toán `#302` chỉ khi Chủ dự án yêu cầu; cập nhật `docs/handoff/` theo `AGENTS.md` §4.5; giữ Gate 10 ở `NO-GO / HOLD`. `PR #300` và `PR #301` **không** thuộc runbook này.
 
-### Bước 9 / 9 — Merge `PR #299` (`feat/sheets-digest-web-recovery`, SHA `b80c238941c4927cbd6c9b435816a4fdc6522f4e`) → `main` & Hậu Kiểm `main`
-```powershell
-gh pr ready 299
-gh pr merge 299 --merge
-git fetch origin
-# Kiểm tra workflow v3 check trên nhánh main hoàn tất COMPLETED / SUCCESS
-gh run list --branch main --limit 3
-# Sau khi main xanh:
-# 1. Merge PR tài liệu kiểm toán (docs/sheets-gate-a-feac-audit) nếu Chủ dự án yêu cầu.
-# 2. Cập nhật docs/handoff/CURRENT-STATE.md, docs/handoff/ROADMAP.md và thêm bản ghi vào docs/handoff/log/ theo AGENTS.md §4.5.
-# 3. Giữ nguyên cổng Gate 10 ở trạng thái NO-GO / HOLD (không tự ý bật cờ production hay chạy migration production).
-```
+---
+
+## 6. Release Safety — Bằng Chứng Merge `main` Không Tự Động Deploy / Migrate / Kích Hoạt (`FEAC v1.2`)
+
+Snapshot kiểm tra ngày `2026-11-09` trên `origin/main` `08c8d8c5e7bf12625857ac3496fb96ec3914e34f` và Gate A tip `b80c238941c4927cbd6c9b435816a4fdc6522f4e`:
+
+| # | Rủi ro | Bằng chứng | Kết luận |
+|---|---|---|---|
+| RS-1 | GitHub Actions deploy production khi merge `main` | Repo chỉ có một workflow: [`.github/workflows/v3-check.yml`](https://github.com/VinhDat267/ATI_Project/blob/08c8d8c5e7bf12625857ac3496fb96ec3914e34f/.github/workflows/v3-check.yml) (`gh api .../actions/workflows` → `1` workflow `v3 check`). Trigger `push: [main]` + `pull_request`; các bước chỉ là `npm ci`, `db:migrate:v3`, `check`, `admin:provision:v3`, `playwright install`, `test:browser:v3`. Không có bước deploy, không dùng secrets, không có `environment:`. Chuỗi Gate A không sửa `.github/` (`git diff --stat 08c8d8c5..b80c2389 -- .github` rỗng). | **VERIFIED — không deploy qua GitHub Actions** |
+| RS-2 | Chạy migration production | `db:migrate:v3` trong CI chạy với `DATABASE_URL=postgresql://ati_v3:…@127.0.0.1:5432/ati_v3` của service container `postgres:16` tạm thời trong runner. `apps/chat-api/src` tại Gate A tip không tự chạy migration khi khởi động (`git grep runAllMigrations\|migrate.mjs\|runMigrations` → `0` kết quả). DDL `0033` và CLI `sheets-digest-v2-migrate` chỉ chạy khi operator gọi thủ công (Gate 10, `B1`). | **VERIFIED — không có đường tự động chạm DB production** |
+| RS-3 | Bật Sheets Digest V2 | [`isSheetsDigestEmitV2Enabled`](https://github.com/VinhDat267/ATI_Project/blob/b80c238941c4927cbd6c9b435816a4fdc6522f4e/apps/chat-api/src/config/schedules-runtime.ts#L17-L23) trả `false` khi biến môi trường vắng hoặc không hợp lệ; `SHEETS_DIGEST_V2_MODE` mặc định `compat`, `SHEETS_DIGEST_V1_COMPAT_POLICY` mặc định `strict_pause_all` (chỉ `allow_consistency_candidate` mới nới lỏng). Merge code không đặt biến môi trường nào. | **VERIFIED — mặc định fail-closed** (giá trị env thực tế của môi trường production không quan sát được từ repo; xem RS-5) |
+| RS-4 | Kích hoạt công cụ ghi MySheets Drive/Docs chưa qua Integration Gate | Các công cụ `mysheets.create_drive_folder`, `create_doc`, `append_doc_text`, `move_drive_file` **đã có sẵn trên `main` trước Gate A** ([`registered-services.ts#L14-L21`](https://github.com/VinhDat267/ATI_Project/blob/08c8d8c5e7bf12625857ac3496fb96ec3914e34f/apps/chat-api/src/services/registered-services.ts#L14-L21)), chỉ xuất hiện khi `MYSHEETS_ENABLED=on` (mặc định `off`) và người dùng có kết nối MySheets `active`. Gate A không sửa `registered-services.ts` hay `env.ts` (diff rỗng). Thay đổi duy nhất liên quan của `#293` ở `gmail-tools-runtime.ts` chỉ quyết định có lọc công cụ **`sheets.*` dùng chung** hay không; không thêm công cụ `mysheets.*` nào. Kill-switch Drive/Docs nằm ở `PR #300` (ngoài Gate A, chưa merge). | **VERIFIED — Gate A không kích hoạt thêm**; rủi ro hiện trạng trên `main` (đã tồn tại trước Gate A) vẫn mở cho tới `PR #300` |
+| RS-5 | CD bên ngoài GitHub Actions | `0` GitHub Deployments trong toàn bộ lịch sử repo, `0` environments, `0` webhooks, `0` commit statuses trên `main`. Tuy nhiên GitHub App **`vercel`** đã được cài cho tài khoản: check suite `vercel` xuất hiện ở trạng thái `queued` (không có check run nào) trên `08c8d8c5` và `b80c2389`. Repo không có `vercel.json`. Cấu hình project Vercel (nếu có) nằm ngoài repo và **không thể kiểm chứng** từ GitHub API. | **NOT VERIFIABLE FROM REPO — giữ Merge GO ở HOLD** cho tới khi Chủ dự án xác nhận (`A5`) |
+| RS-6 | Không có cơ chế cưỡng chế CI/review khi merge | `main` không được bảo vệ, `0` rulesets (xem cổng G7). | Cổng G1–G6 thực hiện thủ công; Chủ dự án có thể bật branch protection trước khi merge (khuyến nghị, không bắt buộc với audit này) |
+
+> [!IMPORTANT]
+> **Kết luận Release Safety:** GitHub Actions/CD trong repo đã được kiểm chứng không deploy, không migrate production và không bật cờ. Riêng tích hợp Vercel GitHub App không thể kiểm chứng từ repo. **Merge GO giữ ở `HOLD`** cho tới khi Chủ dự án xác nhận `A5`: không có project Vercel (hoặc dịch vụ CD nào khác) tự deploy production từ nhánh `main` của repo này, hoặc nếu có thì production đặt `SHEETS_DIGEST_EMIT_V2` khác `true` và `MYSHEETS_ENABLED` theo đúng quyết định Integration Gate.
