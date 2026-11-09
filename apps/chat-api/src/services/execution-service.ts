@@ -602,11 +602,23 @@ export class ExecutionService {
       throw Object.assign(new Error('Execution is already running'), { status: 409 });
     }
     validateRecoveryAction(status, controller.getAllStepStates(), stepId, action);
-    if(reuseController&&planRow.plan_json?.connections?.myslack){
-      const runtime=isBoundSlackExecutableWritePlan(planRow.plan_json,userId)?this.slackWrite:this.slackRead;
-      if(!runtime)throw recoveryConflict('SLACK_READ_UNAVAILABLE');
-      await runtime.assertApproval({planId,planHash:planRow.plan_hash,userId,steps:planRow.plan_json.steps,bindings:planRow.plan_json.connections.myslack});
-      if(!await this.planRepo.claimRecovery(planRow,userId,'executing'))throw recoveryConflict('Execution changed or recovery is already running');
+    if (reuseController) {
+      if (planRow.plan_json?.connections?.myslack) {
+        const runtime = isBoundSlackExecutableWritePlan(planRow.plan_json, userId) ? this.slackWrite : this.slackRead;
+        if (!runtime) throw recoveryConflict('SLACK_READ_UNAVAILABLE');
+        await runtime.assertApproval({
+          planId,
+          planHash: planRow.plan_hash,
+          userId,
+          steps: planRow.plan_json.steps,
+          bindings: planRow.plan_json.connections.myslack,
+        });
+      }
+      if (typeof this.planRepo.claimRecovery === 'function') {
+        if (!(await this.planRepo.claimRecovery(planRow, userId, 'executing'))) {
+          throw recoveryConflict('Execution changed or recovery is already running');
+        }
+      }
     }
     this.executionOutcomes.delete(planId);
     const convId = planRow?.conv_id || '';

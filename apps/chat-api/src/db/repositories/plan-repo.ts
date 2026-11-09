@@ -169,7 +169,19 @@ export class PlanRepo {
       if (!context.allowed) return false;
       if (!jiraGuard) {
         const res = await client.query(
-          "UPDATE plans SET status = 'approved', decided_at = now() WHERE id = $1 AND plan_hash = $2 AND status = 'pending' AND expires_at > now() AND EXISTS (SELECT 1 FROM conversations WHERE conversations.id = plans.conv_id AND conversations.user_id = $3) RETURNING id",
+          `UPDATE plans SET status = 'approved', decided_at = now()
+            WHERE id = $1 AND plan_hash = $2 AND status = 'pending' AND expires_at > now()
+              AND EXISTS (
+                SELECT 1
+                  FROM conversations c
+                  JOIN users u ON u.id = c.user_id
+                  LEFT JOIN workspace_members wm ON wm.workspace_id = c.workspace_id AND wm.user_id = c.user_id
+                 WHERE c.id = plans.conv_id
+                   AND c.user_id = $3
+                   AND u.status = 'active'
+                   AND (c.workspace_id IS NULL OR wm.status = 'active')
+              )
+            RETURNING id`,
           [planId, expectedHash, userId]
         );
         const ok = (res.rowCount ?? 0) > 0;
@@ -280,7 +292,21 @@ export class PlanRepo {
       `UPDATE plans SET status = $6
        WHERE id = $1 AND plan_hash = $2 AND status = $3 AND xmin::text = $4
          AND status IN ('partial', 'reconciliation_required') AND decided_at IS NOT NULL
-         AND EXISTS (SELECT 1 FROM conversations WHERE conversations.id = plans.conv_id AND conversations.user_id = $5)
+         AND EXISTS (
+           SELECT 1
+             FROM conversations c
+             JOIN users u ON u.id = c.user_id
+             LEFT JOIN workspace_members wm ON wm.workspace_id = c.workspace_id AND wm.user_id = c.user_id
+            WHERE c.id = plans.conv_id
+              AND c.user_id = $5
+              AND (
+                $6 = 'stopped'
+                OR (
+                  u.status = 'active'
+                  AND (c.workspace_id IS NULL OR wm.status = 'active')
+                )
+              )
+         )
        RETURNING id`,
       [plan.id, plan.plan_hash, plan.status, plan.revision, userId, nextStatus],
     );
