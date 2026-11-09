@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import type pg from 'pg';
-import { ScheduleConflict, ScheduleNotFound, type ScheduleChange, type ScheduleService } from '../services/schedules/schedule-service.js';
+import { ScheduleBadRequest, ScheduleConflict, ScheduleNotFound, type ScheduleChange, type ScheduleService } from '../services/schedules/schedule-service.js';
 import { assertConversationAccessWithFallback, ConversationAccessDeniedError } from '../services/conversation-access.js';
 import type { ConversationRepo } from '../db/repositories/conversation-repo.js';
 
@@ -33,14 +33,16 @@ export function createScheduleRoutes(options: ScheduleRoutesOptions): Router {
       await work(req, res, userId);
     } catch (error) {
       if (error instanceof ConversationAccessDeniedError) {
-        res.status(error.status).json({ error: { code: error.code, message: error.message } });
+        res.status(error.status).json({ error: { code: error.code, message: error.message }, code: error.code });
+      } else if (error instanceof ScheduleBadRequest) {
+        res.status(400).json({ error: { code: error.code, message: error.message }, code: error.code });
       } else if (error instanceof ScheduleConflict) {
-        res.status(409).json({ error: { code: error.code, message: error.message } });
+        res.status(409).json({ error: { code: error.code, message: error.message }, code: error.code });
       } else if (error instanceof ScheduleNotFound) {
-        res.status(404).json({ error: { code: 'NOT_FOUND', message: error.message } });
+        res.status(404).json({ error: { code: 'NOT_FOUND', message: error.message }, code: 'NOT_FOUND' });
       } else {
         console.error('[schedules] request failed:', error instanceof Error ? error.message : error);
-        res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Máy chủ gặp lỗi khi xử lý lịch.' } });
+        res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Máy chủ gặp lỗi khi xử lý lịch.' }, code: 'SERVER_ERROR' });
       }
     }
   };
@@ -107,7 +109,7 @@ export function createScheduleRoutes(options: ScheduleRoutesOptions): Router {
     router.post(`/schedules/:id/${action}`, handle(async (req, res, userId) => {
       const version = req.body?.version;
       if (!Number.isInteger(version)) {
-        res.status(400).json({ error: { code: 'BAD_REQUEST', message: 'Thiếu phiên bản của lịch.' } });
+        res.status(400).json({ error: { code: 'BAD_REQUEST', message: 'Thiếu phiên bản của lịch.' }, code: 'BAD_REQUEST' });
         return;
       }
       const scope = req.workspace ? { workspaceMode: req.workspace.mode, workspaceId: req.workspace.workspaceId } : undefined;
@@ -117,6 +119,34 @@ export function createScheduleRoutes(options: ScheduleRoutesOptions): Router {
     }));
   }
 
+  router.post('/schedules/:id/status', handle(async (req, res, userId) => {
+    const action = req.body?.action;
+    if (action !== 'pause' && action !== 'resume' && action !== 'cancel') {
+      res.status(400).json({ error: { code: 'BAD_REQUEST', message: 'Hành động cập nhật trạng thái lịch không hợp lệ.' }, code: 'BAD_REQUEST' });
+      return;
+    }
+    const version = req.body?.version;
+    if (!Number.isInteger(version)) {
+      res.status(400).json({ error: { code: 'BAD_REQUEST', message: 'Thiếu phiên bản của lịch.' }, code: 'BAD_REQUEST' });
+      return;
+    }
+    const scope = req.workspace ? { workspaceMode: req.workspace.mode, workspaceId: req.workspace.workspaceId } : undefined;
+    const change = await service.setStatus({ userId, scheduleId: String(req.params.id), action, version, now: now(), scope });
+    await announce(change);
+    res.json({ schedule: change.schedule });
+  }));
+
+  router.post('/schedules/:id/reauthorize-preview', handle(async (req, res, userId) => {
+    const scope = req.workspace ? { workspaceMode: req.workspace.mode, workspaceId: req.workspace.workspaceId } : undefined;
+    const preview = await service.createReauthorizePreview({
+      userId,
+      scheduleId: String(req.params.id),
+      now: now(),
+      scope,
+    });
+    res.json(preview);
+  }));
+
   router.post('/schedules/:id/run-now', handle(async (req, res, userId) => {
     const scope = req.workspace ? { workspaceMode: req.workspace.mode, workspaceId: req.workspace.workspaceId } : undefined;
     res.status(201).json({ run: await service.startRun({ userId, scheduleId: String(req.params.id), trigger: 'manual', now: now(), scope }) });
@@ -125,6 +155,19 @@ export function createScheduleRoutes(options: ScheduleRoutesOptions): Router {
   router.post('/schedule-runs/:id/replan', handle(async (req, res, userId) => {
     const scope = req.workspace ? { workspaceMode: req.workspace.mode, workspaceId: req.workspace.workspaceId } : undefined;
     res.status(201).json({ run: await service.startRun({ userId, runId: String(req.params.id), trigger: 'replan', now: now(), scope }) });
+  }));
+
+  router.post('/schedule-runs/:id/resolve-delivery', handle(async (req, res, userId) => {
+    const scope = req.workspace ? { workspaceMode: req.workspace.mode, workspaceId: req.workspace.workspaceId } : undefined;
+    const result = await service.resolveRunDelivery({
+      userId,
+      runId: String(req.params.id),
+      resolution: req.body?.resolution,
+      confirmDuplicateRisk: req.body?.confirmDuplicateRisk,
+      now: now(),
+      scope,
+    });
+    res.json(result);
   }));
 
   return router;

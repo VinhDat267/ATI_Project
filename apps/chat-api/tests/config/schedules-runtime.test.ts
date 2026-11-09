@@ -46,7 +46,7 @@ describe('createScheduleRuntime', () => {
         TEST_ENC_KEY
       ),
     });
-    await credentialRepo.upsertCredentials(
+    const slackCred = await credentialRepo.upsertCredentials(
       'slack',
       encryptCredentials(
         { botToken: 'xoxb-test', allowedScope: { channels: ['C0123456'] } },
@@ -71,7 +71,7 @@ describe('createScheduleRuntime', () => {
               values: [['Hạng mục', 'Trạng thái'], ['Task 1', 'Done']],
             };
           }
-          return { ok: true };
+          return { ok: true, ts: '1700000000.000100' };
         },
       }),
     })!;
@@ -79,7 +79,9 @@ describe('createScheduleRuntime', () => {
     const convId = (await db.pool.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [owner.id])).rows[0].id;
     const recurrence = { type: 'daily' as const, time: '08:00' };
     const digestConfig = {
-      version: 1 as const,
+      version: 2 as const,
+      workspaceMode: 'legacy' as const,
+      workspaceId: null,
       source: {
         service: 'mysheets' as const,
         spreadsheetId: 'sheet_rt_1',
@@ -90,6 +92,7 @@ describe('createScheduleRuntime', () => {
       },
       destination: {
         service: 'slack' as const,
+        credentialId: slackCred.id,
         channelId: 'C0123456',
       },
       includeAiSummary: false,

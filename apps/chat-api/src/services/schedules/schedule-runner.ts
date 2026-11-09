@@ -8,7 +8,7 @@ import { CALENDAR_DELIVERY_UNKNOWN } from './calendar-digest-runner.js';
 import { RUN_SELECT, runState, type RunRow } from './run-state.js';
 import { localLabel, nextOccurrence } from './next-occurrence.js';
 import type { ScheduleChange } from './schedule-service.js';
-import type { SheetsDigestRunner } from './sheets-digest-runner.js';
+import { SHEETS_DELIVERY_UNKNOWN, type SheetsDigestRunner } from './sheets-digest-runner.js';
 import type { DigestRunOutcome as GithubDigestRunOutcome, RunGithubDigest } from './github-digest-runner.js';
 import { GITHUB_DELIVERY_UNKNOWN } from './github-digest-runner.js';
 import type { TrelloDigestRunOutcome, RunTrelloDigest } from './trello-digest-runner.js';
@@ -90,12 +90,20 @@ export async function reconcileScheduleRuns(pool: pg.Pool): Promise<void> {
   const messages = new MessageRepo(pool);
   await inTransaction(pool, async (client) => {
     const res = await client.query(
-      `UPDATE schedule_runs r SET
-         status=CASE WHEN r.delivery_started_at IS NOT NULL THEN 'needs_attention' ELSE 'interrupted' END,
-         error=CASE WHEN r.delivery_started_at IS NOT NULL THEN $2 ELSE $1 END,
-         updated_at=now()
-       WHERE r.status='planning' RETURNING r.conv_id, r.error`,
-      [INTERRUPTED, CALENDAR_DELIVERY_UNKNOWN]);
+      `UPDATE schedule_runs r
+       SET
+         status = CASE WHEN r.delivery_started_at IS NOT NULL THEN 'needs_attention' ELSE 'interrupted' END,
+         error = CASE
+           WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'sheets_digest' THEN $3
+           WHEN r.delivery_started_at IS NOT NULL THEN $2
+           ELSE $1
+         END,
+         updated_at = now()
+       FROM schedules s
+       WHERE r.schedule_id = s.id AND r.status = 'planning'
+       RETURNING r.conv_id, r.error`,
+      [INTERRUPTED, CALENDAR_DELIVERY_UNKNOWN, SHEETS_DELIVERY_UNKNOWN]
+    );
     for (const row of res.rows) {
       if (!row.conv_id) continue;
       // Answer the run's first message, so reopening the conversation ends its planning state.
@@ -531,6 +539,7 @@ export class ScheduleRunner {
     }, this.planTimeoutMs);
 
     let outcome: Awaited<ReturnType<SheetsDigestRunner['executeDigest']>>;
+    let caughtException = false;
     try {
       const aborted = controller.signal.aborted
         ? Promise.reject(new Error('aborted'))
@@ -541,23 +550,13 @@ export class ScheduleRunner {
         this.options.sheetsDigestRunner!.executeDigest(
           started.scheduleRow,
           started.toPlan.scheduleVersion,
-          async () => {
-            const res = await pool.query('SELECT version, status FROM schedules WHERE id=$1', [
-              started.toPlan.scheduleId,
-            ]);
-            const row = res.rows[0];
-            return Boolean(
-              row &&
-                row.version === started.toPlan.scheduleVersion &&
-                row.status !== 'cancelled' &&
-                row.status !== 'paused'
-            );
-          },
+          runId,
           controller.signal
         ),
         aborted,
       ]);
     } catch {
+      caughtException = true;
       outcome = {
         status: 'digest_failed',
         error: timedOut ? TIMED_OUT : this.stopping ? STOPPED : 'Không gửi được báo cáo tự động lúc này.',
@@ -576,13 +575,29 @@ export class ScheduleRunner {
         await client.query('SELECT * FROM schedules WHERE id=$1 FOR UPDATE', [started.toPlan.scheduleId])
       ).rows[0] as ScheduleRow | undefined;
       const run = (
-        await client.query('SELECT status FROM schedule_runs WHERE id=$1 FOR UPDATE', [runId])
+        await client.query('SELECT status, delivery_started_at FROM schedule_runs WHERE id=$1 FOR UPDATE', [runId])
       ).rows[0];
       if (!schedule || run?.status !== 'planning') {
         return { ended: null as string | null, changes, assistantMessageId: undefined as string | undefined, text: undefined as string | undefined };
       }
 
       const replyTo = { replyToMessageId: started.messageId };
+
+      if (outcome.status === 'delivery_unknown' || (caughtException && Boolean(run.delivery_started_at))) {
+        const unknownErr = outcome.status === 'delivery_unknown' ? outcome.error : SHEETS_DELIVERY_UNKNOWN;
+        await this.messages.createMessage(
+          started.convId,
+          'system',
+          `Lỗi: ${unknownErr}`,
+          { type: 'planning_error', ...replyTo },
+          client
+        );
+        await client.query(
+          "UPDATE schedule_runs SET status='needs_attention', error=$2, updated_at=now() WHERE id=$1",
+          [runId, unknownErr]
+        );
+        return { ended: unknownErr, changes, assistantMessageId: undefined, text: undefined };
+      }
 
       if (stoppedError) {
         await this.messages.createMessage(
