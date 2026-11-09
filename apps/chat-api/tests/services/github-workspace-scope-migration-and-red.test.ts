@@ -70,7 +70,12 @@ describe('PR-R1-A1: GitHub Workspace-Scoped Team Scope Migration (0034) & Route/
     });
 
     it('A1-MIG-2: executes 0034_github_workspace_scoped_team_scope.sql on dedicated test DB with valid UUID workspace fixtures, verifying repeated runs, immutable archives, production CHECK/FK constraints, and tenant isolation', async () => {
-      const report = await run0034MigrationVerification();
+      // Dedicated *_test database on the same server as DATABASE_URL (CI: ephemeral 5432; local: 56534).
+      // The verifier itself refuses port 55533 and any database not ending in _test.
+      const base = new URL(process.env.DATABASE_URL ?? 'postgres://ati_v3:ati_v3_local_only@127.0.0.1:56534/ati_v3');
+      const adminUrl = new URL(base.href); adminUrl.pathname = '/postgres';
+      const testDbUrl = new URL(base.href); testDbUrl.pathname = '/ati_v3_migration_test';
+      const report = await run0034MigrationVerification({ adminUrl: adminUrl.href, testDbUrl: testDbUrl.href });
 
       expect(report.migrationFile).toBe('db/v3/0034_github_workspace_scoped_team_scope.sql');
 
@@ -101,7 +106,7 @@ describe('PR-R1-A1: GitHub Workspace-Scoped Team Scope Migration (0034) & Route/
         { scope_id: WS_BETA_UUID, full_name: 'beta-org/repo-b' },
       ]);
       expect(report.scenario2.archivedScopes).toEqual([{ legacy_id: 'default' }]);
-    });
+    }, 120_000);
   });
 
   describe('Part 2: GitHubTeamRepo & /api/connections/github Route Authorization Deterministic RED Tests', () => {
@@ -156,7 +161,7 @@ describe('PR-R1-A1: GitHub Workspace-Scoped Team Scope Migration (0034) & Route/
           credentialRepo,
           teamRepo: githubTeamRepo,
           encryptionKey: TEST_ENCRYPTION_KEY,
-          oauth: { clientId: 'cid', clientSecret: 'csec', redirectUri: 'http://localhost:3001/cb' },
+          oauth: { clientId: 'cid', clientSecret: 'csec', redirectUri: 'http://localhost:3001/cb', authorizationUrl: 'https://github.test/login/oauth/authorize', tokenUrl: 'https://github.test/login/oauth/access_token', apiBaseUrl: 'https://api.github.test', scope: 'repo' },
           fetchFn: (async () =>
             new Response(
               JSON.stringify([{ id: 101, name: 'alpha-repo', full_name: 'alpha-org/alpha-repo', private: true }]),
@@ -218,7 +223,7 @@ describe('PR-R1-A1: GitHub Workspace-Scoped Team Scope Migration (0034) & Route/
           credentialRepo,
           teamRepo: githubTeamRepo,
           encryptionKey: TEST_ENCRYPTION_KEY,
-          oauth: { clientId: 'cid', clientSecret: 'csec', redirectUri: 'http://localhost:3001/cb' },
+          oauth: { clientId: 'cid', clientSecret: 'csec', redirectUri: 'http://localhost:3001/cb', authorizationUrl: 'https://github.test/login/oauth/authorize', tokenUrl: 'https://github.test/login/oauth/access_token', apiBaseUrl: 'https://api.github.test', scope: 'repo' },
           fetchFn: (async () =>
             new Response(
               JSON.stringify([{ id: 101, name: 'alpha-repo', full_name: 'alpha-org/alpha-repo', private: true }]),
