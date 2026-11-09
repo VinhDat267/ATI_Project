@@ -103,4 +103,33 @@
   [PASS] tree(main) == tree(PR #299) (no integration drift)
   [PASS] final integrated main tree == Gate A stack tip #299 tree
 
-RESULT: PASS=85 FAIL=0
+== Part 3: execute EXACT §5.3 operator command block against bare origin remote ==
+-- Exact §5.3 Step 1/9: PR #289 @ dd7fd0b7b73a5e3f7d1ce26a4965694ca512780f (PREV=08c8d8c5e7bf12625857ac3496fb96ec3914e34f, EXPECTED_DELTA=6)
+  [PASS] Exact §5.3 command block for Step 1/9 (PR #289) executes cleanly (exit 0, expected 0)
+-- Exact §5.3 Step 2/9: PR #290 @ 365b674bfa52f6d15b4c7b4034f9f63ef01c9ce7 (PREV=dd7fd0b7b73a5e3f7d1ce26a4965694ca512780f, EXPECTED_DELTA=2)
+  [PASS] FEAC-EXT-RB-02 (removed defective pre-merge check): is-ancestor MAIN_BEFORE -> PR #290 fails (exit 1, expected 1)
+  [PASS] Exact §5.3 command block for Step 2/9 (PR #290) executes cleanly (exit 0, expected 0)
+-- Exact §5.3 Step 3/9: PR #291 @ 6b307bdc81a22fa3ae95df5a1b39a1a3ee103b52 (PREV=365b674bfa52f6d15b4c7b4034f9f63ef01c9ce7, EXPECTED_DELTA=5)
+  [PASS] FEAC-EXT-RB-02 (removed defective pre-merge check): is-ancestor MAIN_BEFORE -> PR #291 fails (exit 1, expected 1)
+  [PASS] Exact §5.3 command block for Step 3/9 (PR #291) executes cleanly (exit 0, expected 0)
+-- Exact §5.3 Step 4/9: PR #292 @ e3e1e2b86e7f2619844d9030f07c96f978051214 (PREV=6b307bdc81a22fa3ae95df5a1b39a1a3ee103b52, EXPECTED_DELTA=9)
+  [PASS] FEAC-EXT-RB-02 (removed defective pre-merge check): is-ancestor MAIN_BEFORE -> PR #292 fails (exit 1, expected 1)
+  [PASS] Exact §5.3 command block for Step 4/9 (PR #292) executes cleanly (exit 0, expected 0)
+-- Exact §5.3 Step 5/9: PR #293 @ e8e7ce31d950acd7dcdc915c65f175893d2770cf (PREV=e3e1e2b86e7f2619844d9030f07c96f978051214, EXPECTED_DELTA=9)
+  [PASS] FEAC-EXT-RB-02 (removed defective pre-merge check): is-ancestor MAIN_BEFORE -> PR #293 fails (exit 1, expected 1)
+  [PASS] Exact §5.3 command block for Step 5/9 (PR #293) executes cleanly (exit 0, expected 0)
+-- Exact §5.3 Step 6/9: PR #294 @ d97574f81a509c471ca81d21631e2ca757adfe60 (PREV=e8e7ce31d950acd7dcdc915c65f175893d2770cf, EXPECTED_DELTA=3)
+  [PASS] FEAC-EXT-RB-02 (removed defective pre-merge check): is-ancestor MAIN_BEFORE -> PR #294 fails (exit 1, expected 1)
+  [PASS] Exact §5.3 command block for Step 6/9 (PR #294) executes cleanly (exit 0, expected 0)
+-- Exact §5.3 Step 7/9: PR #295 @ 84057251564b9d88cc0da642ba4cf171c9701074 (PREV=d97574f81a509c471ca81d21631e2ca757adfe60, EXPECTED_DELTA=7)
+  [PASS] FEAC-EXT-RB-02 (removed defective pre-merge check): is-ancestor MAIN_BEFORE -> PR #295 fails (exit 1, expected 1)
+  [PASS] Exact §5.3 command block for Step 7/9 (PR #295) executes cleanly (exit 0, expected 0)
+-- Exact §5.3 Step 8/9: PR #297 @ c7ef31cb761f74a5ce3a1afef525f30d60b742c1 (PREV=84057251564b9d88cc0da642ba4cf171c9701074, EXPECTED_DELTA=3)
+  [PASS] FEAC-EXT-RB-02 (removed defective pre-merge check): is-ancestor MAIN_BEFORE -> PR #297 fails (exit 1, expected 1)
+  [PASS] Exact §5.3 command block for Step 8/9 (PR #297) executes cleanly (exit 0, expected 0)
+-- Exact §5.3 Step 9/9: PR #299 @ b80c238941c4927cbd6c9b435816a4fdc6522f4e (PREV=c7ef31cb761f74a5ce3a1afef525f30d60b742c1, EXPECTED_DELTA=11)
+  [PASS] FEAC-EXT-RB-02 (removed defective pre-merge check): is-ancestor MAIN_BEFORE -> PR #299 fails (exit 1, expected 1)
+  [PASS] Exact §5.3 command block for Step 9/9 (PR #299) executes cleanly (exit 0, expected 0)
+  [PASS] Part 3 post-step-9 check: tree(origin/main) == tree(#299)
+
+RESULT: PASS=103 FAIL=0
