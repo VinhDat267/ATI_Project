@@ -27,9 +27,21 @@ export function getEffectiveDeliveryResolution(
   return null;
 }
 
+export function isUncertainSheetsDeliveryRun(
+  run: ScheduleRunView | null | undefined
+): boolean {
+  if (!run) return false;
+  return (
+    run.state === 'needs_attention' &&
+    getEffectiveDeliveryResolution(run) == null &&
+    Boolean(run.deliveryStartedAt) &&
+    typeof run.error === 'string' &&
+    run.error.includes('SHEETS_DELIVERY_UNKNOWN')
+  );
+}
+
 export function SheetsDeliveryRecoveryControl({
   run,
-  isSheetsSchedule = false,
   onResolved,
 }: {
   run: ScheduleRunView;
@@ -78,12 +90,7 @@ export function SheetsDeliveryRecoveryControl({
     );
   }
 
-  const isAwaitingResolution =
-    run.state === 'needs_attention' &&
-    (isSheetsSchedule ||
-      (typeof run.error === 'string' && run.error.includes('SHEETS_DELIVERY_UNKNOWN')));
-
-  if (!isAwaitingResolution) return null;
+  if (!isUncertainSheetsDeliveryRun(run)) return null;
 
   const handleResolve = async (mode: 'mark_sent' | 'retry_new_run') => {
     if (locked.current) return;

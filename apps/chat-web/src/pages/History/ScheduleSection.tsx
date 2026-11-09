@@ -6,7 +6,11 @@ import { schedulesChanged, useSchedulesEnabled } from '../../hooks/use-schedules
 import { describeRecurrence, formatRunTime, runLabel, scheduleLabel } from '../../services/schedule-text';
 import { getActiveWorkspaceId, subscribeWorkspace } from '../../services/workspace-storage';
 import { ScheduleActions } from '../Cockpit/ScheduleActions';
-import { SheetsDeliveryRecoveryControl, getEffectiveDeliveryResolution } from '../Cockpit/ScheduleRunRecovery';
+import {
+  SheetsDeliveryRecoveryControl,
+  getEffectiveDeliveryResolution,
+  isUncertainSheetsDeliveryRun,
+} from '../Cockpit/ScheduleRunRecovery';
 import { WorkflowFlowCanvas } from '../../components/WorkflowFlowCanvas';
 import { ServiceLogo } from '../../components/ServiceLogo';
 
@@ -61,10 +65,7 @@ function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: Sche
   const primaryRecoveryRun =
     effectiveLastRun &&
     (getEffectiveDeliveryResolution(effectiveLastRun) != null ||
-      (effectiveLastRun.state === 'needs_attention' &&
-        (schedule.kind === 'sheets_digest' ||
-          (typeof effectiveLastRun.error === 'string' &&
-            effectiveLastRun.error.includes('SHEETS_DELIVERY_UNKNOWN')))))
+      isUncertainSheetsDeliveryRun(effectiveLastRun))
       ? effectiveLastRun
       : latestResolvedRun;
   return <article className="bg-white rounded-2xl border border-[#E5E5E0] p-4 sm:p-5 v3-space-y-3 min-w-0 shadow-2xs">

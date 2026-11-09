@@ -543,4 +543,96 @@ describe('Task 7 (PR-7): Sheets Digest V2 Preview, Reauthorization CTA & Manual 
     expect(confirmedBadge).toHaveTextContent('Đã xác nhận thủ công là đã gửi');
     expect(screen.queryByTestId('sheets-delivery-recovery-panel')).toBeNull();
   });
+
+  it('6. negative guard: does NOT render SheetsDeliveryRecoveryControl for needs_attention runs without SHEETS_DELIVERY_UNKNOWN or without deliveryStartedAt', async () => {
+    vi.spyOn(useSchedulesHook, 'useSchedulesEnabled').mockReturnValue(true);
+
+    // Case A: non-SHEETS_DELIVERY_UNKNOWN error on a sheets_digest schedule
+    const nonUnknownErrorRun: ScheduleRunView = {
+      id: 'run-non-unknown-err-1',
+      scheduleId: 'sched-sheets-active-neg-1',
+      trigger: 'scheduled',
+      dueAt: '2026-11-09T01:00:00.000Z',
+      createdAt: '2026-11-09T01:00:02.000Z',
+      state: 'needs_attention',
+      missedCount: 0,
+      convId: 'conv-run-non-unknown-1',
+      planId: null,
+      planStatus: null,
+      error: 'GMAIL_RATE_LIMIT: Tạm thời không thể gửi báo cáo.',
+      deliveryStartedAt: '2026-11-09T01:00:05.000Z',
+      deliveryResolution: null,
+      deliveryResolvedAt: null,
+      deliveryFollowupRunId: null,
+    };
+
+    // Case B: SHEETS_DELIVERY_UNKNOWN error but missing deliveryStartedAt
+    const missingDeliveryStartedAtRun: ScheduleRunView = {
+      id: 'run-missing-started-at-1',
+      scheduleId: 'sched-sheets-active-neg-1',
+      trigger: 'scheduled',
+      dueAt: '2026-11-09T02:00:00.000Z',
+      createdAt: '2026-11-09T02:00:02.000Z',
+      state: 'needs_attention',
+      missedCount: 0,
+      convId: 'conv-run-missing-started-at-1',
+      planId: null,
+      planStatus: null,
+      error:
+        'SHEETS_DELIVERY_UNKNOWN: Đã bắt đầu gửi báo cáo sang Gmail nhưng mất kết nối trước khi nhận phản hồi.',
+      deliveryStartedAt: null,
+      deliveryResolution: null,
+      deliveryResolvedAt: null,
+      deliveryFollowupRunId: null,
+    };
+
+    for (const candidateRun of [nonUnknownErrorRun, missingDeliveryStartedAtRun]) {
+      const scheduleWithRun: ScheduleView = {
+        ...pausedReauthSchedule,
+        id: 'sched-sheets-active-neg-1',
+        status: 'active',
+        pauseReason: null,
+        lastRun: candidateRun,
+      };
+
+      vi.spyOn(apiClient, 'getSchedules').mockResolvedValue({
+        schedules: [scheduleWithRun],
+      });
+      vi.spyOn(apiClient, 'getScheduleRuns').mockResolvedValue({
+        runs: [candidateRun],
+      });
+
+      // 1. Verify ScheduleSection does not render recovery controls
+      render(<ScheduleSection user={user} navigate={vi.fn()} />);
+      expect(await screen.findByText('Báo cáo Doanh thu Q4 mỗi sáng')).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent(candidateRun.error!);
+      expect(screen.queryByTestId('sheets-delivery-recovery-panel')).toBeNull();
+      expect(screen.queryByTestId('btn-resolve-mark-sent')).toBeNull();
+      expect(screen.queryByTestId('btn-resolve-retry-new-run')).toBeNull();
+      cleanup();
+
+      // 2. Verify ScheduleRunRecovery does not render recovery controls
+      useChatStore.getState().setConversationId(candidateRun.convId!);
+      const runMsg: ChatMessage = {
+        id: `msg-${candidateRun.id}`,
+        role: 'user',
+        content: scheduleWithRun.request,
+        metadata: {
+          type: 'schedule_run',
+          scheduleId: scheduleWithRun.id,
+          runId: candidateRun.id,
+          name: scheduleWithRun.name,
+          dueAt: candidateRun.dueAt,
+          trigger: 'scheduled',
+        },
+      };
+
+      render(<ScheduleRunRecovery message={runMsg} navigate={vi.fn()} />);
+      expect(await screen.findByRole('status')).toBeInTheDocument();
+      expect(screen.queryByTestId('sheets-delivery-recovery-panel')).toBeNull();
+      expect(screen.queryByTestId('btn-resolve-mark-sent')).toBeNull();
+      expect(screen.queryByTestId('btn-resolve-retry-new-run')).toBeNull();
+      cleanup();
+    }
+  });
 });

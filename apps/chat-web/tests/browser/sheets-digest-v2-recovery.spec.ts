@@ -1,3 +1,8 @@
+// Browser UI E2E (Mocked API)
+// Exercises the Chromium browser UI journey for Sheets Digest V2 preview,
+// reauthorization CTA, manual delivery recovery, and negative recovery guard
+// using Playwright route interception (page.route on /api endpoints).
+// For real backend + isolated PostgreSQL integration, see tests/schedule-sheets-digest-v2-real-backend.test.tsx.
 import { test, expect } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
@@ -39,8 +44,8 @@ test.afterAll(async () => {
   }
 });
 
-test.describe('Sheets Digest V2 Preview, Reauthorization CTA & Manual Delivery Recovery E2E', () => {
-  test('Full browser journey: paused v1 schedule -> reauthorize preview (no credential UUID leak, cross-boundary warning) -> confirm -> needs_attention manual recovery (duplicate-risk checkbox, retry_new_run & mark_sent) -> audit badge', async ({
+test.describe('Browser UI E2E (Mocked API): Sheets Digest V2 Preview, Reauthorization CTA & Manual Delivery Recovery', () => {
+  test('Browser UI E2E (Mocked API): paused v1 schedule -> reauthorize preview (no credential UUID leak, cross-boundary warning) -> confirm -> needs_attention manual recovery (duplicate-risk checkbox, retry_new_run & mark_sent) -> audit badge & negative guard', async ({
     page,
   }) => {
     const SOURCE_CRED_UUID = '00000000-1111-4222-8333-444444444444';
@@ -513,5 +518,32 @@ test.describe('Sheets Digest V2 Preview, Reauthorization CTA & Manual Delivery R
     const resolvedBadge2 = page.getByTestId('delivery-resolution-badge');
     await expect(resolvedBadge2).toBeVisible();
     await expect(resolvedBadge2).toContainText('Đã xác nhận thủ công là đã gửi');
+
+    // 6. Negative guard: a needs_attention run with a non-SHEETS_DELIVERY_UNKNOWN error does NOT render sheets-delivery-recovery-panel
+    currentSchedule = {
+      ...currentSchedule,
+      lastRun: {
+        id: 'run-non-unknown-e2e-3',
+        scheduleId: currentSchedule.id,
+        trigger: 'scheduled',
+        dueAt: '2026-11-09T03:00:00.000Z',
+        createdAt: '2026-11-09T03:00:02.000Z',
+        state: 'needs_attention',
+        missedCount: 0,
+        convId: 'conv-non-unknown-e2e-3',
+        planId: null,
+        planStatus: null,
+        error: 'GMAIL_RATE_LIMIT: Tạm thời không thể gửi báo cáo.',
+        deliveryStartedAt: '2026-11-09T03:00:05.000Z',
+        deliveryResolution: null,
+        deliveryResolvedAt: null,
+        deliveryFollowupRunId: null,
+      },
+    };
+    await page.goto(`${baseUrl}/history`);
+    await expect(page.getByRole('alert')).toContainText('GMAIL_RATE_LIMIT: Tạm thời không thể gửi báo cáo.');
+    await expect(page.getByTestId('sheets-delivery-recovery-panel')).toHaveCount(0);
+    await expect(page.getByTestId('btn-resolve-mark-sent')).toHaveCount(0);
+    await expect(page.getByTestId('btn-resolve-retry-new-run')).toHaveCount(0);
   });
 });
