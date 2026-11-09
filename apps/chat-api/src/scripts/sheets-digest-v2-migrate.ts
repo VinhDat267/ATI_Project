@@ -23,6 +23,20 @@ const VALID_MODES = new Set<SheetsDigestMigrationMode>([
   'rollback',
 ]);
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function parseScheduleIdFlag(raw: string | undefined): string {
+  const val = typeof raw === 'string' ? raw.trim() : '';
+  if (!val || val.startsWith('--') || !UUID_RE.test(val)) {
+    const err = new Error(
+      `INVALID_SCHEDULE_ID: --schedule-id requires a valid UUID, received "${raw ?? ''}".`
+    );
+    (err as { code?: string }).code = 'INVALID_SCHEDULE_ID';
+    throw err;
+  }
+  return val;
+}
+
 function normalizePolicy(raw: string): SheetsDigestV1CompatPolicy {
   const val = raw.trim().toLowerCase();
   if (val === 'allow_consistency_candidate') {
@@ -80,9 +94,13 @@ export function parseMigrationCliArgs(argv: string[]): ParsedMigrationCliArgs {
     ) {
       confirmProductionRollback = true;
     } else if (arg.startsWith('--schedule-id=')) {
-      scheduleId = arg.slice('--schedule-id='.length).trim() || undefined;
-    } else if (arg === '--schedule-id' && i + 1 < argv.length) {
-      scheduleId = argv[++i]!.trim() || undefined;
+      scheduleId = parseScheduleIdFlag(arg.slice('--schedule-id='.length));
+    } else if (arg === '--schedule-id') {
+      const nextArg = i + 1 < argv.length ? argv[i + 1] : undefined;
+      if (nextArg === undefined || nextArg.trim().startsWith('--')) {
+        parseScheduleIdFlag(undefined);
+      }
+      scheduleId = parseScheduleIdFlag(argv[++i]);
     }
   }
 

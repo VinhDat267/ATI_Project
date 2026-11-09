@@ -791,4 +791,546 @@ describe('RMD-01 (PR-6): Controlled V1->V2 Migration CLI & CAS Rollback Tool', (
       scheduleId: undefined,
     });
   });
+
+  it('8. Blocker 1a: apply pass 1 (strict_pause_all) -> apply pass 2 -> rollback preserves audit snapshot and restores original v1 state', async () => {
+    const seeded = await seedMixedSchedules();
+    const initialRowA = (
+      await db.pool.query('SELECT * FROM schedules WHERE id = $1', [seeded.schedClassA.id])
+    ).rows[0]!;
+
+    // Pass 1: strict_pause_all
+    const pass1 = await runSheetsDigestV2Migration(db.pool, {
+      mode: 'apply',
+      confirmProductionApply: true,
+      encryptionKey: DIGEST_TEST_ENC_KEY,
+    });
+    expect(pass1.summary.countsByOutcome).toEqual({
+      upgraded_v2: 0,
+      paused_reauth_required: 4,
+      already_v2: 1,
+      inactive_preserved: 1,
+    });
+
+    // Natively v2 and natively inactive schedules must NOT have audit rows created
+    const nonMutatedAudits = await db.pool.query(
+      'SELECT * FROM sheets_digest_v2_migration_audit WHERE schedule_id = ANY($1::uuid[])',
+      [[seeded.schedV2Ready.id, seeded.schedPausedV1.id]]
+    );
+    expect(nonMutatedAudits.rows).toHaveLength(0);
+
+    // Pass 2: strict_pause_all (idempotent re-run)
+    const pass2 = await runSheetsDigestV2Migration(db.pool, {
+      mode: 'apply',
+      confirmProductionApply: true,
+      encryptionKey: DIGEST_TEST_ENC_KEY,
+    });
+    expect(pass2.summary.countsByOutcome).toEqual({
+      upgraded_v2: 0,
+      paused_reauth_required: 0,
+      already_v2: 1,
+      inactive_preserved: 5,
+    });
+
+    // Audit row for schedClassA must still retain the pass-1 pre-migration snapshot
+    const auditBeforeRollback = (
+      await db.pool.query(
+        'SELECT * FROM sheets_digest_v2_migration_audit WHERE schedule_id = $1',
+        [seeded.schedClassA.id]
+      )
+    ).rows[0]!;
+    expect(auditBeforeRollback).toMatchObject({
+      schedule_id: seeded.schedClassA.id,
+      previous_status: 'active',
+      previous_pause_reason: null,
+      previous_schedule_ver: seeded.schedClassA.version,
+      migrated_schedule_ver: seeded.schedClassA.version + 1,
+      previous_config_version: 1,
+      previous_config_hash: seeded.schedClassA.digest_config_hash,
+      outcome: 'paused_reauth_required',
+      rolled_back_at: null,
+    });
+
+    // Rollback after 2 apply passes must still restore the original v1 active state
+    const rollbackReport = await runSheetsDigestV2Migration(db.pool, {
+      mode: 'rollback',
+      confirmProductionRollback: true,
+      encryptionKey: DIGEST_TEST_ENC_KEY,
+    });
+    const rbItem = rollbackReport.rollbackItems.find(
+      (i) => i.scheduleId === seeded.schedClassA.id
+    );
+    expect(rbItem).toMatchObject({
+      scheduleId: seeded.schedClassA.id,
+      auditOutcome: 'paused_reauth_required',
+      rollbackOutcome: 'restored_previous_state',
+    });
+
+    const restoredRow = (
+      await db.pool.query('SELECT * FROM schedules WHERE id = $1', [seeded.schedClassA.id])
+    ).rows[0]!;
+    expect(restoredRow.status).toBe('active');
+    expect(restoredRow.pause_reason).toBeNull();
+    expect(restoredRow.digest_config.version).toBe(1);
+    expect(restoredRow.digest_config).toEqual(initialRowA.digest_config);
+    expect(restoredRow.digest_config_hash).toBe(seeded.schedClassA.digest_config_hash);
+    expect(restoredRow.version).toBe(seeded.schedClassA.version + 2);
+
+    const auditAfterRollback = (
+      await db.pool.query(
+        'SELECT * FROM sheets_digest_v2_migration_audit WHERE schedule_id = $1',
+        [seeded.schedClassA.id]
+      )
+    ).rows[0]!;
+    expect(auditAfterRollback.outcome).toBe('paused_reauth_required');
+    expect(auditAfterRollback.previous_schedule_ver).toBe(seeded.schedClassA.version);
+    expect(auditAfterRollback.migrated_schedule_ver).toBe(seeded.schedClassA.version + 1);
+    expect(auditAfterRollback.rolled_back_at).not.toBeNull();
+    expect(auditAfterRollback.rollback_outcome).toBe('restored_previous_state');
+  });
+
+  it('9. Blocker 1b: apply pass 1 (allow_consistency_candidate) -> apply pass 2 -> rollback restores original v1 config & hash', async () => {
+    const seeded = await seedMixedSchedules();
+    const initialRowA = (
+      await db.pool.query('SELECT * FROM schedules WHERE id = $1', [seeded.schedClassA.id])
+    ).rows[0]!;
+
+    // Pass 1: allow_consistency_candidate upgrades Class A to v2
+    const pass1 = await runSheetsDigestV2Migration(db.pool, {
+      mode: 'apply',
+      v1CompatPolicy: 'allow_consistency_candidate',
+      confirmProductionApply: true,
+      encryptionKey: DIGEST_TEST_ENC_KEY,
+    });
+    expect(pass1.summary.countsByOutcome.upgraded_v2).toBe(1);
+
+    // Pass 2: allow_consistency_candidate sees Class A as already v2, must NOT overwrite audit snapshot
+    const pass2 = await runSheetsDigestV2Migration(db.pool, {
+      mode: 'apply',
+      v1CompatPolicy: 'allow_consistency_candidate',
+      confirmProductionApply: true,
+      encryptionKey: DIGEST_TEST_ENC_KEY,
+    });
+    expect(pass2.summary.countsByOutcome).toEqual({
+      upgraded_v2: 0,
+      paused_reauth_required: 0,
+      already_v2: 2,
+      inactive_preserved: 4,
+    });
+
+    const auditAfterPass2 = (
+      await db.pool.query(
+        'SELECT * FROM sheets_digest_v2_migration_audit WHERE schedule_id = $1',
+        [seeded.schedClassA.id]
+      )
+    ).rows[0]!;
+    expect(auditAfterPass2).toMatchObject({
+      schedule_id: seeded.schedClassA.id,
+      previous_status: 'active',
+      previous_schedule_ver: seeded.schedClassA.version,
+      migrated_schedule_ver: seeded.schedClassA.version + 1,
+      previous_config_version: 1,
+      previous_config_hash: seeded.schedClassA.digest_config_hash,
+      outcome: 'upgraded_v2',
+      rolled_back_at: null,
+    });
+    expect(auditAfterPass2.previous_digest_config.version).toBe(1);
+
+    // Rollback restores original v1 config and hash
+    const rbReport = await runSheetsDigestV2Migration(db.pool, {
+      mode: 'rollback',
+      confirmProductionRollback: true,
+      encryptionKey: DIGEST_TEST_ENC_KEY,
+    });
+    const rbA = rbReport.rollbackItems.find((i) => i.scheduleId === seeded.schedClassA.id);
+    expect(rbA).toMatchObject({
+      scheduleId: seeded.schedClassA.id,
+      auditOutcome: 'upgraded_v2',
+      rollbackOutcome: 'restored_previous_state',
+    });
+
+    const rowAfterRollback = (
+      await db.pool.query('SELECT * FROM schedules WHERE id = $1', [seeded.schedClassA.id])
+    ).rows[0]!;
+    expect(rowAfterRollback.status).toBe('active');
+    expect(rowAfterRollback.pause_reason).toBeNull();
+    expect(rowAfterRollback.digest_config).toEqual(initialRowA.digest_config);
+    expect(rowAfterRollback.digest_config_hash).toBe(seeded.schedClassA.digest_config_hash);
+    expect(rowAfterRollback.version).toBe(seeded.schedClassA.version + 2);
+
+    const auditAfterRollback = (
+      await db.pool.query(
+        'SELECT * FROM sheets_digest_v2_migration_audit WHERE schedule_id = $1',
+        [seeded.schedClassA.id]
+      )
+    ).rows[0]!;
+    expect(auditAfterRollback.outcome).toBe('upgraded_v2');
+    expect(auditAfterRollback.rolled_back_at).not.toBeNull();
+    expect(auditAfterRollback.rollback_outcome).toBe('restored_previous_state');
+
+    // Re-applying after rollback is permitted because rolled_back_at IS NOT NULL
+    const pass3AfterRollback = await runSheetsDigestV2Migration(db.pool, {
+      mode: 'apply',
+      v1CompatPolicy: 'allow_consistency_candidate',
+      confirmProductionApply: true,
+      encryptionKey: DIGEST_TEST_ENC_KEY,
+      scheduleId: seeded.schedClassA.id,
+    });
+    expect(pass3AfterRollback.summary.countsByOutcome.upgraded_v2).toBe(1);
+    const auditAfterPass3 = (
+      await db.pool.query(
+        'SELECT * FROM sheets_digest_v2_migration_audit WHERE schedule_id = $1',
+        [seeded.schedClassA.id]
+      )
+    ).rows[0]!;
+    expect(auditAfterPass3.rolled_back_at).toBeNull();
+    expect(auditAfterPass3.rollback_outcome).toBeNull();
+    expect(auditAfterPass3.previous_schedule_ver).toBe(seeded.schedClassA.version + 2);
+    expect(auditAfterPass3.migrated_schedule_ver).toBe(seeded.schedClassA.version + 3);
+  });
+
+  it('10. Blocker 1c: concurrent apply and repeated rollback are idempotent and preserve audit history', async () => {
+    const { personalA } = fixtures;
+    const initialDigestConfig = {
+      version: 1 as const,
+      source: {
+        service: 'mysheets' as const,
+        credentialId: personalA.mysheetsCred.id,
+        email: personalA.email,
+        spreadsheetId: personalA.spreadsheetId,
+        spreadsheetTitle: personalA.spreadsheetTitle,
+        sheetName: 'KPI Tháng 11',
+        tailRows: 20,
+      },
+      destination: {
+        service: 'gmail' as const,
+        credentialId: personalA.gmailCred.id,
+        recipientEmail: 'finance@company.test',
+      },
+      includeAiSummary: true,
+    };
+    const schedClassA = await insertTestSheetsDigestSchedule(db.pool, {
+      userId: personalA.user.id,
+      convId: personalA.conversation.id,
+      workspaceMode: 'personal',
+      workspaceId: null,
+      digestApprovedAt: approvedAt,
+      digestConfig: initialDigestConfig,
+    });
+
+    // Run two concurrent apply invocations
+    await Promise.all([
+      runSheetsDigestV2Migration(db.pool, {
+        mode: 'apply',
+        v1CompatPolicy: 'allow_consistency_candidate',
+        confirmProductionApply: true,
+        encryptionKey: DIGEST_TEST_ENC_KEY,
+      }),
+      runSheetsDigestV2Migration(db.pool, {
+        mode: 'apply',
+        v1CompatPolicy: 'allow_consistency_candidate',
+        confirmProductionApply: true,
+        encryptionKey: DIGEST_TEST_ENC_KEY,
+      }),
+    ]);
+
+    const rowAfterConcurrentApply = (
+      await db.pool.query('SELECT * FROM schedules WHERE id = $1', [schedClassA.id])
+    ).rows[0]!;
+    expect(rowAfterConcurrentApply.version).toBe(schedClassA.version + 1);
+    expect(rowAfterConcurrentApply.digest_config.version).toBe(2);
+
+    const auditAfterConcurrentApply = (
+      await db.pool.query(
+        'SELECT * FROM sheets_digest_v2_migration_audit WHERE schedule_id = $1',
+        [schedClassA.id]
+      )
+    ).rows[0]!;
+    expect(auditAfterConcurrentApply).toMatchObject({
+      schedule_id: schedClassA.id,
+      previous_status: 'active',
+      previous_schedule_ver: schedClassA.version,
+      migrated_schedule_ver: schedClassA.version + 1,
+      previous_config_version: 1,
+      previous_config_hash: schedClassA.digest_config_hash,
+      outcome: 'upgraded_v2',
+      rolled_back_at: null,
+    });
+
+    // Concurrent rollback invocations: only one restores the schedule, the other must NOT overwrite rollback_outcome to skipped_user_modified
+    const [rbConcurrentA, rbConcurrentB] = await Promise.all([
+      runSheetsDigestV2Migration(db.pool, {
+        mode: 'rollback',
+        confirmProductionRollback: true,
+        encryptionKey: DIGEST_TEST_ENC_KEY,
+      }),
+      runSheetsDigestV2Migration(db.pool, {
+        mode: 'rollback',
+        confirmProductionRollback: true,
+        encryptionKey: DIGEST_TEST_ENC_KEY,
+      }),
+    ]);
+    const combinedConcurrentItems = [
+      ...rbConcurrentA.rollbackItems,
+      ...rbConcurrentB.rollbackItems,
+    ];
+    expect(combinedConcurrentItems).toHaveLength(1);
+    expect(combinedConcurrentItems[0]?.rollbackOutcome).toBe('restored_previous_state');
+    expect(
+      rbConcurrentA.summary.countsByRollbackOutcome.skipped_user_modified +
+        rbConcurrentB.summary.countsByRollbackOutcome.skipped_user_modified
+    ).toBe(0);
+
+    const rowAfterRb1 = (
+      await db.pool.query('SELECT * FROM schedules WHERE id = $1', [schedClassA.id])
+    ).rows[0]!;
+    expect(rowAfterRb1.status).toBe('active');
+    expect(rowAfterRb1.digest_config).toEqual(initialDigestConfig);
+    expect(rowAfterRb1.digest_config_hash).toBe(schedClassA.digest_config_hash);
+    expect(rowAfterRb1.version).toBe(schedClassA.version + 2);
+
+    const auditAfterRb1 = (
+      await db.pool.query(
+        'SELECT * FROM sheets_digest_v2_migration_audit WHERE schedule_id = $1',
+        [schedClassA.id]
+      )
+    ).rows[0]!;
+    expect(auditAfterRb1.rolled_back_at).not.toBeNull();
+    expect(auditAfterRb1.rollback_outcome).toBe('restored_previous_state');
+
+    // Rollback pass 2 (idempotent: must not re-mutate schedule or erase audit history)
+    const rb2 = await runSheetsDigestV2Migration(db.pool, {
+      mode: 'rollback',
+      confirmProductionRollback: true,
+      encryptionKey: DIGEST_TEST_ENC_KEY,
+    });
+    expect(rb2.rollbackItems).toHaveLength(0);
+
+    const rowAfterRb2 = (
+      await db.pool.query('SELECT * FROM schedules WHERE id = $1', [schedClassA.id])
+    ).rows[0]!;
+    expect(rowAfterRb2.version).toBe(schedClassA.version + 2);
+    expect(rowAfterRb2.digest_config).toEqual(initialDigestConfig);
+
+    const auditAfterRb2 = (
+      await db.pool.query(
+        'SELECT * FROM sheets_digest_v2_migration_audit WHERE schedule_id = $1',
+        [schedClassA.id]
+      )
+    ).rows[0]!;
+    expect(auditAfterRb2.rolled_back_at).toEqual(auditAfterRb1.rolled_back_at);
+    expect(auditAfterRb2.rollback_outcome).toBe('restored_previous_state');
+    expect(auditAfterRb2.outcome).toBe('upgraded_v2');
+    expect(auditAfterRb2.previous_schedule_ver).toBe(schedClassA.version);
+  });
+
+  it('11. Blocker 2: invalid --schedule-id throws INVALID_SCHEDULE_ID in CLI and service layer, and non-existent valid UUID matches 0 rows', async () => {
+    await seedMixedSchedules();
+    const beforeSchedules = (
+      await db.pool.query(
+        'SELECT id, status, pause_reason, version, digest_config, digest_config_hash FROM schedules ORDER BY id ASC'
+      )
+    ).rows;
+
+    // 11a. CLI parser rejects invalid/empty/missing --schedule-id
+    for (const badArgv of [
+      ['--schedule-id', 'not-a-uuid'],
+      ['--schedule-id=not-a-uuid'],
+      ['--schedule-id', ''],
+      ['--schedule-id='],
+      ['--schedule-id'],
+      ['--schedule-id', '--mode=apply'],
+    ]) {
+      let caught: any;
+      try {
+        parseMigrationCliArgs(badArgv);
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      expect(caught.message).toMatch(/INVALID_SCHEDULE_ID/);
+      expect(caught.code).toBe('INVALID_SCHEDULE_ID');
+    }
+
+    // 11b. Service layer rejects invalid/empty/whitespace scheduleId across all modes with 0 DB mutations
+    for (const badId of ['not-a-uuid', '', '   ']) {
+      for (const mode of ['inventory', 'dry-run', 'apply', 'rollback'] as const) {
+        let caught: any;
+        try {
+          await runSheetsDigestV2Migration(db.pool, {
+            mode,
+            scheduleId: badId,
+            confirmProductionApply: true,
+            confirmProductionRollback: true,
+            encryptionKey: DIGEST_TEST_ENC_KEY,
+          });
+        } catch (err) {
+          caught = err;
+        }
+        expect(caught).toBeInstanceOf(Error);
+        expect(caught.message).toMatch(/INVALID_SCHEDULE_ID/);
+        expect(caught.code).toBe('INVALID_SCHEDULE_ID');
+      }
+    }
+
+    const afterBadIds = (
+      await db.pool.query(
+        'SELECT id, status, pause_reason, version, digest_config, digest_config_hash FROM schedules ORDER BY id ASC'
+      )
+    ).rows;
+    expect(afterBadIds).toEqual(beforeSchedules);
+
+    // 11c. Non-existent valid UUID matches 0 schedules and mutates 0 rows across all modes
+    const nonExistentUuid = '00000000-0000-4000-8000-000000000999';
+    for (const mode of ['inventory', 'dry-run', 'apply', 'rollback'] as const) {
+      const report = await runSheetsDigestV2Migration(db.pool, {
+        mode,
+        scheduleId: nonExistentUuid,
+        confirmProductionApply: true,
+        confirmProductionRollback: true,
+        encryptionKey: DIGEST_TEST_ENC_KEY,
+      });
+      expect(report.summary.totalSchedules).toBe(0);
+      expect(report.items).toHaveLength(0);
+      expect(report.rollbackItems).toHaveLength(0);
+    }
+
+    const afterNonExistent = (
+      await db.pool.query(
+        'SELECT id, status, pause_reason, version, digest_config, digest_config_hash FROM schedules ORDER BY id ASC'
+      )
+    ).rows;
+    expect(afterNonExistent).toEqual(beforeSchedules);
+  });
+
+  it('12. Encryption Key Contract: honors process.env.ENCRYPTION_KEY, throws MISSING_ENCRYPTION_KEY when unset, and throws INVALID_ENCRYPTION_KEY on wrong key with 0 mutations', async () => {
+    const seeded = await seedMixedSchedules();
+    const beforeSchedules = (
+      await db.pool.query(
+        'SELECT id, status, pause_reason, version, digest_config, digest_config_hash FROM schedules ORDER BY id ASC'
+      )
+    ).rows;
+
+    const prevEncKey = process.env.ENCRYPTION_KEY;
+    const prevCredEncKey = process.env.CREDENTIALS_ENCRYPTION_KEY;
+    try {
+      // 12a. Missing / empty encryptionKey throws MISSING_ENCRYPTION_KEY
+      delete process.env.ENCRYPTION_KEY;
+      delete process.env.CREDENTIALS_ENCRYPTION_KEY;
+
+      for (const mode of ['inventory', 'dry-run', 'apply', 'rollback'] as const) {
+        for (const badKey of [undefined, '', '   ']) {
+          let caught: any;
+          try {
+            await runSheetsDigestV2Migration(db.pool, {
+              mode,
+              ...(badKey !== undefined ? { encryptionKey: badKey } : {}),
+              v1CompatPolicy: 'allow_consistency_candidate',
+              confirmProductionApply: true,
+              confirmProductionRollback: true,
+            });
+          } catch (err) {
+            caught = err;
+          }
+          expect(caught).toBeInstanceOf(Error);
+          expect(caught.message).toMatch(/MISSING_ENCRYPTION_KEY/);
+          expect(caught.code).toBe('MISSING_ENCRYPTION_KEY');
+        }
+      }
+
+      // 12b. Wrong encryptionKey throws INVALID_ENCRYPTION_KEY instead of misclassifying Class A as Class B
+      for (const mode of ['inventory', 'dry-run', 'apply', 'rollback'] as const) {
+        let caught: any;
+        try {
+          await runSheetsDigestV2Migration(db.pool, {
+            mode,
+            encryptionKey: 'wrong-key-that-fails-aes-gcm-auth-tag-verification',
+            v1CompatPolicy: 'allow_consistency_candidate',
+            confirmProductionApply: true,
+            confirmProductionRollback: true,
+          });
+        } catch (err) {
+          caught = err;
+        }
+        expect(caught).toBeInstanceOf(Error);
+        expect(caught.message).toMatch(/INVALID_ENCRYPTION_KEY/);
+        expect(caught.code).toBe('INVALID_ENCRYPTION_KEY');
+      }
+
+      // Verify 0 mutations occurred from missing or wrong encryption keys
+      const afterFailedKeyChecks = (
+        await db.pool.query(
+          'SELECT id, status, pause_reason, version, digest_config, digest_config_hash FROM schedules ORDER BY id ASC'
+        )
+      ).rows;
+      expect(afterFailedKeyChecks).toEqual(beforeSchedules);
+
+      // 12c. Using process.env.ENCRYPTION_KEY (without options.encryptionKey) succeeds and upgrades Class A
+      process.env.ENCRYPTION_KEY = DIGEST_TEST_ENC_KEY;
+      const applyViaEnv = await runSheetsDigestV2Migration(db.pool, {
+        mode: 'apply',
+        v1CompatPolicy: 'allow_consistency_candidate',
+        confirmProductionApply: true,
+      });
+      expect(applyViaEnv.summary.countsByOutcome.upgraded_v2).toBe(1);
+
+      // Order Class B audit row earlier than Class A audit row, then verify rollback with wrong key mutates 0 rows
+      await db.pool.query(
+        "UPDATE sheets_digest_v2_migration_audit SET migrated_at = now() - interval '10 minutes' WHERE schedule_id = $1",
+        [seeded.schedOrgClassB.id]
+      );
+      const schedulesBeforeFailedRollback = (
+        await db.pool.query(
+          'SELECT id, status, pause_reason, version, digest_config, digest_config_hash FROM schedules ORDER BY id ASC'
+        )
+      ).rows;
+      const auditsBeforeFailedRollback = (
+        await db.pool.query(
+          'SELECT id, schedule_id, outcome, rolled_back_at, rollback_outcome FROM sheets_digest_v2_migration_audit ORDER BY id ASC'
+        )
+      ).rows;
+
+      let rollbackBadKeyErr: any;
+      try {
+        await runSheetsDigestV2Migration(db.pool, {
+          mode: 'rollback',
+          confirmProductionRollback: true,
+          encryptionKey: 'wrong-key-during-rollback-must-not-partially-mutate',
+        });
+      } catch (err) {
+        rollbackBadKeyErr = err;
+      }
+      expect(rollbackBadKeyErr).toBeInstanceOf(Error);
+      expect(rollbackBadKeyErr.code).toBe('INVALID_ENCRYPTION_KEY');
+
+      const schedulesAfterFailedRollback = (
+        await db.pool.query(
+          'SELECT id, status, pause_reason, version, digest_config, digest_config_hash FROM schedules ORDER BY id ASC'
+        )
+      ).rows;
+      const auditsAfterFailedRollback = (
+        await db.pool.query(
+          'SELECT id, schedule_id, outcome, rolled_back_at, rollback_outcome FROM sheets_digest_v2_migration_audit ORDER BY id ASC'
+        )
+      ).rows;
+      expect(schedulesAfterFailedRollback).toEqual(schedulesBeforeFailedRollback);
+      expect(auditsAfterFailedRollback).toEqual(auditsBeforeFailedRollback);
+
+      const upgradedRow = (
+        await db.pool.query('SELECT * FROM schedules WHERE id = $1', [seeded.schedClassA.id])
+      ).rows[0]!;
+      expect(upgradedRow.status).toBe('active');
+      expect(upgradedRow.digest_config.version).toBe(2);
+    } finally {
+      if (prevEncKey === undefined) {
+        delete process.env.ENCRYPTION_KEY;
+      } else {
+        process.env.ENCRYPTION_KEY = prevEncKey;
+      }
+      if (prevCredEncKey === undefined) {
+        delete process.env.CREDENTIALS_ENCRYPTION_KEY;
+      } else {
+        process.env.CREDENTIALS_ENCRYPTION_KEY = prevCredEncKey;
+      }
+    }
+  });
 });

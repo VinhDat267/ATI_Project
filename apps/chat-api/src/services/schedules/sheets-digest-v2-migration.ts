@@ -204,6 +204,13 @@ export function evaluateV1IdentityProven(input: {
   senderEmail?: string;
 } {
   const { schedule, credentialsById, encryptionKey } = input;
+  if (typeof encryptionKey !== 'string' || encryptionKey.trim().length === 0) {
+    const err = new Error(
+      'MISSING_ENCRYPTION_KEY: ENCRYPTION_KEY (or options.encryptionKey) is required to evaluate v1 schedule credentials.'
+    );
+    (err as { code?: string }).code = 'MISSING_ENCRYPTION_KEY';
+    throw err;
+  }
   const reasons: string[] = [];
   const config = schedule.digest_config;
   const wsMode = schedule.workspace_mode ?? 'legacy';
@@ -269,8 +276,19 @@ export function evaluateV1IdentityProven(input: {
       if (approvedAtMs !== null && statusChangedMs !== null && statusChangedMs > approvedAtMs) {
         reasons.push('SOURCE_CREDENTIAL_STATUS_CHANGED_AFTER_APPROVAL');
       }
-      try {
-        const decSource = decryptCredentials(srcRow.config, encryptionKey);
+      if (!srcRow.config || typeof srcRow.config !== 'string') {
+        reasons.push('SOURCE_CREDENTIAL_DECRYPT_FAILED');
+      } else {
+        let decSource: Record<string, any>;
+        try {
+          decSource = decryptCredentials(srcRow.config, encryptionKey);
+        } catch (cause) {
+          const err = new Error(
+            `INVALID_ENCRYPTION_KEY: Failed to decrypt active source credential ${srcRow.id}: ${cause instanceof Error ? cause.message : String(cause)}`
+          );
+          (err as { code?: string }).code = 'INVALID_ENCRYPTION_KEY';
+          throw err;
+        }
         const connectedAtMs = toTimestampMs(decSource?.connectedAt);
         if (approvedAtMs !== null && connectedAtMs !== null && connectedAtMs > approvedAtMs) {
           reasons.push('SOURCE_CREDENTIAL_CONNECTED_AFTER_APPROVAL');
@@ -290,8 +308,6 @@ export function evaluateV1IdentityProven(input: {
         ) {
           reasons.push('SOURCE_SPREADSHEET_OUT_OF_SCOPE');
         }
-      } catch {
-        reasons.push('SOURCE_CREDENTIAL_DECRYPT_FAILED');
       }
     }
   }
@@ -316,8 +332,19 @@ export function evaluateV1IdentityProven(input: {
       if (approvedAtMs !== null && statusChangedMs !== null && statusChangedMs > approvedAtMs) {
         reasons.push('DEST_CREDENTIAL_STATUS_CHANGED_AFTER_APPROVAL');
       }
-      try {
-        const decDest = decryptCredentials(destRow.config, encryptionKey);
+      if (!destRow.config || typeof destRow.config !== 'string') {
+        reasons.push('DEST_CREDENTIAL_DECRYPT_FAILED');
+      } else {
+        let decDest: Record<string, any>;
+        try {
+          decDest = decryptCredentials(destRow.config, encryptionKey);
+        } catch (cause) {
+          const err = new Error(
+            `INVALID_ENCRYPTION_KEY: Failed to decrypt active destination credential ${destRow.id}: ${cause instanceof Error ? cause.message : String(cause)}`
+          );
+          (err as { code?: string }).code = 'INVALID_ENCRYPTION_KEY';
+          throw err;
+        }
         const connectedAtMs = toTimestampMs(decDest?.connectedAt);
         if (approvedAtMs !== null && connectedAtMs !== null && connectedAtMs > approvedAtMs) {
           reasons.push('DEST_CREDENTIAL_CONNECTED_AFTER_APPROVAL');
@@ -328,8 +355,6 @@ export function evaluateV1IdentityProven(input: {
         } else {
           resolvedSenderEmail = senderEmail;
         }
-      } catch {
-        reasons.push('DEST_CREDENTIAL_DECRYPT_FAILED');
       }
     }
   }
@@ -579,7 +604,8 @@ async function upsertAuditRow(
        reason_detail = EXCLUDED.reason_detail,
        migrated_at = now(),
        rolled_back_at = NULL,
-       rollback_outcome = NULL`,
+       rollback_outcome = NULL
+     WHERE sheets_digest_v2_migration_audit.rolled_back_at IS NOT NULL`,
     [
       input.scheduleId,
       input.userId,
@@ -605,12 +631,19 @@ export async function runSheetsDigestV2Migration(
   options: RunSheetsDigestV2MigrationOptions
 ): Promise<SheetsDigestMigrationReport> {
   const mode = options.mode;
-  const encryptionKey = options.encryptionKey ?? process.env.CREDENTIALS_ENCRYPTION_KEY ?? '';
   const notifyOwners = options.notifyOwners ?? true;
-  const scheduleIdFilter =
-    typeof options.scheduleId === 'string' && isNonEmptyUuid(options.scheduleId)
-      ? options.scheduleId.trim()
-      : null;
+
+  let scheduleIdFilter: string | null = null;
+  if (options.scheduleId !== undefined && options.scheduleId !== null) {
+    if (typeof options.scheduleId !== 'string' || !isNonEmptyUuid(options.scheduleId)) {
+      const err = new Error(
+        `INVALID_SCHEDULE_ID: scheduleId must be a valid UUID string, received "${String(options.scheduleId)}".`
+      );
+      (err as { code?: string }).code = 'INVALID_SCHEDULE_ID';
+      throw err;
+    }
+    scheduleIdFilter = options.scheduleId.trim();
+  }
 
   const v1CompatPolicy: SheetsDigestV1CompatPolicy =
     options.v1CompatPolicy ??
@@ -633,6 +666,40 @@ export async function runSheetsDigestV2Migration(
     );
     (err as any).code = 'CONFIRM_PRODUCTION_ROLLBACK_REQUIRED';
     throw err;
+  }
+
+  const rawEncryptionKey =
+    options.encryptionKey !== undefined ? options.encryptionKey : process.env.ENCRYPTION_KEY;
+
+  if (typeof rawEncryptionKey !== 'string' || rawEncryptionKey.trim().length === 0) {
+    const err = new Error(
+      'MISSING_ENCRYPTION_KEY: ENCRYPTION_KEY environment variable (or options.encryptionKey) must be a non-empty string before classifying, migrating, or rolling back schedules.'
+    );
+    (err as { code?: string }).code = 'MISSING_ENCRYPTION_KEY';
+    throw err;
+  }
+
+  const encryptionKey = rawEncryptionKey;
+
+  // Pre-validate encryptionKey against active service_credentials before any classification or mutation transaction
+  const activeCredCheckRes = await pool.query<{ id: string; config: string | null }>(
+    `SELECT id, config
+     FROM service_credentials
+     WHERE status = 'active' AND config IS NOT NULL
+     ORDER BY created_at ASC, id ASC`
+  );
+  for (const credRow of activeCredCheckRes.rows) {
+    if (typeof credRow.config === 'string' && credRow.config.length > 0) {
+      try {
+        decryptCredentials(credRow.config, encryptionKey);
+      } catch (cause) {
+        const err = new Error(
+          `INVALID_ENCRYPTION_KEY: Failed to decrypt active service credential ${credRow.id}: ${cause instanceof Error ? cause.message : String(cause)}`
+        );
+        (err as { code?: string }).code = 'INVALID_ENCRYPTION_KEY';
+        throw err;
+      }
+    }
   }
 
   const countsByClass: Record<SheetsDigestCompatClass, number> = {
@@ -676,7 +743,7 @@ export async function runSheetsDigestV2Migration(
         await client.query('BEGIN');
         await client.query("SET LOCAL lock_timeout = '5s'");
 
-        // Canonical lock order: 1. conversations FOR UPDATE -> 2. schedules FOR UPDATE
+        // Canonical lock order: 1. conversations FOR UPDATE -> 2. schedules FOR UPDATE -> 3. sheets_digest_v2_migration_audit FOR UPDATE
         await client.query('SELECT id FROM conversations WHERE id = $1 FOR UPDATE', [
           audit.schedule_conv_id,
         ]);
@@ -694,22 +761,36 @@ export async function runSheetsDigestV2Migration(
           continue;
         }
 
+        const liveAuditRes = await client.query<MigrationAuditRow>(
+          'SELECT * FROM sheets_digest_v2_migration_audit WHERE id = $1 FOR UPDATE',
+          [audit.id]
+        );
+        const liveAudit = liveAuditRes.rows[0];
+        if (
+          !liveAudit ||
+          liveAudit.rolled_back_at !== null ||
+          (liveAudit.outcome !== 'upgraded_v2' && liveAudit.outcome !== 'paused_reauth_required')
+        ) {
+          await client.query('ROLLBACK');
+          continue;
+        }
+
         // 1. Optimistic Concurrency (CAS) & Kind Guard: Never clobber user edits/reauthorizations or non-sheets_digest schedules
-        if (s.version !== audit.migrated_schedule_ver || s.kind !== 'sheets_digest') {
+        if (s.version !== liveAudit.migrated_schedule_ver || s.kind !== 'sheets_digest') {
           await client.query(
             `UPDATE sheets_digest_v2_migration_audit
              SET rolled_back_at = now(),
                  rollback_outcome = 'skipped_user_modified'
-             WHERE id = $1`,
-            [audit.id]
+             WHERE id = $1 AND rolled_back_at IS NULL`,
+            [liveAudit.id]
           );
           await client.query('COMMIT');
           countsByRollbackOutcome.skipped_user_modified++;
           rollbackItems.push({
             scheduleId: s.id,
             userId: s.user_id,
-            auditOutcome: audit.outcome,
-            migratedScheduleVer: audit.migrated_schedule_ver,
+            auditOutcome: liveAudit.outcome,
+            migratedScheduleVer: liveAudit.migrated_schedule_ver,
             currentScheduleVer: s.version,
             rollbackOutcome: 'skipped_user_modified',
             reasons:
@@ -720,7 +801,7 @@ export async function runSheetsDigestV2Migration(
           continue;
         }
 
-        // 2. Live Revocation Guard: 3. users FOR SHARE -> 4. workspace_members FOR SHARE -> 5. service_credentials FOR SHARE
+        // 2. Live Revocation Guard: 4. users FOR SHARE -> 5. workspace_members FOR SHARE -> 6. service_credentials FOR SHARE
         const userRes = await client.query<{ status: string }>(
           'SELECT status FROM users WHERE id = $1 FOR SHARE',
           [s.user_id]
@@ -740,7 +821,7 @@ export async function runSheetsDigestV2Migration(
           }
         }
 
-        const prevConfig = audit.previous_digest_config;
+        const prevConfig = liveAudit.previous_digest_config;
         const candidateCredIds = [
           prevConfig?.source?.credentialId,
           prevConfig?.destination?.credentialId,
@@ -767,9 +848,9 @@ export async function runSheetsDigestV2Migration(
         const prevEval = evaluateV1IdentityProven({
           schedule: {
             ...s,
-            status: audit.previous_status,
+            status: liveAudit.previous_status,
             digest_config: prevConfig,
-            digest_config_hash: audit.previous_config_hash,
+            digest_config_hash: liveAudit.previous_config_hash,
             user_status: liveUserStatus,
           },
           credentialsById: txCredentialsById,
@@ -777,7 +858,7 @@ export async function runSheetsDigestV2Migration(
         });
 
         const canRestoreActive =
-          audit.previous_status === 'active' &&
+          liveAudit.previous_status === 'active' &&
           liveUserStatus === 'active' &&
           orgMemberActive &&
           prevEval.proven;
@@ -795,12 +876,12 @@ export async function runSheetsDigestV2Migration(
              WHERE id = $1 AND version = $2`,
             [
               s.id,
-              audit.migrated_schedule_ver,
+              liveAudit.migrated_schedule_ver,
               JSON.stringify(prevConfig),
-              audit.previous_config_hash,
-              audit.previous_status,
-              audit.previous_pause_reason,
-              audit.previous_next_run_at,
+              liveAudit.previous_config_hash,
+              liveAudit.previous_status,
+              liveAudit.previous_pause_reason,
+              liveAudit.previous_next_run_at,
             ]
           );
           if (updateRes.rowCount !== 1) {
@@ -812,16 +893,16 @@ export async function runSheetsDigestV2Migration(
             `UPDATE sheets_digest_v2_migration_audit
              SET rolled_back_at = now(),
                  rollback_outcome = 'restored_previous_state'
-             WHERE id = $1`,
-            [audit.id]
+             WHERE id = $1 AND rolled_back_at IS NULL`,
+            [liveAudit.id]
           );
           await client.query('COMMIT');
           countsByRollbackOutcome.restored_previous_state++;
           rollbackItems.push({
             scheduleId: s.id,
             userId: s.user_id,
-            auditOutcome: audit.outcome,
-            migratedScheduleVer: audit.migrated_schedule_ver,
+            auditOutcome: liveAudit.outcome,
+            migratedScheduleVer: liveAudit.migrated_schedule_ver,
             currentScheduleVer: s.version + 1,
             rollbackOutcome: 'restored_previous_state',
             reasons: [],
@@ -840,9 +921,9 @@ export async function runSheetsDigestV2Migration(
              WHERE id = $1 AND version = $2`,
             [
               s.id,
-              audit.migrated_schedule_ver,
+              liveAudit.migrated_schedule_ver,
               JSON.stringify(prevConfig),
-              audit.previous_config_hash,
+              liveAudit.previous_config_hash,
               REAUTH_REQUIRED_PAUSE_REASON,
             ]
           );
@@ -855,16 +936,16 @@ export async function runSheetsDigestV2Migration(
             `UPDATE sheets_digest_v2_migration_audit
              SET rolled_back_at = now(),
                  rollback_outcome = 'restored_paused_due_to_revocation'
-             WHERE id = $1`,
-            [audit.id]
+             WHERE id = $1 AND rolled_back_at IS NULL`,
+            [liveAudit.id]
           );
           await client.query('COMMIT');
           countsByRollbackOutcome.restored_paused_due_to_revocation++;
           rollbackItems.push({
             scheduleId: s.id,
             userId: s.user_id,
-            auditOutcome: audit.outcome,
-            migratedScheduleVer: audit.migrated_schedule_ver,
+            auditOutcome: liveAudit.outcome,
+            migratedScheduleVer: liveAudit.migrated_schedule_ver,
             currentScheduleVer: s.version + 1,
             rollbackOutcome: 'restored_paused_due_to_revocation',
             reasons: prevEval.reasons,
@@ -995,6 +1076,16 @@ export async function runSheetsDigestV2Migration(
   }
 
   // mode === 'apply'
+  // Pre-validate schedule classification & credential decryption before starting any per-schedule mutation transaction
+  for (const row of schedRes.rows) {
+    classifyScheduleMigrationItem({
+      row,
+      credentialsById,
+      encryptionKey,
+      v1CompatPolicy,
+    });
+  }
+
   const messageRepo = new MessageRepo(pool);
 
   for (const candidateRow of schedRes.rows) {
@@ -1020,6 +1111,17 @@ export async function runSheetsDigestV2Migration(
         await client.query('ROLLBACK');
         continue;
       }
+
+      const existingAuditRes = await client.query<MigrationAuditRow>(
+        'SELECT * FROM sheets_digest_v2_migration_audit WHERE schedule_id = $1 FOR UPDATE',
+        [s.id]
+      );
+      const existingAudit = existingAuditRes.rows[0];
+      const hasActiveAuditSnapshot =
+        existingAudit !== undefined &&
+        existingAudit.rolled_back_at === null &&
+        (existingAudit.outcome === 'upgraded_v2' ||
+          existingAudit.outcome === 'paused_reauth_required');
 
       const userRes = await client.query<{ status: string }>(
         'SELECT status FROM users WHERE id = $1 FOR SHARE',
@@ -1055,31 +1157,33 @@ export async function runSheetsDigestV2Migration(
         }
       }
 
-      const classified = classifyScheduleMigrationItem({
+      let classified = classifyScheduleMigrationItem({
         row: s,
         credentialsById: txCredentialsById,
         encryptionKey,
         v1CompatPolicy,
       });
 
-      if (classified.outcome === 'already_v2' || classified.outcome === 'inactive_preserved') {
-        await upsertAuditRow(client, {
-          scheduleId: s.id,
-          userId: s.user_id,
-          workspaceMode: classified.workspaceMode,
-          workspaceId: classified.workspaceId,
-          previousStatus: s.status,
-          previousPauseReason: s.pause_reason ?? null,
-          previousNextRunAt: s.next_run_at ?? null,
-          previousScheduleVer: s.version,
-          migratedScheduleVer: s.version,
-          previousConfigVersion: classified.configVersion,
-          previousDigestConfig: s.digest_config,
-          previousConfigHash: s.digest_config_hash,
-          outcome: classified.outcome,
-          reasonCode: classified.reasonCode,
-          reasonDetail: classified.reasonDetail,
-        });
+      if (hasActiveAuditSnapshot) {
+        const preservedOutcome: SheetsDigestMigrationOutcome =
+          classified.configVersion >= 2 ? 'already_v2' : 'inactive_preserved';
+        classified = {
+          ...classified,
+          newStatus: s.status,
+          migratedVersion: s.version,
+          outcome: preservedOutcome,
+          reasonCode:
+            preservedOutcome === 'already_v2' ? 'ALREADY_V2' : 'INACTIVE_STATUS_PRESERVED',
+          reasonDetail:
+            preservedOutcome === 'already_v2'
+              ? 'Active migration audit snapshot already exists; preserving v2 schedule.'
+              : 'Active migration audit snapshot already exists; preserving schedule without overwriting snapshot.',
+        };
+        await client.query('COMMIT');
+      } else if (
+        classified.outcome === 'already_v2' ||
+        classified.outcome === 'inactive_preserved'
+      ) {
         await client.query('COMMIT');
       } else if (classified.outcome === 'upgraded_v2' && classified.senderEmail) {
         const v1Cfg = s.digest_config as SheetsDigestConfigV1;
