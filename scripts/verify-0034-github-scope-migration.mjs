@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,64 +14,136 @@ export const WS_BETA_UUID = '22222222-2222-4222-8222-222222222222';
 export const USER_ALPHA_UUID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 export const USER_BETA_UUID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 
-const MIGRATION_0033_SQL = `
-ALTER TABLE credentials ADD COLUMN IF NOT EXISTS workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE;
-ALTER TABLE credentials ADD COLUMN IF NOT EXISTS workspace_mode TEXT NOT NULL DEFAULT 'legacy';
-ALTER TABLE conversations ADD COLUMN IF NOT EXISTS workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE;
-ALTER TABLE conversations ADD COLUMN IF NOT EXISTS workspace_mode TEXT NOT NULL DEFAULT 'legacy';
-ALTER TABLE schedules ADD COLUMN IF NOT EXISTS workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE;
-ALTER TABLE schedules ADD COLUMN IF NOT EXISTS workspace_mode TEXT NOT NULL DEFAULT 'legacy';
-`;
+const EPHEMERAL_TEST_DB_PATTERN = /^ati_v3_migration_test(?:_[a-z0-9_]+)?$/;
 
-export function assertDedicatedTestDatabaseUrl(connectionString) {
-  const parsed = new URL(connectionString);
+export function redactDatabaseUrl(connectionString) {
+  if (typeof connectionString !== 'string' || !connectionString.trim()) {
+    return '<EMPTY_DATABASE_URL>';
+  }
+  try {
+    const parsed = new URL(connectionString);
+    if (parsed.username) {
+      parsed.username = 'REDACTED';
+    }
+    if (parsed.password) {
+      parsed.password = 'REDACTED';
+    }
+    return parsed.toString();
+  } catch {
+    return connectionString.replace(/\/\/([^/@:]+)(?::([^/@]*))?@/g, '//REDACTED:REDACTED@');
+  }
+}
+
+export function assertEphemeralTestDbIdentifier(dbName) {
+  if (typeof dbName !== 'string' || !EPHEMERAL_TEST_DB_PATTERN.test(dbName)) {
+    throw new Error(
+      `Refusing destructive database operation on "${String(dbName)}": only ephemeral database matching ${EPHEMERAL_TEST_DB_PATTERN} is permitted.`,
+    );
+  }
+  return dbName;
+}
+
+export function assertDedicatedTestDatabaseUrl(connectionString, { role = 'testDbUrl' } = {}) {
+  if (typeof connectionString !== 'string' || !connectionString.trim()) {
+    throw new Error(`Missing ${role} connection string for migration rehearsal.`);
+  }
+  let parsed;
+  try {
+    parsed = new URL(connectionString);
+  } catch {
+    throw new Error(`Invalid ${role} URL: ${redactDatabaseUrl(connectionString)}`);
+  }
+
+  if (parsed.protocol !== 'postgres:' && parsed.protocol !== 'postgresql:') {
+    throw new Error(
+      `Unsupported protocol "${parsed.protocol}" in ${role} (${redactDatabaseUrl(connectionString)}).`,
+    );
+  }
+
   const host = parsed.hostname;
   const port = parsed.port || '5432';
   const dbName = parsed.pathname.replace(/^\//, '');
 
-  if (host !== '127.0.0.1' && host !== 'localhost') {
-    throw new Error(`Unsafe migration test host "${host}": must be 127.0.0.1 or localhost.`);
-  }
-  if (port === '55533') {
-    throw new Error('Refusing to run migration rehearsal on runtime port 55533.');
-  }
-  if (dbName === 'ati_v3' || !dbName.includes('test')) {
+  if (host !== '127.0.0.1' && host !== 'localhost' && host !== '::1') {
     throw new Error(
-      `Refusing to run migration rehearsal on database "${dbName}": dedicated *_test database required.`,
+      `Unsafe migration rehearsal host "${host}" in ${role} (${redactDatabaseUrl(connectionString)}): must be 127.0.0.1 or localhost.`,
     );
   }
+  if (port === '55533') {
+    throw new Error(
+      `Refusing to run migration rehearsal on runtime port 55533 in ${role} (${redactDatabaseUrl(connectionString)}).`,
+    );
+  }
+
+  if (role === 'adminUrl') {
+    if (!dbName || dbName === 'ati_v3' || (!dbName.endsWith('_test') && dbName !== 'postgres')) {
+      throw new Error(
+        `Refusing admin connection on database "${dbName}" (${redactDatabaseUrl(connectionString)}): adminUrl must target "postgres" or a dedicated *_test maintenance database, never "ati_v3".`,
+      );
+    }
+    return { host, port, dbName, redactedUrl: redactDatabaseUrl(connectionString) };
+  }
+
+  if (dbName === 'ati_v3' || !dbName.endsWith('_test')) {
+    throw new Error(
+      `Refusing to run migration rehearsal on database "${dbName}" (${redactDatabaseUrl(connectionString)}): dedicated *_test database required.`,
+    );
+  }
+  assertEphemeralTestDbIdentifier(dbName);
+  return { host, port, dbName, redactedUrl: redactDatabaseUrl(connectionString) };
 }
 
-export async function run0034MigrationVerification({
-  adminUrl = 'postgres://ati_v3:ati_v3_local_only@127.0.0.1:56534/postgres',
-  testDbUrl = 'postgres://ati_v3:ati_v3_local_only@127.0.0.1:56534/ati_v3_migration_test',
-} = {}) {
-  assertDedicatedTestDatabaseUrl(testDbUrl);
+function resolveDefaultUrlsFromEnv() {
+  const envUrl = process.env.MIGRATION_TEST_DATABASE_URL || process.env.DATABASE_URL;
+  if (!envUrl) {
+    throw new Error(
+      'Explicit adminUrl/testDbUrl options or DATABASE_URL environment variable required for 0034 migration verification.',
+    );
+  }
+  const base = new URL(envUrl);
+  const admin = new URL(base.href);
+  admin.pathname = '/postgres';
+  const testDb = new URL(base.href);
+  testDb.pathname = '/ati_v3_migration_test';
+  return { adminUrl: admin.href, testDbUrl: testDb.href };
+}
+
+export async function run0034MigrationVerification(options = {}) {
+  const resolved =
+    options.adminUrl && options.testDbUrl
+      ? { adminUrl: options.adminUrl, testDbUrl: options.testDbUrl }
+      : { ...resolveDefaultUrlsFromEnv(), ...options };
+
+  const adminMeta = assertDedicatedTestDatabaseUrl(resolved.adminUrl, { role: 'adminUrl' });
+  const testMeta = assertDedicatedTestDatabaseUrl(resolved.testDbUrl, { role: 'testDbUrl' });
+  const targetDbName = assertEphemeralTestDbIdentifier(testMeta.dbName);
 
   const sql0034 = fs.readFileSync(migration0034Path, 'utf8');
+  const migrationFileSha256 = crypto.createHash('sha256').update(sql0034, 'utf8').digest('hex');
   const baselineFiles = fs
     .readdirSync(migrationsDir)
     .filter((f) => f.endsWith('.sql') && f !== '0034_github_workspace_scoped_team_scope.sql')
     .sort();
 
-  const adminClient = new pg.Client({ connectionString: adminUrl });
+  const adminClient = new pg.Client({ connectionString: resolved.adminUrl });
   await adminClient.connect();
   try {
-    await adminClient.query(`
-      SELECT pg_terminate_backend(pid)
-        FROM pg_stat_activity
-       WHERE datname = 'ati_v3_migration_test'
-         AND pid <> pg_backend_pid()
-    `);
-    await adminClient.query('DROP DATABASE IF EXISTS ati_v3_migration_test');
-    await adminClient.query('CREATE DATABASE ati_v3_migration_test');
+    await adminClient.query(
+      `SELECT pg_terminate_backend(pid)
+         FROM pg_stat_activity
+        WHERE datname = $1
+          AND pid <> pg_backend_pid()`,
+      [targetDbName],
+    );
+    await adminClient.query(`DROP DATABASE IF EXISTS "${targetDbName}"`);
+    await adminClient.query(`CREATE DATABASE "${targetDbName}"`);
   } finally {
     await adminClient.end();
   }
 
-  const testPool = new pg.Pool({ connectionString: testDbUrl, max: 4 });
+  const testPool = new pg.Pool({ connectionString: resolved.testDbUrl, max: 4 });
   try {
-    // Scenario 1: pre_0033 baseline (without 0015_workspaces.sql) -> seed legacy 'default' -> run 0034 -> verify constraints, repeated runs, immutable archives, tenant isolation
+    // Scenario 1: pre_0033 baseline -> seed legacy 'default' -> run 0034 -> verify constraints, repeated runs, immutable archives, tenant isolation
     await testPool.query('DROP SCHEMA IF EXISTS s1_pre0033 CASCADE; CREATE SCHEMA s1_pre0033;');
     const c1 = await testPool.connect();
     let scenario1;
@@ -207,7 +280,7 @@ export async function run0034MigrationVerification({
       c1.release();
     }
 
-    // Scenario 2: post_0033 baseline (all 44 baseline migrations including 0015_workspaces.sql) -> pre-existing multi-tenant WS_ALPHA_UUID + WS_BETA_UUID + legacy 'default' -> run 0034
+    // Scenario 2: post_0033 baseline -> pre-existing multi-tenant WS_ALPHA_UUID + WS_BETA_UUID + legacy 'default' -> run 0034
     await testPool.query('DROP SCHEMA IF EXISTS s2_post0033 CASCADE; CREATE SCHEMA s2_post0033;');
     const c2 = await testPool.connect();
     let scenario2;
@@ -272,21 +345,28 @@ export async function run0034MigrationVerification({
 
     return {
       migrationFile: 'db/v3/0034_github_workspace_scoped_team_scope.sql',
+      migrationFilePath: migration0034Path,
+      migrationFileSha256,
+      redactedAdminUrl: adminMeta.redactedUrl,
+      redactedTestDbUrl: testMeta.redactedUrl,
+      ephemeralDatabaseName: targetDbName,
       scenario1,
       scenario2,
     };
   } finally {
     await testPool.end();
-    const cleanupClient = new pg.Client({ connectionString: adminUrl });
+    const cleanupTargetDbName = assertEphemeralTestDbIdentifier(testMeta.dbName);
+    const cleanupClient = new pg.Client({ connectionString: resolved.adminUrl });
     await cleanupClient.connect();
     try {
-      await cleanupClient.query(`
-        SELECT pg_terminate_backend(pid)
-          FROM pg_stat_activity
-         WHERE datname = 'ati_v3_migration_test'
-           AND pid <> pg_backend_pid()
-      `);
-      await cleanupClient.query('DROP DATABASE IF EXISTS ati_v3_migration_test');
+      await cleanupClient.query(
+        `SELECT pg_terminate_backend(pid)
+           FROM pg_stat_activity
+          WHERE datname = $1
+            AND pid <> pg_backend_pid()`,
+        [cleanupTargetDbName],
+      );
+      await cleanupClient.query(`DROP DATABASE IF EXISTS "${cleanupTargetDbName}"`);
     } finally {
       await cleanupClient.end();
     }

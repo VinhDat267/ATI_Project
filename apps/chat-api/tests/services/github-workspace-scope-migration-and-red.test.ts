@@ -1,3 +1,7 @@
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import express from 'express';
 import request from 'supertest';
@@ -17,6 +21,8 @@ import { WorkspaceRepo } from '../../src/db/repositories/workspace-repo.js';
 import { createGitHubConnectionRoutes } from '../../src/routes/connections/github.js';
 import {
   assertDedicatedTestDatabaseUrl,
+  assertEphemeralTestDbIdentifier,
+  redactDatabaseUrl,
   run0034MigrationVerification,
   WS_ALPHA_UUID,
   WS_BETA_UUID,
@@ -55,13 +61,55 @@ describe('PR-R1-A1: GitHub Workspace-Scoped Team Scope Migration (0034) & Route/
   }
 
   describe('Part 1: Dedicated PostgreSQL 16 Revalidation of db/v3/0034_github_workspace_scoped_team_scope.sql (GREEN)', () => {
-    it('A1-MIG-1: assertDedicatedTestDatabaseUrl rejects runtime port 55533 and non-test database name ati_v3', () => {
+    it('A1-MIG-1: validates both adminUrl and testDbUrl before connecting, rejects remote hosts / port 55533 / non-ephemeral DBs, and redacts credentials', async () => {
+      // 1. Credential redaction never leaks username or password
+      const redacted = redactDatabaseUrl('postgres://secret_user:super_secret_pw@127.0.0.1:56534/ati_v3_migration_test');
+      expect(redacted).not.toContain('secret_user');
+      expect(redacted).not.toContain('super_secret_pw');
+      expect(redacted).toContain('REDACTED:REDACTED');
+
+      // 2. Rejects remote hosts for both testDbUrl and adminUrl without leaking credentials
       expect(() =>
-        assertDedicatedTestDatabaseUrl('postgres://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3'),
+        assertDedicatedTestDatabaseUrl('postgres://u_sec:p_sec@db.production.internal:5432/ati_v3_migration_test'),
+      ).toThrow(/must be 127\.0\.0\.1 or localhost/);
+      expect(() =>
+        assertDedicatedTestDatabaseUrl('postgres://u_sec:p_sec@10.0.0.15:5432/postgres', { role: 'adminUrl' }),
+      ).toThrow(/REDACTED:REDACTED/);
+
+      // 3. Rejects runtime port 55533 for both testDbUrl and adminUrl
+      expect(() =>
+        assertDedicatedTestDatabaseUrl('postgres://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3_migration_test'),
       ).toThrow(/55533/);
+      expect(() =>
+        assertDedicatedTestDatabaseUrl('postgres://ati_v3:ati_v3_local_only@127.0.0.1:55533/postgres', {
+          role: 'adminUrl',
+        }),
+      ).toThrow(/55533/);
+
+      // 4. Rejects runtime/shared database ati_v3 for both testDbUrl and adminUrl
       expect(() =>
         assertDedicatedTestDatabaseUrl('postgres://ati_v3:ati_v3_local_only@127.0.0.1:56534/ati_v3'),
       ).toThrow(/dedicated \*_test database required/);
+      expect(() =>
+        assertDedicatedTestDatabaseUrl('postgres://ati_v3:ati_v3_local_only@127.0.0.1:56534/ati_v3', {
+          role: 'adminUrl',
+        }),
+      ).toThrow(/never "ati_v3"/);
+
+      // 5. Ephemeral DROP/CREATE guard refuses any database not matching /^ati_v3_migration_test(?:_[a-z0-9_]+)?$/
+      expect(() => assertEphemeralTestDbIdentifier('ati_v3')).toThrow(/Refusing destructive database operation/);
+      expect(() => assertEphemeralTestDbIdentifier('postgres')).toThrow(/Refusing destructive database operation/);
+      expect(() => assertEphemeralTestDbIdentifier('other_test')).toThrow(/Refusing destructive database operation/);
+      expect(assertEphemeralTestDbIdentifier('ati_v3_migration_test')).toBe('ati_v3_migration_test');
+
+      // 6. run0034MigrationVerification rejects unsafe adminUrl BEFORE opening any network socket
+      await expect(
+        run0034MigrationVerification({
+          adminUrl: 'postgres://sec_u:sec_p@127.0.0.1:55533/postgres',
+          testDbUrl: 'postgres://sec_u:sec_p@127.0.0.1:56534/ati_v3_migration_test',
+        }),
+      ).rejects.toThrow(/55533/);
+
       expect(() =>
         assertDedicatedTestDatabaseUrl(
           'postgres://ati_v3:ati_v3_local_only@127.0.0.1:56534/ati_v3_migration_test',
@@ -69,15 +117,29 @@ describe('PR-R1-A1: GitHub Workspace-Scoped Team Scope Migration (0034) & Route/
       ).not.toThrow();
     });
 
-    it('A1-MIG-2: executes 0034_github_workspace_scoped_team_scope.sql on dedicated test DB with valid UUID workspace fixtures, verifying repeated runs, immutable archives, production CHECK/FK constraints, and tenant isolation', async () => {
-      // Dedicated *_test database on the same server as DATABASE_URL (CI: ephemeral 5432; local: 56534).
-      // The verifier itself refuses port 55533 and any database not ending in _test.
+    it('A1-MIG-2: executes 0034_github_workspace_scoped_team_scope.sql on dedicated test DB with valid UUID workspace fixtures, verifying SHA-256 provenance, repeated runs, immutable archives, production CHECK/FK constraints, and tenant isolation', async () => {
       const base = new URL(process.env.DATABASE_URL ?? 'postgres://ati_v3:ati_v3_local_only@127.0.0.1:56534/ati_v3');
-      const adminUrl = new URL(base.href); adminUrl.pathname = '/postgres';
-      const testDbUrl = new URL(base.href); testDbUrl.pathname = '/ati_v3_migration_test';
+      const adminUrl = new URL(base.href);
+      adminUrl.pathname = '/postgres';
+      const testDbUrl = new URL(base.href);
+      testDbUrl.pathname = '/ati_v3_migration_test';
       const report = await run0034MigrationVerification({ adminUrl: adminUrl.href, testDbUrl: testDbUrl.href });
 
+      const expectedSqlPath = path.resolve(
+        path.dirname(fileURLToPath(import.meta.url)),
+        '../../../../db/v3/0034_github_workspace_scoped_team_scope.sql',
+      );
+      const expectedSha256 = crypto
+        .createHash('sha256')
+        .update(fs.readFileSync(expectedSqlPath, 'utf8'), 'utf8')
+        .digest('hex');
+
       expect(report.migrationFile).toBe('db/v3/0034_github_workspace_scoped_team_scope.sql');
+      expect(report.migrationFilePath).toBe(expectedSqlPath);
+      expect(report.migrationFileSha256).toBe(expectedSha256);
+      expect(report.ephemeralDatabaseName).toBe('ati_v3_migration_test');
+      expect(report.redactedAdminUrl).toContain('REDACTED');
+      expect(report.redactedTestDbUrl).toContain('REDACTED');
 
       // Scenario 1: pre_0033 + repeated runs + conflicting archive snapshots + constraints + cascade isolation
       expect(report.scenario1.archiveSnapshotCount).toBe(2);
@@ -90,6 +152,14 @@ describe('PR-R1-A1: GitHub Workspace-Scoped Team Scope Migration (0034) & Route/
       expect(report.scenario1.remainingReposAfterAlphaCascade).toEqual([
         { scope_id: WS_BETA_UUID, full_name: 'beta-org/beta-repo' },
       ]);
+
+      const constraintMap = new Map<string, string>(
+        report.scenario1.constraints.map((c: { conname: string; def: string }) => [c.conname, c.def]),
+      );
+      expect(constraintMap.get('github_team_scope_id_check')).toContain("id <> 'default'::text");
+      expect(constraintMap.get('github_team_repos_scope_id_check')).toContain("scope_id <> 'default'::text");
+      expect(constraintMap.get('github_team_repos_legacy_archive_snapshot_id_fkey')).toContain('ON DELETE RESTRICT');
+      expect(constraintMap.get('github_team_repos_scope_id_fkey')).toContain('ON DELETE CASCADE');
 
       const constraintNames = report.scenario1.constraints.map((c: { conname: string }) => c.conname);
       expect(constraintNames).toContain('github_team_scope_id_check');
