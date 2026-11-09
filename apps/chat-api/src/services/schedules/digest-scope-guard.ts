@@ -133,9 +133,12 @@ export async function assertDigestScheduleLiveScopeAndAuth(
     }
   }
 
-  const targetWsCandidates = [cfg.targetWorkspaceId, cfg.workspaceId, cfg.scopeId].filter(
-    (v): v is string => typeof v === 'string' && v.trim().length > 0,
-  );
+  // Note: For notion_digest, cfg.workspaceId is the external Notion OAuth workspace ID (alongside workspaceName/botId), not an internal Planora workspace ID.
+  const targetWsCandidates = [
+    cfg.targetWorkspaceId,
+    ...(row.kind !== 'notion_digest' ? [cfg.workspaceId] : []),
+    cfg.scopeId,
+  ].filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
   for (const targetWs of targetWsCandidates) {
     if (targetWs !== trustedWorkspaceId) {
       return {
@@ -153,6 +156,23 @@ export async function assertDigestScheduleLiveScopeAndAuth(
       ? cfg.credentialId.trim()
       : null;
 
+  const serviceLabel =
+    row.kind === 'calendar_digest'
+      ? 'Google Calendar'
+      : row.kind === 'github_digest'
+        ? 'GitHub'
+        : row.kind === 'sheets_digest'
+          ? 'Google Sheets'
+          : row.kind === 'trello_digest'
+            ? 'Trello'
+            : row.kind === 'notion_digest'
+              ? 'Notion'
+              : row.kind === 'myjira_digest'
+                ? 'Jira'
+                : row.kind === 'telegram_digest'
+                  ? 'Telegram'
+                  : 'dịch vụ';
+
   if (pinnedCredentialId && isUuid(pinnedCredentialId)) {
     const credRes = await pool.query<{
       id: string;
@@ -166,35 +186,28 @@ export async function assertDigestScheduleLiveScopeAndAuth(
       [pinnedCredentialId],
     );
     const cred = credRes.rows[0];
-    if (!cred) {
-      return {
-        allowed: false,
-        code: 'DIGEST_CREDENTIAL_INACTIVE',
-        pauseReason: 'Kết nối dịch vụ của chủ lịch không còn hợp lệ hoặc đã thay đổi.',
-        trustedWorkspaceId,
-        trustedWorkspaceMode,
-      };
-    }
-    if (
-      (cred.user_id && cred.user_id !== row.user_id) ||
-      (cred.workspace_id && cred.workspace_id !== trustedWorkspaceId)
-    ) {
-      return {
-        allowed: false,
-        code: 'DIGEST_CROSS_TENANT_SCOPE_MISMATCH',
-        pauseReason: 'Kết nối dịch vụ thuộc về không gian làm việc hoặc người dùng khác.',
-        trustedWorkspaceId,
-        trustedWorkspaceMode,
-      };
-    }
-    if (cred.status !== 'active') {
-      return {
-        allowed: false,
-        code: 'DIGEST_CREDENTIAL_INACTIVE',
-        pauseReason: 'Kết nối dịch vụ của chủ lịch không còn hợp lệ hoặc cần kết nối lại.',
-        trustedWorkspaceId,
-        trustedWorkspaceMode,
-      };
+    if (cred) {
+      if (
+        (cred.user_id && cred.user_id !== row.user_id) ||
+        (cred.workspace_id && cred.workspace_id !== trustedWorkspaceId)
+      ) {
+        return {
+          allowed: false,
+          code: 'DIGEST_CROSS_TENANT_SCOPE_MISMATCH',
+          pauseReason: `Kết nối ${serviceLabel} thuộc về không gian làm việc hoặc người dùng khác.`,
+          trustedWorkspaceId,
+          trustedWorkspaceMode,
+        };
+      }
+      if (cred.status !== 'active') {
+        return {
+          allowed: false,
+          code: 'DIGEST_CREDENTIAL_INACTIVE',
+          pauseReason: `Kết nối ${serviceLabel} của chủ lịch không còn hợp lệ hoặc cần kết nối lại.`,
+          trustedWorkspaceId,
+          trustedWorkspaceMode,
+        };
+      }
     }
   }
 
