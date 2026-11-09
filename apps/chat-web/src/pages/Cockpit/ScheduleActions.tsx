@@ -16,11 +16,14 @@ function CancelDialog({ name, busy, onClose, onConfirm }: { name: string; busy: 
     <div className="flex flex-wrap justify-end gap-2 mt-5"><button type="button" className={scheduleButton} onClick={onClose}>Giữ lịch</button><button type="button" disabled={busy} className={primaryScheduleButton} onClick={onConfirm}>Xác nhận hủy lịch</button></div>
   </div></div>, document.body);
 }
+const REAUTH_PAUSE_REASON_RE = /REAUTH_REQUIRED|cấp quyền lại|xác nhận lại lịch|phiên bản cũ\s*\(v1\)/iu;
+
 export function ScheduleActions({ schedule, navigate, onChanged, onConflict }: { schedule: ScheduleView; navigate: (path: string) => void; onChanged: (schedule: ScheduleView) => void; onConflict: () => Promise<void> }) {
-  const [busy, setBusy] = useState(false), [cancel, setCancel] = useState(false), [error, setError] = useState('');
+  const [busy, setBusy] = useState(false), [cancel, setCancel] = useState(false), [error, setError] = useState(''), [needsReauth, setNeedsReauth] = useState(false);
   const locked = useRef(false);
   const operation = useRef<AbortController | null>(null);
   useEffect(() => () => operation.current?.abort(), []);
+  useEffect(() => { setNeedsReauth(false); }, [schedule.id, schedule.version, schedule.status]);
   const action = async (kind: 'pause' | 'resume' | 'cancel' | 'run-now') => {
     if (locked.current) return;
     locked.current = true; setBusy(true); setError('');
@@ -31,13 +34,54 @@ export function ScheduleActions({ schedule, navigate, onChanged, onConflict }: {
     } catch (reason: any) {
       if (controller.signal.aborted) return;
       setCancel(false);
+      if (
+        kind === 'resume' &&
+        schedule.kind === 'sheets_digest' &&
+        reason?.status === 409 &&
+        (reason?.code === 'REAUTHORIZATION_REQUIRED' ||
+          /cấp quyền lại|REAUTHORIZATION_REQUIRED|xác nhận lại/iu.test(reason?.message ?? ''))
+      ) {
+        setNeedsReauth(true);
+      }
       setError(reason.message || 'Không thể cập nhật lịch.');
       if (reason.status === 409) await onConflict().catch(() => {});
     } finally { locked.current = false; setBusy(false); }
   };
+  const reauthorize = async () => {
+    if (locked.current) return;
+    locked.current = true; setBusy(true); setError('');
+    const controller = new AbortController(); operation.current = controller;
+    try {
+      const res = await apiClient.reauthorizeSchedulePreview(schedule.id);
+      if (!controller.signal.aborted) {
+        schedulesChanged();
+        navigate(`/c/${encodeURIComponent(res.convId)}`);
+      }
+    } catch (reason: any) {
+      if (controller.signal.aborted) return;
+      setError(reason.message || 'Không thể tạo bản xem trước cấp quyền lại.');
+      if (reason.status === 409) await onConflict().catch(() => {});
+    } finally { locked.current = false; setBusy(false); }
+  };
   const closed = schedule.status === 'cancelled' || schedule.status === 'completed';
+  const requiresReauth =
+    schedule.kind === 'sheets_digest' &&
+    schedule.status === 'paused' &&
+    (needsReauth || REAUTH_PAUSE_REASON_RE.test(schedule.pauseReason ?? ''));
   return <><div className="flex flex-wrap gap-2">
-    {!closed && <><button type="button" className={scheduleButton} disabled={busy} onClick={() => void action(schedule.status === 'paused' ? 'resume' : 'pause')}>{schedule.status === 'paused' ? 'Chạy tiếp' : 'Tạm dừng'}</button>
+    {!closed && <>
+      {requiresReauth && (
+        <button
+          type="button"
+          data-testid="btn-reauthorize-schedule-preview"
+          className={primaryScheduleButton}
+          disabled={busy}
+          onClick={() => void reauthorize()}
+        >
+          Xem trước &amp; Cấp quyền lại
+        </button>
+      )}
+      <button type="button" className={scheduleButton} disabled={busy} onClick={() => void action(schedule.status === 'paused' ? 'resume' : 'pause')}>{schedule.status === 'paused' ? 'Chạy tiếp' : 'Tạm dừng'}</button>
       <button type="button" className={scheduleButton} disabled={busy} onClick={() => void action('run-now')}>Chạy lượt này ngay</button>
       <button type="button" className={scheduleButton} disabled={busy} onClick={() => setCancel(true)}>Hủy lịch</button></>}
   </div>{error && <p role="alert" className="text-sm text-red-700 mt-3">{error}</p>}{cancel && <CancelDialog name={schedule.name} busy={busy} onClose={() => setCancel(false)} onConfirm={() => void action('cancel')} />}</>;
