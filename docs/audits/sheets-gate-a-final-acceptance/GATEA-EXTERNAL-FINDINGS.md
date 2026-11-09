@@ -44,11 +44,16 @@
 - **Sửa:** [`STACKED-PR-INTEGRATION-MATRIX.md`](./STACKED-PR-INTEGRATION-MATRIX.md) Mục 5 dùng `is-ancestor <prev_SHA> origin/main` + `is-ancestor <prev_SHA> <next_SHA>` + kiểm tra parent/tree của merge commit, kèm 7 cổng mỗi bước (SHA, base, expected delta, ancestry, CI mới trên trạng thái tích hợp mới, review, branch protection).
 - **Bằng chứng:** [`runbook-rehearsal/stacked-merge-rehearsal-output.txt`](./runbook-rehearsal/stacked-merge-rehearsal-output.txt) — `PASS=85 FAIL=0`; lệnh cũ exit `1` ở `8/8` bước, lệnh mới exit `0` ở `8/8` bước.
 
-### 2.1b. `GATEA-EXT-RS-5` — Release Safety của CD ngoài GitHub Actions (FEAC v1.2 — `OPEN — PENDING OWNER CONFIRMATION A5`)
+### 2.1b. `GATEA-EXT-RS-5` — Release Safety của External CD (Vercel / Render) & Cờ Production Thực Tế (FEAC v1.2 — `BLOCKED (`NOT_VERIFIED`) — PENDING OWNER EVIDENCE A5`)
 - **Phân loại:** `P2` (Pre-Merge Blocking Governance — **Nhóm A, mục `A5`**).
-- **Đã kiểm chứng:** chỉ có workflow `v3 check` (không deploy, không secrets, không `environment:`); migration trong CI chỉ chạm Postgres container tạm; cờ Sheets Digest V2 mặc định fail-closed; Gate A không thêm hay bật công cụ ghi MySheets Drive/Docs (các công cụ này đã có trên `main` trước Gate A, sau `MYSHEETS_ENABLED` mặc định `off`; kill-switch thuộc `PR #300`).
-- **Chưa kiểm chứng được:** GitHub App `vercel` đã cài cho tài khoản (check suite `queued`, `0` check runs, `0` GitHub Deployments); cấu hình project Vercel nằm ngoài repo.
-- **Yêu cầu:** Merge GO giữ `HOLD` cho tới khi Chủ dự án xác nhận `A5` (xem [`FINAL-GATE-VERDICT.md`](./FINAL-GATE-VERDICT.md) Mục 3.1).
+- **Đã kiểm chứng ở mức mã nguồn & GitHub Actions (`2026-11-09T11:16:28Z`):**
+  - Trong repo chỉ có duy nhất workflow [`.github/workflows/v3-check.yml`](https://github.com/VinhDat267/ATI_Project/blob/08c8d8c5e7bf12625857ac3496fb96ec3914e34f/.github/workflows/v3-check.yml) (không deploy, không secrets, không `environment:`); migration trong CI chỉ chạm container `postgres:16` tạm.
+  - Ở mức mã nguồn (`08c8d8c5` và `b80c2389`), các cờ mặc định là fail-closed (`SHEETS_DIGEST_EMIT_V2=false`, `SHEETS_DIGEST_V2_MODE=compat`, `SHEETS_DIGEST_V1_COMPAT_POLICY=strict_pause_all`, `MYSHEETS_ENABLED=off`). Các công cụ ghi MySheets Drive/Docs đã tồn tại trên `main` trước Gate A sau `MYSHEETS_ENABLED`; kill-switch hai lớp thuộc `PR #300` (chưa merge).
+  - Kiểm tra read-only `GET /api/health` trên `https://planora-api-m1ks.onrender.com/api/health` và `https://planora-ivory-tau.vercel.app/api/health` trả về `HTTP 200` `{"status":"ok","version":"v3","deployment":"accounts-workspace","capabilities":{"accounts":true,"conversations":true,"planning":false,"execution":false,"signup":false}}` (bản build từ nhánh `codex/chore/backend-deploy` của `PR #47`, nơi `render.yaml` có `startCommand: node db/v3/migrate.mjs && ...`).
+- **Chưa kiểm chứng được (`NOT_VERIFIED` — Chặn Merge GO):**
+  - Không có quyền truy cập dashboard/API của Vercel (`VERCEL_TOKEN` vắng) và Render (`RENDER_API_KEY` vắng); không đánh dấu `VERIFIED` chỉ vì GitHub có `0` Deployment objects.
+  - Chưa xác minh được từ CD provider: (1) có project Vercel nào gắn với `VinhDat267/ATI_Project` hay không (ngoài `longnguyen005/planora`), (2) Production Branch trên Vercel và Render (`planora-api` `srv-db0kf2e0tbcc73885glg`, `deckai-backend`) là gì, (3) merge vào `VinhDat267/ATI_Project:main` có tự động kích hoạt Production Deployment / `db/v3/migrate.mjs` hay không, (4) các CD hooks khác, (5) cấu hình deployment thực thi trên dashboard, và (6) bảng giá trị biến môi trường thực tế đang cài đặt trên production (`SHEETS_DIGEST_EMIT_V2`, `SHEETS_DIGEST_V2_MODE`, `SHEETS_DIGEST_V1_COMPAT_POLICY`, `MYSHEETS_ENABLED`).
+- **Yêu cầu bắt buộc:** **`SHEETS_DIGEST_EMIT_V2=false` trong mã nguồn không thay thế việc chặn production deployment ngoài ý muốn.** Giữ **Merge GO ở trạng thái `HOLD` (`A5 BLOCKED`)** cho tới khi Chủ dự án cung cấp bằng chứng từ dashboard/API của CD provider hoặc cấp Production Deployment Approval riêng (xem [`STACKED-PR-INTEGRATION-MATRIX.md`](./STACKED-PR-INTEGRATION-MATRIX.md) Mục 6.1–6.2 và [`FINAL-GATE-VERDICT.md`](./FINAL-GATE-VERDICT.md) Mục 3.1).
 
 ---
 
@@ -56,11 +61,12 @@
 - **Phân loại & Mức độ:** `P2` (Product Policy & Staging UAT Gate — chia rõ **Nhóm A: Pre-Merge** và **Nhóm B: Gate 10**)
 - **Người có thẩm quyền duy nhất:** **Project Owner / Product Owner (`VinhDat267`)** phối hợp cùng **DBA / Release Ops**
 - **Trạng thái hiện tại:** **`OPEN — PENDING OWNER PRE-MERGE & GATE 10 DECISIONS`**
-- **Ranh giới an toàn khi Merge vào `main`:**
-  - Việc merge chuỗi `#289..#299` vào `main` **hoàn toàn an toàn** vì mã nguồn mặc định ở chế độ đóng an toàn (`fail-closed`):
+- **Ranh giới an toàn trong mã nguồn (cần kết hợp với việc đóng `A5` ở Mục 2.1b trước khi Merge vào `main`):**
+  - Ở mức mã nguồn (`schedules-runtime.ts`, `sheets-digest-runner.ts`, `env.ts`), giá trị mặc định khi không đặt biến môi trường là đóng an toàn (`fail-closed` — tuy nhiên **không suy luận từ code defaults rằng môi trường production đang dùng các giá trị này**; giá trị thực tế trên production hiện là `NOT_VERIFIED` theo `A5`):
     - `SHEETS_DIGEST_EMIT_V2 = false`
     - `SHEETS_DIGEST_V2_MODE = 'compat'`
     - `SHEETS_DIGEST_V1_COMPAT_POLICY = 'strict_pause_all'`
+    - `MYSHEETS_ENABLED = false` (`'off'`)
 - **Bảng phân tách các hạng mục thuộc `GATEA-EXT-A03` theo Cổng Phê Duyệt:**
 
 | Mã Hạng Mục | Cổng Áp Dụng | Nội dung Quyết định / Kiểm định | Thời hạn Bắt buộc (Deadline) | Trạng thái Ký |
