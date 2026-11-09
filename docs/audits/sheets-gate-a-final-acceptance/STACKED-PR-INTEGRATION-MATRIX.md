@@ -131,87 +131,350 @@ test "$(git rev-parse "origin/main^{tree}")" = "$(git rev-parse "$SHA^{tree}")"
 
 Nếu bất kỳ phép so sánh `tree` nào **khác nhau**, nghĩa là `main` đã nhận commit khác ngoài chuỗi Gate A. Khi đó **DỪNG NGAY LẬP TỨC (`HARD STOP`)**: CI cũ của PR hiện tại / kế tiếp không còn hợp lệ; phải chạy CI mới trên trạng thái tích hợp mới (Mục 5.2, cổng `G4`) trước khi tiếp tục.
 
-### 5.2. Cổng kiểm soát bắt buộc ở MỖI bước (`G1`–`G7`) — Quy tắc Dừng Tức Thì (`HARD STOP ON ANY GATE FAILURE`)
+### 5.2. Cổng kiểm soát Fail-Closed bắt buộc ở MỖI bước (`G1`–`G7`) — Quy tắc Dừng Tức Thì (`HARD STOP ON ANY GATE FAILURE`)
 
 > [!IMPORTANT]
-> **Quy tắc bất khả xâm phạm:** Chuỗi merge cố định là **`#289 → #290 → #291 → #292 → #293 → #294 → #295 → #297 → #299`** (tuyệt đối không thêm `#300`, `#301`, `#303`, `#304`, `#305` vào stack). Tại **mỗi một PR**, cả **7 cổng (`G1`–`G7`)** dưới đây phải đạt `PASS` trước và sau thao tác merge; **nếu bất kỳ một cổng nào không đạt, phải DỪNG NGAY LẬP TỨC (`HARD STOP`) và không được chuyển sang PR kế tiếp.**
+> **Quy tắc bất khả xâm phạm:**
+> 1. Chuỗi merge cố định là **`#289 → #290 → #291 → #292 → #293 → #294 → #295 → #297 → #299`** (tuyệt đối không thêm `#300`, `#301`, `#303`, `#304`, `#305` vào stack).
+> 2. **Tuyệt đối không biến `gh pr ready` thành bước tự động trước khi qua đủ cả 7 cổng pre-merge (`G1`–`G7`):** Mọi phép kiểm tra pre-merge của `G1`–`G7` phải trả về `exit 0` **trước** khi gọi `gh pr ready "$PR"` và **trước** khi gọi `gh pr merge "$PR" --merge --match-head-commit "$SHA"`. Nếu bất kỳ cổng nào lỗi, script thoát khác `0` ngay lập tức (`HARD STOP`), giữ nguyên PR ở trạng thái `isDraft: true` và không chạm `main`.
 
-| Cổng | Kiểm tra | Lệnh / Bằng chứng | Điều kiện đạt |
+| Cổng | Kiểm tra Fail-Closed | Thực thi & Assertions trong §5.3 | Điều kiện đạt (`exit 0`) & Mã lỗi chặn (`exit 1`) |
 |---|---|---|---|
-| **G1 — Locked HEAD SHA** | HEAD của PR đúng SHA 40 ký tự đã khóa | `gh pr view "$PR" --json headRefOid`; merge bằng `gh pr merge "$PR" --merge --match-head-commit "$SHA"` | `headRefOid` khớp đúng SHA khóa tại bảng 5.5; `--match-head-commit` từ chối merge nếu HEAD đã đổi |
-| **G2 — Exact Base & Expected Delta** | Base của PR là `main` và diff chỉ chứa đúng tập file của Task tương ứng | `gh pr view "$PR" --json baseRefName`, `git diff --name-only origin/main..."$SHA"`, `git diff --name-only "$PREV" "$SHA"` và `gh pr diff "$PR" --name-only` | `baseRefName == main` (repo đang bật `delete_branch_on_merge: true`, GitHub tự retarget PR con về `main` khi nhánh base bị xoá sau merge; nếu chưa retarget thì chạy `gh pr edit "$PR" --base main`); đúng số file và danh sách ở Mục 2: `#289`=6, `#290`=2, `#291`=5, `#292`=9, `#293`=9, `#294`=3, `#295`=7, `#297`=3, `#299`=11 |
-| **G3 — Pre-Merge & Post-Merge Ancestry + Tree Integrity** | Các phép kiểm tra đúng ở Mục 5.1 trước và sau merge + parent/tree của merge commit | Trước merge: `STEP=1` kiểm tra `$MAIN_BEFORE == 08c8d8c5...`, mọi bước kiểm tra `is-ancestor "$PREV" origin/main`, `is-ancestor "$PREV" "$SHA"`, `tree(origin/main) == tree($PREV)`. Sau merge: `is-ancestor "$SHA" origin/main`, `$MERGE^1 == $MAIN_BEFORE`, `$MERGE^2 == $SHA`, `tree($MERGE) == tree($SHA)` | Toàn bộ lệnh trả về `exit 0` ở cả 9 bước (`0` false failures từ `#290` trở đi) |
-| **G4 — CI của trạng thái tích hợp mới** | Không dùng lại CI cũ khi base hoặc trạng thái tích hợp đã đổi | (a) Run `push` của `v3 check` trên merge commit mới của `main`: `gh run list --branch main --event push --commit "$MERGE"`. (b) Run `pull_request` mới của PR kế tiếp được tạo **sau** khi retarget. | Cả (a) và (b) `COMPLETED / SUCCESS` trên đúng SHA. **Lưu ý:** workflow `v3-check.yml` dùng `pull_request:` với activity type mặc định (`opened`, `synchronize`, `reopened`), nên việc đổi base (`edited`) **không tự chạy CI mới**. Để có run mới trên merge ref mới mà không sửa nhánh Gate A, dùng `gh pr close "$NEXT_PR" && gh pr reopen "$NEXT_PR"` (sinh sự kiện `reopened`), sau đó chờ run mới xanh. |
-| **G5 — Human Review Disposition** | Quyết định review của Chủ dự án (`A1`) | `gh pr view "$PR" --json reviewDecision,reviews` | Đã có quyết định `A1` được ghi nhận. **Lưu ý:** cả 9 PR do chính tài khoản `VinhDat267` (chủ repo) mở, GitHub không cho tác giả tự *approve* PR của mình; Chủ dự án chọn một reviewer độc lập có quyền approve, hoặc ghi nhận review dạng *comment* nêu rõ `MERGE GO` (`A1`). |
-| **G6 — Branch Protection / Signed Manual Control** | Kiểm tra quy tắc bảo vệ nhánh `main` hoặc biên bản kiểm soát thủ công (`A6`) | `gh api repos/VinhDat267/ATI_Project/branches/main --jq .protected`; `gh api repos/VinhDat267/ATI_Project/rulesets` | Hoặc Chủ dự án đã bật Branch Protection trên `main` theo Đề xuất tại Mục 6.3 (yêu cầu check `v3`, 1 independent approving review, không bypass required checks, chặn force-push & xóa nhánh), hoặc Chủ dự án đã ký biên bản chấp nhận rủi ro kiểm soát thủ công kèm tên người chịu trách nhiệm kiểm từng bước tại Mục 6.3 (`A6`). |
-| **G7 — Production / CD Safety** | Không có auto-deploy / auto-migrate ngoài ý muốn lên production khi merge vào `main` | Đóng cổng `A5` tại Mục 6.1 trước Bước 1; sau mỗi bước kiểm tra `gh api repos/VinhDat267/ATI_Project/deployments?per_page=5 --jq 'length'` và trạng thái CD provider | Đã có bằng chứng đóng `A5` từ Chủ dự án trước khi bắt đầu Bước 1, và không phát sinh production deployment ngoài ý muốn sau mỗi lần merge. |
+| **G1 — Locked HEAD SHA & PR State JSON Assertions** | Khớp chính xác JSON của PR trước khi `gh pr ready` và sau khi `gh pr ready` | `gh pr view "$PR" --json headRefOid,baseRefName,isDraft,mergeable,reviewDecision,reviews,author` kiểm tra bằng `node -e`: trước `gh pr ready` bắt buộc `headRefOid == "$SHA"`, `baseRefName == "main"`, `isDraft == true`, `mergeable == "MERGEABLE"`; sau `gh pr ready` bắt buộc `isDraft == false`; khi merge dùng `--match-head-commit "$SHA"` | Khớp 100% trạng thái kỳ vọng. Sai SHA → `GATE_FAILURE:G1_SHA_MISMATCH`; sai base → `GATE_FAILURE:G1_WRONG_BASE`; không `MERGEABLE` hoặc sai `isDraft` → `GATE_FAILURE:G1_PR_STATE_INVALID` |
+| **G2 — Exact Changed File Path List (Không chỉ `wc -l`)** | So sánh chính xác danh sách đường dẫn file đã sắp xếp của cả 3 nguồn diff với manifest từng PR | So sánh chuỗi đường dẫn đã sort (`LC_ALL=C sort`) của: (1) `git diff --name-only origin/main..."$SHA"`, (2) `git diff --name-only "$PREV" "$SHA"`, và (3) `gh pr diff "$PR" --name-only` với hàm manifest `expected_files_for_pr "$PR"` | Cả 3 tập đường dẫn phải khớp từng ký tự với danh sách file của PR tại Mục 2 & §5.3 (`6/2/5/9/9/3/7/3/11` files). Lệch bất kỳ đường dẫn nào (kể cả khi `wc -l` bằng nhau) → `GATE_FAILURE:G2_FILE_DELTA_MISMATCH` |
+| **G3 — Pre-Merge & Post-Merge Ancestry + Parents + Tree** | Các phép kiểm tra đúng ở Mục 5.1 trước và sau merge + parent 1/2 + tree của merge commit | Trước merge: Bước 1 khóa `$MAIN_BEFORE == 08c8d8c5...`; mọi bước kiểm tra `is-ancestor "$PREV" origin/main`, `is-ancestor "$PREV" "$SHA"`, `tree(origin/main) == tree($PREV)`. Sau merge: `is-ancestor "$SHA" origin/main`, `$MERGE^1 == $MAIN_BEFORE`, `$MERGE^2 == $SHA`, `tree($MERGE) == tree($SHA)` | Toàn bộ trả về `exit 0` ở cả 9 bước (`0` false failures từ `#290` trở đi) |
+| **G4 — CI `completed / success` Đúng SHA & Sau Thời Điểm Retarget** | Không dùng lại CI cũ; chặn merge nếu không có run, run đang chạy hoặc run lỗi | Trước merge: `gh run list --workflow "v3 check" --event pull_request --commit "$SHA" --json databaseId,status,conclusion,headSha,event,createdAt` lọc `headSha == "$SHA"`, `event == "pull_request"`, `createdAt >= "$MIN_CI_CREATED_AT"` (ở Bước 2..9 là thời điểm sau khi retarget và reopen PR). Sau merge: `gh run list --workflow "v3 check" --branch main --event push --commit "$MERGE" --json ...` | Bắt buộc có ít nhất 1 run hợp lệ và run mới nhất có `status == "completed"` và `conclusion == "success"`. Không có run / run cũ trước retarget → `GATE_FAILURE:G4_CI_MISSING_OR_STALE`; đang chạy → `GATE_FAILURE:G4_CI_IN_PROGRESS`; đỏ/hủy → `GATE_FAILURE:G4_CI_RED` |
+| **G5 — Independent Reviewer Approval hoặc Signed Manual Control (`A1–A4`)** | Kiểm tra phê duyệt `A1–A4` và chữ ký review độc lập hoặc kiểm soát thủ công có chữ ký | Kiểm tra `OWNER_A1..A4 == "APPROVED"`. Nếu `main` bật Branch Protection yêu cầu approving review (`reqApprovals >= 1`), bắt buộc `reviewDecision == "APPROVED"` và có ít nhất 1 review `state == "APPROVED"` trên đúng `commit.oid == "$SHA"` từ `author.login != pr.author.login` (**review `COMMENTED` bị từ chối**). Nếu ở chế độ Manual Control đã ký (`G6`), bắt buộc có independent `APPROVED` review hoặc `MANUAL_REVIEW_VERIFIED_PR == "$PR"` & `MANUAL_REVIEW_VERIFIED_SHA == "$SHA"` | Thiếu `A1..A4` → `GATE_FAILURE:G5_OWNER_A1_A4_MISSING`; thiếu independent `APPROVED` review (hoặc chỉ có `COMMENTED`) khi branch protection yêu cầu → `GATE_FAILURE:G5_INDEPENDENT_APPROVAL_REQUIRED`; thiếu cả review lẫn manual record → `GATE_FAILURE:G5_REVIEW_OR_MANUAL_CONTROL_MISSING` |
+| **G6 — Branch Protection hoặc Signed Manual Risk Acceptance + Step-Verifier (`A6`)** | Kiểm tra bảo vệ nhánh `main` hoặc biên bản kiểm soát thủ công có chữ ký | `gh api repos/VinhDat267/ATI_Project/branches/main`: nếu `protected == true`, bắt buộc `strict == true`, check `"v3"`, `enforce_admins.enabled == true`, `allow_force_pushes.enabled == false`, `allow_deletions.enabled == false`. Nếu `protected == false`, bắt buộc `OWNER_A6_MANUAL_CONTROL_SIGN_OFF == "APPROVED"` và `NAMED_STEP_VERIFIER` khác rỗng | Nhánh `main` chưa bật bảo vệ mà thiếu chữ ký `A6` hoặc thiếu `NAMED_STEP_VERIFIER` → dừng ngay trước `gh pr ready` với `GATE_FAILURE:G6_UNPROTECTED_MAIN_NO_MANUAL_SIGNOFF` |
+| **G7 — External CD & Production Flag Safety (`A5 = VERIFIED`)** | Bắt buộc đóng `A5` trước `gh pr ready` và `gh pr merge`; **không** lấy số GitHub Deployments thay cho kiểm tra Vercel/Render | Kiểm tra `OWNER_A5_CD_VERIFICATION_STATUS == "VERIFIED"`, `VERCEL_MAIN_AUTO_DEPLOY_SAFE == "VERIFIED"`, `RENDER_MAIN_AUTO_DEPLOY_SAFE == "VERIFIED"`, `PROD_RUNTIME_FLAGS_SAFE == "VERIFIED"` ở đầu mỗi bước trước `gh pr ready` | Chưa xác minh xong Vercel/Render/Production Flags (`NOT_VERIFIED` hoặc thiếu biến) → dừng ngay trước `gh pr ready` với `GATE_FAILURE:G7_A5_NOT_VERIFIED` |
 
-### 5.3. Lệnh mẫu cho một bước (lặp lại cho cả 9 PR theo bảng 5.5 — Đã được thực thi nguyên văn trong Rehearsal Phần 3)
+### 5.3. Khối lệnh Fail-Closed cho một bước (Lặp lại cho cả 9 PR theo bảng 5.5 — Thực thi nguyên văn trong Rehearsal Phần 3 & Phần 4)
 
 ```bash
+# Hàm tra cứu chính xác danh sách đường dẫn file thay đổi (đã sắp xếp theo LC_ALL=C) của từng PR (G2):
+expected_files_for_pr() {
+  case "$1" in
+    289)
+      cat <<'EOF'
+apps/chat-api/tests/helpers/sheets-digest-tenant-fixtures.ts
+apps/chat-api/tests/services/sheets-digest-baseline-inventory.test.ts
+docs/handoff/log/2026-11-08-RMD-00-sheets-digest-baseline.md
+docs/handoff/tasks/RMD-00-sheets-digest-baseline.md
+docs/superpowers/plans/2026-11-08-sheets-digest-gate-a-remediation.md
+docs/superpowers/specs/2026-11-08-sheets-digest-gate-a-remediation-design.md
+EOF
+      ;;
+    290)
+      cat <<'EOF'
+packages/tool-schemas/src/types.ts
+packages/tool-schemas/tests/sheets-digest-v2-types.test.ts
+EOF
+      ;;
+    291)
+      cat <<'EOF'
+packages/tool-adapters/src/index.ts
+packages/tool-adapters/src/sheets/personal-sheets-adapter.ts
+packages/tool-adapters/src/sheets/sheets-adapter.ts
+packages/tool-adapters/src/sheets/sheets-shared.ts
+packages/tool-adapters/tests/sheets/sheets-digest-window.test.ts
+EOF
+      ;;
+    292)
+      cat <<'EOF'
+apps/chat-api/src/config/schedules-runtime.ts
+apps/chat-api/src/server.ts
+apps/chat-api/src/services/schedules/schedule-runner.ts
+apps/chat-api/src/services/schedules/sheets-digest-candidate.ts
+apps/chat-api/src/services/schedules/sheets-digest-runner.ts
+apps/chat-api/tests/config/schedules-runtime.test.ts
+apps/chat-api/tests/services/sheets-digest-concurrency.test.ts
+apps/chat-api/tests/services/sheets-digest.test.ts
+db/v3/0033_sheets_digest_v2_remediation.sql
+EOF
+      ;;
+    293)
+      cat <<'EOF'
+apps/chat-api/src/config/gmail-tools-runtime.ts
+apps/chat-api/src/config/schedules-runtime.ts
+apps/chat-api/src/server.ts
+apps/chat-api/src/services/chat-service.ts
+apps/chat-api/src/services/schedules/schedule-service.ts
+apps/chat-api/src/services/schedules/sheets-digest-candidate.ts
+apps/chat-api/tests/services/sheets-digest-candidate-v2.test.ts
+apps/chat-api/tests/services/sheets-digest-e2e-pipeline.test.ts
+apps/chat-api/tests/services/sheets-digest.test.ts
+EOF
+      ;;
+    294)
+      cat <<'EOF'
+apps/chat-api/src/routes/schedule-routes.ts
+apps/chat-api/src/services/schedules/schedule-service.ts
+apps/chat-api/tests/services/sheets-digest-reauthorize.test.ts
+EOF
+      ;;
+    295)
+      cat <<'EOF'
+apps/chat-api/src/db/repositories/schedule-repo.ts
+apps/chat-api/src/routes/schedule-routes.ts
+apps/chat-api/src/services/schedules/run-state.ts
+apps/chat-api/src/services/schedules/schedule-service.ts
+apps/chat-api/tests/services/sheets-digest-delivery-recovery.test.ts
+packages/tool-schemas/src/types.ts
+packages/tool-schemas/tests/sheets-digest-v2-types.test.ts
+EOF
+      ;;
+    297)
+      cat <<'EOF'
+apps/chat-api/src/scripts/sheets-digest-v2-migrate.ts
+apps/chat-api/src/services/schedules/sheets-digest-v2-migration.ts
+apps/chat-api/tests/services/sheets-digest-v2-migration.test.ts
+EOF
+      ;;
+    299)
+      cat <<'EOF'
+apps/chat-web/src/pages/Cockpit/ScheduleActions.tsx
+apps/chat-web/src/pages/Cockpit/ScheduleMoment.tsx
+apps/chat-web/src/pages/Cockpit/ScheduleRunRecovery.tsx
+apps/chat-web/src/pages/History/ScheduleSection.tsx
+apps/chat-web/src/services/api-client.ts
+apps/chat-web/tests/browser/sheets-digest-v2-recovery.spec.ts
+apps/chat-web/tests/chat-api-test-shim.d.ts
+apps/chat-web/tests/mysheets-ui.test.tsx
+apps/chat-web/tests/schedule-sheets-digest-v2-real-backend.test.tsx
+apps/chat-web/tests/schedule-sheets-digest-v2.test.tsx
+apps/chat-web/vite.config.ts
+EOF
+      ;;
+    *) return 1 ;;
+  esac
+}
+
 # Biến của bước (xem bảng 5.5):
 # STEP=<1..9>, PR=<số PR>, SHA=<SHA khóa>, PREV=<08c8d8c5... ở bước 1 hoặc SHA khóa của PR trước ở bước 2..9>,
-# EXPECTED_DELTA=<số file ở bảng 5.5>, NEXT_PR=<PR kế tiếp>, NEXT=<SHA khóa kế tiếp>
+# MIN_CI_CREATED_AT=<ISO-8601 UTC timestamp; ở Bước 2..9 phải >= thời điểm retarget/reopen PR>,
+# NEXT_PR=<PR kế tiếp>, NEXT=<SHA khóa kế tiếp>
+set -euo pipefail
 git fetch origin
 MAIN_BEFORE=$(git rev-parse origin/main)
 
-# G6 & G7: branch protection / manual control & CD safety
-gh api repos/VinhDat267/ATI_Project/branches/main --jq .protected
-gh api repos/VinhDat267/ATI_Project/deployments?per_page=5 --jq 'length'
-# G1, G2: SHA và base
-gh pr view "$PR" --json headRefOid,baseRefName,isDraft,mergeable,reviewDecision,statusCheckRollup
-# G2: expected delta (phải khớp số file ở bảng 5.5)
-git diff --name-only origin/main..."$SHA"
-gh pr diff "$PR" --name-only
-test "$(git diff --name-only origin/main..."$SHA" | wc -l | tr -d ' ')" = "$EXPECTED_DELTA"
-test "$(git diff --name-only "$PREV" "$SHA" | wc -l | tr -d ' ')" = "$EXPECTED_DELTA"
-# G3 (trước merge): bước 1 khóa baseline; mọi bước kiểm tra PREV là tổ tiên của origin/main & SHA, và tree(origin/main) == tree(PREV)
+# G7 (trước gh pr ready & gh pr merge): Bắt buộc A5=VERIFIED từ bằng chứng Vercel & Render Dashboard/API + Production Flags.
+# Tuyệt đối KHÔNG lấy số lượng GitHub Deployment objects thay thế kiểm tra Vercel/Render.
+if [ "${OWNER_A5_CD_VERIFICATION_STATUS:-}" != "VERIFIED" ] || \
+   [ "${VERCEL_MAIN_AUTO_DEPLOY_SAFE:-}" != "VERIFIED" ] || \
+   [ "${RENDER_MAIN_AUTO_DEPLOY_SAFE:-}" != "VERIFIED" ] || \
+   [ "${PROD_RUNTIME_FLAGS_SAFE:-}" != "VERIFIED" ]; then
+  echo "GATE_FAILURE:G7_A5_NOT_VERIFIED" >&2
+  exit 1
+fi
+
+# G6 (trước gh pr ready & gh pr merge): Branch Protection trên main hoặc Signed Manual Control + Named Step-Verifier
+BP_JSON=$(gh api repos/VinhDat267/ATI_Project/branches/main)
+BP_MODE=$(BP_JSON="$BP_JSON" \
+  OWNER_A6="${OWNER_A6_MANUAL_CONTROL_SIGN_OFF:-}" \
+  STEP_VERIFIER="${NAMED_STEP_VERIFIER:-}" \
+  node -e '
+    const bp = JSON.parse(process.env.BP_JSON);
+    if (bp.protected === true) {
+      const checks = (bp.protection && bp.protection.required_status_checks && bp.protection.required_status_checks.checks) || [];
+      const hasV3 = checks.some(c => c.context === "v3");
+      const strict = Boolean(bp.protection && bp.protection.required_status_checks && bp.protection.required_status_checks.strict);
+      const enforceAdmins = Boolean(bp.enforce_admins && bp.enforce_admins.enabled);
+      const noForcePush = bp.allow_force_pushes && bp.allow_force_pushes.enabled === false;
+      const noDeletions = bp.allow_deletions && bp.allow_deletions.enabled === false;
+      const reqApprovals = (bp.required_pull_request_reviews && bp.required_pull_request_reviews.required_approving_review_count) || 0;
+      if (!strict || !hasV3 || !enforceAdmins || !noForcePush || !noDeletions) {
+        console.error("GATE_FAILURE:G6_INCOMPLETE_BRANCH_PROTECTION");
+        process.exit(1);
+      }
+      process.stdout.write("PROTECTED:" + reqApprovals);
+    } else {
+      if (process.env.OWNER_A6 !== "APPROVED" || !process.env.STEP_VERIFIER || !process.env.STEP_VERIFIER.trim()) {
+        console.error("GATE_FAILURE:G6_UNPROTECTED_MAIN_NO_MANUAL_SIGNOFF");
+        process.exit(1);
+      }
+      process.stdout.write("MANUAL:0");
+    }
+  ')
+
+# G1 (trước gh pr ready & gh pr merge): JSON assertions bắt buộc cho headRefOid, baseRefName, isDraft, mergeable
+PR_JSON=$(gh pr view "$PR" --json headRefOid,baseRefName,isDraft,mergeable,reviewDecision,reviews,author)
+PR_JSON="$PR_JSON" EXPECTED_SHA="$SHA" node -e '
+  const pr = JSON.parse(process.env.PR_JSON);
+  if (pr.headRefOid !== process.env.EXPECTED_SHA) {
+    console.error("GATE_FAILURE:G1_SHA_MISMATCH");
+    process.exit(1);
+  }
+  if (pr.baseRefName !== "main") {
+    console.error("GATE_FAILURE:G1_WRONG_BASE");
+    process.exit(1);
+  }
+  if (pr.isDraft !== true || pr.mergeable !== "MERGEABLE") {
+    console.error("GATE_FAILURE:G1_PR_STATE_INVALID");
+    process.exit(1);
+  }
+'
+
+# G2 (trước gh pr ready & gh pr merge): So sánh chính xác tập đường dẫn file thay đổi (không chỉ wc -l)
+EXPECTED_PATHS=$(expected_files_for_pr "$PR")
+ACTUAL_THREE_DOT=$(git diff --name-only origin/main..."$SHA" | LC_ALL=C sort)
+ACTUAL_TWO_DOT=$(git diff --name-only "$PREV" "$SHA" | LC_ALL=C sort)
+ACTUAL_PR_DIFF=$(gh pr diff "$PR" --name-only | LC_ALL=C sort)
+if [ "$ACTUAL_THREE_DOT" != "$EXPECTED_PATHS" ] || \
+   [ "$ACTUAL_TWO_DOT" != "$EXPECTED_PATHS" ] || \
+   [ "$ACTUAL_PR_DIFF" != "$EXPECTED_PATHS" ]; then
+  echo "GATE_FAILURE:G2_FILE_DELTA_MISMATCH" >&2
+  exit 1
+fi
+
+# G3 (trước gh pr ready & gh pr merge): Bước 1 khóa baseline; mọi bước kiểm tra PREV là tổ tiên của origin/main & SHA, và tree(origin/main) == tree(PREV)
 if [ "$STEP" -eq 1 ]; then
   test "$MAIN_BEFORE" = "08c8d8c5e7bf12625857ac3496fb96ec3914e34f"
 fi
 git merge-base --is-ancestor "$PREV" origin/main
 git merge-base --is-ancestor "$PREV" "$SHA"
 test "$(git rev-parse "origin/main^{tree}")" = "$(git rev-parse "$PREV^{tree}")"
-# G4 (trước merge): run pull_request mới nhất của PR phải xanh trên đúng SHA và được tạo sau lần đổi main gần nhất
-gh run list --workflow "v3 check" --event pull_request --commit "$SHA" --limit 5
-# G5: đã có quyết định A1 của Chủ dự án
 
+# G4 (trước gh pr ready & gh pr merge): CI "v3 check" pull_request phải completed/success trên đúng $SHA và createdAt >= $MIN_CI_CREATED_AT
+CI_PR_JSON=$(gh run list --workflow "v3 check" --event pull_request --commit "$SHA" --limit 10 \
+  --json databaseId,status,conclusion,headSha,event,createdAt)
+CI_PR_JSON="$CI_PR_JSON" EXPECTED_SHA="$SHA" MIN_TS="$MIN_CI_CREATED_AT" node -e '
+  const runs = JSON.parse(process.env.CI_PR_JSON).filter(
+    r => r.headSha === process.env.EXPECTED_SHA && r.event === "pull_request" && r.createdAt >= process.env.MIN_TS
+  );
+  if (runs.length === 0) {
+    console.error("GATE_FAILURE:G4_CI_MISSING_OR_STALE");
+    process.exit(1);
+  }
+  const latest = runs[0];
+  if (latest.status !== "completed") {
+    console.error("GATE_FAILURE:G4_CI_IN_PROGRESS");
+    process.exit(1);
+  }
+  if (latest.conclusion !== "success") {
+    console.error("GATE_FAILURE:G4_CI_RED");
+    process.exit(1);
+  }
+'
+
+# G5 (trước gh pr ready & gh pr merge): Quyết định A1..A4 + Independent Approving Review (hoặc Signed Manual Control khi unprotected)
+if [ "${OWNER_A1_MERGE_GO:-}" != "APPROVED" ] || \
+   [ "${OWNER_A2_COPY_SIGN_OFF:-}" != "APPROVED" ] || \
+   [ "${OWNER_A3_DEFAULTS_SIGN_OFF:-}" != "APPROVED" ] || \
+   [ "${OWNER_A4_P3_RISK_ACCEPTANCE:-}" != "APPROVED" ]; then
+  echo "GATE_FAILURE:G5_OWNER_A1_A4_MISSING" >&2
+  exit 1
+fi
+PR_JSON="$PR_JSON" BP_MODE="$BP_MODE" EXPECTED_PR="$PR" EXPECTED_SHA="$SHA" \
+  OWNER_A6="${OWNER_A6_MANUAL_CONTROL_SIGN_OFF:-}" \
+  MANUAL_PR="${MANUAL_REVIEW_VERIFIED_PR:-}" \
+  MANUAL_SHA="${MANUAL_REVIEW_VERIFIED_SHA:-}" \
+  node -e '
+    const pr = JSON.parse(process.env.PR_JSON);
+    const bpMode = process.env.BP_MODE || "";
+    const prAuthor = pr.author && pr.author.login;
+    const independentApprovals = (pr.reviews || []).filter(
+      r => r.state === "APPROVED" && r.commit && r.commit.oid === process.env.EXPECTED_SHA && r.author && r.author.login !== prAuthor
+    );
+    const hasIndependentApproval = pr.reviewDecision === "APPROVED" && independentApprovals.length >= 1;
+    if (bpMode.startsWith("PROTECTED:")) {
+      const reqCount = Number(bpMode.split(":")[1] || "1");
+      if (reqCount >= 1 && !hasIndependentApproval) {
+        console.error("GATE_FAILURE:G5_INDEPENDENT_APPROVAL_REQUIRED");
+        process.exit(1);
+      }
+    } else {
+      const hasSignedManual =
+        process.env.OWNER_A6 === "APPROVED" &&
+        process.env.MANUAL_PR === process.env.EXPECTED_PR &&
+        process.env.MANUAL_SHA === process.env.EXPECTED_SHA;
+      if (!hasIndependentApproval && !hasSignedManual) {
+        console.error("GATE_FAILURE:G5_REVIEW_OR_MANUAL_CONTROL_MISSING");
+        process.exit(1);
+      }
+    }
+  '
+
+# Chỉ sau khi cả 7 cổng G1..G7 đều PASS mới được phép chuyển Draft -> Ready và thực thi merge
 gh pr ready "$PR"
+READY_JSON=$(gh pr view "$PR" --json headRefOid,baseRefName,isDraft,mergeable)
+READY_JSON="$READY_JSON" EXPECTED_SHA="$SHA" node -e '
+  const pr = JSON.parse(process.env.READY_JSON);
+  if (pr.headRefOid !== process.env.EXPECTED_SHA || pr.baseRefName !== "main" || pr.isDraft !== false || pr.mergeable !== "MERGEABLE") {
+    console.error("GATE_FAILURE:G1_POST_READY_STATE_INVALID");
+    process.exit(1);
+  }
+'
 gh pr merge "$PR" --merge --match-head-commit "$SHA"     # KHÔNG dùng --squash / --rebase / --admin
 
-# G3 (sau merge): kiểm tra ancestry, parents và tree của merge commit
+# G3 (sau merge): kiểm tra ancestry, parents 1/2 và tree của merge commit
 git fetch origin
 MERGE=$(gh pr view "$PR" --json mergeCommit --jq .mergeCommit.oid)
 git merge-base --is-ancestor "$SHA" origin/main
 test "$(git rev-parse "$MERGE^1")" = "$MAIN_BEFORE"
 test "$(git rev-parse "$MERGE^2")" = "$SHA"
 test "$(git rev-parse "$MERGE^{tree}")" = "$(git rev-parse "$SHA^{tree}")"
-# G4 (sau merge): run push trên main phải xanh
-gh run list --workflow "v3 check" --branch main --event push --commit "$MERGE"
+
+# G4 (sau merge): run push trên main phải completed/success tại đúng $MERGE
+CI_MAIN_JSON=$(gh run list --workflow "v3 check" --branch main --event push --commit "$MERGE" --limit 5 \
+  --json databaseId,status,conclusion,headSha,event,createdAt)
+CI_MAIN_JSON="$CI_MAIN_JSON" MERGE_SHA="$MERGE" node -e '
+  const runs = JSON.parse(process.env.CI_MAIN_JSON).filter(
+    r => r.headSha === process.env.MERGE_SHA && r.event === "push"
+  );
+  if (runs.length === 0 || runs[0].status !== "completed" || runs[0].conclusion !== "success") {
+    console.error("GATE_FAILURE:G4_POST_MERGE_PUSH_CI_FAILED");
+    process.exit(1);
+  }
+'
 
 # Chuẩn bị PR kế tiếp (bỏ qua ở bước 9)
 if [ "$STEP" -lt 9 ]; then
   git merge-base --is-ancestor "$SHA" origin/main
   git merge-base --is-ancestor "$SHA" "$NEXT"
   test "$(git rev-parse "origin/main^{tree}")" = "$(git rev-parse "$SHA^{tree}")"
-  gh pr view "$NEXT_PR" --json baseRefName,headRefOid   # baseRefName phải là main (GitHub auto-retarget), nếu không:
-  # gh pr edit "$NEXT_PR" --base main
-  git diff --name-only origin/main..."$NEXT"            # phải đúng expected delta của PR kế tiếp
-  gh pr close "$NEXT_PR" && gh pr reopen "$NEXT_PR"     # kích hoạt CI mới trên trạng thái tích hợp mới
-  # Chờ run pull_request mới của NEXT_PR COMPLETED / SUCCESS rồi mới sang bước tiếp theo
+  NEXT_VIEW=$(gh pr view "$NEXT_PR" --json headRefOid,baseRefName,isDraft,mergeable)
+  NEXT_BASE=$(NEXT_VIEW="$NEXT_VIEW" node -e 'process.stdout.write(JSON.parse(process.env.NEXT_VIEW).baseRefName)')
+  if [ "$NEXT_BASE" != "main" ]; then
+    gh pr edit "$NEXT_PR" --base main
+    NEXT_VIEW=$(gh pr view "$NEXT_PR" --json headRefOid,baseRefName,isDraft,mergeable)
+  fi
+  NEXT_VIEW="$NEXT_VIEW" EXPECTED_NEXT_SHA="$NEXT" node -e '
+    const pr = JSON.parse(process.env.NEXT_VIEW);
+    if (pr.headRefOid !== process.env.EXPECTED_NEXT_SHA || pr.baseRefName !== "main" || pr.isDraft !== true || pr.mergeable !== "MERGEABLE") {
+      console.error("GATE_FAILURE:NEXT_PR_STATE_INVALID");
+      process.exit(1);
+    }
+  '
+  NEXT_EXPECTED_PATHS=$(expected_files_for_pr "$NEXT_PR")
+  NEXT_ACTUAL_THREE_DOT=$(git diff --name-only origin/main..."$NEXT" | LC_ALL=C sort)
+  test "$NEXT_ACTUAL_THREE_DOT" = "$NEXT_EXPECTED_PATHS"
+  RETARGET_TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  gh pr close "$NEXT_PR" && gh pr reopen "$NEXT_PR"     # kích hoạt CI mới sau retarget
+  # Chờ run pull_request mới của NEXT_PR (createdAt >= RETARGET_TS) COMPLETED / SUCCESS rồi mới sang bước tiếp theo
 fi
 ```
 
-### 5.4. Bằng chứng rehearsal git DAG cô lập & thực thi nguyên văn lệnh §5.3 (`PASS=103 FAIL=0`)
+### 5.4. Bằng chứng rehearsal git DAG cô lập, thực thi nguyên văn lệnh §5.3 & 10 kịch bản Negative Fail-Closed (`PASS=113 FAIL=0`)
 
 - **Script:** [`runbook-rehearsal/stacked-merge-rehearsal.sh`](./runbook-rehearsal/stacked-merge-rehearsal.sh) — chạy hoàn toàn trong repository tạm, không push, không gọi mạng hay GitHub.
-- **Output thô:** [`runbook-rehearsal/stacked-merge-rehearsal-output.txt`](./runbook-rehearsal/stacked-merge-rehearsal-output.txt) — **`RESULT: PASS=103 FAIL=0`**, exit code `0`.
-- **Phần 1 (tổng hợp):** `main → PR A → PR B`; merge PR A bằng merge commit (`--no-ff`); lệnh cũ `is-ancestor main <PR_B>` trả `exit 1` (xác nhận lỗi `FEAC-EXT-RB-01`); hai lệnh mới trả `exit 0`; parent và tree của merge commit đúng; retarget PR B và diff ba chấm chỉ còn `b.txt`; kịch bản *drift* (commit lạ trên `main`) bị phát hiện qua tree khác nhau; kịch bản HEAD bị đổi sau review bị phát hiện qua SHA khác nhau.
-- **Phần 2 (SHA thật — kiểm tra bất biến DAG):** phát lại 9 SHA khóa `#289 → #299` thành merge commit trên bản sao cục bộ của `origin/main` `08c8d8c5e7bf12625857ac3496fb96ec3914e34f`. Ở cả 9 bước: SHA có mặt, PR trước là tổ tiên, expected delta đúng (`6/2/5/9/9/3/7/3/11`), merge không xung đột, parent đúng, `is-ancestor <PR> main` exit `0`, `tree(main) == tree(PR)`. Ở 8 bước có PR kế tiếp: `is-ancestor <PR> <next>` exit `0` và lệnh cũ exit `1`.
-- **Phần 3 (Thực thi nguyên văn khối lệnh operator §5.3 trên bare `origin` remote):** khởi tạo bare repository `origin.git` tại `08c8d8c5e7bf12625857ac3496fb96ec3914e34f` cùng 9 nhánh Gate A, clone bản sao operator, và thực thi **nguyên văn khối lệnh §5.3** (`run_exact_step_5_3`) qua cả 9 bước `STEP=1..9` (`#289 → #290 → #291 → #292 → #293 → #294 → #295 → #297 → #299`):
+- **Output thô:** [`runbook-rehearsal/stacked-merge-rehearsal-output.txt`](./runbook-rehearsal/stacked-merge-rehearsal-output.txt) — **`RESULT: PASS=113 FAIL=0`**, exit code `0`.
+- **Phần 1 (tổng hợp):** `main → PR A → PR B`; merge PR A bằng merge commit (`--no-ff`); lệnh cũ `is-ancestor main <PR_B>` trả `exit 1` (`FEAC-EXT-RB-01`); hai lệnh mới trả `exit 0`; parent và tree của merge commit đúng; retarget PR B và diff ba chấm chỉ còn `b.txt`; kịch bản *drift* (commit lạ trên `main`) bị phát hiện qua tree khác nhau; kịch bản HEAD bị đổi sau review bị phát hiện qua SHA khác nhau.
+- **Phần 2 (SHA thật — kiểm tra bất biến DAG & danh sách đường dẫn file):** phát lại 9 SHA khóa `#289 → #299` thành merge commit trên bản sao cục bộ của `origin/main` `08c8d8c5e7bf12625857ac3496fb96ec3914e34f`. Ở cả 9 bước: SHA có mặt, PR trước là tổ tiên, tập đường dẫn file khớp chính xác từng dòng với `expected_files_for_pr` (`6/2/5/9/9/3/7/3/11` files), merge không xung đột, parent đúng, `is-ancestor <PR> main` exit `0`, `tree(main) == tree(PR)`. Ở 8 bước có PR kế tiếp: `is-ancestor <PR> <next>` exit `0` và lệnh cũ exit `1`.
+- **Phần 3 (Thực thi nguyên văn khối lệnh fail-closed §5.3 trên bare `origin` remote — Positive 9/9):** khởi tạo bare repository `origin.git` tại `08c8d8c5e7bf12625857ac3496fb96ec3914e34f` cùng 9 nhánh Gate A, clone bản sao operator, và thực thi **nguyên văn khối lệnh fail-closed §5.3** (`run_exact_step_5_3`) qua cả 9 bước `STEP=1..9` (`#289 → #290 → #291 → #292 → #293 → #294 → #295 → #297 → #299`):
   - Chứng minh lệnh lỗi đã xóa `FEAC-EXT-RB-02` (`git merge-base --is-ancestor "$MAIN_BEFORE" "$SHA"`) trả về **`exit 1` ở cả `8/8` bước từ Bước 2 (`#290`) đến Bước 9 (`#299`)**.
-  - Chứng minh khối lệnh §5.3 đã sửa trả về **`exit 0` ở cả `9/9` bước (`#289` đến `#299`, không có bất kỳ false failure nào ở `#290+`)**, và sau Bước 9 `tree(origin/main) == tree(#299)` (`b80c238941c4927cbd6c9b435816a4fdc6522f4e`).
-- **Giới hạn:** rehearsal chứng minh toàn bộ lệnh git và luồng §5.3 trên bare `origin` cục bộ, không thay thế CI GitHub của trạng thái tích hợp thật (cổng `G4`) và không thao tác trên GitHub.
+  - Chứng minh khối lệnh fail-closed §5.3 trả về **`exit 0` ở cả `9/9` bước (`#289` đến `#299`, không có bất kỳ false failure nào ở `#290+`)**, và sau Bước 9 `tree(origin/main) == tree(#299)` (`b80c238941c4927cbd6c9b435816a4fdc6522f4e`).
+- **Phần 4 (10 kịch bản Negative Fail-Closed — Tất cả đều thoát `exit 1` với đúng mã lỗi cổng TRƯỚC `gh pr ready` và TRƯỚC `gh pr merge`):**
+  1. **Negative 4.1 (`G4` — CI đỏ `conclusion=failure`):** thoát `exit 1` (`GATE_FAILURE:G4_CI_RED`), `isDraft=true`, `main` không đổi.
+  2. **Negative 4.2a (`G4` — CI đang chạy `status=in_progress`):** thoát `exit 1` (`GATE_FAILURE:G4_CI_IN_PROGRESS`), `isDraft=true`, `main` không đổi.
+  3. **Negative 4.2b (`G4` — CI cũ trước thời điểm retarget `createdAt < MIN_CI_CREATED_AT` hoặc thiếu run):** thoát `exit 1` (`GATE_FAILURE:G4_CI_MISSING_OR_STALE`), `isDraft=true`, `main` không đổi.
+  4. **Negative 4.3 (`G1` — SHA lệch `headRefOid != locked SHA`):** thoát `exit 1` (`GATE_FAILURE:G1_SHA_MISMATCH`), `isDraft=true`, `main` không đổi.
+  5. **Negative 4.4 (`G1/G2` — Base sai `baseRefName != main`):** thoát `exit 1` (`GATE_FAILURE:G1_WRONG_BASE`), `isDraft=true`, `main` không đổi.
+  6. **Negative 4.5 (`G2` — Sai đường dẫn file trong diff dù tổng số file `wc -l` vẫn bằng `6`):** thoát `exit 1` (`GATE_FAILURE:G2_FILE_DELTA_MISMATCH`), `isDraft=true`, `main` không đổi.
+  7. **Negative 4.6a (`G5` — Review dạng `COMMENTED` khi Branch Protection yêu cầu approving review):** thoát `exit 1` (`GATE_FAILURE:G5_INDEPENDENT_APPROVAL_REQUIRED`), `isDraft=true`, `main` không đổi.
+  8. **Negative 4.6b (`G5` — Thiếu independent reviewer và thiếu biên bản manual review khớp PR/SHA):** thoát `exit 1` (`GATE_FAILURE:G5_REVIEW_OR_MANUAL_CONTROL_MISSING`), `isDraft=true`, `main` không đổi.
+  9. **Negative 4.7 (`G7` — Thiếu `A5` / `OWNER_A5_CD_VERIFICATION_STATUS=NOT_VERIFIED`):** thoát `exit 1` (`GATE_FAILURE:G7_A5_NOT_VERIFIED`), `isDraft=true`, `main` không đổi.
+  10. **Negative 4.8 (`G6` — `main` chưa bật Branch Protection và thiếu chữ ký manual risk acceptance `A6` / `NAMED_STEP_VERIFIER`):** thoát `exit 1` (`GATE_FAILURE:G6_UNPROTECTED_MAIN_NO_MANUAL_SIGNOFF`), `isDraft=true`, `main` không đổi.
+- **Giới hạn:** rehearsal chứng minh toàn bộ lệnh git, JSON assertions và 10 kịch bản chặn fail-closed của §5.3 trên bare `origin` cục bộ, không thay thế CI GitHub của trạng thái tích hợp thật (cổng `G4`) và không thao tác trên GitHub.
 
 ### 5.5. Bảng tham số 9 bước
 

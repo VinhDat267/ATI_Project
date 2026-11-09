@@ -25,7 +25,7 @@
 -- Step 1/9: PR #289 @ dd7fd0b7b73a5e3f7d1ce26a4965694ca512780f
   [PASS] locked SHA present
   [PASS] previous PR/base 08c8d8c5e7bf12625857ac3496fb96ec3914e34f is ancestor of PR #289 (exit 0, expected 0)
-  [PASS] expected delta vs main = 6 files (three-dot == parent..child)
+  [PASS] expected exact file path set vs main (6 files, three-dot == parent..child == manifest)
   [PASS] merge commit parents = (previous main, PR #289)
   [PASS] NEW: is-ancestor PR #289 -> main (exit 0, expected 0)
   [PASS] tree(main) == tree(PR #289) (no integration drift)
@@ -34,7 +34,7 @@
 -- Step 2/9: PR #290 @ 365b674bfa52f6d15b4c7b4034f9f63ef01c9ce7
   [PASS] locked SHA present
   [PASS] previous PR/base dd7fd0b7b73a5e3f7d1ce26a4965694ca512780f is ancestor of PR #290 (exit 0, expected 0)
-  [PASS] expected delta vs main = 2 files (three-dot == parent..child)
+  [PASS] expected exact file path set vs main (2 files, three-dot == parent..child == manifest)
   [PASS] merge commit parents = (previous main, PR #290)
   [PASS] NEW: is-ancestor PR #290 -> main (exit 0, expected 0)
   [PASS] tree(main) == tree(PR #290) (no integration drift)
@@ -43,7 +43,7 @@
 -- Step 3/9: PR #291 @ 6b307bdc81a22fa3ae95df5a1b39a1a3ee103b52
   [PASS] locked SHA present
   [PASS] previous PR/base 365b674bfa52f6d15b4c7b4034f9f63ef01c9ce7 is ancestor of PR #291 (exit 0, expected 0)
-  [PASS] expected delta vs main = 5 files (three-dot == parent..child)
+  [PASS] expected exact file path set vs main (5 files, three-dot == parent..child == manifest)
   [PASS] merge commit parents = (previous main, PR #291)
   [PASS] NEW: is-ancestor PR #291 -> main (exit 0, expected 0)
   [PASS] tree(main) == tree(PR #291) (no integration drift)
@@ -52,7 +52,7 @@
 -- Step 4/9: PR #292 @ e3e1e2b86e7f2619844d9030f07c96f978051214
   [PASS] locked SHA present
   [PASS] previous PR/base 6b307bdc81a22fa3ae95df5a1b39a1a3ee103b52 is ancestor of PR #292 (exit 0, expected 0)
-  [PASS] expected delta vs main = 9 files (three-dot == parent..child)
+  [PASS] expected exact file path set vs main (9 files, three-dot == parent..child == manifest)
   [PASS] merge commit parents = (previous main, PR #292)
   [PASS] NEW: is-ancestor PR #292 -> main (exit 0, expected 0)
   [PASS] tree(main) == tree(PR #292) (no integration drift)
@@ -61,7 +61,7 @@
 -- Step 5/9: PR #293 @ e8e7ce31d950acd7dcdc915c65f175893d2770cf
   [PASS] locked SHA present
   [PASS] previous PR/base e3e1e2b86e7f2619844d9030f07c96f978051214 is ancestor of PR #293 (exit 0, expected 0)
-  [PASS] expected delta vs main = 9 files (three-dot == parent..child)
+  [PASS] expected exact file path set vs main (9 files, three-dot == parent..child == manifest)
   [PASS] merge commit parents = (previous main, PR #293)
   [PASS] NEW: is-ancestor PR #293 -> main (exit 0, expected 0)
   [PASS] tree(main) == tree(PR #293) (no integration drift)
@@ -70,7 +70,7 @@
 -- Step 6/9: PR #294 @ d97574f81a509c471ca81d21631e2ca757adfe60
   [PASS] locked SHA present
   [PASS] previous PR/base e8e7ce31d950acd7dcdc915c65f175893d2770cf is ancestor of PR #294 (exit 0, expected 0)
-  [PASS] expected delta vs main = 3 files (three-dot == parent..child)
+  [PASS] expected exact file path set vs main (3 files, three-dot == parent..child == manifest)
   [PASS] merge commit parents = (previous main, PR #294)
   [PASS] NEW: is-ancestor PR #294 -> main (exit 0, expected 0)
   [PASS] tree(main) == tree(PR #294) (no integration drift)
@@ -79,7 +79,7 @@
 -- Step 7/9: PR #295 @ 84057251564b9d88cc0da642ba4cf171c9701074
   [PASS] locked SHA present
   [PASS] previous PR/base d97574f81a509c471ca81d21631e2ca757adfe60 is ancestor of PR #295 (exit 0, expected 0)
-  [PASS] expected delta vs main = 7 files (three-dot == parent..child)
+  [PASS] expected exact file path set vs main (7 files, three-dot == parent..child == manifest)
   [PASS] merge commit parents = (previous main, PR #295)
   [PASS] NEW: is-ancestor PR #295 -> main (exit 0, expected 0)
   [PASS] tree(main) == tree(PR #295) (no integration drift)
@@ -88,7 +88,7 @@
 -- Step 8/9: PR #297 @ c7ef31cb761f74a5ce3a1afef525f30d60b742c1
   [PASS] locked SHA present
   [PASS] previous PR/base 84057251564b9d88cc0da642ba4cf171c9701074 is ancestor of PR #297 (exit 0, expected 0)
-  [PASS] expected delta vs main = 3 files (three-dot == parent..child)
+  [PASS] expected exact file path set vs main (3 files, three-dot == parent..child == manifest)
   [PASS] merge commit parents = (previous main, PR #297)
   [PASS] NEW: is-ancestor PR #297 -> main (exit 0, expected 0)
   [PASS] tree(main) == tree(PR #297) (no integration drift)
@@ -97,39 +97,51 @@
 -- Step 9/9: PR #299 @ b80c238941c4927cbd6c9b435816a4fdc6522f4e
   [PASS] locked SHA present
   [PASS] previous PR/base c7ef31cb761f74a5ce3a1afef525f30d60b742c1 is ancestor of PR #299 (exit 0, expected 0)
-  [PASS] expected delta vs main = 11 files (three-dot == parent..child)
+  [PASS] expected exact file path set vs main (11 files, three-dot == parent..child == manifest)
   [PASS] merge commit parents = (previous main, PR #299)
   [PASS] NEW: is-ancestor PR #299 -> main (exit 0, expected 0)
   [PASS] tree(main) == tree(PR #299) (no integration drift)
   [PASS] final integrated main tree == Gate A stack tip #299 tree
 
-== Part 3: execute EXACT §5.3 operator command block against bare origin remote ==
--- Exact §5.3 Step 1/9: PR #289 @ dd7fd0b7b73a5e3f7d1ce26a4965694ca512780f (PREV=08c8d8c5e7bf12625857ac3496fb96ec3914e34f, EXPECTED_DELTA=6)
-  [PASS] Exact §5.3 command block for Step 1/9 (PR #289) executes cleanly (exit 0, expected 0)
--- Exact §5.3 Step 2/9: PR #290 @ 365b674bfa52f6d15b4c7b4034f9f63ef01c9ce7 (PREV=dd7fd0b7b73a5e3f7d1ce26a4965694ca512780f, EXPECTED_DELTA=2)
+== Part 3: execute EXACT §5.3 fail-closed operator command block against bare origin remote ==
+-- Exact §5.3 Step 1/9: PR #289 @ dd7fd0b7b73a5e3f7d1ce26a4965694ca512780f (PREV=08c8d8c5e7bf12625857ac3496fb96ec3914e34f, MIN_CI_CREATED_AT=2026-11-09T12:00:00Z)
+  [PASS] Exact §5.3 fail-closed block for Step 1/9 (PR #289) executes cleanly (exit 0, expected 0)
+-- Exact §5.3 Step 2/9: PR #290 @ 365b674bfa52f6d15b4c7b4034f9f63ef01c9ce7 (PREV=dd7fd0b7b73a5e3f7d1ce26a4965694ca512780f, MIN_CI_CREATED_AT=2026-11-09T13:00:00Z)
   [PASS] FEAC-EXT-RB-02 (removed defective pre-merge check): is-ancestor MAIN_BEFORE -> PR #290 fails (exit 1, expected 1)
-  [PASS] Exact §5.3 command block for Step 2/9 (PR #290) executes cleanly (exit 0, expected 0)
--- Exact §5.3 Step 3/9: PR #291 @ 6b307bdc81a22fa3ae95df5a1b39a1a3ee103b52 (PREV=365b674bfa52f6d15b4c7b4034f9f63ef01c9ce7, EXPECTED_DELTA=5)
+  [PASS] Exact §5.3 fail-closed block for Step 2/9 (PR #290) executes cleanly (exit 0, expected 0)
+-- Exact §5.3 Step 3/9: PR #291 @ 6b307bdc81a22fa3ae95df5a1b39a1a3ee103b52 (PREV=365b674bfa52f6d15b4c7b4034f9f63ef01c9ce7, MIN_CI_CREATED_AT=2026-11-09T13:00:00Z)
   [PASS] FEAC-EXT-RB-02 (removed defective pre-merge check): is-ancestor MAIN_BEFORE -> PR #291 fails (exit 1, expected 1)
-  [PASS] Exact §5.3 command block for Step 3/9 (PR #291) executes cleanly (exit 0, expected 0)
--- Exact §5.3 Step 4/9: PR #292 @ e3e1e2b86e7f2619844d9030f07c96f978051214 (PREV=6b307bdc81a22fa3ae95df5a1b39a1a3ee103b52, EXPECTED_DELTA=9)
+  [PASS] Exact §5.3 fail-closed block for Step 3/9 (PR #291) executes cleanly (exit 0, expected 0)
+-- Exact §5.3 Step 4/9: PR #292 @ e3e1e2b86e7f2619844d9030f07c96f978051214 (PREV=6b307bdc81a22fa3ae95df5a1b39a1a3ee103b52, MIN_CI_CREATED_AT=2026-11-09T13:00:00Z)
   [PASS] FEAC-EXT-RB-02 (removed defective pre-merge check): is-ancestor MAIN_BEFORE -> PR #292 fails (exit 1, expected 1)
-  [PASS] Exact §5.3 command block for Step 4/9 (PR #292) executes cleanly (exit 0, expected 0)
--- Exact §5.3 Step 5/9: PR #293 @ e8e7ce31d950acd7dcdc915c65f175893d2770cf (PREV=e3e1e2b86e7f2619844d9030f07c96f978051214, EXPECTED_DELTA=9)
+  [PASS] Exact §5.3 fail-closed block for Step 4/9 (PR #292) executes cleanly (exit 0, expected 0)
+-- Exact §5.3 Step 5/9: PR #293 @ e8e7ce31d950acd7dcdc915c65f175893d2770cf (PREV=e3e1e2b86e7f2619844d9030f07c96f978051214, MIN_CI_CREATED_AT=2026-11-09T13:00:00Z)
   [PASS] FEAC-EXT-RB-02 (removed defective pre-merge check): is-ancestor MAIN_BEFORE -> PR #293 fails (exit 1, expected 1)
-  [PASS] Exact §5.3 command block for Step 5/9 (PR #293) executes cleanly (exit 0, expected 0)
--- Exact §5.3 Step 6/9: PR #294 @ d97574f81a509c471ca81d21631e2ca757adfe60 (PREV=e8e7ce31d950acd7dcdc915c65f175893d2770cf, EXPECTED_DELTA=3)
+  [PASS] Exact §5.3 fail-closed block for Step 5/9 (PR #293) executes cleanly (exit 0, expected 0)
+-- Exact §5.3 Step 6/9: PR #294 @ d97574f81a509c471ca81d21631e2ca757adfe60 (PREV=e8e7ce31d950acd7dcdc915c65f175893d2770cf, MIN_CI_CREATED_AT=2026-11-09T13:00:00Z)
   [PASS] FEAC-EXT-RB-02 (removed defective pre-merge check): is-ancestor MAIN_BEFORE -> PR #294 fails (exit 1, expected 1)
-  [PASS] Exact §5.3 command block for Step 6/9 (PR #294) executes cleanly (exit 0, expected 0)
--- Exact §5.3 Step 7/9: PR #295 @ 84057251564b9d88cc0da642ba4cf171c9701074 (PREV=d97574f81a509c471ca81d21631e2ca757adfe60, EXPECTED_DELTA=7)
+  [PASS] Exact §5.3 fail-closed block for Step 6/9 (PR #294) executes cleanly (exit 0, expected 0)
+-- Exact §5.3 Step 7/9: PR #295 @ 84057251564b9d88cc0da642ba4cf171c9701074 (PREV=d97574f81a509c471ca81d21631e2ca757adfe60, MIN_CI_CREATED_AT=2026-11-09T13:00:00Z)
   [PASS] FEAC-EXT-RB-02 (removed defective pre-merge check): is-ancestor MAIN_BEFORE -> PR #295 fails (exit 1, expected 1)
-  [PASS] Exact §5.3 command block for Step 7/9 (PR #295) executes cleanly (exit 0, expected 0)
--- Exact §5.3 Step 8/9: PR #297 @ c7ef31cb761f74a5ce3a1afef525f30d60b742c1 (PREV=84057251564b9d88cc0da642ba4cf171c9701074, EXPECTED_DELTA=3)
+  [PASS] Exact §5.3 fail-closed block for Step 7/9 (PR #295) executes cleanly (exit 0, expected 0)
+-- Exact §5.3 Step 8/9: PR #297 @ c7ef31cb761f74a5ce3a1afef525f30d60b742c1 (PREV=84057251564b9d88cc0da642ba4cf171c9701074, MIN_CI_CREATED_AT=2026-11-09T13:00:00Z)
   [PASS] FEAC-EXT-RB-02 (removed defective pre-merge check): is-ancestor MAIN_BEFORE -> PR #297 fails (exit 1, expected 1)
-  [PASS] Exact §5.3 command block for Step 8/9 (PR #297) executes cleanly (exit 0, expected 0)
--- Exact §5.3 Step 9/9: PR #299 @ b80c238941c4927cbd6c9b435816a4fdc6522f4e (PREV=c7ef31cb761f74a5ce3a1afef525f30d60b742c1, EXPECTED_DELTA=11)
+  [PASS] Exact §5.3 fail-closed block for Step 8/9 (PR #297) executes cleanly (exit 0, expected 0)
+-- Exact §5.3 Step 9/9: PR #299 @ b80c238941c4927cbd6c9b435816a4fdc6522f4e (PREV=c7ef31cb761f74a5ce3a1afef525f30d60b742c1, MIN_CI_CREATED_AT=2026-11-09T13:00:00Z)
   [PASS] FEAC-EXT-RB-02 (removed defective pre-merge check): is-ancestor MAIN_BEFORE -> PR #299 fails (exit 1, expected 1)
-  [PASS] Exact §5.3 command block for Step 9/9 (PR #299) executes cleanly (exit 0, expected 0)
+  [PASS] Exact §5.3 fail-closed block for Step 9/9 (PR #299) executes cleanly (exit 0, expected 0)
   [PASS] Part 3 post-step-9 check: tree(origin/main) == tree(#299)
 
-RESULT: PASS=103 FAIL=0
+== Part 4: fail-closed negative rehearsals (each must exit 1 with exact gate tag BEFORE gh pr ready / merge) ==
+  [PASS] Negative 4.1 (G4): CI red (conclusion=failure) -> blocked with GATE_FAILURE:G4_CI_RED (exit 1, isDraft=true, main unchanged)
+  [PASS] Negative 4.2a (G4): CI in_progress -> blocked with GATE_FAILURE:G4_CI_IN_PROGRESS (exit 1, isDraft=true, main unchanged)
+  [PASS] Negative 4.2b (G4): stale CI created before retarget timestamp -> blocked with GATE_FAILURE:G4_CI_MISSING_OR_STALE (exit 1, isDraft=true, main unchanged)
+  [PASS] Negative 4.3 (G1): headRefOid SHA mismatch -> blocked with GATE_FAILURE:G1_SHA_MISMATCH (exit 1, isDraft=true, main unchanged)
+  [PASS] Negative 4.4 (G1/G2): wrong baseRefName (!= main) -> blocked with GATE_FAILURE:G1_WRONG_BASE (exit 1, isDraft=true, main unchanged)
+  [PASS] Negative 4.5 (G2): wrong file path in diff (even with same file count 6) -> blocked with GATE_FAILURE:G2_FILE_DELTA_MISMATCH (exit 1, isDraft=true, main unchanged)
+  [PASS] Negative 4.6a (G5): COMMENTED review rejected when branch protection requires approval -> blocked with GATE_FAILURE:G5_INDEPENDENT_APPROVAL_REQUIRED (exit 1, isDraft=true, main unchanged)
+  [PASS] Negative 4.6b (G5): missing independent reviewer & missing manual review record -> blocked with GATE_FAILURE:G5_REVIEW_OR_MANUAL_CONTROL_MISSING (exit 1, isDraft=true, main unchanged)
+  [PASS] Negative 4.7 (G7): A5=NOT_VERIFIED blocks before gh pr ready/merge -> blocked with GATE_FAILURE:G7_A5_NOT_VERIFIED (exit 1, isDraft=true, main unchanged)
+  [PASS] Negative 4.8 (G6): unprotected main without manual sign-off & step-verifier -> blocked with GATE_FAILURE:G6_UNPROTECTED_MAIN_NO_MANUAL_SIGNOFF (exit 1, isDraft=true, main unchanged)
+
+RESULT: PASS=113 FAIL=0
