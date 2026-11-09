@@ -9,7 +9,20 @@ export * from './github/github-adapter.js';
 export * from './google/service-account.js';
 export * from './sheets/sheets-adapter.js';
 export * from './sheets/personal-sheets-adapter.js';
-export { normalizeSpreadsheetIdInput } from './sheets/sheets-shared.js';
+export {
+  normalizeSpreadsheetIdInput,
+  SHEETS_DIGEST_MAX_DATA_ROWS,
+  SHEETS_DIGEST_SCAN_ROW_LIMIT,
+  SHEETS_DIGEST_MAX_COLUMNS,
+  classifyDigestDataScope,
+  resolveDigestScanWindow,
+  transformDigestWindowValues,
+  executeReadDigestWindow,
+  quoteSheetTitle,
+  type ReadDigestWindowInput,
+  type ReadDigestWindowResult,
+  type ResolvedDigestScanWindow,
+} from './sheets/sheets-shared.js';
 export * from './calendar/calendar-adapter.js';
 export * from './calendar/personal-calendar-adapter.js';
 export * from './notion/notion-adapter.js';
