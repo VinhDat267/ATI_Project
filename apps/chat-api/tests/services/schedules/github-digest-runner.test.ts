@@ -4,6 +4,10 @@ import pg from 'pg';
 import { encryptCredentials, GlobalRateLimiter, SlackAdapter, StepError, TelegramAdapter } from '@wap/tool-adapters';
 import type { GithubDigestConfig, ScheduleRecurrence } from '@wap/tool-schemas';
 import { AdapterFactory } from '../../../src/services/adapter-factory.js';
+import { CredentialRepo } from '../../../src/db/repositories/credential-repo.js';
+import { GitHubTeamRepo } from '../../../src/db/repositories/github-team-repo.js';
+import { createGitHubConnectionLookup } from '../../../src/services/github/connection-reference.js';
+import { GitHubTokenManager } from '../../../src/services/github/token-manager.js';
 import { ScheduleRunner } from '../../../src/services/schedules/schedule-runner.js';
 import { ScheduleService } from '../../../src/services/schedules/schedule-service.js';
 import { computeDigestConfigHash, evaluateGithubDigestCandidate } from '../../../src/services/schedules/github-digest-candidate.js';
@@ -1059,5 +1063,335 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
     } finally {
       await new Promise<void>((resolve) => telegramServer.close(() => resolve()));
     }
+  });
+
+  it('12. (C1-04) enforces strict credential pin immutability and never substitutes a newer active credential when the pinned credential is sandbox-github, stale, revoked, or non-existent', async () => {
+    const NEWER_ACTIVE_CRED_ID = '0b5c1f0e-7a6d-4c1e-9d2a-1a2b3c4d5e99';
+    const NON_EXISTENT_CRED_ID = '0b5c1f0e-7a6d-4c1e-9d2a-1a2b3c4d5e77';
+
+    // 12a. Even when GH_CRED_ID is active in service_credentials, a 'sandbox-github' lookup result must NEVER be substituted with the latest active DB credential
+    const sandboxLookupSchedule = await insertDigestSchedule();
+    const sandboxLookupPlanned = await service.startRun({
+      userId: owner.id,
+      scheduleId: sandboxLookupSchedule.id,
+      trigger: 'manual',
+      now,
+    });
+    let adapterCalls = 0;
+    const runnerWithSandboxLookup = createGithubDigestRunner({
+      pool: db.pool,
+      githubConnection: async () => ({
+        status: 'connected' as const,
+        connection: {
+          credentialId: 'sandbox-github',
+          githubUserId: '1001',
+          login: 'octocat',
+          repos: ['nhom/ati'],
+        },
+        teamRepos: [{ repoId: '101', fullName: 'nhom/ati', name: 'ati' }],
+        memberRepos: [{ repoId: '101', fullName: 'nhom/ati', name: 'ati' }],
+      }),
+      getAdapter: () => ({
+        execute: async () => {
+          adapterCalls++;
+          return [];
+        },
+      }),
+    });
+    const sandboxOutcome = await runnerWithSandboxLookup(
+      {
+        runId: sandboxLookupPlanned.id,
+        scheduleId: sandboxLookupSchedule.id,
+        scheduleVersion: sandboxLookupSchedule.version,
+        userId: owner.id,
+        name: sandboxLookupSchedule.name,
+        request: sandboxLookupSchedule.request,
+        dueAt: now,
+        trigger: 'manual',
+        recurrence: dailyRecurrence,
+        digestConfig: baseConfig,
+        digestConfigHash: sandboxLookupSchedule.digest_config_hash,
+      },
+      sandboxLookupSchedule.conv_id,
+      new AbortController().signal,
+    );
+    expect(sandboxOutcome.state).toBe('blocked');
+    expect(adapterCalls).toBe(0);
+
+    // 12b. Revoked pinned credential (status = 'reconnect_required') is rejected by both guard and runner
+    await db.pool.query(
+      `UPDATE service_credentials SET status = 'reconnect_required' WHERE id = $1`,
+      [GH_CRED_ID],
+    );
+    const revokedSchedule = await insertDigestSchedule({ config: baseConfig });
+    const revokedScheduler = new ScheduleRunner({
+      pool: db.pool,
+      timeZone: VN,
+      now: () => now,
+      planRun: async () => ({ persist: async () => ({ state: 'needs_attention' }), afterCommit() {} }),
+      runGithubDigest: async () => {
+        adapterCalls++;
+        return { state: 'discarded' as const };
+      },
+      recordState: (client, row, at) => service.recordState(client, row, at),
+    });
+    await revokedScheduler.tick();
+    await revokedScheduler.stop();
+    expect(adapterCalls).toBe(0);
+    expect((await db.pool.query('SELECT status FROM schedules WHERE id = $1', [revokedSchedule.id])).rows[0].status).toBe('paused');
+    expect((await db.pool.query('SELECT status FROM schedule_runs WHERE schedule_id = $1', [revokedSchedule.id])).rows[0].status).toBe('blocked');
+
+    // 12c. Stale / replaced / non-existent / sandbox-github pinned credential while a newer active credential exists for the same user:
+    // Both ScheduleRunner (assertDigestScheduleLiveScopeAndAuth) and createGithubDigestRunner must reject and NEVER substitute NEWER_ACTIVE_CRED_ID.
+    await db.pool.query(`DELETE FROM service_credentials WHERE id = $1`, [GH_CRED_ID]);
+    await db.pool.query(
+      `INSERT INTO service_credentials (id, service, user_id, workspace_id, config, status)
+       VALUES ($1, 'github', $2, NULL, 'fixture_newer', 'active')`,
+      [NEWER_ACTIVE_CRED_ID, owner.id],
+    );
+
+    for (const pinnedId of [GH_CRED_ID, NON_EXISTENT_CRED_ID, 'sandbox-github']) {
+      const config: GithubDigestConfig = { ...baseConfig, credentialId: pinnedId };
+      const schedule = await insertDigestSchedule({ config });
+      let runnerInvoked = false;
+      const runner = createGithubDigestRunner({
+        pool: db.pool,
+        githubConnection: async () => ({
+          status: 'connected' as const,
+          connection: {
+            credentialId: NEWER_ACTIVE_CRED_ID,
+            githubUserId: '1001',
+            login: 'octocat',
+            repos: ['nhom/ati'],
+          },
+          teamRepos: [{ repoId: '101', fullName: 'nhom/ati', name: 'ati' }],
+          memberRepos: [{ repoId: '101', fullName: 'nhom/ati', name: 'ati' }],
+        }),
+        getAdapter: () => ({
+          execute: async () => {
+            adapterCalls++;
+            return [];
+          },
+        }),
+      });
+      const scheduler = new ScheduleRunner({
+        pool: db.pool,
+        timeZone: VN,
+        now: () => now,
+        planRun: async () => ({ persist: async () => ({ state: 'needs_attention' }), afterCommit() {} }),
+        runGithubDigest: async (run, convId, signal) => {
+          runnerInvoked = true;
+          return runner(run, convId, signal);
+        },
+        recordState: (client, row, at) => service.recordState(client, row, at),
+      });
+
+      await scheduler.tick();
+      await scheduler.stop();
+
+      // Guard blocks before runner is even invoked
+      expect(runnerInvoked).toBe(false);
+      expect(adapterCalls).toBe(0);
+      const schedState = (await db.pool.query('SELECT status FROM schedules WHERE id = $1', [schedule.id])).rows[0];
+      expect(schedState.status).toBe('paused');
+      const runState = (await db.pool.query('SELECT status FROM schedule_runs WHERE schedule_id = $1', [schedule.id])).rows[0];
+      expect(runState.status).toBe('blocked');
+
+      // Direct runner invocation also rejects when gh.connection.credentialId (NEWER_ACTIVE_CRED_ID) !== config.credentialId (pinnedId)
+      const directOutcome = await runner(
+        {
+          runId: '0b5c1f0e-7a6d-4c1e-9d2a-1a2b3c4d5e88',
+          scheduleId: schedule.id,
+          scheduleVersion: schedule.version,
+          userId: owner.id,
+          name: schedule.name,
+          request: schedule.request,
+          dueAt: now,
+          trigger: 'manual',
+          recurrence: dailyRecurrence,
+          digestConfig: config,
+          digestConfigHash: schedule.digest_config_hash,
+        },
+        schedule.conv_id,
+        new AbortController().signal,
+      );
+      expect(directOutcome.state).toBe('blocked');
+      expect(adapterCalls).toBe(0);
+    }
+  });
+
+  it('13. (C1-03) completes production proposal evaluation -> confirmProposal -> ScheduleRunner execution end-to-end without mutating schedule rows after confirmation', async () => {
+    const encryptionKey = '01234567890123456789012345678901';
+    const credRepo = new CredentialRepo(db.pool);
+    const teamRepo = new GitHubTeamRepo(db.pool);
+
+    // Clean any default github_credentials so saveCredentials creates a fresh real UUID row for owner.id
+    await db.pool.query("DELETE FROM service_credentials WHERE service = 'github' AND user_id = $1", [owner.id]);
+    const encryptedGithub = encryptCredentials(
+      {
+        accessToken: 'gho_production_flow_token',
+        login: 'octocat',
+        githubUserId: '1001',
+        connectedAt: now.toISOString(),
+      },
+      encryptionKey,
+    );
+    await credRepo.saveCredentials('github', encryptedGithub, owner.id);
+    const savedCred = await credRepo.getPersonalConnectionStatus('github', owner.id);
+    expect(savedCred).not.toBeNull();
+    expect(savedCred!.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+
+    await teamRepo.replace({
+      chosenBy: owner.id,
+      repos: [{ repoId: '101', fullName: 'nhom/ati', name: 'ati' }],
+    });
+
+    const fakeOAuthClient = {
+      repos: async () => [{ id: '101', name: 'ati', fullName: 'nhom/ati', private: false }],
+    } as any;
+    const tokens = new GitHubTokenManager({
+      client: fakeOAuthClient,
+      credentials: credRepo,
+    });
+    const githubLookup = createGitHubConnectionLookup({
+      credentialRepo: credRepo,
+      teamRepo,
+      encryptionKey,
+      tokens,
+      client: fakeOAuthClient,
+    });
+
+    const slackMessages: Array<{ channel: string; text: string }> = [];
+    const getAdapter = async (serviceName: string) => {
+      if (serviceName === 'github') {
+        return {
+          execute: async (tool: string) => {
+            if (tool === 'github.search_issues') {
+              return [
+                {
+                  number: 42,
+                  title: 'Verify C1-03 pinned credential flow',
+                  state: 'open',
+                  createdAt: new Date(now.getTime() - 3600_000).toISOString(),
+                  updatedAt: new Date(now.getTime() - 1800_000).toISOString(),
+                  assignees: ['octocat'],
+                  url: 'https://github.com/nhom/ati/issues/42',
+                },
+              ];
+            }
+            return [];
+          },
+        };
+      }
+      if (serviceName === 'slack') {
+        return {
+          execute: async (tool: string, args: any) => {
+            if (tool === 'slack.search_channels') {
+              return [{ id: 'C0123456789', name: 'general' }];
+            }
+            if (tool === 'slack.send_message') {
+              slackMessages.push({ channel: args.channel, text: args.text });
+              return { ok: true, ts: '1700000000.000100' };
+            }
+            return {};
+          },
+        };
+      }
+      throw new Error(`Unexpected service ${serviceName}`);
+    };
+
+    const requestText = 'Mỗi sáng 8 giờ, gửi bản tin GitHub repo nhom/ati lên Slack #general';
+    const digestCandidate = await evaluateGithubDigestCandidate({
+      userId: owner.id,
+      request: requestText,
+      services: ['github', 'slack'],
+      recurrence: dailyRecurrence,
+      githubConnection: githubLookup,
+      getAdapter,
+    });
+
+    expect(digestCandidate.canAutoDigest).toBe(true);
+    expect(digestCandidate.config?.credentialId).toBe(savedCred!.id);
+
+    const convId = (
+      await db.pool.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [owner.id])
+    ).rows[0].id as string;
+    const proposalMetadata = {
+      type: 'schedule_proposal',
+      proposal: {
+        kind: 'schedule',
+        action: 'create',
+        name: 'Bản tin GitHub sáng',
+        request: requestText,
+        recurrence: dailyRecurrence,
+        summary: 'Mỗi sáng 8 giờ, gửi bản tin GitHub repo nhom/ati lên Slack #general.',
+      },
+      services: ['github', 'slack'],
+      nextRuns: ['2026-10-26T01:00:00.000Z'],
+      scheduleId: null,
+      baseVersion: null,
+      previous: null,
+      digestCandidate,
+    };
+    const msgId = (
+      await db.pool.query(
+        `INSERT INTO messages(conv_id, role, content, metadata)
+         VALUES($1, 'assistant', $2, $3::jsonb) RETURNING id`,
+        [convId, proposalMetadata.proposal.summary, JSON.stringify(proposalMetadata)],
+      )
+    ).rows[0].id as string;
+
+    // Confirm proposal via production ScheduleService.confirmProposal — NO SQL mutation on schedules afterwards!
+    const confirmed = await service.confirmProposal({
+      userId: owner.id,
+      convId,
+      messageId: msgId,
+      approvalMode: 'auto_digest',
+      now: new Date('2026-10-25T10:00:00.000Z'),
+    });
+
+    const persistedSchedule = (
+      await db.pool.query(
+        'SELECT id, recurrence, digest_config, digest_config_hash FROM schedules WHERE id = $1',
+        [confirmed.schedule.id],
+      )
+    ).rows[0];
+    expect(persistedSchedule.digest_config.credentialId).toBe(savedCred!.id);
+    expect(persistedSchedule.digest_config_hash).toBe(
+      computeDigestConfigHash({
+        config: persistedSchedule.digest_config,
+        recurrence: persistedSchedule.recurrence,
+        userId: owner.id,
+      }),
+    );
+
+    // Execute via ScheduleRunner (assertDigestScheduleLiveScopeAndAuth + createGithubDigestRunner) without touching the schedule row
+    const runner = createGithubDigestRunner({
+      pool: db.pool,
+      githubConnection: githubLookup,
+      getAdapter,
+    });
+    const scheduler = new ScheduleRunner({
+      pool: db.pool,
+      timeZone: VN,
+      now: () => now,
+      planRun: async () => ({ persist: async () => ({ state: 'needs_attention' }), afterCommit() {} }),
+      runGithubDigest: runner,
+      recordState: (client, row, at) => service.recordState(client, row, at),
+    });
+
+    await scheduler.tick();
+    await scheduler.stop();
+
+    const runRow = (
+      await db.pool.query(
+        'SELECT status, error FROM schedule_runs WHERE schedule_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [confirmed.schedule.id],
+      )
+    ).rows[0];
+    expect(runRow.status).toBe('digest_sent');
+    expect(slackMessages).toHaveLength(1);
+    expect(slackMessages[0]!.channel).toBe('C0123456789');
+    expect(slackMessages[0]!.text).toContain('Verify C1-03 pinned credential flow');
   });
 });

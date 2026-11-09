@@ -1,14 +1,13 @@
 import { test, expect, type Page } from '@playwright/test';
 import pg from 'pg';
 import { createHash, randomUUID } from 'node:crypto';
+import { encryptCredentials } from '../../../../packages/tool-adapters/src/crypto.js';
 import { hashPassword } from '../../../chat-api/src/db/repositories/user-repo.js';
-import {
-  canonicalizeDigestConfig,
-  computeDigestConfigHash,
-} from '../../../chat-api/src/services/schedules/github-digest-candidate.js';
+import { computeDigestConfigHash } from '../../../chat-api/src/services/schedules/github-digest-candidate.js';
 import { certifyFixturePlan, fixtureConversation, fixtureMessage } from './persisted-artifacts.fixture.js';
 
 const enabled = process.env.SANDBOX_SCENARIO === 'schedule';
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || '01234567890123456789012345678901';
 
 async function loginUser(page: Page, email: string, password: string) {
   await page.goto('/login');
@@ -18,7 +17,7 @@ async function loginUser(page: Page, email: string, password: string) {
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Hôm nay bạn muốn nhờ việc gì?');
 }
 
-test('GITHUB-DIGEST: admin selects team repos, member connects from refusal card, and schedules an auto-digest run end-to-end', async ({ page }, testInfo) => {
+test('GITHUB-DIGEST: [USER_FLOW_E2E] admin selects team repos, member connects from refusal card, and schedules an auto-digest run end-to-end', async ({ page }, testInfo) => {
   test.skip(!enabled, 'requires schedule sandbox scenario with SCHEDULES_ENABLED=on');
 
   const externalRequests: string[] = [];
@@ -29,19 +28,34 @@ test('GITHUB-DIGEST: admin selects team repos, member connects from refusal card
 
   const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
   const memberId = randomUUID();
-  const memberCredId = randomUUID();
   const memberEmail = `github-member-${memberId}@example.test`;
   const memberPassword = 'Member@12345678';
   let refusalConvId = '';
 
   try {
+    const adminId = (await db.query('SELECT id FROM users WHERE email = $1', [process.env.CHAT_ADMIN_EMAIL!])).rows[0].id as string;
+    await db.query('DELETE FROM github_team_scope');
+    await db.query("DELETE FROM service_credentials WHERE service = 'github' AND user_id = $1", [adminId]);
+    await db.query(
+      "INSERT INTO service_credentials(id, service, user_id, workspace_id, config, status) VALUES($1, 'github', $2, NULL, $3, 'active')",
+      [
+        randomUUID(),
+        adminId,
+        encryptCredentials(
+          {
+            accessToken: 'gho_admin_fixture_token',
+            login: 'admin_octo',
+            githubUserId: '9001',
+            connectedAt: new Date().toISOString(),
+          },
+          ENCRYPTION_KEY,
+        ),
+      ],
+    );
+
     await db.query(
       "INSERT INTO users(id, email, password, name, status, role, email_verified) VALUES($1, $2, $3, 'GitHub Member', 'active', 'member', true)",
       [memberId, memberEmail, hashPassword(memberPassword)]
-    );
-    await db.query(
-      "INSERT INTO service_credentials(id, service, user_id, workspace_id, config, status) VALUES($1, 'github', $2, NULL, $3, 'active')",
-      [memberCredId, memberId, JSON.stringify({ githubUserId: 'sandbox-gh-user', login: 'bob_octo' })]
     );
     refusalConvId = await fixtureConversation(db, memberId);
     await fixtureMessage(db, refusalConvId, 'user', 'Tạo issue trên repo acme/ati');
@@ -57,58 +71,8 @@ test('GITHUB-DIGEST: admin selects team repos, member connects from refusal card
       },
     );
 
-    // 1. Admin logs in and selects two repositories for the team
+    // 1. Admin logs in and selects two repositories (acme/ati and owner/repo) for the team via the real backend /api/connections/github/scope
     await loginUser(page, process.env.CHAT_ADMIN_EMAIL!, process.env.CHAT_ADMIN_PASSWORD!);
-
-    let adminConnectionState = {
-      status: 'needs_scope',
-      login: 'admin_octo',
-      repos: [] as Array<{ repoId: string; fullName: string; name: string; accessible: boolean }>,
-    };
-
-    await page.route('**/api/connections/github', async (route) => {
-      if (route.request().method() === 'GET') {
-        return route.fulfill({ json: adminConnectionState });
-      }
-      return route.continue();
-    });
-
-    await page.route('**/api/connections/github/candidate-repos', async (route) => {
-      return route.fulfill({
-        json: {
-          repos: [
-            { repoId: '101', fullName: 'acme/ati', name: 'ati', private: false },
-            { repoId: '102', fullName: 'acme/docs', name: 'docs', private: false },
-            { repoId: '103', fullName: 'acme/secret', name: 'secret', private: true },
-            { repoId: '104', fullName: 'acme/infra', name: 'infra', private: true },
-            { repoId: '105', fullName: 'acme/sdk', name: 'sdk', private: false },
-          ],
-        },
-      });
-    });
-
-    await page.route('**/api/connections/github/scope', async (route) => {
-      if (route.request().method() === 'PUT') {
-        adminConnectionState = {
-          status: 'connected',
-          login: 'admin_octo',
-          repos: [
-            { repoId: '101', fullName: 'acme/ati', name: 'ati', accessible: true },
-            { repoId: '102', fullName: 'acme/docs', name: 'docs', accessible: true },
-          ],
-        };
-        return route.fulfill({
-          json: {
-            chosenBy: 'admin',
-            repos: [
-              { repoId: '101', fullName: 'acme/ati', name: 'ati' },
-              { repoId: '102', fullName: 'acme/docs', name: 'docs' },
-            ],
-          },
-        });
-      }
-      return route.continue();
-    });
 
     await page.goto('/settings#github');
     const adminGithubRow = page.locator('#service-row-github');
@@ -130,7 +94,7 @@ test('GITHUB-DIGEST: admin selects team repos, member connects from refusal card
     await filterInput.fill('');
 
     await page.getByRole('checkbox', { name: /acme\/ati/i }).check();
-    await page.getByRole('checkbox', { name: /acme\/docs/i }).check();
+    await page.getByRole('checkbox', { name: /owner\/repo/i }).check();
     await expect(scopeCounter).toHaveText('Đã chọn 2/10');
     await page.screenshot({ path: testInfo.outputPath('github-scope-selector.png'), fullPage: true });
 
@@ -139,60 +103,31 @@ test('GITHUB-DIGEST: admin selects team repos, member connects from refusal card
     await saveScopeBtn.click();
     await expect(page.locator('#github-edit-scope')).toBeVisible();
 
-    // 2. Member logs in, opens the refusal conversation, connects GitHub via fake OAuth, and returns to the same conversation
+    // 2. Member logs in, opens the refusal conversation, connects GitHub via the real OAuth PKCE callback route, and returns to the same conversation
     await page.evaluate(() => localStorage.clear());
     await loginUser(page, memberEmail, memberPassword);
-
-    let memberConnectionState = {
-      status: 'not_connected',
-      login: undefined as string | undefined,
-      repos: [] as Array<{ repoId: string; fullName: string; name: string; accessible: boolean }>,
-    };
-
-    await page.unroute('**/api/connections/github');
-    await page.route('**/api/connections/github', async (route) => {
-      if (route.request().method() === 'GET') {
-        return route.fulfill({ json: memberConnectionState });
-      }
-      return route.continue();
-    });
-
-    const redirectUri = `http://127.0.0.1:${process.env.V3_WEB_PORT || 5174}/connections/github/callback`;
-    await page.route('**/api/connections/github/start', async (route) => {
-      return route.fulfill({
-        json: {
-          url: `${redirectUri}?code=fake-member-github-code&state=fake-member-github-state`,
-        },
-      });
-    });
-
-    let callbackCompleted = false;
-    await page.route('**/api/connections/github/callback', async (route) => {
-      memberConnectionState = {
-        status: 'connected',
-        login: 'bob_octo',
-        repos: [
-          { repoId: '101', fullName: 'acme/ati', name: 'ati', accessible: true },
-          { repoId: '102', fullName: 'acme/docs', name: 'docs', accessible: true },
-        ],
-      };
-      callbackCompleted = true;
-      return route.fulfill({
-        json: {
-          login: 'bob_octo',
-          returnTo: `/c/${refusalConvId}`,
-        },
-      });
-    });
 
     await page.goto(`/c/${refusalConvId}`);
     const connectFromChatBtn = page.locator('#github-connect');
     await expect(connectFromChatBtn).toBeVisible();
+    const callbackResponsePromise = page.waitForResponse(
+      (res) => res.url().includes('/api/connections/github/callback') && res.request().method() === 'POST',
+    );
     await connectFromChatBtn.click();
+    const callbackResponse = await callbackResponsePromise;
+    expect(callbackResponse.status()).toBe(200);
 
-    await expect.poll(() => callbackCompleted).toBe(true);
     await expect(page).toHaveURL(new RegExp(`/c/${refusalConvId}$`));
     await expect(page.getByRole('heading', { name: 'Tôi chưa làm được yêu cầu này' })).toBeVisible();
+
+    const memberCredRow = (
+      await db.query(
+        "SELECT id, status FROM service_credentials WHERE service = 'github' AND user_id = $1 AND workspace_id IS NULL",
+        [memberId],
+      )
+    ).rows[0];
+    expect(memberCredRow?.status).toBe('active');
+    expect(memberCredRow?.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
 
     // 3. Member creates a new conversation and schedules a GitHub morning digest in auto_digest mode
     await page.goto('/');
@@ -217,24 +152,20 @@ test('GITHUB-DIGEST: admin selects team repos, member connects from refusal card
     await expect(page.getByRole('status').filter({ hasText: 'Đang bật' })).toBeVisible();
     await expect(page.getByText('Tự gửi', { exact: true })).toBeVisible();
 
+    // C1-03: Verify (read-only SELECT, zero post-confirmation SQL mutation) that confirmProposal pinned the real UUID credentialId from the start
     const schedRow = (
       await db.query(
-        'SELECT id, recurrence, digest_config FROM schedules WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1',
-        [memberId]
+        'SELECT id, recurrence, digest_config, digest_config_hash FROM schedules WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [memberId],
       )
     ).rows[0];
-    const pinnedDigestConfig = canonicalizeDigestConfig({
-      ...schedRow.digest_config,
-      credentialId: memberCredId,
-    });
-    const pinnedDigestHash = computeDigestConfigHash({
-      config: pinnedDigestConfig,
-      recurrence: schedRow.recurrence,
-      userId: memberId,
-    });
-    await db.query(
-      'UPDATE schedules SET digest_config = $1::jsonb, digest_config_hash = $2 WHERE id = $3',
-      [JSON.stringify(pinnedDigestConfig), pinnedDigestHash, schedRow.id]
+    expect(schedRow.digest_config.credentialId).toBe(memberCredRow.id);
+    expect(schedRow.digest_config_hash).toBe(
+      computeDigestConfigHash({
+        config: schedRow.digest_config,
+        recurrence: schedRow.recurrence,
+        userId: memberId,
+      }),
     );
 
     // Run now and verify the digest is sent automatically without waiting for manual approval
@@ -258,7 +189,7 @@ test('GITHUB-DIGEST: admin selects team repos, member connects from refusal card
   }
 });
 
-test('GITHUB-DIGEST: extended GitHub tools plan destination, preview badges, real backend execution, and Telegram digest proposal', async ({ page }, testInfo) => {
+test('GITHUB-DIGEST: [SEEDED_INTEGRATION] extended GitHub tools plan destination, preview badges, real backend execution, and Telegram digest proposal', async ({ page }, testInfo) => {
   test.skip(!enabled, 'requires schedule sandbox scenario with SCHEDULES_ENABLED=on');
 
   const externalRequests: string[] = [];
@@ -270,7 +201,30 @@ test('GITHUB-DIGEST: extended GitHub tools plan destination, preview badges, rea
   const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
   try {
     await loginUser(page, process.env.CHAT_ADMIN_EMAIL!, process.env.CHAT_ADMIN_PASSWORD!);
-    const adminId = (await db.query('SELECT id FROM users WHERE email = $1', [process.env.CHAT_ADMIN_EMAIL!])).rows[0].id;
+    const adminId = (await db.query('SELECT id FROM users WHERE email = $1', [process.env.CHAT_ADMIN_EMAIL!])).rows[0].id as string;
+    const adminCredId = randomUUID();
+    await db.query("DELETE FROM service_credentials WHERE service = 'github' AND user_id = $1", [adminId]);
+    await db.query(
+      "INSERT INTO service_credentials(id, service, user_id, workspace_id, config, status) VALUES($1, 'github', $2, NULL, $3, 'active')",
+      [
+        adminCredId,
+        adminId,
+        encryptCredentials(
+          {
+            accessToken: 'gho_admin_fixture_token',
+            login: 'admin_octo',
+            githubUserId: '9001',
+            connectedAt: new Date().toISOString(),
+          },
+          ENCRYPTION_KEY,
+        ),
+      ],
+    );
+    await db.query('DELETE FROM github_team_scope');
+    await db.query("INSERT INTO github_team_scope(id, chosen_by) VALUES('default', $1)", [adminId]);
+    await db.query(
+      "INSERT INTO github_team_repos(scope_id, repo_id, full_name, name, position) VALUES('default', '100', 'owner/repo', 'repo', 1)",
+    );
 
     // 1. Seed a conversation with a 4-step GitHub plan exercising create_issue (with assignees), update_issue, get_pull_request, and add_comment
     const planConvId = await fixtureConversation(db, adminId);
@@ -288,8 +242,8 @@ test('GITHUB-DIGEST: extended GitHub tools plan destination, preview badges, rea
       warnings: [],
       connections: {
         github: {
-          credentialId: 'cred-gh-admin',
-          githubUserId: 'gh-admin-1',
+          credentialId: adminCredId,
+          githubUserId: '9001',
           login: 'admin_octo',
           repos: ['owner/repo'],
         },

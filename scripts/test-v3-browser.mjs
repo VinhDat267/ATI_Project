@@ -5,6 +5,7 @@ import { assertBrowserV3Environment } from './v3-local-env.mjs';
 import { startGoogleFixture } from './google-oidc-fixture.mjs';
 import { startGmailBrowserFixture } from './gmail-browser-fixture.mjs';
 import { startSlackOAuthFixture } from './slack-oauth-fixture.mjs';
+import { startGitHubOAuthFixture } from './github-oauth-fixture.mjs';
 
 assertBrowserV3Environment(process.env);
 if (!process.env.DATABASE_URL || !process.env.CHAT_ADMIN_EMAIL || !process.env.CHAT_ADMIN_PASSWORD) {
@@ -45,11 +46,30 @@ if (passArgs.length > 0) {
     env.SANDBOX_SCENARIO = env.SANDBOX_SCENARIO || 'schedule';
     env.SCHEDULES_ENABLED = env.SCHEDULES_ENABLED || 'on';
   }
-  const result = spawnSync(process.execPath, [cli, 'test', '--config', 'apps/chat-web/playwright.config.ts', ...passArgs], {
-    env, stdio: 'inherit',
-  });
-  if (result.error) throw result.error;
-  process.exit(result.status ?? 0);
+  let stopPassFixture;
+  try {
+    if (passArgs.some(arg => /github-oauth-and-digest/.test(arg))) {
+      const redirectUri = `http://127.0.0.1:${env.V3_WEB_PORT || 5174}/connections/github/callback`;
+      const fixture = await startGitHubOAuthFixture({ redirectUri });
+      stopPassFixture = fixture.stop;
+      Object.assign(env, {
+        GITHUB_OAUTH_CLIENT_ID: 'github-fixture-client',
+        GITHUB_OAUTH_CLIENT_SECRET: 'github-fixture-secret',
+        GITHUB_OAUTH_REDIRECT_URI: redirectUri,
+        GITHUB_OAUTH_AUTH_URL: `${fixture.origin}/authorize`,
+        GITHUB_OAUTH_TOKEN_URL: `${fixture.origin}/token`,
+        GITHUB_API_BASE_URL: fixture.origin,
+      });
+    }
+    const result = spawnSync(process.execPath, [cli, 'test', '--config', 'apps/chat-web/playwright.config.ts', ...passArgs], {
+      env, stdio: 'inherit',
+    });
+    if (result.error) throw result.error;
+    process.exitCode = result.status ?? 0;
+  } finally {
+    await stopPassFixture?.();
+  }
+  process.exit(process.exitCode ?? 0);
 }
 
 const selectedScenario = process.env.SCENARIO;
@@ -118,6 +138,19 @@ for (const scenario of runScenarios) {
         GOOGLE_OAUTH_AUTH_URL: `${fixture.origin}/authorize`,
         GOOGLE_OAUTH_TOKEN_URL: `${fixture.origin}/token`,
         GOOGLE_OAUTH_JWKS_URL: `${fixture.origin}/jwks`,
+      });
+    }
+    if (scenario.name === 'schedule') {
+      const redirectUri = `http://127.0.0.1:${env.V3_WEB_PORT || 5174}/connections/github/callback`;
+      const fixture = await startGitHubOAuthFixture({ redirectUri });
+      stopFixture = fixture.stop;
+      Object.assign(env, {
+        GITHUB_OAUTH_CLIENT_ID: 'github-fixture-client',
+        GITHUB_OAUTH_CLIENT_SECRET: 'github-fixture-secret',
+        GITHUB_OAUTH_REDIRECT_URI: redirectUri,
+        GITHUB_OAUTH_AUTH_URL: `${fixture.origin}/authorize`,
+        GITHUB_OAUTH_TOKEN_URL: `${fixture.origin}/token`,
+        GITHUB_API_BASE_URL: fixture.origin,
       });
     }
     const grepPattern = process.env.GREP ?? scenario.grep;

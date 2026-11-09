@@ -225,21 +225,6 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
     let gh: any;
     try {
       gh = await options.githubConnection?.(run.userId);
-      if (gh?.connection?.credentialId === 'sandbox-github') {
-        const dbCred = await options.pool.query<{ id: string }>(
-          "SELECT id FROM service_credentials WHERE service = 'github' AND user_id = $1 AND workspace_id IS NULL AND status = 'active' ORDER BY created_at DESC LIMIT 1",
-          [run.userId],
-        );
-        if (dbCred.rows[0]?.id) {
-          gh = {
-            ...gh,
-            connection: {
-              ...gh.connection,
-              credentialId: dbCred.rows[0].id,
-            },
-          };
-        }
-      }
     } catch {
       gh = null;
     }
