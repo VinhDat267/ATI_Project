@@ -1,15 +1,18 @@
-/** @vitest-environment jsdom */
+/**
+ * @vitest-environment jsdom
+ *
+ * Real-Backend React Integration Smoke Test (React/JSDOM + real Express HTTP backend + isolated PostgreSQL schema).
+ * Note: Browser UI E2E with mocked API is covered separately in tests/browser/sheets-digest-v2-recovery.spec.ts.
+ */
 import '@testing-library/jest-dom/vitest';
+import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
+import { readFile, readdir } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import { resolve } from 'node:path';
-import {
-  URL as NodeURL,
-  URLSearchParams as NodeURLSearchParams,
-  pathToFileURL,
-} from 'node:url';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import pg from 'pg';
 import type { SheetsDigestConfigV1 } from '@wap/tool-schemas';
 import { ScheduleMoment } from '../src/pages/Cockpit/ScheduleMoment';
 import { ScheduleRunRecovery } from '../src/pages/Cockpit/ScheduleRunRecovery';
@@ -21,45 +24,76 @@ import { useChatStore } from '../src/store/chat-store';
 import type { ChatMessage, User } from '../src/types';
 
 const REPO_ROOT = resolve(process.cwd(), '../..');
-const EFFECTIVE_REPO_ROOT = existsSync(resolve( process.cwd(), 'db/v3'))
+const EFFECTIVE_REPO_ROOT = existsSync(resolve(process.cwd(), 'db/v3'))
   ? process.cwd()
   : REPO_ROOT;
-
-// Ensure Vite's import.meta.url rewrites (base = http://localhost:3000/) resolve to Node file:// URLs for repo files
-class ViteFsAwareURL extends NodeURL {
-  constructor(input: string | URL, base?: string | URL) {
-    if (
-      typeof input === 'string' &&
-      base &&
-      String(base).startsWith('http://localhost:3000') &&
-      input.startsWith('/') &&
-      !input.startsWith('/api/')
-    ) {
-      const candidatePath = resolve(EFFECTIVE_REPO_ROOT, input.slice(1));
-      if (existsSync(candidatePath)) {
-        return pathToFileURL(candidatePath) as this;
-      }
-    }
-    super(input as any, base as any);
-  }
-}
-globalThis.URL = ViteFsAwareURL as unknown as typeof globalThis.URL;
-globalThis.URLSearchParams = NodeURLSearchParams as unknown as typeof globalThis.URLSearchParams;
+const V3_MIGRATIONS_DIR = resolve(EFFECTIVE_REPO_ROOT, 'db/v3');
 
 const TZ = 'Asia/Ho_Chi_Minh';
 const JWT_SECRET = 'sheets_digest_real_backend_ui_smoke_secret_32_chars';
 const NOW = new Date('2026-11-09T01:00:00.000Z');
-const CHAT_API_ROOT = '../../chat-api';
 
-describe('Task 7 Real-Backend + Isolated PostgreSQL + React UI Integration Smoke Test', () => {
+// Re-export the real schedule occurrence math directly without loading prompt-file readers from the @wap/planner barrel in JSDOM
+vi.mock('@wap/planner', () => import('@wap/planner-schedule-occurrence'));
+
+async function createIsolatedMigratedSchema(prefix: string, UserRepoCls: any) {
+  const connectionString =
+    process.env.DATABASE_URL || 'postgresql://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3';
+  const schema = `${prefix}_${randomUUID().replaceAll('-', '')}`;
+  const admin = new pg.Pool({ connectionString });
+  await admin.query(`CREATE SCHEMA "${schema}"`);
+
+  const url = new URL(connectionString);
+  url.searchParams.set('options', `-c search_path=${schema}`);
+  const pool = new pg.Pool({ connectionString: url.href, max: 12 });
+
+  const migrationFiles = (await readdir(V3_MIGRATIONS_DIR))
+    .filter(f => /^\d{4}_.*\.sql$/.test(f))
+    .sort();
+  for (const file of migrationFiles) {
+    const sql = await readFile(resolve(V3_MIGRATIONS_DIR, file), 'utf8');
+    await pool.query(sql);
+  }
+
+  const users = new UserRepoCls(pool);
+  return {
+    pool,
+    users,
+    async person(name = 'Thành viên') {
+      const user = await users.createUser({
+        email: `${randomUUID()}@example.test`,
+        name,
+        password: 'Passw0rd!long-enough',
+      });
+      await pool.query("UPDATE users SET status='active', email_verified=true WHERE id=$1", [
+        user.id,
+      ]);
+      const { sessionId } = await users.sessions.create(user.id, 'test');
+      return { id: user.id, email: user.email, name, role: 'member' as const, sid: sessionId };
+    },
+    async close() {
+      await pool.end();
+      await admin.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
+      await admin.end();
+    },
+  };
+}
+
+describe('Task 7 Real-Backend React Integration Smoke Test (React/JSDOM + Real Express HTTP + Isolated PostgreSQL)', () => {
   const realFetch = globalThis.fetch;
-  let createAppFn: any;
+  let expressFn: any;
+  let createAuthMiddlewareFn: any;
+  let createWorkspaceContextMiddlewareFn: any;
+  let createScheduleRoutesFn: any;
+  let isSchedulePathFn: any;
+  let createConversationRoutesFn: any;
+  let userFacingErrorFn: any;
   let generateAccessTokenFn: any;
   let MessageRepoCls: any;
+  let UserRepoCls: any;
   let computeSheetsDigestV1HashFn: any;
   let SHEETS_DELIVERY_UNKNOWN_CONST: string;
   let ScheduleServiceCls: any;
-  let createMigratedSchemaFn: any;
   let DIGEST_TEST_ENC_KEY_CONST: string;
   let PERSONAL_A_SPREADSHEET_ID_CONST: string;
   let insertTestSheetsDigestScheduleFn: any;
@@ -73,36 +107,46 @@ describe('Task 7 Real-Backend + Isolated PostgreSQL + React UI Integration Smoke
   let plannedFollowupRuns: string[] = [];
 
   beforeAll(async () => {
-    const appMod = await import(`${CHAT_API_ROOT}/src/app.js`);
-    const jwtMod = await import(`${CHAT_API_ROOT}/src/auth/jwt.js`);
-    const msgRepoMod = await import(`${CHAT_API_ROOT}/src/db/repositories/message-repo.js`);
+    const expressMod = await import('express');
+    const jwtMod = await import('@wap/chat-api/src/auth/jwt.js');
+    const wsMiddlewareMod = await import('@wap/chat-api/src/middleware/workspace-context.js');
+    const schedRoutesMod = await import('@wap/chat-api/src/routes/schedule-routes.js');
+    const convRoutesMod = await import('@wap/chat-api/src/routes/conversation-routes.js');
+    const userErrorMod = await import('@wap/chat-api/src/services/user-facing-error.js');
+    const msgRepoMod = await import('@wap/chat-api/src/db/repositories/message-repo.js');
+    const userRepoMod = await import('@wap/chat-api/src/db/repositories/user-repo.js');
     const candidateMod = await import(
-      `${CHAT_API_ROOT}/src/services/schedules/sheets-digest-candidate.js`
+      '@wap/chat-api/src/services/schedules/sheets-digest-candidate.js'
     );
     const runnerMod = await import(
-      `${CHAT_API_ROOT}/src/services/schedules/sheets-digest-runner.js`
+      '@wap/chat-api/src/services/schedules/sheets-digest-runner.js'
     );
     const schedServiceMod = await import(
-      `${CHAT_API_ROOT}/src/services/schedules/schedule-service.js`
+      '@wap/chat-api/src/services/schedules/schedule-service.js'
     );
-    const testDbMod = await import(`${CHAT_API_ROOT}/tests/helpers/gmail-test-db.js`);
     const tenantFixturesMod = await import(
-      `${CHAT_API_ROOT}/tests/helpers/sheets-digest-tenant-fixtures.js`
+      '@wap/chat-api/tests/helpers/sheets-digest-tenant-fixtures.js'
     );
 
-    createAppFn = appMod.createApp;
+    expressFn = expressMod.default;
+    createAuthMiddlewareFn = jwtMod.createAuthMiddleware;
     generateAccessTokenFn = jwtMod.generateAccessToken;
+    createWorkspaceContextMiddlewareFn = wsMiddlewareMod.createWorkspaceContextMiddleware;
+    createScheduleRoutesFn = schedRoutesMod.createScheduleRoutes;
+    isSchedulePathFn = schedRoutesMod.isSchedulePath;
+    createConversationRoutesFn = convRoutesMod.createConversationRoutes;
+    userFacingErrorFn = userErrorMod.userFacingError;
     MessageRepoCls = msgRepoMod.MessageRepo;
+    UserRepoCls = userRepoMod.UserRepo;
     computeSheetsDigestV1HashFn = candidateMod.computeSheetsDigestV1Hash;
     SHEETS_DELIVERY_UNKNOWN_CONST = runnerMod.SHEETS_DELIVERY_UNKNOWN;
     ScheduleServiceCls = schedServiceMod.ScheduleService;
-    createMigratedSchemaFn = testDbMod.createMigratedSchema;
     DIGEST_TEST_ENC_KEY_CONST = tenantFixturesMod.DIGEST_TEST_ENC_KEY;
     PERSONAL_A_SPREADSHEET_ID_CONST = tenantFixturesMod.PERSONAL_A_SPREADSHEET_ID;
     insertTestSheetsDigestScheduleFn = tenantFixturesMod.insertTestSheetsDigestSchedule;
     seedSheetsDigestTenantsFn = tenantFixturesMod.seedSheetsDigestTenants;
 
-    db = await createMigratedSchemaFn('sheets_digest_web_real_backend');
+    db = await createIsolatedMigratedSchema('sheets_digest_web_real_backend', UserRepoCls);
     messageRepo = new MessageRepoCls(db.pool);
   });
 
@@ -140,21 +184,56 @@ describe('Task 7 Real-Backend + Isolated PostgreSQL + React UI Integration Smoke
       },
     });
 
-    const app = createAppFn({
-      jwtSecret: JWT_SECRET,
-      userRepo: db.users,
-      workspaceRepo: fixtures.workspaceRepo,
-      convRepo: fixtures.convRepo,
-      msgRepo: messageRepo,
-      chatService: {} as any,
-      pool: db.pool,
-      schedules: {
+    const app = expressFn();
+    app.use(expressFn.json());
+    app.use((_req: any, res: any, next: any) => {
+      const json = res.json.bind(res);
+      res.json = (body: any) => {
+        if (body && typeof body === 'object' && !Array.isArray(body)) {
+          if (typeof body.error === 'string') {
+            body = { ...body, error: userFacingErrorFn(body.error) };
+          }
+          if (typeof body.message === 'string' && res.statusCode >= 400) {
+            body = { ...body, message: userFacingErrorFn(body.message) };
+          }
+        }
+        return json(body);
+      };
+      next();
+    });
+
+    const authMiddleware = createAuthMiddlewareFn(JWT_SECRET, {
+      sessionRepo: db.users.sessions,
+    });
+    const workspaceContextMiddleware = createWorkspaceContextMiddlewareFn(fixtures.workspaceRepo);
+    const withAuthAndWorkspace = (req: any, res: any, next: any) => {
+      authMiddleware(req, res, (err?: any) => {
+        if (err) return next(err);
+        workspaceContextMiddleware(req, res, next);
+      });
+    };
+
+    app.use(
+      '/api',
+      (req: any, res: any, next: any) =>
+        isSchedulePathFn(req.path) ? withAuthAndWorkspace(req, res, next) : next(),
+      createScheduleRoutesFn({
         service: scheduleService,
         clock: () => NOW,
         pool: db.pool,
         convRepo: fixtures.convRepo,
-      },
-    });
+      })
+    );
+    app.use(
+      '/api/conversations',
+      withAuthAndWorkspace,
+      createConversationRoutesFn({
+        convRepo: fixtures.convRepo,
+        msgRepo: messageRepo,
+        chatService: {} as any,
+        pool: db.pool,
+      })
+    );
 
     server = createServer(app);
     await new Promise<void>(resolve => {
@@ -172,7 +251,7 @@ describe('Task 7 Real-Backend + Isolated PostgreSQL + React UI Integration Smoke
         const rawUrl =
           typeof input === 'string'
             ? input
-            : input instanceof NodeURL || input instanceof URL
+            : input instanceof URL
               ? input.toString()
               : input.url;
 
@@ -194,7 +273,7 @@ describe('Task 7 Real-Backend + Isolated PostgreSQL + React UI Integration Smoke
           return realFetch(`${backendBaseUrl}${rawUrl}`, init);
         }
         if (rawUrl.startsWith('http://localhost/')) {
-          const parsed = new NodeURL(rawUrl);
+          const parsed = new URL(rawUrl);
           return realFetch(`${backendBaseUrl}${parsed.pathname}${parsed.search}`, init);
         }
         return realFetch(input, init);
