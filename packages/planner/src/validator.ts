@@ -861,7 +861,10 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
   // Layer 5b: Report Grounding (FLOW-01 & FLOW-05, F1) — factual reports must have verified reportEvidence
   const userTexts = options.grounding?.userTexts;
   const isReportIntent = requiresReportEvidence(userTexts?.length ? userTexts : [parsed.summary || '', parsed.thinking || '']);
-  const targets = reportOutputTargets(steps);
+  const targets = reportOutputTargets(steps, {
+    userTexts,
+    workItemChoice: parsed.reportEvidence?.workItemDisposition,
+  });
 
   if (isReportIntent && targets.length > 0) {
     if (!parsed.reportEvidence) {

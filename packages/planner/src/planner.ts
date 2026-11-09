@@ -1,4 +1,25 @@
-import { SERVICE_REGISTRY, requiresReportEvidence, reportLiteralBodies, reportOutputTargets, isWorkItemWriteStep, REPORT_SOURCE_TOOLS, type ToolDefinition, type PlannerResponse, type ServiceDefinition, type GatherRule, type AnswerLookup, type ReportKind } from '@wap/tool-schemas';
+import {
+  SERVICE_REGISTRY,
+  requiresReportEvidence,
+  reportLiteralBodies,
+  reportOutputTargets,
+  isWorkItemWriteStep,
+  workItemContentArgument,
+  workItemTitleArgument,
+  resolveWorkItemReportClarification,
+  WORK_ITEM_REPORT_CLARIFICATION_QUESTION,
+  WORK_ITEM_REPORT_CLARIFICATION_OPTIONS,
+  WORK_ITEM_REPORT_MEMORY_KEY,
+  REPORT_SOURCE_TOOLS,
+  type WorkItemReportClarificationState,
+  type WorkItemReportChoice,
+  type ToolDefinition,
+  type PlannerResponse,
+  type ServiceDefinition,
+  type GatherRule,
+  type AnswerLookup,
+  type ReportKind,
+} from '@wap/tool-schemas';
 import type { LLMProvider, ChatMessage, PlanningPhaseMetrics } from './types.js';
 import { WorkingMemory } from './working-memory.js';
 import { routeIntent, unavailableServiceReason, type RoutedIntent } from './router.js';
@@ -282,36 +303,102 @@ export class AIPlanner {
     if (reportLiteralBodies(groundingUserTexts).length > 0) {
       return JSON.stringify({ kind: 'clarification', question: 'Bạn muốn gửi báo cáo có nguồn và một tin nhắn nguyên văn riêng. Hãy tách hai yêu cầu để tôi giữ đúng nội dung và người nhận của từng phần.', context: 'Chưa gửi nội dung nào; tránh đưa báo cáo vào đích chỉ nhận tin nhắn nguyên văn.' });
     }
-    const targets = reportOutputTargets(parsed.steps);
-    const primary = targets.at(-1);
-    if (!primary) return rawOutput;
-
+    const initialTargets = reportOutputTargets(parsed.steps);
     const hasWorkItemStep = parsed.steps.some((s: any) => isWorkItemWriteStep(s));
+    if (!hasWorkItemStep && initialTargets.length === 0) return rawOutput;
+
+    let workItemChoice: WorkItemReportChoice | undefined;
     if (hasWorkItemStep) {
-      const alreadyClarifiedWorkItem = (input.history ?? []).some(
-        (msg) =>
-          msg.role === 'assistant' &&
-          typeof msg.content === 'string' &&
-          msg.content.includes('Bạn muốn nội dung công việc mới là báo cáo dữ liệu hay một nội dung riêng?'),
+      const hasDedicatedNotificationTarget = parsed.steps.some(
+        (s: any) =>
+          s &&
+          typeof s.tool === 'string' &&
+          !REPORT_SOURCE_TOOLS.has(s.tool) &&
+          !isWorkItemWriteStep(s) &&
+          (['text', 'body', 'content'] as const).some((arg) => Object.hasOwn(s.args ?? {}, arg)),
       );
-      const hasDedicatedNotificationTarget = targets.some((target) => {
-        const step = parsed.steps.find((s: any) => s.id === target.stepId);
-        return step && !isWorkItemWriteStep(step);
+      const pendingState =
+        input.memory.getEntity<WorkItemReportClarificationState>(WORK_ITEM_REPORT_MEMORY_KEY) ?? null;
+      const resolution = resolveWorkItemReportClarification({
+        userMessage: input.userMessage,
+        groundingUserTexts,
+        history: input.history ?? [],
+        pendingState,
+        hasDedicatedNotificationTarget,
       });
-      const hasExplicitWorkItemPayload = groundingUserTexts.some((text) =>
-        /(?:với\s+|with\s+)?(?:tiêu\s+đề|tieu\s+de|title)\s*[:=]?\s*(?:"[^"\n]+"|“[^”\n]+”|'[^'\n]+').*(?:nội\s+dung|noi\s+dung|mô\s+tả|mo\s+ta|body|description)\s*[:=]?\s*(?:"[^"\n]+"|“[^”\n]+”|'[^'\n]+')/iu.test(
-          text,
-        ),
-      );
-      if (!alreadyClarifiedWorkItem && !(hasDedicatedNotificationTarget && hasExplicitWorkItemPayload)) {
+
+      if (resolution.status === 'unclarified' || resolution.status === 'invalid_reply') {
+        const state: WorkItemReportClarificationState = {
+          kind: 'work_item_report_disposition',
+          status: 'pending',
+          question: WORK_ITEM_REPORT_CLARIFICATION_QUESTION,
+          options: WORK_ITEM_REPORT_CLARIFICATION_OPTIONS,
+          originalRequest: groundingUserTexts[0] ?? input.userMessage,
+        };
+        input.memory.setEntity(WORK_ITEM_REPORT_MEMORY_KEY, state);
         return JSON.stringify({
           kind: 'clarification',
-          question:
-            'Bạn muốn nội dung công việc mới là báo cáo dữ liệu hay một nội dung riêng? Hãy tách hoặc xác nhận nội dung để tôi giữ đúng từng phần.',
-          context: 'Yêu cầu kết hợp báo cáo với nội dung tạo/cập nhật công việc; chưa gửi hoặc thay đổi dữ liệu.',
+          question: WORK_ITEM_REPORT_CLARIFICATION_QUESTION,
+          options: [...WORK_ITEM_REPORT_CLARIFICATION_OPTIONS],
+          context:
+            resolution.status === 'invalid_reply'
+              ? 'Câu trả lời chưa xác định rõ lựa chọn; vui lòng chọn dùng báo cáo dữ liệu hoặc dùng nội dung riêng cho công việc mới.'
+              : 'Yêu cầu kết hợp báo cáo với nội dung tạo/cập nhật công việc; chưa gửi hoặc thay đổi dữ liệu.',
         });
       }
+
+      input.memory.deleteEntity(WORK_ITEM_REPORT_MEMORY_KEY);
+      workItemChoice = resolution.choice;
+
+      if (workItemChoice === 'separate_content') {
+        if (!hasDedicatedNotificationTarget) {
+          return JSON.stringify({
+            kind: 'clarification',
+            question:
+              'Bạn chọn dùng nội dung riêng cho công việc mới. Bạn muốn gửi báo cáo dữ liệu vào kênh/đích nhận nào?',
+            context: 'Chưa có đích nhận riêng cho báo cáo dữ liệu ngoài bước tạo/cập nhật công việc.',
+          });
+        }
+        for (const step of parsed.steps) {
+          if (!isWorkItemWriteStep(step)) continue;
+          const titleArg = workItemTitleArgument(step.tool);
+          const contentArg = workItemContentArgument(step.tool);
+          if (resolution.explicitTitle) {
+            step.args[titleArg] = resolution.explicitTitle;
+          }
+          if (resolution.explicitBody !== undefined) {
+            step.args[contentArg] = resolution.explicitBody;
+          } else {
+            // Requirement 5 (R1-EXT-B1-01): when body is not approved by the user, do not keep model-fabricated body
+            delete step.args.body;
+            delete step.args.desc;
+            delete step.args.description;
+            delete step.args.text;
+            delete step.args.content;
+          }
+        }
+      } else if (workItemChoice === 'report_content') {
+        for (const step of parsed.steps) {
+          if (!isWorkItemWriteStep(step)) continue;
+          const titleArg = workItemTitleArgument(step.tool);
+          const contentArg = workItemContentArgument(step.tool);
+          if (resolution.explicitTitle) {
+            step.args[titleArg] = resolution.explicitTitle;
+          }
+          // Ensure content argument exists on the work-item step so reportOutputTargets binds the verified report
+          if (!Object.hasOwn(step.args, contentArg)) {
+            step.args[contentArg] = '';
+          }
+        }
+      }
     }
+
+    const targets = reportOutputTargets(parsed.steps, {
+      userTexts: groundingUserTexts,
+      workItemChoice,
+    });
+    const primary = targets.at(-1);
+    if (!primary) return rawOutput;
 
     // Find observation from successfulReads or execute plan's read step via gatherSearch
     let readTool: string | undefined;
@@ -454,6 +541,7 @@ export class AIPlanner {
       itemCount: rendered.itemCount,
       coverage: rendered.coverage,
       contentHash: artifact.contentHash,
+      ...(workItemChoice ? { workItemDisposition: workItemChoice } : {}),
     };
     return JSON.stringify(parsed);
   }
