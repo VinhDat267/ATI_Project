@@ -14,6 +14,10 @@ export default defineConfig(({ command, mode }) => {
   resolve: {
     alias: {
       '@wap/tool-schemas': fileURLToPath(new URL('../../packages/tool-schemas/src/index.ts', import.meta.url)),
+      '@wap/chat-api': fileURLToPath(new URL('../chat-api', import.meta.url)),
+      '@wap/planner-schedule-occurrence': fileURLToPath(
+        new URL('../../packages/planner/src/schedules/next-occurrence.ts', import.meta.url)
+      ),
     },
   },
   define: {

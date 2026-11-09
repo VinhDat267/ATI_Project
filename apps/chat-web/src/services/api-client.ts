@@ -1,6 +1,12 @@
 import { authStorage } from './auth-storage';
 import { getActiveWorkspaceId, getExplicitWorkspaceId, setActiveWorkspaceId } from './workspace-storage';
-import type { ScheduleApprovalMode, ScheduleView, ScheduleRunView } from '@wap/tool-schemas';
+import type {
+  ScheduleApprovalMode,
+  ScheduleProposalMetadata,
+  ScheduleRunView,
+  ScheduleView,
+  SheetsDigestCandidate,
+} from '@wap/tool-schemas';
 import type {
   ActivePlan,
   ChatMessage,
@@ -739,8 +745,34 @@ export class ApiClient {
     );
   }
   changeSchedule(id: string, action: 'pause' | 'resume' | 'cancel', version: number) { return this.request<{ schedule: ScheduleView }>(`/api/schedules/${encodeURIComponent(id)}/${action}`, { method: 'POST', body: JSON.stringify({ version }) }); }
+  reauthorizeSchedulePreview(id: string) {
+    return this.request<{
+      proposalMessageId: string;
+      convId: string;
+      scheduleId: string;
+      baseVersion: number;
+      expiresAt: string;
+      candidate: SheetsDigestCandidate;
+      metadata: ScheduleProposalMetadata;
+    }>(`/api/schedules/${encodeURIComponent(id)}/reauthorize-preview`, {
+      method: 'POST',
+    });
+  }
   runScheduleNow(id: string) { return this.request<{ run: ScheduleRunView }>(`/api/schedules/${encodeURIComponent(id)}/run-now`, { method: 'POST' }); }
   replanScheduleRun(id: string) { return this.request<{ run: ScheduleRunView }>(`/api/schedule-runs/${encodeURIComponent(id)}/replan`, { method: 'POST' }); }
+  resolveScheduleRunDelivery(
+    runId: string,
+    body: { resolution: 'mark_sent' | 'retry_new_run'; confirmDuplicateRisk?: boolean }
+  ) {
+    return this.request<{
+      run: ScheduleRunView;
+      followUpRun: ScheduleRunView | null;
+      schedule: ScheduleView;
+    }>(`/api/schedule-runs/${encodeURIComponent(runId)}/resolve-delivery`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
 
   async getAdminUsers(options: { status?: 'pending' | 'active' | 'disabled'; search?: string; page?: number; limit?: number } = {}): Promise<AdminUserPage> {
     const query = new URLSearchParams();

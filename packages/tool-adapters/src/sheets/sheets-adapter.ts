@@ -9,6 +9,7 @@ import {
   buildDeleteRowRequests,
   buildPartialCellUpdates,
   computeSheetAggregation,
+  executeReadDigestWindow,
   extractTabHeaders,
   filterDuplicateRows,
   filterSearchedRows,
@@ -24,6 +25,8 @@ import {
   spreadsheetUrl,
   titleText,
   validateRawRows,
+  type ReadDigestWindowInput,
+  type ReadDigestWindowResult,
 } from './sheets-shared.js';
 
 export interface SheetsAdapterConfig extends BaseAdapterConfig {
@@ -415,6 +418,18 @@ export class SheetsAdapter extends BaseAdapter {
     }
     return invalid('tool is unsupported');
   }
+  async readDigestWindow(
+    input: ReadDigestWindowInput,
+    context?: { signal?: AbortSignal }
+  ): Promise<ReadDigestWindowResult> {
+    const id = this.checkedId(input?.spreadsheetId);
+    return executeReadDigestWindow(
+      id,
+      input,
+      (path, sig) => this.request(path, sig),
+      context?.signal
+    );
+  }
   private url(id: string): string { return 'https://docs.google.com/spreadsheets/d/' + id + '/edit'; }
   private async tabs(id: string, signal?: AbortSignal): Promise<Array<{ id: number; title: string; spreadsheetId: string; headers?: string[] }>> {
     const value = await this.request(id + '?fields=' + encodeURIComponent('sheets.properties(sheetId,title)'), signal);
@@ -424,4 +439,8 @@ export class SheetsAdapter extends BaseAdapter {
       return { id: tab.properties.sheetId, title: tab.properties.title, spreadsheetId: id, ...(headers.length > 0 ? { headers } : {}) };
     });
   }
+}
+
+export function createSheetsAdapter(config: SheetsAdapterConfig): SheetsAdapter {
+  return new SheetsAdapter(config);
 }

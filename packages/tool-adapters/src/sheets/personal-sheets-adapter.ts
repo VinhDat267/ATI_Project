@@ -9,6 +9,7 @@ import {
   buildDeleteRowRequests,
   buildPartialCellUpdates,
   computeSheetAggregation,
+  executeReadDigestWindow,
   extractTabHeaders,
   filterDuplicateRows,
   filterSearchedRows,
@@ -24,6 +25,8 @@ import {
   spreadsheetUrl,
   titleText,
   validateRawRows,
+  type ReadDigestWindowInput,
+  type ReadDigestWindowResult,
 } from './sheets-shared.js';
 
 export interface PersonalSheetsAdapterConfig extends BaseAdapterConfig {
@@ -1037,6 +1040,19 @@ export class PersonalSheetsAdapter extends BaseAdapter {
         details: { ...(e.details ?? {}), requestSent: false },
       });
     }
+  }
+
+  async readDigestWindow(
+    input: ReadDigestWindowInput,
+    context?: { signal?: AbortSignal }
+  ): Promise<ReadDigestWindowResult> {
+    const id = this.checkedId(input?.spreadsheetId);
+    return executeReadDigestWindow(
+      id,
+      input,
+      (path, sig) => this.request(path, sig),
+      context?.signal
+    );
   }
 
   private async tabs(

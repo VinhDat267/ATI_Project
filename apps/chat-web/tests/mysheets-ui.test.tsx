@@ -235,7 +235,7 @@ describe('SettingsPage - mysheets section', () => {
     render(<SettingsPage user={member} navigate={() => {}} onLogout={() => {}} />);
 
     const personal = await screen.findByRole('region', { name: 'Của riêng bạn' });
-    expect(within(personal).getByText(/Google Sheets của bạn/i)).toBeTruthy();
+    expect(await within(personal).findByText(/Google Sheets của bạn/i)).toBeTruthy();
     expect(within(document.getElementById('service-row-mysheets')!).getByText('Chưa kết nối')).toBeTruthy();
     expect(within(personal).getByRole('button', { name: /Kết nối Google Sheets/i })).toBeTruthy();
   });
@@ -245,7 +245,7 @@ describe('SettingsPage - mysheets section', () => {
     render(<SettingsPage user={member} navigate={() => {}} onLogout={() => {}} />);
 
     const personal = await screen.findByRole('region', { name: 'Của riêng bạn' });
-    expect(within(personal).getByText(/Đã cấp quyền · Chưa chọn bảng tính/i)).toBeTruthy();
+    expect(await within(personal).findByText(/Đã cấp quyền · Chưa chọn bảng tính/i)).toBeTruthy();
     expect(within(personal).getByText(/user@gmail.com/i)).toBeTruthy();
     expect(within(personal).getByRole('button', { name: /Chọn bảng tính/i })).toBeTruthy();
     expect(within(personal).getByRole('button', { name: /Ngắt kết nối/i })).toBeTruthy();
@@ -258,7 +258,7 @@ describe('SettingsPage - mysheets section', () => {
     render(<SettingsPage user={member} navigate={() => {}} onLogout={() => {}} />);
 
     const personal = await screen.findByRole('region', { name: 'Của riêng bạn' });
-    expect(within(personal).getByText('Đã kết nối')).toBeTruthy();
+    expect(await within(personal).findByText('Đã kết nối')).toBeTruthy();
     expect(within(personal).getByText(/user@gmail.com/i)).toBeTruthy();
     expect(within(personal).getByText('Việc của tôi')).toBeTruthy();
     expect(within(personal).getByText('KPI quý 4')).toBeTruthy();
@@ -282,7 +282,7 @@ describe('SettingsPage - mysheets section', () => {
     render(<SettingsPage user={member} navigate={() => {}} onLogout={() => {}} />);
 
     const personal = await screen.findByRole('region', { name: 'Của riêng bạn' });
-    expect(within(personal).getByText(/Cần kết nối lại/i)).toBeTruthy();
+    expect(await within(personal).findByText(/Cần kết nối lại/i)).toBeTruthy();
     expect(within(personal).getByText(/user@gmail.com/i)).toBeTruthy();
     expect(within(personal).getByRole('button', { name: /Kết nối lại Google Sheets/i })).toBeTruthy();
   });
@@ -691,7 +691,7 @@ describe('GuidePage and LandingPage with mysheetsEnabled', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(/Đã kết nối user@gmail\.com/i);
 
     const personal = await screen.findByRole('region', { name: 'Của riêng bạn' });
-    const settingsUrlInput = within(personal).getByLabelText(/Dán liên kết hoặc ID Google Sheets/i);
+    const settingsUrlInput = await within(personal).findByLabelText(/Dán liên kết hoặc ID Google Sheets/i);
     fireEvent.change(settingsUrlInput, {
       target: { value: 'https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit' },
     });
