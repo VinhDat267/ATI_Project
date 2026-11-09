@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { encryptCredentials } from '@wap/tool-adapters';
-import type { ScheduleProposalMetadata } from '@wap/tool-schemas';
+import { encryptCredentials, StepError } from '@wap/tool-adapters';
+import type { ScheduleProposalMetadata, SheetsDigestConfigV2 } from '@wap/tool-schemas';
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
 import { CredentialRepo } from '../../src/db/repositories/credential-repo.js';
 import { ConversationRepo } from '../../src/db/repositories/conversation-repo.js';
@@ -27,6 +27,63 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
   let scheduleRepo: ScheduleRepo;
   let alice: Awaited<ReturnType<Awaited<ReturnType<typeof createMigratedSchema>>['person']>>;
   let mysheetsCredId: string;
+  let slackCredId: string;
+
+  async function upgradeScheduleToPinnedV2(scheduleId: string) {
+    const rowRes = await db.pool.query('SELECT * FROM schedules WHERE id = $1', [scheduleId]);
+    const row = rowRes.rows[0];
+    const oldCfg = row.digest_config;
+    let destCredId = oldCfg.destination.credentialId;
+    if (!destCredId) {
+      if (oldCfg.destination.service === 'slack') {
+        destCredId = slackCredId;
+      } else if (oldCfg.destination.service === 'telegram') {
+        const tg = await credentialRepo.getPersonalCredentials('telegram', row.user_id);
+        destCredId = tg?.id;
+      }
+    }
+    const v2Config: SheetsDigestConfigV2 = {
+      version: 2,
+      workspaceMode: (row.workspace_mode ?? 'legacy') as 'personal' | 'organization' | 'legacy',
+      workspaceId: row.workspace_id ?? null,
+      source: {
+        ...oldCfg.source,
+        credentialId: oldCfg.source.credentialId || mysheetsCredId,
+        email: oldCfg.source.email || 'alice@gmail.com',
+      },
+      destination:
+        oldCfg.destination.service === 'slack'
+          ? {
+              service: 'slack',
+              credentialId: destCredId,
+              channelId: oldCfg.destination.channelId,
+              ...(oldCfg.destination.channelLabel ? { channelLabel: oldCfg.destination.channelLabel } : {}),
+            }
+          : oldCfg.destination.service === 'telegram'
+            ? {
+                service: 'telegram',
+                credentialId: destCredId,
+                chatId: oldCfg.destination.chatId,
+                ...(oldCfg.destination.chatLabel ? { chatLabel: oldCfg.destination.chatLabel } : {}),
+              }
+            : {
+                service: 'gmail',
+                credentialId: destCredId,
+                senderEmail: 'alice@example.com',
+                recipientEmail: oldCfg.destination.recipientEmail,
+              },
+      includeAiSummary: Boolean(oldCfg.includeAiSummary),
+    };
+    const v2Hash = computeSheetsDigestHash({
+      userId: row.user_id,
+      recurrence: row.recurrence,
+      config: v2Config,
+    });
+    await db.pool.query(
+      'UPDATE schedules SET digest_config = $2::jsonb, digest_config_hash = $3 WHERE id = $1',
+      [scheduleId, JSON.stringify(v2Config), v2Hash]
+    );
+  }
 
   beforeAll(async () => {
     db = await createMigratedSchema('sheets_digest_svc');
@@ -61,7 +118,7 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
           },
         ],
         allowedScope: { spreadsheets: [SPREADSHEET_ID] },
-        connectedAt: '2026-11-02T00:00:00Z',
+        connectedAt: '2026-11-01T00:00:00Z',
       },
       ENC_KEY
     );
@@ -76,7 +133,11 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
       },
       ENC_KEY
     );
-    await credentialRepo.saveCredentials('slack', slackConfig);
+    const savedSlack = await credentialRepo.saveCredentials('slack', slackConfig);
+    slackCredId = savedSlack.id;
+    await db.pool.query(
+      "UPDATE service_credentials SET created_at = '2026-11-01T00:00:00Z', status_changed_at = '2026-11-01T00:00:00Z'"
+    );
   });
 
   it('analyzeSheetsDigestCandidate approves read-only mysheets + slack digest and rejects write intent or extra services', async () => {
@@ -300,6 +361,7 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
       now: new Date('2026-11-02T00:00:00Z'),
       approvalMode: 'auto_digest',
     });
+    await upgradeScheduleToPinnedV2(change.schedule.id);
 
     await runner.tick();
 
@@ -377,7 +439,12 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
         }
         return {
           execute: async () => {
-            throw new Error('Slack network error');
+            throw new StepError({
+              message: 'Slack channel not found: channel_not_found',
+              category: 'NOT_FOUND',
+              statusCode: 404,
+              retryable: false,
+            });
           },
         } as any;
       },
@@ -408,6 +475,7 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
       now: new Date('2026-11-02T00:00:00Z'),
       approvalMode: 'auto_digest',
     });
+    await upgradeScheduleToPinnedV2(change.schedule.id);
 
     const runOnce = async (iso: string) => {
       const r = await service.startRun({
@@ -449,6 +517,9 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
       userId: alice.id,
       config: tgPersonalConfig,
     });
+    await db.pool.query(
+      "UPDATE service_credentials SET created_at = '2026-11-01T00:00:00Z', status_changed_at = '2026-11-01T00:00:00Z'"
+    );
 
     const emitted: Array<{ event: string; payload: any }> = [];
     const service = new ScheduleService({
@@ -538,6 +609,7 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
     });
     expect(change.schedule.kind).toBe('sheets_digest');
     expect(change.schedule.approvalMode).toBe('auto_digest');
+    await upgradeScheduleToPinnedV2(change.schedule.id);
 
     const sentTelegram: Array<{ chatId: string; text: string }> = [];
     const digestRunner = new SheetsDigestRunner({
@@ -559,14 +631,20 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
         return {
           execute: async (_tool, args) => {
             sentTelegram.push({ chatId: String(args.chatId), text: String(args.text) });
-            return { ok: true };
+            return { ok: true, messageId: 1001 };
           },
         };
       },
     });
 
     const row = (await scheduleRepo.ownedSchedule(change.schedule.id, alice.id))!;
-    const outcome = await digestRunner.executeDigest(row, row.version, async () => true);
+    const runRes = await db.pool.query<{ id: string }>(
+      `INSERT INTO schedule_runs (schedule_id, schedule_version, trigger, due_at, status)
+       VALUES ($1, $2, 'manual', '2026-11-02T01:30:00Z', 'planning')
+       RETURNING id`,
+      [row.id, row.version]
+    );
+    const outcome = await digestRunner.executeDigest(row, row.version, runRes.rows[0]!.id);
     expect(outcome.status).toBe('digest_sent');
     expect(sentTelegram).toHaveLength(1);
     expect(sentTelegram[0]!.chatId).toBe('-100777888999');
@@ -630,7 +708,7 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
               values: [['Task', 'Status'], ['A', 'Done']],
             };
           }
-          return { ok: true };
+          return { ok: true, ts: '1730509200.000200', channel: 'C12345678' };
         },
       }),
     });
@@ -661,6 +739,7 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
       now: new Date('2026-11-02T00:00:00Z'),
       approvalMode: 'auto_digest',
     });
+    await upgradeScheduleToPinnedV2(change.schedule.id);
 
     // 1. Normal run emits message_complete SSE
     await runner.tick();
@@ -689,10 +768,15 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
       {
         refreshToken: '1//alice-gmail-refresh',
         email: 'alice@example.com',
+        connectedAt: '2026-11-01T00:00:00Z',
       },
       ENC_KEY
     );
     const savedGmail = await credentialRepo.saveCredentials('gmail', gmailConfig, alice.id);
+    await db.pool.query(
+      "UPDATE service_credentials SET created_at = '2026-11-01T00:00:00Z', status_changed_at = '2026-11-01T00:00:00Z' WHERE id = $1",
+      [savedGmail.id]
+    );
 
     // 1. Smart fallback: services=['sheets', 'gmail'] when shared 'sheets' is not configured falls back to Alice's 'mysheets'
     const candidate = await analyzeSheetsDigestCandidate({
@@ -746,6 +830,7 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
       messageRepo,
       encryptionKey: ENC_KEY,
       mysheetsEnabled: true,
+      v1CompatPolicy: 'allow_consistency_candidate',
       createAdapter: async (serviceId) => ({
         execute: async (tool, args) => {
           if (serviceId === 'mysheets') {

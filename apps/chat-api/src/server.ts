@@ -284,16 +284,33 @@ async function bootstrap() {
     encryptionKey: env.ENCRYPTION_KEY,
     credentialRepo: credRepo,
     mysheetsEnabled: mysheetsAvailable,
-    createSheetsDigestAdapter: (serviceId, userId, config) =>
-      (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(serviceId, {
+    createSheetsDigestAdapter: (serviceId, userId, config, scheduleContext) => {
+      const workspaceMode = scheduleContext
+        ? scheduleContext.workspaceMode
+        : 'workspaceMode' in config
+          ? config.workspaceMode
+          : 'legacy';
+      const workspaceId = scheduleContext
+        ? scheduleContext.workspaceId
+        : 'workspaceId' in config
+          ? config.workspaceId
+          : null;
+      if ('workspaceMode' in config) {
+        if (config.workspaceMode !== workspaceMode || (config.workspaceId ?? null) !== (workspaceId ?? null)) {
+          throw new Error('Schedule workspace context mismatch in createSheetsDigestAdapter');
+        }
+      }
+      return (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(serviceId, {
         userId,
         phase: 'execution',
+        workspaceMode,
+        ...(workspaceId ? { workspaceId } : {}),
         connections: {
           ...(config.source.service === 'mysheets' && config.source.credentialId
             ? {
                 mysheets: {
                   credentialId: config.source.credentialId,
-                  email: '',
+                  email: config.source.email ?? '',
                   allowedSpreadsheets: [config.source.spreadsheetId],
                 },
               }
@@ -302,12 +319,28 @@ async function bootstrap() {
             ? {
                 gmail: {
                   credentialId: config.destination.credentialId,
-                  email: '',
+                  email:
+                    'senderEmail' in config.destination && config.destination.senderEmail
+                      ? config.destination.senderEmail
+                      : '',
+                },
+              }
+            : {}),
+          ...(config.destination.service === 'telegram' &&
+          'credentialId' in config.destination &&
+          config.destination.credentialId
+            ? {
+                telegram: {
+                  credentialId: config.destination.credentialId,
+                  telegramUserId: '',
+                  username: '',
+                  chatIds: [config.destination.chatId],
                 },
               }
             : {}),
         },
-      }),
+      });
+    },
     summarizeSheetsDigestWithAi: async (prompt, signal) => {
       if (typeof provider?.generateText !== 'function') return '';
       return provider.generateText(
