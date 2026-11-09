@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import type { ScheduleRunView, ScheduleView } from '@wap/tool-schemas';
 import type { User } from '../../types';
 import { apiClient } from '../../services/api-client';
-import { useSchedulesEnabled } from '../../hooks/use-schedules';
+import { schedulesChanged, useSchedulesEnabled } from '../../hooks/use-schedules';
 import { describeRecurrence, formatRunTime, runLabel, scheduleLabel } from '../../services/schedule-text';
 import { getActiveWorkspaceId, subscribeWorkspace } from '../../services/workspace-storage';
 import { ScheduleActions } from '../Cockpit/ScheduleActions';
+import { SheetsDeliveryRecoveryControl, getEffectiveDeliveryResolution } from '../Cockpit/ScheduleRunRecovery';
 import { WorkflowFlowCanvas } from '../../components/WorkflowFlowCanvas';
 import { ServiceLogo } from '../../components/ServiceLogo';
 
@@ -46,12 +47,26 @@ function RunLink({ run, navigate }: { run: ScheduleRunView; navigate: (path: str
 }
 function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: ScheduleView; navigate: (path: string) => void; reload: () => Promise<void>; onChanged: (schedule: ScheduleView) => void }) {
   const [open, setOpen] = useState(false), [runs, setRuns] = useState<ScheduleRunView[]>([]), [error, setError] = useState('');
+  const [latestResolvedRun, setLatestResolvedRun] = useState<ScheduleRunView | null>(null);
   useEffect(() => {
     if (!open) return;
     let current = true;
     apiClient.getScheduleRuns(schedule.id, 10).then(data => { if (current) { setRuns(data.runs); setError(''); } }).catch(() => { if (current) setError('Không tải được các lượt chạy.'); });
     return () => { current = false; };
   }, [open, schedule]);
+  const effectiveLastRun =
+    latestResolvedRun && schedule.lastRun?.id === latestResolvedRun.id
+      ? latestResolvedRun
+      : schedule.lastRun;
+  const primaryRecoveryRun =
+    effectiveLastRun &&
+    (getEffectiveDeliveryResolution(effectiveLastRun) != null ||
+      (effectiveLastRun.state === 'needs_attention' &&
+        (schedule.kind === 'sheets_digest' ||
+          (typeof effectiveLastRun.error === 'string' &&
+            effectiveLastRun.error.includes('SHEETS_DELIVERY_UNKNOWN')))))
+      ? effectiveLastRun
+      : latestResolvedRun;
   return <article className="bg-white rounded-2xl border border-[#E5E5E0] p-4 sm:p-5 v3-space-y-3 min-w-0 shadow-2xs">
     <h3 className="font-sans text-base font-semibold text-[#111827] [overflow-wrap:anywhere] flex flex-wrap items-center gap-2">
       <span>{schedule.name}</span>
@@ -82,6 +97,18 @@ function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: Sche
         <p>{schedule.lastRun.error || 'Chưa xác định kết quả gửi. Để tránh gửi trùng, lượt này không tự động gửi lại.'}</p>
       </div>
     )}
+    {primaryRecoveryRun && (
+      <SheetsDeliveryRecoveryControl
+        run={primaryRecoveryRun}
+        isSheetsSchedule={schedule.kind === 'sheets_digest'}
+        onResolved={res => {
+          setLatestResolvedRun(res.run);
+          setRuns(prev => prev.map(row => (row.id === res.run.id ? res.run : row)));
+          onChanged(res.schedule);
+          schedulesChanged();
+        }}
+      />
+    )}
     {schedule.lastRun?.state === 'awaiting_approval' && (
       <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-900 v3-space-y-1">
         <p className="font-semibold">Lượt chạy chờ duyệt:</p>
@@ -99,7 +126,7 @@ function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: Sche
     {schedule.lastRun && <p className="text-xs text-[#4B5563]">Lần trước: <RunLink run={schedule.lastRun} navigate={navigate} /></p>}
     <ScheduleActions schedule={schedule} navigate={navigate} onChanged={onChanged} onConflict={reload} />
     <button type="button" className="text-xs font-semibold underline text-[#4B5563]" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? 'Ẩn các lượt gần nhất' : 'Xem 10 lượt gần nhất'}</button>
-    {open && <div className="text-sm text-[#4B5563] v3-space-y-2">{error && <p role="alert">{error}</p>}{!error && !runs.length && <p>Chưa có lượt chạy.</p>}{runs.map(run => <div key={run.id}><RunLink run={run} navigate={navigate} /></div>)}</div>}
+    {open && <div className="text-sm text-[#4B5563] v3-space-y-2">{error && <p role="alert">{error}</p>}{!error && !runs.length && <p>Chưa có lượt chạy.</p>}{runs.map(run => <div key={run.id} className="v3-space-y-1.5"><RunLink run={run} navigate={navigate} />{run.id !== primaryRecoveryRun?.id && <SheetsDeliveryRecoveryControl run={run} isSheetsSchedule={schedule.kind === 'sheets_digest'} onResolved={res => { setLatestResolvedRun(res.run); setRuns(prev => prev.map(row => (row.id === res.run.id ? res.run : row))); onChanged(res.schedule); schedulesChanged(); }} />}</div>)}</div>}
   </article>;
 }
 // PBI-05: chỉ mô tả đúng luồng có thật — lịch được lưu khi người dùng bấm "Xác nhận" trên đề xuất
