@@ -182,5 +182,6 @@ describe('PR-R1-A3c: Atomic Approval & Recovery Re-Validation SQL CAS + continue
 
     await execService.retryStep(plan.id, 'step_1', userId);
     expect(claimSpy).toHaveBeenCalledWith(expect.objectContaining({ id: plan.id }), userId, 'executing');
+    await expect(claimSpy.mock.results[0]?.value).resolves.toBe(true);
   });
 });
