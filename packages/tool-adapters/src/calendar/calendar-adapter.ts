@@ -3,8 +3,23 @@ import { BaseAdapter, StepError, type BaseAdapterConfig } from '../base-adapter.
 import { GlobalRateLimiter } from '../rate-limiter.js';
 import { GoogleServiceAccount, type GoogleServiceAccountCredentials } from '../google/service-account.js';
 import { CALENDAR_MAX_TITLE_CHARS, clipText } from '../bounds.js';
+import {
+  assertValidIanaTimeZone,
+  type CalendarCoverageMetadata,
+  DEFAULT_CALENDAR_TIMEZONE,
+  eventBusyIntervalMs,
+  isValidIanaTimeZone,
+  parseStrictCalendarDate,
+  resolveNaturalTemporalQuery,
+} from './time-utils.js';
 
-export interface CalendarAdapterConfig extends BaseAdapterConfig { credentials: GoogleServiceAccountCredentials; fetchFn?: typeof fetch }
+export * from './time-utils.js';
+
+export interface CalendarAdapterConfig extends BaseAdapterConfig {
+  credentials: GoogleServiceAccountCredentials;
+  fetchFn?: typeof fetch;
+  now?: () => Date;
+}
 export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
 export const CALENDAR_API_BASE = 'https://www.googleapis.com/calendar/v3/calendars/';
 const apiBase = CALENDAR_API_BASE;
@@ -47,10 +62,35 @@ export function only(args: Record<string, any>, keys: string[]): void {
 export function plainDescription(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
-export function normalizedEvent(value: any, writing = false) {
+export function normalizedEvent(value: any, writing = false, fallbackTimeZone?: string) {
   const start = value?.start?.dateTime ?? value?.start?.date;
   const end = value?.end?.dateTime ?? value?.end?.date;
-  if (typeof value?.id !== 'string' || !value.id || typeof value.htmlLink !== 'string' || !value.htmlLink || typeof start !== 'string' || typeof end !== 'string') badResponse(writing);
+  if (
+    typeof value?.id !== 'string' ||
+    !value.id.trim() ||
+    typeof value.htmlLink !== 'string' ||
+    !value.htmlLink.trim() ||
+    typeof start !== 'string' ||
+    typeof end !== 'string'
+  ) {
+    badResponse(writing);
+  }
+  const isStartDateOnly = !start.includes('T');
+  const isEndDateOnly = !end.includes('T');
+  if (isStartDateOnly !== isEndDateOnly) {
+    badResponse(writing);
+  }
+  if (isStartDateOnly) {
+    if (!parseStrictCalendarDate(start) || !parseStrictCalendarDate(end) || end <= start) {
+      badResponse(writing);
+    }
+  } else {
+    const sMs = Date.parse(start);
+    const eMs = Date.parse(end);
+    if (!Number.isFinite(sMs) || !Number.isFinite(eMs) || eMs <= sMs) {
+      badResponse(writing);
+    }
+  }
   const title = clipText(typeof value.summary === 'string' ? value.summary : '(Không có tiêu đề)', CALENDAR_MAX_TITLE_CHARS);
   const location =
     typeof value?.location === 'string' && value.location.trim().length > 0
@@ -77,6 +117,16 @@ export function normalizedEvent(value: any, writing = false) {
       : typeof value?.recurrence === 'string' && value.recurrence.trim()
         ? value.recurrence.trim()
         : undefined;
+  const transparency = value?.transparency === 'transparent' ? ('transparent' as const) : undefined;
+  const status = value?.status === 'cancelled' ? ('cancelled' as const) : undefined;
+  const timeZone =
+    typeof value?.start?.timeZone === 'string' && isValidIanaTimeZone(value.start.timeZone)
+      ? value.start.timeZone.trim()
+      : typeof value?.end?.timeZone === 'string' && isValidIanaTimeZone(value.end.timeZone)
+        ? value.end.timeZone.trim()
+        : typeof fallbackTimeZone === 'string' && isValidIanaTimeZone(fallbackTimeZone)
+          ? fallbackTimeZone.trim()
+          : undefined;
   return {
     id: value.id,
     title: title.text,
@@ -88,6 +138,9 @@ export function normalizedEvent(value: any, writing = false) {
     ...(attendeesList.length > 0 ? { attendees: attendeesList } : {}),
     ...(attendeesCount !== undefined ? { attendeesCount } : {}),
     ...(recurrence ? { recurrence } : {}),
+    ...(transparency ? { transparency } : {}),
+    ...(status ? { status } : {}),
+    ...(timeZone ? { timeZone } : {}),
     ...(title.clipped ? { clipped: true } : {}),
   };
 }
@@ -102,6 +155,9 @@ export interface CalendarEventWithConflict {
   meetLink?: string;
   attendeesCount?: number;
   recurrence?: string;
+  transparency?: string;
+  status?: string;
+  timeZone?: string;
   conflict?: boolean;
   conflictsWith?: string[];
 }
@@ -115,7 +171,10 @@ export interface ParsedCalendarEventQuery {
 const NATURAL_CALENDAR_QUERY_RE = /^(?:\*|all|tất\s+cả|tat\s+ca|today|hôm\s+nay|hom\s+nay|upcoming|sắp\s+tới|sap\s+toi|open|busy|bận|ban|free|trống|trong)$/iu;
 const CONFLICT_CALENDAR_QUERY_RE = /^(?:conflicts?|overlapping|overlap|trùng\s+lịch|trung\s+lich|xung\s+đột|xung\s+dot|trùng\s+giờ|trung\s+gio)(?:\s+(.+))?$/iu;
 
-export function parseCalendarEventQuery(rawQuery?: unknown): ParsedCalendarEventQuery {
+export function parseCalendarEventQuery(
+  rawQuery?: unknown,
+  options?: { now?: Date; timeZone?: string },
+): ParsedCalendarEventQuery {
   if (rawQuery === undefined) return { onlyConflicts: false };
   const checked = text(rawQuery, 4000);
   const trimmed = checked.trim();
@@ -125,43 +184,66 @@ export function parseCalendarEventQuery(rawQuery?: unknown): ParsedCalendarEvent
   const conflictMatch = CONFLICT_CALENDAR_QUERY_RE.exec(trimmed);
   if (conflictMatch) {
     const keyword = conflictMatch[1]?.trim();
+    const cleanedKeyword = keyword
+      ? resolveNaturalTemporalQuery(keyword, {
+          now: options?.now,
+          timeZone: options?.timeZone,
+          requireTemporalWindow: false,
+        }).cleanedQuery
+      : undefined;
     return {
       onlyConflicts: true,
-      ...(keyword ? { keywordFilter: keyword } : {}),
+      ...(cleanedKeyword ? { keywordFilter: cleanedKeyword } : {}),
+    };
+  }
+  const temporalResolved = resolveNaturalTemporalQuery(trimmed, {
+    now: options?.now,
+    timeZone: options?.timeZone,
+    requireTemporalWindow: false,
+  });
+  if (temporalResolved.matchedTemporal) {
+    return {
+      ...(temporalResolved.cleanedQuery ? { textQuery: temporalResolved.cleanedQuery } : {}),
+      onlyConflicts: false,
     };
   }
   return { textQuery: checked, onlyConflicts: false };
 }
 
 export function eventsOverlap(
-  a: Pick<CalendarEventWithConflict, 'start' | 'end'>,
-  b: Pick<CalendarEventWithConflict, 'start' | 'end'>,
+  a: Pick<CalendarEventWithConflict, 'start' | 'end' | 'transparency' | 'status' | 'timeZone'>,
+  b: Pick<CalendarEventWithConflict, 'start' | 'end' | 'transparency' | 'status' | 'timeZone'>,
+  defaultTimeZone = DEFAULT_CALENDAR_TIMEZONE,
 ): boolean {
-  if (!a.start.includes('T') || !a.end.includes('T') || !b.start.includes('T') || !b.end.includes('T')) {
-    return false;
-  }
-  const startA = Date.parse(a.start);
-  const endA = Date.parse(a.end);
-  const startB = Date.parse(b.start);
-  const endB = Date.parse(b.end);
-  if (!Number.isFinite(startA) || !Number.isFinite(endA) || !Number.isFinite(startB) || !Number.isFinite(endB)) {
-    return false;
-  }
-  if (endA <= startA || endB <= startB) return false;
-  return startA < endB && startB < endA;
+  const ivA = eventBusyIntervalMs(a, defaultTimeZone);
+  const ivB = eventBusyIntervalMs(b, defaultTimeZone);
+  if (!ivA || !ivB) return false;
+  return ivA.startMs < ivB.endMs && ivB.startMs < ivA.endMs;
 }
 
 export function detectCalendarConflicts<T extends CalendarEventWithConflict>(
   events: T[],
-  options?: { onlyConflicts?: boolean; keywordFilter?: string; annotateConflicts?: boolean },
+  options?: {
+    onlyConflicts?: boolean;
+    keywordFilter?: string;
+    annotateConflicts?: boolean;
+    timeZone?: string;
+  },
 ): Array<T & { conflict?: boolean; conflictsWith?: string[] }> {
   const annotate = options?.annotateConflicts ?? true;
+  const tz =
+    options?.timeZone && isValidIanaTimeZone(options.timeZone)
+      ? options.timeZone
+      : DEFAULT_CALENDAR_TIMEZONE;
   const annotated = events.map((ev, idx) => {
+    if (ev.status === 'cancelled' || ev.transparency === 'transparent') {
+      return { ...ev };
+    }
     const overlappingTitles: string[] = [];
     for (let j = 0; j < events.length; j++) {
       if (idx === j) continue;
       const other = events[j]!;
-      if (eventsOverlap(ev, other)) {
+      if (eventsOverlap(ev, other, tz)) {
         overlappingTitles.push(other.title);
       }
     }
@@ -185,8 +267,12 @@ export class CalendarAdapter extends BaseAdapter {
   private readonly fetchFn: typeof fetch;
   private readonly auth: GoogleServiceAccount;
   private readonly account: string;
+  private readonly nowFn: () => Date;
   constructor(config: CalendarAdapterConfig) {
-    super(config); this.fetchFn = config.fetchFn ?? globalThis.fetch; this.account = config.credentials.clientEmail;
+    super(config);
+    this.fetchFn = config.fetchFn ?? globalThis.fetch;
+    this.account = config.credentials.clientEmail;
+    this.nowFn = config.now ?? (() => new Date());
     this.auth = new GoogleServiceAccount({ credentials: config.credentials, fetchFn: this.fetchFn });
   }
   private calendars(): string[] {
@@ -263,34 +349,112 @@ export class CalendarAdapter extends BaseAdapter {
       return result;
     }
     if (toolName === 'calendar.list_events') {
-      only(args, ['calendarId', 'timeMin', 'timeMax', 'query', 'limit']); const id = this.checkedId(args.calendarId);
-      windowSize(args.timeMin, args.timeMax, 31); const maximum = limit(args.limit, 20);
-      const parsedQuery = parseCalendarEventQuery(args.query);
-      const params = new URLSearchParams({ timeMin: args.timeMin, timeMax: args.timeMax, singleEvents: 'true', orderBy: 'startTime', maxResults: String(maximum) });
+      only(args, ['calendarId', 'timeMin', 'timeMax', 'timeZone', 'query', 'limit', 'onlyConflicts']);
+      const id = this.checkedId(args.calendarId);
+      const explicitTz = args.timeZone !== undefined ? assertValidIanaTimeZone(args.timeZone) : undefined;
+      let calendarTz = explicitTz;
+      let timeMin = args.timeMin;
+      let timeMax = args.timeMax;
+      if (timeMin === undefined && timeMax === undefined) {
+        if (typeof args.query !== 'string' || !args.query.trim()) {
+          invalid('time requires an explicit ISO timezone');
+        }
+        const preCheck = resolveNaturalTemporalQuery(args.query, {
+          requireTemporalWindow: false,
+        });
+        if (!preCheck.matchedTemporal) {
+          throw new StepError({
+            message:
+              'Calendar query date/time expression is ambiguous or unsupported; please provide explicit timeMin/timeMax or a supported date phrase',
+            category: 'VALIDATION',
+            details: { requestSent: false },
+          });
+        }
+        if (!calendarTz) {
+          const meta = await this.request(encodeURIComponent(id), signal);
+          if (typeof meta?.timeZone !== 'string' || !isValidIanaTimeZone(meta.timeZone)) {
+            badResponse();
+          }
+          calendarTz = meta.timeZone.trim();
+        }
+        const resolved = resolveNaturalTemporalQuery(args.query, {
+          now: this.nowFn(),
+          timeZone: calendarTz,
+          requireTemporalWindow: true,
+        });
+        timeMin = resolved.timeMin!;
+        timeMax = resolved.timeMax!;
+      } else {
+        windowSize(timeMin, timeMax, 31);
+      }
+      const maximum = limit(args.limit, 20);
+      const parsedQuery = parseCalendarEventQuery(args.query, {
+        now: this.nowFn(),
+        timeZone: calendarTz,
+      });
+      const wantOnlyConflicts = parsedQuery.onlyConflicts || args.onlyConflicts === true;
+      const params = new URLSearchParams({ timeMin, timeMax, singleEvents: 'true', orderBy: 'startTime', maxResults: String(maximum) });
       if (parsedQuery.textQuery !== undefined) params.set('q', parsedQuery.textQuery);
-      const events: Array<ReturnType<typeof normalizedEvent>> = []; const seenPages = new Set<string>();
+      const events: Array<ReturnType<typeof normalizedEvent>> = [];
+      const seenPages = new Set<string>();
+      let incompleteReason: string | undefined;
       const done = () => {
         const truncated = events.some(event => event.clipped);
         const baseEvents = events.map(({ clipped: _clipped, ...event }) => event);
-        const processed = parsedQuery.onlyConflicts
+        const processed = wantOnlyConflicts
           ? detectCalendarConflicts(baseEvents, {
               onlyConflicts: true,
               keywordFilter: parsedQuery.keywordFilter,
               annotateConflicts: true,
+              timeZone: calendarTz,
             })
           : baseEvents;
-        return { events: processed, ...(truncated ? { truncated: true } : {}) };
+        const complete = incompleteReason === undefined;
+        const coverage: CalendarCoverageMetadata = {
+          complete,
+          returned: processed.length,
+          totalAvailable: complete ? processed.length : null,
+          ...(incompleteReason ? { reason: incompleteReason } : {}),
+        };
+        return { events: processed, ...(truncated ? { truncated: true } : {}), coverage };
       };
       // Calendar can return an empty page with nextPageToken; empty is not necessarily complete.
       for (let page = 0; page < 20; page++) {
         const value = await this.request(encodeURIComponent(id) + '/events?' + params, signal);
         if (!value || typeof value !== 'object' || (value.items !== undefined && !Array.isArray(value.items))) badResponse();
-        for (const item of value.items ?? []) {
-          if (item?.status === 'cancelled') continue;
-          events.push(normalizedEvent(item)); if (events.length >= maximum) break;
+        if (
+          value.nextPageToken !== undefined &&
+          (typeof value.nextPageToken !== 'string' ||
+            (value.nextPageToken !== '' && seenPages.has(value.nextPageToken)))
+        ) {
+          badResponse();
         }
-        if (events.length >= maximum || value.nextPageToken === undefined || value.nextPageToken === '') return done();
-        if (typeof value.nextPageToken !== 'string' || seenPages.has(value.nextPageToken)) badResponse();
+        if (typeof value.timeZone === 'string' && isValidIanaTimeZone(value.timeZone)) {
+          calendarTz ??= value.timeZone.trim();
+        }
+        const items = value.items ?? [];
+        let hitMaxWithUnreadItems = false;
+        for (let idx = 0; idx < items.length; idx++) {
+          const item = items[idx];
+          if (item?.status === 'cancelled') continue;
+          if (events.length >= maximum) {
+            hitMaxWithUnreadItems = true;
+            break;
+          }
+          const rawStart = item?.start?.dateTime ?? item?.start?.date;
+          const isAllDayItem = typeof rawStart === 'string' && !rawStart.includes('T');
+          events.push(normalizedEvent(item, false, isAllDayItem ? calendarTz : explicitTz));
+        }
+        const hasNextPage = typeof value.nextPageToken === 'string' && value.nextPageToken !== '';
+        if (events.length >= maximum) {
+          if (hitMaxWithUnreadItems) {
+            incompleteReason = 'limit_reached';
+          } else if (hasNextPage) {
+            incompleteReason = 'next_page_available';
+          }
+          return done();
+        }
+        if (value.nextPageToken === undefined || value.nextPageToken === '') return done();
         seenPages.add(value.nextPageToken); params.set('pageToken', value.nextPageToken); params.set('maxResults', String(maximum - events.length));
       }
       throw new StepError({ message: 'Calendar event pagination exceeded its read budget; narrow the time interval', category: 'SERVER_ERROR' });
