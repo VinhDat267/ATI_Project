@@ -116,7 +116,7 @@ describe('real PostgreSQL plan invariants', () => {
     let planId: string | undefined;
     try {
       for (const [id, name] of [[ownerId, 'Owner'], [intruderId, 'Intruder']]) {
-        await pool.query('INSERT INTO users (id, email, password, name) VALUES ($1, $2, $3, $4)', [id, `${id}@example.test`, 'test-only', name]);
+        await pool.query("INSERT INTO users (id, email, password, name, status) VALUES ($1, $2, $3, $4, 'active')", [id, `${id}@example.test`, 'test-only', name]);
       }
       await pool.query('INSERT INTO conversations (id, user_id) VALUES ($1, $2)', [convId, ownerId]);
       const repo = new PlanRepo(pool);
