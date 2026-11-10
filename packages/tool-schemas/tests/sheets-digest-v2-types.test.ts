@@ -15,6 +15,8 @@ import {
   type SheetsDigestPreviewInfo,
   type SheetsDigestSourceConfigV2,
   type SheetsDigestWorkspaceMode,
+  type SheetsAppendLeaseStore,
+  type SheetsAppendLeaseHandle,
 } from '../src/index.js';
 
 describe('SheetsDigestConfigV2 & Gate A recovery schema contracts', () => {
@@ -397,5 +399,59 @@ describe('SheetsDigestConfigV2 & Gate A recovery schema contracts', () => {
     expect(manualDelivery.providerSentAt).toBeNull();
     expect(manualDelivery.manualConfirmedAt).toBe('2026-11-08T08:05:00.000Z');
     expect(manualDelivery.manualResolution?.manualConfirmedAt).toBe('2026-11-08T08:05:00.000Z');
+  });
+
+  it('supports GAS-02/GAS-08/GAS-10 contracts: preview includeAiSummary, delivery dispatch snapshot metadata, and SheetsAppendLeaseStore', async () => {
+    const preview: SheetsDigestPreviewInfo = {
+      workspaceMode: 'personal',
+      sourceConnectionLabel: 'Google Sheets cá nhân',
+      sourceOwnerLabel: 'alice@gmail.com',
+      spreadsheetTitle: 'KPI',
+      spreadsheetId: 'sheet-123',
+      requestedRangeLabel: 'Tasks!A1:B3',
+      destinationConnectionLabel: 'Slack',
+      destinationTargetLabel: '#kpi',
+      includeAiSummary: false,
+    };
+
+    const delivery: SheetsDigestDelivery = {
+      destination: 'slack',
+      targetId: 'C123',
+      spreadsheetId: 'sheet-123',
+      spreadsheetTitle: 'KPI',
+      rowCount: 2,
+      summaryMode: 'deterministic',
+      sentAt: '2026-11-10T08:00:00.000Z',
+      providerSentAt: '2026-11-10T08:00:00.000Z',
+      slackMessageTs: '1700000000.000100',
+      dispatchedScheduleVersion: 1,
+      dispatchedConfigHash: 'hash-v1',
+    };
+
+    const mockStore: SheetsAppendLeaseStore = {
+      acquireLease: async (input) => {
+        const handle: SheetsAppendLeaseHandle = {
+          leaseId: `lease:${input.scopeKey}`,
+          fencingToken: 1,
+          waitedForContention: false,
+          release: async () => {},
+        };
+        return handle;
+      },
+    };
+
+    const lease = await mockStore.acquireLease({
+      scopeKey: 'sheet-123::Tasks',
+      spreadsheetId: 'sheet-123',
+      sheetTitle: 'Tasks',
+      ownerId: 'worker-1',
+    });
+
+    expect(preview.includeAiSummary).toBe(false);
+    expect(delivery.dispatchedScheduleVersion).toBe(1);
+    expect(delivery.dispatchedConfigHash).toBe('hash-v1');
+    expect(lease.fencingToken).toBe(1);
+    expect(lease.waitedForContention).toBe(false);
+    await lease.release();
   });
 });

@@ -365,6 +365,7 @@ export interface SheetsDigestPreviewInfo {
   destinationConnectionLabel: string;
   destinationTargetLabel: string;
   crossBoundaryWarning?: string;
+  includeAiSummary?: boolean;
 }
 
 export interface SheetsDigestCandidate {
@@ -402,7 +403,30 @@ export interface SheetsDigestDelivery {
   telegramMessageId?: string | number;
   gmailMessageId?: string;
   skippedEmpty?: boolean;
+  dispatchedScheduleVersion?: number;
+  dispatchedConfigHash?: string;
   manualResolution?: SheetsDigestManualResolution;
+}
+
+export interface SheetsAppendLeaseAcquireInput {
+  scopeKey: string;
+  spreadsheetId: string;
+  sheetTitle: string;
+  ownerId: string;
+  ttlMs?: number;
+  signal?: AbortSignal;
+}
+
+export interface SheetsAppendLeaseHandle {
+  leaseId: string;
+  fencingToken: number;
+  waitedForContention: boolean;
+  release: () => Promise<void>;
+  markUnknownOutcome?: (reason: string) => Promise<void>;
+}
+
+export interface SheetsAppendLeaseStore {
+  acquireLease(input: SheetsAppendLeaseAcquireInput): Promise<SheetsAppendLeaseHandle>;
 }
 
 export interface CalendarDigestConfig {
