@@ -1,6 +1,50 @@
 import { TrelloBaseAdapter } from './base.js';
 import { StepError } from '../base-adapter.js';
 
+export const TRELLO_BOARD_CARDS_SCAN_PREFIX_LIMIT = 50;
+
+export interface TrelloBoardCardScanStat {
+  boardId: string;
+  fetchedCount: number;
+  capReached: boolean;
+}
+
+export interface TrelloCardScanMetadata {
+  available: 'UNKNOWN';
+  prefixLimit: number;
+  scannedCount: number;
+  uniqueScannedCount: number;
+  duplicateCountDropped: number;
+  matchedCount: number;
+  displayedCount: number;
+  limitApplied: number;
+  prefixCapReached: boolean;
+  truncatedByLimit: boolean;
+  isComplete: false;
+  perBoard: TrelloBoardCardScanStat[];
+}
+
+export interface TrelloCardSearchResultItem {
+  id: string;
+  name: string;
+  url: string;
+  listId: string;
+  boardId?: string;
+  due?: string | null;
+  dueComplete?: boolean;
+  idMembers?: string[];
+  labels?: string[];
+}
+
+export type TrelloCardSearchResultArray = Array<TrelloCardSearchResultItem> & {
+  readonly scanMetadata?: TrelloCardScanMetadata;
+};
+
+export function getTrelloSearchScanMetadata(cards: unknown): TrelloCardScanMetadata | undefined {
+  if (!Array.isArray(cards)) return undefined;
+  return (cards as TrelloCardSearchResultArray).scanMetadata;
+}
+
 export class TrelloReadTools extends TrelloBaseAdapter {
   protected assertBoardInScope(boardId: string): void {
     this.assertAllowedScope('boards', boardId);
@@ -34,7 +78,8 @@ export class TrelloReadTools extends TrelloBaseAdapter {
     args: { boardId: string; query?: string; limit?: number },
     options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<Array<{ id: string; name: string; boardId: string }>> {
-    if (options?.boardId) {
+    this.assertValidResourceId(args.boardId, 'boardId');
+    if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
       if (options.boardId !== args.boardId) {
         throw new StepError({
@@ -42,6 +87,7 @@ export class TrelloReadTools extends TrelloBaseAdapter {
           category: 'AUTH_ERROR',
           statusCode: 403,
           retryable: false,
+          details: { requestSent: false },
         });
       }
     }
@@ -72,27 +118,33 @@ export class TrelloReadTools extends TrelloBaseAdapter {
     args: { query: string; boardId?: string; limit?: number },
     options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<Array<{ id: string; fullName: string; username: string }>> {
-    if (options?.boardId) {
+    if (args.boardId !== undefined) {
+      this.assertValidResourceId(args.boardId, 'boardId');
+    }
+    if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
-      if (options.boardId !== args.boardId) {
+      if (args.boardId !== undefined && options.boardId !== args.boardId) {
         throw new StepError({
           message: `Board '${args.boardId}' does not match expected step board '${options.boardId}'`,
           category: 'AUTH_ERROR',
           statusCode: 403,
           retryable: false,
+          details: { requestSent: false },
         });
       }
     }
-    if (!args.boardId) {
+    const targetBoardId = args.boardId ?? options?.boardId;
+    if (!targetBoardId) {
       throw new StepError({
         message: 'A board ID is required to search members within an allowed board',
         category: 'AUTH_ERROR',
         statusCode: 403,
         retryable: false,
+        details: { requestSent: false },
       });
     }
-    this.assertAllowedScope('boards', args.boardId);
-    const endpoint = `/boards/${args.boardId}/members`;
+    this.assertAllowedScope('boards', targetBoardId);
+    const endpoint = `/boards/${targetBoardId}/members`;
 
     const rawMembers = await this.request<any[]>(endpoint, { signal: options?.signal });
     const queryLower = (args.query || '').toLowerCase();
@@ -112,32 +164,68 @@ export class TrelloReadTools extends TrelloBaseAdapter {
   }
 
   /**
+   * Search cards across boards and lists with explicit scan/coverage metadata.
+   */
+  async searchCardsWithMetadata(
+    args: {
+      query: string;
+      boardId?: string;
+      listId?: string;
+      limit?: number;
+    },
+    options?: { signal?: AbortSignal; boardId?: string }
+  ): Promise<{ cards: TrelloCardSearchResultArray; scanMetadata: TrelloCardScanMetadata }> {
+    const cards = await this.searchCards(args, options);
+    const scanMetadata = getTrelloSearchScanMetadata(cards)!;
+    return { cards, scanMetadata };
+  }
+
+  /**
    * Search cards across boards and lists.
    * Supports empty query ('') by listing open cards directly from allowed boards/lists.
    */
-  async searchCards(args: {
-    query: string;
-    boardId?: string;
-    listId?: string;
-    limit?: number;
-  }): Promise<Array<{
-    id: string;
-    name: string;
-    url: string;
-    listId: string;
-    boardId?: string;
-    due?: string | null;
-    dueComplete?: boolean;
-    idMembers?: string[];
-    labels?: string[];
-  }>> {
-    if (args.boardId) {
-      this.assertAllowedScope('boards', args.boardId);
+  async searchCards(
+    args: {
+      query: string;
+      boardId?: string;
+      listId?: string;
+      limit?: number;
+    },
+    options?: { signal?: AbortSignal; boardId?: string }
+  ): Promise<TrelloCardSearchResultArray> {
+    if (args.boardId !== undefined) {
+      this.assertValidResourceId(args.boardId, 'boardId');
+    }
+    if (args.listId !== undefined) {
+      this.assertValidResourceId(args.listId, 'listId');
+    }
+    if (options?.boardId !== undefined) {
+      this.assertBoardInScope(options.boardId);
+      if (args.boardId !== undefined && options.boardId !== args.boardId) {
+        throw new StepError({
+          message: `Board '${args.boardId}' does not match expected step board '${options.boardId}'`,
+          category: 'AUTH_ERROR',
+          statusCode: 403,
+          retryable: false,
+          details: { requestSent: false },
+        });
+      }
     }
 
-    const signal = (args as any).signal as AbortSignal | undefined;
+    const effectiveBoardId = args.boardId ?? options?.boardId;
+    if (effectiveBoardId !== undefined) {
+      this.assertAllowedScope('boards', effectiveBoardId);
+    }
+
+    const signal = options?.signal ?? ((args as any).signal as AbortSignal | undefined);
     const queryTrimmed = (args.query ?? '').trim();
     let rawCards: any[] = [];
+    const perBoard: TrelloBoardCardScanStat[] = [];
+
+    if (args.listId !== undefined) {
+      const listMeta = await this.request<any>(`/lists/${args.listId}?fields=id,idBoard`, { signal });
+      this.assertParentBoard(listMeta, effectiveBoardId);
+    }
 
     if (!queryTrimmed) {
       if (args.listId) {
@@ -146,49 +234,83 @@ export class TrelloReadTools extends TrelloBaseAdapter {
           { signal }
         );
         rawCards = Array.isArray(res) ? res : [];
+        const inferredBoardId =
+          effectiveBoardId ?? (typeof rawCards[0]?.idBoard === 'string' ? rawCards[0].idBoard : '');
+        perBoard.push({
+          boardId: inferredBoardId,
+          fetchedCount: rawCards.length,
+          capReached: rawCards.length >= TRELLO_BOARD_CARDS_SCAN_PREFIX_LIMIT,
+        });
       } else {
-        const targetBoards = args.boardId ? [args.boardId] : this.allowedBoardIds;
+        const targetBoards = effectiveBoardId ? [effectiveBoardId] : [...this.allowedBoardIds];
         for (const bId of targetBoards) {
           this.assertAllowedScope('boards', bId);
           const res = await this.request<any[]>(
             `/boards/${bId}/cards?fields=id,name,url,idList,idBoard,due,dueComplete,idMembers,labels,desc`,
             { signal }
           );
-          if (Array.isArray(res)) {
-            rawCards.push(...res.map((c) => ({ ...c, idBoard: c.idBoard || bId })));
-          }
+          const boardCards = Array.isArray(res) ? res : [];
+          perBoard.push({
+            boardId: bId,
+            fetchedCount: boardCards.length,
+            capReached: boardCards.length >= TRELLO_BOARD_CARDS_SCAN_PREFIX_LIMIT,
+          });
+          rawCards.push(...boardCards.map((c) => ({ ...c, idBoard: c.idBoard || bId })));
         }
       }
     } else {
+      const targetBoards = effectiveBoardId ? [effectiveBoardId] : [...this.allowedBoardIds];
+      if (targetBoards.length === 0) {
+        throw new StepError({
+          message: 'Allowed scope restriction: no allowed Trello boards configured for search',
+          category: 'AUTH_ERROR',
+          statusCode: 403,
+          retryable: false,
+          details: { requestSent: false },
+        });
+      }
+      for (const bId of targetBoards) {
+        this.assertAllowedScope('boards', bId);
+      }
+      const idBoardsParam = encodeURIComponent(targetBoards.join(','));
       const res = await this.request<any>(
-        `/search?query=${encodeURIComponent(queryTrimmed)}&modelTypes=cards&card_fields=id,name,url,idList,idBoard,due,dueComplete,idMembers,labels,desc`,
+        `/search?query=${encodeURIComponent(queryTrimmed)}&idBoards=${idBoardsParam}&modelTypes=cards&cards_limit=${TRELLO_BOARD_CARDS_SCAN_PREFIX_LIMIT}&card_fields=id,name,url,idList,idBoard,due,dueComplete,idMembers,labels,desc`,
         { signal }
       );
       rawCards = Array.isArray(res?.cards) ? res.cards : Array.isArray(res) ? res : [];
     }
 
+    const scannedCount = rawCards.length;
+    const seenCardIds = new Set<string>();
+    const uniqueRawCards: any[] = [];
+    let duplicateCountDropped = 0;
+
+    for (const c of rawCards) {
+      const cardId = typeof c?.id === 'string' || typeof c?.id === 'number' ? String(c.id).trim() : '';
+      if (!cardId) continue;
+      if (seenCardIds.has(cardId)) {
+        duplicateCountDropped++;
+        continue;
+      }
+      seenCardIds.add(cardId);
+      uniqueRawCards.push(c);
+    }
+
     const limit = Math.min(Math.max(args.limit ?? 10, 1), 50);
 
-    let filtered = rawCards.filter((c) => typeof c.idBoard === 'string' && this.allowedBoardIds.includes(c.idBoard));
-    if (args.boardId) {
-      filtered = filtered.filter((c) => c.idBoard === args.boardId);
+    let filtered = uniqueRawCards.filter(
+      (c) => typeof c.idBoard === 'string' && this.allowedBoardIds.includes(c.idBoard)
+    );
+    if (effectiveBoardId) {
+      filtered = filtered.filter((c) => c.idBoard === effectiveBoardId);
     }
     if (args.listId) {
       filtered = filtered.filter((c) => c.idList === args.listId);
     }
 
-    return filtered.slice(0, limit).map((c) => {
-      const item: {
-        id: string;
-        name: string;
-        url: string;
-        listId: string;
-        boardId?: string;
-        due?: string | null;
-        dueComplete?: boolean;
-        idMembers?: string[];
-        labels?: string[];
-      } = {
+    const matchedCount = filtered.length;
+    const items: TrelloCardSearchResultArray = filtered.slice(0, limit).map((c) => {
+      const item: TrelloCardSearchResultItem = {
         id: String(c.id),
         name: String(c.name),
         url: String(c.url || ''),
@@ -205,6 +327,34 @@ export class TrelloReadTools extends TrelloBaseAdapter {
       }
       return item;
     });
+
+    const prefixCapReached =
+      perBoard.length > 0
+        ? perBoard.some((b) => b.capReached)
+        : scannedCount >= TRELLO_BOARD_CARDS_SCAN_PREFIX_LIMIT;
+    const scanMetadata: TrelloCardScanMetadata = {
+      available: 'UNKNOWN',
+      prefixLimit: TRELLO_BOARD_CARDS_SCAN_PREFIX_LIMIT,
+      scannedCount,
+      uniqueScannedCount: uniqueRawCards.length,
+      duplicateCountDropped,
+      matchedCount,
+      displayedCount: items.length,
+      limitApplied: limit,
+      prefixCapReached,
+      truncatedByLimit: matchedCount > items.length,
+      isComplete: false,
+      perBoard,
+    };
+
+    Object.defineProperty(items, 'scanMetadata', {
+      value: scanMetadata,
+      enumerable: false,
+      configurable: true,
+      writable: false,
+    });
+
+    return items;
   }
 
   /**
@@ -230,9 +380,15 @@ export class TrelloReadTools extends TrelloBaseAdapter {
       items: Array<{ id: string; name: string; state: string }>;
     }>;
   }> {
-    if (options?.boardId) {
+    this.assertValidResourceId(args.cardId, 'cardId');
+    if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
     }
+    const cardMeta = await this.request<any>(`/cards/${args.cardId}?fields=id,idBoard`, {
+      signal: options?.signal,
+    });
+    this.assertParentBoard(cardMeta, options?.boardId);
+
     const card = await this.request<any>(`/cards/${args.cardId}?checklists=all`, { signal: options?.signal });
     this.assertParentBoard(card, options?.boardId);
 
@@ -298,7 +454,7 @@ export class TrelloReadTools extends TrelloBaseAdapter {
       case 'trello.search_members':
         return this.searchMembers(args as any, opts);
       case 'trello.search_cards':
-        return this.searchCards({ ...args, ...opts } as any);
+        return this.searchCards(args as any, opts);
       case 'trello.get_card':
         return this.getCard(args as any, opts);
       default:
