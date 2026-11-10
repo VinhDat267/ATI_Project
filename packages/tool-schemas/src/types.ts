@@ -458,6 +458,11 @@ export interface SheetsAppendLeaseHandle {
   markUnknownOutcome?: (reason: string, meta?: SheetsAppendDispatchMetadata) => Promise<void>;
 }
 
+/**
+ * @deprecated Unsupported in production primitives. Manual override of `unknown_outcome`
+ * append leases is rejected fail-closed until an authenticated, authorized, and durably
+ * audited operator recovery service is introduced.
+ */
 export type SheetsAppendManualRecoveryDecision =
   | 'operator_confirm_aborted_allow_retry'
   | 'operator_acknowledge_duplicate_risk';
@@ -468,8 +473,20 @@ export interface SheetsAppendLeaseReconcileInput {
   fencingToken?: number;
   reason?: string;
   verify?: (state: SheetsAppendLeaseState) => Promise<boolean>;
+  /**
+   * @deprecated Unsupported and rejected fail-closed in production stores/adapters
+   * pending a future authenticated, authorized, and durably audited operator service.
+   */
   manualOperatorDecision?: SheetsAppendManualRecoveryDecision;
+  /**
+   * @deprecated Unsupported and rejected fail-closed in production stores/adapters
+   * pending a future authenticated, authorized, and durably audited operator service.
+   */
   acknowledgeDuplicateRisk?: boolean;
+  /**
+   * @deprecated Unsupported and rejected fail-closed in production stores/adapters
+   * pending a future authenticated, authorized, and durably audited operator service.
+   */
   confirmDuplicateRisk?: boolean;
 }
 

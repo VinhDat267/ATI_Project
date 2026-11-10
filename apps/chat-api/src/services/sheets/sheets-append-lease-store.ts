@@ -173,39 +173,35 @@ export class PostgresSheetsAppendLeaseStore implements SheetsAppendLeaseStore {
     const targetLeaseId = input.leaseId ?? current.leaseId;
     const targetFencingToken = input.fencingToken ?? current.fencingToken;
 
-    const isExplicitManualOverride =
-      (input.manualOperatorDecision === 'operator_confirm_aborted_allow_retry' ||
-        input.manualOperatorDecision === 'operator_acknowledge_duplicate_risk') &&
-      (input.acknowledgeDuplicateRisk === true || input.confirmDuplicateRisk === true);
-
-    if (!isExplicitManualOverride) {
-      if (input.reason === 'aborted') {
-        return false;
-      }
-      if (typeof input.verify !== 'function') {
-        return false;
-      }
-      const meta = current.dispatchedMeta;
-      if (
-        !meta ||
-        !Array.isArray(meta.candidateKeys) ||
-        meta.candidateKeys.length === 0 ||
-        !Number.isInteger(meta.rowCount) ||
-        meta.rowCount < 1 ||
-        meta.candidateKeys.length !== meta.rowCount ||
-        meta.candidateKeys.some((sig) => typeof sig !== 'string' || sig.trim().length === 0)
-      ) {
-        return false;
-      }
-      const verified = await input.verify(current);
-      if (!verified) {
-        return false;
-      }
-    } else if (typeof input.verify === 'function') {
-      const verified = await input.verify(current);
-      if (!verified) {
-        return false;
-      }
+    // Manual operator override and unverified abort claims are unsupported in production
+    // primitives pending an authenticated, authorized, and durably audited operator service.
+    if (
+      input.manualOperatorDecision !== undefined ||
+      input.acknowledgeDuplicateRisk !== undefined ||
+      input.confirmDuplicateRisk !== undefined ||
+      input.reason === 'manual_operator_override' ||
+      input.reason === 'aborted'
+    ) {
+      return false;
+    }
+    if (typeof input.verify !== 'function') {
+      return false;
+    }
+    const meta = current.dispatchedMeta;
+    if (
+      !meta ||
+      !Array.isArray(meta.candidateKeys) ||
+      meta.candidateKeys.length === 0 ||
+      !Number.isInteger(meta.rowCount) ||
+      meta.rowCount < 1 ||
+      meta.candidateKeys.length !== meta.rowCount ||
+      meta.candidateKeys.some((sig) => typeof sig !== 'string' || sig.trim().length === 0)
+    ) {
+      return false;
+    }
+    const verified = await input.verify(current);
+    if (!verified) {
+      return false;
     }
 
     const res = await this.pool.query(

@@ -1744,22 +1744,84 @@ describe('PersonalSheetsAdapter', () => {
       matchedSignatures: ['GH#401\u001fPart 1'],
       inconclusiveReason: 'partial_batch',
     });
-    expect((await leaseStore.getLeaseState?.(scopeKey))?.status).toBe('unknown_outcome');
+    const stateBeforeManualAttempt = await leaseStore.getLeaseState?.(scopeKey);
+    expect(stateBeforeManualAttempt?.status).toBe('unknown_outcome');
+    expect(stateBeforeManualAttempt?.unknownReason).toBe('503 mid-batch');
+    expect(stateBeforeManualAttempt?.dispatchedMeta).toEqual({
+      operation: 'append',
+      rowCount: 2,
+      candidateKeys: ['GH#401\u001fPart 1', 'GH#402\u001fPart 2'],
+    });
 
-    // Explicit manual operator decision acknowledging duplicate risk releases the blocked lease
-    const manualRec = await adapter2.reconcileAppendLease({
+    // Manual operator override (with or without acknowledgement, on adapter or direct store) MUST fail closed
+    const manualWithoutAck = await adapter2.reconcileAppendLease({
+      spreadsheetId,
+      sheet: 'Sheet1',
+      manualOperatorDecision: 'operator_acknowledge_duplicate_risk',
+    });
+    expect(manualWithoutAck).toMatchObject({
+      reconciled: false,
+      committedOnProvider: false,
+      matchedSignatures: ['GH#401\u001fPart 1'],
+      inconclusiveReason: 'partial_batch',
+    });
+    const manualWithAck = await adapter2.reconcileAppendLease({
       spreadsheetId,
       sheet: 'Sheet1',
       manualOperatorDecision: 'operator_acknowledge_duplicate_risk',
       acknowledgeDuplicateRisk: true,
     });
-    expect(manualRec).toMatchObject({
-      reconciled: true,
+    expect(manualWithAck).toMatchObject({
+      reconciled: false,
       committedOnProvider: false,
+      matchedSignatures: ['GH#401\u001fPart 1'],
+      inconclusiveReason: 'partial_batch',
+    });
+    expect(
+      await leaseStore.reconcileUnknownLease({
+        scopeKey,
+        manualOperatorDecision: 'operator_confirm_aborted_allow_retry',
+        acknowledgeDuplicateRisk: true,
+        confirmDuplicateRisk: true,
+        verify: async () => true,
+      })
+    ).toBe(false);
+    const stateAfterManualAttempt = await leaseStore.getLeaseState?.(scopeKey);
+    expect(stateAfterManualAttempt).toEqual(stateBeforeManualAttempt);
+
+    // Retry while partial batch remains unreconciled MUST fail closed with 0 additional provider POSTs
+    const postsBeforeBlockedRetry = postAttempts;
+    await expect(
+      adapter2.execute('mysheets.append_rows', {
+        spreadsheetId,
+        sheet: 'Sheet1',
+        rows: [
+          ['GH#401', 'Part 1'],
+          ['GH#402', 'Part 2'],
+        ],
+      })
+    ).rejects.toMatchObject({
+      details: {
+        code: 'SHEETS_APPEND_UNKNOWN_OUTCOME_UNRECONCILED',
+        requestSent: false,
+      },
+    });
+    expect(postAttempts).toBe(postsBeforeBlockedRetry);
+
+    // Once the remaining row of the batch lands on the provider, automatic verified readback releases the lease
+    sheetRows.push(['GH#402', 'Part 2']);
+    const verifiedBatchRec = await adapter2.reconcileAppendLease({
+      spreadsheetId,
+      sheet: 'Sheet1',
+    });
+    expect(verifiedBatchRec).toMatchObject({
+      reconciled: true,
+      committedOnProvider: true,
+      matchedSignatures: ['GH#401\u001fPart 1', 'GH#402\u001fPart 2'],
     });
     expect((await leaseStore.getLeaseState?.(scopeKey))?.status).toBe('released');
 
-    // 10. >500-row absence / out-of-window boundary: row at index >= 500 (row 501+) fails closed
+    // 10. >500-row absence / out-of-window boundary: row at index >= 500 (row 501+) fails closed even if manual override is requested
     while (sheetRows.length <= 500) {
       sheetRows.push([`GH#FILL_${sheetRows.length}`, `Row ${sheetRows.length}`]);
     }
@@ -1782,6 +1844,18 @@ describe('PersonalSheetsAdapter', () => {
       sheet: 'Sheet1',
     });
     expect(outOfWindowRec).toMatchObject({
+      reconciled: false,
+      committedOnProvider: false,
+      matchedSignatures: [],
+      inconclusiveReason: 'out_of_window',
+    });
+    const outOfWindowManualRec = await adapter2.reconcileAppendLease({
+      spreadsheetId,
+      sheet: 'Sheet1',
+      manualOperatorDecision: 'operator_confirm_aborted_allow_retry',
+      acknowledgeDuplicateRisk: true,
+    });
+    expect(outOfWindowManualRec).toMatchObject({
       reconciled: false,
       committedOnProvider: false,
       matchedSignatures: [],

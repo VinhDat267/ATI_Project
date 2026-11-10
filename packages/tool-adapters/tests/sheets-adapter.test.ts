@@ -480,9 +480,22 @@ it('GAS-10: shared SheetsAdapter (sheets.append_rows) fails closed on delayed co
     matchedSignatures: ['GH#401\u001fPart 1'],
     inconclusiveReason: 'partial_batch',
   });
-  expect((await leaseStore.getLeaseState?.(scopeKey))?.status).toBe('unknown_outcome');
+  const sharedStateBeforeManual = await leaseStore.getLeaseState?.(scopeKey);
+  expect(sharedStateBeforeManual?.status).toBe('unknown_outcome');
+  expect(sharedStateBeforeManual?.unknownReason).toBe('502 mid-batch');
 
-  // Explicit manual operator decision releases the blocked lease
+  // Manual operator override (with or without acknowledgement, on adapter or direct store) MUST fail closed
+  expect(
+    await adapter2.reconcileAppendLease({
+      spreadsheetId: id,
+      sheet: 'Tasks',
+      manualOperatorDecision: 'operator_confirm_aborted_allow_retry',
+    })
+  ).toMatchObject({
+    reconciled: false,
+    committedOnProvider: false,
+    inconclusiveReason: 'partial_batch',
+  });
   expect(
     await adapter2.reconcileAppendLease({
       spreadsheetId: id,
@@ -491,8 +504,50 @@ it('GAS-10: shared SheetsAdapter (sheets.append_rows) fails closed on delayed co
       acknowledgeDuplicateRisk: true,
     })
   ).toMatchObject({
-    reconciled: true,
+    reconciled: false,
     committedOnProvider: false,
+    inconclusiveReason: 'partial_batch',
+  });
+  expect(
+    await leaseStore.reconcileUnknownLease({
+      scopeKey,
+      manualOperatorDecision: 'operator_acknowledge_duplicate_risk',
+      acknowledgeDuplicateRisk: true,
+      confirmDuplicateRisk: true,
+      verify: async () => true,
+    })
+  ).toBe(false);
+  expect(await leaseStore.getLeaseState?.(scopeKey)).toEqual(sharedStateBeforeManual);
+
+  const postsBeforeBlockedSharedRetry = postAttempts;
+  await expect(
+    adapter2.execute('sheets.append_rows', {
+      spreadsheetId: id,
+      sheet: 'Tasks',
+      rows: [
+        ['GH#401', 'Part 1'],
+        ['GH#402', 'Part 2'],
+      ],
+    })
+  ).rejects.toMatchObject({
+    details: {
+      code: 'SHEETS_APPEND_UNKNOWN_OUTCOME_UNRECONCILED',
+      requestSent: false,
+    },
+  });
+  expect(postAttempts).toBe(postsBeforeBlockedSharedRetry);
+
+  // Once the second row of the batch lands on the provider, automatic verified readback releases the lease
+  sheetRows.push(['GH#402', 'Part 2']);
+  expect(
+    await adapter2.reconcileAppendLease({
+      spreadsheetId: id,
+      sheet: 'Tasks',
+    })
+  ).toMatchObject({
+    reconciled: true,
+    committedOnProvider: true,
+    matchedSignatures: ['GH#401\u001fPart 1', 'GH#402\u001fPart 2'],
   });
 
   // >500-row absence / out-of-window boundary on SheetsAdapter
@@ -518,6 +573,19 @@ it('GAS-10: shared SheetsAdapter (sheets.append_rows) fails closed on delayed co
     sheet: 'Tasks',
   });
   expect(winRec).toMatchObject({
+    reconciled: false,
+    committedOnProvider: false,
+    matchedSignatures: [],
+    inconclusiveReason: 'out_of_window',
+  });
+  expect(
+    await adapter2.reconcileAppendLease({
+      spreadsheetId: id,
+      sheet: 'Tasks',
+      manualOperatorDecision: 'operator_acknowledge_duplicate_risk',
+      acknowledgeDuplicateRisk: true,
+    })
+  ).toMatchObject({
     reconciled: false,
     committedOnProvider: false,
     matchedSignatures: [],

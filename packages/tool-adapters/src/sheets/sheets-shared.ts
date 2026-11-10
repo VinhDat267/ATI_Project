@@ -309,6 +309,23 @@ export async function executeAppendLeaseReconciliation(params: {
       readbackMalformed,
     });
 
+  // Manual operator override is unsupported in production primitives because no
+  // authenticated, authorized, and durably audited operator recovery service exists.
+  // Any manual override attempt is rejected fail-closed without releasing the lease.
+  if (
+    manualOperatorDecision !== undefined ||
+    acknowledgeDuplicateRisk !== undefined ||
+    confirmDuplicateRisk !== undefined
+  ) {
+    return {
+      reconciled: false,
+      committedOnProvider: false,
+      matchedSignatures,
+      scopeKey,
+      inconclusiveReason: inconclusiveReason ?? 'manual_override_unsupported',
+    };
+  }
+
   if (committedOnProvider) {
     const reconciled =
       (await appendLeaseStore.reconcileUnknownLease?.({
@@ -342,35 +359,6 @@ export async function executeAppendLeaseReconciliation(params: {
       matchedSignatures,
       scopeKey,
       ...(reconciled ? {} : { inconclusiveReason: inconclusiveReason ?? 'cas_rejected' }),
-    };
-  }
-
-  const isExplicitManualOverride =
-    (manualOperatorDecision === 'operator_confirm_aborted_allow_retry' ||
-      manualOperatorDecision === 'operator_acknowledge_duplicate_risk') &&
-    (acknowledgeDuplicateRisk === true || confirmDuplicateRisk === true);
-
-  if (isExplicitManualOverride) {
-    const reconciled =
-      (await appendLeaseStore.reconcileUnknownLease?.({
-        scopeKey,
-        leaseId: targetLeaseId,
-        fencingToken: targetFencingToken,
-        reason: 'manual_operator_override',
-        manualOperatorDecision,
-        acknowledgeDuplicateRisk: true,
-        verify: async (latestState) =>
-          latestState.status === 'unknown_outcome' &&
-          latestState.leaseId === targetLeaseId &&
-          latestState.fencingToken === targetFencingToken,
-      })) ?? false;
-
-    return {
-      reconciled,
-      committedOnProvider: false,
-      matchedSignatures,
-      scopeKey,
-      ...(inconclusiveReason ? { inconclusiveReason } : {}),
     };
   }
 
@@ -464,36 +452,34 @@ export class InMemorySheetsAppendLeaseStore implements SheetsAppendLeaseStore {
     const targetLeaseId = input.leaseId ?? entry.leaseId;
     const targetFencingToken = input.fencingToken ?? entry.fencingToken;
 
-    const isExplicitManualOverride =
-      (input.manualOperatorDecision === 'operator_confirm_aborted_allow_retry' ||
-        input.manualOperatorDecision === 'operator_acknowledge_duplicate_risk') &&
-      (input.acknowledgeDuplicateRisk === true || input.confirmDuplicateRisk === true);
-
-    if (!isExplicitManualOverride) {
-      if (input.reason === 'aborted') {
-        return false;
-      }
-      if (typeof input.verify !== 'function') {
-        return false;
-      }
-      const meta = entry.dispatchedMeta;
-      if (
-        !meta ||
-        !Array.isArray(meta.candidateKeys) ||
-        meta.candidateKeys.length === 0 ||
-        !Number.isInteger(meta.rowCount) ||
-        meta.rowCount < 1 ||
-        meta.candidateKeys.length !== meta.rowCount ||
-        meta.candidateKeys.some((sig) => typeof sig !== 'string' || sig.trim().length === 0)
-      ) {
-        return false;
-      }
-      const verified = await input.verify(this.toState(input.scopeKey, entry));
-      if (!verified) return false;
-    } else if (typeof input.verify === 'function') {
-      const verified = await input.verify(this.toState(input.scopeKey, entry));
-      if (!verified) return false;
+    // Manual operator override and unverified abort claims are unsupported in production
+    // primitives pending an authenticated, authorized, and durably audited operator service.
+    if (
+      input.manualOperatorDecision !== undefined ||
+      input.acknowledgeDuplicateRisk !== undefined ||
+      input.confirmDuplicateRisk !== undefined ||
+      input.reason === 'manual_operator_override' ||
+      input.reason === 'aborted'
+    ) {
+      return false;
     }
+    if (typeof input.verify !== 'function') {
+      return false;
+    }
+    const meta = entry.dispatchedMeta;
+    if (
+      !meta ||
+      !Array.isArray(meta.candidateKeys) ||
+      meta.candidateKeys.length === 0 ||
+      !Number.isInteger(meta.rowCount) ||
+      meta.rowCount < 1 ||
+      meta.candidateKeys.length !== meta.rowCount ||
+      meta.candidateKeys.some((sig) => typeof sig !== 'string' || sig.trim().length === 0)
+    ) {
+      return false;
+    }
+    const verified = await input.verify(this.toState(input.scopeKey, entry));
+    if (!verified) return false;
 
     const latest = this.locks.get(input.scopeKey);
     if (

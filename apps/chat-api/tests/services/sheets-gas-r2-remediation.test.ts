@@ -1730,9 +1730,100 @@ describe('Google Sheets R2 Audit Remediation (GAS-01 .. GAS-11)', () => {
           matchedSignatures: ['GH#801\u001fDelayed personal row'],
           inconclusiveReason: 'partial_batch',
         });
-        expect((await sharedStore2.getLeaseState(scopeKey))?.status).toBe('unknown_outcome');
+        const pgStateBeforeManual = await sharedStore2.getLeaseState(scopeKey);
+        expect(pgStateBeforeManual?.status).toBe('unknown_outcome');
+        expect(pgStateBeforeManual?.unknownReason).toBe('503 mid-batch');
+        expect(pgStateBeforeManual?.dispatchedMeta).toEqual({
+          operation: 'append',
+          rowCount: 2,
+          candidateKeys: ['GH#801\u001fDelayed personal row', 'GH#803\u001fMissing second row'],
+        });
 
-        // C3. Status/generation CAS protects a new owner if state advances while verify() is running
+        // C2b. Unsupported manual operator overrides (with or without acknowledgement, on Postgres store and both adapters) MUST fail closed
+        expect(
+          await sharedStore2.reconcileUnknownLease({
+            scopeKey,
+            leaseId: pgStateBeforeManual!.leaseId,
+            fencingToken: pgStateBeforeManual!.fencingToken,
+            manualOperatorDecision: 'operator_confirm_aborted_allow_retry',
+          })
+        ).toBe(false);
+        expect(
+          await sharedStore2.reconcileUnknownLease({
+            scopeKey,
+            leaseId: pgStateBeforeManual!.leaseId,
+            fencingToken: pgStateBeforeManual!.fencingToken,
+            manualOperatorDecision: 'operator_acknowledge_duplicate_risk',
+            acknowledgeDuplicateRisk: true,
+            confirmDuplicateRisk: true,
+            verify: async () => true,
+          })
+        ).toBe(false);
+        expect(
+          await personalAdapter2.reconcileAppendLease({
+            spreadsheetId,
+            sheet: 'Tasks',
+            manualOperatorDecision: 'operator_confirm_aborted_allow_retry',
+            acknowledgeDuplicateRisk: true,
+          })
+        ).toMatchObject({
+          reconciled: false,
+          committedOnProvider: false,
+          matchedSignatures: ['GH#801\u001fDelayed personal row'],
+          inconclusiveReason: 'partial_batch',
+        });
+        expect(
+          await sharedAdapter2.reconcileAppendLease({
+            spreadsheetId,
+            sheet: 'Tasks',
+            manualOperatorDecision: 'operator_acknowledge_duplicate_risk',
+            acknowledgeDuplicateRisk: true,
+          })
+        ).toMatchObject({
+          reconciled: false,
+          committedOnProvider: false,
+          matchedSignatures: ['GH#801\u001fDelayed personal row'],
+          inconclusiveReason: 'partial_batch',
+        });
+        const pgStateAfterManual = await sharedStore2.getLeaseState(scopeKey);
+        expect(pgStateAfterManual).toEqual(pgStateBeforeManual);
+
+        // Retry on both adapters while partial batch remains unreconciled MUST fail closed with 0 additional provider POSTs
+        const postCountBeforeManualRetry = appendPostCount;
+        await expect(
+          personalAdapter2.execute('mysheets.append_rows', {
+            spreadsheetId,
+            sheet: 'Tasks',
+            rows: [
+              ['GH#801', 'Delayed personal row'],
+              ['GH#803', 'Missing second row'],
+            ],
+          })
+        ).rejects.toMatchObject({
+          details: {
+            code: 'SHEETS_APPEND_UNKNOWN_OUTCOME_UNRECONCILED',
+            requestSent: false,
+          },
+        });
+        await expect(
+          sharedAdapter2.execute('sheets.append_rows', {
+            spreadsheetId,
+            sheet: 'Tasks',
+            rows: [
+              ['GH#801', 'Delayed personal row'],
+              ['GH#803', 'Missing second row'],
+            ],
+          })
+        ).rejects.toMatchObject({
+          details: {
+            code: 'SHEETS_APPEND_UNKNOWN_OUTCOME_UNRECONCILED',
+            requestSent: false,
+          },
+        });
+        expect(appendPostCount).toBe(postCountBeforeManualRetry);
+
+        // C3. Status/generation CAS protects a new owner if state advances via verified provider commit while verify() is running
+        rowsInSheet.push(['GH#803', 'Missing second row']);
         const stateBeforeCas = (await sharedStore2.getLeaseState(scopeKey))!;
         let newOwnerHandle: any;
         const staleConcurrentReconcile = await sharedStore2.reconcileUnknownLease({
@@ -1740,14 +1831,14 @@ describe('Google Sheets R2 Audit Remediation (GAS-01 .. GAS-11)', () => {
           leaseId: stateBeforeCas.leaseId,
           fencingToken: stateBeforeCas.fencingToken,
           verify: async () => {
-            // Simulate concurrent operator override + new owner acquiring lease (fencingToken + 1, status = 'active')
-            await sharedStore2.reconcileUnknownLease({
-              scopeKey,
+            // Simulate concurrent verified reconciliation + new owner acquiring lease (fencingToken + 1, status = 'active')
+            const winnerReconciled = await sharedAdapter2.reconcileAppendLease({
+              spreadsheetId,
+              sheet: 'Tasks',
               leaseId: stateBeforeCas.leaseId,
               fencingToken: stateBeforeCas.fencingToken,
-              manualOperatorDecision: 'operator_acknowledge_duplicate_risk',
-              acknowledgeDuplicateRisk: true,
             });
+            expect(winnerReconciled.reconciled).toBe(true);
             newOwnerHandle = await sharedStore2.acquireLease({
               scopeKey,
               spreadsheetId,
@@ -1765,7 +1856,7 @@ describe('Google Sheets R2 Audit Remediation (GAS-01 .. GAS-11)', () => {
         expect(stateAfterCasRace?.fencingToken).toBe(newOwnerHandle.fencingToken);
         await newOwnerHandle.release();
 
-        // C4. >500-row absence / out-of-window boundary on PostgreSQL fails closed, then manual operator override releases when confirmed
+        // C4. >500-row absence / out-of-window boundary on PostgreSQL fails closed and rejects unsupported manual override
         while (rowsInSheet.length <= 500) {
           rowsInSheet.push([`GH#FILL_${rowsInSheet.length}`, `Row ${rowsInSheet.length}`]);
         }
@@ -1796,7 +1887,7 @@ describe('Google Sheets R2 Audit Remediation (GAS-01 .. GAS-11)', () => {
         });
         expect((await sharedStore2.getLeaseState(scopeKey))?.status).toBe('unknown_outcome');
 
-        // Explicit manual operator decision acknowledging duplicate risk releases the unknown_outcome lease
+        // Unsupported manual operator override on out-of-window lease MUST also remain blocked
         const manualOverrideRec = await personalAdapter2.reconcileAppendLease({
           spreadsheetId,
           sheet: 'Tasks',
@@ -1804,10 +1895,27 @@ describe('Google Sheets R2 Audit Remediation (GAS-01 .. GAS-11)', () => {
           acknowledgeDuplicateRisk: true,
         });
         expect(manualOverrideRec).toMatchObject({
-          reconciled: true,
+          reconciled: false,
           committedOnProvider: false,
+          matchedSignatures: [],
+          inconclusiveReason: 'out_of_window',
         });
-        expect((await sharedStore2.getLeaseState(scopeKey))?.status).toBe('released');
+        const finalOutOfWinState = await sharedStore2.getLeaseState(scopeKey);
+        expect(finalOutOfWinState?.status).toBe('unknown_outcome');
+        expect(finalOutOfWinState?.unknownReason).toBe('503 at row 502');
+        await expect(
+          personalAdapter2.execute('mysheets.append_rows', {
+            spreadsheetId,
+            sheet: 'Tasks',
+            rows: [['GH#999', 'Row at 502 beyond A1:Z500 window']],
+          })
+        ).rejects.toMatchObject({
+          details: {
+            code: 'SHEETS_APPEND_UNKNOWN_OUTCOME_UNRECONCILED',
+            requestSent: false,
+          },
+        });
+        expect(appendPostCount).toBe(postCountBeforeManualRetry);
       } finally {
         await new Promise<void>((resolve) => server.close(() => resolve()));
       }

@@ -478,24 +478,27 @@ describe('SheetsDigestConfigV2 & Gate A recovery schema contracts', () => {
         if (!input.scopeKey || status !== 'unknown_outcome') {
           return false;
         }
-        const isManual =
-          (input.manualOperatorDecision === 'operator_confirm_aborted_allow_retry' ||
-            input.manualOperatorDecision === 'operator_acknowledge_duplicate_risk') &&
-          (input.acknowledgeDuplicateRisk === true || input.confirmDuplicateRisk === true);
-        if (!isManual) {
-          if (!input.verify) return false;
-          const ok = await input.verify({
-            scopeKey: input.scopeKey,
-            spreadsheetId: 'sheet-123',
-            sheetTitle: 'Tasks',
-            leaseId: `lease:${input.scopeKey}`,
-            ownerId: 'worker-1',
-            fencingToken: 1,
-            status,
-            dispatchedMeta: dispatchMeta,
-          });
-          if (!ok) return false;
+        if (
+          input.manualOperatorDecision !== undefined ||
+          input.acknowledgeDuplicateRisk !== undefined ||
+          input.confirmDuplicateRisk !== undefined ||
+          input.reason === 'manual_operator_override' ||
+          input.reason === 'aborted'
+        ) {
+          return false;
         }
+        if (!input.verify) return false;
+        const ok = await input.verify({
+          scopeKey: input.scopeKey,
+          spreadsheetId: 'sheet-123',
+          sheetTitle: 'Tasks',
+          leaseId: `lease:${input.scopeKey}`,
+          ownerId: 'worker-1',
+          fencingToken: 1,
+          status,
+          dispatchedMeta: dispatchMeta,
+        });
+        if (!ok) return false;
         status = 'released';
         return true;
       },
@@ -528,8 +531,16 @@ describe('SheetsDigestConfigV2 & Gate A recovery schema contracts', () => {
     await lease.markUnknownOutcome?.('503 after dispatch', dispatchMeta);
     await lease.release();
     expect((await mockStore.getLeaseState?.('sheet-123::Tasks'))?.status).toBe('unknown_outcome');
-    // Unverified reconciliation without manual operator decision must fail closed
+    // Unverified reconciliation and unsupported manual operator override must fail closed
     expect(await mockStore.reconcileUnknownLease?.({ scopeKey: 'sheet-123::Tasks' })).toBe(false);
+    expect(
+      await mockStore.reconcileUnknownLease?.({
+        scopeKey: 'sheet-123::Tasks',
+        manualOperatorDecision: manualDecision,
+        acknowledgeDuplicateRisk: true,
+      })
+    ).toBe(false);
+    expect((await mockStore.getLeaseState?.('sheet-123::Tasks'))?.status).toBe('unknown_outcome');
     expect(
       await mockStore.reconcileUnknownLease?.({
         scopeKey: 'sheet-123::Tasks',
