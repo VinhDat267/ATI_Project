@@ -495,8 +495,8 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
     const destRow = (
       await options.pool.query(
         destService === 'telegram'
-          ? 'SELECT config, status FROM service_credentials WHERE service = $1 AND (user_id = $2 OR user_id IS NULL) ORDER BY user_id IS NULL ASC LIMIT 1'
-          : 'SELECT config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL LIMIT 1',
+          ? 'SELECT id, user_id, config, status FROM service_credentials WHERE service = $1 AND (user_id = $2 OR user_id IS NULL) ORDER BY user_id IS NULL ASC LIMIT 1'
+          : 'SELECT id, user_id, config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL LIMIT 1',
         destService === 'telegram' ? [destService, run.userId] : [destService],
       )
     ).rows[0];
@@ -508,6 +508,9 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
       };
     }
 
+    let telegramDestBinding:
+      | { credentialId: string; telegramUserId: string; username: string; chatIds: string[] }
+      | undefined;
     try {
       const decryptedDest = options.encryptionKey
         ? decryptCredentials(destRow.config, options.encryptionKey)
@@ -541,6 +544,15 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
           return {
             state: 'blocked',
             pauseReason: 'Nhóm Telegram nhận bản tin không còn nằm trong phạm vi cho phép.',
+          };
+        }
+        if (destRow.user_id && destRow.id) {
+          telegramDestBinding = {
+            credentialId: String(destRow.id),
+            telegramUserId:
+              typeof decryptedDest?.telegramUserId === 'string' ? decryptedDest.telegramUserId : '',
+            username: typeof decryptedDest?.username === 'string' ? decryptedDest.username : '',
+            chatIds: [config.destination.chatId],
           };
         }
       }
@@ -670,6 +682,7 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
         userId: run.userId,
         phase: 'execution',
         actor: { userId: run.userId },
+        ...(telegramDestBinding ? { connections: { telegram: telegramDestBinding } } : {}),
       });
       if (!destAdapter) {
         return {

@@ -257,12 +257,23 @@ export class PlanRepo {
     if(mapped)await this.pool.query("UPDATE slack_assistant_artifacts SET status=$2,revision=revision+1,updated_at=clock_timestamp() WHERE active_plan_id=$1 AND status NOT IN ('rejected','stale')",[planId,mapped]);
   }
 
-  async assertSourceDispatchAllowed(planId:string,userId:string,expectedHash:string,stepId:string,tool:string,signal?:AbortSignal):Promise<void>{
+  async assertSourceDispatchAllowed(planId:string,userId:string,expectedHash:string,stepId:string,tool:string,signal?:AbortSignal,expectedScope?:{workspaceMode?:string;workspaceId?:string|null}):Promise<void>{
     signal?.throwIfAborted();await this.transaction(async client=>{
       const checked=await guardPlanInTransaction(client,this.slack,planId,'planning');
       if(checked.source&&/^(myslack|slack)\./.test(tool)&&!isBoundSlackManualPlan(checked.row.plan_json,userId)&&!isBoundSlackSourceReplyPlan(checked.row.plan_json,userId))throw Object.assign(new Error('SLACK_DISPATCH_BINDING_REQUIRED'),{category:'AUTH_ERROR',details:{requestSent:false}});
-      const owner=(await client.query('SELECT user_id FROM conversations WHERE id=$1',[checked.row.conv_id])).rows[0]?.user_id;
-      if(!checked.allowed||owner!==userId||checked.row.plan_hash!==expectedHash||!['approved','executing'].includes(checked.row.status)||
+      const convRow=(await client.query(
+        `SELECT c.user_id, c.workspace_mode, c.workspace_id, u.status AS user_status, wm.status AS member_status
+           FROM conversations c
+           LEFT JOIN users u ON u.id = c.user_id
+           LEFT JOIN workspace_members wm ON wm.workspace_id = c.workspace_id AND wm.user_id = c.user_id
+          WHERE c.id = $1`,
+        [checked.row.conv_id],
+      )).rows[0];
+      const orgDenied=convRow?.workspace_mode==='organization'&&(!convRow.workspace_id||!String(convRow.workspace_id).trim()||convRow.member_status!=='active');
+      const scopeMismatch=
+        (expectedScope?.workspaceMode==='organization'&&(convRow?.workspace_mode!=='organization'||convRow?.workspace_id!==expectedScope.workspaceId))||
+        (expectedScope?.workspaceMode==='personal'&&(convRow?.workspace_mode!=='personal'||convRow?.workspace_id!==null));
+      if(!checked.allowed||!convRow||convRow.user_id!==userId||convRow.user_status==='disabled'||orgDenied||scopeMismatch||checked.row.plan_hash!==expectedHash||!['approved','executing'].includes(checked.row.status)||
         !checked.row.plan_json.steps?.some((s:any)=>s.id===stepId&&s.tool===tool))throw Object.assign(new Error('SLACK_SOURCE_UNAVAILABLE'),{category:'AUTH_ERROR',details:{requestSent:false}});
       const stored=(await client.query('SELECT * FROM execution_steps WHERE plan_id=$1 ORDER BY step_id FOR SHARE',[planId])).rows;
       const safe=await guardStepRowsInTransaction(client,this.slack,checked,stored,'planning'),step=safe.find(s=>s.step_id===stepId&&s.tool===tool);

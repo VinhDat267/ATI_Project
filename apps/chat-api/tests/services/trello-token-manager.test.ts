@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { encryptCredentials, StepError } from '@wap/tool-adapters';
 import { CredentialRepo } from '../../src/db/repositories/credential-repo.js';
 import { TrelloTokenManager } from '../../src/services/trello/token-manager.js';
@@ -282,9 +282,17 @@ describe('TrelloTokenManager', () => {
 
   describe('real HTTP server and real CredentialRepo concurrency test', () => {
     const encryptionKey = '0123456789abcdef0123456789abcdef';
+    let db: Awaited<ReturnType<typeof createMigratedSchema>>;
+
+    beforeAll(async () => {
+      db = await createMigratedSchema('trello_refresh_once');
+    });
+
+    afterAll(async () => {
+      await db?.close();
+    });
 
     it('holds initial refresh, calls clear(), requests token second time; provider only receives old token once', async () => {
-      const db = await createMigratedSchema('trello_refresh_once');
       const credentials = new CredentialRepo(db.pool, encryptionKey);
       const user = await db.person('TestUser');
       const initialRefresh = 'initial-secret-refresh-token';
@@ -393,7 +401,6 @@ describe('TrelloTokenManager', () => {
         expect(credStatus?.status).toBe('active');
       } finally {
         await new Promise((resolve) => server.close(resolve));
-        await db.close();
       }
     });
   });

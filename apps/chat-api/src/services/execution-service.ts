@@ -142,10 +142,16 @@ export class ExecutionService {
     if (!conversation || conversation.user_id !== userId) {
       throw Object.assign(new Error('Forbidden: you do not own this plan'), { status: 403 });
     }
-    if (conversation.workspace_mode === 'organization' && conversation.workspace_id && this.workspaceRepo) {
-      const member = await this.workspaceRepo.findMember(conversation.workspace_id, userId);
-      if (!member || member.status !== 'active') {
+    if (conversation.workspace_mode === 'organization') {
+      const workspaceId = typeof conversation.workspace_id === 'string' ? conversation.workspace_id.trim() : '';
+      if (!workspaceId) {
         throw Object.assign(new Error('WORKSPACE_ACCESS_DENIED'), { status: 403 });
+      }
+      if (this.workspaceRepo) {
+        const member = await this.workspaceRepo.findMember(workspaceId, userId);
+        if (!member || member.status !== 'active') {
+          throw Object.assign(new Error('WORKSPACE_ACCESS_DENIED'), { status: 403 });
+        }
       }
     }
     if (isSlackSourceArtifact(plan) || plan.plan_json?.connections?.myslack) {
@@ -361,7 +367,7 @@ export class ExecutionService {
           const detached=structuredClone(args);
           const freeze=(value:any):any=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};freeze(detached);
           if(source && (/^(myslack|slack)\./.test(tool)||step.tool!==tool))throw Object.assign(new Error('SLACK_DISPATCH_BINDING_REQUIRED'),{category:'AUTH_ERROR',details:{requestSent:false}});
-          await this.planRepo.assertSourceDispatchAllowed(planId,source?.userId ?? dispatch!.userId,source?.hash ?? dispatch!.planHash,step.id,tool,options?.signal);
+          await this.planRepo.assertSourceDispatchAllowed(planId,source?.userId ?? dispatch!.userId,source?.hash ?? dispatch!.planHash,step.id,tool,options?.signal,{workspaceMode:stepContext.workspaceMode,workspaceId:stepContext.workspaceId ?? null});
           options?.signal?.throwIfAborted();return adapter.execute(tool,detached,options);
         }};
       } }).executeStep(step,outputs,runOptions)},
@@ -759,10 +765,16 @@ export class ExecutionService {
     const conversation = await this.convRepo?.getConversation(convId);
     if (!conversation) throw Object.assign(new Error('Conversation not found'), { status: 404 });
     if (conversation.user_id !== userId) throw Object.assign(new Error('Forbidden'), { status: 403 });
-    if (conversation.workspace_mode === 'organization' && conversation.workspace_id && this.workspaceRepo) {
-      const member = await this.workspaceRepo.findMember(conversation.workspace_id, userId);
-      if (!member || member.status !== 'active') {
+    if (conversation.workspace_mode === 'organization') {
+      const workspaceId = typeof conversation.workspace_id === 'string' ? conversation.workspace_id.trim() : '';
+      if (!workspaceId) {
         throw Object.assign(new Error('WORKSPACE_ACCESS_DENIED'), { status: 403 });
+      }
+      if (this.workspaceRepo) {
+        const member = await this.workspaceRepo.findMember(workspaceId, userId);
+        if (!member || member.status !== 'active') {
+          throw Object.assign(new Error('WORKSPACE_ACCESS_DENIED'), { status: 403 });
+        }
       }
     }
     let plan = await this.planRepo.getLatestExecutedPlan(convId);

@@ -488,6 +488,9 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
         },
       });
       if (isTelegramDest) {
+        let tgBinding:
+          | { credentialId: string; telegramUserId: string; username: string; chatIds: string[] }
+          | undefined;
         if (options.telegramConnection) {
           const tg = await options.telegramConnection(run.userId);
           const allowedChatIds = new Set(
@@ -500,11 +503,38 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
               pauseReason: 'Cuộc trò chuyện Telegram nhận bản tin không còn nằm trong phạm vi cho phép.',
             };
           }
+          if (
+            config.telegramCredentialId &&
+            tg.connection?.credentialId &&
+            tg.connection.credentialId !== config.telegramCredentialId
+          ) {
+            return {
+              state: 'blocked',
+              error: 'Kết nối Telegram nhận bản tin đã thay đổi, cần phê duyệt lại.',
+              pauseReason: 'Kết nối Telegram nhận bản tin đã thay đổi, cần phê duyệt lại.',
+            };
+          }
+          if (tg.connection?.credentialId) {
+            tgBinding = {
+              credentialId: tg.connection.credentialId,
+              telegramUserId: tg.connection.telegramUserId ?? '',
+              username: tg.connection.username ?? '',
+              chatIds: ((tg.connection.chatIds ?? []) as string[]).map((id: string) => String(id)),
+            };
+          }
+        } else if (config.telegramCredentialId && config.telegramChatId) {
+          tgBinding = {
+            credentialId: config.telegramCredentialId,
+            telegramUserId: '',
+            username: '',
+            chatIds: [String(config.telegramChatId)],
+          };
         }
         telegramAdapter = await options.getAdapter?.('telegram', {
           userId: run.userId,
           phase: 'execution',
           ...workspaceContext,
+          ...(tgBinding ? { connections: { telegram: tgBinding } } : {}),
         });
       } else {
         slackAdapter = await options.getAdapter?.('slack', {
