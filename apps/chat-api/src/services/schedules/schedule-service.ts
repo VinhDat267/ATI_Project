@@ -41,7 +41,12 @@ import {
 } from './sheets-digest-candidate.js';
 import { canonicalizeDigestConfig, computeDigestConfigHash } from './github-digest-candidate.js';
 import { computeTelegramDigestConfigHash } from './telegram-digest-candidate.js';
-import { canonicalizeTrelloDigestConfig, computeTrelloDigestConfigHash } from './trello-digest-candidate.js';
+import {
+  buildConfirmedTrelloDigestDelivery,
+  canonicalizeTrelloDigestConfig,
+  computeTrelloDigestConfigHash,
+  getTrelloDigestPinnedCredentialIds,
+} from './trello-digest-candidate.js';
 import { canonicalizeNotionDigestConfig, computeNotionDigestConfigHash } from './notion-digest-candidate.js';
 import { canonicalizeJiraDigestConfig, computeJiraDigestConfigHash, type JiraDigestCandidate, type JiraDigestConfig } from './jira-digest-candidate.js';
 
@@ -71,6 +76,10 @@ export const SCHEDULE_CONFLICTS = {
     'Lượt chạy này đã được xử lý trạng thái gửi trước đó.',
   RUN_NOT_AWAITING_DELIVERY_RESOLUTION:
     'Lượt chạy này không ở trạng thái chờ xác nhận kết quả gửi.',
+  SCHEDULE_PAUSED:
+    'Lịch đang tạm dừng. Vui lòng bật lại lịch trước khi tạo lượt gửi bù.',
+  CONFIG_CHANGED_SINCE_RUN:
+    'Cấu hình lịch đã thay đổi sau lượt chạy không xác định này. Không thể tự động gửi bù theo cấu hình mới để tránh gửi nhầm đích.',
 } as const;
 export type ScheduleConflictCode = keyof typeof SCHEDULE_CONFLICTS;
 
@@ -1555,10 +1564,14 @@ export class ScheduleService {
       // Canonical lock order: c -> s -> u/wm -> r -> r.conv_id
       const schedule = await this.lockSchedule(client, meta.schedule_id, userId, scope);
       if (!schedule) throw new ScheduleNotFound();
-      if (schedule.kind !== 'sheets_digest') {
+      if (
+        schedule.kind !== 'sheets_digest' &&
+        schedule.kind !== 'trello_digest' &&
+        schedule.kind !== 'telegram_digest'
+      ) {
         throw new ScheduleConflict(
           'RUN_NOT_AWAITING_DELIVERY_RESOLUTION',
-          'Chỉ lượt chạy Google Sheets Digest mới hỗ trợ xử lý trạng thái gửi không xác định.',
+          'Chỉ lượt chạy báo cáo tự động hỗ trợ xử lý trạng thái gửi không xác định.',
         );
       }
       if (schedule.status === 'cancelled') {
@@ -1595,15 +1608,22 @@ export class ScheduleService {
           'Lượt chạy này đã được xử lý trạng thái gửi trước đó.',
         );
       }
-      if (
-        run.status !== 'needs_attention' ||
-        run.delivery_started_at == null ||
-        typeof run.error !== 'string' ||
-        !run.error.includes('SHEETS_DELIVERY_UNKNOWN')
-      ) {
+      const isSheetsUnknown =
+        schedule.kind === 'sheets_digest' &&
+        run.status === 'needs_attention' &&
+        run.delivery_started_at != null &&
+        typeof run.error === 'string' &&
+        run.error.includes('SHEETS_DELIVERY_UNKNOWN');
+      const isTrelloOrTelegramUnknown =
+        (schedule.kind === 'trello_digest' || schedule.kind === 'telegram_digest') &&
+        run.status === 'needs_attention' &&
+        run.delivery_started_at != null &&
+        typeof run.error === 'string' &&
+        run.error.trim().length > 0;
+      if (!isSheetsUnknown && !isTrelloOrTelegramUnknown) {
         throw new ScheduleConflict(
           'RUN_NOT_AWAITING_DELIVERY_RESOLUTION',
-          'Lượt chạy này không ở trạng thái chờ xác nhận kết quả gửi (SHEETS_DELIVERY_UNKNOWN).',
+          'Lượt chạy này không ở trạng thái chờ xác nhận kết quả gửi.',
         );
       }
 
@@ -1611,81 +1631,125 @@ export class ScheduleService {
       const targetConvId = run.conv_id ?? schedule.conv_id;
 
       if (resolution === 'mark_sent') {
-        const cfg =
-          schedule.digest_config && typeof schedule.digest_config === 'object'
-            ? (schedule.digest_config as SheetsDigestConfig)
-            : null;
-        const src = cfg?.source;
-        const dest = cfg?.destination;
-        const prevDelivery =
-          run.delivery && typeof run.delivery === 'object'
-            ? (run.delivery as Partial<SheetsDigestDelivery>)
-            : null;
-        const fallbackTargetId =
-          dest && 'channelId' in dest
-            ? dest.channelId
-            : dest?.service === 'gmail'
-              ? dest.recipientEmail
-              : dest?.service === 'telegram'
-                ? dest.chatId
-                : 'unknown';
-        const fallbackTargetLabel =
-          dest && 'channelId' in dest
-            ? (dest as any).channelLabel ?? dest.channelId
-            : dest?.service === 'telegram'
-              ? (dest as any).chatLabel ?? dest.chatId
+        let deliveryPayload: Record<string, unknown>;
+        if (schedule.kind === 'sheets_digest') {
+          const cfg =
+            schedule.digest_config && typeof schedule.digest_config === 'object'
+              ? (schedule.digest_config as SheetsDigestConfig)
+              : null;
+          const src = cfg?.source;
+          const dest = cfg?.destination;
+          const prevDelivery =
+            run.delivery && typeof run.delivery === 'object'
+              ? (run.delivery as Partial<SheetsDigestDelivery>)
+              : null;
+          const fallbackTargetId =
+            dest && 'channelId' in dest
+              ? dest.channelId
               : dest?.service === 'gmail'
                 ? dest.recipientEmail
-                : undefined;
-        const effectiveTargetLabel = prevDelivery?.targetLabel ?? fallbackTargetLabel;
-        const effectiveSheetName = prevDelivery?.sheetName ?? src?.sheetName;
+                : dest?.service === 'telegram'
+                  ? dest.chatId
+                  : 'unknown';
+          const fallbackTargetLabel =
+            dest && 'channelId' in dest
+              ? (dest as any).channelLabel ?? dest.channelId
+              : dest?.service === 'telegram'
+                ? (dest as any).chatLabel ?? dest.chatId
+                : dest?.service === 'gmail'
+                  ? dest.recipientEmail
+                  : undefined;
+          const effectiveTargetLabel = prevDelivery?.targetLabel ?? fallbackTargetLabel;
+          const effectiveSheetName = prevDelivery?.sheetName ?? src?.sheetName;
 
-        const delivery: SheetsDigestDelivery = {
-          destination: prevDelivery?.destination ?? dest?.service ?? 'telegram',
-          targetId: prevDelivery?.targetId ?? fallbackTargetId,
-          ...(effectiveTargetLabel ? { targetLabel: effectiveTargetLabel } : {}),
-          spreadsheetId: prevDelivery?.spreadsheetId ?? src?.spreadsheetId ?? '',
-          spreadsheetTitle: prevDelivery?.spreadsheetTitle ?? src?.spreadsheetTitle ?? '',
-          ...(effectiveSheetName ? { sheetName: effectiveSheetName } : {}),
-          rowCount: typeof prevDelivery?.rowCount === 'number' ? prevDelivery.rowCount : null,
-          ...(prevDelivery?.dataScope ? { dataScope: prevDelivery.dataScope } : {}),
-          ...(prevDelivery?.scannedRange ? { scannedRange: prevDelivery.scannedRange } : {}),
-          ...(typeof prevDelivery?.windowClipped === 'boolean'
-            ? { windowClipped: prevDelivery.windowClipped }
-            : {}),
-          summaryMode:
-            prevDelivery?.summaryMode === 'ai' || prevDelivery?.summaryMode === 'deterministic'
-              ? prevDelivery.summaryMode
-              : cfg?.includeAiSummary
-                ? 'ai'
-                : 'deterministic',
-          sentAt: typeof prevDelivery?.sentAt === 'string' ? prevDelivery.sentAt : null,
-          providerSentAt:
-            typeof prevDelivery?.providerSentAt === 'string'
-              ? prevDelivery.providerSentAt
-              : typeof prevDelivery?.sentAt === 'string'
-                ? prevDelivery.sentAt
-                : null,
-          manualConfirmedAt: resolvedAtIso,
-          ...(typeof prevDelivery?.slackMessageTs === 'string'
-            ? { slackMessageTs: prevDelivery.slackMessageTs }
-            : {}),
-          ...(prevDelivery?.telegramMessageId !== undefined
-            ? { telegramMessageId: prevDelivery.telegramMessageId }
-            : {}),
-          ...(typeof prevDelivery?.gmailMessageId === 'string'
-            ? { gmailMessageId: prevDelivery.gmailMessageId }
-            : {}),
-          ...(typeof prevDelivery?.skippedEmpty === 'boolean'
-            ? { skippedEmpty: prevDelivery.skippedEmpty }
-            : {}),
-          manualResolution: {
-            status: 'confirmed_sent',
-            resolvedAt: resolvedAtIso,
+          const delivery: SheetsDigestDelivery = {
+            destination: prevDelivery?.destination ?? dest?.service ?? 'telegram',
+            targetId: prevDelivery?.targetId ?? fallbackTargetId,
+            ...(effectiveTargetLabel ? { targetLabel: effectiveTargetLabel } : {}),
+            spreadsheetId: prevDelivery?.spreadsheetId ?? src?.spreadsheetId ?? '',
+            spreadsheetTitle: prevDelivery?.spreadsheetTitle ?? src?.spreadsheetTitle ?? '',
+            ...(effectiveSheetName ? { sheetName: effectiveSheetName } : {}),
+            rowCount: typeof prevDelivery?.rowCount === 'number' ? prevDelivery.rowCount : null,
+            ...(prevDelivery?.dataScope ? { dataScope: prevDelivery.dataScope } : {}),
+            ...(prevDelivery?.scannedRange ? { scannedRange: prevDelivery.scannedRange } : {}),
+            ...(typeof prevDelivery?.windowClipped === 'boolean'
+              ? { windowClipped: prevDelivery.windowClipped }
+              : {}),
+            summaryMode:
+              prevDelivery?.summaryMode === 'ai' || prevDelivery?.summaryMode === 'deterministic'
+                ? prevDelivery.summaryMode
+                : cfg?.includeAiSummary
+                  ? 'ai'
+                  : 'deterministic',
+            sentAt: typeof prevDelivery?.sentAt === 'string' ? prevDelivery.sentAt : null,
+            providerSentAt:
+              typeof prevDelivery?.providerSentAt === 'string'
+                ? prevDelivery.providerSentAt
+                : typeof prevDelivery?.sentAt === 'string'
+                  ? prevDelivery.sentAt
+                  : null,
             manualConfirmedAt: resolvedAtIso,
+            ...(typeof prevDelivery?.slackMessageTs === 'string'
+              ? { slackMessageTs: prevDelivery.slackMessageTs }
+              : {}),
+            ...(prevDelivery?.telegramMessageId !== undefined
+              ? { telegramMessageId: prevDelivery.telegramMessageId }
+              : {}),
+            ...(typeof prevDelivery?.gmailMessageId === 'string'
+              ? { gmailMessageId: prevDelivery.gmailMessageId }
+              : {}),
+            ...(typeof prevDelivery?.skippedEmpty === 'boolean'
+              ? { skippedEmpty: prevDelivery.skippedEmpty }
+              : {}),
+            manualResolution: {
+              status: 'confirmed_sent',
+              resolvedAt: resolvedAtIso,
+              manualConfirmedAt: resolvedAtIso,
+              resolvedBy: userId,
+            },
+          };
+          deliveryPayload = delivery as unknown as Record<string, unknown>;
+        } else if (schedule.kind === 'trello_digest') {
+          const cfg =
+            schedule.digest_config && typeof schedule.digest_config === 'object'
+              ? (schedule.digest_config as TrelloDigestConfig)
+              : null;
+          const prevDelivery =
+            run.delivery && typeof run.delivery === 'object'
+              ? (run.delivery as unknown as Record<string, unknown>)
+              : {};
+          deliveryPayload = buildConfirmedTrelloDigestDelivery({
+            config: cfg,
+            previousDelivery: prevDelivery,
+            resolvedAtIso,
             resolvedBy: userId,
-          },
-        };
+          });
+        } else {
+          const cfg =
+            schedule.digest_config && typeof schedule.digest_config === 'object'
+              ? (schedule.digest_config as TelegramDigestConfig)
+              : null;
+          const prevDelivery =
+            run.delivery && typeof run.delivery === 'object'
+              ? (run.delivery as unknown as Record<string, unknown>)
+              : {};
+          deliveryPayload = {
+            ...prevDelivery,
+            chatId: prevDelivery.chatId ?? cfg?.chatId ?? 'unknown',
+            ...(prevDelivery.chatTitle ?? cfg?.chatTitle
+              ? { chatTitle: prevDelivery.chatTitle ?? cfg?.chatTitle }
+              : {}),
+            sentAt: typeof prevDelivery.sentAt === 'string' ? prevDelivery.sentAt : resolvedAtIso,
+            sources: Array.isArray(prevDelivery.sources) ? prevDelivery.sources : [],
+            manualConfirmedAt: resolvedAtIso,
+            manualResolution: {
+              status: 'confirmed_sent',
+              resolvedAt: resolvedAtIso,
+              manualConfirmedAt: resolvedAtIso,
+              resolvedBy: userId,
+            },
+          };
+        }
 
         const updatedRes = await client.query(
           `UPDATE schedule_runs
@@ -1698,7 +1762,7 @@ export class ScheduleService {
                updated_at = now()
            WHERE id = $1 AND delivery_resolution IS NULL
            RETURNING *`,
-          [run.id, JSON.stringify(delivery), now, userId],
+          [run.id, JSON.stringify(deliveryPayload), now, userId],
         );
         if (!updatedRes.rowCount) {
           throw new ScheduleConflict(
@@ -1735,7 +1799,63 @@ export class ScheduleService {
       }
 
       // Branch B: resolution === 'retry_new_run' with confirmDuplicateRisk === true
-      await this.assertSheetsDigestCanResumeInTx(client, schedule);
+      if (schedule.kind === 'sheets_digest') {
+        await this.assertSheetsDigestCanResumeInTx(client, schedule);
+      } else {
+        if (schedule.status === 'paused') {
+          throw new ScheduleConflict(
+            this.isReauthPauseReason(schedule) ? 'REAUTHORIZATION_REQUIRED' : 'SCHEDULE_PAUSED',
+          );
+        }
+        if (schedule.status !== 'active') {
+          throw new ScheduleConflict('SCHEDULE_CLOSED');
+        }
+        if (
+          run.schedule_version !== schedule.version ||
+          !schedule.digest_config ||
+          typeof schedule.digest_config !== 'object' ||
+          !schedule.digest_config_hash
+        ) {
+          throw new ScheduleConflict('CONFIG_CHANGED_SINCE_RUN');
+        }
+        if (schedule.kind === 'trello_digest') {
+          const cfg = canonicalizeTrelloDigestConfig(schedule.digest_config as TrelloDigestConfig);
+          const expectedHash = computeTrelloDigestConfigHash({
+            config: cfg,
+            recurrence: schedule.recurrence,
+            userId: schedule.user_id,
+          });
+          if (expectedHash !== schedule.digest_config_hash) {
+            throw new ScheduleConflict('CONFIG_CHANGED_SINCE_RUN');
+          }
+          for (const credId of getTrelloDigestPinnedCredentialIds(cfg)) {
+            if (isUuid(credId)) {
+              const credRes = await client.query<{ status: string }>(
+                'SELECT status FROM service_credentials WHERE id = $1',
+                [credId],
+              );
+              if (credRes.rows[0]?.status !== 'active') {
+                throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+              }
+            }
+          }
+        } else if (schedule.kind === 'telegram_digest') {
+          const cfg = schedule.digest_config as TelegramDigestConfig;
+          const expectedHash = computeTelegramDigestConfigHash(cfg);
+          if (expectedHash !== schedule.digest_config_hash) {
+            throw new ScheduleConflict('CONFIG_CHANGED_SINCE_RUN');
+          }
+          if (cfg.credentialId) {
+            const tgCredRes = await client.query<{ status: string }>(
+              'SELECT status FROM service_credentials WHERE id = $1 AND user_id = $2',
+              [cfg.credentialId, schedule.user_id],
+            );
+            if (tgCredRes.rows[0]?.status !== 'active') {
+              throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+            }
+          }
+        }
+      }
       const busy = await client.query(
         "SELECT 1 FROM schedule_runs WHERE schedule_id = $1 AND status = 'planning'",
         [schedule.id],

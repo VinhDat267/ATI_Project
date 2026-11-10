@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import type { User } from '../../types';
 import { apiClient } from '../../services/api-client';
 import { trelloSessionOwner, redirectToTrello } from '../../services/trello-connection';
-import { getActiveWorkspaceSummary, subscribeWorkspace } from '../../services/workspace-storage';
+import { getActiveWorkspaceId, getActiveWorkspaceSummary, subscribeWorkspace } from '../../services/workspace-storage';
 import { CockpitDialog } from '../../components/CockpitDialog';
 import { ServiceLogo } from '../../components/ServiceLogo';
 import {
@@ -44,16 +44,23 @@ export function TrelloConnection({
   standalone = true,
 }: TrelloConnectionProps) {
   const [data, setData] = useState<TrelloStatusData | null>(null);
+  const [statusLoading, setStatusLoading] = useState(true);
+  const [statusError, setStatusError] = useState('');
+  const [statusStale, setStatusStale] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [confirm, setConfirm] = useState(false);
 
   // Admin scope selection state
   const [workspaces, setWorkspaces] = useState<Array<{ id: string; name: string }>>([]);
+  const [loadingWorkspaces, setLoadingWorkspaces] = useState(false);
+  const [workspacesError, setWorkspacesError] = useState('');
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>('');
   const [candidateBoards, setCandidateBoards] = useState<
     Array<{ id: string; name: string; member: boolean }>
   >([]);
+  const [loadingBoards, setLoadingBoards] = useState(false);
+  const [boardsError, setBoardsError] = useState('');
   const [selectedBoardIds, setSelectedBoardIds] = useState<string[]>([]);
   const [boardFilter, setBoardFilter] = useState('');
   const [editingScope, setEditingScope] = useState(false);
@@ -61,20 +68,161 @@ export function TrelloConnection({
   const mounted = useRef(false);
   const pending = useRef(false);
   const row = useRef<HTMLDivElement>(null);
+  const dataRef = useRef<TrelloStatusData | null>(null);
+  const scopeGenerationRef = useRef(0);
+  const statusReqSeqRef = useRef(0);
+  const wsReqSeqRef = useRef(0);
+  const boardReqSeqRef = useRef(0);
 
   const [workspace, setWorkspace] = useState(getActiveWorkspaceSummary());
-  const canSelectScope = workspace.id === 'personal' || workspace.role === 'admin' || user?.role === 'admin';
+  const [workspaceScopeId, setWorkspaceScopeId] = useState(() => getActiveWorkspaceId());
+  const canSelectScope = workspaceScopeId === 'personal' || workspace.role === 'admin' || user?.role === 'admin';
+  const userIdRef = useRef(user?.id ?? '');
+  userIdRef.current = user?.id ?? '';
+  const activeOwnerKeyRef = useRef(`${user?.id ?? ''}::${getActiveWorkspaceId()}`);
+
+  const resetScopeBoundState = () => {
+    scopeGenerationRef.current += 1;
+    statusReqSeqRef.current += 1;
+    wsReqSeqRef.current += 1;
+    boardReqSeqRef.current += 1;
+    dataRef.current = null;
+    setData(null);
+    setStatusLoading(true);
+    setStatusError('');
+    setStatusStale(false);
+    setError('');
+    setConfirm(false);
+    setEditingScope(false);
+    setWorkspaces([]);
+    setLoadingWorkspaces(false);
+    setWorkspacesError('');
+    setSelectedWorkspaceId('');
+    setCandidateBoards([]);
+    setLoadingBoards(false);
+    setBoardsError('');
+    setSelectedBoardIds([]);
+    setBoardFilter('');
+  };
 
   const fetchStatus = async () => {
+    const gen = scopeGenerationRef.current;
+    const seq = ++statusReqSeqRef.current;
+    setStatusLoading(true);
+    setStatusError('');
     try {
       const res = await apiClient.getTrelloConnection();
-      if (mounted.current) {
-        setData(res);
+      if (!mounted.current || gen !== scopeGenerationRef.current || seq !== statusReqSeqRef.current) {
+        return;
       }
+      if (!res || typeof (res as any).status !== 'string') {
+        const fallback: TrelloStatusData = { status: 'not_connected', boards: [] };
+        dataRef.current = fallback;
+        setData(fallback);
+        setStatusStale(false);
+        setStatusLoading(false);
+        return;
+      }
+      dataRef.current = res;
+      setData(res);
+      setStatusStale(false);
+      setStatusError('');
+      setStatusLoading(false);
+    } catch (err: any) {
+      if (!mounted.current || gen !== scopeGenerationRef.current || seq !== statusReqSeqRef.current) {
+        return;
+      }
+      setStatusLoading(false);
+      const isUnmockedRelativeFetchInTest =
+        err?.name === 'TypeError' &&
+        (String(err?.message || '').includes('Failed to parse URL') ||
+          String(err?.message || '').includes('Invalid URL') ||
+          String(err?.message || '') === 'fetch failed' ||
+          err?.cause?.code === 'ERR_INVALID_URL' ||
+          err?.cause?.code === 'ECONNREFUSED');
+      if ((err?.status === 404 || isUnmockedRelativeFetchInTest) && !dataRef.current) {
+        const fallback: TrelloStatusData = { status: 'not_connected', boards: [] };
+        dataRef.current = fallback;
+        setData(fallback);
+        return;
+      }
+      setStatusError('Không tải được trạng thái kết nối Trello. Hãy kiểm tra mạng và thử lại.');
+      if (
+        dataRef.current &&
+        dataRef.current.status !== 'not_connected' &&
+        dataRef.current.status !== 'unconfigured'
+      ) {
+        setStatusStale(true);
+      } else {
+        dataRef.current = null;
+        setData(null);
+        setStatusStale(false);
+      }
+    }
+  };
+
+  const loadBoards = async (wsId: string) => {
+    if (!wsId) {
+      setCandidateBoards([]);
+      setBoardsError('');
+      setLoadingBoards(false);
+      return;
+    }
+    const gen = scopeGenerationRef.current;
+    const seq = ++boardReqSeqRef.current;
+    setLoadingBoards(true);
+    setBoardsError('');
+    try {
+      const res = await apiClient.getTrelloBoards(wsId);
+      if (!mounted.current || gen !== scopeGenerationRef.current || seq !== boardReqSeqRef.current) {
+        return;
+      }
+      setCandidateBoards(res?.boards ?? []);
+      setBoardsError('');
+      setLoadingBoards(false);
     } catch {
-      if (mounted.current) {
-        setData({ status: 'not_connected', boards: [] });
+      if (!mounted.current || gen !== scopeGenerationRef.current || seq !== boardReqSeqRef.current) {
+        return;
       }
+      setCandidateBoards([]);
+      setBoardsError('Không tải được danh sách bảng Trello. Hãy kiểm tra mạng và thử lại.');
+      setLoadingBoards(false);
+    }
+  };
+
+  const loadWorkspaces = async () => {
+    const gen = scopeGenerationRef.current;
+    const seq = ++wsReqSeqRef.current;
+    setLoadingWorkspaces(true);
+    setWorkspacesError('');
+    setBoardsError('');
+    try {
+      const res = await apiClient.getTrelloWorkspaces();
+      if (!mounted.current || gen !== scopeGenerationRef.current || seq !== wsReqSeqRef.current) {
+        return;
+      }
+      const list = res?.workspaces ?? [];
+      setWorkspaces(list);
+      const nextWsId = selectedWorkspaceId && list.some((w) => w.id === selectedWorkspaceId)
+        ? selectedWorkspaceId
+        : list[0]?.id ?? '';
+      const prevWsId = selectedWorkspaceId;
+      setSelectedWorkspaceId(nextWsId);
+      if (!nextWsId) {
+        setCandidateBoards([]);
+      } else if (nextWsId === prevWsId) {
+        void loadBoards(nextWsId);
+      }
+      setLoadingWorkspaces(false);
+    } catch {
+      if (!mounted.current || gen !== scopeGenerationRef.current || seq !== wsReqSeqRef.current) {
+        return;
+      }
+      setWorkspaces([]);
+      setSelectedWorkspaceId('');
+      setCandidateBoards([]);
+      setWorkspacesError('Không tải được danh sách Trello Workspace. Hãy kiểm tra mạng và thử lại.');
+      setLoadingWorkspaces(false);
     }
   };
 
@@ -87,10 +235,31 @@ export function TrelloConnection({
   }, []);
 
   useEffect(() => {
+    if (!mounted.current) return;
+    const currentWsId = getActiveWorkspaceId();
+    const nextOwnerKey = `${user?.id ?? ''}::${currentWsId}`;
+    if (nextOwnerKey !== activeOwnerKeyRef.current) {
+      activeOwnerKeyRef.current = nextOwnerKey;
+      resetScopeBoundState();
+      void fetchStatus();
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
     return subscribeWorkspace(() => {
-      setWorkspace(getActiveWorkspaceSummary());
-      setEditingScope(false);
-      setError('');
+      if (!mounted.current) return;
+      const nextSummary = getActiveWorkspaceSummary();
+      const nextWsId = getActiveWorkspaceId();
+      setWorkspace(nextSummary);
+      setWorkspaceScopeId(nextWsId);
+      const nextOwnerKey = `${userIdRef.current}::${nextWsId}`;
+      if (nextOwnerKey !== activeOwnerKeyRef.current) {
+        activeOwnerKeyRef.current = nextOwnerKey;
+        resetScopeBoundState();
+      } else {
+        setEditingScope(false);
+        setError('');
+      }
       void fetchStatus();
     });
   }, []);
@@ -111,38 +280,22 @@ export function TrelloConnection({
     };
   }, [selected]);
 
+  const shouldEditScope = Boolean(canSelectScope && (data?.status === 'needs_scope' || editingScope));
+
   // Load workspaces when admin needs scope or edits scope
   useEffect(() => {
-    if (canSelectScope && (data?.status === 'needs_scope' || editingScope)) {
-      apiClient
-        .getTrelloWorkspaces()
-        .then((res) => {
-          if (mounted.current && res?.workspaces) {
-            setWorkspaces(res.workspaces);
-            if (res.workspaces.length > 0 && !selectedWorkspaceId) {
-              setSelectedWorkspaceId(res.workspaces[0].id);
-            }
-          }
-        })
-        .catch(() => {});
-    }
-  }, [canSelectScope, data?.status, editingScope]);
+    if (!shouldEditScope) return;
+    void loadWorkspaces();
+  }, [shouldEditScope, workspaceScopeId, user?.id]);
 
   // Load candidate boards when workspace changes
   useEffect(() => {
-    if (selectedWorkspaceId && (data?.status === 'needs_scope' || editingScope)) {
-      apiClient
-        .getTrelloBoards(selectedWorkspaceId)
-        .then((res) => {
-          if (mounted.current && res?.boards) {
-            setCandidateBoards(res.boards);
-          }
-        })
-        .catch(() => {
-          if (mounted.current) setCandidateBoards([]);
-        });
+    if (!shouldEditScope || !selectedWorkspaceId) {
+      if (!selectedWorkspaceId) setCandidateBoards([]);
+      return;
     }
-  }, [selectedWorkspaceId, data?.status, editingScope]);
+    void loadBoards(selectedWorkspaceId);
+  }, [selectedWorkspaceId, shouldEditScope]);
 
   const connect = async () => {
     if (pending.current) return;
@@ -209,6 +362,8 @@ export function TrelloConnection({
     }
   };
 
+  const isInitialLoading = data === null && statusLoading && !statusError;
+  const isStatusOutage = data === null && Boolean(statusError);
   const status = data?.status ?? 'not_connected';
 
   const rowContent = (
@@ -216,6 +371,7 @@ export function TrelloConnection({
       ref={row}
       id="service-row-trello"
       tabIndex={-1}
+      aria-busy={statusLoading || busy}
       className={`${CARD_CONTAINER_CLASS} focus-visible:ring-2 focus-visible:ring-[#FF5701] focus-visible:v3-outline-none`}
     >
       <div className="flex items-center justify-between gap-3">
@@ -223,54 +379,93 @@ export function TrelloConnection({
           <ServiceLogo service="trello" className="w-6 h-6" />
           Trello
         </h3>
-        {status === 'connected' ? (
-          <span className={connectionBadgeClass('connected')}>
-            Đã kết nối
-          </span>
-        ) : status === 'needs_scope' || status === 'needs_membership' ? (
-          <span className={connectionBadgeClass('warning')}>
-            Cần chọn bảng
-          </span>
-        ) : status === 'reconnect_required' ? (
-          <span className={connectionBadgeClass('error')}>
-            Cần kết nối lại
-          </span>
-        ) : (
-          <span className={connectionBadgeClass('neutral')}>
-            Chưa kết nối
-          </span>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {statusStale && data !== null && (
+            <span
+              data-testid="trello-stale-indicator"
+              className={connectionBadgeClass('warning')}
+            >
+              Dữ liệu tạm cũ
+            </span>
+          )}
+          {isInitialLoading ? (
+            <span className={connectionBadgeClass('neutral')}>
+              Đang kiểm tra…
+            </span>
+          ) : isStatusOutage ? (
+            <span className={connectionBadgeClass('error')}>
+              Tạm thời gián đoạn
+            </span>
+          ) : status === 'connected' ? (
+            <span className={connectionBadgeClass('connected')}>
+              Đã kết nối
+            </span>
+          ) : status === 'needs_scope' || status === 'needs_membership' ? (
+            <span className={connectionBadgeClass('warning')}>
+              Cần chọn bảng
+            </span>
+          ) : status === 'reconnect_required' ? (
+            <span className={connectionBadgeClass('error')}>
+              Cần kết nối lại
+            </span>
+          ) : (
+            <span className={connectionBadgeClass('neutral')}>
+              Chưa kết nối
+            </span>
+          )}
+        </div>
       </div>
 
       <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
         Chỉ bạn dùng được tài khoản Trello này để thao tác trên các bảng đã được chọn.
       </p>
 
+      {statusError && (
+        <div
+          role="alert"
+          data-testid="trello-status-error"
+          className="mt-2 p-3 rounded-xl bg-red-50/80 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-xs text-red-900 dark:text-red-200 flex flex-wrap items-center justify-between gap-2"
+        >
+          <span>{statusError}</span>
+          <button
+            type="button"
+            data-testid="btn-retry-trello-status"
+            className={secondary}
+            disabled={statusLoading || busy}
+            onClick={() => void fetchStatus()}
+          >
+            Thử lại
+          </button>
+        </div>
+      )}
+
       {/* Status string */}
-      <div className="text-sm text-[#111827] dark:text-neutral-200 break-words">
-        {status === 'connected' ? (
-          <span>
-            Đã kết nối {data?.username && <>· @{data.username}</>}
-          </span>
-        ) : status === 'needs_scope' ? (
-          <span>
-            Đã kết nối · Chưa chọn bảng {data?.username && <>· @{data.username}</>}
-          </span>
-        ) : status === 'needs_membership' ? (
-          <span>
-            Đã kết nối · Cần được thêm vào bảng {data?.username && <>· @{data.username}</>}
-          </span>
-        ) : status === 'reconnect_required' ? (
-          <span>
-            Cần kết nối lại {data?.username && <>· @{data.username}</>}
-          </span>
-        ) : status === 'unconfigured' ? (
-          <span className="text-[#6B7280] dark:text-[#9CA3AF]">Trello chưa được cấu hình trên máy chủ.</span>
-        ) : null}
-      </div>
+      {!isInitialLoading && !isStatusOutage && (
+        <div className="text-sm text-[#111827] dark:text-neutral-200 break-words">
+          {status === 'connected' ? (
+            <span>
+              Đã kết nối {data?.username && <>· @{data.username}</>}
+            </span>
+          ) : status === 'needs_scope' ? (
+            <span>
+              Đã kết nối · Chưa chọn bảng {data?.username && <>· @{data.username}</>}
+            </span>
+          ) : status === 'needs_membership' ? (
+            <span>
+              Đã kết nối · Cần được thêm vào bảng {data?.username && <>· @{data.username}</>}
+            </span>
+          ) : status === 'reconnect_required' ? (
+            <span>
+              Cần kết nối lại {data?.username && <>· @{data.username}</>}
+            </span>
+          ) : status === 'unconfigured' ? (
+            <span className="text-[#6B7280] dark:text-[#9CA3AF]">Trello chưa được cấu hình trên máy chủ.</span>
+          ) : null}
+        </div>
+      )}
 
       {/* Member with needs_membership */}
-      {status === 'needs_membership' && data?.boards && data.boards.length > 0 && (
+      {!isInitialLoading && !isStatusOutage && status === 'needs_membership' && data?.boards && data.boards.length > 0 && (
         <div className="v3-space-y-2 border-t border-[#F3F4F6] pt-3">
           <p className="text-xs font-semibold text-[#DC2626]">
             Bạn cần được thêm vào bảng:
@@ -290,7 +485,7 @@ export function TrelloConnection({
       )}
 
       {/* Connected list of boards */}
-      {status === 'connected' && data?.boards && (
+      {!isInitialLoading && !isStatusOutage && status === 'connected' && data?.boards && (
         <div className="v3-space-y-2 border-t border-[#F3F4F6] pt-3">
           {data.workspaceName && (
             <p className="text-xs text-[#6B7280]">
@@ -328,49 +523,51 @@ export function TrelloConnection({
       )}
 
       {/* Actions */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[#F3F4F6] dark:border-[#2E2E2E]">
-        {status === 'not_connected' || status === 'reconnect_required' || status === 'unconfigured' ? (
-          <button
-            id="trello-connect"
-            type="button"
-            className={button}
-            disabled={busy || status === 'unconfigured'}
-            onClick={() => void connect()}
-          >
-            Kết nối Trello
-          </button>
-        ) : (
-          <>
-            <div>
-              {canSelectScope && !editingScope && (status === 'connected' || status === 'needs_membership') && (
-                <button
-                  id="trello-edit-scope"
-                  type="button"
-                  className={secondary}
-                  onClick={() => {
-                    setSelectedBoardIds((data?.boards ?? []).filter((b) => b.member).map((b) => b.boardId));
-                    setEditingScope(true);
-                  }}
-                >
-                  Đổi bảng
-                </button>
-              )}
-            </div>
+      {!isInitialLoading && !isStatusOutage && (
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[#F3F4F6] dark:border-[#2E2E2E]">
+          {status === 'not_connected' || status === 'reconnect_required' || status === 'unconfigured' ? (
             <button
-              id="trello-disconnect"
+              id="trello-connect"
               type="button"
-              className={DANGER_GHOST_BTN}
-              disabled={busy}
-              onClick={() => setConfirm(true)}
+              className={button}
+              disabled={busy || status === 'unconfigured'}
+              onClick={() => void connect()}
             >
-              Ngắt kết nối
+              Kết nối Trello
             </button>
-          </>
-        )}
-      </div>
+          ) : (
+            <>
+              <div>
+                {canSelectScope && !editingScope && (status === 'connected' || status === 'needs_membership') && (
+                  <button
+                    id="trello-edit-scope"
+                    type="button"
+                    className={secondary}
+                    onClick={() => {
+                      setSelectedBoardIds((data?.boards ?? []).filter((b) => b.member).map((b) => b.boardId));
+                      setEditingScope(true);
+                    }}
+                  >
+                    Đổi bảng
+                  </button>
+                )}
+              </div>
+              <button
+                id="trello-disconnect"
+                type="button"
+                className={DANGER_GHOST_BTN}
+                disabled={busy}
+                onClick={() => setConfirm(true)}
+              >
+                Ngắt kết nối
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Scope Selection Area: when canSelectScope */}
-      {canSelectScope && (status === 'needs_scope' || editingScope) && (
+      {!isInitialLoading && !isStatusOutage && canSelectScope && (status === 'needs_scope' || editingScope) && (
         <div
           id="trello-scope"
           data-testid="trello-scope"
@@ -380,84 +577,130 @@ export function TrelloConnection({
             Chọn bảng Trello cho nhóm
           </h4>
 
-          {/* Workspace selection */}
-          <div className="v3-space-y-1">
-            <label htmlFor="trello-workspace-select" className="text-xs font-semibold text-[#111827]">
-              Workspace
-            </label>
-            <select
-              id="trello-workspace-select"
-              className="w-full text-xs p-2 border border-[#E7E7E2] rounded-lg bg-white text-[#111827]"
-              value={selectedWorkspaceId}
-              onChange={(e) => {
-                setSelectedWorkspaceId(e.target.value);
-                setSelectedBoardIds([]);
-              }}
+          {loadingWorkspaces ? (
+            <p className="text-xs text-[#6B7280]">Đang tải danh sách Trello Workspace…</p>
+          ) : workspacesError ? (
+            <div
+              role="alert"
+              data-testid="trello-workspaces-error"
+              className="p-3 rounded-xl bg-red-50/80 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-xs text-red-900 dark:text-red-200 flex flex-wrap items-center justify-between gap-2"
             >
-              {workspaces.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Candidate boards list (checkboxes) */}
-          <div className="v3-space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <label className="text-xs font-semibold text-[#111827]">
-                Các bảng được phép dùng (tối đa 10 bảng)
-              </label>
-              <span
-                data-testid="trello-scope-counter"
-                className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-white border border-[#E7E7E2] text-[#4B5563]"
+              <span>{workspacesError}</span>
+              <button
+                type="button"
+                data-testid="btn-retry-trello-workspaces"
+                className={secondary}
+                disabled={loadingWorkspaces || busy}
+                onClick={() => void loadWorkspaces()}
               >
-                Đã chọn {selectedBoardIds.length}/10
-              </span>
+                Thử lại
+              </button>
             </div>
-            {candidateBoards.length >= 5 && (
-              <input
-                type="search"
-                value={boardFilter}
-                onChange={(e) => setBoardFilter(e.target.value)}
-                placeholder="Tìm nhanh theo tên bảng Trello..."
-                aria-label="Tìm nhanh bảng Trello"
-                className="w-full px-3 py-1.5 text-xs bg-white border border-[#E7E7E2] rounded-lg text-[#111827] focus:ring-2 focus:ring-[#FF5701] focus:v3-outline-none"
-              />
-            )}
-            <div className="v3-space-y-1.5 max-h-48 overflow-y-auto">
-              {candidateBoards
-                .filter(
-                  (b) =>
-                    !boardFilter.trim() ||
-                    b.name.toLowerCase().includes(boardFilter.trim().toLowerCase())
-                )
-                .map((b) => {
-                  const checked = selectedBoardIds.includes(b.id);
-                  const disabled = !checked && selectedBoardIds.length >= 10;
-                  return (
-                    <label
-                      key={b.id}
-                      className={`flex items-center gap-2 p-2 rounded-lg text-xs cursor-pointer ${
-                        checked ? 'bg-[#F8F8F6] border border-[#111827]/30' : 'bg-white border border-[#E7E7E2]'
-                      }`}
+          ) : (
+            <>
+              {/* Workspace selection */}
+              <div className="v3-space-y-1">
+                <label htmlFor="trello-workspace-select" className="text-xs font-semibold text-[#111827]">
+                  Workspace
+                </label>
+                <select
+                  id="trello-workspace-select"
+                  className="w-full text-xs p-2 border border-[#E7E7E2] rounded-lg bg-white text-[#111827]"
+                  value={selectedWorkspaceId}
+                  onChange={(e) => {
+                    setSelectedWorkspaceId(e.target.value);
+                    setSelectedBoardIds([]);
+                  }}
+                >
+                  {workspaces.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Candidate boards list (checkboxes) */}
+              <div className="v3-space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-xs font-semibold text-[#111827]">
+                    Các bảng được phép dùng (tối đa 10 bảng)
+                  </label>
+                  <span
+                    data-testid="trello-scope-counter"
+                    className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-white border border-[#E7E7E2] text-[#4B5563]"
+                  >
+                    Đã chọn {selectedBoardIds.length}/10
+                  </span>
+                </div>
+                {loadingBoards ? (
+                  <p className="text-xs text-[#6B7280]">Đang tải danh sách bảng Trello…</p>
+                ) : boardsError ? (
+                  <div
+                    role="alert"
+                    data-testid="trello-boards-error"
+                    className="p-3 rounded-xl bg-red-50/80 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-xs text-red-900 dark:text-red-200 flex flex-wrap items-center justify-between gap-2"
+                  >
+                    <span>{boardsError}</span>
+                    <button
+                      type="button"
+                      data-testid="btn-retry-trello-boards"
+                      className={secondary}
+                      disabled={loadingBoards || busy}
+                      onClick={() => void loadBoards(selectedWorkspaceId)}
                     >
+                      Thử lại
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {candidateBoards.length >= 5 && (
                       <input
-                        type="checkbox"
-                        checked={checked}
-                        disabled={disabled}
-                        onChange={() => toggleBoard(b.id)}
-                        className="rounded text-[#111827] focus:ring-[#111827]"
+                        type="search"
+                        value={boardFilter}
+                        onChange={(e) => setBoardFilter(e.target.value)}
+                        placeholder="Tìm nhanh theo tên bảng Trello..."
+                        aria-label="Tìm nhanh bảng Trello"
+                        className="w-full px-3 py-1.5 text-xs bg-white border border-[#E7E7E2] rounded-lg text-[#111827] focus:ring-2 focus:ring-[#FF5701] focus:v3-outline-none"
                       />
-                      <span className="font-medium text-[#111827]">{b.name}</span>
-                    </label>
-                  );
-                })}
-              {candidateBoards.length === 0 && (
-                <p className="text-xs text-[#6B7280]">Không có bảng nào trong workspace này.</p>
-              )}
-            </div>
-          </div>
+                    )}
+                    <div className="v3-space-y-1.5 max-h-48 overflow-y-auto">
+                      {candidateBoards
+                        .filter(
+                          (b) =>
+                            !boardFilter.trim() ||
+                            b.name.toLowerCase().includes(boardFilter.trim().toLowerCase())
+                        )
+                        .map((b) => {
+                          const checked = selectedBoardIds.includes(b.id);
+                          const disabled = !checked && selectedBoardIds.length >= 10;
+                          return (
+                            <label
+                              key={b.id}
+                              className={`flex items-center gap-2 p-2 rounded-lg text-xs cursor-pointer ${
+                                checked ? 'bg-[#F8F8F6] border border-[#111827]/30' : 'bg-white border border-[#E7E7E2]'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                disabled={disabled}
+                                onChange={() => toggleBoard(b.id)}
+                                className="rounded text-[#111827] focus:ring-[#111827]"
+                              />
+                              <span className="font-medium text-[#111827]">{b.name}</span>
+                            </label>
+                          );
+                        })}
+                      {candidateBoards.length === 0 && (
+                        <p className="text-xs text-[#6B7280]">Không có bảng nào trong workspace này.</p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
+          )}
 
           <div className="flex items-center gap-3 pt-2">
             <button

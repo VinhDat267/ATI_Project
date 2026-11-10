@@ -1,5 +1,66 @@
 import type { ToolDefinition } from './types.js';
 
+export const TRELLO_RESOURCE_ID_PATTERN = '^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$';
+export const TRELLO_RESOURCE_ID_REGEX = new RegExp(TRELLO_RESOURCE_ID_PATTERN);
+
+export function isValidTrelloResourceId(value: unknown): value is string {
+  return typeof value === 'string' && TRELLO_RESOURCE_ID_REGEX.test(value);
+}
+
+const TRELLO_TOOL_RESOURCE_FIELDS: Record<
+  string,
+  { scalar?: readonly string[]; array?: readonly string[]; required?: readonly string[] }
+> = {
+  'trello.search_lists': { scalar: ['boardId'], required: ['boardId'] },
+  'trello.search_members': { scalar: ['boardId'], required: ['boardId'] },
+  'trello.search_cards': { scalar: ['boardId', 'listId'] },
+  'trello.get_card': { scalar: ['cardId'], required: ['cardId'] },
+  'trello.create_card': { scalar: ['listId'], array: ['idMembers'], required: ['listId'] },
+  'trello.update_card': { scalar: ['cardId', 'idList'], required: ['cardId'] },
+  'trello.add_member': { scalar: ['cardId', 'memberId'], required: ['cardId', 'memberId'] },
+  'trello.add_checklist': { scalar: ['cardId'], required: ['cardId'] },
+  'trello.add_comment': { scalar: ['cardId'], required: ['cardId'] },
+  'trello.create_list': { scalar: ['boardId'], required: ['boardId'] },
+  'trello.remove_member': { scalar: ['cardId', 'memberId'], required: ['cardId', 'memberId'] },
+  'trello.update_checklist_item': { scalar: ['cardId', 'checkItemId'], required: ['cardId'] },
+  'trello.set_card_due_complete': { scalar: ['cardId'], required: ['cardId'] },
+};
+
+export function validateTrelloToolArgs(
+  toolName: string,
+  args: Record<string, unknown> | null | undefined
+): string | null {
+  const spec = TRELLO_TOOL_RESOURCE_FIELDS[toolName];
+  if (!spec) return null;
+  if (!args || typeof args !== 'object') {
+    return `Arguments for ${toolName} must be an object`;
+  }
+  for (const reqField of spec.required ?? []) {
+    if (!isValidTrelloResourceId(args[reqField])) {
+      return `Invalid Trello resource ID for ${reqField}`;
+    }
+  }
+  for (const field of spec.scalar ?? []) {
+    const val = args[field];
+    if (val !== undefined && val !== null && !isValidTrelloResourceId(val)) {
+      return `Invalid Trello resource ID for ${field}`;
+    }
+  }
+  for (const arrField of spec.array ?? []) {
+    const val = args[arrField];
+    if (val === undefined || val === null) continue;
+    if (!Array.isArray(val)) {
+      return `Invalid Trello resource ID array for ${arrField}`;
+    }
+    for (let i = 0; i < val.length; i++) {
+      if (!isValidTrelloResourceId(val[i])) {
+        return `Invalid Trello resource ID for ${arrField}[${i}]`;
+      }
+    }
+  }
+  return null;
+}
+
 export const TRELLO_TOOLS: ToolDefinition[] = [
   {
     name: 'trello.search_boards',
@@ -52,6 +113,9 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
       properties: {
         boardId: {
           type: 'string',
+          pattern: TRELLO_RESOURCE_ID_PATTERN,
+          minLength: 1,
+          maxLength: 128,
           description: 'ID của bảng Trello',
           'x-resource': 'board',
         },
@@ -99,6 +163,9 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
         },
         boardId: {
           type: 'string',
+          pattern: TRELLO_RESOURCE_ID_PATTERN,
+          minLength: 1,
+          maxLength: 128,
           description: 'ID của bảng chứa thành viên (bắt buộc; tìm bảng trước)',
           'x-resource': 'board',
         },
@@ -141,11 +208,17 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
         },
         boardId: {
           type: 'string',
+          pattern: TRELLO_RESOURCE_ID_PATTERN,
+          minLength: 1,
+          maxLength: 128,
           description: 'ID bảng Trello để thu hẹp phạm vi (tùy chọn)',
           'x-resource': 'board',
         },
         listId: {
           type: 'string',
+          pattern: TRELLO_RESOURCE_ID_PATTERN,
+          minLength: 1,
+          maxLength: 128,
           description: 'ID danh sách Trello để thu hẹp phạm vi (tùy chọn)',
           'x-resource': 'list',
         },
@@ -195,6 +268,9 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
       properties: {
         cardId: {
           type: 'string',
+          pattern: TRELLO_RESOURCE_ID_PATTERN,
+          minLength: 1,
+          maxLength: 128,
           description: 'ID của thẻ Trello cần xem chi tiết',
         },
       },
@@ -256,6 +332,9 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
       properties: {
         listId: {
           type: 'string',
+          pattern: TRELLO_RESOURCE_ID_PATTERN,
+          minLength: 1,
+          maxLength: 128,
           description: 'ID của danh sách Trello chứa thẻ mới',
           'x-resource': 'list',
         },
@@ -277,7 +356,12 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
         },
         idMembers: {
           type: 'array',
-          items: { type: 'string' },
+          items: {
+            type: 'string',
+            pattern: TRELLO_RESOURCE_ID_PATTERN,
+            minLength: 1,
+            maxLength: 128,
+          },
           description: 'Danh sách ID thành viên được gán vào thẻ',
           'x-resource': 'member',
         },
@@ -308,6 +392,9 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
       properties: {
         cardId: {
           type: 'string',
+          pattern: TRELLO_RESOURCE_ID_PATTERN,
+          minLength: 1,
+          maxLength: 128,
           description: 'ID của thẻ cần cập nhật',
           'x-resource': 'card',
         },
@@ -333,6 +420,9 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
         },
         idList: {
           type: 'string',
+          pattern: TRELLO_RESOURCE_ID_PATTERN,
+          minLength: 1,
+          maxLength: 128,
           description: 'ID danh sách mới nếu muốn di chuyển thẻ',
           'x-resource': 'list',
         },
@@ -363,11 +453,17 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
       properties: {
         cardId: {
           type: 'string',
+          pattern: TRELLO_RESOURCE_ID_PATTERN,
+          minLength: 1,
+          maxLength: 128,
           description: 'ID của thẻ Trello',
           'x-resource': 'card',
         },
         memberId: {
           type: 'string',
+          pattern: TRELLO_RESOURCE_ID_PATTERN,
+          minLength: 1,
+          maxLength: 128,
           description: 'ID của thành viên Trello cần gán',
           'x-resource': 'member',
         },
@@ -398,6 +494,9 @@ export const TRELLO_TOOLS: ToolDefinition[] = [
       properties: {
         cardId: {
           type: 'string',
+          pattern: TRELLO_RESOURCE_ID_PATTERN,
+          minLength: 1,
+          maxLength: 128,
           description: 'ID của thẻ Trello',
           'x-resource': 'card',
         },
@@ -448,6 +547,9 @@ export const TRELLO_OAUTH_TOOLS: ToolDefinition[] = [
       properties: {
         cardId: {
           type: 'string',
+          pattern: TRELLO_RESOURCE_ID_PATTERN,
+          minLength: 1,
+          maxLength: 128,
           description: 'ID của thẻ Trello cần bình luận',
           'x-resource': 'card',
         },
@@ -480,6 +582,9 @@ export const TRELLO_OAUTH_TOOLS: ToolDefinition[] = [
       properties: {
         boardId: {
           type: 'string',
+          pattern: TRELLO_RESOURCE_ID_PATTERN,
+          minLength: 1,
+          maxLength: 128,
           description: 'ID của bảng Trello nơi cần tạo danh sách mới',
           'x-resource': 'board',
         },
@@ -517,11 +622,17 @@ export const TRELLO_OAUTH_TOOLS: ToolDefinition[] = [
       properties: {
         cardId: {
           type: 'string',
+          pattern: TRELLO_RESOURCE_ID_PATTERN,
+          minLength: 1,
+          maxLength: 128,
           description: 'ID của thẻ Trello',
           'x-resource': 'card',
         },
         memberId: {
           type: 'string',
+          pattern: TRELLO_RESOURCE_ID_PATTERN,
+          minLength: 1,
+          maxLength: 128,
           description: 'ID của thành viên Trello cần gỡ khỏi thẻ',
           'x-resource': 'member',
         },
@@ -552,6 +663,9 @@ export const TRELLO_OAUTH_TOOLS: ToolDefinition[] = [
       properties: {
         cardId: {
           type: 'string',
+          pattern: TRELLO_RESOURCE_ID_PATTERN,
+          minLength: 1,
+          maxLength: 128,
           description: 'ID của thẻ Trello chứa checklist',
           'x-resource': 'card',
         },
@@ -566,6 +680,9 @@ export const TRELLO_OAUTH_TOOLS: ToolDefinition[] = [
         },
         checkItemId: {
           type: 'string',
+          pattern: TRELLO_RESOURCE_ID_PATTERN,
+          minLength: 1,
+          maxLength: 128,
           description: 'ID của mục checklist (tùy chọn nếu đã biết)',
         },
       },
@@ -594,6 +711,9 @@ export const TRELLO_OAUTH_TOOLS: ToolDefinition[] = [
       properties: {
         cardId: {
           type: 'string',
+          pattern: TRELLO_RESOURCE_ID_PATTERN,
+          minLength: 1,
+          maxLength: 128,
           description: 'ID của thẻ Trello cần đánh dấu hoàn thành hạn chót',
           'x-resource': 'card',
         },

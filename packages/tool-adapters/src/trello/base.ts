@@ -4,6 +4,21 @@ import type { TrelloBaseAdapterConfig, TrelloCredentials } from './types.js';
 
 const sharedTrelloLimiter = new GlobalRateLimiter({ maxRequests: 100, windowMs: 10_000 });
 
+export const TRELLO_ADAPTER_RESOURCE_ID_REGEX = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
+
+export function assertValidTrelloResourceId(value: unknown, fieldName = 'id'): string {
+  if (typeof value !== 'string' || !TRELLO_ADAPTER_RESOURCE_ID_REGEX.test(value)) {
+    throw new StepError({
+      message: `Invalid Trello resource ID for ${fieldName}`,
+      category: 'VALIDATION',
+      statusCode: 400,
+      retryable: false,
+      details: { requestSent: false, field: fieldName },
+    });
+  }
+  return value;
+}
+
 export class TrelloBaseAdapter extends BaseAdapter {
   public readonly service = 'trello';
   protected credentials: TrelloCredentials;
@@ -19,14 +34,20 @@ export class TrelloBaseAdapter extends BaseAdapter {
     this.fetchFn = config.fetchFn || globalThis.fetch;
   }
 
+  protected assertValidResourceId(value: unknown, fieldName = 'id'): string {
+    return assertValidTrelloResourceId(value, fieldName);
+  }
+
   protected override assertAllowedScope(scopeKey: string, targetIdOrName: string): void {
     if (scopeKey === 'boards') {
+      this.assertValidResourceId(targetIdOrName, 'boardId');
       if (!this.allowedBoardIds.includes(targetIdOrName)) {
         throw new StepError({
           message: `Allowed scope restriction: board '${targetIdOrName}' is not in allowed list [${this.allowedBoardIds.join(', ')}]`,
           category: 'AUTH_ERROR',
           statusCode: 403,
           retryable: false,
+          details: { requestSent: false },
         });
       }
       return;
@@ -35,13 +56,17 @@ export class TrelloBaseAdapter extends BaseAdapter {
   }
 
   protected assertParentBoard(parent: unknown, boundBoardId?: string): void {
+    if (boundBoardId !== undefined) {
+      this.assertValidResourceId(boundBoardId, 'boardId');
+    }
     const boardId = (parent as { idBoard?: unknown } | null)?.idBoard;
-    if (typeof boardId !== 'string' || !boardId.trim()) {
+    if (typeof boardId !== 'string' || !boardId.trim() || !TRELLO_ADAPTER_RESOURCE_ID_REGEX.test(boardId)) {
       throw new StepError({
         message: 'Allowed scope restriction: parent board could not be verified',
         category: 'AUTH_ERROR',
         statusCode: 403,
         retryable: false,
+        details: { requestSent: false },
       });
     }
     if (boundBoardId && boardId !== boundBoardId) {
@@ -50,9 +75,63 @@ export class TrelloBaseAdapter extends BaseAdapter {
         category: 'AUTH_ERROR',
         statusCode: 403,
         retryable: false,
+        details: { requestSent: false },
       });
     }
     this.assertAllowedScope('boards', boardId);
+  }
+
+  private resolveSafeEndpointUrl(endpoint: string): URL {
+    if (
+      typeof endpoint !== 'string' ||
+      !endpoint.startsWith('/') ||
+      endpoint.startsWith('//') ||
+      endpoint.includes('#') ||
+      /[\u0000-\u001f\u007f]/.test(endpoint)
+    ) {
+      throw new StepError({
+        message: 'Invalid Trello API endpoint path',
+        category: 'VALIDATION',
+        statusCode: 400,
+        retryable: false,
+        details: { requestSent: false },
+      });
+    }
+
+    const qIndex = endpoint.indexOf('?');
+    const rawPathPart = qIndex >= 0 ? endpoint.slice(0, qIndex) : endpoint;
+    if (
+      rawPathPart.includes('\\') ||
+      rawPathPart.includes('//') ||
+      /(?:^|\/)\.\.?(?:\/|$)/.test(rawPathPart) ||
+      /%(?:2e|2f|5c|00|25(?:2e|2f|5c|00))/i.test(rawPathPart)
+    ) {
+      throw new StepError({
+        message: 'Invalid Trello API endpoint path: traversal or encoded separator rejected',
+        category: 'VALIDATION',
+        statusCode: 400,
+        retryable: false,
+        details: { requestSent: false },
+      });
+    }
+
+    const normalizedBase = this.baseUrl.endsWith('/') ? this.baseUrl.slice(0, -1) : this.baseUrl;
+    const base = new URL(normalizedBase);
+    const basePathname = base.pathname.endsWith('/') ? base.pathname.slice(0, -1) : base.pathname;
+    const expectedPathname = `${basePathname}${rawPathPart}`;
+    const url = new URL(`${base.origin}${expectedPathname}${qIndex >= 0 ? endpoint.slice(qIndex) : ''}`);
+
+    if (url.origin !== base.origin || url.pathname !== expectedPathname) {
+      throw new StepError({
+        message: 'Invalid Trello API endpoint path: normalized path mismatch',
+        category: 'VALIDATION',
+        statusCode: 400,
+        retryable: false,
+        details: { requestSent: false },
+      });
+    }
+
+    return url;
   }
 
   /**
@@ -69,11 +148,7 @@ export class TrelloBaseAdapter extends BaseAdapter {
       });
     }
 
-    const rawUrl = endpoint.startsWith('http')
-      ? endpoint
-      : `${this.baseUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
-
-    const url = new URL(rawUrl);
+    const url = this.resolveSafeEndpointUrl(endpoint);
     const headers = new Headers(options.headers);
     headers.set('Authorization', `Bearer ${this.credentials.accessToken}`);
 

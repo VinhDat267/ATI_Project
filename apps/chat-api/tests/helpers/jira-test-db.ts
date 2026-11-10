@@ -50,7 +50,9 @@ export function validateDatabaseUrl(rawUrl?: string): string {
     isCI &&
     (parsed.port === '5432' || parsed.port === '') &&
     (parsed.pathname === '/ati_v3' || parsed.pathname === '/ati_v3/');
-  const isLocalDedicatedAllowed = parsed.port === '56534';
+  const isLocalDedicatedAllowed =
+    parsed.port === '56534' ||
+    (process.env.ALLOW_ISOLATED_TEST_PORT === '1' && parsed.port !== '' && parsed.port !== '55533');
 
   if (!isCIAllowed && !isLocalDedicatedAllowed) {
     throw new Error(

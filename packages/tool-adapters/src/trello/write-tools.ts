@@ -16,14 +16,49 @@ export class TrelloWriteTools extends TrelloReadTools {
     },
     options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<{ id: string; name: string; url: string; listId: string; dueComplete?: boolean }> {
-    if (options?.boardId) {
+    const safeListId = this.assertValidResourceId(args.listId, 'listId');
+    if (args.idMembers !== undefined) {
+      if (!Array.isArray(args.idMembers)) {
+        throw new StepError({
+          message: 'Invalid Trello resource ID array for idMembers',
+          category: 'VALIDATION',
+          statusCode: 400,
+          retryable: false,
+          details: { requestSent: false, field: 'idMembers' },
+        });
+      }
+      for (const memberId of args.idMembers) {
+        this.assertValidResourceId(memberId, 'idMembers');
+      }
+    }
+    if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
     }
-    const listInfo = await this.request<any>(`/lists/${args.listId}`, { signal: options?.signal });
+    const listInfo = await this.request<any>(`/lists/${safeListId}`, { signal: options?.signal });
     this.assertParentBoard(listInfo, options?.boardId);
 
+    if (Array.isArray(args.idMembers) && args.idMembers.length > 0) {
+      const boardMembers = await this.request<any[]>(`/boards/${listInfo.idBoard}/members`, {
+        signal: options?.signal,
+      });
+      const allowedMemberIds = new Set(
+        Array.isArray(boardMembers) ? boardMembers.map((m) => String(m?.id ?? '')) : []
+      );
+      for (const memberId of args.idMembers) {
+        if (!allowedMemberIds.has(memberId)) {
+          throw new StepError({
+            message: `Member '${memberId}' is not a member of board '${listInfo.idBoard}'`,
+            category: 'AUTH_ERROR',
+            statusCode: 403,
+            retryable: false,
+            details: { requestSent: false },
+          });
+        }
+      }
+    }
+
     const body: Record<string, any> = {
-      idList: args.listId,
+      idList: safeListId,
       name: args.title,
     };
     if (args.desc !== undefined) body.desc = args.desc;
@@ -48,7 +83,7 @@ export class TrelloWriteTools extends TrelloReadTools {
       id: String(res.id),
       name: String(res.name),
       url: res.url,
-      listId: String(res.idList || args.listId),
+      listId: String(res.idList || safeListId),
     };
     if (typeof res.dueComplete === 'boolean') {
       out.dueComplete = res.dueComplete;
@@ -73,10 +108,14 @@ export class TrelloWriteTools extends TrelloReadTools {
     },
     options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<{ id: string; name: string; url: string; listId: string }> {
-    if (options?.boardId) {
+    const safeCardId = this.assertValidResourceId(args.cardId, 'cardId');
+    if (args.idList !== undefined) {
+      this.assertValidResourceId(args.idList, 'idList');
+    }
+    if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
     }
-    const cardInfo = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
+    const cardInfo = await this.request<any>(`/cards/${safeCardId}`, { signal: options?.signal });
     this.assertParentBoard(cardInfo, options?.boardId);
     if (args.idList) {
       const listInfo = await this.request<any>(`/lists/${args.idList}`, { signal: options?.signal });
@@ -91,7 +130,7 @@ export class TrelloWriteTools extends TrelloReadTools {
     if (args.closed !== undefined) body.closed = args.closed;
     if (args.idList !== undefined) body.idList = args.idList;
 
-    const res = await this.request<any>(`/cards/${args.cardId}`, {
+    const res = await this.request<any>(`/cards/${safeCardId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -116,36 +155,39 @@ export class TrelloWriteTools extends TrelloReadTools {
     },
     options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<{ id: string; idMembers: string[] }> {
-    if (options?.boardId) {
+    const safeCardId = this.assertValidResourceId(args.cardId, 'cardId');
+    const safeMemberId = this.assertValidResourceId(args.memberId, 'memberId');
+    if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
     }
-    const cardInfo = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
+    const cardInfo = await this.request<any>(`/cards/${safeCardId}`, { signal: options?.signal });
     this.assertParentBoard(cardInfo, options?.boardId);
 
     const boardMembers = await this.request<any[]>(`/boards/${cardInfo.idBoard}/members`, { signal: options?.signal });
-    const isBoardMember = Array.isArray(boardMembers) && boardMembers.some((m) => m.id === args.memberId);
+    const isBoardMember = Array.isArray(boardMembers) && boardMembers.some((m) => m.id === safeMemberId);
     if (!isBoardMember) {
       throw new StepError({
-        message: `Member '${args.memberId}' is not a member of board '${cardInfo.idBoard}'`,
+        message: `Member '${safeMemberId}' is not a member of board '${cardInfo.idBoard}'`,
         category: 'AUTH_ERROR',
         statusCode: 403,
         retryable: false,
+        details: { requestSent: false },
       });
     }
 
-    const res = await this.request<any>(`/cards/${args.cardId}/idMembers`, {
+    const res = await this.request<any>(`/cards/${safeCardId}/idMembers`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ value: args.memberId }),
+      body: JSON.stringify({ value: safeMemberId }),
       signal: options?.signal,
     });
 
     const members: string[] = Array.isArray(res?.idMembers)
       ? res.idMembers.map(String)
-      : [args.memberId];
+      : [safeMemberId];
 
     return {
-      id: String(res?.id || args.cardId),
+      id: String(res?.id || safeCardId),
       idMembers: members,
     };
   }
@@ -166,36 +208,82 @@ export class TrelloWriteTools extends TrelloReadTools {
     name: string;
     items: Array<{ id: string; name: string; state: string }>;
   }> {
-    if (options?.boardId) {
+    const safeCardId = this.assertValidResourceId(args.cardId, 'cardId');
+    if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
     }
-    const cardInfo = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
+    let cardInfo: any;
+    try {
+      cardInfo = await this.request<any>(`/cards/${safeCardId}`, { signal: options?.signal });
+    } catch (err: any) {
+      if (err instanceof StepError) {
+        throw new StepError({
+          message: err.message,
+          category: err.category,
+          statusCode: err.statusCode,
+          retryable: err.retryable,
+          cause: err.cause ?? err,
+          details: { ...(err.details ?? {}), requestSent: false },
+        });
+      }
+      throw err;
+    }
     this.assertParentBoard(cardInfo, options?.boardId);
 
     const checklistTitle = args.title || args.name || 'Checklist';
-    const chkRes = await this.request<any>(`/cards/${args.cardId}/checklists`, {
+    const chkRes = await this.request<any>(`/cards/${safeCardId}/checklists`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: checklistTitle }),
       signal: options?.signal,
     });
 
-    const chkId = String(chkRes.id);
+    const rawChkId = typeof chkRes?.id === 'string' || typeof chkRes?.id === 'number' ? String(chkRes.id).trim() : '';
+    if (!rawChkId) {
+      throw new StepError({
+        message: 'Trello created checklist without a valid checklist id',
+        category: 'UNKNOWN',
+        retryable: false,
+        details: { requestSent: true, partialWrite: true },
+      });
+    }
+    const chkId = this.assertValidResourceId(rawChkId, 'checklistId');
     const createdItems: Array<{ id: string; name: string; state: string }> = [];
 
     if (Array.isArray(args.items)) {
-      for (const item of args.items) {
-        const itemRes = await this.request<any>(`/checklists/${chkId}/checkItems`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: item }),
-          signal: options?.signal,
-        });
-        createdItems.push({
-          id: String(itemRes.id || `item_${createdItems.length + 1}`),
-          name: String(itemRes.name || item),
-          state: String(itemRes.state || 'incomplete'),
-        });
+      for (let idx = 0; idx < args.items.length; idx++) {
+        const item = args.items[idx]!;
+        try {
+          const itemRes = await this.request<any>(`/checklists/${chkId}/checkItems`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: item }),
+            signal: options?.signal,
+          });
+          createdItems.push({
+            id: String(itemRes.id || `item_${createdItems.length + 1}`),
+            name: String(itemRes.name || item),
+            state: String(itemRes.state || 'incomplete'),
+          });
+        } catch (err: any) {
+          throw new StepError({
+            message: `Checklist '${chkId}' was created (${createdItems.length}/${args.items.length} items added), but adding item ${idx + 1} ('${item}') failed: ${err?.message || err}`,
+            category: 'UNKNOWN',
+            statusCode: typeof err?.statusCode === 'number' ? err.statusCode : undefined,
+            retryable: false,
+            cause: err,
+            details: {
+              requestSent: true,
+              partialWrite: true,
+              checklistId: chkId,
+              checklistName: String(chkRes.name || checklistTitle),
+              createdItems,
+              failedItemIndex: idx,
+              failedItemName: item,
+              originalCategory: err?.category ?? 'UNKNOWN',
+            },
+          });
+        }
       }
     }
 
@@ -216,13 +304,14 @@ export class TrelloWriteTools extends TrelloReadTools {
     },
     options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<{ id: string; cardId: string; text: string }> {
-    if (options?.boardId) {
+    const safeCardId = this.assertValidResourceId(args.cardId, 'cardId');
+    if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
     }
-    const cardInfo = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
+    const cardInfo = await this.request<any>(`/cards/${safeCardId}`, { signal: options?.signal });
     this.assertParentBoard(cardInfo, options?.boardId);
 
-    const res = await this.request<any>(`/cards/${args.cardId}/actions/comments`, {
+    const res = await this.request<any>(`/cards/${safeCardId}/actions/comments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: args.text }),
@@ -231,7 +320,7 @@ export class TrelloWriteTools extends TrelloReadTools {
 
     return {
       id: String(res?.id || ''),
-      cardId: String(args.cardId),
+      cardId: String(safeCardId),
       text: String(res?.data?.text ?? args.text),
     };
   }
@@ -247,21 +336,23 @@ export class TrelloWriteTools extends TrelloReadTools {
     },
     options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<{ id: string; name: string; boardId: string }> {
-    if (options?.boardId) {
+    const safeBoardId = this.assertValidResourceId(args.boardId, 'boardId');
+    if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
-      if (options.boardId !== args.boardId) {
+      if (options.boardId !== safeBoardId) {
         throw new StepError({
-          message: `Board '${args.boardId}' does not match expected step board '${options.boardId}'`,
+          message: `Board '${safeBoardId}' does not match expected step board '${options.boardId}'`,
           category: 'AUTH_ERROR',
           statusCode: 403,
           retryable: false,
+          details: { requestSent: false },
         });
       }
     }
-    this.assertBoardInScope(args.boardId);
+    this.assertBoardInScope(safeBoardId);
 
     const body: Record<string, any> = {
-      idBoard: args.boardId,
+      idBoard: safeBoardId,
       name: args.name,
     };
     if (args.pos !== undefined) body.pos = args.pos;
@@ -276,7 +367,7 @@ export class TrelloWriteTools extends TrelloReadTools {
     return {
       id: String(res?.id || ''),
       name: String(res?.name || args.name),
-      boardId: String(res?.idBoard || args.boardId),
+      boardId: String(res?.idBoard || safeBoardId),
     };
   }
 
@@ -290,13 +381,33 @@ export class TrelloWriteTools extends TrelloReadTools {
     },
     options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<{ id: string; idMembers: string[] }> {
-    if (options?.boardId) {
+    const safeCardId = this.assertValidResourceId(args.cardId, 'cardId');
+    const safeMemberId = this.assertValidResourceId(args.memberId, 'memberId');
+    if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
     }
-    const cardInfo = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
+    const cardInfo = await this.request<any>(`/cards/${safeCardId}`, { signal: options?.signal });
     this.assertParentBoard(cardInfo, options?.boardId);
 
-    const res = await this.request<any>(`/cards/${args.cardId}/idMembers/${args.memberId}`, {
+    const deleteEndpoint = `/cards/${encodeURIComponent(safeCardId)}/idMembers/${encodeURIComponent(safeMemberId)}`;
+    const segments = deleteEndpoint.split('/').filter(Boolean);
+    if (
+      segments.length !== 4 ||
+      segments[0] !== 'cards' ||
+      segments[1] !== safeCardId ||
+      segments[2] !== 'idMembers' ||
+      segments[3] !== safeMemberId
+    ) {
+      throw new StepError({
+        message: 'Invalid remove_member endpoint path structure',
+        category: 'VALIDATION',
+        statusCode: 400,
+        retryable: false,
+        details: { requestSent: false },
+      });
+    }
+
+    const res = await this.request<any>(deleteEndpoint, {
       method: 'DELETE',
       signal: options?.signal,
     });
@@ -306,11 +417,11 @@ export class TrelloWriteTools extends TrelloReadTools {
       : Array.isArray(res?.idMembers)
         ? res.idMembers.map(String)
         : Array.isArray(cardInfo?.idMembers)
-          ? cardInfo.idMembers.map(String).filter((id: string) => id !== args.memberId)
+          ? cardInfo.idMembers.map(String).filter((id: string) => id !== safeMemberId)
           : [];
 
     return {
-      id: String(args.cardId),
+      id: String(safeCardId),
       idMembers: members,
     };
   }
@@ -327,13 +438,17 @@ export class TrelloWriteTools extends TrelloReadTools {
     },
     options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<{ id: string; cardId: string; name: string; state: string }> {
-    if (options?.boardId) {
+    const safeCardId = this.assertValidResourceId(args.cardId, 'cardId');
+    if (args.checkItemId !== undefined) {
+      this.assertValidResourceId(args.checkItemId, 'checkItemId');
+    }
+    if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
     }
-    const cardInfo = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
+    const cardInfo = await this.request<any>(`/cards/${safeCardId}`, { signal: options?.signal });
     this.assertParentBoard(cardInfo, options?.boardId);
 
-    const checklists = await this.request<any[]>(`/cards/${args.cardId}/checklists`, { signal: options?.signal });
+    const checklists = await this.request<any[]>(`/cards/${safeCardId}/checklists`, { signal: options?.signal });
     const needle = (args.itemName || '').trim().toLowerCase();
     const allItems: Array<{ id: string; name: string; state: string }> = [];
     if (Array.isArray(checklists)) {
@@ -357,7 +472,7 @@ export class TrelloWriteTools extends TrelloReadTools {
       const byId = allItems.find((it) => it.id === targetCheckItemId);
       if (!byId) {
         throw new StepError({
-          message: `Checklist item '${targetCheckItemId}' not found on card '${args.cardId}'`,
+          message: `Checklist item '${targetCheckItemId}' not found on card '${safeCardId}'`,
           category: 'NOT_FOUND',
           statusCode: 404,
           retryable: false,
@@ -385,7 +500,7 @@ export class TrelloWriteTools extends TrelloReadTools {
       const exactMatches = allItems.filter((it) => it.name.trim().toLowerCase() === needle);
       if (exactMatches.length > 1) {
         throw new StepError({
-          message: `Checklist item '${args.itemName}' is ambiguous (${exactMatches.length} exact matches) on card '${args.cardId}'`,
+          message: `Checklist item '${args.itemName}' is ambiguous (${exactMatches.length} exact matches) on card '${safeCardId}'`,
           category: 'VALIDATION',
           statusCode: 400,
           retryable: false,
@@ -400,7 +515,7 @@ export class TrelloWriteTools extends TrelloReadTools {
         );
         if (partialMatches.length === 0) {
           throw new StepError({
-            message: `Checklist item '${args.itemName}' not found on card '${args.cardId}'`,
+            message: `Checklist item '${args.itemName}' not found on card '${safeCardId}'`,
             category: 'NOT_FOUND',
             statusCode: 404,
             retryable: false,
@@ -408,7 +523,7 @@ export class TrelloWriteTools extends TrelloReadTools {
         }
         if (partialMatches.length > 1) {
           throw new StepError({
-            message: `Checklist item '${args.itemName}' is ambiguous (${partialMatches.length} matches) on card '${args.cardId}'`,
+            message: `Checklist item '${args.itemName}' is ambiguous (${partialMatches.length} matches) on card '${safeCardId}'`,
             category: 'VALIDATION',
             statusCode: 400,
             retryable: false,
@@ -419,7 +534,9 @@ export class TrelloWriteTools extends TrelloReadTools {
       }
     }
 
-    const res = await this.request<any>(`/cards/${args.cardId}/checkItem/${targetCheckItemId}`, {
+    const safeCheckItemId = this.assertValidResourceId(targetCheckItemId, 'checkItemId');
+
+    const res = await this.request<any>(`/cards/${safeCardId}/checkItem/${safeCheckItemId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ state: args.state }),
@@ -427,8 +544,8 @@ export class TrelloWriteTools extends TrelloReadTools {
     });
 
     return {
-      id: String(res?.id || targetCheckItemId),
-      cardId: String(args.cardId),
+      id: String(res?.id || safeCheckItemId),
+      cardId: String(safeCardId),
       name: String(res?.name || matchedName),
       state: String(res?.state || args.state),
     };
@@ -444,13 +561,14 @@ export class TrelloWriteTools extends TrelloReadTools {
     },
     options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<{ id: string; name: string; dueComplete: boolean }> {
-    if (options?.boardId) {
+    const safeCardId = this.assertValidResourceId(args.cardId, 'cardId');
+    if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
     }
-    const cardInfo = await this.request<any>(`/cards/${args.cardId}`, { signal: options?.signal });
+    const cardInfo = await this.request<any>(`/cards/${safeCardId}`, { signal: options?.signal });
     this.assertParentBoard(cardInfo, options?.boardId);
 
-    const res = await this.request<any>(`/cards/${args.cardId}`, {
+    const res = await this.request<any>(`/cards/${safeCardId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ dueComplete: Boolean(args.dueComplete) }),
@@ -458,7 +576,7 @@ export class TrelloWriteTools extends TrelloReadTools {
     });
 
     return {
-      id: String(res?.id || args.cardId),
+      id: String(res?.id || safeCardId),
       name: String(res?.name || cardInfo?.name || ''),
       dueComplete: typeof res?.dueComplete === 'boolean' ? res.dueComplete : Boolean(args.dueComplete),
     };

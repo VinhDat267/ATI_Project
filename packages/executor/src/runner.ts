@@ -153,9 +153,12 @@ export class StepRunner {
       const durationMs = Date.now() - startTime;
       const category = classifyErrorCategory(err, timeoutSignal.aborted);
 
-      // Write safety: Network/Server failures on write tools result in 'unknown' status
+      // Write safety: Network/Server failures or partial compound writes on write tools result in 'unknown' status
       const status =
-        isWrite && err?.details?.requestSent !== false && (category === 'NETWORK' || category === 'SERVER_ERROR' || category === 'UNKNOWN')
+        isWrite &&
+        (err?.details?.partialWrite === true ||
+          (err?.details?.requestSent !== false &&
+            (category === 'NETWORK' || category === 'SERVER_ERROR' || category === 'UNKNOWN')))
           ? 'unknown'
           : 'failed';
 

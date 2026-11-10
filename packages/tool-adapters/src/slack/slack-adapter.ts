@@ -199,9 +199,25 @@ export class SlackAdapter extends BaseAdapter {
       signal: options?.signal,
     });
 
+    const rawTs = typeof res?.ts === 'string' ? res.ts.trim() : '';
+    const rawChannel =
+      typeof res?.channel === 'string' && res.channel.trim()
+        ? res.channel.trim()
+        : typeof args.channel === 'string'
+          ? args.channel.trim()
+          : '';
+    if (!rawTs || rawTs === 'undefined' || !rawChannel || rawChannel === 'undefined') {
+      throw new StepError({
+        message: 'Slack chat.postMessage returned a malformed receipt without a valid message timestamp (ts)',
+        category: 'UNKNOWN',
+        retryable: false,
+        details: { requestSent: true },
+      });
+    }
+
     return {
-      ts: String(res.ts),
-      channel: String(res.channel || args.channel),
+      ts: rawTs,
+      channel: rawChannel,
     };
   }
 

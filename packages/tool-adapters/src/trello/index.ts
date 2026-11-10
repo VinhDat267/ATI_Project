@@ -22,7 +22,7 @@ export class TrelloAdapter extends TrelloWriteTools {
       case 'trello.search_members':
         return this.searchMembers(args as any, opts);
       case 'trello.search_cards':
-        return this.searchCards({ ...args, ...opts } as any);
+        return this.searchCards(args as any, opts);
       case 'trello.get_card':
         return this.getCard(args as any, opts);
 
