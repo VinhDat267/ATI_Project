@@ -7,7 +7,6 @@ import {
   CALENDAR_API_BASE,
   type CalendarCoverageMetadata,
   type CalendarEventWithConflict,
-  DEFAULT_CALENDAR_TIMEZONE,
   detectCalendarConflicts,
   enumerateLocalDates,
   eventBusyIntervalMs,
