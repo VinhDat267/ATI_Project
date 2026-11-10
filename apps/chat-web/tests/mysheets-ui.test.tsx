@@ -568,7 +568,7 @@ describe('Cockpit RecoveryMoment', () => {
 });
 
 describe('PrivacyPage with mysheetsEnabled', () => {
-  it('displays Google Sheets privacy section when enabled', async () => {
+  it('displays Google Sheets privacy section when enabled, including accurate drive.file, read tools, kill-switch and AI summary opt-out disclosures', async () => {
     vi.spyOn(apiClient, 'getRuntime').mockResolvedValue({
       runtimeMode: 'sandbox',
       mysheetsEnabled: true,
@@ -577,7 +577,12 @@ describe('PrivacyPage with mysheetsEnabled', () => {
     render(<PrivacyPage navigate={() => {}} />);
     await waitFor(() => expect(apiClient.getRuntime).toHaveBeenCalled());
 
-    expect(await screen.findByRole('region', { name: /Bảng tính Google Sheets của bạn/i })).toBeTruthy();
+    const region = await screen.findByRole('region', { name: /Bảng tính Google Sheets của bạn/i });
+    expect(region).toBeTruthy();
+    expect(region).toHaveTextContent(/mysheets\.list_drive_files/i);
+    expect(region).toHaveTextContent(/mysheets\.get_doc/i);
+    expect(region).toHaveTextContent(/ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS=false/i);
+    expect(region).toHaveTextContent(/includeAiSummary = false/i);
   });
 });
 

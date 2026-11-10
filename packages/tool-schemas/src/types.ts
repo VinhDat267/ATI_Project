@@ -361,6 +361,7 @@ export interface SheetsDigestPreviewInfo {
   spreadsheetTitle: string;
   spreadsheetId: string;
   sheetName?: string;
+  range?: string;
   requestedRangeLabel: string;
   destinationConnectionLabel: string;
   destinationTargetLabel: string;

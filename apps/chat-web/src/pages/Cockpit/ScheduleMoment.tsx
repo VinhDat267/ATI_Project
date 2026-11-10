@@ -42,18 +42,36 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
   const navigate = props.navigate ?? (() => {});
   const onEdit = props.onEdit ?? (() => {});
   const isReauthorize = Boolean((message.metadata as any)?.reauthorize);
+  const rawCandidate = (props.digestCandidate ?? message.metadata?.digestCandidate) as any;
+  const initialIncludeAiSummary = Boolean(
+    rawCandidate?.preview?.includeAiSummary ?? rawCandidate?.config?.includeAiSummary ?? true
+  );
   const [ignored, setIgnored] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [confirmed, setConfirmed] = useState<ScheduleView | null>(null);
   const [approvalMode, setApprovalMode] = useState<ScheduleApprovalMode>(() => (isReauthorize ? 'auto_digest' : 'manual'));
+  const [includeAiSummary, setIncludeAiSummary] = useState<boolean>(initialIncludeAiSummary);
   const locked = useRef(false);
   const currentMessage = useRef(message.id); currentMessage.current = message.id;
-  useEffect(() => { setIgnored(false); setConfirmed(null); setApprovalMode((message.metadata as any)?.reauthorize ? 'auto_digest' : 'manual'); }, [message.id, (message.metadata as any)?.reauthorize]);
+  useEffect(() => {
+    setIgnored(false);
+    setConfirmed(null);
+    setApprovalMode((message.metadata as any)?.reauthorize ? 'auto_digest' : 'manual');
+    const cand = (props.digestCandidate ?? message.metadata?.digestCandidate) as any;
+    setIncludeAiSummary(
+      Boolean(cand?.preview?.includeAiSummary ?? cand?.config?.includeAiSummary ?? true)
+    );
+  }, [message.id, (message.metadata as any)?.reauthorize]);
   const metadata = message.metadata!;
   const schedule = confirmed ?? metadata.schedule;
   const proposal = metadata.proposal;
   const previous = metadata.previous;
   const digestCandidate = (props.digestCandidate ?? metadata.digestCandidate) as any;
   const sheetsPreview = digestCandidate?.preview as SheetsDigestPreviewInfo | undefined;
+  const isSheetsCandidate = Boolean(
+    sheetsPreview ||
+      digestCandidate?.config?.source?.service === 'mysheets' ||
+      digestCandidate?.config?.source?.service === 'sheets'
+  );
   const isTelegramCandidate = Boolean(
     digestCandidate &&
       !Array.isArray(digestCandidate?.config?.repos) &&
@@ -157,7 +175,12 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
             ? await apiClient.confirmSchedule(convId, message.id, approvalMode)
             : await apiClient.confirmSchedule(convId, message.id)
           : approvalMode === 'auto_digest' || isReauthorize
-            ? await apiClient.confirmSchedule(convId, message.id, 'auto_digest')
+            ? isSheetsCandidate && includeAiSummary !== initialIncludeAiSummary
+              ? await apiClient.confirmSchedule(convId, message.id, {
+                  approvalMode: 'auto_digest',
+                  includeAiSummary,
+                })
+              : await apiClient.confirmSchedule(convId, message.id, 'auto_digest')
             : await apiClient.confirmSchedule(convId, message.id);
       if (currentMessage.current === message.id) setConfirmed(result.schedule); schedulesChanged();
     } catch (reason: any) {
@@ -587,6 +610,42 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                       {sheetsPreview.crossBoundaryWarning}
                     </div>
                   )}
+                  <div className="pt-1.5 border-t border-emerald-200/80 v3-space-y-1">
+                    <label className="flex items-start gap-2 cursor-pointer text-xs text-[#111827]">
+                      <input
+                        data-testid="checkbox-sheets-include-ai-summary"
+                        type="checkbox"
+                        checked={includeAiSummary}
+                        onChange={(e) => setIncludeAiSummary(e.target.checked)}
+                        className="mt-0.5 rounded border-emerald-400 text-[#FF5701] focus:ring-[#FF5701]"
+                      />
+                      <span>
+                        <span className="font-semibold">Tóm tắt bằng AI bên thứ ba:</span>{' '}
+                        {includeAiSummary
+                          ? 'Gửi tiêu đề cột và tối đa 20 dòng cuối mỗi lượt chạy qua 9router / nhà cung cấp mô hình AI đã cấu hình để viết đoạn nhận xét.'
+                          : 'Chỉ thống kê số liệu thuần — tính KPI hoàn toàn trên máy chủ Planora, không gửi dữ liệu ô bảng tính tới mô hình AI bên thứ ba.'}
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              )}
+              {!sheetsPreview && isSheetsCandidate && (approvalMode === 'auto_digest' || isReauthorize) && (
+                <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-xs text-[#111827]">
+                  <label className="flex items-start gap-2 cursor-pointer text-xs text-[#111827]">
+                    <input
+                      data-testid="checkbox-sheets-include-ai-summary"
+                      type="checkbox"
+                      checked={includeAiSummary}
+                      onChange={(e) => setIncludeAiSummary(e.target.checked)}
+                      className="mt-0.5 rounded border-emerald-400 text-[#FF5701] focus:ring-[#FF5701]"
+                    />
+                    <span>
+                      <span className="font-semibold">Tóm tắt bằng AI bên thứ ba:</span>{' '}
+                      {includeAiSummary
+                        ? 'Gửi tiêu đề cột và tối đa 20 dòng cuối mỗi lượt chạy qua 9router / nhà cung cấp mô hình AI đã cấu hình để viết đoạn nhận xét.'
+                        : 'Chỉ thống kê số liệu thuần — tính KPI hoàn toàn trên máy chủ Planora, không gửi dữ liệu ô bảng tính tới mô hình AI bên thứ ba.'}
+                    </span>
+                  </label>
                 </div>
               )}
               <p className="text-sm text-[#4B5563] leading-relaxed">

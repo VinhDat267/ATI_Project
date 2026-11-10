@@ -511,7 +511,8 @@ describe('Google Sheets R2 Audit Remediation (GAS-01 .. GAS-11)', () => {
           sheetName: 'Tab Mới',
         },
         destination: {
-          ...oldConfig.destination,
+          service: 'slack',
+          credentialId: oldConfig.destination.credentialId,
           channelId: 'C0999NEWCH',
           channelLabel: '#new-channel',
         },

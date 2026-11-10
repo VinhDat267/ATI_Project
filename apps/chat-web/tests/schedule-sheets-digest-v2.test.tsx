@@ -635,4 +635,108 @@ describe('Task 7 (PR-7): Sheets Digest V2 Preview, Reauthorization CTA & Manual 
       cleanup();
     }
   });
+
+  it('7. GAS-02 & GAS-09: supports opt-out of third-party AI summary in ScheduleMoment and blocks retry_new_run on paused schedule in ScheduleSection', async () => {
+    vi.spyOn(useSchedulesHook, 'useSchedulesEnabled').mockReturnValue(true);
+
+    // Part A: GAS-02 opt-out of includeAiSummary in ScheduleMoment
+    const proposalMsg: ChatMessage = {
+      id: 'msg-reauth-ai-optout-1',
+      role: 'assistant',
+      content: 'Cấp quyền lại lịch',
+      metadata: {
+        type: 'schedule_proposal',
+        scheduleId: pausedReauthSchedule.id,
+        baseVersion: pausedReauthSchedule.version,
+        reauthorize: true,
+        expiresAt: '2026-11-09T01:15:00.000Z',
+        services: ['mysheets', 'gmail'],
+        nextRuns: ['2026-11-10T01:00:00.000Z'],
+        previous: {
+          name: pausedReauthSchedule.name,
+          request: pausedReauthSchedule.request,
+          recurrence: pausedReauthSchedule.recurrence,
+          status: 'paused',
+        },
+        digestCandidate: v2Candidate,
+        proposal: {
+          kind: 'schedule',
+          action: 'update',
+          name: pausedReauthSchedule.name,
+          request: pausedReauthSchedule.request,
+          recurrence: pausedReauthSchedule.recurrence,
+          summary: `Cấp quyền lại lịch "${pausedReauthSchedule.name}" (Google Sheets v2).`,
+        },
+      } as any,
+    };
+
+    const confirmSpy = vi.spyOn(apiClient, 'confirmSchedule').mockResolvedValue({
+      schedule: {
+        ...pausedReauthSchedule,
+        status: 'active',
+        pauseReason: null,
+        version: 4,
+      },
+    });
+
+    render(
+      <ScheduleMoment
+        message={proposalMsg}
+        convId={pausedReauthSchedule.convId}
+        navigate={vi.fn()}
+        onEdit={vi.fn()}
+      />
+    );
+
+    const aiCheckbox = screen.getByTestId('checkbox-sheets-include-ai-summary') as HTMLInputElement;
+    expect(aiCheckbox.checked).toBe(true);
+    fireEvent.click(aiCheckbox);
+    expect(aiCheckbox.checked).toBe(false);
+    expect(screen.getByTestId('sheets-digest-v2-preview')).toHaveTextContent(
+      /Chỉ thống kê số liệu thuần/
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Xác nhận/ }));
+    await waitFor(() => {
+      expect(confirmSpy).toHaveBeenCalledWith(
+        pausedReauthSchedule.convId,
+        'msg-reauth-ai-optout-1',
+        { approvalMode: 'auto_digest', includeAiSummary: false }
+      );
+    });
+    cleanup();
+
+    // Part B: GAS-09 paused schedule blocks retry_new_run in ScheduleSection while allowing mark_sent
+    const pausedUncertainRun: ScheduleRunView = {
+      id: 'run-paused-uncertain-1',
+      scheduleId: pausedReauthSchedule.id,
+      trigger: 'scheduled',
+      dueAt: '2026-11-09T01:00:00.000Z',
+      createdAt: '2026-11-09T01:00:02.000Z',
+      state: 'needs_attention',
+      missedCount: 0,
+      convId: 'conv-run-paused-uncertain-1',
+      planId: null,
+      planStatus: null,
+      error:
+        'SHEETS_DELIVERY_UNKNOWN: Đã bắt đầu gửi báo cáo sang Gmail nhưng mất kết nối trước khi nhận phản hồi.',
+      deliveryStartedAt: '2026-11-09T01:00:05.000Z',
+      deliveryResolution: null,
+      deliveryResolvedAt: null,
+      deliveryFollowupRunId: null,
+    };
+
+    vi.spyOn(apiClient, 'getSchedules').mockResolvedValue({
+      schedules: [{ ...pausedReauthSchedule, lastRun: pausedUncertainRun }],
+    });
+
+    render(<ScheduleSection user={user} navigate={vi.fn()} />);
+    expect(await screen.findByText('Báo cáo Doanh thu Q4 mỗi sáng')).toBeInTheDocument();
+    expect(screen.getByTestId('paused-schedule-retry-warning')).toHaveTextContent(
+      /Lịch đang tạm dừng hoặc đã hủy/
+    );
+    expect(screen.getByTestId('btn-resolve-retry-new-run')).toBeDisabled();
+    expect(screen.getByTestId('checkbox-confirm-duplicate-risk')).toBeDisabled();
+    expect(screen.getByTestId('btn-resolve-mark-sent')).toBeEnabled();
+  });
 });
