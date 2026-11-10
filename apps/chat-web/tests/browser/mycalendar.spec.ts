@@ -222,6 +222,16 @@ for (const width of [1440, 375]) {
       await expect(page.getByRole('heading', { name: /Chọn lịch Google Calendar/i })).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
+      // Verify Privacy page Google Calendar disclosure and zero overflow across desktop/mobile & light/dark
+      await page.goto('/privacy#mycalendar');
+      const privacyCalRegion = page.getByRole('region', { name: /Dữ liệu Google Calendar/i });
+      await expect(privacyCalRegion).toBeVisible();
+      await expect(privacyCalRegion).toContainText('calendar.readonly');
+      await expect(privacyCalRegion).toContainText('calendar.events');
+      await expect(privacyCalRegion).not.toContainText('calendar.calendarlist.readonly');
+      await expect(privacyCalRegion).not.toContainText('sẽ bị thu hồi hoàn toàn');
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
       expect(pageErrors).toEqual([]);
     });
   }
@@ -263,6 +273,7 @@ test('MYCALENDAR: Flow 5 - 1-click primary calendar, rich PlanMoment pills, conf
   await expect(stepCard).toContainText('🎥 Google Meet');
   await expect(stepCard).toContainText('🔁 Thứ 2 – Thứ 6 hàng tuần');
   await expect(stepCard).toContainText('📍 Phòng họp Tầng 5');
+  await expect(stepCard).not.toContainText('Gửi email mời họp');
 
   const conflictBanner = page.getByTestId('calendar-conflict-banner');
   await expect(conflictBanner).toBeVisible();
@@ -284,6 +295,7 @@ test('MYCALENDAR: Flow 5 - 1-click primary calendar, rich PlanMoment pills, conf
   await expect(previewCard).toContainText('🔁 Lặp lại: Thứ 2 – Thứ 6 hàng tuần');
   await expect(previewCard).toContainText('📍 Phòng họp Tầng 5');
   await expect(previewCard).toContainText('Cập nhật tiến độ Sprint');
+  await expect(previewCard).not.toContainText('Gửi email mời họp');
 
   // Close PreviewModal
   await page.getByRole('dialog').getByRole('button', { name: /Đóng/i }).first().click();

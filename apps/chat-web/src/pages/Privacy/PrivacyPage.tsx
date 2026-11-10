@@ -468,9 +468,9 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
             </section>}
           {mycalendarEnabled && <section aria-label="Dữ liệu Google Calendar của bạn" className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm v3-space-y-3">
               <h3 className="font-semibold text-[#111827]">Dữ liệu Google Calendar của bạn</h3>
-              <p>Planora chỉ đọc danh sách lịch và các sự kiện trong khoảng thời gian truy vấn của những lịch mà bạn đã tick chọn. Dữ liệu văn bản cần thiết được gửi qua 9router để model lập kế hoạch.</p>
-              <p>Phạm vi quyền truy cập bao gồm xem danh sách lịch (calendar.calendarlist.readonly) và quản lý sự kiện (calendar.events). Planora chỉ tạo, cập nhật hoặc huỷ sự kiện trên lịch đã chọn sau khi bạn bấm phê duyệt kế hoạch và không tự ý gửi lời mời cho người khác.</p>
-              <p>Bạn có thể thay đổi danh sách lịch được dùng hoặc ngắt kết nối bất cứ lúc nào tại <a href="/settings#mycalendar" onClick={appLink(navigate, '/settings#mycalendar')} className="text-[#FF5701] underline font-medium">Kết nối dịch vụ</a>. Khi ngắt kết nối, token và quyền truy cập sẽ bị thu hồi hoàn toàn.</p>
+              <p>Khi kết nối, Google cấp phạm vi OAuth đọc lịch (calendar.readonly) và quản lý sự kiện (calendar.events); ở tầng ứng dụng, Planora kiểm soát danh sách lịch được phép và chỉ đọc hoặc truy vấn sự kiện trên các lịch bạn đã chọn. Dữ liệu văn bản cần thiết được gửi qua 9router để model lập kế hoạch.</p>
+              <p>Planora chỉ tạo, cập nhật hoặc huỷ sự kiện trên lịch đã chọn sau khi bạn bấm phê duyệt kế hoạch và chỉ gửi email mời họp khi bước kế hoạch bật rõ tuỳ chọn gửi lời mời.</p>
+              <p>Bạn có thể thay đổi danh sách lịch được dùng hoặc ngắt kết nối bất cứ lúc nào tại <a href="/settings#mycalendar" onClick={appLink(navigate, '/settings#mycalendar')} className="text-[#FF5701] underline font-medium">Kết nối dịch vụ</a>. Khi ngắt kết nối, Planora xoá token cùng phạm vi lịch đã lưu và gửi yêu cầu thu hồi token tới Google (hội thoại và kế hoạch cũ vẫn được giữ lại); bạn cũng có thể kiểm tra hoặc gỡ quyền trực tiếp trong trang quản lý quyền của tài khoản Google (Google Account).</p>
             </section>}
           {mysheetsEnabled && <section aria-label="Bảng tính Google Sheets của bạn" className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm v3-space-y-3">
               <h3 className="font-semibold text-[#111827]">Bảng tính Google Sheets của bạn</h3>

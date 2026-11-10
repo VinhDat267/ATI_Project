@@ -146,6 +146,7 @@ describe('Calendar Digest Runner & ScheduleRunner integration on PostgreSQL 16',
                   url: 'https://calendar.google.com/event?eid=2',
                 },
               ],
+              coverage: { complete: true, returned: 2, totalAvailable: 2 },
             }),
           };
         }
@@ -259,6 +260,7 @@ describe('Calendar Digest Runner & ScheduleRunner integration on PostgreSQL 16',
                   url: 'https://calendar.google.com/event?eid=1',
                 },
               ],
+              coverage: { complete: true, returned: 1, totalAvailable: 1 },
             }),
           };
         }

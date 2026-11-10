@@ -119,9 +119,10 @@ describe('ChatService planning-time conflict warnings for mycalendar.create_even
                     url: 'https://calendar.google.com/event?eid=1',
                   },
                 ],
+                coverage: { complete: true, returned: 1, totalAvailable: 1 },
               };
             }
-            return { events: [] };
+            return { events: [], coverage: { complete: true, returned: 0, totalAvailable: 0 } };
           },
         };
       }
@@ -167,9 +168,10 @@ describe('ChatService planning-time conflict warnings for mycalendar.create_even
                     url: 'https://calendar.google.com/event?eid=strict',
                   },
                 ],
+                coverage: { complete: true, returned: 1, totalAvailable: 1 },
               };
             }
-            return { events: [] };
+            return { events: [], coverage: { complete: true, returned: 0, totalAvailable: 0 } };
           },
         };
       }
@@ -200,6 +202,7 @@ describe('ChatService planning-time conflict warnings for mycalendar.create_even
                 url: 'https://calendar.google.com/event?eid=2',
               },
             ],
+            coverage: { complete: true, returned: 1, totalAvailable: 1 },
           }),
         };
       }
