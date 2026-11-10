@@ -3,7 +3,7 @@
 - **Mã task:** `XSVC-INTEGRATION-V2`
 - **Nhánh tích hợp cô lập:** `VinhDat267/ati-v3-cross-service-integration-gate`
 - **Worktree chuyên dụng:** `C:\Users\VinhDat\orca\workspaces\ATI_Project\ati-v3-cross-service-integration-gate`
-- **Trạng thái tổng thể:** `IN PROGRESS` (`Task A: COMPLETED`; `Tasks B–E: PENDING / NOT RUN`)
+- **Trạng thái tổng thể:** `IN PROGRESS` (`Tasks A & B: COMPLETED`; `Tasks C–E: PENDING / NOT RUN`)
 - **Tài liệu chuẩn tắc:** `AGENTS.md` (v3.1), `docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md`, `docs/team-workflow.md`, `docs/handoff/REVIEW-CHECKLIST.md`
 - **Hồ sơ kiểm toán (Audit Bundle):** `docs/audits/2026-11-10-cross-service-integration/` (`01`..`08`)
 
@@ -42,7 +42,7 @@ Hợp nhất có truy vết nguồn gốc (traceable `--no-ff` merges), kiểm t
 - **Task A — Preflight, Conflict Matrix & Execution Plan (`COMPLETED`):**
   - Sở hữu độc quyền: `docs/audits/2026-11-10-cross-service-integration/01-INTEGRATION-EXECUTION-PLAN.md`, `03-SHARED-FILE-CONFLICT-AND-CONTRACT-MATRIX.md`, `docs/handoff/tasks/XSVC-INTEGRATION-V2.md`, và `docs/handoff/log/2026-11-10-xsvc-integration-v2-preflight-plan.md`.
   - Chỉ đọc + kiểm tra khả thi `git merge-tree --write-tree`; **chưa merge, chưa sửa mã nguồn, chưa push/mở PR**.
-- **Task B — Branch Assembly & Conflict Resolution (`PENDING`):**
+- **Task B — Branch Assembly & Conflict Resolution (`COMPLETED`):**
   - Merge có truy vết theo thứ tự `Trello (#313) -> Calendar (#314) -> Sheets (#306)` (`M0`, `M1`, `M2`), giải quyết 3 xung đột văn bản (`schedule-service.ts`, `slack-adapter.ts`, `scripts/test-v3-browser.mjs`) và căn chỉnh đoạn tổng quan Google trong `PrivacyPage.tsx` theo đúng hợp đồng tại `03-SHARED-FILE-CONFLICT-AND-CONTRACT-MATRIX.md`.
   - Xuất `02-SOURCE-ANCESTRY-AND-MERGE-EVIDENCE.md`.
 - **Task C — Backend, DB Migrations (`0001..0035`), Concurrency, Crash/Kill & Negative Auth (`PENDING`):**
@@ -103,5 +103,26 @@ node scripts/test-v3-browser.mjs
   - `docs/handoff/tasks/XSVC-INTEGRATION-V2.md`
   - `docs/handoff/log/2026-11-10-xsvc-integration-v2-preflight-plan.md`
 
-### 5.2. Kết quả Tasks B, C, D, E (`PENDING / NOT RUN`)
-- Chưa thực thi merge, chưa sửa mã nguồn, chưa chạy kiểm thử tích hợp trên cây gộp, chưa push hoặc mở Draft PR trong phạm vi Task A. Sẽ được điền tiếp ở các pha thực thi kế tiếp.
+### 5.2. Kết quả Task B (Branch Assembly, Shared Contract Resolutions & Focused Proofs — `COMPLETED` `2026-11-10`)
+- **Đính chính provenance Task A trước khi merge (`f228d8a4159b944a466f246ec44a9b6e1b28b74c`, tree `ac3f4abdb526e51942303896a48999e4b251b671`):**
+  - Đã chuẩn hóa tên script thực tế trong `package.json`, cấu trúc 1 job `v3` của `.github/workflows/v3-check.yml`, phân loại `SHARED CONTRACT RISK` (tách biệt giả thuyết trước merge với lỗi tái hiện thực tế), bộ nhãn kết luận chuẩn của Owner cho Gate A/B/C, quy tắc so sánh full-tree không loại trừ đường dẫn, nhãn `NO STATIC OVERLAP (RUNTIME NOT VERIFIED)`, và quy tắc cô lập worktree cho Task C/D.
+- **Tái xác thực nguồn & chuỗi commit `--no-ff` (`INDEPENDENTLY VERIFIED`):**
+  - Tái kiểm tra ngay trước khi merge (`git fetch origin --prune`, `gh pr view 313/314/306`): `origin/main` (`2eed8d1d4309e833088d6f1d3fa774189049e283`) và cả 3 Draft PR (`#313` `1c17527f...`, `#314` `38079865...`, `#306` `f292884d...`) không dịch chuyển SHA, giữ nguyên `OPEN` + `isDraft: true`.
+  - **`M0` (`b0232fdd9f5f59c6d1b4c0fc2b882eaf2fcd8954`, tree `d896d0997d3b79f3265ad40ac10e306b717ac773`, parents `f228d8a4...` + `1c17527f...`):** Merge `--no-ff` PR `#313` Trello (`exit 0`, `0` xung đột).
+  - **`M1` (`edbeeffeca97cdb95a4b5dec88f9ee61645910aa`, tree `021ce568864dbb9fb33e095e72bf8e820b0361e9`, parents `b0232fdd...` + `38079865...`):** Merge `--no-ff` PR `#314` Calendar (`exit 0`, auto-merge sạch `chat-service.ts`; kiểm tra trung gian `npm run typecheck:v3` `exit 0`).
+  - **`M2` (`678c5337f0558c3158994825a23e9d09d6ad744c`, tree `6185a45a29537cad679a3b161ede539350696877`, parents `edbeeffe...` + `f292884d...`):** Merge `--no-ff` PR `#306` Sheets R2 và giải quyết đúng **3** xung đột văn bản (`schedule-service.ts`, `slack-adapter.ts`, `scripts/test-v3-browser.mjs`) không dùng `ours`/`theirs` mù quáng.
+  - **Code+Test Anchor Commit (`07c086bfb5299632fc35dd85cbcf906ce4cd1099`, full-tree `fcd0e64019b0c70eb96f7e0d6352ead5f1fc7d4d`):** Căn chỉnh đoạn tổng quan `"Quyền truy cập Google"` trong `PrivacyPage.tsx` theo TDD (`PRIVACY_RED_EXIT=1` -> `PRIVACY_GREEN_EXIT=0`) và bổ sung 4 bộ kiểm thử hợp đồng gộp (`slack-adapter.test.ts`, `trello-telegram-delivery-invariants.test.ts`, `browser-scenario-selection.test.ts`, `calendar-rem-c-09-oauth-disclosure.test.tsx`).
+  - Kiểm tra `git merge-base --is-ancestor <sha> 07c086bfb5299632fc35dd85cbcf906ce4cd1099` trả về `exit 0` cho cả `2eed8d1d`, `1c17527f`, `38079865` và `f292884d`.
+- **Kết quả kiểm thử tập trung & chứng minh bắt lỗi hành vi sai (`INDEPENDENTLY VERIFIED` trên `07c086bf`, `has_dotenv=False`):**
+  - `npm ci` (`exit 0`), `npm run build:v3` (`exit 0`, `214` modules), `npm run typecheck:v3` (`exit 0`), `npm test --workspace=@wap/tool-schemas` (`exit 0`, `27` files, `593` passed, `0` skipped), `npx vitest run evaluations/generic-plumbing/static-guard.test.ts` (`exit 0`, `2` passed, `0` skipped), `node scripts/test-v3-web-build-security.mjs` (`exit 0`).
+  - 9 bộ kiểm thử non-DB (`slack-adapter.test.ts` loopback HTTP thật, `trello-audit-remediation.test.ts`, `browser-scenario-selection.test.ts` `25` kịch bản, `schedule-sheets-digest-v2.test.tsx`, `schedule-trello-digest-mode.test.tsx`, `mysheets-ui.test.tsx`, `calendar-rem-c-09-oauth-disclosure.test.tsx`, `packages/planner/tests/read-answers.test.ts`, `packages/planner/tests/schedules.test.ts`): `exit 0` (`9` files, `127` passed, `0` skipped).
+  - 2 bộ kiểm thử recovery/snapshot PostgreSQL 16 trên container dùng một lần `ati-xsvc-v2-taskb-56789` (`127.0.0.1:56789/ati_v3_taskb`, `ALLOW_ISOLATED_TEST_PORT=1`, đã xóa sạch bằng `docker rm -f` sau khi chạy; không chạm `ati-cal-combined-gate-56657`): `sheets-gas-r2-remediation.test.ts` + `trello-telegram-delivery-invariants.test.ts` -> `exit 0` (`2` files, `22` passed, `0` skipped).
+  - Kiểm chứng độ nhạy bắt lỗi gộp sai (mutation checks): thay tạm fallback `args.channel` của `#313` vào `slack-adapter.ts` bị bắt ngay (`MUTATION_SLACK_EXIT=1`); thay tạm tra cứu `schedule.digest_config` không khóa version của `#313` vào `schedule-service.ts` bị bắt ngay (`MUTATION_SCHED_EXIT=1`); đã khôi phục nguyên trạng `0` byte diff trước khi chạy lượt kiểm chứng sạch cuối cùng.
+- **Sản phẩm bàn giao Task B:**
+  - `docs/audits/2026-11-10-cross-service-integration/02-SOURCE-ANCESTRY-AND-MERGE-EVIDENCE.md`
+  - Cập nhật `01-INTEGRATION-EXECUTION-PLAN.md`, `03-SHARED-FILE-CONFLICT-AND-CONTRACT-MATRIX.md`, `docs/handoff/tasks/XSVC-INTEGRATION-V2.md`
+  - `docs/handoff/log/2026-11-10-xsvc-integration-v2-task-b-assembly.md`
+
+### 5.3. Kết quả Tasks C, D, E (`PENDING / NOT RUN`)
+- **Trạng thái Gate hiện tại:** Gate A = `NOT READY — BLOCKING DEFECT OR MISSING CRITICAL EVIDENCE`; Gate B = `NOT READY`; Gate C = `PRODUCTION ACTIVATION — HOLD`.
+- Chưa chạy Task C (full backend cross-service multi-process/kill/negative-auth & full migration upgrade matrix), chưa chạy Task D (real Chromium Playwright E2E & Calendar `C1/C2` browser assertions), chưa chạy Task E (full `npm run check` + 25 nhóm Chromium, chưa `git push`, chưa mở Draft PR, chưa hoàn thiện `04..08`).
