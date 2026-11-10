@@ -54,16 +54,19 @@ export function SheetsDeliveryRecoveryControl({
     schedule: ScheduleView;
   }) => void;
 }) {
+  const runIdentity = `${run.id}::${run.deliveryResolution ?? ''}`;
+  const [trackedRunIdentity, setTrackedRunIdentity] = useState(runIdentity);
   const [confirmDuplicateRisk, setConfirmDuplicateRisk] = useState(false);
   const [busy, setBusy] = useState(false);
   const [resolveError, setResolveError] = useState('');
   const locked = useRef(false);
   const isScheduleNotActive = Boolean(scheduleStatus && scheduleStatus !== 'active');
 
-  useEffect(() => {
+  if (trackedRunIdentity !== runIdentity) {
+    setTrackedRunIdentity(runIdentity);
     setConfirmDuplicateRisk(false);
     setResolveError('');
-  }, [run.id, run.deliveryResolution]);
+  }
 
   const resolution = getEffectiveDeliveryResolution(run);
   if (resolution) {

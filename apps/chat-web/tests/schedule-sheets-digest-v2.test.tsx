@@ -739,4 +739,148 @@ describe('Task 7 (PR-7): Sheets Digest V2 Preview, Reauthorization CTA & Manual 
     expect(screen.getByTestId('checkbox-confirm-duplicate-risk')).toBeDisabled();
     expect(screen.getByTestId('btn-resolve-mark-sent')).toBeEnabled();
   });
+
+  it('8. deterministic regression (CI 42801382748): clicking duplicate-risk checkbox before passive mount effects flush does not reset checked state or lose run-identity reset', async () => {
+    let simulateFrameBudgetExhaustedOnCommit = false;
+    vi.spyOn(useSchedulesHook, 'useSchedulesEnabled').mockImplementation(() => {
+      if (simulateFrameBudgetExhaustedOnCommit) {
+        simulateFrameBudgetExhaustedOnCommit = false;
+        // Exceed React Scheduler's 5ms frameInterval during the async commit render so
+        // shouldYieldToHost() returns true after commitRoot and yields before flushPassiveEffects().
+        const renderDeadline = performance.now() + 6;
+        while (performance.now() < renderDeadline) {
+          // deterministic >5ms frameInterval render budget simulation
+        }
+        // Hold microtask drain after Testing Library's MutationObserver schedules setTimeout(resolve, 0)
+        // for >= 2ms so libuv's next `timers` phase fires setTimeout(resolve, 0) before `check`
+        // fires setImmediate(performWorkUntilDeadline).
+        queueMicrotask(() => {
+          queueMicrotask(() => {
+            queueMicrotask(() => {
+              queueMicrotask(() => {
+                const timerDeadline = Date.now() + 5;
+                while (Date.now() < timerDeadline) {
+                  // deterministic >=1ms timer threshold after asyncWrapper schedules setTimeout(resolve, 0)
+                }
+              });
+            });
+          });
+        });
+      }
+      return true;
+    });
+
+    const uncertainRunA: ScheduleRunView = {
+      id: 'run-uncertain-race-a',
+      scheduleId: 'sched-sheets-active-race',
+      trigger: 'scheduled',
+      dueAt: '2026-11-09T01:00:00.000Z',
+      createdAt: '2026-11-09T01:00:02.000Z',
+      state: 'needs_attention',
+      missedCount: 0,
+      convId: 'conv-run-uncertain-race-a',
+      planId: null,
+      planStatus: null,
+      error:
+        'SHEETS_DELIVERY_UNKNOWN: Đã bắt đầu gửi báo cáo sang Gmail nhưng mất kết nối trước khi nhận phản hồi.',
+      deliveryStartedAt: '2026-11-09T01:00:05.000Z',
+      deliveryResolution: null,
+      deliveryResolvedAt: null,
+      deliveryFollowupRunId: null,
+    };
+
+    const activeScheduleA: ScheduleView = {
+      ...pausedReauthSchedule,
+      id: 'sched-sheets-active-race',
+      status: 'active',
+      pauseReason: null,
+      lastRun: uncertainRunA,
+    };
+
+    vi.spyOn(apiClient, 'getSchedules').mockImplementation(
+      () =>
+        new Promise(resolve => {
+          setImmediate(() => {
+            simulateFrameBudgetExhaustedOnCommit = true;
+            resolve({ schedules: [activeScheduleA] });
+          });
+        })
+    );
+
+    const resolveSpy = vi.spyOn(apiClient, 'resolveScheduleRunDelivery');
+
+    render(<ScheduleSection user={user} navigate={vi.fn()} />);
+
+    expect(
+      await screen.findByText('Báo cáo Doanh thu Q4 mỗi sáng')
+    ).toBeInTheDocument();
+
+    const dupCheckbox = screen.getByTestId('checkbox-confirm-duplicate-risk') as HTMLInputElement;
+    const retryNewRunBtn = screen.getByTestId('btn-resolve-retry-new-run');
+
+    expect(dupCheckbox.checked).toBe(false);
+    expect(retryNewRunBtn).toBeDisabled();
+
+    // Clicking before consent must never call resolveScheduleRunDelivery
+    fireEvent.click(retryNewRunBtn);
+    expect(resolveSpy).not.toHaveBeenCalled();
+
+    // Immediate click while initial passive mount effect was pending must NOT be clobbered back to false
+    fireEvent.click(dupCheckbox);
+    expect(dupCheckbox.checked).toBe(true);
+    expect(retryNewRunBtn).toBeEnabled();
+    expect(resolveSpy).not.toHaveBeenCalled();
+
+    // Verify double-click lock and error state when resolveScheduleRunDelivery rejects once
+    let rejectFirstResolve!: (err: Error) => void;
+    resolveSpy.mockImplementationOnce(
+      () =>
+        new Promise((_, reject) => {
+          rejectFirstResolve = reject;
+        })
+    );
+
+    fireEvent.click(retryNewRunBtn);
+    fireEvent.click(retryNewRunBtn);
+    expect(resolveSpy).toHaveBeenCalledTimes(1);
+
+    rejectFirstResolve(new Error('Lỗi mạng tạm thời khi tạo lượt gửi bù.'));
+    expect(await screen.findByText('Lỗi mạng tạm thời khi tạo lượt gửi bù.')).toBeInTheDocument();
+    expect(dupCheckbox.checked).toBe(true);
+
+    // Changing run.id on a mounted SheetsDeliveryRecoveryControl (via schedules:changed refresh)
+    // must immediately reset duplicate-risk consent and clear resolveError without leaking across runs
+    const uncertainRunB: ScheduleRunView = {
+      ...uncertainRunA,
+      id: 'run-uncertain-race-b',
+      convId: 'conv-run-uncertain-race-b',
+    };
+    vi.spyOn(apiClient, 'getSchedules').mockResolvedValueOnce({
+      schedules: [{ ...activeScheduleA, lastRun: uncertainRunB }],
+    });
+
+    window.dispatchEvent(new Event('schedules:changed'));
+
+    await waitFor(() => {
+      expect(
+        (screen.getByTestId('checkbox-confirm-duplicate-risk') as HTMLInputElement).checked
+      ).toBe(false);
+    });
+    expect(screen.getByTestId('btn-resolve-retry-new-run')).toBeDisabled();
+    expect(screen.queryByText('Lỗi mạng tạm thời khi tạo lượt gửi bù.')).toBeNull();
+
+    // Switching back to run-uncertain-race-a must also require fresh explicit consent
+    vi.spyOn(apiClient, 'getSchedules').mockResolvedValueOnce({
+      schedules: [activeScheduleA],
+    });
+    window.dispatchEvent(new Event('schedules:changed'));
+
+    await waitFor(() => {
+      expect(apiClient.getSchedules).toHaveBeenCalledTimes(3);
+    });
+    expect(
+      (screen.getByTestId('checkbox-confirm-duplicate-risk') as HTMLInputElement).checked
+    ).toBe(false);
+    expect(screen.getByTestId('btn-resolve-retry-new-run')).toBeDisabled();
+  });
 });

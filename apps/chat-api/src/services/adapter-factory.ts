@@ -262,10 +262,9 @@ export class AdapterFactory {
     if (!registration.definition.credentialFields.every(({ key }) => typeof decrypted[key] === 'string' && String(decrypted[key]).trim())) {
       throw new Error(`Credentials are incomplete for service '${serviceName}'`);
     }
-    const adapterConfig =
-      serviceName === 'sheets' && this.options.sheetsAppendLeaseStore
-        ? { ...decrypted, appendLeaseStore: this.options.sheetsAppendLeaseStore }
-        : decrypted;
+    const adapterConfig = this.options.sheetsAppendLeaseStore
+      ? { ...decrypted, appendLeaseStore: this.options.sheetsAppendLeaseStore }
+      : decrypted;
     const adapter = registration.transport.createAdapter(adapterConfig, allowedScope);
 
     this.adapterCache.set(cacheKey, adapter);
