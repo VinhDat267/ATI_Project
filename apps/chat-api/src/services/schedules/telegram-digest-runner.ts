@@ -16,6 +16,7 @@ import {
   computeTelegramDigestConfigHash,
   READ_DIGEST_SOURCE_MAP,
 } from './telegram-digest-candidate.js';
+import { buildPinnedTelegramAdapterContext } from './digest-scope-guard.js';
 
 export interface DigestRunInput {
   runId: string;
@@ -635,13 +636,31 @@ export class TelegramDigestRunner {
     // 6. Send via Telegram adapter with execution context (once sent, never transition to discarded)
     signal.throwIfAborted();
     try {
+      let pinnedCredentialId = digestConfig.credentialId;
+      let pinnedTelegramUserId = digestConfig.telegramUserId;
+      if (this.options.pool) {
+        const pinnedCtx = await buildPinnedTelegramAdapterContext({
+          pool: this.options.pool,
+          scheduleId: run.scheduleId,
+          encryptionKey: this.options.encryptionKey,
+        });
+        if (!pinnedCtx.allowed || pinnedCtx.chatId !== targetChatId) {
+          return {
+            status: 'blocked',
+            error: 'Kết nối hoặc phạm vi Telegram của lịch chạy không còn hợp lệ.',
+            pauseSchedule: true,
+          };
+        }
+        pinnedCredentialId = pinnedCtx.credentialId ?? pinnedCredentialId;
+        pinnedTelegramUserId = pinnedCtx.telegramUserId ?? pinnedTelegramUserId;
+      }
       const telegramAdapter = await this.options.adapterFactory.getAdapterForService('telegram', {
         userId,
         phase: 'execution',
         connections: {
           telegram: {
-            credentialId: digestConfig.credentialId,
-            telegramUserId: digestConfig.telegramUserId,
+            credentialId: pinnedCredentialId,
+            telegramUserId: pinnedTelegramUserId,
             username: digestConfig.username,
             chatIds: [targetChatId],
           },

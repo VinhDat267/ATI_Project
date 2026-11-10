@@ -48,6 +48,7 @@ const exceptions = [
   { file: 'apps/chat-api/src/services/schedules/telegram-digest-candidate.ts', pattern: /^(?:trello|slack|github|sheets|calendar|notion|telegram|jira)(?:\.[A-Za-z_][\w]*)?$/, reason: 'Telegram digest candidate checks read-only sources and telegram destination.' },
   { file: 'apps/chat-api/src/services/schedules/telegram-digest-runner.ts', pattern: /^(?:telegram|notion)(?:\.[A-Za-z_][\w]*)?$/, reason: 'Telegram digest runner delivers reports to telegram.' },
   { file: 'apps/chat-api/src/services/schedules/schedule-service.ts', pattern: /^(?:sheets|calendar|github|telegram|trello|notion|jira)(?:\.[A-Za-z_][\w]*)?$/, reason: 'Digest schedule confirmation checks service kind.' },
+  { file: 'apps/chat-api/src/services/schedules/digest-scope-guard.ts', pattern: /^(?:github|telegram|trello)$/, reason: 'PR-R1-C1 live digest scope guard maps digest kinds to the service of their pinned personal credential and enforces the Telegram destination pin.' },
   { file: 'apps/chat-api/src/services/registered-services.ts', pattern: /^(?:trello|github|telegram|notion|jira)(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal OAuth registration names those services.' },
   { file: 'apps/chat-api/src/services/jira/jira-oauth-client.ts', pattern: /^jira$/, reason: 'Jira-specific OAuth client filters accessible Jira resources returned by Atlassian.' },
   { file: 'apps/chat-api/src/services/jira/jira-lease-manager.ts', pattern: /^jira$/, reason: 'Jira-specific authorization lease checks grant-site product type in SQL.' },
